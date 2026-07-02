@@ -64,24 +64,36 @@ function samplePath(pts, s, closed) {
 
 function makeTrafficBike(color) {
   const g = new THREE.Group();
-  const body = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.4, 1.7), mat(color));
-  body.position.y = 0.75; g.add(body);
-  const wheelGeo = new THREE.CylinderGeometry(0.32, 0.32, 0.14, 8);
-  for (const wz of [0.8, -0.75]) {
-    const w = new THREE.Mesh(wheelGeo, mat(0x24262a));
-    w.rotation.x = Math.PI / 2; w.rotation.z = Math.PI / 2;
+  // thân xe cong
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.2, 0.95, 4, 8), mat(color));
+  body.rotation.x = Math.PI / 2;
+  body.scale.set(1, 1, 0.8);
+  body.position.set(0, 0.7, 0);
+  g.add(body);
+  const front = new THREE.Mesh(new THREE.CapsuleGeometry(0.13, 0.45, 4, 8), mat(color));
+  front.rotation.x = 0.6;
+  front.position.set(0, 0.9, 0.6);
+  g.add(front);
+  const wheelTorus = new THREE.TorusGeometry(0.24, 0.08, 6, 12);
+  for (const wz of [0.78, -0.72]) {
+    const w = new THREE.Mesh(wheelTorus, mat(0x24262a));
     w.position.set(0, 0.32, wz);
     g.add(w);
   }
-  // người lái đơn giản
-  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.6, 0.3),
+  // người lái bo tròn
+  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.17, 0.35, 4, 10),
     mat(SHIRT_COLORS[Math.floor(Math.random() * SHIRT_COLORS.length)]));
-  torso.position.set(0, 1.35, -0.15); g.add(torso);
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 6), mat(0xf0c090));
-  head.position.set(0, 1.85, -0.15); g.add(head);
-  const helmet = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 5, 0, Math.PI * 2, 0, Math.PI / 2),
+  torso.scale.set(1.1, 1, 0.75);
+  torso.rotation.x = 0.15;
+  torso.position.set(0, 1.32, -0.2);
+  g.add(torso);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 8), mat(0xf0c090));
+  head.position.set(0, 1.75, -0.16);
+  g.add(head);
+  const helmet = new THREE.Mesh(new THREE.SphereGeometry(0.175, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2),
     mat([0xd84040, 0x3a6ab8, 0xe8e8e0, 0x333333][Math.floor(Math.random() * 4)]));
-  helmet.position.set(0, 1.87, -0.15); g.add(helmet);
+  helmet.position.set(0, 1.77, -0.16);
+  g.add(helmet);
   return g;
 }
 

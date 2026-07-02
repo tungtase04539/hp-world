@@ -178,6 +178,118 @@ function speckle(g, w, h, n, alpha) {
   }
 }
 
+// Mặt tiền công trình lớn kiểu Pháp: cửa vòm 2 tầng, trụ áp tường, phào chỉ, chân đế đá
+function grandFacadeTextures(baseCss, trimCss, opts = {}) {
+  const { cols = 7, arch = true } = opts;
+  const draw = (em) => (g, w, h) => {
+    g.fillStyle = em ? '#000' : baseCss;
+    g.fillRect(0, 0, w, h);
+    if (!em) {
+      speckle(g, w, h, 200, 0.05);
+      g.fillStyle = 'rgba(0,0,0,0.18)';           // chân đế đá
+      g.fillRect(0, h * 0.86, w, h * 0.14);
+      g.strokeStyle = 'rgba(0,0,0,0.15)';
+      g.lineWidth = 2;
+      for (let y = h * 0.885; y < h; y += 9) {
+        g.beginPath(); g.moveTo(0, y); g.lineTo(w, y); g.stroke();
+      }
+      g.fillStyle = trimCss;                       // phào chỉ mái
+      g.fillRect(0, 0, w, h * 0.07);
+      g.fillStyle = 'rgba(0,0,0,0.22)';
+      g.fillRect(0, h * 0.07, w, h * 0.016);
+      g.fillStyle = trimCss;                       // gờ phân tầng
+      g.fillRect(0, h * 0.47, w, h * 0.028);
+      for (let i = 0; i <= cols; i++) {            // trụ áp tường
+        const x = (w / cols) * i;
+        g.fillStyle = trimCss;
+        g.fillRect(x - 5, h * 0.07, 10, h * 0.8);
+        g.fillStyle = 'rgba(0,0,0,0.13)';
+        g.fillRect(x + 3, h * 0.07, 3, h * 0.8);
+      }
+    }
+    for (let row = 0; row < 2; row++) {            // cửa vòm hai tầng
+      for (let i = 0; i < cols; i++) {
+        const cw = w / cols;
+        const x = cw * i + cw * 0.25, ww = cw * 0.5;
+        const y = row === 0 ? h * 0.16 : h * 0.55, wh = h * 0.26;
+        if (!em) {
+          g.fillStyle = '#f2ecd8';
+          g.fillRect(x - 3, y - 2, ww + 6, wh + 2);
+          if (arch) {
+            g.beginPath();
+            g.ellipse(x + ww / 2, y, ww / 2 + 3, ww / 2 + 3, 0, Math.PI, 0);
+            g.fill();
+          }
+        }
+        g.fillStyle = em ? '#ffd98a' : '#3a5a74';
+        g.fillRect(x, y, ww, wh);
+        if (arch) {
+          g.beginPath();
+          g.ellipse(x + ww / 2, y, ww / 2, ww / 2, 0, Math.PI, 0);
+          g.fill();
+        }
+        if (!em) {
+          g.strokeStyle = '#f2ecd8';
+          g.lineWidth = 2;
+          g.beginPath();
+          g.moveTo(x + ww / 2, y - (arch ? ww / 2 : 0));
+          g.lineTo(x + ww / 2, y + wh);
+          g.stroke();
+        }
+      }
+    }
+  };
+  return { map: makeTex(512, 256, draw(false)), emissiveMap: makeTex(512, 256, draw(true)) };
+}
+
+// Biển hiệu chữ (CHỢ SẮT, GA HẢI PHÒNG...)
+function signTexture(text, bgCss, fgCss) {
+  return makeTex(512, 96, (g, w, h) => {
+    g.fillStyle = bgCss;
+    g.fillRect(0, 0, w, h);
+    g.strokeStyle = fgCss;
+    g.lineWidth = 4;
+    g.strokeRect(6, 6, w - 12, h - 12);
+    g.fillStyle = fgCss;
+    g.font = 'bold 52px "Segoe UI", sans-serif';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillText(text, w / 2, h / 2 + 2);
+  });
+}
+
+// Tán lá hữu cơ: icosahedron biến dạng ngẫu nhiên — hết vẻ "quả cầu"
+function canopyGeo(r, seed) {
+  const geo = new THREE.IcosahedronGeometry(r, 1);
+  const p = geo.attributes.position;
+  const v = new THREE.Vector3();
+  for (let i = 0; i < p.count; i++) {
+    v.set(p.getX(i), p.getY(i), p.getZ(i));
+    const hash = Math.sin(v.x * 12.98 + v.y * 78.23 + v.z * 37.72 + seed) * 43758.54;
+    const n = 1 + ((hash - Math.floor(hash)) - 0.5) * 0.5;
+    v.multiplyScalar(n);
+    p.setXYZ(i, v.x, v.y * 0.82, v.z);
+  }
+  geo.computeVertexNormals();
+  return geo;
+}
+
+// Đá vôi gồ ghề: chóp nhiều tầng biến dạng — hết vẻ "hình nón"
+function karstGeo(r, h, seed) {
+  const geo = new THREE.CylinderGeometry(r * 0.22, r, h, 8, 4);
+  const p = geo.attributes.position;
+  const v = new THREE.Vector3();
+  for (let i = 0; i < p.count; i++) {
+    v.set(p.getX(i), p.getY(i), p.getZ(i));
+    const t = (v.y / h) + 0.5; // 0 đáy → 1 đỉnh
+    const hash = Math.sin(v.x * 17.31 + v.y * 51.7 + v.z * 29.11 + seed) * 43758.54;
+    const n = 1 + ((hash - Math.floor(hash)) - 0.5) * (0.45 + t * 0.25);
+    p.setXYZ(i, v.x * n, v.y + ((hash * 7 - Math.floor(hash * 7)) - 0.5) * h * 0.06, v.z * n);
+  }
+  geo.computeVertexNormals();
+  return geo;
+}
+
 // Mặt tiền nhà: tường + cửa sổ khung trắng + cửa gỗ; kèm bản đồ phát sáng cửa sổ ban đêm
 function facadeTextures(colorCss) {
   const draw = (emissiveOnly) => (g, w, h) => {
@@ -406,11 +518,21 @@ export function buildWorld(scene) {
   tower(135, 90, 14, 46, 0xc8b89a);
   tower(-290, -15, 13, 38, 0xa8c0b8);
 
+  // Vật liệu mặt tiền lớn dùng chung (đăng ký vào facadeMats để cửa sổ sáng đêm)
+  function grandMat(base, trim, opts) {
+    const { map, emissiveMap } = grandFacadeTextures(base, trim, opts);
+    const m = new THREE.MeshLambertMaterial({ map, emissiveMap, emissive: 0xffcc77, emissiveIntensity: 0 });
+    facadeMats.push(m);
+    return m;
+  }
+
   // ---------- NHÀ HÁT LỚN (Baroque 2 tầng, tường vàng, cột trắng, quảng trường + đài phun nước) ----------
   {
     const g = new THREE.Group();
     const yellow = mat(0xf2ce6b), white = mat(0xfdf6e0);
-    const body = new THREE.Mesh(new THREE.BoxGeometry(34, 13, 20), yellow);
+    const operaFacade = grandMat('#f2ce6b', '#fdf6e0', { cols: 7 });
+    const body = new THREE.Mesh(new THREE.BoxGeometry(34, 13, 20),
+      [operaFacade, operaFacade, yellow, yellow, operaFacade, operaFacade]);
     body.position.y = 6.5; g.add(body);
     // tầng mái + trán tường tam giác trung tâm
     const roof = new THREE.Mesh(new THREE.BoxGeometry(35, 1.6, 21), mat(0x6d6d72));
@@ -426,15 +548,16 @@ export function buildWorld(scene) {
       col.position.set(i * 4.6, 5.5, 10.8);
       g.add(col);
     }
-    // ban công tầng 2 + dãy cửa vòm vàng đậm
+    // ban công tầng 2
     const balc = new THREE.Mesh(new THREE.BoxGeometry(30, 0.6, 2.6), white);
     balc.position.set(0, 7.2, 10.6); g.add(balc);
-    for (let i = -2; i <= 2; i++) {
-      const door = new THREE.Mesh(new THREE.BoxGeometry(2.2, 3.6, 0.2), mat(0xc8912e));
-      door.position.set(i * 5.2, 3.2, 10.15); g.add(door);
-      const win = new THREE.Mesh(new THREE.BoxGeometry(2, 2.8, 0.2), sharedMats.window);
-      win.position.set(i * 5.2, 9.6, 10.15); g.add(win);
+    for (let i = -7; i <= 7; i++) { // lan can con tiện
+      const bal = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.11, 1, 6), white);
+      bal.position.set(i * 2, 7.95, 11.6);
+      g.add(bal);
     }
+    const balRail = new THREE.Mesh(new THREE.BoxGeometry(30, 0.18, 0.3), white);
+    balRail.position.set(0, 8.5, 11.6); g.add(balRail);
     const steps = new THREE.Mesh(new THREE.BoxGeometry(30, 1.4, 7), mat(0xd8cdb0));
     steps.position.set(0, 0.7, 14); g.add(steps);
     g.position.set(0, LAND_H, -30);
@@ -576,31 +699,16 @@ export function buildWorld(scene) {
   // ---------- BƯU ĐIỆN TRUNG TÂM (thuộc địa vàng, đồng hồ) ----------
   {
     const g = new THREE.Group();
-    const body = new THREE.Mesh(new THREE.BoxGeometry(22, 9, 10), mat(0xf0c868));
+    const postFacade = grandMat('#f0c868', '#fdf6e0', { cols: 6 });
+    const body = new THREE.Mesh(new THREE.BoxGeometry(22, 9, 10),
+      [postFacade, postFacade, mat(0xf0c868), mat(0xf0c868), postFacade, postFacade]);
     body.position.y = 4.5; g.add(body);
     const roof = new THREE.Mesh(new THREE.BoxGeometry(23, 1.4, 11), mat(0x7d5040));
     roof.position.y = 9.7; g.add(roof);
-    for (let i = -2; i <= 2; i++) {
-      const arch = new THREE.Mesh(new THREE.BoxGeometry(2.2, 3.4, 0.2), mat(0xfdf6e0));
-      arch.position.set(i * 4.2, 3.4, 5.05); g.add(arch);
-      const win = new THREE.Mesh(new THREE.BoxGeometry(1.8, 2, 0.15), sharedMats.window);
-      win.position.set(i * 4.2, 7, 5.05); g.add(win);
-    }
-    const clockFace = new THREE.Mesh(new THREE.CircleGeometry(1.1, 12), mat(0xfffbe8));
+    const clockFace = new THREE.Mesh(new THREE.CircleGeometry(1.1, 16), mat(0xfffbe8));
     clockFace.position.set(0, 11.2, 5.05); g.add(clockFace);
     const clockBox = new THREE.Mesh(new THREE.BoxGeometry(3, 3, 1.4), mat(0xf0c868));
     clockBox.position.set(0, 11.2, 4.2); g.add(clockBox);
-    // cửa sổ mặt sau + hai đầu hồi (tránh mảng tường trống)
-    for (let i = -2; i <= 2; i++) {
-      const win = new THREE.Mesh(new THREE.BoxGeometry(1.8, 2.2, 0.15), sharedMats.window);
-      win.position.set(i * 4.2, 5.2, -5.05); g.add(win);
-    }
-    for (const sx of [-11.05, 11.05]) {
-      for (const sz of [-2.5, 2.5]) {
-        const win = new THREE.Mesh(new THREE.BoxGeometry(0.15, 2.2, 1.8), sharedMats.window);
-        win.position.set(sx, 5.2, sz); g.add(win);
-      }
-    }
     g.position.set(38, LAND_H, 40);
     g.rotation.y = Math.PI;
     scene.add(g);
@@ -611,18 +719,17 @@ export function buildWorld(scene) {
   {
     const g = new THREE.Group();
     const brick = mat(0xa8503c);
-    const body = new THREE.Mesh(new THREE.BoxGeometry(18, 8, 12), brick);
+    const brickFacade = grandMat('#a8503c', '#f0e4d0', { cols: 5 });
+    const body = new THREE.Mesh(new THREE.BoxGeometry(18, 8, 12),
+      [brickFacade, brickFacade, brick, brick, brickFacade, brickFacade]);
     body.position.y = 4; g.add(body);
     const roof = new THREE.Mesh(new THREE.ConeGeometry(11.5, 4.5, 4), mat(0x5a3a30));
     roof.rotation.y = Math.PI / 4;
     roof.position.y = 10.2; g.add(roof);
     for (const sx of [-6, 6]) {
-      const wing = new THREE.Mesh(new THREE.BoxGeometry(5, 6.5, 13), brick);
+      const wing = new THREE.Mesh(new THREE.BoxGeometry(5, 6.5, 13),
+        [brickFacade, brickFacade, brick, brick, brickFacade, brickFacade]);
       wing.position.set(sx + Math.sign(sx) * 6.5, 3.25, 0); g.add(wing);
-    }
-    for (let i = -1; i <= 1; i++) {
-      const arch = new THREE.Mesh(new THREE.BoxGeometry(2, 3.6, 0.2), mat(0xf5ead0));
-      arch.position.set(i * 5, 3.4, 6.05); g.add(arch);
     }
     g.position.set(-95, LAND_H, -85);
     scene.add(g);
@@ -632,7 +739,9 @@ export function buildWorld(scene) {
   // ---------- GA HẢI PHÒNG (thuộc địa vàng + tàu hỏa) ----------
   {
     const g = new THREE.Group();
-    const body = new THREE.Mesh(new THREE.BoxGeometry(26, 8, 10), mat(0xf2ce6b));
+    const stationFacade = grandMat('#f2ce6b', '#fdf6e0', { cols: 6 });
+    const body = new THREE.Mesh(new THREE.BoxGeometry(26, 8, 10),
+      [stationFacade, stationFacade, mat(0xf2ce6b), mat(0xf2ce6b), stationFacade, stationFacade]);
     body.position.y = 4; g.add(body);
     const center = new THREE.Mesh(new THREE.BoxGeometry(8, 11, 11), mat(0xf2ce6b));
     center.position.y = 5.5; g.add(center);
@@ -640,13 +749,12 @@ export function buildWorld(scene) {
     roofC.rotation.y = Math.PI / 4; roofC.position.y = 12.4; g.add(roofC);
     const roofB = new THREE.Mesh(new THREE.BoxGeometry(27, 1.2, 11), mat(0x7d5040));
     roofB.position.y = 8.5; g.add(roofB);
-    for (let i = -2; i <= 2; i++) {
-      if (i === 0) continue;
-      const arch = new THREE.Mesh(new THREE.BoxGeometry(2.4, 3.4, 0.2), mat(0xfdf6e0));
-      arch.position.set(i * 5, 3.2, 5.05); g.add(arch);
-    }
     const door = new THREE.Mesh(new THREE.BoxGeometry(3.4, 4.6, 0.2), mat(0x6d4a2e));
     door.position.set(0, 2.6, 5.6); g.add(door);
+    // biển tên ga
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(7, 1.3),
+      new THREE.MeshLambertMaterial({ map: signTexture('GA HẢI PHÒNG', '#28457d', '#ffffff') }));
+    sign.position.set(0, 9.6, 5.62); g.add(sign);
     // mái ke ga + tàu hỏa
     const canopy = new THREE.Mesh(new THREE.BoxGeometry(30, 0.5, 8), mat(0x8a8f96));
     canopy.position.set(0, 6, -10); g.add(canopy);
@@ -681,6 +789,9 @@ export function buildWorld(scene) {
     const g = new THREE.Group();
     const hall = new THREE.Mesh(new THREE.BoxGeometry(26, 9, 18), mat(0xd8663c));
     hall.position.y = 4.5; g.add(hall);
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(9, 1.7),
+      new THREE.MeshLambertMaterial({ map: signTexture('CHỢ SẮT', '#b03428', '#ffe9b8') }));
+    sign.position.set(0, 8, 9.06); g.add(sign);
     const roof = new THREE.Mesh(new THREE.CylinderGeometry(9.5, 9.5, 27, 3, 1), mat(0x7d3b2a));
     roof.rotation.z = Math.PI / 2;
     roof.scale.set(1, 1, 0.5);
@@ -969,7 +1080,7 @@ export function buildWorld(scene) {
       const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.55, 4, 6), sharedMats.trunk);
       trunk.position.set(tx, ty + 2, tz);
       scene.add(trunk);
-      const leaf = new THREE.Mesh(new THREE.SphereGeometry(3, 7, 5), sharedMats.leafDark);
+      const leaf = new THREE.Mesh(canopyGeo(3, tx + tz), sharedMats.leafDark);
       leaf.position.set(tx, ty + 5.5, tz);
       scene.add(leaf);
     }
@@ -997,10 +1108,11 @@ export function buildWorld(scene) {
     const karstTop = mat(0x53a04c, { flatShading: true });
     function karst(x, z, r, h) {
       const y = Math.max(groundHeightNoDeck(x, z), -3.5);
-      const cone = new THREE.Mesh(new THREE.ConeGeometry(r, h, 7), karstMat);
-      cone.position.set(x, y + h / 2 - 0.6, z);
-      scene.add(cone);
-      const top = new THREE.Mesh(new THREE.SphereGeometry(r * 0.42, 7, 5), karstTop);
+      const rock = new THREE.Mesh(karstGeo(r, h, x * 1.3 + z * 2.7), karstMat);
+      rock.position.set(x, y + h / 2 - 0.6, z);
+      rock.rotation.y = x + z;
+      scene.add(rock);
+      const top = new THREE.Mesh(canopyGeo(r * 0.45, x + z * 3), karstTop);
       top.position.set(x, y + h - 0.5, z);
       scene.add(top);
       addCollider(x, z, r * 0.8);
@@ -1027,10 +1139,9 @@ export function buildWorld(scene) {
     // tán lá nhiều tầng, hai tông xanh
     const blobs = [[0, 5.2, 0, 2.7], [-1.6, 4.6, 0.9, 1.7], [1.5, 4.8, -0.8, 1.8], [0.4, 6.2, 0.8, 1.6]];
     blobs.forEach(([bx, by, bz, br], i) => {
-      const leaf = new THREE.Mesh(new THREE.SphereGeometry(br, 6, 5),
+      const leaf = new THREE.Mesh(canopyGeo(br, x * 3.1 + z * 1.7 + i),
         i % 2 === 0 ? sharedMats.leafGreen : sharedMats.leafGreen2);
       leaf.position.set(bx, by, bz);
-      leaf.scale.y = 0.75;
       g.add(leaf);
     });
     for (const [fx, fy, fz] of [[-1.6, 5.7, 0.9], [1.4, 6, -0.7], [0.2, 6.9, 1], [-0.9, 5.3, -1.5], [1.8, 5.4, 1.1], [0.9, 6.6, 0.2]]) {
@@ -1082,8 +1193,9 @@ export function buildWorld(scene) {
     const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.4, 3, 5), sharedMats.trunk);
     trunk.position.set(x, y + 1.5, z);
     scene.add(trunk);
-    const leaf = new THREE.Mesh(new THREE.ConeGeometry(2.2, 5, 6), sharedMats.leafDark);
-    leaf.position.set(x, y + 5, z);
+    const leaf = new THREE.Mesh(canopyGeo(2.2, i * 3.3), sharedMats.leafDark);
+    leaf.scale.y = 1.4;
+    leaf.position.set(x, y + 4.6, z);
     scene.add(leaf);
   }
   for (let i = 0; i < HIGHWAY.length - 1; i++) {
@@ -1098,7 +1210,7 @@ export function buildWorld(scene) {
         const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.38, 3.4, 5), sharedMats.trunk);
         trunk.position.set(x, y + 1.7, z);
         scene.add(trunk);
-        const leaf = new THREE.Mesh(new THREE.SphereGeometry(2, 6, 5), sharedMats.leafGreen);
+        const leaf = new THREE.Mesh(canopyGeo(2, x * 0.7 + z), sharedMats.leafGreen);
         leaf.position.set(x, y + 4.6, z);
         scene.add(leaf);
       }

@@ -3,9 +3,13 @@ import * as THREE from 'three';
 function mat(color) { return new THREE.MeshLambertMaterial({ color }); }
 
 function wheel(r, w) {
-  const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, w, 10), mat(0x222428));
-  m.rotation.z = Math.PI / 2;
-  return m;
+  const g = new THREE.Group();
+  const tire = new THREE.Mesh(new THREE.TorusGeometry(r * 0.78, r * 0.24, 8, 14), mat(0x24262a));
+  g.add(tire);
+  const hub = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.5, r * 0.5, w * 0.6, 10), mat(0x8a8f96));
+  hub.rotation.x = Math.PI / 2;
+  g.add(hub);
+  return g;
 }
 
 function blobShadow(r) {
@@ -20,19 +24,43 @@ function blobShadow(r) {
 
 function makeMotorbike() {
   const g = new THREE.Group();
-  const body = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.4, 1.7), mat(0xd8332a));
-  body.position.y = 0.75; g.add(body);
-  const seat = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.14, 0.8), mat(0x2a2a2e));
-  seat.position.set(0, 1, -0.25); g.add(seat);
-  const wF = wheel(0.34, 0.16); wF.rotation.z = 0; wF.rotation.x = Math.PI / 2;
+  const red = mat(0xd8332a);
+  // thân xe cong kiểu xe tay ga
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.22, 0.9, 4, 10), red);
+  body.rotation.x = Math.PI / 2;
+  body.scale.set(1, 1, 0.8);
+  body.position.set(0, 0.72, -0.1);
+  g.add(body);
+  const front = new THREE.Mesh(new THREE.CapsuleGeometry(0.16, 0.5, 4, 8), red);
+  front.rotation.x = 0.6;
+  front.position.set(0, 0.95, 0.62);
+  g.add(front);
+  const seat = new THREE.Mesh(new THREE.CapsuleGeometry(0.17, 0.5, 4, 8), mat(0x2a2a2e));
+  seat.rotation.x = Math.PI / 2;
+  seat.scale.set(1.15, 1, 0.55);
+  seat.position.set(0, 1, -0.3);
+  g.add(seat);
+  const wF = wheel(0.34, 0.16);
   wF.position.set(0, 0.34, 0.85); g.add(wF);
-  const wB = wF.clone(); wB.position.z = -0.8; g.add(wB);
-  const bar = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.08, 0.08), mat(0x8a8a90));
-  bar.position.set(0, 1.15, 0.6); g.add(bar);
-  const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.11, 6, 5), mat(0xfff2b0));
-  lamp.position.set(0, 1, 0.9); g.add(lamp);
+  const wB = wheel(0.34, 0.16);
+  wB.position.set(0, 0.34, -0.8); g.add(wB);
+  // tay lái cong + gương
+  const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.72, 8), mat(0x8a8f96));
+  bar.rotation.z = Math.PI / 2;
+  bar.position.set(0, 1.22, 0.58);
+  g.add(bar);
+  for (const sx of [-0.3, 0.3]) {
+    const mirror = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 6), mat(0xcfd8e0));
+    mirror.position.set(sx, 1.34, 0.56);
+    g.add(mirror);
+  }
+  const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.1, 10, 8),
+    mat(0xfff2b0, { emissive: 0xffee99, emissiveIntensity: 0.3 }));
+  lamp.scale.set(1, 0.85, 0.7);
+  lamp.position.set(0, 1.02, 0.86);
+  g.add(lamp);
   g.add(blobShadow(1));
-  return { mesh: g, seatY: 1.1, seatZ: -0.2 };
+  return { mesh: g, seatY: 1.12, seatZ: -0.28 };
 }
 
 function makeCyclo() {
@@ -59,17 +87,29 @@ function makeCyclo() {
 
 function makeBoat() {
   const g = new THREE.Group();
-  const hull = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1, 6.4, 7, 1), mat(0x2e6fa1));
-  hull.rotation.x = Math.PI / 2;
-  hull.scale.z = 0.45;
-  hull.position.y = 0.5;
+  // vỏ thuyền cong dạng elipxoit + mũi vát
+  const hull = new THREE.Mesh(new THREE.SphereGeometry(1, 14, 10), mat(0x2e6fa1));
+  hull.scale.set(1.25, 0.62, 3.4);
+  hull.position.y = 0.42;
   g.add(hull);
-  const deck = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.16, 5.2), mat(0xc9a86a));
-  deck.position.y = 0.95; g.add(deck);
-  const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.1, 1.6), mat(0xf0ead8));
-  cabin.position.set(0, 1.6, -1.2); g.add(cabin);
-  const roof = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.12, 1.9), mat(0xd8332a));
-  roof.position.set(0, 2.25, -1.2); g.add(roof);
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(1, 0.09, 8, 20), mat(0xc9a86a));
+  rim.rotation.x = Math.PI / 2;
+  rim.scale.set(1.22, 3.32, 1);
+  rim.position.y = 0.88;
+  g.add(rim);
+  const deck = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 0.1, 16), mat(0xc9a86a));
+  deck.scale.set(1.12, 1, 3.1);
+  deck.position.y = 0.86;
+  g.add(deck);
+  const cabin = new THREE.Mesh(new THREE.CapsuleGeometry(0.72, 0.7, 4, 10), mat(0xf0ead8));
+  cabin.rotation.x = Math.PI / 2;
+  cabin.scale.set(1.1, 1, 1.35);
+  cabin.position.set(0, 1.55, -1.2);
+  g.add(cabin);
+  const roof = new THREE.Mesh(new THREE.CylinderGeometry(1.05, 1.05, 0.1, 14), mat(0xd8332a));
+  roof.scale.set(1, 1, 1.1);
+  roof.position.set(0, 2.28, -1.2);
+  g.add(roof);
   const flagPole = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.4, 5), mat(0x8a8a90));
   flagPole.position.set(0, 3, -1.2); g.add(flagPole);
   const flag = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.55), new THREE.MeshLambertMaterial({ color: 0xd8332a, side: THREE.DoubleSide }));
