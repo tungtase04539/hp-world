@@ -159,6 +159,9 @@ export function createDayNight(scene, world) {
       if (world.lighthouseLamp) {
         world.lighthouseLamp.emissiveIntensity = 0.2 + glow * (1.2 + Math.sin(performance.now() * 0.004) * 0.8);
       }
+      if (world.lighthouseBeam) {
+        world.lighthouseBeam.mat.opacity = glow * 0.28;
+      }
       // nước tối dần về đêm
       if (world.waterMat) {
         world.waterMat.color.setHex(0x2b9fd4).lerp(new THREE.Color(0x14304a), glow);

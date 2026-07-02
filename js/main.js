@@ -1,5 +1,10 @@
 import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { buildWorld, groundHeight, groundHeightNoDeck, coastX, WORLD_BOUNDS } from './world.js';
+import { createTraffic } from './traffic.js';
 import { makeHumanoid } from './character.js';
 import { createVehicles } from './vehicles.js';
 import { buildNPCs } from './npcs.js';
@@ -29,10 +34,23 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1800);
 
+// Hậu kỳ bloom (tắt trên di động để giữ mượt)
+const usePost = !isTouchDevice;
+let composer = null, bloomPass = null;
+if (usePost) {
+  composer = new EffectComposer(renderer);
+  composer.addPass(new RenderPass(scene, camera));
+  bloomPass = new UnrealBloomPass(
+    new THREE.Vector2(window.innerWidth, window.innerHeight), 0.3, 0.55, 0.82);
+  composer.addPass(bloomPass);
+  composer.addPass(new OutputPass());
+}
+
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
+  if (composer) composer.setSize(window.innerWidth, window.innerHeight);
 });
 
 // ============ Thế giới ============
@@ -42,6 +60,7 @@ const petals = createPetals(scene);
 const signs = buildLandmarkSigns(scene, world);
 const { npcs, update: updateNPCs } = buildNPCs(scene, world);
 const { vehicles, update: updateVehicle } = createVehicles(scene, groundHeight, groundHeightNoDeck);
+const traffic = createTraffic(scene, world);
 
 // bật đổ bóng cho mọi vật thể đặc (đất nhận bóng, nước & vật trong suốt bỏ qua)
 if (renderer.shadowMap.enabled) {
@@ -285,8 +304,11 @@ function animate() {
       if (!v.mounted && !v.land) updateVehicle(v, dt, 0, 0, time);
     }
 
+    traffic.update(dt, time, pState.pos);
     updateCamera(dt);
-    dayNight.update(dt, pState.pos);
+    const sky = dayNight.update(dt, pState.pos);
+    // đêm bloom mạnh hơn cho đèn phố & cửa sổ rực rỡ
+    if (bloomPass) bloomPass.strength = 0.1 + sky.night * 0.6;
 
     // cánh phượng quanh dải trung tâm (tâm ~ hồ Tam Bạc - Nhà hát lớn)
     const dCity = Math.hypot(pState.pos.x + 70, pState.pos.z - 10);
@@ -308,7 +330,8 @@ function animate() {
     drawMinimap(pState.pos.x, pState.pos.z, pState.mounted ? pState.mounted.heading : pState.yaw);
   }
 
-  renderer.render(scene, camera);
+  if (composer) composer.render();
+  else renderer.render(scene, camera);
 }
 
 // ============ Bắt đầu ============

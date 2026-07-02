@@ -944,6 +944,21 @@ export function buildWorld(scene) {
     world.lighthouseLamp = lampRoom.material;
     const cap = new THREE.Mesh(new THREE.ConeGeometry(2.1, 1.8, 8), mat(0x7d3b2a));
     cap.position.y = 21.5; g.add(cap);
+    // chùm sáng quét ban đêm
+    const beamMat = new THREE.MeshBasicMaterial({
+      color: 0xfff0a8, transparent: true, opacity: 0,
+      blending: THREE.AdditiveBlending, depthWrite: false, fog: false,
+    });
+    const beam = new THREE.Mesh(new THREE.ConeGeometry(7, 90, 10, 1, true), beamMat);
+    beam.geometry.translate(0, -45, 0);
+    beam.rotation.z = Math.PI / 2 - 0.06;
+    beam.position.y = 19.5;
+    const beamPivot = new THREE.Group();
+    beamPivot.add(beam);
+    beamPivot.position.y = 0;
+    g.add(beamPivot);
+    world.lighthouseBeam = { pivot: beamPivot, mat: beamMat };
+    updaters.push((dt, time) => { beamPivot.rotation.y = time * 0.5; });
     g.position.set(520, y0, 2100);
     scene.add(g);
     addCollider(520, 2100, 3.2);
