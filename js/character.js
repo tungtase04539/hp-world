@@ -2,6 +2,33 @@ import * as THREE from 'three';
 
 function mat(color) { return new THREE.MeshLambertMaterial({ color }); }
 
+// Khuôn mặt vẽ canvas: mắt, miệng cười, má hồng (cache theo màu da)
+const faceCache = {};
+function faceMaterial(skinColor) {
+  if (faceCache[skinColor]) return faceCache[skinColor];
+  const c = document.createElement('canvas');
+  c.width = 128; c.height = 128;
+  const g = c.getContext('2d');
+  g.fillStyle = '#' + skinColor.toString(16).padStart(6, '0');
+  g.fillRect(0, 0, 128, 128);
+  g.fillStyle = '#2a241e';                          // mắt
+  g.beginPath(); g.arc(42, 58, 8, 0, Math.PI * 2); g.fill();
+  g.beginPath(); g.arc(86, 58, 8, 0, Math.PI * 2); g.fill();
+  g.fillStyle = '#fff';                             // ánh mắt
+  g.beginPath(); g.arc(45, 55, 2.6, 0, Math.PI * 2); g.fill();
+  g.beginPath(); g.arc(89, 55, 2.6, 0, Math.PI * 2); g.fill();
+  g.strokeStyle = '#8a5240'; g.lineWidth = 4; g.lineCap = 'round'; // miệng cười
+  g.beginPath(); g.arc(64, 78, 13, Math.PI * 0.2, Math.PI * 0.8); g.stroke();
+  g.fillStyle = 'rgba(235,120,100,0.3)';            // má hồng
+  g.beginPath(); g.arc(28, 76, 9, 0, Math.PI * 2); g.fill();
+  g.beginPath(); g.arc(100, 76, 9, 0, Math.PI * 2); g.fill();
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const m = new THREE.MeshLambertMaterial({ map: tex });
+  faceCache[skinColor] = m;
+  return m;
+}
+
 // Nhân vật kiểu low-poly: chân/tay xoay quanh khớp trên
 function limb(w, h, d, color) {
   const g = new THREE.Group();
@@ -34,7 +61,10 @@ export function makeHumanoid(scheme = {}) {
   g.add(armL, armR);
 
   const head = new THREE.Group();
-  const face = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.42, 0.4), mat(s.skin));
+  const skinMat = mat(s.skin);
+  // mặt trước (+z) dùng texture khuôn mặt
+  const face = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.42, 0.4),
+    [skinMat, skinMat, skinMat, skinMat, faceMaterial(s.skin), skinMat]);
   face.position.y = 0.21;
   head.add(face);
   const hair = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.16, 0.42), mat(s.hair));

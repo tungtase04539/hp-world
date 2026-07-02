@@ -21,7 +21,7 @@ const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, isTouchDevice ? 1.5 : 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.12;
+renderer.toneMappingExposure = 1.22;
 // bóng đổ thời gian thực (tắt trên di động để giữ mượt)
 renderer.shadowMap.enabled = !isTouchDevice;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;

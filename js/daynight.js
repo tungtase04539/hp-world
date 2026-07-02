@@ -6,19 +6,19 @@ export const DAY_LENGTH = 300;
 const C = (hex) => new THREE.Color(hex);
 // Keyframe theo t (0 = nửa đêm, 0.5 = giữa trưa)
 const KEYS = [
-  { t: 0.0,  sky: C(0x0a1428), fog: C(0x0c1830), sun: C(0x223355), sunI: 0.05, hemiI: 0.22, night: 1 },
-  { t: 0.2,  sky: C(0x0e1c34), fog: C(0x101f38), sun: C(0x334466), sunI: 0.08, hemiI: 0.26, night: 1 },
-  { t: 0.26, sky: C(0xe8825a), fog: C(0xeda276), sun: C(0xff9a55), sunI: 0.55, hemiI: 0.5,  night: 0.35 },
-  { t: 0.33, sky: C(0x8fd0ee), fog: C(0xbfe2f2), sun: C(0xfff2d8), sunI: 1.0,  hemiI: 0.85, night: 0 },
-  { t: 0.5,  sky: C(0x6fbdf0), fog: C(0xcfe8f8), sun: C(0xffffff), sunI: 1.15, hemiI: 0.95, night: 0 },
-  { t: 0.68, sky: C(0x8fc8ea), fog: C(0xc8e0f0), sun: C(0xfff0c8), sunI: 0.95, hemiI: 0.85, night: 0 },
-  { t: 0.75, sky: C(0xf0885a), fog: C(0xf2a878), sun: C(0xff7a3a), sunI: 0.5,  hemiI: 0.5,  night: 0.3 },
-  { t: 0.81, sky: C(0x2a2248), fog: C(0x342a52), sun: C(0x554466), sunI: 0.12, hemiI: 0.3,  night: 0.9 },
-  { t: 1.0,  sky: C(0x0a1428), fog: C(0x0c1830), sun: C(0x223355), sunI: 0.05, hemiI: 0.22, night: 1 },
+  { t: 0.0,  sky: C(0x131d3a), fog: C(0x15203e), sun: C(0x2a3d66), sunI: 0.07, hemiI: 0.34, night: 1 },
+  { t: 0.2,  sky: C(0x17233f), fog: C(0x1a2644), sun: C(0x3a4d77), sunI: 0.1,  hemiI: 0.38, night: 1 },
+  { t: 0.26, sky: C(0xf08a5c), fog: C(0xf7b184), sun: C(0xffa055), sunI: 0.65, hemiI: 0.55, night: 0.35 },
+  { t: 0.33, sky: C(0x77c4f2), fog: C(0xd2ecfa), sun: C(0xfff4da), sunI: 1.15, hemiI: 0.9,  night: 0 },
+  { t: 0.5,  sky: C(0x4da3f0), fog: C(0xd8eefc), sun: C(0xfff6e6), sunI: 1.32, hemiI: 1.0,  night: 0 },
+  { t: 0.68, sky: C(0x74bcec), fog: C(0xd2e6f4), sun: C(0xffefc4), sunI: 1.05, hemiI: 0.9,  night: 0 },
+  { t: 0.75, sky: C(0xf58a52), fog: C(0xfab183), sun: C(0xff7a3a), sunI: 0.6,  hemiI: 0.55, night: 0.3 },
+  { t: 0.81, sky: C(0x33295a), fog: C(0x403361), sun: C(0x5d4a77), sunI: 0.15, hemiI: 0.4,  night: 0.9 },
+  { t: 1.0,  sky: C(0x131d3a), fog: C(0x15203e), sun: C(0x2a3d66), sunI: 0.07, hemiI: 0.34, night: 1 },
 ];
 
 export function createDayNight(scene, world) {
-  const hemi = new THREE.HemisphereLight(0xbfe8ff, 0x8a9a6a, 0.9);
+  const hemi = new THREE.HemisphereLight(0xbfe3ff, 0xa8a078, 0.95);
   scene.add(hemi);
   const sun = new THREE.DirectionalLight(0xffffff, 1);
   sun.position.set(100, 150, 50);
@@ -37,7 +37,7 @@ export function createDayNight(scene, world) {
   moonGlow.position.set(-80, 120, -60);
   scene.add(moonGlow);
 
-  scene.fog = new THREE.Fog(0xcfe8f8, 150, 620);
+  scene.fog = new THREE.Fog(0xd8eefc, 180, 780);
   scene.background = new THREE.Color(0x6fbdf0);
 
   // Vòm trời gradient (đẹp hơn màu phẳng)
@@ -153,12 +153,15 @@ export function createDayNight(scene, world) {
         sharedMats.lampGlow.emissiveIntensity = glow * 1.6;
         sharedMats.window.emissiveIntensity = glow * 1.1;
       }
+      if (world.facadeMats) {
+        for (const m of world.facadeMats) m.emissiveIntensity = glow * 0.95;
+      }
       if (world.lighthouseLamp) {
         world.lighthouseLamp.emissiveIntensity = 0.2 + glow * (1.2 + Math.sin(performance.now() * 0.004) * 0.8);
       }
       // nước tối dần về đêm
       if (world.waterMat) {
-        world.waterMat.color.setHex(0x2f8fbe).lerp(new THREE.Color(0x0d2438), glow);
+        world.waterMat.color.setHex(0x2b9fd4).lerp(new THREE.Color(0x14304a), glow);
       }
       return s;
     },
