@@ -113,6 +113,7 @@ export function createDayNight(scene, world) {
   }
 
   return {
+    sun,
     get t() { return dayT; },
     set t(v) { dayT = v; },
     get clockString() {

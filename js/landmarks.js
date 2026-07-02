@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { tx, onLangChange } from './i18n.js';
 
-// 14 địa danh đặc trưng — vị trí theo bố cục thật (tỉ lệ ~1:10)
+// 15 địa danh đặc trưng — tọa độ thật từ dữ liệu OpenStreetMap (đã qua phép chiếu 1:10 + kính lúp trung tâm)
 export const LANDMARKS = [
   {
     id: 'opera', x: 0, z: 4,

@@ -130,7 +130,7 @@ const TEMPLATES = {
   cyclo: { maker: makeCyclo, speed: 19, turn: 2.2, nameKey: 'vCyclo', land: true },
   boat: { maker: makeBoat, speed: 46, turn: 1.5, nameKey: 'vBoat', land: false },
 };
-export function createVehicles(scene, groundHeight, waterHeight, spawns) {
+export function createVehicles(scene, groundHeight, waterHeight, spawns, resolveCollisions) {
   const defs = spawns.map((s) => ({ ...TEMPLATES[s.type], type: s.type, x: s.x, z: s.z, heading: s.heading || 0 }));
   const vehicles = defs.map((d) => {
     const built = d.maker();
@@ -164,6 +164,12 @@ export function createVehicles(scene, groundHeight, waterHeight, spawns) {
       || nz < WORLD_BOUNDS.minZ + 40 || nz > WORLD_BOUNDS.maxZ - 40) blocked = true;
     if (!blocked) {
       v.pos.x = nx; v.pos.z = nz;
+      // không xuyên nhà cửa / đảo đá
+      if (resolveCollisions) {
+        const before = { x: v.pos.x, z: v.pos.z };
+        resolveCollisions(v.pos, v.land ? 0.8 : 1.6);
+        if (Math.hypot(v.pos.x - before.x, v.pos.z - before.z) > 0.01) v.vel *= 0.4;
+      }
     } else {
       v.vel = 0;
     }

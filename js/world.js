@@ -198,11 +198,12 @@ export function buildWorld(scene) {
   };
   function addCollider(x, z, r) { colliders.push({ x, z, r }); }
 
-  // đẩy điểm ra khỏi vật cản — dùng chỉ mục lưới (nghìn collider vẫn nhanh)
-  let colIdx = null;
+  // đẩy điểm ra khỏi vật cản — chỉ mục lưới, tự xây lại khi có collider mới (vd NPC thêm sau)
+  let colIdx = null, colIdxCount = -1;
   world.resolveCollisions = (p, pr = 0.45) => {
-    if (!colIdx) {
+    if (!colIdx || colIdxCount !== colliders.length) {
       colIdx = new Map();
+      colIdxCount = colliders.length;
       for (const c of colliders) {
         const k = `${Math.floor(c.x / 48)},${Math.floor(c.z / 48)}`;
         if (!colIdx.has(k)) colIdx.set(k, []);
@@ -384,7 +385,7 @@ export function buildWorld(scene) {
         }
         g2.setAttribute('color', new THREE.BufferAttribute(cols, 3));
         bldGeos.push(g2);
-        addCollider(cx, cz, Math.min(19, Math.sqrt(b.a / Math.PI) + 0.6));
+        addCollider(cx, cz, Math.min(18, Math.sqrt(b.a / Math.PI) * 0.85 + 0.4));
         world.buildingCells.add(`${Math.round(cx / 22)},${Math.round(cz / 22)}`);
         nBld++;
       } catch (e) { /* polygon lỗi -> bỏ qua */ }
@@ -924,10 +925,10 @@ export function buildWorld(scene) {
   }
   ship(175, portBank[1], 44, 0x24455f, 0xf0f0e8, 0.1);      // tàu hàng cập cảng trên sông Cấm
   ship(1000, -60, 40, 0x555a44, 0xe8e8e0, 0.3);             // tàu ra cửa biển
-  const seaShip = ship(2600, 1250, 48, 0x7d2b20, 0xe8e8e0); // tàu tuần du ngoài khơi
+  const seaShip = ship(2650, 1450, 48, 0x7d2b20, 0xe8e8e0); // tàu tuần du ngoài khơi
   updaters.push((dt, time) => {
     const ang = time * 0.02;
-    seaShip.position.set(2600 + Math.cos(ang) * 480, Math.sin(time * 0.7) * 0.15, 1250 + Math.sin(ang) * 360);
+    seaShip.position.set(2650 + Math.cos(ang) * 270, Math.sin(time * 0.7) * 0.15, 1450 + Math.sin(ang) * 210);
     seaShip.rotation.y = -ang + Math.PI / 2;
   });
 
@@ -967,7 +968,7 @@ export function buildWorld(scene) {
   const bbBank = nearestRiverPoint(-30) || [-12, -166, 62];
   const bbShoreZ = bbBank[1] + bbBank[2] / 2 + 6;
   const benBinh = buildPier(-24, bbShoreZ, 0, -1);
-  world.npcSpots.captain = [-30, bbShoreZ + 6];
+  world.npcSpots.captain = [-32, bbShoreZ + 14];
   world.vehicleSpawns.push({ type: 'boat', x: benBinh.boatSpot[0], z: benBinh.boatSpot[1], heading: 0 });
 
   // ---------- ĐỒ SƠN: bãi tắm + Bến Nghiêng + biệt thự Bảo Đại ----------
@@ -1232,10 +1233,30 @@ export function buildWorld(scene) {
   const pickupMat = new THREE.MeshLambertMaterial({
     color: 0xff4d30, emissive: 0xff3010, emissiveIntensity: 0.9,
   });
-  const flowerSpots = [
-    [-40, 20], [-90, 30], [-140, 40], [-180, 20], [-215, -30],
-    [-70, -30], [-20, 60], [30, 44], [-110, 70], [-160, -20],
-  ];
+  // tự tìm 10 chỗ trống dọc phố trung tâm (không dính nhà, không dưới nước)
+  const flowerSpots = [];
+  {
+    const tryAdd = (x, z) => {
+      if (flowerSpots.length >= 10) return;
+      if (Math.abs(groundHeightNoDeck(x, z) - LAND_H) > 0.3) return;
+      const p = { x, z };
+      world.resolveCollisions(p, 0.7);
+      if (Math.hypot(p.x - x, p.z - z) > 0.05) return; // dính vật cản
+      if (flowerSpots.some(([sx, sz]) => (sx - x) ** 2 + (sz - z) ** 2 < 42 * 42)) return;
+      flowerSpots.push([x, z]);
+    };
+    for (const r of ROADS_DT) {
+      if (flowerSpots.length >= 10) break;
+      if (r.c !== 's' && r.c !== 't' && r.c !== 'w') continue;
+      for (let i = 0; i < r.pts.length - 1 && flowerSpots.length < 10; i++) {
+        const [x1, z1] = r.pts[i], [x2, z2] = r.pts[i + 1];
+        const mx = (x1 + x2) / 2, mz = (z1 + z2) / 2;
+        if (mx * mx + mz * mz > 280 * 280) continue;
+        const rotY = Math.atan2(x2 - x1, z2 - z1);
+        tryAdd(mx + Math.cos(rotY) * 7.5, mz - Math.sin(rotY) * 7.5);
+      }
+    }
+  }
   for (const [fx, fz] of flowerSpots) {
     const p = new THREE.Mesh(new THREE.OctahedronGeometry(0.55), pickupMat);
     p.position.set(fx, groundHeight(fx, fz) + 1.3, fz);

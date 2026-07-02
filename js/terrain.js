@@ -79,6 +79,10 @@ function bucketQuery(buckets, x, z) {
   if (cx < 0 || cx >= BW || cz < 0 || cz >= BH) return null;
   return buckets.get(cz * BW + cx) || null;
 }
+// Kênh Nam Triệu: nối cửa sông Cấm ra biển (luồng tàu thật giữa Đình Vũ - Cát Hải;
+// dữ liệu waterway OSM dừng ở cửa sông nên phải nối thủ công, nếu không thuyền bị "đập" chắn)
+RIVERS.push({ w: 110, pts: [[1400, 100], [1700, 380], [2000, 640], [2350, 900]] });
+
 const riverIdx = makeBucketIndex(RIVERS.map((r) => ({ pts: r.pts, meta: r.w })));
 const regionIdx = makeBucketIndex(ROADS_REGION.map((r) => ({ pts: r.pts, meta: 0 })));
 const dtRoadIdx = makeBucketIndex(ROADS_DT.map((r) => ({ pts: r.pts, meta: r.c })));

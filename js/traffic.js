@@ -204,7 +204,10 @@ export function createTraffic(scene, world) {
       if (w.s < 0) { w.s = 0; w.dir = 1; }
       const p = samplePath(w.path, w.s, false);
       const head = w.dir === -1 ? p.heading + Math.PI : p.heading;
-      w.rig.group.position.set(p.x, groundHeight(p.x, p.z), p.z);
+      // đi trên vỉa hè (lệch khỏi tim đường)
+      const ox = Math.cos(p.heading) * 4.4, oz = -Math.sin(p.heading) * 4.4;
+      const wx = p.x + ox, wz = p.z + oz;
+      w.rig.group.position.set(wx, groundHeight(wx, wz), wz);
       w.rig.group.rotation.y = head;
       w.rig.animate(dt, 0.55, time + w.s);
     }

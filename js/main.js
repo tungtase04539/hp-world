@@ -59,7 +59,8 @@ const dayNight = createDayNight(scene, world);
 const petals = createPetals(scene);
 const signs = buildLandmarkSigns(scene, world);
 const { npcs, update: updateNPCs } = buildNPCs(scene, world);
-const { vehicles, update: updateVehicle } = createVehicles(scene, groundHeight, groundHeightNoDeck, world.vehicleSpawns);
+const { vehicles, update: updateVehicle } = createVehicles(
+  scene, groundHeight, groundHeightNoDeck, world.vehicleSpawns, world.resolveCollisions);
 // người đi bộ thêm ở bãi biển Đồ Sơn & thị trấn Cát Bà
 if (world.dosonBeach) {
   world.walkPaths.push([[world.dosonBeach[0] - 30, world.dosonBeach[1] - 20], [world.dosonBeach[0] + 10, world.dosonBeach[1] + 20]]);
@@ -255,6 +256,23 @@ function handleInteract() {
 const clock = new THREE.Clock();
 let time = 0, clockUITimer = 0;
 let started = false;
+// tự hạ chất lượng trên máy yếu: đo FPS 5 giây đầu, dưới 26 thì tắt bóng đổ + bloom
+let fpsFrames = 0, fpsStart = 0, qualityChecked = false;
+function autoQuality() {
+  if (qualityChecked) return;
+  if (!fpsStart) { fpsStart = time; fpsFrames = 0; }
+  fpsFrames++;
+  if (time - fpsStart > 5) {
+    qualityChecked = true;
+    const fps = fpsFrames / (time - fpsStart);
+    if (fps < 26) {
+      dayNight.sun.castShadow = false;
+      renderer.shadowMap.autoUpdate = false;
+      if (bloomPass) bloomPass.enabled = false;
+      renderer.setPixelRatio(1);
+    }
+  }
+}
 
 function animate() {
   requestAnimationFrame(animate);
@@ -322,6 +340,7 @@ function animate() {
     const dPort = Math.hypot(pState.pos.x - 180, pState.pos.z + 154);
     audio.tryHorn(time, 1 - Math.min(1, Math.max(0, (dPort - 70) / 180)));
 
+    autoQuality();
     clockUITimer += dt;
     if (clockUITimer > 0.5) { clockUITimer = 0; ui.setClock(dayNight.clockString); }
 
@@ -342,6 +361,36 @@ setLang('vi');
 
 // Hook gỡ lỗi / chụp ảnh tour (không ảnh hưởng gameplay)
 window.__hp = {
+  // Chẩn đoán: mọi thực thể tương tác có đứng đúng chỗ & tiếp cận được không
+  diag() {
+    const items = [];
+    for (const s of signs) items.push({ kind: 'landmark', id: s.lm.id, x: s.lm.x, z: s.lm.z, reach: 9 });
+    for (const n of npcs) items.push({ kind: 'npc', id: n.data.id, x: n.data.x, z: n.data.z, reach: 4 });
+    vehicles.forEach((v, i) => items.push({ kind: 'vehicle', id: v.type + i, x: v.pos.x, z: v.pos.z, reach: 5, water: !v.land }));
+    world.flowerPickups.forEach((p, i) => items.push({ kind: 'flower', id: 'f' + i, x: p.position.x, z: p.position.z, reach: 2.4 }));
+    const out = [];
+    for (const it of items) {
+      const h = groundHeightNoDeck(it.x, it.z);
+      const hd = groundHeight(it.x, it.z);
+      let reachable = false;
+      for (let a = 0; a < 16 && !reachable; a++) {
+        const ang = (a / 16) * Math.PI * 2;
+        for (const rr of [it.reach * 0.5, it.reach * 0.85, 4, 6, 8].filter((r) => r <= Math.max(8, it.reach))) {
+          const p = { x: it.x + Math.cos(ang) * rr, z: it.z + Math.sin(ang) * rr };
+          world.resolveCollisions(p, 0.45);
+          const ph = groundHeight(p.x, p.z);
+          if (Math.hypot(p.x - it.x, p.z - it.z) <= it.reach && ph > 1.2 && ph < 12) { reachable = true; break; }
+        }
+      }
+      const problems = [];
+      if (it.water) {
+        if (h > -0.6) problems.push(`thuyền mắc cạn h=${h.toFixed(1)}`);
+      } else if (hd < 1.2 || hd > 14) problems.push(`cao độ lạ h=${hd.toFixed(1)}`);
+      if (!reachable && !it.water) problems.push('KHÔNG TIẾP CẬN ĐƯỢC');
+      if (problems.length) out.push(`${it.kind}/${it.id} (${it.x | 0},${it.z | 0}): ${problems.join(', ')}`);
+    }
+    return out;
+  },
   teleport(x, z, camYaw = 0, pitch = 0.3, dist = 14) {
     if (pState.mounted) { pState.mounted.mounted = false; pState.mounted = null; player.sit(false); }
     pState.pos.set(x, Math.max(groundHeight(x, z), 0), z);
@@ -355,6 +404,7 @@ window.__hp = {
     );
   },
   setTime(v) { dayNight.t = v; },
+  gh(x, z) { return groundHeightNoDeck(x, z); },
 };
 
 document.getElementById('startBtn').addEventListener('click', () => {
