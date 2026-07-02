@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Hải Phòng 3D — Thành phố Hoa Phượng Đỏ</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌺</text></svg>">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<canvas id="scene"></canvas>
+
+<!-- Title screen -->
+<div id="titleScreen">
+  <div class="title-inner">
+    <div class="title-flower">🌺</div>
+    <h1 data-i18n="title">Hải Phòng 3D</h1>
+    <h2 data-i18n="subtitle">Thành phố Hoa Phượng Đỏ</h2>
+    <p data-i18n="intro">Nhập vai một du khách trẻ khám phá thành phố Cảng: dạo trung tâm, qua cầu Hoàng Văn Thụ, tắm biển Đồ Sơn và giong thuyền ra Cát Bà!</p>
+    <div class="controls-hint">
+      <div><kbd>W A S D</kbd> / <kbd>← ↑ ↓ →</kbd> <span data-i18n="ctlMove">Di chuyển</span></div>
+      <div><kbd>Shift</kbd> <span data-i18n="ctlRun">Chạy</span> &nbsp; <kbd>Space</kbd> <span data-i18n="ctlJump">Nhảy</span></div>
+      <div><kbd>E</kbd> <span data-i18n="ctlInteract">Tương tác / Lên & xuống xe</span></div>
+      <div>🖱️ <span data-i18n="ctlCam">Kéo chuột xoay camera, lăn để zoom</span></div>
+    </div>
+    <button id="startBtn" data-i18n="start">▶ Bắt đầu khám phá</button>
+    <div class="lang-row">
+      <button class="langPick" data-lang="vi">🇻🇳 Tiếng Việt</button>
+      <button class="langPick" data-lang="en">🇬🇧 English</button>
+    </div>
+  </div>
+</div>
+
+<!-- HUD -->
+<div id="hud" class="hidden">
+  <div id="questPanel">
+    <div id="questTitle" data-i18n="quests">Nhiệm vụ</div>
+    <div id="questList"></div>
+  </div>
+  <div id="topRight">
+    <div id="clock">🕘 09:00</div>
+    <button id="btnLang" title="Language">🌐 VI</button>
+    <button id="btnSound" title="Sound">🔊</button>
+    <button id="btnHelp" title="Help">❓</button>
+  </div>
+  <canvas id="minimap"></canvas>
+</div>
+
+<div id="prompt" class="hidden"></div>
+<div id="toast" class="hidden"></div>
+<div id="banner" class="hidden"></div>
+
+<!-- Dialogue -->
+<div id="dialogue" class="hidden">
+  <div id="dlgName"></div>
+  <div id="dlgText"></div>
+  <div id="dlgHint" data-i18n="dlgNext">E / Chạm để tiếp tục ▸</div>
+</div>
+
+<!-- Landmark info -->
+<div id="infoPanel" class="hidden">
+  <button class="closeX" id="infoClose">✕</button>
+  <h3 id="infoTitle"></h3>
+  <p id="infoText"></p>
+  <p id="infoFact" class="fact"></p>
+</div>
+
+<!-- Minigame -->
+<div id="minigame" class="hidden">
+  <button class="closeX" id="mgClose">✕</button>
+  <h3 data-i18n="mgTitle">🍜 Nấu Bánh Đa Cua</h3>
+  <p data-i18n="mgDesc">Chọn đúng 5 nguyên liệu làm nên bát bánh đa cua trứ danh Hải Phòng!</p>
+  <div id="mgGrid"></div>
+  <div id="mgMsg"></div>
+  <button id="mgCook" data-i18n="mgCook">🔥 Nấu!</button>
+</div>
+
+<!-- Help -->
+<div id="helpModal" class="hidden">
+  <button class="closeX" id="helpClose">✕</button>
+  <h3 data-i18n="helpTitle">Hướng dẫn</h3>
+  <div id="helpBody"></div>
+</div>
+
+<!-- Gợi ý xoay ngang trên điện thoại -->
+<div id="rotateHint" class="hidden">
+  <div class="phone-icon">📱</div>
+  <p data-i18n="rotateHint">Xoay ngang điện thoại để có trải nghiệm đẹp nhất nhé!</p>
+  <button id="rotateDismiss" data-i18n="rotateDismiss">Vẫn chơi màn hình dọc</button>
+</div>
+
+<!-- Touch controls -->
+<div id="touchControls" class="hidden">
+  <div id="joystick"><div id="joyKnob"></div></div>
+  <div id="touchButtons">
+    <button id="btnJumpT">⤒</button>
+    <button id="btnActionT">✦</button>
+  </div>
+</div>
+
+<script type="importmap">{ "imports": { "three": "./lib/three.module.js" } }</script>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
