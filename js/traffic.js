@@ -1,33 +1,39 @@
 import * as THREE from 'three';
 import { makeHumanoid } from './character.js';
+import { ROADS_DT, ROADS_REGION } from './terrain.js';
 
 function mat(color, opts = {}) { return new THREE.MeshLambertMaterial({ color, ...opts }); }
 
 // ============================================================
-// Thành phố sống: người đi bộ trên vỉa hè, xe máy chạy phố,
+// Thành phố sống: người đi bộ + xe máy trên các PHỐ THẬT (từ OSM),
 // thuyền du lịch trong vịnh Lan Hạ
 // ============================================================
 
-// Vòng lặp đường phố cho xe máy (đi bên phải, lệch làn +2.2)
-const BIKE_LOOPS = [
-  [[-180, 8], [-20, 8], [-20, 66], [-180, 66]],
-  [[-100, -60], [60, -60], [60, 8], [-100, 8]],
-  [[-180, -60], [-20, -60], [-20, 8], [-180, 8]],
-  [[-100, 8], [60, 8], [60, 66], [-100, 66]],
-];
-// Tuyến dài: trung tâm ↔ Đồ Sơn (khứ hồi trên quốc lộ)
-const HIGHWAY_PATH = [[30, 120], [120, 480], [180, 950], [240, 1480], [300, 1760], [330, 1930]];
+function plLen(pts) {
+  let L = 0;
+  for (let i = 0; i < pts.length - 1; i++) L += Math.hypot(pts[i + 1][0] - pts[i][0], pts[i + 1][1] - pts[i][1]);
+  return L;
+}
+// Xe máy: 8 phố lớn dài nhất trong trung tâm (khứ hồi) + 2 trục vùng rộng
+const BIKE_PATHS = ROADS_DT
+  .filter((r) => (r.c === 's' || r.c === 't' || r.c === 'p'))
+  .map((r) => r.pts)
+  .sort((a, b) => plLen(b) - plLen(a))
+  .slice(0, 8);
+const REGION_PATHS = ROADS_REGION
+  .map((r) => r.pts)
+  .sort((a, b) => plLen(b) - plLen(a))
+  .slice(0, 3);
 
-// Lối đi bộ (đi qua đi lại trên vỉa hè & dải trung tâm)
-const WALK_PATHS = [
-  [[-240, 16], [-40, 16]],           // dạo dải trung tâm
-  [[-160, 58], [-40, 58]],           // vỉa hè Trần Phú
-  [[-16, 30], [30, 30]],             // quảng trường nhà hát
-  [[-90, -52], [40, -52]],           // Điện Biên Phủ
-  [[-208, -28], [-168, -12]],        // trước chợ Sắt
-  [[352, 1802], [388, 1878]],        // bãi biển Đồ Sơn
-  [[2390, 1128], [2500, 1136]],      // phố biển Cát Bà
-];
+// Người đi bộ: các phố gần trung tâm + bãi biển/thị trấn (điền sau từ world)
+const WALK_PATHS = ROADS_DT
+  .filter((r) => {
+    const [x, z] = r.pts[0];
+    return x * x + z * z < 300 * 300 && plLen(r.pts) > 90;
+  })
+  .map((r) => r.pts)
+  .sort((a, b) => plLen(b) - plLen(a))
+  .slice(0, 9);
 
 const SHIRT_COLORS = [0xe86a4a, 0x4a90d8, 0x8fc16a, 0xd8a03a, 0xb87ad8, 0x5abcb0, 0xe8d05a];
 const PANT_COLORS = [0x33475e, 0x5e4a38, 0x2f5548, 0x4a3a5e];
@@ -103,36 +109,36 @@ export function createTraffic(scene, world) {
   const walkers = [];
   const tourBoats = [];
 
-  // ---------- Xe máy chạy vòng phố ----------
+  // ---------- Xe máy chạy trên các phố THẬT (khứ hồi) ----------
   const bikeColors = [0xd8332a, 0x2e86c1, 0x28a05c, 0xe8a020, 0x555a66, 0xb85ae8];
-  BIKE_LOOPS.forEach((loop, li) => {
-    const L = pathLength(loop, true);
+  BIKE_PATHS.forEach((path, li) => {
+    const L = pathLength(path, false);
     for (let k = 0; k < 2; k++) {
       const mesh = makeTrafficBike(bikeColors[(li * 2 + k) % bikeColors.length]);
       scene.add(mesh);
       bikes.push({
-        mesh, path: loop, closed: true, L,
-        s: (L / 2) * k + li * 13,
-        speed: 13 + (li + k) * 1.6,
-        lane: 2.2,
+        mesh, path, closed: false, L,
+        s: L * (0.25 + 0.5 * k),
+        speed: 13 + ((li + k) % 4) * 1.8,
+        dir: k % 2 === 0 ? 1 : -1,
+        lane: 2.4,
       });
     }
   });
-  // hai xe chạy quốc lộ ra Đồ Sơn và ngược lại (ping-pong)
-  {
-    const L = pathLength(HIGHWAY_PATH, false);
-    for (let k = 0; k < 2; k++) {
-      const mesh = makeTrafficBike(bikeColors[(k + 3) % bikeColors.length]);
-      scene.add(mesh);
-      bikes.push({
-        mesh, path: HIGHWAY_PATH, closed: false, L,
-        s: L * (0.2 + 0.5 * k), speed: 26, lane: 3, dir: k === 0 ? 1 : -1,
-      });
-    }
-  }
+  // trục vùng rộng (ra Đồ Sơn, Đình Vũ...)
+  REGION_PATHS.forEach((path, li) => {
+    const L = pathLength(path, false);
+    const mesh = makeTrafficBike(bikeColors[(li + 3) % bikeColors.length]);
+    scene.add(mesh);
+    bikes.push({
+      mesh, path, closed: false, L,
+      s: L * (0.2 + 0.3 * li), speed: 30, lane: 3, dir: li % 2 === 0 ? 1 : -1,
+    });
+  });
 
   // ---------- Người đi bộ ----------
-  WALK_PATHS.forEach((p, i) => {
+  const allWalks = [...WALK_PATHS, ...(world.walkPaths || [])];
+  allWalks.forEach((p, i) => {
     const n = i < 5 ? 2 : 1; // trung tâm đông hơn
     const L = pathLength(p, false);
     for (let k = 0; k < n; k++) {
@@ -166,9 +172,9 @@ export function createTraffic(scene, world) {
     scene.add(g);
     tourBoats.push({ mesh: g, cx, cz, r, speed, phase });
   }
-  tourBoat(2700, 1270, 90, 0.045, 0);
-  tourBoat(2820, 1180, 70, -0.06, 2);
-  tourBoat(1600, 560, 130, 0.035, 4); // thuyền trên đường ra đảo
+  tourBoat(4780, 1900, 90, 0.045, 0);   // vịnh Lan Hạ
+  tourBoat(4930, 1620, 70, -0.06, 2);   // giữa các đảo đá
+  tourBoat(2700, 1400, 160, 0.035, 4);  // trên đường biển ra đảo
 
   // ---------- Cập nhật mỗi khung hình ----------
   function update(dt, time, playerPos) {

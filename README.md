@@ -18,8 +18,14 @@ Hoặc deploy thẳng lên GitHub Pages (toàn bộ là file tĩnh, Three.js đ�
 
 ## Tính năng
 
-- **Bản đồ tỉ lệ ~1:10 theo bố cục thật**: trung tâm → Đồ Sơn ~2km trong game (20km thật),
-  Cát Bà ngoài khơi đông nam, sông Cấm phía bắc với cảng và hai cây cầu.
+- **Bản đồ Hải Phòng THẬT từ dữ liệu OpenStreetMap**: địa hình đất/biển, sông Cấm — Tam Bạc — Lạch Tray,
+  đường bờ biển, bán đảo Đồ Sơn, quần đảo Cát Bà với các đảo đá thật của vịnh Lan Hạ,
+  và **từng con phố trung tâm đúng như phố thật** (432 tuyến phố từ OSM). Tỉ lệ 1:10,
+  khu trung tâm phóng đại 2,2× (kính lúp phi tuyến) để công trình và phố cân đối khi dạo chơi.
+  Nhà phố tự mọc dọc phố thật, xe máy NPC chạy đúng các phố lớn (Lê Hồng Phong, Hùng Vương...),
+  cầu Hoàng Văn Thụ/cầu Bính đặt đúng vị trí bắc qua sông Cấm thật, mọi cây cầu phố tự sinh
+  nơi phố cắt sông. Minimap chính là bản đồ thật thu nhỏ.
+  Dữ liệu bản đồ © OpenStreetMap contributors (ODbL) — xử lý offline thành `js/mapdata.js`.
 - **15 địa danh** thiết kế theo kiến trúc thực: Nhà hát lớn, Quán hoa, tượng đài Lê Chân,
   hồ Tam Bạc, chợ Sắt, nhà thờ chính tòa, bưu điện, bảo tàng, ga Hải Phòng,
   cầu Hoàng Văn Thụ, cầu Bính, cảng Hải Phòng, bãi biển Đồ Sơn + biệt thự Bảo Đại,

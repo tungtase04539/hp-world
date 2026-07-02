@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { WORLD_BOUNDS } from './terrain.js';
 
 function mat(color) { return new THREE.MeshLambertMaterial({ color }); }
 
@@ -123,13 +124,14 @@ function makeBoat() {
 
 // type: 'motorbike' | 'cyclo' | 'boat'
 // groundHeight: có mặt cầu (xe chạy qua cầu được); waterHeight: KHÔNG có mặt cầu (thuyền chui qua gầm cầu)
-export function createVehicles(scene, groundHeight, waterHeight) {
-  const defs = [
-    { type: 'motorbike', x: 22, z: -14, heading: Math.PI / 2, maker: makeMotorbike, speed: 42, turn: 2.2, nameKey: 'vMotorbike', land: true },
-    { type: 'cyclo', x: -36, z: 14, heading: Math.PI / 2, maker: makeCyclo, speed: 18, turn: 2.2, nameKey: 'vCyclo', land: true },
-    { type: 'boat', x: 29, z: -160, heading: Math.PI / 2, maker: makeBoat, speed: 38, turn: 1.5, nameKey: 'vBoat', land: false },
-    { type: 'boat', x: 440, z: 1884, heading: Math.PI / 2, maker: makeBoat, speed: 38, turn: 1.5, nameKey: 'vBoat', land: false },
-  ];
+// spawns: [{type, x, z, heading}] — do world.js tính từ dữ liệu bản đồ thật (bến, bờ sông...)
+const TEMPLATES = {
+  motorbike: { maker: makeMotorbike, speed: 50, turn: 2.2, nameKey: 'vMotorbike', land: true },
+  cyclo: { maker: makeCyclo, speed: 19, turn: 2.2, nameKey: 'vCyclo', land: true },
+  boat: { maker: makeBoat, speed: 46, turn: 1.5, nameKey: 'vBoat', land: false },
+};
+export function createVehicles(scene, groundHeight, waterHeight, spawns) {
+  const defs = spawns.map((s) => ({ ...TEMPLATES[s.type], type: s.type, x: s.x, z: s.z, heading: s.heading || 0 }));
   const vehicles = defs.map((d) => {
     const built = d.maker();
     built.mesh.position.set(d.x, d.land ? groundHeight(d.x, d.z) : 0.1, d.z);
@@ -158,7 +160,8 @@ export function createVehicles(scene, groundHeight, waterHeight) {
       if (waterHeight(nx, nz) > -0.6) blocked = true;   // thuyền cần nước đủ sâu (bỏ qua mặt cầu)
     }
     // giới hạn mép bản đồ
-    if (nx < -560 || nx > 3560 || nz < -660 || nz > 2560) blocked = true;
+    if (nx < WORLD_BOUNDS.minX + 40 || nx > WORLD_BOUNDS.maxX - 40
+      || nz < WORLD_BOUNDS.minZ + 40 || nz > WORLD_BOUNDS.maxZ - 40) blocked = true;
     if (!blocked) {
       v.pos.x = nx; v.pos.z = nz;
     } else {

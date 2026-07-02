@@ -38,10 +38,11 @@ const dict = {
       <b>W A S D / phím mũi tên</b> — di chuyển · <b>Shift</b> — chạy · <b>Space</b> — nhảy<br>
       <b>E</b> — nói chuyện, xem địa danh, lên/xuống xe · <b>Kéo chuột</b> — xoay camera · <b>Lăn chuột</b> — zoom<br>
       Trên điện thoại: joystick bên trái, nút ✦ để tương tác, ⤒ để nhảy.
-      <h4>Thế giới (tỉ lệ ~1:10 theo bản đồ thật)</h4>
-      Trung tâm có Nhà hát lớn, Quán hoa, tượng đài Lê Chân, hồ Tam Bạc, chợ Sắt, nhà thờ, ga, bưu điện, bảo tàng. Phía bắc là sông Cấm với cầu Hoàng Văn Thụ, cầu Bính và cảng. Theo quốc lộ về nam ~2km (20km thật) là biển Đồ Sơn, biệt thự Bảo Đại và đảo Hòn Dấu. Ngoài khơi đông nam là Cát Bà — vịnh Lan Hạ. Có 15 địa danh, xem <b>bản đồ nhỏ</b> góc dưới phải!
+      <h4>Thế giới — bản đồ Hải Phòng THẬT</h4>
+      Địa hình, sông Cấm, bờ biển, đảo và <b>từng con phố trung tâm</b> dựng từ dữ liệu bản đồ thực (OpenStreetMap), tỉ lệ 1:10, khu trung tâm phóng đại 2,2 lần cho dễ dạo chơi. Trung tâm có Nhà hát lớn, Quán hoa, tượng đài Lê Chân, hồ Tam Bạc, chợ Sắt, nhà thờ, ga, bưu điện, bảo tàng. Phía bắc là sông Cấm với cầu Hoàng Văn Thụ, cầu Bính và cảng. Về nam là biển Đồ Sơn, biệt thự Bảo Đại, đảo Hòn Dấu. Ngoài khơi đông nam là Cát Bà — vịnh Lan Hạ. 15 địa danh, xem <b>bản đồ nhỏ</b>!
       <h4>Mẹo</h4>
-      Xe máy nhanh gấp 6 lần đi bộ — hãy lấy xe khi đi xa. Thuyền đậu ở Bến Bính (sông Cấm) và Bến Nghiêng (Đồ Sơn). Hoa phượng phát sáng nằm quanh dải trung tâm. Trời sẽ tối dần — ngắm hoàng hôn trên sông Cấm nhé!`,
+      Xe máy nhanh gấp 7 lần đi bộ — hãy lấy xe khi đi xa. Thuyền đậu ở Bến Bính (sông Cấm) và Bến Nghiêng (Đồ Sơn). Hoa phượng phát sáng nằm quanh dải trung tâm. Trời sẽ tối dần — ngắm hoàng hôn trên sông Cấm nhé!
+      <p style="margin-top:10px;font-size:11px;color:#8fb8d8">Dữ liệu bản đồ © OpenStreetMap contributors (ODbL)</p>`,
     time: 'Giờ',
   },
   en: {
@@ -80,10 +81,11 @@ const dict = {
       <b>W A S D / arrow keys</b> — move · <b>Shift</b> — run · <b>Space</b> — jump<br>
       <b>E</b> — talk, view landmarks, mount/dismount · <b>Drag mouse</b> — rotate camera · <b>Scroll</b> — zoom<br>
       On mobile: joystick on the left, ✦ to interact, ⤒ to jump.
-      <h4>The world (~1:10 of the real map)</h4>
-      Downtown: Opera House, Flower Kiosks, Le Chan monument, Tam Bac lake, Sat market, cathedral, station, post office, museum. North: the Cam river with Hoang Van Thu & Binh bridges and the port. Follow the highway ~2km south (20km real) to Do Son beach, Bao Dai villa and Hon Dau island. Southeast across the sea lies Cat Ba — Lan Ha bay. 15 landmarks total — check the <b>minimap</b> in the corner!
+      <h4>The world — the REAL Hai Phong map</h4>
+      Terrain, the Cam river, coastline, islands and <b>every downtown street</b> are built from real map data (OpenStreetMap) at 1:10 scale, with downtown magnified 2.2× for walkability. Downtown: Opera House, Flower Kiosks, Le Chan monument, Tam Bac lake, Sat market, cathedral, station, post office, museum. North: the Cam river with two great bridges and the port. South: Do Son beach, Bao Dai villa, Hon Dau island. Southeast across the sea lies Cat Ba — Lan Ha bay. 15 landmarks — check the <b>minimap</b>!
       <h4>Tips</h4>
-      The motorbike is 6× walking speed — grab it for long trips. Boats wait at Ben Binh (Cam river) and Ben Nghieng (Do Son). Glowing flamboyant flowers hide around the central strip. Time passes — enjoy the sunset over the Cam river!`,
+      The motorbike is 7× walking speed — grab it for long trips. Boats wait at Ben Binh (Cam river) and Ben Nghieng (Do Son). Glowing flamboyant flowers hide around the central strip. Time passes — enjoy the sunset over the Cam river!
+      <p style="margin-top:10px;font-size:11px;color:#8fb8d8">Map data © OpenStreetMap contributors (ODbL)</p>`,
     time: 'Time',
   },
 };

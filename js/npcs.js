@@ -78,6 +78,11 @@ export const NPC_DATA = [
 export function buildNPCs(scene, world) {
   const npcs = [];
   for (const d of NPC_DATA) {
+    // vị trí tính từ dữ liệu bản đồ thật (world.npcSpots), fallback về tọa độ tĩnh
+    if (world.npcSpots && world.npcSpots[d.id]) {
+      d.x = world.npcSpots[d.id][0];
+      d.z = world.npcSpots[d.id][1];
+    }
     const rig = makeHumanoid(d.scheme);
     const y = world.groundHeight(d.x, d.z);
     rig.group.position.set(d.x, y, d.z);
