@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import {
-  WORLD_BOUNDS, LM, DT_BOX, RIVERS, ROADS_DT, ROADS_REGION, BRIDGES,
+  WORLD_BOUNDS, LM, DT_BOX, RIVERS, ROADS_DT, ROADS_REGION, BRIDGES, BUILDINGS,
   groundHeight, groundHeightNoDeck, isWater, landAt, riverFactor,
   nearestRiverPoint, findShore, addPier,
 } from './terrain.js';
@@ -198,6 +198,34 @@ export function buildWorld(scene) {
   };
   function addCollider(x, z, r) { colliders.push({ x, z, r }); }
 
+  // đẩy điểm ra khỏi vật cản — dùng chỉ mục lưới (nghìn collider vẫn nhanh)
+  let colIdx = null;
+  world.resolveCollisions = (p, pr = 0.45) => {
+    if (!colIdx) {
+      colIdx = new Map();
+      for (const c of colliders) {
+        const k = `${Math.floor(c.x / 48)},${Math.floor(c.z / 48)}`;
+        if (!colIdx.has(k)) colIdx.set(k, []);
+        colIdx.get(k).push(c);
+      }
+    }
+    const kx = Math.floor(p.x / 48), kz = Math.floor(p.z / 48);
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dz = -1; dz <= 1; dz++) {
+        const list = colIdx.get(`${kx + dx},${kz + dz}`);
+        if (!list) continue;
+        for (const c of list) {
+          const ddx = p.x - c.x, ddz = p.z - c.z;
+          const d = Math.hypot(ddx, ddz), min = c.r + pr;
+          if (d < min && d > 0.001) {
+            p.x = c.x + (ddx / d) * min;
+            p.z = c.z + (ddz / d) * min;
+          }
+        }
+      }
+    }
+  };
+
   // ---------- Mặt đất (từ lưới đất/biển OSM) ----------
   const W = WORLD_BOUNDS.maxX - WORLD_BOUNDS.minX;
   const D = WORLD_BOUNDS.maxZ - WORLD_BOUNDS.minZ;
@@ -317,7 +345,69 @@ export function buildWorld(scene) {
   addMerged(dashGeos, mat(0xe8e4d2), 'dashes');
   addMerged(pathGeos, mat(0xc9b896), 'paths');
 
-  // ---------- Nhà phố tự mọc dọc các phố thật ----------
+  // ---------- 1.200+ TÒA NHÀ THẬT (footprint OSM đùn khối, gộp 1 mesh) ----------
+  world.buildingCells = new Set();
+  {
+    const bldGeos = [];
+    const lmSkip = Object.values(LM);
+    const wallPalette = [0xf5e4b8, 0xf0cfa0, 0xdfe8dc, 0xf4b8a0, 0xcfe0ee, 0xf7efc9, 0xe8d0b0, 0xd8c8a8]
+      .map((c) => new THREE.Color(c));
+    const roofPalette = [0xc24a30, 0x96603c, 0xa84036, 0x8a8f96].map((c) => new THREE.Color(c));
+    let nBld = 0;
+    for (const b of BUILDINGS) {
+      let cx = 0, cz = 0;
+      for (const [x, z] of b.p) { cx += x; cz += z; }
+      cx /= b.p.length; cz /= b.p.length;
+      // chừa chỗ cho mô hình địa danh 3D chi tiết & mặt nước
+      if (lmSkip.some(([lx, lz]) => (cx - lx) ** 2 + (cz - lz) ** 2 < 30 * 30)) continue;
+      if (riverFactor(cx, cz) > 0.01 || Math.abs(groundHeightNoDeck(cx, cz) - LAND_H) > 0.4) continue;
+      const hash = Math.abs(Math.floor(cx * 13 + cz * 7));
+      const lv = b.l > 0 ? b.l : (b.a < 150 ? 2 + (hash % 3) : 2 + (hash % 2));
+      const h = Math.min(46, 3.2 + lv * 2.7);
+      try {
+        const shape = new THREE.Shape(b.p.map(([x, z]) => new THREE.Vector2(x, -z)));
+        const g2 = new THREE.ExtrudeGeometry(shape, { depth: h, bevelEnabled: false, curveSegments: 1 });
+        g2.rotateX(-Math.PI / 2);
+        g2.translate(0, LAND_H, 0);
+        const nrm = g2.attributes.normal;
+        const cnt = g2.attributes.position.count;
+        const cols = new Float32Array(cnt * 3);
+        const wall = wallPalette[hash % wallPalette.length];
+        const roofC = roofPalette[hash % roofPalette.length];
+        for (let i = 0; i < cnt; i++) {
+          const isRoof = nrm.getY(i) > 0.6;
+          const c = isRoof ? roofC : wall;
+          const shade = isRoof ? 0.95 : 0.84 + 0.16 * Math.abs(nrm.getX(i));
+          cols[i * 3] = c.r * shade;
+          cols[i * 3 + 1] = c.g * shade;
+          cols[i * 3 + 2] = c.b * shade;
+        }
+        g2.setAttribute('color', new THREE.BufferAttribute(cols, 3));
+        bldGeos.push(g2);
+        addCollider(cx, cz, Math.min(19, Math.sqrt(b.a / Math.PI) + 0.6));
+        world.buildingCells.add(`${Math.round(cx / 22)},${Math.round(cz / 22)}`);
+        nBld++;
+      } catch (e) { /* polygon lỗi -> bỏ qua */ }
+    }
+    if (bldGeos.length) {
+      const merged = mergeGeometries(bldGeos);
+      bldGeos.forEach((g) => g.dispose());
+      const mesh = new THREE.Mesh(merged, new THREE.MeshLambertMaterial({ vertexColors: true }));
+      mesh.name = 'buildings';
+      scene.add(mesh);
+    }
+  }
+  function nearRealBuilding(x, z) {
+    const kx = Math.round(x / 22), kz = Math.round(z / 22);
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dz = -1; dz <= 1; dz++) {
+        if (world.buildingCells.has(`${kx + dx},${kz + dz}`)) return true;
+      }
+    }
+    return false;
+  }
+
+  // ---------- Nhà phố tự mọc dọc các phố thật (chỉ nơi CHƯA có footprint thật) ----------
   const roofMats = [mat(0xc24a30, { flatShading: true }), mat(0x96603c, { flatShading: true }),
                     mat(0xa84036, { flatShading: true }), mat(0x7d6b58, { flatShading: true })];
   const wallColorsCss = ['#f5e4b8', '#f0cfa0', '#dfe8dc', '#f4b8a0', '#cfe0ee', '#f7efc9'];
@@ -367,6 +457,7 @@ export function buildWorld(scene) {
             if (hSeed % 3 === 0) continue; // thưa bớt
             if (Math.abs(groundHeightNoDeck(hx, hz) - LAND_H) > 0.25) continue;
             if (riverFactor(hx, hz) > 0.01) continue;
+            if (nearRealBuilding(hx, hz)) continue;
             let ok = true;
             for (const [lx, lz] of lmPts) {
               if ((hx - lx) ** 2 + (hz - lz) ** 2 < 30 * 30) { ok = false; break; }

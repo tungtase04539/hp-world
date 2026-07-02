@@ -136,14 +136,7 @@ function tryMove(nx, nz) {
 }
 
 function resolveColliders(p) {
-  for (const c of world.colliders) {
-    const dx = p.x - c.x, dz = p.z - c.z;
-    const d = Math.hypot(dx, dz), min = c.r + 0.45;
-    if (d < min && d > 0.001) {
-      p.x = c.x + (dx / d) * min;
-      p.z = c.z + (dz / d) * min;
-    }
-  }
+  world.resolveCollisions(p, 0.45);
 }
 
 function updatePlayerOnFoot(dt, time) {
