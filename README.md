@@ -27,7 +27,9 @@ Hoặc deploy thẳng lên GitHub Pages (toàn bộ là file tĩnh, Three.js đ�
   nơi phố cắt sông. Minimap chính là bản đồ thật thu nhỏ.
   Dữ liệu bản đồ © OpenStreetMap contributors (ODbL) — xử lý offline thành `js/mapdata.js`.
 - **Mô hình 3D chất lượng cao** (nhánh `assets-storage`, tải qua raw.githubusercontent.com):
-  - Nhà hát lớn: Meshy AI (người dùng cung cấp), texture gốc, nén hình học meshopt không đổi chất lượng.
+  - Nhà hát lớn: dựng bằng Meshy Image-to-3D từ ảnh chụp thật
+    ["Haiphong Opera House"](https://commons.wikimedia.org/wiki/File:Haiphong_Opera_House.jpg)
+    — Wikimedia Commons; texture gốc, nén hình học meshopt không đổi chất lượng.
   - Tượng đài Lê Chân: dựng bằng Meshy Image-to-3D từ ảnh chụp tượng thật
     ["Statue of Madam Lê-Chân in Haiphong City (1)"](https://commons.wikimedia.org/wiki/File:Statue_of_Madam_L%C3%AA-Ch%C3%A2n_in_Haiphong_City_(1).jpg)
     — Wikimedia Commons, giấy phép CC BY-SA 3.0.
