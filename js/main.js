@@ -3,6 +3,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { buildWorld, groundHeight, groundHeightNoDeck, landAt, WORLD_BOUNDS, LM } from './world.js';
 import { createTraffic } from './traffic.js';
 import { makeHumanoid } from './character.js';
@@ -33,6 +34,13 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1800);
+
+// Môi trường phản chiếu cho vật liệu PBR (mô hình GLB không bị xỉn/tối)
+{
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+  pmrem.dispose();
+}
 
 // Hậu kỳ bloom (tắt trên di động để giữ mượt)
 const usePost = !isTouchDevice;

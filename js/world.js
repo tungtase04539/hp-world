@@ -566,14 +566,35 @@ export function buildWorld(scene) {
       const center = box.getCenter(new THREE.Vector3());
       m.position.x += 4 - center.x;
       m.position.z += -22 - center.z;
-      m.position.y += LAND_H - box.min.y;
+      // dìm nhẹ chân model (điểm thấp nhất có thể là tán cây rìa -> thân nhà không lơ lửng)
+      m.position.y += LAND_H - box.min.y - 0.55;
       m.traverse((o) => {
         if (o.isMesh) {
           o.castShadow = true;
           o.receiveShadow = true;
+          const mt = o.material;
+          if (mt) {
+            // texture nét ở góc nhìn xiên + không xỉn màu
+            for (const key of ['map', 'normalMap', 'roughnessMap', 'metalnessMap']) {
+              if (mt[key]) mt[key].anisotropy = 8;
+            }
+            mt.envMapIntensity = 0.85;
+          }
         }
       });
       scene.add(m);
+      // bệ đá nền dưới toàn bộ công trình (đứng vững trên mặt đất)
+      const fw = (box.max.x - box.min.x) + 3, fd = (box.max.z - box.min.z) + 3;
+      const plinth = new THREE.Mesh(new THREE.BoxGeometry(fw, 0.9, fd), mat(0xcfc5ac));
+      plinth.position.set(4, LAND_H + 0.15, -22);
+      plinth.receiveShadow = true;
+      scene.add(plinth);
+      for (let s = 0; s < 3; s++) { // bậc thềm dẫn lên từ quảng trường
+        const step = new THREE.Mesh(new THREE.BoxGeometry(fw * 0.7 - s * 2, 0.3, 1.6), mat(0xd8cdb0));
+        step.position.set(4, LAND_H + 0.15 + s * 0.22, -22 + fd / 2 + 1.4 - s * 0.7);
+        step.receiveShadow = true;
+        scene.add(step);
+      }
     });
     addCollider(4, -22, 20);
 
