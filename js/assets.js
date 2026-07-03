@@ -12,6 +12,12 @@ const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
 const REGISTRY = [];
 let toastFn = null;
 
+// File GLB nặng nằm ở nhánh assets-storage (GitHub Pages giới hạn dung lượng build);
+// chạy local thì dùng bản trong thư mục assets/
+const ASSET_BASE = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+  ? ''
+  : 'https://raw.githubusercontent.com/tungtase04539/hp-world/assets-storage/';
+
 // def: { url, name, x, z, radius, preload, place(gltfScene) }
 export function registerModel(def) {
   REGISTRY.push({ ...def, state: 'idle' });
@@ -22,7 +28,7 @@ function start(d) {
   d.state = 'loading';
   if (toastFn && d.name) toastFn(`⏳ Đang tải ${d.name}…`);
   loader.load(
-    d.url,
+    ASSET_BASE + d.url,
     (gltf) => {
       d.state = 'done';
       try {
