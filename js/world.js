@@ -631,6 +631,26 @@ export function buildWorld(scene) {
           }
         });
         scene.add(m);
+        // Chân dung Chủ tịch Hồ Chí Minh trên mặt tiền: dùng ẢNH CHUẨN phủ đè lên
+        // hình do AI nướng vào texture (bị méo — TUYỆT ĐỐI không dùng hình AI cho chân dung)
+        {
+          const tex = new THREE.TextureLoader().load('assets/img_bacho.jpg');
+          tex.colorSpace = THREE.SRGBColorSpace;
+          tex.anisotropy = 8;
+          const PH = 5.4, PW = PH * (512 / 664); // giữ đúng tỉ lệ ảnh gốc, không kéo méo
+          const grp = new THREE.Group();
+          const frame = new THREE.Mesh(new THREE.PlaneGeometry(PW + 0.55, PH + 0.55), mat(0xf5eede));
+          grp.add(frame);
+          const portrait = new THREE.Mesh(new THREE.PlaneGeometry(PW, PH),
+            new THREE.MeshBasicMaterial({ map: tex, toneMapped: false }));
+          portrait.position.z = 0.03;
+          grp.add(portrait);
+          const halfDepth = (box.max.z - box.min.z) / 2;
+          const [px2, pz2] = localPt(opX, opZ, 0, halfDepth + 0.22, thOpera);
+          grp.position.set(px2, LAND_H + 7.7, pz2);
+          grp.rotation.y = thOpera;
+          scene.add(grp);
+        }
         const fw = (box.max.x - box.min.x) + 3, fd = (box.max.z - box.min.z) + 3;
         const plinth = new THREE.Mesh(new THREE.BoxGeometry(fw, 0.9, fd), mat(0xcfc5ac));
         plinth.position.set(opX, LAND_H + 0.15, opZ);
