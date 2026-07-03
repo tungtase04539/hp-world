@@ -469,11 +469,19 @@ console.log(`parks thật: ${PARKS.length}`);
 const RAIL = [];
 for (const w of load('osm_rail.json')) {
   const t = w.tags || {};
-  if (t.usage !== 'main' && t.service) continue; // bỏ yard/spur trong cảng
   if (!w.geometry) continue;
   const pts = rnd(simplify(subdiv(w.geometry, 50), 6)).filter(([x, z]) =>
     x > WORLD.minX && x < WORLD.maxX && z > WORLD.minZ && z < WORLD.maxZ);
-  if (pts.length >= 2 && plLen(pts) > 60) RAIL.push({ pts });
+  if (pts.length < 2) continue;
+  const isMain = t.usage === 'main' || !t.service;
+  if (isMain) { if (plLen(pts) > 60) RAIL.push({ pts }); continue; }
+  // ray yard/spur: chỉ giữ trong khu cảng hoặc sân ga (thêm không khí đường sắt thật)
+  let cx = 0, cz = 0;
+  for (const [x, z] of pts) { cx += x; cz += z; }
+  cx /= pts.length; cz /= pts.length;
+  const nearPort = Math.hypot(cx - LM.port[0], cz - LM.port[1]) < 170;
+  const nearGa = Math.hypot(cx - LM.station[0], cz - LM.station[1]) < 70;
+  if ((nearPort || nearGa) && plLen(pts) > 30) RAIL.push({ pts });
 }
 console.log(`rail: ${RAIL.length} đoạn`);
 

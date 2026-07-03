@@ -879,10 +879,24 @@ export function buildWorld(scene) {
         scene.add(m);
       },
     });
-    const expo = new THREE.Mesh(new THREE.BoxGeometry(16, 7, 9), mat(0xeae6da));
-    expo.position.set(LM.lechan[0], LAND_H + 4.5, LM.lechan[1] - 14);
-    scene.add(expo);
-    addCollider(LM.lechan[0], LM.lechan[1] - 14, 9);
+    {
+      const eg = new THREE.Group();
+      const body = new THREE.Mesh(new THREE.BoxGeometry(16, 6.5, 9), mat(0xf0ece0));
+      body.position.y = 3.25; eg.add(body);
+      for (let i = -3; i <= 3; i++) { // hàng cột mặt tiền
+        const col = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 5.2, 8), mat(0xfdf8ea));
+        col.position.set(i * 2.2, 2.6, 4.9); eg.add(col);
+      }
+      const cornice = new THREE.Mesh(new THREE.BoxGeometry(16.8, 0.9, 10), mat(0xddd6c2));
+      cornice.position.y = 6.9; eg.add(cornice);
+      const sign = new THREE.Mesh(new THREE.PlaneGeometry(9, 1.1),
+        new THREE.MeshLambertMaterial({ map: signTexture('TRUNG TÂM TRIỂN LÃM', '#2e5f8a', '#ffffff') }));
+      sign.position.set(0, 5.6, 5.06); eg.add(sign);
+      eg.position.set(LM.lechan[0], LAND_H, LM.lechan[1] - 14);
+      // mặt tiền (local +z) quay về tượng Lê Chân ở phía nam (+z) -> không xoay
+      scene.add(eg);
+      addCollider(LM.lechan[0], LM.lechan[1] - 14, 9);
+    }
   }
 
   // ---------- NHÀ THỜ CHÍNH TÒA: GLB từ ảnh thật (Wikimedia Commons) ----------
@@ -1025,7 +1039,7 @@ export function buildWorld(scene) {
     const g = bridgeGroup(b);
     bridgeDeckAndRails(g, b, 0xe8524a);
     const red = mat(0xd8402e);
-    const TILT = 0.24, RIB_X = 6.2, ARCH_H = 26, AS = 96; // vòm chỉ ôm nhịp chính giữa sông
+    const TILT = 0.24, RIB_X = 6.2, ARCH_H = 30, AS = 102; // vòm ôm nhịp chính giữa sông (thật: nhịp 200m)
     for (const s of [-1, 1]) {
       const arcPts = [];
       for (let i = 0; i <= 24; i++) {
@@ -1047,22 +1061,45 @@ export function buildWorld(scene) {
       brace.position.set(0, y * Math.cos(TILT), (tt - 0.5) * AS);
       g.add(brace);
     }
-    // dây treo từ vòm xuống hai mép mặt cầu
+    // dây treo ĐAN CHÉO (network arch — đặc trưng thật của cầu Hoàng Văn Thụ)
     for (let i = 2; i <= 22; i += 2) {
       const tt = i / 24;
       const topYr = Math.sin(tt * Math.PI) * ARCH_H + 2;
       const zz = (tt - 0.5) * AS;
-      const ttd = zz / b.half;
-      const deckY = LAND_H + b.rise * Math.max(0, 1 - ttd * ttd);
-      for (const s of [-1, 1]) {
-        const topY = topYr * Math.cos(TILT);
-        const topX = s * (RIB_X - Math.sin(TILT) * topYr);
-        const len = Math.hypot(topY - deckY, topX - s * 5.8);
-        if (len < 2) continue;
-        const cable = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, len, 4), mat(0xe8e0d8));
-        cable.position.set((topX + s * 5.8) / 2, (topY + deckY) / 2, zz);
-        cable.rotation.z = Math.atan2(topX - s * 5.8, topY - deckY);
-        g.add(cable);
+      for (const dDir of [-1, 1]) {
+        const zd = zz + dDir * AS * 0.075; // chân dây lệch dọc cầu -> các dây cắt nhau
+        if (Math.abs(zd) > AS / 2 + 4) continue;
+        const ttd = zd / b.half;
+        const deckY = LAND_H + b.rise * Math.max(0, 1 - ttd * ttd);
+        for (const s of [-1, 1]) {
+          const topY = topYr * Math.cos(TILT);
+          const topX = s * (RIB_X - Math.sin(TILT) * topYr);
+          const dz = zd - zz;
+          const len = Math.hypot(topY - deckY, topX - s * 5.8, dz);
+          if (len < 2) continue;
+          const cable = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, len, 4), mat(0xe8e0d8));
+          cable.position.set((topX + s * 5.8) / 2, (topY + deckY) / 2, zz + dz / 2);
+          const v = new THREE.Vector3(topX - s * 5.8, topY - deckY, -dz).normalize();
+          cable.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), v);
+          g.add(cable);
+        }
+      }
+    }
+    // trụ dẫn cầu đôi đỡ mặt cầu ngoài nhịp vòm (cầu dẫn thật chạy dài hai phía)
+    for (const dir of [-1, 1]) {
+      for (let a = AS / 2 + 14; a < b.half - 6; a += 20) {
+        const along = dir * a;
+        const ttd = along / b.half;
+        const deckY = LAND_H + b.rise * Math.max(0, 1 - ttd * ttd);
+        if (deckY < 2.6) continue;
+        for (const sx of [-4.2, 4.2]) {
+          const pier = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.9, deckY - 0.2, 8), mat(0xb9bec4));
+          pier.position.set(sx, (deckY - 0.2) / 2, along);
+          g.add(pier);
+        }
+        const cap = new THREE.Mesh(new THREE.BoxGeometry(11.5, 0.8, 2), mat(0xa9aeb4));
+        cap.position.set(0, deckY - 0.9, along);
+        g.add(cap);
       }
     }
   }
@@ -1070,6 +1107,19 @@ export function buildWorld(scene) {
     const b = BRIDGES[1];
     const g = bridgeGroup(b);
     bridgeDeckAndRails(g, b, 0x88b8c8);
+    for (const dir of [-1, 1]) {
+      for (let a = 96; a < b.half - 6; a += 22) {
+        const along = dir * a;
+        const ttd = along / b.half;
+        const deckY = LAND_H + b.rise * Math.max(0, 1 - ttd * ttd);
+        if (deckY < 2.6) continue;
+        for (const sx of [-4.2, 4.2]) {
+          const pier = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.9, deckY - 0.2, 8), mat(0xb9bec4));
+          pier.position.set(sx, (deckY - 0.2) / 2, along);
+          g.add(pier);
+        }
+      }
+    }
     for (const dz of [-40, 40]) {
       for (const dx of [-6, 6]) {
         const pylon = new THREE.Mesh(new THREE.BoxGeometry(1.6, 34, 1.6), mat(0xb8c4c8));
