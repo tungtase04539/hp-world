@@ -113,9 +113,10 @@ function nearDTRoad(x, z, r) {
 }
 
 // ---------- Cầu lớn (vòm) & cầu tàu ----------
+// nhịp cầu chỉ phủ đúng lòng sông + mép bờ (rộng quá sẽ nâng nhầm các phố cắt ngang gần cầu)
 export const BRIDGES = [
-  { x: -80, zc: -163, half: 82, rise: 8 },   // cầu Hoàng Văn Thụ
-  { x: -585, zc: -472, half: 92, rise: 7 },  // cầu Bính
+  { x: -80, zc: -163, half: 55, rise: 8 },   // cầu Hoàng Văn Thụ
+  { x: -585, zc: -472, half: 60, rise: 7 },  // cầu Bính
 ];
 const PIERS = []; // world.js đăng ký sau khi dò bờ
 export function addPier(p) { PIERS.push(p); }

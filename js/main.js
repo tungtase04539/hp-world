@@ -26,7 +26,7 @@ const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, isTouchDevice ? 1.5 : 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.22;
+renderer.toneMappingExposure = 1.26;
 // bóng đổ thời gian thực (tắt trên di động để giữ mượt)
 renderer.shadowMap.enabled = !isTouchDevice;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -405,6 +405,20 @@ window.__hp = {
   },
   setTime(v) { dayNight.t = v; },
   gh(x, z) { return groundHeightNoDeck(x, z); },
+  // bắn tia từ camera qua điểm màn hình (NDC) -> vật thể đầu tiên chạm
+  pick(nx, ny) {
+    const rc = new THREE.Raycaster();
+    rc.setFromCamera(new THREE.Vector2(nx, ny), camera);
+    const hits = rc.intersectObjects(scene.children, true);
+    if (!hits.length) return null;
+    const h = hits[0];
+    return {
+      name: h.object.name || h.object.type,
+      mat: h.object.material?.type,
+      dist: Math.round(h.distance),
+      point: [Math.round(h.point.x), Math.round(h.point.y), Math.round(h.point.z)],
+    };
+  },
 };
 
 document.getElementById('startBtn').addEventListener('click', () => {
