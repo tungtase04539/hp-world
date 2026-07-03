@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { registerModel } from './assets.js';
 import {
-  WORLD_BOUNDS, LM, LM_DIR, LM_FACE, EXTRAS, TREES, PARKS, DT_BOX, RIVERS, ROADS_DT, ROADS_REGION, BRIDGES, BUILDINGS,
+  WORLD_BOUNDS, LM, LM_DIR, LM_FACE, EXTRAS, TREES, PARKS, RAIL, DT_BOX, RIVERS, ROADS_DT, ROADS_REGION, BRIDGES, BUILDINGS,
   groundHeight, groundHeightNoDeck, isWater, landAt, riverFactor,
   nearestRiverPoint, findShore, addPier,
 } from './terrain.js';
@@ -384,6 +384,39 @@ export function buildWorld(scene) {
     mesh.receiveShadow = true;
     scene.add(mesh);
   }
+  // ---------- ĐƯỜNG SẮT THẬT (tuyến Hà Nội - Hải Phòng chạy vào ga) ----------
+  {
+    const ballastGeos = [], railGeos = [];
+    for (const r of RAIL) {
+      for (let i = 0; i < r.pts.length - 1; i++) {
+        const [x1, z1] = r.pts[i], [x2, z2] = r.pts[i + 1];
+        const segLen = Math.hypot(x2 - x1, z2 - z1);
+        if (segLen < 1) continue;
+        const rotY = Math.atan2(x2 - x1, z2 - z1);
+        const nCh = Math.max(1, Math.ceil(segLen / 16));
+        for (let c = 0; c < nCh; c++) {
+          const t1 = c / nCh, t2 = (c + 1) / nCh;
+          const cx1 = x1 + (x2 - x1) * t1, cz1 = z1 + (z2 - z1) * t1;
+          const cx2 = x1 + (x2 - x1) * t2, cz2 = z1 + (z2 - z1) * t2;
+          const h1 = Math.max(groundHeightNoDeck(cx1, cz1), LAND_H);
+          const h2 = Math.max(groundHeightNoDeck(cx2, cz2), LAND_H);
+          if (Math.abs(h1 - h2) > 6) continue;
+          const mx = (cx1 + cx2) / 2, mz = (cz1 + cz2) / 2;
+          const my = (h1 + h2) / 2 + 0.02;
+          const len = segLen / nCh;
+          const rotX = Math.atan2(h1 - h2, len);
+          pushBox(ballastGeos, 3, 0.16, len + 0.8, mx, my, mz, rotY, rotX);
+          const px2 = Math.cos(rotY), pz2 = -Math.sin(rotY);
+          for (const off of [-0.72, 0.72]) {
+            pushBox(railGeos, 0.17, 0.14, len + 0.8, mx + off * px2, my + 0.15, mz + off * pz2, rotY, rotX);
+          }
+        }
+      }
+    }
+    addMerged(ballastGeos, mat(0x6f6659), 'railballast');
+    addMerged(railGeos, mat(0x848a92), 'rails');
+  }
+
   addMerged(asphaltGeos, mat(0x4c5158), 'roads');
   addMerged(sidewalkGeos, mat(0xbcb5a2), 'sidewalks');
   addMerged(dashGeos, mat(0xe8e4d2), 'dashes');

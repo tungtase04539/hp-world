@@ -1,8 +1,8 @@
 // Địa hình từ dữ liệu OpenStreetMap thật (không phụ thuộc three.js — chạy được cả trong node)
-import { WORLD, DT_BOX, MASK, RIVERS, ROADS_DT, ROADS_REGION, LM, LM_DIR, LM_FACE, EXTRAS, TREES, PARKS, BUILDINGS } from './mapdata.js';
+import { WORLD, DT_BOX, MASK, RIVERS, ROADS_DT, ROADS_REGION, LM, LM_DIR, LM_FACE, EXTRAS, TREES, PARKS, RAIL, BUILDINGS } from './mapdata.js';
 
 export const WORLD_BOUNDS = WORLD;
-export { LM, LM_DIR, LM_FACE, EXTRAS, TREES, PARKS, DT_BOX, RIVERS, ROADS_DT, ROADS_REGION, BUILDINGS };
+export { LM, LM_DIR, LM_FACE, EXTRAS, TREES, PARKS, RAIL, DT_BOX, RIVERS, ROADS_DT, ROADS_REGION, BUILDINGS };
 
 const SEA_FLOOR = -4, LAND_H = 2;
 

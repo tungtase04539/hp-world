@@ -465,6 +465,18 @@ console.log(`parks thật: ${PARKS.length}`);
   console.log('hồ Tam Bạc:', JSON.stringify(EXTRAS.lake), 'tâm', LM.lake);
 }
 
+// ---------- 6c. ĐƯỜNG SẮT THẬT (tuyến chính Hà Nội - Hải Phòng vào ga) ----------
+const RAIL = [];
+for (const w of load('osm_rail.json')) {
+  const t = w.tags || {};
+  if (t.usage !== 'main' && t.service) continue; // bỏ yard/spur trong cảng
+  if (!w.geometry) continue;
+  const pts = rnd(simplify(subdiv(w.geometry, 50), 6)).filter(([x, z]) =>
+    x > WORLD.minX && x < WORLD.maxX && z > WORLD.minZ && z < WORLD.maxZ);
+  if (pts.length >= 2 && plLen(pts) > 60) RAIL.push({ pts });
+}
+console.log(`rail: ${RAIL.length} đoạn`);
+
 console.log('LM:', JSON.stringify(LM));
 console.log('LM_DIR:', JSON.stringify(LM_DIR));
 console.log('EXTRAS:', JSON.stringify(EXTRAS));
@@ -484,6 +496,7 @@ export const LM_DIR = ${JSON.stringify(LM_DIR)};
 export const LM_FACE = ${JSON.stringify(LM_FACE)};
 export const EXTRAS = ${JSON.stringify(EXTRAS)};
 export const TREES = ${JSON.stringify(TREES)};
+export const RAIL = ${JSON.stringify(RAIL)};
 export const PARKS = ${JSON.stringify(PARKS)};
 export const BUILDINGS = ${JSON.stringify(BUILDINGS)};
 `;
