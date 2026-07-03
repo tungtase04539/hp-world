@@ -19,6 +19,7 @@ import * as audio from './audio.js';
 import * as quests from './quests.js';
 import { initMinimap, drawMinimap } from './minimap.js';
 import { initMinigame, openMinigame, isMinigameOpen } from './minigame.js';
+import { initAssets, updateAssets } from './assets.js';
 
 // ============ Khởi tạo đồ họa ============
 const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
@@ -349,6 +350,7 @@ function animate() {
     audio.tryHorn(time, 1 - Math.min(1, Math.max(0, (dPort - 70) / 180)));
 
     autoQuality();
+    updateAssets(dt, pState.pos); // streaming mô hình xa theo khoảng cách
     clockUITimer += dt;
     if (clockUITimer > 0.5) { clockUITimer = 0; ui.setClock(dayNight.clockString); }
 
@@ -362,6 +364,7 @@ function animate() {
 // ============ Bắt đầu ============
 initInput();
 ui.initUI();
+initAssets(ui.toast); // preload các mô hình GLB ngay từ màn hình chờ
 initMinigame(audio);
 quests.bindQuestUI(ui, audio);
 initMinimap();

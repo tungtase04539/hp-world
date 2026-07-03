@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+import { registerModel } from './assets.js';
 import {
   WORLD_BOUNDS, LM, DT_BOX, RIVERS, ROADS_DT, ROADS_REGION, BRIDGES, BUILDINGS,
   groundHeight, groundHeightNoDeck, isWater, landAt, riverFactor,
@@ -549,52 +548,48 @@ export function buildWorld(scene) {
     return m;
   };
 
-  // ---------- NHÀ HÁT LỚN: mô hình 3D chi tiết (GLB nén meshopt, do người dùng cung cấp) ----------
+  // ---------- NHÀ HÁT LỚN: GLB chất lượng gốc (preload từ màn hình chờ) ----------
   {
-    const gltfLoader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
-    gltfLoader.load('assets/nhahat.glb', (gltf) => {
-      const m = gltf.scene;
-      // xoay mặt tiền về phía quảng trường (hướng nam +z), chỉnh sau khi soi thực tế
-      m.rotation.y = 0;
-      m.updateMatrixWorld(true);
-      const box = new THREE.Box3().setFromObject(m);
-      const size = box.getSize(new THREE.Vector3());
-      const s = 34 / Math.max(size.x, size.z); // cạnh dài = 34 (cỡ nhà hát thật trong game)
-      m.scale.setScalar(s);
-      m.updateMatrixWorld(true);
-      box.setFromObject(m);
-      const center = box.getCenter(new THREE.Vector3());
-      m.position.x += 4 - center.x;
-      m.position.z += -22 - center.z;
-      // dìm nhẹ chân model (điểm thấp nhất có thể là tán cây rìa -> thân nhà không lơ lửng)
-      m.position.y += LAND_H - box.min.y - 0.55;
-      m.traverse((o) => {
-        if (o.isMesh) {
-          o.castShadow = true;
-          o.receiveShadow = true;
-          const mt = o.material;
-          if (mt) {
-            // texture nét ở góc nhìn xiên + không xỉn màu
-            for (const key of ['map', 'normalMap', 'roughnessMap', 'metalnessMap']) {
-              if (mt[key]) mt[key].anisotropy = 8;
+    registerModel({
+      url: 'assets/nhahat.glb', name: 'Nhà hát lớn', x: 4, z: -22, preload: true,
+      place: (m) => {
+        m.updateMatrixWorld(true);
+        const box = new THREE.Box3().setFromObject(m);
+        const size = box.getSize(new THREE.Vector3());
+        const s = 34 / Math.max(size.x, size.z);
+        m.scale.setScalar(s);
+        m.updateMatrixWorld(true);
+        box.setFromObject(m);
+        const center = box.getCenter(new THREE.Vector3());
+        m.position.x += 4 - center.x;
+        m.position.z += -22 - center.z;
+        m.position.y += LAND_H - box.min.y - 0.55; // dìm nhẹ chân, thân nhà không lơ lửng
+        m.traverse((o) => {
+          if (o.isMesh) {
+            o.castShadow = true;
+            o.receiveShadow = true;
+            const mt = o.material;
+            if (mt) {
+              for (const key of ['map', 'normalMap', 'roughnessMap', 'metalnessMap']) {
+                if (mt[key]) mt[key].anisotropy = 8;
+              }
+              mt.envMapIntensity = 0.85;
             }
-            mt.envMapIntensity = 0.85;
           }
+        });
+        scene.add(m);
+        const fw = (box.max.x - box.min.x) + 3, fd = (box.max.z - box.min.z) + 3;
+        const plinth = new THREE.Mesh(new THREE.BoxGeometry(fw, 0.9, fd), mat(0xcfc5ac));
+        plinth.position.set(4, LAND_H + 0.15, -22);
+        plinth.receiveShadow = true;
+        scene.add(plinth);
+        for (let st = 0; st < 3; st++) {
+          const step = new THREE.Mesh(new THREE.BoxGeometry(fw * 0.7 - st * 2, 0.3, 1.6), mat(0xd8cdb0));
+          step.position.set(4, LAND_H + 0.15 + st * 0.22, -22 + fd / 2 + 1.4 - st * 0.7);
+          step.receiveShadow = true;
+          scene.add(step);
         }
-      });
-      scene.add(m);
-      // bệ đá nền dưới toàn bộ công trình (đứng vững trên mặt đất)
-      const fw = (box.max.x - box.min.x) + 3, fd = (box.max.z - box.min.z) + 3;
-      const plinth = new THREE.Mesh(new THREE.BoxGeometry(fw, 0.9, fd), mat(0xcfc5ac));
-      plinth.position.set(4, LAND_H + 0.15, -22);
-      plinth.receiveShadow = true;
-      scene.add(plinth);
-      for (let s = 0; s < 3; s++) { // bậc thềm dẫn lên từ quảng trường
-        const step = new THREE.Mesh(new THREE.BoxGeometry(fw * 0.7 - s * 2, 0.3, 1.6), mat(0xd8cdb0));
-        step.position.set(4, LAND_H + 0.15 + s * 0.22, -22 + fd / 2 + 1.4 - s * 0.7);
-        step.receiveShadow = true;
-        scene.add(step);
-      }
+      },
     });
     addCollider(4, -22, 20);
 
@@ -685,12 +680,10 @@ export function buildWorld(scene) {
     addCollider(-42 + i * 8, -8, 2.4);
   }
 
-  // ---------- TƯỢNG ĐÀI LÊ CHÂN (dáng đồng mềm mại, bệ đá 2 cấp, bảng tên) ----------
+  // ---------- TƯỢNG ĐÀI LÊ CHÂN: GLB AI có màu (bệ đá + bảng tên giữ nguyên) ----------
   {
     const g = new THREE.Group();
-    const bronze = mat(0x4f5a44, { flatShading: false }); // đồng xanh rêu như tượng thật
     const granite = mat(0x9a948a);
-    // bệ 2 cấp
     const base = new THREE.Mesh(new THREE.BoxGeometry(8.5, 0.9, 8.5), granite);
     base.position.y = 0.45; g.add(base);
     const ped = new THREE.Mesh(new THREE.BoxGeometry(4.6, 4.2, 4.6), granite);
@@ -700,44 +693,41 @@ export function buildWorld(scene) {
     const plaque = new THREE.Mesh(new THREE.PlaneGeometry(3.6, 1),
       new THREE.MeshLambertMaterial({ map: signTexture('NỮ TƯỚNG LÊ CHÂN', '#7a7468', '#f5edd8') }));
     plaque.position.set(0, 2.6, 2.32); g.add(plaque);
-    // thân áo dài + vạt choàng: đường lathe mềm
-    const profile = [
-      [2.05, 0], [1.9, 0.5], [1.5, 1.6], [1.05, 3.0], [0.78, 4.2],
-      [0.72, 4.9], [0.88, 5.5], [0.82, 6.1], [0.6, 6.5], [0.3, 6.7],
-    ].map(([r, y]) => new THREE.Vector2(r, y));
-    const robe = new THREE.Mesh(new THREE.LatheGeometry(profile, 18), bronze);
-    robe.position.y = 5.6; g.add(robe);
-    // vai + hai tay hơi dang (thế tượng thật)
-    for (const s of [-1, 1]) {
-      const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.24, 2.2, 4, 8), bronze);
-      arm.position.set(s * 1.05, 10.6, 0.15);
-      arm.rotation.z = s * 0.42;
-      arm.rotation.x = -0.12;
-      g.add(arm);
-      const hand = new THREE.Mesh(new THREE.SphereGeometry(0.24, 8, 6), bronze);
-      hand.position.set(s * 1.62, 9.55, 0.34);
-      g.add(hand);
-    }
-    // đầu, búi tóc, vành khăn
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.55, 12, 10), bronze);
-    head.scale.set(1, 1.12, 1);
-    head.position.y = 12.5; g.add(head);
-    const bun = new THREE.Mesh(new THREE.SphereGeometry(0.3, 8, 6), bronze);
-    bun.position.set(0, 13.15, -0.28); g.add(bun);
-    // đốc kiếm bên hông trái
-    const sword = new THREE.Mesh(new THREE.BoxGeometry(0.16, 2.6, 0.34), bronze);
-    sword.position.set(-0.95, 8.6, 0.55);
-    sword.rotation.z = 0.18;
-    g.add(sword);
-    // vạt áo choàng bay nhẹ phía sau
-    const cloak = new THREE.Mesh(new THREE.ConeGeometry(1.5, 6.4, 10, 1, true), bronze);
-    cloak.scale.set(1, 1, 0.55);
-    cloak.position.set(0, 8.8, -0.85);
-    cloak.rotation.x = 0.16;
-    g.add(cloak);
     g.position.set(LM.lechan[0], LAND_H, LM.lechan[1]);
-    scene.add(g); // mặt tượng nhìn về hướng nam (phía biển hiệu & dải trung tâm)
+    scene.add(g);
     addCollider(LM.lechan[0], LM.lechan[1], 4.6);
+
+    registerModel({
+      url: 'assets/lechan.glb', name: 'Tượng đài Lê Chân',
+      x: LM.lechan[0], z: LM.lechan[1], preload: true,
+      place: (m) => {
+        m.updateMatrixWorld(true);
+        const box = new THREE.Box3().setFromObject(m);
+        const size = box.getSize(new THREE.Vector3());
+        const s = 9 / size.y; // tượng cao ~9 (tượng thật 7,5m + chân đế liền khối)
+        m.scale.setScalar(s);
+        m.updateMatrixWorld(true);
+        box.setFromObject(m);
+        const center = box.getCenter(new THREE.Vector3());
+        m.position.x += LM.lechan[0] - center.x;
+        m.position.z += LM.lechan[1] - center.z;
+        m.position.y += (LAND_H + 5.6) - box.min.y; // đứng trên mặt bệ đá
+        m.traverse((o) => {
+          if (o.isMesh) {
+            o.castShadow = true;
+            o.receiveShadow = true;
+            const mt = o.material;
+            if (mt) {
+              for (const key of ['map', 'normalMap', 'roughnessMap', 'metalnessMap']) {
+                if (mt[key]) mt[key].anisotropy = 8;
+              }
+              mt.envMapIntensity = 0.85;
+            }
+          }
+        });
+        scene.add(m);
+      },
+    });
     const expo = new THREE.Mesh(new THREE.BoxGeometry(24, 9, 11), mat(0xeae6da));
     expo.position.set(LM.lechan[0], LAND_H + 4.5, LM.lechan[1] - 14);
     scene.add(expo);
