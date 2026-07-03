@@ -4,7 +4,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { buildWorld, groundHeight, groundHeightNoDeck, landAt, WORLD_BOUNDS, LM } from './world.js';
+import { buildWorld, groundHeight, groundHeightNoDeck, landAt, WORLD_BOUNDS, LM, EXTRAS } from './world.js';
 import { createTraffic } from './traffic.js';
 import { makeHumanoid } from './character.js';
 import { createVehicles } from './vehicles.js';
@@ -74,7 +74,10 @@ const { vehicles, update: updateVehicle } = createVehicles(
 if (world.dosonBeach) {
   world.walkPaths.push([[world.dosonBeach[0] - 30, world.dosonBeach[1] - 20], [world.dosonBeach[0] + 10, world.dosonBeach[1] + 20]]);
 }
-world.walkPaths.push([[4420, 1732], [4500, 1738]]);
+world.walkPaths.push([
+  [EXTRAS.catbaTown[0] - 40, EXTRAS.catbaTown[1] - 8],
+  [EXTRAS.catbaTown[0] + 40, EXTRAS.catbaTown[1] - 2],
+]);
 const traffic = createTraffic(scene, world);
 
 // bật đổ bóng cho mọi vật thể đặc (đất nhận bóng, nước & vật trong suốt bỏ qua)
@@ -90,7 +93,7 @@ if (renderer.shadowMap.enabled) {
 // ============ Người chơi ============
 const player = makeHumanoid({ hat: 'cap' });
 scene.add(player.group);
-const SPAWN = { x: 0, z: 34 };
+const SPAWN = { x: EXTRAS.square[0] - 5, z: EXTRAS.square[1] + 23 }; // mép quảng trường Nhà hát lớn
 const pState = {
   pos: new THREE.Vector3(SPAWN.x, groundHeight(SPAWN.x, SPAWN.z), SPAWN.z),
   yaw: Math.PI, // nhìn về Nhà hát lớn (hướng bắc)
@@ -335,8 +338,10 @@ function animate() {
     // đêm bloom mạnh hơn cho đèn phố & cửa sổ rực rỡ
     if (bloomPass) bloomPass.strength = 0.1 + sky.night * 0.6;
 
-    // cánh phượng quanh dải trung tâm (tâm ~ hồ Tam Bạc - Nhà hát lớn)
-    const dCity = Math.hypot(pState.pos.x + 80, pState.pos.z - 20);
+    // cánh phượng quanh dải trung tâm (tâm ~ giữa hồ Tam Bạc và Nhà hát lớn)
+    const dCity = Math.hypot(
+      pState.pos.x - (LM.lake[0] + LM.opera[0]) / 2,
+      pState.pos.z - (LM.lake[1] + LM.opera[1]) / 2);
     const petalStrength = 1 - Math.min(1, Math.max(0, (dCity - 170) / 150));
     petals.update(dt, time, pState.pos, petalStrength, groundHeight);
 
@@ -346,7 +351,7 @@ function animate() {
     const lv = landAt(pState.pos.x, pState.pos.z);
     const seaFactor = onWater || gy < 0.5 ? 1 : 1 - Math.min(1, Math.max(0, (lv - 0.72) / 0.26));
     audio.updateAudio(dt, { seaFactor });
-    const dPort = Math.hypot(pState.pos.x - 180, pState.pos.z + 154);
+    const dPort = Math.hypot(pState.pos.x - world.portAnchor[0], pState.pos.z - world.portAnchor[1]);
     audio.tryHorn(time, 1 - Math.min(1, Math.max(0, (dPort - 70) / 180)));
 
     autoQuality();

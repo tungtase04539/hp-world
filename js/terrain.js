@@ -1,8 +1,8 @@
 // Địa hình từ dữ liệu OpenStreetMap thật (không phụ thuộc three.js — chạy được cả trong node)
-import { WORLD, DT_BOX, MASK, RIVERS, ROADS_DT, ROADS_REGION, LM, BUILDINGS } from './mapdata.js';
+import { WORLD, DT_BOX, MASK, RIVERS, ROADS_DT, ROADS_REGION, LM, LM_DIR, LM_FACE, EXTRAS, BUILDINGS } from './mapdata.js';
 
 export const WORLD_BOUNDS = WORLD;
-export { LM, DT_BOX, RIVERS, ROADS_DT, ROADS_REGION, BUILDINGS };
+export { LM, LM_DIR, LM_FACE, EXTRAS, DT_BOX, RIVERS, ROADS_DT, ROADS_REGION, BUILDINGS };
 
 const SEA_FLOOR = -4, LAND_H = 2;
 
@@ -113,19 +113,21 @@ function nearDTRoad(x, z, r) {
 }
 
 // ---------- Cầu lớn (vòm) & cầu tàu ----------
-// nhịp cầu chỉ phủ đúng lòng sông + mép bờ (rộng quá sẽ nâng nhầm các phố cắt ngang gần cầu)
-export const BRIDGES = [
-  { x: -80, zc: -163, half: 55, rise: 8 },   // cầu Hoàng Văn Thụ
-  { x: -585, zc: -472, half: 60, rise: 7 },  // cầu Bính
-];
+// nhịp cầu lấy đúng từ way OSM: tâm (x,zc), nửa chiều dài half, góc trục ang (atan2(dx,dz))
+export const BRIDGES = EXTRAS.bridges.map((b) => ({
+  ...b, sin: Math.sin(b.ang), cos: Math.cos(b.ang),
+}));
 const PIERS = []; // world.js đăng ký sau khi dò bờ
 export function addPier(p) { PIERS.push(p); }
 
 function deckHeight(x, z, rf) {
   let h = -Infinity;
   for (const b of BRIDGES) {
-    if (Math.abs(x - b.x) < 7 && Math.abs(z - b.zc) < b.half) {
-      const tt = (z - b.zc) / b.half;
+    const dx = x - b.x, dz = z - b.zc;
+    const along = dx * b.sin + dz * b.cos;      // dọc trục cầu
+    const across = dx * b.cos - dz * b.sin;     // ngang trục cầu
+    if (Math.abs(across) < 7 && Math.abs(along) < b.half) {
+      const tt = along / b.half;
       h = Math.max(h, LAND_H + b.rise * Math.max(0, 1 - tt * tt));
     }
   }
@@ -140,11 +142,14 @@ function deckHeight(x, z, rf) {
 }
 
 // ---------- Đồi núi ----------
-const DS_RIDGE = [1365, 2247, 1545, 2426]; // sống đồi Đồ Sơn (thật)
+const DS_RIDGE = EXTRAS.dsRidge; // sống đồi Đồ Sơn (từ bãi biển OSM thật)
 function hills(x, z, v) {
   let h = 0;
   const dDS = distToSeg(x, z, ...DS_RIDGE);
   h += 19 * (1 - smoothstep(25, 105, dDS)) * (0.72 + 0.28 * Math.sin(x * 0.05 + z * 0.03));
+  // đồi Vụng — nơi đặt biệt thự Bảo Đại (node OSM thật)
+  const dBD = Math.hypot(x - EXTRAS.baodai[0], z - EXTRAS.baodai[1]);
+  h += 15 * (1 - smoothstep(16, 90, dBD));
   if (z < -600 && v > 0.6) { // đồi Thủy Nguyên
     h += 7 * smoothstep(-600, -1000, z) * (0.5 + 0.5 * Math.sin(x * 0.011) * Math.sin(z * 0.013)) * smoothstep(0.6, 0.9, v);
   }
@@ -163,8 +168,9 @@ export function groundHeightNoDeck(x, z) {
   h += hills(x, z, v);
   // san phẳng trung tâm (hộp phố thật) + thị trấn Cát Bà + khu cảng
   h = lerp(h, LAND_H, rectFactor(x, DT_BOX.x1, DT_BOX.x2, z, DT_BOX.z1, DT_BOX.z2, 60) * smoothstep(0.35, 0.55, v));
-  h = lerp(h, LAND_H, rectFactor(x, 4400, 4580, z, 1660, 1785, 24) * smoothstep(0.35, 0.55, v));
-  h = lerp(h, LAND_H, rectFactor(x, 130, 320, z, -195, -120, 16) * smoothstep(0.3, 0.5, v));
+  const CT = EXTRAS.catbaTown;
+  h = lerp(h, LAND_H, rectFactor(x, CT[0] - 95, CT[0] + 95, z, CT[1] - 70, CT[1] + 70, 24) * smoothstep(0.35, 0.55, v));
+  h = lerp(h, LAND_H, rectFactor(x, LM.port[0] - 95, LM.port[0] + 95, z, LM.port[1] - 45, LM.port[1] + 45, 16) * smoothstep(0.3, 0.5, v));
   // đào lòng sông (thắng san phẳng)
   const rf = riverFactor(x, z);
   if (rf > 0) h = lerp(h, -3, rf);

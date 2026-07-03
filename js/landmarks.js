@@ -1,10 +1,39 @@
 import * as THREE from 'three';
 import { tx, onLangChange } from './i18n.js';
+import { LM, LM_FACE, EXTRAS } from './mapdata.js';
+
+// đầu cầu phía nam (gần trung tâm) — tính từ tâm/trục/nửa chiều dài way OSM
+function bridgeEnd(b) {
+  const e1 = [b.x + Math.sin(b.ang) * b.half, b.zc + Math.cos(b.ang) * b.half];
+  const e2 = [b.x - Math.sin(b.ang) * b.half, b.zc - Math.cos(b.ang) * b.half];
+  return e1[1] > e2[1] ? e1 : e2;
+}
+const hvtEnd = bridgeEnd(EXTRAS.bridges[0]);
+const binhEnd = bridgeEnd(EXTRAS.bridges[1]);
+
+// vị trí biển chỉ dẫn: cạnh công trình thật (LM = tâm footprint OSM), lệch ra ngoài để không chắn lối
+const P = {
+  opera: [LM.opera[0] + 14, LM.opera[1] + 16],
+  quanhoa: [LM.quanhoa[0] + 8, LM.quanhoa[1] + 6],
+  lechan: [LM.lechan[0] + 8, LM.lechan[1] + 8],
+  lake: [LM.lake[0], LM.lake[1] + 30],
+  market: [LM.market[0] + 2, LM.market[1] + 22], // phía nam — mặt tây là sông Tam Bạc
+  cathedral: [LM.cathedral[0] + LM_FACE.cathedral[0] * 20, LM.cathedral[1] + LM_FACE.cathedral[1] * 20],
+  postoffice: [LM.postoffice[0] + LM_FACE.postoffice[0] * 16, LM.postoffice[1] + LM_FACE.postoffice[1] * 16],
+  museum: [LM.museum[0] + LM_FACE.museum[0] * 18, LM.museum[1] + LM_FACE.museum[1] * 18],
+  station: [LM.station[0] + 18, LM.station[1] + 4],
+  bridge: [hvtEnd[0] + 9, hvtEnd[1] + 8],
+  binhbridge: [binhEnd[0] + 9, binhEnd[1] + 8],
+  port: [LM.port[0] - 80, LM.port[1] + 30],
+  doson: [LM.doson[0], LM.doson[1]],
+  hondau: [LM.hondau[0] + 6, LM.hondau[1] - 6], // đảo nhỏ — lệch về phía đất
+  catba: [EXTRAS.catbaTown[0] - 25, EXTRAS.catbaTown[1] + 10],
+};
 
 // 15 địa danh đặc trưng — tọa độ thật từ dữ liệu OpenStreetMap (đã qua phép chiếu 1:10 + kính lúp trung tâm)
 export const LANDMARKS = [
   {
-    id: 'opera', x: 0, z: 4,
+    id: 'opera', x: P.opera[0], z: P.opera[1],
     name: { vi: 'Nhà hát lớn Hải Phòng', en: 'Hai Phong Opera House' },
     text: {
       vi: 'Xây năm 1904 theo phong cách Baroque với vật liệu chở từ Pháp sang. Mặt tiền vàng rực đối xứng hoàn hảo, các cột trắng kiểu Corinth, hơn 100 cửa. Trước nhà hát là quảng trường với đài phun nước và cột cờ Tổ quốc.',
@@ -16,7 +45,7 @@ export const LANDMARKS = [
     },
   },
   {
-    id: 'quanhoa', x: -26, z: -2,
+    id: 'quanhoa', x: P.quanhoa[0], z: P.quanhoa[1],
     name: { vi: 'Quán hoa', en: 'The Flower Kiosks' },
     text: {
       vi: 'Dải 5 quán hoa nhỏ xây năm 1944, mái ngói vẩy rồng cong vút kiểu đình làng Bắc Bộ trên bốn cột gỗ lim. Hơn 80 năm qua, đây là nơi người Hải Phòng mua hoa mỗi sáng — nét duyên riêng không nơi nào có.',
@@ -28,7 +57,7 @@ export const LANDMARKS = [
     },
   },
   {
-    id: 'lechan', x: -30, z: 32,
+    id: 'lechan', x: P.lechan[0], z: P.lechan[1],
     name: { vi: 'Tượng đài Nữ tướng Lê Chân', en: 'Lady General Le Chan Monument' },
     text: {
       vi: 'Tượng đồng cao 7,5m, nặng 19 tấn, khánh thành năm 2000, đặt trước Trung tâm Triển lãm. Nữ tướng Lê Chân là người khai phá vùng đất An Biên — tiền thân của Hải Phòng — và là biểu tượng tinh thần của thành phố.',
@@ -40,7 +69,7 @@ export const LANDMARKS = [
     },
   },
   {
-    id: 'lake', x: -160, z: 40,
+    id: 'lake', x: P.lake[0], z: P.lake[1],
     name: { vi: 'Hồ Tam Bạc', en: 'Tam Bac Lake' },
     text: {
       vi: 'Dải hồ dài giữa lòng thành phố, người Pháp cải tạo từ một nhánh sông năm 1885. Hai bờ là hàng phượng vĩ rực đỏ mỗi độ hè — đoạn đẹp nhất của "dải trung tâm" để dạo bộ buổi chiều.',
@@ -52,7 +81,7 @@ export const LANDMARKS = [
     },
   },
   {
-    id: 'market', x: -215, z: -40,
+    id: 'market', x: P.market[0], z: P.market[1],
     name: { vi: 'Chợ Sắt', en: 'Sat (Iron) Market' },
     text: {
       vi: 'Khu chợ nổi tiếng nhất Hải Phòng bên sông Tam Bạc, xây từ thời Pháp với khung thép — vì thế có tên "chợ Sắt". Từng là trung tâm buôn bán sầm uất nhất miền Bắc, "gì cũng có, từ cái kim đến chiếc tàu thủy".',
@@ -64,7 +93,7 @@ export const LANDMARKS = [
     },
   },
   {
-    id: 'cathedral', x: -112, z: 48,
+    id: 'cathedral', x: P.cathedral[0], z: P.cathedral[1],
     name: { vi: 'Nhà thờ chính tòa Hải Phòng', en: 'Hai Phong Cathedral' },
     text: {
       vi: 'Nhà thờ chính tòa Nữ Vương Rất Thánh Mân Côi xây năm 1880 theo lối Gothic, tháp chuông cao vút giữa khu phố cũ. Tiếng chuông nhà thờ đã điểm nhịp cho phố Cảng gần một thế kỷ rưỡi.',
@@ -76,7 +105,7 @@ export const LANDMARKS = [
     },
   },
   {
-    id: 'postoffice', x: 62, z: 14,
+    id: 'postoffice', x: P.postoffice[0], z: P.postoffice[1],
     name: { vi: 'Bưu điện trung tâm', en: 'Central Post Office' },
     text: {
       vi: 'Tòa bưu điện kiểu thuộc địa Pháp với tường vàng, dãy cửa vòm trắng và đồng hồ lớn trên nóc — một trong những công trình cổ duyên dáng nhất của khu phố Pháp Hải Phòng.',
@@ -88,7 +117,7 @@ export const LANDMARKS = [
     },
   },
   {
-    id: 'museum', x: -47, z: -24,
+    id: 'museum', x: P.museum[0], z: P.museum[1],
     name: { vi: 'Bảo tàng Hải Phòng', en: 'Hai Phong Museum' },
     text: {
       vi: 'Tòa nhà gạch đỏ kiểu Gothic thuộc địa xây năm 1919, nguyên là Ngân hàng Pháp-Hoa. Nay lưu giữ hàng vạn hiện vật kể chuyện vùng đất Cảng từ thuở Nữ tướng Lê Chân khai hoang.',
@@ -100,7 +129,7 @@ export const LANDMARKS = [
     },
   },
   {
-    id: 'station', x: -30, z: 148,
+    id: 'station', x: P.station[0], z: P.station[1],
     name: { vi: 'Ga Hải Phòng', en: 'Hai Phong Railway Station' },
     text: {
       vi: 'Nhà ga kiểu Pháp khánh thành năm 1902, điểm cuối tuyến đường sắt Hà Nội – Hải Phòng lịch sử. Chuyến tàu LP luôn là cách lãng mạn nhất để đến thành phố Cảng.',
@@ -112,7 +141,7 @@ export const LANDMARKS = [
     },
   },
   {
-    id: 'bridge', x: -78, z: -68,
+    id: 'bridge', x: P.bridge[0], z: P.bridge[1],
     name: { vi: 'Cầu Hoàng Văn Thụ', en: 'Hoang Van Thu Bridge' },
     text: {
       vi: 'Cây cầu vòm thép hiện đại bắc qua sông Cấm, khánh thành 2019, dáng như "cánh chim biển" sải cánh. Nhịp vòm chính dài 200m. Đứng trên cầu ngắm hoàng hôn trên sông Cấm là trải nghiệm không thể bỏ lỡ!',
@@ -124,7 +153,7 @@ export const LANDMARKS = [
     },
   },
   {
-    id: 'binhbridge', x: -585, z: -372,
+    id: 'binhbridge', x: P.binhbridge[0], z: P.binhbridge[1],
     name: { vi: 'Cầu Bính', en: 'Binh Bridge' },
     text: {
       vi: 'Cầu dây văng thanh thoát bắc qua sông Cấm, khánh thành 2005, từng là một trong những cầu dây văng đẹp nhất Đông Nam Á với hai trụ tháp cao vút và rừng dây cáp trắng.',
@@ -136,7 +165,7 @@ export const LANDMARKS = [
     },
   },
   {
-    id: 'port', x: 180, z: -150,
+    id: 'port', x: P.port[0], z: P.port[1],
     name: { vi: 'Cảng Hải Phòng', en: 'Port of Hai Phong' },
     text: {
       vi: 'Cửa ngõ ra biển lớn nhất miền Bắc với lịch sử hơn 150 năm. Giàn cần cẩu và núi container hoạt động ngày đêm bên sông Cấm — chính nơi này cho thành phố cái tên "Thành phố Cảng".',
@@ -148,7 +177,7 @@ export const LANDMARKS = [
     },
   },
   {
-    id: 'doson', x: 1540, z: 2350,
+    id: 'doson', x: P.doson[0], z: P.doson[1],
     name: { vi: 'Bãi biển Đồ Sơn', en: 'Do Son Beach' },
     text: {
       vi: 'Bán đảo nghỉ mát nổi tiếng từ đầu thế kỷ 20, cách trung tâm 20km. Đồi thông, bãi cát dài và sóng êm. Trên đỉnh đồi là biệt thự Bảo Đại — nơi nghỉ của vị vua cuối cùng. Bến Nghiêng dưới kia là nơi thuyền ra đảo Hòn Dấu.',
@@ -160,7 +189,7 @@ export const LANDMARKS = [
     },
   },
   {
-    id: 'hondau', x: 1738, z: 2792,
+    id: 'hondau', x: P.hondau[0], z: P.hondau[1],
     name: { vi: 'Hải đăng Hòn Dấu', en: 'Hon Dau Lighthouse' },
     text: {
       vi: 'Ngọn hải đăng do người Pháp xây năm 1892 trên đảo Hòn Dấu, được mệnh danh "mắt ngọc của Tổ quốc". Hơn 130 năm qua, đèn chưa tắt đêm nào, dẫn lối tàu thuyền vào cảng Hải Phòng.',
@@ -172,7 +201,7 @@ export const LANDMARKS = [
     },
   },
   {
-    id: 'catba', x: 4470, z: 1745,
+    id: 'catba', x: P.catba[0], z: P.catba[1],
     name: { vi: 'Cát Bà & Vịnh Lan Hạ', en: 'Cat Ba & Lan Ha Bay' },
     text: {
       vi: 'Hòn đảo lớn nhất vịnh Bắc Bộ với vườn quốc gia, thị trấn ven vịnh đầy nhà cao màu sắc, và vịnh Lan Hạ — hàng trăm đảo đá vôi nhấp nhô trên nước xanh ngọc, đẹp không kém Hạ Long mà yên bình hơn nhiều.',
