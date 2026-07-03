@@ -37,6 +37,7 @@ Hoặc deploy thẳng lên GitHub Pages (toàn bộ là file tĩnh, Three.js đ�
   - Ga Hải Phòng: từ ảnh ["Bambus-rejser-ga-hai-phong"](https://commons.wikimedia.org/wiki/File:Bambus-rejser-ga-hai-phong.jpg) — Wikimedia Commons.
   - Nhà thờ chính tòa: từ ảnh ["Hai Phong Cathedral (2007)"](https://commons.wikimedia.org/wiki/File:Hai_Phong_Cathedral_(2007).jpg) — Wikimedia Commons.
   - Quán hoa: từ ảnh tham khảo trên web (mia.vn), dùng làm dữ liệu đầu vào tạo mô hình.
+  - Bảo tàng Hải Phòng: từ ảnh tham khảo trên web, dùng làm dữ liệu đầu vào tạo mô hình.
 - **15 địa danh** thiết kế theo kiến trúc thực: Nhà hát lớn, Quán hoa, tượng đài Lê Chân,
   hồ Tam Bạc, chợ Sắt, nhà thờ chính tòa, bưu điện, bảo tàng, ga Hải Phòng,
   cầu Hoàng Văn Thụ, cầu Bính, cảng Hải Phòng, bãi biển Đồ Sơn + biệt thự Bảo Đại,

@@ -837,27 +837,13 @@ export function buildWorld(scene) {
     addCollider(poX, poZ, 12);
   }
 
-  // ---------- BẢO TÀNG ----------
-  {
-    const g = new THREE.Group();
-    const brick = mat(0xa8503c);
-    const brickFacade = grandMat('#a8503c', '#f0e4d0', { cols: 5 });
-    const body = new THREE.Mesh(new THREE.BoxGeometry(18, 8, 12),
-      [brickFacade, brickFacade, brick, brick, brickFacade, brickFacade]);
-    body.position.y = 4; g.add(body);
-    const roof = new THREE.Mesh(new THREE.ConeGeometry(11.5, 4.5, 4), mat(0x5a3a30));
-    roof.rotation.y = Math.PI / 4;
-    roof.position.y = 10.2; g.add(roof);
-    for (const sx of [-6, 6]) {
-      const wing = new THREE.Mesh(new THREE.BoxGeometry(5, 6.5, 13),
-        [brickFacade, brickFacade, brick, brick, brickFacade, brickFacade]);
-      wing.position.set(sx + Math.sign(sx) * 6.5, 3.25, 0); g.add(wing);
-    }
-    g.position.set(LM.museum[0], LAND_H, LM.museum[1]);
-    g.rotation.y = orientLong(LM_DIR.museum, LM_FACE.museum);
-    scene.add(g);
-    addCollider(LM.museum[0], LM.museum[1], 14);
-  }
+  // ---------- BẢO TÀNG: GLB từ ảnh thật (tòa nhà vàng kem thật, không phải gạch đỏ) ----------
+  placeGLB({
+    url: 'assets/baotang.glb', name: 'Bảo tàng Hải Phòng',
+    x: LM.museum[0], z: LM.museum[1],
+    rot: orientLong(LM_DIR.museum, LM_FACE.museum), size: 24,
+  });
+  addCollider(LM.museum[0], LM.museum[1], 12);
 
   // ---------- GA HẢI PHÒNG: GLB từ ảnh thật + đường ray & đoàn tàu phía sau ----------
   {

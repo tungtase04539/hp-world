@@ -99,7 +99,7 @@ với `ang = atan2(Δx, Δz)` của 2 đầu way thật.
 5. Một ảnh tốt > nhiều ảnh xấu. Multi-image (tối đa 4, `image_urls`) chỉ khi các ảnh NHẤT QUÁN
    (cùng công trình, cùng điều kiện sáng, các góc bổ sung nhau).
 
-### 5.2 Tiền xử lý ảnh (đã kiểm chứng 2 lần: Lê Chân, Nhà hát lớn)
+### 5.2 Tiền xử lý ảnh (đã kiểm chứng: Lê Chân, Nhà hát, Bưu điện, Ga, Nhà thờ, Quán hoa, Bảo tàng)
 - Crop sát công trình + lề nhỏ; bỏ watermark/chữ ký (crop hoặc đè).
 - **Xóa vật cản nền trời bằng "silhouette sky-fill"**: đo đường mái theo từng đoạn x
   (vẽ grid tọa độ lên ảnh để đo — PIL ImageDraw), rồi lấp mọi pixel phía trên đường mái bằng
@@ -107,6 +107,12 @@ với `ang = atan2(Δx, Δz)` của 2 đầu way thật.
   → Xóa sạch cờ/cây/nhà nền sau trong MỘT lần, không lem vào kiến trúc.
 - Vật cản trên nền kiến trúc: **clone-stamp** (paste vùng lân cận cùng cấu trúc — bậc thềm clone ngang,
   bóng hiên clone từ trên xuống). Lưu ý nguồn clone không được chứa chính vật cản.
+- Công trình ĐỐI XỨNG bị che một bên: làm sạch nửa dễ rồi **lật gương** (`transpose(FLIP_LEFT_RIGHT)`)
+  đè lên nửa kia (đã dùng: Ga - thân cau, Bảo tàng - nguyên nửa phải).
+- Mái ngói phức tạp: **dò đỉnh mái theo màu** (quét từng cột tìm pixel màu ngói đầu tiên, median ±6 cột)
+  thay vì ước lượng đường thẳng — tránh lấp mất mép mái cong (Quán hoa).
+- Ảnh chỉ có mặt tiền phẳng → mô hình nông (bas-relief), mặt sau xấu: đặt lưng quay vào phía ít nhìn thấy;
+  muốn đẹp mọi phía cần ảnh 3/4 hoặc multi-image.
 - Kết thúc: `SMOOTH` + `SHARPEN` nhẹ, JPEG q93. Luôn XEM LẠI thumbnail trước khi gửi.
 - Gửi API bằng **data URI** (`data:image/jpeg;base64,...`) — không cần host ảnh.
 
@@ -205,6 +211,9 @@ node mobile.mjs    # viewport điện thoại + joystick
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-03 (c)**: Bảo tàng photo→3D (ảnh web 1024px: lấp trời + gương nửa trái sạch sang nửa phải
+  vì tòa nhà đối xứng — kỹ thuật mới cho ảnh nhiều vật cản). Chợ Sắt: BỎ QUA — mọi ảnh đều dính
+  giàn quảng cáo + cây che tầng trệt (tòa 1992 đã phá 2023); giữ mô hình thủ công, chờ ảnh tư liệu tốt.
 - **2026-07-03 (b)**: 4 công trình trung tâm photo→3D: Bưu điện (Commons 5312px, góc 3/4),
   Ga (Commons 4032px, xóa 2 cây cau bằng mirror-clone đối xứng), Nhà thờ (Commons 1136px upscale 1.6x,
   xóa banner tháp bằng ốp tường + kéo dài cửa lam), Quán hoa (ảnh web, dò mái theo màu ngói + nhân 5 clone).
