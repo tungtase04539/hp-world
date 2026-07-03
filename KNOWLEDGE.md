@@ -51,6 +51,11 @@ Quan hệ dữ liệu: `tools/fetch_osm.sh` → `osm_*.json` → `tools/process_
 - Muốn đổi gốc/hệ số: sửa `tools/process_osm.mjs`, chạy lại, rồi RÀ TOÀN BỘ vị trí hardcode còn sót
   (grep số tọa độ trong world/main/traffic/landmarks — bài học: đã từng lệch hàng loạt).
 
+### Tỉ lệ hiển thị chuẩn (đã cân chỉnh 2026-07-03e)
+- Đường: p=7, s=6, t=5, r=4, w=3 (region 9). Nhà footprint phóng ≤1.6×. Địa danh 2.3-2.5× cạnh dài thật.
+- Nhân vật 1.7 đơn vị (to hơn tỉ lệ 1:10 thuần ~10×) — đó là lý do mọi thứ cần phóng nhẹ, nhưng
+  KHÔNG phóng quá mức kẻo công trình lấn phố → cảm giác "sai vị trí".
+
 ### Dữ liệu xuất trong mapdata.js
 - `WORLD` biên thế giới; `DT_BOX` hộp trung tâm (đã warp); `MASK` lưới đất/biển bit-pack base64 (cell 12).
 - `RIVERS [{w, pts}]` — rộng 62 (Cấm), 30 (Lạch Tray), 16 (Tam Bạc).
@@ -211,6 +216,13 @@ node mobile.mjs    # viewport điện thoại + joystick
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-03 (e)**: HIỆU CHỈNH TỈ LỆ toàn trung tâm cho khớp bản đồ thật (đối chiếu render
+  mapdata vs tile OSM cùng bbox): đường p/s/t/r/w 11/9/7.5/5.5/4 → 7/6/5/4/3; footprint nhà
+  phóng 1.6/1.45/1.2/1.05 (trước 2.4/2.0/1.55/1.2); mô hình địa danh ≈2.3-2.5× cạnh dài thật
+  (nhà hát 27, ga 26, nhà thờ 25, bưu điện 23, bảo tàng 17, quán hoa 5×5.6); quảng trường r14.
+  HỒ TAM BẠC: node tay sai vị trí (nằm trên sông) → tính trục+bề rộng từ polygon nước OSM thật
+  (way 236743184), thêm tham số bờ `sh` cho RIVERS (hồ sh=6 để không ngập THCS Trần Phú mép nam).
+  QUY TRÌNH đối chiếu: tools render mapdata PNG + tải tile OSM cùng bbox rồi so bằng mắt.
 - **2026-07-03 (d)**: CHÂN DUNG CHỦ TỊCH HỒ CHÍ MINH trên Nhà hát lớn: thay hình AI méo bằng ảnh
   chính thức nguyên bản (tấm phẳng phủ đè, đúng tỉ lệ). QUY TẮC: chân dung/quốc kỳ/hình nhạy cảm
   KHÔNG BAO GIỜ dùng bản do AI sinh — luôn phủ ảnh gốc (assets/img_bacho.jpg).

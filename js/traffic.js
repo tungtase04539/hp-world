@@ -121,7 +121,7 @@ export function createTraffic(scene, world) {
         s: L * (0.25 + 0.5 * k),
         speed: 13 + ((li + k) % 4) * 1.8,
         dir: k % 2 === 0 ? 1 : -1,
-        lane: 2.4,
+        lane: 1.8,
       });
     }
   });
@@ -132,7 +132,7 @@ export function createTraffic(scene, world) {
     scene.add(mesh);
     bikes.push({
       mesh, path, closed: false, L,
-      s: L * (0.2 + 0.3 * li), speed: 30, lane: 3, dir: li % 2 === 0 ? 1 : -1,
+      s: L * (0.2 + 0.3 * li), speed: 30, lane: 2.4, dir: li % 2 === 0 ? 1 : -1,
     });
   });
 
@@ -205,7 +205,7 @@ export function createTraffic(scene, world) {
       const p = samplePath(w.path, w.s, false);
       const head = w.dir === -1 ? p.heading + Math.PI : p.heading;
       // đi trên vỉa hè (lệch khỏi tim đường)
-      const ox = Math.cos(p.heading) * 4.4, oz = -Math.sin(p.heading) * 4.4;
+      const ox = Math.cos(p.heading) * 3.4, oz = -Math.sin(p.heading) * 3.4;
       const wx = p.x + ox, wz = p.z + oz;
       w.rig.group.position.set(wx, groundHeight(wx, wz), wz);
       w.rig.group.rotation.y = head;

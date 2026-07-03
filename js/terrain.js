@@ -82,8 +82,11 @@ function bucketQuery(buckets, x, z) {
 // Kênh Nam Triệu: nối cửa sông Cấm ra biển (luồng tàu thật giữa Đình Vũ - Cát Hải;
 // dữ liệu waterway OSM dừng ở cửa sông nên phải nối thủ công, nếu không thuyền bị "đập" chắn)
 RIVERS.push({ w: 110, pts: [[1400, 100], [1700, 380], [2000, 640], [2350, 900]] });
+// Hồ Tam Bạc: trục + bề rộng lấy từ polygon nước OSM thật; bờ hẹp (sh=6)
+// để không ngập trường THCS Trần Phú ngay mép nam hồ
+RIVERS.push({ w: EXTRAS.lake.w, sh: 6, pts: EXTRAS.lake.pts });
 
-const riverIdx = makeBucketIndex(RIVERS.map((r) => ({ pts: r.pts, meta: r.w })));
+const riverIdx = makeBucketIndex(RIVERS.map((r) => ({ pts: r.pts, meta: [r.w, r.sh || 16] })));
 const regionIdx = makeBucketIndex(ROADS_REGION.map((r) => ({ pts: r.pts, meta: 0 })));
 const dtRoadIdx = makeBucketIndex(ROADS_DT.map((r) => ({ pts: r.pts, meta: r.c })));
 
@@ -92,9 +95,9 @@ export function riverFactor(x, z) {
   const list = bucketQuery(riverIdx, x, z);
   if (!list) return 0;
   let f = 0;
-  for (const [ax, az, bx, bz, w] of list) {
+  for (const [ax, az, bx, bz, m] of list) {
     const d = distToSeg(x, z, ax, az, bx, bz);
-    const fi = 1 - smoothstep(w / 2, w / 2 + 16, d);
+    const fi = 1 - smoothstep(m[0] / 2, m[0] / 2 + m[1], d);
     if (fi > f) f = fi;
   }
   return f;

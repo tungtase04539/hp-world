@@ -17,7 +17,7 @@ const P = {
   quanhoa: [LM.quanhoa[0] + 8, LM.quanhoa[1] + 6],
   lechan: [LM.lechan[0] + 8, LM.lechan[1] + 8],
   lake: [LM.lake[0], LM.lake[1] + 30],
-  market: [LM.market[0] + 2, LM.market[1] + 22], // phía nam — mặt tây là sông Tam Bạc
+  market: [LM.market[0] + 2, LM.market[1] - 22], // phía bắc — nam là đầu hồ Tam Bạc
   cathedral: [LM.cathedral[0] + LM_FACE.cathedral[0] * 20, LM.cathedral[1] + LM_FACE.cathedral[1] * 20],
   postoffice: [LM.postoffice[0] + LM_FACE.postoffice[0] * 16, LM.postoffice[1] + LM_FACE.postoffice[1] * 16],
   museum: [LM.museum[0] + LM_FACE.museum[0] * 18, LM.museum[1] + LM_FACE.museum[1] * 18],

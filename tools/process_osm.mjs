@@ -295,7 +295,7 @@ for (const w of bldWays) {
   if (area < 3.5 || area > 12000) continue;
   if (cx < dtBox.x1 || cx > dtBox.x2 || cz < dtBox.z1 || cz > dtBox.z2) continue;
   // phóng footprint quanh tâm để cân với nhân vật (nhà nhỏ phóng nhiều, nhà lớn giữ gần nguyên)
-  const bScale = area < 40 ? 2.4 : area < 200 ? 2.0 : area < 900 ? 1.55 : 1.2;
+  const bScale = area < 40 ? 1.6 : area < 200 ? 1.45 : area < 900 ? 1.2 : 1.05;
   pts = pts.map(([x, z]) => [cx + (x - cx) * bScale, cz + (z - cz) * bScale]);
   area *= bScale * bScale;
   // chiều cao: tag height / building:levels, thiếu thì để 0 (game tự ước lượng)
@@ -353,7 +353,7 @@ addWay('museum', 1049831208, null);
 addWay('market', 1175766946, null);
 addNode('lechan', 106.67957, 20.85600);
 addNode('station', 106.68752, 20.85602);
-addNode('lake', 106.67600, 20.85820);
+// LM.lake: tính từ polygon hồ thật (phần 6b)
 addNode('baodai', 106.79297, 20.68766);
 EXTRAS.baodai = LM.baodai; delete LM.baodai;
 addNode('catba', 107.04830, 20.72290);
@@ -435,6 +435,35 @@ for (const w of load('osm_parks.json')) {
   PARKS.push(pts);
 }
 console.log(`parks thật: ${PARKS.length}`);
+
+// ---------- 6b. HỒ TAM BẠC: trục + bề rộng từ polygon nước thật (way 236743184) ----------
+{
+  const wd = load('osm_water_dt.json');
+  const lakeWay = wd.find((e) => e.id === 236743184);
+  const pts = lakeWay.geometry.map((g) => toXZ(g.lon, g.lat));
+  let dir = [1, 0], bl = 0;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const dx = pts[i+1][0] - pts[i][0], dz = pts[i+1][1] - pts[i][1], l = Math.hypot(dx, dz);
+    if (l > bl) { bl = l; dir = [dx / l, dz / l]; }
+  }
+  let mnA = 1e9, mxA = -1e9, mnB = 1e9, mxB = -1e9, cx = 0, cz = 0;
+  for (const [x, z] of pts) {
+    const a = x * dir[0] + z * dir[1], b = -x * dir[1] + z * dir[0];
+    mnA = Math.min(mnA, a); mxA = Math.max(mxA, a);
+    mnB = Math.min(mnB, b); mxB = Math.max(mxB, b);
+    cx += x; cz += z;
+  }
+  cx /= pts.length; cz /= pts.length;
+  const cb = (mnB + mxB) / 2;
+  const line = [];
+  for (const t of [0.06, 0.5, 0.94]) {
+    const a = mnA + (mxA - mnA) * t;
+    line.push([Math.round(a * dir[0] - cb * dir[1]), Math.round(a * dir[1] + cb * dir[0])]);
+  }
+  EXTRAS.lake = { w: Math.round(mxB - mnB), pts: line };
+  LM.lake = [Math.round(cx), Math.round(cz)];
+  console.log('hồ Tam Bạc:', JSON.stringify(EXTRAS.lake), 'tâm', LM.lake);
+}
 
 console.log('LM:', JSON.stringify(LM));
 console.log('LM_DIR:', JSON.stringify(LM_DIR));
