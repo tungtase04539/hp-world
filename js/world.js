@@ -562,6 +562,42 @@ export function buildWorld(scene) {
     return m;
   };
 
+  // Đặt GLB địa danh (từ ảnh thật qua Meshy): scale theo cạnh dài/chiều cao,
+  // xoay theo hướng thật, hạ tâm về (x,z), dìm nhẹ chân chống lơ lửng
+  function placeGLB({ url, name, x, z, rot = 0, size = 26, bySide = 'max', sink = 0.55, preload = false, radius }) {
+    registerModel({
+      url, name, x, z, preload, radius,
+      place: (m) => {
+        m.updateMatrixWorld(true);
+        const box = new THREE.Box3().setFromObject(m);
+        const sz = box.getSize(new THREE.Vector3());
+        const s = size / (bySide === 'y' ? sz.y : Math.max(sz.x, sz.z));
+        m.scale.setScalar(s);
+        m.rotation.y = rot;
+        m.updateMatrixWorld(true);
+        box.setFromObject(m);
+        const c = box.getCenter(new THREE.Vector3());
+        m.position.x += x - c.x;
+        m.position.z += z - c.z;
+        m.position.y += LAND_H - box.min.y - sink;
+        m.traverse((o) => {
+          if (o.isMesh) {
+            o.castShadow = true;
+            o.receiveShadow = true;
+            const mt = o.material;
+            if (mt) {
+              for (const k of ['map', 'normalMap', 'roughnessMap', 'metalnessMap']) {
+                if (mt[k]) mt[k].anisotropy = 8;
+              }
+              mt.envMapIntensity = 0.85;
+            }
+          }
+        });
+        scene.add(m);
+      },
+    });
+  }
+
   // ---------- NHÀ HÁT LỚN: GLB chất lượng gốc, đặt & xoay đúng footprint OSM ----------
   const thOpera = orientLong(LM_DIR.opera, LM_FACE.opera);
   {
@@ -674,38 +710,49 @@ export function buildWorld(scene) {
     });
   }
 
-  // ---------- QUÁN HOA (dãy 5 quán dọc cạnh dài thật của công trình OSM) ----------
-  const qhDir = LM_DIR.quanhoa, qhTh = orientFace(LM_FACE.quanhoa);
-  for (let i = 0; i < 5; i++) {
-    const g = new THREE.Group();
-    for (const [cx, cz] of [[-1.6, -1.6], [1.6, -1.6], [-1.6, 1.6], [1.6, 1.6]]) {
-      const col = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.22, 3.2, 6), mat(0x5a3a22));
-      col.position.set(cx, 1.6, cz);
-      g.add(col);
+  // ---------- QUÁN HOA: GLB từ ảnh thật, nhân 5 quán dọc cạnh dài thật ----------
+  {
+    const qhDir = LM_DIR.quanhoa, qhTh = orientFace(LM_FACE.quanhoa);
+    registerModel({
+      url: 'assets/quanhoa.glb', name: 'Quán hoa',
+      x: LM.quanhoa[0], z: LM.quanhoa[1],
+      place: (m) => {
+        m.updateMatrixWorld(true);
+        const box = new THREE.Box3().setFromObject(m);
+        const sz = box.getSize(new THREE.Vector3());
+        const s = 7 / Math.max(sz.x, sz.z);
+        for (let i = 0; i < 5; i++) {
+          const inst = i === 0 ? m : m.clone(true);
+          inst.scale.setScalar(s);
+          inst.rotation.y = qhTh;
+          inst.updateMatrixWorld(true);
+          const b2 = new THREE.Box3().setFromObject(inst);
+          const c2 = b2.getCenter(new THREE.Vector3());
+          const qx = LM.quanhoa[0] + qhDir[0] * (i - 2) * 8.5;
+          const qz = LM.quanhoa[1] + qhDir[1] * (i - 2) * 8.5;
+          inst.position.x += qx - c2.x;
+          inst.position.z += qz - c2.z;
+          inst.position.y += LAND_H - b2.min.y - 0.25;
+          inst.traverse((o) => {
+            if (o.isMesh) {
+              o.castShadow = true;
+              o.receiveShadow = true;
+              const mt = o.material;
+              if (mt) {
+                for (const k of ['map', 'normalMap', 'roughnessMap', 'metalnessMap']) {
+                  if (mt[k]) mt[k].anisotropy = 8;
+                }
+                mt.envMapIntensity = 0.85;
+              }
+            }
+          });
+          scene.add(inst);
+        }
+      },
+    });
+    for (let i = 0; i < 5; i++) {
+      addCollider(LM.quanhoa[0] + qhDir[0] * (i - 2) * 8.5, LM.quanhoa[1] + qhDir[1] * (i - 2) * 8.5, 2.8);
     }
-    const roof1 = new THREE.Mesh(new THREE.ConeGeometry(3.4, 1.5, 4), mat(0x8a4030, { flatShading: true }));
-    roof1.rotation.y = Math.PI / 4;
-    roof1.position.y = 3.9;
-    g.add(roof1);
-    const roofTip = new THREE.Mesh(new THREE.ConeGeometry(0.5, 0.8, 4), mat(0x6d3226));
-    roofTip.rotation.y = Math.PI / 4;
-    roofTip.position.y = 4.9;
-    g.add(roofTip);
-    for (let k = 0; k < 6; k++) {
-      const fl = new THREE.Mesh(new THREE.SphereGeometry(0.32, 5, 4),
-        mat([0xe8402a, 0xf2ce4b, 0xe87ab8, 0xffffff, 0xb85ae8, 0xf28c3a][k], { flatShading: true }));
-      fl.position.set(-1 + (k % 3), 1.1, -0.8 + Math.floor(k / 3) * 1.6);
-      g.add(fl);
-    }
-    const table = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.7, 2.6), mat(0x8a6a45));
-    table.position.y = 0.35;
-    g.add(table);
-    const qx = LM.quanhoa[0] + qhDir[0] * (i - 2) * 8;
-    const qz = LM.quanhoa[1] + qhDir[1] * (i - 2) * 8;
-    g.position.set(qx, LAND_H, qz);
-    g.rotation.y = qhTh;
-    scene.add(g);
-    addCollider(qx, qz, 2.4);
   }
 
   // ---------- TƯỢNG ĐÀI LÊ CHÂN: GLB AI có màu (bệ đá + bảng tên giữ nguyên) ----------
@@ -762,74 +809,32 @@ export function buildWorld(scene) {
     addCollider(LM.lechan[0], LM.lechan[1] - 14, 13);
   }
 
-  // ---------- NHÀ THỜ CHÍNH TÒA ----------
+  // ---------- NHÀ THỜ CHÍNH TÒA: GLB từ ảnh thật (Wikimedia Commons) ----------
   {
-    const g = new THREE.Group();
-    const cream = mat(0xe6cd96); // vàng kem như nhà thờ thật
-    const white = mat(0xfdf6e0);
-    const nave = new THREE.Mesh(new THREE.BoxGeometry(12, 9, 24), cream);
-    nave.position.y = 4.5; g.add(nave);
-    for (const sz of [-8, -2, 4]) { // trụ tường bên hông
-      for (const sx of [-6.2, 6.2]) {
-        const butt = new THREE.Mesh(new THREE.BoxGeometry(0.8, 8, 1.2), white);
-        butt.position.set(sx, 4, sz);
-        g.add(butt);
-      }
-    }
-    const naveRoof = new THREE.Mesh(new THREE.CylinderGeometry(4.5, 4.5, 24, 3), mat(0x7d5040));
-    naveRoof.rotation.z = Math.PI / 2;
-    naveRoof.rotation.y = Math.PI / 2;
-    naveRoof.scale.x = 0.8;
-    naveRoof.position.y = 10.5; g.add(naveRoof);
-    const belfry = new THREE.Mesh(new THREE.BoxGeometry(6, 16, 6), cream);
-    belfry.position.set(0, 8, 14); g.add(belfry);
-    for (const sx of [-3, 3]) { // viền góc trắng tháp chuông
-      for (const sz2 of [11.2, 16.8]) {
-        const trim = new THREE.Mesh(new THREE.BoxGeometry(0.6, 16, 0.6), white);
-        trim.position.set(sx, 8, sz2 - 14 + 14);
-        trim.position.z = sz2;
-        g.add(trim);
-      }
-    }
-    const louvre = new THREE.Mesh(new THREE.BoxGeometry(3.2, 4, 0.3), mat(0x6b5a40));
-    louvre.position.set(0, 12.5, 17.1); g.add(louvre);
-    const spire = new THREE.Mesh(new THREE.ConeGeometry(4, 8, 8), mat(0x5a5a62, { flatShading: true }));
-    spire.position.set(0, 20, 14); g.add(spire);
-    const cross = new THREE.Mesh(new THREE.BoxGeometry(0.3, 2.4, 0.3), mat(0xf2ce6b));
-    cross.position.set(0, 25.2, 14); g.add(cross);
-    const crossArm = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.3, 0.3), mat(0xf2ce6b));
-    crossArm.position.set(0, 25.6, 14); g.add(crossArm);
-    const rose = new THREE.Mesh(new THREE.CircleGeometry(1.6, 12),
-      mat(0x4a7ab8, { emissive: 0x3a5a98, emissiveIntensity: 0.3 }));
-    rose.position.set(0, 9, 17.05); g.add(rose);
-    // mặt tiền (đầu hồi, local +Z) quay đúng hướng thật; tâm khối ≈ tâm footprint OSM
-    const thCa = orientFace(LM_FACE.cathedral);
-    const [caX, caZ] = localPt(LM.cathedral[0], LM.cathedral[1], 0, -2, thCa);
-    g.position.set(caX, LAND_H, caZ);
-    g.rotation.y = thCa;
-    scene.add(g);
-    addCollider(caX, caZ, 10);
-    const [beX, beZ] = localPt(caX, caZ, 0, 14, thCa); // tháp chuông
-    addCollider(beX, beZ, 5);
+    // trục dài gian giữa theo cạnh dài OSM; tháp chuông (đầu -X của mô hình) quay về hướng mặt tiền thật
+    const thCa = orientLong(LM_DIR.cathedral, null) + Math.PI;
+    placeGLB({
+      url: 'assets/nhatho.glb', name: 'Nhà thờ chính tòa',
+      x: LM.cathedral[0], z: LM.cathedral[1], rot: thCa, size: 32,
+    });
+    addCollider(LM.cathedral[0], LM.cathedral[1], 9);
+    const [c1x, c1z] = localPt(LM.cathedral[0], LM.cathedral[1], -11, 0, thCa);
+    const [c2x, c2z] = localPt(LM.cathedral[0], LM.cathedral[1], 11, 0, thCa);
+    addCollider(c1x, c1z, 7);
+    addCollider(c2x, c2z, 7);
   }
 
-  // ---------- BƯU ĐIỆN ----------
+  // ---------- BƯU ĐIỆN: GLB từ ảnh thật (Wikimedia Commons) ----------
   {
-    const g = new THREE.Group();
-    const postFacade = grandMat('#f0c868', '#fdf6e0', { cols: 6 });
-    const body = new THREE.Mesh(new THREE.BoxGeometry(22, 9, 10),
-      [postFacade, postFacade, mat(0xf0c868), mat(0xf0c868), postFacade, postFacade]);
-    body.position.y = 4.5; g.add(body);
-    const roof = new THREE.Mesh(new THREE.BoxGeometry(23, 1.4, 11), mat(0x7d5040));
-    roof.position.y = 9.7; g.add(roof);
-    const clockFace = new THREE.Mesh(new THREE.CircleGeometry(1.1, 16), mat(0xfffbe8));
-    clockFace.position.set(0, 11.2, 5.05); g.add(clockFace);
-    const clockBox = new THREE.Mesh(new THREE.BoxGeometry(3, 3, 1.4), mat(0xf0c868));
-    clockBox.position.set(0, 11.2, 4.2); g.add(clockBox);
-    g.position.set(LM.postoffice[0], LAND_H, LM.postoffice[1]);
-    g.rotation.y = orientLong(LM_DIR.postoffice, LM_FACE.postoffice);
-    scene.add(g);
-    addCollider(LM.postoffice[0], LM.postoffice[1], 12);
+    // lùi nhẹ khỏi mặt phố (đường trong game vẽ rộng hơn thực tế)
+    const poX = LM.postoffice[0] - LM_FACE.postoffice[0] * 4.5;
+    const poZ = LM.postoffice[1] - LM_FACE.postoffice[1] * 4.5;
+    placeGLB({
+      url: 'assets/buudien.glb', name: 'Bưu điện trung tâm',
+      x: poX, z: poZ,
+      rot: orientLong(LM_DIR.postoffice, LM_FACE.postoffice), size: 24,
+    });
+    addCollider(poX, poZ, 12);
   }
 
   // ---------- BẢO TÀNG ----------
@@ -854,24 +859,15 @@ export function buildWorld(scene) {
     addCollider(LM.museum[0], LM.museum[1], 14);
   }
 
-  // ---------- GA HẢI PHÒNG ----------
+  // ---------- GA HẢI PHÒNG: GLB từ ảnh thật + đường ray & đoàn tàu phía sau ----------
   {
+    placeGLB({
+      url: 'assets/ga.glb', name: 'Ga Hải Phòng',
+      x: LM.station[0], z: LM.station[1] + 14, rot: 0, size: 31,
+    });
+    addCollider(LM.station[0], LM.station[1] + 14, 16);
+    // sân ga + đường ray + đoàn tàu (sau lưng nhà ga, phía bắc)
     const g = new THREE.Group();
-    const stationFacade = grandMat('#f2ce6b', '#fdf6e0', { cols: 6 });
-    const body = new THREE.Mesh(new THREE.BoxGeometry(26, 8, 10),
-      [stationFacade, stationFacade, mat(0xf2ce6b), mat(0xf2ce6b), stationFacade, stationFacade]);
-    body.position.y = 4; g.add(body);
-    const center = new THREE.Mesh(new THREE.BoxGeometry(8, 11, 11), mat(0xf2ce6b));
-    center.position.y = 5.5; g.add(center);
-    const roofC = new THREE.Mesh(new THREE.ConeGeometry(6.5, 3, 4), mat(0x7d5040));
-    roofC.rotation.y = Math.PI / 4; roofC.position.y = 12.4; g.add(roofC);
-    const roofB = new THREE.Mesh(new THREE.BoxGeometry(27, 1.2, 11), mat(0x7d5040));
-    roofB.position.y = 8.5; g.add(roofB);
-    const door = new THREE.Mesh(new THREE.BoxGeometry(3.4, 4.6, 0.2), mat(0x6d4a2e));
-    door.position.set(0, 2.6, 5.6); g.add(door);
-    const sign = new THREE.Mesh(new THREE.PlaneGeometry(7, 1.3),
-      new THREE.MeshLambertMaterial({ map: signTexture('GA HẢI PHÒNG', '#28457d', '#ffffff') }));
-    sign.position.set(0, 9.6, 5.62); g.add(sign);
     const canopy = new THREE.Mesh(new THREE.BoxGeometry(30, 0.5, 8), mat(0x8a8f96));
     canopy.position.set(0, 6, -10); g.add(canopy);
     for (const sx of [-12, -4, 4, 12]) {
@@ -894,7 +890,6 @@ export function buildWorld(scene) {
     }
     g.position.set(LM.station[0], LAND_H, LM.station[1] + 14);
     scene.add(g);
-    addCollider(LM.station[0], LM.station[1] + 14, 16);
     addCollider(LM.station[0], LM.station[1] + 2, 12);
   }
 

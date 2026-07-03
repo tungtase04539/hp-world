@@ -33,6 +33,10 @@ Hoặc deploy thẳng lên GitHub Pages (toàn bộ là file tĩnh, Three.js đ�
   - Tượng đài Lê Chân: dựng bằng Meshy Image-to-3D từ ảnh chụp tượng thật
     ["Statue of Madam Lê-Chân in Haiphong City (1)"](https://commons.wikimedia.org/wiki/File:Statue_of_Madam_L%C3%AA-Ch%C3%A2n_in_Haiphong_City_(1).jpg)
     — Wikimedia Commons, giấy phép CC BY-SA 3.0.
+  - Bưu điện trung tâm: từ ảnh ["Bưu điện thành phố - Hải Phòng"](https://commons.wikimedia.org/wiki/File:B%C6%B0u_%C4%91i%E1%BB%87n_th%C3%A0nh_ph%E1%BB%91_-_H%E1%BA%A3i_Ph%C3%B2ng.jpg) — Wikimedia Commons.
+  - Ga Hải Phòng: từ ảnh ["Bambus-rejser-ga-hai-phong"](https://commons.wikimedia.org/wiki/File:Bambus-rejser-ga-hai-phong.jpg) — Wikimedia Commons.
+  - Nhà thờ chính tòa: từ ảnh ["Hai Phong Cathedral (2007)"](https://commons.wikimedia.org/wiki/File:Hai_Phong_Cathedral_(2007).jpg) — Wikimedia Commons.
+  - Quán hoa: từ ảnh tham khảo trên web (mia.vn), dùng làm dữ liệu đầu vào tạo mô hình.
 - **15 địa danh** thiết kế theo kiến trúc thực: Nhà hát lớn, Quán hoa, tượng đài Lê Chân,
   hồ Tam Bạc, chợ Sắt, nhà thờ chính tòa, bưu điện, bảo tàng, ga Hải Phòng,
   cầu Hoàng Văn Thụ, cầu Bính, cảng Hải Phòng, bãi biển Đồ Sơn + biệt thự Bảo Đại,
