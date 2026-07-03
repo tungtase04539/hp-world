@@ -26,6 +26,8 @@ Hoặc deploy thẳng lên GitHub Pages (toàn bộ là file tĩnh, Three.js đ�
   cầu Hoàng Văn Thụ/cầu Bính đặt đúng vị trí bắc qua sông Cấm thật, mọi cây cầu phố tự sinh
   nơi phố cắt sông. Minimap chính là bản đồ thật thu nhỏ.
   Dữ liệu bản đồ © OpenStreetMap contributors (ODbL) — xử lý offline thành `js/mapdata.js`.
+- **Mô hình 3D Nhà hát lớn** (`assets/nhahat.glb`): tạo bằng Meshy AI (người dùng cung cấp),
+  nén meshopt + WebP từ 75,8MB xuống 3,9MB bằng gltf-transform.
 - **15 địa danh** thiết kế theo kiến trúc thực: Nhà hát lớn, Quán hoa, tượng đài Lê Chân,
   hồ Tam Bạc, chợ Sắt, nhà thờ chính tòa, bưu điện, bảo tàng, ga Hải Phòng,
   cầu Hoàng Văn Thụ, cầu Bính, cảng Hải Phòng, bãi biển Đồ Sơn + biệt thự Bảo Đại,

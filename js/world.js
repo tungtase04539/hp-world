@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import {
   WORLD_BOUNDS, LM, DT_BOX, RIVERS, ROADS_DT, ROADS_REGION, BRIDGES, BUILDINGS,
   groundHeight, groundHeightNoDeck, isWater, landAt, riverFactor,
@@ -547,119 +549,32 @@ export function buildWorld(scene) {
     return m;
   };
 
-  // ---------- NHÀ HÁT LỚN (bám sát kiến trúc thật: trệt vòm cửa, lầu hàng cột trắng,
-  // lan can con tiện trên mái, trán tường tam giác, mái mansard đá đen) + quảng trường ----------
+  // ---------- NHÀ HÁT LỚN: mô hình 3D chi tiết (GLB nén meshopt, do người dùng cung cấp) ----------
   {
-    const g = new THREE.Group();
-    const yellow = mat(0xefc95d), white = mat(0xfdf6e0), slate = mat(0x3f4550);
-    // texture riêng: tầng trệt dãy vòm sâu, tầng lầu cửa cao kiểu Pháp
-    const operaTex = (em) => makeTex(512, 256, (gc, w, h) => {
-      gc.fillStyle = em ? '#000' : '#efc95d';
-      gc.fillRect(0, 0, w, h);
-      if (!em) {
-        speckle(gc, w, h, 160, 0.05);
-        gc.fillStyle = 'rgba(0,0,0,0.2)';
-        gc.fillRect(0, h * 0.9, w, h * 0.1); // chân đế
-        gc.fillStyle = '#fdf6e0';
-        gc.fillRect(0, h * 0.46, w, h * 0.035); // gờ phân tầng
-      }
-      for (let i = 0; i < 9; i++) {
-        const cw = w / 9, x = cw * i + cw * 0.26, ww = cw * 0.48;
-        // trệt: cửa vòm cao
-        let y = h * 0.56, wh = h * 0.32;
-        if (!em) {
-          gc.fillStyle = '#f8f0d8';
-          gc.fillRect(x - 3, y - 2, ww + 6, wh + 2);
-          gc.beginPath(); gc.ellipse(x + ww / 2, y, ww / 2 + 3, ww / 2 + 3, 0, Math.PI, 0); gc.fill();
+    const gltfLoader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
+    gltfLoader.load('assets/nhahat.glb', (gltf) => {
+      const m = gltf.scene;
+      // xoay mặt tiền về phía quảng trường (hướng nam +z), chỉnh sau khi soi thực tế
+      m.rotation.y = 0;
+      m.updateMatrixWorld(true);
+      const box = new THREE.Box3().setFromObject(m);
+      const size = box.getSize(new THREE.Vector3());
+      const s = 34 / Math.max(size.x, size.z); // cạnh dài = 34 (cỡ nhà hát thật trong game)
+      m.scale.setScalar(s);
+      m.updateMatrixWorld(true);
+      box.setFromObject(m);
+      const center = box.getCenter(new THREE.Vector3());
+      m.position.x += 4 - center.x;
+      m.position.z += -22 - center.z;
+      m.position.y += LAND_H - box.min.y;
+      m.traverse((o) => {
+        if (o.isMesh) {
+          o.castShadow = true;
+          o.receiveShadow = true;
         }
-        gc.fillStyle = em ? '#ffd98a' : '#4a3520';
-        gc.fillRect(x, y, ww, wh);
-        gc.beginPath(); gc.ellipse(x + ww / 2, y, ww / 2, ww / 2, 0, Math.PI, 0); gc.fill();
-        // lầu: cửa sổ cao khung trắng
-        y = h * 0.1; wh = h * 0.3;
-        if (!em) {
-          gc.fillStyle = '#f8f0d8';
-          gc.fillRect(x - 2, y - 2, ww + 4, wh + 4);
-        }
-        gc.fillStyle = em ? '#ffd98a' : '#3a5a74';
-        gc.fillRect(x, y, ww, wh);
-        if (!em) {
-          gc.strokeStyle = '#f8f0d8'; gc.lineWidth = 2;
-          gc.beginPath();
-          gc.moveTo(x + ww / 2, y); gc.lineTo(x + ww / 2, y + wh);
-          gc.moveTo(x, y + wh / 2); gc.lineTo(x + ww, y + wh / 2);
-          gc.stroke();
-        }
-      }
+      });
+      scene.add(m);
     });
-    const operaMat = new THREE.MeshLambertMaterial({
-      map: operaTex(false), emissiveMap: operaTex(true), emissive: 0xffcc77, emissiveIntensity: 0,
-    });
-    facadeMats.push(operaMat);
-    const body = new THREE.Mesh(new THREE.BoxGeometry(34, 12, 20),
-      [operaMat, operaMat, yellow, yellow, operaMat, operaMat]);
-    body.position.y = 6; g.add(body);
-    // góc tường trắng (quoins) + băng phào trắng đỉnh tường
-    for (const sx of [-17, 17]) {
-      for (const sz of [-10, 10]) {
-        const quoin = new THREE.Mesh(new THREE.BoxGeometry(1, 12, 1), white);
-        quoin.position.set(sx, 6, sz); g.add(quoin);
-      }
-    }
-    const entab = new THREE.Mesh(new THREE.BoxGeometry(35.4, 1.1, 21.4), white);
-    entab.position.y = 12.4; g.add(entab);
-    // hàng cột trắng tầng lầu (loggia mặt tiền)
-    for (let i = -4; i <= 4; i++) {
-      if (i === 0) continue;
-      const col = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.48, 5.6, 10), white);
-      col.position.set(i * 3.6, 9.2, 10.55);
-      g.add(col);
-    }
-    // ban công dài + lan can con tiện trên mép mái
-    const balc = new THREE.Mesh(new THREE.BoxGeometry(31, 0.55, 2.4), white);
-    balc.position.set(0, 6.6, 10.7); g.add(balc);
-    for (let i = -15; i <= 15; i++) {
-      const bal = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 0.85, 6), white);
-      bal.position.set(i * 1.05, 13.4, 10.8);
-      g.add(bal);
-      const bal2 = bal.clone(); bal2.position.z = -10.8; g.add(bal2);
-    }
-    for (const sz of [10.8, -10.8]) {
-      const rail = new THREE.Mesh(new THREE.BoxGeometry(33, 0.16, 0.3), white);
-      rail.position.set(0, 13.95, sz); g.add(rail);
-    }
-    for (const sx of [-16.5, -8, 8, 16.5]) { // bình trang trí trên mái
-      const urn = new THREE.Mesh(new THREE.SphereGeometry(0.42, 8, 6), white);
-      urn.scale.set(1, 1.25, 1);
-      urn.position.set(sx, 14.3, 10.8);
-      g.add(urn);
-    }
-    // trán tường tam giác trung tâm + phù điêu tròn
-    const pediShape = new THREE.Shape([
-      new THREE.Vector2(-6.5, 0), new THREE.Vector2(6.5, 0), new THREE.Vector2(0, 3.4),
-    ]);
-    const pedi = new THREE.Mesh(new THREE.ExtrudeGeometry(pediShape, { depth: 1.2, bevelEnabled: false }), white);
-    pedi.position.set(0, 12.9, 9.9);
-    g.add(pedi);
-    const relief = new THREE.Mesh(new THREE.CircleGeometry(1.1, 16), mat(0xd8b44a));
-    relief.position.set(0, 14.1, 11.15); g.add(relief);
-    // mái mansard đá đen (khối vát) + nóc
-    const roofGeo = new THREE.CylinderGeometry(11, 14.2, 3.4, 4);
-    const roof = new THREE.Mesh(roofGeo, slate);
-    roof.rotation.y = Math.PI / 4;
-    roof.scale.set(1.62, 1, 0.95);
-    roof.position.y = 14.6;
-    g.add(roof);
-    const ridge = new THREE.Mesh(new THREE.BoxGeometry(15, 0.5, 8), slate);
-    ridge.position.y = 16.4; g.add(ridge);
-    // bậc thềm 3 cấp
-    for (let s = 0; s < 3; s++) {
-      const step = new THREE.Mesh(new THREE.BoxGeometry(32 - s * 1.6, 0.45, 6.5 - s * 1.4), mat(0xd8cdb0));
-      step.position.set(0, 0.25 + s * 0.45, 13 + s * 0.6);
-      g.add(step);
-    }
-    g.position.set(4, LAND_H, -22);
-    scene.add(g);
     addCollider(4, -22, 20);
 
     // quảng trường: sân lát gạch hoa văn tròn, đài phun nước, cột cờ, bồn hoa
