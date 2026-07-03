@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { registerModel } from './assets.js';
 import {
-  WORLD_BOUNDS, LM, LM_DIR, LM_FACE, EXTRAS, DT_BOX, RIVERS, ROADS_DT, ROADS_REGION, BRIDGES, BUILDINGS,
+  WORLD_BOUNDS, LM, LM_DIR, LM_FACE, EXTRAS, TREES, PARKS, DT_BOX, RIVERS, ROADS_DT, ROADS_REGION, BRIDGES, BUILDINGS,
   groundHeight, groundHeightNoDeck, isWater, landAt, riverFactor,
   nearestRiverPoint, findShore, addPier,
 } from './terrain.js';
@@ -257,6 +257,26 @@ export function buildWorld(scene) {
         cCity = new THREE.Color(0xcfc7b2), cHill = new THREE.Color(0x4f9a52),
         cPort = new THREE.Color(0xa9a9a4), cRock = new THREE.Color(0x93a086);
   const tmp = new THREE.Color();
+  // công viên/thảm cỏ thật từ OSM: tô xanh nền đất
+  const parkPolys = PARKS.map((pts) => {
+    let x1 = 1e9, x2 = -1e9, z1 = 1e9, z2 = -1e9;
+    for (const [x, z] of pts) { x1 = Math.min(x1, x); x2 = Math.max(x2, x); z1 = Math.min(z1, z); z2 = Math.max(z2, z); }
+    return { pts, x1, x2, z1, z2 };
+  });
+  function inPark(x, z) {
+    for (const p of parkPolys) {
+      if (x < p.x1 || x > p.x2 || z < p.z1 || z > p.z2) continue;
+      let inside = false;
+      for (let i = 0, j = p.pts.length - 1; i < p.pts.length; j = i++) {
+        const [xi, zi] = p.pts[i], [xj, zj] = p.pts[j];
+        if ((zi > z) !== (zj > z) && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) inside = !inside;
+      }
+      if (inside) return true;
+    }
+    return false;
+  }
+  world.inPark = inPark;
+  const cPark = new THREE.Color(0x6fbf5a);
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i), z = pos.getZ(i);
     const h = groundHeightNoDeck(x, z);
@@ -273,6 +293,7 @@ export function buildWorld(scene) {
     tmp.lerp(cCity, rectFactor(x, DT_BOX.x1, DT_BOX.x2, z, DT_BOX.z1, DT_BOX.z2, 40) * 0.8);
     tmp.lerp(cPort, rectFactor(x, LM.port[0] - 95, LM.port[0] + 95, z, LM.port[1] - 45, LM.port[1] + 45, 12) * 0.9);
     tmp.lerp(cCity, rectFactor(x, EXTRAS.catbaTown[0] - 95, EXTRAS.catbaTown[0] + 95, z, EXTRAS.catbaTown[1] - 70, EXTRAS.catbaTown[1] + 70, 16) * 0.7);
+    if (h > 1.2 && h < 3.5 && inPark(x, z)) tmp.lerp(cPark, 0.72);
     const hash = Math.sin(x * 12.9898 + z * 78.233) * 43758.5453;
     const noise = 1 + ((hash - Math.floor(hash)) - 0.5) * 0.09;
     colors[i * 3] = tmp.r * noise;
@@ -372,7 +393,9 @@ export function buildWorld(scene) {
   world.buildingCells = new Set();
   {
     const bldGeos = [];
-    const lmSkip = Object.values(LM);
+    // chừa chỗ quanh địa danh; trường học là KHUÔN VIÊN rộng nên chừa rộng hơn
+    const lmSkip = Object.entries(LM).map(([k, [x, z]]) =>
+      [x, z, (k === 'thptnq' || k === 'thcsnq' || k === 'thcstp') ? 38 : 30]);
     const wallPalette = [0xf5e4b8, 0xf0cfa0, 0xdfe8dc, 0xf4b8a0, 0xcfe0ee, 0xf7efc9, 0xe8d0b0, 0xd8c8a8]
       .map((c) => new THREE.Color(c));
     const roofPalette = [0xc24a30, 0x96603c, 0xa84036, 0x8a8f96].map((c) => new THREE.Color(c));
@@ -398,7 +421,7 @@ export function buildWorld(scene) {
       }
       cx /= poly.length; cz /= poly.length;
       // chừa chỗ cho mô hình địa danh 3D chi tiết & mặt nước
-      if (lmSkip.some(([lx, lz]) => (cx - lx) ** 2 + (cz - lz) ** 2 < 30 * 30)) continue;
+      if (lmSkip.some(([lx, lz, r]) => (cx - lx) ** 2 + (cz - lz) ** 2 < r * r)) continue;
       if (riverFactor(cx, cz) > 0.01 || Math.abs(groundHeightNoDeck(cx, cz) - LAND_H) > 0.4) continue;
       const hash = Math.abs(Math.floor(cx * 13 + cz * 7));
       const lv = b.l > 0 ? b.l : (b.a < 150 ? 2 + (hash % 3) : 2 + (hash % 2));
@@ -1430,6 +1453,120 @@ export function buildWorld(scene) {
       }
     }
   }
+
+  // ---------- CÂY THẬT từ OSM (node natural=tree) + cây trong công viên thật ----------
+  {
+    const lmPts = Object.values(LM);
+    let nReal = 0;
+    const freeSpot = (x, z) => {
+      const p = { x, z };
+      world.resolveCollisions(p, 0.5);
+      return Math.hypot(p.x - x, p.z - z) < 0.3;
+    };
+    for (const [tx, tz] of TREES) {
+      if (Math.abs(groundHeightNoDeck(tx, tz) - LAND_H) > 0.4) continue;
+      if (riverFactor(tx, tz) > 0.01) continue;
+      if (lmPts.some(([lx, lz]) => (tx - lx) ** 2 + (tz - lz) ** 2 < 18 * 18)) continue;
+      if (!freeSpot(tx, tz)) continue;
+      const hash = Math.abs(Math.floor(tx * 7 + tz * 13));
+      if (hash % 5 === 0) palm(tx, tz);
+      else phuongTree(tx, tz);
+      nReal++;
+    }
+    // rải thêm cây trong các công viên thật (lưới + jitter, thưa)
+    let nPark = 0;
+    for (const p of (PARKS || [])) {
+      let x1 = 1e9, x2 = -1e9, z1 = 1e9, z2 = -1e9;
+      for (const [x, z] of p) { x1 = Math.min(x1, x); x2 = Math.max(x2, x); z1 = Math.min(z1, z); z2 = Math.max(z2, z); }
+      for (let gx = x1 + 8; gx < x2 && nPark < 90; gx += 17) {
+        for (let gz = z1 + 8; gz < z2 && nPark < 90; gz += 17) {
+          const hash = Math.abs(Math.sin(gx * 2.17 + gz * 3.31) * 43758.54) % 1;
+          if (hash > 0.55) continue;
+          const jx = gx + (hash - 0.5) * 8, jz = gz + (hash * 7 % 1 - 0.5) * 8;
+          if (!world.inPark(jx, jz)) continue;
+          if (Math.abs(groundHeightNoDeck(jx, jz) - LAND_H) > 0.4) continue;
+          if (riverFactor(jx, jz) > 0.01) continue;
+          if (lmPts.some(([lx, lz]) => (jx - lx) ** 2 + (jz - lz) ** 2 < 18 * 18)) continue;
+          if (!freeSpot(jx, jz)) continue;
+          if (hash < 0.12) palm(jx, jz); else phuongTree(jx, jz);
+          nPark++;
+        }
+      }
+    }
+  }
+
+  // ---------- 3 TRƯỜNG HỌC THẬT (footprint OSM) ----------
+  // THPT Ngô Quyền (trường Bonnal): GLB từ ảnh thật — cổng + dãy nhà vàng
+  placeGLB({
+    url: 'assets/thptnq.glb', name: 'THPT Ngô Quyền',
+    x: LM.thptnq[0], z: LM.thptnq[1],
+    rot: orientLong(LM_DIR.thptnq, LM_FACE.thptnq), size: 26,
+  });
+  addCollider(LM.thptnq[0], LM.thptnq[1], 11);
+  // 2 trường THCS: khối lớp chữ U + sân + cột cờ + cổng bảng tên (chưa có ảnh kiến trúc đạt chuẩn)
+  function schoolCompound(key, label) {
+    const [sx, sz] = LM[key];
+    const th = orientLong(LM_DIR[key], LM_FACE[key]);
+    const g = new THREE.Group();
+    const wallM = mat(0xf2d488);
+    const trimM = mat(0xfdf6e0);
+    function block(w, d, floors, lx, lz, rotL = 0) {
+      const hgt = 3.4 * floors + 0.6;
+      const b = new THREE.Mesh(new THREE.BoxGeometry(w, hgt, d), wallM);
+      b.position.set(lx, hgt / 2, lz);
+      b.rotation.y = rotL;
+      g.add(b);
+      for (let f = 0; f < floors; f++) {
+        const strip = new THREE.Mesh(new THREE.BoxGeometry(w + 0.14, 1.2, d + 0.14), sharedMats.window);
+        strip.position.set(lx, 2.2 + f * 3.4, lz);
+        strip.rotation.y = rotL;
+        g.add(strip);
+      }
+      const roof = new THREE.Mesh(new THREE.BoxGeometry(w + 0.8, 0.5, d + 0.8), mat(0xb0543c));
+      roof.position.set(lx, hgt + 0.25, lz);
+      roof.rotation.y = rotL;
+      g.add(roof);
+    }
+    block(24, 7, 3, 0, -7);        // dãy chính (song song mặt phố, lùi sâu)
+    block(7, 12, 2, -10, 3);       // cánh trái
+    block(7, 12, 2, 10, 3);        // cánh phải
+    // sân trường + cột cờ
+    const yard = new THREE.Mesh(new THREE.PlaneGeometry(22, 12), mat(0xcabfa8));
+    yard.rotation.x = -Math.PI / 2;
+    yard.position.set(0, 0.06, 4);
+    g.add(yard);
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.12, 9, 6), mat(0xd8d8d8));
+    pole.position.set(0, 4.5, 2); g.add(pole);
+    const fl = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 1.4),
+      new THREE.MeshLambertMaterial({ color: 0xd8332a, side: THREE.DoubleSide }));
+    fl.position.set(1.1, 8.2, 2); g.add(fl);
+    updaters.push((dt, time) => { fl.rotation.y = Math.sin(time * 1.7 + sx) * 0.35; });
+    // cổng + bảng tên quay ra phố (local +z)
+    for (const gx of [-3.4, 3.4]) {
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.9, 3.6, 0.9), trimM);
+      post.position.set(gx, 1.8, 11); g.add(post);
+    }
+    const lintel = new THREE.Mesh(new THREE.BoxGeometry(7.8, 1.2, 1),
+      new THREE.MeshLambertMaterial({ map: signTexture(label, '#28457d', '#ffe9b8') }));
+    lintel.position.set(0, 3.9, 11); g.add(lintel);
+    // tường rào thấp hai bên cổng
+    for (const side of [-1, 1]) {
+      const fence = new THREE.Mesh(new THREE.BoxGeometry(9, 1.4, 0.4), wallM);
+      fence.position.set(side * 8.4, 0.7, 11); g.add(fence);
+    }
+    g.position.set(sx, LAND_H, sz);
+    g.rotation.y = th;
+    scene.add(g);
+    addCollider(sx, sz, 3);
+    const [b1x, b1z] = localPt(sx, sz, 0, -7, th);
+    addCollider(b1x, b1z, 12);
+    for (const wingX of [-10, 10]) {
+      const [wx, wz] = localPt(sx, sz, wingX, 3, th);
+      addCollider(wx, wz, 5.5);
+    }
+  }
+  schoolCompound('thcsnq', 'THCS NGÔ QUYỀN');
+  schoolCompound('thcstp', 'THCS TRẦN PHÚ');
 
   // ghế đá ven hồ Tam Bạc + quảng trường
   {

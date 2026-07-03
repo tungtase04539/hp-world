@@ -394,7 +394,13 @@ function nearestRoadPoint(cx, cz) {
   }
   return best;
 }
-for (const key of ['cathedral', 'postoffice', 'museum', 'market']) {
+// 3 trường học (way OSM thật, file osm_school_geom.json)
+for (const e of load('osm_school_geom.json')) lmGeom[e.id] = e;
+addWay('thptnq', 242169921, null);   // THPT Ngô Quyền (trường Bonnal)
+addWay('thcsnq', 240463141, null);   // THCS Ngô Quyền
+addWay('thcstp', 1120513525, null);  // THCS Trần Phú
+
+for (const key of ['cathedral', 'postoffice', 'museum', 'market', 'thptnq', 'thcsnq', 'thcstp']) {
   const [cx, cz] = LM[key];
   const rp = nearestRoadPoint(cx, cz);
   const f = [rp[0] - cx, rp[1] - cz];
@@ -404,6 +410,32 @@ for (const key of ['cathedral', 'postoffice', 'museum', 'market']) {
 // sống đồi Đồ Sơn + rìa bến Bính
 EXTRAS.dsRidge = [...toXZ(106.7770, 20.7160).map(Math.round), ...toXZ(106.7930, 20.6990).map(Math.round)];
 EXTRAS.catbaTown = LM.catba;
+
+// ---------- 6. CÂY THẬT (node natural=tree) & CÔNG VIÊN/THẢM CỎ THẬT ----------
+const TREES = [];
+for (const n of load('osm_trees.json')) {
+  if (n.type !== 'node') continue;
+  const [x, z] = toXZ(n.lon, n.lat).map((v) => Math.round(v * 10) / 10);
+  if (x > dtBox.x1 - 80 && x < dtBox.x2 + 80 && z > dtBox.z1 - 80 && z < dtBox.z2 + 80) TREES.push([x, z]);
+}
+console.log(`trees thật: ${TREES.length}`);
+const PARKS = [];
+for (const w of load('osm_parks.json')) {
+  if (!w.geometry || w.geometry.length < 4) continue;
+  let pts = rnd(simplify(w.geometry.map((g) => toXZ(g.lon, g.lat)), 2));
+  if (pts.length < 3) continue;
+  let area = 0, cx = 0, cz = 0;
+  for (let i = 0; i < pts.length; i++) {
+    const [x1, z1] = pts[i], [x2, z2] = pts[(i + 1) % pts.length];
+    area += x1 * z2 - x2 * z1; cx += x1; cz += z1;
+  }
+  area = Math.abs(area) / 2; cx /= pts.length; cz /= pts.length;
+  if (area < 60) continue;
+  if (cx < dtBox.x1 || cx > dtBox.x2 || cz < dtBox.z1 || cz > dtBox.z2) continue;
+  PARKS.push(pts);
+}
+console.log(`parks thật: ${PARKS.length}`);
+
 console.log('LM:', JSON.stringify(LM));
 console.log('LM_DIR:', JSON.stringify(LM_DIR));
 console.log('EXTRAS:', JSON.stringify(EXTRAS));
@@ -422,6 +454,8 @@ export const LM = ${JSON.stringify(LM)};
 export const LM_DIR = ${JSON.stringify(LM_DIR)};
 export const LM_FACE = ${JSON.stringify(LM_FACE)};
 export const EXTRAS = ${JSON.stringify(EXTRAS)};
+export const TREES = ${JSON.stringify(TREES)};
+export const PARKS = ${JSON.stringify(PARKS)};
 export const BUILDINGS = ${JSON.stringify(BUILDINGS)};
 `;
 fs.writeFileSync('/home/user/hp-world/js/mapdata.js', out);

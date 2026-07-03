@@ -28,6 +28,9 @@ const P = {
   doson: [LM.doson[0], LM.doson[1]],
   hondau: [LM.hondau[0] + 6, LM.hondau[1] - 6], // đảo nhỏ — lệch về phía đất
   catba: [EXTRAS.catbaTown[0] - 25, EXTRAS.catbaTown[1] + 10],
+  thptnq: [LM.thptnq[0] + LM_FACE.thptnq[0] * 16, LM.thptnq[1] + LM_FACE.thptnq[1] * 16],
+  thcsnq: [LM.thcsnq[0] + LM_FACE.thcsnq[0] * 16, LM.thcsnq[1] + LM_FACE.thcsnq[1] * 16],
+  thcstp: [LM.thcstp[0] + LM_FACE.thcstp[0] * 16, LM.thcstp[1] + LM_FACE.thcstp[1] * 16],
 };
 
 // 15 địa danh đặc trưng — tọa độ thật từ dữ liệu OpenStreetMap (đã qua phép chiếu 1:10 + kính lúp trung tâm)
@@ -210,6 +213,42 @@ export const LANDMARKS = [
     fact: {
       vi: '💡 Cát Bà là Khu dự trữ sinh quyển thế giới, nhà của loài voọc Cát Bà chỉ còn ~70 cá thể.',
       en: '💡 A UNESCO biosphere reserve, home to the Cat Ba langur — only ~70 remain.',
+    },
+  },
+  {
+    id: 'thptnq', x: P.thptnq[0], z: P.thptnq[1],
+    name: { vi: 'Trường THPT Ngô Quyền', en: 'Ngo Quyen High School' },
+    text: {
+      vi: 'Tiền thân là trường Bonnal do người Pháp lập năm 1920 — trường trung học lâu đời nhất Hải Phòng. Dãy nhà vàng kiểu Pháp với cửa chớp xanh đã đón hơn một thế kỷ học trò đất Cảng, trong đó có nhà văn Nguyên Hồng, Tổng Bí thư Nguyễn Văn Linh.',
+      en: 'Founded in 1920 as the French Bonnal school — the oldest high school in Hai Phong. Its yellow colonial halls with green shutters have taught generations, including writer Nguyen Hong and Party leader Nguyen Van Linh.',
+    },
+    fact: {
+      vi: '💡 Hơn 100 năm tuổi — ngôi trường cổ kính bậc nhất thành phố Cảng.',
+      en: '💡 Over a century old — the most storied school of the Port City.',
+    },
+  },
+  {
+    id: 'thcsnq', x: P.thcsnq[0], z: P.thcsnq[1],
+    name: { vi: 'Trường THCS Ngô Quyền', en: 'Ngo Quyen Secondary School' },
+    text: {
+      vi: 'Trường trung học cơ sở nằm giữa khu phố cũ quận Lê Chân, cạnh ngôi trường THPT trăm tuổi cùng tên. Sân trường rợp bóng phượng vĩ — loài hoa biểu tượng của Hải Phòng.',
+      en: 'A secondary school in the old quarter of Le Chan district, neighboring the century-old high school of the same name. Its yard blazes with flamboyant trees — the city\'s signature bloom.',
+    },
+    fact: {
+      vi: '💡 Mùa hè, phượng nở đỏ rực sân trường — mùa chia tay của học trò.',
+      en: '💡 In summer the schoolyard turns red with phoenix flowers — farewell season.',
+    },
+  },
+  {
+    id: 'thcstp', x: P.thcstp[0], z: P.thcstp[1],
+    name: { vi: 'Trường THCS Trần Phú', en: 'Tran Phu Secondary School' },
+    text: {
+      vi: 'Một trong những trường THCS trọng điểm của Hải Phòng bên dải trung tâm, gần hồ Tam Bạc. Nhiều thế hệ học sinh giỏi của thành phố đã trưởng thành từ đây.',
+      en: 'One of Hai Phong\'s key secondary schools by the central strip, near Tam Bac lake. Generations of the city\'s top students grew up here.',
+    },
+    fact: {
+      vi: '💡 Trường nằm ngay dải vườn hoa trung tâm — đi bộ vài phút tới hồ Tam Bạc.',
+      en: '💡 Steps away from the central flower gardens and Tam Bac lake.',
     },
   },
 ];
