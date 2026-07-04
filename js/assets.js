@@ -56,9 +56,15 @@ export function updateAssets(dt, playerPos) {
   acc += dt;
   if (acc < 1) return;
   acc = 0;
+  // tải TUẦN TỰ: nhiều GLB nặng parse cùng lúc sẽ nghẽn luồng chính gây giật
+  if (REGISTRY.some((d) => d.state === 'loading')) return;
+  // ưu tiên model GẦN người chơi nhất trong bán kính
+  let best = null, bd = Infinity;
   for (const d of REGISTRY) {
     if (d.state !== 'idle') continue;
     const r = d.radius || 500;
-    if ((playerPos.x - d.x) ** 2 + (playerPos.z - d.z) ** 2 < r * r) start(d);
+    const dist2 = (playerPos.x - d.x) ** 2 + (playerPos.z - d.z) ** 2;
+    if (dist2 < r * r && dist2 < bd) { bd = dist2; best = d; }
   }
+  if (best) start(best);
 }

@@ -420,6 +420,19 @@ window.__hp = {
     );
   },
   setTime(v) { dayNight.t = v; },
+  // liệt kê cụm mesh GLB (material PBR của Meshy) + vị trí thế giới — công cụ audit
+  glbs() {
+    const out = new Map();
+    scene.traverse((o) => {
+      if (o.isMesh && o.material && o.material.type === 'MeshStandardMaterial') {
+        const p = new THREE.Vector3();
+        o.getWorldPosition(p);
+        const k = `${Math.round(p.x / 10) * 10},${Math.round(p.z / 10) * 10}`;
+        out.set(k, (out.get(k) || 0) + 1);
+      }
+    });
+    return [...out.entries()].map(([k, n]) => k + ' x' + n);
+  },
   gh(x, z) { return groundHeightNoDeck(x, z); },
   // bắn tia từ camera qua điểm màn hình (NDC) -> vật thể đầu tiên chạm
   pick(nx, ny) {

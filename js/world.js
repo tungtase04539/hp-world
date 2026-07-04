@@ -689,21 +689,23 @@ export function buildWorld(scene) {
         scene.add(m);
         // Chân dung Chủ tịch Hồ Chí Minh trên mặt tiền: dùng ẢNH CHUẨN phủ đè lên
         // hình do AI nướng vào texture (bị méo — TUYỆT ĐỐI không dùng hình AI cho chân dung)
+        // Kích thước & vị trí NEO THEO KHUNG MÔ HÌNH để tự đúng khi đổi cỡ nhà hát
         {
           const tex = new THREE.TextureLoader().load('assets/img_bacho.jpg');
           tex.colorSpace = THREE.SRGBColorSpace;
           tex.anisotropy = 8;
-          const PH = 5.4, PW = PH * (512 / 664); // giữ đúng tỉ lệ ảnh gốc, không kéo méo
+          const bh = box.max.y - box.min.y;            // chiều cao nhà hát sau scale
+          const PH = bh * 0.40, PW = PH * (512 / 664); // giữ đúng tỉ lệ ảnh gốc
           const grp = new THREE.Group();
-          const frame = new THREE.Mesh(new THREE.PlaneGeometry(PW + 0.55, PH + 0.55), mat(0xf5eede));
+          const frame = new THREE.Mesh(new THREE.PlaneGeometry(PW + 0.5, PH + 0.5), mat(0xf5eede));
           grp.add(frame);
           const portrait = new THREE.Mesh(new THREE.PlaneGeometry(PW, PH),
             new THREE.MeshBasicMaterial({ map: tex, toneMapped: false }));
           portrait.position.z = 0.03;
           grp.add(portrait);
           const halfDepth = (box.max.z - box.min.z) / 2;
-          const [px2, pz2] = localPt(opX, opZ, 0, halfDepth + 0.22, thOpera);
-          grp.position.set(px2, LAND_H + 7.7, pz2);
+          const [px2, pz2] = localPt(opX, opZ, 0, halfDepth + 0.12, thOpera);
+          grp.position.set(px2, LAND_H + bh * 0.52, pz2); // giữa mặt tiền, không vượt mái
           grp.rotation.y = thOpera;
           scene.add(grp);
         }
