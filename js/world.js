@@ -435,7 +435,43 @@ export function buildWorld(scene) {
     const wallPalette = [0xf5e4b8, 0xf0cfa0, 0xdfe8dc, 0xf4b8a0, 0xcfe0ee, 0xf7efc9, 0xe8d0b0, 0xd8c8a8]
       .map((c) => new THREE.Color(c));
     const roofPalette = [0xc24a30, 0x96603c, 0xa84036, 0x8a8f96].map((c) => new THREE.Color(c));
-    let nBld = 0;
+    // ngói dốc kiểu Pháp cổ / nhà phố cũ cho DÃY TRUNG TÂM (nhà thấp tầng)
+    const tilePalette = [0xb5462c, 0xc85a34, 0xa23c28, 0x9c5636, 0xbb5a30].map((c) => new THREE.Color(c));
+    // Mái hip (4 dốc) phủ lên bbox footprint — đọc ngay ra "phố cổ mái ngói".
+    function hipRoofGeo(x0, x1, z0, z1, yT, rh, col) {
+      const o = 0.7;                       // đua mái (eaves)
+      x0 -= o; x1 += o; z0 -= o; z1 += o;
+      const zc = (z0 + z1) / 2, xc = (x0 + x1) / 2, yR = yT + rh;
+      const longX = (x1 - x0) >= (z1 - z0);
+      const insX = longX ? Math.min((x1 - x0) * 0.28, 5) : 0;
+      const insZ = longX ? 0 : Math.min((z1 - z0) * 0.28, 5);
+      // 4 mép mái + đỉnh nóc (ridge 2 điểm)
+      const A = [x0, yT, z0], B = [x1, yT, z0], C = [x1, yT, z1], D = [x0, yT, z1];
+      const R0 = [longX ? x0 + insX : xc, yR, longX ? zc : z0 + insZ];
+      const R1 = [longX ? x1 - insX : xc, yR, longX ? zc : z1 - insZ];
+      // ridge dọc trục dài; 2 mặt dốc hình thang + 2 mặt hồi tam giác
+      const raw = longX
+        ? [A, B, R1, A, R1, R0, C, D, R0, C, R0, R1, B, C, R1, D, A, R0]
+        : [D, A, R0, D, R0, R1, B, C, R1, B, R1, R0, A, B, R0, C, D, R1];
+      // đảo thứ tự đỉnh mỗi tam giác để pháp tuyến hướng LÊN (mặt ngói nhìn từ trên)
+      const src = [];
+      for (let t = 0; t < raw.length; t += 3) src.push(raw[t], raw[t + 2], raw[t + 1]);
+      const pos = new Float32Array(src.length * 3);
+      src.forEach((v, i) => { pos[i * 3] = v[0]; pos[i * 3 + 1] = v[1]; pos[i * 3 + 2] = v[2]; });
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      g.computeVertexNormals();
+      g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(src.length * 2), 2));
+      const cols = new Float32Array(src.length * 3);
+      const nrm = g.attributes.normal;
+      for (let i = 0; i < src.length; i++) {
+        const sh = 0.82 + 0.18 * Math.max(0, nrm.getY(i));
+        cols[i * 3] = col.r * sh; cols[i * 3 + 1] = col.g * sh; cols[i * 3 + 2] = col.b * sh;
+      }
+      g.setAttribute('color', new THREE.BufferAttribute(cols, 3));
+      return g;
+    }
+    let nBld = 0, nRoof = 0;
     for (const b of BUILDINGS) {
       // làm sạch đa giác: bỏ điểm trùng/kề sát (đa giác bẩn làm tam giác hóa nổ tung)
       const poly = [];
@@ -506,6 +542,15 @@ export function buildWorld(scene) {
           continue;
         }
         bldGeos.push(g2);
+        // Mái ngói dốc kiểu Pháp cổ cho nhà THẤP tầng ở DÃY TRUNG TÂM (không kính, footprint gọn)
+        const central = rectFactor(cx, DT_BOX.x1, DT_BOX.x2, cz, DT_BOX.z1, DT_BOX.z2, 60);
+        const w0 = maxX - minX, d0 = maxZ - minZ;
+        if (central > 0.32 && !glassy && h <= 17 && w0 < 46 && d0 < 46 && w0 > 3 && d0 > 3) {
+          const rh = 2.4 + (hash % 3) * 0.7;
+          const roof = hipRoofGeo(minX, maxX, minZ, maxZ, LAND_H + h, rh, tilePalette[hash % tilePalette.length]);
+          bldGeos.push(roof);
+          nRoof++;
+        }
         addCollider(cx, cz, Math.min(18, Math.sqrt(b.a / Math.PI) * 0.85 + 0.4));
         world.buildingCells.add(`${Math.round(cx / 22)},${Math.round(cz / 22)}`);
         nBld++;
