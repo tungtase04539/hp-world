@@ -885,8 +885,11 @@ export function buildWorld(scene) {
 
   // ---------- NHÀ THỜ CHÍNH TÒA: GLB từ ảnh thật (Wikimedia Commons) ----------
   {
-    // trục dài gian giữa theo cạnh dài OSM; tháp chuông (đầu -X của mô hình) quay về hướng mặt tiền thật
-    const thCa = orientLong(LM_DIR.cathedral, null) + Math.PI;
+    // trục dài gian giữa theo cạnh dài OSM; tháp chuông (đầu -X mô hình) quay về phố (LM_FACE)
+    // dir gần song song face -> tháp ở đầu hồi; orientLong đã cho tháp quay về phố, KHÔNG cộng π
+    let thCa = orientLong(LM_DIR.cathedral, null);
+    // đảm bảo đầu -X (mặt tiền) hướng về phố: nếu -X đang quay ngược face thì lật π
+    if ((-Math.cos(thCa)) * LM_FACE.cathedral[0] + Math.sin(thCa) * LM_FACE.cathedral[1] < 0) thCa += Math.PI;
     placeGLB({
       url: 'assets/nhatho.glb', name: 'Nhà thờ chính tòa',
       x: LM.cathedral[0], z: LM.cathedral[1], rot: thCa, size: 45,
