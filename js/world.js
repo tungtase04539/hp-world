@@ -6,7 +6,7 @@ import {
   groundHeight, groundHeightNoDeck, isWater, landAt, riverFactor,
   nearestRiverPoint, findShore, addPier,
 } from './terrain.js';
-import { STREETS, INTERSECTIONS, MEDIANS } from './mapdata.js';
+import { STREETS, INTERSECTIONS, MEDIANS, GARDENS } from './mapdata.js';
 
 // Thế giới dựng từ dữ liệu OpenStreetMap thật của Hải Phòng (tỉ lệ 1:10,
 // trung tâm phóng đại 2.2x). Mọi con phố trung tâm là phố thật.
@@ -1793,6 +1793,36 @@ export function buildWorld(scene) {
     addCollider(kx, kz, 4.6);
   }
 
+  // Cung Văn hóa Thanh Niên — công trình văn hóa lớn (OSM way 240583084)
+  {
+    const cx = 947, cz = 803;
+    if (Math.abs(groundHeightNoDeck(cx, cz) - LAND_H) < 1.2) {
+      const g = new THREE.Group();
+      const wallM = mat(0xe8ddc8);
+      const body = new THREE.Mesh(new THREE.BoxGeometry(54, 15, 30), wallM);
+      body.position.y = 7.5; g.add(body);
+      for (let f = 0; f < 4; f++) {
+        const strip = new THREE.Mesh(new THREE.BoxGeometry(54.2, 1.5, 30.2), sharedMats.window);
+        strip.position.y = 2.6 + f * 3.4; g.add(strip);
+      }
+      const roof = new THREE.Mesh(new THREE.BoxGeometry(56, 1.2, 32), mat(0x9fb0bf));
+      roof.position.y = 15.6; g.add(roof);
+      // sảnh cong kính phía trước
+      const lobby = new THREE.Mesh(new THREE.CylinderGeometry(11, 11, 12, 16, 1, false, -Math.PI / 2, Math.PI),
+        new THREE.MeshLambertMaterial({ color: 0x9ec6e0, transparent: true, opacity: 0.8 }));
+      lobby.position.set(0, 6, 15); g.add(lobby);
+      const canopy = new THREE.Mesh(new THREE.CylinderGeometry(13, 13, 1, 16, 1, false, -Math.PI / 2, Math.PI), mat(0xc0392b));
+      canopy.position.set(0, 12.5, 15); g.add(canopy);
+      const sign = new THREE.Mesh(new THREE.BoxGeometry(30, 2, 0.4),
+        new THREE.MeshLambertMaterial({ map: signTexture('CUNG VĂN HÓA THANH NIÊN', '#164a7a', '#ffffff') }));
+      sign.position.set(0, 13.6, 15.4); g.add(sign);
+      g.position.set(cx, LAND_H, cz);
+      g.rotation.y = Math.PI; // sảnh cong quay ra phố (−z)
+      scene.add(g);
+      addCollider(cx, cz, 30);
+    }
+  }
+
   // ghế đá ven hồ Tam Bạc + quảng trường
   {
     const woodMat = mat(0x6a4a30);
@@ -1980,6 +2010,63 @@ export function buildWorld(scene) {
         }
         prev = [px, pz];
       }
+    }
+  }
+
+  // ---------- DẢI VƯỜN HOA TRUNG TÂM (chuỗi vườn hoa đặc trưng Hải Phòng) ----------
+  // An Biên → Ng.Văn Trỗi → Ng.Bỉnh Khiêm → Nguyễn Du(Nhà Kèn) → Kim Đồng → Tố Hữu
+  {
+    const flowerCols = [0xe8402a, 0xf4c430, 0xff5fa2, 0xff8c00, 0x9b59b6, 0xfdfdfd, 0xe74c3c];
+    const hedgeM = mat(0x3f7a3a);
+    const pathM = mat(0xd8cba8);
+    const bedRimM = mat(0xa89878);
+    const lawnM = mat(0x6fae4e);
+    function flowerBed(bx, bz, r, seed) {
+      const rim = new THREE.Mesh(new THREE.CylinderGeometry(r, r + 0.3, 0.4, 10), bedRimM);
+      rim.position.set(bx, LAND_H + 0.2, bz); rim.receiveShadow = true; scene.add(rim);
+      const col = flowerCols[seed % flowerCols.length];
+      const dome = new THREE.Mesh(
+        new THREE.SphereGeometry(r * 0.92, 8, 5, 0, Math.PI * 2, 0, Math.PI / 2),
+        new THREE.MeshLambertMaterial({ color: col, emissive: col, emissiveIntensity: 0.14, flatShading: true }));
+      dome.position.set(bx, LAND_H + 0.38, bz); dome.scale.y = 0.5; scene.add(dome);
+    }
+    for (const g of GARDENS) {
+      const y = groundHeightNoDeck(g.x, g.z);
+      if (Math.abs(y - LAND_H) > 1.5 || riverFactor(g.x, g.z) > 0.02) continue;
+      const hw = g.w / 2, hd = g.d / 2;
+      // thảm cỏ nền
+      const lawn = new THREE.Mesh(new THREE.BoxGeometry(g.w, 0.12, g.d), lawnM);
+      lawn.position.set(g.x, LAND_H + 0.06, g.z); lawn.receiveShadow = true; scene.add(lawn);
+      // hàng rào cây thấp quanh vườn
+      for (const [ex, ez, ew, ed] of [[0, -hd, g.w, 1.3], [0, hd, g.w, 1.3], [-hw, 0, 1.3, g.d], [hw, 0, 1.3, g.d]]) {
+        const hedge = new THREE.Mesh(new THREE.BoxGeometry(ew, 1.0, ed), hedgeM);
+        hedge.position.set(g.x + ex, LAND_H + 0.55, g.z + ez); hedge.castShadow = true; scene.add(hedge);
+      }
+      // lối đi chữ thập lát gạch
+      const pH = new THREE.Mesh(new THREE.BoxGeometry(g.w - 2, 0.16, 3.4), pathM);
+      pH.position.set(g.x, LAND_H + 0.12, g.z); scene.add(pH);
+      const pV = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.16, g.d - 2), pathM);
+      pV.position.set(g.x, LAND_H + 0.12, g.z); scene.add(pV);
+      // bồn hoa trung tâm (đài tròn)
+      const center = new THREE.Mesh(new THREE.CylinderGeometry(3.6, 4, 0.8, 14), mat(0xcfc5ac));
+      center.position.set(g.x, LAND_H + 0.4, g.z); center.castShadow = true; scene.add(center);
+      flowerBed(g.x, g.z, 2.8, Math.abs(g.x + g.z) | 0);
+      // luống hoa 4 góc phần tư
+      let bi = 3;
+      for (const qx of [-1, 1]) for (const qz of [-1, 1]) {
+        for (let a = 0; a < 2; a++) for (let b = 0; b < 2; b++) {
+          const bx = g.x + qx * (8 + a * 8), bz = g.z + qz * (8 + b * 8.5);
+          if (Math.abs(bx - g.x) > hw - 2.5 || Math.abs(bz - g.z) > hd - 2.5) continue;
+          flowerBed(bx, bz, 1.8 + ((bi * 7) % 3) * 0.4, bi);
+          bi++;
+        }
+      }
+      // ghế đá + cây phượng góc vườn
+      for (const [cxx, czz] of [[-hw + 5, -hd + 5], [hw - 5, hd - 5]]) {
+        const tx = g.x + cxx, tz = g.z + czz;
+        if (Math.abs(groundHeightNoDeck(tx, tz) - LAND_H) < 0.6) phuongTree(tx, tz);
+      }
+      addCollider(g.x, g.z, 4); // chỉ chặn bồn trung tâm; vườn đi bộ được
     }
   }
 

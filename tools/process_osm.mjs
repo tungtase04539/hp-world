@@ -409,7 +409,7 @@ addWay('chuahang', 236830096, null);
 addWay('dentamky', 961921403, null);
 addWay('nhnn', 242192606, null);       // Ngân hàng Nhà nước CN Hải Phòng
 addNode('dennghe', 106.68041, 20.85466);   // Đền Nghè (node OSM 6380148018)
-addNode('nhaken', 106.68075, 20.85677);    // Nhà Kèn vườn hoa Nguyễn Du (đặt tay theo bản đồ thật)
+addNode('nhaken', 106.68639, 20.85888);    // Nhà Kèn THẬT trong vườn hoa Nguyễn Du (OSM node 6369498380)
 addWay('thptnq', 242169921, null);   // THPT Ngô Quyền (trường Bonnal)
 addWay('thcsnq', 240463141, null);   // THCS Ngô Quyền
 addWay('thcstp', 1120513525, null);  // THCS Trần Phú
@@ -558,6 +558,16 @@ for (const nm of ['Trần Hưng Đạo', 'Trần Phú', 'Điện Biên Phủ']) 
 }
 console.log('MEDIANS:', MEDIANS.map((m) => m.length));
 
+// ---------- Dải VƯỜN HOA trung tâm (chuỗi vườn hoa đặc trưng Hải Phòng) ----------
+const GARDENS = [
+  { n: 'An Biên', lon: 106.68060, lat: 20.85622, w: 58, d: 42 },
+  { n: 'Nguyễn Văn Trỗi', lon: 106.68309, lat: 20.85687, w: 54, d: 40 },
+  { n: 'Nguyễn Bỉnh Khiêm', lon: 106.68481, lat: 20.85772, w: 60, d: 44 },
+  { n: 'Nguyễn Du', lon: 106.68645, lat: 20.85890, w: 70, d: 50 },
+  { n: 'Kim Đồng', lon: 106.68794, lat: 20.86053, w: 58, d: 44 },
+  { n: 'Tố Hữu', lon: 106.68862, lat: 20.86356, w: 54, d: 40 },
+].map((g) => { const [x, z] = toXZ(g.lon, g.lat); return { n: g.n, x: Math.round(x), z: Math.round(z), w: g.w, d: g.d }; });
+console.log('GARDENS:', JSON.stringify(GARDENS.map((g) => g.n + '[' + g.x + ',' + g.z + ']')));
 console.log('LM_SIZE:', JSON.stringify(LM_SIZE));
 console.log('LM:', JSON.stringify(LM));
 console.log('LM_DIR:', JSON.stringify(LM_DIR));
@@ -584,6 +594,7 @@ export const PARKS = ${JSON.stringify(PARKS)};
 export const STREETS = ${JSON.stringify(STREETS)};
 export const INTERSECTIONS = ${JSON.stringify(INTERSECTIONS)};
 export const MEDIANS = ${JSON.stringify(MEDIANS)};
+export const GARDENS = ${JSON.stringify(GARDENS)};
 export const BUILDINGS = ${JSON.stringify(BUILDINGS)};
 `;
 fs.writeFileSync('/home/user/hp-world/js/mapdata.js', out);
