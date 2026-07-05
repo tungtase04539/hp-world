@@ -1520,6 +1520,44 @@ export function buildWorld(scene) {
     });
   }
 
+  // ---------- LUỐNG HOA "HERO": mô hình Meshy từ ẢNH THẬT (luống hồng đỏ) ----------
+  // Đặt làm bồn hoa TRUNG TÂM mỗi vườn. ĐI ĐƯỢC (không collider) — công viên khác công trình.
+  const HERO_BED_FILE = 'flowerbed_a.glb';
+  const heroBeds = [];   // {x,y,z,diam,yaw}
+  function heroBed(x, z, diam) {
+    heroBeds.push({ x, y: groundHeight(x, z) + 0.02, z, diam, yaw: (x * 0.7 + z * 1.1) % (Math.PI * 2) });
+  }
+  function loadHeroBeds() {
+    if (!heroBeds.length) return;
+    const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
+    loader.load(ASSET_BASE_W + HERO_BED_FILE, (gltf) => {
+      let mesh = null;
+      gltf.scene.traverse((o) => { if (o.isMesh && !mesh) mesh = o; });
+      if (!mesh) return;
+      mesh.updateWorldMatrix(true, true);
+      const box = new THREE.Box3().setFromObject(mesh);
+      const cx = (box.min.x + box.max.x) / 2, cz = (box.min.z + box.max.z) / 2;
+      const wxz = Math.max(1e-3, Math.max(box.max.x - box.min.x, box.max.z - box.min.z)); // chuẩn theo ĐƯỜNG KÍNH
+      // B đưa luống về gốc y=0, tâm trục, đường kính = 1 (giữ nguyên tỉ lệ dẹt)
+      const B = new THREE.Matrix4().makeScale(1 / wxz, 1 / wxz, 1 / wxz)
+        .multiply(new THREE.Matrix4().makeTranslation(-cx, -box.min.y, -cz))
+        .multiply(mesh.matrixWorld);
+      const inst = new THREE.InstancedMesh(mesh.geometry, mesh.material, heroBeds.length);
+      inst.frustumCulled = false;
+      const trs = new THREE.Matrix4(), m = new THREE.Matrix4();
+      const q = new THREE.Quaternion(), sv = new THREE.Vector3(), pv = new THREE.Vector3();
+      heroBeds.forEach((bd, i) => {
+        q.setFromEuler(new THREE.Euler(0, bd.yaw, 0));
+        sv.setScalar(bd.diam); pv.set(bd.x, bd.y, bd.z);
+        trs.compose(pv, q, sv);
+        m.multiplyMatrices(trs, B);
+        inst.setMatrixAt(i, m);
+      });
+      inst.instanceMatrix.needsUpdate = true;
+      scene.add(inst);
+    }, undefined, (err) => console.error('hero bed', err));
+  }
+
   // ---------- Cây phượng dải trung tâm + đèn đường (dọc phố thật) ----------
   // Cây phượng vĩ ĐA DẠNG: tán ô rộng dẹt + vòm hoa đỏ phủ trên (đặc trưng Hoa Phượng Đỏ).
   // Mỗi cây tự sinh biến thể theo vị trí: cao/thấp, nở rộ / nở vừa / chưa nở (hết mùa).
@@ -2133,11 +2171,14 @@ export function buildWorld(scene) {
       pH.position.set(g.x, LAND_H + 0.12, g.z); scene.add(pH);
       const pV = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.16, g.d - 2), pathM);
       pV.position.set(g.x, LAND_H + 0.12, g.z); scene.add(pV);
-      // bồn hoa trung tâm (đài tròn)
-      const center = new THREE.Mesh(new THREE.CylinderGeometry(3.6, 4, 0.8, 14), mat(0xcfc5ac));
-      center.position.set(g.x, LAND_H + 0.4, g.z); center.castShadow = true; scene.add(center);
-      flowerBed(g.x, g.z, 2.8, Math.abs(g.x + g.z) | 0);
-      // luống hoa 4 góc phần tư
+      // bồn hoa TRUNG TÂM: luống hoa ẢNH-THẬT (Meshy) — vườn Nhà Kèn thì Nhà Kèn là điểm nhấn nên bỏ
+      const isKen = Math.hypot(g.x - LM.nhaken[0], g.z - LM.nhaken[1]) < 12;
+      if (!isKen) {
+        heroBed(g.x, g.z, Math.min(7.5, hw * 0.7, hd * 0.7));   // luống hoa Meshy, ĐI ĐƯỢC (không collider)
+      } else {
+        addCollider(g.x, g.z, 5);   // chỉ Nhà Kèn (công trình) mới chặn
+      }
+      // luống hoa 4 góc phần tư — procedural nhiều màu (đi được, tô điểm quanh luống chính)
       let bi = 3;
       for (const qx of [-1, 1]) for (const qz of [-1, 1]) {
         for (let a = 0; a < 2; a++) for (let b = 0; b < 2; b++) {
@@ -2152,7 +2193,7 @@ export function buildWorld(scene) {
         const tx = g.x + cxx, tz = g.z + czz;
         if (Math.abs(groundHeightNoDeck(tx, tz) - LAND_H) < 0.6) heroTree(tx, tz);
       }
-      addCollider(g.x, g.z, 4); // chỉ chặn bồn trung tâm; vườn đi bộ được
+      // KHÔNG chặn giữa vườn (trừ Nhà Kèn ở trên) — công viên/vườn hoa ĐI ĐƯỢC, khác công trình
     }
   }
 
@@ -2287,5 +2328,6 @@ export function buildWorld(scene) {
   };
 
   loadHeroTrees();   // nạp GLB cây phượng ảnh-thật rồi dựng InstancedMesh (bất đồng bộ)
+  loadHeroBeds();    // nạp GLB luống hoa ảnh-thật rồi dựng InstancedMesh
   return world;
 }
