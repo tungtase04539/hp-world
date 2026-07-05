@@ -421,7 +421,25 @@ export function buildWorld(scene) {
   }
 
   addMerged(asphaltGeos, mat(0x4c5158), 'roads');
-  addMerged(sidewalkGeos, mat(0xbcb5a2), 'sidewalks');
+  // Vỉa hè lát gạch ĐỎ–XÁM ca-rô (đặc trưng phố Hải Phòng — theo ảnh Street View thật P.Quang Trung).
+  {
+    if (sidewalkGeos.length) {
+      const kerbTex = makeTex(64, 64, (g, w, h) => {
+        g.fillStyle = '#9c968a'; g.fillRect(0, 0, w, h);           // gạch xám
+        g.fillStyle = '#b0472e'; g.fillRect(0, 0, w / 2, h / 2); g.fillRect(w / 2, h / 2, w / 2, h / 2); // gạch đỏ ca-rô
+        g.strokeStyle = 'rgba(0,0,0,.12)'; g.lineWidth = 2;
+        g.strokeRect(0, 0, w / 2, h / 2); g.strokeRect(w / 2, 0, w / 2, h / 2); g.strokeRect(0, h / 2, w / 2, h / 2); g.strokeRect(w / 2, h / 2, w / 2, h / 2);
+      });
+      kerbTex.wrapS = kerbTex.wrapT = THREE.RepeatWrapping;
+      const merged = mergeGeometries(sidewalkGeos);
+      sidewalkGeos.forEach((g) => g.dispose());
+      const pos = merged.attributes.position, uv = new Float32Array(pos.count * 2), S = 1 / 1.6; // 1 ô ca-rô ~0.8m
+      for (let i = 0; i < pos.count; i++) { uv[i * 2] = pos.getX(i) * S; uv[i * 2 + 1] = pos.getZ(i) * S; }
+      merged.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+      const mesh = new THREE.Mesh(merged, new THREE.MeshLambertMaterial({ map: kerbTex }));
+      mesh.name = 'sidewalks'; mesh.receiveShadow = true; scene.add(mesh);
+    }
+  }
   addMerged(dashGeos, mat(0xe8e4d2), 'dashes');
   addMerged(pathGeos, mat(0xc9b896), 'paths');
 
