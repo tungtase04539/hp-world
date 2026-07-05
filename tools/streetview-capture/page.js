@@ -43,7 +43,7 @@
       <div><label>Pitch (°, cách ,)</label><input id="hp-pit" value="0"></div>
     </div>
     <div class="row">
-      <div><label>Chờ tải trang (ms)</label><input id="hp-lw" type="number" value="3500"></div>
+      <div><label>Chờ tải trang (ms)</label><input id="hp-lw" type="number" value="4000"></div>
       <div><label>Bán kính pano (m)</label><input id="hp-rad" type="number" value="70"></div>
     </div>
     <button id="hp-cap-start">▶ Bắt đầu chụp</button>
@@ -111,6 +111,24 @@
     log(`Đang tải view ${state.idx + 1}/${state.total} (chờ ${state.loadWait}ms)…`);
     await sleep(state.loadWait || 3500);
     if (stopFlag) return;
+
+    // Phát hiện trang lỗi "Oops! ... didn't load Google Maps" → thử lại cùng URL (tối đa 4 lần)
+    const bodyTxt = (document.body && document.body.innerText) || '';
+    if (/Oops!\s*Something went wrong|didn't load Google Maps/i.test(bodyTxt)) {
+      state.retry = (state.retry || 0) + 1;
+      if (state.retry <= 4) {
+        log(`⚠ Trang lỗi Google Maps — thử lại lần ${state.retry}…`);
+        await bridge('setState', { state });
+        await sleep(1800 + state.retry * 700);
+        location.href = urlFor(job); return;
+      }
+      log(`⚠ Bỏ qua ${job.file} sau ${state.retry} lần lỗi.`);
+      state.retry = 0; state.idx++;
+      if (state.idx >= state.total) { await bridge('saveText', { filename: 'manifest.json', text: JSON.stringify(state.manifest, null, 2) }); await bridge('clearState'); log(`🏁 XONG. ${state.manifest.length} ảnh.`); reset(); return; }
+      await bridge('setState', { state }); await sleep(300); location.href = urlFor(state.jobs[state.idx]); return;
+    }
+    state.retry = 0;
+
     panel.style.visibility = 'hidden'; await sleep(90);
     const res = await bridge('capture', { filename: job.file });
     panel.style.visibility = 'visible';
