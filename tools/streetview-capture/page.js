@@ -66,15 +66,23 @@
     capDiv.style.cssText = 'position:fixed;inset:0;z-index:2147483000;background:#111';
     document.body.appendChild(capDiv);
     pano = new google.maps.StreetViewPanorama(capDiv, {
-      pov: { heading: 0, pitch: 0 }, zoom: 1, motionTracking: false, showRoadLabels: false,
+      pov: { heading: 0, pitch: 0 }, zoom: 1, visible: true, motionTracking: false, showRoadLabels: false,
       disableDefaultUI: true, addressControl: false, linksControl: false, panControl: false,
       zoomControl: false, fullscreenControl: false, clickToGo: false, scrollwheel: false,
     });
     svc = new google.maps.StreetViewService();
     // đảm bảo panel nổi trên panorama
     panel.style.zIndex = '2147483647';
+    log('pano API: ' + ['setPano', 'setPov', 'setPosition', 'setOptions'].map((m) => m + '=' + typeof pano[m]).join(' '));
     return true;
   }
+  // vài bản Maps JS (instantstreetview) không expose setPano/setPov trực tiếp → fallback setPosition/setOptions
+  function setPanoId(id, latLng) {
+    if (typeof pano.setPano === 'function') pano.setPano(id);
+    else if (latLng && typeof pano.setPosition === 'function') pano.setPosition(latLng);
+    else pano.setOptions({ pano: id });
+  }
+  function setPovSafe(pov) { if (typeof pano.setPov === 'function') pano.setPov(pov); else pano.setOptions({ pov }); }
 
   const getPano = (req) => new Promise((res, rej) => svc.getPanorama(req, (d, s) => (s === 'OK' ? res(d) : rej(s))));
   function waitPano(wantId, timeout = 4000) {
@@ -111,11 +119,11 @@
       const panoId = data.location.pano;
       if (seen.has(panoId)) continue; seen.add(panoId); covered++;
       const pos = data.location.latLng;
-      pano.setPano(panoId); await waitPano(panoId); await sleep(tileWait);
+      setPanoId(panoId, pos); await waitPano(panoId); await sleep(tileWait);
       for (const pitch of pitches) {
         for (const heading of headings) {
           if (stopFlag) break;
-          pano.setPov({ heading, pitch }); await sleep(tileWait);
+          setPovSafe({ heading, pitch }); await sleep(tileWait);
           const file = `pano_${String(covered).padStart(3, '0')}_h${String(heading).padStart(3, '0')}_p${pitch}.jpg`;
           const res = await capture(file);
           if (res && res.ok) {
