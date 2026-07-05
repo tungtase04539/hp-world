@@ -1,0 +1,23 @@
+<!DOCTYPE html><html><body style="margin:0">
+<script type="importmap">{"imports":{"three":"./lib/three.module.js","three/addons/":"./lib/jsm/"}}</script>
+<script type="module">
+import * as THREE from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {MeshoptDecoder} from 'three/addons/libs/meshopt_decoder.module.js';
+const sc=new THREE.Scene(); sc.background=new THREE.Color(0x88aacc);
+const cam=new THREE.PerspectiveCamera(45,1.6,0.1,100);
+const r=new THREE.WebGLRenderer({antialias:true}); r.setSize(1200,750); document.body.appendChild(r.domElement);
+sc.add(new THREE.AmbientLight(0xffffff,1.2));
+const dl=new THREE.DirectionalLight(0xffffff,1.2); dl.position.set(1,2,3); sc.add(dl);
+const lo=new GLTFLoader(); lo.setMeshoptDecoder(MeshoptDecoder);
+const mdl=new URLSearchParams(location.search).get('m')||'nhahat';
+lo.load('assets/'+mdl+'.glb?v='+Date.now(), g=>{
+  sc.add(g.scene);
+  // facade views from both z sides
+  cam.position.set(0, 0.25, 2.2); cam.lookAt(0,0.05,0); r.render(sc,cam);
+  window.__ready1=r.domElement.toDataURL('image/png');
+  cam.position.set(0, 0.25, -2.2); cam.lookAt(0,0.05,0); r.render(sc,cam);
+  window.__ready2=r.domElement.toDataURL('image/png');
+  window.__done=true;
+});
+</script></body></html>

@@ -31,6 +31,10 @@ q '[out:json][timeout:60];way(id:242055606,242169916,242169920,174683856,2422265
 # 7. Geometry 3 trường học (THPT Ngô Quyền 242169921, THCS Ngô Quyền 240463141, THCS Trần Phú 1120513525)
 q '[out:json][timeout:60];way(id:242169921,240463141,1120513525);out geom;' osm_school_geom.json
 
+# 7b. Đợt địa danh 2 (UBND TP 1124706318, rạp Tháng Tám 868234608, đình Hàng Kênh 240394078,
+#     chùa Dư Hàng 236830096, đền Tam Kỳ 961921403)
+q '[out:json][timeout:60];way(id:1124706318,868234608,240394078,236830096,961921403,242192606);out geom;' osm_lm2_geom.json
+
 # 8. Cây thật (node natural=tree) trung tâm
 q '[out:json][timeout:90];node["natural"="tree"](20.845,106.652,20.884,106.712);out;' osm_trees.json
 

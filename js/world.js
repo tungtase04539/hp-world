@@ -6,6 +6,7 @@ import {
   groundHeight, groundHeightNoDeck, isWater, landAt, riverFactor,
   nearestRiverPoint, findShore, addPier,
 } from './terrain.js';
+import { STREETS, INTERSECTIONS, MEDIANS } from './mapdata.js';
 
 // Thế giới dựng từ dữ liệu OpenStreetMap thật của Hải Phòng (tỉ lệ 1:10,
 // trung tâm phóng đại 2.2x). Mọi con phố trung tâm là phố thật.
@@ -687,28 +688,9 @@ export function buildWorld(scene) {
           }
         });
         scene.add(m);
-        // Chân dung Chủ tịch Hồ Chí Minh trên mặt tiền: dùng ẢNH CHUẨN phủ đè lên
-        // hình do AI nướng vào texture (bị méo — TUYỆT ĐỐI không dùng hình AI cho chân dung)
-        // Kích thước & vị trí NEO THEO KHUNG MÔ HÌNH để tự đúng khi đổi cỡ nhà hát
-        {
-          const tex = new THREE.TextureLoader().load('assets/img_bacho.jpg');
-          tex.colorSpace = THREE.SRGBColorSpace;
-          tex.anisotropy = 8;
-          const bh = box.max.y - box.min.y;            // chiều cao nhà hát sau scale
-          const PH = bh * 0.40, PW = PH * (512 / 664); // giữ đúng tỉ lệ ảnh gốc
-          const grp = new THREE.Group();
-          const frame = new THREE.Mesh(new THREE.PlaneGeometry(PW + 0.5, PH + 0.5), mat(0xf5eede));
-          grp.add(frame);
-          const portrait = new THREE.Mesh(new THREE.PlaneGeometry(PW, PH),
-            new THREE.MeshBasicMaterial({ map: tex, toneMapped: false }));
-          portrait.position.z = 0.03;
-          grp.add(portrait);
-          const halfDepth = (box.max.z - box.min.z) / 2;
-          const [px2, pz2] = localPt(opX, opZ, 0, halfDepth + 0.12, thOpera);
-          grp.position.set(px2, LAND_H + bh * 0.52, pz2); // giữa mặt tiền, không vượt mái
-          grp.rotation.y = thOpera;
-          scene.add(grp);
-        }
+        // Chân dung Chủ tịch Hồ Chí Minh: ẢNH CHUẨN đã được dập thẳng vào texture
+        // của nhahat.glb (tools: xem KNOWLEDGE.md §5.6 — fit affine UV↔3D rồi composite).
+        // TUYỆT ĐỐI không dùng hình AI cho chân dung; muốn đổi ảnh → dập lại texture.
         const fw = (box.max.x - box.min.x) + 3, fd = (box.max.z - box.min.z) + 3;
         const plinth = new THREE.Mesh(new THREE.BoxGeometry(fw, 0.9, fd), mat(0xcfc5ac));
         plinth.position.set(opX, LAND_H + 0.15, opZ);
@@ -1653,6 +1635,133 @@ export function buildWorld(scene) {
   schoolCompound('thcsnq', 'THCS NGÔ QUYỀN');
   schoolCompound('thcstp', 'THCS TRẦN PHÚ');
 
+  // ---------- ĐỢT ĐỊA DANH 2: 5 GLB từ ảnh thật ----------
+  // Đền Nghè — di tích thờ Nữ tướng Lê Chân (node OSM, không có trục dài → xoay theo mặt phố)
+  placeGLB({
+    url: 'assets/dennghe.glb', name: 'Đền Nghè',
+    x: LM.dennghe[0], z: LM.dennghe[1],
+    rot: orientFace(LM_FACE.dennghe), size: 11,
+  });
+  addCollider(LM.dennghe[0], LM.dennghe[1], 6);
+
+  // Đình Hàng Kênh — đình cổ 300 năm, footprint OSM
+  placeGLB({
+    url: 'assets/dinhhk.glb', name: 'Đình Hàng Kênh',
+    x: LM.dinhhk[0], z: LM.dinhhk[1],
+    rot: orientLong(LM_DIR.dinhhk, LM_FACE.dinhhk), size: 16,
+  });
+  addCollider(LM.dinhhk[0], LM.dinhhk[1], 8);
+
+  // Chùa Dư Hàng (Phúc Lâm tự) — gác chuông 3 tầng mái
+  placeGLB({
+    url: 'assets/chuahang.glb', name: 'Chùa Dư Hàng',
+    x: LM.chuahang[0], z: LM.chuahang[1],
+    rot: orientLong(LM_DIR.chuahang, LM_FACE.chuahang), size: 12,
+  });
+  addCollider(LM.chuahang[0], LM.chuahang[1], 6.5);
+
+  // Ngân hàng Nhà nước — tân cổ điển Pháp đá granite (ảnh Commons, dựng mirror nửa trái)
+  placeGLB({
+    url: 'assets/nhnn.glb', name: 'Ngân hàng Nhà nước',
+    x: LM.nhnn[0], z: LM.nhnn[1],
+    rot: orientLong(LM_DIR.nhnn, LM_FACE.nhnn), size: 18,
+  });
+  addCollider(LM.nhnn[0], LM.nhnn[1], 9);
+
+  // Đền Tam Kỳ — thờ Quan lớn Tuần Tranh, bên hồ Tam Bạc
+  placeGLB({
+    url: 'assets/dentamky.glb', name: 'Đền Tam Kỳ',
+    x: LM.dentamky[0], z: LM.dentamky[1],
+    rot: orientLong(LM_DIR.dentamky, LM_FACE.dentamky), size: 12,
+  });
+  addCollider(LM.dentamky[0], LM.dentamky[1], 6.5);
+
+  // ---------- ĐỢT ĐỊA DANH 2: procedural (chưa có ảnh đạt chuẩn) ----------
+  // UBND TP — khối Pháp cổ 3 tầng kem, mái đỏ, trán giữa + cờ
+  {
+    const [ux, uz] = LM.ubnd;
+    const th = orientLong(LM_DIR.ubnd, LM_FACE.ubnd);
+    const g = new THREE.Group();
+    const wallM = mat(0xf3e3bc), trimM = mat(0xfdf8ea);
+    const main = new THREE.Mesh(new THREE.BoxGeometry(22, 11, 9), wallM);
+    main.position.y = 5.5; g.add(main);
+    for (let f = 0; f < 3; f++) {
+      const strip = new THREE.Mesh(new THREE.BoxGeometry(22.15, 1.4, 9.15), sharedMats.window);
+      strip.position.y = 2.4 + f * 3.4; g.add(strip);
+    }
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(23.4, 1.1, 10.4), mat(0xa04a34));
+    roof.position.y = 11.5; g.add(roof);
+    const porch = new THREE.Mesh(new THREE.BoxGeometry(8, 12.4, 1.6), trimM);
+    porch.position.set(0, 6.2, 4.6); g.add(porch);
+    const ped = new THREE.Mesh(new THREE.CylinderGeometry(0, 4.6, 2.2, 4, 1), mat(0xa04a34));
+    ped.rotation.y = Math.PI / 4; ped.scale.z = 0.35;
+    ped.position.set(0, 13.4, 4.6); g.add(ped);
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 6, 6), mat(0xd8d8d8));
+    pole.position.set(0, 16, 4.2); g.add(pole);
+    const fl = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 1.5),
+      new THREE.MeshLambertMaterial({ color: 0xd8332a, side: THREE.DoubleSide }));
+    fl.position.set(1.2, 18.4, 4.2); g.add(fl);
+    updaters.push((dt, time) => { fl.rotation.y = Math.sin(time * 1.6 + 7) * 0.35; });
+    const sign = new THREE.Mesh(new THREE.BoxGeometry(10, 1.1, 0.3),
+      new THREE.MeshLambertMaterial({ map: signTexture('UBND THÀNH PHỐ', '#7a1f1f', '#ffe9b8') }));
+    sign.position.set(0, 10.2, 5.5); g.add(sign);
+    g.position.set(ux, LAND_H, uz);
+    g.rotation.y = th;
+    scene.add(g);
+    addCollider(ux, uz, 11);
+  }
+
+  // Rạp Tháng Tám — rạp chiếu bóng art-deco: mặt tiền kem + bảng dọc đỏ
+  {
+    // dịch 9 đơn vị về đông: nhà hát hiển thị phóng 2.5× nên footprint thật bị lấn
+    const [rx, rz] = [LM.rap78[0] + 9, LM.rap78[1] - 3];
+    const th = orientLong(LM_DIR.rap78, LM_FACE.rap78);
+    const g = new THREE.Group();
+    const hall = new THREE.Mesh(new THREE.BoxGeometry(13, 8, 16), mat(0xe8dbb8));
+    hall.position.set(0, 4, -3); g.add(hall);
+    const front = new THREE.Mesh(new THREE.BoxGeometry(14, 10, 2), mat(0xf3ead0));
+    front.position.set(0, 5, 5.6); g.add(front);
+    const marquee = new THREE.Mesh(new THREE.BoxGeometry(11, 0.5, 3), mat(0x8a2f26));
+    marquee.position.set(0, 4.2, 7.4); g.add(marquee);
+    const tower = new THREE.Mesh(new THREE.BoxGeometry(2.2, 12.5, 1.2),
+      new THREE.MeshLambertMaterial({ color: 0xc03428 }));
+    tower.position.set(4.2, 6.25, 6.2); g.add(tower);
+    const sign = new THREE.Mesh(new THREE.BoxGeometry(8.5, 1.2, 0.3),
+      new THREE.MeshLambertMaterial({ map: signTexture('RẠP THÁNG 8', '#c03428', '#ffe9b8') }));
+    sign.position.set(0, 8.6, 6.8); g.add(sign);
+    for (const dx of [-4, -1.4, 1.4]) {
+      const door = new THREE.Mesh(new THREE.BoxGeometry(1.8, 3, 0.3), mat(0x5a3620));
+      door.position.set(dx, 1.5, 6.7); g.add(door);
+    }
+    g.position.set(rx, LAND_H, rz);
+    g.rotation.y = th;
+    scene.add(g);
+    addCollider(rx, rz, 8);
+  }
+
+  // Nhà Kèn — lầu bát giác vườn hoa Nguyễn Du (Pháp xây 1920s, nơi đội kèn diễn tấu)
+  {
+    const [kx, kz] = LM.nhaken;
+    const g = new THREE.Group();
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(4.4, 4.7, 0.7, 8), mat(0xd8cdb4));
+    base.position.y = 0.35; g.add(base);
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2 + Math.PI / 8;
+      const col = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.18, 3.6, 8), mat(0xf3ead6));
+      col.position.set(Math.cos(a) * 3.5, 2.5, Math.sin(a) * 3.5);
+      g.add(col);
+    }
+    const ring = new THREE.Mesh(new THREE.CylinderGeometry(4.0, 4.0, 0.45, 8), mat(0xe6dcc2));
+    ring.position.y = 4.5; g.add(ring);
+    const roofK = new THREE.Mesh(new THREE.ConeGeometry(4.9, 2.6, 8), mat(0x9c4632));
+    roofK.position.y = 6.05; g.add(roofK);
+    const tip = new THREE.Mesh(new THREE.SphereGeometry(0.3, 8, 6), mat(0x7a5a28));
+    tip.position.y = 7.5; g.add(tip);
+    g.position.set(kx, LAND_H, kz);
+    scene.add(g);
+    addCollider(kx, kz, 4.6);
+  }
+
   // ghế đá ven hồ Tam Bạc + quảng trường
   {
     const woodMat = mat(0x6a4a30);
@@ -1674,6 +1783,173 @@ export function buildWorld(scene) {
     bench(LM.lake[0] - 20, LM.lake[1] + 33, 0); bench(LM.lake[0], LM.lake[1] + 34, 0); bench(LM.lake[0] + 20, LM.lake[1] + 35, 0);
     const [ftX2, ftZ2] = EXTRAS.fountain;
     bench(ftX2 - 12, ftZ2 + 10, Math.PI); bench(ftX2 + 12, ftZ2 + 10, Math.PI);
+  }
+
+  // ---------- NỘI THẤT ĐƯỜNG PHỐ (từ dữ liệu OSM: STREETS/INTERSECTIONS/MEDIANS) ----------
+  {
+    // 1) Biển tên phố xanh lá — đặt lệch vuông góc trục phố, chữ song song phố
+    const poleM = mat(0x5a5f66);
+    for (const st of STREETS) {
+      const perp = [-st.d[1], st.d[0]];
+      const sx = st.x + perp[0] * 4.6, sz = st.z + perp[1] * 4.6;
+      if (isWater(sx, sz)) continue;
+      const y = groundHeightNoDeck(sx, sz);
+      if (Math.abs(y - LAND_H) > 1.5) continue;
+      const th = Math.atan2(-st.d[1], st.d[0]);
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 2.6, 6), poleM);
+      post.position.set(sx, y + 1.3, sz); scene.add(post);
+      const plate = new THREE.Mesh(new THREE.BoxGeometry(3.0, 0.62, 0.08),
+        new THREE.MeshLambertMaterial({ map: signTexture(st.n.toUpperCase().replace(/^(ĐƯỜNG|PHỐ|CẦU) /, ''), '#1c6e43', '#ffffff') }));
+      plate.position.set(sx, y + 2.75, sz);
+      plate.rotation.y = th;
+      scene.add(plate);
+    }
+
+    // 2) Đèn tín hiệu tại giao lộ lớn — 3 bóng, chu kỳ xanh/vàng/đỏ lệch pha
+    const lampHeads = [];
+    for (let i = 0; i < INTERSECTIONS.length; i++) {
+      const [ix, iz] = INTERSECTIONS[i];
+      const cx = ix + 5, cz = iz + 5;
+      if (isWater(cx, cz)) continue;
+      const y = groundHeightNoDeck(cx, cz);
+      if (Math.abs(y - LAND_H) > 1.5) continue;
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.13, 4.6, 6), poleM);
+      pole.position.set(cx, y + 2.3, cz); scene.add(pole);
+      const arm = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.12, 0.12), poleM);
+      arm.position.set(cx - 1.1, y + 4.5, cz); scene.add(arm);
+      const headBox = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.35, 0.3), mat(0x24272b));
+      headBox.position.set(cx - 2.1, y + 3.9, cz); scene.add(headBox);
+      const lamps = [];
+      const cols = [0xff2e20, 0xffb300, 0x2ecc40];
+      for (let k = 0; k < 3; k++) {
+        const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 6),
+          new THREE.MeshBasicMaterial({ color: 0x222222 }));
+        lamp.position.set(cx - 2.1, y + 4.3 - k * 0.4, cz + 0.17);
+        scene.add(lamp);
+        lamps.push({ lamp, col: cols[k] });
+      }
+      lampHeads.push({ lamps, phase: i * 2.3 });
+    }
+    updaters.push((dt, time) => {
+      for (const h of lampHeads) {
+        const t = (time + h.phase) % 10;
+        const on = t < 4.5 ? 2 : t < 6 ? 1 : 0; // xanh → vàng → đỏ
+        for (let k = 0; k < 3; k++) h.lamps[k].lamp.material.color.setHex(k === on ? h.lamps[k].col : 0x222222);
+      }
+    });
+
+    // 3) Dải phân cách giữa các đại lộ (THĐ, Trần Phú, Điện Biên Phủ) + bụi cây
+    const medM = mat(0xb9c2b6), bushM = mat(0x3e7a3a);
+    for (const line of MEDIANS) {
+      for (let i = 0; i < line.length - 1; i++) {
+        const [x1, z1] = line[i], [x2, z2] = line[i + 1];
+        const segL = Math.hypot(x2 - x1, z2 - z1);
+        const d = [(x2 - x1) / segL, (z2 - z1) / segL];
+        const th = Math.atan2(-d[1], d[0]);
+        for (let s = 6; s < segL - 6; s += 10) {
+          const mx = x1 + d[0] * s, mz = z1 + d[1] * s;
+          if (INTERSECTIONS.some(([px, pz]) => (px - mx) ** 2 + (pz - mz) ** 2 < 14 * 14)) continue;
+          if (isWater(mx, mz)) continue;
+          const y = groundHeightNoDeck(mx, mz);
+          if (Math.abs(y - LAND_H) > 1) continue;
+          const block = new THREE.Mesh(new THREE.BoxGeometry(6.5, 0.3, 1.1), medM);
+          block.position.set(mx, y + 0.15, mz);
+          block.rotation.y = th;
+          block.receiveShadow = true;
+          scene.add(block);
+          const bush = new THREE.Mesh(new THREE.SphereGeometry(0.5, 7, 5), bushM);
+          bush.position.set(mx, y + 0.65, mz);
+          bush.scale.set(1.6, 0.8, 0.7);
+          bush.rotation.y = th;
+          scene.add(bush);
+        }
+      }
+    }
+
+    // 4) Nhà chờ xe buýt dọc các phố lớn nhất
+    for (const st of STREETS.slice(0, 6)) {
+      const perp = [-st.d[1], st.d[0]];
+      const bx = st.x - perp[0] * 5.4 + st.d[0] * 9, bz = st.z - perp[1] * 5.4 + st.d[1] * 9;
+      if (isWater(bx, bz)) continue;
+      const y = groundHeightNoDeck(bx, bz);
+      if (Math.abs(y - LAND_H) > 1.2) continue;
+      const th = Math.atan2(-st.d[1], st.d[0]);
+      const g = new THREE.Group();
+      const roofB = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.15, 1.7), mat(0x2e6fa1));
+      roofB.position.y = 2.5; g.add(roofB);
+      for (const px of [-1.9, 1.9]) {
+        const p = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 2.5, 6), poleM);
+        p.position.set(px, 1.25, -0.6); g.add(p);
+      }
+      const back = new THREE.Mesh(new THREE.BoxGeometry(4.2, 1.3, 0.08), mat(0xd7e2ea));
+      back.position.set(0, 1.5, -0.72); g.add(back);
+      const seat = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.1, 0.5), mat(0x8a6a44));
+      seat.position.set(0, 0.55, -0.35); g.add(seat);
+      g.position.set(bx, y, bz);
+      g.rotation.y = th;
+      scene.add(g);
+    }
+
+    // 5) Thuyền thiên nga hồ Tam Bạc
+    const swanW = mat(0xf5f5f0);
+    function swan(x, z, rot) {
+      const g = new THREE.Group();
+      const body = new THREE.Mesh(new THREE.SphereGeometry(1.1, 10, 8), swanW);
+      body.scale.set(1.35, 0.8, 1); body.position.y = 0.5; g.add(body);
+      const tail = new THREE.Mesh(new THREE.ConeGeometry(0.55, 1.3, 8), swanW);
+      tail.rotation.x = -1.1; tail.position.set(-1.35, 0.95, 0); g.add(tail);
+      const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.22, 1.7, 8), swanW);
+      neck.rotation.z = -0.25; neck.position.set(1.15, 1.45, 0); g.add(neck);
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.3, 8, 6), swanW);
+      head.position.set(1.4, 2.35, 0); g.add(head);
+      const beak = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.45, 6), mat(0xe8842a));
+      beak.rotation.z = -Math.PI / 2; beak.position.set(1.75, 2.32, 0); g.add(beak);
+      const canopy = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.08, 1.3), mat(0xd8332a));
+      canopy.position.set(-0.2, 1.75, 0); g.add(canopy);
+      g.position.set(x, 0.12, z);
+      g.rotation.y = rot;
+      scene.add(g);
+      const x0 = x, z0 = z, ph = x * 0.7;
+      updaters.push((dt, time) => {
+        g.position.y = 0.12 + Math.sin(time * 1.1 + ph) * 0.07;
+        g.position.x = x0 + Math.sin(time * 0.13 + ph) * 3;
+        g.position.z = z0 + Math.cos(time * 0.11 + ph) * 2;
+        g.rotation.y = rot + Math.sin(time * 0.13 + ph) * 0.4;
+      });
+    }
+    swan(LM.lake[0] + 6, LM.lake[1] - 1, 0.6);
+    swan(LM.lake[0] + 44, LM.lake[1] - 9, -1.2);
+    swan(LM.lake[0] + 90, LM.lake[1] - 18, 2.1);
+
+    // 6) Dây đèn đêm dải trung tâm: quảng trường → đầu đông hồ Tam Bạc
+    {
+      const bulbM = new THREE.MeshBasicMaterial({ color: 0xffd98a });
+      const p0 = [EXTRAS.square[0] - 6, EXTRAS.square[1] + 6], p1 = [-96, 44];
+      const L = Math.hypot(p1[0] - p0[0], p1[1] - p0[1]);
+      const d = [(p1[0] - p0[0]) / L, (p1[1] - p0[1]) / L];
+      const step = 16;
+      let prev = null;
+      for (let s = 0; s <= L; s += step) {
+        const px = p0[0] + d[0] * s, pz = p0[1] + d[1] * s;
+        if (isWater(px, pz)) continue;
+        const y = groundHeightNoDeck(px, pz);
+        if (Math.abs(y - LAND_H) > 1) { prev = null; continue; }
+        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 3.6, 6), poleM);
+        pole.position.set(px, y + 1.8, pz);
+        scene.add(pole);
+        if (prev) {
+          for (let k = 1; k < 7; k++) {
+            const t = k / 7;
+            const bx = prev[0] + (px - prev[0]) * t, bz = prev[1] + (pz - prev[1]) * t;
+            const sag = Math.sin(t * Math.PI) * 0.55;
+            const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.065, 6, 5), bulbM);
+            bulb.position.set(bx, y + 3.55 - sag, bz);
+            scene.add(bulb);
+          }
+        }
+        prev = [px, pz];
+      }
+    }
   }
 
   // ---------- Hoa phượng nhặt (nhiệm vụ) ----------

@@ -396,11 +396,21 @@ function nearestRoadPoint(cx, cz) {
 }
 // 3 trường học (way OSM thật, file osm_school_geom.json)
 for (const e of load('osm_school_geom.json')) lmGeom[e.id] = e;
+// đợt địa danh 2: UBND TP, rạp Tháng Tám, đình Hàng Kênh, chùa Dư Hàng, đền Tam Kỳ
+for (const e of load('osm_lm2_geom.json')) lmGeom[e.id] = e;
+addWay('ubnd', 1124706318, null);
+addWay('rap78', 868234608, null);
+addWay('dinhhk', 240394078, null);
+addWay('chuahang', 236830096, null);
+addWay('dentamky', 961921403, null);
+addWay('nhnn', 242192606, null);       // Ngân hàng Nhà nước CN Hải Phòng
+addNode('dennghe', 106.68041, 20.85466);   // Đền Nghè (node OSM 6380148018)
+addNode('nhaken', 106.68075, 20.85677);    // Nhà Kèn vườn hoa Nguyễn Du (đặt tay theo bản đồ thật)
 addWay('thptnq', 242169921, null);   // THPT Ngô Quyền (trường Bonnal)
 addWay('thcsnq', 240463141, null);   // THCS Ngô Quyền
 addWay('thcstp', 1120513525, null);  // THCS Trần Phú
 
-for (const key of ['cathedral', 'postoffice', 'museum', 'market', 'thptnq', 'thcsnq', 'thcstp']) {
+for (const key of ['cathedral', 'postoffice', 'museum', 'market', 'thptnq', 'thcsnq', 'thcstp', 'ubnd', 'rap78', 'dinhhk', 'chuahang', 'dentamky', 'dennghe', 'nhaken', 'nhnn']) {
   const [cx, cz] = LM[key];
   const rp = nearestRoadPoint(cx, cz);
   const f = [rp[0] - cx, rp[1] - cz];
@@ -485,6 +495,65 @@ for (const w of load('osm_rail.json')) {
 }
 console.log(`rail: ${RAIL.length} đoạn`);
 
+// ---------- Biển tên phố + giao lộ lớn + dải phân cách (nội thất đường phố) ----------
+// STREETS: mỗi phố có tên (p/s/t, tổng dài >60) → điểm giữa đoạn dài nhất + hướng
+const streetAgg = {};
+for (const r of ROADS_DT) if (r.name && ['p', 's', 't'].includes(r.c)) {
+  const L = plLen(r.pts);
+  const a = (streetAgg[r.name] = streetAgg[r.name] || { len: 0, best: null, bl: 0 });
+  a.len += L;
+  if (L > a.bl) { a.bl = L; a.best = r.pts; }
+}
+function plMid(pts) { // điểm giữa theo chiều dài + hướng đơn vị tại đó
+  const total = plLen(pts); let acc = 0;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const seg = Math.hypot(pts[i + 1][0] - pts[i][0], pts[i + 1][1] - pts[i][1]);
+    if (acc + seg >= total / 2) {
+      const t = (total / 2 - acc) / seg;
+      const x = pts[i][0] + (pts[i + 1][0] - pts[i][0]) * t;
+      const z = pts[i][1] + (pts[i + 1][1] - pts[i][1]) * t;
+      const d = [(pts[i + 1][0] - pts[i][0]) / seg, (pts[i + 1][1] - pts[i][1]) / seg];
+      return [Math.round(x), Math.round(z), [+d[0].toFixed(3), +d[1].toFixed(3)]];
+    }
+    acc += seg;
+  }
+  return [pts[0][0], pts[0][1], [1, 0]];
+}
+const STREETS = Object.entries(streetAgg)
+  .filter(([, a]) => a.len > 60)
+  .sort((x, y) => y[1].len - x[1].len).slice(0, 26)
+  .map(([n, a]) => { const [x, z, d] = plMid(a.best); return { n, x, z, d }; });
+console.log('STREETS:', STREETS.length);
+
+// INTERSECTIONS: điểm ≥3 tuyến p/s đi qua (lưới 3 đơn vị), trong bán kính 300, cách nhau ≥45
+const cellCnt = new Map();
+for (const r of ROADS_DT) if (r.c === 'p' || r.c === 's') {
+  const seen = new Set();
+  for (const [x, z] of r.pts) {
+    const k = Math.round(x / 3) + ',' + Math.round(z / 3);
+    if (!seen.has(k)) { seen.add(k); cellCnt.set(k, (cellCnt.get(k) || 0) + 1); }
+  }
+}
+const INTERSECTIONS = [];
+for (const [k, c] of [...cellCnt.entries()].sort((a, b) => b[1] - a[1])) {
+  if (c < 3) continue;
+  const [gx, gz] = k.split(',').map(Number);
+  const x = gx * 3, z = gz * 3;
+  if (x * x + z * z > 300 * 300) continue;
+  if (INTERSECTIONS.some(([px, pz]) => (px - x) ** 2 + (pz - z) ** 2 < 45 * 45)) continue;
+  INTERSECTIONS.push([x, z]);
+  if (INTERSECTIONS.length >= 14) break;
+}
+console.log('INTERSECTIONS:', INTERSECTIONS.length);
+
+// MEDIANS: tuyến dài nhất của các đại lộ có dải phân cách thật
+const MEDIANS = [];
+for (const nm of ['Trần Hưng Đạo', 'Trần Phú', 'Điện Biên Phủ']) {
+  const key = Object.keys(streetAgg).find((k) => k.includes(nm));
+  if (key) MEDIANS.push(streetAgg[key].best.map(([x, z]) => [Math.round(x), Math.round(z)]));
+}
+console.log('MEDIANS:', MEDIANS.map((m) => m.length));
+
 console.log('LM:', JSON.stringify(LM));
 console.log('LM_DIR:', JSON.stringify(LM_DIR));
 console.log('EXTRAS:', JSON.stringify(EXTRAS));
@@ -506,6 +575,9 @@ export const EXTRAS = ${JSON.stringify(EXTRAS)};
 export const TREES = ${JSON.stringify(TREES)};
 export const RAIL = ${JSON.stringify(RAIL)};
 export const PARKS = ${JSON.stringify(PARKS)};
+export const STREETS = ${JSON.stringify(STREETS)};
+export const INTERSECTIONS = ${JSON.stringify(INTERSECTIONS)};
+export const MEDIANS = ${JSON.stringify(MEDIANS)};
 export const BUILDINGS = ${JSON.stringify(BUILDINGS)};
 `;
 fs.writeFileSync('/home/user/hp-world/js/mapdata.js', out);

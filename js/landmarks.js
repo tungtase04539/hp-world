@@ -31,6 +31,14 @@ const P = {
   thptnq: [LM.thptnq[0] + LM_FACE.thptnq[0] * 16, LM.thptnq[1] + LM_FACE.thptnq[1] * 16],
   thcsnq: [LM.thcsnq[0] + LM_FACE.thcsnq[0] * 16, LM.thcsnq[1] + LM_FACE.thcsnq[1] * 16],
   thcstp: [LM.thcstp[0] + LM_FACE.thcstp[0] * 16, LM.thcstp[1] + LM_FACE.thcstp[1] * 16],
+  dennghe: [LM.dennghe[0] + LM_FACE.dennghe[0] * 10, LM.dennghe[1] + LM_FACE.dennghe[1] * 10],
+  dinhhk: [LM.dinhhk[0] + LM_FACE.dinhhk[0] * 13, LM.dinhhk[1] + LM_FACE.dinhhk[1] * 13],
+  chuahang: [LM.chuahang[0] + LM_FACE.chuahang[0] * 11, LM.chuahang[1] + LM_FACE.chuahang[1] * 11],
+  dentamky: [LM.dentamky[0] + LM_FACE.dentamky[0] * 11, LM.dentamky[1] + LM_FACE.dentamky[1] * 11],
+  nhnn: [LM.nhnn[0] + LM_FACE.nhnn[0] * 14, LM.nhnn[1] + LM_FACE.nhnn[1] * 14],
+  ubnd: [LM.ubnd[0] + LM_FACE.ubnd[0] * 16, LM.ubnd[1] + LM_FACE.ubnd[1] * 16],
+  rap78: [LM.rap78[0] + LM_FACE.rap78[0] * 12, LM.rap78[1] + LM_FACE.rap78[1] * 12],
+  nhaken: [LM.nhaken[0] + LM_FACE.nhaken[0] * 8, LM.nhaken[1] + LM_FACE.nhaken[1] * 8],
 };
 
 // 15 địa danh đặc trưng — tọa độ thật từ dữ liệu OpenStreetMap (đã qua phép chiếu 1:10 + kính lúp trung tâm)
@@ -249,6 +257,102 @@ export const LANDMARKS = [
     fact: {
       vi: '💡 Trường nằm ngay dải vườn hoa trung tâm — đi bộ vài phút tới hồ Tam Bạc.',
       en: '💡 Steps away from the central flower gardens and Tam Bac lake.',
+    },
+  },
+  {
+    id: 'dennghe', x: P.dennghe[0], z: P.dennghe[1],
+    name: { vi: 'Đền Nghè', en: 'Nghe Temple' },
+    text: {
+      vi: 'Đền thờ Nữ tướng Lê Chân — người khai phá đất An Biên, tiền thân Hải Phòng. Ngôi đền đầu thế kỷ 20 với mái đắp rồng phượng, võng cuốn chạm trổ tinh xảo, là Di tích lịch sử quốc gia thiêng liêng bậc nhất thành phố.',
+      en: 'The temple of Lady General Le Chan, founder of An Bien — the settlement that became Hai Phong. An early-20th-century shrine with dragon-phoenix roof crests, a most sacred national heritage site.',
+    },
+    fact: {
+      vi: '💡 Lễ hội đền Nghè mùng 8 tháng 2 âm lịch là lễ hội truyền thống lớn nhất nội thành.',
+      en: '💡 Its festival on the 8th day of the 2nd lunar month is downtown\'s biggest.',
+    },
+  },
+  {
+    id: 'dinhhk', x: P.dinhhk[0], z: P.dinhhk[1],
+    name: { vi: 'Đình Hàng Kênh', en: 'Hang Kenh Communal House' },
+    text: {
+      vi: 'Đình cổ dựng năm 1719, thờ Ngô Quyền — vị vua đại phá quân Nam Hán trên sông Bạch Đằng năm 938. Tòa đại đình gỗ lim đồ sộ với 156 con rồng chạm khắc, không hai con nào giống nhau.',
+      en: 'Built in 1719 to honor King Ngo Quyen, victor of the Bach Dang river battle of 938. Its massive ironwood hall carries 156 carved dragons — no two alike.',
+    },
+    fact: {
+      vi: '💡 Nghệ thuật chạm khắc gỗ ở đây được xếp vào hàng đẹp nhất miền Bắc.',
+      en: '💡 Its woodcarving ranks among the finest in northern Vietnam.',
+    },
+  },
+  {
+    id: 'chuahang', x: P.chuahang[0], z: P.chuahang[1],
+    name: { vi: 'Chùa Dư Hàng', en: 'Du Hang Pagoda' },
+    text: {
+      vi: 'Phúc Lâm tự — ngôi chùa cổ nhất Hải Phòng, tương truyền có từ thời Tiền Lê (thế kỷ 10). Gác chuông ba tầng mái cong vút, vườn tháp cổ kính và bộ kinh Tràng A Hàm quý hiếm.',
+      en: 'Phuc Lam pagoda — Hai Phong\'s oldest, tracing back to the 10th-century Early Le dynasty. A three-tiered bell tower with sweeping roofs, an ancient stupa garden and rare Buddhist scriptures.',
+    },
+    fact: {
+      vi: '💡 Hơn 1000 năm tuổi — nơi khởi nguồn Phật giáo vùng duyên hải Bắc Bộ.',
+      en: '💡 Over 1000 years old — a cradle of Buddhism on the northern coast.',
+    },
+  },
+  {
+    id: 'dentamky', x: P.dentamky[0], z: P.dentamky[1],
+    name: { vi: 'Đền Tam Kỳ', en: 'Tam Ky Temple' },
+    text: {
+      vi: 'Ngôi đền bên hồ Tam Bạc thờ Quan lớn Tuần Tranh — vị thánh trong tín ngưỡng thờ Mẫu của người Việt. Cổng đá xám với tượng hộ pháp rực rỡ, nơi người dân đất Cảng cầu bình an mỗi dịp đầu năm.',
+      en: 'A temple by Tam Bac lake honoring Quan Lon Tuan Tranh of the Mother Goddess faith. Grey stone gates with vivid guardian figures — where locals pray for peace each new year.',
+    },
+    fact: {
+      vi: '💡 Tín ngưỡng thờ Mẫu của người Việt được UNESCO công nhận là di sản văn hóa phi vật thể.',
+      en: '💡 The Mother Goddess faith is UNESCO-listed intangible heritage.',
+    },
+  },
+  {
+    id: 'nhnn', x: P.nhnn[0], z: P.nhnn[1],
+    name: { vi: 'Ngân hàng Nhà nước', en: 'State Bank Building' },
+    text: {
+      vi: 'Tòa nhà Ngân hàng Đông Dương cũ xây đầu thế kỷ 20 — khối tân cổ điển bằng đá granite xám với hàng cột lớn và bậc thềm bề thế, một trong những công trình Pháp nguyên vẹn đẹp nhất Hải Phòng.',
+      en: 'The former Bank of Indochina from the early 1900s — a grey granite neoclassical block with grand columns and stairs, among Hai Phong\'s best-preserved French buildings.',
+    },
+    fact: {
+      vi: '💡 Tường đá granite dày cả mét — két bạc khổng lồ của xứ Đông Dương xưa.',
+      en: '💡 Metre-thick granite walls — a giant vault of old Indochina.',
+    },
+  },
+  {
+    id: 'ubnd', x: P.ubnd[0], z: P.ubnd[1],
+    name: { vi: 'UBND thành phố Hải Phòng', en: 'Hai Phong City Hall' },
+    text: {
+      vi: 'Trụ sở chính quyền thành phố bên đường Hoàng Diệu, giữa khu phố Pháp cũ. Tòa nhà kiểu thuộc địa mái đỏ với quốc kỳ tung bay — nơi điều hành thành phố Cảng gần 2 triệu dân.',
+      en: 'The city government seat on Hoang Dieu street in the old French quarter — a red-roofed colonial building flying the national flag, running a port city of nearly two million.',
+    },
+    fact: {
+      vi: '💡 Khu này tập trung các công sở từ thời Pháp — "khu hành chính" hơn trăm năm tuổi.',
+      en: '💡 This has been the administrative quarter for over a century.',
+    },
+  },
+  {
+    id: 'rap78', x: P.rap78[0], z: P.rap78[1],
+    name: { vi: 'Rạp Tháng Tám', en: 'August Cinema' },
+    text: {
+      vi: 'Rạp chiếu bóng lâu đời nhất Hải Phòng ngay trung tâm dải vườn hoa, tiền thân là rạp Eden thời Pháp. Bao thế hệ người Hải Phòng đã có buổi xem phim đầu tiên trong đời tại đây.',
+      en: 'Hai Phong\'s oldest cinema at the heart of the central gardens, once the French-era Eden. Generations of locals saw their first film here.',
+    },
+    fact: {
+      vi: '💡 Tên rạp kỷ niệm Cách mạng Tháng Tám 1945.',
+      en: '💡 Named after the August Revolution of 1945.',
+    },
+  },
+  {
+    id: 'nhaken', x: P.nhaken[0], z: P.nhaken[1],
+    name: { vi: 'Nhà Kèn', en: 'The Bandstand (Nha Ken)' },
+    text: {
+      vi: 'Lầu bát giác người Pháp dựng đầu thế kỷ 20 trong vườn hoa Nguyễn Du để đội kèn nhà binh hòa nhạc cuối tuần. Nay vẫn là sân khấu ngoài trời thân thuộc của các câu lạc bộ văn nghệ đất Cảng.',
+      en: 'An octagonal bandstand built by the French in the early 1900s in Nguyen Du garden for weekend military-band concerts. It still hosts open-air performances today.',
+    },
+    fact: {
+      vi: '💡 "Nhà Kèn" — cái tên dân dã có từ tiếng kèn đồng vang mỗi chiều chủ nhật xưa.',
+      en: '💡 Its folk name means "Horn House", from the brass tunes of old Sunday afternoons.',
     },
   },
 ];
