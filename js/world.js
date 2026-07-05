@@ -1585,7 +1585,8 @@ export function buildWorld(scene) {
   placeGLB({
     url: 'assets/thptnq.glb', name: 'THPT Ngô Quyền',
     x: LM.thptnq[0], z: LM.thptnq[1],
-    rot: orientLong(LM_DIR.thptnq, LM_FACE.thptnq), size: 80,
+    // mặt tiền quay ra quảng trường/tượng đài Lê Chân (cùng hướng với tượng — theo yêu cầu)
+    rot: orientFace([EXTRAS.square[0] - LM.thptnq[0], EXTRAS.square[1] - LM.thptnq[1]]), size: 80,
   });
   addCollider(LM.thptnq[0], LM.thptnq[1], 32);
   // 2 trường THCS: khối lớp chữ U + sân + cột cờ + cổng bảng tên (chưa có ảnh kiến trúc đạt chuẩn)
@@ -1709,20 +1710,33 @@ export function buildWorld(scene) {
     }
     const roof = new THREE.Mesh(new THREE.BoxGeometry(50, 1.3, 17.6), mat(0xa04a34));
     roof.position.y = 14.6; g.add(roof);
-    const porch = new THREE.Mesh(new THREE.BoxGeometry(14, 15.6, 2.2), trimM);
-    porch.position.set(0, 7.8, 8.6); g.add(porch);
-    const ped = new THREE.Mesh(new THREE.CylinderGeometry(0, 4.6, 2.2, 4, 1), mat(0xa04a34));
-    ped.rotation.y = Math.PI / 4; ped.scale.z = 0.35;
-    ped.position.set(0, 16.8, 8.6); g.add(ped);
-    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 6, 6), mat(0xd8d8d8));
-    pole.position.set(0, 19.6, 8.2); g.add(pole);
-    const fl = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 1.5),
+    // sảnh chính kiểu portico: HÀNG CỘT + dầm ngang + trán tam giác (thay khối đặc xấu)
+    for (const cx of [-8, -4.8, -1.6, 1.6, 4.8, 8]) {
+      const col = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.62, 11, 10), trimM);
+      col.position.set(cx, 5.6, 9.4); g.add(col);
+      const capB = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.5, 1.7), trimM);
+      capB.position.set(cx, 11.2, 9.4); g.add(capB);
+    }
+    const entab = new THREE.Mesh(new THREE.BoxGeometry(19.5, 1.8, 2.8), trimM);
+    entab.position.set(0, 12.1, 9.4); g.add(entab);
+    const pedShape = new THREE.Shape();
+    pedShape.moveTo(-10.2, 0); pedShape.lineTo(10.2, 0); pedShape.lineTo(0, 4.4); pedShape.lineTo(-10.2, 0);
+    const ped = new THREE.Mesh(new THREE.ExtrudeGeometry(pedShape, { depth: 2.6, bevelEnabled: false }), trimM);
+    ped.position.set(0, 13, 8.2); g.add(ped);
+    for (let s = 0; s < 3; s++) {   // bậc thềm
+      const step = new THREE.Mesh(new THREE.BoxGeometry(21 - s * 2, 0.4, 2), mat(0xe6dcc2));
+      step.position.set(0, 0.2 + s * 0.4, 11.4 - s * 0.9); g.add(step);
+    }
+    // cột cờ + cờ trên nóc chính
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.12, 8, 6), mat(0xd8d8d8));
+    pole.position.set(0, 19, 0); g.add(pole);
+    const fl = new THREE.Mesh(new THREE.PlaneGeometry(3, 1.9),
       new THREE.MeshLambertMaterial({ color: 0xd8332a, side: THREE.DoubleSide }));
-    fl.position.set(1.2, 22, 8.2); g.add(fl);
+    fl.position.set(1.5, 22, 0); g.add(fl);
     updaters.push((dt, time) => { fl.rotation.y = Math.sin(time * 1.6 + 7) * 0.35; });
-    const sign = new THREE.Mesh(new THREE.BoxGeometry(10, 1.1, 0.3),
+    const sign = new THREE.Mesh(new THREE.BoxGeometry(14, 1.3, 0.3),
       new THREE.MeshLambertMaterial({ map: signTexture('UBND THÀNH PHỐ', '#7a1f1f', '#ffe9b8') }));
-    sign.position.set(0, 12.6, 9.4); g.add(sign);
+    sign.position.set(0, 12.1, 10.9); g.add(sign);
     g.position.set(ux, LAND_H, uz);
     g.rotation.y = th;
     scene.add(g);
