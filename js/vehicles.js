@@ -184,5 +184,22 @@ export function createVehicles(scene, groundHeight, waterHeight, spawns, resolve
     v.mesh.position.copy(v.pos);
   }
 
-  return { vehicles, update };
+  // Gọi/sinh thêm một phương tiện tại chỗ (nút "gọi xe máy")
+  function spawn(type, x, z, heading = 0) {
+    const t = TEMPLATES[type];
+    if (!t) return null;
+    const built = t.maker();
+    const y = t.land ? groundHeight(x, z) : 0.1;
+    built.mesh.position.set(x, y, z);
+    built.mesh.rotation.y = heading;
+    scene.add(built.mesh);
+    const v = {
+      ...t, type, x, z, heading, ...built,
+      pos: new THREE.Vector3(x, y, z), vel: 0, mounted: false,
+    };
+    vehicles.push(v);
+    return v;
+  }
+
+  return { vehicles, update, spawn };
 }

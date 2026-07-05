@@ -5,7 +5,7 @@
 > **Quy tắc cập nhật:** mỗi khi thêm kiến thức, công thức, kỹ thuật, cách xử lý mới —
 > cập nhật vào đúng mục tương ứng của file này (và ghi vào mục 10. Nhật ký) trong cùng commit.
 
-Trò chơi: thế giới 3D Hải Phòng tỉ lệ 1:10 theo bản đồ THẬT (OpenStreetMap), chạy web thuần
+Trò chơi: thế giới 3D Hải Phòng **tỉ lệ 1:1 mét thật** (từ 2026-07-05) theo bản đồ THẬT (OpenStreetMap), chạy web thuần
 (không build step), Three.js r160 vendor sẵn trong `lib/`. Live: https://tungtase04539.github.io/hp-world/
 
 ---
@@ -42,28 +42,32 @@ Quan hệ dữ liệu: `tools/fetch_osm.sh` → `osm_*.json` → `tools/process_
 
 - Gốc (0,0) = **tâm Nhà hát lớn thật** (OSM way/242055606): `LON0=106.68182, LAT0=20.85750`.
 - **+x = Đông, +z = NAM** (z = −(lat−LAT0)·UZ → lat giảm khi z tăng).
-- Tỉ lệ 1:10: `UX = 111320·cos(LAT0°)/10 (m/độ kinh)`, `UZ = 110574/10`.
-- **Kính lúp trung tâm** (phi tuyến, xuyên tâm quanh gốc): hệ số
-  `s(r) = 1 + (K−1)(1 − smoothstep(WA, WB, r))` với `K=2.2, WA=260, WB=1000`;
-  bán kính mới `r' = ∫₀ʳ s(t)dt` (bảng tích phân bước 2, nội suy tuyến tính).
-  → Trung tâm phóng to 2.2 lần, ngoài 1000 giữ nguyên 1:10, chuyển tiếp mượt.
-- Mọi polyline phải **chia nhỏ TRƯỚC khi warp** (warp làm cong đường thẳng) — hàm `subdiv`.
-- Muốn đổi gốc/hệ số: sửa `tools/process_osm.mjs`, chạy lại, rồi RÀ TOÀN BỘ vị trí hardcode còn sót
-  (grep số tọa độ trong world/main/traffic/landmarks — bài học: đã từng lệch hàng loạt).
+- **Tỉ lệ 1:1 MÉT THẬT** (từ 2026-07-05): `UX = 111320·cos(LAT0°) (m/độ kinh)`, `UZ = 110574`.
+  KHÔNG chia 10. 1 đơn vị game = 1 mét thật. `toXZ` KHÔNG warp (trả thẳng (lon−LON0)·UX, −(lat−LAT0)·UZ).
+- ~~Kính lúp trung tâm K=2.2~~ ĐÃ BỎ (code cũ warpR/rTable còn nằm trong process_osm nhưng toXZ không gọi).
+- `WORLD = {minX:-6900, maxX:48000, minZ:-6800, maxZ:24800}` (~55×32 km thật), MASK cell 40.
+- Mọi polyline vẫn **chia nhỏ** (`subdiv`) để bám địa hình/khúc cong — bước lớn hơn ở 1:1 (100-300m).
+- Muốn đổi gốc: sửa `tools/process_osm.mjs`, chạy lại, rồi RÀ TOÀN BỘ vị trí hardcode còn sót trong
+  world/main/traffic (grep số toạ độ) — BÀI HỌC: từng sót tàu (1000,-125) & núi Lan Hạ (3600-5500)
+  ở hệ 1:10 → nổi giữa phố / mọc sai chỗ. Có `tools/diag.mjs` + probe groundHeightNoDeck để kiểm.
 
-### Tỉ lệ hiển thị chuẩn (đã cân chỉnh 2026-07-03e)
-- Đường: p=7, s=6, t=5, r=4, w=3 (region 9). Nhà footprint phóng ≤1.6×. Địa danh 2.3-2.5× cạnh dài thật.
-- Nhân vật 1.7 đơn vị (to hơn tỉ lệ 1:10 thuần ~10×) — đó là lý do mọi thứ cần phóng nhẹ, nhưng
-  KHÔNG phóng quá mức kẻo công trình lấn phố → cảm giác "sai vị trí".
+### Tỉ lệ hiển thị 1:1 (mét thật)
+- Đường lòng: p=13, s=10, t=8, r=5.5, w=3.5 (region 12). Nhà dân footprint THẬT, 3.3m/tầng.
+- Địa danh GLB scale theo `LM_SIZE[key]` (cạnh dài thật OSM): opera 49, bưu điện 49, nhà thờ 45, ga 55,
+  bảo tàng 36, NHNN 63, chợ Sắt 132×96, THPT NQ 80... Cầu HVT nhịp vòm 200m, trụ Bính 101m, cần cẩu 50m.
+- Tốc độ THẬT (m/s): đi 5, chạy 11, xe máy 23 (~83 km/h), thuyền 19. Camera far 16000, fog 600-4200.
+- Nhân vật ~1.7m. Đồ nội thất phố (ghế/đèn/biển/thùng rác) giữ TẦM NGƯỜI (~0.5-3m), KHÔNG scale theo 1:1.
 
 ### Dữ liệu xuất trong mapdata.js
-- `WORLD` biên thế giới; `DT_BOX` hộp trung tâm (đã warp); `MASK` lưới đất/biển bit-pack base64 (cell 12).
-- `RIVERS [{w, pts}]` — rộng 62 (Cấm), 30 (Lạch Tray), 16 (Tam Bạc).
+- `WORLD` biên thế giới; `DT_BOX` hộp trung tâm; `MASK` lưới đất/biển bit-pack base64 (cell 40).
+- `RIVERS [{w, pts}]` — rộng 620 (Cấm), 300 (Lạch Tray), 55 (Tam Bạc). Kênh Nam Triệu + hồ push trong terrain.
 - `ROADS_DT [{c, pts}]` — c ∈ p(primary/trunk) s(secondary) t(tertiary) r(residential) w(pedestrian).
-- `ROADS_REGION`, `BUILDINGS [{p, a, l}]` (footprint đã phóng theo diện tích, a=diện tích, l=số tầng×10).
-- `LM {key:[x,z]}` tâm công trình thật; `LM_DIR {key:[ux,uz]}` **vector đơn vị cạnh dài nhất** footprint;
-  `LM_FACE {key:[ux,uz]}` **hướng mặt tiền** (về quảng trường hoặc phố gần nhất);
-  `EXTRAS { square, fountain, baodai, bridges[{x,zc,half,ang,rise}], dsRidge, catbaTown }`.
+- `ROADS_REGION`, `BUILDINGS [{p, a, l}]` (footprint THẬT không phóng, a=diện tích, l=số tầng×10).
+- `LM {key:[x,z]}` tâm công trình thật; `LM_DIR` **vector đơn vị cạnh dài** footprint;
+  `LM_FACE` **hướng mặt tiền** = về **phố lớn (p/s/t) gần nhất** (bỏ ngõ r/w — sửa 2026-07-05e);
+  `LM_SIZE {key:[dài,rộng]}` kích thước thật footprint (mét) để scale GLB;
+  `STREETS/INTERSECTIONS/MEDIANS` cho nội thất phố;
+  `EXTRAS { square, fountain, baodai, bridges[{x,zc,half,ang,rise}], dsRidge, catbaTown, lake }`.
 
 ### Công thức xoay công trình theo hướng thật (world.js)
 Quy ước mô hình: trục dài = **local X**, mặt tiền = **local +Z**.
@@ -82,17 +86,18 @@ với `ang = atan2(Δx, Δz)` của 2 đầu way thật.
 - `groundHeightNoDeck`: `lerp(-4, 2, smoothstep(0.32,0.68, landAt))` + gợn nhẹ + `hills` +
   san phẳng (DT_BOX, thị trấn Cát Bà quanh `EXTRAS.catbaTown`, cảng quanh `LM.port`)
   − đào lòng sông `riverFactor` (thắng san phẳng, đáy −3).
-- `riverFactor(x,z)`: max theo đoạn sông của `1 − smoothstep(w/2, w/2+16, dist)` (bucket index 150).
+- `riverFactor(x,z)`: max theo đoạn sông của `1 − smoothstep(w/2, w/2+sh, dist)`; shore `sh` mặc định 28,
+  hồ Tam Bạc 25 (bờ hẹp để không ngập trường/chợ). BÀI HỌC: Tam Bạc từng rộng 160m → ngập Chợ Sắt/Đền Tam Kỳ.
 - **Mặt cầu** `deckHeight`: với mỗi cầu `dx=x−b.x, dz=z−b.zc`;
   `along = dx·sin(ang)+dz·cos(ang)`; `across = dx·cos(ang)−dz·sin(ang)`;
-  nếu `|across|<7 && |along|<half` → `y = 2 + rise·(1−(along/half)²)`.
+  nếu `|across|<10 && |along|<half` → `y = 2 + rise·(1−(along/half)²)` (rise=25 cho HVT/Bính, tĩnh không thật).
   Đường phố băng sông nhỏ = cầu phẳng 2.05 khi gần tim đường (`nearDTRoad/nearRegionRoad`).
 - `groundHeight = max(groundHeightNoDeck, deckHeight)`. **Thuyền dùng NoDeck** để chui gầm cầu;
   xe/người dùng bản có deck. `isWater = NoDeck < 0.25`.
-- Đồi: sống Đồ Sơn `EXTRAS.dsRidge` (cao 19, phạm vi 25→105), đồi Vụng quanh `EXTRAS.baodai`
-  (cao 15, 16→90), đồi Thủy Nguyên z<−600, núi Cát Bà x>3600 theo mask.
-- **Kênh Nam Triệu nhân tạo**: OSM waterway dừng ở cửa sông → `RIVERS.push({w:110, pts:[[1400,100],[1700,380],[2000,640],[2350,900]]})`
-  trong terrain.js nối sông Cấm ra biển cho thuyền. Nếu đổi gốc tọa độ phải kiểm tra lại các điểm này.
+- Đồi (1:1): sống Đồ Sơn `EXTRAS.dsRidge` (cao 62, phạm vi 220→950), đồi Vụng quanh `EXTRAS.baodai`
+  (cao 32, 150→700), đồi Thủy Nguyên z<−2500, núi Cát Bà x>30000 theo mask (cao tới 110m).
+- **Kênh Nam Triệu nhân tạo** (1:1): `RIVERS.push({w:1300, pts:[[7600,0],[11000,4100],[15000,7000],[20600,9700]]})`
+  trong terrain.js nối sông Cấm ra biển cho thuyền. Nếu đổi gốc toạ độ phải kiểm tra lại các điểm này.
 
 ## 5. Meshy AI — tạo mô hình 3D chất lượng cao
 

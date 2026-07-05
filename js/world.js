@@ -817,6 +817,8 @@ export function buildWorld(scene) {
 
   // ---------- TƯỢNG ĐÀI LÊ CHÂN: GLB AI có màu (bệ đá + bảng tên giữ nguyên) ----------
   {
+    // Nữ tướng quay mặt ra quảng trường (về phía Nhà hát lớn / đài phun) — không quay vào Trung tâm Triển lãm
+    const thLC = orientFace([EXTRAS.square[0] - LM.lechan[0], EXTRAS.square[1] - LM.lechan[1]]);
     const g = new THREE.Group();
     const granite = mat(0x9a948a);
     const base = new THREE.Mesh(new THREE.BoxGeometry(8.5, 0.9, 8.5), granite);
@@ -829,6 +831,7 @@ export function buildWorld(scene) {
       new THREE.MeshLambertMaterial({ map: signTexture('NỮ TƯỚNG LÊ CHÂN', '#7a7468', '#f5edd8') }));
     plaque.position.set(0, 2.6, 2.32); g.add(plaque);
     g.position.set(LM.lechan[0], LAND_H, LM.lechan[1]);
+    g.rotation.y = thLC;             // bảng tên quay ra quảng trường
     scene.add(g);
     addCollider(LM.lechan[0], LM.lechan[1], 4.6);
 
@@ -841,6 +844,7 @@ export function buildWorld(scene) {
         const size = box.getSize(new THREE.Vector3());
         const s = 9 / size.y; // tượng cao ~9 (tượng thật 7,5m + chân đế liền khối)
         m.scale.setScalar(s);
+        m.rotation.y = thLC;         // xoay TRƯỚC khi đo lại box để tâm không lệch khỏi bệ
         m.updateMatrixWorld(true);
         box.setFromObject(m);
         const center = box.getCenter(new THREE.Vector3());

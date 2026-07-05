@@ -68,7 +68,7 @@ const dayNight = createDayNight(scene, world);
 const petals = createPetals(scene);
 const signs = buildLandmarkSigns(scene, world);
 const { npcs, update: updateNPCs } = buildNPCs(scene, world);
-const { vehicles, update: updateVehicle } = createVehicles(
+const { vehicles, update: updateVehicle, spawn: spawnVehicle } = createVehicles(
   scene, groundHeight, groundHeightNoDeck, world.vehicleSpawns, world.resolveCollisions);
 // người đi bộ thêm ở bãi biển Đồ Sơn & thị trấn Cát Bà
 if (world.dosonBeach) {
@@ -214,6 +214,35 @@ function dismount() {
   ui.toast(tx({ vi: '⚓ Hãy cập bến hoặc vào gần bờ rồi mới rời thuyền!', en: '⚓ Reach a pier or shallow shore before leaving the boat!' }));
   return false;
 }
+
+// ============ Nút "Gọi xe máy" ============
+let personalMoto = null;
+function callMoto() {
+  if (pState.mounted) { dismount(); return; }   // đang cưỡi → bấm lần nữa để xuống
+  // đặt xe ngay trước mặt nhân vật, trên cạn
+  let bx = pState.pos.x, bz = pState.pos.z;
+  const fx = pState.pos.x + Math.sin(pState.yaw) * 3.2;
+  const fz = pState.pos.z + Math.cos(pState.yaw) * 3.2;
+  if (groundHeight(fx, fz) > 0.35) { bx = fx; bz = fz; }
+  if (groundHeight(bx, bz) < 0.35) {   // đang trên nước/thuyền
+    ui.toast(tx({ vi: '🏍️ Cần đứng trên bờ mới gọi được xe máy!', en: '🏍️ Stand on land to call a motorbike!' }));
+    return;
+  }
+  if (!personalMoto) {
+    personalMoto = spawnVehicle('motorbike', bx, bz, pState.yaw);
+  } else {
+    personalMoto.pos.set(bx, groundHeight(bx, bz), bz);
+    personalMoto.mesh.position.copy(personalMoto.pos);
+    personalMoto.heading = pState.yaw;
+    personalMoto.vel = 0;
+    personalMoto.mesh.rotation.set(0, pState.yaw, 0);
+  }
+  if (personalMoto) {
+    mount(personalMoto);
+    ui.toast(tx({ vi: '🏍️ Lên xe! WASD để chạy, bấm lại để xuống.', en: '🏍️ Hop on! WASD to ride, tap again to get off.' }));
+  }
+}
+document.getElementById('btnMoto').addEventListener('click', (e) => { e.currentTarget.blur(); callMoto(); });
 
 function updateMounted(dt, time) {
   const v = pState.mounted;
