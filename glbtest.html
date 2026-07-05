@@ -18,6 +18,8 @@ lo.load('assets/'+mdl+'.glb?v='+Date.now(), g=>{
   window.__ready1=r.domElement.toDataURL('image/png');
   cam.position.set(0, 0.25, -2.2); cam.lookAt(0,0.05,0); r.render(sc,cam);
   window.__ready2=r.domElement.toDataURL('image/png');
+  cam.position.set(0.55, 0.28, 1.05); cam.lookAt(0,0.08,0.41); r.render(sc,cam);
+  window.__ready3=r.domElement.toDataURL('image/png');
   window.__done=true;
 });
 </script></body></html>
