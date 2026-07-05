@@ -780,7 +780,7 @@ export function buildWorld(scene) {
         m.updateMatrixWorld(true);
         const box = new THREE.Box3().setFromObject(m);
         const sz = box.getSize(new THREE.Vector3());
-        const s = 5 / Math.max(sz.x, sz.z);
+        const s = 9 / Math.max(sz.x, sz.z); // quán hoa to hơn cho đúng tầm nhìn 1:1
         for (let i = 0; i < 5; i++) {
           const inst = i === 0 ? m : m.clone(true);
           inst.scale.setScalar(s);
@@ -788,8 +788,8 @@ export function buildWorld(scene) {
           inst.updateMatrixWorld(true);
           const b2 = new THREE.Box3().setFromObject(inst);
           const c2 = b2.getCenter(new THREE.Vector3());
-          const qx = LM.quanhoa[0] + qhDir[0] * (i - 2) * 9.8;
-          const qz = LM.quanhoa[1] + qhDir[1] * (i - 2) * 9.8;
+          const qx = LM.quanhoa[0] + qhDir[0] * (i - 2) * 10.5;
+          const qz = LM.quanhoa[1] + qhDir[1] * (i - 2) * 10.5;
           inst.position.x += qx - c2.x;
           inst.position.z += qz - c2.z;
           inst.position.y += LAND_H - b2.min.y - 0.25;
@@ -811,7 +811,7 @@ export function buildWorld(scene) {
       },
     });
     for (let i = 0; i < 5; i++) {
-      addCollider(LM.quanhoa[0] + qhDir[0] * (i - 2) * 9.8, LM.quanhoa[1] + qhDir[1] * (i - 2) * 9.8, 2.4);
+      addCollider(LM.quanhoa[0] + qhDir[0] * (i - 2) * 10.5, LM.quanhoa[1] + qhDir[1] * (i - 2) * 10.5, 4);
     }
   }
 
@@ -955,42 +955,45 @@ export function buildWorld(scene) {
 
   // ---------- CHỢ SẮT (khối lớn xanh xám + tháp tròn góc như tòa nhà thật) ----------
   {
+    // Chợ Sắt: khối hội chợ lớn lấp gần kín footprint thật (~147×114m), 6-7 tầng
     const g = new THREE.Group();
     const grey = mat(0x8fa3b0);
     const marketFacade = grandMat('#8fa3b0', '#dde5ea', { cols: 8, arch: false });
-    const hall = new THREE.Mesh(new THREE.BoxGeometry(28, 13, 18),
+    const HW = 132, HD = 96, HH = 23;
+    const hall = new THREE.Mesh(new THREE.BoxGeometry(HW, HH, HD),
       [marketFacade, marketFacade, grey, grey, marketFacade, marketFacade]);
-    hall.position.y = 6.5; g.add(hall);
-    // tháp tròn ở góc — nét nhận diện của chợ Sắt
-    const drum = new THREE.Mesh(new THREE.CylinderGeometry(5.2, 5.2, 15, 14), mat(0xa3b5c0));
-    drum.position.set(14, 7.5, 9);
+    hall.position.y = HH / 2; g.add(hall);
+    // tháp tròn ở góc trước — nét nhận diện của chợ Sắt
+    const drumX = HW / 2 - 12, drumZ = HD / 2 - 8;
+    const drum = new THREE.Mesh(new THREE.CylinderGeometry(13, 13, 33, 18), mat(0xa3b5c0));
+    drum.position.set(drumX, 16.5, drumZ);
     g.add(drum);
-    for (let fy = 3.5; fy <= 12.5; fy += 3) {
-      const strip = new THREE.Mesh(new THREE.CylinderGeometry(5.3, 5.3, 1, 14), sharedMats.window);
-      strip.position.set(14, fy, 9);
+    for (let fy = 6; fy <= 27; fy += 5) {
+      const strip = new THREE.Mesh(new THREE.CylinderGeometry(13.2, 13.2, 2, 18), sharedMats.window);
+      strip.position.set(drumX, fy, drumZ);
       g.add(strip);
     }
-    const drumCap = new THREE.Mesh(new THREE.CylinderGeometry(5.6, 5.6, 0.7, 14), mat(0x7a8d99));
-    drumCap.position.set(14, 15.3, 9);
+    const drumCap = new THREE.Mesh(new THREE.CylinderGeometry(14, 14, 1.6, 18), mat(0x7a8d99));
+    drumCap.position.set(drumX, 33.6, drumZ);
     g.add(drumCap);
-    const sign = new THREE.Mesh(new THREE.PlaneGeometry(10, 1.9),
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(40, 7),
       new THREE.MeshLambertMaterial({ map: signTexture('CHỢ SẮT', '#b03428', '#ffe9b8') }));
-    sign.position.set(-2, 11, 9.06); g.add(sign);
-    // sạp hàng vỉa hè phía trước
-    for (const sx of [-10, -2, 6]) {
-      const stall = new THREE.Mesh(new THREE.BoxGeometry(4, 2.2, 3), mat(0xe8b84d));
-      stall.position.set(sx, 1.1, 12.5); g.add(stall);
-      const canopy = new THREE.Mesh(new THREE.ConeGeometry(3, 1.4, 4), mat(0xd84040, { flatShading: true }));
+    sign.position.set(-14, 19, HD / 2 + 0.1); g.add(sign);
+    // sạp hàng vỉa hè phía trước (giữ tầm người)
+    for (const sx of [-40, -30, -20, 18, 28, 38]) {
+      const stall = new THREE.Mesh(new THREE.BoxGeometry(6, 2.4, 3.4), mat(0xe8b84d));
+      stall.position.set(sx, 1.2, HD / 2 + 5); g.add(stall);
+      const canopy = new THREE.Mesh(new THREE.ConeGeometry(4, 1.6, 4), mat(0xd84040, { flatShading: true }));
       canopy.rotation.y = Math.PI / 4;
-      canopy.position.set(sx, 3, 12.5); g.add(canopy);
+      canopy.position.set(sx, 3.4, HD / 2 + 5); g.add(canopy);
     }
     const thMk = orientLong(LM_DIR.market, LM_FACE.market);
     g.position.set(LM.market[0], LAND_H, LM.market[1]);
     g.rotation.y = thMk;
     scene.add(g);
-    addCollider(LM.market[0], LM.market[1], 55);
-    const [drX, drZ] = localPt(LM.market[0], LM.market[1], 14, 9, thMk); // tháp tròn góc
-    addCollider(drX, drZ, 6);
+    addCollider(LM.market[0], LM.market[1], 78);
+    const [drX, drZ] = localPt(LM.market[0], LM.market[1], drumX, drumZ, thMk); // tháp tròn góc
+    addCollider(drX, drZ, 13);
   }
 
   // ---------- CẦU HOÀNG VĂN THỤ & CẦU BÍNH (đúng vị trí + trục thật từ way OSM) ----------
@@ -1007,11 +1010,11 @@ export function buildWorld(scene) {
     for (let z = -b.half; z <= b.half; z += 4) {
       const tt = z / b.half;
       const y = LAND_H + b.rise * Math.max(0, 1 - tt * tt);
-      const seg = new THREE.Mesh(new THREE.BoxGeometry(14, 0.8, 4.4), deckMat);
+      const seg = new THREE.Mesh(new THREE.BoxGeometry(28, 0.8, 4.4), deckMat);
       seg.position.set(0, y - 0.45, z);
       g.add(seg);
-      for (const sx of [-6.6, 6.6]) {
-        const rail = new THREE.Mesh(new THREE.BoxGeometry(0.4, 1.1, 4.4), mat(railColor));
+      for (const sx of [-13.4, 13.4]) {
+        const rail = new THREE.Mesh(new THREE.BoxGeometry(0.4, 1.4, 4.4), mat(railColor));
         rail.position.set(sx, y + 0.55, z);
         g.add(rail);
       }
@@ -1023,7 +1026,7 @@ export function buildWorld(scene) {
     const g = bridgeGroup(b);
     bridgeDeckAndRails(g, b, 0xe8524a);
     const red = mat(0xd8402e);
-    const TILT = 0.24, RIB_X = 8.5, ARCH_H = 45, AS = 102; // 1:1 — nhịp chính 200m, vòm 45m
+    const TILT = 0.24, RIB_X = 14, ARCH_H = 45, AS = 200; // 1:1 — nhịp chính 200m, vòm 45m
     for (const s of [-1, 1]) {
       const arcPts = [];
       for (let i = 0; i <= 24; i++) {
@@ -1031,7 +1034,7 @@ export function buildWorld(scene) {
         arcPts.push(new THREE.Vector3(0, Math.sin(tt * Math.PI) * ARCH_H + 2, (tt - 0.5) * AS));
       }
       const rib = new THREE.Mesh(
-        new THREE.TubeGeometry(new THREE.CatmullRomCurve3(arcPts), 32, 0.85, 7), red);
+        new THREE.TubeGeometry(new THREE.CatmullRomCurve3(arcPts), 40, 1.4, 8), red);
       rib.position.set(s * RIB_X, 0, 0);
       rib.rotation.z = -s * TILT;
       g.add(rib);
@@ -1040,7 +1043,7 @@ export function buildWorld(scene) {
     for (const tt of [0.34, 0.5, 0.66]) {
       const y = Math.sin(tt * Math.PI) * ARCH_H + 2;
       const xOff = RIB_X - Math.sin(TILT) * y;
-      const brace = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, xOff * 2 * Math.cos(TILT) + 1, 6), red);
+      const brace = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, xOff * 2 * Math.cos(TILT) + 1, 6), red);
       brace.rotation.z = Math.PI / 2;
       brace.position.set(0, y * Math.cos(TILT), (tt - 0.5) * AS);
       g.add(brace);
@@ -1059,11 +1062,11 @@ export function buildWorld(scene) {
           const topY = topYr * Math.cos(TILT);
           const topX = s * (RIB_X - Math.sin(TILT) * topYr);
           const dz = zd - zz;
-          const len = Math.hypot(topY - deckY, topX - s * 5.8, dz);
+          const len = Math.hypot(topY - deckY, topX - s * 13, dz);
           if (len < 2) continue;
-          const cable = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, len, 4), mat(0xe8e0d8));
-          cable.position.set((topX + s * 5.8) / 2, (topY + deckY) / 2, zz + dz / 2);
-          const v = new THREE.Vector3(topX - s * 5.8, topY - deckY, -dz).normalize();
+          const cable = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.11, len, 4), mat(0xe8e0d8));
+          cable.position.set((topX + s * 13) / 2, (topY + deckY) / 2, zz + dz / 2);
+          const v = new THREE.Vector3(topX - s * 13, topY - deckY, -dz).normalize();
           cable.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), v);
           g.add(cable);
         }
@@ -1071,17 +1074,17 @@ export function buildWorld(scene) {
     }
     // trụ dẫn cầu đôi đỡ mặt cầu ngoài nhịp vòm (cầu dẫn thật chạy dài hai phía)
     for (const dir of [-1, 1]) {
-      for (let a = AS / 2 + 14; a < b.half - 6; a += 20) {
+      for (let a = AS / 2 + 30; a < b.half - 12; a += 40) {
         const along = dir * a;
         const ttd = along / b.half;
         const deckY = LAND_H + b.rise * Math.max(0, 1 - ttd * ttd);
         if (deckY < 2.6) continue;
-        for (const sx of [-4.2, 4.2]) {
-          const pier = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.9, deckY - 0.2, 8), mat(0xb9bec4));
+        for (const sx of [-9, 9]) {
+          const pier = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.9, deckY - 0.2, 8), mat(0xb9bec4));
           pier.position.set(sx, (deckY - 0.2) / 2, along);
           g.add(pier);
         }
-        const cap = new THREE.Mesh(new THREE.BoxGeometry(11.5, 0.8, 2), mat(0xa9aeb4));
+        const cap = new THREE.Mesh(new THREE.BoxGeometry(24, 1.4, 3), mat(0xa9aeb4));
         cap.position.set(0, deckY - 0.9, along);
         g.add(cap);
       }
@@ -1092,37 +1095,37 @@ export function buildWorld(scene) {
     const g = bridgeGroup(b);
     bridgeDeckAndRails(g, b, 0x88b8c8);
     for (const dir of [-1, 1]) {
-      for (let a = 96; a < b.half - 6; a += 22) {
+      for (let a = 150; a < b.half - 12; a += 42) {
         const along = dir * a;
         const ttd = along / b.half;
         const deckY = LAND_H + b.rise * Math.max(0, 1 - ttd * ttd);
         if (deckY < 2.6) continue;
-        for (const sx of [-4.2, 4.2]) {
-          const pier = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.9, deckY - 0.2, 8), mat(0xb9bec4));
+        for (const sx of [-9, 9]) {
+          const pier = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.9, deckY - 0.2, 8), mat(0xb9bec4));
           pier.position.set(sx, (deckY - 0.2) / 2, along);
           g.add(pier);
         }
       }
     }
-    for (const dz of [-40, 40]) {
-      for (const dx of [-6, 6]) {
-        const pylon = new THREE.Mesh(new THREE.BoxGeometry(1.6, 34, 1.6), mat(0xb8c4c8));
-        pylon.position.set(dx, 15, dz);
+    for (const dz of [-65, 65]) {
+      for (const dx of [-11, 11]) {
+        const pylon = new THREE.Mesh(new THREE.BoxGeometry(3, 101, 3), mat(0xb8c4c8));
+        pylon.position.set(dx, 50, dz);
         g.add(pylon);
       }
-      const beam = new THREE.Mesh(new THREE.BoxGeometry(13, 1.4, 1.4), mat(0xb8c4c8));
-      beam.position.set(0, 28, dz);
+      const beam = new THREE.Mesh(new THREE.BoxGeometry(26, 2.6, 2.6), mat(0xb8c4c8));
+      beam.position.set(0, 92, dz);
       g.add(beam);
-      for (let k = 1; k <= 4; k++) {
+      for (let k = 1; k <= 8; k++) {
         for (const dir of [-1, 1]) {
-          const zz = dz + dir * k * 12;
+          const zz = dz + dir * k * 15;
           if (Math.abs(zz) > b.half) continue;
           const ttd = zz / b.half;
           const deckY = LAND_H + b.rise * Math.max(0, 1 - ttd * ttd);
-          const topY = 30;
+          const topY = 95;
           const dzLen = Math.abs(zz - dz);
           const len = Math.hypot(topY - deckY, dzLen);
-          const cable = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, len, 4), mat(0xd8e0e4));
+          const cable = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, len, 4), mat(0xd8e0e4));
           cable.position.set(0, (topY + deckY) / 2, (zz + dz) / 2);
           cable.rotation.x = Math.atan2(dzLen, topY - deckY) * Math.sign(zz - dz);
           g.add(cable);
@@ -1142,41 +1145,42 @@ export function buildWorld(scene) {
   world.portAnchor = [PORT_X, quayZ + 14];
   {
     const g = new THREE.Group();
-    const quay = new THREE.Mesh(new THREE.BoxGeometry(150, 2.4, 12), mat(0x9a9a96));
+    const quay = new THREE.Mesh(new THREE.BoxGeometry(240, 3, 45), mat(0x9a9a96));
     quay.position.set(PORT_X, 1.2, quayZ);
     g.add(quay);
+    // cần cẩu STS thật: chân cao ~50m, dầm vươn ~60m ra phía sông
     function crane(x) {
       const c = new THREE.Group();
       const legMat = mat(0x3f6fb5);
-      for (const [lx, lz] of [[-3, -2.5], [3, -2.5], [-3, 2.5], [3, 2.5]]) {
-        const leg = new THREE.Mesh(new THREE.BoxGeometry(0.9, 16, 0.9), legMat);
-        leg.position.set(lx, 8, lz); c.add(leg);
+      for (const [lx, lz] of [[-8, -7], [8, -7], [-8, 7], [8, 7]]) {
+        const leg = new THREE.Mesh(new THREE.BoxGeometry(2, 50, 2), legMat);
+        leg.position.set(lx, 25, lz); c.add(leg);
       }
-      const beam = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 26), legMat);
-      beam.position.set(0, 16.5, -6); c.add(beam);
-      const cab = new THREE.Mesh(new THREE.BoxGeometry(3, 2.4, 3), mat(0xe8b820));
-      cab.position.set(0, 14.5, 0); c.add(cab);
-      const cable = new THREE.Mesh(new THREE.BoxGeometry(0.18, 8, 0.18), mat(0x333333));
-      cable.position.set(0, 12.5, -14); c.add(cable);
-      const hook = new THREE.Mesh(new THREE.BoxGeometry(2.4, 1.4, 2.4), mat(0xd84040));
-      hook.position.set(0, 8, -14); c.add(hook);
-      c.position.set(x, LAND_H, quayZ + 12);
+      const beam = new THREE.Mesh(new THREE.BoxGeometry(4, 3.5, 62), legMat);
+      beam.position.set(0, 51, -16); c.add(beam);
+      const cab = new THREE.Mesh(new THREE.BoxGeometry(6, 5, 6), mat(0xe8b820));
+      cab.position.set(0, 45, 2); c.add(cab);
+      const cable = new THREE.Mesh(new THREE.BoxGeometry(0.4, 30, 0.4), mat(0x333333));
+      cable.position.set(0, 36, -38); c.add(cable);
+      const hook = new THREE.Mesh(new THREE.BoxGeometry(4, 2.5, 4), mat(0xd84040));
+      hook.position.set(0, 22, -38); c.add(hook);
+      c.position.set(x, LAND_H, quayZ + 15);
       c.rotation.y = Math.PI;
       g.add(c);
-      addCollider(x, quayZ + 12, 5);
+      addCollider(x, quayZ + 15, 10);
     }
-    crane(PORT_X - 50); crane(PORT_X); crane(PORT_X + 50);
+    crane(PORT_X - 70); crane(PORT_X); crane(PORT_X + 70);
     const ctColors = [0xd84040, 0x2e86c1, 0x28a05c, 0xe8a020, 0x8e44ad];
     let ci = 0;
-    for (let cx = PORT_X - 60; cx <= PORT_X + 70; cx += 13) {
-      for (let cz = quayZ + 24; cz <= quayZ + 40; cz += 8) {
-        const stack = 1 + (ci % 3);
+    for (let cx = PORT_X - 95; cx <= PORT_X + 95; cx += 13) {
+      for (let cz = quayZ + 40; cz <= quayZ + 95; cz += 6.5) {
+        const stack = 1 + (ci % 4);
         for (let s = 0; s < stack; s++) {
-          const ct = new THREE.Mesh(new THREE.BoxGeometry(9, 3, 4.5), mat(ctColors[(ci + s) % 5]));
-          ct.position.set(cx, LAND_H + 1.5 + s * 3, cz);
+          const ct = new THREE.Mesh(new THREE.BoxGeometry(12, 2.6, 2.4), mat(ctColors[(ci + s) % 5]));
+          ct.position.set(cx, LAND_H + 1.3 + s * 2.6, cz);
           g.add(ct);
         }
-        addCollider(cx, cz, 5.5);
+        addCollider(cx, cz, 6);
         ci++;
       }
     }
@@ -1186,20 +1190,21 @@ export function buildWorld(scene) {
   // ---------- Tàu thủy ----------
   function ship(x, z, len, colHull, colTop, rotY = 0) {
     const s = new THREE.Group();
-    const hull = new THREE.Mesh(new THREE.BoxGeometry(len, 4, len * 0.28), mat(colHull));
-    hull.position.y = 1; s.add(hull);
-    const bow = new THREE.Mesh(new THREE.ConeGeometry(len * 0.14, 7, 4), mat(colHull));
+    const HB = len * 0.11;               // chiều cao thân tàu tỉ lệ với chiều dài
+    const hull = new THREE.Mesh(new THREE.BoxGeometry(len, HB, len * 0.28), mat(colHull));
+    hull.position.y = HB / 2; s.add(hull);
+    const bow = new THREE.Mesh(new THREE.ConeGeometry(len * 0.14, len * 0.12, 4), mat(colHull));
     bow.scale.y = 2;
-    bow.position.set(len / 2 + 2.4, 1, 0);
+    bow.position.set(len / 2 + len * 0.04, HB / 2, 0);
     bow.rotation.z = -Math.PI / 2;
     s.add(bow);
-    const bridge = new THREE.Mesh(new THREE.BoxGeometry(len * 0.18, 6, len * 0.2), mat(colTop));
-    bridge.position.set(-len * 0.3, 6, 0); s.add(bridge);
-    const funnel = new THREE.Mesh(new THREE.CylinderGeometry(1, 1.2, 3.2, 8), mat(0xd84040));
-    funnel.position.set(-len * 0.3, 10.4, 0); s.add(funnel);
+    const bridge = new THREE.Mesh(new THREE.BoxGeometry(len * 0.18, len * 0.14, len * 0.2), mat(colTop));
+    bridge.position.set(-len * 0.3, HB + len * 0.07, 0); s.add(bridge);
+    const funnel = new THREE.Mesh(new THREE.CylinderGeometry(len * 0.02, len * 0.025, len * 0.08, 10), mat(0xd84040));
+    funnel.position.set(-len * 0.3, HB + len * 0.18, 0); s.add(funnel);
     for (let i = 0; i < 3; i++) {
-      const ct = new THREE.Mesh(new THREE.BoxGeometry(len * 0.14, 2.2, len * 0.16), mat([0x2e86c1, 0x28a05c, 0xe8a020][i]));
-      ct.position.set(len * (0.05 + i * 0.16), 4.1, 0);
+      const ct = new THREE.Mesh(new THREE.BoxGeometry(len * 0.14, len * 0.055, len * 0.16), mat([0x2e86c1, 0x28a05c, 0xe8a020][i]));
+      ct.position.set(len * (0.05 + i * 0.16), HB + len * 0.03, 0);
       s.add(ct);
     }
     s.position.set(x, 0, z);
@@ -1209,17 +1214,17 @@ export function buildWorld(scene) {
   }
   {
     // tàu hàng cập cảng: dò điểm nước sâu ngay ngoài cầu cảng
-    let shipZ = quayZ - 26;
-    for (let z = quayZ - 8; z > quayZ - 120; z -= 4) {
-      if (groundHeightNoDeck(PORT_X - 20, z) < -1.5) { shipZ = z - 8; break; }
+    let shipZ = quayZ - 70;
+    for (let z = quayZ - 20; z > quayZ - 260; z -= 6) {
+      if (groundHeightNoDeck(PORT_X - 30, z) < -1.5) { shipZ = z - 20; break; }
     }
-    ship(PORT_X - 20, shipZ, 44, 0x24455f, 0xf0f0e8, 0.1);
+    ship(PORT_X - 30, shipZ, 115, 0x24455f, 0xf0f0e8, 0.1);
   }
-  ship(1000, -125, 40, 0x555a44, 0xe8e8e0, 0.3);            // tàu ra cửa biển trên sông Cấm
-  const seaShip = ship(2650, 1450, 48, 0x7d2b20, 0xe8e8e0); // tàu tuần du ngoài khơi
+  ship(6500, 140, 95, 0x555a44, 0xe8e8e0, -0.1);           // tàu ra cửa biển trên sông Cấm
+  const seaShip = ship(16000, 20000, 130, 0x7d2b20, 0xe8e8e0); // tàu tuần du ngoài khơi
   updaters.push((dt, time) => {
     const ang = time * 0.02;
-    seaShip.position.set(2650 + Math.cos(ang) * 270, Math.sin(time * 0.7) * 0.15, 1450 + Math.sin(ang) * 210);
+    seaShip.position.set(16000 + Math.cos(ang) * 2500, Math.sin(time * 0.7) * 0.15, 20000 + Math.sin(ang) * 1800);
     seaShip.rotation.y = -ang + Math.PI / 2;
   });
 
@@ -1292,16 +1297,20 @@ export function buildWorld(scene) {
     const villaXZ = EXTRAS.baodai;
     const vy = groundHeight(villaXZ[0], villaXZ[1]);
     const g = new THREE.Group();
-    const body = new THREE.Mesh(new THREE.BoxGeometry(14, 7, 10), mat(0xf5efd8));
-    body.position.y = 3.5; g.add(body);
-    const roof = new THREE.Mesh(new THREE.ConeGeometry(9.5, 3.4, 4), mat(0x8a4030));
+    const body = new THREE.Mesh(new THREE.BoxGeometry(25, 12, 18), mat(0xf5efd8));
+    body.position.y = 6; g.add(body);
+    for (let fy = 3.5; fy < 11; fy += 3.6) {  // dải cửa 2-3 tầng
+      const win = new THREE.Mesh(new THREE.BoxGeometry(25.1, 1.3, 18.1), sharedMats.window);
+      win.position.y = fy; g.add(win);
+    }
+    const roof = new THREE.Mesh(new THREE.ConeGeometry(17, 6, 4), mat(0x8a4030));
     roof.rotation.y = Math.PI / 4;
-    roof.position.y = 8.6; g.add(roof);
-    const terrace = new THREE.Mesh(new THREE.BoxGeometry(18, 0.8, 14), mat(0xd8cdb0));
-    terrace.position.y = 0.4; g.add(terrace);
+    roof.position.y = 15; g.add(roof);
+    const terrace = new THREE.Mesh(new THREE.BoxGeometry(33, 1.2, 26), mat(0xd8cdb0));
+    terrace.position.y = 0.6; g.add(terrace);
     g.position.set(villaXZ[0], vy, villaXZ[1]);
     scene.add(g);
-    addCollider(villaXZ[0], villaXZ[1], 11);
+    addCollider(villaXZ[0], villaXZ[1], 17);
   }
 
   // ---------- HẢI ĐĂNG HÒN DẤU ----------
@@ -1376,19 +1385,21 @@ export function buildWorld(scene) {
   const CBT = EXTRAS.catbaTown;
   {
     const rowColors = [0xf2ce6b, 0x6fbde8, 0xe87a6a, 0x8fd0a0, 0xf4b8d0, 0xb8a8e8, 0xf28c3a, 0x9fd8d8];
-    for (let i = 0; i < 8; i++) {
-      const x = CBT[0] - 33 + i * 9.5;
-      const rz = CBT[1] - 20;
-      const hgt = 10 + (i * 3) % 6;
-      const b = new THREE.Mesh(new THREE.BoxGeometry(8, hgt, 9), mat(rowColors[i]));
-      b.position.set(x, LAND_H + hgt / 2, rz);
-      scene.add(b);
-      for (let fy = 3; fy < hgt - 1; fy += 3.2) {
-        const win = new THREE.Mesh(new THREE.BoxGeometry(6, 1.1, 0.15), sharedMats.window);
-        win.position.set(x, LAND_H + fy, rz + 4.6);
-        scene.add(win);
+    for (let row = 0; row < 2; row++) {
+      for (let i = 0; i < 10; i++) {
+        const x = CBT[0] - 45 + i * 9.5;
+        const rz = CBT[1] - 24 + row * 22;
+        const hgt = 17 + ((i * 5 + row * 7) % 14);   // 17-30m, nhà ống 5-9 tầng
+        const b = new THREE.Mesh(new THREE.BoxGeometry(8, hgt, 9), mat(rowColors[(i + row * 3) % 8]));
+        b.position.set(x, LAND_H + hgt / 2, rz);
+        scene.add(b);
+        for (let fy = 3; fy < hgt - 1; fy += 3.3) {
+          const win = new THREE.Mesh(new THREE.BoxGeometry(6, 1.1, 0.15), sharedMats.window);
+          win.position.set(x, LAND_H + fy, rz + 4.6);
+          scene.add(win);
+        }
+        addCollider(x, rz, 5.8);
       }
-      addCollider(x, rz, 5.8);
     }
     const shore = findShore(CBT[0], CBT[1] + 45, 220);
     if (shore) {
@@ -1410,14 +1421,14 @@ export function buildWorld(scene) {
     const karstMat = mat(0x93a284, { flatShading: true });
     const karstTop = mat(0x53a04c, { flatShading: true });
     let nKarst = 0;
-    for (let x = 3600; x <= 5500 && nKarst < 150; x += 44) {
-      for (let z = 700; z <= 2540 && nKarst < 150; z += 44) {
-        const hash = Math.abs(Math.sin(x * 1.37 + z * 2.91) * 43758.54) % 1;
-        const jx = x + (hash - 0.5) * 32, jz = z + (hash * 7 % 1 - 0.5) * 32;
-        if (jx > CBT[0] - 115 && jx < CBT[0] + 115 && jz > CBT[1] - 90 && jz < CBT[1] + 90) continue; // chừa thị trấn
+    for (let x = 30000; x <= 47000 && nKarst < 220; x += 700) {
+      for (let z = 6000; z <= 22000 && nKarst < 220; z += 700) {
+        const hash = Math.abs(Math.sin(x * 0.137 + z * 0.291) * 43758.54) % 1;
+        const jx = x + (hash - 0.5) * 420, jz = z + (hash * 7 % 1 - 0.5) * 420;
+        if (jx > CBT[0] - 260 && jx < CBT[0] + 260 && jz > CBT[1] - 190 && jz < CBT[1] + 190) continue; // chừa thị trấn
         const v = landAt(jx, jz);
         if (v > 0.75 && hash < 0.32) { // núi trên đảo lớn
-          const r = 16 + hash * 22, h = 34 + hash * 34;
+          const r = 42 + hash * 70, h = 80 + hash * 90;
           const y = groundHeightNoDeck(jx, jz);
           const rock = new THREE.Mesh(karstGeo(r, h, jx + jz), karstMat);
           rock.position.set(jx, y + h / 2 - 0.6, jz);
@@ -1428,12 +1439,12 @@ export function buildWorld(scene) {
           addCollider(jx, jz, r * 0.75);
           nKarst++;
         } else if (v > 0.06 && v < 0.62 && hash > 0.45) { // đảo đá vôi giữa vịnh Lan Hạ
-          const r = 8 + hash * 14, h = 16 + hash * 26;
+          const r = 20 + hash * 42, h = 45 + hash * 80;
           const rock = new THREE.Mesh(karstGeo(r, h, jx + jz), karstMat);
-          rock.position.set(jx, -3 + h / 2, jz);
+          rock.position.set(jx, -4 + h / 2, jz);
           scene.add(rock);
           const top = new THREE.Mesh(canopyGeo(r * 0.42, jx + jz * 3), karstTop);
-          top.position.set(jx, -3 + h - 0.5, jz);
+          top.position.set(jx, -4 + h - 0.5, jz);
           scene.add(top);
           addCollider(jx, jz, r * 0.75);
           nKarst++;

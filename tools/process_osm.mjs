@@ -209,7 +209,7 @@ for (const w of riverWays) {
   const name = (w.tags && (w.tags.name || '')) || '';
   let width = 0;
   if (/Cấm/i.test(name)) width = 620;
-  else if (/Tam Bạc/i.test(name)) width = 160;
+  else if (/Tam Bạc/i.test(name)) width = 55;
   else if (/Lạch Tray/i.test(name)) width = 300;
   else continue;
   if (!w.geometry) continue;
@@ -390,6 +390,7 @@ LM.bridge_binh = [EXTRAS.bridges[1].x, EXTRAS.bridges[1].zc + EXTRAS.bridges[1].
 function nearestRoadPoint(cx, cz) {
   let best = null, bd = 1e18;
   for (const r of ROADS_DT) {
+    if (r.c === 'r' || r.c === 'w') continue; // mặt tiền quay ra phố lớn, không ngõ nhỏ
     for (const [px, pz] of r.pts) {
       const d = (px - cx) ** 2 + (pz - cz) ** 2;
       if (d < bd) { bd = d; best = [px, pz]; }
