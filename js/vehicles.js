@@ -126,9 +126,9 @@ function makeBoat() {
 // groundHeight: có mặt cầu (xe chạy qua cầu được); waterHeight: KHÔNG có mặt cầu (thuyền chui qua gầm cầu)
 // spawns: [{type, x, z, heading}] — do world.js tính từ dữ liệu bản đồ thật (bến, bờ sông...)
 const TEMPLATES = {
-  motorbike: { maker: makeMotorbike, speed: 50, turn: 2.2, nameKey: 'vMotorbike', land: true },
-  cyclo: { maker: makeCyclo, speed: 19, turn: 2.2, nameKey: 'vCyclo', land: true },
-  boat: { maker: makeBoat, speed: 46, turn: 1.5, nameKey: 'vBoat', land: false },
+  motorbike: { maker: makeMotorbike, speed: 23, turn: 2.2, nameKey: 'vMotorbike', land: true },   // ~83 km/h
+  cyclo: { maker: makeCyclo, speed: 8, turn: 2.2, nameKey: 'vCyclo', land: true },
+  boat: { maker: makeBoat, speed: 19, turn: 1.5, nameKey: 'vBoat', land: false },   // ~37 hải lý
 };
 export function createVehicles(scene, groundHeight, waterHeight, spawns, resolveCollisions) {
   const defs = spawns.map((s) => ({ ...TEMPLATES[s.type], type: s.type, x: s.x, z: s.z, heading: s.heading || 0 }));

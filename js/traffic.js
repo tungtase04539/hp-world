@@ -121,7 +121,7 @@ export function createTraffic(scene, world) {
         s: L * (0.25 + 0.5 * k),
         speed: 13 + ((li + k) % 4) * 1.8,
         dir: k % 2 === 0 ? 1 : -1,
-        lane: 1.8,
+        lane: 3.2,
       });
     }
   });
@@ -132,7 +132,7 @@ export function createTraffic(scene, world) {
     scene.add(mesh);
     bikes.push({
       mesh, path, closed: false, L,
-      s: L * (0.2 + 0.3 * li), speed: 30, lane: 2.4, dir: li % 2 === 0 ? 1 : -1,
+      s: L * (0.2 + 0.3 * li), speed: 12, lane: 4, dir: li % 2 === 0 ? 1 : -1,
     });
   });
 

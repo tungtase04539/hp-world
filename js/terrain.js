@@ -81,12 +81,12 @@ function bucketQuery(buckets, x, z) {
 }
 // Kênh Nam Triệu: nối cửa sông Cấm ra biển (luồng tàu thật giữa Đình Vũ - Cát Hải;
 // dữ liệu waterway OSM dừng ở cửa sông nên phải nối thủ công, nếu không thuyền bị "đập" chắn)
-RIVERS.push({ w: 110, pts: [[1400, 100], [1700, 380], [2000, 640], [2350, 900]] });
+RIVERS.push({ w: 1300, pts: [[7600, 0], [11000, 4100], [15000, 7000], [20600, 9700]] });
 // Hồ Tam Bạc: trục + bề rộng lấy từ polygon nước OSM thật; bờ hẹp (sh=6)
 // để không ngập trường THCS Trần Phú ngay mép nam hồ
-RIVERS.push({ w: EXTRAS.lake.w, sh: 6, pts: EXTRAS.lake.pts });
+RIVERS.push({ w: EXTRAS.lake.w, sh: 25, pts: EXTRAS.lake.pts });
 
-const riverIdx = makeBucketIndex(RIVERS.map((r) => ({ pts: r.pts, meta: [r.w, r.sh || 16] })));
+const riverIdx = makeBucketIndex(RIVERS.map((r) => ({ pts: r.pts, meta: [r.w, r.sh || 60] })));
 const regionIdx = makeBucketIndex(ROADS_REGION.map((r) => ({ pts: r.pts, meta: 0 })));
 const dtRoadIdx = makeBucketIndex(ROADS_DT.map((r) => ({ pts: r.pts, meta: r.c })));
 
@@ -129,7 +129,7 @@ function deckHeight(x, z, rf) {
     const dx = x - b.x, dz = z - b.zc;
     const along = dx * b.sin + dz * b.cos;      // dọc trục cầu
     const across = dx * b.cos - dz * b.sin;     // ngang trục cầu
-    if (Math.abs(across) < 7 && Math.abs(along) < b.half) {
+    if (Math.abs(across) < 10 && Math.abs(along) < b.half) {
       const tt = along / b.half;
       h = Math.max(h, LAND_H + b.rise * Math.max(0, 1 - tt * tt));
     }
@@ -139,7 +139,7 @@ function deckHeight(x, z, rf) {
   }
   // đường bộ băng sông = mặt cầu phẳng (mọi cây cầu phố thật: cầu Rào, Lạc Long, An Dương...)
   if (rf > 0.03) {
-    if (nearDTRoad(x, z, 5) || nearRegionRoad(x, z, 6)) h = Math.max(h, LAND_H + 0.05);
+    if (nearDTRoad(x, z, 8) || nearRegionRoad(x, z, 9)) h = Math.max(h, LAND_H + 0.05);
   }
   return h;
 }
@@ -149,15 +149,15 @@ const DS_RIDGE = EXTRAS.dsRidge; // sống đồi Đồ Sơn (từ bãi biển O
 function hills(x, z, v) {
   let h = 0;
   const dDS = distToSeg(x, z, ...DS_RIDGE);
-  h += 19 * (1 - smoothstep(25, 105, dDS)) * (0.72 + 0.28 * Math.sin(x * 0.05 + z * 0.03));
+  h += 62 * (1 - smoothstep(220, 950, dDS)) * (0.72 + 0.28 * Math.sin(x * 0.005 + z * 0.003));
   // đồi Vụng — nơi đặt biệt thự Bảo Đại (node OSM thật)
   const dBD = Math.hypot(x - EXTRAS.baodai[0], z - EXTRAS.baodai[1]);
-  h += 15 * (1 - smoothstep(16, 90, dBD));
-  if (z < -600 && v > 0.6) { // đồi Thủy Nguyên
-    h += 7 * smoothstep(-600, -1000, z) * (0.5 + 0.5 * Math.sin(x * 0.011) * Math.sin(z * 0.013)) * smoothstep(0.6, 0.9, v);
+  h += 32 * (1 - smoothstep(150, 700, dBD));
+  if (z < -2500 && v > 0.6) { // đồi Thủy Nguyên
+    h += 28 * smoothstep(-2500, -6000, z) * (0.5 + 0.5 * Math.sin(x * 0.0011) * Math.sin(z * 0.0013)) * smoothstep(0.6, 0.9, v);
   }
-  if (x > 3600 && v > 0.55) { // núi Cát Bà
-    h += 13 * (0.45 + 0.55 * Math.sin(x * 0.016 + 1) * Math.sin(z * 0.019)) * smoothstep(0.55, 0.85, v);
+  if (x > 30000 && v > 0.55) { // núi Cát Bà
+    h += 110 * (0.45 + 0.55 * Math.sin(x * 0.0016 + 1) * Math.sin(z * 0.0019)) * smoothstep(0.55, 0.85, v);
   }
   return Math.max(0, h);
 }
@@ -167,13 +167,13 @@ export function groundHeightNoDeck(x, z) {
   const v = landAt(x, z);
   let h = lerp(SEA_FLOOR, LAND_H, smoothstep(0.32, 0.68, v));
   // gợn nhẹ đồng bằng
-  h += 0.4 * Math.sin(x * 0.021) * Math.sin(z * 0.017) * smoothstep(0.6, 0.9, v);
+  h += 0.4 * Math.sin(x * 0.0021) * Math.sin(z * 0.0017) * smoothstep(0.6, 0.9, v);
   h += hills(x, z, v);
   // san phẳng trung tâm (hộp phố thật) + thị trấn Cát Bà + khu cảng
-  h = lerp(h, LAND_H, rectFactor(x, DT_BOX.x1, DT_BOX.x2, z, DT_BOX.z1, DT_BOX.z2, 60) * smoothstep(0.35, 0.55, v));
+  h = lerp(h, LAND_H, rectFactor(x, DT_BOX.x1, DT_BOX.x2, z, DT_BOX.z1, DT_BOX.z2, 250) * smoothstep(0.35, 0.55, v));
   const CT = EXTRAS.catbaTown;
-  h = lerp(h, LAND_H, rectFactor(x, CT[0] - 95, CT[0] + 95, z, CT[1] - 70, CT[1] + 70, 24) * smoothstep(0.35, 0.55, v));
-  h = lerp(h, LAND_H, rectFactor(x, LM.port[0] - 95, LM.port[0] + 95, z, LM.port[1] - 45, LM.port[1] + 45, 16) * smoothstep(0.3, 0.5, v));
+  h = lerp(h, LAND_H, rectFactor(x, CT[0] - 500, CT[0] + 500, z, CT[1] - 380, CT[1] + 380, 120) * smoothstep(0.35, 0.55, v));
+  h = lerp(h, LAND_H, rectFactor(x, LM.port[0] - 600, LM.port[0] + 600, z, LM.port[1] - 300, LM.port[1] + 300, 90) * smoothstep(0.3, 0.5, v));
   // đào lòng sông (thắng san phẳng)
   const rf = riverFactor(x, z);
   if (rf > 0) h = lerp(h, -3, rf);
@@ -203,7 +203,7 @@ export function nearestRiverPoint(x0, minW = 50) {
 }
 
 // Dò bãi biển/bến quanh một mỏ neo: trả về các điểm cát + hướng ra biển
-export function findShore(ax, az, searchR = 260, step = 10) {
+export function findShore(ax, az, searchR = 1200, step = 40) {
   const beach = [];
   for (let dx = -searchR; dx <= searchR; dx += step) {
     for (let dz = -searchR; dz <= searchR; dz += step) {

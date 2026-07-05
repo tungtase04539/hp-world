@@ -34,7 +34,7 @@ renderer.shadowMap.enabled = !isTouchDevice;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1800);
+const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 16000);
 
 // Môi trường phản chiếu cho vật liệu PBR (mô hình GLB không bị xỉn/tối)
 {
@@ -140,7 +140,7 @@ camera.position.set(SPAWN.x, 10, SPAWN.z + 14);
 updateCamera(1);
 
 // ============ Di chuyển nhân vật ============
-const WALK = 7, RUN = 13, GRAV = 26, JUMP = 9;
+const WALK = 5, RUN = 11, GRAV = 26, JUMP = 7.5;  // 1:1 — m/s thật
 
 function tryMove(nx, nz) {
   if (nx < WORLD_BOUNDS.minX + 30 || nx > WORLD_BOUNDS.maxX - 30

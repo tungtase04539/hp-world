@@ -37,7 +37,7 @@ export function createDayNight(scene, world) {
   moonGlow.position.set(-80, 120, -60);
   scene.add(moonGlow);
 
-  scene.fog = new THREE.Fog(0xd8eefc, 180, 780);
+  scene.fog = new THREE.Fog(0xd8eefc, 600, 4200);
   scene.background = new THREE.Color(0x6fbdf0);
 
   // Vòm trời gradient (đẹp hơn màu phẳng)

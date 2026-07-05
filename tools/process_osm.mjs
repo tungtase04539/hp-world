@@ -1,10 +1,10 @@
 // Xử lý dữ liệu OSM Hải Phòng -> js/mapdata.js
-// Phép chiếu: 1:10 + "kính lúp" phóng to trung tâm k=2.2 (bán kính 260 -> 1000 chuyển tiếp mượt)
+// Phép chiếu: 1:1 MÉT THẬT — không thu nhỏ, không kính lúp (yêu cầu 2026-07-05)
 import fs from 'fs';
 
 const LON0 = 106.68182, LAT0 = 20.85750; // Nhà hát lớn THẬT (OSM way/242055606) = gốc
-const UX = 111320 * Math.cos(LAT0 * Math.PI / 180) / 10;
-const UZ = 110574 / 10;
+const UX = 111320 * Math.cos(LAT0 * Math.PI / 180);
+const UZ = 110574;
 
 // ---- Warp xuyên tâm: r' = ∫ s(r) dr, s = 1 + (k-1)(1 - smoothstep(a,b,r)) ----
 const K = 2.2, WA = 260, WB = 1000;
@@ -21,11 +21,8 @@ function warpR(r) {
   return rTable[i0] + (rTable[i0 + 1] - rTable[i0]) * (i - i0);
 }
 function toXZ(lon, lat) {
-  const x = (lon - LON0) * UX, z = -(lat - LAT0) * UZ;
-  const r = Math.hypot(x, z);
-  if (r < 1e-6) return [0, 0];
-  const f = warpR(r) / r;
-  return [x * f, z * f];
+  // 1:1 — không warp
+  return [(lon - LON0) * UX, -(lat - LAT0) * UZ];
 }
 // chia nhỏ đoạn dài trước khi warp (warp làm cong đường thẳng)
 function subdiv(geo, step = 50) {
@@ -45,8 +42,8 @@ function subdiv(geo, step = 50) {
 }
 
 // Biên thế giới phải nằm TRONG vùng dữ liệu bờ biển đã warp (tránh flood lách qua rìa không có tường)
-const WORLD = { minX: -1450, maxX: 5560, minZ: -1440, maxZ: 3240 };
-const CELL = 12;
+const WORLD = { minX: -6900, maxX: 48000, minZ: -6800, maxZ: 24800 };
+const CELL = 40;
 const MW = Math.ceil((WORLD.maxX - WORLD.minX) / CELL);
 const MH = Math.ceil((WORLD.maxZ - WORLD.minZ) / CELL);
 
@@ -89,10 +86,10 @@ const cellOf = (x, z) => {
 const segs = []; // [ax, az, bx, bz]
 for (const w of coast) {
   if (!w.geometry) continue;
-  const pts = subdiv(w.geometry, 20);
+  const pts = subdiv(w.geometry, 100);
   for (let i = 0; i < pts.length - 1; i++) segs.push([pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1]]);
 }
-const BK = 96;
+const BK = 900;
 const BW = Math.ceil((WORLD.maxX - WORLD.minX) / BK), BH = Math.ceil((WORLD.maxZ - WORLD.minZ) / BK);
 const buckets = Array.from({ length: BW * BH }, () => []);
 for (let si = 0; si < segs.length; si++) {
@@ -142,13 +139,13 @@ function countCrossings(px, pz, tx, tz) {
   }
   return crossings;
 }
-const SEA_TX = WORLD.maxX + 2600, SEA_TZ = WORLD.maxZ + 1900; // ngoài khơi đông nam
+const SEA_TX = WORLD.maxX + 9000, SEA_TZ = WORLD.maxZ + 7000; // ngoài khơi đông nam
 const land = new Uint8Array(MW * MH);
 for (let cz = 0; cz < MH; cz++) {
   for (let cx = 0; cx < MW; cx++) {
     const px = WORLD.minX + (cx + 0.5) * CELL, pz = WORLD.minZ + (cz + 0.5) * CELL;
     // lắc nhẹ đích tia theo ô để tránh đi trúng khớp nối đoạn
-    const j = ((cx * 7 + cz * 13) % 11 - 5) * 30;
+    const j = ((cx * 7 + cz * 13) % 11 - 5) * 300;
     land[cz * MW + cx] = countCrossings(px, pz, SEA_TX + j, SEA_TZ - j) % 2;
   }
 }
@@ -174,7 +171,7 @@ function stampLand(lon, lat, radius) {
     }
   }
 }
-stampLand(106.8125, 20.6667, 40);
+stampLand(106.8125, 20.6667, 300);
 const check = (lon, lat, want, name) => {
   const [x, z] = toXZ(lon, lat).map(Math.round);
   const v = land[cellOf(x, z)];
@@ -211,12 +208,12 @@ const RIVERS = [];
 for (const w of riverWays) {
   const name = (w.tags && (w.tags.name || '')) || '';
   let width = 0;
-  if (/Cấm/i.test(name)) width = 62;
-  else if (/Tam Bạc/i.test(name)) width = 16;
-  else if (/Lạch Tray/i.test(name)) width = 30;
+  if (/Cấm/i.test(name)) width = 620;
+  else if (/Tam Bạc/i.test(name)) width = 160;
+  else if (/Lạch Tray/i.test(name)) width = 300;
   else continue;
   if (!w.geometry) continue;
-  const sim = rnd(simplify(subdiv(w.geometry, 60), 10)).filter(([x, z]) =>
+  const sim = rnd(simplify(subdiv(w.geometry, 300), 30)).filter(([x, z]) =>
     x > WORLD.minX && x < WORLD.maxX && z > WORLD.minZ && z < WORLD.maxZ);
   if (sim.length >= 2) RIVERS.push({ w: width, pts: sim });
 }
@@ -229,11 +226,11 @@ const ROADS_DT = [];
 for (const w of dtRoads) {
   const c = CLS[w.tags?.highway];
   if (!c || !w.geometry) continue;
-  const pts = rnd(simplify(subdiv(w.geometry, 40), 3));
+  const pts = rnd(simplify(subdiv(w.geometry, 150), 6));
   if (pts.length < 2) continue;
   const len = plLen(pts);
-  if (c === 'r' && len < 120) continue;
-  if (c === 'w' && len < 70) continue;
+  if (c === 'r' && len < 260) continue;
+  if (c === 'w' && len < 150) continue;
   ROADS_DT.push({ c, pts, name: w.tags?.name || '' });
 }
 console.log(`roads downtown: ${ROADS_DT.length}`);
@@ -258,9 +255,9 @@ const inDT = ([x, z]) => x > dtBox.x1 && x < dtBox.x2 && z > dtBox.z1 && z < dtB
 const ROADS_REGION = [];
 for (const w of regRoads) {
   if (!w.geometry) continue;
-  const pts = rnd(simplify(subdiv(w.geometry, 60), 16)).filter(([x, z]) =>
+  const pts = rnd(simplify(subdiv(w.geometry, 300), 50)).filter(([x, z]) =>
     x > WORLD.minX && x < WORLD.maxX && z > WORLD.minZ && z < WORLD.maxZ);
-  if (pts.length < 2 || plLen(pts) < 100) continue;
+  if (pts.length < 2 || plLen(pts) < 900) continue;
   // cắt bỏ phần nằm trong hộp trung tâm
   let cur = [];
   const parts = [];
@@ -269,7 +266,7 @@ for (const w of regRoads) {
     else cur.push(p);
   }
   if (cur.length >= 2) parts.push(cur);
-  for (const part of parts) if (plLen(part) > 120) ROADS_REGION.push({ pts: part });
+  for (const part of parts) if (plLen(part) > 1100) ROADS_REGION.push({ pts: part });
 }
 console.log(`roads region: ${ROADS_REGION.length}`);
 
@@ -280,8 +277,8 @@ for (const w of bldWays) {
   if (!w.geometry || w.geometry.length < 4) continue;
   let pts = w.geometry.map((g) => toXZ(g.lon, g.lat));
   // bỏ điểm cuối trùng điểm đầu (polygon đóng)
-  if (Math.hypot(pts[0][0] - pts[pts.length - 1][0], pts[0][1] - pts[pts.length - 1][1]) < 0.5) pts = pts.slice(0, -1);
-  pts = simplify(pts, 0.8);
+  if (Math.hypot(pts[0][0] - pts[pts.length - 1][0], pts[0][1] - pts[pts.length - 1][1]) < 2) pts = pts.slice(0, -1);
+  pts = simplify(pts, 1.5);
   if (pts.length < 3) continue;
   // diện tích (shoelace) + tâm
   let area = 0, cx = 0, cz = 0;
@@ -292,12 +289,9 @@ for (const w of bldWays) {
   }
   area = Math.abs(area) / 2;
   cx /= pts.length; cz /= pts.length;
-  if (area < 3.5 || area > 12000) continue;
+  if (area < 30 || area > 250000) continue;
   if (cx < dtBox.x1 || cx > dtBox.x2 || cz < dtBox.z1 || cz > dtBox.z2) continue;
-  // phóng footprint quanh tâm để cân với nhân vật (nhà nhỏ phóng nhiều, nhà lớn giữ gần nguyên)
-  const bScale = area < 40 ? 1.6 : area < 200 ? 1.45 : area < 900 ? 1.2 : 1.05;
-  pts = pts.map(([x, z]) => [cx + (x - cx) * bScale, cz + (z - cz) * bScale]);
-  area *= bScale * bScale;
+  // 1:1 — footprint giữ NGUYÊN kích thước thật, không phóng
   // chiều cao: tag height / building:levels, thiếu thì để 0 (game tự ước lượng)
   let lv = 0;
   const tags = w.tags || {};
@@ -327,11 +321,20 @@ function longEdgeDir(pts) {
   }
   return best;
 }
-const LM = {}, LM_DIR = {}, LM_FACE = {}, EXTRAS = {};
+const LM = {}, LM_DIR = {}, LM_FACE = {}, EXTRAS = {}, LM_SIZE = {};
 function addWay(key, id, faceTarget) {
   const [cx, cz, pts] = centroidOf(lmGeom[id]);
   LM[key] = [Math.round(cx), Math.round(cz)];
-  LM_DIR[key] = longEdgeDir(pts).map((v) => Math.round(v * 1000) / 1000);
+  const dir = longEdgeDir(pts);
+  LM_DIR[key] = dir.map((v) => Math.round(v * 1000) / 1000);
+  // kích thước THẬT của footprint: extent dọc trục dài + trục vuông góc (mét)
+  let mnA = 1e9, mxA = -1e9, mnB = 1e9, mxB = -1e9;
+  for (const [x, z] of pts) {
+    const a = x * dir[0] + z * dir[1], b = -x * dir[1] + z * dir[0];
+    mnA = Math.min(mnA, a); mxA = Math.max(mxA, a);
+    mnB = Math.min(mnB, b); mxB = Math.max(mxB, b);
+  }
+  LM_SIZE[key] = [Math.round(mxA - mnA), Math.round(mxB - mnB)];
   if (faceTarget) {
     const f = [faceTarget[0] - cx, faceTarget[1] - cz];
     const l = Math.hypot(...f) || 1;
@@ -374,14 +377,14 @@ function bridgeDef(id) {
   const cx = (a[0] + b[0]) / 2, cz = (a[1] + b[1]) / 2;
   const half = Math.hypot(b[0] - a[0], b[1] - a[1]) / 2;
   const ang = Math.atan2(b[0] - a[0], b[1] - a[1]); // trục dọc cầu so với +z
-  return { x: Math.round(cx), zc: Math.round(cz), half: Math.round(half + 14), ang: Math.round(ang * 1000) / 1000 };
+  return { x: Math.round(cx), zc: Math.round(cz), half: Math.round(half + 40), ang: Math.round(ang * 1000) / 1000 };
 }
 EXTRAS.bridges = [
-  { ...bridgeDef(738297304), rise: 8 },   // Hoàng Văn Thụ
-  { ...bridgeDef(1002961725), rise: 7 },  // Bính
+  { ...bridgeDef(738297304), rise: 25 },   // Hoàng Văn Thụ (tĩnh không thật ~25m)
+  { ...bridgeDef(1002961725), rise: 25 },  // Bính (tĩnh không 25m)
 ];
-LM.bridge_hvt = [EXTRAS.bridges[0].x, EXTRAS.bridges[0].zc + EXTRAS.bridges[0].half + 14];
-LM.bridge_binh = [EXTRAS.bridges[1].x, EXTRAS.bridges[1].zc + EXTRAS.bridges[1].half + 14];
+LM.bridge_hvt = [EXTRAS.bridges[0].x, EXTRAS.bridges[0].zc + EXTRAS.bridges[0].half + 40];
+LM.bridge_binh = [EXTRAS.bridges[1].x, EXTRAS.bridges[1].zc + EXTRAS.bridges[1].half + 40];
 
 // mặt tiền các tòa chưa có mục tiêu: quay về phố gần nhất
 function nearestRoadPoint(cx, cz) {
@@ -426,13 +429,13 @@ const TREES = [];
 for (const n of load('osm_trees.json')) {
   if (n.type !== 'node') continue;
   const [x, z] = toXZ(n.lon, n.lat).map((v) => Math.round(v * 10) / 10);
-  if (x > dtBox.x1 - 80 && x < dtBox.x2 + 80 && z > dtBox.z1 - 80 && z < dtBox.z2 + 80) TREES.push([x, z]);
+  if (x > dtBox.x1 - 300 && x < dtBox.x2 + 300 && z > dtBox.z1 - 300 && z < dtBox.z2 + 300) TREES.push([x, z]);
 }
 console.log(`trees thật: ${TREES.length}`);
 const PARKS = [];
 for (const w of load('osm_parks.json')) {
   if (!w.geometry || w.geometry.length < 4) continue;
-  let pts = rnd(simplify(w.geometry.map((g) => toXZ(g.lon, g.lat)), 2));
+  let pts = rnd(simplify(w.geometry.map((g) => toXZ(g.lon, g.lat)), 5));
   if (pts.length < 3) continue;
   let area = 0, cx = 0, cz = 0;
   for (let i = 0; i < pts.length; i++) {
@@ -440,7 +443,7 @@ for (const w of load('osm_parks.json')) {
     area += x1 * z2 - x2 * z1; cx += x1; cz += z1;
   }
   area = Math.abs(area) / 2; cx /= pts.length; cz /= pts.length;
-  if (area < 60) continue;
+  if (area < 600) continue;
   if (cx < dtBox.x1 || cx > dtBox.x2 || cz < dtBox.z1 || cz > dtBox.z2) continue;
   PARKS.push(pts);
 }
@@ -480,18 +483,18 @@ const RAIL = [];
 for (const w of load('osm_rail.json')) {
   const t = w.tags || {};
   if (!w.geometry) continue;
-  const pts = rnd(simplify(subdiv(w.geometry, 50), 6)).filter(([x, z]) =>
+  const pts = rnd(simplify(subdiv(w.geometry, 200), 15)).filter(([x, z]) =>
     x > WORLD.minX && x < WORLD.maxX && z > WORLD.minZ && z < WORLD.maxZ);
   if (pts.length < 2) continue;
   const isMain = t.usage === 'main' || !t.service;
-  if (isMain) { if (plLen(pts) > 60) RAIL.push({ pts }); continue; }
+  if (isMain) { if (plLen(pts) > 500) RAIL.push({ pts }); continue; }
   // ray yard/spur: chỉ giữ trong khu cảng hoặc sân ga (thêm không khí đường sắt thật)
   let cx = 0, cz = 0;
   for (const [x, z] of pts) { cx += x; cz += z; }
   cx /= pts.length; cz /= pts.length;
-  const nearPort = Math.hypot(cx - LM.port[0], cz - LM.port[1]) < 170;
-  const nearGa = Math.hypot(cx - LM.station[0], cz - LM.station[1]) < 70;
-  if ((nearPort || nearGa) && plLen(pts) > 30) RAIL.push({ pts });
+  const nearPort = Math.hypot(cx - LM.port[0], cz - LM.port[1]) < 1500;
+  const nearGa = Math.hypot(cx - LM.station[0], cz - LM.station[1]) < 350;
+  if ((nearPort || nearGa) && plLen(pts) > 200) RAIL.push({ pts });
 }
 console.log(`rail: ${RAIL.length} đoạn`);
 
@@ -520,7 +523,7 @@ function plMid(pts) { // điểm giữa theo chiều dài + hướng đơn vị 
   return [pts[0][0], pts[0][1], [1, 0]];
 }
 const STREETS = Object.entries(streetAgg)
-  .filter(([, a]) => a.len > 60)
+  .filter(([, a]) => a.len > 400)
   .sort((x, y) => y[1].len - x[1].len).slice(0, 26)
   .map(([n, a]) => { const [x, z, d] = plMid(a.best); return { n, x, z, d }; });
 console.log('STREETS:', STREETS.length);
@@ -530,7 +533,7 @@ const cellCnt = new Map();
 for (const r of ROADS_DT) if (r.c === 'p' || r.c === 's') {
   const seen = new Set();
   for (const [x, z] of r.pts) {
-    const k = Math.round(x / 3) + ',' + Math.round(z / 3);
+    const k = Math.round(x / 12) + ',' + Math.round(z / 12);
     if (!seen.has(k)) { seen.add(k); cellCnt.set(k, (cellCnt.get(k) || 0) + 1); }
   }
 }
@@ -538,11 +541,11 @@ const INTERSECTIONS = [];
 for (const [k, c] of [...cellCnt.entries()].sort((a, b) => b[1] - a[1])) {
   if (c < 3) continue;
   const [gx, gz] = k.split(',').map(Number);
-  const x = gx * 3, z = gz * 3;
-  if (x * x + z * z > 300 * 300) continue;
-  if (INTERSECTIONS.some(([px, pz]) => (px - x) ** 2 + (pz - z) ** 2 < 45 * 45)) continue;
+  const x = gx * 12, z = gz * 12;
+  if (x * x + z * z > 1500 * 1500) continue;
+  if (INTERSECTIONS.some(([px, pz]) => (px - x) ** 2 + (pz - z) ** 2 < 180 * 180)) continue;
   INTERSECTIONS.push([x, z]);
-  if (INTERSECTIONS.length >= 14) break;
+  if (INTERSECTIONS.length >= 20) break;
 }
 console.log('INTERSECTIONS:', INTERSECTIONS.length);
 
@@ -554,13 +557,14 @@ for (const nm of ['Trần Hưng Đạo', 'Trần Phú', 'Điện Biên Phủ']) 
 }
 console.log('MEDIANS:', MEDIANS.map((m) => m.length));
 
+console.log('LM_SIZE:', JSON.stringify(LM_SIZE));
 console.log('LM:', JSON.stringify(LM));
 console.log('LM_DIR:', JSON.stringify(LM_DIR));
 console.log('EXTRAS:', JSON.stringify(EXTRAS));
 
 // ---------- Ghi file ----------
 const out = `// SINH TỰ ĐỘNG từ dữ liệu OpenStreetMap (ODbL) — bản đồ Hải Phòng thật
-// Tỉ lệ 1:10, trung tâm phóng đại 2.2x (kính lúp phi tuyến quanh Nhà hát lớn)
+// Tỉ lệ 1:1 MÉT THẬT — không phóng đại
 // © OpenStreetMap contributors — https://www.openstreetmap.org/copyright
 export const WORLD = ${JSON.stringify(WORLD)};
 export const DT_BOX = ${JSON.stringify(dtBox)};
@@ -570,6 +574,7 @@ export const ROADS_DT = ${JSON.stringify(ROADS_DT.map(({ c, pts }) => ({ c, pts 
 export const ROADS_REGION = ${JSON.stringify(ROADS_REGION.map(({ pts }) => ({ pts })))};
 export const LM = ${JSON.stringify(LM)};
 export const LM_DIR = ${JSON.stringify(LM_DIR)};
+export const LM_SIZE = ${JSON.stringify(LM_SIZE)};
 export const LM_FACE = ${JSON.stringify(LM_FACE)};
 export const EXTRAS = ${JSON.stringify(EXTRAS)};
 export const TREES = ${JSON.stringify(TREES)};

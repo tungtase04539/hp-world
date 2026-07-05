@@ -62,7 +62,7 @@ export function updateAssets(dt, playerPos) {
   let best = null, bd = Infinity;
   for (const d of REGISTRY) {
     if (d.state !== 'idle') continue;
-    const r = d.radius || 500;
+    const r = d.radius || 1500;
     const dist2 = (playerPos.x - d.x) ** 2 + (playerPos.z - d.z) ** 2;
     if (dist2 < r * r && dist2 < bd) { bd = dist2; best = d; }
   }

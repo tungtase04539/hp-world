@@ -13,32 +13,32 @@ const binhEnd = bridgeEnd(EXTRAS.bridges[1]);
 
 // vị trí biển chỉ dẫn: cạnh công trình thật (LM = tâm footprint OSM), lệch ra ngoài để không chắn lối
 const P = {
-  opera: [LM.opera[0] + 14, LM.opera[1] + 16],
-  quanhoa: [LM.quanhoa[0] + 8, LM.quanhoa[1] + 6],
-  lechan: [LM.lechan[0] + 8, LM.lechan[1] + 8],
-  lake: [LM.lake[0], LM.lake[1] + 30],
-  market: [LM.market[0] + 2, LM.market[1] - 22], // phía bắc — nam là đầu hồ Tam Bạc
-  cathedral: [LM.cathedral[0] + LM_FACE.cathedral[0] * 20, LM.cathedral[1] + LM_FACE.cathedral[1] * 20],
-  postoffice: [LM.postoffice[0] + LM_FACE.postoffice[0] * 16, LM.postoffice[1] + LM_FACE.postoffice[1] * 16],
-  museum: [LM.museum[0] + LM_FACE.museum[0] * 18, LM.museum[1] + LM_FACE.museum[1] * 18],
-  station: [LM.station[0] + 18, LM.station[1] + 4],
-  bridge: [hvtEnd[0] + 9, hvtEnd[1] + 8],
-  binhbridge: [binhEnd[0] + 9, binhEnd[1] + 8],
-  port: [LM.port[0] - 80, LM.port[1] + 30],
+  opera: [LM.opera[0] + 40, LM.opera[1] + 45],
+  quanhoa: [LM.quanhoa[0] + 25, LM.quanhoa[1] + 14],
+  lechan: [LM.lechan[0] + 20, LM.lechan[1] + 20],
+  lake: [LM.lake[0], LM.lake[1] + 68],
+  market: [LM.market[0] + 5, LM.market[1] - 75], // phía bắc — nam là đầu hồ Tam Bạc
+  cathedral: [LM.cathedral[0] + LM_FACE.cathedral[0] * 42, LM.cathedral[1] + LM_FACE.cathedral[1] * 42],
+  postoffice: [LM.postoffice[0] + LM_FACE.postoffice[0] * 40, LM.postoffice[1] + LM_FACE.postoffice[1] * 40],
+  museum: [LM.museum[0] + LM_FACE.museum[0] * 32, LM.museum[1] + LM_FACE.museum[1] * 32],
+  station: [LM.station[0] + 42, LM.station[1] + 8],
+  bridge: [hvtEnd[0] + 22, hvtEnd[1] + 20],
+  binhbridge: [binhEnd[0] + 22, binhEnd[1] + 20],
+  port: [LM.port[0] - 320, LM.port[1] + 120],
   doson: [LM.doson[0], LM.doson[1]],
-  hondau: [LM.hondau[0] + 6, LM.hondau[1] - 6], // đảo nhỏ — lệch về phía đất
-  catba: [EXTRAS.catbaTown[0] - 25, EXTRAS.catbaTown[1] + 10],
-  thptnq: [LM.thptnq[0] + LM_FACE.thptnq[0] * 16, LM.thptnq[1] + LM_FACE.thptnq[1] * 16],
-  thcsnq: [LM.thcsnq[0] + LM_FACE.thcsnq[0] * 16, LM.thcsnq[1] + LM_FACE.thcsnq[1] * 16],
-  thcstp: [LM.thcstp[0] + LM_FACE.thcstp[0] * 16, LM.thcstp[1] + LM_FACE.thcstp[1] * 16],
-  dennghe: [LM.dennghe[0] + LM_FACE.dennghe[0] * 10, LM.dennghe[1] + LM_FACE.dennghe[1] * 10],
-  dinhhk: [LM.dinhhk[0] + LM_FACE.dinhhk[0] * 13, LM.dinhhk[1] + LM_FACE.dinhhk[1] * 13],
-  chuahang: [LM.chuahang[0] + LM_FACE.chuahang[0] * 11, LM.chuahang[1] + LM_FACE.chuahang[1] * 11],
-  dentamky: [LM.dentamky[0] + LM_FACE.dentamky[0] * 11, LM.dentamky[1] + LM_FACE.dentamky[1] * 11],
-  nhnn: [LM.nhnn[0] + LM_FACE.nhnn[0] * 14, LM.nhnn[1] + LM_FACE.nhnn[1] * 14],
-  ubnd: [LM.ubnd[0] + LM_FACE.ubnd[0] * 16, LM.ubnd[1] + LM_FACE.ubnd[1] * 16],
-  rap78: [LM.rap78[0] + LM_FACE.rap78[0] * 12, LM.rap78[1] + LM_FACE.rap78[1] * 12],
-  nhaken: [LM.nhaken[0] + LM_FACE.nhaken[0] * 8, LM.nhaken[1] + LM_FACE.nhaken[1] * 8],
+  hondau: [LM.hondau[0] + 22, LM.hondau[1] - 22], // đảo nhỏ — lệch về phía đất
+  catba: [EXTRAS.catbaTown[0] - 90, EXTRAS.catbaTown[1] + 35],
+  thptnq: [LM.thptnq[0] + LM_FACE.thptnq[0] * 58, LM.thptnq[1] + LM_FACE.thptnq[1] * 58],
+  thcsnq: [LM.thcsnq[0] + LM_FACE.thcsnq[0] * 50, LM.thcsnq[1] + LM_FACE.thcsnq[1] * 50],
+  thcstp: [LM.thcstp[0] + LM_FACE.thcstp[0] * 50, LM.thcstp[1] + LM_FACE.thcstp[1] * 50],
+  dennghe: [LM.dennghe[0] + LM_FACE.dennghe[0] * 22, LM.dennghe[1] + LM_FACE.dennghe[1] * 22],
+  dinhhk: [LM.dinhhk[0] + LM_FACE.dinhhk[0] * 28, LM.dinhhk[1] + LM_FACE.dinhhk[1] * 28],
+  chuahang: [LM.chuahang[0] + LM_FACE.chuahang[0] * 25, LM.chuahang[1] + LM_FACE.chuahang[1] * 25],
+  dentamky: [LM.dentamky[0] + LM_FACE.dentamky[0] * 22, LM.dentamky[1] + LM_FACE.dentamky[1] * 22],
+  nhnn: [LM.nhnn[0] + LM_FACE.nhnn[0] * 42, LM.nhnn[1] + LM_FACE.nhnn[1] * 42],
+  ubnd: [LM.ubnd[0] + LM_FACE.ubnd[0] * 38, LM.ubnd[1] + LM_FACE.ubnd[1] * 38],
+  rap78: [LM.rap78[0] + LM_FACE.rap78[0] * 26, LM.rap78[1] + LM_FACE.rap78[1] * 26],
+  nhaken: [LM.nhaken[0] + LM_FACE.nhaken[0] * 14, LM.nhaken[1] + LM_FACE.nhaken[1] * 14],
 };
 
 // 15 địa danh đặc trưng — tọa độ thật từ dữ liệu OpenStreetMap (đã qua phép chiếu 1:10 + kính lúp trung tâm)

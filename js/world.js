@@ -321,7 +321,7 @@ export function buildWorld(scene) {
   updaters.push((dt, time) => { water.position.y = Math.sin(time * 0.8) * 0.06; });
 
   // ---------- Đường phố THẬT (merge geometry để nhẹ GPU) ----------
-  const ROAD_W = { p: 7, s: 6, t: 5, r: 4, w: 3 }; // sát tỉ lệ thật hơn (thực ~4.4 với phố chính)
+  const ROAD_W = { p: 13, s: 10, t: 8, r: 5.5, w: 3.5 }; // 1:1 — lòng đường thật
   const asphaltGeos = [], sidewalkGeos = [], dashGeos = [], pathGeos = [];
   const m4 = new THREE.Matrix4(), q4 = new THREE.Quaternion(), e4 = new THREE.Euler(), s4 = new THREE.Vector3(1, 1, 1);
   function pushBox(arr, w, h, l, x, y, z, rotY, rotX = 0) {
@@ -339,7 +339,7 @@ export function buildWorld(scene) {
       if (segLen < 1) continue;
       const rotY = Math.atan2(x2 - x1, z2 - z1);
       // chia nhỏ theo địa hình (đoạn dài qua dốc cầu không bị thành tấm nghiêng khổng lồ)
-      const nChunk = Math.max(1, Math.ceil(segLen / 14));
+      const nChunk = Math.max(1, Math.ceil(segLen / 30));
       for (let c = 0; c < nChunk; c++) {
         const t1 = c / nChunk, t2 = (c + 1) / nChunk;
         const cx1 = x1 + (x2 - x1) * t1, cz1 = z1 + (z2 - z1) * t1;
@@ -375,7 +375,7 @@ export function buildWorld(scene) {
       path: r.c === 'w',
     });
   }
-  for (const r of ROADS_REGION) layRoad(r.pts, 9, { dashes: true });
+  for (const r of ROADS_REGION) layRoad(r.pts, 12, { dashes: true });
   function addMerged(geos, material, name) {
     if (!geos.length) return;
     const merged = mergeGeometries(geos);
@@ -394,7 +394,7 @@ export function buildWorld(scene) {
         const segLen = Math.hypot(x2 - x1, z2 - z1);
         if (segLen < 1) continue;
         const rotY = Math.atan2(x2 - x1, z2 - z1);
-        const nCh = Math.max(1, Math.ceil(segLen / 16));
+        const nCh = Math.max(1, Math.ceil(segLen / 30));
         for (let c = 0; c < nCh; c++) {
           const t1 = c / nCh, t2 = (c + 1) / nCh;
           const cx1 = x1 + (x2 - x1) * t1, cz1 = z1 + (z2 - z1) * t1;
@@ -408,7 +408,7 @@ export function buildWorld(scene) {
           const rotX = Math.atan2(h1 - h2, len);
           pushBox(ballastGeos, 3, 0.16, len + 0.8, mx, my, mz, rotY, rotX);
           const px2 = Math.cos(rotY), pz2 = -Math.sin(rotY);
-          for (const off of [-0.72, 0.72]) {
+          for (const off of [-0.5, 0.5]) {   // khổ ray 1000mm thật
             pushBox(railGeos, 0.17, 0.14, len + 0.8, mx + off * px2, my + 0.15, mz + off * pz2, rotY, rotX);
           }
         }
@@ -429,7 +429,7 @@ export function buildWorld(scene) {
     const bldGeos = [];
     // chừa chỗ quanh địa danh; trường học là KHUÔN VIÊN rộng nên chừa rộng hơn
     const lmSkip = Object.entries(LM).map(([k, [x, z]]) =>
-      [x, z, (k === 'thptnq' || k === 'thcsnq' || k === 'thcstp') ? 38 : 30]);
+      [x, z, (k === 'thptnq' || k === 'thcsnq' || k === 'thcstp') ? 120 : 80]);
     const wallPalette = [0xf5e4b8, 0xf0cfa0, 0xdfe8dc, 0xf4b8a0, 0xcfe0ee, 0xf7efc9, 0xe8d0b0, 0xd8c8a8]
       .map((c) => new THREE.Color(c));
     const roofPalette = [0xc24a30, 0x96603c, 0xa84036, 0x8a8f96].map((c) => new THREE.Color(c));
@@ -459,7 +459,7 @@ export function buildWorld(scene) {
       if (riverFactor(cx, cz) > 0.01 || Math.abs(groundHeightNoDeck(cx, cz) - LAND_H) > 0.4) continue;
       const hash = Math.abs(Math.floor(cx * 13 + cz * 7));
       const lv = b.l > 0 ? b.l : (b.a < 150 ? 2 + (hash % 3) : 2 + (hash % 2));
-      const h = Math.min(46, 3.2 + lv * 2.7);
+      const h = Math.min(62, 3 + lv * 3.3);   // 1:1 — 3.3m/tầng thật
       try {
         const shape = new THREE.Shape(poly.map(([x, z]) => new THREE.Vector2(x, -z)));
         // nhà cao chia nhiều nấc để có vân tầng (dải cửa sổ giả)
@@ -571,8 +571,8 @@ export function buildWorld(scene) {
         for (let s = 14; s < len - 8; s += 24) {
           const t = s / len;
           for (const side of [-1, 1]) {
-            const hx = x1 + (x2 - x1) * t + side * 7.5 * px;
-            const hz = z1 + (z2 - z1) * t + side * 7.5 * pz;
+            const hx = x1 + (x2 - x1) * t + side * 12 * px;
+            const hz = z1 + (z2 - z1) * t + side * 12 * pz;
             const hSeed = Math.abs(Math.floor(hx * 3 + hz * 7));
             if (hSeed % 3 === 0) continue; // thưa bớt
             if (Math.abs(groundHeightNoDeck(hx, hz) - LAND_H) > 0.25) continue;
@@ -665,7 +665,7 @@ export function buildWorld(scene) {
         m.updateMatrixWorld(true);
         const box = new THREE.Box3().setFromObject(m);
         const size = box.getSize(new THREE.Vector3());
-        const s = 27 / Math.max(size.x, size.z);
+        const s = 49 / Math.max(size.x, size.z);  // cạnh dài thật từ OSM (LM_SIZE)
         m.scale.setScalar(s);
         m.rotation.y = thOpera; // trục dài + mặt tiền theo cạnh thật (quay ra quảng trường)
         m.updateMatrixWorld(true);
@@ -730,7 +730,7 @@ export function buildWorld(scene) {
     const pcx = EXTRAS.square[0] + LM_FACE.opera[0] * 9;
     const pcz = EXTRAS.square[1] + LM_FACE.opera[1] * 9;
     const [ftX, ftZ] = EXTRAS.fountain;
-    const plaza = new THREE.Mesh(new THREE.CircleGeometry(14, 32),
+    const plaza = new THREE.Mesh(new THREE.CircleGeometry(55, 40),
       new THREE.MeshLambertMaterial({ map: paveTex }));
     plaza.rotation.x = -Math.PI / 2;
     plaza.position.set(pcx, LAND_H + 0.06, pcz);
@@ -788,8 +788,8 @@ export function buildWorld(scene) {
           inst.updateMatrixWorld(true);
           const b2 = new THREE.Box3().setFromObject(inst);
           const c2 = b2.getCenter(new THREE.Vector3());
-          const qx = LM.quanhoa[0] + qhDir[0] * (i - 2) * 5.6;
-          const qz = LM.quanhoa[1] + qhDir[1] * (i - 2) * 5.6;
+          const qx = LM.quanhoa[0] + qhDir[0] * (i - 2) * 9.8;
+          const qz = LM.quanhoa[1] + qhDir[1] * (i - 2) * 9.8;
           inst.position.x += qx - c2.x;
           inst.position.z += qz - c2.z;
           inst.position.y += LAND_H - b2.min.y - 0.25;
@@ -811,7 +811,7 @@ export function buildWorld(scene) {
       },
     });
     for (let i = 0; i < 5; i++) {
-      addCollider(LM.quanhoa[0] + qhDir[0] * (i - 2) * 5.6, LM.quanhoa[1] + qhDir[1] * (i - 2) * 5.6, 2.1);
+      addCollider(LM.quanhoa[0] + qhDir[0] * (i - 2) * 9.8, LM.quanhoa[1] + qhDir[1] * (i - 2) * 9.8, 2.4);
     }
   }
 
@@ -889,11 +889,11 @@ export function buildWorld(scene) {
     const thCa = orientLong(LM_DIR.cathedral, null) + Math.PI;
     placeGLB({
       url: 'assets/nhatho.glb', name: 'Nhà thờ chính tòa',
-      x: LM.cathedral[0], z: LM.cathedral[1], rot: thCa, size: 25,
+      x: LM.cathedral[0], z: LM.cathedral[1], rot: thCa, size: 45,
     });
-    addCollider(LM.cathedral[0], LM.cathedral[1], 9);
-    const [c1x, c1z] = localPt(LM.cathedral[0], LM.cathedral[1], -11, 0, thCa);
-    const [c2x, c2z] = localPt(LM.cathedral[0], LM.cathedral[1], 11, 0, thCa);
+    addCollider(LM.cathedral[0], LM.cathedral[1], 15);
+    const [c1x, c1z] = localPt(LM.cathedral[0], LM.cathedral[1], -19, 0, thCa);
+    const [c2x, c2z] = localPt(LM.cathedral[0], LM.cathedral[1], 19, 0, thCa);
     addCollider(c1x, c1z, 7);
     addCollider(c2x, c2z, 7);
   }
@@ -901,31 +901,31 @@ export function buildWorld(scene) {
   // ---------- BƯU ĐIỆN: GLB từ ảnh thật (Wikimedia Commons) ----------
   {
     // lùi nhẹ khỏi mặt phố (đường trong game vẽ rộng hơn thực tế)
-    const poX = LM.postoffice[0] - LM_FACE.postoffice[0] * 4.5;
-    const poZ = LM.postoffice[1] - LM_FACE.postoffice[1] * 4.5;
+    const poX = LM.postoffice[0] - LM_FACE.postoffice[0] * 9;
+    const poZ = LM.postoffice[1] - LM_FACE.postoffice[1] * 9;
     placeGLB({
       url: 'assets/buudien.glb', name: 'Bưu điện trung tâm',
       x: poX, z: poZ,
-      rot: orientLong(LM_DIR.postoffice, LM_FACE.postoffice), size: 23,
+      rot: orientLong(LM_DIR.postoffice, LM_FACE.postoffice), size: 49,
     });
-    addCollider(poX, poZ, 11);
+    addCollider(poX, poZ, 22);
   }
 
   // ---------- BẢO TÀNG: GLB từ ảnh thật (tòa nhà vàng kem thật, không phải gạch đỏ) ----------
   placeGLB({
     url: 'assets/baotang.glb', name: 'Bảo tàng Hải Phòng',
     x: LM.museum[0], z: LM.museum[1],
-    rot: orientLong(LM_DIR.museum, LM_FACE.museum), size: 17,
+    rot: orientLong(LM_DIR.museum, LM_FACE.museum), size: 36,
   });
-  addCollider(LM.museum[0], LM.museum[1], 9);
+  addCollider(LM.museum[0], LM.museum[1], 18);
 
   // ---------- GA HẢI PHÒNG: GLB từ ảnh thật + đường ray & đoàn tàu phía sau ----------
   {
     placeGLB({
       url: 'assets/ga.glb', name: 'Ga Hải Phòng',
-      x: LM.station[0], z: LM.station[1] + 12, rot: 0, size: 26,
+      x: LM.station[0], z: LM.station[1] + 25, rot: 0, size: 55,
     });
-    addCollider(LM.station[0], LM.station[1] + 12, 13);
+    addCollider(LM.station[0], LM.station[1] + 25, 27);
     // sân ga + đường ray + đoàn tàu (sau lưng nhà ga, phía bắc)
     const g = new THREE.Group();
     const canopy = new THREE.Mesh(new THREE.BoxGeometry(30, 0.5, 8), mat(0x8a8f96));
@@ -948,9 +948,9 @@ export function buildWorld(scene) {
       const car = new THREE.Mesh(new THREE.BoxGeometry(8, 3, 2.5), mat(0x8fb03e));
       car.position.set(-4 + i * 9.5, 1.9, -13.7); g.add(car);
     }
-    g.position.set(LM.station[0], LAND_H, LM.station[1] + 14);
+    g.position.set(LM.station[0], LAND_H, LM.station[1] - 6);
     scene.add(g);
-    addCollider(LM.station[0], LM.station[1] + 2, 12);
+    addCollider(LM.station[0], LM.station[1] - 18, 14);
   }
 
   // ---------- CHỢ SẮT (khối lớn xanh xám + tháp tròn góc như tòa nhà thật) ----------
@@ -988,7 +988,7 @@ export function buildWorld(scene) {
     g.position.set(LM.market[0], LAND_H, LM.market[1]);
     g.rotation.y = thMk;
     scene.add(g);
-    addCollider(LM.market[0], LM.market[1], 17);
+    addCollider(LM.market[0], LM.market[1], 55);
     const [drX, drZ] = localPt(LM.market[0], LM.market[1], 14, 9, thMk); // tháp tròn góc
     addCollider(drX, drZ, 6);
   }
@@ -1023,7 +1023,7 @@ export function buildWorld(scene) {
     const g = bridgeGroup(b);
     bridgeDeckAndRails(g, b, 0xe8524a);
     const red = mat(0xd8402e);
-    const TILT = 0.24, RIB_X = 6.2, ARCH_H = 30, AS = 102; // vòm ôm nhịp chính giữa sông (thật: nhịp 200m)
+    const TILT = 0.24, RIB_X = 8.5, ARCH_H = 45, AS = 102; // 1:1 — nhịp chính 200m, vòm 45m
     for (const s of [-1, 1]) {
       const arcPts = [];
       for (let i = 0; i <= 24; i++) {
@@ -1402,7 +1402,7 @@ export function buildWorld(scene) {
       }
       for (const [px2, pz2] of placed) palm(px2, pz2);
     }
-    world.npcSpots.catba = [CBT[0] - 25, CBT[1] - 5];
+    world.npcSpots.catba = [CBT[0] - 60, CBT[1] - 12];
   }
 
   // núi đá vôi: rải theo lưới đất/biển thật của quần đảo
@@ -1491,11 +1491,11 @@ export function buildWorld(scene) {
       for (let i = 0; i < r.pts.length - 1; i++) {
         const [x1, z1] = r.pts[i], [x2, z2] = r.pts[i + 1];
         const mx = (x1 + x2) / 2, mz = (z1 + z2) / 2;
-        if (mx * mx + mz * mz > 300 * 300) continue;
+        if (mx * mx + mz * mz > 1350 * 1350) continue;
         const len = Math.hypot(x2 - x1, z2 - z1);
         const rotY = Math.atan2(x2 - x1, z2 - z1);
         const px = Math.cos(rotY), pz = -Math.sin(rotY);
-        for (let s = 20; s < len; s += 46) {
+        for (let s = 20; s < len; s += 46) {   // nhịp cây/đèn phố giữ cỡ người thật
           const t = s / len;
           sideFlip = -sideFlip;
           const off = sideFlip * (ROAD_W[r.c] / 2 + 3.4);
@@ -1545,15 +1545,15 @@ export function buildWorld(scene) {
     for (const p of (PARKS || [])) {
       let x1 = 1e9, x2 = -1e9, z1 = 1e9, z2 = -1e9;
       for (const [x, z] of p) { x1 = Math.min(x1, x); x2 = Math.max(x2, x); z1 = Math.min(z1, z); z2 = Math.max(z2, z); }
-      for (let gx = x1 + 8; gx < x2 && nPark < 90; gx += 17) {
-        for (let gz = z1 + 8; gz < z2 && nPark < 90; gz += 17) {
+      for (let gx = x1 + 8; gx < x2 && nPark < 260; gx += 17) {
+        for (let gz = z1 + 8; gz < z2 && nPark < 260; gz += 17) {
           const hash = Math.abs(Math.sin(gx * 2.17 + gz * 3.31) * 43758.54) % 1;
           if (hash > 0.55) continue;
           const jx = gx + (hash - 0.5) * 8, jz = gz + (hash * 7 % 1 - 0.5) * 8;
           if (!world.inPark(jx, jz)) continue;
           if (Math.abs(groundHeightNoDeck(jx, jz) - LAND_H) > 0.4) continue;
           if (riverFactor(jx, jz) > 0.01) continue;
-          if (lmPts.some(([lx, lz]) => (jx - lx) ** 2 + (jz - lz) ** 2 < 18 * 18)) continue;
+          if (lmPts.some(([lx, lz]) => (jx - lx) ** 2 + (jz - lz) ** 2 < 55 * 55)) continue;
           if (!freeSpot(jx, jz)) continue;
           if (hash < 0.12) palm(jx, jz); else phuongTree(jx, jz);
           nPark++;
@@ -1567,9 +1567,9 @@ export function buildWorld(scene) {
   placeGLB({
     url: 'assets/thptnq.glb', name: 'THPT Ngô Quyền',
     x: LM.thptnq[0], z: LM.thptnq[1],
-    rot: orientLong(LM_DIR.thptnq, LM_FACE.thptnq), size: 22,
+    rot: orientLong(LM_DIR.thptnq, LM_FACE.thptnq), size: 80,
   });
-  addCollider(LM.thptnq[0], LM.thptnq[1], 9);
+  addCollider(LM.thptnq[0], LM.thptnq[1], 32);
   // 2 trường THCS: khối lớp chữ U + sân + cột cờ + cổng bảng tên (chưa có ảnh kiến trúc đạt chuẩn)
   function schoolCompound(key, label) {
     const [sx, sz] = LM[key];
@@ -1594,42 +1594,42 @@ export function buildWorld(scene) {
       roof.rotation.y = rotL;
       g.add(roof);
     }
-    block(24, 7, 3, 0, -7);        // dãy chính (song song mặt phố, lùi sâu)
-    block(7, 12, 2, -10, 3);       // cánh trái
-    block(7, 12, 2, 10, 3);        // cánh phải
+    block(46, 11, 3, 0, -14);      // dãy chính (song song mặt phố, lùi sâu)
+    block(13, 22, 2, -20, 6);      // cánh trái
+    block(13, 22, 2, 20, 6);       // cánh phải
     // sân trường + cột cờ
-    const yard = new THREE.Mesh(new THREE.PlaneGeometry(22, 12), mat(0xcabfa8));
+    const yard = new THREE.Mesh(new THREE.PlaneGeometry(42, 24), mat(0xcabfa8));
     yard.rotation.x = -Math.PI / 2;
-    yard.position.set(0, 0.06, 4);
+    yard.position.set(0, 0.06, 8);
     g.add(yard);
     const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.12, 9, 6), mat(0xd8d8d8));
-    pole.position.set(0, 4.5, 2); g.add(pole);
+    pole.position.set(0, 4.5, 4); g.add(pole);
     const fl = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 1.4),
       new THREE.MeshLambertMaterial({ color: 0xd8332a, side: THREE.DoubleSide }));
-    fl.position.set(1.1, 8.2, 2); g.add(fl);
+    fl.position.set(1.1, 8.2, 4); g.add(fl);
     updaters.push((dt, time) => { fl.rotation.y = Math.sin(time * 1.7 + sx) * 0.35; });
     // cổng + bảng tên quay ra phố (local +z)
-    for (const gx of [-3.4, 3.4]) {
+    for (const gx of [-4.4, 4.4]) {
       const post = new THREE.Mesh(new THREE.BoxGeometry(0.9, 3.6, 0.9), trimM);
-      post.position.set(gx, 1.8, 11); g.add(post);
+      post.position.set(gx, 1.8, 21); g.add(post);
     }
     const lintel = new THREE.Mesh(new THREE.BoxGeometry(7.8, 1.2, 1),
       new THREE.MeshLambertMaterial({ map: signTexture(label, '#28457d', '#ffe9b8') }));
-    lintel.position.set(0, 3.9, 11); g.add(lintel);
+    lintel.position.set(0, 3.9, 21); g.add(lintel);
     // tường rào thấp hai bên cổng
     for (const side of [-1, 1]) {
-      const fence = new THREE.Mesh(new THREE.BoxGeometry(9, 1.4, 0.4), wallM);
-      fence.position.set(side * 8.4, 0.7, 11); g.add(fence);
+      const fence = new THREE.Mesh(new THREE.BoxGeometry(17, 1.4, 0.4), wallM);
+      fence.position.set(side * 14.5, 0.7, 21); g.add(fence);
     }
     g.position.set(sx, LAND_H, sz);
     g.rotation.y = th;
     scene.add(g);
     addCollider(sx, sz, 3);
-    const [b1x, b1z] = localPt(sx, sz, 0, -7, th);
-    addCollider(b1x, b1z, 12);
-    for (const wingX of [-10, 10]) {
-      const [wx, wz] = localPt(sx, sz, wingX, 3, th);
-      addCollider(wx, wz, 5.5);
+    const [b1x, b1z] = localPt(sx, sz, 0, -14, th);
+    addCollider(b1x, b1z, 24);
+    for (const wingX of [-20, 20]) {
+      const [wx, wz] = localPt(sx, sz, wingX, 6, th);
+      addCollider(wx, wz, 11);
     }
   }
   schoolCompound('thcsnq', 'THCS NGÔ QUYỀN');
@@ -1640,41 +1640,41 @@ export function buildWorld(scene) {
   placeGLB({
     url: 'assets/dennghe.glb', name: 'Đền Nghè',
     x: LM.dennghe[0], z: LM.dennghe[1],
-    rot: orientFace(LM_FACE.dennghe), size: 11,
+    rot: orientFace(LM_FACE.dennghe), size: 22,
   });
-  addCollider(LM.dennghe[0], LM.dennghe[1], 6);
+  addCollider(LM.dennghe[0], LM.dennghe[1], 11);
 
   // Đình Hàng Kênh — đình cổ 300 năm, footprint OSM
   placeGLB({
     url: 'assets/dinhhk.glb', name: 'Đình Hàng Kênh',
     x: LM.dinhhk[0], z: LM.dinhhk[1],
-    rot: orientLong(LM_DIR.dinhhk, LM_FACE.dinhhk), size: 16,
+    rot: orientLong(LM_DIR.dinhhk, LM_FACE.dinhhk), size: 30,
   });
-  addCollider(LM.dinhhk[0], LM.dinhhk[1], 8);
+  addCollider(LM.dinhhk[0], LM.dinhhk[1], 15);
 
   // Chùa Dư Hàng (Phúc Lâm tự) — gác chuông 3 tầng mái
   placeGLB({
     url: 'assets/chuahang.glb', name: 'Chùa Dư Hàng',
     x: LM.chuahang[0], z: LM.chuahang[1],
-    rot: orientLong(LM_DIR.chuahang, LM_FACE.chuahang), size: 12,
+    rot: orientLong(LM_DIR.chuahang, LM_FACE.chuahang), size: 25,
   });
-  addCollider(LM.chuahang[0], LM.chuahang[1], 6.5);
+  addCollider(LM.chuahang[0], LM.chuahang[1], 12);
 
   // Ngân hàng Nhà nước — tân cổ điển Pháp đá granite (ảnh Commons, dựng mirror nửa trái)
   placeGLB({
     url: 'assets/nhnn.glb', name: 'Ngân hàng Nhà nước',
     x: LM.nhnn[0], z: LM.nhnn[1],
-    rot: orientLong(LM_DIR.nhnn, LM_FACE.nhnn), size: 18,
+    rot: orientLong(LM_DIR.nhnn, LM_FACE.nhnn), size: 63,
   });
-  addCollider(LM.nhnn[0], LM.nhnn[1], 9);
+  addCollider(LM.nhnn[0], LM.nhnn[1], 28);
 
   // Đền Tam Kỳ — thờ Quan lớn Tuần Tranh, bên hồ Tam Bạc
   placeGLB({
     url: 'assets/dentamky.glb', name: 'Đền Tam Kỳ',
     x: LM.dentamky[0], z: LM.dentamky[1],
-    rot: orientLong(LM_DIR.dentamky, LM_FACE.dentamky), size: 12,
+    rot: orientLong(LM_DIR.dentamky, LM_FACE.dentamky), size: 22,
   });
-  addCollider(LM.dentamky[0], LM.dentamky[1], 6.5);
+  addCollider(LM.dentamky[0], LM.dentamky[1], 11);
 
   // ---------- ĐỢT ĐỊA DANH 2: procedural (chưa có ảnh đạt chuẩn) ----------
   // UBND TP — khối Pháp cổ 3 tầng kem, mái đỏ, trán giữa + cờ
@@ -1683,60 +1683,59 @@ export function buildWorld(scene) {
     const th = orientLong(LM_DIR.ubnd, LM_FACE.ubnd);
     const g = new THREE.Group();
     const wallM = mat(0xf3e3bc), trimM = mat(0xfdf8ea);
-    const main = new THREE.Mesh(new THREE.BoxGeometry(22, 11, 9), wallM);
-    main.position.y = 5.5; g.add(main);
-    for (let f = 0; f < 3; f++) {
-      const strip = new THREE.Mesh(new THREE.BoxGeometry(22.15, 1.4, 9.15), sharedMats.window);
+    const main = new THREE.Mesh(new THREE.BoxGeometry(48, 14, 16), wallM);
+    main.position.y = 7; g.add(main);
+    for (let f = 0; f < 4; f++) {
+      const strip = new THREE.Mesh(new THREE.BoxGeometry(48.15, 1.5, 16.15), sharedMats.window);
       strip.position.y = 2.4 + f * 3.4; g.add(strip);
     }
-    const roof = new THREE.Mesh(new THREE.BoxGeometry(23.4, 1.1, 10.4), mat(0xa04a34));
-    roof.position.y = 11.5; g.add(roof);
-    const porch = new THREE.Mesh(new THREE.BoxGeometry(8, 12.4, 1.6), trimM);
-    porch.position.set(0, 6.2, 4.6); g.add(porch);
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(50, 1.3, 17.6), mat(0xa04a34));
+    roof.position.y = 14.6; g.add(roof);
+    const porch = new THREE.Mesh(new THREE.BoxGeometry(14, 15.6, 2.2), trimM);
+    porch.position.set(0, 7.8, 8.6); g.add(porch);
     const ped = new THREE.Mesh(new THREE.CylinderGeometry(0, 4.6, 2.2, 4, 1), mat(0xa04a34));
     ped.rotation.y = Math.PI / 4; ped.scale.z = 0.35;
-    ped.position.set(0, 13.4, 4.6); g.add(ped);
+    ped.position.set(0, 16.8, 8.6); g.add(ped);
     const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 6, 6), mat(0xd8d8d8));
-    pole.position.set(0, 16, 4.2); g.add(pole);
+    pole.position.set(0, 19.6, 8.2); g.add(pole);
     const fl = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 1.5),
       new THREE.MeshLambertMaterial({ color: 0xd8332a, side: THREE.DoubleSide }));
-    fl.position.set(1.2, 18.4, 4.2); g.add(fl);
+    fl.position.set(1.2, 22, 8.2); g.add(fl);
     updaters.push((dt, time) => { fl.rotation.y = Math.sin(time * 1.6 + 7) * 0.35; });
     const sign = new THREE.Mesh(new THREE.BoxGeometry(10, 1.1, 0.3),
       new THREE.MeshLambertMaterial({ map: signTexture('UBND THÀNH PHỐ', '#7a1f1f', '#ffe9b8') }));
-    sign.position.set(0, 10.2, 5.5); g.add(sign);
+    sign.position.set(0, 12.6, 9.4); g.add(sign);
     g.position.set(ux, LAND_H, uz);
     g.rotation.y = th;
     scene.add(g);
-    addCollider(ux, uz, 11);
+    addCollider(ux, uz, 27);
   }
 
   // Rạp Tháng Tám — rạp chiếu bóng art-deco: mặt tiền kem + bảng dọc đỏ
   {
-    // dịch 9 đơn vị về đông: nhà hát hiển thị phóng 2.5× nên footprint thật bị lấn
-    const [rx, rz] = [LM.rap78[0] + 9, LM.rap78[1] - 3];
+    const [rx, rz] = LM.rap78;   // 1:1 — footprint thật, hết lấn nhau
     const th = orientLong(LM_DIR.rap78, LM_FACE.rap78);
     const g = new THREE.Group();
-    const hall = new THREE.Mesh(new THREE.BoxGeometry(13, 8, 16), mat(0xe8dbb8));
-    hall.position.set(0, 4, -3); g.add(hall);
-    const front = new THREE.Mesh(new THREE.BoxGeometry(14, 10, 2), mat(0xf3ead0));
-    front.position.set(0, 5, 5.6); g.add(front);
-    const marquee = new THREE.Mesh(new THREE.BoxGeometry(11, 0.5, 3), mat(0x8a2f26));
-    marquee.position.set(0, 4.2, 7.4); g.add(marquee);
+    const hall = new THREE.Mesh(new THREE.BoxGeometry(22, 10, 30), mat(0xe8dbb8));
+    hall.position.set(0, 5, -6); g.add(hall);
+    const front = new THREE.Mesh(new THREE.BoxGeometry(24, 12, 2.4), mat(0xf3ead0));
+    front.position.set(0, 6, 10.2); g.add(front);
+    const marquee = new THREE.Mesh(new THREE.BoxGeometry(18, 0.6, 4), mat(0x8a2f26));
+    marquee.position.set(0, 4.5, 12.8); g.add(marquee);
     const tower = new THREE.Mesh(new THREE.BoxGeometry(2.2, 12.5, 1.2),
       new THREE.MeshLambertMaterial({ color: 0xc03428 }));
-    tower.position.set(4.2, 6.25, 6.2); g.add(tower);
+    tower.position.set(7.5, 7.5, 11); g.add(tower);
     const sign = new THREE.Mesh(new THREE.BoxGeometry(8.5, 1.2, 0.3),
       new THREE.MeshLambertMaterial({ map: signTexture('RẠP THÁNG 8', '#c03428', '#ffe9b8') }));
-    sign.position.set(0, 8.6, 6.8); g.add(sign);
-    for (const dx of [-4, -1.4, 1.4]) {
-      const door = new THREE.Mesh(new THREE.BoxGeometry(1.8, 3, 0.3), mat(0x5a3620));
-      door.position.set(dx, 1.5, 6.7); g.add(door);
+    sign.position.set(0, 10.2, 11.6); g.add(sign);
+    for (const dx of [-6, -2, 2]) {
+      const door = new THREE.Mesh(new THREE.BoxGeometry(2.2, 3, 0.3), mat(0x5a3620));
+      door.position.set(dx, 1.5, 11.5); g.add(door);
     }
     g.position.set(rx, LAND_H, rz);
     g.rotation.y = th;
     scene.add(g);
-    addCollider(rx, rz, 8);
+    addCollider(rx, rz, 17);
   }
 
   // Nhà Kèn — lầu bát giác vườn hoa Nguyễn Du (Pháp xây 1920s, nơi đội kèn diễn tấu)
@@ -1780,9 +1779,9 @@ export function buildWorld(scene) {
       scene.add(b);
     }
     // ven hồ Tam Bạc (bờ nam, ngoài lòng hồ đào) + mép quảng trường Nhà hát lớn
-    bench(LM.lake[0] - 20, LM.lake[1] + 33, 0); bench(LM.lake[0], LM.lake[1] + 34, 0); bench(LM.lake[0] + 20, LM.lake[1] + 35, 0);
+    bench(LM.lake[0] - 90, LM.lake[1] + 88, 0); bench(LM.lake[0], LM.lake[1] + 70, 0); bench(LM.lake[0] + 90, LM.lake[1] + 52, 0);
     const [ftX2, ftZ2] = EXTRAS.fountain;
-    bench(ftX2 - 12, ftZ2 + 10, Math.PI); bench(ftX2 + 12, ftZ2 + 10, Math.PI);
+    bench(ftX2 - 24, ftZ2 + 20, Math.PI); bench(ftX2 + 24, ftZ2 + 20, Math.PI);
   }
 
   // ---------- NỘI THẤT ĐƯỜNG PHỐ (từ dữ liệu OSM: STREETS/INTERSECTIONS/MEDIANS) ----------
@@ -1917,14 +1916,14 @@ export function buildWorld(scene) {
         g.rotation.y = rot + Math.sin(time * 0.13 + ph) * 0.4;
       });
     }
-    swan(LM.lake[0] + 6, LM.lake[1] - 1, 0.6);
-    swan(LM.lake[0] + 44, LM.lake[1] - 9, -1.2);
-    swan(LM.lake[0] + 90, LM.lake[1] - 18, 2.1);
+    swan(LM.lake[0] + 60, LM.lake[1] - 12, 0.6);
+    swan(LM.lake[0] + 250, LM.lake[1] - 52, -1.2);
+    swan(LM.lake[0] + 480, LM.lake[1] - 100, 2.1);
 
     // 6) Dây đèn đêm dải trung tâm: quảng trường → đầu đông hồ Tam Bạc
     {
       const bulbM = new THREE.MeshBasicMaterial({ color: 0xffd98a });
-      const p0 = [EXTRAS.square[0] - 6, EXTRAS.square[1] + 6], p1 = [-96, 44];
+      const p0 = [EXTRAS.square[0] - 10, EXTRAS.square[1] + 10], p1 = [-430, 195];
       const L = Math.hypot(p1[0] - p0[0], p1[1] - p0[1]);
       const d = [(p1[0] - p0[0]) / L, (p1[1] - p0[1]) / L];
       const step = 16;
@@ -1975,7 +1974,7 @@ export function buildWorld(scene) {
       for (let i = 0; i < r.pts.length - 1 && flowerSpots.length < 10; i++) {
         const [x1, z1] = r.pts[i], [x2, z2] = r.pts[i + 1];
         const mx = (x1 + x2) / 2, mz = (z1 + z2) / 2;
-        if (mx * mx + mz * mz > 280 * 280) continue;
+        if (mx * mx + mz * mz > 900 * 900) continue;
         const rotY = Math.atan2(x2 - x1, z2 - z1);
         tryAdd(mx + Math.cos(rotY) * 7.5, mz - Math.sin(rotY) * 7.5);
       }
@@ -2059,8 +2058,8 @@ export function buildWorld(scene) {
   world.vehicleSpawns.push({ type: 'motorbike', x: LM.opera[0] + 32, z: LM.opera[1] + 4, heading: Math.PI / 2 });
   world.vehicleSpawns.push({ type: 'cyclo', x: LM.lechan[0] + 14, z: LM.lechan[1] + 8, heading: Math.PI / 2 });
   world.npcSpots.guide = [EXTRAS.fountain[0] + 9, EXTRAS.fountain[1] + 5];
-  world.npcSpots.coba = [LM.lake[0] - 8, LM.lake[1] + 34];
-  world.npcSpots.xichlo = [LM.quanhoa[0] - 14, LM.quanhoa[1] + 10];
+  world.npcSpots.coba = [LM.lake[0] - 20, LM.lake[1] + 62];
+  world.npcSpots.xichlo = [LM.quanhoa[0] - 26, LM.quanhoa[1] + 18];
   world.npcSpots.florist = [LM.quanhoa[0] + 6, LM.quanhoa[1] - 1];
 
   // ---------- Nhãn chữ nổi ----------
