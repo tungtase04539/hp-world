@@ -1,36 +1,39 @@
-// MAIN world — chạy trên instantstreetview.com, TÁI DÙNG Google Maps mà trang đã nạp
-// (không cần API key riêng). Tạo 1 panorama phủ toàn trang, tự lái xoay 360° từng tọa độ,
-// nhờ bridge.js (ISOLATED) gọi chrome.tabs.captureVisibleTab để chụp.
+// MAIN world — CÁCH B: điều hướng thẳng URL instantstreetview.com cho từng (pano × góc)
+// rồi chụp CHÍNH ảnh trang đang hiển thị (không tạo panorama riêng → hết màn đen).
+// Trạng thái lưu qua mỗi lần reload nhờ bridge.js (chrome.storage).
 (function () {
   if (window.__hpCapLoaded) return; window.__hpCapLoaded = true;
   const WAYPOINTS = window.HP_WAYPOINTS || [];
 
-  // ---- cầu nối tới bridge.js (ISOLATED) ----
+  // ---- cầu nối tới bridge.js (ISOLATED) — có kèm timeout để không treo nếu bridge chưa sẵn ----
   let msgId = 0; const pending = {};
-  function bridge(type, payload) {
-    return new Promise((resolve) => { const id = ++msgId; pending[id] = resolve; window.postMessage({ source: 'hp-cap-req', id, type, payload }, '*'); });
+  function bridge(type, payload, timeout = 20000) {
+    return new Promise((resolve) => {
+      const id = ++msgId; pending[id] = resolve;
+      window.postMessage({ source: 'hp-cap-req', id, type, payload }, '*');
+      setTimeout(() => { if (pending[id]) { delete pending[id]; resolve({ ok: false, timeout: true }); } }, timeout);
+    });
   }
   window.addEventListener('message', (e) => {
     if (e.source !== window || !e.data || e.data.source !== 'hp-cap-res') return;
     const p = pending[e.data.id]; if (p) { p(e.data.result); delete pending[e.data.id]; }
   });
-
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-  // ---- UI panel ----
+  // ---- UI panel (góc trên-PHẢI để không đè ô tìm kiếm của trang) ----
   const panel = document.createElement('div');
   panel.id = 'hp-cap-panel';
   panel.innerHTML = `
     <style>
-      #hp-cap-panel{position:fixed;top:12px;left:12px;z-index:2147483647;width:310px;max-height:94vh;overflow:auto;
-        background:rgba(18,22,26,.95);color:#eef;border-radius:12px;padding:13px 15px;font:13px/1.5 system-ui,Arial;box-shadow:0 6px 24px rgba(0,0,0,.55)}
+      #hp-cap-panel{position:fixed;top:12px;right:12px;z-index:2147483647;width:310px;max-height:94vh;overflow:auto;
+        background:rgba(18,22,26,.96);color:#eef;border-radius:12px;padding:13px 15px;font:13px/1.5 system-ui,Arial;box-shadow:0 6px 24px rgba(0,0,0,.55)}
       #hp-cap-panel h1{font-size:15px;margin:0 0 6px}
       #hp-cap-panel label{display:block;margin:7px 0 2px;color:#9fb3c8}
       #hp-cap-panel input{width:100%;box-sizing:border-box;padding:6px 8px;border-radius:7px;border:1px solid #3a4653;background:#0e1418;color:#eef}
       #hp-cap-panel .row{display:flex;gap:8px}#hp-cap-panel .row>div{flex:1}
       #hp-cap-panel button{margin-top:10px;width:100%;padding:9px;border:0;border-radius:8px;font-weight:600;cursor:pointer}
       #hp-cap-start{background:#2e9c56;color:#fff}#hp-cap-stop{background:#b5423a;color:#fff}
-      #hp-cap-log{margin-top:9px;font:11px/1.45 ui-monospace,monospace;white-space:pre-wrap;max-height:32vh;overflow:auto;background:#0b0f13;padding:8px;border-radius:7px;color:#bfe}
+      #hp-cap-log{margin-top:9px;font:11px/1.45 ui-monospace,monospace;white-space:pre-wrap;max-height:34vh;overflow:auto;background:#0b0f13;padding:8px;border-radius:7px;color:#bfe}
       #hp-cap-panel .muted{color:#7f93a8}
     </style>
     <h1>🌺 Chụp Street View — Dải trung tâm HP</h1>
@@ -40,109 +43,112 @@
       <div><label>Pitch (°, cách ,)</label><input id="hp-pit" value="0"></div>
     </div>
     <div class="row">
-      <div><label>Chờ tile (ms)</label><input id="hp-tw" type="number" value="1300"></div>
-      <div><label>Nghỉ/ảnh (ms)</label><input id="hp-gap" type="number" value="550"></div>
+      <div><label>Chờ tải trang (ms)</label><input id="hp-lw" type="number" value="3500"></div>
+      <div><label>Bán kính pano (m)</label><input id="hp-rad" type="number" value="70"></div>
     </div>
-    <label>Bán kính tìm pano (m)</label><input id="hp-rad" type="number" value="70">
     <button id="hp-cap-start">▶ Bắt đầu chụp</button>
     <button id="hp-cap-stop" style="display:none">■ Dừng</button>
     <div id="hp-cap-log"></div>
-    <div class="muted" style="margin-top:8px">Ảnh → <b>Downloads/hp-streetview/</b> + <b>manifest.json</b>. Đừng chuyển tab khi đang chụp.</div>`;
-  const mount = () => { document.body.appendChild(panel); };
+    <div class="muted" style="margin-top:8px">Cách B: mỗi góc trang sẽ tự nhảy URL & tải lại rồi chụp. <b>Đừng chuyển tab.</b> Ảnh → <b>Downloads/hp-streetview/</b>.</div>`;
+  const mount = () => document.body.appendChild(panel);
   if (document.body) mount(); else window.addEventListener('DOMContentLoaded', mount);
-
   const $ = (id) => panel.querySelector('#' + id);
   const logEl = () => $('hp-cap-log');
-  function log(m) { const t = new Date().toLocaleTimeString(); logEl().textContent = `[${t}] ${m}\n` + logEl().textContent; }
+  function log(m) { const t = new Date().toLocaleTimeString(); if (logEl()) logEl().textContent = `[${t}] ${m}\n` + logEl().textContent; }
   $('hp-wp').textContent = `${WAYPOINTS.length} tọa độ (bám đường thật OSM)`;
 
-  // panorama phủ toàn trang (che panorama của site)
-  let capDiv, pano, svc, stopFlag = false, running = false;
-  function ensurePano() {
-    if (pano) return true;
-    if (!(window.google && google.maps && google.maps.StreetViewPanorama)) return false;
-    capDiv = document.createElement('div');
-    capDiv.id = 'hp-cap-pano';
-    capDiv.style.cssText = 'position:fixed;inset:0;z-index:2147483000;background:#111';
-    document.body.appendChild(capDiv);
-    pano = new google.maps.StreetViewPanorama(capDiv, {
-      pov: { heading: 0, pitch: 0 }, zoom: 1, visible: true, motionTracking: false, showRoadLabels: false,
-      disableDefaultUI: true, addressControl: false, linksControl: false, panControl: false,
-      zoomControl: false, fullscreenControl: false, clickToGo: false, scrollwheel: false,
-    });
-    svc = new google.maps.StreetViewService();
-    // đảm bảo panel nổi trên panorama
-    panel.style.zIndex = '2147483647';
-    log('pano API: ' + ['setPano', 'setPov', 'setPosition', 'setOptions'].map((m) => m + '=' + typeof pano[m]).join(' '));
+  let stopFlag = false;
+  const urlFor = (j) => `https://www.instantstreetview.com/@${j.lat},${j.lng},${j.heading}h,${j.pitch}p,0z,${j.panoId}`;
+
+  async function waitMaps(timeout = 20000) {
+    const t0 = Date.now();
+    while (!(window.google && google.maps && google.maps.StreetViewService)) {
+      if (Date.now() - t0 > timeout) return false; await sleep(300);
+    }
     return true;
   }
-  // vài bản Maps JS (instantstreetview) không expose setPano/setPov trực tiếp → fallback setPosition/setOptions
-  function setPanoId(id, latLng) {
-    if (typeof pano.setPano === 'function') pano.setPano(id);
-    else if (latLng && typeof pano.setPosition === 'function') pano.setPosition(latLng);
-    else pano.setOptions({ pano: id });
-  }
-  function setPovSafe(pov) { if (typeof pano.setPov === 'function') pano.setPov(pov); else pano.setOptions({ pov }); }
+  const getPano = (svc, req) => new Promise((res, rej) => svc.getPanorama(req, (d, s) => (s === 'OK' ? res(d) : rej(s))));
 
-  const getPano = (req) => new Promise((res, rej) => svc.getPanorama(req, (d, s) => (s === 'OK' ? res(d) : rej(s))));
-  function waitPano(wantId, timeout = 4000) {
-    return new Promise((resolve) => {
-      let done = false; const fin = () => { if (!done) { done = true; resolve(); } };
-      const l = pano.addListener('pano_changed', () => { if (pano.getPano() === wantId) { google.maps.event.removeListener(l); fin(); } });
-      setTimeout(() => { google.maps.event.removeListener(l); fin(); }, timeout);
-    });
-  }
-  async function capture(filename) {
-    panel.style.visibility = 'hidden'; await sleep(80);
-    const res = await bridge('capture', { filename });
-    panel.style.visibility = 'visible';
-    return res;
-  }
-
-  async function run() {
-    if (running) return;
-    if (!ensurePano()) { log('❌ Trang chưa nạp xong Google Maps — chờ vài giây rồi bấm lại.'); return; }
-    running = true; stopFlag = false;
+  // ---------- PHA 1: dò các pano có Street View rồi bắt đầu ----------
+  async function startRun() {
+    stopFlag = false;
     $('hp-cap-start').style.display = 'none'; $('hp-cap-stop').style.display = 'block';
     const nH = Math.max(4, Math.min(24, +$('hp-nh').value || 8));
     const pitches = ($('hp-pit').value || '0').split(',').map((s) => +s.trim()).filter((v) => !isNaN(v));
-    const tileWait = +$('hp-tw').value || 1300, gap = +$('hp-gap').value || 550, radius = +$('hp-rad').value || 70;
+    const loadWait = +$('hp-lw').value || 3500, radius = +$('hp-rad').value || 70;
     const headings = Array.from({ length: nH }, (_, i) => Math.round((360 / nH) * i));
-    const manifest = []; let covered = 0, shots = 0; const seen = new Set();
-    log(`Bắt đầu quét ${WAYPOINTS.length} tọa độ…`);
 
+    log('Đang dò vùng có Street View (StreetViewService)…');
+    if (!await waitMaps()) { log('❌ Trang chưa nạp Google Maps — chờ ảnh street view hiện rồi bấm lại.'); reset(); return; }
+    const svc = new google.maps.StreetViewService();
+    const seen = new Set(); const panos = [];
     for (let i = 0; i < WAYPOINTS.length && !stopFlag; i++) {
-      const wp = WAYPOINTS[i];
-      let data;
-      try { data = await getPano({ location: wp, radius, source: 'outdoor', preference: 'nearest' }); }
-      catch (s) { continue; } // không có Street View ở điểm này
-      const panoId = data.location.pano;
-      if (seen.has(panoId)) continue; seen.add(panoId); covered++;
-      const pos = data.location.latLng;
-      setPanoId(panoId, pos); await waitPano(panoId); await sleep(tileWait);
-      for (const pitch of pitches) {
-        for (const heading of headings) {
-          if (stopFlag) break;
-          setPovSafe({ heading, pitch }); await sleep(tileWait);
-          const file = `pano_${String(covered).padStart(3, '0')}_h${String(heading).padStart(3, '0')}_p${pitch}.jpg`;
-          const res = await capture(file);
-          if (res && res.ok) {
-            shots++;
-            manifest.push({ file, reqLat: wp.lat, reqLng: wp.lng, panoId,
-              panoLat: +pos.lat().toFixed(7), panoLng: +pos.lng().toFixed(7), heading, pitch, zoom: 1,
-              date: data.imageDate || '', copyright: data.copyright || '' });
-          } else { log('⚠ lỗi chụp ' + file + ' — ' + (res && res.error)); }
-          await sleep(gap);
-        }
-      }
-      log(`✓ pano #${covered} (điểm ${i + 1}/${WAYPOINTS.length}) — ${shots} ảnh`);
-      if (covered % 10 === 0) await bridge('saveText', { filename: 'manifest.json', text: JSON.stringify(manifest, null, 2) });
+      let d; try { d = await getPano(svc, { location: WAYPOINTS[i], radius, source: 'outdoor', preference: 'nearest' }); } catch (e) { continue; }
+      const id = d.location.pano; if (seen.has(id)) continue; seen.add(id);
+      panos.push({ panoId: id, lat: +d.location.latLng.lat().toFixed(7), lng: +d.location.latLng.lng().toFixed(7),
+        reqLat: WAYPOINTS[i].lat, reqLng: WAYPOINTS[i].lng, date: d.imageDate || '', copyright: d.copyright || '' });
+      if (i % 50 === 0) log(`…dò ${i}/${WAYPOINTS.length}, thấy ${panos.length} pano`);
     }
-    await bridge('saveText', { filename: 'manifest.json', text: JSON.stringify(manifest, null, 2) });
-    log(`🏁 XONG. ${covered} pano, ${shots} ảnh → Downloads/hp-streetview/.`);
-    running = false; $('hp-cap-start').style.display = 'block'; $('hp-cap-stop').style.display = 'none';
+    if (stopFlag) { reset(); return; }
+    if (!panos.length) { log('⚠ Không thấy Street View nào ở dải trung tâm (Hải Phòng có thể chưa phủ).'); reset(); return; }
+
+    const jobs = [];
+    panos.forEach((p, pi) => { for (const pitch of pitches) for (const heading of headings) {
+      jobs.push({ panoId: p.panoId, lat: p.lat, lng: p.lng, reqLat: p.reqLat, reqLng: p.reqLng, heading, pitch,
+        date: p.date, copyright: p.copyright, file: `pano_${String(pi + 1).padStart(3, '0')}_h${String(heading).padStart(3, '0')}_p${pitch}.jpg` });
+    } });
+    const state = { active: true, idx: 0, total: jobs.length, nPano: panos.length, loadWait, jobs, manifest: [] };
+    await bridge('setState', { state });
+    log(`Tìm thấy ${panos.length} pano → ${jobs.length} ảnh. Bắt đầu (điều hướng URL)…`);
+    await sleep(400);
+    location.href = urlFor(jobs[0]);   // rời trang → content script sẽ tự chạy PHA 2 sau khi tải lại
   }
 
-  $('hp-cap-start').addEventListener('click', run);
-  $('hp-cap-stop').addEventListener('click', () => { stopFlag = true; log('■ Đang dừng…'); });
+  // ---------- PHA 2: mỗi lần tải lại, trang đang ở view của jobs[idx] → chụp rồi sang cái kế ----------
+  async function continueRun(state) {
+    $('hp-cap-start').style.display = 'none'; $('hp-cap-stop').style.display = 'block';
+    const job = state.jobs[state.idx];
+    log(`Đang tải view ${state.idx + 1}/${state.total} (chờ ${state.loadWait}ms)…`);
+    await sleep(state.loadWait || 3500);
+    if (stopFlag) return;
+    panel.style.visibility = 'hidden'; await sleep(90);
+    const res = await bridge('capture', { filename: job.file });
+    panel.style.visibility = 'visible';
+    if (res && res.ok) {
+      state.manifest.push({ file: job.file, reqLat: job.reqLat, reqLng: job.reqLng, panoId: job.panoId,
+        panoLat: job.lat, panoLng: job.lng, heading: job.heading, pitch: job.pitch, zoom: 0, date: job.date, copyright: job.copyright });
+      log(`✓ ${state.idx + 1}/${state.total} ${job.file}`);
+    } else { log(`⚠ lỗi chụp ${job.file} — ${res && (res.error || (res.timeout && 'timeout'))}`); }
+
+    state.idx++;
+    if (state.idx % 10 === 0 || state.idx >= state.total) {
+      await bridge('saveText', { filename: 'manifest.json', text: JSON.stringify(state.manifest, null, 2) });
+    }
+    if (state.idx >= state.total) {
+      await bridge('clearState');
+      log(`🏁 XONG. ${state.manifest.length} ảnh từ ${state.nPano} pano → Downloads/hp-streetview/.`);
+      $('hp-cap-start').style.display = 'block'; $('hp-cap-stop').style.display = 'none';
+      return;
+    }
+    await bridge('setState', { state });
+    await sleep(250);
+    location.href = urlFor(state.jobs[state.idx]);
+  }
+
+  function reset() { $('hp-cap-start').style.display = 'block'; $('hp-cap-stop').style.display = 'none'; }
+
+  $('hp-cap-start').addEventListener('click', startRun);
+  $('hp-cap-stop').addEventListener('click', async () => {
+    stopFlag = true; log('■ Dừng — lưu manifest…');
+    const r = await bridge('getState');
+    if (r && r.state) { await bridge('saveText', { filename: 'manifest.json', text: JSON.stringify(r.state.manifest || [], null, 2) }); await bridge('clearState'); }
+    reset();
+  });
+
+  // Khi trang tải: nếu đang có phiên chụp dở → tự chạy PHA 2 (không cần bấm lại)
+  (async () => {
+    let r;
+    for (let k = 0; k < 12; k++) { r = await bridge('getState', null, 1500); if (r && !r.timeout) break; await sleep(300); }
+    if (r && r.state && r.state.active) continueRun(r.state);
+  })();
 })();

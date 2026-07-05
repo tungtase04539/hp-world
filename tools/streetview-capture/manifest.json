@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "HP Street View Capturer",
-  "version": "2.0.2",
+  "version": "3.0.0",
   "description": "Chụp Street View 360° dải trung tâm Hải Phòng NGAY TRÊN instantstreetview.com (không cần API key) — mỗi ảnh gắn tọa độ + góc quay.",
   "permissions": ["tabs", "downloads", "storage", "activeTab"],
   "host_permissions": ["<all_urls>"],

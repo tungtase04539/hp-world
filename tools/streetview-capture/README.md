@@ -26,11 +26,21 @@ Chạy trên **máy của bạn** (nơi vào được Street View); máy chủ C
 > Không cần API key vì extension dùng lại Google Maps mà instantstreetview đã tải sẵn.
 > Hải Phòng có thể thưa Street View — extension chụp hết chỗ có phủ, tự bỏ điểm trống.
 
-## Kiến trúc (vì sao 2 file JS chạy trên trang)
-- `page.js` (world **MAIN**): chạy cùng ngữ cảnh trang → dùng được `google.maps` đã nạp; tạo panorama
-  phủ toàn trang, lái POV, vòng lặp chụp, chèn bảng điều khiển.
-- `bridge.js` (world **ISOLATED**): chỉ world này có `chrome.*`; nhận lệnh của page.js qua
-  `postMessage` rồi gọi `background.js` để `captureVisibleTab` + tải file.
+## Cách chạy (CÁCH B — chắc ăn, điều hướng URL)
+Từ v3, extension **không tạo panorama riêng** (tránh màn đen). Thay vào đó:
+1. **Pha 1** (không tải lại): dùng `google.maps.StreetViewService` của trang dò 446 tọa độ → lọc ra
+   các **pano có Street View** thật (bỏ điểm trống), dựng danh sách công việc = pano × góc × pitch.
+2. **Pha 2**: lần lượt **đổi URL** `.../@lat,lng,{heading}h,{pitch}p,0z,{panoId}` → trang **tự tải lại**
+   và hiện đúng view đó → chờ `Chờ tải trang (ms)` → **chụp chính ảnh trang đang hiển thị** → sang cái kế.
+   Tiến trình lưu qua mỗi lần tải lại (chrome.storage) nên tự chạy tiếp, không cần bấm lại.
+
+> Vì mỗi ảnh là 1 lần tải lại trang nên **chậm** (vài giây/ảnh) nhưng **chắc chắn đúng ảnh trang hiện**.
+> Muốn nhanh: giảm **Số góc/vòng** xuống 4–6. **Đừng chuyển tab** khi đang chạy.
+
+## Kiến trúc file
+- `page.js` (world **MAIN**): dùng `google.maps` của trang (Pha 1), điều hướng URL + vòng chụp, bảng điều khiển.
+- `bridge.js` (world **ISOLATED**, chỉ world này có `chrome.*`): lưu/đọc tiến trình (`chrome.storage`) và
+  chuyển lệnh `captureVisibleTab`/tải file sang `background.js` qua `postMessage`.
 - `background.js`: service worker — chụp tab + `downloads`; mở instantstreetview khi bấm icon.
 - `coords.js`: 446 tọa độ bám đường thật (gán `window.HP_WAYPOINTS`).
 
