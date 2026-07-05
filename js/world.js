@@ -1461,27 +1461,52 @@ export function buildWorld(scene) {
   }
 
   // ---------- Cây phượng dải trung tâm + đèn đường (dọc phố thật) ----------
+  // Cây phượng vĩ ĐA DẠNG: tán ô rộng dẹt + vòm hoa đỏ phủ trên (đặc trưng Hoa Phượng Đỏ).
+  // Mỗi cây tự sinh biến thể theo vị trí: cao/thấp, nở rộ / nở vừa / chưa nở (hết mùa).
   function phuongTree(x, z) {
     const g = new THREE.Group();
     const y = groundHeight(x, z);
-    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.55, 4.2, 6), sharedMats.trunk);
-    trunk.position.y = 2.1; g.add(trunk);
-    const blobs = [[0, 5.2, 0, 2.7], [-1.6, 4.6, 0.9, 1.7], [1.5, 4.8, -0.8, 1.8], [0.4, 6.2, 0.8, 1.6]];
-    blobs.forEach(([bx, by, bz, br], i) => {
-      const leaf = new THREE.Mesh(canopyGeo(br, x * 3.1 + z * 1.7 + i),
+    const frac = (v) => { const t = Math.abs(v); return t - Math.floor(t); };
+    const s1 = frac(Math.sin(x * 1.73 + z * 0.91) * 43758.5);   // cỡ cây
+    const s2 = frac(Math.sin(x * 0.41 + z * 2.31) * 12543.7);   // độ nở hoa
+    const scale = 0.72 + s1 * 1.05;                              // ~5m .. ~12m
+    const bloom = s2 < 0.58 ? 1 : s2 < 0.84 ? 0.5 : 0;           // nở rộ / vừa / xanh
+    const trunkH = 3.2 * scale, crownY = trunkH + 1.0 * scale, crownR = 3.2 * scale;
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.26 * scale, 0.55 * scale, trunkH, 6), sharedMats.trunk);
+    trunk.position.y = trunkH / 2; g.add(trunk);
+    // vài cành chính toả ngang (dáng xoè của phượng)
+    for (let i = 0; i < 3; i++) {
+      const a = (i / 3) * Math.PI * 2 + s1 * 4;
+      const br = new THREE.Mesh(new THREE.CylinderGeometry(0.1 * scale, 0.22 * scale, 1.7 * scale, 5), sharedMats.trunk);
+      br.position.set(Math.cos(a) * 0.9 * scale, trunkH - 0.4 * scale, Math.sin(a) * 0.9 * scale);
+      br.rotation.set(Math.cos(a) * 0.8, 0, -Math.sin(a) * 0.8);
+      g.add(br);
+    }
+    // tán lá dẹt xếp rộng thành hình Ô/DÙ
+    const green = [[0, 0.5, 0, 1.15], [-0.62, 0.02, 0.5, 0.82], [0.6, 0.06, -0.5, 0.84], [0.12, -0.08, 0.72, 0.76], [-0.5, -0.02, -0.62, 0.8]];
+    green.forEach(([ox, oy, oz, rf], i) => {
+      const leaf = new THREE.Mesh(canopyGeo(crownR * rf, x * 3.1 + z * 1.7 + i),
         i % 2 === 0 ? sharedMats.leafGreen : sharedMats.leafGreen2);
-      leaf.position.set(bx, by, bz);
+      leaf.position.set(ox * crownR, crownY + oy * scale, oz * crownR);
+      leaf.scale.y = 0.5;
       g.add(leaf);
     });
-    for (const [fx, fy, fz] of [[-1.6, 5.7, 0.9], [1.4, 6, -0.7], [0.2, 6.9, 1], [-0.9, 5.3, -1.5], [1.8, 5.4, 1.1]]) {
-      const fl = new THREE.Mesh(new THREE.SphereGeometry(0.8, 6, 4), sharedMats.flower);
-      fl.position.set(fx, fy, fz);
-      g.add(fl);
+    // vòm HOA ĐỎ phủ mặt trên tán (dày khi nở rộ)
+    if (bloom > 0) {
+      const reds = bloom > 0.7
+        ? [[0, 0.58, 0, 1.02], [-0.55, 0.48, 0.45, 0.64], [0.55, 0.48, -0.4, 0.66], [0.06, 0.52, 0.6, 0.6], [-0.1, 0.5, -0.55, 0.58]]
+        : [[0, 0.56, 0, 0.86], [0.42, 0.48, 0.32, 0.52]];
+      reds.forEach(([ox, oy, oz, rf], i) => {
+        const fl = new THREE.Mesh(canopyGeo(crownR * rf, x * 5.1 + z * 2.3 + i + 40), sharedMats.flower);
+        fl.position.set(ox * crownR, crownY + oy * scale, oz * crownR);
+        fl.scale.y = 0.42;
+        g.add(fl);
+      });
     }
     g.position.set(x, y, z);
     g.rotation.y = x * 1.3 + z;
     scene.add(g);
-    addCollider(x, z, 0.8);
+    addCollider(x, z, 0.9 * scale);
   }
   function palm(x, z) {
     const g = new THREE.Group();
