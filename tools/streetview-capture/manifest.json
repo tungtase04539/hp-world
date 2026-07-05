@@ -1,0 +1,10 @@
+{
+  "manifest_version": 3,
+  "name": "HP Street View Capturer",
+  "version": "1.0.0",
+  "description": "Chụp Street View 360° theo tọa độ dải trung tâm Hải Phòng — mỗi ảnh gắn tọa độ + góc quay, gom thành 1 thư viện.",
+  "permissions": ["tabs", "downloads", "storage"],
+  "host_permissions": ["<all_urls>"],
+  "background": { "service_worker": "background.js" },
+  "action": { "default_title": "Mở trang chụp Street View Hải Phòng" }
+}

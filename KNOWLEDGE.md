@@ -240,6 +240,13 @@ node mobile.mjs    # viewport điện thoại + joystick
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-05 (i)**: EXTENSION CHỤP STREET VIEW (`tools/streetview-capture/`). Vì máy chủ remote
+    chặn Google Maps, làm extension Chrome MV3 chạy TRÊN MÁY CHỦ DỰ ÁN: nạp `coords.js` (446 tọa độ
+    bám đường thật dải trung tâm — sinh bằng `tools/gen_sv_coords.mjs`, lấy NGƯỢC phép chiếu XZ→lat/lng),
+    duyệt từng điểm, `StreetViewService.getPanorama` (bỏ điểm không phủ), xoay đủ N góc × pitch,
+    `chrome.tabs.captureVisibleTab` chụp từng khung → tải về `Downloads/hp-streetview/` + `manifest.json`
+    (mỗi ảnh gắn tọa độ/panoId/heading/pitch/ngày/bản quyền). Dùng làm THAM CHIẾU dựng dãy phố (không
+    nhúng pixel Google). Ẩn panel trước khi chụp để không lọt UI. Cần Maps JavaScript API key (free).
 - **2026-07-05 (h)**: DÃY TRUNG TÂM KIỂU THẬT — MÁI NGÓI DỐC PHÁP CỔ. Nhà THẤP tầng (h≤17m,
     không kính, footprint gọn) trong vùng DT_BOX được phủ MÁI HIP 4 dốc ngói đỏ/cam
     (`hipRoofGeo`, gộp chung mesh nhà → không tốn draw-call) → đọc ngay ra "phố cổ mái ngói"
