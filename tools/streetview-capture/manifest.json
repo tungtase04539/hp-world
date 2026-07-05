@@ -1,10 +1,24 @@
 {
   "manifest_version": 3,
   "name": "HP Street View Capturer",
-  "version": "1.0.0",
-  "description": "Chụp Street View 360° theo tọa độ dải trung tâm Hải Phòng — mỗi ảnh gắn tọa độ + góc quay, gom thành 1 thư viện.",
+  "version": "2.0.0",
+  "description": "Chụp Street View 360° dải trung tâm Hải Phòng NGAY TRÊN instantstreetview.com (không cần API key) — mỗi ảnh gắn tọa độ + góc quay.",
   "permissions": ["tabs", "downloads", "storage"],
-  "host_permissions": ["<all_urls>"],
+  "host_permissions": ["https://www.instantstreetview.com/*"],
   "background": { "service_worker": "background.js" },
-  "action": { "default_title": "Mở trang chụp Street View Hải Phòng" }
+  "action": { "default_title": "Mở instantstreetview.com để chụp dải trung tâm HP" },
+  "content_scripts": [
+    {
+      "matches": ["https://www.instantstreetview.com/*"],
+      "js": ["coords.js", "page.js"],
+      "run_at": "document_idle",
+      "world": "MAIN"
+    },
+    {
+      "matches": ["https://www.instantstreetview.com/*"],
+      "js": ["bridge.js"],
+      "run_at": "document_idle",
+      "world": "ISOLATED"
+    }
+  ]
 }

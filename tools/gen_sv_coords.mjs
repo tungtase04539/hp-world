@@ -34,5 +34,6 @@ const coords = kept.map(([x, z]) => { const [lat, lng] = inv(x, z); return { lat
 writeFileSync(new URL('./streetview-capture/coords.js', import.meta.url),
   `// Tọa độ dải trung tâm Hải Phòng (bám đường thật OSM của dự án, cách ~${STEP}m).\n` +
   `// Sinh tự động từ js/mapdata.js bằng tools/gen_sv_coords.mjs (radius=${R}m).\n` +
-  `export const WAYPOINTS = ${JSON.stringify(coords)};\n`);
+  `// Content script (classic) — gắn vào window để page.js đọc.\n` +
+  `window.HP_WAYPOINTS = ${JSON.stringify(coords)};\n`);
 console.log(`Đã ghi ${coords.length} tọa độ vào tools/streetview-capture/coords.js (R=${R}m, step=${STEP}m).`);

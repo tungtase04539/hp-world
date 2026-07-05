@@ -2,7 +2,8 @@
 // capture.js gửi message; ở đây gọi captureVisibleTab / downloads.
 
 chrome.action.onClicked.addListener(() => {
-  chrome.tabs.create({ url: chrome.runtime.getURL('capture.html') });
+  // Mở instantstreetview.com — content script (page.js) sẽ tự chèn bảng điều khiển.
+  chrome.tabs.create({ url: 'https://www.instantstreetview.com/' });
 });
 
 // Hàng đợi tải để không nghẽn (downloads.download nhiều dataURL cùng lúc dễ lỗi)

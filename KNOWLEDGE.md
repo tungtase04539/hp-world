@@ -240,13 +240,18 @@ node mobile.mjs    # viewport điện thoại + joystick
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
-- **2026-07-05 (i)**: EXTENSION CHỤP STREET VIEW (`tools/streetview-capture/`). Vì máy chủ remote
-    chặn Google Maps, làm extension Chrome MV3 chạy TRÊN MÁY CHỦ DỰ ÁN: nạp `coords.js` (446 tọa độ
-    bám đường thật dải trung tâm — sinh bằng `tools/gen_sv_coords.mjs`, lấy NGƯỢC phép chiếu XZ→lat/lng),
-    duyệt từng điểm, `StreetViewService.getPanorama` (bỏ điểm không phủ), xoay đủ N góc × pitch,
-    `chrome.tabs.captureVisibleTab` chụp từng khung → tải về `Downloads/hp-streetview/` + `manifest.json`
-    (mỗi ảnh gắn tọa độ/panoId/heading/pitch/ngày/bản quyền). Dùng làm THAM CHIẾU dựng dãy phố (không
-    nhúng pixel Google). Ẩn panel trước khi chụp để không lọt UI. Cần Maps JavaScript API key (free).
+- **2026-07-05 (i)**: EXTENSION CHỤP STREET VIEW (`tools/streetview-capture/`, v2). Vì máy chủ remote
+    chặn Google Maps, làm extension Chrome MV3 chạy TRÊN MÁY CHỦ DỰ ÁN. v2 TƯƠNG TÁC TRỰC TIẾP
+    instantstreetview.com (KHÔNG cần API key — tái dùng Google Maps trang đã nạp):
+    • `coords.js` = 446 tọa độ bám ĐƯỜNG THẬT dải trung tâm (sinh bằng `tools/gen_sv_coords.mjs`,
+      lấy NGƯỢC phép chiếu XZ→lat/lng), gán `window.HP_WAYPOINTS`.
+    • `page.js` (world MAIN) dùng `google.maps` của trang → tạo panorama phủ toàn trang, `getPanorama`
+      (bỏ điểm không phủ), xoay N góc × pitch; `bridge.js` (world ISOLATED, chỉ nó có chrome.*) chuyển
+      lệnh qua postMessage → `background.js` `captureVisibleTab` + `downloads` → `Downloads/hp-streetview/`
+      + `manifest.json` (mỗi ảnh gắn tọa độ/panoId/heading/pitch/ngày/bản quyền).
+    • Ẩn panel trước khi chụp để không lọt UI. Dùng làm THAM CHIẾU dựng dãy phố (không nhúng pixel Google).
+    BÀI HỌC: content script MAIN world dùng được biến JS của trang nhưng KHÔNG có chrome.*; ISOLATED
+    world có chrome.* nhưng không thấy biến trang → phải bắc cầu bằng window.postMessage.
 - **2026-07-05 (h)**: DÃY TRUNG TÂM KIỂU THẬT — MÁI NGÓI DỐC PHÁP CỔ. Nhà THẤP tầng (h≤17m,
     không kính, footprint gọn) trong vùng DT_BOX được phủ MÁI HIP 4 dốc ngói đỏ/cam
     (`hipRoofGeo`, gộp chung mesh nhà → không tốn draw-call) → đọc ngay ra "phố cổ mái ngói"

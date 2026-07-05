@@ -1,57 +1,54 @@
-# HP Street View Capturer (extension Chrome)
+# HP Street View Capturer (extension Chrome, v2)
 
-Chụp **Street View 360°** theo tọa độ **dải trung tâm Hải Phòng**, tự xoay hết các góc ở mỗi
-điểm, tải về thành **1 thư viện ảnh** — mỗi ảnh gắn **tọa độ + góc quay** (trong `manifest.json`).
+Chụp **Street View 360°** dải trung tâm Hải Phòng **ngay trên instantstreetview.com** — **KHÔNG
+cần API key**. Extension chèn 1 bảng điều khiển vào trang, tái dùng Google Maps mà trang đã nạp,
+tự lái panorama xoay đủ các góc ở từng tọa độ và chụp về **1 thư viện ảnh** (mỗi ảnh gắn **tọa độ
++ góc quay** trong `manifest.json`).
 
-Vì môi trường máy chủ (Claude Code remote) chặn Google Maps, extension này chạy trên **máy của
-bạn** (nơi vào được Street View). Bạn chạy nó, nó chụp, rồi gửi thư mục ảnh lại cho mình để mình
-dùng làm **tham chiếu** dựng dãy phố dải trung tâm cho khớp thật (không nhúng pixel Google vào game).
-
-## Cần chuẩn bị: 1 Google Maps API key (miễn phí)
-1. Vào <https://console.cloud.google.com/> → tạo project.
-2. **APIs & Services → Enable APIs** → bật **Maps JavaScript API**.
-3. **Credentials → Create credentials → API key** → copy key (`AIza…`).
-   (Không cần thẻ để dùng mức miễn phí Maps JavaScript API cho việc này; nếu Google bắt bật billing
-   thì mức free hàng tháng vẫn dư cho lần chụp này.)
+Chạy trên **máy của bạn** (nơi vào được Street View); máy chủ Claude Code remote bị chặn Google.
 
 ## Cài extension
-1. Mở Chrome → `chrome://extensions`.
-2. Bật **Developer mode** (góc trên phải).
-3. **Load unpacked** → chọn thư mục `tools/streetview-capture/`.
-4. Bấm biểu tượng extension trên thanh công cụ → mở **trang chụp**.
+1. Chrome → `chrome://extensions` → bật **Developer mode** (góc trên phải).
+2. **Load unpacked** → chọn thư mục `tools/streetview-capture/`.
+3. Bấm **icon extension** trên thanh công cụ → nó tự mở **instantstreetview.com** kèm bảng điều khiển
+   góc trên-trái. (Hoặc tự vào <https://www.instantstreetview.com/> — bảng vẫn hiện.)
 
 ## Chụp
-1. Dán **API key** vào ô.
-2. Tuỳ chọn:
-   - **Số góc / vòng**: 8 = mỗi 45° (đủ phủ 360°). Muốn kỹ hơn để 12 (30°).
-   - **Pitch**: `0` là ngang tầm mắt. Muốn thêm mái nhà để `0,15`; thêm vỉa hè để `-10,0,15`.
-   - **Chờ tải tile**: tăng nếu mạng chậm (ảnh chưa nét đã chụp).
-   - **Bán kính tìm pano**: 70m — điểm nào không có Street View sẽ **tự bỏ qua**.
-3. **▶ Bắt đầu chụp**. Cứ để tab chạy (đừng chuyển tab — `captureVisibleTab` chụp tab đang hiện).
-4. Xong: ảnh nằm ở **Downloads/hp-streetview/** kèm **manifest.json**.
+1. Chờ trang instantstreetview hiện ảnh Street View (Google Maps đã nạp).
+2. Trên bảng điều khiển, chỉnh nếu muốn:
+   - **Số góc / vòng**: 8 = mỗi 45° (đủ phủ 360°). Kỹ hơn để 12.
+   - **Pitch**: `0` ngang mắt; thêm mái để `0,15`; thêm vỉa hè để `-10,0,15`.
+   - **Chờ tile / Nghỉ giữa ảnh**: tăng nếu mạng chậm.
+   - **Bán kính tìm pano**: 70m — điểm nào không có Street View **tự bỏ qua**.
+3. **▶ Bắt đầu chụp** → **để yên tab đang chạy** (đừng chuyển tab; `captureVisibleTab` chụp tab đang hiện).
+4. Xong: ảnh ở **Downloads/hp-streetview/** + **manifest.json**.
 
-> Lưu ý: Hải Phòng có thể **thưa Street View chính thức**; extension chụp **hết chỗ nào có phủ**
-> và tự bỏ điểm không có. `manifest.json` ghi lại `date`/`copyright` từng pano.
+> Không cần API key vì extension dùng lại Google Maps mà instantstreetview đã tải sẵn.
+> Hải Phòng có thể thưa Street View — extension chụp hết chỗ có phủ, tự bỏ điểm trống.
 
-## Cấu trúc mỗi ảnh trong `manifest.json`
+## Kiến trúc (vì sao 2 file JS chạy trên trang)
+- `page.js` (world **MAIN**): chạy cùng ngữ cảnh trang → dùng được `google.maps` đã nạp; tạo panorama
+  phủ toàn trang, lái POV, vòng lặp chụp, chèn bảng điều khiển.
+- `bridge.js` (world **ISOLATED**): chỉ world này có `chrome.*`; nhận lệnh của page.js qua
+  `postMessage` rồi gọi `background.js` để `captureVisibleTab` + tải file.
+- `background.js`: service worker — chụp tab + `downloads`; mở instantstreetview khi bấm icon.
+- `coords.js`: 446 tọa độ bám đường thật (gán `window.HP_WAYPOINTS`).
+
+## `manifest.json` mỗi ảnh
 ```json
-{
-  "file": "pano_007_h045_p0.jpg",
-  "reqLat": 20.8571, "reqLng": 106.6829,   // tọa độ yêu cầu (trên đường thật)
-  "panoId": "…", "panoLat": 20.8572, "panoLng": 106.6830,  // pano thực Google trả về
-  "heading": 45, "pitch": 0, "zoom": 1,
-  "date": "2019-08", "copyright": "© Google"
-}
+{ "file":"pano_007_h045_p0.jpg",
+  "reqLat":20.8571,"reqLng":106.6829,
+  "panoId":"…","panoLat":20.8572,"panoLng":106.6830,
+  "heading":45,"pitch":0,"zoom":1,
+  "date":"2019-08","copyright":"© Google" }
 ```
 
-## Tọa độ chụp ở đâu ra?
-`coords.js` = các điểm **bám đúng đường thật** dải trung tâm, lấy từ dữ liệu OSM của chính dự án
-(`js/mapdata.js`) rồi chuyển ngược phép chiếu về lat/lng. Muốn đổi phạm vi/độ dày:
+## Đổi phạm vi tọa độ
 ```
-node tools/gen_sv_coords.mjs 1100 40    # radius 1100m, cách 40m  → sinh lại coords.js
+node tools/gen_sv_coords.mjs 1100 40   # radius 1100m, cách 40m → sinh lại coords.js
 ```
 
-## Sau khi chụp xong
-Nén thư mục `hp-streetview/` (kèm `manifest.json`) gửi lại cho mình. Mình sẽ:
-- Dùng làm tham chiếu chỉnh **màu tường, số tầng, kiểu mái, ban công, biển hiệu** dãy phố trung tâm.
-- Với toà nhà tiêu biểu có ảnh rõ mặt → có thể đưa vào Meshy như pipeline địa danh.
+## Sau khi chụp
+Nén `hp-streetview/` (kèm `manifest.json`) gửi lại cho mình → mình dùng làm **tham chiếu** dựng dãy
+phố dải trung tâm cho khớp thật (màu tường, số tầng, kiểu mái, ban công, biển hiệu); toà tiêu biểu
+ảnh rõ mặt → đưa vào Meshy như pipeline địa danh. (Chỉ tham chiếu, không nhúng pixel Google vào game.)
