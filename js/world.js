@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { registerModel } from './assets.js';
 import {
   WORLD_BOUNDS, LM, LM_DIR, LM_FACE, EXTRAS, TREES, PARKS, RAIL, DT_BOX, RIVERS, ROADS_DT, ROADS_REGION, BRIDGES, BUILDINGS,
@@ -817,8 +819,9 @@ export function buildWorld(scene) {
 
   // ---------- TƯỢNG ĐÀI LÊ CHÂN: GLB AI có màu (bệ đá + bảng tên giữ nguyên) ----------
   {
-    // Nữ tướng quay mặt ra quảng trường (về phía Nhà hát lớn / đài phun) — không quay vào Trung tâm Triển lãm
-    const thLC = orientFace([EXTRAS.square[0] - LM.lechan[0], EXTRAS.square[1] - LM.lechan[1]]);
+    // Nữ tướng quay mặt VUÔNG GÓC với đường thật trước tượng (đường Đông–Tây, tiếp tuyến OSM
+    // [-0.979,0.206]) → mặt hướng thẳng ra đường về phía Bắc: [-0.208,-0.978].
+    const thLC = orientFace([-0.208, -0.978]);
     const g = new THREE.Group();
     const granite = mat(0x9a948a);
     const base = new THREE.Mesh(new THREE.BoxGeometry(8.5, 0.9, 8.5), granite);
@@ -1460,6 +1463,63 @@ export function buildWorld(scene) {
     }
   }
 
+  // ---------- CÂY PHƯỢNG "HERO": mô hình Meshy dựng từ ẢNH THẬT (3 dáng) ----------
+  // Dùng ở dải trung tâm + các vườn hoa (nơi người chơi dạo nhiều). InstancedMesh: mỗi dáng
+  // 1 draw-call dù nhiều cây. Cây nền (OSM/công viên xa) vẫn dùng procedural cho nhẹ.
+  const HERO_FILES = ['phuong_a.glb', 'phuong_c.glb', 'phuong_d.glb'];
+  const HERO_BASE_H = [8.6, 10.8, 8.8];   // chiều cao gốc (m) từng dáng — c là cây cao dáng bình
+  const heroTrees = [];                   // {x,y,z,scale,yaw,variant}
+  const fracH = (v) => { const t = Math.abs(v); return t - Math.floor(t); };
+  function heroTree(x, z) {
+    const y = groundHeight(x, z);
+    const s1 = fracH(Math.sin(x * 1.73 + z * 0.91) * 43758.5);
+    const s2 = fracH(Math.sin(x * 0.41 + z * 2.31) * 12543.7);
+    const variant = s2 < 0.4 ? 0 : s2 < 0.72 ? 1 : 2;
+    const scale = HERO_BASE_H[variant] * (0.82 + s1 * 0.5);   // biến thể cao/thấp
+    heroTrees.push({ x, y, z, scale, yaw: (x * 1.3 + z) % (Math.PI * 2), variant });
+    addCollider(x, z, 1.1);              // chỉ chặn quanh gốc; tán ở trên đầu, đi dưới được
+  }
+  const ASSET_BASE_W = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+    ? 'assets/' : 'https://raw.githubusercontent.com/tungtase04539/hp-world/assets-storage/assets/';
+  function loadHeroTrees() {
+    if (!heroTrees.length) return;
+    const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
+    const dummy = new THREE.Object3D();
+    HERO_FILES.forEach((file, v) => {
+      const slots = heroTrees.filter((t) => t.variant === v);
+      if (!slots.length) return;
+      loader.load(ASSET_BASE_W + file, (gltf) => {
+        let mesh = null;
+        gltf.scene.traverse((o) => { if (o.isMesh && !mesh) mesh = o; });
+        if (!mesh) return;
+        mesh.updateWorldMatrix(true, true);
+        // GLB Meshy nén meshopt/quantize (buffer interleaved) — KHÔNG applyMatrix4 lên geometry
+        // (làm hỏng vị trí → gai rủ). Thay vào đó gộp chuẩn-hoá + matrixWorld vào MA TRẬN INSTANCE,
+        // giữ nguyên geometry y hệt lúc render scene.
+        const box = new THREE.Box3().setFromObject(mesh);   // bbox trong hệ thế giới
+        const cx = (box.min.x + box.max.x) / 2, cz = (box.min.z + box.max.z) / 2;
+        const h = Math.max(1e-3, box.max.y - box.min.y);
+        // B = S(1/h) · T(-cx,-minY,-cz) · matrixWorld  → đưa cây về gốc y=0, tâm trục, cao = 1
+        const B = new THREE.Matrix4().makeScale(1 / h, 1 / h, 1 / h)
+          .multiply(new THREE.Matrix4().makeTranslation(-cx, -box.min.y, -cz))
+          .multiply(mesh.matrixWorld);
+        const inst = new THREE.InstancedMesh(mesh.geometry, mesh.material, slots.length);
+        inst.frustumCulled = false;
+        const trs = new THREE.Matrix4(), m = new THREE.Matrix4();
+        const q = new THREE.Quaternion(), sv = new THREE.Vector3(), pv = new THREE.Vector3();
+        slots.forEach((t, i) => {
+          q.setFromEuler(new THREE.Euler(0, t.yaw, 0));
+          sv.setScalar(t.scale); pv.set(t.x, t.y, t.z);
+          trs.compose(pv, q, sv);
+          m.multiplyMatrices(trs, B);        // instance = TRS · B
+          inst.setMatrixAt(i, m);
+        });
+        inst.instanceMatrix.needsUpdate = true;
+        scene.add(inst);
+      }, undefined, (err) => console.error('hero tree', file, err));
+    });
+  }
+
   // ---------- Cây phượng dải trung tâm + đèn đường (dọc phố thật) ----------
   // Cây phượng vĩ ĐA DẠNG: tán ô rộng dẹt + vòm hoa đỏ phủ trên (đặc trưng Hoa Phượng Đỏ).
   // Mỗi cây tự sinh biến thể theo vị trí: cao/thấp, nở rộ / nở vừa / chưa nở (hết mùa).
@@ -1547,7 +1607,7 @@ export function buildWorld(scene) {
           if (Math.abs(groundHeightNoDeck(tx, tz) - LAND_H) > 0.3) continue;
           if (lmPts.some(([lx, lz]) => (tx - lx) ** 2 + (tz - lz) ** 2 < 24 * 24)) continue;
           if (nTree <= nLamp * 1.6 && nTree < 46) {
-            phuongTree(tx, tz);
+            heroTree(tx, tz);       // dải trung tâm: cây phượng ảnh-thật (Meshy)
             nTree++;
           } else if (nLamp < 30) {
             const y = groundHeight(tx, tz);
@@ -1610,8 +1670,9 @@ export function buildWorld(scene) {
   placeGLB({
     url: 'assets/thptnq.glb', name: 'THPT Ngô Quyền',
     x: LM.thptnq[0], z: LM.thptnq[1],
-    // mặt tiền quay ra quảng trường/tượng đài Lê Chân (cùng hướng với tượng — theo yêu cầu)
-    rot: orientFace([EXTRAS.square[0] - LM.thptnq[0], EXTRAS.square[1] - LM.thptnq[1]]), size: 80,
+    // cổng quay VUÔNG GÓC với đường thật cạnh trường (đường Bắc–Nam, tiếp tuyến OSM [0.125,0.992])
+    // → mặt tiền/cổng hướng thẳng ra đường về phía Đông: [0.992,-0.126].
+    rot: orientFace([0.992, -0.126]), size: 80,
   });
   addCollider(LM.thptnq[0], LM.thptnq[1], 32);
   // 2 trường THCS: khối lớp chữ U + sân + cột cờ + cổng bảng tên (chưa có ảnh kiến trúc đạt chuẩn)
@@ -2086,10 +2147,10 @@ export function buildWorld(scene) {
           bi++;
         }
       }
-      // ghế đá + cây phượng góc vườn
-      for (const [cxx, czz] of [[-hw + 5, -hd + 5], [hw - 5, hd - 5]]) {
+      // cây phượng ảnh-thật (Meshy) 4 góc vườn — điểm nhấn nơi người chơi dạo nhiều
+      for (const [cxx, czz] of [[-hw + 5, -hd + 5], [hw - 5, hd - 5], [-hw + 5, hd - 5], [hw - 5, -hd + 5]]) {
         const tx = g.x + cxx, tz = g.z + czz;
-        if (Math.abs(groundHeightNoDeck(tx, tz) - LAND_H) < 0.6) phuongTree(tx, tz);
+        if (Math.abs(groundHeightNoDeck(tx, tz) - LAND_H) < 0.6) heroTree(tx, tz);
       }
       addCollider(g.x, g.z, 4); // chỉ chặn bồn trung tâm; vườn đi bộ được
     }
@@ -2225,5 +2286,6 @@ export function buildWorld(scene) {
     return sp;
   };
 
+  loadHeroTrees();   // nạp GLB cây phượng ảnh-thật rồi dựng InstancedMesh (bất đồng bộ)
   return world;
 }
