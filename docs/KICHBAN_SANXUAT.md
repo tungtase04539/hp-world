@@ -233,3 +233,64 @@ cand.vn, tapchikientruc.com.vn, haiphongnews.gov.vn, hoinhacsi.vn, vovworld.vn�
 Nguồn game design: gamedeveloper.com, gamestudies.org (Šisler), playthepast.org,
 culturalsurvival.org, tuni.fi, concerninghistory.org, Wikipedia (Svoboda 1945,
 1979 Revolution, Through the Darkest of Times).*
+
+---
+
+## PHẦN VIII — PHỤ LỤC XÁC MINH v2 (nguồn authoritative: sách *Lịch sử Hải Phòng Tập III* + nguồn mở lại)
+> Phần này **CHỐT/ĐÍNH CHÍNH** nhiều mục ⚠️ ở PHẦN VI. Ưu tiên dùng các số liệu dưới đây.
+
+**1. Tổ tử thủ Nhà hát Lớn 【Tập III tr.295–297】** — con số 17 vs 13 KHÔNG mâu thuẫn:
+- **17** chiến sĩ Vệ quốc Đoàn (Đại đội 2, Tiểu đoàn 89, **Trung đoàn 41**) do **Đặng Kim Nở** chỉ huy
+  + **22** chiến sĩ Đội Tuyên truyền văn hóa Chiến khu 3 (**Nguyễn Văn Đạo** phụ trách) ≈ 39 người.
+- **13** = số **hy sinh** đợt đầu (sáng 21/11); thêm 8 bị bắt. Cầm cự **20/11→24/11**; Nở hy sinh sáng 24/11.
+- Vũ khí: 1 tiểu liên Thompson + 16 súng trường. Ngày đầu ~**50 lính Pháp** tử trận trước quảng trường
+  (chỉ huy Pháp: Đại tá **Debbes**).
+- **Câu nói có nguồn** (Nguyễn Văn Đạo): *"Chúng tao là người chiến thắng. Chúng tao thà chết chứ không
+  đầu hàng."* 【Tập III tr.296】 — được phép dùng (người thật, có nguồn).
+
+**2. Tiếp quản 13/5/1955 【Tập III tr.369】**:
+- Đơn vị: **Đại đoàn 320** (gọi "Đại đoàn", KHÔNG phải "Sư đoàn" ở mốc 1955) **và Trung đoàn 42**;
+  bộ đội **vào qua các cửa ô** sáng sớm. Chỉ huy tiếp quản: **Đỗ Mười** (Chủ tịch UB Quân chính).
+- **Chiều 13/5**: tàu **"Đirin Boócđô"** chở những lính Pháp cuối cùng rời **bến cảng** (2 sĩ quan
+  QĐND giám sát). Tàu hỏa từ **ga Hải Phòng** treo cờ đỏ sao vàng + ảnh Bác kéo còi vào cảng; còi nhà
+  máy/công sở **đồng loạt**.
+- **KHÔNG có "lễ thượng cờ/mít tinh chính thức" nào được sách mô tả** (0 lần "thượng cờ/kéo cờ/duyệt
+  binh" trong Tập III) — chỉ có biển người đón quân + cờ rợp trời ở **Quảng trường Nhà hát**. → Hồi 4
+  thể hiện bằng **cờ hoa nhân dân + còi tàu/nhà máy**, KHÔNG dựng nghi thức.
+
+**3. "Bến Nghiêng" — thận trọng**: từ này **KHÔNG xuất hiện trong Tập III**. Sách ghi lính Pháp rời
+**bến cảng chiều 13/5** (tàu Đirin Boócđô); **Đồ Sơn tiếp quản 14–16/5**. → Mốc "Bến Nghiêng (Đồ Sơn)
+15/5 – lính Pháp cuối cùng rút" là **truyền thống địa phương** (haiphong.gov.vn ghi 15/5), CHƯA thấy
+trong sách sử → nếu dùng phải ghi rõ nguồn địa phương, KHÔNG gán cho Tập III.
+- Lịch tiếp quản 【Tập III tr.369】: 28/4 khoảnh 4 · 10/5 Kiến An · 12/5 An Dương · **13/5 nội thành** ·
+  14–16/5 Kiến Thụy, Đồ Sơn, Cát Hải, Cát Bà.
+
+**4. Trích Hồ Chí Minh (chuẩn hóa nguồn)**: bài **"Sau 83 năm"**, bút danh **C.B**, Báo **Nhân Dân
+18/5/1955** (Hồ Chí Minh Toàn tập, t.9, tr.484) 【Tập III tr.369–370; TT70 tr.3】.
+
+**5. Đấu tranh 300 ngày 【Tập III tr.363–365】 (dùng thay/ bổ sung cho Hồi 3)**:
+- **Nhà thương Vườn Hoa** (nay BV Việt–Tiệp): **29/11/1954** địch tháo máy chữa răng, bàn mổ → ~2.000
+  rồi hàng vạn dân bao vây, buộc trả máy + thả 18 người; **11/1/1955** tái diễn, địch bắn 7 người bị
+  thương.
+- **Nhà máy Xi măng**: tự vệ **cất giấu bộ phận máy quý, làm hỏng cần cẩu** để địch không chuyển thiết
+  bị ra cảng; **Nhà máy đá Tràng Kênh** giữ máy hàng tháng.
+- **Cảng**: giữ tàu **Lơgan, HC1, HC5**; ngăn địch đưa tàu **Đơgiécmông, Sênu** vào Nam.
+- Đấu tranh **TẬP THỂ** — sách không nêu "công nhân tiêu biểu" đích danh cho 1954–55 (nhân vật giữ máy
+  của game nên là **hư cấu**).
+> *Lưu ý*: mốc "27/10/1954 giữ toa xe ga Hải Phòng" (từ VnExpress) KHÔNG thấy trong Tập III → ưu tiên
+> cảnh **Nhà thương Vườn Hoa 29/11/1954** (có trong sách) làm cảnh mốc Hồi 3.
+
+**6. "Da" thời kỳ — xác nhận từ sách**:
+- **KHÔNG có tàu điện**: dự án **tàu điện/xe điện Hải Phòng–Đồ Sơn từng được đề xuất nhưng KHÔNG thực
+  hiện** 【Tập III tr.73, 94】. Phương tiện: **xe song mã "Victoria", phu kéo xe tay**, xích lô, tàu ở cảng.
+- Nhà hát xây **1898**, hoạt động sôi nổi từ 1900 【Tập III tr.30, 94】.
+- **Cặp tên phố (xác minh)**: Paul Bert→Điện Biên Phủ · Bonnal→hồ Tam Bạc & dải vườn hoa · cầu Paul
+  Doumer "từ cửa Nhà hát sang Cầu Đất, nay dãy Quán hoa" · Strasbourg→Cát Cụt · Metz→Mê Linh · Trung
+  Quốc→Phan Bội Châu · Amiral Courbet→Hoàng Văn Thụ · Clémenceau→Lương Khánh Thiện · Rue du
+  Commerce→Lý Thường Kiệt · Chavassieux→Trần Hưng Đạo (+Quang Trung) · Sadi Carnot→Tô Hiệu ·
+  Belgique→Lê Lợi. 【Tập III tr.94, 140, 411–412; tapchikientruc.com.vn】
+- **Còi Nhà hát thành phố** dùng báo tin sự kiện lớn 【Tập III tr.290】 — dùng làm chi tiết âm thanh.
+- Danh hiệu thành phố: **"Trung dũng – Quyết thắng"** 【TT70 tr.4】.
+
+**Vẫn để ⚠️** (chưa nguồn chốt): toàn văn thơ Trần Huyền Trân (chỉ có các câu trích); "Bến Nghiêng"
+trong nguồn chính thống; ảnh trang phục/phương tiện đúng HP 1946–55.

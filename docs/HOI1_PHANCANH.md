@@ -89,12 +89,17 @@ tuần tra (KHÔNG chiến đấu).
 
 ## CẢNH 1.4 — "Những người ở lại Nhà hát Lớn" (23–24/11)
 **Cảm xúc: KÍNH PHỤC + LO ÂU.** Cơ chế: tiếp tế (mang nước/băng), quan sát từ xa.
-- **Bối cảnh 【THẬT — NGUYÊN VĂN NGUỒN】**: tổ tử thủ Nhà hát Lớn.
-  > **Thẻ tư liệu (khung đen-trắng, dòng nguồn):** *"Lực lượng ta bảo vệ Nhà hát
-  > lớn có **17 chiến sĩ** thuộc Đại đội 2 (Tiểu đoàn 89, **Trung đoàn 41**) do
-  > Trung đội trưởng **Đặng Kim Nở** chỉ huy, vũ khí có 1 tiểu liên, 16 súng
-  > trường, lựu đạn và chai cháy."* 【THẬT: quansu.haiphong.gov.vn】
-  > ⚠️*chú thích dị bản: một số nguồn phổ thông ghi 13 chiến sĩ.*
+- **Bối cảnh 【THẬT — SÁCH "LỊCH SỬ HẢI PHÒNG" TẬP III, tr.295–297】**: tổ tử thủ
+  Nhà hát Lớn. **Giải quyết mâu thuẫn 17 vs 13**: không mâu thuẫn — là hai đại
+  lượng khác nhau.
+  > **Thẻ tư liệu (khung đen-trắng, dòng nguồn):** *"Bảo vệ Nhà hát có **17 chiến
+  > sĩ Vệ quốc Đoàn** (Đại đội 2, Tiểu đoàn 89, **Trung đoàn 41**) do Trung đội
+  > trưởng **Đặng Kim Nở** chỉ huy, cùng **22 chiến sĩ Đội Tuyên truyền văn hóa
+  > Chiến khu 3** do **Nguyễn Văn Đạo** phụ trách. Vũ khí: 1 tiểu liên Thompson,
+  > 16 súng trường. Cầm cự từ **20/11 đến 24/11/1946**; **13 chiến sĩ hy sinh**
+  > trong đợt chiến đấu đầu (sáng 21/11), 8 người bị bắt. Đặng Kim Nở hy sinh
+  > sáng 24/11."* 【THẬT: Lịch sử Hải Phòng Tập III, tr.295–297; quansu.haiphong.
+  > gov.vn】
 - **Mục tiêu**: mang **bi đông nước & cuộn băng** tới một điểm tiếp tế gần Nhà
   hát Lớn cho tự vệ; **không vào trận**, chỉ tiếp tế & rút.
 - **Cơ chế**: lén đưa đồ qua vài chốt; **quan sát Nhà hát Lớn từ xa** (khói,
@@ -103,8 +108,14 @@ tuần tra (KHÔNG chiến đấu).
   - *Tự vệ trẻ (nhận nước, khản giọng):* "Cảm ơn em. Về đi, ở đây nguy. Bọn anh
     giữ được chừng nào hay chừng ấy."
   - *Bối (ngoảnh lại nhìn Nhà hát Lớn):* "…Các anh giữ nhé."
-- **Ghi chú (NT#8)**: tinh thần "thà chết không rời vị trí" (nguồn quân sự nêu
-  như khẩu hiệu/tinh thần chung, ⚠️ KHÔNG gán thành lời thoại cá nhân có tên).
+- **Thẻ tư liệu — CÂU NÓI CÓ THẬT (được ghi trong sách sử, dùng làm điểm nhấn)**:
+  > *Đội trưởng văn nghệ **Nguyễn Văn Đạo** cầm cây đàn ghi-ta, thét lớn giữa vòng
+  > vây: "Chúng tao là người chiến thắng. Chúng tao thà chết chứ không đầu
+  > hàng."* 【THẬT: Lịch sử Hải Phòng Tập III, tr.296】
+  > *(Đây là trích dẫn CÓ NGUỒN của người thật — được phép dùng; KHÔNG bịa thêm.)*
+- **Ghi chú (NT#8)**: quân Pháp thể hiện chân thực (chỉ huy Đại tá Debbes; ~50
+  lính Pháp tử trận trước quảng trường ngày đầu 【THẬT: Tập III tr.296】) — không
+  hình nộm, không thẩm mỹ hóa; không dựng cảnh máu me.
 
 ## CẢNH 1.5 — "Nến trong đêm" (Nhà hát Lớn thất thủ, 24/11)
 **Cảm xúc: TIẾC THƯƠNG (trang nghiêm).** Cơ chế: tưởng niệm (đặt nến/hoa).
