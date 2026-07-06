@@ -220,7 +220,9 @@ for (const w of riverWays) {
 console.log(`rivers: ${RIVERS.length} đoạn`);
 
 // ---------- 3. Phố trung tâm ----------
-const CLS = { trunk: 'p', primary: 'p', secondary: 's', tertiary: 't', residential: 'r', pedestrian: 'w' };
+const CLS = { trunk: 'p', primary: 'p', secondary: 's', tertiary: 't', residential: 'r', living_street: 'r', unclassified: 'r', pedestrian: 'w' };
+// Lõi trung tâm: GIỮ mọi phố nhỏ (kể cả residential ngắn) để không thiếu đường ngang sau các công trình.
+const isCentralRoad = (pts) => pts.some(([x, z]) => Math.hypot(x, z - 9) < 1600);
 const dtRoads = load('osm_roads_dt.json');
 const ROADS_DT = [];
 for (const w of dtRoads) {
@@ -229,7 +231,7 @@ for (const w of dtRoads) {
   const pts = rnd(simplify(subdiv(w.geometry, 150), 6));
   if (pts.length < 2) continue;
   const len = plLen(pts);
-  if (c === 'r' && len < 260) continue;
+  if (c === 'r' && len < 260 && !isCentralRoad(pts)) continue;   // giữ phố nhỏ trong lõi
   if (c === 'w' && len < 150) continue;
   ROADS_DT.push({ c, pts, name: w.tags?.name || '' });
 }

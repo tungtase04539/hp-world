@@ -14,7 +14,7 @@ q '[out:json][timeout:120];way["natural"="coastline"](20.55,106.45,21.10,107.35)
 q '[out:json][timeout:120];way["waterway"~"^(river|canal)$"](20.55,106.45,21.10,107.35);out geom;' osm_rivers.json
 
 # 3. Phố trung tâm (mọi cấp đường trong hộp trung tâm)
-q '[out:json][timeout:120];way["highway"~"^(trunk|primary|secondary|tertiary|residential|pedestrian)$"](20.845,106.652,20.884,106.712);out geom;' osm_roads_dt.json
+q '[out:json][timeout:120];way["highway"~"^(trunk|primary|secondary|tertiary|residential|living_street|unclassified|pedestrian)$"](20.845,106.652,20.884,106.712);out geom;' osm_roads_dt.json
 
 # 4. Trục vùng rộng (ra Đồ Sơn, Đình Vũ, Thủy Nguyên...)
 q '[out:json][timeout:120];way["highway"~"^(trunk|primary|secondary)$"](20.55,106.45,21.10,107.35);out geom;' osm_roads_region.json

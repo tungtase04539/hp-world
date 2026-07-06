@@ -240,6 +240,14 @@ node mobile.mjs    # viewport điện thoại + joystick
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-06 (m)**: BỔ SUNG PHỐ NHỎ DẢI TRUNG TÂM (thiếu đường ngang sau Nhà hát lớn). Nguyên nhân:
+    bộ lọc `if (c==='r' && len<260) continue` cắt các phố residential NGẮN ở lõi (Kỳ Đồng, Đinh Tiên
+    Hoàng… chạy ngang ngay sau các công trình). SỬA:
+    • `fetch_osm.sh`: thêm `living_street|unclassified` vào truy vấn phố trung tâm.
+    • `process_osm.mjs`: `CLS` map `living_street`/`unclassified`→'r'; bộ lọc residential thêm điều kiện
+      `&& !isCentralRoad(pts)` (giữ mọi phố nhỏ trong bán kính 1600m quanh Opera).
+    • `mapdata.js` `ROADS_DT` sinh lại TỪ OSM TRỰC TIẾP (Overpass, cùng bbox 20.845,106.652,20.884,106.712):
+      505→608 tuyến (+103 phố nhỏ lõi). Đối chiếu overlay với OSM thật: khớp, đã có đường ngang sau Opera.
 - **2026-07-06 (l)**: VƯỜN HOA KHỚP Ô THEO OBB (sửa "xiên xẹo, ra ngoài đường"). Lưới phố trung tâm
     KHÔNG song song trục XZ mà NGHIÊNG ~7° (trục dọc `GU=[0.992,-0.126]`, ngang `GV=[0.126,0.992]`).
     Trước dùng AABB (bbox theo XZ) của polygon công viên nghiêng → hộp phình to, trùm cả lòng đường.
