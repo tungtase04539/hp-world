@@ -13,7 +13,8 @@ import * as THREE from 'three';
 // ============================================================================
 export function initCinematic({ renderer, camera }) {
   const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
-  const easeInOut = (t) => t * t * (3 - 2 * t);
+  // smootherstep (6t^5−15t^4+10t^3): vào/ra êm hơn smoothstep → hết "giật" đầu/cuối
+  const ease = (t) => t * t * t * (t * (t * 6 - 15) + 10);
 
   const state = { active: false, mode: null };  // mode: 'free' | 'play'
   const keys = new Set();
@@ -74,8 +75,10 @@ export function initCinematic({ renderer, camera }) {
     // bay theo path: keys=[{pos:[x,y,z], look:[x,y,z]}], trong `sec` giây
     play(kf, sec = 12, done) {
       if (!kf || kf.length < 2) return 'cần ≥2 điểm mốc';
-      posCurve = new THREE.CatmullRomCurve3(kf.map(k => new THREE.Vector3(...k.pos)), false, 'catmullrom', 0.5);
-      tgtCurve = new THREE.CatmullRomCurve3(kf.map(k => new THREE.Vector3(...(k.look || k.tgt))), false, 'catmullrom', 0.5);
+      // 'centripetal': không tạo gấp khúc/vòng lặp khi mốc cách nhau không đều → mượt
+      posCurve = new THREE.CatmullRomCurve3(kf.map(k => new THREE.Vector3(...k.pos)), false, 'centripetal');
+      tgtCurve = new THREE.CatmullRomCurve3(kf.map(k => new THREE.Vector3(...(k.look || k.tgt))), false, 'centripetal');
+      posCurve.getLengths(600); tgtCurve.getLengths(600);   // bảng độ dài cung mịn → getPointAt đều tốc độ
       dur = Math.max(0.1, sec); startT = nowS(); onDone = done || null;
       state.active = true; state.mode = 'play';
       return `chạy path ${kf.length} mốc trong ${sec}s`;
@@ -106,9 +109,9 @@ export function initCinematic({ renderer, camera }) {
         if (keys.has('KeyQ')) camera.position.y -= sp;
         dir(); camera.lookAt(camera.position.clone().add(fwdVec));
       } else if (state.mode === 'play' && posCurve) {
-        const t = Math.min(1, (nowS() - startT) / dur), te = easeInOut(t);   // đồng hồ thực
-        camera.position.copy(posCurve.getPoint(te));
-        camera.lookAt(tgtCurve.getPoint(te));
+        const t = Math.min(1, (nowS() - startT) / dur), te = ease(t);   // đồng hồ thực + smootherstep
+        camera.position.copy(posCurve.getPointAt(te));   // getPointAt: theo độ dài cung → tốc độ ĐỀU
+        camera.lookAt(tgtCurve.getPointAt(te));
         if (t >= 1) { state.mode = 'free'; syncFromCamera(); const cb = onDone; onDone = null; if (cb) cb(); }
       }
     },
