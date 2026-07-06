@@ -358,10 +358,22 @@ export function buildWorld(scene) {
         pushBox(opts.path ? pathGeos : asphaltGeos, wRoad, 0.14, len + 1.2, mx, my, mz, rotY, rotX);
         if (opts.sidewalk) {
           const px = Math.cos(rotY), pz = -Math.sin(rotY);
+          const sinR = Math.sin(rotY), cosR = Math.cos(rotY), S = 1 / 1.6;   // ô ca-rô ~0.8m
           for (const side of [-1, 1]) {
             const off = side * (wRoad / 2 + wRoad * 0.14);
-            pushBox(sidewalkGeos, wRoad * 0.28, 0.24, len + 1.2,
-              mx + off * px, my + 0.02, mz + off * pz, rotY, rotX);
+            const sg = new THREE.BoxGeometry(wRoad * 0.28, 0.24, len + 1.2);
+            e4.set(rotX, rotY, 0); q4.setFromEuler(e4);
+            m4.compose(new THREE.Vector3(mx + off * px, my + 0.02, mz + off * pz), q4, s4);
+            sg.applyMatrix4(m4);
+            // UV ca-rô CHẠY THẲNG theo hướng ĐOẠN ĐƯỜNG (u dọc, v ngang) — hết lệch trục thế giới
+            const sp = sg.attributes.position, suv = new Float32Array(sp.count * 2);
+            for (let k = 0; k < sp.count; k++) {
+              const vx = sp.getX(k), vz = sp.getZ(k);
+              suv[k * 2] = (vx * sinR + vz * cosR) * S;       // dọc đường
+              suv[k * 2 + 1] = (vx * cosR - vz * sinR) * S;   // ngang đường
+            }
+            sg.setAttribute('uv', new THREE.BufferAttribute(suv, 2));
+            sidewalkGeos.push(sg);
           }
         }
         if (opts.dashes && c % 2 === 0) {
@@ -431,11 +443,9 @@ export function buildWorld(scene) {
         g.strokeRect(0, 0, w / 2, h / 2); g.strokeRect(w / 2, 0, w / 2, h / 2); g.strokeRect(0, h / 2, w / 2, h / 2); g.strokeRect(w / 2, h / 2, w / 2, h / 2);
       });
       kerbTex.wrapS = kerbTex.wrapT = THREE.RepeatWrapping;
+      // UV đã bake THẲNG theo hướng từng đoạn đường ở layRoad → gộp thẳng, KHÔNG chiếu phẳng lại
       const merged = mergeGeometries(sidewalkGeos);
       sidewalkGeos.forEach((g) => g.dispose());
-      const pos = merged.attributes.position, uv = new Float32Array(pos.count * 2), S = 1 / 1.6; // 1 ô ca-rô ~0.8m
-      for (let i = 0; i < pos.count; i++) { uv[i * 2] = pos.getX(i) * S; uv[i * 2 + 1] = pos.getZ(i) * S; }
-      merged.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
       const mesh = new THREE.Mesh(merged, new THREE.MeshLambertMaterial({ map: kerbTex }));
       mesh.name = 'sidewalks'; mesh.receiveShadow = true; scene.add(mesh);
     }
