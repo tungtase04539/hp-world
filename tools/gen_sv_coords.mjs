@@ -11,19 +11,23 @@ const LON0 = 106.68182, LAT0 = 20.85750;
 const UX = 111320 * Math.cos(LAT0 * Math.PI / 180), UZ = 110574;
 const inv = (x, z) => [+(LAT0 - z / UZ).toFixed(6), +(LON0 + x / UX).toFixed(6)];
 
-const R = +(process.argv[2] || 1100);       // bán kính quanh trung tâm (m)
-const STEP = +(process.argv[3] || 40);       // khoảng cách lấy mẫu dọc đường (m)
+const R = +(process.argv[2] || 1100);       // bán kính quanh trung tâm (m) cho PHỐ CHÍNH
+const CORE = +(process.argv[4] || 900);      // trong LÕI này lấy CẢ phố nhỏ (residential) để phủ kín
+const STEP = +(process.argv[3] || 42);       // khoảng cách lấy mẫu dọc đường (m)
 const DEDUP = STEP;                           // gộp điểm gần nhau
 
 const raw = [];
 for (const r of ROADS_DT) {
-  if (!['p', 's', 't'].includes(r.c)) continue;   // phố chính (bỏ ngõ nhỏ r/w)
+  const isMain = ['p', 's', 't'].includes(r.c);
+  const isLane = r.c === 'r';                       // phố nhỏ — chỉ lấy trong lõi
+  if (!isMain && !isLane) continue;
   for (let i = 0; i < r.pts.length - 1; i++) {
     const [x1, z1] = r.pts[i], [x2, z2] = r.pts[i + 1];
     const len = Math.hypot(x2 - x1, z2 - z1);
     for (let s = 0; s < len; s += STEP) {
       const t = s / len, x = x1 + (x2 - x1) * t, z = z1 + (z2 - z1) * t;
-      if (Math.hypot(x, z) <= R) raw.push([x, z]);
+      const d = Math.hypot(x, z);
+      if (isMain ? d <= R : d <= CORE) raw.push([x, z]);   // phố chính tới R, phố nhỏ tới CORE
     }
   }
 }
