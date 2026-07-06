@@ -536,6 +536,53 @@ export function buildWorld(scene) {
     if (poleGeos.length) { addMerged(poleGeos, mat(0xb8bcc2), 'flagpoles'); const fm = mergeGeometries(flagGeos); flagGeos.forEach((g) => g.dispose()); const mesh = new THREE.Mesh(fm, flagMat); mesh.name = 'flags'; scene.add(mesh); }
   }
 
+  // ---------- BĂNG RÔN CỔ ĐỘNG đỏ chữ vàng căng dọc phố (rất thân thuộc, hợp 2/9) ----------
+  {
+    const slogans = ['CHÀO MỪNG QUỐC KHÁNH 2 · 9', 'MỪNG ĐẢNG · MỪNG XUÂN · MỪNG ĐẤT NƯỚC ĐỔI MỚI', 'THÀNH PHỐ HOA PHƯỢNG ĐỎ'];
+    const banMats = slogans.map((s) => {
+      const tex = makeTex(512, 72, (g, w, h) => {
+        g.fillStyle = '#c8102e'; g.fillRect(0, 0, w, h);
+        g.strokeStyle = '#ffdd00'; g.lineWidth = 5; g.strokeRect(4, 4, w - 8, h - 8);
+        g.fillStyle = '#ffdd00'; g.font = "bold 34px 'Arial', sans-serif"; g.textAlign = 'center'; g.textBaseline = 'middle';
+        g.fillText(s, w / 2, h / 2 + 2);
+      });
+      return new THREE.MeshLambertMaterial({ map: tex, side: THREE.DoubleSide });
+    });
+    const banGeos = [[], [], []], banPoles = [];
+    let bs = 4242; const brnd = () => { bs = (bs * 1103515245 + 12345) & 0x7fffffff; return bs / 0x7fffffff; };
+    let bi = 0;
+    for (let ri = 0; ri < ROADS_DT.length; ri++) {
+      const r = ROADS_DT[ri];
+      if (r.c !== 'p') continue;
+      for (let i = 0; i < r.pts.length - 1; i++) {
+        const [x1, z1] = r.pts[i], [x2, z2] = r.pts[i + 1];
+        const segLen = Math.hypot(x2 - x1, z2 - z1);
+        if (segLen < 40) continue;
+        const dxn = (x2 - x1) / segLen, dzn = (z2 - z1) / segLen;
+        const rotY = Math.atan2(x2 - x1, z2 - z1);
+        const px = Math.cos(rotY), pz = -Math.sin(rotY);
+        for (let d = 30; d < segLen - 30; d += 68) {   // băng rôn cách ~68m
+          const mx = x1 + dxn * d, mz = z1 + dzn * d;
+          if (mx * mx + mz * mz > 1300 * 1300) continue;
+          const side = brnd() < 0.5 ? 1 : -1;
+          const off = side * (ROAD_W.p / 2 + 1.5);
+          const cx = mx + off * px, cz = mz + off * pz;
+          const gy = groundHeight(cx, cz);
+          if (gy < LAND_H - 0.5 || isWater(cx, cz)) continue;
+          const BW = 6, BH = 0.85, PH = 4.6;
+          // 2 cột 2 đầu băng rôn
+          for (const e2 of [-1, 1]) { const ex = cx + dxn * (BW / 2) * e2, ez = cz + dzn * (BW / 2) * e2; const pole = new THREE.CylinderGeometry(0.07, 0.09, PH, 6); pole.translate(ex, gy + PH / 2, ez); banPoles.push(pole); }
+          const pl = new THREE.PlaneGeometry(BW, BH);
+          const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, rotY, 0));
+          pl.applyMatrix4(new THREE.Matrix4().compose(new THREE.Vector3(cx, gy + PH - 0.7, cz), q, new THREE.Vector3(1, 1, 1)));
+          banGeos[bi % 3].push(pl); bi++;
+        }
+      }
+    }
+    if (banPoles.length) addMerged(banPoles, mat(0x9aa0a6), 'bannerpoles');
+    banGeos.forEach((geos, k) => { if (!geos.length) return; const m = mergeGeometries(geos); geos.forEach((g) => g.dispose()); const mesh = new THREE.Mesh(m, banMats[k]); mesh.name = 'banner' + k; scene.add(mesh); });
+  }
+
   // ---------- XE MÁY ĐỖ VỈA HÈ (đặc trưng nhất Hải Phòng) — 2 InstancedMesh low-poly ----------
   // Hero xe máy đang chạy vẫn là moto.glb Meshy; xe ĐỖ dùng scooter procedural nhẹ, instanced hàng trăm chiếc.
   {
