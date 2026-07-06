@@ -249,6 +249,7 @@ function updateMounted(dt, time) {
   updateVehicle(v, dt, input.forward, input.right, time);
   const seat = new THREE.Vector3(0, v.seatY, v.seatZ).applyAxisAngle(new THREE.Vector3(0, 1, 0), v.heading);
   pState.pos.copy(v.pos).add(seat);
+  pState.pos.y -= 0.86;   // hạ nhân vật xuống: HÔNG ngồi trên yên (gốc nhân vật ở CHÂN, hip ~0.9 local)
   player.group.position.copy(pState.pos);
   pState.yaw = v.heading;
   player.group.rotation.y = v.heading;
@@ -407,6 +408,7 @@ setLang('vi');
 // Hook gỡ lỗi / chụp ảnh tour (không ảnh hưởng gameplay)
 window.__hp = {
   renderer, scene,   // chẩn đoán hiệu năng (draw calls / triangles)
+  vehicles, mount, player,   // chẩn đoán/thử nghiệm cưỡi xe
   // Chẩn đoán: mọi thực thể tương tác có đứng đúng chỗ & tiếp cận được không
   diag() {
     const items = [];
