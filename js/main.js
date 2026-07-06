@@ -123,18 +123,20 @@ canvas.addEventListener('wheel', (e) => {
   cam.dist = Math.min(36, Math.max(5, cam.dist + e.deltaY * 0.012));
 }, { passive: true });
 
+// vector tạm dùng lại mỗi khung hình (tránh cấp phát → GC giật)
+const UP = new THREE.Vector3(0, 1, 0);
+const _tgt = new THREE.Vector3(), _off = new THREE.Vector3(), _des = new THREE.Vector3();
+const _fwd = new THREE.Vector3(), _rgt = new THREE.Vector3(), _seat = new THREE.Vector3();
 function updateCamera(dt) {
-  const target = pState.mounted
-    ? pState.mounted.pos.clone().setY(pState.mounted.pos.y + 3)
-    : pState.pos.clone().setY(pState.pos.y + 2.2);
+  if (pState.mounted) _tgt.copy(pState.mounted.pos).setY(pState.mounted.pos.y + 3);
+  else _tgt.copy(pState.pos).setY(pState.pos.y + 2.2);
   const cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch);
-  const off = new THREE.Vector3(Math.sin(cam.yaw) * cp, sp, Math.cos(cam.yaw) * cp)
-    .multiplyScalar(cam.dist);
-  const desired = target.clone().add(off);
-  const gy = groundHeight(desired.x, desired.z);
-  desired.y = Math.max(desired.y, gy + 1.2, 1.2);
-  camera.position.lerp(desired, Math.min(1, dt * 7));
-  camera.lookAt(target);
+  _off.set(Math.sin(cam.yaw) * cp, sp, Math.cos(cam.yaw) * cp).multiplyScalar(cam.dist);
+  _des.copy(_tgt).add(_off);
+  const gy = groundHeight(_des.x, _des.z);
+  _des.y = Math.max(_des.y, gy + 1.2, 1.2);
+  camera.position.lerp(_des, Math.min(1, dt * 7));
+  camera.lookAt(_tgt);
 }
 camera.position.set(SPAWN.x, 10, SPAWN.z + 14);
 updateCamera(1);
@@ -158,9 +160,9 @@ function updatePlayerOnFoot(dt, time) {
   const speed = (input.run ? RUN : WALK) * mag;
 
   if (mag > 0.05) {
-    const fwd = new THREE.Vector3(-Math.sin(cam.yaw), 0, -Math.cos(cam.yaw));
-    const right = new THREE.Vector3(-fwd.z, 0, fwd.x);
-    const dir = fwd.multiplyScalar(f).add(right.multiplyScalar(r)).normalize();
+    _fwd.set(-Math.sin(cam.yaw), 0, -Math.cos(cam.yaw));
+    _rgt.set(-_fwd.z, 0, _fwd.x);
+    const dir = _fwd.multiplyScalar(f).add(_rgt.multiplyScalar(r)).normalize();
     const nx = pState.pos.x + dir.x * speed * dt;
     const nz = pState.pos.z + dir.z * speed * dt;
     if (tryMove(nx, nz)) { pState.pos.x = nx; pState.pos.z = nz; }
@@ -247,8 +249,8 @@ document.getElementById('btnMoto').addEventListener('click', (e) => { e.currentT
 function updateMounted(dt, time) {
   const v = pState.mounted;
   updateVehicle(v, dt, input.forward, input.right, time);
-  const seat = new THREE.Vector3(0, v.seatY, v.seatZ).applyAxisAngle(new THREE.Vector3(0, 1, 0), v.heading);
-  pState.pos.copy(v.pos).add(seat);
+  _seat.set(0, v.seatY, v.seatZ).applyAxisAngle(UP, v.heading);
+  pState.pos.copy(v.pos).add(_seat);
   pState.pos.y -= 0.86;   // hạ nhân vật xuống: HÔNG ngồi trên yên (gốc nhân vật ở CHÂN, hip ~0.9 local)
   player.group.position.copy(pState.pos);
   pState.yaw = v.heading;
@@ -329,8 +331,8 @@ function animate() {
     if (!modal) {
       if (pState.mounted) updateMounted(dt, time);
       else updatePlayerOnFoot(dt, time);
-    } else {
-      player.animate(dt, 0, time);
+    } else if (!pState.mounted) {
+      player.animate(dt, 0, time);   // mở modal khi đang cưỡi → GIỮ tư thế ngồi (không animate lại)
     }
 
     if (!modal) {

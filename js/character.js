@@ -146,7 +146,6 @@ export function makeHumanoid(scheme = {}) {
         this.legR.rotation.x = -sw;
         this.armL.rotation.x = -sw * 0.75;
         this.armR.rotation.x = sw * 0.75;
-        this.group.position.y += 0; // giữ nguyên — nhún đã thể hiện qua chân
         this.head.rotation.x = Math.sin(this.walkT * 2) * 0.03;
       } else {
         const k = 0.12;

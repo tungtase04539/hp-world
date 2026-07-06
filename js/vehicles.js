@@ -1,7 +1,53 @@
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { WORLD_BOUNDS } from './terrain.js';
 
 function mat(color) { return new THREE.MeshLambertMaterial({ color }); }
+
+// ---- Xe máy Meshy (ảnh thật Honda Cub) — nạp 1 lần rồi CLONE cho mỗi xe ----
+// GLB nén meshopt: KHÔNG đụng geometry (applyMatrix4 làm hỏng). Chỉ transform Object3D/Group.
+const ASSET_BASE = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+  ? 'assets/' : 'https://raw.githubusercontent.com/tungtase04539/hp-world/assets-storage/assets/';
+let motoTemplate = null;           // Group đã chuẩn-hoá (tâm XZ, đáy y=0, dài theo +Z, tỉ lệ thật)
+const motoPending = [];            // các outer group chờ template tải xong
+function normalizeMoto(gltf) {
+  const model = gltf.scene;
+  const box = new THREE.Box3().setFromObject(model);
+  const cx = (box.min.x + box.max.x) / 2, cz = (box.min.z + box.max.z) / 2;
+  const lenX = Math.max(1e-3, box.max.x - box.min.x);   // trục dài mô hình (đầu xe ở −X)
+  const s = 1.98 / lenX;             // Honda Cub thật ~1.95–2.0 m
+  model.position.set(-cx, -box.min.y, -cz);   // tâm XZ, bánh chạm y=0
+  const pivot = new THREE.Group();
+  pivot.add(model);
+  pivot.rotation.y = Math.PI / 2;    // đầu xe (−X) → +Z (hướng tiến trong game)
+  pivot.scale.setScalar(s);
+  pivot.traverse((o) => { if (o.isMesh) { o.castShadow = true; } });
+  return pivot;
+}
+function attachMoto(outer) {
+  outer.add(motoTemplate.clone(true));
+}
+function makeMotoFallback() {   // dự phòng khi GLB lỗi mạng — khối tối giản, KHÔNG để xe tàng hình
+  const p = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.2, 1.0, 4, 8), mat(0xd8332a));
+  body.rotation.x = Math.PI / 2; body.position.set(0, 0.7, 0); p.add(body);
+  for (const z of [0.75, -0.75]) { const w = wheel(0.32, 0.14); w.position.set(0, 0.32, z); p.add(w); }
+  return p;
+}
+(function loadMoto() {
+  const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
+  loader.load(ASSET_BASE + 'moto.glb', (gltf) => {
+    motoTemplate = normalizeMoto(gltf);
+    for (const outer of motoPending) attachMoto(outer);
+    motoPending.length = 0;
+  }, undefined, (err) => {
+    console.error('moto.glb', err);
+    motoTemplate = makeMotoFallback();          // clone-able group
+    for (const outer of motoPending) outer.add(motoTemplate.clone(true));
+    motoPending.length = 0;
+  });
+})();
 
 function wheel(r, w) {
   const g = new THREE.Group();
@@ -24,44 +70,13 @@ function blobShadow(r) {
 }
 
 function makeMotorbike() {
+  // Mô hình Meshy ảnh-thật (Honda Cub đỏ). Xe chạy = di chuyển GROUP ngoài, không đụng geometry.
   const g = new THREE.Group();
-  const red = mat(0xd8332a);
-  // thân xe cong kiểu xe tay ga
-  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.22, 0.9, 4, 10), red);
-  body.rotation.x = Math.PI / 2;
-  body.scale.set(1, 1, 0.8);
-  body.position.set(0, 0.72, -0.1);
-  g.add(body);
-  const front = new THREE.Mesh(new THREE.CapsuleGeometry(0.16, 0.5, 4, 8), red);
-  front.rotation.x = 0.6;
-  front.position.set(0, 0.95, 0.62);
-  g.add(front);
-  const seat = new THREE.Mesh(new THREE.CapsuleGeometry(0.17, 0.5, 4, 8), mat(0x2a2a2e));
-  seat.rotation.x = Math.PI / 2;
-  seat.scale.set(1.15, 1, 0.55);
-  seat.position.set(0, 1, -0.3);
-  g.add(seat);
-  const wF = wheel(0.34, 0.16);
-  wF.position.set(0, 0.34, 0.85); g.add(wF);
-  const wB = wheel(0.34, 0.16);
-  wB.position.set(0, 0.34, -0.8); g.add(wB);
-  // tay lái cong + gương
-  const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.72, 8), mat(0x8a8f96));
-  bar.rotation.z = Math.PI / 2;
-  bar.position.set(0, 1.22, 0.58);
-  g.add(bar);
-  for (const sx of [-0.3, 0.3]) {
-    const mirror = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 6), mat(0xcfd8e0));
-    mirror.position.set(sx, 1.34, 0.56);
-    g.add(mirror);
-  }
-  const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.1, 10, 8),
-    mat(0xfff2b0, { emissive: 0xffee99, emissiveIntensity: 0.3 }));
-  lamp.scale.set(1, 0.85, 0.7);
-  lamp.position.set(0, 1.02, 0.86);
-  g.add(lamp);
-  g.add(blobShadow(1));
-  return { mesh: g, seatY: 1.12, seatZ: -0.28 };
+  g.add(blobShadow(0.95));
+  if (motoTemplate) attachMoto(g);
+  else motoPending.push(g);       // template chưa tải xong → gắn sau
+  // yên xe thật ~0.72 m; công thức đặt nhân vật (main.js): hip_world = pos.y + seatY + 0.09
+  return { mesh: g, seatY: 0.64, seatZ: -0.05 };
 }
 
 function makeCyclo() {
@@ -166,9 +181,9 @@ export function createVehicles(scene, groundHeight, waterHeight, spawns, resolve
       v.pos.x = nx; v.pos.z = nz;
       // không xuyên nhà cửa / đảo đá
       if (resolveCollisions) {
-        const before = { x: v.pos.x, z: v.pos.z };
+        const bx = v.pos.x, bz = v.pos.z;
         resolveCollisions(v.pos, v.land ? 0.8 : 1.6);
-        if (Math.hypot(v.pos.x - before.x, v.pos.z - before.z) > 0.01) v.vel *= 0.4;
+        if (Math.hypot(v.pos.x - bx, v.pos.z - bz) > 0.01) v.vel *= 0.4;
       }
     } else {
       v.vel = 0;

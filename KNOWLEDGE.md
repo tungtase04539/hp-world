@@ -240,6 +240,15 @@ node mobile.mjs    # viewport điện thoại + joystick
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-06 (n)**: XE MÁY MESHY (ảnh thật Honda Cub đỏ) thay xe procedural + dọn hiệu năng.
+    • `assets/moto.glb` (768KB, 43k tris) từ ảnh Wikimedia → Meshy → hậu xử lý (simplify 0.35, baseColor
+      1024, `gltf-transform meshopt`). Kích thước gốc 1.91m dài ≈ Honda Cub thật.
+    • `vehicles.js`: nạp GLB 1 LẦN → `motoTemplate.clone(true)` mỗi xe (chia sẻ geometry, KHÔNG đụng
+      buffer meshopt). `normalizeMoto`: tâm XZ + đáy y=0, xoay `π/2` (đầu xe −X → +Z tiến), scale 1.98/dài.
+      Xe spawn trước khi GLB tải xong → hàng `motoPending`, gắn khi xong. Lỗi mạng → `makeMotoFallback` (khối
+      tối giản, tránh xe tàng hình). `seatY:0.64 seatZ:-0.05` → nhân vật ngồi HÔNG trên yên (đã kiểm ảnh).
+    • Hiệu năng (từ review): main.js hoist vector tạm (camera/mounted/onfoot — hết cấp phát mỗi khung),
+      guard `modal khi đang cưỡi` để GIỮ tư thế ngồi; character.js bỏ dòng chết; vehicles.js bỏ alloc `before`.
 - **2026-07-06 (m)**: BỔ SUNG PHỐ NHỎ DẢI TRUNG TÂM (thiếu đường ngang sau Nhà hát lớn). Nguyên nhân:
     bộ lọc `if (c==='r' && len<260) continue` cắt các phố residential NGẮN ở lõi (Kỳ Đồng, Đinh Tiên
     Hoàng… chạy ngang ngay sau các công trình). SỬA:
