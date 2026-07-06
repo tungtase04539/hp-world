@@ -240,6 +240,15 @@ node mobile.mjs    # viewport điện thoại + joystick
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-06 (v)**: NÉN TEXTURE "nhẹ mà chất lượng tối đa" — **13 công trình 231MB → 68MB (−70%)**,
+    gần như VÔ TỔN THẤT (kiểm chứng render trước/sau: tượng Lê Chân, cổng trường, chữ, chân dung Bác
+    đều giữ nguyên). Phát hiện: texture chiếm **84–86%** dung lượng GLB, thủ phạm chính là **normal map
+    PNG ~8MB** + vài texture **4096**. Pipeline (`tools`/scratchpad `optimize_all.mjs`, dùng
+    @gltf-transform + sharp): base JPEG **q94** ≤2048; emissive JPEG q90 ≤2048; normal/MR **WebP q95**
+    ≤1024 (WebP ít artifact hơn JPEG cho normal, three.js r160 đọc được qua EXT_texture_webp);
+    meshopt geometry. **NGOẠI LỆ Nhà hát lớn**: base GIỮ full-res q97 để **chân dung Chủ tịch HCM chuẩn
+    tuyệt đối** (quy tắc bất di bất dịch). GLB là drop-in (cùng hình học/hướng) → KHÔNG đổi world.js.
+    Lê Chân 30MB→3MB (texture cũ phí cho tượng đồng tối màu). Đã đẩy assets-storage + purge jsDelivr.
 - **2026-07-06 (u)**: TỐI ƯU LOAD "vào là thấy hết, không tải lại" (deploy Vercel + jsDelivr).
     (1) **CDN jsDelivr immutable** thay `raw.githubusercontent` cho GLB (`assets.js` ASSET_BASE =
     `cdn.jsdelivr.net/gh/<repo>@assets-storage/`) — edge toàn cầu, cache 7 ngày, KHÔNG tải lại.
