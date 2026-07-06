@@ -240,6 +240,12 @@ node mobile.mjs    # viewport điện thoại + joystick
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-06 (s)**: VƯỜN HOA VẼ THEO ĐÚNG POLYGON Ô ĐẤT (hết lệch với ô bình hành). Min-area RECT chỉ
+    đúng khi ô là chữ nhật; ô đất giữa 2 đường cắt xéo là HÌNH BÌNH HÀNH → chữ nhật không khớp, lệch ở 2
+    đầu. NAY vẽ cỏ = `ExtrudeGeometry` từ CHÍNH polygon công viên (nong ×1.14 quanh tâm để ra tới vỉa hè,
+    GIỮ hình dạng), `shape` toạ độ (x,−z) rồi `rotateX(−90°)` cho ra đúng XZ. Luống hoa/cây CẮT theo
+    polygon bằng point-in-polygon (ray cast); lối đi chữ thập khít extent theo trục GU/GV; cây rải dọc
+    BIÊN polygon thụt vào 4m. Bỏ hàng rào box (gây dáng chữ nhật). Ảnh 6 vườn: khớp ô, song song vỉa hè.
 - **2026-07-06 (r)**: CHẾ ĐỘ ĐẠO DIỄN (`js/cinematic.js`) cho trailer/giới thiệu/cutscene — KHÔNG đụng
     lối chơi (off mặc định; khi bật, animate loop bỏ điều khiển nhân vật, camera do cinematic lo). API
     `window.__cine`: `free()` camera bay tự do (WASD+chuột+Q/E+Shift); `mark()`/`playMarks(sec)` ghi &

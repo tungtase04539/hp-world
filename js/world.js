@@ -2441,59 +2441,58 @@ export function buildWorld(scene) {
       const GU = rect ? rect.u : [1, 0];              // trục dọc theo mép ô ĐẤT NÀY
       const GV = [-GU[1], GU[0]];                     // trục ngang vuông góc
       const GROT = Math.atan2(-GU[1], GU[0]);         // rot.y để local +X trùng GU
-      const g = rect
-        ? { n: g0.n, x: Math.round(rect.cx), z: Math.round(rect.cz), w: Math.min(230, Math.round(rect.w)), d: Math.min(460, Math.round(rect.d)) }
-        : g0;
-      const y = groundHeightNoDeck(g.x, g.z);
-      if (Math.abs(y - LAND_H) > 1.5 || riverFactor(g.x, g.z) > 0.02) continue;
-      const hw = g.w / 2, hd = g.d / 2;
-      // local (ox theo GU, oz theo GV) → world XZ
-      const L = (ox, oz) => [g.x + ox * GU[0] + oz * GV[0], g.z + ox * GU[1] + oz * GV[1]];
-      // group xoay theo lưới phố: mọi box con dùng toạ độ LOCAL, group lo phần xoay
-      const gg = new THREE.Group();
-      gg.position.set(g.x, LAND_H, g.z); gg.rotation.y = GROT; scene.add(gg);
-      // thảm cỏ NỚI RA tới sát vỉa hè (polygon công viên OSM lùi vào sau vỉa hè → nới thêm biên)
-      const M = 8, lw = g.w + 2 * M, ld = g.d + 2 * M, lhw = lw / 2, lhd = ld / 2;
-      const lawn = new THREE.Mesh(new THREE.BoxGeometry(lw, 0.12, ld), lawnM);
-      lawn.position.set(0, 0.06, 0); lawn.receiveShadow = true; gg.add(lawn);
-      // lối đi chữ thập lát gạch — KÉO tới MÉP CỎ để LỐI VÀO lát gạch (bỏ cỏ chỗ vào), 2 đầu ăn ra vỉa hè
-      const pH = new THREE.Mesh(new THREE.BoxGeometry(lw, 0.16, 3.4), pathM);
-      pH.position.set(0, 0.12, 0); gg.add(pH);
-      const pV = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.16, ld), pathM);
-      pV.position.set(0, 0.12, 0); gg.add(pV);
-      // hàng rào cây thấp quanh vườn — CHỪA CỬA ở giữa mỗi cạnh cho lối vào
-      const GAPW = 5;   // nửa bề rộng cửa
-      const seg = (ex, ez, ew, ed) => { const h = new THREE.Mesh(new THREE.BoxGeometry(ew, 1.0, ed), hedgeM); h.position.set(ex, 0.55, ez); h.castShadow = true; gg.add(h); };
-      const half = (lw - 2 * GAPW) / 2, halfD = (ld - 2 * GAPW) / 2;
-      for (const ez of [-lhd, lhd]) { seg(-(GAPW + half / 2), ez, half, 1.3); seg(GAPW + half / 2, ez, half, 1.3); }   // cạnh trên/dưới, cửa giữa
-      for (const ex of [-lhw, lhw]) { seg(ex, -(GAPW + halfD / 2), 1.3, halfD); seg(ex, GAPW + halfD / 2, 1.3, halfD); }   // cạnh trái/phải
-      // bồn hoa TRUNG TÂM: luống hoa ẢNH-THẬT (Meshy) to theo cỡ vườn — vườn Nhà Kèn giữ Nhà Kèn
-      const isKen = Math.hypot(g.x - LM.nhaken[0], g.z - LM.nhaken[1]) < 20;
-      if (!isKen) heroBed(g.x, g.z, Math.max(7, Math.min(14, hw * 0.42, hd * 0.42)));
-      else addCollider(g.x, g.z, 5);
-      // LUỐNG HOA dàn KHẮP vườn (lưới) — nhiều màu, đi được
+      if (!rect) continue;
+      const y = groundHeightNoDeck(rect.cx, rect.cz);
+      if (Math.abs(y - LAND_H) > 1.5 || riverFactor(rect.cx, rect.cz) > 0.02) continue;
+      // ---- CỎ theo ĐÚNG hình POLYGON ô đất (bình hành/thang vẫn khớp — HẾT LỆCH), nong ra tới vỉa hè ----
+      const cx0 = poly.reduce((s, p) => s + p[0], 0) / poly.length;
+      const cz0 = poly.reduce((s, p) => s + p[1], 0) / poly.length;
+      const SC = 1.14;   // nong polygon ra ~ tới vỉa hè (giữ nguyên HÌNH DẠNG)
+      const spoly = poly.map(([x, z]) => [cx0 + (x - cx0) * SC, cz0 + (z - cz0) * SC]);
+      const shape = new THREE.Shape(spoly.map(([x, z]) => new THREE.Vector2(x, -z)));   // (x,-z): sau rotateX ra đúng XZ
+      const lawnGeo = new THREE.ExtrudeGeometry(shape, { depth: 0.12, bevelEnabled: false });
+      lawnGeo.rotateX(-Math.PI / 2);
+      const lawn = new THREE.Mesh(lawnGeo, lawnM);
+      lawn.position.y = LAND_H; lawn.receiveShadow = true; scene.add(lawn);
+      // point-in-polygon (ray cast) để CẮT luống hoa/cây theo đúng hình
+      const inPoly = (x, z) => { let c = false; for (let i = 0, j = spoly.length - 1; i < spoly.length; j = i++) { const [xi, zi] = spoly[i], [xj, zj] = spoly[j]; if (((zi > z) !== (zj > z)) && (x < (xj - xi) * (z - zi) / (zj - zi) + xi)) c = !c; } return c; };
+      // extent theo TRỤC ô đất (GU dọc / GV ngang) quanh tâm
+      let u1 = 1e9, u2 = -1e9, v1 = 1e9, v2 = -1e9;
+      for (const [x, z] of spoly) { const u = (x - cx0) * GU[0] + (z - cz0) * GU[1], v = (x - cx0) * GV[0] + (z - cz0) * GV[1]; if (u < u1) u1 = u; if (u > u2) u2 = u; if (v < v1) v1 = v; if (v > v2) v2 = v; }
+      const uc = (u1 + u2) / 2, vc = (v1 + v2) / 2, uw = u2 - u1, vw = v2 - v1;
+      const L = (ox, oz) => [cx0 + ox * GU[0] + oz * GV[0], cz0 + ox * GU[1] + oz * GV[1]];
+      // lối đi chữ thập lát gạch — vừa khít extent ô, giao ở tâm
+      const gg = new THREE.Group(); gg.position.set(cx0, LAND_H, cz0); gg.rotation.y = GROT; scene.add(gg);
+      const pH = new THREE.Mesh(new THREE.BoxGeometry(uw, 0.16, 3.4), pathM); pH.position.set(uc, 0.14, vc); gg.add(pH);
+      const pV = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.16, vw), pathM); pV.position.set(uc, 0.14, vc); gg.add(pV);
+      // bồn hoa TRUNG TÂM (Meshy) — trừ vườn Nhà Kèn giữ Nhà Kèn
+      const [bcx, bcz] = L(uc, vc);
+      const isKen = Math.hypot(cx0 - LM.nhaken[0], cz0 - LM.nhaken[1]) < 20;
+      if (!isKen) heroBed(bcx, bcz, Math.max(7, Math.min(14, uw * 0.21, vw * 0.21)));
+      else addCollider(bcx, bcz, 5);
+      // LUỐNG HOA lưới — CHỈ trong polygon (đi được)
       let bi = 3;
-      for (let ox = -hw + 10; ox <= hw - 10; ox += 17) {
-        for (let oz = -hd + 10; oz <= hd - 10; oz += 17) {
-          if (Math.abs(ox) < 5 || Math.abs(oz) < 5) continue;      // chừa lối đi chữ thập
-          if (Math.hypot(ox, oz) < Math.max(12, hw * 0.24)) continue; // chừa bồn trung tâm
+      for (let ox = u1 + 8; ox <= u2 - 8; ox += 17) {
+        for (let oz = v1 + 8; oz <= v2 - 8; oz += 17) {
+          if (Math.abs(ox - uc) < 5 || Math.abs(oz - vc) < 5) continue;                 // chừa lối đi
+          if (Math.hypot(ox - uc, oz - vc) < Math.max(12, uw * 0.12)) continue;         // chừa bồn giữa
           const [wx, wz] = L(ox, oz);
+          if (!inPoly(wx, wz)) continue;
           flowerBed(wx, wz, 1.7 + ((bi * 7) % 3) * 0.45, bi); bi++;
         }
       }
-      // Cây quanh CHU VI vườn: chủ yếu procedural (nhẹ), điểm hero ở 4 góc
-      const corners = [[-hw + 6, -hd + 6], [hw - 6, hd - 6], [-hw + 6, hd - 6], [hw - 6, -hd + 6]];
-      for (const [cxx, czz] of corners) {
-        const [tx, tz] = L(cxx, czz);
-        if (Math.abs(groundHeightNoDeck(tx, tz) - LAND_H) < 0.6) heroTree(tx, tz);
+      // Cây quanh CHU VI: rải dọc BIÊN polygon, thụt vào ~4m (hero ở đoạn đầu, còn lại procedural)
+      const nb = spoly.length; let ti = 0;
+      for (let i = 0; i < nb; i++) {
+        const [ax, az] = spoly[i], [bx, bz] = spoly[(i + 1) % nb];
+        const segL = Math.hypot(bx - ax, bz - az), steps = Math.max(1, Math.floor(segL / 24));
+        for (let s = 0; s < steps; s++) {
+          const t = (s + 0.5) / steps; let tx = ax + (bx - ax) * t, tz = az + (bz - az) * t;
+          const dx = cx0 - tx, dz = cz0 - tz, dl = Math.hypot(dx, dz) || 1; tx += dx / dl * 4; tz += dz / dl * 4;
+          if (Math.abs(groundHeightNoDeck(tx, tz) - LAND_H) > 0.6) continue;
+          if ((ti++ % 5) === 0) heroTree(tx, tz); else phuongTree(tx, tz);
+        }
       }
-      const edge = (ox, oz) => {
-        const [tx, tz] = L(ox, oz);
-        if (Math.abs(groundHeightNoDeck(tx, tz) - LAND_H) > 0.6) return;
-        phuongTree(tx, tz);
-      };
-      for (let ox = -hw + 18; ox <= hw - 18; ox += 26) { edge(ox, -hd + 6); edge(ox, hd - 6); }
-      for (let oz = -hd + 26; oz <= hd - 26; oz += 26) { edge(-hw + 6, oz); edge(hw - 6, oz); }
       // KHÔNG chặn giữa vườn (trừ Nhà Kèn) — công viên/vườn hoa ĐI ĐƯỢC
     }
   }
