@@ -901,6 +901,50 @@ export function buildWorld(scene) {
     scene.add(g);
     addCollider(LM.lechan[0], LM.lechan[1], 4.6);
 
+    // QUẢNG TRƯỜNG VƯỜN HOA nghi lễ quanh tượng (theo Street View thật: cây cắt tỉa + lối granite
+    // đỏ + chậu cảnh + cột cờ). ĐI ĐƯỢC — chỉ tượng/chậu/cột chặn, không chặn cả quảng trường.
+    {
+      const LX = LM.lechan[0], LZ = LM.lechan[1];
+      const faceV = [-0.208, -0.978], perpV = [0.978, -0.208];
+      const P = (a, b) => [LX + a * faceV[0] + b * perpV[0], LZ + a * faceV[1] + b * perpV[1]];
+      const redGranite = mat(0x9c4636), topiary = mat(0x3f7a3a, { flatShading: true }), potM = mat(0x6f4636), hedgeM = mat(0x356b33);
+      // nền lát granite sáng + trục lối đi granite ĐỎ
+      const pave = new THREE.Mesh(new THREE.BoxGeometry(30, 0.12, 24), mat(0xbdb6a6));
+      pave.position.set(LX, LAND_H + 0.06, LZ); pave.rotation.y = thLC; pave.receiveShadow = true; scene.add(pave);
+      const axis = new THREE.Mesh(new THREE.BoxGeometry(5, 0.16, 22), redGranite);
+      axis.position.set(LX, LAND_H + 0.1, LZ); axis.rotation.y = thLC; scene.add(axis);
+      // cây cắt tỉa (vòm tròn) xếp hàng hai bên trục
+      for (const b of [-11, -7.5, 7.5, 11]) for (const a of [-8, -4, 0, 4, 8]) {
+        if (Math.abs(b) < 6 && Math.abs(a) < 4) continue;
+        const [wx, wz] = P(a, b);
+        const dome = new THREE.Mesh(canopyGeo(1.35, wx * 3 + wz), topiary);
+        dome.position.set(wx, LAND_H + 0.9, wz); dome.scale.y = 0.7; scene.add(dome);
+      }
+      // chậu cảnh lớn 4 góc lối đi gần tượng
+      for (const [a, b] of [[6, -4.5], [6, 4.5], [-6, -4.5], [-6, 4.5]]) {
+        const [wx, wz] = P(a, b);
+        const pot = new THREE.Mesh(new THREE.CylinderGeometry(1.15, 0.8, 1.2, 12), potM);
+        pot.position.set(wx, LAND_H + 0.6, wz); scene.add(pot);
+        const bush = new THREE.Mesh(canopyGeo(1.2, wx + wz * 2), topiary);
+        bush.position.set(wx, LAND_H + 1.7, wz); bush.scale.y = 0.85; scene.add(bush);
+        addCollider(wx, wz, 1.2);
+      }
+      // hàng rào cắt thấp viền quảng trường
+      for (const [a, b, w, d] of [[0, -12, 30, 1], [0, 12, 30, 1], [-14.5, 0, 1, 24], [14.5, 0, 1, 24]]) {
+        const [wx, wz] = P(a, b);
+        const hedge = new THREE.Mesh(new THREE.BoxGeometry(w, 0.9, d), hedgeM);
+        hedge.position.set(wx, LAND_H + 0.45, wz); hedge.rotation.y = thLC; scene.add(hedge);
+      }
+      // cột cờ đỏ phía sau tượng
+      for (const b of [-5, 0, 5]) {
+        const [wx, wz] = P(-10, b);
+        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.11, 7, 6), mat(0xd8d8d8));
+        pole.position.set(wx, LAND_H + 3.5, wz); scene.add(pole);
+        const flag = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 1.05), new THREE.MeshLambertMaterial({ color: 0xd8202a, side: THREE.DoubleSide }));
+        flag.position.set(wx + 0.85, LAND_H + 6, wz); flag.rotation.y = thLC; scene.add(flag);
+      }
+    }
+
     registerModel({
       url: 'assets/lechan.glb', name: 'Tượng đài Lê Chân',
       x: LM.lechan[0], z: LM.lechan[1], preload: true,
