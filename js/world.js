@@ -910,7 +910,7 @@ export function buildWorld(scene) {
   {
     // Nữ tướng quay mặt VUÔNG GÓC với đường thật trước tượng (đường Đông–Tây, tiếp tuyến OSM
     // [-0.979,0.206]) → mặt hướng thẳng ra đường về phía Bắc: [-0.208,-0.978].
-    const thLC = orientFace([-0.208, -0.978]);
+    const thLC = orientFace([0.992, -0.126]);   // CÙNG HƯỚNG cổng trường Ngô Quyền (theo yêu cầu)
     const g = new THREE.Group();
     const granite = mat(0x9a948a);
     const base = new THREE.Mesh(new THREE.BoxGeometry(8.5, 0.9, 8.5), granite);
@@ -931,7 +931,7 @@ export function buildWorld(scene) {
     // đỏ + chậu cảnh + cột cờ). ĐI ĐƯỢC — chỉ tượng/chậu/cột chặn, không chặn cả quảng trường.
     {
       const LX = LM.lechan[0], LZ = LM.lechan[1];
-      const faceV = [-0.208, -0.978], perpV = [0.978, -0.208];
+      const faceV = [0.992, -0.126], perpV = [0.126, 0.992];   // mặt tượng = hướng cổng trường
       const P = (a, b) => [LX + a * faceV[0] + b * perpV[0], LZ + a * faceV[1] + b * perpV[1]];
       const redGranite = mat(0x9c4636), topiary = mat(0x3f7a3a, { flatShading: true }), potM = mat(0x6f4636), hedgeM = mat(0x356b33);
       // nền lát granite sáng + trục lối đi granite ĐỎ
@@ -963,7 +963,7 @@ export function buildWorld(scene) {
       }
       // cột cờ đỏ phía sau tượng
       for (const b of [-5, 0, 5]) {
-        const [wx, wz] = P(-10, b);
+        const [wx, wz] = P(-7, b);
         const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.11, 7, 6), mat(0xd8d8d8));
         pole.position.set(wx, LAND_H + 3.5, wz); scene.add(pole);
         const flag = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 1.05), new THREE.MeshLambertMaterial({ color: 0xd8202a, side: THREE.DoubleSide }));
@@ -1016,10 +1016,12 @@ export function buildWorld(scene) {
       const sign = new THREE.Mesh(new THREE.PlaneGeometry(9, 1.1),
         new THREE.MeshLambertMaterial({ map: signTexture('TRUNG TÂM TRIỂN LÃM', '#2e5f8a', '#ffffff') }));
       sign.position.set(0, 5.6, 5.06); eg.add(sign);
-      eg.position.set(LM.lechan[0], LAND_H, LM.lechan[1] - 14);
-      // mặt tiền (local +z) quay về tượng Lê Chân ở phía nam (+z) -> không xoay
+      // Nhà triển lãm ĐẰNG SAU tượng: ngược hướng mặt tượng (−faceV), mặt tiền quay về tượng
+      const egx = LM.lechan[0] - 16 * 0.992, egz = LM.lechan[1] - 16 * (-0.126);
+      eg.position.set(egx, LAND_H, egz);
+      eg.rotation.y = thLC;                 // mặt tiền (local +z) quay về tượng
       scene.add(eg);
-      addCollider(LM.lechan[0], LM.lechan[1] - 14, 9);
+      addCollider(egx, egz, 9);
     }
   }
 
