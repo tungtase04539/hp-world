@@ -240,6 +240,12 @@ node mobile.mjs    # viewport điện thoại + joystick
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-06 (q)**: VỈA HÈ + VƯỜN HOA hoàn thiện.
+    • Vỉa hè ca-rô: bake UV THẲNG theo hướng từng đoạn đường (rotY) thay vì chiếu phẳng trục thế giới →
+      ô ca-rô chạy song song mép đường (hết "ẩu/xiên").
+    • Cỏ vườn NỚI RA +8m mỗi biên tới sát vỉa hè (polygon công viên OSM lùi sau vỉa hè nên trước có khe
+      đất trống). Lối đi chữ thập KÉO tới mép cỏ → LỐI VÀO lát gạch (bỏ cỏ chỗ vào). Hàng rào chừa CỬA
+      giữa mỗi cạnh cho lối vào.
 - **2026-07-06 (p)**: VƯỜN HOA KHỚP TỪNG Ô ĐẤT (min-area rect) + gộp container/karst.
     • Vườn vẫn xiên vì dùng CHUNG 1 góc lưới `GU=[0.992,-0.126]` cho MỌI vườn, mà mỗi ô đất có hướng
       riêng (phố cong). NAY mỗi vườn tính HÌNH CHỮ NHẬT BAO DIỆN TÍCH NHỎ NHẤT của CHÍNH polygon công

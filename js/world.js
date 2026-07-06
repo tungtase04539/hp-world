@@ -2452,19 +2452,21 @@ export function buildWorld(scene) {
       // group xoay theo lưới phố: mọi box con dùng toạ độ LOCAL, group lo phần xoay
       const gg = new THREE.Group();
       gg.position.set(g.x, LAND_H, g.z); gg.rotation.y = GROT; scene.add(gg);
-      // thảm cỏ nền phủ CẢ Ô
-      const lawn = new THREE.Mesh(new THREE.BoxGeometry(g.w, 0.12, g.d), lawnM);
+      // thảm cỏ NỚI RA tới sát vỉa hè (polygon công viên OSM lùi vào sau vỉa hè → nới thêm biên)
+      const M = 8, lw = g.w + 2 * M, ld = g.d + 2 * M, lhw = lw / 2, lhd = ld / 2;
+      const lawn = new THREE.Mesh(new THREE.BoxGeometry(lw, 0.12, ld), lawnM);
       lawn.position.set(0, 0.06, 0); lawn.receiveShadow = true; gg.add(lawn);
-      // hàng rào cây thấp quanh vườn
-      for (const [ex, ez, ew, ed] of [[0, -hd, g.w, 1.3], [0, hd, g.w, 1.3], [-hw, 0, 1.3, g.d], [hw, 0, 1.3, g.d]]) {
-        const hedge = new THREE.Mesh(new THREE.BoxGeometry(ew, 1.0, ed), hedgeM);
-        hedge.position.set(ex, 0.55, ez); hedge.castShadow = true; gg.add(hedge);
-      }
-      // lối đi chữ thập lát gạch
-      const pH = new THREE.Mesh(new THREE.BoxGeometry(g.w - 2, 0.16, 3.4), pathM);
+      // lối đi chữ thập lát gạch — KÉO tới MÉP CỎ để LỐI VÀO lát gạch (bỏ cỏ chỗ vào), 2 đầu ăn ra vỉa hè
+      const pH = new THREE.Mesh(new THREE.BoxGeometry(lw, 0.16, 3.4), pathM);
       pH.position.set(0, 0.12, 0); gg.add(pH);
-      const pV = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.16, g.d - 2), pathM);
+      const pV = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.16, ld), pathM);
       pV.position.set(0, 0.12, 0); gg.add(pV);
+      // hàng rào cây thấp quanh vườn — CHỪA CỬA ở giữa mỗi cạnh cho lối vào
+      const GAPW = 5;   // nửa bề rộng cửa
+      const seg = (ex, ez, ew, ed) => { const h = new THREE.Mesh(new THREE.BoxGeometry(ew, 1.0, ed), hedgeM); h.position.set(ex, 0.55, ez); h.castShadow = true; gg.add(h); };
+      const half = (lw - 2 * GAPW) / 2, halfD = (ld - 2 * GAPW) / 2;
+      for (const ez of [-lhd, lhd]) { seg(-(GAPW + half / 2), ez, half, 1.3); seg(GAPW + half / 2, ez, half, 1.3); }   // cạnh trên/dưới, cửa giữa
+      for (const ex of [-lhw, lhw]) { seg(ex, -(GAPW + halfD / 2), 1.3, halfD); seg(ex, GAPW + halfD / 2, 1.3, halfD); }   // cạnh trái/phải
       // bồn hoa TRUNG TÂM: luống hoa ẢNH-THẬT (Meshy) to theo cỡ vườn — vườn Nhà Kèn giữ Nhà Kèn
       const isKen = Math.hypot(g.x - LM.nhaken[0], g.z - LM.nhaken[1]) < 20;
       if (!isKen) heroBed(g.x, g.z, Math.max(7, Math.min(14, hw * 0.42, hd * 0.42)));
