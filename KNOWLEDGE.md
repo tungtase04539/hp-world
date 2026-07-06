@@ -240,6 +240,16 @@ node mobile.mjs    # viewport điện thoại + joystick
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-06 (k)**: KIỂM TOÁN ẢNH STREET VIEW THẬT (3360 ảnh/420 pano ở nhánh `streetview-refs`)
+    + DỰNG DẢI TRUNG TÂM GIỐNG THẬT. Công cụ: `tools/gen_sv_coords`, bản đồ phủ (chuyển panoLat/Lng→XZ,
+    chấm pano + công trình + đường), helper tìm ảnh nhìn đúng công trình (heading Google=atan2(dx,-dz)).
+    ĐÃ SỬA từ đối chiếu ảnh thật:
+    • Tượng Lê Chân: dựng cả QUẢNG TRƯỜNG VƯỜN HOA (lối granite đỏ, cây cắt tỉa hàng, chậu cảnh, cột cờ) — trước trơ trọi.
+    • Đại lộ trung tâm: thêm CÂY XÀ CỪ tán tròn xanh lớn (`shadeTree`) dọc dải phân cách (mỗi ~22m) +
+      hai bên phố lớn (mỗi ~44m, bán kính 850m, CAP 170 cây để giữ FPS) — theo ảnh rợp cây xanh.
+    • Nhà ống: ~48% nhà thấp trung tâm mái ngói Pháp, còn lại MÁI BẰNG + BỒN NƯỚC mái (inox/xanh, gộp mesh).
+    • Xác nhận ĐÚNG bằng ảnh: trường Ngô Quyền (Pháp vàng cửa chớp xanh), vỉa hè ca-rô đỏ, quán hoa, rạp Tháng Tám.
+    TỒN ĐỌNG audit: kiểm vị trí Nhà hát/Nhà thờ (góc gần chưa thấy nhà thờ), liệt kê công trình thiếu, mặt tiền nhà ống.
 - **2026-07-05 (i)**: EXTENSION CHỤP STREET VIEW (`tools/streetview-capture/`, v2). Vì máy chủ remote
     chặn Google Maps, làm extension Chrome MV3 chạy TRÊN MÁY CHỦ DỰ ÁN. v2 TƯƠNG TÁC TRỰC TIẾP
     instantstreetview.com (KHÔNG cần API key — tái dùng Google Maps trang đã nạp):

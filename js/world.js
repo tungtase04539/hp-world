@@ -489,6 +489,16 @@ export function buildWorld(scene) {
       g.setAttribute('color', new THREE.BufferAttribute(cols, 3));
       return g;
     }
+    // Bồn nước mái (inox/xanh) — đặc trưng nhà ống Việt Nam (theo Street View thật)
+    function waterTankGeo(cx, cz, yTop, seed) {
+      const g = new THREE.CylinderGeometry(0.62, 0.62, 1.45, 9).toNonIndexed();
+      g.translate(cx, yTop + 0.75, cz);
+      const col = seed % 3 === 0 ? new THREE.Color(0x2f6fb0) : new THREE.Color(0x9aa6ae);
+      const n = g.attributes.position.count, cols = new Float32Array(n * 3);
+      for (let i = 0; i < n; i++) { cols[i * 3] = col.r; cols[i * 3 + 1] = col.g; cols[i * 3 + 2] = col.b; }
+      g.setAttribute('color', new THREE.BufferAttribute(cols, 3));
+      return g;
+    }
     let nBld = 0, nRoof = 0;
     for (const b of BUILDINGS) {
       // làm sạch đa giác: bỏ điểm trùng/kề sát (đa giác bẩn làm tam giác hóa nổ tung)
@@ -563,11 +573,19 @@ export function buildWorld(scene) {
         // Mái ngói dốc kiểu Pháp cổ cho nhà THẤP tầng ở DÃY TRUNG TÂM (không kính, footprint gọn)
         const central = rectFactor(cx, DT_BOX.x1, DT_BOX.x2, cz, DT_BOX.z1, DT_BOX.z2, 60);
         const w0 = maxX - minX, d0 = maxZ - minZ;
-        if (central > 0.32 && !glassy && h <= 17 && w0 < 46 && d0 < 46 && w0 > 3 && d0 > 3) {
-          const rh = 2.4 + (hash % 3) * 0.7;
-          const roof = hipRoofGeo(minX, maxX, minZ, maxZ, LAND_H + h, rh, tilePalette[hash % tilePalette.length]);
-          bldGeos.push(roof);
-          nRoof++;
+        if (central > 0.3 && !glassy && w0 < 46 && d0 < 46 && w0 > 3 && d0 > 3) {
+          if (h <= 17 && hash % 100 < 48) {          // ~48% nhà thấp: mái ngói dốc kiểu Pháp cổ
+            const rh = 2.4 + (hash % 3) * 0.7;
+            bldGeos.push(hipRoofGeo(minX, maxX, minZ, maxZ, LAND_H + h, rh, tilePalette[hash % tilePalette.length]));
+            nRoof++;
+          } else {                                    // còn lại: mái bằng + BỒN NƯỚC mái (nhà ống)
+            const nT = 1 + (hash % 2);
+            for (let k = 0; k < nT; k++) {
+              const tx = Math.max(minX + 1, Math.min(maxX - 1, cx + (((hash * (k + 3)) % 7) - 3) * 0.8));
+              const tz = Math.max(minZ + 1, Math.min(maxZ - 1, cz + (((hash * (k + 5)) % 7) - 3) * 0.8));
+              bldGeos.push(waterTankGeo(tx, tz, LAND_H + h, hash + k));
+            }
+          }
         }
         addCollider(cx, cz, Math.min(18, Math.sqrt(b.a / Math.PI) * 0.85 + 0.4));
         world.buildingCells.add(`${Math.round(cx / 22)},${Math.round(cz / 22)}`);
@@ -2130,9 +2148,35 @@ export function buildWorld(scene) {
       }
     });
 
-    // 3) Dải phân cách giữa các đại lộ (THĐ, Trần Phú, Điện Biên Phủ) + bụi cây
+    // 3) Dải phân cách giữa các đại lộ (THĐ, Trần Phú, Điện Biên Phủ) + CÂY XÀ CỪ tán lớn + bụi cây
+    // (theo Street View thật: đại lộ trung tâm rợp cây xà cừ/muồng tán tròn to, xanh quanh năm)
     const medM = mat(0xb9c2b6), bushM = mat(0x3e7a3a);
+    const fracM = (v) => { const t = Math.abs(v); return t - Math.floor(t); };
+    // Cây xà cừ: thân to + tán tròn XANH lớn (không nở đỏ), rợp bóng đại lộ
+    function shadeTree(x, z) {
+      const gg = new THREE.Group();
+      const yy = groundHeight(x, z);
+      const s = 0.9 + fracM(Math.sin(x * 2.1 + z * 1.3) * 7919.3) * 0.55;   // ~11–17m
+      const trunkH = 4.4 * s;
+      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.34 * s, 0.6 * s, trunkH, 7), sharedMats.trunk);
+      trunk.position.y = trunkH / 2; gg.add(trunk);
+      for (let i = 0; i < 3; i++) {
+        const a = (i / 3) * Math.PI * 2 + s * 3;
+        const br = new THREE.Mesh(new THREE.CylinderGeometry(0.12 * s, 0.26 * s, 2 * s, 5), sharedMats.trunk);
+        br.position.set(Math.cos(a) * 0.8 * s, trunkH - 0.3 * s, Math.sin(a) * 0.8 * s);
+        br.rotation.set(Math.cos(a) * 0.7, 0, -Math.sin(a) * 0.7); gg.add(br);
+      }
+      const crownY = trunkH + 2.4 * s, crownR = 4.8 * s;
+      const blobs = [[0, 0.42, 0, 1], [-0.56, 0.02, 0.5, 0.74], [0.56, 0.06, -0.5, 0.74], [0.12, -0.05, 0.66, 0.68], [-0.5, -0.02, -0.6, 0.7], [0, 0.78, 0, 0.72]];
+      blobs.forEach(([ox, oy, oz, rf], i) => {
+        const leaf = new THREE.Mesh(canopyGeo(crownR * rf, x * 2.3 + z * 1.9 + i), i % 2 ? sharedMats.leafGreen2 : sharedMats.leafGreen);
+        leaf.position.set(ox * crownR, crownY + oy * crownR, oz * crownR); leaf.scale.y = 0.8; gg.add(leaf);
+      });
+      gg.position.set(x, yy, z); gg.rotation.y = x + z * 1.7; scene.add(gg);
+      addCollider(x, z, 1.0 * s);
+    }
     for (const line of MEDIANS) {
+      let acc = 0;
       for (let i = 0; i < line.length - 1; i++) {
         const [x1, z1] = line[i], [x2, z2] = line[i + 1];
         const segL = Math.hypot(x2 - x1, z2 - z1);
@@ -2149,11 +2193,40 @@ export function buildWorld(scene) {
           block.rotation.y = th;
           block.receiveShadow = true;
           scene.add(block);
-          const bush = new THREE.Mesh(new THREE.SphereGeometry(0.5, 7, 5), bushM);
-          bush.position.set(mx, y + 0.65, mz);
-          bush.scale.set(1.6, 0.8, 0.7);
-          bush.rotation.y = th;
-          scene.add(bush);
+          acc += 10;
+          if (acc >= 22) {           // cây xà cừ lớn ~ mỗi 22m
+            acc = 0;
+            shadeTree(mx, mz);
+          } else {
+            const bush = new THREE.Mesh(new THREE.SphereGeometry(0.5, 7, 5), bushM);
+            bush.position.set(mx, y + 0.65, mz);
+            bush.scale.set(1.6, 0.8, 0.7);
+            bush.rotation.y = th;
+            scene.add(bush);
+          }
+        }
+      }
+    }
+    // Cây xà cừ rợp bóng dọc HAI BÊN các đại lộ lớn trung tâm (theo ảnh thật) — giới hạn để giữ FPS
+    let nShade = 0;
+    for (const r of ROADS_DT) {
+      if (r.c !== 'p' || nShade >= 170) continue;
+      for (let i = 0; i < r.pts.length - 1 && nShade < 170; i++) {
+        const [x1, z1] = r.pts[i], [x2, z2] = r.pts[i + 1];
+        const len = Math.hypot(x2 - x1, z2 - z1);
+        const rotY = Math.atan2(x2 - x1, z2 - z1), px = Math.cos(rotY), pz = -Math.sin(rotY);
+        for (let s = 16; s < len && nShade < 170; s += 44) {
+          const t = s / len;
+          for (const sgn of [-1, 1]) {
+            const tx = x1 + (x2 - x1) * t + sgn * (ROAD_W.p / 2 + 2.6) * px;
+            const tz = z1 + (z2 - z1) * t + sgn * (ROAD_W.p / 2 + 2.6) * pz;
+            if (tx * tx + tz * tz > 850 * 850) continue;
+            if (Math.abs(groundHeightNoDeck(tx, tz) - LAND_H) > 0.3) continue;
+            if (Object.values(LM).some(([lx, lz]) => (tx - lx) ** 2 + (tz - lz) ** 2 < 22 * 22)) continue;
+            const p = { x: tx, z: tz }; world.resolveCollisions(p, 0.6);
+            if (Math.hypot(p.x - tx, p.z - tz) > 0.3) continue;
+            shadeTree(tx, tz); nShade++;
+          }
         }
       }
     }
