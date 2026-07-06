@@ -494,6 +494,73 @@ export function buildWorld(scene) {
   addMerged(dashGeos, mat(0xe8e4d2), 'dashes');
   addMerged(pathGeos, mat(0xc9b896), 'paths');
 
+  // ---------- XE MÁY ĐỖ VỈA HÈ (đặc trưng nhất Hải Phòng) — 2 InstancedMesh low-poly ----------
+  // Hero xe máy đang chạy vẫn là moto.glb Meshy; xe ĐỖ dùng scooter procedural nhẹ, instanced hàng trăm chiếc.
+  {
+    // hình học scooter (mũi +Z), bánh chạm đất y=0 — tách "thân" (đổi màu) và "tối" (bánh/ghi-đông)
+    const bodyG = [], darkG = [];
+    const box = (arr, w, h, l, x, y, z) => { const g = new THREE.BoxGeometry(w, h, l); g.translate(x, y, z); arr.push(g); };
+    const wheel = (z) => { const g = new THREE.CylinderGeometry(0.27, 0.27, 0.14, 12); g.rotateZ(Math.PI / 2); g.translate(0, 0.27, z); darkG.push(g); };
+    wheel(-0.62); wheel(0.62);
+    box(bodyG, 0.46, 0.16, 1.35, 0, 0.5, 0);         // sàn/thân
+    box(bodyG, 0.4, 0.34, 0.5, 0, 0.55, 0.5);        // yếm trước
+    box(bodyG, 0.42, 0.17, 0.6, 0, 0.74, -0.32);     // yên
+    box(bodyG, 0.34, 0.28, 0.26, 0, 0.9, -0.66);     // cốp/đuôi
+    box(darkG, 0.1, 0.52, 0.1, 0, 0.9, 0.6);         // cổ phuộc
+    box(darkG, 0.56, 0.07, 0.09, 0, 1.12, 0.62);     // ghi-đông
+    box(darkG, 0.06, 0.44, 0.06, 0.18, 0.27, -0.62); box(darkG, 0.06, 0.44, 0.06, -0.18, 0.27, -0.62); // chân chống/khung sau
+    const bodyGeo = mergeGeometries(bodyG), darkGeo = mergeGeometries(darkG);
+    bodyG.forEach((g) => g.dispose()); darkG.forEach((g) => g.dispose());
+    // màu thân đa dạng (đỏ, đen, xanh, trắng, xám...) — như xe thật đỗ san sát
+    const scoolCols = [0xb23a2f, 0x2b2b2f, 0x3a5a8a, 0xd8d2c4, 0x6a6f76, 0x9c2f28, 0x24303a, 0xc7a24a].map((c) => new THREE.Color(c));
+    // gom vị trí đỗ dọc vỉa hè các phố p/s vùng trung tâm
+    const slots = [];
+    let seed = 20260706;
+    const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+    for (let ri = 0; ri < ROADS_DT.length; ri++) {
+      const r = ROADS_DT[ri];
+      if (r.c !== 'p' && r.c !== 's') continue;
+      const wRoad = ROAD_W[r.c];
+      for (let i = 0; i < r.pts.length - 1; i++) {
+        const [x1, z1] = r.pts[i], [x2, z2] = r.pts[i + 1];
+        const segLen = Math.hypot(x2 - x1, z2 - z1);
+        if (segLen < 8) continue;
+        const dxn = (x2 - x1) / segLen, dzn = (z2 - z1) / segLen;
+        const rotY = Math.atan2(x2 - x1, z2 - z1);       // dọc đường
+        const px = Math.cos(rotY), pz = -Math.sin(rotY); // pháp tuyến
+        for (let d = 4; d < segLen - 4; d += 1.35) {      // khoảng cách xe san sát
+          if (rnd() > 0.62) continue;                     // thưa vừa phải
+          const mx = x1 + dxn * d, mz = z1 + dzn * d;
+          if (mx * mx + mz * mz > 1400 * 1400) continue;  // vùng trung tâm mở rộng
+          const side = rnd() < 0.5 ? 1 : -1;
+          const off = side * (wRoad / 2 + 0.85 + rnd() * 0.5);
+          const gx = mx + off * px, gz = mz + off * pz;
+          const gy = groundHeight(gx, gz);
+          if (gy < LAND_H - 0.5 || isWater(gx, gz)) continue;   // né sông/cầu
+          // mũi quay VÀO vỉa hè (vuông góc đường), lệch nhẹ cho tự nhiên
+          slots.push([gx, gy, gz, rotY + Math.PI / 2 + (rnd() - 0.5) * 0.25, (rnd() * scoolCols.length) | 0]);
+          if (slots.length >= 480) break;
+        }
+        if (slots.length >= 480) break;
+      }
+      if (slots.length >= 480) break;
+    }
+    if (slots.length) {
+      const bodyInst = new THREE.InstancedMesh(bodyGeo, mat(0xcccccc), slots.length);
+      const darkInst = new THREE.InstancedMesh(darkGeo, mat(0x1c1c1f), slots.length);
+      const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), s = new THREE.Vector3(1, 1, 1), p = new THREE.Vector3();
+      slots.forEach(([x, y, z, ry, ci], k) => {
+        e.set(0, ry, 0); q.setFromEuler(e); p.set(x, y, z); m.compose(p, q, s);
+        bodyInst.setMatrixAt(k, m); darkInst.setMatrixAt(k, m);
+        bodyInst.setColorAt(k, scoolCols[ci]);
+      });
+      bodyInst.instanceMatrix.needsUpdate = true; darkInst.instanceMatrix.needsUpdate = true;
+      if (bodyInst.instanceColor) bodyInst.instanceColor.needsUpdate = true;
+      bodyInst.castShadow = darkInst.castShadow = true;
+      bodyInst.name = 'parked_scooters'; scene.add(bodyInst); scene.add(darkInst);
+    }
+  }
+
   // ---------- 1.200+ TÒA NHÀ THẬT (footprint OSM đùn khối, gộp 1 mesh) ----------
   world.buildingCells = new Set();
   {
