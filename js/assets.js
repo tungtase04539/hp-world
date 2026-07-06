@@ -18,9 +18,13 @@ let progressFn = null;
 // (cache immutable + edge toàn cầu, băng thông không giới hạn) thay cho
 // raw.githubusercontent (không phải CDN, cache ngắn → "tải lại" mỗi lần vào).
 const IS_LOCAL = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
-const ASSET_BASE = IS_LOCAL
-  ? ''
-  : 'https://cdn.jsdelivr.net/gh/tungtase04539/hp-world@assets-storage/';
+const JSDELIVR = 'https://cdn.jsdelivr.net/gh/tungtase04539/hp-world@assets-storage/';
+const RAWGH = 'https://raw.githubusercontent.com/tungtase04539/hp-world/assets-storage/';
+// jsDelivr GIỚI HẠN 20MB/file → 3 công trình >20MB (giữ 100% chất lượng gốc, không nén)
+// phải dùng raw.githubusercontent (không giới hạn). Còn lại dùng jsDelivr (CDN nhanh).
+// Service Worker cache cả hai nên lần sau vào đều hiện ngay.
+const OVERSIZE = new Set(['assets/baotang.glb', 'assets/quanhoa.glb', 'assets/lechan.glb']);
+const assetURL = (url) => IS_LOCAL ? url : ((OVERSIZE.has(url) ? RAWGH : JSDELIVR) + url);
 
 // Cụm trung tâm (quanh gốc toạ độ) tải NGAY ở màn chờ; công trình xa để streaming.
 const PRELOAD_RADIUS = 950;      // m — bán kính preload quanh điểm xuất phát (dải trung tâm)
@@ -40,7 +44,7 @@ function start(d) {
   loadingCount++;
   if (toastFn && d.name) toastFn(`⏳ Đang tải ${d.name}…`);
   loader.load(
-    ASSET_BASE + d.url,
+    assetURL(d.url),
     (gltf) => {
       d.state = 'done';
       loadingCount--;
