@@ -406,6 +406,7 @@ setLang('vi');
 
 // Hook gỡ lỗi / chụp ảnh tour (không ảnh hưởng gameplay)
 window.__hp = {
+  renderer, scene,   // chẩn đoán hiệu năng (draw calls / triangles)
   // Chẩn đoán: mọi thực thể tương tác có đứng đúng chỗ & tiếp cận được không
   diag() {
     const items = [];
