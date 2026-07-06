@@ -402,10 +402,31 @@ function animate() {
   else renderer.render(scene, camera);
 }
 
+// Service Worker: cache file nặng (GLB) → lần sau vào hiện đủ NGAY, không tải lại
+if ('serviceWorker' in navigator && location.protocol === 'https:') {
+  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
+}
+
 // ============ Bắt đầu ============
 initInput();
 ui.initUI();
-initAssets(ui.toast); // preload các mô hình GLB ngay từ màn hình chờ
+// preload cụm trung tâm ngay ở màn chờ + hiển thị tiến trình % dưới nút Bắt đầu
+(() => {
+  const btn = document.getElementById('startBtn');
+  const bar = document.createElement('div');
+  bar.id = 'preloadBar';
+  bar.innerHTML = '<div id="preloadFill"></div><span id="preloadTxt"></span>';
+  btn.parentNode.insertBefore(bar, btn.nextSibling);
+  const fill = bar.querySelector('#preloadFill');
+  const txt = bar.querySelector('#preloadTxt');
+  initAssets(ui.toast, (done, total) => {
+    if (!total) return;
+    const pct = Math.round((done / total) * 100);
+    fill.style.width = pct + '%';
+    txt.textContent = pct < 100 ? `Đang tải dải trung tâm… ${pct}%` : '✓ Sẵn sàng — đã tải đủ dải trung tâm';
+    bar.classList.toggle('done', pct >= 100);
+  });
+})();
 initMinigame(audio);
 quests.bindQuestUI(ui, audio);
 initMinimap();

@@ -240,6 +240,16 @@ node mobile.mjs    # viewport điện thoại + joystick
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-06 (u)**: TỐI ƯU LOAD "vào là thấy hết, không tải lại" (deploy Vercel + jsDelivr).
+    (1) **CDN jsDelivr immutable** thay `raw.githubusercontent` cho GLB (`assets.js` ASSET_BASE =
+    `cdn.jsdelivr.net/gh/<repo>@assets-storage/`) — edge toàn cầu, cache 7 ngày, KHÔNG tải lại.
+    (2) **Preload SONG SONG cả cụm trung tâm** (mọi model trong bán kính 950m quanh gốc) ngay ở
+    màn chờ, 4 cái/lúc; streaming công trình xa 1 cái/lúc (tránh giật). (3) **Thanh tiến trình %**
+    dưới nút Bắt đầu (`#preloadBar`, main.js + style.css). (4) **Service Worker** (`sw.js`) cache
+    cache-first file nặng (.glb/.hdr/.bin) → lần sau vào hiện đủ NGAY, offline được; KHÔNG cache
+    HTML/JS/CSS để app vẫn cập nhật. (5) **vercel.json**: lib/ immutable, sw.js must-revalidate.
+    Bài học: raw.githubusercontent KHÔNG phải CDN + cache ngắn = nguyên nhân "load đi load lại".
+    Muốn NHẸ hơn nữa (giảm ~250MB → ~70MB): nén texture KTX2/Basis (giai đoạn sau, cân nhắc chất lượng).
 - **2026-07-06 (t)**: SỬA HƯỚNG THPT NGÔ QUYỀN (trường Bonnal) — hết lệch. Trường là NHÀ GÓC ở ngã tư
     Phố Nguyễn Đức Cảnh × Phố Mê Linh. Đối chiếu OSM thật (Overpass, around 130m quanh 20.85520,106.67954):
     footprint dài 48–67m chạy theo trục [0.98,−0.20] (SONG SONG Nguyễn Đức Cảnh, tiếp tuyến [0.981,−0.195],
