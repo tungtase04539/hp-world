@@ -9,6 +9,7 @@ import {
   nearestRiverPoint, findShore, addPier,
 } from './terrain.js';
 import { STREETS, INTERSECTIONS, MEDIANS, GARDENS } from './mapdata.js';
+import { SIDEWALK_BY_ROAD, SIDEWALK_DEFAULT } from './sidewalks.js';
 
 // Thế giới dựng từ dữ liệu OpenStreetMap thật của Hải Phòng (tỉ lệ 1:10,
 // trung tâm phóng đại 2.2x). Mọi con phố trung tâm là phố thật.
@@ -66,6 +67,48 @@ function speckle(g, w, h, n, alpha) {
     g.fillStyle = `rgba(0,0,0,${(alpha * Math.random()).toFixed(3)})`;
     g.fillRect(Math.random() * w, Math.random() * h, 2, 2);
   }
+}
+// ---------- VỈA HÈ tả thực: mỗi kiểu một texture (theo phân loại pano thật, R1a) ----------
+// UV đã bake ~1 lần texture / 1.6m ở layRoad → texture 4 ô ⇒ ô ~0.4m (đúng gạch vỉa hè thật).
+const _swMatCache = {};
+function jitter(base, d) { const v = (c) => Math.max(0, Math.min(255, c + (Math.random() * 2 - 1) * d)); return `rgb(${v(base[0]) | 0},${v(base[1]) | 0},${v(base[2]) | 0})`; }
+function tileGrid(g, W, H, N, rgb, dv, grout) {
+  const s = W / N;
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { g.fillStyle = jitter(rgb, dv); g.fillRect(x * s, y * s, s, s); }
+  g.strokeStyle = grout; g.lineWidth = Math.max(1, s * 0.08);
+  for (let i = 0; i <= N; i++) { g.beginPath(); g.moveTo(i * s, 0); g.lineTo(i * s, H); g.moveTo(0, i * s); g.lineTo(W, i * s); g.stroke(); }
+}
+function sidewalkMaterial(type) {
+  if (_swMatCache[type]) return _swMatCache[type];
+  const S = 256;
+  const tex = makeTex(S, S, (g, w, h) => {
+    if (type === 'caro_do_xam') {                       // đỏ–xám ca-rô (bờ sông Tam Bạc, quảng trường)
+      const s = w / 4;
+      for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) {
+        g.fillStyle = ((x + y) % 2 === 0) ? jitter([176, 71, 46], 14) : jitter([156, 150, 138], 12);
+        g.fillRect(x * s, y * s, s, s);
+      }
+      g.strokeStyle = 'rgba(0,0,0,.14)'; g.lineWidth = 2;
+      for (let i = 0; i <= 4; i++) { g.beginPath(); g.moveTo(i * s, 0); g.lineTo(i * s, h); g.moveTo(0, i * s); g.lineTo(w, i * s); g.stroke(); }
+      speckle(g, w, h, 260, 0.10);
+    } else if (type === 'terracotta') {                 // gạch đỏ đất nung liền (một vài đoạn)
+      tileGrid(g, w, h, 4, [174, 86, 52], 16, 'rgba(70,30,15,.30)'); speckle(g, w, h, 300, 0.10);
+    } else if (type === 'con_sau') {                     // gạch con sâu / xương cá (đỏ + xám xen)
+      const b = 16; g.fillStyle = '#8f8a80'; g.fillRect(0, 0, w, h);
+      for (let y = -b; y < h + b; y += b) for (let x = -b; x < w + b; x += b * 2) {
+        const off = (Math.floor(y / b) % 2) * b;
+        g.save(); g.translate(x + off, y);
+        g.fillStyle = (Math.random() < 0.5) ? jitter([170, 84, 52], 14) : jitter([150, 144, 132], 10);
+        g.fillRect(1, 1, b * 2 - 2, b - 2); g.restore();
+      }
+      g.strokeStyle = 'rgba(0,0,0,.12)'; g.lineWidth = 1; speckle(g, w, h, 220, 0.08);
+    } else {                                             // 'gach_xam' — bê tông/đá xám (MẶC ĐỊNH, phổ biến nhất)
+      tileGrid(g, w, h, 4, [182, 178, 168], 12, 'rgba(0,0,0,.16)'); speckle(g, w, h, 340, 0.09);
+    }
+  });
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  const m = new THREE.MeshLambertMaterial({ map: tex });
+  _swMatCache[type] = m; return m;
 }
 function facadeTextures(colorCss) {
   const draw = (em) => (g, w, h) => {
@@ -324,7 +367,8 @@ export function buildWorld(scene) {
 
   // ---------- Đường phố THẬT (merge geometry để nhẹ GPU) ----------
   const ROAD_W = { p: 13, s: 10, t: 8, r: 5.5, w: 3.5 }; // 1:1 — lòng đường thật
-  const asphaltGeos = [], sidewalkGeos = [], dashGeos = [], pathGeos = [];
+  const asphaltGeos = [], dashGeos = [], pathGeos = [];
+  const sidewalkBuckets = {};  // { type: [geo,...] } — vỉa hè theo từng kiểu (đúng pano)
   const m4 = new THREE.Matrix4(), q4 = new THREE.Quaternion(), e4 = new THREE.Euler(), s4 = new THREE.Vector3(1, 1, 1);
   function pushBox(arr, w, h, l, x, y, z, rotY, rotX = 0) {
     const g = new THREE.BoxGeometry(w, h, l);
@@ -373,7 +417,8 @@ export function buildWorld(scene) {
               suv[k * 2 + 1] = (vx * cosR - vz * sinR) * S;   // ngang đường
             }
             sg.setAttribute('uv', new THREE.BufferAttribute(suv, 2));
-            sidewalkGeos.push(sg);
+            const swType = opts.swType || SIDEWALK_DEFAULT;
+            (sidewalkBuckets[swType] = sidewalkBuckets[swType] || []).push(sg);
           }
         }
         if (opts.dashes && c % 2 === 0) {
@@ -382,9 +427,12 @@ export function buildWorld(scene) {
       }
     }
   }
-  for (const r of ROADS_DT) {
+  for (let ri = 0; ri < ROADS_DT.length; ri++) {
+    const r = ROADS_DT[ri];
+    const hasSW = r.c === 'p' || r.c === 's';
     layRoad(r.pts, ROAD_W[r.c], {
-      sidewalk: r.c === 'p' || r.c === 's',
+      sidewalk: hasSW,
+      swType: hasSW ? (SIDEWALK_BY_ROAD[ri] || SIDEWALK_DEFAULT) : null,
       dashes: r.c === 'p' || r.c === 's' || r.c === 't',
       path: r.c === 'w',
     });
@@ -433,22 +481,15 @@ export function buildWorld(scene) {
   }
 
   addMerged(asphaltGeos, mat(0x4c5158), 'roads');
-  // Vỉa hè lát gạch ĐỎ–XÁM ca-rô (đặc trưng phố Hải Phòng — theo ảnh Street View thật P.Quang Trung).
-  {
-    if (sidewalkGeos.length) {
-      const kerbTex = makeTex(64, 64, (g, w, h) => {
-        g.fillStyle = '#9c968a'; g.fillRect(0, 0, w, h);           // gạch xám
-        g.fillStyle = '#b0472e'; g.fillRect(0, 0, w / 2, h / 2); g.fillRect(w / 2, h / 2, w / 2, h / 2); // gạch đỏ ca-rô
-        g.strokeStyle = 'rgba(0,0,0,.12)'; g.lineWidth = 2;
-        g.strokeRect(0, 0, w / 2, h / 2); g.strokeRect(w / 2, 0, w / 2, h / 2); g.strokeRect(0, h / 2, w / 2, h / 2); g.strokeRect(w / 2, h / 2, w / 2, h / 2);
-      });
-      kerbTex.wrapS = kerbTex.wrapT = THREE.RepeatWrapping;
-      // UV đã bake THẲNG theo hướng từng đoạn đường ở layRoad → gộp thẳng, KHÔNG chiếu phẳng lại
-      const merged = mergeGeometries(sidewalkGeos);
-      sidewalkGeos.forEach((g) => g.dispose());
-      const mesh = new THREE.Mesh(merged, new THREE.MeshLambertMaterial({ map: kerbTex }));
-      mesh.name = 'sidewalks'; mesh.receiveShadow = true; scene.add(mesh);
-    }
+  // VỈA HÈ ĐA DẠNG theo từng nơi (phân loại từ pano Street View — R1a): mặc định xám bê tông,
+  // ca-rô đỏ-xám ở bờ sông Tam Bạc/quảng trường, terracotta/con sâu ở vài đoạn. UV đã bake thẳng
+  // theo hướng đoạn đường ở layRoad → gộp thẳng theo từng KIỂU, mỗi kiểu một material riêng.
+  for (const [type, geos] of Object.entries(sidewalkBuckets)) {
+    if (!geos.length) continue;
+    const merged = mergeGeometries(geos);
+    geos.forEach((g) => g.dispose());
+    const mesh = new THREE.Mesh(merged, sidewalkMaterial(type));
+    mesh.name = 'sidewalk_' + type; mesh.receiveShadow = true; scene.add(mesh);
   }
   addMerged(dashGeos, mat(0xe8e4d2), 'dashes');
   addMerged(pathGeos, mat(0xc9b896), 'paths');

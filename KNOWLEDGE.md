@@ -240,6 +240,14 @@ node mobile.mjs    # viewport điện thoại + joystick
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-06 (x)** [VÒNG 1 — NỀN]: VỈA HÈ ĐA DẠNG ĐÚNG TỪNG NƠI (hết "caro mặc định khắp nơi").
+    Nghiên cứu: map mỗi road p/s → pano gần nhất (≤60m) → agent thị giác phân loại vỉa hè từ 51 crop
+    → **phần lớn phố là XÁM bê tông (gach_xam)**, ca-rô đỏ-xám chỉ ở **bờ sông Tam Bạc/quảng trường**,
+    terracotta/con sâu vài đoạn. Sinh `js/sidewalks.js` (SIDEWALK_BY_ROAD theo INDEX road trong
+    ROADS_DT — index PHẢI ổn định, đừng regen mapdata làm lệch). world.js: `sidewalkMaterial(type)`
+    4 texture tả thực (gach_xam mặc định / caro_do_xam / terracotta / con_sau), layRoad bucket theo
+    type, gộp mỗi kiểu 1 mesh. UV bake ~1 texture/1.6m → ô ~0.4m. Cách nghiên cứu vỉa hè: crop pano
+    p0 lộ vỉa hè ở phần DƯỚI khung; agent phân loại theo bộ code cố định.
 - **2026-07-06 (w)**: HOÀN TÁC nén texture (v) — chủ dự án yêu cầu **100% chất lượng gốc** (cả chân
     dung Bác). Trả toàn bộ GLB về full-res. Kiến trúc phân phối CUỐI:
     (1) **jsDelivr GIỚI HẠN 20MB/file** — phát hiện khi 3 công trình full-res >20MB bị 403
