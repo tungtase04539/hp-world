@@ -48,6 +48,7 @@
     </div>
     <button id="hp-cap-start">▶ Bắt đầu chụp</button>
     <button id="hp-cap-stop" style="display:none">■ Dừng</button>
+    <button id="hp-cap-clear" style="background:#5a4636;color:#fff">🗑 Xóa tiến trình cũ (chụp lại từ đầu)</button>
     <div id="hp-cap-log"></div>
     <div class="muted" style="margin-top:8px">Cách B: mỗi góc trang sẽ tự nhảy URL & tải lại rồi chụp. <b>Đừng chuyển tab.</b> Ảnh → <b>Downloads/hp-streetview/</b>.</div>`;
   const mount = () => document.body.appendChild(panel);
@@ -160,6 +161,14 @@
     stopFlag = true; log('■ Dừng — lưu manifest…');
     const r = await bridge('getState');
     if (r && r.state) { await bridge('saveText', { filename: 'manifest.json', text: JSON.stringify(r.state.manifest || [], null, 2) }); await bridge('clearState'); }
+    reset();
+  });
+  // Xóa TIẾN TRÌNH cũ trong chrome.storage (phiên chụp dở của bộ toạ độ CŨ) để chụp lại từ đầu bộ MỚI.
+  // KHÔNG đụng file ảnh đã tải trong Downloads (nằm trên máy bạn).
+  $('hp-cap-clear').addEventListener('click', async () => {
+    stopFlag = true;
+    await bridge('clearState');
+    log(`🗑 Đã xóa tiến trình cũ. Bấm "Bắt đầu chụp" để chụp lại từ đầu ${WAYPOINTS.length} điểm mới.`);
     reset();
   });
 
