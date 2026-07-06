@@ -19,8 +19,9 @@ export function initCinematic({ renderer, camera }) {
   const keys = new Set();
   let yaw = 0, pitch = 0, speed = 45;
 
-  // playback
-  let posCurve = null, tgtCurve = null, dur = 1, elapsed = 0, onDone = null;
+  // playback — dùng ĐỒNG HỒ THỰC (performance.now) để không phụ thuộc fps / giới hạn dt
+  let posCurve = null, tgtCurve = null, dur = 1, startT = 0, onDone = null;
+  const nowS = () => (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000;
 
   // recording
   let rec = null, chunks = [];
@@ -75,7 +76,7 @@ export function initCinematic({ renderer, camera }) {
       if (!kf || kf.length < 2) return 'cần ≥2 điểm mốc';
       posCurve = new THREE.CatmullRomCurve3(kf.map(k => new THREE.Vector3(...k.pos)), false, 'catmullrom', 0.5);
       tgtCurve = new THREE.CatmullRomCurve3(kf.map(k => new THREE.Vector3(...(k.look || k.tgt))), false, 'catmullrom', 0.5);
-      dur = Math.max(0.1, sec); elapsed = 0; onDone = done || null;
+      dur = Math.max(0.1, sec); startT = nowS(); onDone = done || null;
       state.active = true; state.mode = 'play';
       return `chạy path ${kf.length} mốc trong ${sec}s`;
     },
@@ -105,8 +106,7 @@ export function initCinematic({ renderer, camera }) {
         if (keys.has('KeyQ')) camera.position.y -= sp;
         dir(); camera.lookAt(camera.position.clone().add(fwdVec));
       } else if (state.mode === 'play' && posCurve) {
-        elapsed += dt;
-        const t = Math.min(1, elapsed / dur), te = easeInOut(t);
+        const t = Math.min(1, (nowS() - startT) / dur), te = easeInOut(t);   // đồng hồ thực
         camera.position.copy(posCurve.getPoint(te));
         camera.lookAt(tgtCurve.getPoint(te));
         if (t >= 1) { state.mode = 'free'; syncFromCamera(); const cb = onDone; onDone = null; if (cb) cb(); }
