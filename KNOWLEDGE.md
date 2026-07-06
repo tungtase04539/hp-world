@@ -240,6 +240,13 @@ node mobile.mjs    # viewport điện thoại + joystick
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-06 (p)**: VƯỜN HOA KHỚP TỪNG Ô ĐẤT (min-area rect) + gộp container/karst.
+    • Vườn vẫn xiên vì dùng CHUNG 1 góc lưới `GU=[0.992,-0.126]` cho MỌI vườn, mà mỗi ô đất có hướng
+      riêng (phố cong). NAY mỗi vườn tính HÌNH CHỮ NHẬT BAO DIỆN TÍCH NHỎ NHẤT của CHÍNH polygon công
+      viên (`minAreaRect`: thử mọi hướng cạnh đa giác, chọn diện tích nhỏ nhất) → GU/GV/GROT riêng từng
+      vườn, cạnh song song mép ô/vỉa hè, phủ tới mép đất. Ảnh top-down: 6 vườn đều khớp ô, hết xiên.
+    • Container cảng: gộp theo 5 màu (trước ~340 mesh). Đá karst Cát Bà/Lan Hạ: gộp theo 2 material
+      (trước ~440 mesh). Mesh scene 5.942→5.480.
 - **2026-07-06 (o)**: HIỆU NĂNG LỚN — GỘP CÂY PROCEDURAL. Trước: `phuongTree`/`shadeTree`/`palm` mỗi cây là
     1 Group ~11-14 mesh, ~8700 cây → mesh scene 13.836, ~8700 draw call = nghẽn FPS chính (review chỉ ra).
     NAY: `bakeTree(group,x,z)` nướng geometry con vào hệ THẾ GIỚI (clone→toNonIndexed→applyMatrix4, chỉ

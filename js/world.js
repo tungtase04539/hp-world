@@ -1316,19 +1316,27 @@ export function buildWorld(scene) {
     }
     crane(PORT_X - 70); crane(PORT_X); crane(PORT_X + 70);
     const ctColors = [0xd84040, 0x2e86c1, 0x28a05c, 0xe8a020, 0x8e44ad];
+    const ctMats = ctColors.map((c) => mat(c));
+    const ctBuckets = ctColors.map(() => []);   // gộp container theo màu → 5 mesh (trước ~340 mesh/material)
     let ci = 0;
     for (let cx = PORT_X - 95; cx <= PORT_X + 95; cx += 13) {
       for (let cz = quayZ + 40; cz <= quayZ + 95; cz += 6.5) {
         const stack = 1 + (ci % 4);
         for (let s = 0; s < stack; s++) {
-          const ct = new THREE.Mesh(new THREE.BoxGeometry(12, 2.6, 2.4), mat(ctColors[(ci + s) % 5]));
-          ct.position.set(cx, LAND_H + 1.3 + s * 2.6, cz);
-          g.add(ct);
+          const geo = new THREE.BoxGeometry(12, 2.6, 2.4);
+          geo.translate(cx, LAND_H + 1.3 + s * 2.6, cz);
+          ctBuckets[(ci + s) % 5].push(geo);
         }
         addCollider(cx, cz, 6);
         ci++;
       }
     }
+    ctBuckets.forEach((geos, i) => {
+      if (!geos.length) return;
+      const m = new THREE.Mesh(mergeGeometries(geos), ctMats[i]);
+      geos.forEach((gg) => gg.dispose());
+      m.castShadow = true; m.receiveShadow = true; g.add(m);
+    });
     scene.add(g);
   }
 
@@ -1565,6 +1573,12 @@ export function buildWorld(scene) {
   {
     const karstMat = mat(0x93a284, { flatShading: true });
     const karstTop = mat(0x53a04c, { flatShading: true });
+    const rockGeos = [], topGeos = [];   // gộp đá karst theo material → 2 mesh (trước tới ~440 mesh)
+    const addRock = (jx, jy, jz, r, h, topR, topY, seed) => {
+      const rg = karstGeo(r, h, seed); rg.translate(jx, jy, jz); rockGeos.push(rg);
+      const tg = canopyGeo(topR, seed * 2 + 1); tg.translate(jx, topY, jz); topGeos.push(tg);
+      addCollider(jx, jz, r * 0.75);
+    };
     let nKarst = 0;
     for (let x = 30000; x <= 47000 && nKarst < 220; x += 700) {
       for (let z = 6000; z <= 22000 && nKarst < 220; z += 700) {
@@ -1575,26 +1589,20 @@ export function buildWorld(scene) {
         if (v > 0.75 && hash < 0.32) { // núi trên đảo lớn
           const r = 42 + hash * 70, h = 80 + hash * 90;
           const y = groundHeightNoDeck(jx, jz);
-          const rock = new THREE.Mesh(karstGeo(r, h, jx + jz), karstMat);
-          rock.position.set(jx, y + h / 2 - 0.6, jz);
-          scene.add(rock);
-          const top = new THREE.Mesh(canopyGeo(r * 0.45, jx * 2 + jz), karstTop);
-          top.position.set(jx, y + h - 0.5, jz);
-          scene.add(top);
-          addCollider(jx, jz, r * 0.75);
+          addRock(jx, y + h / 2 - 0.6, jz, r, h, r * 0.45, y + h - 0.5, jx + jz);
           nKarst++;
         } else if (v > 0.06 && v < 0.62 && hash > 0.45) { // đảo đá vôi giữa vịnh Lan Hạ
           const r = 20 + hash * 42, h = 45 + hash * 80;
-          const rock = new THREE.Mesh(karstGeo(r, h, jx + jz), karstMat);
-          rock.position.set(jx, -4 + h / 2, jz);
-          scene.add(rock);
-          const top = new THREE.Mesh(canopyGeo(r * 0.42, jx + jz * 3), karstTop);
-          top.position.set(jx, -4 + h - 0.5, jz);
-          scene.add(top);
-          addCollider(jx, jz, r * 0.75);
+          addRock(jx, -4 + h / 2, jz, r, h, r * 0.42, -4 + h - 0.5, jx + jz);
           nKarst++;
         }
       }
+    }
+    if (rockGeos.length) {
+      const rm = new THREE.Mesh(mergeGeometries(rockGeos.map((g) => g.toNonIndexed())), karstMat);
+      rockGeos.forEach((g) => g.dispose()); rm.castShadow = true; rm.receiveShadow = true; scene.add(rm);
+      const tm = new THREE.Mesh(mergeGeometries(topGeos.map((g) => g.toNonIndexed())), karstTop);
+      topGeos.forEach((g) => g.dispose()); tm.castShadow = true; scene.add(tm);
     }
   }
 
@@ -2381,31 +2389,51 @@ export function buildWorld(scene) {
         flowerDomeM[seed % flowerCols.length]);
       dome.position.set(bx, LAND_H + 0.38, bz); dome.scale.y = 0.5; scene.add(dome);
     }
-    // Lưới phố trung tâm KHÔNG song song trục XZ mà nghiêng ~7° theo hướng đường.
-    // → phải dùng OBB (oriented bounding box) theo trục lưới, KHÔNG dùng AABB
-    //   (AABB của 1 ô nghiêng bị phình ra, trùm cả lòng đường → "xiên xẹo, ra ngoài đường").
-    const GU = [0.992, -0.126], GV = [0.126, 0.992];            // trục dọc/ngang lưới phố
-    const GROT = Math.atan2(-GU[1], GU[0]);                     // rot.y để local +X trùng GU
-    // Snap mỗi vườn vào POLYGON CÔNG VIÊN THẬT gần nhất (OSM), đo theo TRỤC LƯỚI → khớp ĐÚNG ô
-    function nearestParkOBB(gx, gz, maxD = 140) {
+    // MỖI Ô ĐẤT có HƯỚNG RIÊNG (phố cong, ô xéo khác nhau) → KHÔNG dùng 1 góc lưới chung
+    // (dùng chung làm vườn xiên so với mép ô). Tính HÌNH CHỮ NHẬT BAO DIỆN TÍCH NHỎ NHẤT của
+    // CHÍNH polygon công viên (min-area rect: 1 cạnh trùng cạnh đa giác) → vườn khớp mép ô, cạnh
+    // song song vỉa hè, phủ đúng tới mép đất (hết "xiên xẹo").
+    function nearestPark(gx, gz, maxD = 170) {
       let best = null, bd = maxD;
       for (const pts of (PARKS || [])) {
+        let sx = 0, sz = 0; for (const [x, z] of pts) { sx += x; sz += z; }
+        const cx = sx / pts.length, cz = sz / pts.length;
+        const d = Math.hypot(cx - gx, cz - gz);
+        if (d < bd) { bd = d; best = pts; }
+      }
+      return best;
+    }
+    function minAreaRect(pts) {
+      let best = null; const seen = new Set();
+      for (let i = 0; i < pts.length; i++) {
+        const a = pts[i], b = pts[(i + 1) % pts.length];
+        const dx = b[0] - a[0], dz = b[1] - a[1], len = Math.hypot(dx, dz);
+        if (len < 1) continue;
+        const ux = dx / len, uz = dz / len;
+        const q = ((Math.round(Math.atan2(uz, ux) * 57.2958) % 180) + 180) % 180;  // gộp hướng trùng
+        if (seen.has(q)) continue; seen.add(q);
         let u1 = 1e9, u2 = -1e9, v1 = 1e9, v2 = -1e9;
         for (const [x, z] of pts) {
-          const au = x * GU[0] + z * GU[1], av = x * GV[0] + z * GV[1];
-          if (au < u1) u1 = au; if (au > u2) u2 = au;
-          if (av < v1) v1 = av; if (av > v2) v2 = av;
+          const u = x * ux + z * uz, v = -x * uz + z * ux;
+          if (u < u1) u1 = u; if (u > u2) u2 = u; if (v < v1) v1 = v; if (v > v2) v2 = v;
         }
-        const cu = (u1 + u2) / 2, cv = (v1 + v2) / 2;
-        const cx = cu * GU[0] + cv * GV[0], cz = cu * GU[1] + cv * GV[1];   // (u,v)→world
-        const d = Math.hypot(cx - gx, cz - gz);
-        if (d < bd) { bd = d; best = { x: Math.round(cx), z: Math.round(cz), w: Math.round(u2 - u1), d: Math.round(v2 - v1) }; }
+        const w = u2 - u1, h = v2 - v1, area = w * h;
+        if (!best || area < best.area) {
+          const cu = (u1 + u2) / 2, cv = (v1 + v2) / 2;
+          best = { area, u: [ux, uz], w, d: h, cx: cu * ux - cv * uz, cz: cu * uz + cv * ux };
+        }
       }
       return best;
     }
     for (const g0 of GARDENS) {
-      const bb = nearestParkOBB(g0.x, g0.z);
-      const g = bb ? { n: g0.n, x: bb.x, z: bb.z, w: Math.min(210, bb.w), d: Math.min(440, bb.d) } : g0;
+      const poly = nearestPark(g0.x, g0.z);
+      const rect = poly && poly.length >= 3 ? minAreaRect(poly) : null;
+      const GU = rect ? rect.u : [1, 0];              // trục dọc theo mép ô ĐẤT NÀY
+      const GV = [-GU[1], GU[0]];                     // trục ngang vuông góc
+      const GROT = Math.atan2(-GU[1], GU[0]);         // rot.y để local +X trùng GU
+      const g = rect
+        ? { n: g0.n, x: Math.round(rect.cx), z: Math.round(rect.cz), w: Math.min(230, Math.round(rect.w)), d: Math.min(460, Math.round(rect.d)) }
+        : g0;
       const y = groundHeightNoDeck(g.x, g.z);
       if (Math.abs(y - LAND_H) > 1.5 || riverFactor(g.x, g.z) > 0.02) continue;
       const hw = g.w / 2, hd = g.d / 2;
