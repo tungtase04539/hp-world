@@ -240,6 +240,13 @@ node mobile.mjs    # viewport điện thoại + joystick
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-06 (o)**: HIỆU NĂNG LỚN — GỘP CÂY PROCEDURAL. Trước: `phuongTree`/`shadeTree`/`palm` mỗi cây là
+    1 Group ~11-14 mesh, ~8700 cây → mesh scene 13.836, ~8700 draw call = nghẽn FPS chính (review chỉ ra).
+    NAY: `bakeTree(group,x,z)` nướng geometry con vào hệ THẾ GIỚI (clone→toNonIndexed→applyMatrix4, chỉ
+    primitive nội bộ nên AN TOÀN, khác GLB meshopt), gom theo (material × ô lưới 500m) → `flushTrees()`
+    `mergeGeometries` mỗi bucket thành 1 mesh. Kết quả: **13.836→5.942 mesh** (−7.894), draw call cây từ
+    ~8700 còn vài chục, VẪN CULL theo ô 500m. Ảnh đối chiếu: cây/hoa/tán y hệt, không hụt. `palm` dùng
+    chung `palmTrunkM` (trước tạo material mới mỗi cây).
 - **2026-07-06 (n)**: XE MÁY MESHY (ảnh thật Honda Cub đỏ) thay xe procedural + dọn hiệu năng.
     • `assets/moto.glb` (768KB, 43k tris) từ ảnh Wikimedia → Meshy → hậu xử lý (simplify 0.35, baseColor
       1024, `gltf-transform meshopt`). Kích thước gốc 1.91m dài ≈ Honda Cub thật.

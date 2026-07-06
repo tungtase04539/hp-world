@@ -1693,6 +1693,41 @@ export function buildWorld(scene) {
     }, undefined, (err) => console.error('hero bed', err));
   }
 
+  // ---------- GỘP CÂY PROCEDURAL (phượng/xà cừ/cọ) → vài mesh tĩnh ----------
+  // Trước: mỗi cây là 1 Group ~11-14 mesh, ~8700 cây → ~8700 draw call = sink FPS chính.
+  // Nay: nướng (bake) geometry con vào hệ THẾ GIỚI, gom theo (material × ô lưới 500m) rồi merge.
+  // Vẫn cull được theo ô (không phải luôn vẽ toàn thành phố), draw call giảm ~8700 → vài chục.
+  const TREE_TILE = 500;
+  const treeBuckets = new Map();     // key `matIdx|tx|tz` -> { mat, geos:[] }
+  const treeMatList = [];
+  const palmTrunkM = mat(0x8a6a42);
+  function bakeTree(group, cx, cz) {
+    group.updateMatrixWorld(true);
+    const tx = Math.floor(cx / TREE_TILE), tz = Math.floor(cz / TREE_TILE);
+    group.traverse((o) => {
+      if (!o.isMesh) return;
+      let mi = treeMatList.indexOf(o.material);
+      if (mi < 0) { mi = treeMatList.length; treeMatList.push(o.material); }
+      const key = mi + '|' + tx + '|' + tz;
+      let b = treeBuckets.get(key);
+      if (!b) treeBuckets.set(key, b = { mat: o.material, geos: [] });
+      const geo = (o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone());
+      geo.applyMatrix4(o.matrixWorld);   // geometry primitive nội bộ (KHÔNG phải GLB meshopt) → an toàn
+      b.geos.push(geo);
+    });
+  }
+  function flushTrees() {
+    for (const { mat: matr, geos } of treeBuckets.values()) {
+      if (!geos.length) continue;
+      const merged = mergeGeometries(geos, false);
+      geos.forEach((g) => g.dispose());
+      const m = new THREE.Mesh(merged, matr);
+      m.castShadow = true; m.receiveShadow = true;
+      scene.add(m);
+    }
+    treeBuckets.clear();
+  }
+
   // ---------- Cây phượng dải trung tâm + đèn đường (dọc phố thật) ----------
   // Cây phượng vĩ ĐA DẠNG: tán ô rộng dẹt + vòm hoa đỏ phủ trên (đặc trưng Hoa Phượng Đỏ).
   // Mỗi cây tự sinh biến thể theo vị trí: cao/thấp, nở rộ / nở vừa / chưa nở (hết mùa).
@@ -1738,14 +1773,14 @@ export function buildWorld(scene) {
     }
     g.position.set(x, y, z);
     g.rotation.y = x * 1.3 + z;
-    scene.add(g);
+    bakeTree(g, x, z);
     addCollider(x, z, 0.9 * scale);
   }
   function palm(x, z) {
     const g = new THREE.Group();
     const y = groundHeightNoDeck(x, z);
     if (y < 0.7) return;
-    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.32, 5, 6), mat(0x8a6a42));
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.32, 5, 6), palmTrunkM);
     trunk.position.y = 2.5; trunk.rotation.z = 0.12; g.add(trunk);
     for (let i = 0; i < 6; i++) {
       const leaf = new THREE.Mesh(new THREE.ConeGeometry(0.5, 3.4, 4), sharedMats.leafDark);
@@ -1755,7 +1790,7 @@ export function buildWorld(scene) {
       g.add(leaf);
     }
     g.position.set(x, y, z);
-    scene.add(g);
+    bakeTree(g, x, z);
     addCollider(x, z, 0.6);
   }
   {
@@ -2182,7 +2217,7 @@ export function buildWorld(scene) {
         const leaf = new THREE.Mesh(canopyGeo(crownR * rf, x * 2.3 + z * 1.9 + i), i % 2 ? sharedMats.leafGreen2 : sharedMats.leafGreen);
         leaf.position.set(ox * crownR, crownY + oy * crownR, oz * crownR); leaf.scale.y = 0.8; gg.add(leaf);
       });
-      gg.position.set(x, yy, z); gg.rotation.y = x + z * 1.7; scene.add(gg);
+      gg.position.set(x, yy, z); gg.rotation.y = x + z * 1.7; bakeTree(gg, x, z);
       addCollider(x, z, 1.0 * s);
     }
     for (const line of MEDIANS) {
@@ -2553,6 +2588,7 @@ export function buildWorld(scene) {
     return sp;
   };
 
+  flushTrees();      // GỘP toàn bộ cây procedural đã bake → vài mesh tĩnh (giảm ~8700 draw call)
   loadHeroTrees();   // nạp GLB cây phượng ảnh-thật rồi dựng InstancedMesh (bất đồng bộ)
   loadHeroBeds();    // nạp GLB luống hoa ảnh-thật rồi dựng InstancedMesh
   return world;
