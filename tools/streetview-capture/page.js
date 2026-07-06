@@ -46,6 +46,8 @@
       <div><label>Chờ tải trang (ms)</label><input id="hp-lw" type="number" value="4000"></div>
       <div><label>Bán kính pano (m)</label><input id="hp-rad" type="number" value="70"></div>
     </div>
+    <label>Đánh số pano TIẾP TỪ (đã có 420 pano cũ → điền 420 để ảnh mới là pano_421…, không đè folder cũ)</label>
+    <input id="hp-off" type="number" min="0" value="420">
     <button id="hp-cap-start">▶ Bắt đầu chụp</button>
     <button id="hp-cap-stop" style="display:none">■ Dừng</button>
     <button id="hp-cap-clear" style="background:#5a4636;color:#fff">🗑 Xóa tiến trình cũ (chụp lại từ đầu)</button>
@@ -77,6 +79,7 @@
     const nH = Math.max(4, Math.min(24, +$('hp-nh').value || 8));
     const pitches = ($('hp-pit').value || '0').split(',').map((s) => +s.trim()).filter((v) => !isNaN(v));
     const loadWait = +$('hp-lw').value || 3500, radius = +$('hp-rad').value || 70;
+    const offset = Math.max(0, +$('hp-off').value || 0);   // đánh số pano tiếp sau bộ cũ (không đè folder)
     const headings = Array.from({ length: nH }, (_, i) => Math.round((360 / nH) * i));
 
     log('Đang dò vùng có Street View (StreetViewService)…');
@@ -96,9 +99,11 @@
     const jobs = [];
     panos.forEach((p, pi) => { for (const pitch of pitches) for (const heading of headings) {
       jobs.push({ panoId: p.panoId, lat: p.lat, lng: p.lng, reqLat: p.reqLat, reqLng: p.reqLng, heading, pitch,
-        date: p.date, copyright: p.copyright, file: `pano_${String(pi + 1).padStart(3, '0')}_h${String(heading).padStart(3, '0')}_p${pitch}.jpg` });
+        date: p.date, copyright: p.copyright, file: `pano_${String(pi + 1 + offset).padStart(3, '0')}_h${String(heading).padStart(3, '0')}_p${pitch}.jpg` });
     } });
-    const state = { active: true, idx: 0, total: jobs.length, nPano: panos.length, loadWait, jobs, manifest: [] };
+    // manifest ĐỢT NÀY tên riêng theo offset → KHÔNG đè manifest.json cũ trong cùng folder
+    const manifestName = offset > 0 ? `manifest_from${offset + 1}.json` : 'manifest.json';
+    const state = { active: true, idx: 0, total: jobs.length, nPano: panos.length, loadWait, jobs, manifest: [], manifestName };
     await bridge('setState', { state });
     log(`Tìm thấy ${panos.length} pano → ${jobs.length} ảnh. Bắt đầu (điều hướng URL)…`);
     await sleep(400);
@@ -125,7 +130,7 @@
       }
       log(`⚠ Bỏ qua ${job.file} sau ${state.retry} lần lỗi.`);
       state.retry = 0; state.idx++;
-      if (state.idx >= state.total) { await bridge('saveText', { filename: 'manifest.json', text: JSON.stringify(state.manifest, null, 2) }); await bridge('clearState'); log(`🏁 XONG. ${state.manifest.length} ảnh.`); reset(); return; }
+      if (state.idx >= state.total) { await bridge('saveText', { filename: state.manifestName || 'manifest.json', text: JSON.stringify(state.manifest, null, 2) }); await bridge('clearState'); log(`🏁 XONG. ${state.manifest.length} ảnh.`); reset(); return; }
       await bridge('setState', { state }); await sleep(300); location.href = urlFor(state.jobs[state.idx]); return;
     }
     state.retry = 0;
@@ -141,7 +146,7 @@
 
     state.idx++;
     if (state.idx % 10 === 0 || state.idx >= state.total) {
-      await bridge('saveText', { filename: 'manifest.json', text: JSON.stringify(state.manifest, null, 2) });
+      await bridge('saveText', { filename: state.manifestName || 'manifest.json', text: JSON.stringify(state.manifest, null, 2) });
     }
     if (state.idx >= state.total) {
       await bridge('clearState');
@@ -160,7 +165,7 @@
   $('hp-cap-stop').addEventListener('click', async () => {
     stopFlag = true; log('■ Dừng — lưu manifest…');
     const r = await bridge('getState');
-    if (r && r.state) { await bridge('saveText', { filename: 'manifest.json', text: JSON.stringify(r.state.manifest || [], null, 2) }); await bridge('clearState'); }
+    if (r && r.state) { await bridge('saveText', { filename: (r.state.manifestName) || 'manifest.json', text: JSON.stringify(r.state.manifest || [], null, 2) }); await bridge('clearState'); }
     reset();
   });
   // Xóa TIẾN TRÌNH cũ trong chrome.storage (phiên chụp dở của bộ toạ độ CŨ) để chụp lại từ đầu bộ MỚI.
