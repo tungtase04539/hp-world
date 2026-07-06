@@ -214,19 +214,19 @@ export function buildWorld(scene) {
     colliders, updaters, groundHeight, groundHeightNoDeck, isWater, sharedMats,
     vehicleSpawns: [], npcSpots: {}, walkPaths: [],
   };
-  function addCollider(x, z, r) { colliders.push({ x, z, r }); }
-
-  // đẩy điểm ra khỏi vật cản — chỉ mục lưới, tự xây lại khi có collider mới (vd NPC thêm sau)
-  let colIdx = null, colIdxCount = -1;
+  // đẩy điểm ra khỏi vật cản — chỉ mục lưới XÂY 1 LẦN rồi CHÈN TĂNG DẦN (tránh xây lại O(P·C) lúc tải:
+  // ~9000 addCollider xen kẽ resolveCollisions khi rải cây → trước đây xây lại toàn map mỗi lần).
+  let colIdx = null;
+  const colKey = (x, z) => `${Math.floor(x / 48)},${Math.floor(z / 48)}`;
+  function addCollider(x, z, r) {
+    const c = { x, z, r };
+    colliders.push(c);
+    if (colIdx) { const k = colKey(x, z); let l = colIdx.get(k); if (!l) colIdx.set(k, l = []); l.push(c); }
+  }
   world.resolveCollisions = (p, pr = 0.45) => {
-    if (!colIdx || colIdxCount !== colliders.length) {
+    if (!colIdx) {
       colIdx = new Map();
-      colIdxCount = colliders.length;
-      for (const c of colliders) {
-        const k = `${Math.floor(c.x / 48)},${Math.floor(c.z / 48)}`;
-        if (!colIdx.has(k)) colIdx.set(k, []);
-        colIdx.get(k).push(c);
-      }
+      for (const c of colliders) { const k = colKey(c.x, c.z); let l = colIdx.get(k); if (!l) colIdx.set(k, l = []); l.push(c); }
     }
     const kx = Math.floor(p.x / 48), kz = Math.floor(p.z / 48);
     for (let dx = -1; dx <= 1; dx++) {
@@ -2366,6 +2366,9 @@ export function buildWorld(scene) {
   // An Biên → Ng.Văn Trỗi → Ng.Bỉnh Khiêm → Nguyễn Du(Nhà Kèn) → Kim Đồng → Tố Hữu
   {
     const flowerCols = [0xe8402a, 0xf4c430, 0xff5fa2, 0xff8c00, 0x9b59b6, 0xfdfdfd, 0xe74c3c];
+    // material bồn hoa CHIA SẺ theo màu (trước: tạo material mới mỗi bồn — hàng trăm bồn)
+    const flowerDomeM = flowerCols.map((col) =>
+      new THREE.MeshLambertMaterial({ color: col, emissive: col, emissiveIntensity: 0.14, flatShading: true }));
     const hedgeM = mat(0x3f7a3a);
     const pathM = mat(0xd8cba8);
     const bedRimM = mat(0xa89878);
@@ -2373,10 +2376,9 @@ export function buildWorld(scene) {
     function flowerBed(bx, bz, r, seed) {
       const rim = new THREE.Mesh(new THREE.CylinderGeometry(r, r + 0.3, 0.4, 10), bedRimM);
       rim.position.set(bx, LAND_H + 0.2, bz); rim.receiveShadow = true; scene.add(rim);
-      const col = flowerCols[seed % flowerCols.length];
       const dome = new THREE.Mesh(
         new THREE.SphereGeometry(r * 0.92, 8, 5, 0, Math.PI * 2, 0, Math.PI / 2),
-        new THREE.MeshLambertMaterial({ color: col, emissive: col, emissiveIntensity: 0.14, flatShading: true }));
+        flowerDomeM[seed % flowerCols.length]);
       dome.position.set(bx, LAND_H + 0.38, bz); dome.scale.y = 0.5; scene.add(dome);
     }
     // Lưới phố trung tâm KHÔNG song song trục XZ mà nghiêng ~7° theo hướng đường.
