@@ -240,6 +240,12 @@ node mobile.mjs    # viewport điện thoại + joystick
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-06 (r)**: CHẾ ĐỘ ĐẠO DIỄN (`js/cinematic.js`) cho trailer/giới thiệu/cutscene — KHÔNG đụng
+    lối chơi (off mặc định; khi bật, animate loop bỏ điều khiển nhân vật, camera do cinematic lo). API
+    `window.__cine`: `free()` camera bay tự do (WASD+chuột+Q/E+Shift); `mark()`/`playMarks(sec)` ghi &
+    bay qua điểm mốc; `play(keys,sec)` path tự định nghĩa; `demo(sec)` bay giới thiệu dải trung tâm
+    (CatmullRom + easeInOut); `startRec()/stopRec('tên')` quay .webm từ `canvas.captureStream()` +
+    MediaRecorder(VP9) rồi tải về; `recordDemo()` bay+quay+tải tự động; `stop()` trả camera cho lối chơi.
 - **2026-07-06 (q)**: VỈA HÈ + VƯỜN HOA hoàn thiện.
     • Vỉa hè ca-rô: bake UV THẲNG theo hướng từng đoạn đường (rotY) thay vì chiếu phẳng trục thế giới →
       ô ca-rô chạy song song mép đường (hết "ẩu/xiên").

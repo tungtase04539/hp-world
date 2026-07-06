@@ -20,6 +20,7 @@ import * as quests from './quests.js';
 import { initMinimap, drawMinimap } from './minimap.js';
 import { initMinigame, openMinigame, isMinigameOpen } from './minigame.js';
 import { initAssets, updateAssets } from './assets.js';
+import { initCinematic } from './cinematic.js';
 
 // ============ Khởi tạo đồ họa ============
 const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
@@ -46,6 +47,7 @@ const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerH
 // Hậu kỳ bloom (tắt trên di động để giữ mượt)
 const usePost = !isTouchDevice;
 let composer = null, bloomPass = null;
+const cine = initCinematic({ renderer, camera });   // chế độ đạo diễn (trailer/cutscene) — off mặc định
 if (usePost) {
   composer = new EffectComposer(renderer);
   composer.addPass(new RenderPass(scene, camera));
@@ -328,14 +330,16 @@ function animate() {
 
     if (consumeInteract()) handleInteract();
 
-    if (!modal) {
+    if (cine.active) {
+      // CHẾ ĐỘ ĐẠO DIỄN: không điều khiển nhân vật, camera do cinematic lo
+    } else if (!modal) {
       if (pState.mounted) updateMounted(dt, time);
       else updatePlayerOnFoot(dt, time);
     } else if (!pState.mounted) {
       player.animate(dt, 0, time);   // mở modal khi đang cưỡi → GIỮ tư thế ngồi (không animate lại)
     }
 
-    if (!modal) {
+    if (!modal && !cine.active) {
       const act = nearestInteraction();
       ui.setPrompt(act ? (input.isTouch ? act.label.replace('<b>E</b>', '✦') : act.label) : null);
     } else {
@@ -407,9 +411,13 @@ quests.bindQuestUI(ui, audio);
 initMinimap();
 setLang('vi');
 
+// Chế độ đạo diễn (trailer/giới thiệu/cutscene) — dùng qua console: __cine.free(), __cine.demo(), __cine.recordDemo()...
+window.__cine = cine;
+
 // Hook gỡ lỗi / chụp ảnh tour (không ảnh hưởng gameplay)
 window.__hp = {
   renderer, scene,   // chẩn đoán hiệu năng (draw calls / triangles)
+  cine,
   vehicles, mount, player,   // chẩn đoán/thử nghiệm cưỡi xe
   // Chẩn đoán: mọi thực thể tương tác có đứng đúng chỗ & tiếp cận được không
   diag() {
