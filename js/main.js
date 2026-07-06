@@ -369,7 +369,7 @@ function animate() {
     }
 
     traffic.update(dt, time, pState.pos);
-    updateCamera(dt);
+    if (cine.active) cine.update(dt); else updateCamera(dt);   // đạo diễn lo camera khi bật
     const sky = dayNight.update(dt, pState.pos);
     // đêm bloom mạnh hơn cho đèn phố & cửa sổ rực rỡ
     if (bloomPass) bloomPass.strength = 0.1 + sky.night * 0.6;
