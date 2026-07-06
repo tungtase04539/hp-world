@@ -18,7 +18,11 @@ let progressFn = null;
 // (cache immutable + edge toàn cầu, băng thông không giới hạn) thay cho
 // raw.githubusercontent (không phải CDN, cache ngắn → "tải lại" mỗi lần vào).
 const IS_LOCAL = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
-const JSDELIVR = 'https://cdn.jsdelivr.net/gh/tungtase04539/hp-world@assets-storage/';
+// Ghim theo COMMIT SHA (không dùng tên nhánh) → jsDelivr cache IMMUTABLE + đồng nhất
+// trên mọi edge (tránh tình trạng edge trả bản cũ/bản mới lẫn lộn khi asset đổi).
+// Cập nhật SHA này mỗi khi đổi asset (nhánh assets-storage HEAD).
+const ASSETS_SHA = '7a54597';
+const JSDELIVR = 'https://cdn.jsdelivr.net/gh/tungtase04539/hp-world@' + ASSETS_SHA + '/';
 const RAWGH = 'https://raw.githubusercontent.com/tungtase04539/hp-world/assets-storage/';
 // jsDelivr GIỚI HẠN 20MB/file → 3 công trình >20MB (giữ 100% chất lượng gốc, không nén)
 // phải dùng raw.githubusercontent (không giới hạn). Còn lại dùng jsDelivr (CDN nhanh).

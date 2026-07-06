@@ -240,7 +240,18 @@ node mobile.mjs    # viewport điện thoại + joystick
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
-- **2026-07-06 (v)**: NÉN TEXTURE "nhẹ mà chất lượng tối đa" — **13 công trình 231MB → 68MB (−70%)**,
+- **2026-07-06 (w)**: HOÀN TÁC nén texture (v) — chủ dự án yêu cầu **100% chất lượng gốc** (cả chân
+    dung Bác). Trả toàn bộ GLB về full-res. Kiến trúc phân phối CUỐI:
+    (1) **jsDelivr GIỚI HẠN 20MB/file** — phát hiện khi 3 công trình full-res >20MB bị 403
+    ("File size exceeded the configured limit of 20 MB"): **Bảo tàng 20.1MB, Quán hoa 22.4MB,
+    Lê Chân 29.4MB** → 3 cái này tải qua **raw.githubusercontent** (không giới hạn, CORS `*` ok);
+    còn lại qua jsDelivr. (2) **GHIM jsDelivr theo COMMIT SHA** (`ASSETS_SHA` trong assets.js),
+    KHÔNG dùng tên nhánh — vì cache nhánh trên jsDelivr **KHÔNG đồng nhất giữa các edge** (edge này
+    trả bản mới, edge kia trả bản cũ) sau khi asset đổi; SHA thì immutable + đồng nhất. **Đổi asset
+    → phải cập nhật `ASSETS_SHA`** = HEAD nhánh assets-storage. (3) Service Worker `v2` +
+    stale-while-revalidate để xoá cache bản nén cũ trong máy người chơi. Bài học: đừng nén lossy
+    khi chủ muốn 100%; jsDelivr 20MB limit; branch-ref cache jsDelivr không đáng tin khi content đổi.
+- **2026-07-06 (v)**: ~~NÉN TEXTURE~~ *(ĐÃ HOÀN TÁC ở (w) — chủ dự án muốn 100% chất lượng)*. NÉN TEXTURE "nhẹ mà chất lượng tối đa" — **13 công trình 231MB → 68MB (−70%)**,
     gần như VÔ TỔN THẤT (kiểm chứng render trước/sau: tượng Lê Chân, cổng trường, chữ, chân dung Bác
     đều giữ nguyên). Phát hiện: texture chiếm **84–86%** dung lượng GLB, thủ phạm chính là **normal map
     PNG ~8MB** + vài texture **4096**. Pipeline (`tools`/scratchpad `optimize_all.mjs`, dùng
