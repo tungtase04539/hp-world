@@ -494,6 +494,48 @@ export function buildWorld(scene) {
   addMerged(dashGeos, mat(0xe8e4d2), 'dashes');
   addMerged(pathGeos, mat(0xc9b896), 'paths');
 
+  // ---------- CỜ ĐỎ SAO VÀNG trên cột dọc các đại lộ trung tâm (thân thuộc + hợp 2/9) ----------
+  {
+    const flagTex = makeTex(128, 86, (g, w, h) => {
+      g.fillStyle = '#da251d'; g.fillRect(0, 0, w, h);           // nền đỏ
+      const cx = w / 2, cy = h / 2, R = h * 0.34, r = R * 0.42;  // sao vàng 5 cánh
+      g.fillStyle = '#ffdd00'; g.beginPath();
+      for (let i = 0; i < 10; i++) { const ang = -Math.PI / 2 + i * Math.PI / 5; const rad = i % 2 ? r : R; const x = cx + Math.cos(ang) * rad, y = cy + Math.sin(ang) * rad; i ? g.lineTo(x, y) : g.moveTo(x, y); }
+      g.closePath(); g.fill();
+    });
+    const flagMat = new THREE.MeshLambertMaterial({ map: flagTex, side: THREE.DoubleSide });
+    const poleGeos = [], flagGeos = [];
+    let fs = 777;
+    const frnd = () => { fs = (fs * 1103515245 + 12345) & 0x7fffffff; return fs / 0x7fffffff; };
+    for (let ri = 0; ri < ROADS_DT.length; ri++) {
+      const r = ROADS_DT[ri];
+      if (r.c !== 'p') continue;                    // chỉ đại lộ chính
+      for (let i = 0; i < r.pts.length - 1; i++) {
+        const [x1, z1] = r.pts[i], [x2, z2] = r.pts[i + 1];
+        const segLen = Math.hypot(x2 - x1, z2 - z1);
+        const dxn = (x2 - x1) / segLen, dzn = (z2 - z1) / segLen;
+        const rotY = Math.atan2(x2 - x1, z2 - z1);
+        const px = Math.cos(rotY), pz = -Math.sin(rotY);
+        for (let d = 12; d < segLen - 12; d += 26) {   // cột cờ cách ~26m
+          const mx = x1 + dxn * d, mz = z1 + dzn * d;
+          if (mx * mx + mz * mz > 1300 * 1300) continue;
+          const side = frnd() < 0.5 ? 1 : -1;
+          const gx = mx + side * (ROAD_W.p / 2 + 1.2) * px, gz = mz + side * (ROAD_W.p / 2 + 1.2) * pz;
+          const gy = groundHeight(gx, gz);
+          if (gy < LAND_H - 0.5 || isWater(gx, gz)) continue;
+          const H = 5.4;
+          const pole = new THREE.CylinderGeometry(0.06, 0.08, H, 6); pole.translate(gx, gy + H / 2, gz); poleGeos.push(pole);
+          // lá cờ 1.4×0.9 gần đỉnh, bay dọc theo đường
+          const flag = new THREE.PlaneGeometry(1.4, 0.9);
+          const e = new THREE.Euler(0, rotY, 0), q = new THREE.Quaternion().setFromEuler(e);
+          const mm = new THREE.Matrix4().compose(new THREE.Vector3(gx + dxn * 0.75, gy + H - 0.7, gz + dzn * 0.75), q, new THREE.Vector3(1, 1, 1));
+          flag.applyMatrix4(mm); flagGeos.push(flag);
+        }
+      }
+    }
+    if (poleGeos.length) { addMerged(poleGeos, mat(0xb8bcc2), 'flagpoles'); const fm = mergeGeometries(flagGeos); flagGeos.forEach((g) => g.dispose()); const mesh = new THREE.Mesh(fm, flagMat); mesh.name = 'flags'; scene.add(mesh); }
+  }
+
   // ---------- XE MÁY ĐỖ VỈA HÈ (đặc trưng nhất Hải Phòng) — 2 InstancedMesh low-poly ----------
   // Hero xe máy đang chạy vẫn là moto.glb Meshy; xe ĐỖ dùng scooter procedural nhẹ, instanced hàng trăm chiếc.
   {
