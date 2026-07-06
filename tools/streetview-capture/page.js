@@ -46,8 +46,11 @@
       <div><label>Chờ tải trang (ms)</label><input id="hp-lw" type="number" value="4000"></div>
       <div><label>Bán kính pano (m)</label><input id="hp-rad" type="number" value="70"></div>
     </div>
-    <label>Đánh số pano TIẾP TỪ (đã có 420 pano cũ → điền 420 để ảnh mới là pano_421…, không đè folder cũ)</label>
-    <input id="hp-off" type="number" min="0" value="420">
+    <div class="row">
+      <div><label>Đánh số pano tiếp từ</label><input id="hp-off" type="number" min="0" value="420"></div>
+      <div><label>Bỏ qua N pano đầu (đã chụp)</label><input id="hp-skip" type="number" min="0" value="0"></div>
+    </div>
+    <div class="muted" style="margin-top:2px">Chụp tiếp sau khi gián đoạn: giữ "đánh số từ" = 420; điền "bỏ qua" = số pano đã xong (vd đã tới pano_464 → bỏ qua 44 → chụp tiếp pano_465).</div>
     <button id="hp-cap-start">▶ Bắt đầu chụp</button>
     <button id="hp-cap-stop" style="display:none">■ Dừng</button>
     <button id="hp-cap-clear" style="background:#5a4636;color:#fff">🗑 Xóa tiến trình cũ (chụp lại từ đầu)</button>
@@ -80,6 +83,7 @@
     const pitches = ($('hp-pit').value || '0').split(',').map((s) => +s.trim()).filter((v) => !isNaN(v));
     const loadWait = +$('hp-lw').value || 3500, radius = +$('hp-rad').value || 70;
     const offset = Math.max(0, +$('hp-off').value || 0);   // đánh số pano tiếp sau bộ cũ (không đè folder)
+    const skipPanos = Math.max(0, +$('hp-skip').value || 0);   // bỏ qua N pano ĐÃ CHỤP (nối tiếp sau gián đoạn)
     const headings = Array.from({ length: nH }, (_, i) => Math.round((360 / nH) * i));
 
     log('Đang dò vùng có Street View (StreetViewService)…');
@@ -97,10 +101,14 @@
     if (!panos.length) { log('⚠ Không thấy Street View nào ở dải trung tâm (Hải Phòng có thể chưa phủ).'); reset(); return; }
 
     const jobs = [];
-    panos.forEach((p, pi) => { for (const pitch of pitches) for (const heading of headings) {
-      jobs.push({ panoId: p.panoId, lat: p.lat, lng: p.lng, reqLat: p.reqLat, reqLng: p.reqLng, heading, pitch,
-        date: p.date, copyright: p.copyright, file: `pano_${String(pi + 1 + offset).padStart(3, '0')}_h${String(heading).padStart(3, '0')}_p${pitch}.jpg` });
-    } });
+    panos.forEach((p, pi) => {
+      if (pi < skipPanos) return;   // pano này đã chụp lần trước → bỏ qua (giữ pi để đánh số liên tục)
+      for (const pitch of pitches) for (const heading of headings) {
+        jobs.push({ panoId: p.panoId, lat: p.lat, lng: p.lng, reqLat: p.reqLat, reqLng: p.reqLng, heading, pitch,
+          date: p.date, copyright: p.copyright, file: `pano_${String(pi + 1 + offset).padStart(3, '0')}_h${String(heading).padStart(3, '0')}_p${pitch}.jpg` });
+      }
+    });
+    if (!jobs.length) { log('✓ Không còn pano nào để chụp (đã bỏ qua hết).'); reset(); return; }
     // manifest ĐỢT NÀY tên riêng theo offset → KHÔNG đè manifest.json cũ trong cùng folder
     const manifestName = offset > 0 ? `manifest_from${offset + 1}.json` : 'manifest.json';
     const state = { active: true, idx: 0, total: jobs.length, nPano: panos.length, loadWait, jobs, manifest: [], manifestName };
