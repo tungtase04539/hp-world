@@ -240,6 +240,13 @@ node mobile.mjs    # viewport điện thoại + joystick
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-06 (l)**: VƯỜN HOA KHỚP Ô THEO OBB (sửa "xiên xẹo, ra ngoài đường"). Lưới phố trung tâm
+    KHÔNG song song trục XZ mà NGHIÊNG ~7° (trục dọc `GU=[0.992,-0.126]`, ngang `GV=[0.126,0.992]`).
+    Trước dùng AABB (bbox theo XZ) của polygon công viên nghiêng → hộp phình to, trùm cả lòng đường.
+    NAY: `nearestParkOBB` chiếu đỉnh polygon lên GU/GV để lấy extent+tâm ĐÚNG theo trục lưới; dựng vườn
+    trong `THREE.Group` xoay `GROT=atan2(-GU[1],GU[0])`, mọi box con (cỏ/rào/lối) toạ độ LOCAL, còn
+    bồn/luống/cây map LOCAL→world bằng `L(ox,oz)=[gx+ox*GU+oz*GV...]`. Kết quả: vườn nằm gọn TRONG ô,
+    song song đường (world.js mục "DẢI VƯỜN HOA TRUNG TÂM").
 - **2026-07-06 (k)**: KIỂM TOÁN ẢNH STREET VIEW THẬT (3360 ảnh/420 pano ở nhánh `streetview-refs`)
     + DỰNG DẢI TRUNG TÂM GIỐNG THẬT. Công cụ: `tools/gen_sv_coords`, bản đồ phủ (chuyển panoLat/Lng→XZ,
     chấm pano + công trình + đường), helper tìm ảnh nhìn đúng công trình (heading Google=atan2(dx,-dz)).

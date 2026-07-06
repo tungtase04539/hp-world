@@ -2344,36 +2344,52 @@ export function buildWorld(scene) {
         new THREE.MeshLambertMaterial({ color: col, emissive: col, emissiveIntensity: 0.14, flatShading: true }));
       dome.position.set(bx, LAND_H + 0.38, bz); dome.scale.y = 0.5; scene.add(dome);
     }
-    // Snap mỗi vườn vào POLYGON CÔNG VIÊN THẬT gần nhất (OSM) → phủ ĐÚNG cả ô (vị trí + cỡ thật)
-    function nearestParkBBox(gx, gz, maxD = 140) {
+    // Lưới phố trung tâm KHÔNG song song trục XZ mà nghiêng ~7° theo hướng đường.
+    // → phải dùng OBB (oriented bounding box) theo trục lưới, KHÔNG dùng AABB
+    //   (AABB của 1 ô nghiêng bị phình ra, trùm cả lòng đường → "xiên xẹo, ra ngoài đường").
+    const GU = [0.992, -0.126], GV = [0.126, 0.992];            // trục dọc/ngang lưới phố
+    const GROT = Math.atan2(-GU[1], GU[0]);                     // rot.y để local +X trùng GU
+    // Snap mỗi vườn vào POLYGON CÔNG VIÊN THẬT gần nhất (OSM), đo theo TRỤC LƯỚI → khớp ĐÚNG ô
+    function nearestParkOBB(gx, gz, maxD = 140) {
       let best = null, bd = maxD;
       for (const pts of (PARKS || [])) {
-        let x1 = 1e9, x2 = -1e9, z1 = 1e9, z2 = -1e9;
-        for (const [x, z] of pts) { x1 = Math.min(x1, x); x2 = Math.max(x2, x); z1 = Math.min(z1, z); z2 = Math.max(z2, z); }
-        const cx = (x1 + x2) / 2, cz = (z1 + z2) / 2, d = Math.hypot(cx - gx, cz - gz);
-        if (d < bd) { bd = d; best = { x: Math.round(cx), z: Math.round(cz), w: Math.round(x2 - x1), d: Math.round(z2 - z1) }; }
+        let u1 = 1e9, u2 = -1e9, v1 = 1e9, v2 = -1e9;
+        for (const [x, z] of pts) {
+          const au = x * GU[0] + z * GU[1], av = x * GV[0] + z * GV[1];
+          if (au < u1) u1 = au; if (au > u2) u2 = au;
+          if (av < v1) v1 = av; if (av > v2) v2 = av;
+        }
+        const cu = (u1 + u2) / 2, cv = (v1 + v2) / 2;
+        const cx = cu * GU[0] + cv * GV[0], cz = cu * GU[1] + cv * GV[1];   // (u,v)→world
+        const d = Math.hypot(cx - gx, cz - gz);
+        if (d < bd) { bd = d; best = { x: Math.round(cx), z: Math.round(cz), w: Math.round(u2 - u1), d: Math.round(v2 - v1) }; }
       }
       return best;
     }
     for (const g0 of GARDENS) {
-      const bb = nearestParkBBox(g0.x, g0.z);
+      const bb = nearestParkOBB(g0.x, g0.z);
       const g = bb ? { n: g0.n, x: bb.x, z: bb.z, w: Math.min(210, bb.w), d: Math.min(440, bb.d) } : g0;
       const y = groundHeightNoDeck(g.x, g.z);
       if (Math.abs(y - LAND_H) > 1.5 || riverFactor(g.x, g.z) > 0.02) continue;
       const hw = g.w / 2, hd = g.d / 2;
+      // local (ox theo GU, oz theo GV) → world XZ
+      const L = (ox, oz) => [g.x + ox * GU[0] + oz * GV[0], g.z + ox * GU[1] + oz * GV[1]];
+      // group xoay theo lưới phố: mọi box con dùng toạ độ LOCAL, group lo phần xoay
+      const gg = new THREE.Group();
+      gg.position.set(g.x, LAND_H, g.z); gg.rotation.y = GROT; scene.add(gg);
       // thảm cỏ nền phủ CẢ Ô
       const lawn = new THREE.Mesh(new THREE.BoxGeometry(g.w, 0.12, g.d), lawnM);
-      lawn.position.set(g.x, LAND_H + 0.06, g.z); lawn.receiveShadow = true; scene.add(lawn);
+      lawn.position.set(0, 0.06, 0); lawn.receiveShadow = true; gg.add(lawn);
       // hàng rào cây thấp quanh vườn
       for (const [ex, ez, ew, ed] of [[0, -hd, g.w, 1.3], [0, hd, g.w, 1.3], [-hw, 0, 1.3, g.d], [hw, 0, 1.3, g.d]]) {
         const hedge = new THREE.Mesh(new THREE.BoxGeometry(ew, 1.0, ed), hedgeM);
-        hedge.position.set(g.x + ex, LAND_H + 0.55, g.z + ez); hedge.castShadow = true; scene.add(hedge);
+        hedge.position.set(ex, 0.55, ez); hedge.castShadow = true; gg.add(hedge);
       }
       // lối đi chữ thập lát gạch
       const pH = new THREE.Mesh(new THREE.BoxGeometry(g.w - 2, 0.16, 3.4), pathM);
-      pH.position.set(g.x, LAND_H + 0.12, g.z); scene.add(pH);
+      pH.position.set(0, 0.12, 0); gg.add(pH);
       const pV = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.16, g.d - 2), pathM);
-      pV.position.set(g.x, LAND_H + 0.12, g.z); scene.add(pV);
+      pV.position.set(0, 0.12, 0); gg.add(pV);
       // bồn hoa TRUNG TÂM: luống hoa ẢNH-THẬT (Meshy) to theo cỡ vườn — vườn Nhà Kèn giữ Nhà Kèn
       const isKen = Math.hypot(g.x - LM.nhaken[0], g.z - LM.nhaken[1]) < 20;
       if (!isKen) heroBed(g.x, g.z, Math.max(7, Math.min(14, hw * 0.42, hd * 0.42)));
@@ -2384,17 +2400,18 @@ export function buildWorld(scene) {
         for (let oz = -hd + 10; oz <= hd - 10; oz += 17) {
           if (Math.abs(ox) < 5 || Math.abs(oz) < 5) continue;      // chừa lối đi chữ thập
           if (Math.hypot(ox, oz) < Math.max(12, hw * 0.24)) continue; // chừa bồn trung tâm
-          flowerBed(g.x + ox, g.z + oz, 1.7 + ((bi * 7) % 3) * 0.45, bi); bi++;
+          const [wx, wz] = L(ox, oz);
+          flowerBed(wx, wz, 1.7 + ((bi * 7) % 3) * 0.45, bi); bi++;
         }
       }
       // Cây quanh CHU VI vườn: chủ yếu procedural (nhẹ), điểm hero ở 4 góc
       const corners = [[-hw + 6, -hd + 6], [hw - 6, hd - 6], [-hw + 6, hd - 6], [hw - 6, -hd + 6]];
       for (const [cxx, czz] of corners) {
-        const tx = g.x + cxx, tz = g.z + czz;
+        const [tx, tz] = L(cxx, czz);
         if (Math.abs(groundHeightNoDeck(tx, tz) - LAND_H) < 0.6) heroTree(tx, tz);
       }
       const edge = (ox, oz) => {
-        const tx = g.x + ox, tz = g.z + oz;
+        const [tx, tz] = L(ox, oz);
         if (Math.abs(groundHeightNoDeck(tx, tz) - LAND_H) > 0.6) return;
         phuongTree(tx, tz);
       };
