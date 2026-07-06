@@ -1896,9 +1896,11 @@ export function buildWorld(scene) {
   placeGLB({
     url: 'assets/thptnq.glb', name: 'THPT Ngô Quyền',
     x: LM.thptnq[0], z: LM.thptnq[1],
-    // cổng quay VUÔNG GÓC với đường thật cạnh trường (đường Bắc–Nam, tiếp tuyến OSM [0.125,0.992])
-    // → mặt tiền/cổng hướng thẳng ra đường về phía Đông: [0.992,-0.126].
-    rot: orientFace([0.992, -0.126]), size: 80,
+    // Trường Bonnal là NHÀ GÓC: cạnh dài (mặt tiền +Z của mô hình) chạy dọc Phố Nguyễn
+    // Đức Cảnh (tiếp tuyến OSM thật [0.981,-0.195], nằm phía Bắc trường), cạnh ngắn quay
+    // ra Phố Mê Linh (phía Đông). → mặt tiền dài quay VUÔNG GÓC ra Nguyễn Đức Cảnh, pháp
+    // tuyến hướng Bắc: [-0.195,-0.981] (khớp footprint OSM + ảnh Street View "32 Nguyễn Đức Cảnh").
+    rot: orientFace([-0.195, -0.981]), size: 80,
   });
   addCollider(LM.thptnq[0], LM.thptnq[1], 32);
   // 2 trường THCS: khối lớp chữ U + sân + cột cờ + cổng bảng tên (chưa có ảnh kiến trúc đạt chuẩn)

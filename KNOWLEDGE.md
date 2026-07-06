@@ -240,6 +240,16 @@ node mobile.mjs    # viewport điện thoại + joystick
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-06 (t)**: SỬA HƯỚNG THPT NGÔ QUYỀN (trường Bonnal) — hết lệch. Trường là NHÀ GÓC ở ngã tư
+    Phố Nguyễn Đức Cảnh × Phố Mê Linh. Đối chiếu OSM thật (Overpass, around 130m quanh 20.85520,106.67954):
+    footprint dài 48–67m chạy theo trục [0.98,−0.20] (SONG SONG Nguyễn Đức Cảnh, tiếp tuyến [0.981,−0.195],
+    đường nằm phía BẮC trường); Mê Linh (tiếp tuyến [0.104,0.995]) nằm phía ĐÔNG. Trước đây đặt
+    `orientFace([0.992,−0.126])` = mặt tiền quay ĐÔNG (sai ~90°). NAY `orientFace([−0.195,−0.981])`:
+    mặt tiền dài (local +Z của GLB, có cổng "NGÔ QUYỀN") quay VUÔNG GÓC ra Nguyễn Đức Cảnh, pháp tuyến
+    hướng Bắc — khớp footprint + ảnh Street View "31/32 Nguyễn Đức Cảnh" (nhà vàng Pháp, chớp cửa xanh).
+    Bản thân GLB thptnq.glb ĐẠT CHUẨN (kiểm tra render riêng: mặt tiền vàng, cổng NGÔ QUYỀN đúng) — chỉ
+    lỗi GÓC QUAY, không cần dựng lại. Kỹ thuật xác minh: dựng trang `glbview.html` render GLB đơn top/front
+    để biết trục dài (local X) + mặt tiền (local +Z); orientFace(f)=atan2(f.x,f.z) đưa +Z về hướng f.
 - **2026-07-06 (s)**: VƯỜN HOA VẼ THEO ĐÚNG POLYGON Ô ĐẤT (hết lệch với ô bình hành). Min-area RECT chỉ
     đúng khi ô là chữ nhật; ô đất giữa 2 đường cắt xéo là HÌNH BÌNH HÀNH → chữ nhật không khớp, lệch ở 2
     đầu. NAY vẽ cỏ = `ExtrudeGeometry` từ CHÍNH polygon công viên (nong ×1.14 quanh tâm để ra tới vỉa hè,
