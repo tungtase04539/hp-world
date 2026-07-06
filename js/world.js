@@ -556,6 +556,14 @@ export function buildWorld(scene) {
             cols[i * 3 + 2] = 0.64 * shade;
             continue;
           }
+          // TẦNG TRỆT SHOPFRONT: nhà ống VN tầng 1 là cửa hàng/kính/cửa cuốn tối màu ấm
+          if (!isRoof) {
+            const yRel = posA.getY(i) - LAND_H;
+            if (yRel > 0.15 && yRel < 3.5) {
+              cols[i * 3] = 0.34 * shade; cols[i * 3 + 1] = 0.31 * shade; cols[i * 3 + 2] = 0.29 * shade;
+              continue;
+            }
+          }
           cols[i * 3] = c.r * shade;
           cols[i * 3 + 1] = c.g * shade;
           cols[i * 3 + 2] = c.b * shade;
