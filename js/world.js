@@ -2344,11 +2344,24 @@ export function buildWorld(scene) {
         new THREE.MeshLambertMaterial({ color: col, emissive: col, emissiveIntensity: 0.14, flatShading: true }));
       dome.position.set(bx, LAND_H + 0.38, bz); dome.scale.y = 0.5; scene.add(dome);
     }
-    for (const g of GARDENS) {
+    // Snap mỗi vườn vào POLYGON CÔNG VIÊN THẬT gần nhất (OSM) → phủ ĐÚNG cả ô (vị trí + cỡ thật)
+    function nearestParkBBox(gx, gz, maxD = 140) {
+      let best = null, bd = maxD;
+      for (const pts of (PARKS || [])) {
+        let x1 = 1e9, x2 = -1e9, z1 = 1e9, z2 = -1e9;
+        for (const [x, z] of pts) { x1 = Math.min(x1, x); x2 = Math.max(x2, x); z1 = Math.min(z1, z); z2 = Math.max(z2, z); }
+        const cx = (x1 + x2) / 2, cz = (z1 + z2) / 2, d = Math.hypot(cx - gx, cz - gz);
+        if (d < bd) { bd = d; best = { x: Math.round(cx), z: Math.round(cz), w: Math.round(x2 - x1), d: Math.round(z2 - z1) }; }
+      }
+      return best;
+    }
+    for (const g0 of GARDENS) {
+      const bb = nearestParkBBox(g0.x, g0.z);
+      const g = bb ? { n: g0.n, x: bb.x, z: bb.z, w: Math.min(210, bb.w), d: Math.min(440, bb.d) } : g0;
       const y = groundHeightNoDeck(g.x, g.z);
       if (Math.abs(y - LAND_H) > 1.5 || riverFactor(g.x, g.z) > 0.02) continue;
       const hw = g.w / 2, hd = g.d / 2;
-      // thảm cỏ nền
+      // thảm cỏ nền phủ CẢ Ô
       const lawn = new THREE.Mesh(new THREE.BoxGeometry(g.w, 0.12, g.d), lawnM);
       lawn.position.set(g.x, LAND_H + 0.06, g.z); lawn.receiveShadow = true; scene.add(lawn);
       // hàng rào cây thấp quanh vườn
@@ -2361,29 +2374,33 @@ export function buildWorld(scene) {
       pH.position.set(g.x, LAND_H + 0.12, g.z); scene.add(pH);
       const pV = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.16, g.d - 2), pathM);
       pV.position.set(g.x, LAND_H + 0.12, g.z); scene.add(pV);
-      // bồn hoa TRUNG TÂM: luống hoa ẢNH-THẬT (Meshy) — vườn Nhà Kèn thì Nhà Kèn là điểm nhấn nên bỏ
-      const isKen = Math.hypot(g.x - LM.nhaken[0], g.z - LM.nhaken[1]) < 12;
-      if (!isKen) {
-        heroBed(g.x, g.z, Math.min(7.5, hw * 0.7, hd * 0.7));   // luống hoa Meshy, ĐI ĐƯỢC (không collider)
-      } else {
-        addCollider(g.x, g.z, 5);   // chỉ Nhà Kèn (công trình) mới chặn
-      }
-      // luống hoa 4 góc phần tư — procedural nhiều màu (đi được, tô điểm quanh luống chính)
+      // bồn hoa TRUNG TÂM: luống hoa ẢNH-THẬT (Meshy) to theo cỡ vườn — vườn Nhà Kèn giữ Nhà Kèn
+      const isKen = Math.hypot(g.x - LM.nhaken[0], g.z - LM.nhaken[1]) < 20;
+      if (!isKen) heroBed(g.x, g.z, Math.max(7, Math.min(14, hw * 0.42, hd * 0.42)));
+      else addCollider(g.x, g.z, 5);
+      // LUỐNG HOA dàn KHẮP vườn (lưới) — nhiều màu, đi được
       let bi = 3;
-      for (const qx of [-1, 1]) for (const qz of [-1, 1]) {
-        for (let a = 0; a < 2; a++) for (let b = 0; b < 2; b++) {
-          const bx = g.x + qx * (8 + a * 8), bz = g.z + qz * (8 + b * 8.5);
-          if (Math.abs(bx - g.x) > hw - 2.5 || Math.abs(bz - g.z) > hd - 2.5) continue;
-          flowerBed(bx, bz, 1.8 + ((bi * 7) % 3) * 0.4, bi);
-          bi++;
+      for (let ox = -hw + 10; ox <= hw - 10; ox += 17) {
+        for (let oz = -hd + 10; oz <= hd - 10; oz += 17) {
+          if (Math.abs(ox) < 5 || Math.abs(oz) < 5) continue;      // chừa lối đi chữ thập
+          if (Math.hypot(ox, oz) < Math.max(12, hw * 0.24)) continue; // chừa bồn trung tâm
+          flowerBed(g.x + ox, g.z + oz, 1.7 + ((bi * 7) % 3) * 0.45, bi); bi++;
         }
       }
-      // cây phượng ảnh-thật (Meshy) 4 góc vườn — điểm nhấn nơi người chơi dạo nhiều
-      for (const [cxx, czz] of [[-hw + 5, -hd + 5], [hw - 5, hd - 5], [-hw + 5, hd - 5], [hw - 5, -hd + 5]]) {
+      // Cây quanh CHU VI vườn: chủ yếu procedural (nhẹ), điểm hero ở 4 góc
+      const corners = [[-hw + 6, -hd + 6], [hw - 6, hd - 6], [-hw + 6, hd - 6], [hw - 6, -hd + 6]];
+      for (const [cxx, czz] of corners) {
         const tx = g.x + cxx, tz = g.z + czz;
         if (Math.abs(groundHeightNoDeck(tx, tz) - LAND_H) < 0.6) heroTree(tx, tz);
       }
-      // KHÔNG chặn giữa vườn (trừ Nhà Kèn ở trên) — công viên/vườn hoa ĐI ĐƯỢC, khác công trình
+      const edge = (ox, oz) => {
+        const tx = g.x + ox, tz = g.z + oz;
+        if (Math.abs(groundHeightNoDeck(tx, tz) - LAND_H) > 0.6) return;
+        phuongTree(tx, tz);
+      };
+      for (let ox = -hw + 18; ox <= hw - 18; ox += 26) { edge(ox, -hd + 6); edge(ox, hd - 6); }
+      for (let oz = -hd + 26; oz <= hd - 26; oz += 26) { edge(-hw + 6, oz); edge(hw - 6, oz); }
+      // KHÔNG chặn giữa vườn (trừ Nhà Kèn) — công viên/vườn hoa ĐI ĐƯỢC
     }
   }
 
@@ -2452,10 +2469,12 @@ export function buildWorld(scene) {
     scene.add(c);
     clouds.push(c);
   }
+  // Mây TRÔI theo gió — tốc độ hợp tỉ lệ 1:1 (trước để 2.2 m/s, ở thế giới 55km nhìn như đứng im)
+  clouds.forEach((c, i) => { c.userData.drift = 13 + (i % 5) * 3.5; });   // ~13–27 m/s mỗi đám
   updaters.push((dt) => {
     for (const c of clouds) {
-      c.position.x += dt * 2.2;
-      if (c.position.x > WORLD_BOUNDS.maxX + 100) c.position.x = WORLD_BOUNDS.minX - 100;
+      c.position.x += dt * c.userData.drift;
+      if (c.position.x > WORLD_BOUNDS.maxX + 400) c.position.x = WORLD_BOUNDS.minX - 400;
     }
   });
   function gullFlock(cx, cz, n) {

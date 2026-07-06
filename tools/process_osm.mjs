@@ -559,6 +559,18 @@ for (const nm of ['Trần Hưng Đạo', 'Trần Phú', 'Điện Biên Phủ']) 
 console.log('MEDIANS:', MEDIANS.map((m) => m.length));
 
 // ---------- Dải VƯỜN HOA trung tâm (chuỗi vườn hoa đặc trưng Hải Phòng) ----------
+// Snap mỗi vườn vào POLYGON CÔNG VIÊN THẬT gần nhất (OSM) để phủ ĐÚNG cả ô (vị trí + kích thước
+// thật), thay vì rectangle đặt tay bé/lệch. Dùng bbox của polygon.
+function parkBBoxNear(gx, gz, maxD = 130) {
+  let best = null, bd = maxD;
+  for (const pts of PARKS) {
+    let x1 = 1e9, x2 = -1e9, z1 = 1e9, z2 = -1e9;
+    for (const [x, z] of pts) { x1 = Math.min(x1, x); x2 = Math.max(x2, x); z1 = Math.min(z1, z); z2 = Math.max(z2, z); }
+    const cx = (x1 + x2) / 2, cz = (z1 + z2) / 2, d = Math.hypot(cx - gx, cz - gz);
+    if (d < bd) { bd = d; best = { x: Math.round(cx), z: Math.round(cz), w: Math.round(x2 - x1), d: Math.round(z2 - z1) }; }
+  }
+  return best;
+}
 const GARDENS = [
   { n: 'An Biên', lon: 106.68060, lat: 20.85622, w: 58, d: 42 },
   { n: 'Nguyễn Văn Trỗi', lon: 106.68309, lat: 20.85687, w: 54, d: 40 },
@@ -566,7 +578,12 @@ const GARDENS = [
   { n: 'Nguyễn Du', lon: 106.68645, lat: 20.85890, w: 70, d: 50 },
   { n: 'Kim Đồng', lon: 106.68794, lat: 20.86053, w: 58, d: 44 },
   { n: 'Tố Hữu', lon: 106.68862, lat: 20.86356, w: 54, d: 40 },
-].map((g) => { const [x, z] = toXZ(g.lon, g.lat); return { n: g.n, x: Math.round(x), z: Math.round(z), w: g.w, d: g.d }; });
+].map((g) => {
+  const [gx, gz] = toXZ(g.lon, g.lat);
+  const bb = parkBBoxNear(gx, gz);
+  if (bb) return { n: g.n, x: bb.x, z: bb.z, w: bb.w, d: bb.d };   // dùng polygon công viên thật
+  return { n: g.n, x: Math.round(gx), z: Math.round(gz), w: g.w, d: g.d };
+});
 console.log('GARDENS:', JSON.stringify(GARDENS.map((g) => g.n + '[' + g.x + ',' + g.z + ']')));
 console.log('LM_SIZE:', JSON.stringify(LM_SIZE));
 console.log('LM:', JSON.stringify(LM));
