@@ -1,0 +1,2678 @@
+[
+ {
+  "id": "pano_233",
+  "X": 724.5,
+  "Z": -395.6,
+  "dist": 825,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_233_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_233_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_233_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_233_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_234",
+  "X": 739.2,
+  "Z": -435.8,
+  "dist": 858,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_234_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_234_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_234_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_234_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_235",
+  "X": 387.1,
+  "Z": -135.3,
+  "dist": 410,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_235_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_235_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_235_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_235_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_236",
+  "X": 224.6,
+  "Z": -20,
+  "dist": 225,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_236_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_236_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_236_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_236_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_237",
+  "X": 168.6,
+  "Z": 7.9,
+  "dist": 169,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_237_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_237_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_237_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_237_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_238",
+  "X": 95.9,
+  "Z": 40.2,
+  "dist": 104,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_238_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_238_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_238_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_238_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_239",
+  "X": -88.3,
+  "Z": 464.4,
+  "dist": 473,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_239_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_239_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_239_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_239_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_240",
+  "X": -9.4,
+  "Z": 449.9,
+  "dist": 450,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_240_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_240_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_240_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_240_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_241",
+  "X": 30.6,
+  "Z": 441.4,
+  "dist": 442,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_241_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_241_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_241_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_241_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_242",
+  "X": 109.8,
+  "Z": 425.8,
+  "dist": 440,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_242_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_242_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_242_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_242_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_243",
+  "X": 149.8,
+  "Z": 416.8,
+  "dist": 443,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_243_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_243_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_243_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_243_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_244",
+  "X": -525.2,
+  "Z": 594.9,
+  "dist": 794,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_244_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_244_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_244_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_244_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_245",
+  "X": -508.7,
+  "Z": 673.4,
+  "dist": 844,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_245_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_245_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_245_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_245_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_246",
+  "X": -499.1,
+  "Z": 828.4,
+  "dist": 967,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_246_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_246_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_246_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_246_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_247",
+  "X": -555.6,
+  "Z": 884.3,
+  "dist": 1044,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_247_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_247_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_247_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_247_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_248",
+  "X": -588.5,
+  "Z": 904.3,
+  "dist": 1079,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_248_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_248_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_248_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_248_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_249",
+  "X": -31,
+  "Z": 78.7,
+  "dist": 85,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_249_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_249_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_249_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_249_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_250",
+  "X": -38.2,
+  "Z": 42,
+  "dist": 57,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_250_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_250_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_250_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_250_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_251",
+  "X": -41.1,
+  "Z": -24.6,
+  "dist": 48,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_251_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_251_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_251_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_251_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_252",
+  "X": -45,
+  "Z": -196.6,
+  "dist": 202,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_252_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_252_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_252_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_252_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_253",
+  "X": -40.6,
+  "Z": -240.5,
+  "dist": 244,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_253_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_253_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_253_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_253_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_254",
+  "X": -41.3,
+  "Z": -282.4,
+  "dist": 285,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_254_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_254_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_254_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_254_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_255",
+  "X": -45.6,
+  "Z": -319.3,
+  "dist": 323,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_255_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_255_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_255_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_255_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_256",
+  "X": -46.2,
+  "Z": -359.4,
+  "dist": 362,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_256_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_256_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_256_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_256_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_257",
+  "X": -46.5,
+  "Z": -399,
+  "dist": 402,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_257_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_257_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_257_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_257_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_258",
+  "X": 472.6,
+  "Z": 546.3,
+  "dist": 722,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_258_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_258_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_258_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_258_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_259",
+  "X": -206.7,
+  "Z": 156.7,
+  "dist": 259,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_259_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_259_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_259_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_259_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_260",
+  "X": -193.8,
+  "Z": 231.2,
+  "dist": 302,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_260_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_260_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_260_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_260_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_261",
+  "X": -189.2,
+  "Z": 272.4,
+  "dist": 332,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_261_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_261_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_261_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_261_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_262",
+  "X": -181.2,
+  "Z": 352.3,
+  "dist": 396,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_262_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_262_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_262_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_262_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_263",
+  "X": -183.7,
+  "Z": 384.5,
+  "dist": 426,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_263_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_263_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_263_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_263_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_264",
+  "X": -191.4,
+  "Z": 388,
+  "dist": 433,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_264_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_264_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_264_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_264_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_265",
+  "X": 360,
+  "Z": -202.2,
+  "dist": 413,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_265_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_265_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_265_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_265_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_266",
+  "X": 354.9,
+  "Z": -273.8,
+  "dist": 448,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_266_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_266_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_266_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_266_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_267",
+  "X": 352.5,
+  "Z": -314.6,
+  "dist": 472,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_267_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_267_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_267_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_267_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_268",
+  "X": 347.8,
+  "Z": -394.1,
+  "dist": 526,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_268_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_268_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_268_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_268_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_269",
+  "X": 340.9,
+  "Z": -508.1,
+  "dist": 612,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_269_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_269_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_269_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_269_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_270",
+  "X": 379.4,
+  "Z": -595.5,
+  "dist": 706,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_270_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_270_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_270_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_270_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_271",
+  "X": 330.9,
+  "Z": -669.9,
+  "dist": 747,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_271_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_271_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_271_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_271_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_272",
+  "X": 330.4,
+  "Z": -679.8,
+  "dist": 756,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_272_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_272_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_272_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_272_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_273",
+  "X": 327.1,
+  "Z": -759.8,
+  "dist": 827,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_273_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_273_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_273_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_273_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_274",
+  "X": -575.7,
+  "Z": 563.2,
+  "dist": 805,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_274_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_274_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_274_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_274_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_275",
+  "X": -611.7,
+  "Z": 572.4,
+  "dist": 838,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_275_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_275_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_275_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_275_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_276",
+  "X": -651.7,
+  "Z": 578.8,
+  "dist": 872,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_276_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_276_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_276_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_276_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_277",
+  "X": -691.1,
+  "Z": 588,
+  "dist": 907,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_277_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_277_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_277_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_277_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_278",
+  "X": -771.1,
+  "Z": 603.8,
+  "dist": 979,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_278_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_278_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_278_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_278_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_279",
+  "X": -809.9,
+  "Z": 611.1,
+  "dist": 1015,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_279_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_279_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_279_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_279_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_280",
+  "X": -848,
+  "Z": 618.1,
+  "dist": 1049,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_280_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_280_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_280_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_280_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_281",
+  "X": -888.3,
+  "Z": 625.7,
+  "dist": 1087,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_281_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_281_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_281_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_281_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_282",
+  "X": 73.6,
+  "Z": -897,
+  "dist": 900,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_282_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_282_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_282_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_282_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_283",
+  "X": 43.7,
+  "Z": -870.4,
+  "dist": 871,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_283_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_283_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_283_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_283_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_284",
+  "X": -51.1,
+  "Z": -958.9,
+  "dist": 960,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_284_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_284_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_284_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_284_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_285",
+  "X": -50.9,
+  "Z": -999.8,
+  "dist": 1001,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_285_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_285_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_285_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_285_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_286",
+  "X": -50.2,
+  "Z": -1080.8,
+  "dist": 1082,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_286_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_286_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_286_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_286_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_287",
+  "X": -1080.1,
+  "Z": -0.7,
+  "dist": 1080,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_287_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_287_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_287_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_287_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_288",
+  "X": -1042.7,
+  "Z": -12.7,
+  "dist": 1043,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_288_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_288_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_288_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_288_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_289",
+  "X": -962.3,
+  "Z": -38.2,
+  "dist": 963,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_289_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_289_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_289_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_289_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_290",
+  "X": -918.3,
+  "Z": -48.8,
+  "dist": 920,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_290_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_290_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_290_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_290_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_291",
+  "X": -838.6,
+  "Z": -59.7,
+  "dist": 841,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_291_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_291_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_291_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_291_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_292",
+  "X": -798.8,
+  "Z": -64.5,
+  "dist": 801,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_292_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_292_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_292_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_292_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_293",
+  "X": -718.4,
+  "Z": -74.1,
+  "dist": 722,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_293_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_293_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_293_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_293_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_294",
+  "X": -639,
+  "Z": -84.1,
+  "dist": 645,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_294_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_294_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_294_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_294_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_295",
+  "X": -599,
+  "Z": -91.3,
+  "dist": 606,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_295_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_295_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_295_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_295_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_296",
+  "X": -554.6,
+  "Z": -102.3,
+  "dist": 564,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_296_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_296_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_296_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_296_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_297",
+  "X": -534.7,
+  "Z": -108,
+  "dist": 545,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_297_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_297_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_297_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_297_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_298",
+  "X": -418.7,
+  "Z": -162.3,
+  "dist": 449,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_298_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_298_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_298_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_298_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_299",
+  "X": -381.8,
+  "Z": -189,
+  "dist": 426,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_299_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_299_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_299_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_299_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_300",
+  "X": -363.9,
+  "Z": -213.6,
+  "dist": 422,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_300_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_300_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_300_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_300_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_301",
+  "X": -335.7,
+  "Z": -381.3,
+  "dist": 508,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_301_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_301_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_301_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_301_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_302",
+  "X": -345.1,
+  "Z": -420.3,
+  "dist": 544,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_302_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_302_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_302_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_302_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_303",
+  "X": -359.7,
+  "Z": -460.3,
+  "dist": 584,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_303_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_303_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_303_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_303_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_304",
+  "X": -110.6,
+  "Z": -937.7,
+  "dist": 944,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_304_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_304_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_304_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_304_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_305",
+  "X": -616.9,
+  "Z": -758.2,
+  "dist": 977,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_305_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_305_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_305_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_305_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_306",
+  "X": -594.7,
+  "Z": -736.5,
+  "dist": 947,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_306_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_306_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_306_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_306_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_307",
+  "X": -568.5,
+  "Z": -711.7,
+  "dist": 911,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_307_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_307_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_307_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_307_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_308",
+  "X": -534.8,
+  "Z": -673.6,
+  "dist": 860,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_308_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_308_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_308_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_308_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_309",
+  "X": -501,
+  "Z": -623,
+  "dist": 799,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_309_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_309_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_309_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_309_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_310",
+  "X": -454.4,
+  "Z": -554.5,
+  "dist": 717,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_310_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_310_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_310_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_310_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_311",
+  "X": -177.8,
+  "Z": -888.7,
+  "dist": 906,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_311_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_311_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_311_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_311_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_312",
+  "X": 39.3,
+  "Z": -941.7,
+  "dist": 943,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_312_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_312_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_312_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_312_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_313",
+  "X": 251.8,
+  "Z": 370.7,
+  "dist": 448,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_313_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_313_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_313_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_313_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_314",
+  "X": 308.6,
+  "Z": 316.9,
+  "dist": 442,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_314_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_314_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_314_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_314_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_315",
+  "X": 337.3,
+  "Z": 289,
+  "dist": 444,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_315_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_315_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_315_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_315_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_316",
+  "X": 396,
+  "Z": 233.6,
+  "dist": 460,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_316_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_316_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_316_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_316_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_317",
+  "X": 425.1,
+  "Z": 205.3,
+  "dist": 472,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_317_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_317_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_317_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_317_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_318",
+  "X": 453.7,
+  "Z": 176.9,
+  "dist": 487,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_318_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_318_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_318_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_318_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_319",
+  "X": 513,
+  "Z": 121.2,
+  "dist": 527,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_319_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_319_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_319_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_319_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_320",
+  "X": -37.8,
+  "Z": 1064.8,
+  "dist": 1065,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_320_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_320_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_320_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_320_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_321",
+  "X": -45.6,
+  "Z": 1025.2,
+  "dist": 1026,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_321_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_321_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_321_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_321_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_322",
+  "X": -53.1,
+  "Z": 986.1,
+  "dist": 988,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_322_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_322_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_322_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_322_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_323",
+  "X": -61.1,
+  "Z": 946.5,
+  "dist": 948,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_323_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_323_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_323_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_323_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_324",
+  "X": -77.6,
+  "Z": 867.6,
+  "dist": 871,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_324_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_324_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_324_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_324_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_325",
+  "X": -94,
+  "Z": 789.5,
+  "dist": 795,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_325_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_325_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_325_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_325_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_326",
+  "X": -100.9,
+  "Z": 759.3,
+  "dist": 766,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_326_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_326_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_326_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_326_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_327",
+  "X": -109,
+  "Z": 721.3,
+  "dist": 729,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_327_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_327_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_327_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_327_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_328",
+  "X": -58.4,
+  "Z": -1035,
+  "dist": 1037,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_328_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_328_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_328_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_328_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_329",
+  "X": -109.5,
+  "Z": -869.8,
+  "dist": 877,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_329_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_329_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_329_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_329_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_330",
+  "X": -143.9,
+  "Z": -868.6,
+  "dist": 880,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_330_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_330_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_330_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_330_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_331",
+  "X": -524.9,
+  "Z": -905.4,
+  "dist": 1047,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_331_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_331_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_331_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_331_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_332",
+  "X": -529.8,
+  "Z": -867.4,
+  "dist": 1016,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_332_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_332_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_332_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_332_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_333",
+  "X": -510,
+  "Z": -832.9,
+  "dist": 977,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_333_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_333_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_333_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_333_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_334",
+  "X": -478.6,
+  "Z": -791.6,
+  "dist": 925,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_334_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_334_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_334_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_334_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_335",
+  "X": -430.5,
+  "Z": -729.1,
+  "dist": 847,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_335_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_335_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_335_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_335_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_336",
+  "X": -400.7,
+  "Z": -688.1,
+  "dist": 796,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_336_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_336_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_336_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_336_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_337",
+  "X": -379.1,
+  "Z": -654.3,
+  "dist": 756,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_337_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_337_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_337_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_337_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_338",
+  "X": 498.6,
+  "Z": -239.9,
+  "dist": 553,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_338_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_338_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_338_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_338_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_339",
+  "X": 636.2,
+  "Z": -418.3,
+  "dist": 761,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_339_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_339_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_339_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_339_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_340",
+  "X": 605,
+  "Z": -365.8,
+  "dist": 707,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_340_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_340_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_340_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_340_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_341",
+  "X": 559.2,
+  "Z": -300.1,
+  "dist": 635,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_341_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_341_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_341_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_341_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_342",
+  "X": 534.1,
+  "Z": -269.6,
+  "dist": 598,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_342_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_342_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_342_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_342_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_343",
+  "X": 339.5,
+  "Z": 770.9,
+  "dist": 842,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_343_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_343_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_343_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_343_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_344",
+  "X": 335.2,
+  "Z": 729.4,
+  "dist": 803,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_344_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_344_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_344_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_344_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_345",
+  "X": 334.4,
+  "Z": 709.3,
+  "dist": 784,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_345_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_345_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_345_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_345_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_346",
+  "X": -5.6,
+  "Z": -870.9,
+  "dist": 871,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_346_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_346_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_346_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_346_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_347",
+  "X": -7.9,
+  "Z": -990,
+  "dist": 990,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_347_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_347_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_347_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_347_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_348",
+  "X": 78.4,
+  "Z": -946.7,
+  "dist": 950,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_348_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_348_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_348_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_348_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_349",
+  "X": -201.6,
+  "Z": -943.3,
+  "dist": 965,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_349_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_349_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_349_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_349_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_350",
+  "X": -165.9,
+  "Z": -985.7,
+  "dist": 1000,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_350_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_350_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_350_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_350_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_351",
+  "X": -216.5,
+  "Z": -273.7,
+  "dist": 349,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_351_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_351_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_351_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_351_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_352",
+  "X": -175,
+  "Z": -272.2,
+  "dist": 324,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_352_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_352_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_352_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_352_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_353",
+  "X": -113.6,
+  "Z": -269.4,
+  "dist": 292,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_353_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_353_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_353_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_353_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_354",
+  "X": 10.2,
+  "Z": -269.4,
+  "dist": 270,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_354_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_354_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_354_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_354_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_355",
+  "X": 69.8,
+  "Z": -267.8,
+  "dist": 277,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_355_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_355_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_355_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_355_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_356",
+  "X": 109.2,
+  "Z": -267.3,
+  "dist": 289,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_356_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_356_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_356_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_356_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_357",
+  "X": 149.2,
+  "Z": -266.2,
+  "dist": 305,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_357_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_357_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_357_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_357_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_358",
+  "X": 236.5,
+  "Z": -265.1,
+  "dist": 355,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_358_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_358_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_358_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_358_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_359",
+  "X": 276.4,
+  "Z": -264.3,
+  "dist": 382,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_359_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_359_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_359_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_359_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_360",
+  "X": 390.9,
+  "Z": -262,
+  "dist": 471,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_360_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_360_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_360_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_360_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_361",
+  "X": 65.7,
+  "Z": -721.2,
+  "dist": 724,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_361_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_361_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_361_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_361_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_362",
+  "X": 6.4,
+  "Z": -694.2,
+  "dist": 694,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_362_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_362_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_362_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_362_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_363",
+  "X": -219.1,
+  "Z": -454.8,
+  "dist": 505,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_363_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_363_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_363_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_363_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_364",
+  "X": -74.1,
+  "Z": 692.8,
+  "dist": 697,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_364_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_364_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_364_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_364_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_365",
+  "X": -35.7,
+  "Z": 684.7,
+  "dist": 686,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_365_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_365_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_365_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_365_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_366",
+  "X": 5,
+  "Z": 676.6,
+  "dist": 677,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_366_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_366_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_366_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_366_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_367",
+  "X": 84.5,
+  "Z": 660.4,
+  "dist": 666,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_367_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_367_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_367_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_367_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_368",
+  "X": 161.9,
+  "Z": 644.4,
+  "dist": 664,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_368_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_368_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_368_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_368_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_369",
+  "X": 378.9,
+  "Z": 538.5,
+  "dist": 658,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_369_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_369_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_369_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_369_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_370",
+  "X": 347.3,
+  "Z": 513.3,
+  "dist": 620,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_370_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_370_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_370_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_370_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_371",
+  "X": 316.5,
+  "Z": 487,
+  "dist": 581,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_371_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_371_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_371_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_371_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_372",
+  "X": 255.3,
+  "Z": 432.8,
+  "dist": 502,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_372_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_372_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_372_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_372_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_373",
+  "X": 386.7,
+  "Z": 545.5,
+  "dist": 669,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_373_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_373_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_373_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_373_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_374",
+  "X": 1073,
+  "Z": -61.1,
+  "dist": 1075,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_374_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_374_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_374_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_374_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_375",
+  "X": 1016.9,
+  "Z": -3.3,
+  "dist": 1017,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_375_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_375_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_375_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_375_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_376",
+  "X": -286.5,
+  "Z": 505.1,
+  "dist": 581,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_376_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_376_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_376_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_376_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_377",
+  "X": -325.2,
+  "Z": 513.1,
+  "dist": 607,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_377_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_377_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_377_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_377_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_378",
+  "X": -405,
+  "Z": 528.9,
+  "dist": 666,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_378_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_378_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_378_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_378_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_379",
+  "X": -474.3,
+  "Z": 543.4,
+  "dist": 721,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_379_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_379_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_379_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_379_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_380",
+  "X": 1011.5,
+  "Z": 1.6,
+  "dist": 1012,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_380_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_380_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_380_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_380_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_381",
+  "X": -271.3,
+  "Z": -928.2,
+  "dist": 967,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_381_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_381_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_381_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_381_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_382",
+  "X": -352.7,
+  "Z": -938.5,
+  "dist": 1003,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_382_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_382_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_382_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_382_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_383",
+  "X": -459.8,
+  "Z": -951.6,
+  "dist": 1057,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_383_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_383_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_383_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_383_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_384",
+  "X": -488,
+  "Z": -940,
+  "dist": 1059,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_384_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_384_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_384_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_384_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_385",
+  "X": 395.1,
+  "Z": -62.2,
+  "dist": 400,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_385_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_385_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_385_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_385_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_386",
+  "X": 578.8,
+  "Z": 439.2,
+  "dist": 727,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_386_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_386_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_386_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_386_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_387",
+  "X": 543.7,
+  "Z": 475.2,
+  "dist": 722,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_387_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_387_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_387_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_387_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_388",
+  "X": 486.4,
+  "Z": 532.3,
+  "dist": 721,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_388_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_388_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_388_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_388_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_389",
+  "X": -20.8,
+  "Z": -458.6,
+  "dist": 459,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_389_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_389_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_389_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_389_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_390",
+  "X": -49.3,
+  "Z": -537.1,
+  "dist": 539,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_390_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_390_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_390_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_390_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_391",
+  "X": -49.6,
+  "Z": -576.9,
+  "dist": 579,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_391_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_391_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_391_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_391_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_392",
+  "X": 68.3,
+  "Z": -616.8,
+  "dist": 621,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_392_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_392_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_392_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_392_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_393",
+  "X": 67.3,
+  "Z": -606.7,
+  "dist": 610,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_393_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_393_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_393_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_393_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_394",
+  "X": 58.6,
+  "Z": -526,
+  "dist": 529,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_394_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_394_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_394_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_394_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_395",
+  "X": -91.3,
+  "Z": -657,
+  "dist": 663,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_395_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_395_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_395_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_395_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_396",
+  "X": 13,
+  "Z": -455.9,
+  "dist": 456,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_396_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_396_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_396_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_396_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_397",
+  "X": 139.6,
+  "Z": 113.9,
+  "dist": 180,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_397_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_397_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_397_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_397_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_398",
+  "X": 211.7,
+  "Z": 80.4,
+  "dist": 226,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_398_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_398_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_398_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_398_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_399",
+  "X": 251.7,
+  "Z": 63.9,
+  "dist": 260,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_399_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_399_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_399_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_399_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_400",
+  "X": 295.8,
+  "Z": 39.4,
+  "dist": 298,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_400_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_400_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_400_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_400_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_401",
+  "X": 329.8,
+  "Z": 18.2,
+  "dist": 330,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_401_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_401_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_401_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_401_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_402",
+  "X": 365.1,
+  "Z": -6.7,
+  "dist": 365,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_402_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_402_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_402_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_402_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_403",
+  "X": 472,
+  "Z": -205.3,
+  "dist": 515,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_403_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_403_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_403_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_403_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_404",
+  "X": 410.2,
+  "Z": -153.6,
+  "dist": 438,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_404_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_404_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_404_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_404_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_405",
+  "X": -69.5,
+  "Z": 86.8,
+  "dist": 111,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_405_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_405_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_405_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_405_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_406",
+  "X": -150.3,
+  "Z": 103.3,
+  "dist": 182,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_406_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_406_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_406_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_406_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_407",
+  "X": -30.2,
+  "Z": 127.1,
+  "dist": 131,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_407_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_407_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_407_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_407_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_408",
+  "X": 1008.9,
+  "Z": -444,
+  "dist": 1102,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_408_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_408_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_408_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_408_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_409",
+  "X": 957.4,
+  "Z": -441.8,
+  "dist": 1054,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_409_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_409_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_409_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_409_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_410",
+  "X": 929.7,
+  "Z": -442.6,
+  "dist": 1030,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_410_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_410_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_410_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_410_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_411",
+  "X": 888.1,
+  "Z": -445.4,
+  "dist": 994,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_411_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_411_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_411_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_411_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_412",
+  "X": 848.4,
+  "Z": -443.7,
+  "dist": 957,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_412_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_412_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_412_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_412_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_413",
+  "X": 808.6,
+  "Z": -444.6,
+  "dist": 923,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_413_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_413_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_413_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_413_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_414",
+  "X": -581.1,
+  "Z": -471.3,
+  "dist": 748,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_414_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_414_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_414_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_414_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_415",
+  "X": -621.1,
+  "Z": -466.3,
+  "dist": 777,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_415_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_415_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_415_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_415_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_416",
+  "X": -701.7,
+  "Z": -467.8,
+  "dist": 843,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_416_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_416_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_416_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_416_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_417",
+  "X": -783.5,
+  "Z": -469.1,
+  "dist": 913,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_417_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_417_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_417_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_417_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_418",
+  "X": -897,
+  "Z": -471.1,
+  "dist": 1013,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_418_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_418_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_418_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_418_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_419",
+  "X": -978.4,
+  "Z": -472.6,
+  "dist": 1087,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_419_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_419_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_419_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_419_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_420",
+  "X": 91.3,
+  "Z": -756.6,
+  "dist": 762,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_420_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_420_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_420_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_420_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_517",
+  "X": -878.9,
+  "Z": -55.3,
+  "dist": 881,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_517_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_517_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_517_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_517_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_518",
+  "X": 280.1,
+  "Z": 344.5,
+  "dist": 444,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_518_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_518_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_518_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_518_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_519",
+  "X": -450.6,
+  "Z": -751.9,
+  "dist": 877,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_519_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_519_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_519_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_519_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_520",
+  "X": -357.2,
+  "Z": -619.9,
+  "dist": 715,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_520_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_520_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_520_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_520_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_521",
+  "X": 582.7,
+  "Z": -332.1,
+  "dist": 671,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_521_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_521_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_521_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_521_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_522",
+  "X": 383.6,
+  "Z": 804.1,
+  "dist": 891,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_522_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_522_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_522_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_522_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_523",
+  "X": -145.3,
+  "Z": 590.7,
+  "dist": 608,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_523_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_523_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_523_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_523_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_524",
+  "X": 479.2,
+  "Z": -411,
+  "dist": 631,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_524_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_524_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_524_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_524_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_525",
+  "X": 479.6,
+  "Z": -370.1,
+  "dist": 606,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_525_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_525_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_525_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_525_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_526",
+  "X": 482.2,
+  "Z": -281.2,
+  "dist": 558,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_526_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_526_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_526_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_526_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_527",
+  "X": 47,
+  "Z": -709,
+  "dist": 711,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_527_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_527_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_527_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_527_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_528",
+  "X": -327.9,
+  "Z": -772.8,
+  "dist": 839,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_528_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_528_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_528_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_528_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_529",
+  "X": 54.7,
+  "Z": 666.3,
+  "dist": 669,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_529_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_529_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_529_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_529_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_530",
+  "X": -593.2,
+  "Z": -185.5,
+  "dist": 622,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_530_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_530_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_530_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_530_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_531",
+  "X": -593.6,
+  "Z": -235.3,
+  "dist": 639,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_531_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_531_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_531_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_531_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_532",
+  "X": -594.3,
+  "Z": -277.1,
+  "dist": 656,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_532_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_532_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_532_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_532_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_533",
+  "X": -602.4,
+  "Z": -307.2,
+  "dist": 676,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_533_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_533_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_533_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_533_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_534",
+  "X": -313.3,
+  "Z": -933.9,
+  "dist": 985,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_534_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_534_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_534_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_534_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_535",
+  "X": 217.2,
+  "Z": -35.6,
+  "dist": 220,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_535_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_535_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_535_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_535_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_536",
+  "X": -49.3,
+  "Z": -537.1,
+  "dist": 539,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_536_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_536_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_536_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_536_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_537",
+  "X": -49,
+  "Z": -627.1,
+  "dist": 629,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_537_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_537_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_537_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_537_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_538",
+  "X": 65.7,
+  "Z": -721.2,
+  "dist": 724,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_538_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_538_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_538_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_538_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_539",
+  "X": 206.6,
+  "Z": -397.7,
+  "dist": 448,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_539_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_539_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_539_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_539_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_540",
+  "X": -121.3,
+  "Z": -646.9,
+  "dist": 658,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_540_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_540_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_540_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_540_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_541",
+  "X": 25.9,
+  "Z": 157.3,
+  "dist": 159,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_541_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_541_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_541_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_541_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_542",
+  "X": 185,
+  "Z": 94.5,
+  "dist": 208,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_542_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_542_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_542_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_542_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_543",
+  "X": 440.4,
+  "Z": -179,
+  "dist": 475,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_543_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_543_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_543_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_543_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_544",
+  "X": -119.7,
+  "Z": 97.5,
+  "dist": 154,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_544_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_544_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_544_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_544_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_545",
+  "X": 697.7,
+  "Z": -447.5,
+  "dist": 829,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_545_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_545_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_545_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_545_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_546",
+  "X": -322.8,
+  "Z": -20.6,
+  "dist": 323,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_546_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_546_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_546_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_546_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_547",
+  "X": -595.6,
+  "Z": -216.2,
+  "dist": 634,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_547_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_547_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_547_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_547_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_548",
+  "X": -596.6,
+  "Z": -303.6,
+  "dist": 669,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_548_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_548_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_548_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_548_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_549",
+  "X": -594.5,
+  "Z": -267,
+  "dist": 652,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_549_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_549_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_549_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_549_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_550",
+  "X": -752,
+  "Z": -468.5,
+  "dist": 886,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_550_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_550_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_550_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_550_h270_p0.jpg"
+  }
+ },
+ {
+  "id": "pano_551",
+  "X": 65.2,
+  "Z": -586.5,
+  "dist": 590,
+  "imgs": {
+   "0": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_551_h000_p0.jpg",
+   "90": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_551_h090_p0.jpg",
+   "180": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_551_h180_p0.jpg",
+   "270": "/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/sv_refs/streetview-refs/pano_551_h270_p0.jpg"
+  }
+ }
+]
