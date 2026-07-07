@@ -1,13 +1,13 @@
 export const meta = {
   name: 'pano-audit-remaining-4h',
-  description: 'Catalog 301 pano còn lại (4 heading tiết kiệm quota) theo quy chuẩn Hải Phòng',
+  description: 'Catalog 223 pano còn lại (4 heading tiết kiệm quota) theo quy chuẩn Hải Phòng',
   phases: [
-    { title: 'Catalog', detail: '51 agent, mỗi agent 6 pano × 4 heading (0/90/180/270)' },
+    { title: 'Catalog', detail: '38 agent, mỗi agent 6 pano × 4 heading (0/90/180/270)' },
   ],
 }
 
 const indexPath = '/tmp/claude-0/-home-user-hp-world/c2e34905-ff51-516d-bf34-6f2f3d70ade9/scratchpad/pano_remaining.json'
-const total = 301
+const total = 223
 const batchSize = 6
 
 const RUBRIC = `

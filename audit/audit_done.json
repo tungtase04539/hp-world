@@ -20583,5 +20583,4075 @@
   ],
   "summary": "Phố Trần Phú số 14/37-40 - dãy shophouse đồ thờ và dịch thuật cùng nhà Pháp cổ có cột/ban công, đối diện công viên trung tâm nổi bật với đài phun nước dàn vòi hình vòm; gần Vincom Plaza Lê Thánh Tông.",
   "confidence": "high"
+ },
+ {
+  "id": "pano_239",
+  "area": "Giao lộ phố Hai Bà Trưng (gần số 98), khu phố cũ phường An Biên; góc phố là bãi tập kết vật liệu/phế thải xây dựng.",
+  "sidewalk": "Vỉa hè góc phố lát bê tông/gạch xám đã vỡ nứt, nhiều mảng đất trống và rác phế thải, rộng ~2-3 m; hoa văn khó xác định.",
+  "buildings": [
+   {
+    "heading": 0,
+    "style": "nhà phố cũ kiểu Pháp",
+    "floors": 3,
+    "color": "vàng-xám cũ",
+    "width_m": 6,
+    "features": "ban công lan can con tiện, biển 'THỜI TRANG TRẺ EM', salon 'Phúc', cửa cuốn tầng trệt"
+   },
+   {
+    "heading": 0,
+    "style": "nhà ống/shophouse",
+    "floors": 2,
+    "color": "đỏ",
+    "width_m": 5,
+    "features": "cửa cuốn đỏ, biển 'DỊCH VỤ CẦM ĐỒ' và 'CỬA HÀNG BÁNH ĐỨC SƠN'"
+   },
+   {
+    "heading": 0,
+    "style": "nhà góc bo tròn",
+    "floors": 2,
+    "color": "xanh ngọc",
+    "width_m": 6,
+    "features": "tầng 2 mái vòm cong, shop 'GỐM', góc phố"
+   },
+   {
+    "heading": 90,
+    "style": "nhà thấp/shophouse",
+    "floors": 2,
+    "color": "trắng",
+    "width_m": 5,
+    "features": "mái tôn đỏ, biển '6P.M Nail studio'"
+   }
+  ],
+  "landmarks": [
+   "Salon Phúc",
+   "6P.M Nail studio",
+   "Cửa hàng Bánh Đức Sơn",
+   "Gốm (shop)"
+  ],
+  "vehicles": "Xe máy đỗ ven đường (một chiếc phủ bạt xanh), xe ôm áo cam đang chạy; ô tô con trắng (Mazda, Mercedes) đỗ bên phải.",
+  "vegetation": "Cây xà cừ/cây bóng mát lớn tán rộng dọc phố; một cây lớn thân xù xì ở góc.",
+  "street_furniture": [
+   "cột điện bê tông với búi dây chằng chịt",
+   "loa phường gắn cột",
+   "ô/dù che hàng",
+   "hộp công tơ điện",
+   "nắp hố ga",
+   "tấm đậy cáp điện màu xanh lá đặt dưới đất"
+  ],
+  "banners": [
+   "TOÀN DÂN ĐOÀN KẾT XÂY DỰNG ĐỜI SỐNG VĂN HÓA",
+   "ỦY BAN NHÂN DÂN PHƯỜNG AN BIÊN - TỔ DÂN PHỐ SỐ 5",
+   "DỊCH VỤ CẦM ĐỒ - NHÀ ĐẤT - ÔTÔ - XE MÁY",
+   "CỬA HÀNG BÁNH ĐỨC SƠN"
+  ],
+  "special": [],
+  "summary": "Góc giao lộ phố Hai Bà Trưng khu phố cổ, tập trung nhà phố Pháp cũ và shophouse, góc phố có bãi phế thải; nhiều dây điện, loa phường và ô che hàng.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_240",
+  "area": "Phố Hai Bà Trưng đoạn giao Cát Dài (gần số 53-70), phố thương mại thời trang - may đo, phường An Biên.",
+  "sidewalk": "Vỉa hè lát gạch bê tông tự chèn hình lục giác màu xám, có mảng vá và mòn, rộng ~2.5-3 m.",
+  "buildings": [
+   {
+    "heading": 0,
+    "style": "nhà ống/shophouse",
+    "floors": 3,
+    "color": "trắng-đen (biển) tường sáng",
+    "width_m": 5,
+    "features": "ban công lan can sắt, biển 'Bích 70 FASHION - THỜI TRANG NỮ - 70 Cát Dài', manocanh váy trước cửa"
+   },
+   {
+    "heading": 0,
+    "style": "nhà tạp hóa",
+    "floors": 2,
+    "color": "xám",
+    "width_m": 4,
+    "features": "biển 'CỬA HÀNG TẠP HOÁ - VINAMILK - 68 Hai Bà Trưng', cửa cuốn"
+   },
+   {
+    "heading": 0,
+    "style": "nhà hàng",
+    "floors": 2,
+    "color": "cam",
+    "width_m": 5,
+    "features": "mặt tiền cam '72 Cát Dài', hình đầu bếp"
+   },
+   {
+    "heading": 180,
+    "style": "shophouse may đo",
+    "floors": 3,
+    "color": "trắng-xám",
+    "width_m": 6,
+    "features": "biển 'LỢI THÀNH VESTON - L&T - 55-57 Hai Bà Trưng', poster nam mặc vest, ô tô đỗ trong nhà"
+   }
+  ],
+  "landmarks": [
+   "Lợi Thành Veston (L&T) - 55-57 Hai Bà Trưng",
+   "Chang Flower",
+   "Bích 70 Fashion - 70 Cát Dài",
+   "Cửa hàng tạp hóa Vinamilk"
+  ],
+  "vehicles": "Xe máy đỗ hai bên (một số phủ bạt); ô tô Mercedes GLC trắng đỗ; xe đạp; mẹ chở con đội mũ bảo hiểm xanh lá.",
+  "vegetation": "Hàng cây bàng/cây bóng mát lớn dọc phố; cây cảnh trong chậu trước cửa hàng.",
+  "street_furniture": [
+   "cột điện bê tông búi dây lớn",
+   "chậu cây terracotta trên vỉa hè",
+   "dây đèn trang trí trước shop",
+   "nắp hố ga"
+  ],
+  "banners": [
+   "Bích 70 FASHION - Bán buôn, bán lẻ - THỜI TRANG NỮ - ĐC: 70 CÁT DÀI - Tel: 0903.422.603",
+   "CỬA HÀNG TẠP HOÁ - VINAMILK - ĐC: 68 Hai Bà Trưng",
+   "LỢI THÀNH VESTON - ĐC: 55-57 Hai Bà Trưng",
+   "Chang Flower",
+   "50% OFF",
+   "ÁO PHÚC NAM 0236 691 456"
+  ],
+  "special": [],
+  "summary": "Đoạn phố Hai Bà Trưng giao Cát Dài với các shophouse thời trang, tiệm may vest và cửa hàng hoa; đường có hàng cây lớn, xe máy và ô tô đỗ hai bên.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_241",
+  "area": "Phố Hai Bà Trưng (gần số 45), phố ăn uống - thời trang - may đo, phường An Biên; có một biệt thự/công sở kiểu Pháp cũ màu vàng ở góc.",
+  "sidewalk": "Vỉa hè bê tông/gạch xám nứt vỡ nhiều, rộng ~3 m; có cây non trồng chống cọc gỗ, rác vụn.",
+  "buildings": [
+   {
+    "heading": 0,
+    "style": "shophouse",
+    "floors": 3,
+    "color": "xanh lá (mặt tiền quán)",
+    "width_m": 6,
+    "features": "quán 'SẦU RIÊNG - Thiên Đường Ăn Uống - Chè 4 Mùa', shop trẻ em 'TÍ HON', phòng khám 'NHỔ RĂNG'"
+   },
+   {
+    "heading": 90,
+    "style": "shophouse mỹ phẩm",
+    "floors": 3,
+    "color": "xanh lá",
+    "width_m": 5,
+    "features": "biển 'Cỏ Mềm HOME LAB - Phẩm Thiên Nhiên', nhà cam 'FOOD' kế bên"
+   },
+   {
+    "heading": 180,
+    "style": "biệt thự/công sở kiểu Pháp cũ",
+    "floors": 2,
+    "color": "vàng",
+    "width_m": 10,
+    "features": "cửa sổ chớp, cổng sắt, mái ngói, tường bong tróc"
+   },
+   {
+    "heading": 270,
+    "style": "shophouse",
+    "floors": 3,
+    "color": "trắng (biển đỏ)",
+    "width_m": 5,
+    "features": "biển 'Nhà may VINH', 'TUẤN TIẾN HAIR SALON', 'JAPAN 279'"
+   }
+  ],
+  "landmarks": [
+   "Cỏ Mềm Home Lab",
+   "Nhà may Vinh",
+   "Quán Sầu Riêng - Thiên Đường Ăn Uống",
+   "Tuấn Tiến Hair Salon",
+   "JAPAN 279"
+  ],
+  "vehicles": "Xe máy đỗ dày hai bên; một taxi màu vàng; ô tô SUV Mercedes trắng đỗ; người đi xe đạp đội nón lá; xe máy đang chạy.",
+  "vegetation": "Cây bóng mát lớn (thân xù xì bong vảy) dọc phố; cây non mới trồng có cọc chống gỗ ở góc.",
+  "street_furniture": [
+   "cột điện với nhiều hộp công tơ và búi dây",
+   "ô/dù che hàng màu hồng/đỏ",
+   "bảng quảng cáo đứng có hình hoạt hình",
+   "ghế nhựa đỏ",
+   "xô nhựa đỏ"
+  ],
+  "banners": [
+   "SẦU RIÊNG - Thiên Đường Ăn Uống - Chè 4 Mùa",
+   "NHỔ RĂNG",
+   "Cỏ Mềm HOME LAB - Phẩm Thiên Nhiên",
+   "MUA THẢ GA MUA SIÊU ĐÃ",
+   "Nhà may VINH",
+   "BÁN NHÀ",
+   "JAPAN 279"
+  ],
+  "special": [
+   "Biệt thự/công sở kiểu Pháp cũ màu vàng có cổng sắt và cửa chớp ở góc phố (heading 180) - đáng dựng riêng",
+   "cây non chống cọc gỗ giữa vỉa hè"
+  ],
+  "summary": "Đoạn phố Hai Bà Trưng đông đúc với quán ăn, mỹ phẩm và tiệm may; điểm nhấn là một biệt thự Pháp cũ màu vàng ở góc phố, nhiều dây điện và ô che hàng.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_242",
+  "area": "Phố Hai Bà Trưng (gần số 26-28), phố chợ buôn bán sầm uất: mỹ phẩm, nail, vải vóc, tạp hóa; phường An Biên.",
+  "sidewalk": "Vỉa hè bê tông/gạch xám bày kín hàng hóa (quần áo, mũ nón, túi treo), lối đi hẹp, nứt vỡ.",
+  "buildings": [
+   {
+    "heading": 0,
+    "style": "shophouse mỹ phẩm/spa",
+    "floors": 2,
+    "color": "trắng, biển đỏ",
+    "width_m": 7,
+    "features": "biển lớn 'NGỌC TRÂM - MỸ PHẨM - SPA - NAILS - TÓC', 'NGỌC TRÂM NAIL-MI', mái hiên vải"
+   },
+   {
+    "heading": 0,
+    "style": "cửa hàng tạp hóa/quần áo",
+    "floors": 2,
+    "color": "hỗn hợp",
+    "width_m": 5,
+    "features": "bày mũ nón - quần áo trên vỉa hè, tiệm 'BẠC'"
+   },
+   {
+    "heading": 180,
+    "style": "nhà cũ mái đầu hồi (colonial)",
+    "floors": 2,
+    "color": "xám cũ",
+    "width_m": 6,
+    "features": "mái đầu hồi tam giác, 'Lâm Cafe', 'DỊCH VỤ Y TẾ', 'ĐÔNG TRÙNG HẠ THẢO'"
+   }
+  ],
+  "landmarks": [
+   "Ngọc Trâm - Mỹ phẩm Spa Nails Tóc",
+   "Lâm Cafe",
+   "Cửa hàng Đông Trùng Hạ Thảo",
+   "Tiệm bạc"
+  ],
+  "vehicles": "Rất nhiều xe máy đỗ hai bên; ô tô Honda CRV trắng, Mazda đỏ; phụ nữ đi xe máy áo đỏ; xe đạp.",
+  "vegetation": "Cây bóng mát lớn tán rộng dọc hai bên phố.",
+  "street_furniture": [
+   "cột đèn đường kiểu cần vươn (cobra)",
+   "cột điện búi dây",
+   "ô/dù che hàng",
+   "giá treo quần áo",
+   "ghế nhựa",
+   "nắp hố ga"
+  ],
+  "banners": [
+   "NGỌC TRÂM - MỸ PHẨM - SPA - NAILS - TÓC",
+   "NGỌC TRÂM NAIL-MI",
+   "DỊCH VỤ Y TẾ",
+   "ĐÔNG TRÙNG HẠ THẢO - Trà Bảo... Detox",
+   "19 Hai Bà Trưng - Cây & Hoa: Khách sạn",
+   "BẠC"
+  ],
+  "special": [
+   "Xe/quầy bán bóng bay hình trái tim (bóng foil hồng) trên vỉa hè (heading 0)",
+   "kiosk cà phê vàng 'OBIO' (heading 180)"
+  ],
+  "summary": "Đoạn phố Hai Bà Trưng mang tính phố chợ, buôn bán mỹ phẩm-nail-vải vóc-tạp hóa, hàng hóa tràn ra vỉa hè; nhiều xe máy và cây bóng mát lớn.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_243",
+  "area": "Đầu phố Hai Bà Trưng (số 4-8), gần khu Ga Hải Phòng/Chợ Sắt; phố rợp bóng cây cổ thụ tạo vòm xanh; bán giày, máy đọc sách, cà phê, cầm đồ.",
+  "sidewalk": "Vỉa hè bê tông/gạch xám dưới tán cây, nhiều xe máy phủ bạt đỗ; rộng ~2.5 m.",
+  "buildings": [
+   {
+    "heading": 0,
+    "style": "shophouse giày/sách",
+    "floors": 3,
+    "color": "vàng & cam (biển)",
+    "width_m": 6,
+    "features": "shop giày 'Đẹp Collection - 0912 233933', 'Akishop - MÁY ĐỌC SÁCH CHÍNH HÃNG - Số 8 Hai Bà Trưng', cửa cuốn xếp"
+   },
+   {
+    "heading": 0,
+    "style": "quán cà phê",
+    "floors": 2,
+    "color": "tối màu",
+    "width_m": 5,
+    "features": "biển 'Cafe no.6'"
+   },
+   {
+    "heading": 180,
+    "style": "nhà cổ kiểu Pháp",
+    "floors": 4,
+    "color": "hồng/salmon",
+    "width_m": 6,
+    "features": "tháp tròn (turret), mặt tiền một phần sọc đen-trắng, ban công, biển 'Victoria's SECRET' và 'CẦM ĐỒ'"
+   }
+  ],
+  "landmarks": [
+   "Akishop - Máy đọc sách (số 8 Hai Bà Trưng)",
+   "Đẹp Collection",
+   "Cafe no.6",
+   "Victoria's Secret (biển hiệu)",
+   "Minh Tuyền"
+  ],
+  "vehicles": "Xe máy đỗ dày, nhiều xe phủ bạt bạc; xe đạp (người đội nón lá); xe máy đang chạy; ô tô bán tải đỏ trên đường.",
+  "vegetation": "Hàng cây cổ thụ lớn tán giao nhau tạo vòm xanh phủ kín lòng đường - đặc trưng nổi bật.",
+  "street_furniture": [
+   "cột điện bê tông búi dây",
+   "băng rôn dọc màu xanh trên cột",
+   "kiosk/xe đẩy đỏ",
+   "ghế nhựa xanh"
+  ],
+  "banners": [
+   "Đẹp Collection - Tel: 0912 233933",
+   "MÁY ĐỌC SÁCH CHÍNH HÃNG - Akishop - Số 8 Hai Bà Trưng",
+   "CẦM ĐỒ - MUA BÁN XE - LÃI SUẤT 1K",
+   "Cafe no.6",
+   "Victoria's SECRET"
+  ],
+  "special": [
+   "Nhà cổ kiểu Pháp màu hồng có tháp tròn (turret) và mặt tiền sọc đen-trắng (heading 180) - đáng dựng riêng",
+   "vòm cây cổ thụ phủ kín lòng đường"
+  ],
+  "summary": "Đầu phố Hai Bà Trưng rợp bóng cây cổ thụ thành vòm xanh, hai bên là shop giày, cửa hàng máy đọc sách Akishop, quán cà phê và tiệm cầm đồ; điểm nhấn là nhà cổ Pháp hồng có tháp tròn.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_244",
+  "area": "Phố Cát Cụt (gần số 100), phố chợ dân sinh gần Bệnh viện Việt Tiệp; có trường mầm non, quầy hoa quả nhập khẩu và sạp sách báo.",
+  "sidewalk": "Vỉa hè lát gạch tự chèn hình lục giác màu xám, bày hàng hóa lộn xộn, một mảng bị đào bới; rộng ~3 m.",
+  "buildings": [
+   {
+    "heading": 90,
+    "style": "trường mầm non",
+    "floors": 3,
+    "color": "xanh lá & vàng (biển)",
+    "width_m": 10,
+    "features": "biển 'TRƯỜNG MẦM NON SAO MAI - Cho Mẹ niềm tin - Cho Con năng lượng', cổng sắt xanh, cờ đỏ sao vàng, cờ dây trang trí, ban công lan can xanh, cửa gỗ"
+   },
+   {
+    "heading": 270,
+    "style": "nhà chợ/cửa hàng",
+    "floors": 2,
+    "color": "xanh dương",
+    "width_m": 8,
+    "features": "biển 'HT MART - HOA QUẢ NHẬP KHẨU - 100 Cát Cụt', mái hiên sọc xanh-trắng, sạp 'TRUYỆN SÁCH BÁO'"
+   },
+   {
+    "heading": 0,
+    "style": "nhà phố cũ",
+    "floors": 2,
+    "color": "xanh cũ",
+    "width_m": 6,
+    "features": "ban công, mái ngói, dãy sạp chợ mái bạt xanh phía trước"
+   }
+  ],
+  "landmarks": [
+   "Trường Mầm non Sao Mai",
+   "HT Mart - Hoa quả nhập khẩu (100 Cát Cụt)",
+   "Sạp truyện sách báo"
+  ],
+  "vehicles": "Xe máy/xe đạp điện đỗ ven đường; người đi xe máy Honda SH mặc áo mưa; xe đạp (người áo đỏ); ô tô con trắng đỗ.",
+  "vegetation": "Cây bóng mát cỡ vừa dọc phố; cây cảnh trong nhiều chậu terracotta trước cổng trường mầm non.",
+  "street_furniture": [
+   "cột điện búi dây",
+   "biển tuyên truyền màu xanh 'HÃY DỪNG LẠI Ở HẢI CẢNG ĐỂ NUÔI DẠY CHO TỐT'",
+   "ô/dù bia hơi vàng-đỏ",
+   "ghế nhựa vàng/cam",
+   "biển báo giao thông hình thoi vàng",
+   "cờ đỏ sao vàng",
+   "cờ dây trang trí"
+  ],
+  "banners": [
+   "TRƯỜNG MẦM NON SAO MAI - Cho Mẹ niềm tin - Cho Con năng lượng",
+   "XÂY DỰNG TRƯỜNG MẦM NON HẠNH PHÚC",
+   "HT MART - HOA QUẢ NHẬP KHẨU - ĐC: 100 Cát Cụt",
+   "TRUYỆN SÁCH BÁO",
+   "BIA HƠI HẢI HÀ",
+   "HÃY DỪNG LẠI Ở HẢI CẢNG ĐỂ NUÔI DẠY CHO TỐT"
+  ],
+  "special": [
+   "Quầy bia hơi Hải Hà với ô/dù vàng-đỏ (heading 90)",
+   "sạp truyện-sách-báo mái bạt và quầy hoa quả HT Mart mái hiên sọc (heading 270)",
+   "cổng Trường Mầm non Sao Mai treo cờ dây rực rỡ và cờ Tổ quốc"
+  ],
+  "summary": "Phố Cát Cụt mang tính chợ dân sinh với Trường Mầm non Sao Mai treo cờ, quầy hoa quả nhập khẩu HT Mart, quầy bia hơi và sạp sách báo; vỉa hè lát gạch lục giác bày hàng lộn xộn.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_233",
+  "area": "Đại lộ Trần Phú (số ~19), đoạn chạy dọc công viên/vườn hoa trung tâm, khu phố Pháp cũ. Một bên dãy shophouse cà phê, một bên vườn cây xanh.",
+  "sidewalk": "Vỉa hè lát gạch caro đỏ-xám (block terracotta đỏ xen ô xám), rộng ~4-5 m phía dãy nhà; phía công viên là bó vỉa bê tông + thảm cỏ.",
+  "buildings": [
+   {
+    "heading": 90,
+    "style": "shophouse/nhà ống hiện đại ốp đá granite + kính",
+    "floors": 5,
+    "color": "xám granite + kính",
+    "width_m": 7,
+    "features": "biển đen chữ vàng 'VIP COFFEE / CÀ PHÊ MANG VỀ / DC: 28 TRẦN PHÚ', ô kính lớn, cửa cuốn, ban công"
+   },
+   {
+    "heading": 270,
+    "style": "biệt thự/công sở Pháp",
+    "floors": 2,
+    "color": "trắng kem",
+    "width_m": 20,
+    "features": "cửa chớp xanh, mái ngói, tường vôi cũ"
+   },
+   {
+    "heading": 180,
+    "style": "dãy shophouse nhà ống nhiều màu",
+    "floors": 4,
+    "color": "đỏ, be, kem",
+    "width_m": 5,
+    "features": "biển hiệu 'MỸ NGHỆ CAO', 'YÊN SƠN', quán Pizza mặt đỏ, ô dù café xanh"
+   }
+  ],
+  "landmarks": [
+   "VIP COFFEE (28 Trần Phú)",
+   "Vincom Plaza Lê Thánh Tông (toà kính màu xanh phía xa)"
+  ],
+  "vehicles": "Ô tô con đỗ/chạy thưa (xe đen đỗ ven đường), vài xe máy chạy và đỗ trên vỉa hè trước quán.",
+  "vegetation": "Hàng cây xà cừ/bàng cổ thụ tán rộng buông bóng xuống mặt đường; công viên cỏ xanh, cây cảnh, bồn cây.",
+  "street_furniture": [
+   "cột đèn chiếu sáng",
+   "cột điện + dây điện",
+   "bốt gác/chốt công an nhỏ",
+   "biển tuyên truyền đỏ (Viettel)",
+   "trụ cứu hoả đỏ",
+   "hàng rào/dải phân cách công viên"
+  ],
+  "banners": [
+   "Băng rôn đỏ chữ vàng khẩu hiệu tuyên truyền (không đọc rõ toàn văn)",
+   "Biển nền xanh 'ĐẢNG CỘNG SẢN VIỆT NAM QUANG VINH MUÔN NĂM' treo trên thân cây"
+  ],
+  "special": [
+   "Trụ cứu hoả đỏ kiểu Mỹ trên vỉa hè",
+   "Quán cà phê vỉa hè với ô dù xanh và kiosk ô đỏ",
+   "Bốt gác/chốt công an nhỏ"
+  ],
+  "summary": "Đại lộ Trần Phú rộng thoáng ven công viên trung tâm; một bên là dãy shophouse cà phê (VIP COFFEE) và biệt thự Pháp trắng, một bên là vườn cây xanh, xa xa nổi bật toà kính xanh Vincom Plaza.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_234",
+  "area": "Giao lộ Trần Phú – Điện Biên Phủ (số ~16 Trần Phú), rìa công viên trung tâm, khu phố Pháp cổ.",
+  "sidewalk": "Vỉa hè lát gạch caro đỏ-xám rộng ~4 m; ở góc có đống vật liệu/xà bần đang thi công.",
+  "buildings": [
+   {
+    "heading": 0,
+    "style": "công sở Pháp cổ điển (VietinBank)",
+    "floors": 3,
+    "color": "vàng kem, cột sảnh hồng-đỏ",
+    "width_m": 45,
+    "features": "sảnh cổng cột tròn lớn, ô cửa vòm, cửa sổ chớp, ô tròn trên nóc, biển 'NH TMCP CÔNG THƯƠNG VIỆT NAM' + logo VietinBank"
+   },
+   {
+    "heading": 90,
+    "style": "toà Pháp (NORTHFREIGHT)",
+    "floors": 2,
+    "color": "vàng kem",
+    "width_m": 25,
+    "features": "cửa chớp xanh lá, ban công lan can con tiện, cửa cuốn, biển 'NORTHFREIGHT'"
+   },
+   {
+    "heading": 180,
+    "style": "toà cao tầng kính hiện đại",
+    "floors": 20,
+    "color": "xanh kính",
+    "width_m": 30,
+    "features": "tháp kính phía xa cuối phố"
+   }
+  ],
+  "landmarks": [
+   "VietinBank – Chi nhánh Hải Phòng (Ngân hàng TMCP Công Thương Việt Nam)",
+   "NORTHFREIGHT Co. Ltd",
+   "Vincom Plaza Lê Thánh Tông (toà kính xanh)"
+  ],
+  "vehicles": "Ô tô con băng qua ngã tư (xe đen, taxi có sọc), xe máy chạy lẻ tẻ; đường khá vắng.",
+  "vegetation": "Cây xà cừ cổ thụ tán lớn dọc phố; công viên cỏ xanh, hàng rào cây cắt xén.",
+  "street_furniture": [
+   "biển tên phố xanh 'PHỐ TRẦN PHÚ'",
+   "cột tiêu/cọc sơn đỏ-trắng",
+   "cột đèn chiếu sáng cao",
+   "biển cấm ô tô (vòng đỏ gạch chéo)",
+   "biển tuyên truyền đỏ",
+   "bốt gác",
+   "cột điện + dây"
+  ],
+  "banners": [
+   "Biển tuyên truyền đỏ (khẩu hiệu, không đọc rõ toàn văn)"
+  ],
+  "special": [
+   "Sảnh cổng cột tròn cổ điển của toà VietinBank (kiến trúc Pháp đặc trưng, có ô tròn trên đỉnh)",
+   "Biển tên phố 'PHỐ TRẦN PHÚ'"
+  ],
+  "summary": "Ngã tư Trần Phú – Điện Biên Phủ với điểm nhấn là toà VietinBank kiến trúc Pháp vàng kem có sảnh cột lớn; đối diện là toà Pháp NORTHFREIGHT cửa chớp xanh, cuối phố thấp thoáng tháp kính và toà Vincom.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_235",
+  "area": "Giao lộ Trần Hưng Đạo – Minh Khai (số ~5 Trần Hưng Đạo), cạnh dải công viên/vườn cây xanh trung tâm.",
+  "sidewalk": "Vỉa hè lát gạch caro đỏ-xám rất rộng (~6-8 m), có nắp cống/hố ga trang trí và vạch qua đường.",
+  "buildings": [
+   {
+    "heading": 0,
+    "style": "toà văn phòng hiện đại đang cải tạo",
+    "floors": 6,
+    "color": "xanh lá (mint) + đế trắng + kính",
+    "width_m": 30,
+    "features": "phủ giàn giáo thi công, canopy/mái vòm thép cong ở sảnh, mặt kính lớn, biển '...BẢN'"
+   },
+   {
+    "heading": 270,
+    "style": "toà Pháp cổ (công sở)",
+    "floors": 3,
+    "color": "trắng, mái ngói đỏ",
+    "width_m": 30,
+    "features": "tầng trệt hành lang vòm cuốn (arcade), cửa vòm, ô tròn ở mặt tiền"
+   },
+   {
+    "heading": 180,
+    "style": "toà cao tầng hiện đại",
+    "floors": 12,
+    "color": "trắng",
+    "width_m": 20,
+    "features": "khối cao tầng trắng phía xa cuối tầm nhìn"
+   }
+  ],
+  "landmarks": [],
+  "vehicles": "Ô tô con đỗ ven đường (VinFast trắng, xe van xanh, xe con đỏ), xe máy chạy lẻ tẻ.",
+  "vegetation": "Dải phân cách/công viên trồng nhiều cọ/cau vua cao vút xen cây bóng mát; thảm cỏ rộng, hàng rào cây xanh cắt xén.",
+  "street_furniture": [
+   "cột đèn chiếu sáng",
+   "biển tuyên truyền đỏ",
+   "kiosk thùng rác tái chế màu xanh",
+   "thùng rác đôi",
+   "trụ cứu hoả đỏ",
+   "nắp cống/hố ga trang trí"
+  ],
+  "banners": [
+   "Biển tuyên truyền đỏ (khẩu hiệu, không đọc rõ)"
+  ],
+  "special": [
+   "Canopy/giàn mái thép cong đang thi công ở sảnh toà nhà xanh",
+   "Kiosk thùng rác tái chế màu xanh",
+   "Trụ cứu hoả đỏ",
+   "Nắp cống/hố ga hoa văn trang trí"
+  ],
+  "summary": "Giao lộ Trần Hưng Đạo – Minh Khai với đại lộ rợp cọ và cây xanh; nổi bật một toà nhà mặt xanh đang cải tạo (giàn giáo, canopy thép cong) và một toà Pháp trắng hành lang vòm phía đối diện.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_236",
+  "area": "Giao lộ trên Trần Hưng Đạo (góc số 2), cạnh công viên trung tâm và một cây xăng, khu phố trung tâm.",
+  "sidewalk": "Vỉa hè lát gạch caro đỏ-xám rộng ~4-5 m; có vạch qua đường.",
+  "buildings": [
+   {
+    "heading": 0,
+    "style": "toà góc hiện đại (trung tâm ngoại ngữ/café)",
+    "floors": 7,
+    "color": "trắng",
+    "width_m": 18,
+    "features": "góc bo tròn, ban công, biển 'GIABAO EDU – IELTS & LANGUAGES', quán 'PHAM. café & bistro' số 18, ô dù café đen"
+   },
+   {
+    "heading": 270,
+    "style": "toà Pháp cổ (văn phòng)",
+    "floors": 2,
+    "color": "vàng kem, mái ngói",
+    "width_m": 25,
+    "features": "cửa chớp xanh, hàng rào sắt cổng xanh, trụ cổng xây"
+   },
+   {
+    "heading": 0,
+    "style": "biệt thự cũ",
+    "floors": 2,
+    "color": "hồng phấn",
+    "width_m": 12,
+    "features": "cửa chớp xanh, tường cũ"
+   }
+  ],
+  "landmarks": [
+   "GIABAO EDU (IELTS & Languages)",
+   "PHAM Café & Bistro",
+   "VietinBank (biển ở đế toà kính)",
+   "Cây xăng/trạm xăng dầu mái che cam-xanh (kiểu Petrolimex) đối diện"
+  ],
+  "vehicles": "Ô tô con đỗ dọc (Hyundai i10 trắng, Honda CR-V trắng, xe đỏ), xe máy chạy và đỗ.",
+  "vegetation": "Dải phân cách/công viên cây xà cừ cổ thụ tán lớn, hàng rào cây xanh cắt xén, thảm cỏ.",
+  "street_furniture": [
+   "biển tên phố xanh 'Phố Trần Hưng Đạo'",
+   "cột đèn chiếu sáng",
+   "cột tiêu đỏ-trắng",
+   "biển cấm (vòng đỏ)",
+   "biển Viettel đỏ",
+   "thùng rác",
+   "kiosk giặt là 'Laundry' xanh"
+  ],
+  "banners": [
+   "Biển đỏ Viettel khẩu hiệu tuyên truyền (không đọc rõ toàn văn)"
+  ],
+  "special": [
+   "Trạm xăng dầu (cây xăng) mái che cam-xanh phía đối diện ngã tư",
+   "Kiosk giặt là 'Laundry – Thực sự sạch sẽ' màu xanh"
+  ],
+  "summary": "Nút giao đầu Trần Hưng Đạo (số 2) với toà góc trắng bo tròn treo biển GIABAO EDU và quán PHAM café; đối diện qua công viên là một cây xăng, cạnh đó có kiosk giặt là xanh.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_237",
+  "area": "Trần Hưng Đạo (số 22), showroom nội thất bên dải công viên cây xanh lớn, gần cây xăng.",
+  "sidewalk": "Vỉa hè lát gạch caro đỏ-xám rộng, bó vỉa đá; kê ô dù café phía trước showroom.",
+  "buildings": [
+   {
+    "heading": 0,
+    "style": "showroom hiện đại mặt lượn sóng",
+    "floors": 3,
+    "color": "be/nâu nhạt",
+    "width_m": 25,
+    "features": "logo 'LIEN A – Làm mới cuộc sống', tranh tường graphic hình con mắt lớn, mặt kính, ô dù café trắng phía trước"
+   },
+   {
+    "heading": 270,
+    "style": "toà Pháp cổ (văn phòng)",
+    "floors": 2,
+    "color": "vàng kem",
+    "width_m": 25,
+    "features": "cửa chớp xanh, hàng rào sắt xanh, biển 'VĂN PHÒNG ĐẠI DIỆN' nền xanh"
+   }
+  ],
+  "landmarks": [
+   "LIEN A (showroom nệm/nội thất)",
+   "Cây xăng kiểu Petrolimex (mái cam-xanh phía xa)"
+  ],
+  "vehicles": "Ô tô con đỗ dọc (Toyota Corolla Cross trắng, Kia Morning đỏ, Kia SUV trắng, VinFast trắng), xe máy đỗ, một người đạp xe chở hàng, xe ôm công nghệ áo xanh.",
+  "vegetation": "Dải công viên rộng với nhiều cây cổ thụ bị cắt trụi cành (đốn tỉa mạnh, trơ cành) xen cây còn tán; thảm cỏ, hàng rào cây xanh.",
+  "street_furniture": [
+   "cột đèn chiếu sáng",
+   "biển tuyên truyền đỏ",
+   "bảng thông tin/bản đồ khu vực",
+   "tủ điện/hộp kỹ thuật",
+   "thùng rác xanh",
+   "biển 'VĂN PHÒNG ĐẠI DIỆN' xanh"
+  ],
+  "banners": [
+   "Băng rôn xanh treo ngang (khẩu hiệu, không đọc rõ)",
+   "Biển tuyên truyền đỏ"
+  ],
+  "special": [
+   "Tranh tường/graphic hình con mắt lớn trên mặt tiền showroom LIEN A",
+   "Quán café vỉa hè ô dù trắng",
+   "Bảng thông tin/bản đồ khu vực dạng panel"
+  ],
+  "summary": "Đoạn Trần Hưng Đạo số 22 với showroom LIEN A mặt lượn sóng và bức graphic con mắt đặc trưng, cạnh toà Pháp vàng có biển 'Văn phòng đại diện'; đối diện là công viên rộng nhiều cây bị đốn tỉa trơ cành.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_238",
+  "area": "Trần Hưng Đạo (số 24-26), dãy phố cà phê – nhà hàng sầm uất đối diện công viên trung tâm.",
+  "sidewalk": "Vỉa hè lát gạch caro đỏ-xám rộng, kê dày bàn ghế và ô dù café.",
+  "buildings": [
+   {
+    "heading": 0,
+    "style": "nhà gỗ kiểu cổ (nhà hàng/bar)",
+    "floors": 2,
+    "color": "xanh rêu (gỗ)",
+    "width_m": 12,
+    "features": "ban công gỗ, giàn cây leo, biển đen 'SAIGON LOCAL' (24 Trần Hưng Đạo), biển đen '97%' phía trên"
+   },
+   {
+    "heading": 0,
+    "style": "shophouse cổ mặt vòm",
+    "floors": 3,
+    "color": "xanh ngọc (teal)",
+    "width_m": 6,
+    "features": "cửa vòm cổ, biển 'TRÀ CÚC HOA VÀNG', ô dù đỏ café"
+   },
+   {
+    "heading": 270,
+    "style": "dãy shophouse thương mại",
+    "floors": 3,
+    "color": "trắng, đỏ",
+    "width_m": 8,
+    "features": "biển 'QUANG MINH' đỏ-vàng, 'QUỐC HÀ' xanh, ô dù xám café"
+   }
+  ],
+  "landmarks": [
+   "SAIGON LOCAL (24 Trần Hưng Đạo)",
+   "97% (quán/café)",
+   "Trà Cúc Hoa Vàng",
+   "Quốc Hà",
+   "Quang Minh"
+  ],
+  "vehicles": "Rất nhiều xe máy/xe tay ga đỗ kín trước quán (đỏ, đen), ô tô con đỗ (Sonata trắng, VinFast trắng); người đi xe Vespa xanh và xe đạp điện chở hàng; xe bus xanh phía xa.",
+  "vegetation": "Công viên đối diện nhiều cây cổ thụ cắt tỉa trụi cành, thảm cỏ, hàng rào cây xanh, bồn cây.",
+  "street_furniture": [
+   "cột đèn trang trí kiểu hai bóng (ornate)",
+   "cột đèn chiếu sáng cao",
+   "biển tuyên truyền đỏ",
+   "băng rôn xanh",
+   "tủ điện",
+   "thùng rác",
+   "bàn ghế + ô dù café (đỏ, xám, xanh)"
+  ],
+  "banners": [
+   "'SAIGON LOCAL'",
+   "'97%'",
+   "'TRÀ CÚC HOA VÀNG'",
+   "'QUANG MINH'",
+   "Biển tuyên truyền đỏ và băng rôn xanh (khẩu hiệu, không đọc rõ)"
+  ],
+  "special": [
+   "Nhà gỗ cổ 2 tầng SAIGON LOCAL (ban công gỗ, cây leo)",
+   "Cột đèn trang trí kiểu hai bóng cổ điển trong công viên",
+   "Quán café vỉa hè ô dù đỏ dày đặc",
+   "Quầy vỉa hè có ô đỏ + ô xanh, ghế nhựa đỏ, người bán ngồi dưới gốc cây"
+  ],
+  "summary": "Đoạn Trần Hưng Đạo số 24-26 là phố cà phê – ẩm thực nhộn nhịp (SAIGON LOCAL nhà gỗ xanh rêu, quán '97%', Trà Cúc Hoa Vàng, Quốc Hà, Quang Minh) với xe máy đỗ kín vỉa hè, đối diện công viên trung tâm và hàng đèn trang trí cổ.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_251",
+  "area": "Phố Hoàng Văn Thụ (địa chỉ 152 Hoàng Văn Thụ), đoạn có công sở kiểu Pháp và chi nhánh ngân hàng PVcomBank; gần lối rẽ phố Ký Con",
+  "sidewalk": "Vỉa hè lát gạch caro đỏ-xám (terracotta xen xám), rộng khoảng 4-5 m",
+  "buildings": [
+   {
+    "heading": 90,
+    "style": "công sở/công trình công cộng kiểu Pháp thuộc địa",
+    "floors": 2,
+    "color": "vàng kem, cửa chớp đỏ",
+    "width_m": 40,
+    "features": "hàng rào sắt đen bao quanh, cửa sổ cao cửa chớp gỗ, mái ngói, ban công, sân trong đỗ ô tô"
+   },
+   {
+    "heading": 270,
+    "style": "toà nhà ngân hàng ốp đá granit",
+    "floors": 4,
+    "color": "nâu đá granit, biển vàng",
+    "width_m": 25,
+    "features": "biển 'PVcomBank' màu vàng, buồng ATM, cabin kính, cửa kính lớn"
+   },
+   {
+    "heading": 0,
+    "style": "nhà ống/shophouse",
+    "floors": 3,
+    "color": "tường xám, ốp gỗ nâu",
+    "width_m": 6,
+    "features": "quán 'TRÀ CÚC 15-17', mái hiên/ô dù xanh, bàn ghế cà phê vỉa hè"
+   }
+  ],
+  "landmarks": [
+   "PVcomBank (chi nhánh ngân hàng)",
+   "Quán Trà Cúc 15-17"
+  ],
+  "vehicles": "Ô tô con (SUV trắng, Hyundai đen), xe khách Hyundai Solati đen đỗ ven đường, xe máy đỗ và chạy rải rác",
+  "vegetation": "Hàng cây bóng mát (xà cừ) tán lớn hai bên tạo vòm che phố",
+  "street_furniture": [
+   "cột điện + búi dây điện",
+   "cột biển báo tròn nền đỏ-trắng, thân sơn khoanh đỏ-trắng",
+   "hàng rào sắt đen quanh công sở",
+   "họng/trụ cứu hoả đỏ",
+   "gờ giảm tốc kẻ vàng-đen trên đường",
+   "biển tên phố Hoàng Văn Thụ"
+  ],
+  "banners": [
+   "Băng rôn dọc đỏ: 'ĐẨY MẠNH HỌC TẬP VÀ LÀM THEO TƯ TƯỞNG, ĐẠO ĐỨC, PHONG CÁCH HỒ CHÍ MINH'"
+  ],
+  "special": [
+   "Công sở kiến trúc Pháp cổ màu vàng kem có hàng rào sắt trang trí — nên dựng riêng"
+  ],
+  "summary": "Đoạn phố Hoàng Văn Thụ trước một công sở kiểu Pháp màu vàng (hàng rào sắt) đối diện toà nhà PVcomBank ốp đá, có quán trà và cà phê vỉa hè, cây xanh tán rộng.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_252",
+  "area": "Phố Hoàng Văn Thụ (gần số 45), đoạn phố thương mại nhà ống mật độ cao, gần góc phố Ký Con",
+  "sidewalk": "Vỉa hè lát gạch caro đỏ-xám (terracotta xen xám), rộng ~3-4 m; mép đường viền vạch đỏ",
+  "buildings": [
+   {
+    "heading": 90,
+    "style": "dãy nhà ống/shophouse cũ",
+    "floors": 2,
+    "color": "trắng ngà, vàng, xanh cửa chớp",
+    "width_m": 5,
+    "features": "biển 'HOÀNG NGÂN' (số 47), 'AnAn - Made in Vietnam', 'SEVEN.art', 'HUNG', cửa cuốn, ban công sắt, băng rôn 'CHO THUÊ NHÀ'"
+   },
+   {
+    "heading": 270,
+    "style": "nhà ống có ban công lan can con tiện kiểu Pháp",
+    "floors": 2,
+    "color": "trắng ngà",
+    "width_m": 6,
+    "features": "quán cà phê sân thượng 'insider' có mái bạt & đèn treo, biển 'MINH ĐĂNG - DÂY LƯNG - VÍ DA' (80 Hoàng Văn Thụ), salon 'HUYỀN' (28), 'Tiệm Cơm Mập'"
+   },
+   {
+    "heading": 0,
+    "style": "nhà ống/shophouse",
+    "floors": 3,
+    "color": "trắng, xám",
+    "width_m": 5,
+    "features": "quán 'NGA TRÀ CÚC - Cà Phê Sinh Tố Nước Ép' với ô/dù đỏ, 'Yoshino', 'tasty florist'"
+   }
+  ],
+  "landmarks": [],
+  "vehicles": "Ô tô con đỗ ven đường (sedan Hyundai i10 bạc, taxi 'Sport' bạc, sedan/BMW đen), nhiều xe máy đỗ trên vỉa hè và chạy trên đường",
+  "vegetation": "Hàng cây bóng mát tán rộng dọc hai bên phố",
+  "street_furniture": [
+   "cột điện + búi dây điện dày",
+   "ô/dù bạt quán cà phê",
+   "tủ điện",
+   "biển tên phố Hoàng Văn Thụ",
+   "biển tên ngõ 'P. Ký Con' (biển dọc)"
+  ],
+  "banners": [
+   "Băng rôn đỏ: 'CHO THUÊ NHÀ - LH: 0903 694 ...'"
+  ],
+  "special": [],
+  "summary": "Đoạn phố Hoàng Văn Thụ dày đặc nhà ống cũ 2 tầng kinh doanh (quán trà cà phê, shop thời trang, tiệm cơm, salon), ô tô và xe máy đỗ san sát, dây điện chằng chịt.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_253",
+  "area": "Nút giao có đèn tín hiệu trên phố Hoàng Văn Thụ (gần góc Trần Phú/Điện Biên Phủ); khu phố thương mại rất đông đúc",
+  "sidewalk": "Vỉa hè gạch đỏ-xám xen làn xe đạp sơn đỏ, khá hẹp do xe máy đỗ, ~2-3 m",
+  "buildings": [
+   {
+    "heading": 90,
+    "style": "toà nhà tân cổ điển/kiểu Pháp sơn trắng",
+    "floors": 2,
+    "color": "trắng",
+    "width_m": 30,
+    "features": "3 biển 'ELISE' (thời trang), 'KARAOKE 35 Hoàng Văn Thụ', 'CHRISBELLA' (túi xách, số 35), cửa vòm, cột trang trí"
+   },
+   {
+    "heading": 270,
+    "style": "dãy nhà ống/shophouse",
+    "floors": 4,
+    "color": "trắng, cam",
+    "width_m": 6,
+    "features": "showroom 'HMH - BOSCH' (60 Hoàng Văn Thụ, hotline 0911659900), 'Takara Standard TTG-Kitchen Trung Tâm Bảo Hành', 'blum', 'Chảng Junior'"
+   },
+   {
+    "heading": 0,
+    "style": "shophouse",
+    "floors": 2,
+    "color": "đen, đỏ",
+    "width_m": 5,
+    "features": "spa 'Gội đầu dưỡng sinh' (58 Hoàng Văn Thụ), salon 'HIỀN CƯỜNG' biển đỏ, 'Tuyết Anh - Chăm sóc da'"
+   }
+  ],
+  "landmarks": [
+   "Cửa hàng thời trang ELISE (35 Hoàng Văn Thụ)",
+   "CHRISBELLA (túi xách)",
+   "Showroom Bosch / HMH (60 Hoàng Văn Thụ)"
+  ],
+  "vehicles": "Rất đông xe máy chạy qua nút giao, ô tô con (Kia Morning bạc, SUV trắng, Hyundai trắng), một cụ đi xe máy/xe cũ; mật độ giao thông cao",
+  "vegetation": "Hàng cây bóng mát lớn ven đường, chậu cây cảnh trước cửa hàng",
+  "street_furniture": [
+   "cụm đèn tín hiệu giao thông có đồng hồ đếm ngược (đèn xanh, 21s)",
+   "cột đèn tín hiệu cần vươn",
+   "băng rôn/cờ dọc trên cột",
+   "tủ điện",
+   "chậu cây cảnh"
+  ],
+  "banners": [
+   "Băng rôn/cờ dọc trên cột (không đọc rõ nội dung)"
+  ],
+  "special": [
+   "Ô/dù cầu vồng (che sạp) trước cửa hàng ELISE"
+  ],
+  "summary": "Nút giao đèn tín hiệu trên phố Hoàng Văn Thụ, một bên là toà nhà trắng ELISE/Chrisbella, một bên là dãy shophouse showroom Bosch; giao thông xe máy dày đặc, trời âm u.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_254",
+  "area": "Nút giao Hoàng Văn Thụ với phố Trần Phú/Điện Biên Phủ (gần Cảng Hải Phòng), có đèn tín hiệu",
+  "sidewalk": "Vỉa hè gạch đỏ-xám hai bên, một số đoạn bị lấn bởi xe/hàng; rộng ~3 m",
+  "buildings": [
+   {
+    "heading": 90,
+    "style": "công sở/nhà kiểu Pháp cổ (đã xuống cấp)",
+    "floors": 2,
+    "color": "vàng kem nhạt, tường loang",
+    "width_m": 35,
+    "features": "hàng trụ tường, cửa vòm, mái hiên bạt; phía sau là chung cư bê tông cao tầng"
+   },
+   {
+    "heading": 90,
+    "style": "chung cư/toà cao tầng hiện đại",
+    "floors": 15,
+    "color": "be, trắng",
+    "width_m": 40,
+    "features": "nhiều tầng căn hộ, biển 'Hoàng Long Plaza' (?), tương phản với nhà cổ phía trước"
+   },
+   {
+    "heading": 270,
+    "style": "nhà góc phố kiểu Pháp",
+    "floors": 2,
+    "color": "trắng",
+    "width_m": 15,
+    "features": "tiệm may 'Bắc Nam Tailor - Thời Trang Thiết Kế - May Đo - SINCE 1994', ma-nơ-canh mặc áo dài & vest trong tủ kính"
+   },
+   {
+    "heading": 180,
+    "style": "nhà góc phố kiểu Pháp",
+    "floors": 2,
+    "color": "xanh ngọc/lam nhạt",
+    "width_m": 15,
+    "features": "thẩm mỹ viện, mái vòm, cửa chớp"
+   }
+  ],
+  "landmarks": [
+   "Toà nhà cao tầng Hoàng Long Plaza (nền)",
+   "Cửa hàng ELISE",
+   "Tiệm may Bắc Nam Tailor (từ 1994)"
+  ],
+  "vehicles": "Taxi bạc hãng 'Sport' biển '(0225) 3.925.925' (mui có hộp đèn), ô tô Audi/BMW đen bật đèn, xe con trắng, nhiều xe máy qua nút giao; mật độ cao",
+  "vegetation": "Cây bóng mát lớn ở dải vỉa hè, tán phủ nút giao",
+  "street_furniture": [
+   "đèn tín hiệu giao thông (đèn vàng/đỏ)",
+   "cột điện + dây",
+   "tủ điện lớn ven đường",
+   "vạch sang đường (crosswalk)",
+   "cột biển báo sơn khoanh đỏ-trắng",
+   "băng rôn dọc màu xanh trên cột",
+   "xe đạp dựng bên vỉa hè"
+  ],
+  "banners": [
+   "Băng rôn dọc màu xanh trên cột (không đọc rõ nội dung)"
+  ],
+  "special": [],
+  "summary": "Nút giao Hoàng Văn Thụ - Trần Phú với taxi bạc nổi bật, đối lập giữa nhà kiểu Pháp cổ xuống cấp và chung cư cao tầng hiện đại; góc phố có tiệm may Bắc Nam trưng áo dài, vest.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_255",
+  "area": "Phố Hoàng Văn Thụ (gần số 31), đoạn có công trình công sở/kiến trúc Pháp lớn màu vàng và khuôn viên tường rào; gần Cảng Hải Phòng",
+  "sidewalk": "Vỉa hè lát gạch caro đỏ-xám, rộng ~4-5 m; gốc cây có ô đất/song sắt bảo vệ",
+  "buildings": [
+   {
+    "heading": 90,
+    "style": "công trình công cộng kiểu Pháp thuộc địa (mặt tiền dài)",
+    "floors": 2,
+    "color": "vàng kem, dải hồng/salmon tầng trên, cửa chớp nâu đỏ",
+    "width_m": 60,
+    "features": "dãy cửa sổ vòm cuốn, trụ tường (pilaster), cửa cuốn tầng trệt, mái bằng có lan can con tiện"
+   },
+   {
+    "heading": 270,
+    "style": "tường rào + khuôn viên có cổng",
+    "color": "trắng loang",
+    "width_m": 40,
+    "features": "tường rào cao có song sắt phía trên, cây xanh rậm bên trong, cổng trụ trắng; thấp thoáng toà nhà/tháp phía sau"
+   },
+   {
+    "heading": 0,
+    "style": "nhà ống/thương mại",
+    "floors": 3,
+    "color": "trắng, hồng",
+    "width_m": 6,
+    "features": "nằm sau hàng cây, có vài quán/ô dù"
+   }
+  ],
+  "landmarks": [
+   "Công trình kiến trúc Pháp cổ quy mô lớn trên phố Hoàng Văn Thụ (gần Cảng Hải Phòng)"
+  ],
+  "vehicles": "Ô tô con đỗ dày ven đường (Porsche Macan đỏ, VinFast trắng, BMW đen, Hyundai Tucson trắng, xe đỏ), xe máy lác đác",
+  "vegetation": "Hàng cây bóng mát lớn (xà cừ) hai bên, thân sơn vôi trắng gốc; cây rậm trong khuôn viên",
+  "street_furniture": [
+   "cột điện + dây",
+   "cột đèn chiếu sáng cần vươn",
+   "tủ điện ven đường",
+   "băng rôn dọc trên chân đế (tripod) và trên cột",
+   "ô đất gốc cây có song sắt",
+   "cổng trụ trắng + hàng rào sắt"
+  ],
+  "banners": [
+   "Băng rôn dọc màu xanh (nội dung tuyên truyền, không đọc rõ toàn văn)"
+  ],
+  "special": [
+   "Công trình kiến trúc Pháp cổ quy mô lớn (mặt tiền dài, cửa vòm cuốn, lan can con tiện) — nên dựng riêng"
+  ],
+  "summary": "Đoạn phố Hoàng Văn Thụ trời nắng, một bên là công trình Pháp cổ màu vàng mặt tiền dài với cửa vòm, đối diện là tường rào khuôn viên cây xanh; ô tô đỗ san sát dưới hàng xà cừ.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_256",
+  "area": "Phố Hoàng Văn Thụ (gần số 46), khu vực gần Nhà thờ Chính toà Hải Phòng — có Nhà sách Đức Mẹ và Uỷ ban Bác ái Xã hội (Caritas); một bên là công trình Pháp cổ dài",
+  "sidewalk": "Vỉa hè lát gạch caro đỏ-xám, rộng ~4-5 m; gốc cây có song sắt",
+  "buildings": [
+   {
+    "heading": 90,
+    "style": "nhà ống cải tạo mặt tiền phòng khám",
+    "floors": 3,
+    "color": "xanh dương (biển) trên nền trắng",
+    "width_m": 8,
+    "features": "'NHA KHOA SING 11' / 'Sing Nha Khoa', biển liệt kê 'Niềng Răng, Trồng Răng, Nhổ Răng Khôn, Răng Sứ Thẩm Mỹ', 'Hotline 0866 36 22 66', địa chỉ 29 Hoàng Văn Thụ; dù Sing xanh-trắng, xe máy đỗ hàng dài"
+   },
+   {
+    "heading": 180,
+    "style": "công trình Pháp cổ dài (thuộc khuôn viên Công giáo)",
+    "floors": 2,
+    "color": "vàng kem/trắng loang, cửa chớp nâu đỏ",
+    "width_m": 60,
+    "features": "cửa cuốn tầng trệt, biển 'Nhà Sách Đức Mẹ Hằng Cứu...', 'Siêu thị mini Chân Thiện', 'Uỷ ban Bác ái ... Văn Phòng' (logo thánh giá), cửa sổ chữ nhật, cờ đuôi nheo màu"
+   },
+   {
+    "heading": 0,
+    "style": "nhà ống/shophouse",
+    "floors": 2,
+    "color": "đỏ gạch, xanh",
+    "width_m": 6,
+    "features": "quán 'Coffee - Tea - Mojito' (logo mèo thần tài), biển quảng cáo nha khoa cỡ lớn"
+   }
+  ],
+  "landmarks": [
+   "Nha khoa Sing (Phòng khám chuyên khoa Răng Hàm Mặt, 29 Hoàng Văn Thụ)",
+   "Nhà sách Đức Mẹ Hằng Cứu Giúp (nhà sách Công giáo)",
+   "Uỷ ban Bác ái Xã hội / Caritas (văn phòng, logo thánh giá)",
+   "Siêu thị mini Chân Thiện"
+  ],
+  "vehicles": "Ô tô con đỗ và chạy (Porsche Macan đỏ, xe đỏ, Ford Ranger trắng, Hyundai trắng, BMW đen), nhiều xe máy đỗ dưới dù trước phòng khám",
+  "vegetation": "Hàng cây bóng mát lớn hai bên, thân sơn vôi trắng gốc; tán rợp phố",
+  "street_furniture": [
+   "cột điện + dây",
+   "cột đèn chiếu sáng cần vươn",
+   "ô/dù quán cà phê (xanh-trắng, hồng)",
+   "sạp bán hàng có bạt xanh-đỏ",
+   "xe đẩy 'Coffee-Tea'",
+   "tủ điện",
+   "băng rôn dọc trên cột (dự án thanh niên)",
+   "biển quảng cáo dọc có chân đế",
+   "biển tên phố Hoàng Văn Thụ"
+  ],
+  "banners": [
+   "Biển quảng cáo nha khoa: 'Niềng Răng / Trồng Răng / Nhổ Răng Khôn / Răng Sứ Thẩm Mỹ - Hotline 0866 36 22 66'",
+   "Băng rôn dọc xanh: 'DỰ ÁN THANH NIÊN ... VIỆC LÀM ...' (không đọc trọn)"
+  ],
+  "special": [
+   "Cụm công trình Công giáo (Nhà sách Đức Mẹ + Uỷ ban Bác ái/Caritas, logo thánh giá) trong toà nhà Pháp cổ dài — đặc trưng khu vực Nhà thờ Chính toà"
+  ],
+  "summary": "Đoạn phố Hoàng Văn Thụ gần Nhà thờ Chính toà: một bên là phòng khám Nha khoa Sing biển xanh nổi bật với dù và xe máy đỗ, đối diện là toà nhà Pháp cổ dài đặt Nhà sách Đức Mẹ và Uỷ ban Bác ái (Caritas).",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_245",
+  "area": "Phố Cát Cụt (địa chỉ hiển thị 131 P. Cát Cụt), quận Lê Chân - phố thương mại nhà ống bán sơn, đồng phục, sách vở, đồ điện; lòng đường hẹp rải nhựa, hai bên san sát cửa hàng.",
+  "sidewalk": "Vỉa hè lát gạch/bê tông xám, hẹp khoảng 1,5-2m, nhiều đoạn bị hàng hóa, xe máy và khung gỗ chống cây lấn chiếm; mặt đường nhựa có vạch tim vàng.",
+  "buildings": [
+   {
+    "heading": 90,
+    "style": "nhà ống shophouse",
+    "floors": 4,
+    "color": "trắng/xám, biển xanh",
+    "width_m": 4.5,
+    "features": "tầng 1 cửa kính bày ma-nơ-canh (Lady Mode), biển đỏ 'NHÀ PHÂN PHỐI DÂY VÀ CÁP ĐIỆN', cửa cuốn"
+   },
+   {
+    "heading": 0,
+    "style": "nhà ống shophouse",
+    "floors": 4,
+    "color": "kem/vàng, biển xanh JOTUN",
+    "width_m": 4,
+    "features": "biển 'JOTUN ĐẠI LÝ SƠN MINH KIÊN', 'CTY BẾN THÀNH YC', cửa cuốn, ban công có lam"
+   },
+   {
+    "heading": 270,
+    "style": "nhà ống có ban công kiểu Pháp",
+    "floors": 3,
+    "color": "kem/trắng, biển cam CANDI STORE",
+    "width_m": 4,
+    "features": "ban công lan can con tiện (balustrade), cột trắng, biển 'ĐỒNG PHỤC NHÀ KEO', số nhà 114A, cửa cuốn"
+   }
+  ],
+  "landmarks": [],
+  "vehicles": "Xe máy đỗ và chạy rải rác, một vài xe máy phủ bạt trên vỉa hè; hầu như không có ô tô, mật độ trung bình.",
+  "vegetation": "Cây xanh non trồng ven vỉa hè có khung gỗ tam giác chống đỡ; vài cây tán lớn ở giữa phố phía xa.",
+  "street_furniture": [
+   "cột điện bê tông nhiều dây chằng chịt",
+   "khung gỗ chống cây non",
+   "biển tên phố 'P. Cát Cụt' sơn trên mặt đường",
+   "cửa cuốn kim loại"
+  ],
+  "banners": [
+   "JOTUN - ĐẠI LÝ SƠN MINH KIÊN",
+   "CTY BẾN THÀNH YC - 133 Cát Cụt - 0225 3734186",
+   "ĐỘ BỀN THÁCH THỨC THỜI GIAN",
+   "CANDI STORE - ĐỒNG PHỤC NHÀ KEO - ÁO LỚP ÁO SỰ KIỆN",
+   "ĐỒNG PHỤC Siêu rẻ 50K",
+   "ĐÔNG LỢI - SÁCH-LỊCH-ĐỒ DÙNG HỌC SINH",
+   "SƠN VIỆT-MỸ",
+   "XẢ HÀNG DƯỚI 150K"
+  ],
+  "special": [
+   "quầy hàng rong/đồ ăn có ô lớn nhiều màu đặt sát mép đường (heading 180)"
+  ],
+  "summary": "Phố Cát Cụt (Lê Chân) - phố nhà ống thương mại hẹp bán sơn (JOTUN), đồng phục (CANDI STORE), sách vở; nhiều biển hiệu, dây điện chằng chịt và cây non có khung gỗ chống.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_246",
+  "area": "Phố Chùa Hàng (địa chỉ hiển thị 10 P. Chùa Hàng), Lê Chân - đoạn chợ ẩm thực rất đông đúc chuyên bán pate/bánh mì cay, đồ ăn, trái cây; nhà cửa phủ kín bạt và biển hiệu.",
+  "sidewalk": "Gần như không còn vỉa hè trống - bị quầy hàng, rổ bánh mì, sạp trái cây và bạt che phủ kín; không rõ kiểu lát, lòng đường nhựa hẹp.",
+  "buildings": [
+   {
+    "heading": 90,
+    "style": "nhà ống mặt phố phủ bạt",
+    "floors": 3,
+    "color": "bạt xanh, biển đỏ-trắng",
+    "width_m": 4,
+    "features": "biển 'PA TÊ CỘT ĐÈN CHÍNH HIỆU THÀNH BÉO', tủ kính bày pate, cửa mở bán hàng"
+   },
+   {
+    "heading": 270,
+    "style": "nhà ống có mái hiên bạt",
+    "floors": 2,
+    "color": "bạt xanh dương chữ trắng",
+    "width_m": 4,
+    "features": "mái hiên bạt 'PATÊ KIỀU CHÍNH HIỆU', rổ bánh mì/bánh mì cay bày trước cửa, xe máy đỏ đỗ"
+   },
+   {
+    "heading": 0,
+    "style": "nhà ống shophouse",
+    "floors": 4,
+    "color": "trắng/xám, biển xanh",
+    "width_m": 4,
+    "features": "biển 'L.Y.Y STORE', 'NHÀ THUỐC' chữ thập xanh, cửa hàng san sát"
+   }
+  ],
+  "landmarks": [],
+  "vehicles": "Xe máy chạy và đỗ với mật độ cao len lỏi trong lòng phố hẹp; người điều khiển mờ mặt.",
+  "vegetation": "Hầu như không có cây xanh - không gian phố dày đặc nhà và bạt che.",
+  "street_furniture": [
+   "cột điện với búi dây điện dày đặc",
+   "biển tên phố 'P. Chùa Hàng' trên mặt đường",
+   "bạt che/mái hiên căng ngang vỉa hè"
+  ],
+  "banners": [
+   "MINH NGÂN - PATE CỘT ĐÈN - Số 8 đường Chùa Hàng - Lê Chân - HP - Bán buôn Bán lẻ",
+   "PA TÊ CỘT ĐÈN CHÍNH HIỆU THÀNH BÉO - ĐC:21 Chùa Hàng - ĐT:0817 209 548 - ĐẢM BẢO VỆ SINH AN TOÀN THỰC PHẨM",
+   "PATÊ KIỀU CHÍNH HIỆU - ĐC:10 Chùa Hàng - ĐT 0374 166178 - 0934 3157 5718",
+   "PA TÊ CÂN - PA TÊ HỘP",
+   "QUANG VINH - CHUYÊN MUA BÁN, SỬA CHỮA ĐỒ CŨ - ĐC:23 Chùa Hàng",
+   "BẢO MINH SỐ 10 CHÙA HÀNG - MUA BÁN SỬA CHỮA ĐIỆN TỬ",
+   "L.Y.Y STORE - 0943.875.229",
+   "24H",
+   "RAU MÁ - ĐẬU XANH - TRÀ TẮC - CHANH LEO - MÍA ĐÁ"
+  ],
+  "special": [
+   "sạp/quầy pate và bánh mì cay với rổ bánh mì trưng bày đặc trưng",
+   "quầy nước giải khát trái cây (rau má, đậu xanh, trà tắc, mía đá) có rổ hoa quả bày trước cửa"
+  ],
+  "summary": "Phố Chùa Hàng đoạn chợ pate/bánh mì cay nổi tiếng (Lê Chân) - dày đặc quầy pate (Minh Ngân, Thành Béo, Kiều Chính), sạp trái cây, tạp hóa; bạt xanh và dây điện phủ kín, xe máy đông.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_247",
+  "area": "Phố Chùa Hàng (địa chỉ hiển thị 45 P. Chùa Hàng), Lê Chân - đoạn nhiều cửa hàng điện thoại/SIM, cầm đồ, tạp hóa và sạp trái cây; phố hẹp buôn bán sầm uất.",
+  "sidewalk": "Vỉa hè lát gạch/bê tông, bị hàng hóa (rổ trái cây, bao gạo), quầy và xe máy lấn gần hết; mặt đường nhựa có ghi 'P. Chùa Hàng'.",
+  "buildings": [
+   {
+    "heading": 90,
+    "style": "nhà ống tạp hóa",
+    "floors": 3,
+    "color": "biển đỏ chữ vàng",
+    "width_m": 5,
+    "features": "biển lớn 'CỬA HÀNG TẠP HÓA - 0982 240 292', hàng hóa/đồ uống/bao gạo bày kín, sạp trái cây trước cửa"
+   },
+   {
+    "heading": 0,
+    "style": "nhà ống bán SIM/điện thoại",
+    "floors": 3,
+    "color": "biển xanh dương chữ trắng",
+    "width_m": 3.5,
+    "features": "biển 'SIM THẺ - SỬA CHỮA - MUA BÁN - PHỤ KIỆN CHÍNH', mái bạt xanh-trắng sọc, cổng sắt xếp số 38"
+   },
+   {
+    "heading": 270,
+    "style": "nhà ống, có nhà cầm đồ",
+    "floors": 3,
+    "color": "biển đỏ CẦM ĐỒ",
+    "width_m": 4,
+    "features": "biển 'CẦM ĐỒ M2K 1K/tr', 'CẦM ĐỒ ĐIỆN THOẠI THANH', ô dù chợ tím/đỏ, sạp bày điện thoại"
+   }
+  ],
+  "landmarks": [],
+  "vehicles": "Xe máy chạy và đỗ dày đặc dọc hai bên, một người chở hàng đội mũ bảo hiểm; mật độ cao.",
+  "vegetation": "Cây xanh rải rác trên vỉa hè (heading 270); phần lớn phố ít cây do nhà san sát.",
+  "street_furniture": [
+   "cột điện với búi dây dày",
+   "biển tên phố 'P. Chùa Hàng' trên mặt đường",
+   "ô dù chợ",
+   "mái bạt sọc"
+  ],
+  "banners": [
+   "SIM THẺ - SỬA CHỮA - MUA BÁN - PHỤ KIỆN CHÍNH - 0987.348.299",
+   "CỬA HÀNG TẠP HÓA - 0982 240 292 - 47 Chùa Hàng - Q.Lê Chân - TP.Hải Phòng",
+   "Castrol - BẢO DƯỠNG XE GA XE SỐ XE ĐIỆN",
+   "KIÊN PHONG",
+   "CẦM ĐỒ M2K - 1K/tr",
+   "CẦM ĐỒ ĐIỆN THOẠI THANH - SIM THẺ",
+   "MUA BÁN TRAO ĐỔI ĐIỆN THOẠI IPHONE IPAD LAPTOP",
+   "47A CHÙA HÀNG"
+  ],
+  "special": [
+   "sạp trái cây bày rổ hoa quả và khoai trước cửa tạp hóa"
+  ],
+  "summary": "Phố Chùa Hàng (Lê Chân) đoạn có cửa hàng SIM/điện thoại, cầm đồ (M2K), gara xe máy Castrol và tạp hóa lớn 47 Chùa Hàng; phố hẹp đông xe máy, sạp trái cây lấn vỉa hè.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_248",
+  "area": "Phố Chùa Hàng (địa chỉ hiển thị 61 P. Chùa Hàng), Lê Chân - đoạn có gara mua bán ô tô cũ và một ngõ cắt ngang (Ngõ 50); phố nhà ống buôn bán, có băng rôn tuyên truyền treo ngang.",
+  "sidewalk": "Vỉa hè lát gạch đỏ terracotta xen gạch xám, rộng khoảng 2m (rõ nhất ở heading 270); một số đoạn cũ, có sạp và xe máy lấn.",
+  "buildings": [
+   {
+    "heading": 0,
+    "style": "gara/showroom ô tô nhà ống",
+    "floors": 3,
+    "color": "biển đỏ-trắng, cửa kính lớn",
+    "width_m": 5,
+    "features": "biển 'BÌNH AUTO', 'MUA BÁN Ô TÔ ĐÃ QUA SỬ DỤNG' với logo hãng xe, trưng bày Toyota Vios đỏ trong nhà, số 48 Chùa Hàng"
+   },
+   {
+    "heading": 90,
+    "style": "nhà ống cũ có sân thượng",
+    "floors": 3,
+    "color": "xám/vàng cũ, bạt xanh sọc",
+    "width_m": 4,
+    "features": "mái bạt sọc xanh-trắng, cửa cuốn, sân thượng trồng cây, đồ đạc chất trước cửa"
+   },
+   {
+    "heading": 180,
+    "style": "nhà ống đóng cửa",
+    "floors": 2,
+    "color": "tường cũ, bạt xanh sọc",
+    "width_m": 4,
+    "features": "cổng sắt xếp (scissor gate), cửa cuốn, biển nhỏ 'GIẶT LÀ', cây leo trên sân thượng"
+   }
+  ],
+  "landmarks": [],
+  "vehicles": "Xe máy chạy và đỗ, xe đạp, một người lớn tuổi đi xe máy; trong showroom có ô tô con (Toyota Vios đỏ). Mật độ trung bình.",
+  "vegetation": "Cây tán lớn (phượng/xà cừ) rợp bóng phía trước (heading 90); vài cây leo trên sân thượng nhà cũ.",
+  "street_furniture": [
+   "cột điện và đèn đường",
+   "biển tên phố 'P. Chùa Hàng' và biển ngõ 'Ng. 50 P. Chùa Hàng' trên mặt đường",
+   "băng rôn khẩu hiệu căng ngang phố"
+  ],
+  "banners": [
+   "BÌNH AUTO - DD:0904.972378 - 094.6905866 - ĐC:48 Chùa Hàng",
+   "MUA BÁN Ô TÔ ĐÃ QUA SỬ DỤNG - CHÙA HÀNG - MUA BÁN Ô TÔ CŨ CHẤT LƯỢNG GIÁ TỐT",
+   "KIM THÀNH (sạp trái cây)",
+   "BÁNH CUỐN - GIÒ CHẢ",
+   "TOÀN DÂN ĐOÀN KẾT XÂY DỰNG ĐỜI SỐNG VĂN HÓA",
+   "SÔNG VĂN HÓA"
+  ],
+  "special": [
+   "băng rôn/khẩu hiệu tuyên truyền căng ngang qua phố (dây treo)",
+   "sạp trái cây KIM THÀNH có ô"
+  ],
+  "summary": "Phố Chùa Hàng (Lê Chân) đoạn gara ô tô cũ 'BÌNH AUTO' (48 Chùa Hàng, trưng Vios đỏ) ngay góc ngõ 50; có sạp trái cây Kim Thành, quán bánh cuốn-giò chả và băng rôn văn hóa treo ngang phố.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_249",
+  "area": "Quảng trường Nhà hát Lớn / trước Nhà hát Thành phố Hải Phòng, khu vực gần Ga Hải Phòng - quảng trường rộng có đài phun nước, ảnh chụp bằng xe (tháng 12/2024, dịp Giáng sinh).",
+  "sidewalk": "Không phải vỉa hè phố thông thường - quảng trường lát rộng bằng đá/bê tông; mép đường có bó vỉa và cây trồng trong ô.",
+  "buildings": [
+   {
+    "heading": 90,
+    "style": "nhà hát kiến trúc Pháp cổ (tân cổ điển)",
+    "floors": 2,
+    "color": "vàng kem, cột trắng",
+    "width_m": 40,
+    "features": "Nhà hát Thành phố Hải Phòng - hàng cột lớn, cửa vòm, lan can con tiện, treo cờ đỏ và chân dung/tranh cổ động, băng rôn đỏ"
+   },
+   {
+    "heading": 270,
+    "style": "nhà góc phố cổ có quán cà phê",
+    "floors": 4,
+    "color": "vàng, mặt trên bọc quảng cáo",
+    "width_m": 20,
+    "features": "'HIGHLANDS COFFEE' ở tầng trệt góc nhà, quảng cáo lớn bọc các tầng trên, xe máy đỗ thành hàng phía trước"
+   },
+   {
+    "heading": 0,
+    "style": "nhà phố cổ",
+    "floors": 3,
+    "color": "vàng cũ",
+    "width_m": 8,
+    "features": "biển 'COFFEE' lớn, tầng trệt quán cà phê, cây xanh che phía trước"
+   }
+  ],
+  "landmarks": [
+   "Nhà hát Thành phố Hải Phòng (Nhà hát Lớn)",
+   "Quảng trường Nhà hát Lớn với đài phun nước",
+   "Highlands Coffee (tòa nhà góc)",
+   "gần Ga Hải Phòng"
+  ],
+  "vehicles": "Ô tô con và xe khách 16 chỗ màu bạc trên đường, nhiều xe máy đỗ và chạy quanh quảng trường, có xe đạp; mật độ khá đông người tụ tập.",
+  "vegetation": "Cây xanh cổ thụ lớn viền quanh quảng trường, cây mới trồng có khung chống 3 chân, hàng cây ven đường và bồn cây.",
+  "street_furniture": [
+   "cột đèn cao hiện đại",
+   "đèn giao thông (đang đỏ)",
+   "cột cờ treo cờ Tổ quốc",
+   "biển báo cấm rẽ/cấm dừng",
+   "đài phun nước",
+   "bồn cây"
+  ],
+  "banners": [
+   "HIGHLANDS COFFEE",
+   "COFFEE",
+   "cụm cờ đỏ và pano cổ động trên mặt tiền nhà hát (chữ mờ không đọc rõ)"
+  ],
+  "special": [
+   "cây thông Noel lớn trang trí đèn có ngôi sao trên đỉnh (dịp Giáng sinh 12/2024)",
+   "đài phun nước giữa quảng trường",
+   "chân dung/tranh Chủ tịch Hồ Chí Minh trên mặt tiền Nhà hát",
+   "cụm cờ đỏ trang trí"
+  ],
+  "summary": "Quảng trường Nhà hát Lớn Hải Phòng nhìn từ xe (12/2024) - Nhà hát Thành phố kiến trúc Pháp vàng treo cờ và chân dung Bác, cây thông Noel lớn, đài phun nước, quán Highlands Coffee ở góc; quảng trường rộng đông xe máy, trời âm u.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_250",
+  "area": "Đường Hoàng Văn Thụ (địa chỉ hiển thị 164 Hoàng Văn Thụ), ven Quảng trường Nhà hát Lớn (ảnh Google 6/2017) - một bên là dãy phố Pháp cổ bán điện thoại/đồng hồ, một bên là Nhà hát Thành phố và quảng trường rộng.",
+  "sidewalk": "Vỉa hè lát gạch rộng dưới hàng cây cổ thụ (rõ ở heading 270), gốc cây lớn quét vôi trắng; mép quảng trường quây cọc xích vàng.",
+  "buildings": [
+   {
+    "heading": 90,
+    "style": "nhà hát kiến trúc Pháp tân cổ điển",
+    "floors": 2,
+    "color": "vàng kem, cột trắng",
+    "width_m": 40,
+    "features": "Nhà hát Thành phố Hải Phòng - hàng cột, lan can con tiện, treo cờ đỏ (có cờ Tổ quốc) và băng rôn 'KỶ NIỆM NGÀY GIẢI PHÓNG HẢI PHÒNG'"
+   },
+   {
+    "heading": 0,
+    "style": "nhà phố Pháp cổ shophouse",
+    "floors": 3,
+    "color": "vàng/kem cũ, biển xanh-đỏ",
+    "width_m": 4,
+    "features": "cửa hàng điện thoại 'BINLI 160', 'iPhone Sky', biển 'Sale 50%', tầng trên cửa lá sách"
+   },
+   {
+    "heading": 270,
+    "style": "nhà phố Pháp cổ shophouse",
+    "floors": 2,
+    "color": "vàng cũ, biển đỏ",
+    "width_m": 4,
+    "features": "'ĐỒNG HỒ QUỐC DOANH / WATCH', 'PHỤ KIỆN ĐIỆN THOẠI' (LG, HTC), tủ kính, ô dù xanh, xe máy đỗ"
+   }
+  ],
+  "landmarks": [
+   "Nhà hát Thành phố Hải Phòng (Nhà hát Lớn)",
+   "Quảng trường Nhà hát Lớn"
+  ],
+  "vehicles": "Ô tô con, taxi đỏ, xe khách/xe tải trắng, xe máy đỗ và chạy, xe đạp; mật độ trung bình, đường rộng thoáng.",
+  "vegetation": "Hàng cây cổ thụ lớn (xà cừ) tán rộng rợp bóng dọc đường và viền quảng trường.",
+  "street_furniture": [
+   "cột điện và cột đèn, dây điện",
+   "cọc/bollard vàng nối xích quây quanh mép quảng trường",
+   "biển tên đường 'Hoàng Văn Thụ' trên mặt đường",
+   "biển báo cấm (cấm rẽ/một chiều)",
+   "đèn trang trí hình bông hoa treo ngang đường"
+  ],
+  "banners": [
+   "BINLI 160",
+   "iPhone Sky",
+   "ĐỒNG HỒ QUỐC DOANH - WATCH",
+   "PHỤ KIỆN ĐIỆN THOẠI",
+   "Sale 50%",
+   "CÔNG TY CỔ PHẦN...",
+   "ĐẦU TƯ XÂY DỰNG HẢI PHÒNG",
+   "KỶ NIỆM NGÀY GIẢI PHÓNG HẢI PHÒNG (băng rôn đỏ trên nhà hát)"
+  ],
+  "special": [
+   "đèn trang trí hình bông hoa treo ngang đường (heading 0)",
+   "dãy cọc xích vàng quây quanh quảng trường",
+   "cờ đỏ trên nóc Nhà hát"
+  ],
+  "summary": "Đường Hoàng Văn Thụ ven Quảng trường Nhà hát Lớn (6/2017) - Nhà hát Thành phố Pháp cổ màu vàng treo cờ đối diện dãy phố Pháp bán điện thoại/đồng hồ (BINLI, Đồng hồ Quốc Doanh); hàng xà cừ cổ thụ, cọc xích vàng quây quảng trường, đèn hoa treo ngang đường.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_257",
+  "area": "Góc phố Hoàng Văn Thụ (địa chỉ hiển thị '23 Hoàng Văn Thụ'), gần giao lộ/ngõ nhỏ trong khu phố cổ thương mại trung tâm Hải Phòng, quận Hồng Bàng. Ảnh chụp tháng 10/2024, trời nắng.",
+  "sidewalk": "Vỉa hè lát gạch caro đỏ terracotta xen ô xám, ở góc phố rộng ~4-5m; có bóng cây phủ.",
+  "buildings": [
+   {
+    "heading": 90,
+    "style": "nhà công cộng/câu lạc bộ 2 tầng bê tông",
+    "floors": 2,
+    "color": "xám",
+    "width_m": 22,
+    "features": "biển đen chữ trắng 'DIAMOND BRIDGE & POKER' trên nóc, cửa cuốn kéo xuống, hàng cửa kính lớn tầng 2, mái tôn nhỏ, khung giàn sắt trên mái"
+   },
+   {
+    "heading": 0,
+    "style": "nhà ống shophouse",
+    "floors": 2,
+    "color": "vàng kem",
+    "width_m": 6,
+    "features": "biển đỏ 'BÁN BUÔN - BÁN LẺ HÀNG TIÊU DÙNG', biển đỏ 'XÔI', cửa cuốn"
+   },
+   {
+    "heading": 0,
+    "style": "quán cà phê nhà ống",
+    "floors": 2,
+    "color": "tối/đen",
+    "width_m": 8,
+    "features": "biển 'coffee - COFFEE & TEA', bạt che, cây cảnh trước cửa"
+   },
+   {
+    "heading": 270,
+    "style": "quán cà phê góc phố hiện đại",
+    "floors": 2,
+    "color": "xám kính",
+    "width_m": 15,
+    "features": "biển 'FiiN coffee - COFFEE & TEA', mặt tiền cong, mái hiên bo tròn, ô dù trắng lớn"
+   },
+   {
+    "heading": 180,
+    "style": "nhà cổ kiểu Pháp thấp tầng + tường rào",
+    "floors": 2,
+    "color": "vàng kem",
+    "width_m": 30,
+    "features": "tường rào dài, cửa sổ chớp"
+   }
+  ],
+  "landmarks": [
+   "FiiN coffee (quán cà phê góc phố)",
+   "Diamond Bridge & Poker (câu lạc bộ)"
+  ],
+  "vehicles": "Ô tô con mật độ trung bình: SUV màu cam-đỏ chạy giữa đường, SUV đen, Toyota bạc và BMW đen đỗ ven đường; xe máy tay ga (xanh teal) đỗ trên vỉa hè.",
+  "vegetation": "Hàng cây xanh tán rộng (dạng cây sấu/bàng) trồng dọc hai bên phố, nhiều bóng mát.",
+  "street_furniture": [
+   "cột đèn đường cần vươn cong",
+   "cột điện + dây điện chằng chịt",
+   "biển báo một chiều mũi tên xanh",
+   "biển cấm đi ngược chiều (tròn đỏ vạch trắng)",
+   "biển tên phố 'PHỐ HOÀNG VĂN THỤ'",
+   "trụ cứu hỏa đỏ",
+   "cọc/barrier trắng ven đường"
+  ],
+  "banners": [
+   "BÁN BUÔN - BÁN LẺ HÀNG TIÊU DÙNG",
+   "băng rôn dọc đỏ tuyên truyền PCCC chữ trắng (đọc được '...PHÒNG CHÁY CHỮA CHÁY... QUẢN LÝ, KHAI THÁC...')",
+   "chữ sơn đỏ rao vặt trên cửa cuốn 'Đất nhà...'",
+   "XÔI"
+  ],
+  "special": [
+   "quán cà phê góc FiiN với mái hiên cong + ô dù trắng (mốc góc phố)",
+   "tòa cao tầng đang xây phủ lưới xanh phía sau (heading ~270)"
+  ],
+  "summary": "Góc phố Hoàng Văn Thụ với dãy shophouse cổ 2 tầng, câu lạc bộ Diamond Bridge & Poker và quán FiiN coffee ở góc; vỉa hè gạch caro đỏ-xám, hàng cây bóng mát, giao lộ có biển một chiều và cấm ngược chiều.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_258",
+  "area": "Phố Lê Lợi (địa chỉ '429 Lê Lợi'), tuyến phố thương mại sầm uất nhiều cửa hàng thời trang/in ấn, quận Ngô Quyền. Ảnh tháng 10/2024, nắng.",
+  "sidewalk": "Vỉa hè hẹp ~2-3m, lát bê tông/gạch xám, bị hàng hóa và xe máy lấn chiếm.",
+  "buildings": [
+   {
+    "heading": 0,
+    "style": "nhà ống shophouse thương mại",
+    "floors": 3,
+    "color": "đỏ (biển) trên nền vàng",
+    "width_m": 12,
+    "features": "biển đỏ lớn 'ĐẠI PHÁT - in & QUẢNG CÁO', biển 'SEVEN.UOMO', 'P&H' xanh, 'VINAMILK', treo biển giảm giá SALE -40%/-50%"
+   },
+   {
+    "heading": 90,
+    "style": "nhà ống/studio",
+    "floors": 3,
+    "color": "xám bạc",
+    "width_m": 10,
+    "features": "biển 'SAY CHEESE - PHOTO STUDIO' logo máy ảnh, mặt kính lớn, shop xanh lá kế bên, 'CÔNG TY TNHH THA...'"
+   },
+   {
+    "heading": 180,
+    "style": "cửa hàng xe đạp + nhà mái ngói cổ",
+    "floors": 2,
+    "color": "đỏ + ngói nâu",
+    "width_m": 14,
+    "features": "biển đỏ 'ĐỨC HUY - CHUYÊN XE ĐẠP - XE ĐẠP THỂ THAO', kế bên là nhà mái ngói cong kiểu truyền thống"
+   },
+   {
+    "heading": 270,
+    "style": "biệt thự Pháp",
+    "floors": 3,
+    "color": "vàng kem/trắng",
+    "width_m": 9,
+    "features": "ban công lan can trang trí, ô văng cửa sổ, số nhà '340'"
+   }
+  ],
+  "landmarks": [
+   "SAY CHEESE Photo Studio",
+   "ĐẠI PHÁT in & Quảng cáo",
+   "ĐỨC HUY (cửa hàng xe đạp)",
+   "Vinamilk",
+   "SEVEN.UOMO"
+  ],
+  "vehicles": "Rất đông: xe máy và xe đạp điện chạy & đỗ dày đặc, người đi xe máy áo xanh; ô tô VinFast đỏ, SUV bạc, SUV đen di chuyển trên đường.",
+  "vegetation": "Hàng cây tán rộng (bàng/xà cừ) trồng dọc phố tạo bóng mát.",
+  "street_furniture": [
+   "cột điện bê tông với búi dây điện/cáp chằng chịt",
+   "đèn đường",
+   "nhiều biển hiệu treo dọc trước cửa hàng"
+  ],
+  "banners": [
+   "ĐẠI PHÁT in & QUẢNG CÁO",
+   "THANH LÝ TRẢ MẶT BẰNG -50% TOÀN BỘ SẢN PHẨM",
+   "SALE -40%",
+   "SAY CHEESE PHOTO STUDIO",
+   "ĐỨC HUY CHUYÊN XE ĐẠP"
+  ],
+  "special": [
+   "nhà mái ngói cong kiểu truyền thống xen giữa dãy phố (heading ~180)"
+  ],
+  "summary": "Đoạn phố Lê Lợi buôn bán sầm uất với biển hiệu dày đặc (in quảng cáo Đại Phát, Say Cheese Photo Studio, xe đạp Đức Huy), xe máy đông đúc, dây điện chằng chịt và một nhà mái ngói cổ nổi bật giữa dãy shophouse.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_259",
+  "area": "Quảng trường/vườn hoa quanh Tượng đài Nữ tướng Lê Chân, gần Nhà hát Thành phố Hải Phòng; không gian mở, đường lớn nhiều làn. Ảnh tháng 11/2020, trời âm u, mặt đường ướt sau mưa.",
+  "sidewalk": "Quảng trường lát đá granite xám khổ lớn; lối đi trục dẫn tới tượng lát đá granite đỏ; bó vỉa đá; diện tích rất rộng.",
+  "buildings": [
+   {
+    "heading": 90,
+    "style": "khách sạn/căn hộ cao tầng",
+    "floors": 8,
+    "color": "trắng",
+    "width_m": 25,
+    "features": "biển 'CINDY HOTEL & APARTMENT' trên nóc"
+   },
+   {
+    "heading": 0,
+    "style": "cao ốc văn phòng cao tầng",
+    "floors": 15,
+    "color": "xám kính/trắng",
+    "width_m": 30,
+    "features": "khối nhà kính nhiều tầng phía sau hàng cây"
+   },
+   {
+    "heading": 90,
+    "style": "nhà thấp tầng thương mại",
+    "floors": 2,
+    "color": "đỏ (biển)",
+    "width_m": 12,
+    "features": "biển đỏ 'LUCKY'"
+   }
+  ],
+  "landmarks": [
+   "Tượng đài Nữ tướng Lê Chân (tượng đồng lớn)",
+   "CINDY HOTEL & APARTMENT",
+   "Nhà hát Thành phố Hải Phòng (lân cận, theo bản đồ)"
+  ],
+  "vehicles": "Thưa: vài xe máy chạy, xe đạp (người đội nón lá chở hàng), ô tô con trắng có dán quảng cáo (taxi), công nhân vệ sinh mặc đồ xanh.",
+  "vegetation": "Nhiều cây cổ thụ tán rất lớn bao quanh; vườn cây cảnh cắt tỉa (topiary), hàng rào cây xén, cây thế, chậu/lư cảnh bằng đá granite lớn, bồn hoa.",
+  "street_furniture": [
+   "container/thùng rác kim loại lớn màu xanh rêu đặt giữa quảng trường",
+   "hàng rào sắt quanh vườn hoa",
+   "bảng 'NỘI QUY' màu xanh",
+   "đèn tín hiệu giao thông (đèn xanh)",
+   "cột đèn",
+   "cờ trang trí",
+   "đèn/lư đá trang trí",
+   "dải phân cách trồng cây"
+  ],
+  "banners": [
+   "băng rôn xanh dương chữ trắng đọc được một phần '...SINH VIÊN HẢI PHÒNG TỰ THÀNH LẬP NGHIỆP, PHỤNG SỰ TỔ QUỐC'",
+   "băng rôn xanh 'LỄ HƯỞNG ỨNG...' (mờ)"
+  ],
+  "special": [
+   "Tượng đài Nữ tướng Lê Chân: tượng đồng lớn một nhân vật nữ đứng, tay chống hông, trên bệ đá, lối đá đỏ dẫn vào — cần dựng riêng",
+   "vườn cây cảnh với chậu/lư đá granite lớn và cây thế cắt tỉa",
+   "bảng 'NỘI QUY' vườn hoa"
+  ],
+  "summary": "Quảng trường vườn hoa Tượng đài Nữ tướng Lê Chân với tượng đồng trên bệ đá, lối đá granite đỏ, vườn cây cảnh cắt tỉa và chậu đá lớn; xung quanh là cây cổ thụ, khách sạn Cindy và cao ốc văn phòng, mặt đường ướt mưa.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_260",
+  "area": "Đầu phố Mê Linh (địa chỉ '1 Mê Linh'), cạnh tường rào Trường THPT Ngô Quyền, khu phố cổ quận Lê Chân. Ảnh tháng 10/2024, trời mây.",
+  "sidewalk": "Vỉa hè lát gạch/bê tông xám, có ô trồng cây thân to; bề rộng ~2-3m; rải rác rác và thùng carton.",
+  "buildings": [
+   {
+    "heading": 180,
+    "style": "dãy nhà lớp học kiểu Pháp + tường rào (Trường THPT Ngô Quyền)",
+    "floors": 2,
+    "color": "vàng kem",
+    "width_m": 60,
+    "features": "cửa sổ vòm, chớp gỗ xanh, tường rào trang trí ô vòm, phủ bạt trên đỉnh tường"
+   },
+   {
+    "heading": 90,
+    "style": "quán cà phê + nhà cổ",
+    "floors": 2,
+    "color": "vàng ố / ngói nâu",
+    "width_m": 8,
+    "features": "biển đen chữ vàng 'ViP 55 - VIP COFFEE - CÀ PHÊ MANG VỀ CHỈ 15K', mái ngói cũ, cửa sổ chớp"
+   },
+   {
+    "heading": 90,
+    "style": "shophouse (túi/vali)",
+    "floors": 2,
+    "color": "trắng/xám",
+    "width_m": 6,
+    "features": "biển 'JINXIU', địa chỉ '03 Mê Linh', tủ kính bày hàng"
+   },
+   {
+    "heading": 0,
+    "style": "nhà ống bán tranh/gương",
+    "floors": 2,
+    "color": "đỏ",
+    "width_m": 8,
+    "features": "khung tranh mạ vàng, số điện thoại '0225 3739857 - 0904 519911', cửa cuốn"
+   }
+  ],
+  "landmarks": [
+   "Trường THPT Ngô Quyền (tường & dãy nhà lớp học)",
+   "VIP Coffee",
+   "JINXIU",
+   "Ruby Spa"
+  ],
+  "vehicles": "Xe khách limousine trắng (Hyundai Solati 'DCAR LIMOUSINE') chạy giữa đường; xe máy chạy & đỗ; ô tô VinFast đỏ đỗ ven đường; xe đạp.",
+  "vegetation": "Hàng cây cổ thụ tán rộng thân to trồng dọc vỉa hè hai bên phố.",
+  "street_furniture": [
+   "cột điện + búi dây điện/cáp chằng chịt",
+   "đèn đường",
+   "ô trồng cây bó vỉa",
+   "thùng carton/rác trên vỉa hè"
+  ],
+  "banners": [
+   "VIP COFFEE - CÀ PHÊ MANG VỀ CHỈ 15K",
+   "JINXIU",
+   "0225 3739857 - 0904 519911 (biển shop tranh)"
+  ],
+  "special": [
+   "dãy nhà lớp học + tường rào kiểu Pháp của Trường THPT Ngô Quyền (kiến trúc vàng kem, cửa vòm, chớp xanh) — công trình đặc trưng"
+  ],
+  "summary": "Đầu phố Mê Linh chạy dọc tường và dãy nhà lớp học kiểu Pháp vàng kem của Trường THPT Ngô Quyền; đối diện là dãy shophouse cổ với VIP Coffee, JINXIU, shop tranh gương; xe limousine DCAR và cây cổ thụ đặc trưng.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_261",
+  "area": "Phố Mê Linh (địa chỉ '19 Mê Linh'), ngay trước cổng chính Trường THPT Ngô Quyền, phố cổ shophouse quận Lê Chân. Ảnh tháng 10/2024, trời mây.",
+  "sidewalk": "Vỉa hè lát gạch/bê tông xám, có ô trồng cây, bề rộng hẹp ~2-3m.",
+  "buildings": [
+   {
+    "heading": 270,
+    "style": "cổng trường + nhà bảo vệ (Trường THPT Ngô Quyền)",
+    "floors": 1,
+    "color": "vàng kem + ngói đỏ",
+    "width_m": 30,
+    "features": "cổng bề thế mái ngói đỏ, trụ vàng, cánh cổng sắt đen hoa văn mạ vàng, biển 'TRƯỜNG TRUNG HỌC PHỔ THÔNG NGÔ QUYỀN', số '104'/'04'"
+   },
+   {
+    "heading": 90,
+    "style": "shophouse thể thao/đồng hồ",
+    "floors": 2,
+    "color": "đỏ + đen (biển)",
+    "width_m": 14,
+    "features": "biển đỏ 'G-STORE' (G-Shock Casio), biển đen 'D&T SPORT - CHUYÊN GIÀY ĐÁ BÓNG - QUẦN ÁO - PHỤ KIỆN THỂ THAO', ma-nơ-canh áo đấu, lan can con tiện"
+   },
+   {
+    "heading": 90,
+    "style": "shophouse đặc sản/quán",
+    "floors": 2,
+    "color": "vàng + đỏ (biển)",
+    "width_m": 10,
+    "features": "biển đỏ 'ĐẶC SẢN HẢI PHÒNG - BÁNH ĐA CUA HẢI SẢN' (23 Mê Linh), biển 'KAF LÊ / Café Lê'"
+   },
+   {
+    "heading": 180,
+    "style": "biệt thự cổ + shophouse",
+    "floors": 2,
+    "color": "vàng kem / ngói đỏ",
+    "width_m": 20,
+    "features": "mái ngói đỏ, cổng sắt, ban công"
+   }
+  ],
+  "landmarks": [
+   "Trường THPT Ngô Quyền (cổng chính)",
+   "G-Store",
+   "D&T Sport",
+   "Bánh đa cua hải sản (đặc sản Hải Phòng)"
+  ],
+  "vehicles": "Xe khách limousine trắng DCAR (Hyundai Solati); ô tô Kia đỏ và SUV đen đỗ; xe máy chạy; xe đạp bán hàng rong đội nón lá; người đi bộ.",
+  "vegetation": "Hàng cây cổ thụ tán rộng dọc phố; chậu cảnh và cây thế trước biệt thự/cổng trường.",
+  "street_furniture": [
+   "cột điện + búi dây điện",
+   "đèn đường",
+   "cổng sắt hoa văn mạ vàng",
+   "chậu cây cảnh",
+   "ô trồng cây bó vỉa",
+   "tên phố 'P. Mê Linh' sơn trên mặt đường"
+  ],
+  "banners": [
+   "TRƯỜNG TRUNG HỌC PHỔ THÔNG NGÔ QUYỀN",
+   "TRẠM THANH XUÂN SỐ 20 - Chào mừng quý khách (băng rôn xanh)",
+   "ĐẶC SẢN HẢI PHÒNG - BÁNH ĐA CUA HẢI SẢN",
+   "D&T SPORT",
+   "G-STORE"
+  ],
+  "special": [
+   "Cổng chính Trường THPT Ngô Quyền: cổng bề thế mái ngói đỏ, trụ vàng, cánh cổng sắt đen hoa văn mạ vàng — công trình đặc trưng cần dựng riêng"
+  ],
+  "summary": "Đoạn phố Mê Linh trước cổng chính bề thế của Trường THPT Ngô Quyền (mái ngói đỏ, cổng sắt hoa văn mạ vàng); đối diện là dãy shophouse với G-Store, D&T Sport và quán bánh đa cua đặc sản, xe limousine DCAR và cây cổ thụ.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_262",
+  "area": "Phố Mê Linh (địa chỉ '27 Mê Linh'), đoạn cửa hàng thời trang gần cuối phố nối Lê Lợi, phố cổ shophouse quận Lê Chân. Ảnh tháng 10/2024, trời mây.",
+  "sidewalk": "Vỉa hè lát gạch/bê tông xám, có đoạn đang sửa chữa (đống cát, ghế nhựa), ô trồng cây; bề rộng hẹp.",
+  "buildings": [
+   {
+    "heading": 90,
+    "style": "shophouse giày dép + quà tặng",
+    "floors": 3,
+    "color": "đen (biển) + hồng",
+    "width_m": 14,
+    "features": "biển đen chữ vàng '2M - Shoes & more - ĐT 0984 68 28 69' (35-37 Mê Linh), mặt tiền hồng 'Mochi/Mochi Store' có cây leo rủ, 'Nail' kế bên, mái tôn cam"
+   },
+   {
+    "heading": 270,
+    "style": "shophouse thời trang",
+    "floors": 2,
+    "color": "trắng/xám kính",
+    "width_m": 12,
+    "features": "biển 'ĐTEEN/4TEEN' mặt kính lớn bày ma-nơ-canh, kế bên 'nh Thúy - LẮP ĐẶT THI CÔNG', 'Cúc Thảo', 'THIẾT KẾ - BÁN SẴN ĐỒ... VEST MỸ' (may đo), lan can con tiện"
+   },
+   {
+    "heading": 0,
+    "style": "dãy shophouse hai bên phố",
+    "floors": 2,
+    "color": "vàng/xám",
+    "width_m": 20,
+    "features": "biển 'BẢO LONG', số '12' đỏ, cửa cuốn"
+   }
+  ],
+  "landmarks": [
+   "2M Shoes & more",
+   "Mochi Store (cửa hàng quà tặng)",
+   "4TEEN (thời trang)"
+  ],
+  "vehicles": "Xe khách limousine trắng DCAR; ô tô SUV đen, hatchback bạc, taxi vàng đỗ & chạy; xe máy tay ga (trắng, cam điện, đỏ) đỗ và chạy; người đi xe máy.",
+  "vegetation": "Hàng cây cổ thụ tán rộng dọc vỉa hè (một số cây bị cắt trụi cành).",
+  "street_furniture": [
+   "cột điện + búi dây điện chằng chịt",
+   "đèn đường",
+   "ô trồng cây bó vỉa",
+   "ghế nhựa đỏ/xanh",
+   "giàn tre chống của quầy tạp hóa",
+   "bạt xanh che công trình sửa chữa"
+  ],
+  "banners": [
+   "2M Shoes & more - Điện thoại 0984 68 28 69",
+   "Mochi",
+   "4TEEN",
+   "SALE ÁO PHÔNG... 140K",
+   "THIẾT KẾ - BÁN SẴN ĐỒ...",
+   "Cúc Thảo"
+  ],
+  "special": [
+   "quầy tạp hóa vỉa hè có giàn tre chống + bạt che (kiosk tạm)",
+   "mặt tiền hồng cửa hàng Mochi với cây leo rủ"
+  ],
+  "summary": "Đoạn cuối phố Mê Linh với các cửa hàng thời trang (2M Shoes, 4TEEN, Mochi mặt hồng); dãy shophouse cổ 2-3 tầng lan can con tiện, một đoạn vỉa hè đang sửa chữa, quầy tạp hóa giàn tre và dây điện chằng chịt.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_263",
+  "area": "Ảnh CHỤP TRONG NHÀ — nội thất cửa hàng vật tư/thiết bị ngành ảnh kiêm bán album ảnh (biển 'Studio – Thiết bị · Phụ Kiện', 'KIM OANH – Vật tư thiết bị ngành ảnh'). Bản đồ định vị gần Nhà hát TP Hải Phòng, Ga Hải Phòng, chùa Bà cụ, khu Quang Trung.",
+  "sidewalk": "Không rõ (trong nhà). Nền lát gạch bông/gạch hoa hoạ tiết ngôi sao màu xanh–nâu.",
+  "buildings": [
+   {
+    "heading": 90,
+    "style": "nhà ống đối diện (nhìn qua cửa ra phố)",
+    "floors": 3,
+    "color": "vàng kem",
+    "width_m": 4,
+    "features": "cửa hàng đối diện biển đen 'NGỌC MON', tầng trệt mở, thấy qua khung cửa ra vào"
+   }
+  ],
+  "landmarks": [
+   "Cửa hàng ảnh KIM OANH (Vật tư thiết bị ngành ảnh)",
+   "Đại lý Canon / Kodak / Selphy (biển trưng bày)",
+   "Cửa hàng 'NGỌC MON' đối diện qua phố"
+  ],
+  "vehicles": "Trong nhà không có xe; qua cửa (heading 90) thấy xe máy đỗ và chạy ngoài phố.",
+  "vegetation": "Hoa giả/hoa lụa trưng bày trong tủ (heading 0 & 270); không có cây thật.",
+  "street_furniture": [
+   "kệ/giá trưng bày album và phụ kiện",
+   "đèn tuýp trần",
+   "đèn LED studio + đèn ring",
+   "chân máy (tripod) treo tường",
+   "tủ chống ẩm đen",
+   "qua cửa thấy cột điện + dây ngoài phố"
+  ],
+  "banners": [
+   "Studio – Thiết bị · Phụ Kiện",
+   "Canon Digital camera",
+   "Kodak Digital camera",
+   "KIM OANH – Vật tư thiết bị ngành ảnh",
+   "SELPHY",
+   "PHOTOS",
+   "nhãn giá viết tay trên kệ album (vd 'Si CP3 60A 1ngăn 100K')"
+  ],
+  "special": [],
+  "summary": "Ảnh nội thất một cửa hàng vật tư thiết bị ngành ảnh kiêm bán album ảnh (KIM OANH) ở Hải Phòng: kệ chất đầy album, khung ảnh, phụ kiện Canon/Kodak, chân máy và đèn studio; một phụ nữ ngồi ở quầy, qua cửa nhìn ra con phố nhỏ có xe máy.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_264",
+  "area": "Ảnh CHỤP TRONG NHÀ — cùng cửa hàng thiết bị ngành ảnh/album ảnh với pano_263 (thẻ vị trí 'Cửa Hàng Phi Long', biển 'Studio – Thiết bị · Phụ Kiện', 'KIM OANH'). Khu Quang Trung, gần Ga Hải Phòng / Nhà hát TP.",
+  "sidewalk": "Không rõ (trong nhà). Nền gạch bông hoạ tiết ngôi sao xanh–nâu.",
+  "buildings": [
+   {
+    "heading": 90,
+    "style": "nhà ống đối diện (nhìn qua cửa ra phố)",
+    "floors": 3,
+    "color": "vàng kem",
+    "width_m": 4,
+    "features": "biển đen 'NGỌC MON', cửa cuốn, xe máy và xe đạp đỗ trước cửa; hai bên hông cửa hàng là kệ đầy album"
+   }
+  ],
+  "landmarks": [
+   "Cửa hàng ảnh KIM OANH / Phi Long (thiết bị ngành ảnh, album ảnh)",
+   "Đại lý Canon / Kodak",
+   "Cửa hàng 'NGỌC MON' đối diện"
+  ],
+  "vehicles": "Qua cửa (heading 90) thấy xe máy đỗ, một xe đạp và xe máy ngoài phố; trong nhà không có xe.",
+  "vegetation": "Hoa giả/hoa lụa trưng bày; không có cây thật.",
+  "street_furniture": [
+   "kệ/giá kim loại đầy album ảnh (nhãn giá viết tay)",
+   "đèn tuýp + quạt trần",
+   "chân máy treo tường",
+   "tủ chống ẩm",
+   "quầy tính tiền gỗ"
+  ],
+  "banners": [
+   "Studio – Thiết bị · Phụ Kiện",
+   "Kodak Digital camera",
+   "Canon Digital camera",
+   "KIM OANH – Vật tư thiết bị ngành ảnh",
+   "SELPHY",
+   "nhãn giá album viết tay: 'Da ép 13x18-240A =120K', 'Si CP3 80A 1ngăn 110K', 'Si CP3 100A 1ngăn 120K'"
+  ],
+  "special": [],
+  "summary": "Góc nhìn khác trong cùng cửa hàng thiết bị ảnh/album (KIM OANH – Phi Long): dày đặc chồng album ảnh dán nhãn giá viết tay, phụ kiện Canon/Kodak, chân máy; cửa ra phố ở giữa nhìn thấy 'NGỌC MON' và xe cộ bên ngoài.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_265",
+  "area": "Phố Minh Khai, đoạn số 50–54 (thẻ '52 Minh Khai'), khu quán trà chanh/café sầm uất; gần Khách sạn Pullman Hải Phòng và Nhà hát TP (theo bản đồ).",
+  "sidewalk": "Vỉa hè bê tông/lát gạch xám khá rộng (~3–4 m), kê nhiều bàn ghế nhựa của quán café; có gốc cây đa lớn mọc chồi lên giữa hè.",
+  "buildings": [
+   {
+    "heading": 270,
+    "style": "shophouse/nhà ống",
+    "floors": 3,
+    "color": "vàng kem, mái hiên vải đỏ",
+    "width_m": 5,
+    "features": "quán 'TRÀ CÚC NGA LOUIS' số 50 Minh Khai, mái hiên đỏ lớn, đèn dây trang trí"
+   },
+   {
+    "heading": 0,
+    "style": "shophouse",
+    "floors": 2,
+    "color": "vàng",
+    "width_m": 4,
+    "features": "biển 'TRÀ CÚC 46', 'BẢO LỘC', dù/ô đỏ, đèn dây"
+   },
+   {
+    "heading": 90,
+    "style": "nhà 2 tầng cũ",
+    "floors": 2,
+    "color": "kem",
+    "width_m": 5,
+    "features": "'VIP HOÀNG LINH – Apple Service Center', quán 'Café ... 37', mái hiên vàng"
+   },
+   {
+    "heading": 180,
+    "style": "nhà ống cũ",
+    "floors": 3,
+    "color": "vàng kem",
+    "width_m": 4,
+    "features": "'TRÀ CÚC Diamond' biển đen chữ vàng, 'PHƯỢNG – Bánh đa cua – Miến tôm', mái hiên xanh"
+   }
+  ],
+  "landmarks": [
+   "Trà Cúc Nga Louis (50 Minh Khai)",
+   "Trà Cúc 46",
+   "Trà Cúc Diamond",
+   "VIP Hoàng Linh – Apple Service Center",
+   "Phượng – Bánh đa cua Miến tôm",
+   "Khách sạn Pullman Hải Phòng (theo bản đồ, nhà cao tầng phía xa)"
+  ],
+  "vehicles": "Rất nhiều xe máy đỗ ken kín hai bên hè; ô tô (SUV trắng, xe con đỏ, xe con bạc); vài xe máy đang chạy.",
+  "vegetation": "Cây đa/si cổ thụ lớn với chùm rễ phụ buông xuống mọc giữa vỉa hè (heading 90); hàng cây bóng mát (xà cừ) lớn dọc phố.",
+  "street_furniture": [
+   "cột điện bê tông + búi dây điện dày",
+   "dù/ô đỏ quán café",
+   "bàn ghế nhựa",
+   "mái hiên vải đỏ",
+   "đèn dây trang trí"
+  ],
+  "banners": [
+   "TRÀ CÚC NGA LOUIS – Hương vị chính hiệu Hải Phòng",
+   "50 MINH KHAI",
+   "TRÀ CÚC 46",
+   "TRÀ CÚC Diamond – Chuyên vé 33 Minh Khai cơ sở",
+   "VIP HOÀNG LINH – Apple Service Center",
+   "PHƯỢNG – BÁNH ĐA CUA – MIẾN TÔM",
+   "BẢO LỘC"
+  ],
+  "special": [
+   "Cây đa/si cổ thụ với chùm rễ phụ buông dày mọc giữa vỉa hè trước quán trà — điểm nhấn cần dựng riêng"
+  ],
+  "summary": "Đoạn phố Minh Khai (50–54) là dãy quán trà chanh 'Trà Cúc' và café với mái hiên/dù đỏ, bàn ghế tràn ra vỉa hè; nổi bật một cây đa cổ thụ rễ phụ buông giữa hè, hai bên xe máy đỗ dày đặc.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_266",
+  "area": "Ngã tư phố Minh Khai × phố Trần Quang Khải (chữ 'P. Trần Qu…' sơn trên mặt đường); khu nhà Pháp cổ, thẻ '35 Minh Khai'.",
+  "sidewalk": "Hè lát gạch/bê tông, có gốc cây lớn ở góc; xe máy đỗ trên hè.",
+  "buildings": [
+   {
+    "heading": 90,
+    "style": "biệt thự Pháp cổ",
+    "floors": 2,
+    "color": "vàng kem, mái ngói đỏ",
+    "width_m": 14,
+    "features": "chi nhánh ngân hàng VietABank (logo 'V' / VAB, biển xanh '… HẢI PHÒNG'), lối vào vòm cung, cổng và hàng rào sắt, cây trong sân"
+   },
+   {
+    "heading": 180,
+    "style": "nhà Pháp cổ (công sở)",
+    "floors": 2,
+    "color": "vàng kem, mái ngói",
+    "width_m": 20,
+    "features": "dãy nhà cũ cửa chớp gỗ, ban công đơn giản"
+   },
+   {
+    "heading": 270,
+    "style": "nhà góc kiểu Pháp",
+    "floors": 4,
+    "color": "trắng",
+    "width_m": 12,
+    "features": "tầng trệt biển xanh 'CÔNG TY TNHH … XÂY LẮP …' (ĐT 043 823 6640), cửa cuốn, bổ trụ đá góc"
+   }
+  ],
+  "landmarks": [
+   "Chi nhánh ngân hàng VietABank (VAB) Hải Phòng — biệt thự Pháp góc phố",
+   "Ngã tư Minh Khai × Trần Quang Khải"
+  ],
+  "vehicles": "Taxi vàng, ô tô con bạc và xanh, SUV xanh (gần camera); nhiều xe máy đỗ trên hè.",
+  "vegetation": "Cây bóng mát cổ thụ (xà cừ) lớn ở góc ngã tư và dọc phố, tán rộng.",
+  "street_furniture": [
+   "cột đèn tín hiệu giao thông (đèn đỏ/xanh) trên trụ",
+   "cột điện bê tông + dây",
+   "thùng rác nhựa xanh",
+   "hàng rào sắt biệt thự",
+   "xe kéo/ba gác nhỏ"
+  ],
+  "banners": [
+   "Biển xanh chi nhánh VietABank '… HẢI PHÒNG'",
+   "CÔNG TY TNHH … XÂY LẮP … (043 823 6640)"
+  ],
+  "special": [
+   "Biệt thự Pháp cổ góc phố (chi nhánh VietABank) mái ngói đỏ, cổng vòm cung — công trình đặc trưng cần dựng riêng"
+  ],
+  "summary": "Ngã tư Minh Khai – Trần Quang Khải với quần thể nhà Pháp cổ 2 tầng mái ngói vàng kem, nổi bật biệt thự góc phố là chi nhánh VietABank; có đèn tín hiệu, cây xà cừ cổ thụ, taxi vàng và xe máy đỗ.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_267",
+  "area": "Phố Minh Khai đoạn số 24–35, phố thương mại quán ăn/café; thẻ '24 Minh Khai'.",
+  "sidewalk": "Hè lát gạch/bê tông xám, kê nhiều bàn ghế + dù đỏ của quán trà; xe máy đỗ dày.",
+  "buildings": [
+   {
+    "heading": 0,
+    "style": "nhà mặt tiền quán ăn",
+    "floors": 4,
+    "color": "đỏ–xanh–vàng sặc sỡ",
+    "width_m": 6,
+    "features": "'CƠM NIÊU SINGAPORE', biển hộp nổi bật; cạnh bên 'Lipton', 'Huyền Linh'"
+   },
+   {
+    "heading": 90,
+    "style": "nhà ống cũ",
+    "floors": 4,
+    "color": "vàng kem",
+    "width_m": 5,
+    "features": "tầng trệt 'TRÀ CÚC Diamond' (33 Minh Khai) mái hiên sọc + dù đỏ 'KIM THÀNH'; biển dọc đỏ 'HOTEL'; 'HATRACO HOTEL – Công ty CP Thương mại Du lịch'"
+   },
+   {
+    "heading": 180,
+    "style": "nhà đang sửa chữa",
+    "floors": 4,
+    "color": "phủ lưới công trình xanh",
+    "width_m": 6,
+    "features": "giàn giáo + lưới xanh; tầng trệt 'Ca fe · Trà cúc · Sinh tố'"
+   },
+   {
+    "heading": 270,
+    "style": "shophouse",
+    "floors": 3,
+    "color": "kem/đỏ",
+    "width_m": 5,
+    "features": "'CÔNG TY TNHH THIẾT BỊ PHÒNG CHÁY CHỮA CHÁY HẢI PHÒNG' (logo EFC), 'Ca fe · Trà cúc · Sinh tố', 'Huyền Linh', 'Cơm niêu'"
+   }
+  ],
+  "landmarks": [
+   "Cơm Niêu Singapore",
+   "Trà Cúc Diamond (33 Minh Khai)",
+   "HATRACO Hotel (Công ty CP Thương mại Du lịch)",
+   "Kim Thành (quán, dù đỏ)",
+   "Công ty TNHH Thiết bị Phòng cháy Chữa cháy Hải Phòng"
+  ],
+  "vehicles": "Rất nhiều xe máy đỗ hai bên; ô tô (Mazda đỏ, Kia đỏ, xe con trắng); vài xe máy đang chạy.",
+  "vegetation": "Cây bóng mát (xà cừ) lớn dọc phố, một số thân bị cắt cụt cành.",
+  "street_furniture": [
+   "cột điện + búi dây điện",
+   "dù đỏ 'KIM THÀNH'",
+   "mái hiên sọc",
+   "bàn ghế nhựa xanh",
+   "biển hiệu dọc gắn tường"
+  ],
+  "banners": [
+   "CƠM NIÊU SINGAPORE",
+   "TRÀ CÚC Diamond – 33 Minh Khai",
+   "KIM THÀNH",
+   "HATRACO HOTEL – CÔNG TY CỔ PHẦN THƯƠNG MẠI DU LỊCH",
+   "CÔNG TY TNHH THIẾT BỊ PHÒNG CHÁY CHỮA CHÁY HẢI PHÒNG",
+   "CA FE · TRÀ CÚC · SINH TỐ",
+   "HUYỀN LINH"
+  ],
+  "special": [
+   "Khối điêu khắc/tạo hình kim loại xoắn ánh kim (inox) dựng trên vỉa hè trước quán Trà Cúc Diamond (heading 90) — vật thể lạ, nên dựng riêng (nhận diện chi tiết chưa chắc)"
+  ],
+  "summary": "Đoạn phố Minh Khai (24–35) đông đúc với chuỗi quán 'Trà Cúc', nhà hàng 'Cơm Niêu Singapore', HATRACO Hotel và các cửa hàng; dù/mái hiên đỏ, xe máy và ô tô đỗ kín, có một khối kim loại xoắn ánh kim lạ mắt trên hè.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_268",
+  "area": "Phố Minh Khai đoạn số 22, gần đầu phố phía Cảng Hải Phòng; có siêu thị BRG Mart và nhà hàng hải sản. Thẻ '22 Minh Khai'.",
+  "sidewalk": "Hè bê tông rộng chạy dưới hành lang có cột (arcade) của khối nhà thương mại; nhiều xe máy đỗ, có bãi giữ xe.",
+  "buildings": [
+   {
+    "heading": 90,
+    "style": "khối siêu thị/thương mại hiện đại",
+    "floors": 2,
+    "color": "ốp gạch nâu + kính",
+    "width_m": 35,
+    "features": "hành lang cột vuông (arcade), tầng trệt 'BRG Mart' / 'BRG SHOPPING.VN' (biển xanh lá + cam), poster rau củ/thực phẩm, cửa kính"
+   },
+   {
+    "heading": 270,
+    "style": "tòa nhà thương mại nhiều tầng",
+    "floors": 6,
+    "color": "trắng/kính, ban công lam",
+    "width_m": 25,
+    "features": "'CÔNG TY CỔ PHẦN THƯƠNG MẠI MINH KHAI', 'Nhà hàng hải sản Talata – seafood restaurant', 'Công ty TNHH Nhất Ly'; tầng trệt là bãi để xe máy lớn"
+   },
+   {
+    "heading": 180,
+    "style": "nhà ống",
+    "floors": 4,
+    "color": "biển đỏ chữ vàng",
+    "width_m": 4,
+    "features": "cửa hàng 'SỈ LẺ YẾN SÀO', 'QUÀ TẶNG CAO CẤP', 'YẾN SÀO', 'Nước yến', cây cảnh chậu trước cửa"
+   }
+  ],
+  "landmarks": [
+   "BRG Mart (siêu thị)",
+   "Nhà hàng hải sản Talata",
+   "Công ty CP Thương mại Minh Khai",
+   "Các cửa hàng Yến sào / Quà tặng cao cấp",
+   "Cảng Hải Phòng (đầu phố, theo bản đồ)"
+  ],
+  "vehicles": "Rất nhiều xe máy đỗ (bãi xe dưới tòa nhà); ô tô con (Mitsubishi Xpander trắng, Honda CR-V trắng, xe xám); xe máy chạy chở người.",
+  "vegetation": "Vài cây bóng mát dọc phố; cây cảnh trong chậu trước cửa hàng yến sào.",
+  "street_furniture": [
+   "cột bê tông vuông của hành lang",
+   "cột điện + búi dây",
+   "hai thùng rác nhựa xanh",
+   "ghế nhựa/ghế đẩu",
+   "biển hiệu dọc gắn tường",
+   "poster/QR quảng cáo BRG"
+  ],
+  "banners": [
+   "BRGMART",
+   "BRG SHOPPING.VN",
+   "CÔNG TY CỔ PHẦN THƯƠNG MẠI MINH KHAI",
+   "Nhà hàng hải sản talata – seafood restaurant",
+   "CÔNG TY TNHH NHẤT LY",
+   "SỈ LẺ YẾN SÀO",
+   "QUÀ TẶNG CAO CẤP",
+   "YẾN SÀO",
+   "Nước yến"
+  ],
+  "special": [],
+  "summary": "Đoạn cuối phố Minh Khai (số 22) hướng ra Cảng Hải Phòng: một bên là khối siêu thị BRG Mart với hành lang cột hiện đại, bên kia là tòa nhà Công ty CP Thương mại Minh Khai có nhà hàng hải sản Talata và bãi để xe máy lớn, xen kẽ các cửa hàng yến sào.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_269",
+  "area": "Phố Minh Khai, đoạn gần khu Hoàng Diệu/Điện Biên Phủ (địa chỉ hiển thị '19 Minh Khai'); đường lớn hai chiều, vạch tim vàng, hai bên nhiều cây lớn.",
+  "sidewalk": "Vỉa hè bê tông/đá xám rộng khoảng 3-4m, nhiều đoạn nứt vỡ, đất đá; heading 90 có đoạn lát gạch xám dưới hàng cột vòm.",
+  "buildings": [
+   {
+    "heading": 0,
+    "style": "nhà xưởng/công sở thấp và nhà ống",
+    "floors": 2,
+    "color": "xám và trắng, một nhà ống sơn xanh dương",
+    "width_m": 30,
+    "features": "cửa cuốn tầng trệt, mái tôn, biển quảng cáo lớn có chữ VINGROUP; xa xa nhà ống cao 4 tầng sơn xanh dương"
+   },
+   {
+    "heading": 90,
+    "style": "khối nhà kiểu vòm cuốn (arcade, ảnh hưởng Pháp)",
+    "floors": 4,
+    "color": "hồng nhạt/kem",
+    "width_m": 40,
+    "features": "dãy vòm cuốn ở tầng trệt, ban công, cửa xếp sắt, mái hiên vải xanh của tiệm 'June since 2012', cờ đỏ nhỏ"
+   },
+   {
+    "heading": 270,
+    "style": "dãy công sở 2 tầng mái bằng",
+    "floors": 2,
+    "color": "vàng kem",
+    "width_m": 50,
+    "features": "cửa sổ chấn song sắt, tường loang màu, biển đỏ có logo (ngân hàng/công ty), hàng rào song sắt phía trước"
+   }
+  ],
+  "landmarks": [],
+  "vehicles": "Ô tô đỗ ven đường (SUV xanh rêu Subaru, sedan đỏ, các xe con khác), xe máy chạy và đỗ rải rác.",
+  "vegetation": "Cây xanh cổ thụ tán rộng (phượng/xà cừ) hai bên đường, một cây lớn nghiêng ra lòng đường ở heading 270.",
+  "street_furniture": [
+   "cột điện bê tông lớn với nhiều dây điện chằng chịt",
+   "hàng rào song sắt ven công sở",
+   "biển hiệu tiệm 'June'"
+  ],
+  "banners": [
+   "June since 2012",
+   "VINGROUP"
+  ],
+  "special": [],
+  "summary": "Đoạn phố Minh Khai với công sở/nhà xưởng bên trái, khối nhà vòm cuốn kiểu Pháp có tiệm June bên phải; ô tô đỗ ven đường, cây xanh lớn.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_270",
+  "area": "Phố Hồ Xuân Hương (địa chỉ '3 P. Hồ Xuân Hương'); phố nhỏ yên tĩnh, khu biệt thự/công sở kiểu Pháp, một làn mỗi chiều.",
+  "sidewalk": "Sân trước biệt thự lát gạch caro đỏ-hồng (terracotta); vỉa hè hai bên hẹp, bê tông và đất.",
+  "buildings": [
+   {
+    "heading": 0,
+    "style": "biệt thự Pháp",
+    "floors": 2,
+    "color": "vàng kem",
+    "width_m": 15,
+    "features": "ban công lan can con tiện (balustrade), mái hiên đắp nổi hình tam giác (fronton), cột trụ, cổng gỗ chạm kẻ ô hoa văn, cửa xếp sắt, cửa chớp xanh; treo biển 'BÌNH SƠN' và 'KHÔNG ĐỖ XE Ở ĐÂY'"
+   },
+   {
+    "heading": 180,
+    "style": "khu biệt thự/công sở Pháp trong khuôn viên có cổng",
+    "floors": 2,
+    "color": "vàng kem",
+    "width_m": 40,
+    "features": "cổng sắt hai cánh, cửa chớp xanh, cờ đỏ, nhà mái tôn đỏ, sân trong có ô tô trắng đỗ"
+   },
+   {
+    "heading": 270,
+    "style": "dãy biệt thự Pháp có tường rào",
+    "floors": 2,
+    "color": "vàng kem",
+    "width_m": 30,
+    "features": "cổng sắt sơn xanh lá chạm hoa văn cầu kỳ, tường rào thấp, cửa chớp xanh; biển 'BÌNH SƠN', biển 'enspire'"
+   }
+  ],
+  "landmarks": [
+   "Nhà thuốc Hồng ... (hiệu thuốc nhỏ, biển hiển thị một phần ở heading 90)"
+  ],
+  "vehicles": "Ô tô con đỗ ven đường (SUV trắng, xe đen, một ô tô trắng trong sân); ít xe máy.",
+  "vegetation": "Cây xanh tán rộng ven đường (bàng/xà cừ), cây cau/cảnh; nhiều đống cành cây vừa cắt tỉa chất dưới đất.",
+  "street_furniture": [
+   "cột điện bê tông và dây điện",
+   "cổng sắt biệt thự",
+   "biển hiệu treo",
+   "đống cành cây cắt tỉa"
+  ],
+  "banners": [
+   "BÌNH SƠN",
+   "KHÔNG ĐỖ XE Ở ĐÂY",
+   "enspire",
+   "Nhà thuốc Hồng ..."
+  ],
+  "special": [
+   "Cổng sắt biệt thự Pháp sơn xanh lá chạm hoa văn cầu kỳ (heading 270)",
+   "Cổng gỗ chạm ô hoa văn kèm mái hiên fronton của biệt thự vàng (heading 0)"
+  ],
+  "summary": "Phố Hồ Xuân Hương tĩnh lặng với các biệt thự và công sở kiểu Pháp màu vàng, cổng sắt chạm hoa văn, sân lát gạch đỏ; đang có đợt cắt tỉa cây.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_271",
+  "area": "Phố Minh Khai (địa chỉ '7 Minh Khai'), đoạn phố thương mại có cửa hàng và trường học; đường hai chiều vạch tim vàng.",
+  "sidewalk": "Vỉa hè gạch/bê tông rộng, một số đoạn lát gạch đỏ; nhiều xe máy đỗ trên vỉa hè.",
+  "buildings": [
+   {
+    "heading": 0,
+    "style": "dãy nhà ống shophouse thương mại",
+    "floors": 4,
+    "color": "trắng, be, hồng nhạt",
+    "width_m": 40,
+    "features": "biển hiệu 'CHUYÊN HÓA MỸ PHẨM / HÀNG XÁCH TAY', 'coffee', mái hiên vải xanh sọc và đỏ, ô/dù cà phê, cửa cuốn"
+   },
+   {
+    "heading": 90,
+    "style": "nhà 2 tầng cũ và shophouse",
+    "floors": 2,
+    "color": "vàng kem, trắng",
+    "width_m": 35,
+    "features": "cửa chớp xanh, mái hiên xanh sọc, biển xanh của trường ('SỞ GIÁO DỤC & ĐÀO TẠO HẢI PHÒNG'), biển 'HÀNG HIỆU TOP 1', cửa xếp sắt"
+   },
+   {
+    "heading": 270,
+    "style": "khu công sở/biệt thự có sân rào",
+    "floors": 2,
+    "color": "vàng kem, trắng",
+    "width_m": 45,
+    "features": "hàng rào sắt, cổng sắt, cửa cuốn xanh, biển bảng 'TRỤ SỞ CÁC ĐƠN VỊ', mái ngói"
+   }
+  ],
+  "landmarks": [
+   "Trường Trung học Phổ thông ... Khánh Thiện (biển xanh 'SỞ GIÁO DỤC & ĐÀO TẠO HẢI PHÒNG / TRUNG HỌC PHỔ THÔNG ... KHÁNH THIỆN')"
+  ],
+  "vehicles": "Nhiều xe máy đỗ trên vỉa hè và chạy; ô tô đỗ ven đường (MPV đỏ đô, sedan đen Mercedes, wagon bạc, SUV).",
+  "vegetation": "Hàng cây xà cừ/phượng cổ thụ tán rộng dọc hai bên đường.",
+  "street_furniture": [
+   "cột điện bê tông với nhiều dây điện",
+   "hàng rào sắt",
+   "chữ tên đường 'Minh Khai' sơn trên mặt đường",
+   "ô/dù cà phê màu đỏ"
+  ],
+  "banners": [
+   "CHUYÊN HÓA MỸ PHẨM",
+   "HÀNG XÁCH TAY",
+   "coffee",
+   "HÀNG HIỆU TOP 1",
+   "SỞ GIÁO DỤC & ĐÀO TẠO HẢI PHÒNG",
+   "TRUNG HỌC PHỔ THÔNG ... KHÁNH THIỆN",
+   "TRỤ SỞ CÁC ĐƠN VỊ"
+  ],
+  "special": [],
+  "summary": "Đoạn phố Minh Khai thương mại với cửa hàng mỹ phẩm, cà phê và biển trường THPT; đối diện là khu công sở có hàng rào sắt, xe máy đỗ dày đặc.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_272",
+  "area": "Phố Minh Khai (địa chỉ '6 Minh Khai'), phố thương mại sầm uất với quán ăn và giải trí; đường hai chiều vạch tim vàng.",
+  "sidewalk": "Vỉa hè lát gạch/đá xám rộng, gốc cây có bồn xi măng; xe máy đỗ san sát.",
+  "buildings": [
+   {
+    "heading": 0,
+    "style": "nhà cao tầng và nhà ống thương mại",
+    "floors": 5,
+    "color": "hồng nhạt, trắng",
+    "width_m": 40,
+    "features": "biển lớn 'Black Pink BILLIARDS' (câu lạc bộ bi-a), quán 'CƠM CHÁY', quán phở, cửa kính, ban công"
+   },
+   {
+    "heading": 90,
+    "style": "shophouse và nhà cao tầng",
+    "floors": 5,
+    "color": "trắng, kem",
+    "width_m": 40,
+    "features": "mái hiên nâu sọc quán 'Phương Mèo Cà...', ô đỏ, biển 'CHUYÊN HÓA MỸ PHẨM / HÀNG XÁCH TAY / Phương Diện', cửa sổ kính lớn"
+   },
+   {
+    "heading": 270,
+    "style": "nhà ống và khu công sở có rào",
+    "floors": 3,
+    "color": "hồng nhạt, vàng",
+    "width_m": 35,
+    "features": "biển đỏ 'KHẮC DẤU', ban công lan can sắt, cửa cuốn; công sở có hàng rào sắt, cổng, biển 'TRỤ SỞ CÁC ĐƠN VỊ'"
+   }
+  ],
+  "landmarks": [
+   "Black Pink Billiards (câu lạc bộ bi-a)"
+  ],
+  "vehicles": "Ô tô đỗ ven đường (Mercedes đen sedan, Nissan bạc); rất nhiều xe máy đỗ san sát trên vỉa hè.",
+  "vegetation": "Cây xà cừ cổ thụ lớn ven đường, có bồn gốc cây xây gạch.",
+  "street_furniture": [
+   "cột điện bê tông với dây điện chằng chịt",
+   "ô/dù quán màu đỏ",
+   "biển menu cà phê đứng màu xanh",
+   "hàng rào sắt",
+   "nắp cống tròn"
+  ],
+  "banners": [
+   "Black Pink BILLIARDS",
+   "CƠM CHÁY",
+   "CHUYÊN HÓA MỸ PHẨM",
+   "HÀNG XÁCH TAY",
+   "Phương Diện",
+   "KHẮC DẤU",
+   "Quán Phương Miên: CAFE MUỐI / TRÀ CÚC / TRÀ HOA QUẢ / TRÀ SỮA / SỦI DÌN / CHÈ 3 MIỀN"
+  ],
+  "special": [],
+  "summary": "Đoạn phố Minh Khai đông đúc với câu lạc bộ bi-a Black Pink, quán cơm cháy, cà phê và tiệm khắc dấu; đối diện là khuôn viên trụ sở có hàng rào, xe máy đỗ dày đặc.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_273",
+  "area": "Phố Minh Khai đoạn đầu phố (địa chỉ '2 Minh Khai', gần giao Điện Biên Phủ/Hoàng Diệu); dãy quán cà phê và tòa nhà kiểu Pháp bề thế; đường hai chiều vạch tim vàng.",
+  "sidewalk": "Vỉa hè lát gạch/đá xám (viên lục giác) rộng, có gốc cây bồn; bàn ghế quán bày ra vỉa hè.",
+  "buildings": [
+   {
+    "heading": 90,
+    "style": "khu tập thể cũ tầng trệt làm quán cà phê",
+    "floors": 4,
+    "color": "trắng ngả xám",
+    "width_m": 45,
+    "features": "ban công dài, cửa chấn song sắt, dây phơi; tầng trệt là dãy quán 'CAFE 10 MINH KHAI', 'Quỳnh', 'Phương', 'KIM TRANG', 'SEI 成', 'Béo'; ô/dù xanh-vàng, bàn ghế gỗ"
+   },
+   {
+    "heading": 0,
+    "style": "nhà kiểu Pháp góc phố",
+    "floors": 2,
+    "color": "vàng kem",
+    "width_m": 20,
+    "features": "cửa chớp, tường vàng; phía trước có quán cà phê ô xanh, biển đứng 'MASSAGE'"
+   },
+   {
+    "heading": 270,
+    "style": "tòa nhà Pháp cổ bề thế trong khuôn viên rào sắt",
+    "floors": 3,
+    "color": "vàng kem",
+    "width_m": 40,
+    "features": "kiến trúc đối xứng cầu kỳ, cửa chớp, gờ phào, mái ngói; hàng rào sắt cao; phía sau có nhà cao tầng biển 'NGÂN HÀNG Á CHÂU', băng rôn Vietcombank"
+   }
+  ],
+  "landmarks": [
+   "Tòa nhà Pháp cổ bề thế màu vàng (công sở/di sản, không rõ tên - heading 270)",
+   "Ngân hàng Á Châu (ACB) - biển tòa nhà phía sau",
+   "Vietcombank (băng rôn quảng cáo)"
+  ],
+  "vehicles": "Ô tô đỗ ven đường (SUV trắng, sedan), xe máy đỗ và chạy, một xe máy đỏ trên vỉa hè.",
+  "vegetation": "Cây xà cừ/phượng cổ thụ rất lớn, nhiều cây bị cắt cụt thân; tán che rợp.",
+  "street_furniture": [
+   "cột điện bê tông và dây điện",
+   "ô/dù quán cà phê",
+   "biển đứng 'MASSAGE'",
+   "băng rôn Vietcombank",
+   "hàng rào sắt cao",
+   "cây chống cọc cho cây mới cắt"
+  ],
+  "banners": [
+   "CAFE 10 MINH KHAI",
+   "Quỳnh",
+   "KIM TRANG",
+   "Béo",
+   "CHĂM SÓC SỨC KHỎE",
+   "MASSAGE",
+   "NGÂN HÀNG Á CHÂU",
+   "Ước mơ trong tầm tay - Vietcombank Visa Signature"
+  ],
+  "special": [
+   "Tòa biệt thự/công sở Pháp cổ bề thế màu vàng bên trong khuôn viên rào sắt (heading 270) - kiến trúc đáng dựng riêng"
+  ],
+  "summary": "Đầu phố Minh Khai với dãy quán cà phê tầng trệt khu tập thể cũ một bên, đối diện là tòa nhà kiểu Pháp cổ bề thế màu vàng sau hàng rào sắt; nhiều cây cổ thụ bị cắt cụt.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_274",
+  "area": "Phố Hai Bà Trưng (địa chỉ '220 P. Hai Bà Trưng', theo bản đồ gần Bệnh viện Việt Tiệp và Chùa Dư Hàng); phố thương mại đông đúc có trường tiểu học; đường hai chiều vạch tim vàng. (Ảnh chụp 12/2020.)",
+  "sidewalk": "Vỉa hè lát gạch/đá xám (viên lục giác), nhiều đoạn hư hỏng, bị hàng quán và xe máy lấn chiếm.",
+  "buildings": [
+   {
+    "heading": 0,
+    "style": "dãy nhà ống shophouse thương mại",
+    "floors": 4,
+    "color": "vàng, cam, trắng",
+    "width_m": 35,
+    "features": "quán 'Nét Huế / Bún Bò Huế' (biển cam-đỏ có logo tô), cửa hàng 'GIÀY THỂ THAO NAM-NỮ / T&T Sneaker' (biển vàng, tủ kính bày giày), tiệm cắt tóc 'H1...CUT', quầy hàng 'YÊN...', ma-nơ-canh đỏ"
+   },
+   {
+    "heading": 180,
+    "style": "trường tiểu học và nhà 2 tầng",
+    "floors": 2,
+    "color": "vàng kem, tường có tranh nhiều màu",
+    "width_m": 60,
+    "features": "hàng rào sắt, cổng trường, tường vẽ tranh (mural) hình trẻ em, ki-ốt nhỏ bán tạp hóa, cờ đỏ, chậu cây xi măng trắng"
+   }
+  ],
+  "landmarks": [
+   "Trường Tiểu học Nguyễn Văn Tố (biển 'TRƯỜNG TIỂU HỌC NGUYỄN VĂN TỐ')",
+   "Quán Nét Huế - Bún Bò Huế",
+   "Cửa hàng giày T&T Sneaker"
+  ],
+  "vehicles": "Mật độ giao thông rất cao: nhiều xe máy chạy và đỗ san sát; một người đẩy xe kéo tay chở hàng trên vỉa hè.",
+  "vegetation": "Hàng cây xà cừ/phượng cổ thụ tán rộng che rợp lòng đường; cây cảnh trong chậu xi măng trắng.",
+  "street_furniture": [
+   "cột điện bê tông và dây điện",
+   "chậu cây xi măng trắng lớn",
+   "băng rôn đỏ khẩu hiệu",
+   "cờ đỏ sao vàng",
+   "tranh tường trường học",
+   "quầy hàng rong"
+  ],
+  "banners": [
+   "Nét Huế - Bún Bò Huế",
+   "GIÀY THỂ THAO NAM - NỮ / T&T Sneaker",
+   "TRƯỜNG TIỂU HỌC NGUYỄN VĂN TỐ",
+   "ĐẢNG CỘNG SẢN VIỆT NAM QUANG VINH MUÔN NĂM"
+  ],
+  "special": [
+   "Tường tranh tường (mural) hình trẻ em dọc hàng rào Trường Tiểu học Nguyễn Văn Tố",
+   "Đôi chậu cây xi măng trắng lớn hai bên cổng trường"
+  ],
+  "summary": "Phố Hai Bà Trưng đông đúc với quán bún bò Huế, cửa hàng giày và tiệm cắt tóc một bên, đối diện là Trường Tiểu học Nguyễn Văn Tố có tường tranh trẻ em; giao thông xe máy dày đặc.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_275",
+  "area": "Phố Hai Bà Trưng (đoạn ~số 228), khu phố thương mại shophouse san sát, gần cụm cơ quan công/trường học của quận Lê Chân.",
+  "sidewalk": "Vỉa hè/sân trước cửa hàng lát gạch bê tông xám, khá rộng (~3-4 m); lòng đường nhựa. Một số chỗ trước quầy hàng bày biện lộn xộn nên khó thấy rõ mạch lát.",
+  "buildings": [
+   {
+    "heading": 0,
+    "style": "shophouse nhà ống cũ",
+    "floors": 3,
+    "color": "tường xám bạc màu",
+    "width_m": 5,
+    "features": "biển đỏ 'CH LIÊU - Bác sỹ ĐOÀN THỊ MÙI', mái tôn/bạt xanh che trước, cửa cuốn"
+   },
+   {
+    "heading": 0,
+    "style": "shophouse nhà ống",
+    "floors": 4,
+    "color": "hồng",
+    "width_m": 5,
+    "features": "mặt tiền hồng chữ '...NAM', khung cửa sổ trắng, ban công"
+   },
+   {
+    "heading": 0,
+    "style": "shophouse nhà ống",
+    "floors": 4,
+    "color": "xám-lam",
+    "width_m": 5,
+    "features": "biển 'Bánh cuốn' màu vàng, cửa kính tầng 1"
+   },
+   {
+    "heading": 90,
+    "style": "công sở/trường kiểu Pháp cũ",
+    "floors": 2,
+    "color": "kem, cửa chớp nâu đỏ",
+    "width_m": 40,
+    "features": "khối nhà dài trổ nhiều cửa chớp gỗ nâu đỏ, biển xanh 'TRƯỜNG TIỂU HỌC NGUYỄN...' và 'UBND QUẬN LÊ...'"
+   },
+   {
+    "heading": 180,
+    "style": "shophouse có biển quảng cáo lớn",
+    "floors": 3,
+    "color": "biển xanh dương",
+    "width_m": 6,
+    "features": "billboard xanh 'ĐẠI LÝ VÉ MÁY BAY 0906.110.522', kiosk sắt màu vàng bán hàng phía trước"
+   }
+  ],
+  "landmarks": [
+   "Trường Tiểu học Nguyễn... (biển 'TRƯỜNG TIỂU HỌC NGUYỄN')",
+   "UBND Quận Lê... (biển trên nhà công sở kem)",
+   "Phòng khám/Bác sỹ Đoàn Thị Mùi ('CH LIÊU')",
+   "Đại lý vé máy bay 0906.110.522 (En Việt Hải Phòng)"
+  ],
+  "vehicles": "Nhiều xe máy đỗ ven đường, ô tô con (Honda CR-V trắng, SUV trắng) đỗ/chạy, xe máy chở hàng đang chạy.",
+  "vegetation": "Hàng cây bóng mát lớn (bàng/xà cừ) ven phố; có cây cổ thụ bị cắt trụi cành, thân chống đỡ bằng khung gỗ tam giác.",
+  "street_furniture": [
+   "cột điện bê tông với búi dây điện dày chằng chịt",
+   "đèn đường cần vươn",
+   "biển tên phố 'P. Hai Bà Trưng'",
+   "khung gỗ chống thân cây",
+   "biển báo giao thông tam giác",
+   "kiosk sắt màu vàng"
+  ],
+  "banners": [
+   "0906.110.522 - ĐẠI LÝ VÉ MÁY BAY TRONG NƯỚC VÀ QUỐC TẾ",
+   "CH LIÊU - Bác sỹ ĐOÀN THỊ MÙI",
+   "THU TRANG - ĐẠI LÝ BÁN VÉ MÁY BAY",
+   "TRƯỜNG TIỂU HỌC NGUYỄN...",
+   "LÀM SỈ ÁO DA CÁC MÀU - BỀN ĐẸP - THAY KHÓA"
+  ],
+  "special": [],
+  "summary": "Đoạn phố Hai Bà Trưng số ~228 với dãy shophouse buôn bán và một khối nhà công sở/trường học kiểu Pháp cũ cửa chớp nâu đỏ; đặc trưng bởi búi dây điện dày và cây cổ thụ bị cắt trụi cành có khung gỗ chống.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_276",
+  "area": "Phố Hai Bà Trưng (số ~242, giáp Cát Dài), một bên là chùa/trụ sở Phật giáo lớn, một bên là dãy shophouse và trường mầm non.",
+  "sidewalk": "Sân/vỉa hè trước chùa lát gạch xám lục giác rộng, có bó vỉa và bậc granite; vỉa hè phía shophouse lát gạch xám.",
+  "buildings": [
+   {
+    "heading": 0,
+    "style": "văn phòng dịch vụ (đại lý du lịch)",
+    "floors": 3,
+    "color": "xanh dương",
+    "width_m": 7,
+    "features": "mặt tiền xanh cao 'CATTOUR CHI NHÁNH HẢI PHÒNG', tủ kính lớn dán poster tour du lịch, cửa cuốn tầng 1"
+   },
+   {
+    "heading": 0,
+    "style": "trường mầm non",
+    "floors": 2,
+    "color": "nhiều màu, vòm cầu vồng",
+    "width_m": 8,
+    "features": "mặt tiền trang trí sặc sỡ họa tiết trẻ em, biển 'TRƯỜNG MẦM NON CHẤT LƯỢNG CAO', vòm cầu vồng"
+   },
+   {
+    "heading": 90,
+    "style": "chùa/đền Phật giáo mái cong nhiều tầng",
+    "floors": 3,
+    "color": "tường vàng, mái ngói nâu đỏ",
+    "width_m": 45,
+    "features": "mái ngói cong nhiều tầng, cờ ngũ sắc Phật giáo, hàng lan can gỗ, cổng và bia đá chạm khắc, cây đại (sứ) và bonsai trong sân"
+   },
+   {
+    "heading": 0,
+    "style": "shophouse hàng ăn",
+    "floors": 3,
+    "color": "biển đỏ",
+    "width_m": 5,
+    "features": "biển đỏ 'BÁNH MÌ PATE ...BÀ CỤ' - 244 Cát Dài"
+   }
+  ],
+  "landmarks": [
+   "Chùa / Trụ sở Ban Trị Sự Giáo hội Phật giáo Việt Nam - TP Hải Phòng (bia đá 'TRỤ SỞ - BAN TRỊ SỰ')",
+   "CATTOUR chi nhánh Hải Phòng",
+   "Trường mầm non chất lượng cao",
+   "Bánh mì pate Bà Cụ (244 Cát Dài)"
+  ],
+  "vehicles": "Xe máy chạy trên đường (2 người đi xe có ba lô hồng), xe máy đỗ, ô tô con đỏ đỗ ven đường, xe đẩy hàng.",
+  "vegetation": "Cây đại/hoa sứ (plumeria) và nhiều chậu cây cảnh/bonsai trong khuôn viên chùa; cây xanh non trồng ven phố.",
+  "street_furniture": [
+   "cột điện bê tông với búi dây",
+   "đèn đường",
+   "tường rào chùa với trụ/bia đá chạm khắc",
+   "bồn cây granite",
+   "cột cờ",
+   "xe đẩy bán hàng có ô",
+   "biển tên phố 'P. Hai Bà Trưng'"
+  ],
+  "banners": [
+   "TOÀN DÂN ĐOÀN KẾT XÂY DỰNG ĐỜI SỐNG VĂN HÓA",
+   "CATTOUR CHI NHÁNH HẢI PHÒNG",
+   "TRƯỜNG MẦM NON CHẤT LƯỢNG CAO",
+   "BÁNH MÌ PATE ...BÀ CỤ - 244 Cát Dài",
+   "GIÁO HỘI PHẬT GIÁO VIỆT NAM - THÀNH PHỐ HẢI PHÒNG - TRỤ SỞ BAN TRỊ SỰ"
+  ],
+  "special": [
+   "Ngôi chùa/trụ sở Phật giáo mái ngói cong nhiều tầng, tường vàng, cắm cờ ngũ sắc",
+   "Cụm bia đá và trụ đá chạm khắc + non bộ trước cổng chùa",
+   "Cổng vòm 'TRỤ SỞ - BAN TRỊ SỰ' của chùa",
+   "Billboard vẽ tranh thác nước khổ lớn cạnh chùa"
+  ],
+  "summary": "Điểm nhấn là ngôi chùa/trụ sở Ban Trị Sự Giáo hội Phật giáo Hải Phòng tường vàng mái cong nhiều tầng, đối diện là văn phòng du lịch CATTOUR màu xanh và trường mầm non cầu vồng trên phố Hai Bà Trưng.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_277",
+  "area": "Phố Hai Bà Trưng, ngay cửa ngõ vào một con ngõ/khu dân cư; vỉa hè có nhiều hàng ăn vặt, quán nước.",
+  "sidewalk": "Vỉa hè lát gạch xám, bày nhiều xe hàng rong và bàn ghế; lòng ngõ hẹp lát bê tông.",
+  "buildings": [
+   {
+    "heading": 0,
+    "style": "shophouse - trung tâm ngoại ngữ",
+    "floors": 3,
+    "color": "biển cam",
+    "width_m": 6,
+    "features": "biển cam lớn 'TRUNG TÂM NGOẠI NGỮ TOÀN CẦU', cửa cuốn, chữ 'LUYỆN THI IELTS, PTE'"
+   },
+   {
+    "heading": 180,
+    "style": "shophouse dịch vụ làm đẹp",
+    "floors": 3,
+    "color": "biển đỏ/nâu",
+    "width_m": 6,
+    "features": "'Hải Thành - Bàn ghế, Dụng cụ làm tóc' và 'Hải Thành Beauty Supply - DỤNG CỤ NAIL - TATTOO' (logo K đỏ)"
+   },
+   {
+    "heading": 180,
+    "style": "shophouse thời trang",
+    "floors": 3,
+    "color": "kem",
+    "width_m": 5,
+    "features": "tủ kính bày ma-nơ-canh quần áo, cửa gỗ nâu"
+   },
+   {
+    "heading": 270,
+    "style": "quán cà phê",
+    "floors": 2,
+    "color": "sáng",
+    "width_m": 6,
+    "features": "biển 'UP COFFEE', bàn ghế cà phê ngoài trời che ô màu kem"
+   }
+  ],
+  "landmarks": [
+   "Trung tâm Ngoại ngữ Toàn Cầu (luyện thi IELTS, PTE; tiếng Hàn-Đức-Nhật)",
+   "Hải Thành Beauty Supply (dụng cụ nail-tattoo)",
+   "UP Coffee"
+  ],
+  "vehicles": "Xe máy đỗ và chạy, ô tô SUV đen (Mazda) và ô tô trắng/bạc đỗ, cặp đôi đi xe máy.",
+  "vegetation": "Cây xanh bóng mát lớn ven phố, cây trồng trong bồn bê tông giữa vỉa hè.",
+  "street_furniture": [
+   "cột điện bê tông búi dây dày",
+   "cổng chào khung sắt vào ngõ",
+   "ô/dù lớn của hàng rong (xanh, kem)",
+   "ghế nhựa đỏ",
+   "bồn cây bê tông",
+   "biển tên phố 'P. Hai Bà Trưng'"
+  ],
+  "banners": [
+   "TOÀN DÂN ĐOÀN KẾT XÂY DỰNG ĐỜI SỐNG VĂN HÓA (băng rôn đỏ có hoa sen)",
+   "TRUNG TÂM NGOẠI NGỮ TOÀN CẦU - LUYỆN THI CẤP TỐC IELTS, PTE - ĐÀO TẠO TIẾNG HÀN-ĐỨC-NHẬT-TIẾNG ANH CHO TRẺ EM",
+   "SINH TỐ HOA QUẢ",
+   "Hải Thành Beauty Supply - DỤNG CỤ NAIL - TATTOO"
+  ],
+  "special": [
+   "Cổng chào khung sắt bắc ngang miệng ngõ căng băng rôn đỏ 'Toàn dân đoàn kết...' hai đầu có họa tiết hoa sen vàng",
+   "Xe đẩy bán sinh tố/nước ép với ô dù lớn hai bên miệng ngõ"
+  ],
+  "summary": "Miệng một con ngõ trên phố Hai Bà Trưng có cổng chào khung sắt căng băng rôn đỏ hoa sen; hai bên là trung tâm ngoại ngữ Toàn Cầu biển cam, tiệm làm đẹp Hải Thành và các xe đẩy hàng ăn vặt che ô lớn.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_278",
+  "area": "Phố Hai Bà Trưng (đoạn số 227-229), khu dịch vụ - y tế: trung tâm tiếng Anh, phòng khám, bệnh viện quốc tế và quán ăn đặc sản.",
+  "sidewalk": "Vỉa hè lát gạch xám rộng ~3 m, có cây bóng mát và bồn cây; nhiều đoạn để xe máy.",
+  "buildings": [
+   {
+    "heading": 0,
+    "style": "trung tâm tiếng Anh (Apollo)",
+    "floors": 3,
+    "color": "xanh dương",
+    "width_m": 8,
+    "features": "mặt tiền xanh 'APOLLO', cầu thang sắt ngoài trời sơn xanh, cửa kính"
+   },
+   {
+    "heading": 180,
+    "style": "phòng khám (tai mũi họng)",
+    "floors": 4,
+    "color": "biển xanh/đỏ",
+    "width_m": 5,
+    "features": "biển 'PHÒNG KHÁM KỸ THUẬT CAO - TAI MŨI HỌNG - NỘI SOI - NGƯỜI LỚN & TRẺ EM' số 227, ban công"
+   },
+   {
+    "heading": 180,
+    "style": "quán ăn đặc sản",
+    "floors": 2,
+    "color": "vàng-đỏ",
+    "width_m": 5,
+    "features": "biển vàng 'BÚN CÁ CAY - 229 Hải Bà Trưng - ĐẶC SẢN HẢI PHÒNG', cửa mở bày quán"
+   },
+   {
+    "heading": 180,
+    "style": "bệnh viện/công ty y tế",
+    "floors": 4,
+    "color": "biển xanh dương + cam",
+    "width_m": 8,
+    "features": "'CÔNG TY CỔ PHẦN BỆNH VIỆN QUỐC TẾ MEDIPHARCARE' và biển đứng cam 'MEDIPHAR CARE'"
+   }
+  ],
+  "landmarks": [
+   "Apollo English (trung tâm tiếng Anh)",
+   "Bệnh viện Quốc tế Medipharcare / Mediphar Care",
+   "Phòng khám Tai-Mũi-Họng nội soi (227)",
+   "Bún Cá Cay 229 Hai Bà Trưng - đặc sản Hải Phòng",
+   "Koji chi nhánh Hải Phòng"
+  ],
+  "vehicles": "Ford Everest đen đỗ ven đường, Mazda đỏ, Kia Morning trắng đỗ, xe máy đỗ và chạy.",
+  "vegetation": "Hàng cây bóng mát lớn (phượng/bàng) hai bên phố; cây non trong bồn có khung gỗ chống.",
+  "street_furniture": [
+   "cột điện bê tông với búi dây dày",
+   "đèn đường",
+   "trụ cứu hỏa (họng nước chữa cháy) màu đỏ-vàng trên vỉa hè",
+   "bồn cây + khung gỗ chống",
+   "bảng LED chạy chữ",
+   "biển tên phố 'P. Hai Bà Trưng'"
+  ],
+  "banners": [
+   "APOLLO",
+   "MEDIPHAR CARE",
+   "CÔNG TY CỔ PHẦN BỆNH VIỆN QUỐC TẾ MEDIPHARCARE",
+   "BÚN CÁ CAY - 229 Hải Bà Trưng - ĐẶC SẢN HẢI PHÒNG - 0904 304 866 / 0929 880 890",
+   "TAI - MŨI - HỌNG / NỘI SOI TAI MŨI HỌNG NGƯỜI LỚN & TRẺ EM - 227",
+   "Koji ... CHI NHÁNH HẢI PHÒNG"
+  ],
+  "special": [
+   "Trụ cứu hỏa màu đỏ-vàng trên vỉa hè",
+   "Cầu thang sắt ngoài trời sơn xanh của tòa nhà Apollo"
+  ],
+  "summary": "Đoạn phố Hai Bà Trưng số 227-229 tập trung dịch vụ: trung tâm Apollo mặt xanh có cầu thang sắt ngoài trời, bệnh viện quốc tế Mediphar Care, phòng khám tai-mũi-họng và quán đặc sản Bún Cá Cay; vỉa hè có trụ cứu hỏa đỏ.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_279",
+  "area": "Phố Hai Bà Trưng (đoạn số 233-243), dãy shophouse bán lẻ đông đúc: salon tóc, cà phê, thời trang, đồ gia dụng.",
+  "sidewalk": "Vỉa hè lát gạch xám, có cây bóng mát; xe máy đỗ thành hàng dài kín vỉa hè.",
+  "buildings": [
+   {
+    "heading": 0,
+    "style": "shophouse đồ gia dụng",
+    "floors": 3,
+    "color": "vàng/kem",
+    "width_m": 6,
+    "features": "biển 'Nhaxinh Hải Phòng / ...HAIPHONG.COM', biển đứng đỏ 'ĐỒ GIA DỤNG TIỆN ÍCH - 8H-18H30 - NGHỈ CHỦ NHẬT', 'PHỤ KIỆN NAM NỮ', cửa cuốn"
+   },
+   {
+    "heading": 90,
+    "style": "salon tóc",
+    "floors": 3,
+    "color": "xanh dương",
+    "width_m": 6,
+    "features": "billboard '30 SHINE' hình người cắt tóc, biển hiệu lớn"
+   },
+   {
+    "heading": 180,
+    "style": "shophouse cửa hàng/công ty phân phối",
+    "floors": 3,
+    "color": "xanh lá",
+    "width_m": 8,
+    "features": "mặt tiền xanh lá lớn 'CÔNG TY ... TÂM BÍCH VÂN', 'MAX SHOP 233 EST 2015', biển xanh 'CHUYÊN SỬA HÀNG HIỆU', cửa cuốn"
+   }
+  ],
+  "landmarks": [
+   "30 Shine (salon tóc)",
+   "Smile Coffee",
+   "Max Shop 233 (EST 2015)",
+   "Nhaxinh Hải Phòng (đồ gia dụng)",
+   "Công ty ... Tâm Bích Vân",
+   "Bích Hảo"
+  ],
+  "vehicles": "Rất nhiều xe máy đỗ thành hàng dài ven phố, ô tô SUV trắng, xe ôm (biển 'XE ÔM').",
+  "vegetation": "Hàng cây bàng bóng mát lớn dọc hai bên phố.",
+  "street_furniture": [
+   "cột điện bê tông búi dây",
+   "ghế nhựa vàng trước cửa hàng",
+   "bồn cây",
+   "biển tên phố 'P. Hai Bà Trưng'",
+   "banner giảm giá dựng đứng"
+  ],
+  "banners": [
+   "30 SHINE",
+   "Smile Coffee",
+   "20 ... GIẢM HÀNG LOẠT ... 12%",
+   "MAX SHOP 233 EST 2015",
+   "ĐỒ GIA DỤNG TIỆN ÍCH - 8H-18H30 - NGHỈ CHỦ NHẬT",
+   "PHỤ KIỆN NAM NỮ",
+   "CHUYÊN SỬA HÀNG HIỆU",
+   "CÔNG TY ... TÂM BÍCH VÂN"
+  ],
+  "special": [],
+  "summary": "Đoạn phố Hai Bà Trưng số 233-243 với dãy shophouse bán lẻ dày đặc (salon 30 Shine, Smile Coffee, Max Shop, cửa hàng đồ gia dụng Nhaxinh) và xe máy đỗ thành hàng dài dưới bóng cây bàng.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_280",
+  "area": "Phố Hai Bà Trưng (số 253), gần cửa ngõ vào chợ/ngõ 253 (Chợ Kỳ Đồng); cụm cơ sở y tế xen hàng ăn.",
+  "sidewalk": "Vỉa hè lát gạch xám lục giác khá rộng; miệng ngõ chợ có hàng cơm/mì và xe đẩy.",
+  "buildings": [
+   {
+    "heading": 0,
+    "style": "nhà phố có phòng khám + nhà thuốc",
+    "floors": 3,
+    "color": "kem, ban công sắt mạ vàng",
+    "width_m": 8,
+    "features": "ban công sắt uốn hoa văn mạ vàng cầu kỳ, biển xanh 'PHÒNG KHÁM CHUYÊN KHOA NHI', biển 'NHÀ THUỐC HOA ĐIỆP' chữ thập xanh, 'BS. ĐIỆP'"
+   },
+   {
+    "heading": 180,
+    "style": "phòng khám chuyên khoa",
+    "floors": 3,
+    "color": "biển xanh dương",
+    "width_m": 6,
+    "features": "biển '...KHOA... 253 - PGS.TS. KHÚC THỊ NHỤN - GPHĐ-SYT - HAI BÀ TRƯNG', bảng LED chạy chữ đỏ 'ỨC THỊ NHỤN', cửa cuốn"
+   },
+   {
+    "heading": 90,
+    "style": "shophouse dịch vụ/bán lẻ",
+    "floors": 3,
+    "color": "sáng, biển xanh lá 'Farm'",
+    "width_m": 5,
+    "features": "biển 'Farm', 'TAIMBAY...', tủ kính, cửa cuốn"
+   }
+  ],
+  "landmarks": [
+   "Phòng khám Chuyên khoa Nhi",
+   "Nhà thuốc Hoa Điệp (BS. Điệp)",
+   "Phòng khám PGS.TS Khúc Thị Nhụn - 253 Hai Bà Trưng",
+   "Chợ Kỳ Đồng (biển 'MÌ CHỢ KỲ ĐỒNG')",
+   "Ô tô tự lái"
+  ],
+  "vehicles": "Xe máy chạy và đỗ (2 người trên một xe), ô tô Toyota Wigo trắng đỗ, ô tô đen.",
+  "vegetation": "Cây bóng mát ven phố; chậu cây phát tài/dracaena đặt trước cửa phòng khám.",
+  "street_furniture": [
+   "cột điện bê tông búi dây",
+   "đèn đường",
+   "cờ đỏ Việt Nam và cờ nhiều màu",
+   "ô/dù hàng rong (tím, đỏ-trắng)",
+   "bảng đèn LED chạy chữ đỏ",
+   "khung sắt căng băng rôn ngang miệng ngõ",
+   "biển tên phố 'P. Hai Bà Trưng'",
+   "bồn/chậu cây"
+  ],
+  "banners": [
+   "KHU PHỐ CÁT DÀI - TỔ DÂN PHỐ SỐ 3-5-8 - TOÀN DÂN ĐOÀN KẾT XÂY DỰNG ĐỜI SỐNG VĂN HÓA ĐÔ THỊ VĂN MINH",
+   "CƠM RANG THẬP CẨM",
+   "MÌ CHỢ KỲ ĐỒNG",
+   "PHÒNG KHÁM CHUYÊN KHOA NHI",
+   "NHÀ THUỐC HOA ĐIỆP",
+   "PGS.TS. KHÚC THỊ NHỤN - 253 - HAI BÀ TRƯNG",
+   "Ô TÔ TỰ LÁI"
+  ],
+  "special": [
+   "Băng rôn đỏ khổ lớn treo ngang miệng ngõ chợ trên khung sắt ('Toàn dân đoàn kết...' - Khu phố Cát Dài, tổ dân phố 3-5-8)",
+   "Ban công sắt uốn hoa văn mạ vàng cầu kỳ của tòa nhà phòng khám nhi",
+   "Bảng đèn LED chạy chữ đỏ trước phòng khám PGS.TS Khúc Thị Nhụn"
+  ],
+  "summary": "Đoạn phố Hai Bà Trưng số 253 tại cửa ngõ chợ Kỳ Đồng: tòa nhà phòng khám nhi ban công sắt mạ vàng cầu kỳ và nhà thuốc Hoa Điệp, cạnh miệng ngõ căng băng rôn đỏ khổ lớn với các hàng cơm rang, mì chợ.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_281",
+  "area": "Phố Hai Bà Trưng, đoạn ngã ba dẫn vào Ngõ 326 (gần khu Bệnh viện Hữu nghị Việt Tiệp theo mini-map). Phố thương mại nhà ống, chuyên cửa hàng thiết bị/dụng cụ y tế, có một trụ sở/công sở màu vàng và khu chợ ăn uống nhỏ.",
+  "sidewalk": "Vỉa hè lát gạch con sâu/terracotta màu xám-đỏ nhạt bên dãy nhà (h270), rộng ~2-3m; góc giao và mép đối diện là mảng đá/bê tông tấm lớn màu xám. Nhiều đoạn bị xe máy và biển hiệu chiếm dụng.",
+  "buildings": [
+   {
+    "heading": 270,
+    "style": "nhà ống/shophouse",
+    "floors": 5,
+    "color": "trắng-kem",
+    "width_m": 4,
+    "features": "ban công, số '326' đỏ lớn, biển LED đỏ 'ĐIỆN THOẠI 0912', cửa hàng thiết bị y tế (OMRON, CỤ Y TẾ, THIẾT BỊ Y TẾ), cửa cuốn, biển 'Ngõ 326 Hai Bà Trưng' màu xanh"
+   },
+   {
+    "heading": 90,
+    "style": "công sở/trụ sở nhà nước",
+    "floors": 2,
+    "color": "vàng kem",
+    "width_m": 22,
+    "features": "cổng sắt, bốt bảo vệ màu vàng, tường rào, băng rôn đỏ tuyên truyền PCCC gắn trên mặt tiền"
+   },
+   {
+    "heading": 180,
+    "style": "nhà ống đang xây",
+    "floors": 3,
+    "color": "xám bê tông",
+    "width_m": 8,
+    "features": "giàn giáo thép bao quanh, quây lưới bảo hộ, chưa hoàn thiện mặt tiền, cây to mọc sát trên vỉa hè"
+   },
+   {
+    "heading": 0,
+    "style": "nhà ống/shophouse",
+    "floors": 4,
+    "color": "trắng/kem",
+    "width_m": 4,
+    "features": "ban công, mái tôn, nhiều biển hiệu, xe máy đỗ trước cửa"
+   }
+  ],
+  "landmarks": [
+   "Phố Hai Bà Trưng (chữ 'P. Hai Bà Trưng' sơn trên mặt đường)",
+   "Ngõ 326 Hai Bà Trưng (biển tên ngõ màu xanh)"
+  ],
+  "vehicles": "Xe máy đỗ dày hai bên vỉa hè; vài ô tô con (trắng, đen) đỗ và chạy trong ngõ; người điều khiển xe máy qua lại; có bóng một CSGT/bảo vệ đứng giữa đường (h090).",
+  "vegetation": "Hàng cây bóng mát lớn (xà cừ) chạy dọc phố Hai Bà Trưng; một cây thân to mọc ngay trên vỉa hè ở góc chợ (h180).",
+  "street_furniture": [
+   "cột điện bê tông với búi dây điện/cáp chằng chịt và nhiều tủ điện, hộp công tơ",
+   "biển tên ngõ màu xanh 'Ngõ 326'",
+   "dù/ô che hàng (sọc xanh, sọc đỏ-xanh)",
+   "ghế nhựa, bàn hàng ăn",
+   "bốt bảo vệ khu dân cư màu vàng/cam",
+   "biển hiệu LED, giá kệ đặt vỉa hè"
+  ],
+  "banners": [
+   "'...PHONG TRÀO TOÀN DÂN PHÒNG CHÁY VÀ CHỮA CHÁY...' (băng rôn đỏ trên trụ sở màu vàng)",
+   "'BÚN CHẢ' (biển quán ăn đỏ)",
+   "'MÁY TRỢ THÍNH'",
+   "'ĐIỆN THOẠI 0912 0912.045.496'"
+  ],
+  "special": [],
+  "summary": "Phố Hai Bà Trưng đông đúc, dãy nhà ống bán thiết bị y tế và biển LED, đối diện là trụ sở công sở màu vàng có băng rôn PCCC và khu chợ ăn uống nhỏ dưới tán cây lớn. Ngã ba mở vào Ngõ 326.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_282",
+  "area": "Đường dẫn/nút giao trên cao ở chân Cầu Hoàng Văn Thụ, chạy ven Sông Cấm ngay cạnh Cảng Hải Phòng. Không gian đường trên cao vượt qua các kho bãi cảng.",
+  "sidewalk": "Không có vỉa hè — đây là cầu vượt/đường dẫn trên cao; hai mép là lan can bê tông kết hợp rào chống ồn khung thép và tấm kính.",
+  "buildings": [
+   {
+    "heading": 90,
+    "style": "nhà kho cảng mái tôn",
+    "floors": 1,
+    "color": "xanh rêu/nâu gỉ",
+    "width_m": 40,
+    "features": "dãy kho dài mái tôn của Cảng Hải Phòng, cần cẩu cổng đứng phía sau, sát mép sông"
+   },
+   {
+    "heading": 180,
+    "style": "tòa nhà cổ điển mái mansard",
+    "floors": 6,
+    "color": "trắng-vàng nhạt",
+    "width_m": 60,
+    "features": "kiến trúc kiểu Pháp/cổ điển mái dốc, nhiều cửa sổ đều; cụm cao ốc kính và tháp viễn thông phía sau"
+   },
+   {
+    "heading": 180,
+    "style": "chung cư/cao ốc đang xây",
+    "floors": 12,
+    "color": "xám-trắng",
+    "width_m": 25,
+    "features": "cần cẩu tháp, kết cấu bê tông chưa hoàn thiện"
+   }
+  ],
+  "landmarks": [
+   "Cầu Hoàng Văn Thụ (nhịp vòm thép đỏ nhìn thấy phía xa)",
+   "Cảng Hải Phòng (cần cẩu cổng, kho bãi)",
+   "Sông Cấm"
+  ],
+  "vehicles": "Ô tô con (trắng, bạc) và xe máy chạy trên đường dẫn; mật độ thưa.",
+  "vegetation": "Dải cây xanh và vườn dạo/công viên ven sông bên dưới bên trái (h000); hàng cây dọc bờ.",
+  "street_furniture": [
+   "cột đèn cao áp cần vươn dài",
+   "lan can bê tông",
+   "rào chống ồn khung thép + tấm kính",
+   "cột điện/đèn ven đường"
+  ],
+  "banners": [],
+  "special": [
+   "Cần cẩu cổng (gantry crane) màu cam của Cảng Hải Phòng — cụm cần cẩu lớn đặc trưng ven sông",
+   "Nhịp vòm thép đỏ Cầu Hoàng Văn Thụ nhìn từ xa"
+  ],
+  "summary": "Đường dẫn trên cao lên Cầu Hoàng Văn Thụ, một bên là dãy kho và rừng cần cẩu cổng màu cam của Cảng Hải Phòng bên Sông Cấm, một bên là công viên ven sông và skyline thành phố với tòa nhà cổ điển mái mansard trắng.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_283",
+  "area": "Đường dẫn cong trên cao lên Cầu Hoàng Văn Thụ, ven Sông Cấm và Cảng Hải Phòng; ánh nắng chiều xiên.",
+  "sidewalk": "Không có vỉa hè — cầu vượt trên cao; mép đường là lan can bê tông và rào chống ồn khung thép gắn tấm kính (h180/h090).",
+  "buildings": [
+   {
+    "heading": 90,
+    "style": "nhà kho cảng mái tôn",
+    "floors": 1,
+    "color": "xanh rêu/xám",
+    "width_m": 50,
+    "features": "dãy kho dài, cần cẩu cổng cam phía sau, tàu/sà lan cập bến"
+   },
+   {
+    "heading": 180,
+    "style": "tòa nhà cổ điển mái mansard",
+    "floors": 6,
+    "color": "trắng-vàng nhạt",
+    "width_m": 60,
+    "features": "kiến trúc cổ điển mái dốc lớn (bên phải xa), cụm cao ốc kính, cần cẩu tháp công trường phía sau"
+   },
+   {
+    "heading": 90,
+    "style": "cao ốc văn phòng/chung cư",
+    "floors": 10,
+    "color": "kính xanh/trắng",
+    "width_m": 25,
+    "features": "mặt kính, đứng thành cụm trong skyline thành phố"
+   }
+  ],
+  "landmarks": [
+   "Cầu Hoàng Văn Thụ",
+   "Cảng Hải Phòng (cần cẩu cổng, kho bãi, tàu)",
+   "Sông Cấm"
+  ],
+  "vehicles": "Ô tô con (bạc, trắng) và SUV; một xe máy đỏ; mật độ thưa trên đường dẫn.",
+  "vegetation": "Vài khóm cây xanh ven đường bên dưới; cây bụi rìa bờ sông.",
+  "street_furniture": [
+   "cột đèn cao áp cần vươn",
+   "lan can bê tông",
+   "rào chống ồn khung thép + tấm kính",
+   "khe co giãn thép (expansion joint) trên mặt đường"
+  ],
+  "banners": [],
+  "special": [
+   "Cần cẩu cổng cam của Cảng Hải Phòng",
+   "Nhịp vòm thép đỏ Cầu Hoàng Văn Thụ (xa)"
+  ],
+  "summary": "Đoạn đường dẫn cong lên Cầu Hoàng Văn Thụ dưới nắng chiều, một bên nhìn xuống kho bãi và cần cẩu Cảng Hải Phòng ven Sông Cấm, một bên là skyline thành phố với tòa nhà cổ điển mái mansard trắng.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_284",
+  "area": "Trên mặt Cầu Hoàng Văn Thụ, đoạn dẫn tiến vào nhịp vòm thép đỏ, vượt Sông Cấm. Địa chỉ hiển thị 'Cầu Hoàng Văn Thụ, Hải Phòng'.",
+  "sidewalk": "Lối đi bộ/kỹ thuật hẹp hai mép cầu có lan can thép mạ; lòng đường chia hai chiều bằng dải phân cách bê tông giữa; không phải vỉa hè phố thông thường.",
+  "buildings": [
+   {
+    "heading": 180,
+    "style": "chung cư cao tầng đang xây",
+    "floors": 13,
+    "color": "trắng-xám",
+    "width_m": 30,
+    "features": "cần cẩu tháp bên trên, kết cấu bê tông; đứng nổi bật trong skyline"
+   },
+   {
+    "heading": 180,
+    "style": "cụm cao ốc thành phố",
+    "floors": 10,
+    "color": "kính/trắng đa sắc",
+    "width_m": 120,
+    "features": "skyline Hải Phòng phía bờ, có tháp viễn thông và nhiều nhà cao tầng"
+   }
+  ],
+  "landmarks": [
+   "Cầu Hoàng Văn Thụ (nhịp vòm thép đỏ ngay phía trước, h000)",
+   "Cảng Hải Phòng (cần cẩu, kho)",
+   "Sông Cấm",
+   "một cây cầu khác (dây văng) thấy mờ phía xa (h270)"
+  ],
+  "vehicles": "Ô tô con và xe máy chạy hai chiều trên cầu; mật độ vừa phải.",
+  "vegetation": "Hầu như không có cây trên cầu; chỉ thấy cây xanh ven sông ở xa.",
+  "street_furniture": [
+   "cột đèn cao áp cần vươn cắm trên dải phân cách giữa",
+   "dải phân cách bê tông",
+   "lan can thép mạ hai bên",
+   "cọc tiêu/cột phản quang, biển báo",
+   "nón giao thông màu cam (h180/h270)"
+  ],
+  "banners": [],
+  "special": [
+   "Nhịp vòm thép đỏ (through-arch) của Cầu Hoàng Văn Thụ — kết cấu đặc trưng phía trước"
+  ],
+  "summary": "Đang trên mặt Cầu Hoàng Văn Thụ, đường đôi tiến thẳng vào nhịp vòm thép đỏ đặc trưng; hai bên là Sông Cấm rộng, xa là skyline Hải Phòng và cần cẩu cảng dưới nắng chiều.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_285",
+  "area": "Đỉnh nhịp vòm Cầu Hoàng Văn Thụ, ngay dưới vòm thép đỏ và giàn lattice trắng, giữa dòng Sông Cấm. Có lối/điểm ngắm cảnh với kết cấu tháp thang máy-vọng cảnh.",
+  "sidewalk": "Lối đi bộ ngắm cảnh hai bên cầu với lan can thép; xuất hiện kết cấu tháp bằng kính-inox (thang máy/vọng cảnh); lòng đường ô tô chia dải phân cách bê tông.",
+  "buildings": [
+   {
+    "heading": 180,
+    "style": "chung cư cao tầng đang xây",
+    "floors": 13,
+    "color": "trắng-xám",
+    "width_m": 30,
+    "features": "cần cẩu tháp, bê tông chưa hoàn thiện"
+   },
+   {
+    "heading": 90,
+    "style": "tháp thang máy/vọng cảnh trên cầu",
+    "floors": 2,
+    "color": "inox-kính xám",
+    "width_m": 6,
+    "features": "hộp kính-thép đứng gắn ở mép cầu phục vụ lối đi bộ/ngắm cảnh"
+   },
+   {
+    "heading": 180,
+    "style": "cụm cao ốc thành phố",
+    "floors": 10,
+    "color": "kính/trắng đa sắc",
+    "width_m": 120,
+    "features": "skyline Hải Phòng, tháp viễn thông, nhà kho + cần cẩu cảng"
+   }
+  ],
+  "landmarks": [
+   "Cầu Hoàng Văn Thụ (vòm thép đỏ + giàn thép trắng ngay trên đầu)",
+   "Cảng Hải Phòng (cần cẩu cổng cam, tàu/sà lan)",
+   "Sông Cấm",
+   "cầu dây văng phía xa (h270)"
+  ],
+  "vehicles": "Ô tô con (trắng, đen), xe máy đỏ, một xe bán tải màu nâu/vàng (h180); người đi xe đạp trên lối bộ (h000/h090).",
+  "vegetation": "Gần như không có cây trên cầu; cây xanh và bãi bồi ven sông ở xa.",
+  "street_furniture": [
+   "cột đèn cao áp cắm giữa dải phân cách",
+   "dải phân cách bê tông",
+   "lan can thép hai bên",
+   "tháp/hộp kỹ thuật kính-inox trên lối đi bộ"
+  ],
+  "banners": [],
+  "special": [
+   "Nhịp vòm thép đỏ + giàn lattice trắng của Cầu Hoàng Văn Thụ (đỉnh vòm)",
+   "Tháp thang máy/vọng cảnh bằng kính-inox trên cầu — kết cấu độc đáo",
+   "Điểm dừng ngắm cảnh có người đi xe đạp"
+  ],
+  "summary": "Ngay đỉnh nhịp vòm Cầu Hoàng Văn Thụ dưới cấu trúc thép đỏ-trắng đặc trưng; hai bên nhìn bao quát Sông Cấm, cần cẩu Cảng Hải Phòng và skyline thành phố, có tháp thang máy/vọng cảnh kính-inox và người ngắm cảnh.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_286",
+  "area": "Nhịp chính Cầu Hoàng Văn Thụ với hệ thanh treo đứng (hanger) inox và vòm thép đỏ, vượt Sông Cấm. Trên lối đi bộ có bàn ghế nghỉ/ngắm cảnh, người dân tụ tập.",
+  "sidewalk": "Lối đi bộ ngắm cảnh hai bên cầu, có ghế/bàn nghỉ (h090 thấy nhóm người ngồi); lòng đường ô tô hai chiều ngăn bằng dải phân cách bê tông; lan can thép.",
+  "buildings": [
+   {
+    "heading": 90,
+    "style": "nhà kho + cao ốc cảng",
+    "floors": 8,
+    "color": "trắng/xám đa sắc",
+    "width_m": 120,
+    "features": "kho bãi, cần cẩu cổng cam, cụm cao ốc và chung cư trắng trong skyline bên bờ"
+   },
+   {
+    "heading": 180,
+    "style": "cụm cao ốc thành phố",
+    "floors": 12,
+    "color": "trắng-kính",
+    "width_m": 100,
+    "features": "chung cư/cao ốc, cần cẩu tháp công trường; skyline Hải Phòng"
+   }
+  ],
+  "landmarks": [
+   "Cầu Hoàng Văn Thụ (vòm thép đỏ + hệ thanh treo inox)",
+   "Cảng Hải Phòng (cần cẩu, kho, tàu)",
+   "Sông Cấm",
+   "cầu dây văng phía xa (h270)"
+  ],
+  "vehicles": "Ô tô con (trắng) chạy trên cầu; một người áo xanh đi xe máy Honda SH màu đỏ (h270); mật độ thưa.",
+  "vegetation": "Gần như không có cây trên cầu; ven sông là đất bãi bồi/công trường san lấp, ít cây.",
+  "street_furniture": [
+   "cột đèn cao áp cần vươn",
+   "hệ thanh treo (hanger) inox thẳng đứng dày đặc hai bên",
+   "lan can thép",
+   "dải phân cách bê tông giữa",
+   "bàn/ghế nghỉ ngắm cảnh trên lối đi bộ"
+  ],
+  "banners": [],
+  "special": [
+   "Vòm thép đỏ + hệ thanh treo inox của nhịp chính Cầu Hoàng Văn Thụ — kết cấu đặc trưng",
+   "Điểm ngắm cảnh có bàn ghế và nhóm người ngồi hóng mát trên cầu"
+  ],
+  "summary": "Nhịp chính Cầu Hoàng Văn Thụ với rừng thanh treo inox và vòm thép đỏ; hai bên nhìn ra Sông Cấm, cần cẩu Cảng Hải Phòng và skyline thành phố. Trên lối đi bộ có bàn ghế nghỉ và người dân tụ tập ngắm cảnh lúc hoàng hôn.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_287",
+  "area": "Góc cua phố Thế Lữ ven sông Tam Bạc (phường Thế Lữ, Hồng Bàng), nơi phố giao với một ngõ nhỏ; một bên là dãy nhà hàng, một bên là kè sông có lan can.",
+  "sidewalk": "Vỉa hè lát gạch caro ô vuông xen kẽ đỏ terracotta và xám, rộng khoảng 3-4 m, có bó vỉa xám sát mép đường.",
+  "buildings": [
+   {
+    "heading": 0,
+    "style": "shophouse/nhà hàng góc",
+    "floors": 3,
+    "color": "vàng kem",
+    "width_m": 20,
+    "features": "Nhà hàng góc bo tròn, biển xanh lá 'DÂN CHỦ', mái hiên (awning) xanh, ban công lan can sắt, tầng trệt kính; billboard cổ động khổ lớn dựng trên nóc"
+   },
+   {
+    "heading": 270,
+    "style": "tường hông bê tông + kho tôn",
+    "floors": 4,
+    "color": "xám bê tông / tôn trắng",
+    "width_m": 25,
+    "features": "Mảng tường hông bê tông trơn cao không cửa sổ, cạnh là nhà kho mái tôn trắng thấp"
+   },
+   {
+    "heading": 90,
+    "style": "nhà ống",
+    "floors": 6,
+    "color": "trắng",
+    "width_m": 12,
+    "features": "Dãy nhà ống mới cao tầng phía cuối phố, ban công lan can sắt"
+   }
+  ],
+  "landmarks": [
+   "Nhà hàng Dân Chủ",
+   "Nhà hàng Thế Lữ (băng rôn đỏ ven kè)"
+  ],
+  "vehicles": "Xe máy đỗ thành hàng dày trước nhà hàng, vài xe máy chạy, ô tô con màu tối trên đường, xe đạp công cộng (bike-share) màu xanh đỗ ven kè.",
+  "vegetation": "Cây bóng mát ven kè, hoa giấy (bougainvillea) tím-hồng rủ trên khung, nhiều chậu cây cảnh trước nhà hàng.",
+  "street_furniture": [
+   "Cột đèn đường cao cần vươn (đèn LED)",
+   "Cột bollard sọc đỏ-trắng ở góc cua",
+   "Lan can sắt đen ven sông",
+   "Tủ/thùng tái chế màu xanh tím ghi 'AFANI'",
+   "Giá xe đạp công cộng"
+  ],
+  "banners": [
+   "VIỆT NAM TIẾN LÊN (billboard cổ động trên nóc nhà hàng)",
+   "DÂN CHỦ",
+   "NHÀ HÀNG ... THẾ LỮ (băng rôn đỏ)"
+  ],
+  "special": [
+   "Giàn khung sắt đen treo các dải băng rôn đỏ trang trí ở mép kè sông (thuộc nhà hàng Thế Lữ)",
+   "Cột bollard sọc đỏ-trắng ở góc cua"
+  ],
+  "summary": "Góc cua đầu phố Thế Lữ ven sông Tam Bạc với nhà hàng góc màu vàng kem 'Dân Chủ' mang billboard cổ động 'Việt Nam Tiến Lên' trên nóc, đối diện là kè sông trang trí băng rôn đỏ. Vỉa hè gạch caro đỏ-xám.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_288",
+  "area": "Đoạn phố Thế Lữ ven kè sông Tam Bạc, có một lô đất trống/công trường nhỏ xen giữa các nhà mới.",
+  "sidewalk": "Vỉa hè lát gạch caro đỏ-xám, rộng khoảng 3-4 m.",
+  "buildings": [
+   {
+    "heading": 270,
+    "style": "shophouse mới",
+    "floors": 5,
+    "color": "kem/be",
+    "width_m": 12,
+    "features": "Tòa nhà mới ốp đá marble/travertine tầng trệt, cửa cuốn kính (mặt bằng trống), ban công lan can sắt, chậu cây; kế bên là tường hông bê tông xám cao"
+   },
+   {
+    "heading": 90,
+    "style": "nhà ống",
+    "floors": 5,
+    "color": "trắng",
+    "width_m": 30,
+    "features": "Dãy nhà ống liền kề có ban công, cửa cuốn; một mặt tường có chữ 'Hải Phòng' màu xanh (tranh tường)"
+   }
+  ],
+  "landmarks": [],
+  "vehicles": "Ô tô con đỗ (Toyota Camry bạc, hatchback Hyundai bạc), xe bán tải Ford Ranger trắng, vài ô tô con màu tối chạy trên đường, xe máy.",
+  "vegetation": "Cây bóng mát lớn ven kè (cây mới trồng có cọc chống), cây quất/kim quất trong chậu, hoa giấy.",
+  "street_furniture": [
+   "Cột đèn đường",
+   "Tủ điện màu xám trên bệ gạch",
+   "Lan can sắt đen ven sông",
+   "Cột đèn trang trí ven kè",
+   "Thùng/xe rác phủ bạt xanh lá"
+  ],
+  "banners": [
+   "Hải Phòng (chữ xanh trên tranh tường)"
+  ],
+  "special": [],
+  "summary": "Đoạn phố Thế Lữ ven sông Tam Bạc với một lô đất trống còn tập kết vật liệu, xen giữa các nhà ống trắng và tòa ốp đá mới; kè sông có hàng cây mới trồng và lan can sắt đen.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_289",
+  "area": "Bờ kè sông Tam Bạc trên phố Thế Lữ, cụm quán bar/nhà hàng 'Sky Beer', tại ngã ba với một ngõ nhỏ (ảnh chụp 11/2020).",
+  "sidewalk": "Vỉa hè lát gạch caro đỏ-xám, rộng khoảng 3-4 m.",
+  "buildings": [
+   {
+    "heading": 270,
+    "style": "nhà hàng/rooftop bar",
+    "floors": 3,
+    "color": "be/nâu",
+    "width_m": 18,
+    "features": "Sky Beer rooftop bar & restaurant: biển 'Sky Beer' logo cốc bia, chữ 'SILVER' trên nóc, biển Heineken xanh + ngôi sao đỏ, 'STRONGBOW', ban công trồng hoa giấy hồng, ghế mây, tầng trệt kính đen"
+   },
+   {
+    "heading": 0,
+    "style": "bar/lounge",
+    "floors": 3,
+    "color": "trắng, viền cam",
+    "width_m": 15,
+    "features": "Linked Bar & Lounge: logo chữ hồng/magenta neon, chữ 'Bar & Lounge' xanh neon, biển Heineken, cờ đỏ Việt Nam, tầng trệt kính đang cho thuê (dán giấy vàng)"
+   }
+  ],
+  "landmarks": [
+   "Sky Beer (rooftop bar & restaurant)",
+   "SILVER",
+   "Linked Bar & Lounge",
+   "Heineken"
+  ],
+  "vehicles": "Xe máy đỗ thành hàng (phủ bạt đỏ 'Sky Beer'), hai người đang dắt/đứng cạnh xe máy, người đi xe điện màu xanh.",
+  "vegetation": "Hàng cây liễu rủ ven kè, cây mới trồng có cọc chống, hoa giấy hồng trên ban công.",
+  "street_furniture": [
+   "Lan can sắt đen ven sông",
+   "Cột đèn trang trí kiểu cổ điển đôi bóng (đen/xanh)",
+   "Cột cờ có cờ Tổ quốc",
+   "Ghế băng gỗ",
+   "Cột đèn đường",
+   "Băng rôn xanh khẩu hiệu gắn trên lan can kè"
+  ],
+  "banners": [
+   "BÁC LÀ NGƯỜI... (băng rôn xanh khẩu hiệu Hồ Chí Minh trên lan can kè)",
+   "Sky Beer",
+   "Heineken",
+   "STRONGBOW",
+   "Linked Bar & Lounge"
+  ],
+  "special": [
+   "Cột cờ với cờ Tổ quốc ở bờ kè",
+   "Cột đèn trang trí đôi bóng kiểu cổ điển dọc promenade"
+  ],
+  "summary": "Bờ kè sông Tam Bạc rợp liễu rủ trên phố Thế Lữ, với quán rooftop 'Sky Beer' (Heineken, Strongbow) và 'Linked Bar & Lounge' ở hai góc ngã ba; cột đèn cổ điển và khẩu hiệu ven kè.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_290",
+  "area": "Góc phố Thế Lữ ven kè sông Tam Bạc (số 11), gần ngã ba, cụm hàng quán ăn uống.",
+  "sidewalk": "Vỉa hè lát gạch caro đỏ-xám, rộng khoảng 3-4 m, có vạch qua đường.",
+  "buildings": [
+   {
+    "heading": 0,
+    "style": "nhà hàng góc",
+    "floors": 4,
+    "color": "cam terracotta",
+    "width_m": 15,
+    "features": "Bánh Tráng Phú Minh: mặt tiền cam rực, biển đỏ 'Bánh Tráng Phú Minh' logo xe máy xanh, khẩu hiệu 'PHÚ MINH - Cuốn ngon chuẩn vị!', ảnh món ăn ốp mặt tiền, biển đứng xanh 'PHÚ MINH', ban công hoa giấy hồng, tầng trệt kính"
+   },
+   {
+    "heading": 0,
+    "style": "quán chè/giải khát",
+    "floors": 3,
+    "color": "trắng, biển xanh lá",
+    "width_m": 6,
+    "features": "Biển xanh 'CHÈ CÔ CẨM' (Trà - Café - Sinh tố - Nước ép - Chè)"
+   },
+   {
+    "heading": 270,
+    "style": "nhà hàng/bar",
+    "floors": 3,
+    "color": "be/nâu",
+    "width_m": 16,
+    "features": "Sky Beer: biển cốc bia, 'Hoegaarden', ban công hoa giấy, chảo K+, cửa cuốn, biển cấm màu xanh"
+   }
+  ],
+  "landmarks": [
+   "Bánh Tráng Phú Minh",
+   "Chè Cô Cẩm",
+   "Sky Beer",
+   "Hoegaarden"
+  ],
+  "vehicles": "Xe máy đỗ dày trước quán (có xe đỏ nổi bật), ô tô con đỗ ven kè (Mazda SUV màu tối, SUV đỏ, xe trắng), vài ô tô chạy.",
+  "vegetation": "Cây bóng mát ven kè, cọ/cây trong chậu, hoa giấy hồng trên ban công.",
+  "street_furniture": [
+   "Cột đèn đường cao",
+   "Lan can sắt đen ven sông",
+   "Cột đèn trang trí ven kè",
+   "Tủ điện",
+   "Chậu cây trang trí",
+   "Vạch qua đường"
+  ],
+  "banners": [
+   "PHÚ MINH - Cuốn ngon chuẩn vị!",
+   "Bánh Tráng Phú Minh",
+   "CHÈ CÔ CẨM",
+   "Sky Beer",
+   "Hoegaarden"
+  ],
+  "special": [],
+  "summary": "Góc phố Thế Lữ với nhà hàng góc màu cam rực 'Bánh Tráng Phú Minh' và quán 'Chè Cô Cẩm', đối diện quán 'Sky Beer'; bên kia là kè sông Tam Bạc với hàng cây và lan can sắt đen.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_291",
+  "area": "Đoạn phố Thế Lữ ven kè sông Tam Bạc, trước một ngôi đền có sân bày cây cảnh.",
+  "sidewalk": "Vỉa hè và sân đền lát gạch caro đỏ-xám, rộng, bày nhiều chậu cảnh trên bệ.",
+  "buildings": [
+   {
+    "heading": 0,
+    "style": "đền/kiến trúc tôn giáo truyền thống",
+    "floors": 2,
+    "color": "đỏ - vàng",
+    "width_m": 18,
+    "features": "Đền Bát Tràng: mái ngói cong đầu đao trang trí rồng, ba cửa vòm sơn đỏ, biển vàng chữ Việt, tượng Quan Âm/Bồ Tát trên mặt tiền đỏ, dây cờ ngũ sắc Phật giáo giăng ngang, cột cờ"
+   },
+   {
+    "heading": 0,
+    "style": "nhà hàng/bar",
+    "floors": 3,
+    "color": "xanh dương",
+    "width_m": 6,
+    "features": "Mặt tiền xanh dương 'COOLER CITY' với hình mascot hoạt hình"
+   },
+   {
+    "heading": 90,
+    "style": "nhà ống",
+    "floors": 5,
+    "color": "trắng",
+    "width_m": 20,
+    "features": "Dãy nhà ống trắng có ban công lan can sắt bao quanh đền"
+   }
+  ],
+  "landmarks": [
+   "Đền Bát Tràng (thờ Đức Vua Cha Bát Hải)",
+   "Cooler City"
+  ],
+  "vehicles": "Ô tô con màu tối chạy trên đường, xe máy đỗ, người đi xe máy/xe điện màu xanh.",
+  "vegetation": "Rất nhiều cây cảnh bonsai trong chậu sứ lớn bày trước đền, cây cọ, hoa giấy; cây bóng mát ven kè.",
+  "street_furniture": [
+   "Cột đèn/cột cờ cao sọc đỏ-trắng",
+   "Lan can sắt đen ven sông",
+   "Cột đèn trang trí ven kè",
+   "Bệ trang trí đế đỏ đặt chậu cảnh",
+   "Xe đẩy hàng rong màu hồng/tím",
+   "Dây cờ ngũ sắc Phật giáo"
+  ],
+  "banners": [
+   "ĐỀN BÁT TRÀNG - THỜ ĐỨC VUA CHA BÁT HẢI",
+   "COOLER CITY",
+   "0906.240761 - 0782120782"
+  ],
+  "special": [
+   "Đền Bát Tràng (mái đầu đao chạm rồng, tượng Quan Âm, dây cờ ngũ sắc) - công trình cần dựng riêng",
+   "Dãy chậu bonsai/cây cảnh lớn trên bệ trang trí đế đỏ trước đền",
+   "Xe đẩy hàng rong màu hồng/tím"
+  ],
+  "summary": "Điểm nhấn của đoạn phố: Đền Bát Tràng thờ Đức Vua Cha Bát Hải với mái đầu đao chạm rồng, tượng Quan Âm và dây cờ ngũ sắc Phật giáo, sân bày dày chậu bonsai; kế bên là quán 'Cooler City' mặt tiền xanh, đối diện kè sông Tam Bạc.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_292",
+  "area": "Đoạn phố Thế Lữ ven kè sông Tam Bạc, trước tổ hợp bar/lounge 'LUCKY'.",
+  "sidewalk": "Vỉa hè lát gạch caro đỏ-xám, rộng khoảng 3-4 m.",
+  "buildings": [
+   {
+    "heading": 0,
+    "style": "bar/lounge hiện đại (công nghiệp)",
+    "floors": 3,
+    "color": "gỉ sét/nâu cam + xám đậm",
+    "width_m": 16,
+    "features": "LUCKY COMPLEX: ốp thép corten màu gỉ sét đục lỗ chấm bi, mặt xám đậm, mái đua (canopy) vươn ra, biển chữ 'LUCKY'; tầng trệt có khối điêu khắc hình quả trứng/hạt đậu mạ gương phản chiếu và ghế bar"
+   },
+   {
+    "heading": 270,
+    "style": "nhà ống",
+    "floors": 4,
+    "color": "trắng",
+    "width_m": 12,
+    "features": "Nhà ống trắng cửa cuốn xám (số 7-8), ban công lan can sắt, vòng hoa/garland treo trên cửa, mái che/carport có xe máy đỗ bên dưới"
+   },
+   {
+    "heading": 90,
+    "style": "nhà ống/shophouse",
+    "floors": 4,
+    "color": "trắng",
+    "width_m": 10,
+    "features": "Dãy nhà ống có biển hồng 'Vivian', dù/parasol trước cửa"
+   }
+  ],
+  "landmarks": [
+   "Lucky Complex (bar/lounge)",
+   "Vivian"
+  ],
+  "vehicles": "Ô tô con màu trắng đỗ ven đường, xe máy chạy và đỗ, người đi xe máy.",
+  "vegetation": "Cây bóng mát ven kè (một cây thân lớn bị cắt cụt đang nảy chồi, một cây tán xanh), cây/hoa trong chậu.",
+  "street_furniture": [
+   "Cột đèn đường cao",
+   "Lan can sắt đen ven sông",
+   "Biển chữ kim loại đỏ 'LUCKY COMPLEX' gắn trên lan can kè",
+   "Cột đèn trang trí ven kè",
+   "Vạch qua đường",
+   "Tủ điện"
+  ],
+  "banners": [
+   "LUCKY",
+   "LUCKY COMPLEX",
+   "Vivian"
+  ],
+  "special": [
+   "Khối điêu khắc mạ gương hình quả trứng/hạt đậu (mirror pebble) đặt trước bar Lucky",
+   "Mặt đứng thép corten đục lỗ chấm bi của tòa Lucky",
+   "Biển chữ kim loại đỏ 'LUCKY COMPLEX' dựng trên bờ kè"
+  ],
+  "summary": "Đoạn phố Thế Lữ nổi bật với tổ hợp bar hiện đại 'LUCKY' ốp thép corten đục lỗ và khối điêu khắc mạ gương hình quả trứng ở tầng trệt; biển đỏ 'LUCKY COMPLEX' dựng trên bờ kè sông Tam Bạc, đối diện là dãy nhà ống trắng.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_293",
+  "area": "Phố Thế Lữ, ven sông (kênh) Tam Bạc — đoạn phố cà phê/thương mại sát bờ kè, có lối vào một đền thờ. Thanh địa chỉ ghi 'P. Thế Lữ, Haiphong, Hải Phòng'.",
+  "sidewalk": "Vỉa hè và mặt bờ kè lát gạch caro đỏ-xám (khối vuông xen kẽ đỏ/xám), rộng khoảng 4-5 m.",
+  "buildings": [
+   {
+    "heading": 0,
+    "style": "nhà ống café (shophouse)",
+    "floors": 4,
+    "color": "trắng",
+    "width_m": 6,
+    "features": "café tầng trệt, biển chữ vàng 'HUY Co' và 'Café', ban công lan can sắt, giàn cây leo"
+   },
+   {
+    "heading": 0,
+    "style": "cổng/đền thờ mái tôn",
+    "floors": 1,
+    "color": "đỏ",
+    "width_m": 8,
+    "features": "cổng mái tôn đỏ treo băng rôn tên đền, cờ hội ngũ sắc và cờ đuôi nheo; phía sau có hàng rào lưới thép"
+   },
+   {
+    "heading": 270,
+    "style": "dãy nhà ống café liền kề",
+    "floors": 5,
+    "color": "trắng/kem",
+    "width_m": 22,
+    "features": "nhiều quán café (HUY Co, VIP COFFEE, TINA COFFEE), mái hiên bạt xanh, ban công, chậu cây cảnh"
+   },
+   {
+    "heading": 180,
+    "style": "dãy nhà phố cũ bên kia sông (bờ đối diện)",
+    "floors": 4,
+    "color": "nhiều màu (vàng, kem, xanh)",
+    "features": "nhà phố cũ san sát, biển hiệu nhỏ, mái ngói/mái bằng"
+   }
+  ],
+  "landmarks": [
+   "Đền Ấn Khánh Long (băng rôn 'ĐỀN ẤN KHÁNH LONG — thờ Thánh Trần Hưng Đạo')",
+   "HUY Coffee"
+  ],
+  "vehicles": "Xe máy chạy trên đường, xe tải nhỏ màu xanh, vài ô tô con; mật độ thưa.",
+  "vegetation": "Cau cảnh và cây cảnh trồng chậu trước quán; cây bóng mát mới trồng dọc bờ kè.",
+  "street_furniture": [
+   "Cột đèn trang trí kiểu cổ màu xanh rêu dọc bờ sông",
+   "Lan can sắt hoa văn ven sông",
+   "Cột điện và dây điện",
+   "Họng cứu hỏa màu đỏ",
+   "Hàng rào tôn cũ (lô đất trống)",
+   "Miệng cống thoát nước có song sắt",
+   "Bọc/thùng phủ bạt xanh"
+  ],
+  "banners": [
+   "ĐỀN ẤN KHÁNH LONG",
+   "THỜ THÁNH TRẦN HƯNG ĐẠO",
+   "HUY Co",
+   "Café",
+   "VIP COFFEE",
+   "TINA COFFEE"
+  ],
+  "special": [
+   "Cổng đền mái tôn đỏ treo cờ hội ngũ sắc và cờ đuôi nheo",
+   "Ô/dù che nắng lớn của quán café ven sông"
+  ],
+  "summary": "Đoạn phố Thế Lữ ven kênh Tam Bạc với dãy nhà ống café (HUY Coffee, VIP/TINA Coffee) và lối vào đền Ấn Khánh Long treo cờ hội; bờ kè lát gạch caro đỏ-xám, lan can sắt và cột đèn cổ xanh rêu, nhìn sang dãy nhà phố cũ bên kia sông.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_294",
+  "area": "Phố Thế Lữ ven sông Tam Bạc — đoạn quán ăn/cà phê và nhà hàng hải sản; có vạch sang đường. Thanh địa chỉ 'P. Thế Lữ, Haiphong, Hải Phòng'.",
+  "sidewalk": "Vỉa hè và bờ kè lát gạch caro đỏ-xám, rộng khoảng 4-5 m; có vạch kẻ đi bộ qua đường.",
+  "buildings": [
+   {
+    "heading": 0,
+    "style": "nhà ống café (shophouse)",
+    "floors": 4,
+    "color": "trắng, biển đen",
+    "width_m": 6,
+    "features": "quán 'Coffee GIANG', biển đen chữ trắng ghi 'ĐC:17/15 Thế Lữ — ĐT:0347 456 468', ô dù pastel nhiều màu, bàn ghế café, chậu cây"
+   },
+   {
+    "heading": 0,
+    "style": "quán nướng/lẩu (shophouse)",
+    "floors": 4,
+    "color": "biển đen chữ vàng",
+    "width_m": 8,
+    "features": "biển 'XÓT — NƯỚNG & LẦU', mái hiên bạt xanh, đèn dây, dù bạt 'THÔNG KIM'"
+   },
+   {
+    "heading": 0,
+    "style": "nhà ống dịch vụ làm đẹp",
+    "floors": 4,
+    "color": "trắng",
+    "width_m": 5,
+    "features": "biển 'Cici Beauty' bên phải khung hình"
+   },
+   {
+    "heading": 270,
+    "style": "nhà hàng hải sản có cổng vòm sắt",
+    "floors": 1,
+    "color": "khung sắt đen",
+    "width_m": 10,
+    "features": "cổng vòm sắt, đỉnh gắn mô hình con cua đỏ lớn phát sáng"
+   }
+  ],
+  "landmarks": [
+   "Coffee GIANG",
+   "Nướng & Lẩu (Xót)",
+   "Cici Beauty",
+   "Nhà hàng hải sản (biểu tượng con cua đỏ)"
+  ],
+  "vehicles": "Xe máy đỗ và chạy; có xe máy gắn ô/dù bán hàng rong ven sông; vài ô tô con; mật độ thưa.",
+  "vegetation": "Chậu cây cảnh trước quán; cây bóng mát mới trồng có cọc gỗ chống dọc bờ kè.",
+  "street_furniture": [
+   "Cột đèn LED cần cong hiện đại",
+   "Cột đèn trang trí cổ xanh rêu ven sông",
+   "Lan can sắt hoa văn ven sông",
+   "Cột điện và dây",
+   "Biển pano dọc màu đỏ",
+   "Cây có khung cọc gỗ chống",
+   "Bọc bạt xanh"
+  ],
+  "banners": [
+   "Coffee GIANG",
+   "NƯỚNG & LẦU",
+   "XÓT",
+   "THÔNG KIM",
+   "Cici Beauty"
+  ],
+  "special": [
+   "Cổng vòm sắt của nhà hàng hải sản với mô hình con cua đỏ lớn trên đỉnh",
+   "Cụm ô/dù pastel nhiều màu của quán Coffee Giang"
+  ],
+  "summary": "Đoạn phố Thế Lữ ven Tam Bạc tập trung quán ăn — cà phê (Coffee Giang, Nướng & Lẩu Xót) và nhà hàng hải sản có cổng vòm gắn con cua đỏ; bờ kè lát gạch caro với cột đèn cổ và cây mới trồng chống cọc.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_295",
+  "area": "Phố Thế Lữ ven sông Tam Bạc — dãy shophouse cà phê/trà sữa, hàng cây phượng lớn dọc bờ kè. Thanh địa chỉ 'P. Thế Lữ, Haiphong, Hải Phòng'.",
+  "sidewalk": "Vỉa hè và bờ kè lát gạch caro đỏ-xám, rộng khoảng 4 m.",
+  "buildings": [
+   {
+    "heading": 0,
+    "style": "dãy nhà ống café liền kề",
+    "floors": 5,
+    "color": "kem/trắng, biển xanh",
+    "width_m": 18,
+    "features": "quán 'NO. 1987' biển xanh dài 'COFFFEE - MILK TEA - SMOOTHIE - COCKTAIL & MORE', ghi 'Add: Số 11 Lô 16 Phố Tô Thế Lữ - Hải Phòng'; cửa cuốn; số nhà 9 và 10; dù xanh lá, bàn ghế café trắng; ban công lan can sắt"
+   },
+   {
+    "heading": 270,
+    "style": "nhà ống ở/kinh doanh",
+    "floors": 4,
+    "color": "trắng, ốp đá phần trệt",
+    "width_m": 6,
+    "features": "cửa gỗ, ban công lan can sắt, chậu cây, dù đỏ, cửa cuốn; biển số nhà 9 màu xanh"
+   }
+  ],
+  "landmarks": [
+   "Quán café 'NO. 1987' (COFFEE - MILK TEA - SMOOTHIE - COCKTAIL)"
+  ],
+  "vehicles": "Ô tô con đỗ ven đường (trắng, đen sedan), nhiều xe máy đỗ (có xe đỏ); mật độ vừa.",
+  "vegetation": "Hàng cây phượng vĩ lớn tán rộng lá kép dọc bờ kè; chậu cây cảnh.",
+  "street_furniture": [
+   "Lan can sắt hoa văn ven sông",
+   "Ghế đá/bê tông",
+   "Cột đèn",
+   "Cột điện và dây",
+   "Miệng cống thoát nước có khung sắt"
+  ],
+  "banners": [
+   "COFFFEE - MILK TEA - SMOOTHIE - COCKTAIL & MORE",
+   "NO. 1987"
+  ],
+  "special": [],
+  "summary": "Đoạn phố Thế Lữ với dãy nhà ống café/trà sữa (nổi bật quán 'NO. 1987') và hàng cây phượng vĩ lớn rợp bóng bờ kè Tam Bạc; xe cộ đỗ khá nhiều dọc hai bên.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_296",
+  "area": "Số 45 Phố Thế Lữ, ven sông Tam Bạc — dãy nhà ống cao mới xây, có tiệm bánh. Thanh địa chỉ '45 P. Thế Lữ, Haiphong, Hải Phòng'.",
+  "sidewalk": "Vỉa hè và bờ kè lát gạch caro đỏ-xám, rộng khoảng 4 m.",
+  "buildings": [
+   {
+    "heading": 0,
+    "style": "nhà ống cao tầng (shophouse mới)",
+    "floors": 6,
+    "color": "trắng, mặt tiền trệt hồng",
+    "width_m": 6,
+    "features": "tiệm bánh 'HA MY Bakery / Holly girl Bakery' mặt tiền hồng, cửa vòm hồng viền hoa, bàn ghế café trắng nhỏ; ban công lan can sắt, cờ đỏ sao vàng, đèn lồng đỏ, chậu cây"
+   },
+   {
+    "heading": 270,
+    "style": "dãy nhà ống liền kề",
+    "floors": 5,
+    "color": "trắng",
+    "width_m": 16,
+    "features": "cửa cuốn, ban công, chậu cây, cờ đỏ; có biển xanh 'KEM TRÀNG TIỀN' (quán kem)"
+   },
+   {
+    "heading": 180,
+    "style": "dãy nhà phố cũ bên kia sông",
+    "floors": 4,
+    "color": "nhiều màu",
+    "features": "nhà phố cũ san sát, mái hiên bạt xanh"
+   }
+  ],
+  "landmarks": [
+   "HA MY Bakery / Holly girl Bakery",
+   "Kem Tràng Tiền"
+  ],
+  "vehicles": "Ô tô con đỗ dày ven đường (Hyundai Kona trắng, Mercedes trắng, xe đen), xe máy đỗ; mật độ vừa-đông.",
+  "vegetation": "Cây bóng mát mới trồng có cọc gỗ chống dọc bờ kè; có khúc gỗ cây bị chặt để trên vỉa hè; chậu cây cảnh trên ban công.",
+  "street_furniture": [
+   "Cột đèn LED cần cong hiện đại",
+   "Cột đèn trang trí cổ xanh rêu ven sông",
+   "Lan can sắt hoa văn ven sông",
+   "Tủ điện màu xám",
+   "Biển pano dọc màu đỏ",
+   "Đèn lồng đỏ treo lan can",
+   "Ghế bê tông",
+   "Chữ sơn đỏ 'DUY ĐA' trên tường lô bên"
+  ],
+  "banners": [
+   "HA MY Bakery",
+   "KEM TRÀNG TIỀN",
+   "DUY ĐA (chữ sơn tường)"
+  ],
+  "special": [
+   "Mặt tiền tiệm bánh màu hồng, cửa vòm trang trí hoa (HA MY / Holly girl Bakery)"
+  ],
+  "summary": "Số 45 phố Thế Lữ với dãy nhà ống cao mới xây; nổi bật tiệm bánh HA MY mặt tiền hồng cửa vòm hoa và quán Kem Tràng Tiền; bờ kè Tam Bạc lát gạch caro, cây mới trồng chống cọc, nhìn sang khu nhà phố cũ bên kia sông.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_297",
+  "area": "Số 45 Phố Thế Lữ, ven sông Tam Bạc — dãy nhà ống mới, có cửa hàng máy lọc nước và tiệm trà chanh; cạnh lô đất trống rào tôn. Thanh địa chỉ '45 P. Thế Lữ'.",
+  "sidewalk": "Vỉa hè và bờ kè lát gạch caro đỏ-xám, rộng khoảng 4 m.",
+  "buildings": [
+   {
+    "heading": 0,
+    "style": "nhà ống (shophouse mới)",
+    "floors": 5,
+    "color": "trắng, khung cửa ốp đá đen",
+    "width_m": 6,
+    "features": "tầng trệt cửa kính khung đá hoa cương đen; biển xanh 'MÁY ĐIỆN GIẢI ION KIỀM ... NHẬT BẢN / VĂN PHÒNG GIỚI THIỆU'; cửa cuốn; ban công lan can sắt, chậu cây"
+   },
+   {
+    "heading": 0,
+    "style": "nhà ống quán giải khát",
+    "floors": 4,
+    "color": "trắng, biển gỗ nâu",
+    "width_m": 5,
+    "features": "biển 'TIỆM TRÀ CHANH' bên phải khung hình"
+   },
+   {
+    "heading": 270,
+    "style": "lô đất trống rào tôn",
+    "floors": 1,
+    "color": "tôn đỏ",
+    "width_m": 12,
+    "features": "hàng rào tôn đỏ có chữ sơn 'DUY ĐA', vật liệu xây dựng xếp bên trong"
+   },
+   {
+    "heading": 180,
+    "style": "dãy nhà phố cũ bên kia sông",
+    "floors": 4,
+    "color": "nhiều màu",
+    "features": "nhà phố cũ san sát, mái hiên bạt xanh"
+   }
+  ],
+  "landmarks": [
+   "Cửa hàng 'Máy điện giải ion kiềm Nhật Bản'",
+   "Tiệm Trà Chanh"
+  ],
+  "vehicles": "Ô tô con đỗ ven đường (Camry đen, Mazda CX-5 trắng, Mercedes trắng), xe máy đỗ; mật độ vừa.",
+  "vegetation": "Cây mới trồng dọc bờ kè (có một cây trơ trụi lá); chậu cây cảnh trên ban công.",
+  "street_furniture": [
+   "Cột đèn LED cần cong hiện đại",
+   "Cột đèn trang trí cổ xanh rêu ven sông",
+   "Lan can sắt hoa văn ven sông có chậu cây",
+   "Tủ điện màu xám",
+   "Biển pano dọc màu đỏ",
+   "Ghế bê tông",
+   "Hàng rào tôn đỏ (lô đất trống)"
+  ],
+  "banners": [
+   "MÁY ĐIỆN GIẢI ION KIỀM ... NHẬT BẢN",
+   "VĂN PHÒNG GIỚI THIỆU",
+   "TIỆM TRÀ CHANH",
+   "DUY ĐA (chữ sơn tôn)"
+  ],
+  "special": [],
+  "summary": "Đoạn 45 phố Thế Lữ với nhà ống mới có cửa hàng máy điện giải ion kiềm Nhật Bản và tiệm trà chanh, cạnh một lô đất trống rào tôn đỏ; bờ kè Tam Bạc lát gạch caro, lan can sắt và cột đèn cổ, nhìn sang khu nhà phố cũ bên kia sông.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_298",
+  "area": "Ven sông Tam Bạc gần quán 'Gió Mùa Coffee HP' — đoạn còn lô đất trống và đang thi công, hàng cây liễu rủ dọc bờ kè. Thanh địa chỉ 'Gió mùa coffee HP'; ảnh chụp 11/2020 (cũ hơn các pano khác).",
+  "sidewalk": "Vỉa hè và bờ kè lát gạch caro đỏ-xám, rộng khoảng 4-5 m; có ký hiệu sơn 'T2/19' trên bó vỉa.",
+  "buildings": [
+   {
+    "heading": 0,
+    "style": "nhà ống café (shophouse)",
+    "floors": 3,
+    "color": "trắng",
+    "width_m": 7,
+    "features": "quán 'GIÓ MÙA COFFEE' (logo chữ G trong lục giác), mái bạt cuốn sọc cam-trắng; ban công lan can sắt hoa văn, cửa gỗ đỏ; ô dù bãi biển nhiều màu, bàn ghế gỗ; biển 'ICE DREAM/ICE CREAM'"
+   },
+   {
+    "heading": 270,
+    "style": "nhà ống ở/kinh doanh",
+    "floors": 3,
+    "color": "trắng, lan can đồng/vàng bóng",
+    "width_m": 7,
+    "features": "ban công lan can đồng/vàng, cửa gỗ đỏ, cửa cuốn; biển đứng 'SINH TỐ - NƯỚC ÉP - TRÀ SỮA - TRÀ CHANH / ICE CREAM'; cạnh lô đất trống đang thi công"
+   },
+   {
+    "heading": 180,
+    "style": "dãy nhà phố cũ bên kia sông",
+    "floors": 4,
+    "color": "nhiều màu (xanh, vàng)",
+    "features": "nhà phố cũ san sát bên kia Tam Bạc"
+   }
+  ],
+  "landmarks": [
+   "Gió Mùa Coffee HP"
+  ],
+  "vehicles": "Xe máy chạy (người lái áo xanh đội mũ bảo hiểm); công trường có máy xúc màu cam và xe tải ben xanh đang thi công; mật độ thưa.",
+  "vegetation": "Hàng cây liễu rủ (cành buông) dọc bờ kè; cây mới trồng có cọc chống; chậu hoa giấy đỏ đặt trên lan can.",
+  "street_furniture": [
+   "Cột đèn LED cần cong hiện đại",
+   "Cột đèn trang trí cổ ven sông",
+   "Lan can sắt hoa văn ven sông có chậu hoa",
+   "Ghế bê tông",
+   "Biển pano dọc màu đỏ",
+   "Hàng rào tre/gỗ tạm quanh lô đất trống"
+  ],
+  "banners": [
+   "GIÓ MÙA COFFEE",
+   "ICE CREAM",
+   "SINH TỐ",
+   "NƯỚC ÉP",
+   "TRÀ SỮA",
+   "TRÀ CHANH"
+  ],
+  "special": [
+   "Cụm ô/dù bãi biển nhiều màu của quán Gió Mùa Coffee",
+   "Công trường đang thi công với máy xúc cam và xe tải ben"
+  ],
+  "summary": "Đoạn bờ kè Tam Bạc quanh quán Gió Mùa Coffee (ảnh 11/2020), khu vực còn lô đất trống và đang thi công (máy xúc, xe ben); hàng cây liễu rủ và chậu hoa giấy đỏ ven kè, ô dù nhiều màu trước quán café/kem.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_305",
+  "area": "Cổng chính Nhà máy X46 - Hải quân trên phố Phan Đình Phùng (địa chỉ hiển thị 35 Phan Đình Phùng); phía trước tường và cổng doanh trại quân đội, sân bê tông rộng.",
+  "sidewalk": "Không có vỉa hè lát gạch rõ; chủ yếu là mặt sân/đường bê tông - nhựa trước cổng, mép đường có bó vỉa bê tông xám. Bên phố (h180) lề đường bê tông.",
+  "buildings": [
+   {
+    "heading": 90,
+    "style": "Nhà công sở kiểu Pháp (thuộc địa)",
+    "floors": 2,
+    "color": "vàng kem",
+    "width_m": 40,
+    "features": "Hành lang vòm chạy dài, lan can con tiện (balustrade) màu trắng, mái bằng, treo cờ đỏ sao vàng và cờ đỏ, có cây cau trong sân"
+   },
+   {
+    "heading": 0,
+    "style": "Tường rào doanh trại + trụ cổng",
+    "floors": 1,
+    "color": "vàng đậm (ochre)",
+    "width_m": 30,
+    "features": "Tường rào cao màu vàng, trụ cổng ốp đá granite xám gắn biển đỏ, cổng sắt, trên đỉnh trụ có ô đèn lồng vuông"
+   }
+  ],
+  "landmarks": [
+   "Nhà máy X46 - Hải quân (Công ty TNHH MTV Đóng và Sửa chữa tàu Hải Long)",
+   "Trung tâm Kỹ thuật Hải quân",
+   "Doanh trại Quân đội Nhân dân Việt Nam"
+  ],
+  "vehicles": "Xe tải nhỏ đỗ trong sân nhà máy; xe tải đỗ ven phố (h180/h90); một người mặc áo xanh đứng gần cổng.",
+  "vegetation": "Cây cau/dừa cảnh trong khuôn viên, cây bàng - xà cừ lớn ven đường, hoa giấy (bougainvillea) hồng rủ, hàng cây xanh rậm.",
+  "street_furniture": [
+   "Cột điện với nhiều dây chằng chịt",
+   "Bốt gác (guard booth) màu xanh mint/xám",
+   "Cổng sắt lớn",
+   "Trụ cổng đá granite gắn biển",
+   "Biển tên phố xanh 'PHỐ PHAN ĐÌNH PHÙNG' (h180)",
+   "Cột điện có giàn máy biến áp (transformer) lớn (h180)"
+  ],
+  "banners": [
+   "DOANH TRẠI QUÂN ĐỘI NHÂN DÂN VIỆT NAM (băng rôn đỏ chữ vàng, h90)",
+   "Biển đá: NHÀ MÁY X46 - HẢI QUÂN / CÔNG TY TNHH MTV / ĐÓNG VÀ SỬA CHỮA TÀU HẢI LONG (h90)",
+   "Biển đỏ trên trụ cổng: TRUNG TÂM KỸ THUẬT HẢI QUÂN / NHÀ MÁY X46 / X46 FACTORY (h0)"
+  ],
+  "special": [
+   "Bốt gác đầu cổng đặc trưng",
+   "Trụ cổng đá granite có ô đèn lồng trên đỉnh",
+   "Cột điện với giàn máy biến áp lớn dựng ven đường"
+  ],
+  "summary": "Cổng và tường bao Nhà máy X46 - Hải quân trên phố Phan Đình Phùng, nổi bật với tòa công sở kiểu Pháp mái vòm màu vàng, băng rôn doanh trại quân đội và bốt gác. Không gian nhiều cây xanh, ít xe cộ.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_306",
+  "area": "Phố Phan Đình Phùng, đoạn một bên là dãy nhà ở/nhà ống + quán, một bên là tường rào cũ rêu phong của Nhà máy X46.",
+  "sidewalk": "Vỉa hè lát gạch terracotta đỏ rộng ~2-3m bên dãy nhà ở (h0, h90); phía tường nhà máy là nền đất/bê tông có cây bóng mát.",
+  "buildings": [
+   {
+    "heading": 0,
+    "style": "Biệt thự/công sở kiểu Pháp",
+    "floors": 3,
+    "color": "vàng",
+    "width_m": 18,
+    "features": "Cửa chớp gỗ màu xanh lá, mái bằng; kế bên (bên phải) là shophouse hiện đại mặt kính có ban công lan can con tiện"
+   },
+   {
+    "heading": 90,
+    "style": "Nhà ống (shophouse)",
+    "floors": 4,
+    "color": "vàng kem/trắng",
+    "width_m": 16,
+    "features": "Ban công lan can, mặt tiền kính (số 106), tầng trệt có quán treo băng rôn đỏ, mái hiên bạt"
+   }
+  ],
+  "landmarks": [
+   "Tường bao Nhà máy X46 (gián tiếp)"
+  ],
+  "vehicles": "Ô tô đỗ ven đường (h0), xe máy đỗ trên vỉa hè (h90), xe tải nhẹ màu xanh đỗ sát tường nhà máy (h270), người đi bộ.",
+  "vegetation": "Hàng cây bàng/xà cừ thân lớn dọc phố, cây cảnh trong chậu, dây leo trên tường rêu.",
+  "street_furniture": [
+   "Cột điện và dây điện",
+   "Bó vỉa bê tông",
+   "Cổng sắt sơn xanh của nhà máy (h0)",
+   "Lều bạt xanh dựng sát tường (h180)",
+   "Bảng thông báo/áp phích dán trên tường cũ"
+  ],
+  "banners": [
+   "Băng rôn đỏ quán ăn: 'Bún Mọc...' (chỉ đọc rõ 'Bún Mọc', h90)"
+  ],
+  "special": [],
+  "summary": "Đoạn phố Phan Đình Phùng đối lập giữa dãy nhà ống - biệt thự Pháp có vỉa hè gạch đỏ và bức tường rêu phong dài của Nhà máy X46 rợp bóng cây bàng.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_307",
+  "area": "Phố Phan Đình Phùng (số 11) ngay cạnh Ngõ 84; khu dân cư nhà ống, đối diện là khuôn viên một công ty/công sở.",
+  "sidewalk": "Vỉa hè lát gạch terracotta đỏ, có bậc lên nhà và chậu cảnh.",
+  "buildings": [
+   {
+    "heading": 0,
+    "style": "Nhà ống (shophouse)",
+    "floors": 4,
+    "color": "vàng kem, một nhà mặt tiền đỏ",
+    "width_m": 15,
+    "features": "Ban công có hoa giấy hồng, tầng trệt cửa xếp (accordion) kim loại, mái hiên bạt xanh"
+   },
+   {
+    "heading": 180,
+    "style": "Công sở/công ty (tòa văn phòng + nhà 1 tầng)",
+    "floors": 3,
+    "color": "vàng, chân tường đỏ mận",
+    "width_m": 35,
+    "features": "Treo cờ đỏ, cổng vòm với cổng sắt kéo, trụ cổng có quả cầu trang trí, sân rộng có xe tải"
+   }
+  ],
+  "landmarks": [
+   "Ngõ 84 Phan Đình Phùng (biển ngõ)",
+   "Công ty (biển 'CÔNG TY...' không đọc rõ, phía sân có xe tải)"
+  ],
+  "vehicles": "Xe máy đỗ dọc vỉa hè, xe tải đỗ trong sân công ty, một người đi xe đạp trên phố.",
+  "vegetation": "Cây cau (palm) cao, cây xà cừ/bàng lớn, hoa giấy hồng, nhiều chậu cảnh và bonsai.",
+  "street_furniture": [
+   "Biển ngõ xanh 'NGÕ 84 PHAN ĐÌNH PHÙNG' (h0, h90)",
+   "Cột điện và dây",
+   "Cổng sắt vòm",
+   "Chậu cảnh lớn",
+   "Ghế nhựa đỏ của quán"
+  ],
+  "banners": [
+   "Biển ngõ: NGÕ 84 PHAN ĐÌNH PHÙNG",
+   "Biển nhỏ 'CẦM ĐỒ' (h90)",
+   "Cờ đỏ treo trước công sở"
+  ],
+  "special": [
+   "Cổng vòm với trụ cột có quả cầu trang trí ở lối vào khuôn viên công ty (h180)"
+  ],
+  "summary": "Ngã giữa phố Phan Đình Phùng và Ngõ 84: dãy nhà ống cửa xếp có hoa giấy đối diện khuôn viên một công ty/công sở có cổng vòm và cờ đỏ.",
+  "confidence": "medium"
+ },
+ {
+  "id": "pano_308",
+  "area": "Phố Phan Đình Phùng (số 33); khu dân cư nhà ống một bên, bên kia là tường rào công sở dán khẩu hiệu.",
+  "sidewalk": "Vỉa hè lát gạch terracotta đỏ, bày rất nhiều chậu cảnh và bonsai.",
+  "buildings": [
+   {
+    "heading": 90,
+    "style": "Nhà ống (shophouse)",
+    "floors": 4,
+    "color": "vàng kem/trắng",
+    "width_m": 16,
+    "features": "Mái hiên bạt sọc xanh-trắng và bạt xanh, tầng trệt cửa xếp kim loại và cửa gỗ trắng (số 50), ban công lan can"
+   },
+   {
+    "heading": 180,
+    "style": "Nhà 1 tầng (cửa hàng) + tòa nhiều tầng sau tường rào",
+    "floors": 1,
+    "color": "xanh mint (nhà thấp), vàng ochre (tường + tòa nhà sau)",
+    "width_m": 20,
+    "features": "Nhà thấp màu xanh mint mặt phố; tường rào vàng dán băng rôn đỏ, tòa nhà nhiều tầng màu vàng phía sau"
+   }
+  ],
+  "landmarks": [],
+  "vehicles": "Xe máy đỗ, xe đạp, một người đi xe đạp, ô tô đỗ ở xa.",
+  "vegetation": "Rất nhiều chậu cảnh và bonsai lớn dọc vỉa hè, cây bàng, cây cau.",
+  "street_furniture": [
+   "Cột điện và dây",
+   "Bảng tin/áp phích (vàng-đỏ) gắn trên tường",
+   "Đèn đường",
+   "Lốp xe cũ dùng làm bồn cây",
+   "Mái hiên bạt"
+  ],
+  "banners": [
+   "Băng rôn đỏ khẩu hiệu trên tường rào: 'PHÒNG CHỐNG DỊCH...' (chỉ đọc được một phần)"
+  ],
+  "special": [],
+  "summary": "Đoạn phố Phan Đình Phùng với dãy nhà ống mái hiên bạt sọc và vỉa hè gạch đỏ dày đặc chậu cảnh, đối diện tường rào công sở treo băng rôn phòng chống dịch.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_309",
+  "area": "Phố Phan Đình Phùng (số 6); đoạn có xí nghiệp/kho hàng và nhà cũ, gần một ngã giao.",
+  "sidewalk": "Nền bê tông/xi măng trước dãy kho, không lát gạch rõ; mép đường có bó vỉa.",
+  "buildings": [
+   {
+    "heading": 0,
+    "style": "Nhà ở nhiều tầng kiểu cổ điển",
+    "floors": 4,
+    "color": "xanh dương",
+    "width_m": 10,
+    "features": "Ban công vòm trang trí cầu kỳ, cục nóng điều hòa; bên trái là nhà cũ thấp tường rêu"
+   },
+   {
+    "heading": 90,
+    "style": "Nhà kho/xí nghiệp 1 tầng",
+    "floors": 1,
+    "color": "vàng ochre",
+    "width_m": 30,
+    "features": "Dãy cửa cuốn/cửa lùa kim loại (roll-up), mái ngói cũ, hàng rào dây thép gai trên tường"
+   }
+  ],
+  "landmarks": [
+   "Xí nghiệp Kinh doanh Tổng hợp (biển bán buôn/bán lẻ dầu nhớt, có logo Castrol)"
+  ],
+  "vehicles": "Ô tô đỗ ở xa, xe máy lác đác.",
+  "vegetation": "Hàng cây xà cừ thân lớn rợp phố, cây xanh.",
+  "street_furniture": [
+   "Cột điện và dây",
+   "Đèn đường",
+   "Trụ cứu hỏa màu đỏ (h270)",
+   "Biển tên phố xanh",
+   "Bồn nước tròn lớn trên giá cao (h270)",
+   "Hàng rào dây thép gai"
+  ],
+  "banners": [
+   "Biển: XÍ NGHIỆP KINH DOANH TỔNG HỢP / Chuyên bán buôn bán lẻ các loại dầu nhớt... (kèm hình sản phẩm Castrol, h90)"
+  ],
+  "special": [
+   "Bồn chứa nước tròn lớn đặt trên giá cao phía sau các dãy nhà kho (h270)"
+  ],
+  "summary": "Đoạn phố Phan Đình Phùng mang tính kho bãi - xí nghiệp: dãy nhà một tầng cửa cuốn vàng có hàng rào thép gai và biển dầu nhớt Castrol, nổi bật căn nhà 4 tầng sơn xanh với ban công vòm.",
+  "confidence": "high"
+ },
+ {
+  "id": "pano_310",
+  "area": "Đầu phố Phan Đình Phùng (số 2); khu xưởng sửa/sơn ô tô, quán nước nhỏ, có cây đa cổ thụ lớn.",
+  "sidewalk": "Nền bê tông/xi măng, không lát gạch; bày nhiều đồ đạc, bàn ghế quán và xe cộ.",
+  "buildings": [
+   {
+    "heading": 90,
+    "style": "Nhà xưởng 1 tầng",
+    "floors": 1,
+    "color": "vàng và xám tôn",
+    "width_m": 25,
+    "features": "Cửa cuốn tôn, xưởng sửa/sơn ô tô mở, mái hiên tôn/bạt; phía xa có biệt thự 2 tầng màu trắng"
+   },
+   {
+    "heading": 180,
+    "style": "Nhà cổ kiểu Pháp (phía xa) + quán",
+    "floors": 2,
+    "color": "vàng nhạt",
+    "width_m": 15,
+    "features": "Mặt tiền có vòm cổ điển phía cuối phố; phía trước là quán nước có dù và tủ đông"
+   }
+  ],
+  "landmarks": [
+   "Xưởng 'SƠN SÀI GÒN - CHUYÊN ĐÈN GƯƠNG Ô TÔ' (biển đỏ)",
+   "Quán 'KIM THÀNH'"
+  ],
+  "vehicles": "Xe bán tải Suzuki trắng phủ bạt xanh in 'CTY TNHH DUY ANH' (h0); xe rác màu xanh lá (h90/h180); xe tải nhỏ/van; nhiều xe máy đỗ; xe đạp dựng.",
+  "vegetation": "Cây đa/si cổ thụ rễ phụ rủ trùm vỉa hè (h270), cây bàng, cây cau/dừa cảnh, khóm hoa đỏ.",
+  "street_furniture": [
+   "Cột điện và dây",
+   "Ô/dù quán màu tím",
+   "Bàn ghế nhựa hồng",
+   "Tủ đông đỏ 'KIM THÀNH'",
+   "Bạt che xanh"
+  ],
+  "banners": [
+   "Biển đỏ: SƠN SÀI GÒN / CHUYÊN ĐÈN GƯƠNG Ô TÔ (kèm địa chỉ Phan Đình Phùng, h90)",
+   "Biển 'KIM THÀNH' (h180)"
+  ],
+  "special": [
+   "Cây đa/si cổ thụ với bộ rễ phụ lớn trùm kín vỉa hè và mặt tiền nhà (h270)"
+  ],
+  "summary": "Đầu phố Phan Đình Phùng với xưởng sửa - sơn đèn gương ô tô, xe tải Duy Anh và xe rác đô thị; điểm nhấn là cây đa cổ thụ rễ phụ rủ tạo bóng lớn trùm góc phố.",
+  "confidence": "high"
  }
 ]
