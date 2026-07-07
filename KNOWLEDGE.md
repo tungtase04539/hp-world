@@ -258,6 +258,9 @@ node mobile.mjs    # viewport điện thoại + joystick
     (tân cổ điển mạ vàng + hàng cột + đầu hồi + cặp sư tử, pano_354 [10,-269]), `nha_phap_arcade`
     (nhà Pháp 2 tầng hành lang cuốn vòm + mái ngói đỏ, pano_358 [237,-265]). Helper `facadeTex()`
     sinh texture lưới cửa sổ. Test: headless render từng công trình, 0 lỗi JS, đặt đúng toạ độ.
+    **ĐỢT 2.5** (rải rộng cho sống động): `shop_awnings` (460 mái hiên bạt nghiêng + diềm, màu đa dạng,
+    protrusion hướng ra đường qua `faceRoad`-style), `shop_signs` (292 biển hiệu đứng) dọc phố 'p'/'s'
+    building-side (offset wRoad/2+3.4). InstancedMesh + instanceColor.
     Test: headless render tại từng toạ độ gap, 0 lỗi JS, mọi mesh mới hiện diện.
 
 - **2026-07-06 (z)** [XE MÁY]: sửa 3 lỗi người dùng nêu. (1) **Nghiêng xe khi rẽ**: vehicles.js

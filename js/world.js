@@ -1137,6 +1137,58 @@ export function buildWorld(scene) {
     }
   }
 
+  // ---------- MÁI HIÊN BẠT + BIỂN HIỆU shophouse dọc phố thương mại (rải rộng, rất thân thuộc) ----------
+  {
+    // mái hiên: canopy nghiêng + diềm; protrusion hướng +Z (ra phía đường)
+    const awnG = [];
+    { const cano = new THREE.BoxGeometry(3.0, 0.08, 1.7); cano.rotateX(-0.22); cano.translate(0, 3.15, 0.85); awnG.push(cano);
+      const val = new THREE.BoxGeometry(3.0, 0.42, 0.06); val.translate(0, 2.92, 1.66); awnG.push(val); }
+    const awnGeo = mergeGeometries(awnG); awnG.forEach((g) => g.dispose());
+    // biển hiệu: tấm chữ nhật đứng cạnh mặt tiền
+    const signGeo = new THREE.BoxGeometry(0.9, 1.3, 0.12);
+    const awnCols = [0x2f6bd8, 0xd6382c, 0x2f9c4a, 0xe0a52f, 0xe8e2d6, 0x18808a].map((c) => new THREE.Color(c));
+    const signCols = [0xd6382c, 0x1f6fae, 0x2f9c4a, 0xe0a52f, 0xb23a8a, 0xe8e2d6].map((c) => new THREE.Color(c));
+    const awnSlots = [], signSlots = [];
+    let as = 990201; const ar = () => { as = (as * 1103515245 + 12345) & 0x7fffffff; return as / 0x7fffffff; };
+    for (let ri = 0; ri < ROADS_DT.length; ri++) {
+      const r = ROADS_DT[ri]; if (r.c !== 'p' && r.c !== 's') continue;
+      const wRoad = ROAD_W[r.c];
+      for (let i = 0; i < r.pts.length - 1; i++) {
+        const [x1, z1] = r.pts[i], [x2, z2] = r.pts[i + 1];
+        const segLen = Math.hypot(x2 - x1, z2 - z1); if (segLen < 8) continue;
+        const dxn = (x2 - x1) / segLen, dzn = (z2 - z1) / segLen, rotY = Math.atan2(x2 - x1, z2 - z1);
+        const px = Math.cos(rotY), pz = -Math.sin(rotY);
+        for (let d = 4; d < segLen - 4; d += 4.2) {
+          const mx = x1 + dxn * d, mz = z1 + dzn * d;
+          if (mx * mx + mz * mz > 1250 * 1250) continue;
+          for (const side of [1, -1]) {
+            if (ar() > 0.5) continue;
+            const off = side * (wRoad / 2 + 3.4);                 // sát mặt nhà (sau vỉa hè)
+            const gx = mx + off * px, gz = mz + off * pz;
+            const gy = groundHeight(gx, gz); if (gy < LAND_H - 0.5 || isWater(gx, gz)) continue;
+            const faceY = Math.atan2(-side * px, -side * pz);      // protrusion hướng ra đường
+            if (ar() < 0.82) awnSlots.push([gx, gy, gz, faceY, (ar() * awnCols.length) | 0]);
+            if (ar() < 0.5) signSlots.push([gx, gy + 2.0, gz, faceY, (ar() * signCols.length) | 0]);
+            if (awnSlots.length >= 460) break;
+          }
+          if (awnSlots.length >= 460) break;
+        }
+        if (awnSlots.length >= 460) break;
+      }
+      if (awnSlots.length >= 460) break;
+    }
+    const mkInst = (geo, slots, cols, name, yOff) => {
+      if (!slots.length) return;
+      const inst = new THREE.InstancedMesh(geo, mat(0xcccccc), slots.length);
+      const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), s = new THREE.Vector3(1, 1, 1), p = new THREE.Vector3();
+      slots.forEach(([x, y, z, ry, ci], k) => { e.set(0, ry, 0); q.setFromEuler(e); p.set(x, y + (yOff || 0), z); m.compose(p, q, s); inst.setMatrixAt(k, m); inst.setColorAt(k, cols[ci]); });
+      inst.instanceMatrix.needsUpdate = true; if (inst.instanceColor) inst.instanceColor.needsUpdate = true;
+      inst.castShadow = true; inst.name = name; scene.add(inst);
+    };
+    mkInst(awnGeo, awnSlots, awnCols, 'shop_awnings', 0);
+    mkInst(signGeo, signSlots, signCols, 'shop_signs', 0);
+  }
+
   // ---------- 1.200+ TÒA NHÀ THẬT (footprint OSM đùn khối, gộp 1 mesh) ----------
   world.buildingCells = new Set();
   {
