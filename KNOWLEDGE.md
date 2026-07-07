@@ -253,6 +253,11 @@ node mobile.mjs    # viewport điện thoại + joystick
     (hòn non bộ + cau vua đảo giao thông), `parked_cars` (200 ô tô đỗ instanced dọc đại lộ 'p').
     **ĐỢT 1b**: regenerate `sidewalks.js` từ TOÀN BỘ 551 pano — mỗi road 'p'/'s' khớp pano gần nhất
     (<85m) → 42 đoạn caro/con sâu (trước 11), 4 terracotta, 56 bê tông/xám; hết "gạch xám mặc định khắp nơi".
+    **ĐỢT 2** (công trình đặc trưng procedural, có `faceRoad()` quay mặt tiền về đường gần nhất):
+    `ks_huunghi` (tháp 12 tầng + khối ban công hộp nhô, pano_158 [257,-452]), `toa_hoanglong`
+    (tân cổ điển mạ vàng + hàng cột + đầu hồi + cặp sư tử, pano_354 [10,-269]), `nha_phap_arcade`
+    (nhà Pháp 2 tầng hành lang cuốn vòm + mái ngói đỏ, pano_358 [237,-265]). Helper `facadeTex()`
+    sinh texture lưới cửa sổ. Test: headless render từng công trình, 0 lỗi JS, đặt đúng toạ độ.
     Test: headless render tại từng toạ độ gap, 0 lỗi JS, mọi mesh mới hiện diện.
 
 - **2026-07-06 (z)** [XE MÁY]: sửa 3 lỗi người dùng nêu. (1) **Nghiêng xe khi rẽ**: vehicles.js

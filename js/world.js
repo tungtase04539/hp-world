@@ -1052,6 +1052,91 @@ export function buildWorld(scene) {
     }
   }
 
+  // ---------- CÔNG TRÌNH ĐẶC TRƯNG dải trung tâm (procedural tỉ mỉ theo mô tả pano) ----------
+  {
+    // texture mặt tiền lưới cửa sổ trên nền màu tòa nhà
+    const facadeTex = (baseCss, winCss, cols, rows) => {
+      const t = makeTex(256, 256, (g, w, h) => {
+        g.fillStyle = baseCss; g.fillRect(0, 0, w, h);
+        const mx = w * 0.12, my = h * 0.12, cw = (w - mx * 2) / cols, ch = (h - my * 2) / rows;
+        for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+          g.fillStyle = winCss; g.fillRect(mx + c * cw + cw * 0.16, my + r * ch + ch * 0.16, cw * 0.68, ch * 0.66);
+        }
+      });
+      t.wrapS = t.wrapT = THREE.RepeatWrapping; return new THREE.MeshLambertMaterial({ map: t });
+    };
+    // hướng mặt tiền: quay về đoạn đường 'p'/'s' gần nhất
+    const faceRoad = (x, z) => {
+      let bd = 1e9, ry = 0;
+      for (const r of ROADS_DT) { if (r.c !== 'p' && r.c !== 's' && r.c !== 't') continue;
+        for (let i = 0; i < r.pts.length - 1; i++) { const [x1, z1] = r.pts[i], [x2, z2] = r.pts[i + 1];
+          const mx = (x1 + x2) / 2, mz = (z1 + z2) / 2, d = Math.hypot(mx - x, mz - z);
+          if (d < bd) { bd = d; ry = Math.atan2(mx - x, mz - z); } } }
+      return ry;
+    };
+
+    // (1) KHÁCH SẠN HỮU NGHỊ — tháp 12 tầng, khối ban công hộp nhô ra đặc trưng (pano_158 [257,-452])
+    {
+      const hx = 257, hz = -451.9, gy = groundHeight(hx, hz);
+      if (gy > LAND_H - 0.5 && !isWater(hx, hz)) {
+        const grp = new THREE.Group(); grp.position.set(hx, gy, hz); grp.rotation.y = faceRoad(hx, hz);
+        const W = 22, D = 15, FL = 12, FH = 3.2, H = FL * FH;
+        const pod = new THREE.Mesh(new THREE.BoxGeometry(W + 3, 4.4, D + 3), mat(0xe7dfd0)); pod.position.set(0, 2.2, 0); grp.add(pod);
+        const tower = new THREE.Mesh(new THREE.BoxGeometry(W, H, D), facadeTex('#e9e2d4', '#3f5a6b', 6, 11)); tower.position.set(0, 4.4 + H / 2, 0); grp.add(tower);
+        // ban công hộp nhô ra (2 mặt W), lưới đặc trưng
+        const balG = [];
+        for (let f = 1; f < FL; f++) for (let c = -2; c <= 2; c++) {
+          for (const zside of [D / 2 + 0.5, -D / 2 - 0.5]) { const bb = new THREE.BoxGeometry(3, 2.1, 1.1); bb.translate(c * 3.9, 4.4 + f * FH + 0.4, zside); balG.push(bb); }
+        }
+        const balMesh = new THREE.Mesh(mergeGeometries(balG), mat(0xd9d0bd)); balG.forEach((g) => g.dispose()); grp.add(balMesh);
+        const roof = new THREE.Mesh(new THREE.BoxGeometry(W + 1, 1, D + 1), mat(0xbfb6a2)); roof.position.set(0, 4.4 + H + 0.5, 0); grp.add(roof);
+        grp.traverse((o) => { if (o.isMesh) o.castShadow = true; }); grp.name = 'ks_huunghi'; scene.add(grp);
+        addCollider(hx, hz, Math.max(W, D) / 2 + 1);
+      }
+    }
+
+    // (2) TÒA HOÀNG LONG — tân cổ điển mạ vàng, hàng cột + đầu hồi + cặp sư tử (pano_354 [10,-269])
+    {
+      const bx = 10.2, bz = -269.4, gy = groundHeight(bx, bz);
+      if (gy > LAND_H - 0.5 && !isWater(bx, bz)) {
+        const grp = new THREE.Group(); grp.position.set(bx, gy, bz); grp.rotation.y = faceRoad(bx, bz);
+        const W = 18, D = 13, FL = 5, FH = 3.6, H = FL * FH;
+        const goldMat = mat(0xc9a84e), creamMat = facadeTex('#e8dcae', '#8a6a2a', 5, 4);
+        const body = new THREE.Mesh(new THREE.BoxGeometry(W, H, D), creamMat); body.position.set(0, H / 2, 0); grp.add(body);
+        // hàng cột mặt trước
+        const colG = [];
+        for (let c = -2; c <= 2; c++) { const cyl = new THREE.CylinderGeometry(0.5, 0.55, H - 1, 12); cyl.translate(c * 3.6, (H - 1) / 2 + 0.5, D / 2 + 0.3); colG.push(cyl); }
+        grp.add(new THREE.Mesh(mergeGeometries(colG), goldMat)); colG.forEach((g) => g.dispose());
+        // đầu hồi tam giác (fronton)
+        const ped = new THREE.Mesh(new THREE.CylinderGeometry(0.01, W * 0.62, 3.2, 3), goldMat); ped.rotation.y = Math.PI; ped.position.set(0, H + 1.6, D / 2 - 1); ped.scale.set(1, 1, 0.35); grp.add(ped);
+        // cặp sư tử ở cửa
+        const lionG = [];
+        for (const sx of [-3.5, 3.5]) { const base = new THREE.BoxGeometry(1.2, 1.4, 1.2); base.translate(sx, 0.7, D / 2 + 2); lionG.push(base); const body2 = new THREE.SphereGeometry(0.6, 8, 6); body2.scale(1, 0.8, 1.4); body2.translate(sx, 1.7, D / 2 + 2); lionG.push(body2); }
+        grp.add(new THREE.Mesh(mergeGeometries(lionG), mat(0xd8c98a))); lionG.forEach((g) => g.dispose());
+        grp.traverse((o) => { if (o.isMesh) o.castShadow = true; }); grp.name = 'toa_hoanglong'; scene.add(grp);
+        addCollider(bx, bz, Math.max(W, D) / 2 + 1);
+      }
+    }
+
+    // (3) NHÀ PHÁP 2 TẦNG HÀNH LANG CUỐN VÒM (pano_358 [237,-265]) — vàng, cửa vòm
+    {
+      const bx = 236.5, bz = -265.1, gy = groundHeight(bx, bz);
+      if (gy > LAND_H - 0.5 && !isWater(bx, bz)) {
+        const grp = new THREE.Group(); grp.position.set(bx, gy, bz); grp.rotation.y = faceRoad(bx, bz);
+        const W = 16, D = 11, H = 8.4;
+        const body = new THREE.Mesh(new THREE.BoxGeometry(W, H, D), facadeTex('#e4c96f', '#7a5a20', 5, 2)); body.position.set(0, H / 2, 0); grp.add(body);
+        // hành lang cuốn vòm tầng trệt: các cột + vòm bán nguyệt
+        const archG = [];
+        for (let c = -2; c <= 2; c++) { const pil = new THREE.BoxGeometry(0.7, 4.2, 0.7); pil.translate(c * 3.4, 2.1, D / 2 + 0.4); archG.push(pil);
+          const arc = new THREE.TorusGeometry(1.2, 0.28, 6, 14, Math.PI); arc.rotateY(0); arc.translate(c * 3.4 + 1.7, 4.2, D / 2 + 0.4); archG.push(arc); }
+        grp.add(new THREE.Mesh(mergeGeometries(archG), mat(0xefe6cf))); archG.forEach((g) => g.dispose());
+        const roof = new THREE.Mesh(new THREE.BoxGeometry(W + 1.4, 0.8, D + 1.4), mat(0x7a3b2a)); roof.position.set(0, H + 0.4, 0); grp.add(roof);
+        grp.traverse((o) => { if (o.isMesh) o.castShadow = true; }); grp.name = 'nha_phap_arcade'; scene.add(grp);
+        addCollider(bx, bz, Math.max(W, D) / 2 + 1);
+      }
+    }
+  }
+
   // ---------- 1.200+ TÒA NHÀ THẬT (footprint OSM đùn khối, gộp 1 mesh) ----------
   world.buildingCells = new Set();
   {
