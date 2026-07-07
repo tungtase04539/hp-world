@@ -240,6 +240,21 @@ node mobile.mjs    # viewport điện thoại + joystick
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-07 (ab)** [AUDIT 551 PANO + DẢI TRUNG TÂM]: vét cạn **551 pano Street View** (2 manifest:
+    420 + 131) qua workflow đa-agent (catalog theo quy chuẩn 11 trường, chống bịa; 8 heading cho ~250
+    pano đầu, 4 heading cho phần còn lại để tiết kiệm quota). Dữ liệu + bảng chi tiết HTML + gap-analysis
+    lưu ở nhánh `streetview-refs/audit/` (audit_done.json, audit_enriched.json, hp_pano_audit.html).
+    Toạ độ pano: dùng cùng phép chiếu 1:1. Gap chính (game thiếu vs thật): đài phun nước, cây xăng
+    Petrolimex, tượng/phù điêu, hòn non bộ vòng xuyến, bàn ghế nhựa quán vỉa hè, ô tô đỗ.
+    **ĐỢT 1 (procedural, world.js)** thêm 6 lớp đặt theo toạ độ pano thật (gap_coords.json):
+    `streetside_furniture`/`streetside_parasols` (bàn ghế nhựa + ô dù, 27 cụm), `fountains`+`fountain_water`
+    (8 đài phun nước), `gasstation_*` (cây xăng mái khoang cam-xanh + trụ bơm), `hp_letters` (chữ 3D
+    "HẢI PHÒNG" bờ hồ — **có land-search 90m** vì pano sát mép nước bị isWater loại), `rockery_*`
+    (hòn non bộ + cau vua đảo giao thông), `parked_cars` (200 ô tô đỗ instanced dọc đại lộ 'p').
+    **ĐỢT 1b**: regenerate `sidewalks.js` từ TOÀN BỘ 551 pano — mỗi road 'p'/'s' khớp pano gần nhất
+    (<85m) → 42 đoạn caro/con sâu (trước 11), 4 terracotta, 56 bê tông/xám; hết "gạch xám mặc định khắp nơi".
+    Test: headless render tại từng toạ độ gap, 0 lỗi JS, mọi mesh mới hiện diện.
+
 - **2026-07-06 (z)** [XE MÁY]: sửa 3 lỗi người dùng nêu. (1) **Nghiêng xe khi rẽ**: vehicles.js
     `v.lean` nội suy theo turnInput → `mesh.rotateZ` quanh trục tiến (rẽ trái/phải nghiêng, đi thẳng
     thẳng); main.js cho người nghiêng theo (rotation.z=v.lean). (2) **Tư thế ngồi**: character.sit đùi

@@ -875,6 +875,183 @@ export function buildWorld(scene) {
     }
   }
 
+  // ---------- QUÁN VỈA HÈ: bàn + ghế nhựa đỏ/xanh + ô dù (rất thân thuộc, 27 cụm thật từ pano) ----------
+  {
+    // 1 "bộ" = bàn nhựa thấp + 4 ghế con; ô dù tách riêng để đổi màu
+    const setG = [], parasolG = [];
+    const cyl = (arr, rt, rb, h, x, y, z) => { const g = new THREE.CylinderGeometry(rt, rb, h, 10); g.translate(x, y, z); arr.push(g); };
+    cyl(setG, 0.34, 0.34, 0.04, 0, 0.44, 0);         // mặt bàn
+    cyl(setG, 0.04, 0.05, 0.44, 0, 0.22, 0);          // chân bàn
+    for (const [sx, sz] of [[0.5, 0], [-0.5, 0], [0, 0.5], [0, -0.5]]) { cyl(setG, 0.15, 0.15, 0.05, sx, 0.29, sz); cyl(setG, 0.03, 0.03, 0.29, sx, 0.145, sz); } // 4 ghế con
+    cyl(parasolG, 0.04, 0.04, 2.15, 0, 1.07, 0);      // cột ô
+    { const c = new THREE.ConeGeometry(1.35, 0.42, 12); c.translate(0, 2.35, 0); parasolG.push(c); } // tán ô
+    const setGeo = mergeGeometries(setG), parasolGeo = mergeGeometries(parasolG);
+    setG.forEach((g) => g.dispose()); parasolG.forEach((g) => g.dispose());
+    const plasticCols = [0xd6382c, 0x2f6bd8, 0x2f9c4a, 0xe6e0d2].map((c) => new THREE.Color(c)); // đỏ/xanh dương/xanh lá/trắng
+    const parasolCols = [0xd6382c, 0x2f6bd8, 0xe0a52f, 0x2f9c4a, 0xded2c4].map((c) => new THREE.Color(c));
+    const FOOD = [[95.9,40.2],[185,94.5],[33.7,-229.6],[40.5,-340.6],[355.9,-243],[-429.1,73.9],[461.4,20.8],[-459.1,255.3],[591.5,50.1],[-325.2,513.1],[-143.5,601.5],[347.3,513.3],[-49,-627.1],[650.3,-5.6],[-405,528.9],[-357.2,-619.9],[-298.5,-704.8],[-400.7,-688.1],[-245.3,-766],[-783.2,185.2],[724.5,-395.6],[-47.8,842.8],[-825,-274.3],[-935,-96.6],[656.4,779.3],[929.7,-442.6],[-50.2,-1080.8]];
+    let fs = 771; const frnd = () => { fs = (fs * 1103515245 + 12345) & 0x7fffffff; return fs / 0x7fffffff; };
+    const setSlots = [], paraSlots = [];
+    for (const [cx, cz] of FOOD) {
+      const nSet = 3 + ((frnd() * 3) | 0);
+      for (let k = 0; k < nSet; k++) {
+        const gx = cx + (frnd() - 0.5) * 4.5, gz = cz + (frnd() - 0.5) * 4.5;
+        const gy = groundHeight(gx, gz); if (gy < LAND_H - 0.5 || isWater(gx, gz)) continue;
+        setSlots.push([gx, gy, gz, frnd() * Math.PI, (frnd() * plasticCols.length) | 0]);
+      }
+      const nPar = 1 + ((frnd() * 2) | 0);
+      for (let k = 0; k < nPar; k++) {
+        const gx = cx + (frnd() - 0.5) * 4, gz = cz + (frnd() - 0.5) * 4;
+        const gy = groundHeight(gx, gz); if (gy < LAND_H - 0.5 || isWater(gx, gz)) continue;
+        paraSlots.push([gx, gy, gz, (frnd() * parasolCols.length) | 0]);
+      }
+    }
+    const putInst = (geo, baseMat, slots, cols, name, withRot) => {
+      if (!slots.length) return;
+      const inst = new THREE.InstancedMesh(geo, baseMat, slots.length);
+      const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), s = new THREE.Vector3(1, 1, 1), p = new THREE.Vector3();
+      slots.forEach((sl, k) => { const [x, y, z] = sl; const ry = withRot ? sl[3] : 0, ci = sl[withRot ? 4 : 3];
+        e.set(0, ry, 0); q.setFromEuler(e); p.set(x, y, z); m.compose(p, q, s); inst.setMatrixAt(k, m); inst.setColorAt(k, cols[ci]); });
+      inst.instanceMatrix.needsUpdate = true; if (inst.instanceColor) inst.instanceColor.needsUpdate = true;
+      inst.castShadow = true; inst.name = name; scene.add(inst);
+    };
+    putInst(setGeo, mat(0xcccccc), setSlots, plasticCols, 'streetside_furniture', true);
+    putInst(parasolGeo, mat(0xcccccc), paraSlots, parasolCols, 'streetside_parasols', false);
+  }
+
+  // ---------- ĐÀI PHUN NƯỚC (8 điểm thật: quảng trường, công viên, sảnh Trung tâm Hội nghị) ----------
+  {
+    const stoneG = [], waterG = [];
+    const FOUNT = [[-31,78.7],[276.4,-264.3],[559.2,-300.1],[525.1,-448.2],[685.4,-323.9],[705.6,-358.9],[697.7,-447.5],[295.1,-799.5]];
+    for (const [x, z] of FOUNT) {
+      const gy = groundHeight(x, z); if (gy < LAND_H - 0.5 || isWater(x, z)) continue;
+      const wall = new THREE.CylinderGeometry(2.0, 2.1, 0.55, 22); wall.translate(x, gy + 0.27, z); stoneG.push(wall);
+      const inner = new THREE.CylinderGeometry(1.7, 1.7, 0.5, 22); inner.translate(x, gy + 0.24, z); // lòng
+      const water = new THREE.CylinderGeometry(1.72, 1.72, 0.08, 22); water.translate(x, gy + 0.46, z); waterG.push(water);
+      const tier1 = new THREE.CylinderGeometry(0.55, 0.72, 0.5, 14); tier1.translate(x, gy + 0.75, z); stoneG.push(tier1);
+      const dish = new THREE.CylinderGeometry(0.95, 0.95, 0.12, 16); dish.translate(x, gy + 1.02, z); stoneG.push(dish);
+      const tier2 = new THREE.CylinderGeometry(0.28, 0.4, 0.5, 12); tier2.translate(x, gy + 1.3, z); stoneG.push(tier2);
+      const top = new THREE.SphereGeometry(0.26, 10, 8); top.translate(x, gy + 1.62, z); stoneG.push(top);
+      addCollider(x, z, 2.1);
+    }
+    if (stoneG.length) addMerged(stoneG, mat(0xcfc9ba), 'fountains');
+    if (waterG.length) addMerged(waterG, new THREE.MeshLambertMaterial({ color: 0x2f7fb5, transparent: true, opacity: 0.82, emissive: 0x18506f, emissiveIntensity: 0.15 }), 'fountain_water');
+  }
+
+  // ---------- CÂY XĂNG PETROLIMEX (mái che khung thép sơn khoang xanh–cam đặc trưng) ----------
+  {
+    const whiteG = [], orangeG = [], blueG = [], pumpG = [], darkG = [];
+    const RAW = [[168.6,7.9],[224.6,-20],[211.7,80.4],[-897,-471.1],[664.9,-799]];
+    const GAS = []; for (const c of RAW) { if (!GAS.some((k) => Math.hypot(k[0]-c[0], k[1]-c[1]) < 60)) GAS.push(c); }
+    for (const [x, z] of GAS) {
+      const gy = groundHeight(x, z); if (gy < LAND_H - 0.5 || isWater(x, z)) continue;
+      // 4 trụ
+      for (const [px, pz] of [[3,4],[-3,4],[3,-4],[-3,-4]]) { const pil = new THREE.BoxGeometry(0.28, 5, 0.28); pil.translate(x+px, gy+2.5, z+pz); whiteG.push(pil); }
+      const roof = new THREE.BoxGeometry(7.2, 0.35, 10.2); roof.translate(x, gy + 5.1, z); whiteG.push(roof);
+      const fasO = new THREE.BoxGeometry(7.4, 0.42, 10.4); fasO.translate(x, gy + 4.78, z); orangeG.push(fasO);   // khoang cam
+      const fasB = new THREE.BoxGeometry(7.5, 0.3, 10.5); fasB.translate(x, gy + 4.5, z); blueG.push(fasB);       // khoang xanh
+      // 2 trụ bơm
+      for (const [px, pz] of [[1.2,0],[-1.2,0]]) { const pm = new THREE.BoxGeometry(0.6, 1.7, 0.95); pm.translate(x+px, gy+0.85, z+pz); pumpG.push(pm); const hd = new THREE.BoxGeometry(0.64, 0.4, 0.99); hd.translate(x+px, gy+1.55, z+pz); darkG.push(hd); }
+      addCollider(x+3, z+4, 0.4); addCollider(x-3, z-4, 0.4);
+    }
+    if (whiteG.length) addMerged(whiteG, mat(0xe9e6df), 'gasstation_frame');
+    if (orangeG.length) addMerged(orangeG, mat(0xe87a1e), 'gasstation_orange');
+    if (blueG.length) addMerged(blueG, mat(0x1e5aa8), 'gasstation_blue');
+    if (pumpG.length) addMerged(pumpG, mat(0xd8d2c6), 'gasstation_pumps');
+    if (darkG.length) addMerged(darkG, mat(0x2a2d31), 'gasstation_pumpheads');
+  }
+
+  // ---------- CHỮ 3D "HẢI PHÒNG" (cụm chữ check-in đỏ khổ lớn, pano_009 [-718,219] bờ hồ Tam Bạc) ----------
+  {
+    // pano ở sát mép nước → dò điểm ĐẤT gần nhất trong bán kính 24m (né bị isWater loại bỏ)
+    let x = -718.6, z = 219.3;
+    if (isWater(x, z) || groundHeight(x, z) < LAND_H - 0.5) {
+      let best = null, bd = 1e9;
+      for (let r = 4; r <= 90; r += 5) { for (let a = 0; a < 16; a++) {
+        const tx = -718.6 + Math.cos(a / 16 * Math.PI * 2) * r, tz = 219.3 + Math.sin(a / 16 * Math.PI * 2) * r;
+        if (!isWater(tx, tz) && groundHeight(tx, tz) > LAND_H - 0.5) { bd = r; best = [tx, tz]; break; }
+      } if (best) break; }
+      if (best) { x = best[0]; z = best[1]; }
+    }
+    const gy = groundHeight(x, z);
+    if (gy > LAND_H - 0.5 && !isWater(x, z)) {
+      const base = new THREE.Mesh(new THREE.BoxGeometry(8.4, 0.5, 1.4), mat(0x9a2a24)); base.position.set(x, gy + 0.25, z); base.name = 'hp_letters'; scene.add(base);
+      const tex = makeTex(512, 150, (g, w, h) => { g.fillStyle = '#c62828'; g.fillRect(0, 0, w, h);
+        g.fillStyle = '#fff'; g.font = 'bold 96px system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+        g.fillText('HẢI PHÒNG', w / 2, h / 2 + 6); });
+      const sign = new THREE.Mesh(new THREE.BoxGeometry(8, 2.4, 0.35), [mat(0xb23029), mat(0xb23029), mat(0xb23029), mat(0xb23029), new THREE.MeshLambertMaterial({ map: tex }), new THREE.MeshLambertMaterial({ map: tex })]);
+      sign.position.set(x, gy + 1.75, z); scene.add(sign);
+      addCollider(x, z, 4.2);
+    }
+  }
+
+  // ---------- HÒN NON BỘ / ĐẢO CÂY CẢNH giữa vòng xuyến (cau vua + đá cảnh + bonsai) ----------
+  {
+    const rockG = [], moundG = [], trunkG = [], frondG = [];
+    const RAW = [[498.6,-239.9],[534.1,-269.6],[-110.6,-937.7],[-201.6,-943.3],[653.9,-869.4]];
+    const RB = []; for (const c of RAW) { if (!RB.some((k) => Math.hypot(k[0]-c[0], k[1]-c[1]) < 40)) RB.push(c); }
+    let rs = 349; const rr = () => { rs = (rs * 1103515245 + 12345) & 0x7fffffff; return rs / 0x7fffffff; };
+    for (const [x, z] of RB) {
+      const gy = groundHeight(x, z); if (gy < LAND_H - 0.5 || isWater(x, z)) continue;
+      const mound = new THREE.CylinderGeometry(3.2, 3.6, 0.4, 20); mound.translate(x, gy + 0.2, z); moundG.push(mound);
+      const nRock = 3 + ((rr() * 3) | 0);
+      for (let k = 0; k < nRock; k++) { const rk = new THREE.IcosahedronGeometry(0.5 + rr() * 0.7, 0); const rx = x + (rr()-0.5)*3, rz = z + (rr()-0.5)*3; rk.translate(rx, gy + 0.4 + rr()*0.3, rz); rockG.push(rk); }
+      // cau vua giữa đảo
+      const tr = new THREE.CylinderGeometry(0.12, 0.18, 3.6, 8); tr.translate(x, gy + 1.8, z); trunkG.push(tr);
+      for (let f = 0; f < 6; f++) { const ang = f / 6 * Math.PI * 2; const fr = new THREE.BoxGeometry(0.16, 0.08, 1.8); fr.rotateY(ang); fr.rotateX(-0.5); fr.translate(x + Math.cos(ang)*0.8, gy + 3.5, z + Math.sin(ang)*0.8); frondG.push(fr); }
+      addCollider(x, z, 3.2);
+    }
+    if (moundG.length) addMerged(moundG, mat(0x5f8a45), 'rockery_mound');
+    if (rockG.length) addMerged(rockG, mat(0x8d8a82, { flatShading: true }), 'rockery_rocks');
+    if (trunkG.length) addMerged(trunkG, sharedMats.trunk, 'rockery_palmtrunk');
+    if (frondG.length) addMerged(frondG, sharedMats.leafDark, 'rockery_palmfronds');
+  }
+
+  // ---------- Ô TÔ ĐỖ dọc đại lộ (thực tế nhiều ô tô đỗ; game trước thiên về xe máy) ----------
+  {
+    const carG = [], wheelG = [];
+    const box = (arr, w, h, l, x, y, z) => { const g = new THREE.BoxGeometry(w, h, l); g.translate(x, y, z); arr.push(g); };
+    box(carG, 1.72, 0.5, 4.2, 0, 0.55, 0);            // thân
+    box(carG, 1.5, 0.5, 2.2, 0, 1.0, -0.15);          // ca-bin
+    { const wl = (z) => { for (const sx of [0.82, -0.82]) { const g = new THREE.CylinderGeometry(0.32, 0.32, 0.2, 10); g.rotateZ(Math.PI/2); g.translate(sx, 0.32, z); wheelG.push(g); } }; wl(1.35); wl(-1.35); }
+    const carGeo = mergeGeometries(carG), wheelGeo = mergeGeometries(wheelG);
+    carG.forEach((g) => g.dispose()); wheelG.forEach((g) => g.dispose());
+    const carCols = [0x1c1c20, 0xe4e2dc, 0xb0b3b6, 0x9c2f28, 0x64686e, 0x24354f, 0x3a3f45].map((c) => new THREE.Color(c));
+    const slots = [];
+    let cs = 20260707; const cr = () => { cs = (cs * 1103515245 + 12345) & 0x7fffffff; return cs / 0x7fffffff; };
+    for (let ri = 0; ri < ROADS_DT.length; ri++) {
+      const r = ROADS_DT[ri]; if (r.c !== 'p') continue;
+      const wRoad = ROAD_W[r.c];
+      for (let i = 0; i < r.pts.length - 1; i++) {
+        const [x1, z1] = r.pts[i], [x2, z2] = r.pts[i + 1];
+        const segLen = Math.hypot(x2 - x1, z2 - z1); if (segLen < 12) continue;
+        const dxn = (x2 - x1) / segLen, dzn = (z2 - z1) / segLen, rotY = Math.atan2(x2 - x1, z2 - z1);
+        const px = Math.cos(rotY), pz = -Math.sin(rotY);
+        for (let d = 6; d < segLen - 6; d += 5.5) {
+          if (cr() > 0.5) continue;
+          const mx = x1 + dxn * d, mz = z1 + dzn * d;
+          if (mx * mx + mz * mz > 1350 * 1350) continue;
+          const side = cr() < 0.5 ? 1 : -1;
+          const off = side * (wRoad / 2 + 1.3);
+          const gx = mx + off * px, gz = mz + off * pz;
+          const gy = groundHeight(gx, gz); if (gy < LAND_H - 0.5 || isWater(gx, gz)) continue;
+          slots.push([gx, gy, gz, rotY + (cr() - 0.5) * 0.12, (cr() * carCols.length) | 0]);
+          if (slots.length >= 200) break;
+        }
+        if (slots.length >= 200) break;
+      }
+      if (slots.length >= 200) break;
+    }
+    if (slots.length) {
+      const carInst = new THREE.InstancedMesh(carGeo, mat(0xcccccc), slots.length);
+      const whInst = new THREE.InstancedMesh(wheelGeo, mat(0x18181b), slots.length);
+      const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), s = new THREE.Vector3(1, 1, 1), p = new THREE.Vector3();
+      slots.forEach(([x, y, z, ry, ci], k) => { e.set(0, ry, 0); q.setFromEuler(e); p.set(x, y, z); m.compose(p, q, s); carInst.setMatrixAt(k, m); whInst.setMatrixAt(k, m); carInst.setColorAt(k, carCols[ci]); });
+      carInst.instanceMatrix.needsUpdate = true; whInst.instanceMatrix.needsUpdate = true; if (carInst.instanceColor) carInst.instanceColor.needsUpdate = true;
+      carInst.castShadow = whInst.castShadow = true; carInst.name = 'parked_cars'; scene.add(carInst); scene.add(whInst);
+    }
+  }
+
   // ---------- 1.200+ TÒA NHÀ THẬT (footprint OSM đùn khối, gộp 1 mesh) ----------
   world.buildingCells = new Set();
   {
