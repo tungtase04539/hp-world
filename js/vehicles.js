@@ -190,7 +190,11 @@ export function createVehicles(scene, groundHeight, waterHeight, spawns, resolve
     }
     if (v.land) {
       v.pos.y = groundHeight(v.pos.x, v.pos.z);
+      // NGHIÊNG XE khi rẽ (roll quanh trục tiến): rẽ trái/phải nghiêng theo, đi thẳng thì thẳng.
+      const targetLean = -turnInput * 0.30 * Math.min(1, Math.abs(v.vel) / 7);
+      v.lean = (v.lean || 0) + (targetLean - (v.lean || 0)) * Math.min(1, dt * 6);
       v.mesh.rotation.set(0, v.heading, 0);
+      v.mesh.rotateZ(v.lean);     // roll quanh trục Z LOCAL (= hướng tiến) → nghiêng đúng
     } else {
       v.pos.y = Math.sin(time * 1.3) * 0.1;
       v.mesh.rotation.set(Math.sin(time * 1.1) * 0.03, v.heading, Math.sin(time * 0.9) * 0.04);

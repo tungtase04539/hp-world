@@ -258,6 +258,7 @@ function updateMounted(dt, time) {
   pState.yaw = v.heading;
   player.group.rotation.y = v.heading;
   player.group.rotation.x = v.mesh.rotation.x;
+  player.group.rotation.z = v.lean || 0;   // nhân vật nghiêng theo xe khi rẽ
 }
 
 // ============ Tương tác ============

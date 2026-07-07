@@ -136,7 +136,7 @@ export function makeHumanoid(scheme = {}) {
   g.add(blob);
 
   return {
-    group: g, legL, legR, armL, armR, head,
+    group: g, legL, legR, armL, armR, head, torso,
     walkT: 0,
     animate(dt, speedRatio, time) {
       if (speedRatio > 0.05) {
@@ -157,9 +157,15 @@ export function makeHumanoid(scheme = {}) {
       }
     },
     sit(on) {
-      const a = on ? 1.15 : 0;
+      // Tư thế ngồi xe máy tự nhiên: đùi đưa ra TRƯỚC (chân đặt sàn xe), hơi dạng;
+      // hai tay vươn ra trước-xuống nắm ghi-đông; thân hơi chồm.
+      const a = on ? 1.0 : 0;
       this.legL.rotation.x = a; this.legR.rotation.x = a;
-      this.armL.rotation.x = on ? 0.5 : 0; this.armR.rotation.x = on ? 0.5 : 0;
+      this.legL.rotation.z = on ? 0.14 : 0; this.legR.rotation.z = on ? -0.14 : 0;
+      this.armL.rotation.x = on ? 0.78 : 0; this.armR.rotation.x = on ? 0.78 : 0;
+      this.armL.rotation.z = on ? 0.18 : 0.08; this.armR.rotation.z = on ? -0.18 : -0.08;
+      this.torso.rotation.x = on ? 0.16 : 0;   // chồm nhẹ ra trước
+      this.head.rotation.x = 0;
     },
   };
 }
