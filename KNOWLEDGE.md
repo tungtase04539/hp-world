@@ -270,6 +270,14 @@ node mobile.mjs    # viewport điện thoại + joystick
     (3) mái hiên bớt số + hạ bão hòa màu (đỡ trôi nổi sặc sỡ).
     (4) `mural` (11 panô cổ động đỏ sao vàng trên cột) + `civic_fences` (hàng rào sắt + cột cờ đỏ búa liềm
     ở 3 công sở) theo toạ độ pano. Test: headless render từng cụm fix, 0 lỗi JS, cải thiện rõ.
+    **VÒNG 3 (sửa regression)**: đối chiếu vòng 2 lộ lỗi #1 "khối hộp xám trơn trôi nổi" (30 lần) — do nâng
+    tầng đẩy nhà 5-7 tầng vượt ngưỡng `glassy = h>18` → bị tô tông KÍNH XANH-XÁM lạnh. Thực tế shophouse
+    3-6 tầng là nhà SƠN MÀU. Sửa: `glassy` ngưỡng **h>18 → h>30** (chỉ cao ốc ~9+ tầng mới kính); nâng tầng
+    lõi TT dịu lại **3-5/3-6** (thay 3-5/4-7). Nhà trung tâm giờ giữ tường sơn cream/vàng + lưới cửa sổ.
+    BÀI HỌC: khi tăng chiều cao nhà generic phải kiểm ngưỡng `glassy` kẻo biến nhà phố thành cao ốc kính.
+    CÒN TỒN (cần xử lý cẩn thận, chưa làm trong đêm vì rủi ro terrain): mặt nước sông Tam Bạc lấn lên
+    promenade/mặt phố ở vài điểm ven sông (pano_200/004); dãy shophouse chưa "liền mạch" do khoảng hở
+    footprint OSM; thiếu cây đa cổ thụ rễ phụ ở quảng trường Nhà hát.
     Test: headless render tại từng toạ độ gap, 0 lỗi JS, mọi mesh mới hiện diện.
 
 - **2026-07-06 (z)** [XE MÁY]: sửa 3 lỗi người dùng nêu. (1) **Nghiêng xe khi rẽ**: vehicles.js

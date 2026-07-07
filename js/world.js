@@ -1310,7 +1310,7 @@ export function buildWorld(scene) {
       const central = (cx * cx + cz * cz) < 780 * 780;
       let lv;
       if (b.l > 0) lv = central ? Math.max(b.l, 3) : b.l;
-      else if (central) lv = (b.a < 130 ? 3 + (hash % 3) : 4 + (hash % 4)); // 3-5 / 4-7 tầng
+      else if (central) lv = (b.a < 130 ? 3 + (hash % 3) : 3 + (hash % 4)); // 3-5 / 3-6 tầng (shophouse sơn màu)
       else lv = (b.a < 150 ? 2 + (hash % 3) : 2 + (hash % 2));
       const h = Math.min(62, 3 + lv * 3.3);   // 1:1 — 3.3m/tầng thật
       try {
@@ -1326,7 +1326,7 @@ export function buildWorld(scene) {
         const cols = new Float32Array(cnt * 3);
         const wall = wallPalette[hash % wallPalette.length];
         const roofC = roofPalette[hash % roofPalette.length];
-        const glassy = h > 18; // nhà cao tầng: tông kính xanh xám
+        const glassy = h > 30; // CHỈ cao ốc thật (~9+ tầng) mới tông kính; shophouse 3-6 tầng giữ tường sơn màu
         for (let i = 0; i < cnt; i++) {
           const isRoof = nrm.getY(i) > 0.6;
           const c = isRoof ? roofC : wall;
