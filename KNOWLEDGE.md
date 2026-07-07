@@ -240,6 +240,12 @@ node mobile.mjs    # viewport điện thoại + joystick
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-06 (y)** [R3 — CHI TIẾT THÂN THUỘC]: thêm 5 lớp street-life procedural (nhẹ, gộp/instanced)
+    dọc phố trung tâm, né sông/cầu (groundHeight+isWater): **xe máy đỗ vỉa hè** (480 InstancedMesh 2
+    phần thân-màu/bánh-tối), **cờ đỏ sao vàng** trên cột dọc đại lộ 'p', **băng rôn cổ động** đỏ chữ vàng
+    (3 khẩu hiệu công), **cột điện + dây điện chằng chịt** (catenary 4 dây/nhịp, cột ~34m), **xích lô**
+    (InstancedMesh gần Nhà hát/chợ/nhà thờ/ga/bưu điện/bảo tàng). Hero xe chạy vẫn moto.glb Meshy.
+    Mẫu chung: RNG tất định (LCG seed) để tái lập; đặt theo ROADS_DT p/s trong bán kính ~1300–1400m.
 - **2026-07-06 (x)** [VÒNG 1 — NỀN]: VỈA HÈ ĐA DẠNG ĐÚNG TỪNG NƠI (hết "caro mặc định khắp nơi").
     Nghiên cứu: map mỗi road p/s → pano gần nhất (≤60m) → agent thị giác phân loại vỉa hè từ 51 crop
     → **phần lớn phố là XÁM bê tông (gach_xam)**, ca-rô đỏ-xám chỉ ở **bờ sông Tam Bạc/quảng trường**,

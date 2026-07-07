@@ -630,6 +630,47 @@ export function buildWorld(scene) {
     if (poleG.length) { addMerged(poleG, mat(0x9a958c), 'utilpoles'); addMerged(armG, mat(0x6b6660), 'utilarms'); addMerged(wireG, mat(0x23262b), 'utilwires'); }
   }
 
+  // ---------- XÍCH LÔ (biểu tượng du lịch) gần các điểm trung tâm — 2 InstancedMesh ----------
+  {
+    const bodyG = [], darkG = [];
+    const box = (arr, w, h, l, x, y, z) => { const g = new THREE.BoxGeometry(w, h, l); g.translate(x, y, z); arr.push(g); };
+    const wh = (x, z) => { const g = new THREE.CylinderGeometry(0.3, 0.3, 0.08, 12); g.rotateZ(Math.PI / 2); g.translate(x, 0.3, z); darkG.push(g); };
+    wh(0.52, 0.62); wh(-0.52, 0.62); wh(0, -0.95);        // 2 bánh trước + 1 bánh sau
+    box(bodyG, 1.02, 0.42, 0.95, 0, 0.52, 0.55);          // thùng chở khách
+    box(bodyG, 1.02, 0.5, 0.12, 0, 0.78, 0.12);           // tựa lưng ghế
+    box(bodyG, 0.94, 0.12, 0.8, 0, 0.74, 0.55);           // đệm ngồi
+    box(darkG, 0.06, 0.5, 1.4, 0.42, 0.7, -0.3);          // khung trái
+    box(darkG, 0.06, 0.5, 1.4, -0.42, 0.7, -0.3);         // khung phải
+    box(darkG, 0.22, 0.1, 0.32, 0, 0.98, -0.72);          // yên tài xế
+    box(darkG, 0.06, 0.44, 0.06, 0, 1.15, -0.4);          // cổ lái
+    box(darkG, 0.5, 0.06, 0.06, 0, 1.32, -0.4);           // ghi-đông
+    const bodyGeo = mergeGeometries(bodyG), darkGeo = mergeGeometries(darkG);
+    bodyG.forEach((g) => g.dispose()); darkG.forEach((g) => g.dispose());
+    const cycCols = [0x2f6db0, 0x2f8f56, 0xb23a2f, 0xcaa63c, 0x7a4bb0].map((c) => new THREE.Color(c));
+    // điểm đặt gần địa danh trung tâm (chờ khách)
+    const anchors = [LM.opera, LM.market, LM.cathedral, LM.station, LM.postoffice, LM.museum].filter(Boolean);
+    let cs = 33; const crnd = () => { cs = (cs * 1103515245 + 12345) & 0x7fffffff; return cs / 0x7fffffff; };
+    const slots = [];
+    for (const [ax, az] of anchors) {
+      const nC = 3 + (crnd() * 2 | 0);
+      for (let k = 0; k < nC; k++) {
+        const ang = crnd() * Math.PI * 2, rr = 26 + crnd() * 26;
+        const gx = ax + Math.cos(ang) * rr, gz = az + Math.sin(ang) * rr;
+        const gy = groundHeight(gx, gz);
+        if (gy < LAND_H - 0.5 || isWater(gx, gz)) continue;
+        slots.push([gx, gy, gz, crnd() * Math.PI * 2, (crnd() * cycCols.length) | 0]);
+      }
+    }
+    if (slots.length) {
+      const bodyInst = new THREE.InstancedMesh(bodyGeo, mat(0xcccccc), slots.length);
+      const darkInst = new THREE.InstancedMesh(darkGeo, mat(0x2a2a2e), slots.length);
+      const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), s = new THREE.Vector3(1, 1, 1), p = new THREE.Vector3();
+      slots.forEach(([x, y, z, ry, ci], k) => { e.set(0, ry, 0); q.setFromEuler(e); p.set(x, y, z); m.compose(p, q, s); bodyInst.setMatrixAt(k, m); darkInst.setMatrixAt(k, m); bodyInst.setColorAt(k, cycCols[ci]); });
+      bodyInst.instanceMatrix.needsUpdate = true; darkInst.instanceMatrix.needsUpdate = true; if (bodyInst.instanceColor) bodyInst.instanceColor.needsUpdate = true;
+      bodyInst.castShadow = darkInst.castShadow = true; bodyInst.name = 'cyclos'; scene.add(bodyInst); scene.add(darkInst);
+    }
+  }
+
   // ---------- XE MÁY ĐỖ VỈA HÈ (đặc trưng nhất Hải Phòng) — 2 InstancedMesh low-poly ----------
   // Hero xe máy đang chạy vẫn là moto.glb Meshy; xe ĐỖ dùng scooter procedural nhẹ, instanced hàng trăm chiếc.
   {
