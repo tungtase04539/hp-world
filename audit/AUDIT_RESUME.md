@@ -1,9 +1,9 @@
 # Pano Audit — Checkpoint (tạm dừng theo yêu cầu user tại batch 72-77)
 
 ## Tình trạng
-- **400 / 551 pano** đã catalog xong → `scratchpad/audit_done.json` (dữ liệu đầy đủ, an toàn, đã push git)
-- **151 pano còn lại** → `scratchpad/pano_remaining.json` (đã lọc sẵn, mỗi pano 4 heading 0/90/180/270)
-  - Pano số còn thiếu: **299–304, 311–420, 517–551**
+- **538 / 551 pano** đã catalog xong → `scratchpad/audit_done.json` (dữ liệu đầy đủ, an toàn, đã push git)
+- **13 pano còn lại** → `scratchpad/pano_remaining.json` (đã lọc sẵn, mỗi pano 4 heading 0/90/180/270)
+  - Pano số còn thiếu: **539–551** (chỉ còn 3 batch nhỏ)
 - Chưa chạy: verify có mục tiêu + tổng hợp bảng chi tiết + gap-list.
 
 ## Chiến lược đã chốt với user
@@ -14,7 +14,7 @@
 
 ## Cách chạy tiếp (catalog 151 pano còn lại, 4 heading)
 Script: `scratchpad/pano-audit-remaining.js` (đọc `pano_remaining.json`).
-⚠️ Trước khi chạy: sửa `const total = 223` → **151** trong `pano-audit-remaining.js`, rồi chạy MỚI (không resume — pano_remaining.json đã đổi).
+⚠️ Trước khi chạy: sửa `const total = 151` → **13** trong `pano-audit-remaining.js`, rồi chạy MỚI (không resume — pano_remaining.json đã đổi).
 Sau khi chạy xong: harvest tất cả journal wf_* → gộp vào audit_done.json (bản đầu tiên theo id).
 
 ## Nguồn dữ liệu
