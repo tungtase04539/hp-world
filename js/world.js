@@ -494,6 +494,50 @@ export function buildWorld(scene) {
   addMerged(dashGeos, mat(0xe8e4d2), 'dashes');
   addMerged(pathGeos, mat(0xc9b896), 'paths');
 
+  // ---------- CỘT ĐÈN GANG TRANG TRÍ kiểu Pháp cổ (đèn 3 cầu) dọc dải vườn hoa trung tâm ----------
+  {
+    const ironG = [], globeG = [];
+    const H = 3.9;
+    function ornLamp(x, z, gy, rotY) {
+      const base = new THREE.CylinderGeometry(0.34, 0.42, 0.7, 8); base.translate(x, gy + 0.35, z); ironG.push(base);
+      const col = new THREE.CylinderGeometry(0.1, 0.15, H, 8); col.translate(x, gy + 0.7 + H / 2, z); ironG.push(col);
+      const finial = new THREE.SphereGeometry(0.14, 8, 6); finial.translate(x, gy + 0.7 + H + 0.12, z); ironG.push(finial);
+      // 3 cầu đèn: 1 đỉnh + 2 tay ngang
+      const topY = gy + 0.7 + H - 0.1;
+      const gl0 = new THREE.SphereGeometry(0.22, 10, 8); gl0.translate(x, topY + 0.5, z); globeG.push(gl0);
+      for (const a of [rotY + Math.PI / 2, rotY - Math.PI / 2]) {
+        const ax = Math.sin(a), az = Math.cos(a);
+        const arm = new THREE.CylinderGeometry(0.05, 0.05, 0.95, 5); arm.rotateZ(Math.PI / 2);
+        const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, a, 0));
+        arm.applyMatrix4(new THREE.Matrix4().compose(new THREE.Vector3(x + ax * 0.48, topY + 0.05, z + az * 0.48), q, new THREE.Vector3(1, 1, 1)));
+        ironG.push(arm);
+        const gl = new THREE.SphereGeometry(0.2, 10, 8); gl.translate(x + ax * 0.92, topY + 0.02, z + az * 0.92); globeG.push(gl);
+      }
+    }
+    for (let ri = 0; ri < ROADS_DT.length; ri++) {
+      const r = ROADS_DT[ri];
+      if (r.c !== 'p' && r.c !== 's') continue;
+      const wRoad = ROAD_W[r.c];
+      for (let i = 0; i < r.pts.length - 1; i++) {
+        const [x1, z1] = r.pts[i], [x2, z2] = r.pts[i + 1];
+        const segLen = Math.hypot(x2 - x1, z2 - z1); if (segLen < 10) continue;
+        const dxn = (x2 - x1) / segLen, dzn = (z2 - z1) / segLen, rotY = Math.atan2(x2 - x1, z2 - z1);
+        const nx = Math.cos(rotY), nz = -Math.sin(rotY);
+        for (let d = 14; d < segLen - 14; d += 38) {
+          const mx = x1 + dxn * d, mz = z1 + dzn * d;
+          if (mx * mx + mz * mz > 800 * 800) continue;    // chỉ LÕI trung tâm (dải vườn hoa)
+          for (const side of [-1, 1]) {
+            const gx = mx + side * (wRoad / 2 + 1.0) * nx, gz = mz + side * (wRoad / 2 + 1.0) * nz;
+            const gy = groundHeight(gx, gz);
+            if (gy < LAND_H - 0.5 || isWater(gx, gz)) continue;
+            ornLamp(gx, gz, gy, rotY);
+          }
+        }
+      }
+    }
+    if (ironG.length) { addMerged(ironG, mat(0x2b3a30), 'ornlamp_iron'); const gm = mergeGeometries(globeG); globeG.forEach((g) => g.dispose()); const mesh = new THREE.Mesh(gm, sharedMats.lampGlow); mesh.name = 'ornlamp_globes'; scene.add(mesh); }
+  }
+
   // ---------- CỜ ĐỎ SAO VÀNG trên cột dọc các đại lộ trung tâm (thân thuộc + hợp 2/9) ----------
   {
     const flagTex = makeTex(128, 86, (g, w, h) => {
