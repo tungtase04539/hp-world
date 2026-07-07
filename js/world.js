@@ -1146,7 +1146,7 @@ export function buildWorld(scene) {
     const awnGeo = mergeGeometries(awnG); awnG.forEach((g) => g.dispose());
     // biển hiệu: tấm chữ nhật đứng cạnh mặt tiền
     const signGeo = new THREE.BoxGeometry(0.9, 1.3, 0.12);
-    const awnCols = [0x2f6bd8, 0xd6382c, 0x2f9c4a, 0xe0a52f, 0xe8e2d6, 0x18808a].map((c) => new THREE.Color(c));
+    const awnCols = [0x3f6ea8, 0xb24a3e, 0x4f8a5c, 0xd9c48a, 0xe4ddcd, 0x9fa3a0].map((c) => new THREE.Color(c)); // bạt vải dịu (đỡ sặc sỡ)
     const signCols = [0xd6382c, 0x1f6fae, 0x2f9c4a, 0xe0a52f, 0xb23a8a, 0xe8e2d6].map((c) => new THREE.Color(c));
     const awnSlots = [], signSlots = [];
     let as = 990201; const ar = () => { as = (as * 1103515245 + 12345) & 0x7fffffff; return as / 0x7fffffff; };
@@ -1169,13 +1169,13 @@ export function buildWorld(scene) {
             const faceY = Math.atan2(-side * px, -side * pz);      // protrusion hướng ra đường
             if (ar() < 0.82) awnSlots.push([gx, gy, gz, faceY, (ar() * awnCols.length) | 0]);
             if (ar() < 0.5) signSlots.push([gx, gy + 2.0, gz, faceY, (ar() * signCols.length) | 0]);
-            if (awnSlots.length >= 460) break;
+            if (awnSlots.length >= 300) break;
           }
-          if (awnSlots.length >= 460) break;
+          if (awnSlots.length >= 300) break;
         }
-        if (awnSlots.length >= 460) break;
+        if (awnSlots.length >= 300) break;
       }
-      if (awnSlots.length >= 460) break;
+      if (awnSlots.length >= 300) break;
     }
     const mkInst = (geo, slots, cols, name, yOff) => {
       if (!slots.length) return;
@@ -1187,6 +1187,42 @@ export function buildWorld(scene) {
     };
     mkInst(awnGeo, awnSlots, awnCols, 'shop_awnings', 0);
     mkInst(signGeo, signSlots, signCols, 'shop_signs', 0);
+  }
+
+  // ---------- PANÔ CỔ ĐỘNG đỏ sao vàng + HÀNG RÀO CÔNG SỞ + CỘT CỜ (rất thân thuộc VN, theo pano) ----------
+  {
+    const faceRoadM = (x, z) => { let bd = 1e9, ry = 0; for (const r of ROADS_DT) { if (r.c !== 'p' && r.c !== 's' && r.c !== 't') continue; for (let i = 0; i < r.pts.length - 1; i++) { const mx = (r.pts[i][0] + r.pts[i + 1][0]) / 2, mz = (r.pts[i][1] + r.pts[i + 1][1]) / 2, d = Math.hypot(mx - x, mz - z); if (d < bd) { bd = d; ry = Math.atan2(mx - x, mz - z); } } } return ry; };
+    const MURALS = [[616.2,-869.1],[498.1,-844.5],[-575.9,281],[-300.7,224.1],[-429.1,73.9],[-129.7,683.5],[-187.8,201.6],[-119.7,97.5],[-256,-291.7],[387.1,-135.3],[68.3,-616.8],[-45.6,-319.3]];
+    const CIVIC = [[-556.3,436.6],[763.8,253.2],[-777.3,11]];
+    const muralTex = makeTex(256, 160, (g, w, h) => {
+      g.fillStyle = '#c1201a'; g.fillRect(0, 0, w, h);
+      g.fillStyle = '#ffd21a'; const cx = w * 0.22, cy = h * 0.5, R = h * 0.32, r = R * 0.42; g.beginPath();
+      for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rad = i % 2 ? r : R, px = cx + Math.cos(a) * rad, py = cy + Math.sin(a) * rad; i ? g.lineTo(px, py) : g.moveTo(px, py); } g.closePath(); g.fill();
+      g.fillStyle = '#ffe9a8'; for (let i = 0; i < 3; i++) g.fillRect(w * 0.42, h * (0.3 + i * 0.2), w * 0.5, h * 0.09);
+    });
+    const muralMat = new THREE.MeshLambertMaterial({ map: muralTex });
+    const postG = [];
+    for (const [x, z] of MURALS) { const gy = groundHeight(x, z); if (gy < LAND_H - 0.5 || isWater(x, z)) continue;
+      const ry = faceRoadM(x, z);
+      const panel = new THREE.Mesh(new THREE.BoxGeometry(4.2, 2.6, 0.2), [mat(0x9a1c17), mat(0x9a1c17), mat(0x9a1c17), mat(0x9a1c17), muralMat, muralMat]);
+      panel.position.set(x, gy + 3.0, z); panel.rotation.y = ry; panel.name = 'mural'; scene.add(panel);
+      const dx = Math.sin(ry + Math.PI / 2), dz = Math.cos(ry + Math.PI / 2);
+      for (const s of [-1, 1]) { const p = new THREE.CylinderGeometry(0.1, 0.12, 3.6, 6); p.translate(x + dx * 1.7 * s, gy + 1.8, z + dz * 1.7 * s); postG.push(p); }
+      addCollider(x, z, 0.6);
+    }
+    if (postG.length) addMerged(postG, mat(0x8a8f92), 'mural_posts');
+    const fenceG = [];
+    const flagTex = makeTex(80, 54, (g, w, h) => { g.fillStyle = '#da251d'; g.fillRect(0, 0, w, h); g.fillStyle = '#ffdd00'; const cx = w / 2, cy = h / 2, R = h * 0.34, r = R * 0.42; g.beginPath(); for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rad = i % 2 ? r : R, px = cx + Math.cos(a) * rad, py = cy + Math.sin(a) * rad; i ? g.lineTo(px, py) : g.moveTo(px, py); } g.closePath(); g.fill(); });
+    for (const [x, z] of CIVIC) { const gy = groundHeight(x, z); if (gy < LAND_H - 0.5 || isWater(x, z)) continue;
+      const ry = faceRoadM(x, z), dx = Math.cos(ry), dz = -Math.sin(ry);
+      for (let t = -5; t <= 5; t += 0.55) { const bar = new THREE.BoxGeometry(0.07, 1.4, 0.07); bar.translate(x + dx * t, gy + 0.7, z + dz * t); fenceG.push(bar); }
+      const top = new THREE.BoxGeometry(10.6, 0.12, 0.12); top.rotateY(ry); top.translate(x, gy + 1.4, z); fenceG.push(top);
+      const bot = new THREE.BoxGeometry(10.6, 0.12, 0.12); bot.rotateY(ry); bot.translate(x, gy + 0.2, z); fenceG.push(bot);
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.14, 7, 8), mat(0xd8dce0)); pole.position.set(x, gy + 3.5, z); scene.add(pole);
+      const flag = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 1.5), new THREE.MeshLambertMaterial({ map: flagTex, side: THREE.DoubleSide })); flag.position.set(x + 1.1, gy + 6, z); scene.add(flag);
+      addCollider(x, z, 0.5);
+    }
+    if (fenceG.length) addMerged(fenceG, mat(0x35503a), 'civic_fences');
   }
 
   // ---------- 1.200+ TÒA NHÀ THẬT (footprint OSM đùn khối, gộp 1 mesh) ----------
@@ -1270,7 +1306,12 @@ export function buildWorld(scene) {
       if (lmSkip.some(([lx, lz, r]) => (cx - lx) ** 2 + (cz - lz) ** 2 < r * r)) continue;
       if (riverFactor(cx, cz) > 0.01 || Math.abs(groundHeightNoDeck(cx, cz) - LAND_H) > 0.4) continue;
       const hash = Math.abs(Math.floor(cx * 13 + cz * 7));
-      const lv = b.l > 0 ? b.l : (b.a < 150 ? 2 + (hash % 3) : 2 + (hash % 2));
+      // Lõi trung tâm: phố thương mại thực tế 3-5 tầng liền mạch (đối chiếu pano) → nâng nhà generic
+      const central = (cx * cx + cz * cz) < 780 * 780;
+      let lv;
+      if (b.l > 0) lv = central ? Math.max(b.l, 3) : b.l;
+      else if (central) lv = (b.a < 130 ? 3 + (hash % 3) : 4 + (hash % 4)); // 3-5 / 4-7 tầng
+      else lv = (b.a < 150 ? 2 + (hash % 3) : 2 + (hash % 2));
       const h = Math.min(62, 3 + lv * 3.3);   // 1:1 — 3.3m/tầng thật
       try {
         const shape = new THREE.Shape(poly.map(([x, z]) => new THREE.Vector2(x, -z)));
@@ -2547,6 +2588,34 @@ export function buildWorld(scene) {
     bakeTree(g, x, z);
     addCollider(x, z, 0.6);
   }
+  // CÂY XANH BÓNG MÁT (xà cừ/bàng) — tán tròn xanh, biến thể cắt cụt cành (pollard) như phố thật
+  function shadeTree(x, z) {
+    const g = new THREE.Group();
+    const y = groundHeight(x, z);
+    const frac = (v) => { const t = Math.abs(v); return t - Math.floor(t); };
+    const s1 = frac(Math.sin(x * 1.11 + z * 0.71) * 33457.1);
+    const pollard = frac(Math.sin(x * 0.53 + z * 1.9) * 9137.3) < 0.30;   // ~30% cây cắt cụt cành
+    const scale = 0.85 + s1 * 1.05;
+    const trunkH = (pollard ? 2.5 : 3.7) * scale, crownY = trunkH + (pollard ? 0.3 : 0.9) * scale, crownR = (pollard ? 1.9 : 3.4) * scale;
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.3 * scale, 0.6 * scale, trunkH, 6), sharedMats.trunk);
+    trunk.position.y = trunkH / 2; g.add(trunk);
+    if (pollard) {
+      for (let i = 0; i < 4; i++) { const a = i / 4 * Math.PI * 2 + s1 * 3; const stub = new THREE.Mesh(new THREE.CylinderGeometry(0.1 * scale, 0.18 * scale, 0.9 * scale, 4), sharedMats.trunk); stub.position.set(Math.cos(a) * 0.5 * scale, trunkH, Math.sin(a) * 0.5 * scale); stub.rotation.set(Math.cos(a) * 1.0, 0, -Math.sin(a) * 1.0); g.add(stub); }
+      const ball = new THREE.Mesh(canopyGeo(crownR, x * 2 + z), sharedMats.leafDark); ball.position.y = crownY; ball.scale.y = 0.85; g.add(ball);
+    } else {
+      const blobs = [[0, 0.6, 0, 1.1], [-0.5, 0.15, 0.4, 0.76], [0.5, 0.2, -0.35, 0.78], [0.1, 0.0, 0.6, 0.7]];
+      blobs.forEach(([ox, oy, oz, rf], i) => { const leaf = new THREE.Mesh(canopyGeo(crownR * rf, x * 2.7 + z * 1.3 + i), i % 2 ? sharedMats.leafGreen : sharedMats.leafDark); leaf.position.set(ox * crownR, crownY + oy * scale, oz * crownR); leaf.scale.y = 0.72; g.add(leaf); });
+    }
+    g.position.set(x, y, z); g.rotation.y = x * 0.7 + z;
+    bakeTree(g, x, z); addCollider(x, z, 0.8 * scale);
+  }
+  // dispatcher cây phố: đa số xanh bóng mát, phượng vẫn nổi bật (Thành phố Hoa Phượng Đỏ), ít cọ
+  function streetTree(x, z) {
+    const h = (function (v) { const t = Math.abs(v); return t - Math.floor(t); })(Math.sin(x * 3.3 + z * 1.9) * 24571.3);
+    if (h < 0.55) shadeTree(x, z);
+    else if (h < 0.90) phuongTree(x, z);
+    else palm(x, z);
+  }
   {
     // phượng + đèn dọc các trục trung tâm gần Nhà hát lớn
     const lmPts = Object.values(LM);
@@ -2600,9 +2669,7 @@ export function buildWorld(scene) {
       if (riverFactor(tx, tz) > 0.01) continue;
       if (lmPts.some(([lx, lz]) => (tx - lx) ** 2 + (tz - lz) ** 2 < 18 * 18)) continue;
       if (!freeSpot(tx, tz)) continue;
-      const hash = Math.abs(Math.floor(tx * 7 + tz * 13));
-      if (hash % 5 === 0) palm(tx, tz);
-      else phuongTree(tx, tz);
+      streetTree(tx, tz);   // đa số cây xanh bóng mát + phượng nổi bật + ít cọ
       nReal++;
     }
     // rải thêm cây trong các công viên thật (lưới + jitter, thưa)
@@ -2620,7 +2687,7 @@ export function buildWorld(scene) {
           if (riverFactor(jx, jz) > 0.01) continue;
           if (lmPts.some(([lx, lz]) => (jx - lx) ** 2 + (jz - lz) ** 2 < 55 * 55)) continue;
           if (!freeSpot(jx, jz)) continue;
-          if (hash < 0.12) palm(jx, jz); else phuongTree(jx, jz);
+          streetTree(jx, jz);
           nPark++;
         }
       }
@@ -3228,7 +3295,7 @@ export function buildWorld(scene) {
           const t = (s + 0.5) / steps; let tx = ax + (bx - ax) * t, tz = az + (bz - az) * t;
           const dx = cx0 - tx, dz = cz0 - tz, dl = Math.hypot(dx, dz) || 1; tx += dx / dl * 4; tz += dz / dl * 4;
           if (Math.abs(groundHeightNoDeck(tx, tz) - LAND_H) > 0.6) continue;
-          if ((ti++ % 5) === 0) heroTree(tx, tz); else phuongTree(tx, tz);
+          if ((ti++ % 5) === 0) heroTree(tx, tz); else streetTree(tx, tz);
         }
       }
       // KHÔNG chặn giữa vườn (trừ Nhà Kèn) — công viên/vườn hoa ĐI ĐƯỢC
