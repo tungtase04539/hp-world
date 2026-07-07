@@ -583,6 +583,53 @@ export function buildWorld(scene) {
     banGeos.forEach((geos, k) => { if (!geos.length) return; const m = mergeGeometries(geos); geos.forEach((g) => g.dispose()); const mesh = new THREE.Mesh(m, banMats[k]); mesh.name = 'banner' + k; scene.add(mesh); });
   }
 
+  // ---------- CỘT ĐIỆN BÊ TÔNG + DÂY ĐIỆN CHẰNG CHỊT (rất đặc trưng phố Việt) ----------
+  {
+    const poleG = [], armG = [], wireG = [];
+    const PH = 8.2;
+    // cột + xà ngang; trả về [x, topY, z] để nối dây
+    function utilPole(x, z, gy, rotY) {
+      const p = new THREE.CylinderGeometry(0.12, 0.18, PH, 6); p.translate(x, gy + PH / 2, z); poleG.push(p);
+      const px = Math.cos(rotY), pz = -Math.sin(rotY);
+      for (const hy of [PH - 0.6, PH - 1.5]) { const a = new THREE.BoxGeometry(1.5, 0.1, 0.1); const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, rotY, 0)); a.applyMatrix4(new THREE.Matrix4().compose(new THREE.Vector3(x, gy + hy, z), q, new THREE.Vector3(1, 1, 1))); armG.push(a); }
+      return [x, gy, z, px, pz];
+    }
+    // dây võng giữa 2 cột (catenary 4 đoạn), theo offset ngang trên xà
+    function stringWire(A, B, hy, lat) {
+      const ax = A[0] + A[3] * lat, az = A[2] + A[4] * lat, bx = B[0] + B[3] * lat, bz = B[2] + B[4] * lat;
+      const y0 = A[1] + hy, y1 = B[1] + hy, sag = 0.9, N = 4;
+      let prev = null;
+      for (let i = 0; i <= N; i++) { const t = i / N; const x = ax + (bx - ax) * t, z = az + (bz - az) * t, y = y0 + (y1 - y0) * t - Math.sin(t * Math.PI) * sag; if (prev) { const dx = x - prev[0], dy = y - prev[1], dz = z - prev[2]; const L = Math.hypot(dx, dy, dz); const seg = new THREE.CylinderGeometry(0.02, 0.02, L, 4); const mid = new THREE.Vector3((x + prev[0]) / 2, (y + prev[1]) / 2, (z + prev[2]) / 2); const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(dx, dy, dz).normalize()); seg.applyMatrix4(new THREE.Matrix4().compose(mid, q, new THREE.Vector3(1, 1, 1))); wireG.push(seg); } prev = [x, y, z]; }
+    }
+    let us = 91; const urnd = () => { us = (us * 1103515245 + 12345) & 0x7fffffff; return us / 0x7fffffff; };
+    for (let ri = 0; ri < ROADS_DT.length; ri++) {
+      const r = ROADS_DT[ri];
+      if (r.c !== 'p' && r.c !== 's') continue;
+      const wRoad = ROAD_W[r.c];
+      // đi dọc toàn tuyến (nối các segment) đặt cột đều ~34m rồi nối dây
+      const poles = [];
+      const side = urnd() < 0.5 ? 1 : -1;
+      let acc = 8;
+      for (let i = 0; i < r.pts.length - 1; i++) {
+        const [x1, z1] = r.pts[i], [x2, z2] = r.pts[i + 1];
+        const segLen = Math.hypot(x2 - x1, z2 - z1); if (segLen < 1) continue;
+        const dxn = (x2 - x1) / segLen, dzn = (z2 - z1) / segLen, rotY = Math.atan2(x2 - x1, z2 - z1);
+        const nx = Math.cos(rotY), nz = -Math.sin(rotY);
+        for (; acc < segLen; acc += 34) {
+          const mx = x1 + dxn * acc, mz = z1 + dzn * acc;
+          if (mx * mx + mz * mz > 1350 * 1350) { poles.length = 0; continue; }
+          const gx = mx + side * (wRoad / 2 + 1.1) * nx, gz = mz + side * (wRoad / 2 + 1.1) * nz;
+          const gy = groundHeight(gx, gz);
+          if (gy < LAND_H - 0.5 || isWater(gx, gz)) { poles.length && poles.push(null); continue; }
+          poles.push(utilPole(gx, gz, gy, rotY));
+        }
+        acc -= segLen;
+      }
+      for (let i = 0; i < poles.length - 1; i++) { const A = poles[i], B = poles[i + 1]; if (!A || !B) continue; for (const [hy, lat] of [[PH - 0.6, -0.55], [PH - 0.6, 0.55], [PH - 1.5, -0.4], [PH - 1.5, 0.4]]) stringWire(A, B, hy, lat); }
+    }
+    if (poleG.length) { addMerged(poleG, mat(0x9a958c), 'utilpoles'); addMerged(armG, mat(0x6b6660), 'utilarms'); addMerged(wireG, mat(0x23262b), 'utilwires'); }
+  }
+
   // ---------- XE MÁY ĐỖ VỈA HÈ (đặc trưng nhất Hải Phòng) — 2 InstancedMesh low-poly ----------
   // Hero xe máy đang chạy vẫn là moto.glb Meshy; xe ĐỖ dùng scooter procedural nhẹ, instanced hàng trăm chiếc.
   {
