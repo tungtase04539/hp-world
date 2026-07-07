@@ -494,6 +494,47 @@ export function buildWorld(scene) {
   addMerged(dashGeos, mat(0xe8e4d2), 'dashes');
   addMerged(pathGeos, mat(0xc9b896), 'paths');
 
+  // ---------- GIÀN VÒM THÉP TRẮNG trang trí (dải công viên trung tâm, gần Trần Bình Trọng) ----------
+  // Theo pano thật pano_195 [~555,-234]: dãy vòm bán nguyệt trắng lặp trên lối đi lát.
+  {
+    const archGeos = [];
+    const cx0 = 585, cz0 = -238;            // trong dải công viên phía đông pano
+    const dir = Math.atan2(1, -0.15);        // chạy gần Bắc-Nam theo dải
+    const dxn = Math.sin(dir), dzn = Math.cos(dir);
+    for (let k = 0; k < 15; k++) {
+      const x = cx0 + dxn * k * 2.4, z = cz0 + dzn * k * 2.4;
+      const gy = groundHeight(x, z);
+      if (gy < LAND_H - 0.5 || isWater(x, z)) continue;
+      const arch = new THREE.TorusGeometry(1.7, 0.12, 6, 20, Math.PI);
+      const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, dir, 0));
+      arch.applyMatrix4(new THREE.Matrix4().compose(new THREE.Vector3(x, gy + 0.05, z), q, new THREE.Vector3(1, 1, 1)));
+      archGeos.push(arch);
+    }
+    if (archGeos.length) addMerged(archGeos, mat(0xf2f4f6), 'white_arches');
+  }
+
+  // ---------- CỘT CỜ LỚN giữa quảng trường (theo pano pano_407 [~-30,127]) ----------
+  {
+    const fx = -28, fz = 120, gy = groundHeight(fx, fz);
+    if (gy > LAND_H - 0.5 && !isWater(fx, fz)) {
+      const PH = 13;
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.2, PH, 10), mat(0xd8dce0));
+      pole.position.set(fx, gy + PH / 2, fz); scene.add(pole);
+      const knob = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 6), mat(0xe8c14a));
+      knob.position.set(fx, gy + PH + 0.2, fz); scene.add(knob);
+      const flagTex = makeTex(128, 86, (g, w, h) => {
+        g.fillStyle = '#da251d'; g.fillRect(0, 0, w, h);
+        const cx = w / 2, cy = h / 2, R = h * 0.36, r = R * 0.42;
+        g.fillStyle = '#ffdd00'; g.beginPath();
+        for (let i = 0; i < 10; i++) { const ang = -Math.PI / 2 + i * Math.PI / 5; const rad = i % 2 ? r : R; const x = cx + Math.cos(ang) * rad, y = cy + Math.sin(ang) * rad; i ? g.lineTo(x, y) : g.moveTo(x, y); }
+        g.closePath(); g.fill();
+      });
+      const flag = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 2.3), new THREE.MeshLambertMaterial({ map: flagTex, side: THREE.DoubleSide }));
+      flag.position.set(fx + 1.75, gy + PH - 1.5, fz); scene.add(flag);
+      addCollider(fx, fz, 0.6);
+    }
+  }
+
   // ---------- CỘT ĐÈN GANG TRANG TRÍ kiểu Pháp cổ (đèn 3 cầu) dọc dải vườn hoa trung tâm ----------
   {
     const ironG = [], globeG = [];
