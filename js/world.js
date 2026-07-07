@@ -671,6 +671,58 @@ export function buildWorld(scene) {
     }
   }
 
+  // ---------- HÀNG RONG (xe đẩy + ô che) & THÙNG RÁC công cộng dọc phố ----------
+  {
+    // xe hàng rong: phần "xe" (trung tính) + "ô che" (đổi màu) — 2 InstancedMesh
+    const cartG = [], canopyG = [];
+    const box = (arr, w, h, l, x, y, z) => { const g = new THREE.BoxGeometry(w, h, l); g.translate(x, y, z); arr.push(g); };
+    box(cartG, 0.78, 0.55, 1.15, 0, 0.55, 0);        // thùng xe
+    box(cartG, 0.72, 0.12, 1.06, 0, 0.9, 0);         // mặt bày hàng
+    box(cartG, 0.24, 0.2, 0.24, -0.2, 1.06, -0.3); box(cartG, 0.22, 0.18, 0.22, 0.22, 1.05, 0.28); // rổ/thùng hàng
+    { const w1 = new THREE.CylinderGeometry(0.22, 0.22, 0.1, 10); w1.rotateZ(Math.PI / 2); w1.translate(0.4, 0.22, 0); cartG.push(w1); const w2 = w1.clone(); w2.translate(-0.8, 0, 0); cartG.push(w2); }
+    box(cartG, 0.05, 2.2, 0.05, 0.18, 1.55, 0);      // cột ô
+    { const cone = new THREE.ConeGeometry(1.05, 0.5, 10); cone.translate(0.18, 2.6, 0); canopyG.push(cone); }
+    const cartGeo = mergeGeometries(cartG), canopyGeo = mergeGeometries(canopyG);
+    cartG.forEach((g) => g.dispose()); canopyG.forEach((g) => g.dispose());
+    const paraCols = [0xd83b2f, 0x2f7bd8, 0x3aa35a, 0xe0a52f, 0xded2c4, 0xcf4fa0].map((c) => new THREE.Color(c));
+    // thùng rác (gộp 1 mesh)
+    const binG = [];
+    let hs = 55; const hrnd = () => { hs = (hs * 1103515245 + 12345) & 0x7fffffff; return hs / 0x7fffffff; };
+    const cartSlots = [];
+    const binAnchors = [];
+    for (let ri = 0; ri < ROADS_DT.length; ri++) {
+      const r = ROADS_DT[ri];
+      if (r.c !== 'p' && r.c !== 's') continue;
+      const wRoad = ROAD_W[r.c];
+      for (let i = 0; i < r.pts.length - 1; i++) {
+        const [x1, z1] = r.pts[i], [x2, z2] = r.pts[i + 1];
+        const segLen = Math.hypot(x2 - x1, z2 - z1); if (segLen < 6) continue;
+        const dxn = (x2 - x1) / segLen, dzn = (z2 - z1) / segLen, rotY = Math.atan2(x2 - x1, z2 - z1);
+        const nx = Math.cos(rotY), nz = -Math.sin(rotY);
+        for (let d = 5; d < segLen - 5; d += 6) {
+          const mx = x1 + dxn * d, mz = z1 + dzn * d;
+          if (mx * mx + mz * mz > 1300 * 1300) continue;
+          const side = hrnd() < 0.5 ? 1 : -1;
+          const gx = mx + side * (wRoad / 2 + 1.4) * nx, gz = mz + side * (wRoad / 2 + 1.4) * nz;
+          const gy = groundHeight(gx, gz); if (gy < LAND_H - 0.5 || isWater(gx, gz)) continue;
+          const rv = hrnd();
+          if (rv < 0.05 && cartSlots.length < 70) cartSlots.push([gx, gy, gz, hrnd() * Math.PI * 2, (hrnd() * paraCols.length) | 0]);
+          else if (rv > 0.93 && binAnchors.length < 120) binAnchors.push([gx, gy, gz]);
+        }
+      }
+    }
+    for (const [x, y, z] of binAnchors) { const body = new THREE.CylinderGeometry(0.26, 0.22, 0.8, 8); body.translate(x, y + 0.4, z); binG.push(body); const lid = new THREE.CylinderGeometry(0.28, 0.28, 0.08, 8); lid.translate(x, y + 0.84, z); binG.push(lid); }
+    if (binG.length) addMerged(binG, mat(0x2f6b3a), 'trashbins');
+    if (cartSlots.length) {
+      const cInst = new THREE.InstancedMesh(cartGeo, mat(0x8a7f6a), cartSlots.length);
+      const pInst = new THREE.InstancedMesh(canopyGeo, mat(0xcccccc), cartSlots.length);
+      const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), s = new THREE.Vector3(1, 1, 1), p = new THREE.Vector3();
+      cartSlots.forEach(([x, y, z, ry, ci], k) => { e.set(0, ry, 0); q.setFromEuler(e); p.set(x, y, z); m.compose(p, q, s); cInst.setMatrixAt(k, m); pInst.setMatrixAt(k, m); pInst.setColorAt(k, paraCols[ci]); });
+      cInst.instanceMatrix.needsUpdate = true; pInst.instanceMatrix.needsUpdate = true; if (pInst.instanceColor) pInst.instanceColor.needsUpdate = true;
+      cInst.castShadow = pInst.castShadow = true; cInst.name = 'vendors'; scene.add(cInst); scene.add(pInst);
+    }
+  }
+
   // ---------- XE MÁY ĐỖ VỈA HÈ (đặc trưng nhất Hải Phòng) — 2 InstancedMesh low-poly ----------
   // Hero xe máy đang chạy vẫn là moto.glb Meshy; xe ĐỖ dùng scooter procedural nhẹ, instanced hàng trăm chiếc.
   {
