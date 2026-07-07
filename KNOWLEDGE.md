@@ -240,6 +240,13 @@ node mobile.mjs    # viewport điện thoại + joystick
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-06 (z)** [XE MÁY]: sửa 3 lỗi người dùng nêu. (1) **Nghiêng xe khi rẽ**: vehicles.js
+    `v.lean` nội suy theo turnInput → `mesh.rotateZ` quanh trục tiến (rẽ trái/phải nghiêng, đi thẳng
+    thẳng); main.js cho người nghiêng theo (rotation.z=v.lean). (2) **Tư thế ngồi**: character.sit đùi
+    đưa trước+dạng, tay vươn ghi-đông, thân chồm (lộ `torso` ra return object). (3) **Bánh trước ngoắc
+    sang trái** = do CHÍNH GLB (ảnh gốc chụp xe bánh lệch) → dựng lại moto.glb bằng Meshy-5 từ ảnh
+    Super Cub side-profile **bánh trước THẲNG** (silodrome), simplify 33k/612KB. normalizeMoto giữ
+    nguyên (front→+Z đúng). moto.glb tải qua raw.githubusercontent (vehicles.js), KHÔNG qua jsDelivr SHA-pin.
 - **2026-07-06 (y)** [R3 — CHI TIẾT THÂN THUỘC]: thêm 5 lớp street-life procedural (nhẹ, gộp/instanced)
     dọc phố trung tâm, né sông/cầu (groundHeight+isWater): **xe máy đỗ vỉa hè** (480 InstancedMesh 2
     phần thân-màu/bánh-tối), **cờ đỏ sao vàng** trên cột dọc đại lộ 'p', **băng rôn cổ động** đỏ chữ vàng
