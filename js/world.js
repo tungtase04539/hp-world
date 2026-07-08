@@ -1737,6 +1737,27 @@ export function buildWorld(scene) {
     let bs = 424241; const brnd = () => { bs = (bs * 1103515245 + 12345) & 0x7fffffff; return bs / 0x7fffffff; };
     let nB = 0;
     const CAPB = 5600;   // vệ tinh GE: lòng ô kín mái ~100% → lưới dày, nhà gần chạm nhau
+    // KHU PHÂN LÔ LIỀN KỀ MỚI cạnh THPT Lê Hồng Phong (GE ảnh 4: dãy nhà trắng đều) — georef từ ảnh
+    {
+      const R = { x1: -1035, x2: -925, z1: -545, z2: -405 };
+      for (let rx = R.x1 + 3; rx <= R.x2 - 3 && nB < CAPB; rx += 5.4) {
+        for (let rz = R.z1 + 5; rz <= R.z2 - 5 && nB < CAPB; rz += 11) {
+          if (Math.abs(groundHeightNoDeck(rx, rz) - LAND_H) > 0.3 || riverFactor(rx, rz) > 0.01) continue;
+          const [big2, alley2] = roadDists(rx, rz);
+          if (big2 < 17.5 || alley2 < 7) continue;                  // đường phân lô nhỏ: chỉ cần cách 7m
+          if (_gridNear(_bldGrid, rx, rz, 12)) continue;
+          if (openSpace(rx, rz)) continue;
+          const h2 = 12.8, gy2 = groundHeight(rx, rz);              // liền kề mới 4 tầng, trắng kem, mái xám
+          const bx2 = new THREE.BoxGeometry(4.8, h2, 8.2);
+          { const nrm = bx2.attributes.normal, cn = bx2.attributes.position.count, c = new Float32Array(cn * 3);
+            for (let v = 0; v < cn; v++) { const isR = nrm.getY(v) > 0.6; const sh = isR ? 0.94 : 0.84 + 0.16 * Math.abs(nrm.getX(v));
+              c[v * 3] = (isR ? 0.62 : 0.93) * sh; c[v * 3 + 1] = (isR ? 0.63 : 0.91) * sh; c[v * 3 + 2] = (isR ? 0.66 : 0.86) * sh; }
+            bx2.setAttribute('color', new THREE.BufferAttribute(c, 3)); }
+          bx2.translate(rx, gy2 + h2 / 2, rz);
+          geos.push(bx2); addCollider(rx, rz, 4.2); nB++;
+        }
+      }
+    }
     for (let gx = -1100; gx <= 900 && nB < CAPB; gx += 10.5) {
       for (let gz = -900; gz <= 560 && nB < CAPB; gz += 10.5) {
         const x = gx + (brnd() - 0.5) * 4, z = gz + (brnd() - 0.5) * 4;
