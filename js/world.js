@@ -1710,6 +1710,66 @@ export function buildWorld(scene) {
     }
   }
 
+  // ---------- LẤP LÒNG Ô PHỐ theo 2 bản đồ (OSM + footprint): ô phố thật DÀY ĐẶC nhà, game đang rỗng ruột ----------
+  // Nhà ống nhỏ 2-3 tầng phủ kín lòng ô (block interior), chừa: mọi loại đường, công viên/vườn hoa/quảng trường/kè,
+  // hành lang đường sắt, nhà OSM thật, và chỉ nơi Ô CÓ BẰNG CHỨNG nhà (footprint OSM <60m hoặc điểm nhà pano <40m).
+  {
+    const BK = 48; const segBuck = new Map();
+    const addSeg = (ax, az, bx, bz, big) => {
+      for (let gx = Math.floor((Math.min(ax, bx) - BK) / BK); gx <= Math.floor((Math.max(ax, bx) + BK) / BK); gx++)
+        for (let gz = Math.floor((Math.min(az, bz) - BK) / BK); gz <= Math.floor((Math.max(az, bz) + BK) / BK); gz++) {
+          const k = gx + ',' + gz; let l = segBuck.get(k); if (!l) segBuck.set(k, l = []); l.push([ax, az, bx, bz, big]);
+        }
+    };
+    for (const r of ROADS_DT) for (let i = 0; i < r.pts.length - 1; i++) addSeg(r.pts[i][0], r.pts[i][1], r.pts[i + 1][0], r.pts[i + 1][1], (r.c === 'p' || r.c === 's' || r.c === 't') ? 1 : 0);
+    for (const rl of (RAIL || [])) for (let i = 0; i < rl.pts.length - 1; i++) addSeg(rl.pts[i][0], rl.pts[i][1], rl.pts[i + 1][0], rl.pts[i + 1][1], 2);
+    const roadDists = (x, z) => {
+      const kx = Math.floor(x / BK), kz = Math.floor(z / BK); let big = 1e9, alley = 1e9, rail = 1e9;
+      for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) {
+        const l = segBuck.get((kx + dx) + ',' + (kz + dz)); if (!l) continue;
+        for (const s of l) { const d = _segD(x, z, s[0], s[1], s[2], s[3]); if (s[4] === 2) { if (d < rail) rail = d; } else if (s[4] === 1) { if (d < big) big = d; } else if (d < alley) alley = d; }
+      }
+      return [big, alley, rail];
+    };
+    const wallTones = [[0.93, 0.87, 0.70], [0.90, 0.79, 0.62], [0.86, 0.88, 0.84], [0.92, 0.74, 0.62], [0.82, 0.85, 0.89], [0.88, 0.82, 0.68]];
+    const roofTones = [[0.70, 0.28, 0.18], [0.64, 0.38, 0.24], [0.55, 0.57, 0.60], [0.45, 0.48, 0.52], [0.68, 0.25, 0.20]]; // ngói đỏ + tôn xám
+    const geos = []; const lmPtsB = Object.values(LM);
+    let bs = 424241; const brnd = () => { bs = (bs * 1103515245 + 12345) & 0x7fffffff; return bs / 0x7fffffff; };
+    let nB = 0;
+    for (let gx = -1100; gx <= 900 && nB < 3200; gx += 13) {
+      for (let gz = -900; gz <= 560 && nB < 3200; gz += 13) {
+        const x = gx + (brnd() - 0.5) * 6, z = gz + (brnd() - 0.5) * 6;
+        if (Math.abs(groundHeightNoDeck(x, z) - LAND_H) > 0.3) continue;
+        if (riverFactor(x, z) > 0.01) continue;
+        const [big, alley, rail] = roadDists(x, z);
+        if (big < 17.5 || alley < 16 || rail < 15) continue;         // trong LÒNG ô, không đè dải nhà mặt phố/ngõ/ray
+        if (big > 130 && alley > 130) continue;                       // quá xa mọi đường = ngoại vi trống
+        if (_gridNear(_bldGrid, x, z, 13)) continue;                  // né nhà OSM thật
+        if (!(_gridNear(_bldGrid, x, z, 60) || _gridNear(_phGrid, x, z, 40))) continue; // Ô PHẢI CÓ BẰNG CHỨNG nhà
+        if (openSpace(x, z) || panoDenies(x, z)) continue;
+        let lmHit = false; for (const [lx, lz] of lmPtsB) { if ((x - lx) ** 2 + (z - lz) ** 2 < 30 * 30) { lmHit = true; break; } }
+        if (lmHit) continue;
+        if (!cornersDry(x, z, 1, 0, 3.4, 0, 1, 3.4)) continue;
+        const w = 5.2 + brnd() * 2.2, d = 5.2 + brnd() * 2.2, fl = 2 + ((brnd() * 2) | 0), h = fl * 3.2;
+        const gy = groundHeight(x, z);
+        const box = new THREE.BoxGeometry(w, h, d);
+        const wc = wallTones[(Math.abs(x * 7 + z * 13) | 0) % wallTones.length];
+        const rc = roofTones[(Math.abs(x * 3 + z * 5) | 0) % roofTones.length];
+        { const nrm = box.attributes.normal, cn = box.attributes.position.count, c = new Float32Array(cn * 3);
+          for (let v = 0; v < cn; v++) { const isR = nrm.getY(v) > 0.6; const t = isR ? rc : wc; const sh = isR ? 0.96 : 0.8 + 0.2 * Math.abs(nrm.getX(v)); c[v * 3] = t[0] * sh; c[v * 3 + 1] = t[1] * sh; c[v * 3 + 2] = t[2] * sh; }
+          box.setAttribute('color', new THREE.BufferAttribute(c, 3)); }
+        box.rotateY((brnd() * 4 | 0) * Math.PI / 2 + (brnd() - 0.5) * 0.2);
+        box.translate(x, gy + h / 2, z);
+        geos.push(box); addCollider(x, z, Math.max(w, d) * 0.52); nB++;
+      }
+    }
+    if (geos.length) {
+      const merged = mergeGeometries(geos); geos.forEach((g) => g.dispose());
+      const m = new THREE.Mesh(merged, new THREE.MeshLambertMaterial({ vertexColors: true }));
+      m.castShadow = true; m.receiveShadow = true; m.name = 'block_infill'; scene.add(m);
+    }
+  }
+
   // vài tòa cao tầng khu Lê Hồng Phong (đông trung tâm)
   function tower(x, z, w, hgt, color) {
     const b = new THREE.Mesh(new THREE.BoxGeometry(w, hgt, w), mat(color));

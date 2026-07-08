@@ -240,6 +240,14 @@ node mobile.mjs    # viewport điện thoại + joystick
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-07 (af)** [LẤP LÒNG Ô PHỐ theo bản đồ]: đối chiếu top-down 8 ô aerial với OSM map + bản đồ
+    footprint → ô phố game RỖNG RUỘT (nhà chỉ viền mép đường) trong khi thật DÀY ĐẶC. Thêm `block_infill`:
+    lưới 13m quét [-1100..900]×[-900..560], nhà ống 2-3 tầng (~3200 căn, 1 mesh vertex-color, mái ngói
+    đỏ/tôn xám) đặt trong LÒNG ô: cách đường lớn >17.5m/ngõ >16m/RAY >15m (segment-bucket 48m gồm cả
+    RAIL), <130m tới đường gần nhất, có BẰNG CHỨNG ô (nhà OSM <60m hoặc điểm nhà pano <40m), né openSpace/
+    panoDenies/nhà OSM <13m/landmark <30m/cornersDry. Aerial sau fix khớp pattern bản đồ footprint;
+    vườn hoa/quảng trường/kè/ray vẫn sạch. Collider r≈3.5/căn (spatial-hash chịu được).
+
 - **2026-07-07 (ae)** [BẢN ĐỒ NHÀ TỪ PANO + KÈ HỒ — ý tưởng của chủ dự án]: "check pano là vẽ được bản đồ
     nhà dân ở toạ độ nào". Sinh `js/housemap.js`: 1920 điểm NHÀ THẬT = vị trí pano + 14m theo heading
     từng nhà trong catalog. Luật đặt nhà procedural mới (cả shophouse + nhà tự mọc):
