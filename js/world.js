@@ -1463,6 +1463,14 @@ export function buildWorld(scene) {
     const s = Math.round(bearing / 45) % 8, mask = best[2];
     return !((mask >> s) & 1 || (mask >> ((s + 1) % 8)) & 1 || (mask >> ((s + 7) % 8)) & 1);
   }
+  // CẢ 4 GÓC footprint phải là ĐẤT chuẩn (không chỉ tâm) — hết nhà "lội nước" trên dải đất hẹp ven hồ/sông
+  function cornersDry(x, z, ux, uz, halfW, nx2, nz2, halfD) {
+    for (const su of [-1, 1]) for (const sv of [-1, 1]) {
+      const cx2 = x + su * halfW * ux + sv * halfD * nx2, cz2 = z + su * halfW * uz + sv * halfD * nz2;
+      if (Math.abs(groundHeightNoDeck(cx2, cz2) - LAND_H) > 0.4) return false;
+    }
+    return true;
+  }
 
   {
     const placed = [];
@@ -1488,6 +1496,7 @@ export function buildWorld(scene) {
             if (nearRealBuilding(hx, hz)) continue;
             if (openSpace(hx, hz) || onOtherRoad(hx, hz)) continue;   // né vườn hoa/quảng trường/ven hồ/đường cắt
             if (panoDenies(hx, hz)) continue;                          // pano thật không thấy nhà ở hướng này
+            if (!cornersDry(hx, hz, Math.sin(rotY), Math.cos(rotY), 4.0, px, pz, 3.8)) continue; // 4 góc là đất
             let ok = true;
             for (const [lx, lz] of lmPts) {
               if ((hx - lx) ** 2 + (hz - lz) ** 2 < 30 * 30) { ok = false; break; }
@@ -1555,6 +1564,7 @@ export function buildWorld(scene) {
             if (nearRealBuilding(gx, gz)) continue;                  // né footprint OSM thật
             if (openSpace(gx, gz) || onOtherRoad(gx, gz)) continue;  // né vườn hoa/quảng trường/ven hồ/đường cắt
             if (panoDenies(gx, gz)) continue;                         // pano thật không thấy nhà ở hướng này
+            if (!cornersDry(gx, gz, dxn, dzn, 2.6, nx, nz, 4.0)) continue; // 4 góc phải là đất — hết nhà lội nước
             let ok = true;
             for (const [lx, lz] of lmPtsS) { if ((gx - lx) ** 2 + (gz - lz) ** 2 < 34 * 34) { ok = false; break; } }
             if (!ok) continue;
