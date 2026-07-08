@@ -276,6 +276,13 @@ node mobile.mjs    # viewport điện thoại + joystick
     footprint thật (`nearRealBuilding`). Gộp 1 mesh vertex-color (tường sơn màu + vân tầng + mái ngói),
     có collider (spatial-hash 48m nên +780 collider không ảnh hưởng FPS). Mái hiên/biển hiệu (Đợt 2.5) giờ
     bám đúng vào mặt shophouse này → phố "kín" và thân thuộc.
+    **ĐỢT 4 — CHI TIẾT HOÁ SHOPHOUSE** (soi 18 phố buôn bán game↔pano, workflow 6 agent — mọi phố "kém"
+    vì shophouse còn là khối trơn). Nâng `shophouse_infill` từ khối trơn thành nhà ống chi tiết, mỗi căn:
+    tầng trệt CỬA CUỐN/KÍNH tối màu, BIỂN HIỆU ngang phủ bề rộng (màu đỏ/xanh/lá/cam/đen) + BIỂN VẪY nhô
+    vuông góc, BAN CÔNG + lan can sắt + ĐIỀU HOÀ cục nóng tầng trên, MÁI BẰNG bê tông + BỒN NƯỚC INOX,
+    2-5 tầng SO LE, MÀU TỪNG CĂN đa dạng (bạc hà/kem/cam/hồng/vàng/xám — hết "khối xám đơn điệu"). Gộp
+    parts mỗi căn → applyMatrix4 (xoay bề ngang dọc phố + đặt) → merge toàn bộ 1 mesh (167k đỉnh, 1 draw
+    call). Mái hiên/biển hiệu Đợt 2.5 bám đúng mặt tiền. Test: 0 lỗi JS, render 3 phố khớp pano rõ.
     (6) TERRAIN: hồ Tam Bạc `sh` 25→14 (bờ hẹp lại) để nước không lấn ra phố đi bộ Quang Trung (pano_004);
     numeric-verified: lõi hồ w/2=39m vẫn nước, swan/bench không đổi, chỉ rút vệt tràn ~11m. LƯU Ý: vài điểm
     ven Tam Bạc (pano_135, pano_200) nước đến từ OSM WATER MASK (không phải RIVERS) → cần chỉnh mapdata,

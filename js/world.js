@@ -1480,9 +1480,21 @@ export function buildWorld(scene) {
   // Chỉ mọc nơi CHƯA có footprint OSM; né nước/địa danh/nhà thật. Gộp 1 mesh (vertex-color + vân tầng).
   {
     const shopGeos = [];
-    const wallCols = [[0.95, 0.89, 0.72], [0.94, 0.81, 0.63], [0.86, 0.91, 0.86], [0.95, 0.72, 0.62],
-                      [0.80, 0.87, 0.93], [0.93, 0.85, 0.55], [0.88, 0.74, 0.58], [0.90, 0.80, 0.78]];
-    const roofCols = [[0.72, 0.29, 0.18], [0.62, 0.40, 0.25], [0.66, 0.25, 0.21], [0.55, 0.47, 0.40]];
+    // màu TỪNG CĂN đa dạng (bạc hà/kem/cam gạch/hồng/xám xanh/vàng/trắng/nâu) — hết "đơn điệu khối xám"
+    const bayCols = [[0.62, 0.82, 0.74], [0.94, 0.88, 0.68], [0.88, 0.55, 0.34], [0.86, 0.58, 0.64],
+                     [0.58, 0.66, 0.74], [0.95, 0.82, 0.42], [0.88, 0.90, 0.92], [0.72, 0.47, 0.40], [0.80, 0.74, 0.55]];
+    const signCols = [[0.78, 0.14, 0.12], [0.10, 0.32, 0.62], [0.10, 0.52, 0.32], [0.90, 0.58, 0.10], [0.16, 0.16, 0.20], [0.85, 0.80, 0.10]];
+    const shopfront = [0.24, 0.26, 0.30];   // cửa cuốn/kính tầng trệt (tối)
+    const roofFlat = [0.56, 0.56, 0.58];    // mái bằng bê tông
+    const railC = [0.30, 0.30, 0.33];       // lan can sắt
+    const acC = [0.86, 0.87, 0.85];         // điều hoà cục nóng
+    const tankC = [0.76, 0.78, 0.81];       // bồn nước inox
+    const colorFlat = (g, rgb) => {
+      const nrm = g.attributes.normal, cn = g.attributes.position.count, c = new Float32Array(cn * 3);
+      for (let v = 0; v < cn; v++) { const sh = 0.8 + 0.2 * Math.abs(nrm.getX(v)); c[v * 3] = rgb[0] * sh; c[v * 3 + 1] = rgb[1] * sh; c[v * 3 + 2] = rgb[2] * sh; }
+      g.setAttribute('color', new THREE.BufferAttribute(c, 3)); return g;
+    };
+    const colBox = (bw, bh, bd, x, y, z, rgb) => { const g = new THREE.BoxGeometry(bw, bh, bd); colorFlat(g, rgb); g.translate(x, y, z); return g; };
     const lmPtsS = Object.values(LM);
     let ss = 660317; const srnd = () => { ss = (ss * 1103515245 + 12345) & 0x7fffffff; return ss / 0x7fffffff; };
     const placedS = [];
@@ -1511,23 +1523,43 @@ export function buildWorld(scene) {
             for (const [ox, oz] of placedS) { if ((gx - ox) ** 2 + (gz - oz) ** 2 < 4.1 * 4.1) { ok = false; break; } }
             if (!ok) continue;
             const gy = groundHeight(gx, gz); if (gy < LAND_H - 0.5) continue;
-            const floors = 3 + ((srnd() * 3) | 0);                   // 3-5 tầng
-            const h = floors * 3.3, w = 4.2 + srnd() * 0.7, dp = 6.5 + srnd() * 1.5;
-            const box = new THREE.BoxGeometry(w, h, dp, 1, floors, 1);
-            const pos = box.attributes.position, nrm = box.attributes.normal, cnt = pos.count;
-            const col = new Float32Array(cnt * 3);
-            const wc = wallCols[(Math.abs(gx * 7 + gz * 13) | 0) % wallCols.length];
-            const rc = roofCols[(Math.abs(gx * 3 + gz * 5) | 0) % roofCols.length];
-            for (let v = 0; v < cnt; v++) {
-              const isRoof = nrm.getY(v) > 0.6;
-              let c = isRoof ? rc : wc, sh = isRoof ? 0.95 : 0.86 + 0.14 * Math.abs(nrm.getX(v));
-              if (!isRoof) { const yy = pos.getY(v) + h / 2; sh *= (Math.floor(yy / 3.3 + 0.01) % 2 === 0) ? 1 : 0.8; } // vân tầng
-              col[v * 3] = c[0] * sh; col[v * 3 + 1] = c[1] * sh; col[v * 3 + 2] = c[2] * sh;
+            const floors = 2 + ((srnd() * 4) | 0);                   // 2-5 tầng SO LE
+            const h = floors * 3.3, w = 4.0 + srnd() * 1.2, dp = 6.5 + srnd() * 1.5;
+            const bay = bayCols[(Math.abs(gx * 7 + gz * 13) | 0) % bayCols.length];
+            const sgn = signCols[(Math.abs(gx * 5 + gz * 11) | 0) % signCols.length];
+            const fz = dp / 2;                                        // mặt tiền (local +Z)
+            const parts = [];
+            // 1) THÂN: tầng trệt cửa cuốn/kính tối, tầng trên màu bay + vân tầng, mái bằng bê tông
+            const body = new THREE.BoxGeometry(w, h, dp, 1, Math.max(1, floors), 1);
+            { const nrm = body.attributes.normal, p = body.attributes.position, cn = p.count, c = new Float32Array(cn * 3);
+              for (let v = 0; v < cn; v++) {
+                const ny = nrm.getY(v), yy = p.getY(v) + h / 2; let rgb, sh = 0.82 + 0.16 * Math.abs(nrm.getX(v));
+                if (ny > 0.6) { rgb = roofFlat; sh = 0.9; }
+                else if (yy < 3.1) { rgb = shopfront; }
+                else { rgb = bay; sh *= (Math.floor(yy / 3.3 + 0.01) % 2 === 0) ? 1 : 0.86; }
+                c[v * 3] = rgb[0] * sh; c[v * 3 + 1] = rgb[1] * sh; c[v * 3 + 2] = rgb[2] * sh;
+              }
+              body.setAttribute('color', new THREE.BufferAttribute(c, 3)); body.translate(0, h / 2, 0); parts.push(body); }
+            // 2) BIỂN HIỆU ngang phủ bề rộng trên tầng trệt
+            parts.push(colBox(w * 0.98, 1.0, 0.3, 0, 3.15, fz + 0.02, sgn));
+            // 3) BIỂN VẪY nhô vuông góc mặt tiền (đôi khi)
+            if (srnd() < 0.5) parts.push(colBox(0.22, 0.85, 1.0, (srnd() < 0.5 ? 1 : -1) * w * 0.38, 3.5, fz + 0.55,
+              signCols[(Math.abs(gx * 3 + gz * 17) | 0) % signCols.length]));
+            // 4) BAN CÔNG + lan can sắt + điều hoà cục nóng (tầng 2 trở lên)
+            for (let f = 1; f < floors; f++) {
+              if (srnd() < 0.62) {
+                parts.push(colBox(w * 0.86, 0.12, 0.9, 0, f * 3.3 + 0.1, fz + 0.42, railC));   // sàn ban công
+                parts.push(colBox(w * 0.86, 0.85, 0.06, 0, f * 3.3 + 0.5, fz + 0.85, railC));  // lan can
+              }
+              if (srnd() < 0.5) parts.push(colBox(0.55, 0.4, 0.32, (srnd() - 0.5) * w * 0.7, f * 3.3 + 1.7, fz + 0.14, acC)); // điều hoà
             }
-            box.setAttribute('color', new THREE.BufferAttribute(col, 3));
-            box.rotateY(rotY + Math.PI / 2);                          // bề ngang chạy dọc phố
-            box.translate(gx, gy + h / 2, gz);
-            shopGeos.push(box); placedS.push([gx, gz]);
+            // 5) BỒN NƯỚC INOX trên mái (đôi khi)
+            if (srnd() < 0.6) { const tank = new THREE.CylinderGeometry(0.34, 0.34, 0.7, 8); colorFlat(tank, tankC);
+              tank.translate((srnd() - 0.5) * w * 0.5, h + 0.35, (srnd() - 0.5) * dp * 0.4); parts.push(tank); }
+            // gộp parts → xoay bề ngang dọc phố + đặt tại (gx,gy,gz)
+            const merged1 = mergeGeometries(parts); parts.forEach((g) => g.dispose());
+            merged1.applyMatrix4(new THREE.Matrix4().makeTranslation(gx, gy, gz).multiply(new THREE.Matrix4().makeRotationY(rotY + Math.PI / 2)));
+            shopGeos.push(merged1); placedS.push([gx, gz]);
             addCollider(gx, gz, Math.max(w, dp) * 0.5);
             if (shopGeos.length >= CAP) break outerShop;
           }
