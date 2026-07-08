@@ -258,6 +258,11 @@ node mobile.mjs    # viewport điện thoại + joystick
     và v.mesh khi mount. Bài học: MỌI vật bám camera/animate khớp phải tắt frustum culling.
     Kiểm chứng sim offline (scratchpad sim_quay2.mjs): rail 335+335/2 bờ, 66 ghế, 72 đèn; trục hồ
     100% nước; 0 đường bị ngập MỚI (59 mẫu ngập đều có sẵn từ trước = kè/cầu sông Tam Bạc, có deck).
+    GOTCHA deckHeight: ROADS_REGION vẽ thô ĐÈ QUA lòng hồ → nhánh "rf>0.03 gần đường = lát mặt
+    cầu" nâng LAND_H+0.05 thành DẢI ĐẤT nổi giữa nước (chỉ lộ ở render aerial, sim NoDeck không
+    thấy!). Sửa: trong lòng hồ (dL<half−2 theo LAKE_SEGS) chỉ nearDTRoad(8) được lát, bỏ
+    nearRegionRoad. BÀI HỌC KIỂM THỬ: sim địa hình phải chạy CẢ groundHeight (có deck) chứ
+    không riêng groundHeightNoDeck.
 - **2026-07-08 (ag)** [CHỐNG CRASH MOBILE]: Chrome điện thoại crash khi vào (user báo) — nguyên nhân:
     texture GLB 100% (nhiều tấm 4K ≈ 67MB VRAM/tấm) + preload 4 GLB song song → hết RAM/VRAM di động.
     Vá KHÔNG đụng desktop (giữ 100% theo yêu cầu): `IS_MOBILE` (UA hoặc deviceMemory≤4) trong assets.js →

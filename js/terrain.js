@@ -150,8 +150,12 @@ function deckHeight(x, z, rf) {
     if (x > p.x0 && x < p.x1 && z > p.z0 && z < p.z1) h = Math.max(h, LAND_H);
   }
   // đường bộ băng sông = mặt cầu phẳng (mọi cây cầu phố thật: cầu Rào, Lạc Long, An Dương...)
+  // NHƯNG trong LÒNG HỒ Tam Bạc: ROADS_REGION vẽ thô đè qua lòng hồ → "dải đất" nổi giữa
+  // nước (lộ ở render aerial); chỉ đường DT thật cắt hồ (đập Tam Kỳ) mới được lát mặt.
   if (rf > 0.03) {
-    if (nearDTRoad(x, z, 8) || nearRegionRoad(x, z, 9)) h = Math.max(h, LAND_H + 0.05);
+    let inLake = false;
+    for (const [ax, az, bx, bz, hf] of LAKE_SEGS) { if (distToSeg(x, z, ax, az, bx, bz) < hf - 2) { inLake = true; break; } }
+    if (nearDTRoad(x, z, 8) || (!inLake && nearRegionRoad(x, z, 9))) h = Math.max(h, LAND_H + 0.05);
   }
   return h;
 }
