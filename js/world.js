@@ -587,7 +587,9 @@ export function buildWorld(scene) {
   {
     // LAKE_SEGS (terrain.js): trục = trung tuyến 2 phố ven hồ, half thay đổi theo đoạn —
     // dùng CHUNG với carve địa hình nên rail/ghế/đèn luôn nằm đúng mép nước, không ra giữa đường
-    const OFF_RAIL = 1.8, OFF_LAMP = 3.2, OFF_BENCH = 5.2;           // + half của đoạn
+    // RÀO đứng ĐÚNG MÉP NGOÀI vỉa hè (sát mặt nước, chỉ chừa gờ 0.5m chân rào) — user chốt:
+    // "vỉa hè kéo tới rào, rào không được nằm trong vỉa hè"
+    const OFF_RAIL = -0.1, OFF_LAMP = 3.2, OFF_BENCH = 5.2;          // + half của đoạn
     // đường CẮT NGANG hồ (cầu/đập): chừa khoảng trống, không dựng lan can chắn lối đi
     const crossSegs = [];
     const _sd = (px, pz, ax, az, bx, bz) => { const dx = bx - ax, dz = bz - az, l2 = dx * dx + dz * dz; let t = l2 ? ((px - ax) * dx + (pz - az) * dz) / l2 : 0; t = Math.max(0, Math.min(1, t)); return Math.hypot(px - (ax + t * dx), pz - (az + t * dz)); };
@@ -631,7 +633,7 @@ export function buildWorld(scene) {
             for (const s of parSegs) { const d = _sd(qx, qz, s[0], s[1], s[2], s[3]); if (d < roadD) { roadD = d; eOff = s[4]; } }
             let outerDL = roadD > 40 ? HALF + 5 : HALF + 2 + roadD - eOff + 0.25;   // chạm mép trong vỉa hè của đường
             outerDL = Math.max(Math.min(outerDL, HALF + 13), HALF + 2.6);
-            const innerDL = HALF - 1.0;                                             // chớm ra mép nước (gờ kè)
+            const innerDL = HALF - 0.6;                                             // chớm ra mép nước (gờ kè 0.5m ngoài rào)
             const midDL = (innerDL + outerDL) / 2, wAcross = outerDL - innerDL;
             const sx = cx0 + nx * side * midDL, sz = cz0 + nz * side * midDL;
             if (Math.abs(groundHeightNoDeck(sx, sz) - LAND_H) < 0.5 && !nearCross(sx, sz, 4)) {
@@ -646,9 +648,11 @@ export function buildWorld(scene) {
             }
           }
           const ox = cx0 + nx * side * (HALF + OFF_RAIL), oz = cz0 + nz * side * (HALF + OFF_RAIL);
-          if (Math.abs(groundHeightNoDeck(ox, oz) - LAND_H) > 0.4) continue;  // phải là đất kè chuẩn
-          if (nearCross(ox, oz, 9)) continue;                                  // chừa lối cầu/đập cắt hồ
-          const gy = groundHeight(ox, oz) + 0.17;                              // đứng TRÊN mặt lát caro
+          // rào ở mép nước (trên gờ kè) → kiểm tra ĐẤT tại lòng vỉa hè (HALF+2), cao độ lấy theo mặt lát
+          const gx2 = cx0 + nx * side * (HALF + 2), gz2 = cz0 + nz * side * (HALF + 2);
+          if (Math.abs(groundHeightNoDeck(gx2, gz2) - LAND_H) > 0.4) continue;  // phải là đất kè chuẩn
+          if (nearCross(ox, oz, 9)) continue;                                    // chừa lối cầu/đập cắt hồ
+          const gy = groundHeight(gx2, gz2) + 0.17;                              // đứng TRÊN mặt lát caro
           const post = new THREE.BoxGeometry(0.07, 0.95, 0.07); post.translate(ox, gy + 0.48, oz); railG.push(post);
           for (const ry of [0.9, 0.5]) { const r2 = new THREE.BoxGeometry(2.62, 0.06, 0.05); r2.rotateY(barAng); r2.translate(ox, gy + ry, oz); railG.push(r2); }
           // ghế đá mỗi ~26m (TRÊN vỉa hè caro sau lan can, quay mặt ra hồ) + đèn đôi mỗi ~31m
