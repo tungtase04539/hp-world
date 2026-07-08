@@ -1,3 +1,5 @@
 assets/*.glb
 glbview.html
 /rb
+node_modules
+water_debug.png
