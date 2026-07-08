@@ -178,17 +178,18 @@ export function groundHeightNoDeck(x, z) {
   const CT = EXTRAS.catbaTown;
   h = lerp(h, LAND_H, rectFactor(x, CT[0] - 500, CT[0] + 500, z, CT[1] - 380, CT[1] + 380, 120) * smoothstep(0.35, 0.55, v));
   h = lerp(h, LAND_H, rectFactor(x, LM.port[0] - 600, LM.port[0] + 600, z, LM.port[1] - 300, LM.port[1] + 300, 90) * smoothstep(0.3, 0.5, v));
-  // KÈ HỒ TAM BẠC: mask nước OSM tràn ra ngoài lòng hồ (pano_004/007: quanh hồ là phố + nhà, không phải nước)
-  // → trong hành lang quanh hồ, điểm NGOÀI lòng hồ chuẩn bị ép thành đất; lòng hồ do RIVERS đào lại ngay dưới
-  if (h < 1.5 && x > -1150 && x < -190 && z > 60 && z < 340) {
-    let dL = 1e9;
-    for (let i = 0; i < LAKE_AXIS.length - 1; i++) { const d2 = distToSeg(x, z, LAKE_AXIS[i][0], LAKE_AXIS[i][1], LAKE_AXIS[i + 1][0], LAKE_AXIS[i + 1][1]); if (d2 < dL) dL = d2; }
-    if (dL > LAKE_HALF + 6 && dL < 95) h = LAND_H;
-  }
   // đào lòng sông (thắng san phẳng)
   const rf = riverFactor(x, z);
   if (rf > 0) h = lerp(h, -3, rf);
-  // (Hồ Tam Bạc: GIỮ NƯỚC đầy hồ theo yêu cầu chủ dự án — thực địa 2026 hồ đang cạn thi công nhưng không mô phỏng.)
+  // HỒ TAM BẠC — TẠO HÌNH SẠCH (đè lên mask OSM nham nhở): trong hành lang hồ, lòng hồ là KÊNH
+  // phẳng đều theo trục (bờ thẳng mượt, rộng đúng w); ngoài mép là ĐẤT PHỐ. Hết "bét nhè"/nước thò sau nhà.
+  // (Giữ NƯỚC đầy hồ theo yêu cầu chủ dự án — thực địa 2026 hồ cạn thi công nhưng không mô phỏng.)
+  if (x > -1150 && x < -205 && z > 55 && z < 365) {
+    let dL = 1e9;
+    for (let i = 0; i < LAKE_AXIS.length - 1; i++) { const d2 = distToSeg(x, z, LAKE_AXIS[i][0], LAKE_AXIS[i][1], LAKE_AXIS[i + 1][0], LAKE_AXIS[i + 1][1]); if (d2 < dL) dL = d2; }
+    if (dL < LAKE_HALF) h = lerp(-3, 1.7, smoothstep(LAKE_HALF - 5, LAKE_HALF, dL));   // lòng hồ mượt
+    else if (dL < 95 && h < 1.6) h = LAND_H;                                           // ngoài mép = đất phố
+  }
   return h;
 }
 

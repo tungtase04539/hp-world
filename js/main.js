@@ -94,6 +94,9 @@ if (renderer.shadowMap.enabled) {
 
 // ============ Người chơi ============
 const player = makeHumanoid({ hat: 'cap' });
+// KHÔNG frustum-cull nhân vật: chi tiết tay/chân xoay theo animation làm bounding sphere
+// lệch → bị cull nhầm khi camera bám sát lúc lái xe ("người lúc hiện lúc không")
+player.group.traverse((o) => { o.frustumCulled = false; });
 scene.add(player.group);
 const SPAWN = { x: EXTRAS.square[0] - 5, z: EXTRAS.square[1] + 23 }; // mép quảng trường Nhà hát lớn
 const pState = {
@@ -195,6 +198,7 @@ function updatePlayerOnFoot(dt, time) {
 function mount(v) {
   pState.mounted = v;
   v.mounted = true;
+  v.mesh.traverse((o) => { o.frustumCulled = false; });   // xe đang cưỡi không được cull (nhấp nháy khi lái)
   player.sit(true);
   audio.sfx('mount');
 }
