@@ -1736,9 +1736,10 @@ export function buildWorld(scene) {
     const geos = []; const lmPtsB = Object.values(LM);
     let bs = 424241; const brnd = () => { bs = (bs * 1103515245 + 12345) & 0x7fffffff; return bs / 0x7fffffff; };
     let nB = 0;
-    for (let gx = -1100; gx <= 900 && nB < 3200; gx += 13) {
-      for (let gz = -900; gz <= 560 && nB < 3200; gz += 13) {
-        const x = gx + (brnd() - 0.5) * 6, z = gz + (brnd() - 0.5) * 6;
+    const CAPB = 5600;   // vệ tinh GE: lòng ô kín mái ~100% → lưới dày, nhà gần chạm nhau
+    for (let gx = -1100; gx <= 900 && nB < CAPB; gx += 10.5) {
+      for (let gz = -900; gz <= 560 && nB < CAPB; gz += 10.5) {
+        const x = gx + (brnd() - 0.5) * 4, z = gz + (brnd() - 0.5) * 4;
         if (Math.abs(groundHeightNoDeck(x, z) - LAND_H) > 0.3) continue;
         if (riverFactor(x, z) > 0.01) continue;
         const [big, alley, rail] = roadDists(x, z);
@@ -1750,7 +1751,7 @@ export function buildWorld(scene) {
         let lmHit = false; for (const [lx, lz] of lmPtsB) { if ((x - lx) ** 2 + (z - lz) ** 2 < 30 * 30) { lmHit = true; break; } }
         if (lmHit) continue;
         if (!cornersDry(x, z, 1, 0, 3.4, 0, 1, 3.4)) continue;
-        const w = 5.2 + brnd() * 2.2, d = 5.2 + brnd() * 2.2, fl = 2 + ((brnd() * 2) | 0), h = fl * 3.2;
+        const w = 6.2 + brnd() * 2.4, d = 6.2 + brnd() * 2.4, fl = 2 + ((brnd() * 2) | 0), h = fl * 3.2;
         const gy = groundHeight(x, z);
         const box = new THREE.BoxGeometry(w, h, d);
         const wc = wallTones[(Math.abs(x * 7 + z * 13) | 0) % wallTones.length];

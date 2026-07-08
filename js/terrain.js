@@ -188,6 +188,7 @@ export function groundHeightNoDeck(x, z) {
   // đào lòng sông (thắng san phẳng)
   const rf = riverFactor(x, z);
   if (rf > 0) h = lerp(h, -3, rf);
+  // (Hồ Tam Bạc: GIỮ NƯỚC đầy hồ theo yêu cầu chủ dự án — thực địa 2026 hồ đang cạn thi công nhưng không mô phỏng.)
   return h;
 }
 
