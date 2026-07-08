@@ -82,9 +82,10 @@ function bucketQuery(buckets, x, z) {
 // Kênh Nam Triệu: nối cửa sông Cấm ra biển (luồng tàu thật giữa Đình Vũ - Cát Hải;
 // dữ liệu waterway OSM dừng ở cửa sông nên phải nối thủ công, nếu không thuyền bị "đập" chắn)
 RIVERS.push({ w: 1300, pts: [[7600, 0], [11000, 4100], [15000, 7000], [20600, 9700]] });
-// Hồ Tam Bạc: trục + bề rộng lấy từ polygon nước OSM thật; bờ hẹp (sh=6)
+// Hồ Tam Bạc: trục + bề rộng lấy từ polygon nước OSM thật; bờ hẹp sh=14 để nước không lấn
+// ra promenade/phố đi bộ Quang Trung (đối chiếu pano_004; lõi hồ w/2=39m giữ nguyên là nước)
 // để không ngập trường THCS Trần Phú ngay mép nam hồ
-RIVERS.push({ w: EXTRAS.lake.w, sh: 25, pts: EXTRAS.lake.pts });
+RIVERS.push({ w: EXTRAS.lake.w, sh: 14, pts: EXTRAS.lake.pts });
 
 const riverIdx = makeBucketIndex(RIVERS.map((r) => ({ pts: r.pts, meta: [r.w, r.sh || 28] })));
 const regionIdx = makeBucketIndex(ROADS_REGION.map((r) => ({ pts: r.pts, meta: 0 })));

@@ -1474,6 +1474,73 @@ export function buildWorld(scene) {
       }
     }
   }
+
+  // ---------- DÃY SHOPHOUSE LIỀN MẠCH dọc PHỐ CHÍNH 'p'/'s' lõi trung tâm ----------
+  // Lấp mặt phố cho hết trống: nhà ống/cửa hàng 3-5 tầng sát nhau tạo "tường phố" (đối chiếu pano).
+  // Chỉ mọc nơi CHƯA có footprint OSM; né nước/địa danh/nhà thật. Gộp 1 mesh (vertex-color + vân tầng).
+  {
+    const shopGeos = [];
+    const wallCols = [[0.95, 0.89, 0.72], [0.94, 0.81, 0.63], [0.86, 0.91, 0.86], [0.95, 0.72, 0.62],
+                      [0.80, 0.87, 0.93], [0.93, 0.85, 0.55], [0.88, 0.74, 0.58], [0.90, 0.80, 0.78]];
+    const roofCols = [[0.72, 0.29, 0.18], [0.62, 0.40, 0.25], [0.66, 0.25, 0.21], [0.55, 0.47, 0.40]];
+    const lmPtsS = Object.values(LM);
+    let ss = 660317; const srnd = () => { ss = (ss * 1103515245 + 12345) & 0x7fffffff; return ss / 0x7fffffff; };
+    const placedS = [];
+    const CAP = 780;
+    outerShop:
+    for (let ri = 0; ri < ROADS_DT.length; ri++) {
+      const r = ROADS_DT[ri]; if (r.c !== 'p' && r.c !== 's') continue;
+      const wRoad = ROAD_W[r.c];
+      for (let i = 0; i < r.pts.length - 1; i++) {
+        const [x1, z1] = r.pts[i], [x2, z2] = r.pts[i + 1];
+        const segLen = Math.hypot(x2 - x1, z2 - z1); if (segLen < 9) continue;
+        const dxn = (x2 - x1) / segLen, dzn = (z2 - z1) / segLen, rotY = Math.atan2(x2 - x1, z2 - z1);
+        const nx = Math.cos(rotY), nz = -Math.sin(rotY);           // pháp tuyến
+        for (let d = 3; d < segLen - 3; d += 4.7) {                 // shophouse sát nhau
+          const mx = x1 + dxn * d, mz = z1 + dzn * d;
+          if (mx * mx + mz * mz > 830 * 830) continue;              // lõi trung tâm
+          for (const side of [1, -1]) {
+            const off = side * (wRoad / 2 + 5.6);                    // sau vỉa hè (building-line)
+            const gx = mx + off * nx, gz = mz + off * nz;
+            if (Math.abs(groundHeightNoDeck(gx, gz) - LAND_H) > 0.3) continue;
+            if (riverFactor(gx, gz) > 0.01) continue;
+            if (nearRealBuilding(gx, gz)) continue;                  // né footprint OSM thật
+            let ok = true;
+            for (const [lx, lz] of lmPtsS) { if ((gx - lx) ** 2 + (gz - lz) ** 2 < 34 * 34) { ok = false; break; } }
+            if (!ok) continue;
+            for (const [ox, oz] of placedS) { if ((gx - ox) ** 2 + (gz - oz) ** 2 < 4.1 * 4.1) { ok = false; break; } }
+            if (!ok) continue;
+            const gy = groundHeight(gx, gz); if (gy < LAND_H - 0.5) continue;
+            const floors = 3 + ((srnd() * 3) | 0);                   // 3-5 tầng
+            const h = floors * 3.3, w = 4.2 + srnd() * 0.7, dp = 6.5 + srnd() * 1.5;
+            const box = new THREE.BoxGeometry(w, h, dp, 1, floors, 1);
+            const pos = box.attributes.position, nrm = box.attributes.normal, cnt = pos.count;
+            const col = new Float32Array(cnt * 3);
+            const wc = wallCols[(Math.abs(gx * 7 + gz * 13) | 0) % wallCols.length];
+            const rc = roofCols[(Math.abs(gx * 3 + gz * 5) | 0) % roofCols.length];
+            for (let v = 0; v < cnt; v++) {
+              const isRoof = nrm.getY(v) > 0.6;
+              let c = isRoof ? rc : wc, sh = isRoof ? 0.95 : 0.86 + 0.14 * Math.abs(nrm.getX(v));
+              if (!isRoof) { const yy = pos.getY(v) + h / 2; sh *= (Math.floor(yy / 3.3 + 0.01) % 2 === 0) ? 1 : 0.8; } // vân tầng
+              col[v * 3] = c[0] * sh; col[v * 3 + 1] = c[1] * sh; col[v * 3 + 2] = c[2] * sh;
+            }
+            box.setAttribute('color', new THREE.BufferAttribute(col, 3));
+            box.rotateY(rotY + Math.PI / 2);                          // bề ngang chạy dọc phố
+            box.translate(gx, gy + h / 2, gz);
+            shopGeos.push(box); placedS.push([gx, gz]);
+            addCollider(gx, gz, Math.max(w, dp) * 0.5);
+            if (shopGeos.length >= CAP) break outerShop;
+          }
+        }
+      }
+    }
+    if (shopGeos.length) {
+      const merged = mergeGeometries(shopGeos); shopGeos.forEach((g) => g.dispose());
+      const m = new THREE.Mesh(merged, new THREE.MeshLambertMaterial({ vertexColors: true }));
+      m.castShadow = true; m.receiveShadow = true; m.name = 'shophouse_infill'; scene.add(m);
+    }
+  }
+
   // vài tòa cao tầng khu Lê Hồng Phong (đông trung tâm)
   function tower(x, z, w, hgt, color) {
     const b = new THREE.Mesh(new THREE.BoxGeometry(w, hgt, w), mat(color));

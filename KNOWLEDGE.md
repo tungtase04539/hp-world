@@ -270,6 +270,16 @@ node mobile.mjs    # viewport điện thoại + joystick
     (3) mái hiên bớt số + hạ bão hòa màu (đỡ trôi nổi sặc sỡ).
     (4) `mural` (11 panô cổ động đỏ sao vàng trên cột) + `civic_fences` (hàng rào sắt + cột cờ đỏ búa liềm
     ở 3 công sở) theo toạ độ pano. Test: headless render từng cụm fix, 0 lỗi JS, cải thiện rõ.
+    (5) **DÃY SHOPHOUSE LIỀN MẠCH** `shophouse_infill`: khối "nhà tự mọc" cũ CHỈ mọc dọc ngõ 'r'/'t' nên
+    phố chính 'p'/'s' trống (chỉ footprint OSM có nhiều hở) → thêm ~780 nhà ống 3-5 tầng SÁT NHAU dọc phố
+    'p'/'s' lõi trung tâm (dist<830), tại building-line (offset wRoad/2+5.6, sau vỉa hè), né nước/địa danh/
+    footprint thật (`nearRealBuilding`). Gộp 1 mesh vertex-color (tường sơn màu + vân tầng + mái ngói),
+    có collider (spatial-hash 48m nên +780 collider không ảnh hưởng FPS). Mái hiên/biển hiệu (Đợt 2.5) giờ
+    bám đúng vào mặt shophouse này → phố "kín" và thân thuộc.
+    (6) TERRAIN: hồ Tam Bạc `sh` 25→14 (bờ hẹp lại) để nước không lấn ra phố đi bộ Quang Trung (pano_004);
+    numeric-verified: lõi hồ w/2=39m vẫn nước, swan/bench không đổi, chỉ rút vệt tràn ~11m. LƯU Ý: vài điểm
+    ven Tam Bạc (pano_135, pano_200) nước đến từ OSM WATER MASK (không phải RIVERS) → cần chỉnh mapdata,
+    CHƯA sửa (rủi ro cao).
     **VÒNG 3 (sửa regression)**: đối chiếu vòng 2 lộ lỗi #1 "khối hộp xám trơn trôi nổi" (30 lần) — do nâng
     tầng đẩy nhà 5-7 tầng vượt ngưỡng `glassy = h>18` → bị tô tông KÍNH XANH-XÁM lạnh. Thực tế shophouse
     3-6 tầng là nhà SƠN MÀU. Sửa: `glassy` ngưỡng **h>18 → h>30** (chỉ cao ốc ~9+ tầng mới kính); nâng tầng
