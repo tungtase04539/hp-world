@@ -86,9 +86,17 @@ RIVERS.push({ w: 1300, pts: [[7600, 0], [11000, 4100], [15000, 7000], [20600, 97
 // ra promenade/phố đi bộ Quang Trung (đối chiếu pano_004; lõi hồ w/2=39m giữ nguyên là nước)
 // để không ngập trường THCS Trần Phú ngay mép nam hồ
 RIVERS.push({ w: EXTRAS.lake.w, sh: 14, pts: EXTRAS.lake.pts });
-// trục hồ Tam Bạc mở rộng về đông (mask hồ thật kéo dài tới ~x=-240) — dùng cho clamp hành lang hồ
-const LAKE_AXIS = [...EXTRAS.lake.pts, [-240, 128]];
-const LAKE_HALF = EXTRAS.lake.w / 2;
+// TRỤC HỒ HIỆU CHỈNH cho khớp 2 PHỐ ven hồ trong game (Quang Trung/Thế Lữ):
+// trục polygon OSM (EXTRAS.lake.pts) lệch ~15m về nam so với tim 2 đường → carve đối xứng
+// theo trục cũ làm NGẬP phố Quang Trung. Đường là chân lý hiển thị → trục mới = TRUNG TUYẾN
+// 2 tim đường, nửa-rộng mỗi đoạn = (khoảng cách 2 đường)/2 − 11m (lòng đường + vỉa hè kè).
+// Mỗi đoạn: [ax, az, bx, bz, half]
+export const LAKE_SEGS = [
+  [-1139, 350, -1050, 331, 35],
+  [-1050, 331, -793, 276, 33],
+  [-793, 276, -447, 202, 30],
+  [-447, 202, -240, 158, 25],
+];
 
 const riverIdx = makeBucketIndex(RIVERS.map((r) => ({ pts: r.pts, meta: [r.w, r.sh || 28] })));
 const regionIdx = makeBucketIndex(ROADS_REGION.map((r) => ({ pts: r.pts, meta: 0 })));
@@ -182,13 +190,14 @@ export function groundHeightNoDeck(x, z) {
   const rf = riverFactor(x, z);
   if (rf > 0) h = lerp(h, -3, rf);
   // HỒ TAM BẠC — TẠO HÌNH SẠCH (đè lên mask OSM nham nhở): trong hành lang hồ, lòng hồ là KÊNH
-  // phẳng đều theo trục (bờ thẳng mượt, rộng đúng w); ngoài mép là ĐẤT PHỐ. Hết "bét nhè"/nước thò sau nhà.
+  // phẳng đều theo trục hiệu chỉnh LAKE_SEGS (bờ thẳng mượt, KHÔNG ngập 2 phố ven hồ);
+  // ngoài mép là ĐẤT PHỐ. Hết "bét nhè"/nước thò sau nhà.
   // (Giữ NƯỚC đầy hồ theo yêu cầu chủ dự án — thực địa 2026 hồ cạn thi công nhưng không mô phỏng.)
-  if (x > -1150 && x < -205 && z > 55 && z < 365) {
-    let dL = 1e9;
-    for (let i = 0; i < LAKE_AXIS.length - 1; i++) { const d2 = distToSeg(x, z, LAKE_AXIS[i][0], LAKE_AXIS[i][1], LAKE_AXIS[i + 1][0], LAKE_AXIS[i + 1][1]); if (d2 < dL) dL = d2; }
-    if (dL < LAKE_HALF) h = lerp(-3, 1.7, smoothstep(LAKE_HALF - 5, LAKE_HALF, dL));   // lòng hồ mượt
-    else if (dL < 95 && h < 1.6) h = LAND_H;                                           // ngoài mép = đất phố
+  if (x > -1160 && x < -205 && z > 55 && z < 400) {
+    let dL = 1e9, half = 30;
+    for (const [ax, az, bx, bz, hf] of LAKE_SEGS) { const d2 = distToSeg(x, z, ax, az, bx, bz); if (d2 - hf < dL - half) { dL = d2; half = hf; } }
+    if (dL < half) h = lerp(-3, 1.7, smoothstep(half - 5, half, dL));   // lòng hồ mượt
+    else if (dL < half + 60 && h < 1.6) h = LAND_H;                     // ngoài mép = đất phố
   }
   return h;
 }

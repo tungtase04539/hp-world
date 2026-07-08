@@ -241,20 +241,23 @@ node mobile.mjs    # viewport điện thoại + joystick
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
 - **2026-07-08 (ah)** [HỒ TAM BẠC SẠCH + KÈ ĐÚNG THỨ TỰ + HẾT BIỂN BAY + HẾT NHÂN VẬT NHẤP NHÁY]:
-    (1) terrain.js: lòng hồ TẠO HÌNH SẠCH đè lên mask OSM nham nhở — trong hành lang hồ
-    (x∈−1150..−205, z∈55..365) đo khoảng cách tới LAKE_AXIS (=EXTRAS.lake.pts + [−240,128]):
-    dL<HALF → kênh mượt lerp(−3,1.7); ngoài mép mà h<1.6 → LAND_H. Hết nước "bét nhè" tràn sau nhà.
-    (2) world.js KÈ HỒ viết lại: neo theo TRỤC HỒ (không theo tim đường như cũ — tim đường lệch
-    trục hồ nên rào "ra giữa đường"/mọc cạnh nhà): cả 2 bờ, rail=HALF+1.8, đèn=HALF+3.2,
-    ghế đá=HALF+5.2 (trên vỉa hè caro, quay ra hồ); chừa 9m quanh đoạn đường CẮT NGANG lòng hồ
-    (lọc: điểm giữa đoạn cách trục <HALF−4 → là cầu/đập; đường ven bờ song song KHÔNG bị tính).
+    (1) terrain.js: lòng hồ TẠO HÌNH SẠCH đè lên mask OSM nham nhở theo `LAKE_SEGS` (export) —
+    GOTCHA QUAN TRỌNG: trục polygon nước OSM (EXTRAS.lake.pts) LỆCH ~15m về nam so với tim
+    2 phố ven hồ trong game → carve đối xứng HALF=39 quanh trục đó NGẬP phố Quang Trung
+    (render kiểm chứng mới lộ). Đường là chân lý hiển thị → trục đúng = TRUNG TUYẾN 2 tim
+    đường thẳng kè cũ, nửa-rộng mỗi đoạn = gap/2 − 11m (≈35/33/30/25 tây→đông). Trong hành lang
+    (x∈−1160..−205, z∈55..400): dL<half → kênh mượt lerp(−3,1.7); ngoài mép h<1.6 → LAND_H.
+    (2) world.js KÈ HỒ viết lại: neo theo LAKE_SEGS (dùng CHUNG với terrain nên rail luôn đúng
+    mép nước): cả 2 bờ, rail=half+1.8, đèn=half+3.2, ghế đá=half+5.2 (trên vỉa hè caro, quay ra
+    hồ); chừa 9m quanh đoạn đường CẮT NGANG lòng hồ (lọc: điểm giữa đoạn cách trục <half−4 →
+    cầu/đập; đường ven bờ song song KHÔNG bị tính). openSpace() ven-hồ cũng đổi sang LAKE_SEGS.
     (3) Khối MÁI HIÊN+BIỂN HIỆU chuyển xuống SAU khối bằng-chứng-nhà, thêm guard
     openSpace/onOtherRoad/houseEvidence/panoDenies — hết biển hiệu bay lơ lửng trên mặt hồ/quảng trường.
     (4) Nhân vật "lúc hiện lúc không" khi lái xe = frustum culling cắt nhầm (bounding sphere các
     khớp xoay theo animation + camera bám sát): `frustumCulled=false` cho player.group (traverse)
     và v.mesh khi mount. Bài học: MỌI vật bám camera/animate khớp phải tắt frustum culling.
-    Kiểm chứng sim offline (scratchpad sim_quay.mjs): rail 328+352 điểm/2 bờ, 71 ghế, 69 đèn;
-    24 điểm "ướt" ngoài mép chỉ ở góc TB = sông Tam Bạc thật (hợp lệ, guard đất đã tự né).
+    Kiểm chứng sim offline (scratchpad sim_quay2.mjs): rail 335+335/2 bờ, 66 ghế, 72 đèn; trục hồ
+    100% nước; 0 đường bị ngập MỚI (59 mẫu ngập đều có sẵn từ trước = kè/cầu sông Tam Bạc, có deck).
 - **2026-07-08 (ag)** [CHỐNG CRASH MOBILE]: Chrome điện thoại crash khi vào (user báo) — nguyên nhân:
     texture GLB 100% (nhiều tấm 4K ≈ 67MB VRAM/tấm) + preload 4 GLB song song → hết RAM/VRAM di động.
     Vá KHÔNG đụng desktop (giữ 100% theo yêu cầu): `IS_MOBILE` (UA hoặc deviceMemory≤4) trong assets.js →

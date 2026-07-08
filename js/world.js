@@ -6,7 +6,7 @@ import { registerModel, shrinkTexturesForMobile } from './assets.js';
 import {
   WORLD_BOUNDS, LM, LM_DIR, LM_FACE, EXTRAS, TREES, PARKS, RAIL, DT_BOX, RIVERS, ROADS_DT, ROADS_REGION, BRIDGES, BUILDINGS,
   groundHeight, groundHeightNoDeck, isWater, landAt, riverFactor,
-  nearestRiverPoint, findShore, addPier,
+  nearestRiverPoint, findShore, addPier, LAKE_SEGS,
 } from './terrain.js';
 import { STREETS, INTERSECTIONS, MEDIANS, GARDENS } from './mapdata.js';
 import { SIDEWALK_BY_ROAD, SIDEWALK_DEFAULT } from './sidewalks.js';
@@ -541,9 +541,9 @@ export function buildWorld(scene) {
   // Neo theo TRỤC HỒ (không theo tim đường) → lan can bám đúng mép nước cả 2 bờ, thứ tự thật
   // từ hồ ra: nước → LAN CAN (mép kè) → đèn → GHẾ ĐÁ (trên vỉa hè caro, quay mặt ra hồ) → vỉa hè → đường.
   {
-    const AXIS = [...EXTRAS.lake.pts, [-240, 128]];      // trục hồ (khớp terrain.js LAKE_AXIS)
-    const HALF = EXTRAS.lake.w / 2;
-    const OFF_RAIL = HALF + 1.8, OFF_LAMP = HALF + 3.2, OFF_BENCH = HALF + 5.2;
+    // LAKE_SEGS (terrain.js): trục = trung tuyến 2 phố ven hồ, half thay đổi theo đoạn —
+    // dùng CHUNG với carve địa hình nên rail/ghế/đèn luôn nằm đúng mép nước, không ra giữa đường
+    const OFF_RAIL = 1.8, OFF_LAMP = 3.2, OFF_BENCH = 5.2;           // + half của đoạn
     // đường CẮT NGANG hồ (cầu/đập): chừa khoảng trống, không dựng lan can chắn lối đi
     const crossSegs = [];
     const _sd = (px, pz, ax, az, bx, bz) => { const dx = bx - ax, dz = bz - az, l2 = dx * dx + dz * dz; let t = l2 ? ((px - ax) * dx + (pz - az) * dz) / l2 : 0; t = Math.max(0, Math.min(1, t)); return Math.hypot(px - (ax + t * dx), pz - (az + t * dz)); };
@@ -551,25 +551,22 @@ export function buildWorld(scene) {
       if (r.c !== 'p' && r.c !== 's' && r.c !== 't' && r.c !== 'r') continue;
       for (let i = 0; i < r.pts.length - 1; i++) {
         const [x1, z1] = r.pts[i], [x2, z2] = r.pts[i + 1];
-        if (Math.max(x1, x2) < -1160 || Math.min(x1, x2) > -200 || Math.max(z1, z2) < 50 || Math.min(z1, z2) > 380) continue;
-        // chỉ lấy đoạn thực sự đi VÀO lòng hồ (điểm giữa cách trục < HALF-4) — loại đường ven bờ chạy song song
+        if (Math.max(x1, x2) < -1170 || Math.min(x1, x2) > -200 || Math.max(z1, z2) < 50 || Math.min(z1, z2) > 410) continue;
+        // chỉ lấy đoạn thực sự đi VÀO lòng hồ (điểm giữa cách trục < half-4) — loại đường ven bờ chạy song song
         const mx = (x1 + x2) / 2, mz = (z1 + z2) / 2;
-        let dm = 1e9;
-        for (let j = 0; j < AXIS.length - 1; j++) dm = Math.min(dm, _sd(mx, mz, AXIS[j][0], AXIS[j][1], AXIS[j + 1][0], AXIS[j + 1][1]));
-        if (dm < HALF - 4) crossSegs.push([x1, z1, x2, z2]);
+        for (const [ax, az, bx, bz, hf] of LAKE_SEGS) if (_sd(mx, mz, ax, az, bx, bz) < hf - 4) { crossSegs.push([x1, z1, x2, z2]); break; }
       }
     }
     const nearCross = (x, z, r) => { for (const s of crossSegs) if (_sd(x, z, s[0], s[1], s[2], s[3]) < r) return true; return false; };
     const railG = [], benchG = [], lampPostG = [], globeG = [];
-    for (let i = 0; i < AXIS.length - 1; i++) {
-      const [ax, az] = AXIS[i], [bx2, bz2] = AXIS[i + 1];
+    for (const [ax, az, bx2, bz2, HALF] of LAKE_SEGS) {
       const dx = bx2 - ax, dz = bz2 - az, L = Math.hypot(dx, dz);
       const ux = dx / L, uz = dz / L, nx = -uz, nz = ux;             // pháp tuyến trục
       const barAng = Math.atan2(ux, uz) + Math.PI / 2;               // thanh ngang dọc theo trục
       for (const side of [-1, 1]) {                                  // cả 2 bờ hồ
         for (let t = 2; t < L - 2; t += 2.6) {
           const cx0 = ax + ux * t, cz0 = az + uz * t;
-          const ox = cx0 + nx * side * OFF_RAIL, oz = cz0 + nz * side * OFF_RAIL;
+          const ox = cx0 + nx * side * (HALF + OFF_RAIL), oz = cz0 + nz * side * (HALF + OFF_RAIL);
           if (Math.abs(groundHeightNoDeck(ox, oz) - LAND_H) > 0.4) continue;  // phải là đất kè chuẩn
           if (nearCross(ox, oz, 9)) continue;                                  // chừa lối cầu/đập cắt hồ
           const gy = groundHeight(ox, oz);
@@ -577,7 +574,7 @@ export function buildWorld(scene) {
           for (const ry of [0.9, 0.5]) { const r2 = new THREE.BoxGeometry(2.62, 0.06, 0.05); r2.rotateY(barAng); r2.translate(ox, gy + ry, oz); railG.push(r2); }
           // ghế đá mỗi ~26m (TRÊN vỉa hè caro sau lan can, quay mặt ra hồ) + đèn đôi mỗi ~31m
           if (Math.round(t) % 26 < 2.6) {
-            const bx = cx0 + nx * side * OFF_BENCH, bz = cz0 + nz * side * OFF_BENCH;
+            const bx = cx0 + nx * side * (HALF + OFF_BENCH), bz = cz0 + nz * side * (HALF + OFF_BENCH);
             if (Math.abs(groundHeightNoDeck(bx, bz) - LAND_H) < 0.4 && !nearCross(bx, bz, 9)) {
               const by = groundHeight(bx, bz);
               const seat = new THREE.BoxGeometry(1.7, 0.12, 0.5); seat.rotateY(barAng); seat.translate(bx, by + 0.46, bz); benchG.push(seat);
@@ -585,7 +582,7 @@ export function buildWorld(scene) {
             }
           }
           if (Math.round(t) % 31 < 2.6) {
-            const lx = cx0 + nx * side * OFF_LAMP, lz = cz0 + nz * side * OFF_LAMP;
+            const lx = cx0 + nx * side * (HALF + OFF_LAMP), lz = cz0 + nz * side * (HALF + OFF_LAMP);
             if (Math.abs(groundHeightNoDeck(lx, lz) - LAND_H) < 0.4 && !nearCross(lx, lz, 9)) {
               const ly = groundHeight(lx, lz);
               const pole = new THREE.CylinderGeometry(0.07, 0.11, 3.6, 8); pole.translate(lx, ly + 1.8, lz); lampPostG.push(pole);
@@ -1473,7 +1470,6 @@ export function buildWorld(scene) {
   // ---- KHÔNG ĐẶT NHÀ ở KHÔNG GIAN MỞ: công viên, dải vườn hoa, quảng trường Nhà hát, ven hồ Tam Bạc, đè đường cắt ----
   const _segD = (px, pz, ax, az, bx, bz) => { const dx = bx - ax, dz = bz - az, l2 = dx * dx + dz * dz; let t = l2 ? ((px - ax) * dx + (pz - az) * dz) / l2 : 0; t = Math.max(0, Math.min(1, t)); return Math.hypot(px - (ax + t * dx), pz - (az + t * dz)); };
   const _sqX = EXTRAS.square[0], _sqZ = EXTRAS.square[1];
-  const _lakePts = EXTRAS.lake.pts, _lakeHalf = EXTRAS.lake.w / 2;
   // đoạn đường lớn (p/s/t) để né đè nhà lên lòng/mép đường cắt ngang
   const _majSeg = [];
   for (const r of ROADS_DT) { if (r.c !== 'p' && r.c !== 's' && r.c !== 't') continue; const hw = ROAD_W[r.c] / 2; for (let i = 0; i < r.pts.length - 1; i++) _majSeg.push([r.pts[i][0], r.pts[i][1], r.pts[i + 1][0], r.pts[i + 1][1], hw]); }
@@ -1484,7 +1480,7 @@ export function buildWorld(scene) {
     if (LM.lechan && Math.hypot(x - LM.lechan[0], z - LM.lechan[1]) < 55) return true; // quảng trường tượng Lê Chân (pano_428: chỉ tượng + không gian mở)
     if (Math.hypot(x + 187.8, z - 201.6) < 50) return true;          // quảng trường Trung tâm Triển lãm (pano_421: đúng 1 công trình)
     for (const g of GARDENS) if (Math.hypot(x - g.x, z - g.z) < Math.max(g.w, g.d) / 2 + 12) return true; // dải vườn hoa
-    for (let i = 0; i < _lakePts.length - 1; i++) if (_segD(x, z, _lakePts[i][0], _lakePts[i][1], _lakePts[i + 1][0], _lakePts[i + 1][1]) < _lakeHalf + 16) return true; // ven hồ Tam Bạc
+    for (const [ax, az, bx, bz, hf] of LAKE_SEGS) if (_segD(x, z, ax, az, bx, bz) < hf + 16) return true; // ven hồ Tam Bạc (trục hiệu chỉnh)
     // KÈ HỒ (pano_004-013/028-037: lan can+ghế đá+đèn, KHÔNG nhà): cấm phía-hồ (cross<0) trong 25m dọc 2 tuyến bờ
     for (const [ax, az, bx, bz, x0, x1] of [[-211, 116, -1052, 285, -1e9, 1e9], [-1007, 367, -20, 162, -1050, -260]]) {
       if (x < x0 || x > x1) continue;
