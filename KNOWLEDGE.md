@@ -240,6 +240,17 @@ node mobile.mjs    # viewport điện thoại + joystick
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-07 (ad)** [PANO LÀM NGUỒN SỰ THẬT cho vị trí nhà — user chỉ ra vẫn sai sau (ac)]: guard (ac)
+    dựa dữ liệu map tự khai (GARDENS/square/lake polyline) nên SÓT — vd polyline hồ Tam Bạc chỉ 3 điểm,
+    không phủ đoạn ven hồ phía đông [-220..-310, ~120-140] → vẫn dựng nhà trên bờ hồ. Fix: sinh
+    `js/panosides.js` từ catalog 551 pano (mỗi pano `[x,z,mask8]` — bit s bật nếu pano THẤY NHÀ ở hướng
+    compass s·45°; 550 pano, 1920 nhà đều có heading). world.js thêm `panoDenies(x,z)`: pano gần nhất
+    (<45m) phải thấy nhà ở bearing tới vị trí đặt (±1 sector); không thì bỏ. Compass: 0=Bắc=-Z,
+    bearing=atan2(dx,-dz). Áp cho CẢ shophouse_infill + nhà tự mọc. Kết quả: loại thêm 132 vị trí —
+    toàn ven hồ Tam Bạc đông/tây + phố đi bộ (khớp đúng chỗ user chỉ). Sanity: pano_007/004 mask chỉ
+    Bắc (hồ Nam ✓), pano_201 thiếu Tây (sông ✓). QUY TRÌNH từ nay: vị trí nhà = pano quyết, map chỉ phụ.
+
+
 - **2026-07-07 (ac)** [SỬA VỊ TRÍ SHOPHOUSE/NHÀ DÂN — lỗi user chỉ ra]: shophouse đặt CẢ HAI bên mọi
     phố 'p'/'s' → dựng nhầm nhà ở vỉa hè cạnh VƯỜN HOA, QUẢNG TRƯỜNG Nhà hát, VEN HỒ Tam Bạc (không
     gian mở, thực tế KHÔNG có nhà) + đè lên đường cắt ngang. Thêm helper `openSpace(x,z)` (inPark OSM +

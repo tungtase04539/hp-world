@@ -10,6 +10,7 @@ import {
 } from './terrain.js';
 import { STREETS, INTERSECTIONS, MEDIANS, GARDENS } from './mapdata.js';
 import { SIDEWALK_BY_ROAD, SIDEWALK_DEFAULT } from './sidewalks.js';
+import { PANO_SIDES } from './panosides.js';
 
 // Thế giới dựng từ dữ liệu OpenStreetMap thật của Hải Phòng (tỉ lệ 1:10,
 // trung tâm phóng đại 2.2x). Mọi con phố trung tâm là phố thật.
@@ -1450,6 +1451,18 @@ export function buildWorld(scene) {
     return false;
   }
   function onOtherRoad(x, z) { for (const s of _majSeg) if (_segD(x, z, s[0], s[1], s[2], s[3]) < s[4] + 2.5) return true; return false; }
+  // PANO LÀ NGUỒN SỰ THẬT: pano gần nhất (<45m) phải THẤY NHÀ ở hướng từ pano tới vị trí đặt (±1 sector 45°);
+  // nếu pano cho thấy hướng đó là bờ hồ/kè sông/công viên/quảng trường (không nhà) → KHÔNG đặt.
+  function panoDenies(x, z) {
+    let bd = 45 * 45, best = null;
+    for (const p of PANO_SIDES) { const dx = x - p[0], dz = z - p[1], d2 = dx * dx + dz * dz; if (d2 < bd) { bd = d2; best = p; } }
+    if (!best) return false;                                  // không có pano gần → không có dữ liệu, cho phép
+    const dx = x - best[0], dz = z - best[1];
+    if (dx * dx + dz * dz < 4) return false;                  // trùng điểm pano → không xác định hướng
+    const bearing = (Math.atan2(dx, -dz) * 180 / Math.PI + 360) % 360;  // compass: 0=Bắc(-Z), 90=Đông(+X)
+    const s = Math.round(bearing / 45) % 8, mask = best[2];
+    return !((mask >> s) & 1 || (mask >> ((s + 1) % 8)) & 1 || (mask >> ((s + 7) % 8)) & 1);
+  }
 
   {
     const placed = [];
@@ -1474,6 +1487,7 @@ export function buildWorld(scene) {
             if (riverFactor(hx, hz) > 0.01) continue;
             if (nearRealBuilding(hx, hz)) continue;
             if (openSpace(hx, hz) || onOtherRoad(hx, hz)) continue;   // né vườn hoa/quảng trường/ven hồ/đường cắt
+            if (panoDenies(hx, hz)) continue;                          // pano thật không thấy nhà ở hướng này
             let ok = true;
             for (const [lx, lz] of lmPts) {
               if ((hx - lx) ** 2 + (hz - lz) ** 2 < 30 * 30) { ok = false; break; }
@@ -1540,6 +1554,7 @@ export function buildWorld(scene) {
             if (riverFactor(gx, gz) > 0.01) continue;
             if (nearRealBuilding(gx, gz)) continue;                  // né footprint OSM thật
             if (openSpace(gx, gz) || onOtherRoad(gx, gz)) continue;  // né vườn hoa/quảng trường/ven hồ/đường cắt
+            if (panoDenies(gx, gz)) continue;                         // pano thật không thấy nhà ở hướng này
             let ok = true;
             for (const [lx, lz] of lmPtsS) { if ((gx - lx) ** 2 + (gz - lz) ** 2 < 34 * 34) { ok = false; break; } }
             if (!ok) continue;
