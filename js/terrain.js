@@ -200,7 +200,7 @@ export function groundHeightNoDeck(x, z) {
   if (x > -1160 && x < -205 && z > 55 && z < 400) {
     let dL = 1e9, half = 30;
     for (const [ax, az, bx, bz, hf] of LAKE_SEGS) { const d2 = distToSeg(x, z, ax, az, bx, bz); if (d2 - hf < dL - half) { dL = d2; half = hf; } }
-    if (dL < half) h = lerp(-3, 1.7, smoothstep(half - 5, half, dL));   // lòng hồ mượt
+    if (dL < half) h = lerp(-3, 1.7, smoothstep(half - 2, half, dL));   // kè gần dựng đứng — nước áp sát chân kè, không còn dải cát rộng
     else if (dL < half + 60 && h < 1.6) h = LAND_H;                     // ngoài mép = đất phố
   }
   return h;

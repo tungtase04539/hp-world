@@ -591,6 +591,7 @@ export function buildWorld(scene) {
     // đường CẮT NGANG hồ (cầu/đập): chừa khoảng trống, không dựng lan can chắn lối đi
     const crossSegs = [];
     const _sd = (px, pz, ax, az, bx, bz) => { const dx = bx - ax, dz = bz - az, l2 = dx * dx + dz * dz; let t = l2 ? ((px - ax) * dx + (pz - az) * dz) / l2 : 0; t = Math.max(0, Math.min(1, t)); return Math.hypot(px - (ax + t * dx), pz - (az + t * dz)); };
+    const parSegs = [];   // đoạn đường ven hồ CHẠY SONG SONG trục — mốc mép trong vỉa hè của đường
     for (const r of ROADS_DT) {
       if (r.c !== 'p' && r.c !== 's' && r.c !== 't' && r.c !== 'r') continue;
       for (let i = 0; i < r.pts.length - 1; i++) {
@@ -598,29 +599,63 @@ export function buildWorld(scene) {
         if (Math.max(x1, x2) < -1170 || Math.min(x1, x2) > -200 || Math.max(z1, z2) < 50 || Math.min(z1, z2) > 410) continue;
         // chỉ lấy đoạn thực sự đi VÀO lòng hồ (điểm giữa cách trục < half-4) — loại đường ven bờ chạy song song
         const mx = (x1 + x2) / 2, mz = (z1 + z2) / 2;
-        for (const [ax, az, bx, bz, hf] of LAKE_SEGS) if (_sd(mx, mz, ax, az, bx, bz) < hf - 4) { crossSegs.push([x1, z1, x2, z2]); break; }
+        let crossed = false;
+        for (const [ax, az, bx, bz, hf] of LAKE_SEGS) {
+          const dm = _sd(mx, mz, ax, az, bx, bz);
+          if (dm < hf - 4) { crossSegs.push([x1, z1, x2, z2]); crossed = true; break; }
+          if ((r.c === 'p' || r.c === 's') && dm < hf + 26) {
+            // song song với trục? (đường ven hồ) → mốc để lát vỉa hè kè tới mép vỉa hè của đường
+            const sl = Math.hypot(x2 - x1, z2 - z1) || 1, sux = (x2 - x1) / sl, suz = (z2 - z1) / sl;
+            const al = Math.hypot(bx - ax, bz - az) || 1, aux = (bx - ax) / al, auz = (bz - az) / al;
+            if (Math.abs(sux * aux + suz * auz) > 0.8) { parSegs.push([x1, z1, x2, z2, ROAD_W[r.c] / 2 + ROAD_W[r.c] * 0.28]); break; }
+          }
+        }
+        if (crossed) continue;
       }
     }
     const nearCross = (x, z, r) => { for (const s of crossSegs) if (_sd(x, z, s[0], s[1], s[2], s[3]) < r) return true; return false; };
-    const railG = [], benchG = [], lampPostG = [], globeG = [];
+    const railG = [], benchG = [], lampPostG = [], globeG = [], caroG = [];
     for (const [ax, az, bx2, bz2, HALF] of LAKE_SEGS) {
       const dx = bx2 - ax, dz = bz2 - az, L = Math.hypot(dx, dz);
       const ux = dx / L, uz = dz / L, nx = -uz, nz = ux;             // pháp tuyến trục
       const barAng = Math.atan2(ux, uz) + Math.PI / 2;               // thanh ngang dọc theo trục
+      const alongAng = Math.atan2(ux, uz);
       for (const side of [-1, 1]) {                                  // cả 2 bờ hồ
         for (let t = 2; t < L - 2; t += 2.6) {
           const cx0 = ax + ux * t, cz0 = az + uz * t;
+          // VỈA HÈ CARO KÈ HỒ: lát LIỀN từ mép nước tới mép vỉa hè của đường ven hồ —
+          // rào/đèn/ghế đứng TRÊN mặt lát này, hết cảnh rào chỗ trong chỗ ngoài vỉa hè
+          {
+            const qx = cx0 + nx * side * (HALF + 2), qz = cz0 + nz * side * (HALF + 2);
+            let roadD = 1e9, eOff = 8.1;
+            for (const s of parSegs) { const d = _sd(qx, qz, s[0], s[1], s[2], s[3]); if (d < roadD) { roadD = d; eOff = s[4]; } }
+            let outerDL = roadD > 40 ? HALF + 5 : HALF + 2 + roadD - eOff + 0.25;   // chạm mép trong vỉa hè của đường
+            outerDL = Math.max(Math.min(outerDL, HALF + 13), HALF + 2.6);
+            const innerDL = HALF - 1.0;                                             // chớm ra mép nước (gờ kè)
+            const midDL = (innerDL + outerDL) / 2, wAcross = outerDL - innerDL;
+            const sx = cx0 + nx * side * midDL, sz = cz0 + nz * side * midDL;
+            if (Math.abs(groundHeightNoDeck(sx, sz) - LAND_H) < 0.5 && !nearCross(sx, sz, 4)) {
+              const pg = new THREE.BoxGeometry(2.75, 0.24, wAcross);
+              pg.rotateY(barAng); pg.translate(sx, groundHeight(sx, sz) + 0.05, sz);
+              // UV ca-rô chạy thẳng theo trục hồ (khớp hoa văn vỉa hè của đường ven hồ)
+              const pp = pg.attributes.position, puv = new Float32Array(pp.count * 2), S = 1 / 1.6;
+              const sinR = Math.sin(alongAng), cosR = Math.cos(alongAng);
+              for (let k = 0; k < pp.count; k++) { const vx = pp.getX(k), vz = pp.getZ(k); puv[k * 2] = (vx * sinR + vz * cosR) * S; puv[k * 2 + 1] = (vx * cosR - vz * sinR) * S; }
+              pg.setAttribute('uv', new THREE.BufferAttribute(puv, 2));
+              caroG.push(pg);
+            }
+          }
           const ox = cx0 + nx * side * (HALF + OFF_RAIL), oz = cz0 + nz * side * (HALF + OFF_RAIL);
           if (Math.abs(groundHeightNoDeck(ox, oz) - LAND_H) > 0.4) continue;  // phải là đất kè chuẩn
           if (nearCross(ox, oz, 9)) continue;                                  // chừa lối cầu/đập cắt hồ
-          const gy = groundHeight(ox, oz);
+          const gy = groundHeight(ox, oz) + 0.17;                              // đứng TRÊN mặt lát caro
           const post = new THREE.BoxGeometry(0.07, 0.95, 0.07); post.translate(ox, gy + 0.48, oz); railG.push(post);
           for (const ry of [0.9, 0.5]) { const r2 = new THREE.BoxGeometry(2.62, 0.06, 0.05); r2.rotateY(barAng); r2.translate(ox, gy + ry, oz); railG.push(r2); }
           // ghế đá mỗi ~26m (TRÊN vỉa hè caro sau lan can, quay mặt ra hồ) + đèn đôi mỗi ~31m
           if (Math.round(t) % 26 < 2.6) {
             const bx = cx0 + nx * side * (HALF + OFF_BENCH), bz = cz0 + nz * side * (HALF + OFF_BENCH);
             if (Math.abs(groundHeightNoDeck(bx, bz) - LAND_H) < 0.4 && !nearCross(bx, bz, 9)) {
-              const by = groundHeight(bx, bz);
+              const by = groundHeight(bx, bz) + 0.17;
               const seat = new THREE.BoxGeometry(1.7, 0.12, 0.5); seat.rotateY(barAng); seat.translate(bx, by + 0.46, bz); benchG.push(seat);
               for (const s of [-0.7, 0.7]) { const lg = new THREE.BoxGeometry(0.14, 0.42, 0.5); lg.rotateY(barAng); lg.translate(bx + ux * s, by + 0.21, bz + uz * s); benchG.push(lg); }
             }
@@ -628,7 +663,7 @@ export function buildWorld(scene) {
           if (Math.round(t) % 31 < 2.6) {
             const lx = cx0 + nx * side * (HALF + OFF_LAMP), lz = cz0 + nz * side * (HALF + OFF_LAMP);
             if (Math.abs(groundHeightNoDeck(lx, lz) - LAND_H) < 0.4 && !nearCross(lx, lz, 9)) {
-              const ly = groundHeight(lx, lz);
+              const ly = groundHeight(lx, lz) + 0.17;
               const pole = new THREE.CylinderGeometry(0.07, 0.11, 3.6, 8); pole.translate(lx, ly + 1.8, lz); lampPostG.push(pole);
               const arm = new THREE.BoxGeometry(1.5, 0.07, 0.07); arm.rotateY(barAng); arm.translate(lx, ly + 3.55, lz); lampPostG.push(arm);
               for (const s of [-0.62, 0.62]) { const gl = new THREE.SphereGeometry(0.17, 8, 6); gl.translate(lx + ux * s, ly + 3.72, lz + uz * s); globeG.push(gl); }
@@ -637,6 +672,7 @@ export function buildWorld(scene) {
         }
       }
     }
+    if (caroG.length) addMerged(caroG, sidewalkMaterial('caro_do_xam'), 'lake_promenade'); // vỉa hè caro kè hồ
     if (railG.length) addMerged(railG, mat(0x2e5e46), 'lake_railing');          // lan can gang xanh
     if (benchG.length) addMerged(benchG, mat(0xd6d2c6), 'lake_benches');        // ghế đá granite
     if (lampPostG.length) addMerged(lampPostG, mat(0x23282b), 'lake_lampposts'); // trụ gang đen
