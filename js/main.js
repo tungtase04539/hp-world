@@ -25,8 +25,8 @@ import { initCinematic } from './cinematic.js';
 // ============ Khởi tạo đồ họa ============
 const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 const canvas = document.getElementById('scene');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, isTouchDevice ? 1.5 : 2));
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: !isTouchDevice }); // mobile: tắt MSAA (VRAM + ổn định)
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, isTouchDevice ? 1.2 : 2)); // mobile hạ 1.2 chống crash
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.26;

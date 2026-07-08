@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { shrinkTexturesForMobile } from './assets.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { WORLD_BOUNDS } from './terrain.js';
 
@@ -38,6 +39,7 @@ function makeMotoFallback() {   // dự phòng khi GLB lỗi mạng — khối t
 (function loadMoto() {
   const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
   loader.load(ASSET_BASE + 'moto.glb', (gltf) => {
+    shrinkTexturesForMobile(gltf.scene);
     motoTemplate = normalizeMoto(gltf);
     for (const outer of motoPending) attachMoto(outer);
     motoPending.length = 0;

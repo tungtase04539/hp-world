@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
-import { registerModel } from './assets.js';
+import { registerModel, shrinkTexturesForMobile } from './assets.js';
 import {
   WORLD_BOUNDS, LM, LM_DIR, LM_FACE, EXTRAS, TREES, PARKS, RAIL, DT_BOX, RIVERS, ROADS_DT, ROADS_REGION, BRIDGES, BUILDINGS,
   groundHeight, groundHeightNoDeck, isWater, landAt, riverFactor,
@@ -2737,6 +2737,7 @@ export function buildWorld(scene) {
       const slots = heroTrees.filter((t) => t.variant === v);
       if (!slots.length) return;
       loader.load(ASSET_BASE_W + file, (gltf) => {
+        shrinkTexturesForMobile(gltf.scene);
         let mesh = null;
         gltf.scene.traverse((o) => { if (o.isMesh && !mesh) mesh = o; });
         if (!mesh) return;
@@ -2779,6 +2780,7 @@ export function buildWorld(scene) {
     if (!heroBeds.length) return;
     const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
     loader.load(ASSET_BASE_W + HERO_BED_FILE, (gltf) => {
+      shrinkTexturesForMobile(gltf.scene);
       let mesh = null;
       gltf.scene.traverse((o) => { if (o.isMesh && !mesh) mesh = o; });
       if (!mesh) return;

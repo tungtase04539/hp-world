@@ -240,6 +240,14 @@ node mobile.mjs    # viewport điện thoại + joystick
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-08 (ag)** [CHỐNG CRASH MOBILE]: Chrome điện thoại crash khi vào (user báo) — nguyên nhân:
+    texture GLB 100% (nhiều tấm 4K ≈ 67MB VRAM/tấm) + preload 4 GLB song song → hết RAM/VRAM di động.
+    Vá KHÔNG đụng desktop (giữ 100% theo yêu cầu): `IS_MOBILE` (UA hoặc deviceMemory≤4) trong assets.js →
+    (1) `shrinkTexturesForMobile(root)`: sau load, downscale canvas mọi texture >1024px về 1024 + `img.close()`
+    giải phóng ImageBitmap khỏi RAM — áp cho CẢ 3 pipeline load GLB (assets.js registry, hero trees/beds
+    world.js, moto vehicles.js); (2) PRELOAD_RADIUS 950→320, PRELOAD_PARALLEL 4→1 trên mobile;
+    (3) main.js: antialias tắt trên touch + pixelRatio trần 1.2 (trước 1.5). Desktop regression: ready ✓ 0 lỗi.
+
 - **2026-07-07 (af)** [LẤP LÒNG Ô PHỐ theo bản đồ]: đối chiếu top-down 8 ô aerial với OSM map + bản đồ
     footprint → ô phố game RỖNG RUỘT (nhà chỉ viền mép đường) trong khi thật DÀY ĐẶC. Thêm `block_infill`:
     lưới 13m quét [-1100..900]×[-900..560], nhà ống 2-3 tầng (~3200 căn, 1 mesh vertex-color, mái ngói

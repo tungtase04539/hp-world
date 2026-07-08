@@ -30,10 +30,45 @@ const RAWGH = 'https://raw.githubusercontent.com/tungtase04539/hp-world/assets-s
 const OVERSIZE = new Set(['assets/baotang.glb', 'assets/quanhoa.glb', 'assets/lechan.glb']);
 const assetURL = (url) => IS_LOCAL ? url : ((OVERSIZE.has(url) ? RAWGH : JSDELIVR) + url);
 
+// MOBILE: RAM/VRAM hạn chế → tải tuần tự, bán kính hẹp, texture hạ về ≤1024px (desktop giữ 100% gốc).
+export const IS_MOBILE = /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent)
+  || (navigator.deviceMemory !== undefined && navigator.deviceMemory <= 4);
+
 // Cụm trung tâm (quanh gốc toạ độ) tải NGAY ở màn chờ; công trình xa để streaming.
-const PRELOAD_RADIUS = 950;      // m — bán kính preload quanh điểm xuất phát (dải trung tâm)
-const PRELOAD_PARALLEL = 4;      // số GLB tải song song ở màn chờ (không sợ giật vì chưa chơi)
+const PRELOAD_RADIUS = IS_MOBILE ? 320 : 950;   // m — mobile chỉ preload cụm sát điểm xuất phát
+const PRELOAD_PARALLEL = IS_MOBILE ? 1 : 4;     // mobile: 1 GLB/lúc (tránh peak RAM decode song song)
 const STREAM_PARALLEL = 1;       // trong game: 1 cái/lúc để không giật khung hình khi parse
+const MOBILE_TEX_MAX = 1024;     // px — trần texture trên mobile (màn nhỏ, không nhìn ra khác biệt)
+
+// Hạ cỡ texture cho mobile NGAY sau khi load (canvas downscale) + giải phóng ảnh gốc khỏi RAM.
+// KHÔNG đụng file gốc — desktop vẫn 100% chất lượng theo yêu cầu chủ dự án.
+export function shrinkTexturesForMobile(root) {
+  if (!IS_MOBILE) return;
+  const seen = new Set();
+  root.traverse((o) => {
+    if (!o.isMesh) return;
+    const mats = Array.isArray(o.material) ? o.material : [o.material];
+    for (const m of mats) {
+      if (!m) continue;
+      for (const slot of ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap']) {
+        const t = m[slot];
+        if (!t || !t.image || seen.has(t)) continue;
+        seen.add(t);
+        const img = t.image, w = img.width || 0, h = img.height || 0;
+        if (w <= MOBILE_TEX_MAX && h <= MOBILE_TEX_MAX) continue;
+        const s = MOBILE_TEX_MAX / Math.max(w, h);
+        const cv = document.createElement('canvas');
+        cv.width = Math.max(1, Math.round(w * s)); cv.height = Math.max(1, Math.round(h * s));
+        try {
+          cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+          t.image = cv;
+          if (img.close) img.close();           // ImageBitmap: giải phóng RAM ngay
+          t.needsUpdate = true;
+        } catch (e) { /* texture lạ → giữ nguyên */ }
+      }
+    }
+  });
+}
 
 // def: { url, name, x, z, radius, preload, place(gltfScene) }
 export function registerModel(def) {
@@ -53,6 +88,7 @@ function start(d) {
       d.state = 'done';
       loadingCount--;
       try {
+        shrinkTexturesForMobile(gltf.scene);
         d.place(gltf.scene);
         if (toastFn && d.name) toastFn(`✓ ${d.name} sẵn sàng`);
       } catch (e) {
