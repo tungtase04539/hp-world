@@ -11,6 +11,7 @@ import {
 import { STREETS, INTERSECTIONS, MEDIANS, GARDENS } from './mapdata.js';
 import { SIDEWALK_BY_ROAD, SIDEWALK_DEFAULT } from './sidewalks.js';
 import { PANO_SIDES } from './panosides.js';
+import { PANO_HOUSES } from './housemap.js';
 
 // Thế giới dựng từ dữ liệu OpenStreetMap thật của Hải Phòng (tỉ lệ 1:10,
 // trung tâm phóng đại 2.2x). Mọi con phố trung tâm là phố thật.
@@ -534,6 +535,53 @@ export function buildWorld(scene) {
       flag.position.set(fx + 1.75, gy + PH - 1.5, fz); scene.add(flag);
       addCollider(fx, fz, 0.6);
     }
+  }
+
+  // ---------- KÈ HỒ TAM BẠC: lan can sắt xanh + ghế đá granite + cột đèn đôi Pháp cổ (pano_004-013, 028-037) ----------
+  {
+    // 2 tuyến bờ: bắc = phố Quang Trung (lakeside phía nam), nam = phố Thế Lữ (lakeside phía bắc, clamp x)
+    const QUAYS = [
+      { A: [-211, 116], B: [-1052, 285], clampX: null },
+      { A: [-290, 205], B: [-1007, 367], clampX: [-1050, -260] },
+    ];
+    const railG = [], benchG = [], lampPostG = [], globeG = [];
+    for (const { A, B, clampX } of QUAYS) {
+      const dx = B[0] - A[0], dz = B[1] - A[1], L = Math.hypot(dx, dz);
+      const ux = dx / L, uz = dz / L, nx = dz / L, nz = -dx / L;    // n hướng về phía hồ (đã kiểm dấu cross)
+      for (let t = 4; t < L - 4; t += 2.6) {
+        const bx0 = A[0] + ux * t, bz0 = A[1] + uz * t;
+        if (clampX && (bx0 < clampX[0] || bx0 > clampX[1])) continue;
+        let ox = bx0 + nx * 7.2, oz = bz0 + nz * 7.2;
+        if (Math.abs(groundHeightNoDeck(ox, oz) - LAND_H) > 0.4) { ox = bx0 + nx * 5.6; oz = bz0 + nz * 5.6; if (Math.abs(groundHeightNoDeck(ox, oz) - LAND_H) > 0.4) continue; }
+        const gy = groundHeight(ox, oz);
+        const post = new THREE.BoxGeometry(0.07, 0.95, 0.07); post.translate(ox, gy + 0.48, oz); railG.push(post);
+        for (const ry of [0.9, 0.5]) { const r2 = new THREE.BoxGeometry(2.62, 0.06, 0.05); r2.rotateY(Math.atan2(ux, uz) + Math.PI / 2); r2.translate(ox, gy + ry, oz); railG.push(r2); }
+        // ghế đá mỗi ~26m (quay mặt ra hồ) + đèn đôi mỗi ~31m
+        if (Math.round(t) % 26 < 2.6) {
+          const seat = new THREE.BoxGeometry(1.7, 0.12, 0.5); const legL = new THREE.BoxGeometry(0.14, 0.42, 0.5);
+          const bAng = Math.atan2(ux, uz) + Math.PI / 2;
+          const bx = bx0 + nx * 5.9, bz = bz0 + nz * 5.9;
+          if (Math.abs(groundHeightNoDeck(bx, bz) - LAND_H) < 0.4) {
+            const by = groundHeight(bx, bz);
+            seat.rotateY(bAng); seat.translate(bx, by + 0.46, bz); benchG.push(seat);
+            for (const s of [-0.7, 0.7]) { const lg = legL.clone(); lg.rotateY(bAng); lg.translate(bx + Math.sin(bAng + Math.PI / 2) * s, by + 0.21, bz + Math.cos(bAng + Math.PI / 2) * s); benchG.push(lg); }
+          }
+        }
+        if (Math.round(t) % 31 < 2.6) {
+          const lx = bx0 + nx * 6.6, lz = bz0 + nz * 6.6;
+          if (Math.abs(groundHeightNoDeck(lx, lz) - LAND_H) < 0.4) {
+            const ly = groundHeight(lx, lz);
+            const pole = new THREE.CylinderGeometry(0.07, 0.11, 3.6, 8); pole.translate(lx, ly + 1.8, lz); lampPostG.push(pole);
+            const arm = new THREE.BoxGeometry(1.5, 0.07, 0.07); arm.rotateY(Math.atan2(ux, uz) + Math.PI / 2); arm.translate(lx, ly + 3.55, lz); lampPostG.push(arm);
+            for (const s of [-0.62, 0.62]) { const gl = new THREE.SphereGeometry(0.17, 8, 6); gl.translate(lx + ux * s, ly + 3.72, lz + uz * s); globeG.push(gl); }
+          }
+        }
+      }
+    }
+    if (railG.length) addMerged(railG, mat(0x2e5e46), 'lake_railing');          // lan can gang xanh
+    if (benchG.length) addMerged(benchG, mat(0xd6d2c6), 'lake_benches');        // ghế đá granite
+    if (lampPostG.length) addMerged(lampPostG, mat(0x23282b), 'lake_lampposts'); // trụ gang đen
+    if (globeG.length) { const gm = new THREE.Mesh(mergeGeometries(globeG), sharedMats.lampGlow); gm.name = 'lake_lampglobes'; scene.add(gm); globeG.forEach((g) => g.dispose()); }
   }
 
   // ---------- CỘT ĐÈN GANG TRANG TRÍ kiểu Pháp cổ (đèn 3 cầu) dọc dải vườn hoa trung tâm ----------
@@ -1227,6 +1275,22 @@ export function buildWorld(scene) {
   }
 
   // ---------- 1.200+ TÒA NHÀ THẬT (footprint OSM đùn khối, gộp 1 mesh) ----------
+  // BẢN ĐỒ BẰNG CHỨNG NHÀ: lưới centroid nhà OSM (_bldGrid) + lưới điểm nhà từ pano (housemap.js)
+  const _bldGrid = new Map();
+  const _phGrid = new Map();
+  for (const [x, z] of PANO_HOUSES) { const k = `${Math.floor(x / 24)},${Math.floor(z / 24)}`; let l = _phGrid.get(k); if (!l) _phGrid.set(k, l = []); l.push([x, z]); }
+  const _gridNear = (grid, x, z, r) => {
+    const kx = Math.floor(x / 24), kz = Math.floor(z / 24), r2 = r * r, span = Math.ceil(r / 24);
+    for (let dx = -span; dx <= span; dx++) for (let dz = -span; dz <= span; dz++) {
+      const l = grid.get(`${kx + dx},${kz + dz}`); if (!l) continue;
+      for (const [px, pz] of l) if ((x - px) ** 2 + (z - pz) ** 2 < r2) return true;
+    }
+    return false;
+  };
+  const _psGrid = new Map();
+  for (const p of PANO_SIDES) { const k = `${Math.floor(p[0] / 24)},${Math.floor(p[1] / 24)}`; let l = _psGrid.get(k); if (!l) _psGrid.set(k, l = []); l.push([p[0], p[1]]); }
+  // BẰNG CHỨNG để được đặt nhà: pano thấy nhà trong 20m; hoặc vùng KHÔNG pano nào (45m) thì cần nhà OSM trong 50m
+  const houseEvidence = (x, z) => _gridNear(_phGrid, x, z, 20) || (!_gridNear(_psGrid, x, z, 45) && _gridNear(_bldGrid, x, z, 50));
   world.buildingCells = new Set();
   {
     const bldGeos = [];
@@ -1385,6 +1449,7 @@ export function buildWorld(scene) {
         }
         addCollider(cx, cz, Math.min(18, Math.sqrt(b.a / Math.PI) * 0.85 + 0.4));
         world.buildingCells.add(`${Math.round(cx / 22)},${Math.round(cz / 22)}`);
+        { const k = `${Math.floor(cx / 24)},${Math.floor(cz / 24)}`; let l = _bldGrid.get(k); if (!l) _bldGrid.set(k, l = []); l.push([cx, cz]); }
         nBld++;
       } catch (e) { /* polygon lỗi -> bỏ qua */ }
     }
@@ -1446,8 +1511,15 @@ export function buildWorld(scene) {
   function openSpace(x, z) {
     if (inPark(x, z)) return true;                                   // công viên OSM
     if (Math.hypot(x - _sqX, z - _sqZ) < 62) return true;            // quảng trường Nhà hát
+    if (LM.lechan && Math.hypot(x - LM.lechan[0], z - LM.lechan[1]) < 55) return true; // quảng trường tượng Lê Chân (pano_428: chỉ tượng + không gian mở)
+    if (Math.hypot(x + 187.8, z - 201.6) < 50) return true;          // quảng trường Trung tâm Triển lãm (pano_421: đúng 1 công trình)
     for (const g of GARDENS) if (Math.hypot(x - g.x, z - g.z) < Math.max(g.w, g.d) / 2 + 12) return true; // dải vườn hoa
     for (let i = 0; i < _lakePts.length - 1; i++) if (_segD(x, z, _lakePts[i][0], _lakePts[i][1], _lakePts[i + 1][0], _lakePts[i + 1][1]) < _lakeHalf + 16) return true; // ven hồ Tam Bạc
+    // KÈ HỒ (pano_004-013/028-037: lan can+ghế đá+đèn, KHÔNG nhà): cấm phía-hồ (cross<0) trong 25m dọc 2 tuyến bờ
+    for (const [ax, az, bx, bz, x0, x1] of [[-211, 116, -1052, 285, -1e9, 1e9], [-1007, 367, -20, 162, -1050, -260]]) {
+      if (x < x0 || x > x1) continue;
+      if (_segD(x, z, ax, az, bx, bz) < 25 && ((bx - ax) * (z - az) - (bz - az) * (x - ax)) < 0) return true;
+    }
     return false;
   }
   function onOtherRoad(x, z) { for (const s of _majSeg) if (_segD(x, z, s[0], s[1], s[2], s[3]) < s[4] + 2.5) return true; return false; }
@@ -1493,7 +1565,8 @@ export function buildWorld(scene) {
             if (hSeed % 3 === 0) continue; // thưa bớt
             if (Math.abs(groundHeightNoDeck(hx, hz) - LAND_H) > 0.25) continue;
             if (riverFactor(hx, hz) > 0.01) continue;
-            if (nearRealBuilding(hx, hz)) continue;
+            if (_gridNear(_bldGrid, hx, hz, 13)) continue;             // không đè nhà OSM thật
+            if (!houseEvidence(hx, hz)) continue;                      // BẢN ĐỒ NHÀ (pano+OSM): không bằng chứng → cấm
             if (openSpace(hx, hz) || onOtherRoad(hx, hz)) continue;   // né vườn hoa/quảng trường/ven hồ/đường cắt
             if (panoDenies(hx, hz)) continue;                          // pano thật không thấy nhà ở hướng này
             if (!cornersDry(hx, hz, Math.sin(rotY), Math.cos(rotY), 4.0, px, pz, 3.8)) continue; // 4 góc là đất
@@ -1561,7 +1634,8 @@ export function buildWorld(scene) {
             const gx = mx + off * nx, gz = mz + off * nz;
             if (Math.abs(groundHeightNoDeck(gx, gz) - LAND_H) > 0.3) continue;
             if (riverFactor(gx, gz) > 0.01) continue;
-            if (nearRealBuilding(gx, gz)) continue;                  // né footprint OSM thật
+            if (_gridNear(_bldGrid, gx, gz, 13)) continue;           // không đè nhà OSM thật
+            if (!houseEvidence(gx, gz)) continue;                     // BẢN ĐỒ NHÀ (pano+OSM): không bằng chứng → cấm
             if (openSpace(gx, gz) || onOtherRoad(gx, gz)) continue;  // né vườn hoa/quảng trường/ven hồ/đường cắt
             if (panoDenies(gx, gz)) continue;                         // pano thật không thấy nhà ở hướng này
             if (!cornersDry(gx, gz, dxn, dzn, 2.6, nx, nz, 4.0)) continue; // 4 góc phải là đất — hết nhà lội nước

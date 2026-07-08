@@ -240,6 +240,21 @@ node mobile.mjs    # viewport điện thoại + joystick
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-07 (ae)** [BẢN ĐỒ NHÀ TỪ PANO + KÈ HỒ — ý tưởng của chủ dự án]: "check pano là vẽ được bản đồ
+    nhà dân ở toạ độ nào". Sinh `js/housemap.js`: 1920 điểm NHÀ THẬT = vị trí pano + 14m theo heading
+    từng nhà trong catalog. Luật đặt nhà procedural mới (cả shophouse + nhà tự mọc):
+    (1) không đè nhà OSM (<13m); (2) PHẢI có bằng chứng: điểm nhà pano trong 20m, HOẶC vùng không pano
+    (45m) thì cần nhà OSM trong 50m; (3) openSpace mở rộng: + quảng trường tượng LÊ CHÂN r55 + quảng
+    trường TRUNG TÂM TRIỂN LÃM [-187.8,201.6] r50 (pano_421/428: chỉ 1 công trình, còn lại không gian mở);
+    (4) KÈ HỒ: cấm tuyệt đối phía-hồ (cross<0) trong 25m dọc 2 tuyến bờ [-211,116]→[-1052,285] và
+    [-1007,367]→[-20,162] (clamp x −1050..−260). Sim 780 nhà: Lê Chân/Triển lãm/QT Nhà hát = 0;
+    phía hồ = 0; nhà kè bắc 100% đúng phía dãy phố thật.
+    **KÈ HỒ TAM BẠC dựng theo pano** (31 pano thấy lan can, 14 đèn cổ, 4 ghế đá): `lake_railing` (lan can
+    gang xanh 2 thanh + trụ mỗi 2.6m, offset 7.2m fallback 5.6m khi chạm nước), `lake_benches` (ghế đá
+    granite mỗi ~26m quay ra hồ), `lake_lampposts`+`lake_lampglobes` (đèn ĐÔI hai bóng cầu kiểu Pháp mỗi
+    ~31m, trụ gang đen, globes dùng sharedMats.lampGlow) dọc CẢ 2 bờ.
+
+
 - **2026-07-07 (ad)** [PANO LÀM NGUỒN SỰ THẬT cho vị trí nhà — user chỉ ra vẫn sai sau (ac)]: guard (ac)
     dựa dữ liệu map tự khai (GARDENS/square/lake polyline) nên SÓT — vd polyline hồ Tam Bạc chỉ 3 điểm,
     không phủ đoạn ven hồ phía đông [-220..-310, ~120-140] → vẫn dựng nhà trên bờ hồ. Fix: sinh
