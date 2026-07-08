@@ -86,6 +86,9 @@ RIVERS.push({ w: 1300, pts: [[7600, 0], [11000, 4100], [15000, 7000], [20600, 97
 // ra promenade/phố đi bộ Quang Trung (đối chiếu pano_004; lõi hồ w/2=39m giữ nguyên là nước)
 // để không ngập trường THCS Trần Phú ngay mép nam hồ
 RIVERS.push({ w: EXTRAS.lake.w, sh: 14, pts: EXTRAS.lake.pts });
+// trục hồ Tam Bạc mở rộng về đông (mask hồ thật kéo dài tới ~x=-240) — dùng cho clamp hành lang hồ
+const LAKE_AXIS = [...EXTRAS.lake.pts, [-240, 128]];
+const LAKE_HALF = EXTRAS.lake.w / 2;
 
 const riverIdx = makeBucketIndex(RIVERS.map((r) => ({ pts: r.pts, meta: [r.w, r.sh || 28] })));
 const regionIdx = makeBucketIndex(ROADS_REGION.map((r) => ({ pts: r.pts, meta: 0 })));
@@ -175,6 +178,13 @@ export function groundHeightNoDeck(x, z) {
   const CT = EXTRAS.catbaTown;
   h = lerp(h, LAND_H, rectFactor(x, CT[0] - 500, CT[0] + 500, z, CT[1] - 380, CT[1] + 380, 120) * smoothstep(0.35, 0.55, v));
   h = lerp(h, LAND_H, rectFactor(x, LM.port[0] - 600, LM.port[0] + 600, z, LM.port[1] - 300, LM.port[1] + 300, 90) * smoothstep(0.3, 0.5, v));
+  // KÈ HỒ TAM BẠC: mask nước OSM tràn ra ngoài lòng hồ (pano_004/007: quanh hồ là phố + nhà, không phải nước)
+  // → trong hành lang quanh hồ, điểm NGOÀI lòng hồ chuẩn bị ép thành đất; lòng hồ do RIVERS đào lại ngay dưới
+  if (h < 1.5 && x > -1150 && x < -190 && z > 60 && z < 340) {
+    let dL = 1e9;
+    for (let i = 0; i < LAKE_AXIS.length - 1; i++) { const d2 = distToSeg(x, z, LAKE_AXIS[i][0], LAKE_AXIS[i][1], LAKE_AXIS[i + 1][0], LAKE_AXIS[i + 1][1]); if (d2 < dL) dL = d2; }
+    if (dL > LAKE_HALF + 6 && dL < 95) h = LAND_H;
+  }
   // đào lòng sông (thắng san phẳng)
   const rf = riverFactor(x, z);
   if (rf > 0) h = lerp(h, -3, rf);

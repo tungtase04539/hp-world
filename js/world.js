@@ -551,8 +551,9 @@ export function buildWorld(scene) {
       for (let t = 4; t < L - 4; t += 2.6) {
         const bx0 = A[0] + ux * t, bz0 = A[1] + uz * t;
         if (clampX && (bx0 < clampX[0] || bx0 > clampX[1])) continue;
-        let ox = bx0 + nx * 7.2, oz = bz0 + nz * 7.2;
-        if (Math.abs(groundHeightNoDeck(ox, oz) - LAND_H) > 0.4) { ox = bx0 + nx * 5.6; oz = bz0 + nz * 5.6; if (Math.abs(groundHeightNoDeck(ox, oz) - LAND_H) > 0.4) continue; }
+        // thứ tự thật: đường(→5m) → VỈA HÈ(5–7.8m) → LAN CAN(~8.3m) → hồ. Chạm nước thì BỎ, không kéo vào trong
+        let ox = bx0 + nx * 8.3, oz = bz0 + nz * 8.3;
+        if (Math.abs(groundHeightNoDeck(ox, oz) - LAND_H) > 0.4) { ox = bx0 + nx * 8.0; oz = bz0 + nz * 8.0; if (Math.abs(groundHeightNoDeck(ox, oz) - LAND_H) > 0.4) continue; }
         const gy = groundHeight(ox, oz);
         const post = new THREE.BoxGeometry(0.07, 0.95, 0.07); post.translate(ox, gy + 0.48, oz); railG.push(post);
         for (const ry of [0.9, 0.5]) { const r2 = new THREE.BoxGeometry(2.62, 0.06, 0.05); r2.rotateY(Math.atan2(ux, uz) + Math.PI / 2); r2.translate(ox, gy + ry, oz); railG.push(r2); }
@@ -560,7 +561,7 @@ export function buildWorld(scene) {
         if (Math.round(t) % 26 < 2.6) {
           const seat = new THREE.BoxGeometry(1.7, 0.12, 0.5); const legL = new THREE.BoxGeometry(0.14, 0.42, 0.5);
           const bAng = Math.atan2(ux, uz) + Math.PI / 2;
-          const bx = bx0 + nx * 5.9, bz = bz0 + nz * 5.9;
+          const bx = bx0 + nx * 6.7, bz = bz0 + nz * 6.7;   // ghế TRÊN vỉa hè, trước lan can, quay ra hồ
           if (Math.abs(groundHeightNoDeck(bx, bz) - LAND_H) < 0.4) {
             const by = groundHeight(bx, bz);
             seat.rotateY(bAng); seat.translate(bx, by + 0.46, bz); benchG.push(seat);
@@ -568,7 +569,7 @@ export function buildWorld(scene) {
           }
         }
         if (Math.round(t) % 31 < 2.6) {
-          const lx = bx0 + nx * 6.6, lz = bz0 + nz * 6.6;
+          const lx = bx0 + nx * 7.6, lz = bz0 + nz * 7.6;   // đèn ở mép ngoài vỉa hè, cạnh lan can
           if (Math.abs(groundHeightNoDeck(lx, lz) - LAND_H) < 0.4) {
             const ly = groundHeight(lx, lz);
             const pole = new THREE.CylinderGeometry(0.07, 0.11, 3.6, 8); pole.translate(lx, ly + 1.8, lz); lampPostG.push(pole);
@@ -1511,6 +1512,7 @@ export function buildWorld(scene) {
   function openSpace(x, z) {
     if (inPark(x, z)) return true;                                   // công viên OSM
     if (Math.hypot(x - _sqX, z - _sqZ) < 62) return true;            // quảng trường Nhà hát
+    if (_segD(x, z, 5, 15, -45, 125) < 55) return true;              // HÀNH LANG quảng trường: Nhà hát → Quán hoa → cột cờ (user: không có nhà ở đây)
     if (LM.lechan && Math.hypot(x - LM.lechan[0], z - LM.lechan[1]) < 55) return true; // quảng trường tượng Lê Chân (pano_428: chỉ tượng + không gian mở)
     if (Math.hypot(x + 187.8, z - 201.6) < 50) return true;          // quảng trường Trung tâm Triển lãm (pano_421: đúng 1 công trình)
     for (const g of GARDENS) if (Math.hypot(x - g.x, z - g.z) < Math.max(g.w, g.d) / 2 + 12) return true; // dải vườn hoa
