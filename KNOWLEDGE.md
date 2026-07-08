@@ -263,6 +263,13 @@ node mobile.mjs    # viewport điện thoại + joystick
     thấy!). Sửa: trong lòng hồ (dL<half−2 theo LAKE_SEGS) chỉ nearDTRoad(8) được lát, bỏ
     nearRegionRoad. BÀI HỌC KIỂM THỬ: sim địa hình phải chạy CẢ groundHeight (có deck) chứ
     không riêng groundHeightNoDeck.
+    GOTCHA LƯỚI NỀN (quan trọng cho MỌI địa vật hẹp): mesh nền là 1 PlaneGeometry TOÀN thế giới
+    500×340 seg → ô lưới ~45m, TO HƠN lòng hồ (half 25-35) → dù hàm địa hình đúng 100%
+    (sim + __hp.gh đều ra nước), mặt đất render vẫn "bắc cầu đất" qua kênh từng mảng vì 2 đỉnh
+    kề nhau cùng đứng trên 2 bờ (nội suy không bao giờ chạm nước). Sửa KHÔNG tăng lưới (nặng
+    mobile): NẮN đỉnh trong hành lang hồ — đỉnh có dL<34 kéo VỀ TRỤC (chuỗi đỉnh −3 liên tục),
+    đỉnh dL<half+20 kéo VỀ MÉP bờ (dL=half+4, bờ kè sắc như kè đá thật). Kênh/mương hẹp mới
+    sau này phải nắn lưới tương tự, đừng tin mỗi hàm địa hình.
 - **2026-07-08 (ag)** [CHỐNG CRASH MOBILE]: Chrome điện thoại crash khi vào (user báo) — nguyên nhân:
     texture GLB 100% (nhiều tấm 4K ≈ 67MB VRAM/tấm) + preload 4 GLB song song → hết RAM/VRAM di động.
     Vá KHÔNG đụng desktop (giữ 100% theo yêu cầu): `IS_MOBILE` (UA hoặc deviceMemory≤4) trong assets.js →

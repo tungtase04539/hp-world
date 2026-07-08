@@ -326,7 +326,21 @@ export function buildWorld(scene) {
   world.inPark = inPark;
   const cPark = new THREE.Color(0x6fbf5a);
   for (let i = 0; i < pos.count; i++) {
-    const x = pos.getX(i), z = pos.getZ(i);
+    let x = pos.getX(i), z = pos.getZ(i);
+    // NẮN LƯỚI NỀN theo hồ Tam Bạc: ô lưới ~45m TO HƠN lòng hồ (half 25-35) → nếu không nắn,
+    // 2 đỉnh kề nhau cùng nằm trên 2 bờ và mặt đất "bắc cầu" qua kênh (nước đứt quãng từng mảng).
+    // Đỉnh gần trục → kéo VỀ TRỤC (lòng -3 liên tục); đỉnh quanh mép → kéo VỀ MÉP (bờ kè sắc).
+    if (x > -1160 && x < -205 && z > 55 && z < 400) {
+      let bd = 1e9, bh = 30, bpx = 0, bpz = 0;
+      for (const [ax, az, bx, bz, hf] of LAKE_SEGS) {
+        const dx = bx - ax, dz = bz - az, l2 = dx * dx + dz * dz;
+        let t = ((x - ax) * dx + (z - az) * dz) / l2; t = Math.max(0, Math.min(1, t));
+        const px = ax + dx * t, pz = az + dz * t, d = Math.hypot(x - px, z - pz);
+        if (d - hf < bd - bh) { bd = d; bh = hf; bpx = px; bpz = pz; }
+      }
+      if (bd < 34) { x = bpx; z = bpz; pos.setX(i, x); pos.setZ(i, z); }
+      else if (bd < bh + 20) { const s = (bh + 4) / bd; x = bpx + (x - bpx) * s; z = bpz + (z - bpz) * s; pos.setX(i, x); pos.setZ(i, z); }
+    }
     const h = groundHeightNoDeck(x, z);
     pos.setY(i, h);
     if (h < -0.6) tmp.copy(cDeep);
