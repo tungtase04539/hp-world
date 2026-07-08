@@ -326,22 +326,17 @@ export function buildWorld(scene) {
   world.inPark = inPark;
   const cPark = new THREE.Color(0x6fbf5a);
   for (let i = 0; i < pos.count; i++) {
-    let x = pos.getX(i), z = pos.getZ(i);
-    // NẮN LƯỚI NỀN theo hồ Tam Bạc: ô lưới ~45m TO HƠN lòng hồ (half 25-35) → nếu không nắn,
-    // 2 đỉnh kề nhau cùng nằm trên 2 bờ và mặt đất "bắc cầu" qua kênh (nước đứt quãng từng mảng).
-    // Đỉnh gần trục → kéo VỀ TRỤC (lòng -3 liên tục); đỉnh quanh mép → kéo VỀ MÉP (bờ kè sắc).
-    if (x > -1160 && x < -205 && z > 55 && z < 400) {
-      let bd = 1e9, bh = 30, bpx = 0, bpz = 0;
-      for (const [ax, az, bx, bz, hf] of LAKE_SEGS) {
-        const dx = bx - ax, dz = bz - az, l2 = dx * dx + dz * dz;
-        let t = ((x - ax) * dx + (z - az) * dz) / l2; t = Math.max(0, Math.min(1, t));
-        const px = ax + dx * t, pz = az + dz * t, d = Math.hypot(x - px, z - pz);
-        if (d - hf < bd - bh) { bd = d; bh = hf; bpx = px; bpz = pz; }
-      }
-      if (bd < 34) { x = bpx; z = bpz; pos.setX(i, x); pos.setZ(i, z); }
-      else if (bd < bh + 20) { const s = (bh + 4) / bd; x = bpx + (x - bpx) * s; z = bpz + (z - bpz) * s; pos.setX(i, x); pos.setZ(i, z); }
+    const x = pos.getX(i), z = pos.getZ(i);
+    let h = groundHeightNoDeck(x, z);
+    // HÀNH LANG HỒ TAM BẠC: lưới toàn cầu ô ~112m KHÔNG THỂ diễn tả kênh 50-66m (2 đỉnh kề
+    // nhau đứng 2 bờ → nội suy "bắc cầu đất" qua mặt nước). Dìm mọi đỉnh trong hành lang
+    // xuống -3 (tam giác nào phủ kênh cũng chìm); dải lưới MỊN 5m phủ đè bên dưới sẽ vẽ
+    // đúng bờ/kênh/phố (xem khối "DẢI LƯỚI MỊN" ngay sau).
+    if (x > -1170 && x < -195 && z > 45 && z < 410) {
+      let bd = 1e9;
+      for (const [ax, az, bx, bz] of LAKE_SEGS) { const d = ((px, pz, x1, z1, x2, z2) => { const dx = x2 - x1, dz = z2 - z1, l2 = dx * dx + dz * dz; let t = ((px - x1) * dx + (pz - z1) * dz) / l2; t = Math.max(0, Math.min(1, t)); return Math.hypot(px - (x1 + dx * t), pz - (z1 + dz * t)); })(x, z, ax, az, bx, bz); if (d < bd) bd = d; }
+      if (bd < 200) h = -3;
     }
-    const h = groundHeightNoDeck(x, z);
     pos.setY(i, h);
     if (h < -0.6) tmp.copy(cDeep);
     else if (h < 1.1) tmp.copy(cSand);
@@ -368,6 +363,41 @@ export function buildWorld(scene) {
   groundMesh.name = 'ground';
   groundMesh.receiveShadow = true;
   scene.add(groundMesh);
+
+  // ---------- DẢI LƯỚI MỊN HỒ TAM BẠC (5m) ----------
+  // Phủ hành lang hồ bằng lưới mịn đúng cao độ + màu (lưới toàn cầu trong hành lang đã dìm -3).
+  // +0.05 để nổi trên lưới toàn cầu ở rìa hộp (tránh z-fight nơi 2 mặt trùng cao độ).
+  {
+    const X1 = -1170, X2 = -195, Z1 = 45, Z2 = 410, STEP = 5;
+    const g2 = new THREE.PlaneGeometry(X2 - X1, Z2 - Z1, Math.round((X2 - X1) / STEP), Math.round((Z2 - Z1) / STEP));
+    g2.rotateX(-Math.PI / 2);
+    g2.translate((X1 + X2) / 2, 0, (Z1 + Z2) / 2);
+    const p2 = g2.attributes.position;
+    const col2 = new Float32Array(p2.count * 3);
+    for (let i = 0; i < p2.count; i++) {
+      const x = p2.getX(i), z = p2.getZ(i);
+      const h = groundHeightNoDeck(x, z);
+      p2.setY(i, h + 0.05);
+      if (h < -0.6) tmp.copy(cDeep);
+      else if (h < 1.1) tmp.copy(cSand);
+      else {
+        const patch = Math.sin(x * 0.047) * Math.sin(z * 0.041)
+                    + 0.6 * Math.sin(x * 0.11 + 1.7) * Math.sin(z * 0.093 + 0.6);
+        tmp.copy(cGrass).lerp(cGrass2, smoothstep(-0.5, 0.9, patch));
+      }
+      tmp.lerp(cCity, rectFactor(x, DT_BOX.x1, DT_BOX.x2, z, DT_BOX.z1, DT_BOX.z2, 40) * 0.8);
+      if (h > 1.2 && h < 3.5 && inPark(x, z)) tmp.lerp(cPark, 0.72);
+      const hash = Math.sin(x * 12.9898 + z * 78.233) * 43758.5453;
+      const noise = 1 + ((hash - Math.floor(hash)) - 0.5) * 0.09;
+      col2[i * 3] = tmp.r * noise; col2[i * 3 + 1] = tmp.g * noise; col2[i * 3 + 2] = tmp.b * noise;
+    }
+    g2.setAttribute('color', new THREE.BufferAttribute(col2, 3));
+    g2.computeVertexNormals();
+    const lakeGround = new THREE.Mesh(g2, new THREE.MeshLambertMaterial({ vertexColors: true }));
+    lakeGround.name = 'lake_ground';
+    lakeGround.receiveShadow = true;
+    scene.add(lakeGround);
+  }
 
   // ---------- Mặt nước ----------
   const waterMat = new THREE.MeshPhongMaterial({
