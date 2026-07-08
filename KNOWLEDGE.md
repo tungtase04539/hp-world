@@ -240,6 +240,17 @@ node mobile.mjs    # viewport điện thoại + joystick
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-07 (ac)** [SỬA VỊ TRÍ SHOPHOUSE/NHÀ DÂN — lỗi user chỉ ra]: shophouse đặt CẢ HAI bên mọi
+    phố 'p'/'s' → dựng nhầm nhà ở vỉa hè cạnh VƯỜN HOA, QUẢNG TRƯỜNG Nhà hát, VEN HỒ Tam Bạc (không
+    gian mở, thực tế KHÔNG có nhà) + đè lên đường cắt ngang. Thêm helper `openSpace(x,z)` (inPark OSM +
+    6 GARDENS bán kính max(w,d)/2+12 + quảng trường EXTRAS.square r62 + ven hồ EXTRAS.lake dist<w/2+16)
+    và `onOtherRoad(x,z)` (dist<halfW+2.5 tới đoạn 'p'/'s'/'t' — né nhà giữa đường). Chặn đặt nhà ở đó
+    cho CẢ 2 khối (shophouse_infill + nhà tự mọc 'r'/'t'). Bỏ ~116 vị trí sai (12 vườn hoa/27 quảng
+    trường/4 hồ/73 đường cắt). CŨNG sửa: shophouse side=+1 quay LƯNG ra đường (bug hướng) → lật thêm
+    180° (`faceAng = rotY+π/2 + (side>0?π:0)`). + chi tiết hoá: cửa sổ khung+kính từng tầng, kính+cửa
+    tầng trệt, chậu cây ban công, ăng-ten nóc. Kiểm chứng: aerial + render quảng trường/vườn hoa sạch nhà.
+
+
 - **2026-07-07 (ab)** [AUDIT 551 PANO + DẢI TRUNG TÂM]: vét cạn **551 pano Street View** (2 manifest:
     420 + 131) qua workflow đa-agent (catalog theo quy chuẩn 11 trường, chống bịa; 8 heading cho ~250
     pano đầu, 4 heading cho phần còn lại để tiết kiệm quota). Dữ liệu + bảng chi tiết HTML + gap-analysis
