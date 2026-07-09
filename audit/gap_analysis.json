@@ -1,0 +1,873 @@
+{
+ "dai_phun_nuoc": {
+  "count": 8,
+  "panos": [
+   {
+    "id": "pano_249",
+    "X": -31,
+    "Z": 78.7,
+    "dist": 85,
+    "txt": "đài phun nước giữa quảng trường"
+   },
+   {
+    "id": "pano_359",
+    "X": 276.4,
+    "Z": -264.3,
+    "dist": 382,
+    "txt": "bồn phun nước tròn trước sảnh"
+   },
+   {
+    "id": "pano_341",
+    "X": 559.2,
+    "Z": -300.1,
+    "dist": 635,
+    "txt": "Giàn vòm phun nước (hàng cổng vòm kim loại) trong công viên ven đường"
+   },
+   {
+    "id": "pano_454",
+    "X": 525.1,
+    "Z": -448.2,
+    "dist": 690,
+    "txt": "Đài phun nước sân vườn Nhà khách"
+   },
+   {
+    "id": "pano_231",
+    "X": 685.4,
+    "Z": -323.9,
+    "dist": 758,
+    "txt": "Đài phun nước trong công viên (nhìn ở hướng 270)"
+   },
+   {
+    "id": "pano_232",
+    "X": 705.6,
+    "Z": -358.9,
+    "dist": 792,
+    "txt": "Đài phun nước với dàn vòi phun hình vòm cong trong công viên (rõ ở hướng 270)"
+   },
+   {
+    "id": "pano_545",
+    "X": 697.7,
+    "Z": -447.5,
+    "dist": 829,
+    "txt": "Đài phun nước dạng vòm nan kim loại (cuối trục đường)"
+   },
+   {
+    "id": "pano_020",
+    "X": 295.1,
+    "Z": -799.5,
+    "dist": 852,
+    "txt": "Đài phun nước tròn trước Trung tâm Hội nghị"
+   }
+  ]
+ },
+ "cay_xang": {
+  "count": 9,
+  "panos": [
+   {
+    "id": "pano_237",
+    "X": 168.6,
+    "Z": 7.9,
+    "dist": 169,
+    "txt": "Cây xăng kiểu Petrolimex (mái cam-xanh phía xa)"
+   },
+   {
+    "id": "pano_474",
+    "X": 194.2,
+    "Z": -4.7,
+    "dist": 194,
+    "txt": "Cây xăng/trạm xăng (biển chữ P) ở gần ngã tư"
+   },
+   {
+    "id": "pano_475",
+    "X": 205.4,
+    "Z": 35.1,
+    "dist": 208,
+    "txt": "Mái che cây xăng lớn với dãy cột trụ sơn khoang xanh-trắng-cam đặc trưng"
+   },
+   {
+    "id": "pano_542",
+    "X": 185,
+    "Z": 94.5,
+    "dist": 208,
+    "txt": "Cây xăng Petrolimex (trạm xăng dầu bên kia quảng trường)"
+   },
+   {
+    "id": "pano_236",
+    "X": 224.6,
+    "Z": -20,
+    "dist": 225,
+    "txt": "Trạm xăng dầu (cây xăng) mái che cam-xanh phía đối diện ngã tư"
+   },
+   {
+    "id": "pano_398",
+    "X": 211.7,
+    "Z": 80.4,
+    "dist": 226,
+    "txt": "Cây xăng Petrolimex (mái che lớn khung thép xanh-cam) - công trình đặc trưng"
+   },
+   {
+    "id": "pano_399",
+    "X": 251.7,
+    "Z": 63.9,
+    "dist": 260,
+    "txt": "PETROLIMEX (cây xăng, nhìn từ heading 270)"
+   },
+   {
+    "id": "pano_418",
+    "X": -897,
+    "Z": -471.1,
+    "dist": 1013,
+    "txt": "cây xăng (trạm xăng dầu) trên phố Bạch Đằng"
+   },
+   {
+    "id": "pano_222",
+    "X": 664.9,
+    "Z": -799,
+    "dist": 1039,
+    "txt": "Trạm xăng có mái hiên bê tông cong đặc trưng"
+   }
+  ]
+ },
+ "tuong_dai": {
+  "count": 22,
+  "panos": [
+   {
+    "id": "pano_498",
+    "X": -202.7,
+    "Z": -112.3,
+    "dist": 232,
+    "txt": "Shophouse cổ số 39 Kỳ Đồng mặt tiền vàng đắp phù điêu hoa văn/rồng cầu kỳ - kiến trúc đặc trưng đáng dựng riêng"
+   },
+   {
+    "id": "pano_259",
+    "X": -206.7,
+    "Z": 156.7,
+    "dist": 259,
+    "txt": "Tượng đài Nữ tướng Lê Chân: tượng đồng lớn một nhân vật nữ đứng, tay chống hông, trên bệ đá, lối đá đỏ dẫn vào — cần dựng riêng"
+   },
+   {
+    "id": "pano_428",
+    "X": -187.8,
+    "Z": 201.6,
+    "dist": 276,
+    "txt": "Tượng đài đồng màu vàng (Nữ tướng Lê Chân) nhìn thấy phía công viên"
+   },
+   {
+    "id": "pano_421",
+    "X": -252.9,
+    "Z": 123.5,
+    "dist": 281,
+    "txt": "Tượng đài/bức tượng mạ vàng (dáng người) đặt giữa quảng trường trước Trung tâm Triển lãm"
+   },
+   {
+    "id": "pano_037",
+    "X": -220.7,
+    "Z": 208.4,
+    "dist": 304,
+    "txt": "Tượng đài đặt giữa đảo vườn hoa cây cảnh cắt tỉa"
+   },
+   {
+    "id": "pano_128",
+    "X": -429.1,
+    "Z": 73.9,
+    "dist": 435,
+    "txt": "Mảng tranh tường cổ động dài chạy dọc tường rào (phù điêu/tranh cổ động, đáng dựng riêng)"
+   },
+   {
+    "id": "pano_267",
+    "X": 352.5,
+    "Z": -314.6,
+    "dist": 472,
+    "txt": "Công ty TNHH Thiết bị Phòng cháy Chữa cháy Hải Phòng"
+   },
+   {
+    "id": "pano_156",
+    "X": 327.3,
+    "Z": -451.8,
+    "dist": 558,
+    "txt": "Hội Chữ thập đỏ Thành phố Hải Phòng (Vietnam Red Cross Hai Phong Chapter)"
+   },
+   {
+    "id": "pano_154",
+    "X": 492.5,
+    "Z": -455,
+    "dist": 671,
+    "txt": "Tường rào phù điêu mỏ neo và hoa sen của khu Hải quân"
+   },
+   {
+    "id": "pano_454",
+    "X": 525.1,
+    "Z": -448.2,
+    "dist": 690,
+    "txt": "Tường rào phù điêu mỏ neo Hải quân (chi tiết đặc trưng)"
+   },
+   {
+    "id": "pano_516",
+    "X": 477.4,
+    "Z": -498.1,
+    "dist": 690,
+    "txt": "Tường rào vàng phù điêu mỏ neo & hoa sen kéo dài - motif hàng hải đặc trưng cần dựng riêng"
+   },
+   {
+    "id": "pano_515",
+    "X": 475.9,
+    "Z": -547.8,
+    "dist": 726,
+    "txt": "Tường rào vàng phù điêu mỏ neo & hoa sen (khuôn viên hàng hải)"
+   },
+   {
+    "id": "pano_153",
+    "X": 576.7,
+    "Z": -447.7,
+    "dist": 730,
+    "txt": "Tường rào phù điêu mỏ neo và hoa sen"
+   },
+   {
+    "id": "pano_009",
+    "X": -718.6,
+    "Z": 219.3,
+    "dist": 751,
+    "txt": "Cụm chữ 3D khổ lớn màu đỏ 'HẢI PHÒNG' đặt trên quảng trường bờ hồ (biểu tượng check-in)"
+   },
+   {
+    "id": "pano_453",
+    "X": 606.3,
+    "Z": -447.2,
+    "dist": 753,
+    "txt": "Tường rào phù điêu mỏ neo (biểu tượng Hải quân) đắp nổi lặp lại dọc bờ tường - chi tiết đặc trưng nên dựng riêng"
+   }
+  ]
+ },
+ "vong_xuyen_hon_non_bo": {
+  "count": 20,
+  "panos": [
+   {
+    "id": "pano_055",
+    "X": 48.7,
+    "Z": 95.5,
+    "dist": 107,
+    "txt": "Vườn trưng bày cây cảnh bonsai chống kiềng cọc gỗ dọc quảng trường"
+   },
+   {
+    "id": "pano_407",
+    "X": -30.2,
+    "Z": 127.1,
+    "dist": 131,
+    "txt": "Cột cờ + quảng trường trưng bày cây cảnh bonsai theo hàng"
+   },
+   {
+    "id": "pano_056",
+    "X": 66.2,
+    "Z": 138.5,
+    "dist": 154,
+    "txt": "Vườn cây cảnh bonsai chống kiềng cọc gỗ trên quảng trường"
+   },
+   {
+    "id": "pano_385",
+    "X": 395.1,
+    "Z": -62.2,
+    "dist": 400,
+    "txt": "dải công viên/vườn hoa trung tâm với hàng cau vua cao dọc lối đi lát gạch đỏ"
+   },
+   {
+    "id": "pano_338",
+    "X": 498.6,
+    "Z": -239.9,
+    "dist": 553,
+    "txt": "Đảo giao thông vòng xuyến quây tôn sơn xanh in dãy mũi tên trắng chỉ hướng"
+   },
+   {
+    "id": "pano_062",
+    "X": -265.5,
+    "Z": -521,
+    "dist": 585,
+    "txt": "Hàng cau vua cao dọc dải phân cách giữa cầu"
+   },
+   {
+    "id": "pano_342",
+    "X": 534.1,
+    "Z": -269.6,
+    "dist": 598,
+    "txt": "Bồn hoa/tiểu đảo vòng xuyến trung tâm có cột trang trí"
+   },
+   {
+    "id": "pano_547",
+    "X": -595.6,
+    "Z": -216.2,
+    "dist": 634,
+    "txt": "Hàng cau vua (cọ) cao đặc trưng chạy dọc ngõ"
+   },
+   {
+    "id": "pano_064",
+    "X": -235.2,
+    "Z": -600,
+    "dist": 644,
+    "txt": "Công viên cau vua ven sông Tam Bạc"
+   },
+   {
+    "id": "pano_065",
+    "X": -243.7,
+    "Z": -597.2,
+    "dist": 645,
+    "txt": "Công viên cau vua ven sông Tam Bạc"
+   },
+   {
+    "id": "pano_521",
+    "X": 582.7,
+    "Z": -332.1,
+    "dist": 671,
+    "txt": "Giàn pergola sắt + hàng chậu bonsai trước sảnh MENRVA HOTEL"
+   },
+   {
+    "id": "pano_291",
+    "X": -838.6,
+    "Z": -59.7,
+    "dist": 841,
+    "txt": "Dãy chậu bonsai/cây cảnh lớn trên bệ trang trí đế đỏ trước đền"
+   },
+   {
+    "id": "pano_020",
+    "X": 295.1,
+    "Z": -799.5,
+    "dist": 852,
+    "txt": "Dãy chậu bonsai lớn tạo dáng nghệ thuật"
+   },
+   {
+    "id": "pano_276",
+    "X": -651.7,
+    "Z": 578.8,
+    "dist": 872,
+    "txt": "Cụm bia đá và trụ đá chạm khắc + non bộ trước cổng chùa"
+   },
+   {
+    "id": "pano_440",
+    "X": -220,
+    "Z": -883.9,
+    "dist": 911,
+    "txt": "Nhánh cầu cạn/vòng xuyến dẫn lên cầu"
+   }
+  ]
+ },
+ "nha_phap_co_dien": {
+  "count": 75,
+  "panos": [
+   {
+    "id": "pano_054",
+    "X": 36.2,
+    "Z": 46.5,
+    "dist": 59,
+    "txt": "Nhà hát Lớn Hải Phòng - công trình Pháp tân cổ điển màu vàng với chân dung Chủ tịch Hồ Chí Minh và dàn cờ đỏ trên nóc"
+   },
+   {
+    "id": "pano_132",
+    "X": -113.7,
+    "Z": 12.1,
+    "dist": 114,
+    "txt": "Lô đất đang phá dỡ với hàng cột trang trí kiểu cổ điển (Corinthian) mạ vàng và tượng thiên thần/thần tình yêu (cupid) mạ vàng — công trình trang trí độc đáo, khả năng trung tâm tiệc cưới cũ"
+   },
+   {
+    "id": "pano_541",
+    "X": 25.9,
+    "Z": 157.3,
+    "dist": 159,
+    "txt": "Nhà hát Lớn Hải Phòng (tòa nhà tân cổ điển vàng-trắng có tháp đồng hồ, nhìn thấy phía cuối quảng trường)"
+   },
+   {
+    "id": "pano_398",
+    "X": 211.7,
+    "Z": 80.4,
+    "dist": 226,
+    "txt": "Biệt thự Pháp cổ mái đầu hồi màu vàng"
+   },
+   {
+    "id": "pano_498",
+    "X": -202.7,
+    "Z": -112.3,
+    "dist": 232,
+    "txt": "Cột đèn cổ kiểu Pháp đèn chùm bóng cầu"
+   },
+   {
+    "id": "pano_001",
+    "X": -211.7,
+    "Z": 114.1,
+    "dist": 240,
+    "txt": "vòng xoay giao thông lớn có cụm công trình màu vàng kiểu Pháp phía xa"
+   },
+   {
+    "id": "pano_354",
+    "X": 10.2,
+    "Z": -269.4,
+    "dist": 270,
+    "txt": "Toà nhà Hoàng Long mạ vàng tân cổ điển với cặp tượng sư tử/nghê đá ở lối vào"
+   },
+   {
+    "id": "pano_355",
+    "X": 69.8,
+    "Z": -267.8,
+    "dist": 277,
+    "txt": "toà nhà tân cổ điển màu trắng có cửa vòm (khách sạn/văn phòng)"
+   },
+   {
+    "id": "pano_050",
+    "X": 35.2,
+    "Z": -300.4,
+    "dist": 302,
+    "txt": "Cổng chào mái vòm màu xanh của Trường Tiểu học Đinh Tiên Hoàng với hai trụ băng rôn khẩu hiệu đỏ-vàng hai bên"
+   },
+   {
+    "id": "pano_260",
+    "X": -193.8,
+    "Z": 231.2,
+    "dist": 302,
+    "txt": "dãy nhà lớp học + tường rào kiểu Pháp của Trường THPT Ngô Quyền (kiến trúc vàng kem, cửa vòm, chớp xanh) — công trình đặc trưng"
+   },
+   {
+    "id": "pano_037",
+    "X": -220.7,
+    "Z": 208.4,
+    "dist": 304,
+    "txt": "Cột đèn đôi hai bóng cầu kiểu Pháp cổ trên trụ gang trang trí"
+   },
+   {
+    "id": "pano_002",
+    "X": -285.4,
+    "Z": 131.1,
+    "dist": 314,
+    "txt": "dãy nhà công cộng hành lang vòm cuốn kiểu Pháp"
+   },
+   {
+    "id": "pano_358",
+    "X": 236.5,
+    "Z": -265.1,
+    "dist": 355,
+    "txt": "Toà nhà kiểu Pháp (thuộc địa) hai tầng hành lang cuốn vòm với lan can con tiện của Hội Liên hiệp Phụ nữ Hải Phòng - công trình kiến trúc đặc trưng đáng dựng riêng"
+   },
+   {
+    "id": "pano_468",
+    "X": 306.1,
+    "Z": 180.8,
+    "dist": 356,
+    "txt": "Căn biệt thự Pháp cổ ở góc phố (ban công lan can con tiện) kết hợp khu chợ ô dù nhiều màu"
+   },
+   {
+    "id": "pano_482",
+    "X": -185.9,
+    "Z": 312.1,
+    "dist": 363,
+    "txt": "Dãy công sở kiểu Pháp màu vàng (hành lang vòm)"
+   }
+  ]
+ },
+ "khach_san_iconic": {
+  "count": 47,
+  "panos": [
+   {
+    "id": "pano_133",
+    "X": -73.4,
+    "Z": 4,
+    "dist": 74,
+    "txt": "biển 'HOTEL'"
+   },
+   {
+    "id": "pano_500",
+    "X": 123.2,
+    "Z": 28.6,
+    "dist": 126,
+    "txt": "Công viên/vườn hoa ven phố Trần Hưng Đạo (khu Khách sạn Pullman gần đó theo bản đồ)"
+   },
+   {
+    "id": "pano_535",
+    "X": 217.2,
+    "Z": -35.6,
+    "dist": 220,
+    "txt": "Khách sạn Pullman Hải Phòng (trên bản đồ, gần đó)"
+   },
+   {
+    "id": "pano_038",
+    "X": -148,
+    "Z": 193.6,
+    "dist": 244,
+    "txt": "CINDY HOTEL & APARTMENTS"
+   },
+   {
+    "id": "pano_259",
+    "X": -206.7,
+    "Z": 156.7,
+    "dist": 259,
+    "txt": "CINDY HOTEL & APARTMENT"
+   },
+   {
+    "id": "pano_355",
+    "X": 69.8,
+    "Z": -267.8,
+    "dist": 277,
+    "txt": "toà nhà tân cổ điển màu trắng có cửa vòm (khách sạn/văn phòng)"
+   },
+   {
+    "id": "pano_352",
+    "X": -175,
+    "Z": -272.2,
+    "dist": 324,
+    "txt": "HOTEL QUÝ HẰNG"
+   },
+   {
+    "id": "pano_401",
+    "X": 329.8,
+    "Z": 18.2,
+    "dist": 330,
+    "txt": "Khách sạn Pullman Hải Phòng (cao tầng ở xa)"
+   },
+   {
+    "id": "pano_427",
+    "X": -262.1,
+    "Z": 216.5,
+    "dist": 340,
+    "txt": "Khách sạn Pullman Hải Phòng (theo bản đồ nhỏ)"
+   },
+   {
+    "id": "pano_402",
+    "X": 365.1,
+    "Z": -6.7,
+    "dist": 365,
+    "txt": "PH Hotel"
+   },
+   {
+    "id": "pano_359",
+    "X": 276.4,
+    "Z": -264.3,
+    "dist": 382,
+    "txt": "gần Khách sạn Pullman Hải Phòng"
+   },
+   {
+    "id": "pano_385",
+    "X": 395.1,
+    "Z": -62.2,
+    "dist": 400,
+    "txt": "Khách sạn Pullman Hải Phòng (tòa cao tầng trắng, theo bản đồ)"
+   },
+   {
+    "id": "pano_265",
+    "X": 360,
+    "Z": -202.2,
+    "dist": 413,
+    "txt": "Khách sạn Pullman Hải Phòng (theo bản đồ, nhà cao tầng phía xa)"
+   },
+   {
+    "id": "pano_424",
+    "X": 434.3,
+    "Z": -9.6,
+    "dist": 434,
+    "txt": "Tòa nhà kiểu Pháp cổ lớn trên phố Phạm Ngũ Lão (khả năng là khách sạn/công sở)"
+   },
+   {
+    "id": "pano_404",
+    "X": 410.2,
+    "Z": -153.6,
+    "dist": 438,
+    "txt": "Khách sạn Pullman và các cao ốc (nền)"
+   }
+  ]
+ },
+ "cao_oc_kinh": {
+  "count": 30,
+  "panos": [
+   {
+    "id": "pano_254",
+    "X": -41.3,
+    "Z": -282.4,
+    "dist": 285,
+    "txt": "Toà nhà cao tầng Hoàng Long Plaza (nền)"
+   },
+   {
+    "id": "pano_401",
+    "X": 329.8,
+    "Z": 18.2,
+    "dist": 330,
+    "txt": "Khách sạn Pullman Hải Phòng (cao tầng ở xa)"
+   },
+   {
+    "id": "pano_402",
+    "X": 365.1,
+    "Z": -6.7,
+    "dist": 365,
+    "txt": "Khách sạn Pullman (cao tầng ở xa)"
+   },
+   {
+    "id": "pano_385",
+    "X": 395.1,
+    "Z": -62.2,
+    "dist": 400,
+    "txt": "Khách sạn Pullman Hải Phòng (tòa cao tầng trắng, theo bản đồ)"
+   },
+   {
+    "id": "pano_257",
+    "X": -46.5,
+    "Z": -399,
+    "dist": 402,
+    "txt": "tòa cao tầng đang xây phủ lưới xanh phía sau (heading ~270)"
+   },
+   {
+    "id": "pano_265",
+    "X": 360,
+    "Z": -202.2,
+    "dist": 413,
+    "txt": "Khách sạn Pullman Hải Phòng (theo bản đồ, nhà cao tầng phía xa)"
+   },
+   {
+    "id": "pano_404",
+    "X": 410.2,
+    "Z": -153.6,
+    "dist": 438,
+    "txt": "Khách sạn Pullman và các cao ốc (nền)"
+   },
+   {
+    "id": "pano_046",
+    "X": 52.8,
+    "Z": -456.7,
+    "dist": 460,
+    "txt": "Công trình cao tầng đang xây phủ lưới xanh kèm cần cẩu tháp ở phía xa"
+   },
+   {
+    "id": "pano_161",
+    "X": 136.2,
+    "Z": -455.6,
+    "dist": 476,
+    "txt": "Toà nhà/cần cẩu công trình cao tầng đang xây ở cuối phố (nhìn xa)"
+   },
+   {
+    "id": "pano_403",
+    "X": 472,
+    "Z": -205.3,
+    "dist": 515,
+    "txt": "Khách sạn Pullman (cao tầng ở xa)"
+   },
+   {
+    "id": "pano_158",
+    "X": 257,
+    "Z": -451.9,
+    "dist": 520,
+    "txt": "Tòa cao ốc kính (phía cuối phố)"
+   },
+   {
+    "id": "pano_319",
+    "X": 513,
+    "Z": 121.2,
+    "dist": 527,
+    "txt": "Tòa Diamond Fitness cao tầng mặt kính bạc"
+   },
+   {
+    "id": "pano_157",
+    "X": 287.4,
+    "Z": -451.9,
+    "dist": 536,
+    "txt": "Tòa nhà cao tầng kính (SHP/địa ốc, phía cuối phố)"
+   },
+   {
+    "id": "pano_156",
+    "X": 327.3,
+    "Z": -451.8,
+    "dist": 558,
+    "txt": "Cao ốc văn phòng kính trắng"
+   },
+   {
+    "id": "pano_072",
+    "X": -308.7,
+    "Z": -513.3,
+    "dist": 599,
+    "txt": "Cao ốc đang xây phủ lưới xanh kèm cần cẩu tháp - mốc nhìn nổi bật"
+   }
+  ]
+ },
+ "benh_vien": {
+  "count": 11,
+  "panos": [
+   {
+    "id": "pano_429",
+    "X": 33.8,
+    "Z": -219.2,
+    "dist": 222,
+    "txt": "Bệnh viện Phụ sản Hải Phòng"
+   },
+   {
+    "id": "pano_051",
+    "X": 33.7,
+    "Z": -229.6,
+    "dist": 232,
+    "txt": "Cửa vòm cuốn của khoa quốc tế bệnh viện phụ sản với bồn cây cảnh trang trí"
+   },
+   {
+    "id": "pano_356",
+    "X": 109.2,
+    "Z": -267.3,
+    "dist": 289,
+    "txt": "Bệnh viện Phụ Sản Hải Phòng"
+   },
+   {
+    "id": "pano_357",
+    "X": 149.2,
+    "Z": -266.2,
+    "dist": 305,
+    "txt": "Cổng Khu Khám Bệnh của Bệnh viện Phụ Sản với biển xanh chữ trắng"
+   },
+   {
+    "id": "pano_006",
+    "X": -525.5,
+    "Z": 179.3,
+    "dist": 555,
+    "txt": "Công ty Xuân Hòa (nội thất văn phòng/trường học/bệnh viện)"
+   },
+   {
+    "id": "pano_376",
+    "X": -286.5,
+    "Z": 505.1,
+    "dist": 581,
+    "txt": "Bệnh viện Hữu nghị Việt Tiệp"
+   },
+   {
+    "id": "pano_540",
+    "X": -121.3,
+    "Z": -646.9,
+    "dist": 658,
+    "txt": "Bệnh viện Đa khoa Gold Star (số 6 Nguyễn Tri Phương)"
+   },
+   {
+    "id": "pano_364",
+    "X": -74.1,
+    "Z": 692.8,
+    "dist": 697,
+    "txt": "gần Bệnh viện Hữu nghị Việt Tiệp"
+   },
+   {
+    "id": "pano_278",
+    "X": -771.1,
+    "Z": 603.8,
+    "dist": 979,
+    "txt": "Bệnh viện Quốc tế Medipharcare / Mediphar Care"
+   },
+   {
+    "id": "pano_322",
+    "X": -53.1,
+    "Z": 986.1,
+    "dist": 988,
+    "txt": "Bệnh viện Hữu nghị Việt Tiệp (hướng lân cận theo bản đồ)"
+   },
+   {
+    "id": "pano_025",
+    "X": -1007.4,
+    "Z": 367.3,
+    "dist": 1072,
+    "txt": "Bệnh viện Hữu nghị Việt Tiệp (gần đó, theo bản đồ)"
+   }
+  ]
+ },
+ "cong_chao": {
+  "count": 15,
+  "panos": [
+   {
+    "id": "pano_430",
+    "X": 38.5,
+    "Z": -208.2,
+    "dist": 212,
+    "txt": "Cổng trường mầm non hình cầu vồng nhiều màu với tranh tường con thú và bảng LED — vật thể đặc trưng đáng dựng riêng"
+   },
+   {
+    "id": "pano_050",
+    "X": 35.2,
+    "Z": -300.4,
+    "dist": 302,
+    "txt": "Cổng chào mái vòm màu xanh của Trường Tiểu học Đinh Tiên Hoàng với hai trụ băng rôn khẩu hiệu đỏ-vàng hai bên"
+   },
+   {
+    "id": "pano_495",
+    "X": -49.5,
+    "Z": -556.7,
+    "dist": 559,
+    "txt": "Cổng chào băng rôn đỏ vắt ngang lối vào khu dân cư"
+   },
+   {
+    "id": "pano_366",
+    "X": 5,
+    "Z": 676.6,
+    "dist": 677,
+    "txt": "Cổng chào băng rôn đỏ khẩu hiệu 'Toàn dân đoàn kết xây dựng đời sống văn hóa' bắc ngang Ngõ 125"
+   },
+   {
+    "id": "pano_527",
+    "X": 47,
+    "Z": -709,
+    "dist": 711,
+    "txt": "Cổng trường tiểu học mái ngói đỏ kiểu truyền thống (điểm nhấn nên dựng riêng)"
+   },
+   {
+    "id": "pano_505",
+    "X": 448.6,
+    "Z": -604.9,
+    "dist": 753,
+    "txt": "Cổng chào ngõ với băng rôn đỏ 'Toàn dân đoàn kết...'"
+   },
+   {
+    "id": "pano_422",
+    "X": 78.7,
+    "Z": -777.5,
+    "dist": 781,
+    "txt": "Cổng trường học (bảng 'CỔNG TRƯỜNG' an toàn giao thông)"
+   },
+   {
+    "id": "pano_244",
+    "X": -525.2,
+    "Z": 594.9,
+    "dist": 794,
+    "txt": "cổng Trường Mầm non Sao Mai treo cờ dây rực rỡ và cờ Tổ quốc"
+   },
+   {
+    "id": "pano_274",
+    "X": -575.7,
+    "Z": 563.2,
+    "dist": 805,
+    "txt": "Đôi chậu cây xi măng trắng lớn hai bên cổng trường"
+   },
+   {
+    "id": "pano_095",
+    "X": -828.2,
+    "Z": -234.3,
+    "dist": 861,
+    "txt": "Cổng Trường THPT Lê Hồng Phong (mái vòm, bảng LED, cờ, hàng chữ đỏ) - cần dựng riêng"
+   },
+   {
+    "id": "pano_324",
+    "X": -77.6,
+    "Z": 867.6,
+    "dist": 871,
+    "txt": "Cổng chào Công viên thể thao Hồ Sen: vòm cổng tạo hình lá/cánh hoa sen nhiều màu (xanh-đỏ-lam) với biểu tượng bông sen đỏ"
+   },
+   {
+    "id": "pano_097",
+    "X": -824.6,
+    "Z": -313,
+    "dist": 882,
+    "txt": "Cổng chào khu dân cư văn hóa có băng rôn đỏ và dãy cờ đỏ"
+   },
+   {
+    "id": "pano_277",
+    "X": -691.1,
+    "Z": 588,
+    "dist": 907,
+    "txt": "Cổng chào khung sắt bắc ngang miệng ngõ căng băng rôn đỏ 'Toàn dân đoàn kết...' hai đầu có họa tiết hoa sen vàng"
+   },
+   {
+    "id": "pano_099",
+    "X": -822.9,
+    "Z": -386.7,
+    "dist": 909,
+    "txt": "Cổng Trường Tiểu học Trần Văn Ơn kiểu trụ đỏ mái ngói với biển LED"
+   },
+   {
+    "id": "pano_061",
+    "X": 656.4,
+    "Z": 779.3,
+    "dist": 1019,
+    "txt": "Cổng chào/vòm đỏ ở cuối phố nhìn theo hướng tây"
+   }
+  ]
+ }
+}

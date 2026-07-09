@@ -1,0 +1,24 @@
+{
+  "landmarks_in_game": [
+    "opera (Nhà hát lớn, có ảnh Bác Hồ)", "quanhoa (Quán hoa)", "lechan (Tượng nữ tướng Lê Chân)",
+    "lake (Hồ Tam Bạc)", "market (Chợ Sắt)", "cathedral (Nhà thờ chính tòa)",
+    "postoffice (Bưu điện TP)", "museum (Bảo tàng HP)", "station (Ga Hải Phòng)",
+    "bridge", "binhbridge (cầu Bính)", "port (cảng)", "doson (Đồ Sơn)", "hondau (hải đăng Hòn Dấu)",
+    "catba (Cát Bà/karst)", "thptnq (THPT Ngô Quyền)", "thcsnq (THCS Ngô Quyền)", "thcstp",
+    "dennghe (Đền Nghè)", "dinhhk (Đình Hàng Kênh)", "chuahang (Chùa Dư Hàng)",
+    "dentamky (Đền Tam Kỳ)", "nhnn (Ngân hàng Nhà nước)", "ubnd (UBND TP)",
+    "rap78 (Rạp Tháng Tám)", "nhaken (Nhà Kèn - vọng lâu vườn hoa)"
+  ],
+  "props_in_game": [
+    "parked_scooters (xe máy đỗ)", "flags/flagpoles (cờ)", "banner/bannerpoles (băng rôn khẩu hiệu)",
+    "utilpoles/utilarms/utilwires (cột điện + dây)", "cyclos (xích lô)", "vendors (hàng rong)",
+    "trashbins (thùng rác)", "ornlamp_iron/ornlamp_globes (cột đèn gang kiểu Pháp)",
+    "white_arches (giàn vòm thép trắng)", "central flagpole (cột cờ quảng trường)",
+    "phượng/xà cừ/cọ (cây procedural + Meshy hero)", "vườn hoa Meshy", "thiên nga hồ",
+    "đèn giao thông", "biển tên phố", "dải phân cách", "nhà chờ bus", "đèn dây đêm"
+  ],
+  "sidewalk_types_in_game": {
+    "caro_do_xam": "11 đoạn phố", "con_sau": "2 đoạn", "terracotta": "1 đoạn", "gach_xam (mặc định)": "66 đoạn"
+  },
+  "note": "Dùng để đối chiếu: pano nào có thứ THẬT mà KHÔNG nằm trong danh sách này => GAP cần bổ sung."
+}

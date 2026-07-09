@@ -198,6 +198,9 @@ Quy trình đã kiểm chứng (scratchpad `bake.mjs`, dùng `@gltf-transform/co
   Chuyển nhánh có file ignore: dùng `git checkout -f`, cẩn thận mất file local (backup ra scratchpad trước).
 - Preload lúc màn hình chờ (`initAssets`), model xa stream theo khoảng cách (`updateAssets`, radius mặc định 900).
 - Người dùng gửi file nặng cho AI: upload lên GitHub Release / nhánh assets-storage rồi đưa URL.
+- **Dữ liệu audit 551 pano**: bản phân tích (JSON + bảng HTML, ~4MB) nằm NGAY nhánh chính
+  ở `audit/` (audit_done/enriched, gap_analysis, hp_pano_audit.html, pano_index...); ẢNH pano
+  gốc (~4.400 jpg, 1.7GB) vẫn CHỈ ở nhánh `streetview-refs` — không merge ảnh vào nhánh deploy.
 
 ## 7. Sinh lại bản đồ (khi cần cập nhật dữ liệu OSM)
 
