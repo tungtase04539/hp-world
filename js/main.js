@@ -254,6 +254,7 @@ document.getElementById('btnMoto').addEventListener('click', (e) => { e.currentT
 
 function updateMounted(dt, time) {
   const v = pState.mounted;
+  player.sit(true);   // áp lại MỖI khung: mọi animate() lỡ chạy trước đó không làm "đứng trên yên" nữa
   updateVehicle(v, dt, input.forward, input.right, time);
   _seat.set(0, v.seatY, v.seatZ).applyAxisAngle(UP, v.heading);
   pState.pos.copy(v.pos).add(_seat);
