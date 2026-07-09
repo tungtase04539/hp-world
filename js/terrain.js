@@ -91,11 +91,14 @@ RIVERS.push({ w: EXTRAS.lake.w, sh: 14, pts: EXTRAS.lake.pts });
 // theo trục cũ làm NGẬP phố Quang Trung. Đường là chân lý hiển thị → trục mới = TRUNG TUYẾN
 // 2 tim đường, nửa-rộng mỗi đoạn = (khoảng cách 2 đường)/2 − 11m (lòng đường + vỉa hè kè).
 // Mỗi đoạn: [ax, az, bx, bz, half]
+// half đo từ POLYLINE đường thật (không phải đường thẳng xấp xỉ): min khoảng cách trục→đường
+// theo từng đoạn trừ 11m (nửa lòng đường 6.5 + vỉa hè 3.6 + mép 1) — vỉa hè không bao giờ
+// chờm ra mặt nước dù đường lượn sát hồ (đo: seg0 min 30m, seg1 40, seg2 38, seg3 36).
 export const LAKE_SEGS = [
-  [-1139, 350, -1050, 331, 35],
-  [-1050, 331, -793, 276, 33],
-  [-793, 276, -447, 202, 30],
-  [-447, 202, -240, 158, 25],
+  [-1139, 350, -1050, 331, 19],
+  [-1050, 331, -793, 276, 29],
+  [-793, 276, -447, 202, 27],
+  [-447, 202, -240, 158, 24],
 ];
 
 const riverIdx = makeBucketIndex(RIVERS.map((r) => ({ pts: r.pts, meta: [r.w, r.sh || 28] })));

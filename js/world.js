@@ -375,7 +375,29 @@ export function buildWorld(scene) {
     const p2 = g2.attributes.position;
     const col2 = new Float32Array(p2.count * 3);
     for (let i = 0; i < p2.count; i++) {
-      const x = p2.getX(i), z = p2.getZ(i);
+      let x = p2.getX(i), z = p2.getZ(i);
+      // NẮN mép bờ THẲNG: bờ hồ chạy chéo so với lưới 5m → răng cưa "lồi lõm". Đỉnh nào nằm
+      // trong ±2.4m quanh đường bờ (dL=half) thì kéo VỀ đúng đường bờ; đỉnh trong dải dốc
+      // kéo về chân kè (half-2.1, taluy 2m) → mép nước + chân kè đều là đường thẳng.
+      {
+        let bd = 1e9, bh = 30, bpx = 0, bpz = 0;
+        for (const [ax, az, bx, bz, hf] of LAKE_SEGS) {
+          const dx = bx - ax, dz = bz - az, l2 = dx * dx + dz * dz;
+          let t = ((x - ax) * dx + (z - az) * dz) / l2; t = Math.max(0, Math.min(1, t));
+          const px = ax + dx * t, pz = az + dz * t, d = Math.hypot(x - px, z - pz);
+          if (d - hf < bd - bh) { bd = d; bh = hf; bpx = px; bpz = pz; }
+        }
+        if (bd > 0.01) {
+          let target = 0;
+          if (Math.abs(bd - bh) < 2.4) target = bh;                      // mép kè
+          else if (bd >= bh - 6.5 && bd < bh - 2.4) target = bh - 2.1;   // chân kè (taluy 2m)
+          if (target > 0) {
+            const s = target / bd;
+            x = bpx + (x - bpx) * s; z = bpz + (z - bpz) * s;
+            p2.setX(i, x); p2.setZ(i, z);
+          }
+        }
+      }
       const h = groundHeightNoDeck(x, z);
       p2.setY(i, h + 0.05);
       if (h < -0.6) tmp.copy(cDeep);
