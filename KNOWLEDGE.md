@@ -240,6 +240,18 @@ node mobile.mjs    # viewport điện thoại + joystick
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-09 (ai)** [HỒ TAM BẠC = POLYGON OSM THẬT — BÀI HỌC LỚN: ĐỪNG XẤP XỈ ĐỊA VẬT CÓ DỮ LIỆU THẬT]:
+    User chê "hồ thành chữ nhật, 2 đầu sai, vỉa hè thụt ra thụt vào" → nguyên nhân gốc là mọi
+    phiên bản trước đều XẤP XỈ hồ bằng trục thẳng + bề rộng. Sửa đúng: tải polygon nước OSM
+    way 236743184 (Overpass GET, 21 đỉnh → 20 sau dedupe), chiếu hệ game, hardcode
+    `LAKE_POLY` + `lakeSD(x,z)` (khoảng cách CÓ DẤU, âm=trong hồ) trong terrain.js.
+    Nước: sd<0 (taluy 2m smoothstep(-2,0)); lấp đất sd<60 & h<1.6; đông đập rect riêng.
+    KÈ world.js: bám TỪNG CẠNH polygon — pháp tuyến tự lật ra ngoài (test lakeSD(mid+n*3)),
+    nhịp ghế/đèn theo QUÃNG ĐƯỜNG TÍCH LŨY (tAcc) để đều qua khúc cong; mặt lát caro tới mép
+    nhựa (roadD đo tới mọi đoạn p/s gần hồ); lưới mịn nắn đỉnh theo mép polygon (±2.4→mép,
+    trong 2.4-6.5→chân kè). ĐO ĐẠC: polygon cách tim đường ven hồ ≥14m (KHÔNG hề lệch như
+    từng nghĩ — thứ sai là phép xấp xỉ đối xứng). Sim: trong poly 0 khô / ngoài 0 ướt.
+    Kẹp nghiêng nhân vật lái xe (±0.3 pitch, ±0.45 lean) — hết "người nằm bẹp cạnh xe" trên dốc.
 - **2026-07-08 (ah)** [HỒ TAM BẠC SẠCH + KÈ ĐÚNG THỨ TỰ + HẾT BIỂN BAY + HẾT NHÂN VẬT NHẤP NHÁY]:
     (1) terrain.js: lòng hồ TẠO HÌNH SẠCH đè lên mask OSM nham nhở theo `LAKE_SEGS` (export) —
     GOTCHA QUAN TRỌNG: trục polygon nước OSM (EXTRAS.lake.pts) LỆCH ~15m về nam so với tim
