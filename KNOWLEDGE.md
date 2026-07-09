@@ -199,8 +199,18 @@ Quy trình đã kiểm chứng (scratchpad `bake.mjs`, dùng `@gltf-transform/co
 - Preload lúc màn hình chờ (`initAssets`), model xa stream theo khoảng cách (`updateAssets`, radius mặc định 900).
 - Người dùng gửi file nặng cho AI: upload lên GitHub Release / nhánh assets-storage rồi đưa URL.
 - **Dữ liệu audit 551 pano**: bản phân tích (JSON + bảng HTML, ~4MB) nằm NGAY nhánh chính
-  ở `audit/` (audit_done/enriched, gap_analysis, hp_pano_audit.html, pano_index...); ẢNH pano
-  gốc (~4.400 jpg, 1.7GB) vẫn CHỈ ở nhánh `streetview-refs` — không merge ảnh vào nhánh deploy.
+  ở `audit/`; TRỌN BỘ ẢNH pano (4.411 jpg + manifest + README ánh xạ tọa độ) cũng đã ở nhánh
+  chính tại `audit/550_pano_dai_trung_tam_hai_phong/` (loại khỏi deploy bằng `.vercelignore`);
+  bản gốc song song vẫn ở nhánh `streetview-refs`.
+- **PUSH DỮ LIỆU LỚN qua proxy git (giới hạn ~413 khi pack quá lớn)**: `git push` chỉ loại trừ
+  blob theo cây COMMIT CHA (edge), KHÔNG theo các ref khác server đã có → push 1 commit chứa cây
+  lớn sẽ đóng gói lại TOÀN BỘ blob (dù server có sẵn) → HTTP 413. Cách đúng: chia nhiều commit
+  nhỏ (GIT_INDEX_FILE tạm + `update-index --cacheinfo` + `commit-tree`) rồi push TUẦN TỰ — mỗi
+  pack chỉ chứa phần chênh với cha (~150 file/đợt là an toàn). Ký lại lịch sử đã push: dựng chuỗi
+  `commit-tree -S` cùng tree, đẩy từng commit lên NHÁNH TẠM, rồi force-with-lease swap tip
+  (pack ≈ 0 vì object đã trên server). Proxy KHÔNG cho xóa nhánh (403) — nhánh tạm trùng tip
+  vô hại. Worktree: bật sparse-checkout loại thư mục ảnh TRƯỚC khi checkout/pull để không
+  materialize 1.7GB ra đĩa.
 
 ## 7. Sinh lại bản đồ (khi cần cập nhật dữ liệu OSM)
 
