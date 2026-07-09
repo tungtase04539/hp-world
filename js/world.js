@@ -6,7 +6,7 @@ import { registerModel, shrinkTexturesForMobile } from './assets.js';
 import {
   WORLD_BOUNDS, LM, LM_DIR, LM_FACE, EXTRAS, TREES, PARKS, RAIL, DT_BOX, RIVERS, ROADS_DT, ROADS_REGION, BRIDGES, BUILDINGS,
   groundHeight, groundHeightNoDeck, isWater, landAt, riverFactor,
-  nearestRiverPoint, findShore, addPier, LAKE_SEGS,
+  nearestRiverPoint, findShore, addPier, LAKE_POLY, lakeSD,
 } from './terrain.js';
 import { STREETS, INTERSECTIONS, MEDIANS, GARDENS } from './mapdata.js';
 import { SIDEWALK_BY_ROAD, SIDEWALK_DEFAULT } from './sidewalks.js';
@@ -84,15 +84,20 @@ function sidewalkMaterial(type) {
   if (_swMatCache[type]) return _swMatCache[type];
   const S = 256;
   const tex = makeTex(S, S, (g, w, h) => {
-    if (type === 'caro_do_xam') {                       // đỏ–xám ca-rô (bờ sông Tam Bạc, quảng trường)
+    if (type === 'caro_do_xam') {                       // gạch kè hồ Tam Bạc THEO PANO_004:
+      // nền gạch đỏ đất nung TRẦM là chủ đạo, điểm viên xám nhạt rải rác — KHÔNG phải
+      // ca-rô đỏ/trắng xen kẽ đều (user đối chiếu pano chê sai)
       const s = w / 4;
       for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) {
-        g.fillStyle = ((x + y) % 2 === 0) ? jitter([176, 71, 46], 14) : jitter([156, 150, 138], 12);
+        const rr = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453, rv = rr - Math.floor(rr);
+        g.fillStyle = rv < 0.72 ? jitter([158, 82, 58], 12)          // đỏ đất nung trầm (chủ đạo)
+          : rv < 0.88 ? jitter([142, 70, 50], 10)                    // đỏ sẫm
+          : jitter([160, 152, 138], 10);                             // xám nhạt điểm xuyết
         g.fillRect(x * s, y * s, s, s);
       }
-      g.strokeStyle = 'rgba(0,0,0,.14)'; g.lineWidth = 2;
+      g.strokeStyle = 'rgba(40,20,12,.28)'; g.lineWidth = 2;
       for (let i = 0; i <= 4; i++) { g.beginPath(); g.moveTo(i * s, 0); g.lineTo(i * s, h); g.moveTo(0, i * s); g.lineTo(w, i * s); g.stroke(); }
-      speckle(g, w, h, 260, 0.10);
+      speckle(g, w, h, 260, 0.08);
     } else if (type === 'terracotta') {                 // gạch đỏ đất nung liền (một vài đoạn)
       tileGrid(g, w, h, 4, [174, 86, 52], 16, 'rgba(70,30,15,.30)'); speckle(g, w, h, 300, 0.10);
     } else if (type === 'con_sau') {                     // gạch con sâu / xương cá (đỏ + xám xen)
@@ -332,10 +337,8 @@ export function buildWorld(scene) {
     // nhau đứng 2 bờ → nội suy "bắc cầu đất" qua mặt nước). Dìm mọi đỉnh trong hành lang
     // xuống -3 (tam giác nào phủ kênh cũng chìm); dải lưới MỊN 5m phủ đè bên dưới sẽ vẽ
     // đúng bờ/kênh/phố (xem khối "DẢI LƯỚI MỊN" ngay sau).
-    if (x > -1170 && x < -195 && z > 45 && z < 410) {
-      let bd = 1e9;
-      for (const [ax, az, bx, bz] of LAKE_SEGS) { const d = ((px, pz, x1, z1, x2, z2) => { const dx = x2 - x1, dz = z2 - z1, l2 = dx * dx + dz * dz; let t = ((px - x1) * dx + (pz - z1) * dz) / l2; t = Math.max(0, Math.min(1, t)); return Math.hypot(px - (x1 + dx * t), pz - (z1 + dz * t)); })(x, z, ax, az, bx, bz); if (d < bd) bd = d; }
-      if (bd < 200) h = -3;
+    if (x > -1210 && x < -195 && z > 45 && z < 410) {
+      if (lakeSD(x, z) < 200) h = -3;   // trong/quanh polygon hồ: dìm — dải lưới MỊN vẽ đè đúng cao độ
     }
     pos.setY(i, h);
     if (h < -0.6) tmp.copy(cDeep);
@@ -367,17 +370,45 @@ export function buildWorld(scene) {
   // ---------- DẢI LƯỚI MỊN HỒ TAM BẠC (5m) ----------
   // Phủ hành lang hồ bằng lưới mịn đúng cao độ + màu (lưới toàn cầu trong hành lang đã dìm -3).
   // +0.05 để nổi trên lưới toàn cầu ở rìa hộp (tránh z-fight nơi 2 mặt trùng cao độ).
-  // HỘP RỘNG HƠN vùng dìm ≥120m mọi phía: đỉnh dìm (-3) nội suy với đỉnh thường tạo VÀNH TRŨNG
-  // lan 1 ô lưới (~112m) ra ngoài vùng dìm — không phủ thì lộ "rãnh nước" giả cạnh vườn hoa (user báo).
   {
-    const X1 = -1300, X2 = -65, Z1 = -85, Z2 = 540, STEP = 5;
+    // HỘP RỘNG HƠN vùng dìm ≥120m mọi phía: đỉnh dìm (-3) nội suy với đỉnh thường tạo VÀNH TRŨNG
+    // lan 1 ô lưới thô (~112m) ra ngoài vùng dìm — không phủ thì lộ "rãnh nước" giả cạnh vườn hoa
+    // Lê Chân (đông) và ven đập Tam Kỳ (tây) — user báo.
+    const X1 = -1330, X2 = -65, Z1 = -75, Z2 = 530, STEP = 5;
     const g2 = new THREE.PlaneGeometry(X2 - X1, Z2 - Z1, Math.round((X2 - X1) / STEP), Math.round((Z2 - Z1) / STEP));
     g2.rotateX(-Math.PI / 2);
     g2.translate((X1 + X2) / 2, 0, (Z1 + Z2) / 2);
     const p2 = g2.attributes.position;
     const col2 = new Float32Array(p2.count * 3);
     for (let i = 0; i < p2.count; i++) {
-      const x = p2.getX(i), z = p2.getZ(i);
+      let x = p2.getX(i), z = p2.getZ(i);
+      // NẮN mép bờ theo POLYGON hồ thật: bờ chạy chéo so với lưới 5m → răng cưa "lồi lõm".
+      // Đỉnh trong ±2.4m quanh mép polygon → kéo VỀ đúng mép; đỉnh trong dải dốc (trong hồ,
+      // cách mép 2.4-6.5m) → kéo về chân kè (2.1m trong mép) → mép nước + chân kè sắc nét.
+      {
+        let bd = 1e9, bpx = 0, bpz = 0;
+        for (let e = 0, j = LAKE_POLY.length - 1; e < LAKE_POLY.length; j = e++) {
+          const [x1, z1] = LAKE_POLY[j], [x2, z2] = LAKE_POLY[e];
+          const dx = x2 - x1, dz = z2 - z1, l2 = dx * dx + dz * dz;
+          let t = ((x - x1) * dx + (z - z1) * dz) / l2; t = Math.max(0, Math.min(1, t));
+          const px = x1 + dx * t, pz = z1 + dz * t, d = Math.hypot(x - px, z - pz);
+          if (d < bd) { bd = d; bpx = px; bpz = pz; }
+        }
+        if (bd > 0.01 && bd < 11) {
+          const sd = lakeSD(x, z);                                       // âm = trong hồ
+          // DẢI BẮT ĐỈNH PHẢI RỘNG HƠN BƯỚC LƯỚI 5m: |Δsd| giữa 2 đỉnh kề ≤5 nên mép ±3.6
+          // và chân (−9.6,−3.6) đảm bảo MỌI tuyến lưới cắt bờ đều có đủ cặp đỉnh mép+chân
+          // → tường kè dựng đứng đồng nhất, mực nước bám viền ĐỀU (hết "chỗ có chỗ không")
+          let target = -1;
+          if (Math.abs(sd) < 3.6) target = 0;                            // mép kè
+          else if (sd < -3.6 && sd > -9.6) target = 2.1;                 // chân kè (2.1m trong mép)
+          if (target >= 0) {
+            const s = target / bd;                                       // 0 → về đúng mép
+            x = bpx + (x - bpx) * s; z = bpz + (z - bpz) * s;
+            p2.setX(i, x); p2.setZ(i, z);
+          }
+        }
+      }
       const h = groundHeightNoDeck(x, z);
       p2.setY(i, h + 0.05);
       if (h < -0.6) tmp.copy(cDeep);
@@ -486,54 +517,6 @@ export function buildWorld(scene) {
     });
   }
   for (const r of ROADS_REGION) layRoad(r.pts, 12, { dashes: true });
-
-  // ---------- LÁT KÍN KÈ HỒ TAM BẠC: vỉa hè caro phủ TRỌN dải bờ + 2 đầu hồ ----------
-  // (vỉa hè theo-đoạn-đường để hở nêm/tam giác ở khúc cong và 2 đầu hồ — user yêu cầu phủ kín cả ô)
-  {
-    const S = 1 / 1.6;
-    const _qsd = (px, pz, x1, z1, x2, z2) => { const dx = x2 - x1, dz = z2 - z1, l2 = dx * dx + dz * dz; let t = l2 ? ((px - x1) * dx + (pz - z1) * dz) / l2 : 0; t = Math.max(0, Math.min(1, t)); return Math.hypot(px - (x1 + dx * t), pz - (z1 + dz * t)); };
-    const onRoadQ = (x, z, m) => { for (const r of ROADS_DT) { if (r.c === 'w') continue; const hw = ROAD_W[r.c] / 2 + m; for (let i = 0; i < r.pts.length - 1; i++) if (_qsd(x, z, r.pts[i][0], r.pts[i][1], r.pts[i + 1][0], r.pts[i + 1][1]) < hw) return true; } return false; };
-    const laySlab = (cx, cz, w, l, rotY, roadM) => {
-      const gy = groundHeightNoDeck(cx, cz);
-      if (Math.abs(gy - LAND_H) > 0.4 || onRoadQ(cx, cz, roadM)) return;   // không lát xuống nước / đè lòng đường
-      const sg = new THREE.BoxGeometry(w, 0.24, l);
-      e4.set(0, rotY, 0); q4.setFromEuler(e4);
-      m4.compose(new THREE.Vector3(cx, gy + 0.05, cz), q4, s4);            // top 0.17 — thấp hơn vỉa hè đường 1cm (hết z-fight chỗ chồng)
-      sg.applyMatrix4(m4);
-      const sinR = Math.sin(rotY), cosR = Math.cos(rotY);
-      const sp = sg.attributes.position, suv = new Float32Array(sp.count * 2);
-      for (let k = 0; k < sp.count; k++) { const vx = sp.getX(k), vz = sp.getZ(k); suv[k * 2] = (vx * sinR + vz * cosR) * S; suv[k * 2 + 1] = (vx * cosR - vz * sinR) * S; }
-      sg.setAttribute('uv', new THREE.BufferAttribute(suv, 2));
-      (sidewalkBuckets.caro_do_xam = sidewalkBuckets.caro_do_xam || []).push(sg);
-    };
-    // dải bờ dọc 2 bên hồ: từ mép nước (half+0.2) nối liền vào vỉa hè có sẵn của đường ven hồ
-    for (const [ax, az, bx, bz, hf] of LAKE_SEGS) {
-      const L = Math.hypot(bx - ax, bz - az), ux = (bx - ax) / L, uz = (bz - az) / L, nx = -uz, nz = ux;
-      const rotY = Math.atan2(bx - ax, bz - az);
-      for (const side of [-1, 1]) {
-        for (let t = 0; t < L; t += 10) {
-          const len = Math.min(10, L - t);
-          const cx = ax + ux * (t + len / 2) + nx * side * (hf + 2.3), cz = az + uz * (t + len / 2) + nz * side * (hf + 2.3);
-          laySlab(cx, cz, 4.2, len + 0.5, rotY, -1);   // roadM -1: chỉ né khi tâm THẬT SỰ trên mặt nhựa
-        }
-      }
-    }
-    // 2 ĐẦU HỒ: phủ kín cả ô đất đầu hồ (chừa nước + lòng đường tự động qua guard)
-    const capFill = (px0, pz0, ux, uz, rotY, hf) => {
-      const nx = -uz, nz = ux;
-      for (let d = 4; d <= 56; d += 10) {
-        for (let s = -(hf + 8); s <= hf + 8; s += 10) {
-          laySlab(px0 + ux * d + nx * s, pz0 + uz * d + nz * s, 10.5, 10.5, rotY, 1.5);
-        }
-      }
-    };
-    const F = LAKE_SEGS[0], E = LAKE_SEGS[LAKE_SEGS.length - 1];
-    { const L = Math.hypot(E[2] - E[0], E[3] - E[1]), ux = (E[2] - E[0]) / L, uz = (E[3] - E[1]) / L;
-      capFill(E[2], E[3], ux, uz, Math.atan2(ux, uz), E[4]); }                    // đầu ĐÔNG (gần Chợ Sắt/Quang Trung)
-    { const L = Math.hypot(F[2] - F[0], F[3] - F[1]), ux = (F[0] - F[2]) / L, uz = (F[1] - F[3]) / L;
-      capFill(F[0], F[1], ux, uz, Math.atan2(ux, uz), F[4]); }                    // đầu TÂY (đập Tam Kỳ)
-  }
-
   function addMerged(geos, material, name) {
     if (!geos.length) return;
     const merged = mergeGeometries(geos);
@@ -635,58 +618,121 @@ export function buildWorld(scene) {
   // Neo theo TRỤC HỒ (không theo tim đường) → lan can bám đúng mép nước cả 2 bờ, thứ tự thật
   // từ hồ ra: nước → LAN CAN (mép kè) → đèn → GHẾ ĐÁ (trên vỉa hè caro, quay mặt ra hồ) → vỉa hè → đường.
   {
-    // LAKE_SEGS (terrain.js): trục = trung tuyến 2 phố ven hồ, half thay đổi theo đoạn —
-    // dùng CHUNG với carve địa hình nên rail/ghế/đèn luôn nằm đúng mép nước, không ra giữa đường
-    const OFF_RAIL = 1.8, OFF_LAMP = 3.2, OFF_BENCH = 5.2;           // + half của đoạn
-    // đường CẮT NGANG hồ (cầu/đập): chừa khoảng trống, không dựng lan can chắn lối đi
-    const crossSegs = [];
+    // Bám theo MÉP POLYGON hồ thật (LAKE_POLY, terrain.js) — kè/vỉa hè/rào theo đúng hình hồ
+    // thực địa (2 đầu, bờ cong), KHÔNG còn xấp xỉ trục thẳng. Thứ tự từ nước ra:
+    // RÀO (mép kè, gờ 0.5m) → mặt lát caro liền → mép nhựa đường. User chốt chuẩn này.
+    const OFF_RAIL = -0.1, OFF_LAMP = 3.2, OFF_BENCH = 5.2;          // m tính từ mép nước ra ngoài
     const _sd = (px, pz, ax, az, bx, bz) => { const dx = bx - ax, dz = bz - az, l2 = dx * dx + dz * dz; let t = l2 ? ((px - ax) * dx + (pz - az) * dz) / l2 : 0; t = Math.max(0, Math.min(1, t)); return Math.hypot(px - (ax + t * dx), pz - (az + t * dz)); };
+    const parSegs = [];   // MỌI đoạn đường gần hồ (kể cả đập 'r') — mốc lát vỉa hè kè tới MÉP NHỰA
     for (const r of ROADS_DT) {
       if (r.c !== 'p' && r.c !== 's' && r.c !== 't' && r.c !== 'r') continue;
       for (let i = 0; i < r.pts.length - 1; i++) {
         const [x1, z1] = r.pts[i], [x2, z2] = r.pts[i + 1];
-        if (Math.max(x1, x2) < -1170 || Math.min(x1, x2) > -200 || Math.max(z1, z2) < 50 || Math.min(z1, z2) > 410) continue;
-        // chỉ lấy đoạn thực sự đi VÀO lòng hồ (điểm giữa cách trục < half-4) — loại đường ven bờ chạy song song
-        const mx = (x1 + x2) / 2, mz = (z1 + z2) / 2;
-        for (const [ax, az, bx, bz, hf] of LAKE_SEGS) if (_sd(mx, mz, ax, az, bx, bz) < hf - 4) { crossSegs.push([x1, z1, x2, z2]); break; }
+        if (Math.max(x1, x2) < -1210 || Math.min(x1, x2) > -200 || Math.max(z1, z2) < 50 || Math.min(z1, z2) > 410) continue;
+        const sd = lakeSD((x1 + x2) / 2, (z1 + z2) / 2);
+        if (sd > -4 && sd < 60) parSegs.push([x1, z1, x2, z2, ROAD_W[r.c] / 2]);
       }
     }
-    const nearCross = (x, z, r) => { for (const s of crossSegs) if (_sd(x, z, s[0], s[1], s[2], s[3]) < r) return true; return false; };
-    const railG = [], benchG = [], lampPostG = [], globeG = [];
-    for (const [ax, az, bx2, bz2, HALF] of LAKE_SEGS) {
-      const dx = bx2 - ax, dz = bz2 - az, L = Math.hypot(dx, dz);
-      const ux = dx / L, uz = dz / L, nx = -uz, nz = ux;             // pháp tuyến trục
-      const barAng = Math.atan2(ux, uz) + Math.PI / 2;               // thanh ngang dọc theo trục
-      for (const side of [-1, 1]) {                                  // cả 2 bờ hồ
-        for (let t = 2; t < L - 2; t += 2.6) {
-          const cx0 = ax + ux * t, cz0 = az + uz * t;
-          const ox = cx0 + nx * side * (HALF + OFF_RAIL), oz = cz0 + nz * side * (HALF + OFF_RAIL);
-          if (Math.abs(groundHeightNoDeck(ox, oz) - LAND_H) > 0.4) continue;  // phải là đất kè chuẩn
-          if (nearCross(ox, oz, 9)) continue;                                  // chừa lối cầu/đập cắt hồ
-          const gy = groundHeight(ox, oz);
-          const post = new THREE.BoxGeometry(0.07, 0.95, 0.07); post.translate(ox, gy + 0.48, oz); railG.push(post);
-          for (const ry of [0.9, 0.5]) { const r2 = new THREE.BoxGeometry(2.62, 0.06, 0.05); r2.rotateY(barAng); r2.translate(ox, gy + ry, oz); railG.push(r2); }
-          // ghế đá mỗi ~26m (TRÊN vỉa hè caro sau lan can, quay mặt ra hồ) + đèn đôi mỗi ~31m
-          if (Math.round(t) % 26 < 2.6) {
-            const bx = cx0 + nx * side * (HALF + OFF_BENCH), bz = cz0 + nz * side * (HALF + OFF_BENCH);
-            if (Math.abs(groundHeightNoDeck(bx, bz) - LAND_H) < 0.4 && !nearCross(bx, bz, 9)) {
-              const by = groundHeight(bx, bz);
-              const seat = new THREE.BoxGeometry(1.7, 0.12, 0.5); seat.rotateY(barAng); seat.translate(bx, by + 0.46, bz); benchG.push(seat);
-              for (const s of [-0.7, 0.7]) { const lg = new THREE.BoxGeometry(0.14, 0.42, 0.5); lg.rotateY(barAng); lg.translate(bx + ux * s, by + 0.21, bz + uz * s); benchG.push(lg); }
-            }
+    const railG = [], benchG = [], lampPostG = [], globeG = [], caroG = [];
+    // LẤY MẪU CHU VI đều 2.6m — đi XUYÊN QUA GÓC polygon (bước dư cạnh này chuyển sang cạnh
+    // sau) → rào/mặt lát liên tục quanh hồ kể cả 2 đầu ngắn, không đứt tại đỉnh góc
+    const samples = [];
+    {
+      let next = 1.3;
+      for (let e = 0; e < LAKE_POLY.length; e++) {
+        const [ax, az] = LAKE_POLY[e], [bx2, bz2] = LAKE_POLY[(e + 1) % LAKE_POLY.length];
+        const dx = bx2 - ax, dz = bz2 - az, L = Math.hypot(dx, dz);
+        const ux = dx / L, uz = dz / L;
+        let nx = -uz, nz = ux;
+        { const mx0 = (ax + bx2) / 2 + nx * 3, mz0 = (az + bz2) / 2 + nz * 3;
+          if (lakeSD(mx0, mz0) < 0) { nx = -nx; nz = -nz; } }         // pháp tuyến RA NGOÀI hồ
+        let t = next;
+        for (; t < L; t += 2.6) samples.push([ax + ux * t, az + uz * t, ux, uz, nx, nz, e]);
+        next = t - L;
+      }
+    }
+    // ĐĨA LÁT BO GÓC: tại đỉnh gãy >20° lát đĩa caro phủ nêm hở giữa 2 dải cạnh (cao hơn 1.5cm)
+    for (let e = 0; e < LAKE_POLY.length; e++) {
+      const [px0, pz0] = LAKE_POLY[(e + LAKE_POLY.length - 1) % LAKE_POLY.length];
+      const [cx1, cz1] = LAKE_POLY[e];
+      const [qx0, qz0] = LAKE_POLY[(e + 1) % LAKE_POLY.length];
+      const d1x = cx1 - px0, d1z = cz1 - pz0, l1 = Math.hypot(d1x, d1z);
+      const d2x = qx0 - cx1, d2z = qz0 - cz1, l2 = Math.hypot(d2x, d2z);
+      const dot = (d1x * d2x + d1z * d2z) / (l1 * l2);
+      if (dot > 0.94) continue;                                       // gần thẳng → dải cạnh tự phủ
+      let bnx = -(d1z / l1 + d2z / l2), bnz = (d1x / l1 + d2x / l2);
+      const bl = Math.hypot(bnx, bnz) || 1; bnx /= bl; bnz /= bl;
+      if (lakeSD(cx1 + bnx * 3, cz1 + bnz * 3) < 0) { bnx = -bnx; bnz = -bnz; }  // phân giác ra ngoài
+      const ccx = cx1 + bnx * 2.2, ccz = cz1 + bnz * 2.2;
+      if (Math.abs(groundHeightNoDeck(ccx, ccz) - LAND_H) > 0.5) continue;
+      const disc = new THREE.CylinderGeometry(3.6, 3.6, 0.24, 20);
+      disc.translate(ccx, groundHeight(ccx, ccz) + 0.135, ccz);
+      const dp = disc.attributes.position, duv = new Float32Array(dp.count * 2), DS = 1 / 1.6;
+      for (let k = 0; k < dp.count; k++) { duv[k * 2] = dp.getX(k) * DS; duv[k * 2 + 1] = dp.getZ(k) * DS; }
+      disc.setAttribute('uv', new THREE.BufferAttribute(duv, 2));
+      caroG.push(disc);
+    }
+    {
+      let tAcc = 0;
+      for (const [cx0, cz0, ux, uz, nx, nz, eIdx] of samples) {
+        tAcc += 2.6;
+        const yJit = (eIdx % 3) * 0.005;   // lệch 5mm giữa dải các cạnh kề — chống z-fight nơi giao nhau
+        const barAng = Math.atan2(ux, uz) + Math.PI / 2;              // thanh/ghế nằm dọc theo bờ
+        const alongAng = Math.atan2(ux, uz);
+        // VỈA HÈ CARO KÈ HỒ: lát LIỀN từ mép nước tới MÉP NHỰA của đường ven hồ (phủ luôn
+        // dải vỉa hè bám-tim-đường bên dưới, cao hơn 6cm) — một mặt caro liền
+        {
+          const qx = cx0 + nx * 2, qz = cz0 + nz * 2;
+          let roadD = 1e9, eOff = 3.25;
+          for (const s of parSegs) { const d = _sd(qx, qz, s[0], s[1], s[2], s[3]); if (d < roadD) { roadD = d; eOff = s[4]; } }
+          // ĐẦU ĐÔNG hồ (x>-480) là QUẢNG TRƯỜNG: caro lát liền góc vuông tới tận mép nhựa
+          // các đường bao (user đối chiếu thực địa) → cho lát rộng tới 42m; bờ dài giữ 16m
+          const capW = cx0 > -480 ? 42 : 16;
+          let outer = roadD > 60 ? 5 : 2 + roadD - eOff + 0.3;        // m từ mép nước ra tới mép nhựa
+          outer = Math.max(Math.min(outer, capW), 2.6);
+          const inner = -0.6;                                          // chớm ra mép nước (gờ kè)
+          const mid = (inner + outer) / 2, wAcross = outer - inner;
+          const sx = cx0 + nx * mid, sz = cz0 + nz * mid;
+          if (Math.abs(groundHeightNoDeck(sx, sz) - LAND_H) < 0.5) {
+            const pg = new THREE.BoxGeometry(2.75, 0.24, wAcross);
+            pg.rotateY(barAng); pg.translate(sx, groundHeight(sx, sz) + 0.12 + yJit, sz);
+            // UV ca-rô chạy thẳng theo hướng bờ (khớp hoa văn vỉa hè của đường ven hồ)
+            const pp = pg.attributes.position, puv = new Float32Array(pp.count * 2), S = 1 / 1.6;
+            const sinR = Math.sin(alongAng), cosR = Math.cos(alongAng);
+            for (let k = 0; k < pp.count; k++) { const vx = pp.getX(k), vz = pp.getZ(k); puv[k * 2] = (vx * sinR + vz * cosR) * S; puv[k * 2 + 1] = (vx * cosR - vz * sinR) * S; }
+            pg.setAttribute('uv', new THREE.BufferAttribute(puv, 2));
+            caroG.push(pg);
           }
-          if (Math.round(t) % 31 < 2.6) {
-            const lx = cx0 + nx * side * (HALF + OFF_LAMP), lz = cz0 + nz * side * (HALF + OFF_LAMP);
-            if (Math.abs(groundHeightNoDeck(lx, lz) - LAND_H) < 0.4 && !nearCross(lx, lz, 9)) {
-              const ly = groundHeight(lx, lz);
-              const pole = new THREE.CylinderGeometry(0.07, 0.11, 3.6, 8); pole.translate(lx, ly + 1.8, lz); lampPostG.push(pole);
-              const arm = new THREE.BoxGeometry(1.5, 0.07, 0.07); arm.rotateY(barAng); arm.translate(lx, ly + 3.55, lz); lampPostG.push(arm);
-              for (const s of [-0.62, 0.62]) { const gl = new THREE.SphereGeometry(0.17, 8, 6); gl.translate(lx + ux * s, ly + 3.72, lz + uz * s); globeG.push(gl); }
-            }
+        }
+        const ox = cx0 + nx * OFF_RAIL, oz = cz0 + nz * OFF_RAIL;
+        // rào ở mép nước (trên gờ kè) → kiểm tra ĐẤT tại lòng vỉa hè (+2m), cao độ theo mặt lát
+        const gx2 = cx0 + nx * 2, gz2 = cz0 + nz * 2;
+        if (Math.abs(groundHeightNoDeck(gx2, gz2) - LAND_H) > 0.4) continue;  // phải là đất kè chuẩn
+        const gy = groundHeight(gx2, gz2) + 0.24;                     // đứng TRÊN mặt lát caro (+0.12 tâm, dày 0.24)
+        addCollider(ox, oz, 1.6);                                     // RÀO CHẶN THẬT: người/xe không lao ra hồ (mỗi 2.6m, r1.6 → tường liền)
+        const post = new THREE.BoxGeometry(0.07, 0.95, 0.07); post.translate(ox, gy + 0.48, oz); railG.push(post);
+        for (const ry of [0.9, 0.5]) { const r2 = new THREE.BoxGeometry(2.62, 0.06, 0.05); r2.rotateY(barAng); r2.translate(ox, gy + ry, oz); railG.push(r2); }
+        // ghế đá mỗi ~26m (TRÊN vỉa hè caro sau lan can, quay mặt ra hồ) + đèn đôi mỗi ~31m
+        if (Math.round(tAcc) % 26 < 2.6) {
+          const bx = cx0 + nx * OFF_BENCH, bz = cz0 + nz * OFF_BENCH;
+          if (Math.abs(groundHeightNoDeck(bx, bz) - LAND_H) < 0.4) {
+            const by = groundHeight(bx, bz) + 0.24;
+            const seat = new THREE.BoxGeometry(1.7, 0.12, 0.5); seat.rotateY(barAng); seat.translate(bx, by + 0.46, bz); benchG.push(seat);
+            for (const s of [-0.7, 0.7]) { const lg = new THREE.BoxGeometry(0.14, 0.42, 0.5); lg.rotateY(barAng); lg.translate(bx + ux * s, by + 0.21, bz + uz * s); benchG.push(lg); }
+          }
+        }
+        if (Math.round(tAcc) % 31 < 2.6) {
+          const lx = cx0 + nx * OFF_LAMP, lz = cz0 + nz * OFF_LAMP;
+          if (Math.abs(groundHeightNoDeck(lx, lz) - LAND_H) < 0.4) {
+            const ly = groundHeight(lx, lz) + 0.24;
+            const pole = new THREE.CylinderGeometry(0.07, 0.11, 3.6, 8); pole.translate(lx, ly + 1.8, lz); lampPostG.push(pole);
+            const arm = new THREE.BoxGeometry(1.5, 0.07, 0.07); arm.rotateY(barAng); arm.translate(lx, ly + 3.55, lz); lampPostG.push(arm);
+            for (const s of [-0.62, 0.62]) { const gl = new THREE.SphereGeometry(0.17, 8, 6); gl.translate(lx + ux * s, ly + 3.72, lz + uz * s); globeG.push(gl); }
           }
         }
       }
     }
+    if (caroG.length) addMerged(caroG, sidewalkMaterial('caro_do_xam'), 'lake_promenade'); // vỉa hè caro kè hồ
     if (railG.length) addMerged(railG, mat(0x2e5e46), 'lake_railing');          // lan can gang xanh
     if (benchG.length) addMerged(benchG, mat(0xd6d2c6), 'lake_benches');        // ghế đá granite
     if (lampPostG.length) addMerged(lampPostG, mat(0x23282b), 'lake_lampposts'); // trụ gang đen
@@ -1310,11 +1356,18 @@ export function buildWorld(scene) {
       g.fillStyle = '#ffe9a8'; for (let i = 0; i < 3; i++) g.fillRect(w * 0.42, h * (0.3 + i * 0.2), w * 0.5, h * 0.09);
     });
     const muralMat = new THREE.MeshLambertMaterial({ map: muralTex });
-    // KHÔNG đặt panô/rào giữa lòng đường (tọa độ tay có thể rơi trúng tim đường — user báo)
-    const _msd = (px, pz, x1, z1, x2, z2) => { const dx = x2 - x1, dz = z2 - z1, l2 = dx * dx + dz * dz; let t = l2 ? ((px - x1) * dx + (pz - z1) * dz) / l2 : 0; t = Math.max(0, Math.min(1, t)); return Math.hypot(px - (x1 + dx * t), pz - (z1 + dz * t)); };
-    const onRoadM = (x, z) => { for (const r of ROADS_DT) { if (r.c === 'w') continue; const hw = ROAD_W[r.c] / 2 + 2; for (let i = 0; i < r.pts.length - 1; i++) if (_msd(x, z, r.pts[i][0], r.pts[i][1], r.pts[i + 1][0], r.pts[i + 1][1]) < hw) return true; } return false; };
+    // KHÔNG đặt panô/hàng rào GIỮA ĐƯỜNG (user: "biển sao vàng giữa đường dẹp hết") — tọa độ
+    // hardcode từ trước giờ rơi vào lòng đường sau các đợt chỉnh map
+    const onRoadM = (x, z) => {
+      for (const r of ROADS_DT) { if (!'pstr'.includes(r.c)) continue; const hw = ROAD_W[r.c] / 2 + 2;
+        for (let i = 0; i < r.pts.length - 1; i++) { const [x1, z1] = r.pts[i], [x2, z2] = r.pts[i + 1];
+          const ddx = x2 - x1, ddz = z2 - z1, l2 = ddx * ddx + ddz * ddz || 1e-9;
+          let t = ((x - x1) * ddx + (z - z1) * ddz) / l2; t = Math.max(0, Math.min(1, t));
+          if (Math.hypot(x - (x1 + ddx * t), z - (z1 + ddz * t)) < hw) return true; } }
+      return false;
+    };
     const postG = [];
-    for (const [x, z] of MURALS) { const gy = groundHeight(x, z); if (gy < LAND_H - 0.5 || isWater(x, z) || onRoadM(x, z)) continue;
+    for (const [x, z] of MURALS) { const gy = groundHeight(x, z); if (gy < LAND_H - 0.5 || isWater(x, z) || onRoadM(x, z) || lakeSD(x, z) < 18) continue;
       const ry = faceRoadM(x, z);
       const panel = new THREE.Mesh(new THREE.BoxGeometry(4.2, 2.6, 0.2), [mat(0x9a1c17), mat(0x9a1c17), mat(0x9a1c17), mat(0x9a1c17), muralMat, muralMat]);
       panel.position.set(x, gy + 3.0, z); panel.rotation.y = ry; panel.name = 'mural'; scene.add(panel);
@@ -1577,7 +1630,7 @@ export function buildWorld(scene) {
     if (LM.lechan && Math.hypot(x - LM.lechan[0], z - LM.lechan[1]) < 55) return true; // quảng trường tượng Lê Chân (pano_428: chỉ tượng + không gian mở)
     if (Math.hypot(x + 187.8, z - 201.6) < 50) return true;          // quảng trường Trung tâm Triển lãm (pano_421: đúng 1 công trình)
     for (const g of GARDENS) if (Math.hypot(x - g.x, z - g.z) < Math.max(g.w, g.d) / 2 + 12) return true; // dải vườn hoa
-    for (const [ax, az, bx, bz, hf] of LAKE_SEGS) if (_segD(x, z, ax, az, bx, bz) < hf + 16) return true; // ven hồ Tam Bạc (trục hiệu chỉnh)
+    if (lakeSD(x, z) < 16) return true; // ven hồ Tam Bạc (polygon thật + 16m)
     // KÈ HỒ (pano_004-013/028-037: lan can+ghế đá+đèn, KHÔNG nhà): cấm phía-hồ (cross<0) trong 25m dọc 2 tuyến bờ
     for (const [ax, az, bx, bz, x0, x1] of [[-211, 116, -1052, 285, -1e9, 1e9], [-1007, 367, -20, 162, -1050, -260]]) {
       if (x < x0 || x > x1) continue;
@@ -2325,7 +2378,9 @@ export function buildWorld(scene) {
     const g = new THREE.Group();
     const grey = mat(0x8fa3b0);
     const marketFacade = grandMat('#8fa3b0', '#dde5ea', { cols: 8, arch: false });
-    const HW = 132, HD = 96, HH = 23;
+    // 110×80 dịch (+12,+4) so với node OSM: sim đối chiếu polyline đường → 0 điểm đè
+    // lòng/vỉa hè đường, 0 chạm hồ (user: "chợ Sắt che cả đường, không lấn chiếm vỉa hè")
+    const HW = 110, HD = 80, HH = 23;
     const hall = new THREE.Mesh(new THREE.BoxGeometry(HW, HH, HD),
       [marketFacade, marketFacade, grey, grey, marketFacade, marketFacade]);
     hall.position.y = HH / 2; g.add(hall);
@@ -2354,11 +2409,12 @@ export function buildWorld(scene) {
       canopy.position.set(sx, 3.4, HD / 2 + 5); g.add(canopy);
     }
     const thMk = orientLong(LM_DIR.market, LM_FACE.market);
-    g.position.set(LM.market[0], LAND_H, LM.market[1]);
+    const mkX = LM.market[0] + 12, mkZ = LM.market[1] + 4;   // dịch khỏi lòng đường (sim kiểm chứng)
+    g.position.set(mkX, LAND_H, mkZ);
     g.rotation.y = thMk;
     scene.add(g);
-    addCollider(LM.market[0], LM.market[1], 78);
-    const [drX, drZ] = localPt(LM.market[0], LM.market[1], drumX, drumZ, thMk); // tháp tròn góc
+    addCollider(mkX, mkZ, 58);
+    const [drX, drZ] = localPt(mkX, mkZ, drumX, drumZ, thMk); // tháp tròn góc
     addCollider(drX, drZ, 13);
   }
 
@@ -3210,13 +3266,12 @@ export function buildWorld(scene) {
   // ---------- ĐỢT ĐỊA DANH 2: 5 GLB từ ảnh thật ----------
   // Đền Nghè — di tích thờ Nữ tướng Lê Chân (node OSM, không có trục dài → xoay theo mặt phố)
   // lùi 9m khỏi mặt đường theo hướng mặt tiền — node OSM là CỔNG đền nên mô hình chìa ra lòng đường (user báo)
-  const dnX = LM.dennghe[0] - LM_FACE.dennghe[0] * 9, dnZ = LM.dennghe[1] - LM_FACE.dennghe[1] * 9;
   placeGLB({
     url: 'assets/dennghe.glb', name: 'Đền Nghè',
-    x: dnX, z: dnZ,
+    x: LM.dennghe[0] - LM_FACE.dennghe[0] * 9, z: LM.dennghe[1] - LM_FACE.dennghe[1] * 9,
     rot: orientFace(LM_FACE.dennghe), size: 22,
   });
-  addCollider(dnX, dnZ, 11);
+  addCollider(LM.dennghe[0] - LM_FACE.dennghe[0] * 9, LM.dennghe[1] - LM_FACE.dennghe[1] * 9, 11);
 
   // Đình Hàng Kênh — đình cổ 300 năm, footprint OSM
   placeGLB({

@@ -262,8 +262,10 @@ function updateMounted(dt, time) {
   player.group.position.copy(pState.pos);
   pState.yaw = v.heading;
   player.group.rotation.y = v.heading;
-  player.group.rotation.x = v.mesh.rotation.x;
-  player.group.rotation.z = v.lean || 0;   // nhân vật nghiêng theo xe khi rẽ
+  // KẸP độ nghiêng: trên dốc/taluy, pitch xe có thể rất lớn → nhân vật xoay quanh gốc CHÂN
+  // thành "nằm bẹp ra đất cạnh xe" (user báo). Người thật chỉ ngả theo xe một phần.
+  player.group.rotation.x = Math.max(-0.3, Math.min(0.3, v.mesh.rotation.x));
+  player.group.rotation.z = Math.max(-0.45, Math.min(0.45, v.lean || 0));   // nghiêng theo xe khi rẽ
 }
 
 // ============ Tương tác ============

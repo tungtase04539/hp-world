@@ -240,6 +240,18 @@ node mobile.mjs    # viewport điện thoại + joystick
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-09 (ai)** [HỒ TAM BẠC = POLYGON OSM THẬT — BÀI HỌC LỚN: ĐỪNG XẤP XỈ ĐỊA VẬT CÓ DỮ LIỆU THẬT]:
+    User chê "hồ thành chữ nhật, 2 đầu sai, vỉa hè thụt ra thụt vào" → nguyên nhân gốc là mọi
+    phiên bản trước đều XẤP XỈ hồ bằng trục thẳng + bề rộng. Sửa đúng: tải polygon nước OSM
+    way 236743184 (Overpass GET, 21 đỉnh → 20 sau dedupe), chiếu hệ game, hardcode
+    `LAKE_POLY` + `lakeSD(x,z)` (khoảng cách CÓ DẤU, âm=trong hồ) trong terrain.js.
+    Nước: sd<0 (taluy 2m smoothstep(-2,0)); lấp đất sd<60 & h<1.6; đông đập rect riêng.
+    KÈ world.js: bám TỪNG CẠNH polygon — pháp tuyến tự lật ra ngoài (test lakeSD(mid+n*3)),
+    nhịp ghế/đèn theo QUÃNG ĐƯỜNG TÍCH LŨY (tAcc) để đều qua khúc cong; mặt lát caro tới mép
+    nhựa (roadD đo tới mọi đoạn p/s gần hồ); lưới mịn nắn đỉnh theo mép polygon (±2.4→mép,
+    trong 2.4-6.5→chân kè). ĐO ĐẠC: polygon cách tim đường ven hồ ≥14m (KHÔNG hề lệch như
+    từng nghĩ — thứ sai là phép xấp xỉ đối xứng). Sim: trong poly 0 khô / ngoài 0 ướt.
+    Kẹp nghiêng nhân vật lái xe (±0.3 pitch, ±0.45 lean) — hết "người nằm bẹp cạnh xe" trên dốc.
 - **2026-07-08 (ah)** [HỒ TAM BẠC SẠCH + KÈ ĐÚNG THỨ TỰ + HẾT BIỂN BAY + HẾT NHÂN VẬT NHẤP NHÁY]:
     (1) terrain.js: lòng hồ TẠO HÌNH SẠCH đè lên mask OSM nham nhở theo `LAKE_SEGS` (export) —
     GOTCHA QUAN TRỌNG: trục polygon nước OSM (EXTRAS.lake.pts) LỆCH ~15m về nam so với tim
@@ -263,13 +275,31 @@ node mobile.mjs    # viewport điện thoại + joystick
     thấy!). Sửa: trong lòng hồ (dL<half−2 theo LAKE_SEGS) chỉ nearDTRoad(8) được lát, bỏ
     nearRegionRoad. BÀI HỌC KIỂM THỬ: sim địa hình phải chạy CẢ groundHeight (có deck) chứ
     không riêng groundHeightNoDeck.
+    VỈA HÈ KÈ (user: "vỉa hè phải kéo tới rào"): vỉa hè đường ven hồ bám TIM ĐƯỜNG (rộng cố định)
+    còn rào bám MÉP HỒ → hở/chồng lộn xộn. Sửa: khối kè lát thêm 'lake_promenade' (caro_do_xam,
+    UV theo trục hồ, S=1/1.6 khớp hoa văn) từ mép nước (half−1) tới mép trong vỉa hè của đường
+    (đo khoảng cách thật tới parSegs − wRoad/2 − 0.28·wRoad), clamp [half+2.6, half+13];
+    rào/đèn/ghế nâng +0.17 đứng TRÊN mặt lát; taluy hồ thu 5m→2m (nước áp chân kè).
     GOTCHA LƯỚI NỀN (quan trọng cho MỌI địa vật hẹp): mesh nền là 1 PlaneGeometry TOÀN thế giới
-    500×340 seg → ô lưới ~45m, TO HƠN lòng hồ (half 25-35) → dù hàm địa hình đúng 100%
-    (sim + __hp.gh đều ra nước), mặt đất render vẫn "bắc cầu đất" qua kênh từng mảng vì 2 đỉnh
-    kề nhau cùng đứng trên 2 bờ (nội suy không bao giờ chạm nước). Sửa KHÔNG tăng lưới (nặng
-    mobile): NẮN đỉnh trong hành lang hồ — đỉnh có dL<34 kéo VỀ TRỤC (chuỗi đỉnh −3 liên tục),
-    đỉnh dL<half+20 kéo VỀ MÉP bờ (dL=half+4, bờ kè sắc như kè đá thật). Kênh/mương hẹp mới
-    sau này phải nắn lưới tương tự, đừng tin mỗi hàm địa hình.
+    500×340 seg → ô lưới ~112m (đo thật trong page: vùng 300×110m quanh hồ chỉ có 5 đỉnh!),
+    TO HƠN lòng hồ → dù hàm địa hình đúng 100% (sim + __hp.gh đều ra nước), mặt đất render vẫn
+    "bắc cầu đất" qua kênh vì 2 đỉnh kề nhau cùng đứng trên 2 bờ. Nắn đỉnh KHÔNG đủ (nhiều ô
+    không có đỉnh gần trục). Giải pháp chuẩn (local refinement): (1) đỉnh lưới toàn cầu trong
+    hành lang dL<200 DÌM xuống −3 → không tam giác nào nhô khỏi mặt nước; (2) phủ DẢI LƯỚI MỊN
+    5m (~14k đỉnh, mesh 'lake_ground') đúng cao độ + màu, +0.05 tránh z-fight rìa hộp; (3) nắn
+    đỉnh dải mịn quanh mép (±2.4m→đường bờ, dải dốc→chân kè taluy 2m) cho MÉP NƯỚC THẲNG không
+    răng cưa. half từng đoạn đo lại từ min-dist trục→POLYLINE đường thật −11m (19/29/27/24) —
+    vỉa hè đường không bao giờ chờm mặt nước (sim: worst clearance 2.3m, sim_sw.mjs). Kênh/mương
+    hẹp mới sau này dùng đúng công thức này, đừng tin mỗi hàm địa hình.
+    RANH GIỚI HỒ THẬT (user xác nhận): hồ Tam Bạc chỉ có từ ĐẬP (đường r qua hồ gần tượng
+    Lê Chân, (-383,150)→(-366,235)) về TÂY; phía đông đập là ĐẤT (dải vườn hoa + Triển lãm) dù
+    mask nước OSM cũ kéo tới ~x=-240 → terrain lấp rect đông đập (x>-392, z 100-240, h<1.6→LAND_H).
+    LAKE_SEGS format mới [ax,az,bx,bz,h1,h2] + `lakeDH(x,z)` (terrain.js): half NỘI SUY liên tục
+    dọc trục — hết "bậc thụt" bờ/vỉa hè tại khớp nối đoạn. Điểm cuối trục phải LÙI TÂY nửa-rộng
+    (cap tròn bán kính half) để nước không lấn qua đập. Vỉa hè kè: đo roadD tới MỌI đoạn p/s
+    gần trục (bỏ lọc song song cũ — nó bỏ sót đoạn ở khúc cong → vỉa hè thụt ra thụt vào),
+    lát tới MÉP NHỰA (roadD − wRoad/2), mặt lát +0.12 tâm (cao hơn vỉa hè bám-tim-đường 6cm,
+    phủ hẳn) — một mặt caro liền từ mép nước tới lòng đường.
 - **2026-07-08 (ag)** [CHỐNG CRASH MOBILE]: Chrome điện thoại crash khi vào (user báo) — nguyên nhân:
     texture GLB 100% (nhiều tấm 4K ≈ 67MB VRAM/tấm) + preload 4 GLB song song → hết RAM/VRAM di động.
     Vá KHÔNG đụng desktop (giữ 100% theo yêu cầu): `IS_MOBILE` (UA hoặc deviceMemory≤4) trong assets.js →
