@@ -91,15 +91,27 @@ RIVERS.push({ w: EXTRAS.lake.w, sh: 14, pts: EXTRAS.lake.pts });
 // theo trục cũ làm NGẬP phố Quang Trung. Đường là chân lý hiển thị → trục mới = TRUNG TUYẾN
 // 2 tim đường, nửa-rộng mỗi đoạn = (khoảng cách 2 đường)/2 − 11m (lòng đường + vỉa hè kè).
 // Mỗi đoạn: [ax, az, bx, bz, half]
-// half đo từ POLYLINE đường thật (không phải đường thẳng xấp xỉ): min khoảng cách trục→đường
-// theo từng đoạn trừ 11m (nửa lòng đường 6.5 + vỉa hè 3.6 + mép 1) — vỉa hè không bao giờ
-// chờm ra mặt nước dù đường lượn sát hồ (đo: seg0 min 30m, seg1 40, seg2 38, seg3 36).
+// half đo từ POLYLINE đường thật (min khoảng cách trục→đường − 11m) và NỘI SUY liên tục dọc
+// trục ([ax,az,bx,bz,h1,h2]) — hết "bậc nhảy" bờ/vỉa hè tại khớp nối đoạn.
+// ĐẦU ĐÔNG hồ = ĐẬP (đường r (-383,150)→(-366,235) gần tượng Lê Chân): user xác nhận
+// phía đông đập là ĐẤT (vườn hoa/Triển lãm), hồ chỉ có từ đập về tây.
 export const LAKE_SEGS = [
-  [-1139, 350, -1050, 331, 19],
-  [-1050, 331, -793, 276, 29],
-  [-793, 276, -447, 202, 27],
-  [-447, 202, -240, 158, 24],
+  [-1139, 350, -1050, 331, 19, 24],
+  [-1050, 331, -793, 276, 24, 28],
+  [-793, 276, -447, 202, 28, 25.5],
+  [-447, 202, -408, 194, 25.5, 24.5],   // điểm cuối lùi tây để CAP TRÒN (bán kính half) không lấn qua đông đập
 ];
+// khoảng cách tới trục hồ + half nội suy tại điểm chiếu gần nhất
+export function lakeDH(x, z) {
+  let bd = 1e9, bh = 25;
+  for (const [ax, az, bx, bz, h1, h2] of LAKE_SEGS) {
+    const dx = bx - ax, dz = bz - az, l2 = dx * dx + dz * dz;
+    let t = ((x - ax) * dx + (z - az) * dz) / l2; t = Math.max(0, Math.min(1, t));
+    const d = Math.hypot(x - (ax + dx * t), z - (az + dz * t)), hf = h1 + (h2 - h1) * t;
+    if (d - hf < bd - bh) { bd = d; bh = hf; }
+  }
+  return [bd, bh];
+}
 
 const riverIdx = makeBucketIndex(RIVERS.map((r) => ({ pts: r.pts, meta: [r.w, r.sh || 28] })));
 const regionIdx = makeBucketIndex(ROADS_REGION.map((r) => ({ pts: r.pts, meta: 0 })));
@@ -156,9 +168,8 @@ function deckHeight(x, z, rf) {
   // NHƯNG trong LÒNG HỒ Tam Bạc: ROADS_REGION vẽ thô đè qua lòng hồ → "dải đất" nổi giữa
   // nước (lộ ở render aerial); chỉ đường DT thật cắt hồ (đập Tam Kỳ) mới được lát mặt.
   if (rf > 0.03) {
-    let inLake = false;
-    for (const [ax, az, bx, bz, hf] of LAKE_SEGS) { if (distToSeg(x, z, ax, az, bx, bz) < hf - 2) { inLake = true; break; } }
-    if (nearDTRoad(x, z, 8) || (!inLake && nearRegionRoad(x, z, 9))) h = Math.max(h, LAND_H + 0.05);
+    const [ld, lh] = lakeDH(x, z);
+    if (nearDTRoad(x, z, 8) || (ld >= lh - 2 && nearRegionRoad(x, z, 9))) h = Math.max(h, LAND_H + 0.05);
   }
   return h;
 }
@@ -201,10 +212,12 @@ export function groundHeightNoDeck(x, z) {
   // ngoài mép là ĐẤT PHỐ. Hết "bét nhè"/nước thò sau nhà.
   // (Giữ NƯỚC đầy hồ theo yêu cầu chủ dự án — thực địa 2026 hồ cạn thi công nhưng không mô phỏng.)
   if (x > -1160 && x < -205 && z > 55 && z < 400) {
-    let dL = 1e9, half = 30;
-    for (const [ax, az, bx, bz, hf] of LAKE_SEGS) { const d2 = distToSeg(x, z, ax, az, bx, bz); if (d2 - hf < dL - half) { dL = d2; half = hf; } }
+    const [dL, half] = lakeDH(x, z);
     if (dL < half) h = lerp(-3, 1.7, smoothstep(half - 2, half, dL));   // kè gần dựng đứng — nước áp sát chân kè, không còn dải cát rộng
     else if (dL < half + 60 && h < 1.6) h = LAND_H;                     // ngoài mép = đất phố
+    // ĐÔNG ĐẬP Lê Chân: thực tế là ĐẤT (dải vườn hoa + Triển lãm) nhưng mask nước OSM cũ
+    // kéo tới ~x=-240 → lấp thành đất phố (user: "đằng sau nhà triển lãm có hồ đâu")
+    else if (x > -392 && z > 100 && z < 240 && h < 1.6) h = LAND_H;
   }
   return h;
 }

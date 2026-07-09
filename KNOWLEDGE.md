@@ -279,6 +279,15 @@ node mobile.mjs    # viewport điện thoại + joystick
     răng cưa. half từng đoạn đo lại từ min-dist trục→POLYLINE đường thật −11m (19/29/27/24) —
     vỉa hè đường không bao giờ chờm mặt nước (sim: worst clearance 2.3m, sim_sw.mjs). Kênh/mương
     hẹp mới sau này dùng đúng công thức này, đừng tin mỗi hàm địa hình.
+    RANH GIỚI HỒ THẬT (user xác nhận): hồ Tam Bạc chỉ có từ ĐẬP (đường r qua hồ gần tượng
+    Lê Chân, (-383,150)→(-366,235)) về TÂY; phía đông đập là ĐẤT (dải vườn hoa + Triển lãm) dù
+    mask nước OSM cũ kéo tới ~x=-240 → terrain lấp rect đông đập (x>-392, z 100-240, h<1.6→LAND_H).
+    LAKE_SEGS format mới [ax,az,bx,bz,h1,h2] + `lakeDH(x,z)` (terrain.js): half NỘI SUY liên tục
+    dọc trục — hết "bậc thụt" bờ/vỉa hè tại khớp nối đoạn. Điểm cuối trục phải LÙI TÂY nửa-rộng
+    (cap tròn bán kính half) để nước không lấn qua đập. Vỉa hè kè: đo roadD tới MỌI đoạn p/s
+    gần trục (bỏ lọc song song cũ — nó bỏ sót đoạn ở khúc cong → vỉa hè thụt ra thụt vào),
+    lát tới MÉP NHỰA (roadD − wRoad/2), mặt lát +0.12 tâm (cao hơn vỉa hè bám-tim-đường 6cm,
+    phủ hẳn) — một mặt caro liền từ mép nước tới lòng đường.
 - **2026-07-08 (ag)** [CHỐNG CRASH MOBILE]: Chrome điện thoại crash khi vào (user báo) — nguyên nhân:
     texture GLB 100% (nhiều tấm 4K ≈ 67MB VRAM/tấm) + preload 4 GLB song song → hết RAM/VRAM di động.
     Vá KHÔNG đụng desktop (giữ 100% theo yêu cầu): `IS_MOBILE` (UA hoặc deviceMemory≤4) trong assets.js →
