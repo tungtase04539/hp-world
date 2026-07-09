@@ -386,15 +386,17 @@ export function buildWorld(scene) {
           const px = x1 + dx * t, pz = z1 + dz * t, d = Math.hypot(x - px, z - pz);
           if (d < bd) { bd = d; bpx = px; bpz = pz; }
         }
-        if (bd > 0.01 && bd < 8) {
+        if (bd > 0.01 && bd < 11) {
           const sd = lakeSD(x, z);                                       // âm = trong hồ
+          // DẢI BẮT ĐỈNH PHẢI RỘNG HƠN BƯỚC LƯỚI 5m: |Δsd| giữa 2 đỉnh kề ≤5 nên mép ±3.6
+          // và chân (−9.6,−3.6) đảm bảo MỌI tuyến lưới cắt bờ đều có đủ cặp đỉnh mép+chân
+          // → tường kè dựng đứng đồng nhất, mực nước bám viền ĐỀU (hết "chỗ có chỗ không")
           let target = -1;
-          if (Math.abs(sd) < 2.4) target = 0;                            // mép kè
-          else if (sd < -2.4 && sd > -6.5) target = 2.1;                 // chân kè (2.1m trong mép)
+          if (Math.abs(sd) < 3.6) target = 0;                            // mép kè
+          else if (sd < -3.6 && sd > -9.6) target = 2.1;                 // chân kè (2.1m trong mép)
           if (target >= 0) {
             const s = target / bd;                                       // 0 → về đúng mép
-            const sgn = sd < 0 ? 1 : 1;                                  // giữ phía hiện tại khi co về
-            x = bpx + (x - bpx) * s * sgn; z = bpz + (z - bpz) * s * sgn;
+            x = bpx + (x - bpx) * s; z = bpz + (z - bpz) * s;
             p2.setX(i, x); p2.setZ(i, z);
           }
         }
@@ -624,19 +626,50 @@ export function buildWorld(scene) {
       }
     }
     const railG = [], benchG = [], lampPostG = [], globeG = [], caroG = [];
-    let tAcc = 0;   // quãng đường tích lũy dọc bờ — nhịp ghế/đèn đều qua cả khúc cong/góc
+    // LẤY MẪU CHU VI đều 2.6m — đi XUYÊN QUA GÓC polygon (bước dư cạnh này chuyển sang cạnh
+    // sau) → rào/mặt lát liên tục quanh hồ kể cả 2 đầu ngắn, không đứt tại đỉnh góc
+    const samples = [];
+    {
+      let next = 1.3;
+      for (let e = 0; e < LAKE_POLY.length; e++) {
+        const [ax, az] = LAKE_POLY[e], [bx2, bz2] = LAKE_POLY[(e + 1) % LAKE_POLY.length];
+        const dx = bx2 - ax, dz = bz2 - az, L = Math.hypot(dx, dz);
+        const ux = dx / L, uz = dz / L;
+        let nx = -uz, nz = ux;
+        { const mx0 = (ax + bx2) / 2 + nx * 3, mz0 = (az + bz2) / 2 + nz * 3;
+          if (lakeSD(mx0, mz0) < 0) { nx = -nx; nz = -nz; } }         // pháp tuyến RA NGOÀI hồ
+        let t = next;
+        for (; t < L; t += 2.6) samples.push([ax + ux * t, az + uz * t, ux, uz, nx, nz]);
+        next = t - L;
+      }
+    }
+    // ĐĨA LÁT BO GÓC: tại đỉnh gãy >20° lát đĩa caro phủ nêm hở giữa 2 dải cạnh (cao hơn 1.5cm)
     for (let e = 0; e < LAKE_POLY.length; e++) {
-      const [ax, az] = LAKE_POLY[e], [bx2, bz2] = LAKE_POLY[(e + 1) % LAKE_POLY.length];
-      const dx = bx2 - ax, dz = bz2 - az, L = Math.hypot(dx, dz);
-      if (L < 3) continue;
-      const ux = dx / L, uz = dz / L;
-      let nx = -uz, nz = ux;                                          // pháp tuyến cạnh
-      { const mx0 = (ax + bx2) / 2 + nx * 3, mz0 = (az + bz2) / 2 + nz * 3;
-        if (lakeSD(mx0, mz0) < 0) { nx = -nx; nz = -nz; } }           // lật cho hướng RA NGOÀI hồ
-      const barAng = Math.atan2(ux, uz) + Math.PI / 2;                // thanh/ghế nằm dọc theo bờ
-      const alongAng = Math.atan2(ux, uz);
-      for (let t = 1.3; t < L - 1.3; t += 2.6, tAcc += 2.6) {
-        const cx0 = ax + ux * t, cz0 = az + uz * t;
+      const [px0, pz0] = LAKE_POLY[(e + LAKE_POLY.length - 1) % LAKE_POLY.length];
+      const [cx1, cz1] = LAKE_POLY[e];
+      const [qx0, qz0] = LAKE_POLY[(e + 1) % LAKE_POLY.length];
+      const d1x = cx1 - px0, d1z = cz1 - pz0, l1 = Math.hypot(d1x, d1z);
+      const d2x = qx0 - cx1, d2z = qz0 - cz1, l2 = Math.hypot(d2x, d2z);
+      const dot = (d1x * d2x + d1z * d2z) / (l1 * l2);
+      if (dot > 0.94) continue;                                       // gần thẳng → dải cạnh tự phủ
+      let bnx = -(d1z / l1 + d2z / l2), bnz = (d1x / l1 + d2x / l2);
+      const bl = Math.hypot(bnx, bnz) || 1; bnx /= bl; bnz /= bl;
+      if (lakeSD(cx1 + bnx * 3, cz1 + bnz * 3) < 0) { bnx = -bnx; bnz = -bnz; }  // phân giác ra ngoài
+      const ccx = cx1 + bnx * 2.2, ccz = cz1 + bnz * 2.2;
+      if (Math.abs(groundHeightNoDeck(ccx, ccz) - LAND_H) > 0.5) continue;
+      const disc = new THREE.CylinderGeometry(3.6, 3.6, 0.24, 20);
+      disc.translate(ccx, groundHeight(ccx, ccz) + 0.135, ccz);
+      const dp = disc.attributes.position, duv = new Float32Array(dp.count * 2), DS = 1 / 1.6;
+      for (let k = 0; k < dp.count; k++) { duv[k * 2] = dp.getX(k) * DS; duv[k * 2 + 1] = dp.getZ(k) * DS; }
+      disc.setAttribute('uv', new THREE.BufferAttribute(duv, 2));
+      caroG.push(disc);
+    }
+    {
+      let tAcc = 0;
+      for (const [cx0, cz0, ux, uz, nx, nz] of samples) {
+        tAcc += 2.6;
+        const barAng = Math.atan2(ux, uz) + Math.PI / 2;              // thanh/ghế nằm dọc theo bờ
+        const alongAng = Math.atan2(ux, uz);
         // VỈA HÈ CARO KÈ HỒ: lát LIỀN từ mép nước tới MÉP NHỰA của đường ven hồ (phủ luôn
         // dải vỉa hè bám-tim-đường bên dưới, cao hơn 6cm) — một mặt caro liền
         {
