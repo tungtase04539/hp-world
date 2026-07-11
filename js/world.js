@@ -1095,18 +1095,37 @@ export function buildWorld(scene) {
     const parasolCols = [0xd6382c, 0x2f6bd8, 0xe0a52f, 0x2f9c4a, 0xded2c4].map((c) => new THREE.Color(c));
     const FOOD = [[95.9,40.2],[185,94.5],[33.7,-229.6],[40.5,-340.6],[355.9,-243],[-429.1,73.9],[461.4,20.8],[-459.1,255.3],[591.5,50.1],[-325.2,513.1],[-143.5,601.5],[347.3,513.3],[-49,-627.1],[650.3,-5.6],[-405,528.9],[-357.2,-619.9],[-298.5,-704.8],[-400.7,-688.1],[-245.3,-766],[-783.2,185.2],[724.5,-395.6],[-47.8,842.8],[-825,-274.3],[-935,-96.6],[656.4,779.3],[929.7,-442.6],[-50.2,-1080.8]];
     let fs = 771; const frnd = () => { fs = (fs * 1103515245 + 12345) & 0x7fffffff; return fs / 0x7fffffff; };
+    // BÀI HỌC PANO-LOOP V1: FOOD là tọa độ PANO (tim đường) → dời cụm quán sang VỈA HÈ:
+    // chiếu lên đoạn đường gần nhất rồi đẩy ngang (nửa lòng + 2.6m); từng món vẫn né lòng đường.
+    const _fsd = (px, pz, x1, z1, x2, z2) => { const dx = x2 - x1, dz = z2 - z1, l2 = dx * dx + dz * dz; let t = l2 ? ((px - x1) * dx + (pz - z1) * dz) / l2 : 0; t = Math.max(0, Math.min(1, t)); return Math.hypot(px - (x1 + dx * t), pz - (z1 + dz * t)); };
+    const _onRoadF = (px, pz, m) => { for (const r of ROADS_DT) { if (r.c === 'w') continue; const hw = ROAD_W[r.c] / 2 + m; for (let i = 0; i < r.pts.length - 1; i++) if (_fsd(px, pz, r.pts[i][0], r.pts[i][1], r.pts[i + 1][0], r.pts[i + 1][1]) < hw) return true; } return false; };
+    const toSidewalk = (cx, cz) => {
+      let bd = 1e9, bx = cx, bz = cz, bn = null;
+      for (const r of ROADS_DT) { if (r.c === 'w') continue; const hw = ROAD_W[r.c] / 2;
+        for (let i = 0; i < r.pts.length - 1; i++) {
+          const [x1, z1] = r.pts[i], [x2, z2] = r.pts[i + 1];
+          const dx = x2 - x1, dz = z2 - z1, l2 = dx * dx + dz * dz; if (!l2) continue;
+          let t = ((cx - x1) * dx + (cz - z1) * dz) / l2; t = Math.max(0, Math.min(1, t));
+          const px = x1 + dx * t, pz = z1 + dz * t, d = Math.hypot(cx - px, cz - pz);
+          if (d < bd) { bd = d; const L = Math.sqrt(l2); let nx = -(dz / L), nz = dx / L;
+            if (nx * (cx - px) + nz * (cz - pz) < 0) { nx = -nx; nz = -nz; }   // đẩy về phía cụm gốc
+            bx = px + nx * (hw + 2.6); bz = pz + nz * (hw + 2.6); bn = true; }
+        } }
+      return bn && bd < 40 ? [bx, bz] : [cx, cz];
+    };
     const setSlots = [], paraSlots = [];
-    for (const [cx, cz] of FOOD) {
+    for (const [fx0, fz0] of FOOD) {
+      const [cx, cz] = toSidewalk(fx0, fz0);
       const nSet = 3 + ((frnd() * 3) | 0);
       for (let k = 0; k < nSet; k++) {
         const gx = cx + (frnd() - 0.5) * 4.5, gz = cz + (frnd() - 0.5) * 4.5;
-        const gy = groundHeight(gx, gz); if (gy < LAND_H - 0.5 || isWater(gx, gz)) continue;
+        const gy = groundHeight(gx, gz); if (gy < LAND_H - 0.5 || isWater(gx, gz) || _onRoadF(gx, gz, 0.6)) continue;
         setSlots.push([gx, gy, gz, frnd() * Math.PI, (frnd() * plasticCols.length) | 0]);
       }
       const nPar = 1 + ((frnd() * 2) | 0);
       for (let k = 0; k < nPar; k++) {
         const gx = cx + (frnd() - 0.5) * 4, gz = cz + (frnd() - 0.5) * 4;
-        const gy = groundHeight(gx, gz); if (gy < LAND_H - 0.5 || isWater(gx, gz)) continue;
+        const gy = groundHeight(gx, gz); if (gy < LAND_H - 0.5 || isWater(gx, gz) || _onRoadF(gx, gz, 0.6)) continue;
         paraSlots.push([gx, gy, gz, (frnd() * parasolCols.length) | 0]);
       }
     }
@@ -1167,13 +1186,17 @@ export function buildWorld(scene) {
 
   // ---------- CHỮ 3D "HẢI PHÒNG" (cụm chữ check-in đỏ khổ lớn, pano_009 [-718,219] bờ hồ Tam Bạc) ----------
   {
-    // pano ở sát mép nước → dò điểm ĐẤT gần nhất trong bán kính 24m (né bị isWater loại bỏ)
+    // BÀI HỌC PANO-LOOP V1: tọa độ pano = TIM ĐƯỜNG (xe Google) → không đặt đồ vật tại đó.
+    // Dò điểm trên MẶT LÁT KÈ HỒ: đất chuẩn + cách trục mọi đường lớn >(nửa lòng+2m) + gần mép hồ.
+    const _hsd = (px, pz, x1, z1, x2, z2) => { const dx = x2 - x1, dz = z2 - z1, l2 = dx * dx + dz * dz; let t = l2 ? ((px - x1) * dx + (pz - z1) * dz) / l2 : 0; t = Math.max(0, Math.min(1, t)); return Math.hypot(px - (x1 + dx * t), pz - (z1 + dz * t)); };
+    const _onRoadHP = (px, pz) => { for (const r of ROADS_DT) { if (r.c === 'w') continue; const hw = ROAD_W[r.c] / 2 + 2; for (let i = 0; i < r.pts.length - 1; i++) if (_hsd(px, pz, r.pts[i][0], r.pts[i][1], r.pts[i + 1][0], r.pts[i + 1][1]) < hw) return true; } return false; };
     let x = -718.6, z = 219.3;
-    if (isWater(x, z) || groundHeight(x, z) < LAND_H - 0.5) {
+    {
       let best = null, bd = 1e9;
-      for (let r = 4; r <= 90; r += 5) { for (let a = 0; a < 16; a++) {
-        const tx = -718.6 + Math.cos(a / 16 * Math.PI * 2) * r, tz = 219.3 + Math.sin(a / 16 * Math.PI * 2) * r;
-        if (!isWater(tx, tz) && groundHeight(tx, tz) > LAND_H - 0.5) { bd = r; best = [tx, tz]; break; }
+      for (let r = 3; r <= 90; r += 3) { for (let a = 0; a < 24; a++) {
+        const tx = -718.6 + Math.cos(a / 24 * Math.PI * 2) * r, tz = 219.3 + Math.sin(a / 24 * Math.PI * 2) * r;
+        const sd = lakeSD(tx, tz);
+        if (!isWater(tx, tz) && Math.abs(groundHeightNoDeck(tx, tz) - LAND_H) < 0.4 && !_onRoadHP(tx, tz) && sd > 2 && sd < 30) { bd = r; best = [tx, tz]; break; }
       } if (best) break; }
       if (best) { x = best[0]; z = best[1]; }
     }
@@ -1722,7 +1745,9 @@ export function buildWorld(scene) {
     outer:
     for (const r of ROADS_DT) {
       if (r.c !== 'r' && r.c !== 't') continue;
-      for (let i = 0; i < r.pts.length - 1 && count < 210; i++) {
+      // BÀI HỌC PANO-LOOP V1 (pano_022/023 khu Ga trống): cap 210 cạn theo THỨ TỰ ROADS_DT
+      // → các phố 't' phía đông không bao giờ được đặt nhà. Nâng 210→380 (mesh vẫn gộp, không thêm draw call).
+      for (let i = 0; i < r.pts.length - 1 && count < 380; i++) {
         const [x1, z1] = r.pts[i], [x2, z2] = r.pts[i + 1];
         const len = Math.hypot(x2 - x1, z2 - z1);
         const rotY = Math.atan2(x2 - x1, z2 - z1);
@@ -1905,7 +1930,8 @@ export function buildWorld(scene) {
     const geos = []; const lmPtsB = Object.values(LM);
     let bs = 424241; const brnd = () => { bs = (bs * 1103515245 + 12345) & 0x7fffffff; return bs / 0x7fffffff; };
     let nB = 0;
-    const CAPB = 5600;   // vệ tinh GE: lòng ô kín mái ~100% → lưới dày, nhà gần chạm nhau
+    const CAPB = 9500;   // vệ tinh GE: lòng ô kín mái ~100% → lưới dày, nhà gần chạm nhau
+    // (PANO-LOOP V1: 5600 cạn quanh gx≈0 → cả dải đông tới Ga trống; 9500 đủ quét hết lưới, vẫn 1 mesh gộp)
     // KHU PHÂN LÔ LIỀN KỀ MỚI cạnh THPT Lê Hồng Phong (GE ảnh 4: dãy nhà trắng đều) — georef từ ảnh
     {
       const R = { x1: -1035, x2: -925, z1: -545, z2: -405 };
@@ -3104,6 +3130,14 @@ export function buildWorld(scene) {
   // dispatcher cây phố: đa số xanh bóng mát, phượng vẫn nổi bật (Thành phố Hoa Phượng Đỏ), ít cọ
   function streetTree(x, z) {
     const h = (function (v) { const t = Math.abs(v); return t - Math.floor(t); })(Math.sin(x * 3.3 + z * 1.9) * 24571.3);
+    // BÀI HỌC PANO-LOOP V1 (39 finding tree): ven hồ Tam Bạc thực địa là xà cừ/bàng tán XANH
+    // + cây cắt tỉa, phượng đỏ chỉ điểm xuyết → trong hành lang hồ (lakeSD<45) hạ phượng còn ~12%.
+    if (lakeSD(x, z) < 45) {
+      if (h < 0.80) shadeTree(x, z);
+      else if (h < 0.92) phuongTree(x, z);
+      else palm(x, z);
+      return;
+    }
     if (h < 0.55) shadeTree(x, z);
     else if (h < 0.90) phuongTree(x, z);
     else palm(x, z);
@@ -3142,6 +3176,30 @@ export function buildWorld(scene) {
             scene.add(bulb);
             nLamp++;
           }
+        }
+      }
+    }
+  }
+
+  // ---------- HÀNG CÂY CỔ THỤ TRÊN KÈ HỒ TAM BẠC (pano-loop V1: promenade thật rợp cây tán rộng) ----------
+  {
+    const _tsd = (px, pz, x1, z1, x2, z2) => { const dx = x2 - x1, dz = z2 - z1, l2 = dx * dx + dz * dz; let t = l2 ? ((px - x1) * dx + (pz - z1) * dz) / l2 : 0; t = Math.max(0, Math.min(1, t)); return Math.hypot(px - (x1 + dx * t), pz - (z1 + dz * t)); };
+    const _onRoadT = (px, pz) => { for (const r of ROADS_DT) { if (r.c === 'w') continue; const hw = ROAD_W[r.c] / 2 + 1.2; for (let i = 0; i < r.pts.length - 1; i++) if (_tsd(px, pz, r.pts[i][0], r.pts[i][1], r.pts[i + 1][0], r.pts[i + 1][1]) < hw) return true; } return false; };
+    let nQ = 0;
+    for (let e = 0; e < LAKE_POLY.length; e++) {
+      const [ax, az] = LAKE_POLY[e], [bx, bz] = LAKE_POLY[(e + 1) % LAKE_POLY.length];
+      const dx = bx - ax, dz = bz - az, L = Math.hypot(dx, dz);
+      if (L < 12) continue;
+      const ux = dx / L, uz = dz / L;
+      for (let t = 8; t < L - 4; t += 14) {
+        const cx0 = ax + ux * t, cz0 = az + uz * t;
+        // đẩy 4.5m về phía ĐẤT (thử 2 phía pháp tuyến, chọn phía lakeSD dương)
+        for (const s of [1, -1]) {
+          const tx = cx0 - uz * s * 4.5, tz = cz0 + ux * s * 4.5;
+          if (lakeSD(tx, tz) < 2.5) continue;
+          if (Math.abs(groundHeightNoDeck(tx, tz) - LAND_H) > 0.4 || _onRoadT(tx, tz)) break;
+          shadeTree(tx, tz); nQ++;
+          break;
         }
       }
     }
@@ -3458,11 +3516,15 @@ export function buildWorld(scene) {
 
   // ---------- NỘI THẤT ĐƯỜNG PHỐ (từ dữ liệu OSM: STREETS/INTERSECTIONS/MEDIANS) ----------
   {
-    // 1) Biển tên phố xanh lá — đặt lệch vuông góc trục phố, chữ song song phố
+    // 1) Biển tên phố xanh lá — đặt tại GIAO LỘ gần nhất (đúng thực tế; tâm nhãn OSM có thể
+    //    rơi giữa lòng đường/sát điểm pano — bài học pano-loop V1, pano_031), chữ song song phố
     const poleM = mat(0x5a5f66);
     for (const st of STREETS) {
       const perp = [-st.d[1], st.d[0]];
-      const sx = st.x + perp[0] * 4.6, sz = st.z + perp[1] * 4.6;
+      let ax = st.x, az = st.z, abd = 1e9;
+      for (const [ix, iz] of INTERSECTIONS) { const d = Math.hypot(ix - st.x, iz - st.z); if (d < abd) { abd = d; ax = ix; az = iz; } }
+      if (abd > 220) { ax = st.x; az = st.z; }               // phố không có giao lộ gần → giữ tâm nhãn
+      const sx = ax + perp[0] * 4.6 + st.d[0] * 6, sz = az + perp[1] * 4.6 + st.d[1] * 6;
       if (isWater(sx, sz)) continue;
       const y = groundHeightNoDeck(sx, sz);
       if (Math.abs(y - LAND_H) > 1.5) continue;
