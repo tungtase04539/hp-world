@@ -38,5 +38,11 @@ ngay bên dưới chúng, rồi chạy `xelatex` hai lần.
   được tái tạo; số liệu định lượng tương ứng nằm trong **Bảng 2** và **Bảng 3**.
 - Một lỗi sắp chữ nhỏ trong bản gốc (một cặp dấu chuẩn thừa ở khai triển của $\|x_{n+1}-x^*\|^2$
   trong chứng minh tính bị chặn) đã được chỉnh về dạng đúng chuẩn.
+- **Bảng 1** (tham số điều khiển) được in **ngang (landscape)** đúng như bản gốc, dùng gói
+  `rotating`. Toàn bộ giá trị đã được đối chiếu lại với ảnh gốc (thêm các $\alpha_n$, $a_n^{*}=0.67$,
+  sửa $\eta_n^{*}$/$\eta_n$/$\psi_n$ ở các hàng phương pháp so sánh).
 - Tệp PDF đã biên dịch sẵn (`mewomo-2024-bai-toan-tach-dang-thuc-vi.pdf`, 27 trang) được kèm theo
   để tiện tham khảo ngay.
+- Bản dịch đã được **rà soát đối chiếu từng phương trình/bảng** với ảnh gốc (Mục 1–6, phụ lục,
+  Bảng 1–3): các phương trình $(1.1)$–$(4.57)$, hai Bảng số liệu 2–3, và các thuật toán ở Phụ lục
+  đều khớp bản gốc.
