@@ -1778,7 +1778,7 @@ export function buildWorld(scene) {
             house(hx, hz, 5 + (hSeed % 3), 5 + (hSeed % 2), 5 + (hSeed % 5), rotY + Math.PI / 2 * side);
             placed.push([hx, hz]);
             count++;
-            if (count >= 210) break outer;
+            if (count >= 380) break outer;
           }
         }
       }
