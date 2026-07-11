@@ -244,6 +244,55 @@ node mobile.mjs    # viewport điện thoại + joystick
 - Probe nhanh không cần browser: `node -e "const t = await import('./js/terrain.js'); ..." --input-type=module`
   (terrain.js không phụ thuộc three).
 
+## 8b. PANO-LOOP — vòng lặp đối chiếu 551 pano thật ↔ game (V1 đã chạy trên 50 pano đầu)
+
+Bộ công cụ: `tools/pano_loop/` (capture_gamepano.mjs + compare_panos.mjs + capture_list.json).
+Mục tiêu: chụp pano trong game đúng tọa độ + heading như bộ ảnh thật (`audit/550_pano_*`),
+nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi hết lệch cấu trúc.
+
+### Công thức chụp (đã kiểm chứng khớp khung hình)
+- Nhìn theo la bàn H: `camYaw = −H·π/180` (0=Bắc, 90=Đông); `pitch 0.02`.
+- **`dist = 0.1`** — camera đứng ĐÚNG điểm chụp như xe Google (dist 1.5 từng làm camera lùi
+  CHUI VÀO nhà phía sau → nửa khung xám, pano_042).
+- Viewport 956×474 (tỉ lệ 2.02 của ảnh SV gốc 1912×948 → FOV ngang ~98° khớp).
+- `setTime(0.35)` (trưa), ẩn `#dialogue/#hud/#titleScreen`, ẩn player
+  (`__hp.player.group.visible=false`), ẩn cánh hoa (InstancedMesh count 200 !frustumCulled).
+- Chụp localhost → GLB địa danh KHÔNG tải (chỉ CDN) — finding loại "landmark" phải đối chiếu
+  thủ công trước khi tin; muốn có GLB: chạy chromium với
+  `--host-resolver-rules="MAP hp.test 127.0.0.1"` và mở `http://hp.test:8099`.
+
+### Chấm điểm bằng model ngoài (điều phối + kiểm duyệt bởi Claude)
+- Endpoint OpenAI-compatible (tunnel), model `cx/gpt-5.6-sol-xhigh` — vision rất khá, JSON
+  đúng schema, ~15-30s/lượt. Key qua env `PANO_LOOP_KEY`, KHÔNG commit.
+- 1 lượt/pano: 4 ảnh thật + 4 ảnh game (NÉN 640-768px JPEG q≤70 — payload to bị rate-limit/
+  trả trang HTML lỗi) + context đầy đủ (entry audit_done + tọa độ + mục tiêu). Schema:
+  headings{score,missing,wrong,extra} + top_fixes{what,type,severity}.
+- **Variance chấm ±0.5/pano giữa các lần** → chỉ tin TRUNG BÌNH nhóm và finding lặp lại,
+  không tin điểm 1 pano đơn lẻ. LUÔN tự kiểm mẫu bằng mắt (V1: phát hiện 2/2204 ảnh thật là
+  rác — screenshot YouTube: pano_001_h000, pano_535_h090 — blocklist; quét bằng heuristic
+  độ sáng dải trên ảnh <70).
+
+### Quy luật lỗi nội dung rút từ V1 (48 verdict + tự kiểm mắt)
+1. **TỌA ĐỘ PANO = TIM ĐƯỜNG (xe Google)** — mọi vật đặt theo tọa độ pano (quán vỉa hè FOOD,
+   chữ HẢI PHÒNG, biển hiệu...) đều đứng giữa đường/trùm camera. Công thức dời: chiếu lên
+   đoạn đường gần nhất → đẩy ngang (nửa lòng + 2.6m) về phía vỉa hè + guard né lòng đường.
+2. **Trần đặt nhà cạn theo THỨ TỰ duyệt** → vùng cuối danh sách (khu Ga, phía đông) trống
+   bất thường (pano_022/023 = 0.6/10). Kiểm cả điều kiện vòng LẪN break bên trong. Hiện:
+   phố r/t 380 căn, block_infill CAPB 9500.
+3. Ven hồ Tam Bạc: cây thật là xà cừ/bàng TÁN XANH + cây cắt tỉa, phượng đỏ chỉ điểm xuyết
+   (lakeSD<45: phượng 12%); kè hồ thật RỢP cổ thụ — trồng theo chu vi LAKE_POLY mỗi 14m,
+   cách mép nước 4.5m.
+4. Biển tên phố đặt ở GIAO LỘ (tâm nhãn OSM có thể rơi giữa đường).
+5. Cụm lỗi lớn nhất còn lại (chưa sửa hết): HOUSE — dãy shophouse phải LIỀN KỀ SÁT VỈA HÈ
+   từng lô ~5m (thực địa hiếm khi có khoảng trống); LANDMARK — từng công trình đặc trưng
+   thiếu phải dựng riêng (danh sách trong scratchpad cluster_report.txt / compare/*.json).
+
+### Số liệu V1 (50 pano đầu, cùng thang chấm)
+- v1 (camera dist1.5): TB 2.85/10 → v2 (camera chuẩn, chưa sửa nội dung): ~2.7-2.9
+- v3 (sau 7 fix): trên nhóm so sánh được +0.4~0.5 điểm (+23%); pano khu Ga +0.6.
+- Kết luận: pipeline vận hành đúng, lỗi chấm đã nhận diện; muốn nhảy điểm lớn cần cụm
+  HOUSE (dãy phố liền kề) + LANDMARK (công trình riêng) — làm ở vòng sau.
+
 ## 9. Deploy
 
 - Workflow `.github/workflows/deploy-pages.yml`: push nhánh làm việc → mirror sang `gh-pages` (force).
