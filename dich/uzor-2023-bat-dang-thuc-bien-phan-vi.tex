@@ -1,0 +1,184 @@
+%=======================================================================
+%  TÀI LIỆU HỌC TẬP TIẾNG VIỆT (tóm tắt & chú giải)
+%  Dựa trên bài báo:
+%    V. A. Uzor, T. O. Alakoya, O. T. Mewomo, A. Gibali,
+%    "Solving quasimonotone and non-monotone variational inequalities",
+%    Math. Methods Oper. Res. (2023) 98:461-498.
+%    https://doi.org/10.1007/s00186-023-00846-9  (giấy phép CC BY 4.0)
+%
+%  ĐÂY LÀ TÀI LIỆU TÓM TẮT & CHÚ GIẢI phục vụ học tập/nghiên cứu, KHÔNG
+%  phải bản dịch nguyên văn toàn bài. Tài liệu diễn giải bằng tiếng Việt,
+%  phát biểu đầy đủ thuật toán và các định lý chính (trích dẫn), tóm tắt
+%  ý tưởng chứng minh, và mô tả phần thực nghiệm số. Mọi kết quả gốc thuộc
+%  về các tác giả; xem bài báo gốc để có nội dung và chứng minh đầy đủ.
+%
+%  Biên dịch: pdfLaTeX (cần gói vntex). Chạy pdflatex HAI lượt.
+%=======================================================================
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T5]{fontenc}
+\usepackage[vietnamese]{babel}
+% XeLaTeX/LuaLaTeX: thay 3 dòng trên bằng fontspec + polyglossia + \setmainlanguage{vietnamese}
+
+\usepackage{amsmath,amssymb,amsthm,amsfonts,mathtools}
+\usepackage{enumitem}
+\usepackage[margin=2.4cm]{geometry}
+\usepackage[hidelinks]{hyperref}
+\usepackage{xurl}
+\allowdisplaybreaks
+\setlength{\emergencystretch}{3em}
+
+\theoremstyle{plain}
+\newtheorem{theorem}{Định lý}
+\newtheorem{lemma}{Bổ đề}
+\theoremstyle{definition}
+\newtheorem{example}{Ví dụ}
+\newtheorem*{algo}{Thuật toán 3.1 (MTPCM)}
+
+\newcommand{\inp}[2]{\langle #1,\,#2\rangle}
+\newcommand{\nm}[1]{\lVert #1\rVert}
+\newcommand{\wto}{\rightharpoonup}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathbb{N}}
+
+\title{\vspace{-1.2cm}\bfseries Tóm tắt \& chú giải tiếng Việt\\[4pt]
+\large ``Giải các bất đẳng thức biến phân tựa đơn điệu và không đơn điệu''}
+\author{\normalsize Bài gốc: V. A. Uzor, T. O. Alakoya, O. T. Mewomo, A. Gibali (2023)}
+\date{\small Math. Methods Oper. Res. (2023) 98:461--498 --- giấy phép CC BY 4.0\\[2pt]
+\textit{Tài liệu học tập: tóm tắt, phát biểu thuật toán/định lý và diễn giải bằng tiếng Việt (không phải bản dịch nguyên văn).}}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent Tài liệu này tóm tắt và chú giải bằng tiếng Việt bài báo của Uzor và cộng sự (2023) về một phương pháp lặp \emph{đơn giản, hội tụ mạnh} để giải bài toán bất đẳng thức biến phân (VI) khi toán tử giá \emph{tựa đơn điệu} (và cả trường hợp không có tính đơn điệu). Điểm nổi bật: phương pháp chỉ dùng \emph{một phép chiếu}/bước lặp, cỡ bước \emph{tự thích nghi} (không cần biết hằng số Lipschitz, không tìm kiếm theo tia), kèm \emph{kỹ thuật quán tính}, và loại bỏ được các điều kiện ngặt mà các công trình trước đòi hỏi. Nghiệm giới hạn là \emph{nghiệm có chuẩn nhỏ nhất}.
+\end{abstract}
+
+\section{Bài toán và bối cảnh}
+
+Cho $C$ là tập con khác rỗng, đóng, lồi của không gian Hilbert thực $H$, và $A:H\to H$ là ánh xạ đơn trị. \textbf{Bài toán bất đẳng thức biến phân (VI)}: tìm $x^{*}\in C$ sao cho
+\[
+\inp{Ax^{*}}{x-x^{*}}\ge 0,\quad\forall x\in C. \tag{1.1}
+\]
+Ký hiệu tập nghiệm là $V_I$; tập nghiệm tầm thường $V_T:=\{x^{*}\in C:\inp{Ax^{*}}{x-x^{*}}=0\ \forall x\in C\}$ và $V_N:=V_I\setminus V_T$. \textbf{Bài toán đối ngẫu (DVI)}: tìm $x^{*}\in C$ với $\inp{Ax}{x-x^{*}}\ge 0\ \forall x\in C$; tập nghiệm $V_D$.
+
+\medskip
+\noindent\textbf{Vì sao ``tựa đơn điệu'' là khó.} Các lớp toán tử: đơn điệu $\Rightarrow$ giả đơn điệu $\Rightarrow$ tựa đơn điệu (bao hàm chặt). Với $A$ giả đơn điệu và liên tục thì $V_I=V_D$; nhưng với $A$ \emph{tựa đơn điệu} thì nói chung $V_I\not\subseteq V_D$ (chỉ có $V_N\subseteq V_D$). Hầu hết các phương pháp cũ dựa vào $V_I=V_D$ (tức giả đơn điệu), nên không áp dụng trực tiếp cho trường hợp tựa đơn điệu.
+
+\medskip
+\noindent\textbf{Nhược điểm cần khắc phục.} Phương pháp chiếu--co (PCM) cổ điển hội tụ nhưng \emph{phụ thuộc hằng số Lipschitz $L$} của $A$ (khó tính). Nhiều thuật toán gần đây cho VI tựa đơn điệu (Liu \& Yang 2020; Yin và cộng sự 2022; Yin \& Hussain 2022; Izuchukwu và cộng sự 2022) chỉ đạt \emph{hội tụ yếu} và cần các điều kiện ngặt (ký hiệu C4--C5$'$: các tập $\{d\in C:Ad=0\}\setminus V_D$ và $V_I\setminus V_D$ hữu hạn; tính liên tục yếu theo dãy).
+
+\medskip
+\noindent\textbf{Câu hỏi trung tâm của bài báo:} \emph{Có thể xây dựng một phương pháp \textbf{hội tụ mạnh} cho VI tựa đơn điệu (và VI không đơn điệu) mà \textbf{loại bỏ} được các điều kiện ngặt C4--C5$'$ hay không?} Bài báo trả lời khẳng định.
+
+\section{Thuật toán đề xuất (phát biểu đầy đủ)}
+
+Phương pháp được gọi là \emph{phương pháp chiếu và co kiểu Mann} (MTPCM). Dưới đây là các giả thiết và thuật toán, trích dẫn nguyên dạng toán học.
+
+\medskip
+\noindent\textbf{Giả thiết A.}
+\begin{enumerate}[label=(A\arabic*),leftmargin=2.4em,itemsep=1pt]
+\item $V_D\ne\emptyset$.
+\item $A:H\to H$ liên tục $L$-Lipschitz (\emph{không cần biết trước} $L$).
+\item Mỗi khi $\{x_n\}\subset C$, $x_n\wto d$ thì $\nm{Ad}\le\liminf_{n\to\infty}\nm{Ax_n}$.
+\item $A$ tựa đơn điệu.
+\item[(A3$'$)] $A$ liên tục yếu theo dãy.
+\item[(A4$'$)] Nếu $x_n\wto x^{*}$ và $\limsup_{n\to\infty}\inp{Ax_n}{x_n}\le\inp{Ax^{*}}{x^{*}}$ thì $\lim_{n\to\infty}\inp{Ax_n}{x_n}=\inp{Ax^{*}}{x^{*}}$.
+\end{enumerate}
+\emph{Ghi chú:} (A3) chặt yếu hơn (A3$'$). Định lý hội tụ thứ nhất (tựa đơn điệu) chỉ dùng (A1)--(A4); định lý thứ hai (không đơn điệu) dùng (A1),(A2),(A3$'$),(A4$'$).
+
+\medskip
+\noindent\textbf{Giả thiết B.}
+\begin{enumerate}[label=(B\arabic*),leftmargin=2.4em,itemsep=1pt]
+\item $\{\alpha_n\}\subset(0,1)$ với $\lim_{n}(1-\alpha_n)=0$, $\sum_n(1-\alpha_n)=+\infty$; $\{\beta_n\}\subset[a,b]\subset(0,1)$.
+\item $\delta>0$; $\{\epsilon_n\}$ dương với $\lim_n\dfrac{\epsilon_n}{1-\alpha_n}=0$; $l\in(0,2)$; $\sigma\in(0,1)$.
+\item $\gamma_0>0$; $\{\theta_n\}$ không âm với $\sum_n\theta_n<+\infty$.
+\end{enumerate}
+
+\begin{algo}
+\textbf{Bước 0.} Chọn $x_0,x_1\in H$ tùy ý; đặt $n=1$.
+
+\smallskip
+\textbf{Bước 1 (bước quán tính).} Chọn $\delta_n$ với $0\le\delta_n\le\hat{\delta}_n$, trong đó
+\[
+\hat{\delta}_n=\begin{cases}\min\Bigl\{\delta,\ \dfrac{\epsilon_n}{\nm{x_n-x_{n-1}}}\Bigr\}, & x_n\ne x_{n-1},\\[6pt]\delta, & \text{ngược lại.}\end{cases} \tag{3.1}
+\]
+
+\textbf{Bước 2.} Tính
+\[
+w_n=x_n+\delta_n(x_n-x_{n-1}),\qquad y_n=P_C(w_n-\gamma_n Aw_n). \tag{3.2}
+\]
+Nếu $y_n=w_n$ (hoặc $Ay_n=0$): dừng, $y_n$ là nghiệm. Ngược lại:
+
+\smallskip
+\textbf{Bước 3 (bước co + cập nhật cỡ bước).}
+\[
+z_n=w_n-l\,\tau_n d_n,\qquad d_n:=w_n-y_n-\gamma_n(Aw_n-Ay_n),
+\]
+\[
+\tau_n=\begin{cases}\dfrac{\inp{w_n-y_n}{d_n}}{\nm{d_n}^2}, & d_n\ne 0,\\[4pt]0,&\text{ngược lại,}\end{cases}
+\qquad
+\gamma_{n+1}=\begin{cases}\min\Bigl\{\dfrac{\sigma\nm{w_n-y_n}}{\nm{Aw_n-Ay_n}},\ \gamma_n+\theta_n\Bigr\}, & Aw_n\ne Ay_n,\\[4pt]\gamma_n+\theta_n,&\text{ngược lại.}\end{cases} \tag{3.3--3.4}
+\]
+
+\textbf{Bước 4.} $x_{n+1}=(1-\beta_n)(\alpha_n w_n)+\beta_n z_n.$ \hfill(3.5)
+
+\smallskip
+Đặt $n:=n+1$ và quay lại Bước 1.
+\end{algo}
+
+\noindent\textbf{Đặc điểm nổi bật.} (i) Chỉ \emph{một} phép chiếu $P_C$ mỗi bước (rẻ). (ii) Cỡ bước $\gamma_n$ tự thích nghi, không cần $L$, không tìm kiếm theo tia, sinh dãy cỡ bước \emph{không đơn điệu}; $\gamma_n\to\gamma\in[\min\{\tfrac{\sigma}{L},\gamma_1\},\gamma_1+\Theta]$ với $\Theta=\sum\theta_n$. (iii) Có bước quán tính (3.1)--(3.2) tăng tốc hội tụ. (iv) Loại bỏ điều kiện ngặt C4--C5$'$.
+
+\section{Các kết quả hội tụ chính}
+
+Sơ đồ chứng minh dựa trên chuỗi bổ đề:
+\begin{itemize}[leftmargin=1.4em,itemsep=1pt]
+\item \textbf{Bổ đề 3.4 (tính bị chặn).} Dãy $\{x_n\}$ (và $\{w_n\},\{y_n\},\{z_n\},\{d_n\}$) bị chặn. \emph{Ý tưởng:} từ (3.2)--(3.5) và tính chất phép chiếu, thu được $\nm{z_n-d}^2\le\nm{w_n-d}^2-l^{-1}(2-l)\nm{z_n-w_n}^2\le\nm{w_n-d}^2$ với $d\in V_D$, rồi áp dụng bổ đề kiểu Maingé.
+\item \textbf{Bổ đề 3.5 (điểm tụ yếu là nghiệm DVI).} Nếu dãy con $w_{n_k}\wto\hat{x}$ và $\nm{w_{n_k}-y_{n_k}}\to0$ thì $\hat{x}\in V_D$ hoặc $A\hat{x}=0$. \emph{Ý tưởng:} dùng tính tựa đơn điệu $+$ Lipschitz $+$ cấu trúc phép chiếu (đây là chỗ mấu chốt xử lý tựa đơn điệu, qua kỹ thuật đặt $\xi_{n_k}=Ay_{n_k}/\nm{Ay_{n_k}}^2$).
+\item \textbf{Bổ đề 3.6 \& 3.7 (bất đẳng thức chủ đạo).} Cho ước lượng đệ quy dạng $\nm{x_{n+1}-d}^2\le[1-s_n]\nm{x_n-d}^2+s_n b_n-(\cdots)\nm{z_n-w_n}^2$ với $s_n=(1-\alpha_n)(1-\beta_n)$, dùng để áp dụng bổ đề Saejung--Yotkaew.
+\end{itemize}
+
+\begin{theorem}[Định lý 3.8 --- trường hợp tựa đơn điệu]
+Cho $\{x_n\}$ sinh bởi Thuật toán 3.1 với các điều kiện $(A1)$--$(A4)$ và $(B1)$--$(B3)$, và $Ax\ne 0,\ \forall x\in C$. Khi đó $\{x_n\}$ hội tụ mạnh về $x^{*}\in V_D\subset V_I$, trong đó $\nm{x^{*}}=\min\{\nm{p}:p\in V_D\subset V_I\}$ (nghiệm có chuẩn nhỏ nhất, tức $x^{*}=P_{V_D}(0)$).
+\end{theorem}
+
+\begin{theorem}[Định lý 3.11 --- trường hợp không đơn điệu]
+Cho $\{x_n\}$ sinh bởi Thuật toán 3.1 với các điều kiện $(A1)$--$(A2)$, $(A3')$--$(A4')$ và $(B1)$--$(B3)$, và $Ax\ne 0,\ \forall x\in C$. Khi đó $\{x_n\}$ hội tụ mạnh về $x^{*}\in V_D\subset V_I$ với $\nm{x^{*}}=\min\{\nm{p}:p\in V_D\subset V_I\}$.
+\end{theorem}
+
+\noindent\emph{Ý tưởng chứng minh chung.} Đặt $x^{*}=P_{V_D}(0)$. Xét dãy con $\{\nm{x_{n_k}-x^{*}}\}$ thỏa điều kiện của bổ đề Saejung--Yotkaew; từ bất đẳng thức chủ đạo suy ra $\nm{z_{n_k}-w_{n_k}}\to0$ (và do đó $\nm{w_{n_k}-y_{n_k}}\to0$). Kết hợp Bổ đề 3.5/3.10 (điểm tụ yếu thuộc $V_D$) và tính nửa liên tục dưới yếu của chuẩn, chứng minh $\limsup_k b_{n_k}\le0$, từ đó $\nm{x_n-x^{*}}\to0$. Ở Định lý 3.11, tính tựa đơn điệu được thay bằng (A3$'$)--(A4$'$) (liên tục yếu theo dãy) và dùng Bổ đề 3.10 thay cho 3.5.
+
+\medskip
+\noindent\textbf{Nhận xét 3.9.} Tính tựa đơn điệu chỉ được dùng ở Bổ đề 3.5; khi thay bằng (A3$'$)--(A4$'$) ta được kết quả cho lớp toán tử \emph{không đơn điệu} tổng quát hơn.
+
+\section{Ví dụ số}
+
+Các thực nghiệm (MATLAB R2022b) so sánh Thuật toán 3.1 với: Thuật toán 1.2 (Liu \& Yang), 1.5 (Yin và cộng sự), 1.6 (Yin \& Hussain), và hai thuật toán khác (Izuchukwu và cộng sự; Alakoya và cộng sự). Tham số tiêu biểu: $\alpha_n=\tfrac{n}{n+2}$, $\beta_n=\tfrac{n}{2n+1}$, $\epsilon_n=\tfrac{2}{(n+2)^3}$, $\delta=0.89$, $\theta_n=\tfrac{1000}{(n+1)^{1.5}}$, $\gamma_0=0.9$, $\sigma=0.95$, $l=0.89$.
+
+\begin{example}[hữu hạn chiều, 1 chiều]
+$C=[-1,1]$, $Ax=\begin{cases}2x-1,&x>1\\ x^2,&x\in[-1,1]\\ -2x-1,&x<-1\end{cases}$; $A$ tựa đơn điệu, Lipschitz; $V_D=\{-1\}$, $V_I=\{-1,0\}$. (Minh họa: phương pháp bắt đúng nghiệm $-1\in V_D$.)
+\end{example}
+\begin{example}[nhiều chiều]
+$C=[0,1]^m$ với toán tử tuyến tính theo từng thành phần (theo Izuchukwu và cộng sự 2022).
+\end{example}
+\begin{example}[vô hạn chiều]
+$H=\ell_2$ (không gian các dãy bình phương khả tổng), minh họa tính khả dụng trong không gian vô hạn chiều.
+\end{example}
+
+\noindent\textbf{Kết luận thực nghiệm (theo bài báo).} Qua số bước lặp và thời gian CPU (Bảng 1--3 của bản gốc), phương pháp đề xuất tỏ ra hiệu quả, đơn giản và cạnh tranh so với các phương pháp so sánh, đồng thời \emph{hội tụ mạnh} trong khi nhiều phương pháp đối chứng chỉ hội tụ yếu.
+
+\section{Đóng góp và kết luận}
+
+\begin{itemize}[leftmargin=1.4em,itemsep=1pt]
+\item Phương pháp \emph{hội tụ mạnh} cho VI \emph{tựa đơn điệu} và VI \emph{không đơn điệu} mà \emph{không} cần các điều kiện ngặt C4--C5$'$.
+\item Cỡ bước tự thích nghi (không cần $L$, không line-search) $+$ quán tính; chỉ một phép chiếu mỗi bước.
+\item Nghiệm giới hạn là nghiệm có chuẩn nhỏ nhất --- có ý nghĩa trong nhiều ứng dụng.
+\item Tổng quát hóa/cải tiến các kết quả của Liu \& Yang (2020), Yin và cộng sự (2022), Yin \& Hussain (2022), Izuchukwu và cộng sự (2022).
+\end{itemize}
+
+\vfill
+\noindent\rule{\linewidth}{0.4pt}\\[2pt]
+{\footnotesize\textit{Nguồn:} V. A. Uzor, T. O. Alakoya, O. T. Mewomo, A. Gibali, ``Solving quasimonotone and non-monotone variational inequalities,'' \textit{Math. Methods Oper. Res.} (2023) \textbf{98}:461--498, \url{https://doi.org/10.1007/s00186-023-00846-9}. Bài gốc phát hành theo giấy phép CC BY 4.0. Đây là tài liệu \emph{tóm tắt \& chú giải} phục vụ học tập; các phát biểu thuật toán và định lý được trích dẫn, phần còn lại được diễn giải/tóm tắt. Để có chứng minh và nội dung đầy đủ, vui lòng xem bài báo gốc.}
+
+\end{document}

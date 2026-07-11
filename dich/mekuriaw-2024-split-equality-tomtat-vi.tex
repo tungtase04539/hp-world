@@ -1,0 +1,159 @@
+%=======================================================================
+%  TÀI LIỆU TÓM TẮT & CHÚ GIẢI TIẾNG VIỆT (phục vụ học tập)
+%  Dựa trên bài báo:
+%    G. Mekuriaw, H. Zegeye, M. H. Takele, A. R. Tufa,
+%    "Algorithms for split equality variational inequality and fixed
+%     point problems",
+%    Applicable Analysis (2024) 103:17, 3267-3294.
+%    DOI: 10.1080/00036811.2024.2348669
+%
+%  LƯU Ý BẢN QUYỀN: Bài gốc phát hành theo giấy phép Creative Commons
+%  Attribution-NonCommercial-NoDerivatives (CC BY-NC-ND 4.0). Điều khoản
+%  "NoDerivatives" (KHÔNG phái sinh) KHÔNG cho phép tạo/phân phối bản dịch
+%  (bản dịch là tác phẩm phái sinh). Vì vậy tài liệu này KHÔNG phải bản
+%  dịch toàn văn, mà là TÓM TẮT & CHÚ GIẢI bằng tiếng Việt phục vụ học
+%  tập/nghiên cứu: nêu bài toán, trích dẫn ngắn công thức thuật toán và
+%  phát biểu định lý để bình luận, diễn giải ý tưởng. Nội dung/chứng minh
+%  đầy đủ: xin xem bài gốc.
+%
+%  Biên dịch: pdfLaTeX (cần gói vntex). Chạy pdflatex HAI lượt.
+%=======================================================================
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T5]{fontenc}
+\usepackage[vietnamese]{babel}
+% XeLaTeX/LuaLaTeX: thay 3 dòng trên bằng fontspec + polyglossia + \setmainlanguage{vietnamese}
+
+\usepackage{amsmath,amssymb,amsthm,amsfonts,mathtools}
+\usepackage{enumitem}
+\usepackage[margin=2.2cm]{geometry}
+\usepackage[hidelinks]{hyperref}
+\usepackage{xurl}
+\allowdisplaybreaks
+\setlength{\emergencystretch}{3em}
+
+\theoremstyle{plain}
+\newtheorem{theorem}{Định lý}
+\theoremstyle{definition}
+\newtheorem*{algoA}{Thuật toán 3.1 (dưới vi phân ngoài, kiểu quán tính)}
+
+\newcommand{\inp}[2]{\langle #1,\,#2\rangle}
+\newcommand{\nm}[1]{\lVert #1\rVert}
+\newcommand{\Fix}{F}
+\DeclareMathOperator{\MVI}{MVI}
+
+\title{\vspace{-1.2cm}\bfseries Tóm tắt \& chú giải tiếng Việt\\[4pt]
+\large ``Các thuật toán cho bài toán bất đẳng thức biến phân và điểm bất động tách đẳng thức''}
+\author{\normalsize Bài gốc: G. Mekuriaw, H. Zegeye, M. H. Takele, A. R. Tufa (2024)}
+\date{\small Applicable Analysis (2024) 103:17, 3267--3294, DOI: 10.1080/00036811.2024.2348669\\[2pt]
+\textit{Tài liệu học tập (tóm tắt \& chú giải) --- bài gốc CC BY-NC-ND (không cho phép bản phái sinh/dịch), đây không phải bản dịch toàn văn.}}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent Tài liệu này tóm tắt và chú giải bằng tiếng Việt bài báo của Mekuriaw và cộng sự (2024). Bài báo đề xuất các thuật toán \emph{kiểu quán tính} (inertial) để giải \emph{bài toán bất đẳng thức biến phân và điểm bất động tách đẳng thức} (SEVIFPP), trong đó toán tử của bất đẳng thức biến phân là \emph{tựa đơn điệu, liên tục đều} và ánh xạ điểm bất động là \emph{tựa không giãn nửa đóng}. Có hai thuật toán: kiểu \emph{dưới vi phân ngoài} (subgradient extragradient) và kiểu \emph{Tseng}, cùng cỡ bước tự thích nghi (tìm kiếm theo tia Armijo và cỡ bước cho phần tách đẳng thức không cần chuẩn toán tử). Cả hai \emph{hội tụ mạnh} về nghiệm chuẩn nhỏ nhất.
+\end{abstract}
+
+\section{Bài toán}
+
+Cho $H_1,H_2,H_3$ là các không gian Hilbert thực; $C\subseteq H_1$, $D\subseteq H_2$ khác rỗng, đóng, lồi; $A:H_1\to H_3$, $B:H_2\to H_3$ tuyến tính bị chặn.
+
+\begin{itemize}[leftmargin=1.4em,itemsep=2pt]
+\item \textbf{VI (Stampacchia):} với $T:H_1\to H_1$, tìm $x\in C$ sao cho $\inp{Tx}{y-x}\ge 0,\ \forall y\in C$; tập nghiệm ký hiệu $\MVI(C,T)$.
+\item \textbf{Bài toán tách đẳng thức (SEFP):} tìm $x\in C,\ u\in D$ sao cho $Ax=Bu$.
+\item \textbf{SEVIP:} thay $C,D$ bằng tập nghiệm VI, tìm $x\in\MVI(C,T),\ u\in\MVI(D,S)$ với $Ax=Bu$.
+\item \textbf{SEVIFPP (bài toán chính):} tìm
+\[
+(p,q)\in\bigl(\MVI(C,T)\cap \Fix(K)\bigr)\times\bigl(\MVI(D,S)\cap \Fix(G)\bigr)\ \text{ sao cho } Ap=Bq,
+\]
+trong đó $K,G$ là các ánh xạ điểm bất động; $\Fix(\cdot)$ là tập điểm bất động.
+\end{itemize}
+
+\section{Các điều kiện (C1)--(C6)}
+\begin{enumerate}[label=(C\arabic*),leftmargin=2.4em,itemsep=1pt]
+\item $C,D$ khác rỗng, đóng, lồi trong $H_1,H_2$.
+\item $T:H_1\to H_1$, $S:H_2\to H_2$ \emph{tựa đơn điệu, liên tục đều}, và liên tục yếu theo dãy ($x_n\rightharpoonup x\Rightarrow Tx_n\rightharpoonup Tx$; tương tự $S$).
+\item $K:H_1\to H_1$, $G:H_2\to H_2$ \emph{tựa không giãn} sao cho $I-K$, $I-G$ nửa đóng tại $0$.
+\item $A:H_1\to H_3$, $B:H_2\to H_3$ tuyến tính bị chặn, liên hợp $A^{*},B^{*}$.
+\item Tập nghiệm $\Upsilon=\bigl\{(p,q)\in(\MVI(C,T)\cap \Fix(K))\times(\MVI(D,S)\cap \Fix(G)):Ap=Bq\bigr\}\ne\emptyset$.
+\item $\{\epsilon_n\},\{\beta_n\},\{\sigma_n\},\{a_n\}$ thỏa: $\sum\epsilon_n<\infty$, $\lim_n\tfrac{\epsilon_n}{\alpha_n}=0$; $\{\alpha_n\}\subset(0,1)$ với $\sum\alpha_n=\infty$, $\lim\alpha_n=0$; $\{\beta_n\},\{a_n\},\{\sigma_n\}\subseteq[a,b]\subset(0,1)$.
+\end{enumerate}
+
+\section{Thuật toán 3.1 (trích dẫn để chú giải)}
+
+\begin{algoA}
+\textbf{Khởi tạo:} $\bar{x},x_0,x_1\in C$, $\bar{u},u_0,u_1\in D$, $0\le\theta<1$, $\rho,\xi,\kappa,\ell,\omega\in(0,1)$. Đặt $n=1$.
+
+\smallskip
+\textbf{Bước 1 (quán tính).} Chọn $\theta_n$ với $0\le\theta_n\le\bar{\theta}_n$,
+\[
+\bar{\theta}_n=\begin{cases}\min\Bigl\{\theta,\ \dfrac{\epsilon_n}{\nm{x_n-x_{n-1}}},\ \dfrac{\epsilon_n}{\nm{u_n-u_{n-1}}}\Bigr\}, & x_n\ne x_{n-1}\text{ và } u_n\ne u_{n-1},\\[6pt]\theta,&\text{ngược lại.}\end{cases}
+\]
+
+\textbf{Bước 2.} $w_n=x_n+\theta_n(x_{n-1}-x_n)$, \quad $v_n=u_n+\theta_n(u_{n-1}-u_n)$.
+
+\smallskip
+\textbf{Bước 3 (dưới vi phân ngoài + tìm kiếm theo tia Armijo).}
+\[
+\begin{cases}
+y_n=P_C(w_n-\tau_n Tw_n), & z_n=P_{T_n}(w_n-\tau_n Ty_n),\\
+s_n=P_D(v_n-\varphi_n Sv_n), & t_n=P_{S_n}(v_n-\varphi_n Ss_n),
+\end{cases}
+\]
+với các nửa không gian
+\[
+T_n=\{x\in C:\inp{w_n-\tau_n Tw_n-y_n}{x-y_n}\le 0\},\quad S_n=\{u\in D:\inp{v_n-\varphi_n Sv_n-s_n}{u-s_n}\le 0\};
+\]
+cỡ bước $\tau_n=\xi\omega^{j_m}$ ($j_m$ nhỏ nhất: $\xi\omega^{j}\nm{Tw_n-Ty_n}\le\rho\nm{w_n-y_n}$), $\varphi_n=\kappa\ell^{k_i}$ (tương tự với $S$).
+
+\smallskip
+\textbf{Bước 4 (kết hợp tách đẳng thức $+$ điểm bất động).}
+\[
+\begin{cases}
+d_n=P_C(w_n-\gamma_n A^{*}(Aw_n-Bv_n)),\\
+h_n=P_C(\sigma_n d_n+(1-\sigma_n)Kd_n),\\
+x_{n+1}=\alpha_n\bar{x}+(1-\alpha_n)[(1-\beta_n)w_n+\beta_n(a_n z_n+(1-a_n)h_n)],\\
+e_n=P_D(v_n+\gamma_n B^{*}(Aw_n-Bv_n)),\\
+r_n=P_D(\sigma_n e_n+(1-\sigma_n)Ge_n),\\
+u_{n+1}=\alpha_n\bar{u}+(1-\alpha_n)[(1-\beta_n)v_n+\beta_n(a_n t_n+(1-a_n)r_n)],
+\end{cases}
+\]
+với $0<\gamma\le\gamma_n\le\hat{\rho}_n$, $\hat{\rho}_n=\min\Bigl\{\gamma+1,\ \dfrac{\nm{Aw_n-Bv_n}^2}{\nm{A^{*}(Aw_n-Bv_n)}^2+\nm{B^{*}(Bv_n-Aw_n)}^2}\Bigr\}$ khi $Aw_n\ne Bv_n$, ngược lại $\gamma_n=\gamma$. Đặt $n:=n+1$ và quay lại Bước 1.
+\end{algoA}
+
+\noindent\textbf{Diễn giải.} Bước 1--2: quán tính (tăng tốc). Bước 3: kỹ thuật \emph{dưới vi phân ngoài} (chiếu lên nửa không gian $T_n$ thay vì chiếu lần hai lên $C$) kèm \emph{tìm kiếm theo tia Armijo} để chọn cỡ bước mà không cần hằng số Lipschitz --- xử lý được toán tử \emph{tựa đơn điệu}. Bước 4: cỡ bước $\gamma_n$ cho phần \emph{tách đẳng thức} \emph{không cần chuẩn} của $A,B$, đồng thời lồng phép chiếu Krasnoselskii--Mann với $K,G$ để đồng thời giải \emph{điểm bất động}, và số hạng $\alpha_n\bar{x},\alpha_n\bar{u}$ kiểu Halpern tạo \emph{hội tụ mạnh}.
+
+\section{Kết quả hội tụ}
+
+\begin{theorem}[Định lý 3.4 --- tính bị chặn]
+Dưới các điều kiện (C1)--(C6), các dãy $\{x_n\}$ và $\{u_n\}$ sinh bởi Thuật toán 3.1 bị chặn.
+\end{theorem}
+
+\begin{theorem}[Định lý 3.5 --- hội tụ mạnh]
+Dưới (C1)--(C6), và $Tx\ne 0\ \forall x\in C$, $Su\ne 0\ \forall u\in D$, dãy $\{(x_n,u_n)\}$ sinh bởi Thuật toán 3.1 hội tụ \emph{mạnh} về $(p^{*},q^{*})\in\Upsilon$ --- nghiệm gần điểm khởi tạo $(\bar{x},\bar{u})$ nhất (với $\bar{x},\bar{u}=0$ thì đó là nghiệm \emph{chuẩn nhỏ nhất}).
+\end{theorem}
+
+\noindent\textbf{Thuật toán 3.2 (kiểu Tseng).} Bài báo còn đưa ra biến thể \emph{Tseng extragradient} (chỉ một phép chiếu $+$ một bước "sửa" tiến--lùi--tiến) cho cùng bài toán, với cùng cấu trúc quán tính $+$ tách đẳng thức $+$ điểm bất động.
+\begin{theorem}[Định lý 3.6]
+Dưới (C1)--(C6) và $Tx\ne0,\ Su\ne0$, dãy sinh bởi Thuật toán 3.2 cũng hội tụ \emph{mạnh} về nghiệm của SEVIFPP.
+\end{theorem}
+\noindent Các Hệ quả 3.7--3.8 rút ra trường hợp riêng (ví dụ khi bỏ ràng buộc điểm bất động, hoặc $T,S$ liên tục và tựa đơn điệu).
+
+\medskip
+\noindent\emph{Ý tưởng chứng minh (tóm tắt).} (i) Nhờ tìm kiếm Armijo và cỡ bước tự thích nghi, thiết lập bất đẳng thức bị chặn (Định lý 3.4). (ii) Tính \emph{tựa đơn điệu $+$ liên tục đều $+$ liên tục yếu theo dãy} bảo đảm mọi điểm tụ yếu của dãy con thuộc $\MVI(C,T)$ (tương tự cho $D,S$); tính \emph{nửa đóng} của $I-K,I-G$ bảo đảm thuộc $\Fix(K),\Fix(G)$. (iii) Số hạng Halpern $\alpha_n\bar{x}$ cùng bổ đề kiểu Saejung--Yotkaew/Maingé (Bổ đề 2.7--2.8) ép \emph{hội tụ mạnh} về nghiệm gần $(\bar{x},\bar{u})$ nhất.
+
+\section{Đóng góp chính}
+\begin{itemize}[leftmargin=1.4em,itemsep=1pt]
+\item Giải \emph{đồng thời} bất đẳng thức biến phân (tựa đơn điệu) và điểm bất động, trong khuôn khổ \emph{tách đẳng thức} --- lớp bài toán tổng quát.
+\item Cỡ bước \emph{tự thích nghi}: Armijo cho phần VI (không cần Lipschitz) và cỡ bước tách đẳng thức \emph{không cần chuẩn} của $A,B$.
+\item \emph{Hội tụ mạnh} (về nghiệm chuẩn nhỏ nhất) cho toán tử \emph{tựa đơn điệu} --- vốn khó vì $\MVI$ có thể không trùng bài toán đối ngẫu.
+\item Hai biến thể (dưới vi phân ngoài và Tseng) $+$ kỹ thuật quán tính; kèm thực nghiệm số.
+\end{itemize}
+
+\vfill
+\noindent\rule{\linewidth}{0.4pt}\\[2pt]
+{\footnotesize\textit{Nguồn:} G. Mekuriaw, H. Zegeye, M. H. Takele, A. R. Tufa, ``Algorithms for split equality variational inequality and fixed point problems,'' \textit{Applicable Analysis} (2024) \textbf{103}(17):3267--3294, \url{https://doi.org/10.1080/00036811.2024.2348669}. Bài gốc phát hành theo giấy phép CC BY-NC-ND 4.0 (không cho phép tác phẩm phái sinh/bản dịch). Tài liệu này là \emph{tóm tắt \& chú giải} phục vụ học tập, chỉ trích dẫn ngắn công thức/định lý để bình luận; để có nội dung, chứng minh và số liệu đầy đủ, vui lòng tham khảo bài báo gốc.}
+
+\end{document}
