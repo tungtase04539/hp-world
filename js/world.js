@@ -1861,7 +1861,9 @@ export function buildWorld(scene) {
         const nx = Math.cos(rotY), nz = -Math.sin(rotY);           // pháp tuyến
         for (let d = 3; d < segLen - 3; d += 4.7) {                 // shophouse sát nhau
           const mx = x1 + dxn * d, mz = z1 + dzn * d;
-          if (mx * mx + mz * mz > 980 * 980) continue;              // lõi trung tâm (V2: phủ tới khu Ga/Lạch Tray)
+          // V3-fix: vành 830-980 trùm khu CƠ QUAN KHUÔN VIÊN/đất giải tỏa (Cảng vụ ~878m, pano_019
+          // regression -1.4) → thu về 830; mật độ lõi vẫn giữ nhờ CAP 3000
+          if (mx * mx + mz * mz > 830 * 830) continue;
           for (const side of [1, -1]) {
             const off = side * (wRoad / 2 + 5.6);                    // sau vỉa hè (building-line)
             const gx = mx + off * nx, gz = mz + off * nz;
@@ -3175,7 +3177,7 @@ export function buildWorld(scene) {
       else palm(x, z);
       return;
     }
-    if (h < 0.55) shadeTree(x, z);
+    if (h < 0.63) shadeTree(x, z);           // V3-fix: model chê "hoa đỏ dày" cả ngoài hồ → phượng 35%→27%
     else if (h < 0.90) phuongTree(x, z);
     else palm(x, z);
   }
