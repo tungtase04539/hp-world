@@ -30,8 +30,11 @@
 \usepackage{graphicx}
 \usepackage{booktabs}
 \usepackage{array}
-\usepackage[margin=2.4cm]{geometry}
+\usepackage[margin=2cm]{geometry}
 \usepackage[hidelinks]{hyperref}
+\usepackage{xurl}                 % cho phép ngắt dòng bên trong URL/DOI dài
+\allowdisplaybreaks              % cho phép ngắt trang trong các khối align dài
+\setlength{\emergencystretch}{3em} % hấp thụ phần tràn lề nhỏ ở đoạn văn
 
 % ------- Định lý, bổ đề... (đánh số theo mục, dùng chung bộ đếm) -------
 \theoremstyle{plain}
@@ -98,7 +101,7 @@ Lĩnh vực tối ưu hóa và lý thuyết điểm bất động là một lĩn
 Ta ký hiệu tập nghiệm của bài toán VI \eqref{eq:1.1} là $\VI(C,\Fc)$.
 
 Có ba phương pháp nổi tiếng chủ yếu để giải bài toán VI \eqref{eq:1.1}, đó là: phương pháp Tseng extragradient (TEGM) (Tseng 2000), phương pháp extragradient dưới vi phân (SEGM) (Censor và cộng sự 2011a, b, 2010), và phương pháp chiếu-co (PCM) (Cholamjiak và cộng sự 2020). Về các cải biên thú vị của những phương pháp này, xem Gibali và cộng sự (2020), Ogwo và cộng sự (2023), Reich và cộng sự (2021), Reich và cộng sự (2022), Shehu và cộng sự (2019), Shehu và cộng sự (2022), Oyewole và Reich (2024). Phương pháp PCM được phát biểu như sau, xem Cholamjiak và cộng sự (2020):
-\begin{equation}
+\[
 \begin{cases}
 x_1\in H,\\
 y_n = P_C(x_n-\lambda \Fc x_n),\\
@@ -106,7 +109,7 @@ d(x_n,y_n) := (x_n-y_n)-\lambda(\Fc x_n-\Fc y_n),\\
 z_n = x_n-\rho\xi\, d(x_n,y_n),\\
 x_{n+1} = (1-\alpha_n-\beta_n)x_n+\beta_n z_n,
 \end{cases}
-\end{equation}
+\]
 trong đó $P_C$ là phép chiếu từ $H$ lên tập chấp nhận được $C$, $\rho\in(0,2)$, $\lambda\in(0,\tfrac{1}{L})$, $L$ là hằng số Lipschitz của toán tử giá, $\xi_n:=\dfrac{\tau(w_n,y_n)}{\nm{d(w_n,y_n)}^2}$, $\tau(w_n,y_n):=\inp{w_n-y_n}{d(w_n,y_n)}$, $\forall n\ge 1$. Ta lưu ý rằng trong khi cỡ bước ($\lambda$) trong Cholamjiak và cộng sự (2020) phụ thuộc vào hằng số Lipschitz (mà việc tính toán có thể khá khó khăn), thì phương pháp của chúng tôi trong bài báo này sử dụng các cỡ bước tự thích nghi hiệu quả hơn về mặt tính toán.
 
 Bài toán ngược tách (SIP) (Censor và cộng sự 2012) là một mô hình toán học khả dụng, nổi tiếng vì tính hữu ích và các ứng dụng của nó trong nhiều lĩnh vực rộng lớn như xử lý tín hiệu, khôi phục pha, khôi phục ảnh, nén dữ liệu, xạ trị điều biến cường độ, xem chẳng hạn Censor và cộng sự (2006), Godwin và cộng sự (2023), Eslamian và cộng sự (2018). Mô hình SIP được phát biểu như sau:
@@ -518,8 +521,9 @@ Khi đó, bằng cách cộng \eqref{eq:4.1} và \eqref{eq:4.2}, ta được
 Do $T_1x^{*}=T_2y^{*}$, cùng với \eqref{eq:3.7}, ta thu được
 \begin{align}
 \nm{z_n-x^{*}}^2+\nm{t_n-y^{*}}^2 &= \nm{w_n-x^{*}}^2+\nm{g_n-y^{*}}^2\notag\\
-&\quad +\zeta_n[2\nm{T_1w_n-T_2g_n}^2-\zeta_n(\nm{T_1^{*}(T_1w_n-T_2g_n)}^2+\nm{T_2^{*}(T_1w_n-T_2g_n)}^2)]\notag\\
-&\le \nm{w_n-x^{*}}^2+\nm{g_n-y^{*}}^2-\zeta_n\cdot\epsilon[\nm{T_1^{*}(T_1w_n-T_2g_n)}^2+\nm{T_2^{*}(T_1w_n-T_2g_n)}^2]\notag\\
+&\quad +\zeta_n\bigl[2\nm{T_1w_n-T_2g_n}^2-\zeta_n(\nm{T_1^{*}(T_1w_n-T_2g_n)}^2+\nm{T_2^{*}(T_1w_n-T_2g_n)}^2)\bigr]\notag\\
+&\le \nm{w_n-x^{*}}^2+\nm{g_n-y^{*}}^2\notag\\
+&\quad -\zeta_n\cdot\epsilon[\nm{T_1^{*}(T_1w_n-T_2g_n)}^2+\nm{T_2^{*}(T_1w_n-T_2g_n)}^2]\notag\\
 &\le \nm{w_n-x^{*}}^2+\nm{g_n-y^{*}}^2. \label{eq:4.3}
 \end{align}
 \end{proof}
@@ -663,9 +667,9 @@ Theo định nghĩa của $\{x_{n+1}\}$, ta được
 \end{align}
 Theo \eqref{eq:4.11} và Bổ đề~\ref{lem:2.5}, ta thu được
 \begin{align*}
-\nm{(1-\alpha_n-\beta_n)(z_n-x^{*})+\beta_n(q_n-x^{*})}^2 &= (1-\alpha_n-\beta_n)^2\nm{z_n-x^{*}}^2+2(1-\alpha_n-\beta_n)\beta_n\inp{z_n-x^{*}}{q_n-x^{*}}+\beta_n^2\nm{q_n-x^{*}}^2\\
-&\le (1-\alpha_n-\beta_n)^2\nm{z_n-x^{*}}^2+2(1-\alpha_n-\beta_n)\beta_n\\
-&\quad \times[\nm{z_n-x^{*}}^2+\nm{q_n-x^{*}}^2]+\beta_n^2\nm{q_n-x^{*}}^2\\
+&\nm{(1-\alpha_n-\beta_n)(z_n-x^{*})+\beta_n(q_n-x^{*})}^2\\
+&= (1-\alpha_n-\beta_n)^2\nm{z_n-x^{*}}^2+2(1-\alpha_n-\beta_n)\beta_n\inp{z_n-x^{*}}{q_n-x^{*}}+\beta_n^2\nm{q_n-x^{*}}^2\\
+&\le (1-\alpha_n-\beta_n)^2\nm{z_n-x^{*}}^2+2(1-\alpha_n-\beta_n)\beta_n[\nm{z_n-x^{*}}^2+\nm{q_n-x^{*}}^2]+\beta_n^2\nm{q_n-x^{*}}^2\\
 &= (1-\alpha_n-\beta_n)(1-\alpha_n)\nm{z_n-x^{*}}^2+\beta_n(1-\alpha_n)\nm{q_n-x^{*}}^2\\
 &\le (1-\alpha_n-\beta_n)(1-\alpha_n)\nm{z_n-x^{*}}^2+\beta_n(1-\alpha_n)\nm{z_n-x^{*}}^2\\
 &= (1-\alpha_n)^2\nm{z_n-x^{*}}^2.
@@ -860,7 +864,8 @@ Ta đã biết rằng $\{z_n\}$ bị chặn, do đó $\omega_{*}(z_n)\ne\emptyse
 \medskip
 \noindent\textbf{Trường hợp 2:} Nếu $\limsup_{k\to\infty}\nm{\Fc u_{n_k}}>0$. Không mất tính tổng quát, cho $\lim_{k\to\infty}\nm{\Fc u_{n_k}}=\mathcal{J}_{*}>0$. Do đó, tồn tại $n_2\in\N$ sao cho $\nm{\Fc u_{n_k}}>\dfrac{\mathcal{J}_{*}}{2}$, $\forall k\ge n_2$. Theo định nghĩa của $\{u_n\}$ và tính chất phép chiếu, $\forall x\in C$, ta thu được
 \begin{align}
-\inp{u_{n_k}-z_{n_k}+\xi_{n_k}\Fc z_{n_k}}{x-u_{n_k}}\ge 0 &\Longrightarrow \inp{z_{n_k}-u_{n_k}}{x-u_{n_k}}\le\xi_{n_k}\inp{\Fc z_{n_k}}{x-u_{n_k}}\notag\\
+&\inp{u_{n_k}-z_{n_k}+\xi_{n_k}\Fc z_{n_k}}{x-u_{n_k}}\ge 0\notag\\
+&\Longrightarrow \inp{z_{n_k}-u_{n_k}}{x-u_{n_k}}\le\xi_{n_k}\inp{\Fc z_{n_k}}{x-u_{n_k}}\notag\\
 &\Longrightarrow \frac{1}{\xi_{n_k}}\inp{z_{n_k}-u_{n_k}}{x-u_{n_k}}\le\inp{\Fc u_{n_k}}{x-u_{n_k}}+\inp{\Fc z_{n_k}-\Fc u_{n_k}}{x-u_{n_k}}. \label{eq:4.36}
 \end{align}
 Ngoài ra, vì $\{u_{n_k}\}$ bị chặn, và $\lim_{k\to\infty}\xi_{n_k}=\xi>0$, $\lim_{k\to\infty}\nm{u_{n_k}-z_{n_k}}=0$, và theo tính liên tục Lipschitz của $\Fc$, ta có
@@ -901,7 +906,8 @@ Cho $(\hat{x},\hat{y})\in\Omega$, trong đó $\hat{x}=P_A(0)$ và $\hat{y}=P_B(0
 \begin{align}
 \nm{x_{n+1}-\hat{x}}^2 &+ \nm{y_{n+1}-\hat{y}}^2\le(1-\alpha_n)[\nm{x_n-\hat{x}}^2+\nm{y_n-\hat{y}}^2]+\alpha_n b_n^{*},\notag\\
 \text{trong đó}\quad b_n^{*} &= \Bigl[3M_5(1-\alpha_n)\frac{\tau_n}{\alpha_n}\nm{x_n-x_{n-1}}+3M_6(1-\alpha_n)\frac{\nu_n}{\alpha_n}\nm{y_n-y_{n-1}}\notag\\
-&\quad +2\beta_n\nm{z_n-q_n}\nm{x_{n+1}-\hat{x}}+2\beta_n\nm{t_n-b_n}\nm{y_{n+1}-\hat{y}}+2\inp{\hat{x}}{\hat{x}-x_{n+1}}+2\inp{\hat{y}}{\hat{y}-y_{n+1}}\Bigr]. \label{eq:4.41}
+&\quad +2\beta_n\nm{z_n-q_n}\nm{x_{n+1}-\hat{x}}+2\beta_n\nm{t_n-b_n}\nm{y_{n+1}-\hat{y}}\notag\\
+&\quad +2\inp{\hat{x}}{\hat{x}-x_{n+1}}+2\inp{\hat{y}}{\hat{y}-y_{n+1}}\Bigr]. \label{eq:4.41}
 \end{align}
 Do đó, ta khẳng định rằng dãy $\{\nm{x_n-\hat{x}}+\nm{y_n-\hat{y}}\}$ hội tụ về không. Vì vậy, theo Bổ đề~\ref{lem:2.10}, chỉ cần chứng minh rằng $\limsup_{k\to\infty}b_n^{*}\le 0$, với mọi dãy con $\{\nm{x_{n_k}-\hat{x}}+\nm{y_{n_k}-\hat{y}}\}$ của $\{\nm{x_n-\hat{x}}+\nm{y_n-\hat{y}}\}$ thỏa mãn
 \begin{equation}
@@ -1160,6 +1166,7 @@ $\zeta_n=0.004$, $\alpha_n=\dfrac{1}{n+1}$ & $\beta_n=\dfrac{1-\alpha_n}{2}$ & $
 \centering
 \caption{Kết quả số cho Ví dụ~\ref{ex:5.1}}\label{tab:2}
 \small
+\resizebox{\textwidth}{!}{%
 \begin{tabular}{@{}l cc cc cc cc@{}}
 \toprule
 & \multicolumn{2}{c}{Trường hợp 1} & \multicolumn{2}{c}{Trường hợp 2} & \multicolumn{2}{c}{Trường hợp 3} & \multicolumn{2}{c}{Trường hợp 4}\\
@@ -1173,7 +1180,8 @@ Thuật toán Wang \& Fang & 41 & 0.0041 & 40 & 0.0054 & 42 & 0.0041 & 41 & 0.00
 Thuật toán đề xuất (không quán tính) & 30 & 0.0214 & 30 & 0.0237 & 30 & 0.0211 & 30 & 0.0217\\
 Thuật toán đề xuất 3.2 & 26 & 0.0121 & 26 & 0.0147 & 26 & 0.0124 & 26 & 0.0133\\
 \bottomrule
-\end{tabular}
+\end{tabular}%
+}
 \end{table}
 
 % -------- Bảng 3: Kết quả số cho Ví dụ 5.2 --------
@@ -1181,6 +1189,7 @@ Thuật toán đề xuất 3.2 & 26 & 0.0121 & 26 & 0.0147 & 26 & 0.0124 & 26 & 
 \centering
 \caption{Kết quả số cho Ví dụ~\ref{ex:5.2}}\label{tab:3}
 \small
+\resizebox{\textwidth}{!}{%
 \begin{tabular}{@{}l cc cc cc cc@{}}
 \toprule
 & \multicolumn{2}{c}{Trường hợp 1} & \multicolumn{2}{c}{Trường hợp 2} & \multicolumn{2}{c}{Trường hợp 3} & \multicolumn{2}{c}{Trường hợp 4}\\
@@ -1194,7 +1203,8 @@ Thuật toán Wang \& Fang & 18 & 0.0035 & 18 & 0.0033 & 18 & 0.0038 & 18 & 0.00
 Thuật toán đề xuất (không quán tính) & 20 & 0.0213 & 20 & 0.0203 & 20 & 0.0204 & 20 & 0.0208\\
 Thuật toán đề xuất 3.2 & 15 & 0.0125 & 15 & 0.0123 & 15 & 0.0124 & 15 & 0.0122\\
 \bottomrule
-\end{tabular}
+\end{tabular}%
+}
 \end{table}
 
 \section{Kết luận}\label{sec:concl}

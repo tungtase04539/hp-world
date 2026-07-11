@@ -29,9 +29,14 @@ ngay bên dưới chúng, rồi chạy `xelatex` hai lần.
 
 ## Ghi chú
 
+- **Phải biên dịch 2 lần** (pdfLaTeX chạy hai lượt, hoặc dùng `latexmk`). Nếu chỉ chạy 1 lần,
+  các tham chiếu chéo (số phương trình, số bổ đề…) sẽ hiện `??` vì lượt đầu mới chỉ ghi tệp `.aux`.
+- Tài liệu đã được biên dịch và kiểm tra: **không còn lỗi, không còn `??`, không còn tham chiếu
+  chưa xác định**. Cách đánh số phương trình/định lý/bổ đề khớp **chính xác** với bản gốc:
+  Mục 1 → (1.1)–(1.8), Mục 3 → (3.1)–(3.7), Mục 4 → (4.1)–(4.57).
 - Các Hình 1–8 trong bản gốc là đồ thị sai số theo bước lặp (kết quả mô phỏng MATLAB) nên không
   được tái tạo; số liệu định lượng tương ứng nằm trong **Bảng 2** và **Bảng 3**.
-- Cách đánh số định lý/bổ đề/phương trình theo mục được giữ khớp với bản gốc (ví dụ Bổ đề 4.3,
-  phương trình (4.10), v.v.).
 - Một lỗi sắp chữ nhỏ trong bản gốc (một cặp dấu chuẩn thừa ở khai triển của $\|x_{n+1}-x^*\|^2$
   trong chứng minh tính bị chặn) đã được chỉnh về dạng đúng chuẩn.
+- Tệp PDF đã biên dịch sẵn (`mewomo-2024-bai-toan-tach-dang-thuc-vi.pdf`, 27 trang) được kèm theo
+  để tiện tham khảo ngay.
