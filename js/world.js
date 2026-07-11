@@ -12,6 +12,7 @@ import { STREETS, INTERSECTIONS, MEDIANS, GARDENS } from './mapdata.js';
 import { SIDEWALK_BY_ROAD, SIDEWALK_DEFAULT } from './sidewalks.js';
 import { PANO_SIDES } from './panosides.js';
 import { PANO_HOUSES } from './housemap.js';
+import { SHOP_SIGNS } from './shopsigns.js';
 
 // Thế giới dựng từ dữ liệu OpenStreetMap thật của Hải Phòng (tỉ lệ 1:10,
 // trung tâm phóng đại 2.2x). Mọi con phố trung tâm là phố thật.
@@ -1736,6 +1737,40 @@ export function buildWorld(scene) {
     };
     mkInst(awnGeo, awnSlots, awnCols, 'shop_awnings', 0);
     mkInst(signGeo, signSlots, signCols, 'shop_signs', 0);
+  }
+
+  // ---------- BIỂN HIỆU TÊN THẬT từ catalog 551 pano (PANO-LOOP V3: 954 biển, texture-atlas → 3 draw call) ----------
+  {
+    const CELL_W = 512, CELL_H = 80, COLS = 8, ROWS = 51, PER = COLS * ROWS;   // 408 biển/atlas 4096²
+    const bg = ['#c62828', '#1c56a0', '#1f7a3c', '#d8862a', '#26262c', '#8e2f80'];
+    for (let a = 0; a < Math.ceil(SHOP_SIGNS.length / PER); a++) {
+      const items = SHOP_SIGNS.slice(a * PER, (a + 1) * PER);
+      const cv = document.createElement('canvas'); cv.width = COLS * CELL_W; cv.height = ROWS * CELL_H;
+      const g = cv.getContext('2d');
+      items.forEach(([, , , name], k) => {
+        const cx = (k % COLS) * CELL_W, cy = ((k / COLS) | 0) * CELL_H;
+        g.fillStyle = bg[(name.length + k) % bg.length]; g.fillRect(cx, cy, CELL_W, CELL_H);
+        g.fillStyle = '#fff'; g.font = 'bold 44px system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+        g.fillText(name, cx + CELL_W / 2, cy + CELL_H / 2 + 2, CELL_W - 30);
+      });
+      const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
+      const geos = [];
+      items.forEach(([x, z, ry], k) => {
+        const gy = groundHeightNoDeck(x, z);
+        if (Math.abs(gy - LAND_H) > 0.5 || isWater(x, z)) return;
+        const pg = new THREE.PlaneGeometry(4.2, 0.85);
+        const u0 = (k % COLS) / COLS, v1 = 1 - ((k / COLS) | 0) / ROWS, v0 = v1 - 1 / ROWS;
+        const uv = pg.attributes.uv;
+        for (let i = 0; i < uv.count; i++) uv.setXY(i, u0 + uv.getX(i) / COLS, v0 + uv.getY(i) * (v1 - v0));
+        pg.rotateY(ry); pg.translate(x, groundHeight(x, z) + 3.35, z);
+        geos.push(pg);
+      });
+      if (geos.length) {
+        const m = new THREE.Mesh(mergeGeometries(geos), new THREE.MeshLambertMaterial({ map: tex, side: THREE.DoubleSide }));
+        geos.forEach((gg) => gg.dispose());
+        m.name = 'real_shop_signs_' + a; scene.add(m);
+      }
+    }
   }
 
   {
@@ -3666,6 +3701,41 @@ export function buildWorld(scene) {
       gg.position.set(x, yy, z); gg.rotation.y = x + z * 1.7; bakeTree(gg, x, z);
       addCollider(x, z, 1.0 * s);
     }
+    // 2b) VẠCH QUA ĐƯỜNG zebra tại giao lộ lớn (PANO-LOOP V3: nhiều finding "thiếu vạch qua đường")
+    {
+      const zebraG = [];
+      for (const [ix, iz] of INTERSECTIONS) {
+        if (ix * ix + iz * iz > 1000 * 1000) continue;
+        if (isWater(ix, iz)) continue;
+        // đoạn đường p/s gần nhất → hướng đặt vạch
+        let bd = 1e9, ux = 1, uz = 0, hw = 5;
+        for (const r of ROADS_DT) {
+          if (r.c !== 'p' && r.c !== 's') continue;
+          for (let i = 0; i < r.pts.length - 1; i++) {
+            const [x1, z1] = r.pts[i], [x2, z2] = r.pts[i + 1];
+            const dx = x2 - x1, dz = z2 - z1, l2 = dx * dx + dz * dz; if (!l2) continue;
+            let t = ((ix - x1) * dx + (iz - z1) * dz) / l2; t = Math.max(0, Math.min(1, t));
+            const d = Math.hypot(ix - (x1 + dx * t), iz - (z1 + dz * t));
+            if (d < bd) { bd = d; const L = Math.sqrt(l2); ux = dx / L; uz = dz / L; hw = ROAD_W[r.c] / 2; }
+          }
+        }
+        if (bd > 6) continue;                                   // giao lộ không nằm trên p/s
+        const rotY = Math.atan2(ux, uz);
+        for (const dir of [-1, 1]) {                             // 2 phía giao lộ
+          const cx = ix + ux * dir * (hw + 3.2), cz = iz + uz * dir * (hw + 3.2);
+          const y = groundHeightNoDeck(cx, cz);
+          if (Math.abs(y - LAND_H) > 0.4) continue;
+          for (let k = -Math.floor(hw - 1); k <= Math.floor(hw - 1); k += 1.15) {  // sọc song song trục đường
+            const sx = cx - uz * k, sz = cz + ux * k;
+            const strip = new THREE.BoxGeometry(0.5, 0.03, 2.1);
+            strip.rotateY(rotY); strip.translate(sx, y + 0.12, sz);
+            zebraG.push(strip);
+          }
+        }
+      }
+      if (zebraG.length) addMerged(zebraG, mat(0xe8e6df), 'zebra_crossings');
+    }
+
     for (const line of MEDIANS) {
       let acc = 0;
       for (let i = 0; i < line.length - 1; i++) {
