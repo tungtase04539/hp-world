@@ -1812,7 +1812,9 @@ export function buildWorld(scene) {
     const lmPtsS = Object.values(LM);
     let ss = 660317; const srnd = () => { ss = (ss * 1103515245 + 12345) & 0x7fffffff; return ss / 0x7fffffff; };
     const placedS = [];
-    const CAP = 780;
+    // PANO-LOOP V2: 780 chỉ phủ ~12% lô mặt phố (bước 4.7m×2 bên) → dãy phố đứt quãng khắp nơi
+    // (76 finding house sev3). 3000 phủ trọn lõi; vẫn 1 mesh gộp — không thêm draw call.
+    const CAP = 3000;
     outerShop:
     for (let ri = 0; ri < ROADS_DT.length; ri++) {
       const r = ROADS_DT[ri]; if (r.c !== 'p' && r.c !== 's') continue;
@@ -1824,7 +1826,7 @@ export function buildWorld(scene) {
         const nx = Math.cos(rotY), nz = -Math.sin(rotY);           // pháp tuyến
         for (let d = 3; d < segLen - 3; d += 4.7) {                 // shophouse sát nhau
           const mx = x1 + dxn * d, mz = z1 + dzn * d;
-          if (mx * mx + mz * mz > 830 * 830) continue;              // lõi trung tâm
+          if (mx * mx + mz * mz > 980 * 980) continue;              // lõi trung tâm (V2: phủ tới khu Ga/Lạch Tray)
           for (const side of [1, -1]) {
             const off = side * (wRoad / 2 + 5.6);                    // sau vỉa hè (building-line)
             const gx = mx + off * nx, gz = mz + off * nz;
@@ -1841,7 +1843,7 @@ export function buildWorld(scene) {
             for (const [ox, oz] of placedS) { if ((gx - ox) ** 2 + (gz - oz) ** 2 < 4.1 * 4.1) { ok = false; break; } }
             if (!ok) continue;
             const gy = groundHeight(gx, gz); if (gy < LAND_H - 0.5) continue;
-            const floors = 2 + ((srnd() * 4) | 0);                   // 2-5 tầng SO LE
+            const floors = (mx * mx + mz * mz < 480 * 480 ? 3 : 2) + ((srnd() * 4) | 0);   // lõi 3-6 tầng, ngoài 2-5 (pano V1: trung tâm cao hơn)
             const h = floors * 3.3, w = 4.0 + srnd() * 1.2, dp = 6.5 + srnd() * 1.5;
             const bay = bayCols[(Math.abs(gx * 7 + gz * 13) | 0) % bayCols.length];
             const sgn = signCols[(Math.abs(gx * 5 + gz * 11) | 0) % signCols.length];
@@ -3181,6 +3183,34 @@ export function buildWorld(scene) {
     }
   }
 
+  // ---------- CÂY ĐA/SI CỔ THỤ (pano-loop V2: 5 finding "thân bạnh, rễ phụ rủ, tán rất rộng") ----------
+  function banyanTree(x, z) {
+    const g = new THREE.Group();
+    const y = groundHeight(x, z);
+    const bark = mat(0x6b5a44), leaf = new THREE.MeshLambertMaterial({ color: 0x2f6b34 });
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.7, 5.2, 9), bark);
+    trunk.position.set(0, 2.6, 0); g.add(trunk);
+    const fr = (v) => { const t = Math.abs(Math.sin(v * 127.1)); return t - Math.floor(t); };
+    for (let k = 0; k < 7; k++) {                                   // rễ phụ rủ quanh tán
+      const a = k / 7 * Math.PI * 2 + fr(x + k) * 0.6, rr = 2.2 + fr(z + k) * 2.6;
+      const root = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.16, 4.6 + fr(x * k + 1) * 1.6, 5), bark);
+      root.position.set(Math.sin(a) * rr, 2.6, Math.cos(a) * rr); g.add(root);
+    }
+    for (let k = 0; k < 5; k++) {                                    // tán nhiều lớp rất rộng (~16m)
+      const a = k / 5 * Math.PI * 2, rr = k ? 3.6 : 0;
+      const blob = new THREE.Mesh(new THREE.IcosahedronGeometry(4.4 + fr(x + z + k) * 1.6, 1), leaf);
+      blob.position.set(Math.sin(a) * rr, 7.2 + fr(k + z) * 1.6, Math.cos(a) * rr);
+      blob.scale.y = 0.62; g.add(blob);
+    }
+    g.position.set(x, y, z); scene.add(g);
+    addCollider(x, z, 1.9);
+    bakeTree(g, x, z); scene.remove(g);
+  }
+  // vị trí từ finding V1 (quảng trường ven hồ + cạnh Sở KH&CN khu Ga) — đều đã né lòng đường
+  for (const [bx, bz] of [[-795, 242], [-1004, 360], [-383, 245], [468, 13]]) {
+    if (Math.abs(groundHeightNoDeck(bx, bz) - LAND_H) < 0.4 && !isWater(bx, bz)) banyanTree(bx, bz);
+  }
+
   // ---------- HÀNG CÂY CỔ THỤ TRÊN KÈ HỒ TAM BẠC (pano-loop V1: promenade thật rợp cây tán rộng) ----------
   {
     const _tsd = (px, pz, x1, z1, x2, z2) => { const dx = x2 - x1, dz = z2 - z1, l2 = dx * dx + dz * dz; let t = l2 ? ((px - x1) * dx + (pz - z1) * dz) / l2 : 0; t = Math.max(0, Math.min(1, t)); return Math.hypot(px - (x1 + dx * t), pz - (z1 + dz * t)); };
@@ -3320,6 +3350,44 @@ export function buildWorld(scene) {
   }
   schoolCompound('thcsnq', 'THCS NGÔ QUYỀN');
   schoolCompound('thcstp', 'THCS TRẦN PHÚ');
+
+  // ---------- PANO-LOOP V2: 2 công trình đích danh từ finding (procedural) ----------
+  {
+    // 1) Trung tâm Triển lãm & Mỹ thuật (1 Nguyễn Đức Cảnh) — vàng kem 2 tầng dài ~40m,
+    //    hành lang vòm; pano_003 thấy ở h90/h180 (đông-nam pano → khối dọc Nguyễn Đức Cảnh)
+    {
+      const cx = -302, cz = 172, W = 40, D = 12, H = 8.6, rot = 0.20;   // trục ~song song NĐC
+      const g = new THREE.Group();
+      const cream = mat(0xead9a8), white = mat(0xf4efe2), roofM = mat(0x8a5a40);
+      const body = new THREE.Mesh(new THREE.BoxGeometry(W, H, D), cream); body.position.y = H / 2; g.add(body);
+      for (let k = 0; k < 9; k++) {                                     // hàng cột vòm mặt bắc
+        const col = new THREE.Mesh(new THREE.BoxGeometry(0.6, 4.4, 0.6), white);
+        col.position.set(-W / 2 + 2.4 + k * (W - 4.8) / 8, 2.2, D / 2 + 1.1); g.add(col);
+      }
+      const porch = new THREE.Mesh(new THREE.BoxGeometry(W - 3, 0.5, 2.6), white); porch.position.set(0, 4.6, D / 2 + 1.0); g.add(porch);
+      const roof = new THREE.Mesh(new THREE.BoxGeometry(W + 1.6, 0.9, D + 1.6), roofM); roof.position.y = H + 0.45; g.add(roof);
+      g.position.set(cx, groundHeight(cx, cz), cz); g.rotation.y = rot; scene.add(g);
+      addCollider(cx, cz, W * 0.5);
+    }
+    // 2) Sở KH&CN (khu Ga, pano_022): 6 tầng kính xanh mặt cong trắng, ~30m, cột cờ
+    {
+      const cx = 474, cz = 6, W = 30, D = 15, FL = 6, H = FL * 3.4;
+      const g = new THREE.Group();
+      const glassM = new THREE.MeshLambertMaterial({ color: 0x5f8fb4 }), white = mat(0xeef0ee);
+      const body = new THREE.Mesh(new THREE.BoxGeometry(W, H, D), white); body.position.y = H / 2; g.add(body);
+      for (let f = 0; f < FL; f++) {                                    // băng kính từng tầng, mặt tây (ra phố)
+        const band = new THREE.Mesh(new THREE.BoxGeometry(0.3, 2.1, D - 2), glassM);
+        band.position.set(-W / 2 - 0.05, f * 3.4 + 2.0, 0); g.add(band);
+        const band2 = new THREE.Mesh(new THREE.BoxGeometry(W - 4, 2.1, 0.3), glassM);
+        band2.position.set(0, f * 3.4 + 2.0, D / 2 + 0.05); g.add(band2);
+      }
+      const curve = new THREE.Mesh(new THREE.CylinderGeometry(6.5, 6.5, H, 18, 1, false, Math.PI * 0.5, Math.PI * 0.55), glassM);
+      curve.position.set(-W / 2 + 1.5, H / 2, -D / 2 + 3); g.add(curve);   // khối kính cong góc
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 9, 6), mat(0xd8dce0)); pole.position.set(-W / 2 - 5, 4.5, 4); g.add(pole);
+      g.position.set(cx, groundHeight(cx, cz), cz); scene.add(g);
+      addCollider(cx, cz, W * 0.55);
+    }
+  }
 
   // ---------- ĐỢT ĐỊA DANH 2: 5 GLB từ ảnh thật ----------
   // Đền Nghè — di tích thờ Nữ tướng Lê Chân (node OSM, không có trục dài → xoay theo mặt phố)
