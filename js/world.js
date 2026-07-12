@@ -3426,6 +3426,53 @@ export function buildWorld(scene) {
     }
   }
 
+  // ---------- PANO-LOOP V4: kiểu ô đất "CƠ QUAN KHUÔN VIÊN" + công trình đích danh còn lại ----------
+  {
+    // Cơ quan có khuôn viên: nhà chính + sân lát + rào sắt quanh + 2 trụ cổng (khác hẳn shophouse —
+    // bài học pano_019: lấp shophouse vào loại ô này là sai thực địa)
+    const compound = (cx, cz, W, D, FL, wallHex, roofHex, rotY) => {
+      const g = new THREE.Group();
+      const H = FL * 3.5;
+      const body = new THREE.Mesh(new THREE.BoxGeometry(W, H, D), mat(wallHex)); body.position.y = H / 2; g.add(body);
+      const roof = new THREE.Mesh(new THREE.BoxGeometry(W + 1.4, 1.0, D + 1.4), mat(roofHex)); roof.position.y = H + 0.5; g.add(roof);
+      const YW = W + 16, YD = D + 14;
+      const yard = new THREE.Mesh(new THREE.BoxGeometry(YW, 0.12, YD), mat(0xb9b4a6)); yard.position.y = 0.06; g.add(yard);
+      const rail = [];
+      const post = (px, pz) => { const q = new THREE.BoxGeometry(0.09, 1.6, 0.09); q.translate(px, 0.8, pz); rail.push(q); };
+      for (let x = -YW / 2; x <= YW / 2; x += 2.2) { post(x, -YD / 2); post(x, YD / 2); }
+      for (let z = -YD / 2; z <= YD / 2; z += 2.2) { post(-YW / 2, z); post(YW / 2, z); }
+      for (const [sx, sz, ln, hor] of [[0, -YD / 2, YW, 1], [0, YD / 2, YW, 1], [-YW / 2, 0, YD, 0], [YW / 2, 0, YD, 0]]) {
+        const bar = new THREE.BoxGeometry(hor ? ln : 0.07, 0.07, hor ? 0.07 : ln); bar.translate(sx, 1.5, sz); rail.push(bar);
+      }
+      const rm = new THREE.Mesh(mergeGeometries(rail), mat(0x2e4a5e)); rail.forEach((r) => r.dispose()); g.add(rm);
+      for (const s of [-2.6, 2.6]) { const p = new THREE.Mesh(new THREE.BoxGeometry(0.5, 2.2, 0.5), mat(0xd9d2bd)); p.position.set(s, 1.1, YD / 2); g.add(p); }
+      g.position.set(cx, groundHeight(cx, cz), cz); g.rotation.y = rotY; scene.add(g);
+      addCollider(cx, cz, Math.max(YW, YD) * 0.5);
+    };
+    // Cảng vụ HP (pano_019 h315): 3 tầng vàng kem ~38m mái xanh, mặt tiền quay ĐN (135°) về phố Hoàng Diệu
+    compound(326, -826, 38, 13, 3, 0xead9a8, 0x3f6e50, -135 * Math.PI / 180);
+
+    // FUNZ/quán trà (pano_010 h0, ~156 Quang Trung): 3 tầng mặt tiền ĐEN + gân hồng, quay Nam về pano
+    {
+      const cx = -798, cz = 221, W = 10, FL = 3, H = FL * 3.3;
+      const g = new THREE.Group();
+      const body = new THREE.Mesh(new THREE.BoxGeometry(W, H, 8), mat(0x1e1e22)); body.position.y = H / 2; g.add(body);
+      for (let f = 0; f <= FL; f++) { const band = new THREE.Mesh(new THREE.BoxGeometry(W + 0.15, 0.22, 8.15), mat(0xd4527e)); band.position.y = f * 3.3 + 0.1; g.add(band); }
+      g.position.set(cx, groundHeight(cx, cz), cz); g.rotation.y = Math.PI; scene.add(g);
+      addCollider(cx, cz, 6);
+    }
+
+    // Cao ốc văn phòng kính 11 tầng sau góc chợ Lãn Ông (pano_002 h45)
+    {
+      const cx = -262, cz = 106, FL = 11, H = FL * 3.4;
+      const g = new THREE.Group();
+      const body = new THREE.Mesh(new THREE.BoxGeometry(16, H, 14), mat(0x9aa8b2)); body.position.y = H / 2; g.add(body);
+      for (let f = 0; f < FL; f++) { const band = new THREE.Mesh(new THREE.BoxGeometry(16.15, 1.9, 14.15), new THREE.MeshLambertMaterial({ color: 0x5f8fb4 })); band.position.y = f * 3.4 + 2.1; g.add(band); }
+      g.position.set(cx, groundHeight(cx, cz), cz); g.rotation.y = 0.28; scene.add(g);
+      addCollider(cx, cz, 10);
+    }
+  }
+
   // ---------- ĐỢT ĐỊA DANH 2: 5 GLB từ ảnh thật ----------
   // Đền Nghè — di tích thờ Nữ tướng Lê Chân (node OSM, không có trục dài → xoay theo mặt phố)
   // lùi 9m khỏi mặt đường theo hướng mặt tiền — node OSM là CỔNG đền nên mô hình chìa ra lòng đường (user báo)
