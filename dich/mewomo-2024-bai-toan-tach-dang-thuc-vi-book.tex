@@ -1,0 +1,1353 @@
+%=======================================================================
+%  BẢN DỊCH TIẾNG VIỆT
+%  "A strongly convergent algorithm for solving split equality
+%   problems beyond monotonicity"
+%  O. T. Mewomo, V. A. Uzor, A. Gibali
+%  Comput. Appl. Math. (2024) 43:326.  https://doi.org/10.1007/s40314-024-02829-w
+%
+%  Bài báo gốc được phát hành theo giấy phép Creative Commons Attribution 4.0
+%  (CC BY 4.0), cho phép dịch thuật và phóng tác kèm ghi nguồn thích hợp.
+%  Bản dịch tiếng Việt nhằm mục đích học thuật/tham khảo, giữ nguyên toàn bộ
+%  nội dung toán học của bản gốc.
+%
+%  Biên dịch bằng pdfLaTeX (cần gói vntex cho bảng mã T5).
+%  Nếu muốn dùng XeLaTeX/LuaLaTeX, xem chú thích ở phần đầu preamble.
+%=======================================================================
+\documentclass[11pt,a4paper,oneside]{book}
+
+% ------- Hỗ trợ tiếng Việt (pdfLaTeX) -------
+\usepackage[utf8]{inputenc}
+\usepackage[T5]{fontenc}
+\usepackage[vietnamese]{babel}
+% --- Nếu dùng XeLaTeX/LuaLaTeX, hãy thay ba dòng trên bằng: ---
+%   \usepackage{fontspec}
+%   \usepackage{polyglossia}
+%   \setmainlanguage{vietnamese}
+
+\usepackage{amsmath,amssymb,amsthm,amsfonts,mathtools}
+\usepackage{bm}
+\usepackage{enumitem}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{rotating}   % cho bảng nằm ngang (sidewaystable) như bản gốc
+\usepackage[margin=2cm]{geometry}
+\usepackage[hidelinks]{hyperref}
+\usepackage{xurl}                 % cho phép ngắt dòng bên trong URL/DOI dài
+\allowdisplaybreaks              % cho phép ngắt trang trong các khối align dài
+\setlength{\emergencystretch}{3em} % hấp thụ phần tràn lề nhỏ ở đoạn văn
+
+% ------- Định lý, bổ đề... (đánh số theo mục, dùng chung bộ đếm) -------
+\theoremstyle{plain}
+\newtheorem{theorem}{Định lý}[chapter]
+\newtheorem{lemma}[theorem]{Bổ đề}
+\newtheorem{proposition}[theorem]{Mệnh đề}
+\newtheorem{corollary}[theorem]{Hệ quả}
+
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Định nghĩa}
+\newtheorem{example}[theorem]{Ví dụ}
+
+\theoremstyle{remark}
+\newtheorem{remark}[theorem]{Nhận xét}
+
+\renewcommand{\proofname}{Chứng minh}
+\numberwithin{equation}{chapter}
+
+% ------- Ký hiệu tắt -------
+\newcommand{\Fc}{\mathcal{F}}
+\newcommand{\Gc}{\mathcal{G}}
+\newcommand{\Nc}{\mathcal{N}}
+\newcommand{\Dc}{\mathcal{D}}
+\newcommand{\inp}[2]{\langle #1,\,#2\rangle}
+\newcommand{\nm}[1]{\lVert #1\rVert}
+\newcommand{\abs}[1]{\lvert #1\rvert}
+\newcommand{\wto}{\rightharpoonup}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathbb{N}}
+\DeclareMathOperator{\VI}{VI}
+\newcommand{\Gam}{\bar{\Gamma}}
+\newcommand{\Gams}{\bar{\Gamma}_{*}}
+\newcommand{\Fix}[1]{F(#1)}
+
+% ------- Môi trường trình bày thuật toán -------
+\newenvironment{algobox}[1]
+  {\par\medskip\noindent\textbf{#1}\par\vspace{-2pt}\noindent\hrulefill\par\nopagebreak\vspace{2pt}}
+  {\par\noindent\hrulefill\par\medskip}
+
+\title{\vspace{-1.2cm}\bfseries Một thuật toán hội tụ mạnh để giải các bài toán tách đẳng thức vượt ra ngoài tính đơn điệu}
+\author{Oluwatosin Temitope Mewomo \and Victor Amarachi Uzor \and Aviv Gibali}
+\date{\small Comput. Appl. Math. (2024) 43:326\\[2pt]
+\textit{Bản dịch tiếng Việt --- giữ nguyên toàn bộ nội dung toán học của bản gốc (CC BY 4.0).}}
+
+\newenvironment{abstract}{\begin{quotation}\small\noindent\textbf{Tóm tắt.\ }}{\end{quotation}\normalsize}
+
+\begin{document}
+\frontmatter
+\maketitle
+
+\begin{abstract}
+\noindent Trong bài báo này, chúng tôi tập trung vào một số bài toán ngược tách (\textit{split inverse problems}), cụ thể là bài toán bất đẳng thức biến phân tách đẳng thức và bài toán điểm bất động chung, đồng thời kết hợp nhiều kỹ thuật của lý thuyết toán tử để thiết lập sự hội tụ mạnh về nghiệm có chuẩn nhỏ nhất cho phương pháp được đề xuất. Chúng tôi trình bày hai kết quả hội tụ mạnh có (và không có) tham chiếu đến tính đơn điệu của các toán tử giá. Các phân tích hội tụ của chúng tôi chỉ đòi hỏi những điều kiện rất nhẹ và do đó tổng quát hóa cũng như mở rộng các kết quả liên quan gần đây trong tài liệu. Hơn nữa, một số ví dụ số minh họa tiềm năng và ưu điểm thực tiễn của thuật toán đề xuất.
+
+\medskip
+\noindent\textbf{Từ khóa} Phép chiếu $\cdot$ Phương pháp co $\cdot$ Tựa giả co $\cdot$ Tựa đơn điệu $\cdot$ Liên tục Lipschitz $\cdot$ Kỹ thuật quán tính $\cdot$ Hội tụ mạnh $\cdot$ Cỡ bước tự thích nghi
+
+\medskip
+\noindent\textbf{Phân loại toán học (MSC)} 47H09 $\cdot$ 47J20 $\cdot$ 49J40 $\cdot$ 90C25 $\cdot$ 90C33
+\end{abstract}
+\tableofcontents
+\mainmatter
+
+\chapter{Giới thiệu}
+
+Lĩnh vực tối ưu hóa và lý thuyết điểm bất động là một lĩnh vực có tính thời sự cao, thu hút sự quan tâm của rất nhiều nhà nghiên cứu nhờ khả năng ứng dụng phong phú và đa dạng trong các lĩnh vực liên ngành, chẳng hạn như phân bổ băng thông và tài nguyên, khoa học thần kinh, học máy, khôi phục ảnh và tín hiệu, các bài toán điều khiển tối ưu, xem chẳng hạn Iiduka (2012), Liu và cộng sự (2016), Taiwo và cộng sự (2021), Tan và cộng sự (2021), Zeng và cộng sự (2020). Một bài toán tối ưu nổi tiếng được nghiên cứu rộng rãi trong nhiều năm là bài toán bất đẳng thức biến phân cổ điển (VI), được giới thiệu bởi Stampacchia (1968) và Fichera (1963). Cho $C$ là một tập con khác rỗng, đóng và lồi của không gian Hilbert thực $H$. Ký hiệu $\inp{\cdot}{\cdot}$ và $\nm{\cdot}$ lần lượt là tích vô hướng và chuẩn cảm sinh trên $H$. Cho $\Fc:H\to H$ là một ánh xạ đơn trị. Khi đó, bài toán VI được định nghĩa là tìm điểm $x\in C$ sao cho
+\begin{equation}
+\inp{\Fc x}{z-x}\ge 0,\quad \forall z\in C. \label{eq:1.1}
+\end{equation}
+Ta ký hiệu tập nghiệm của bài toán VI \eqref{eq:1.1} là $\VI(C,\Fc)$.
+
+Có ba phương pháp nổi tiếng chủ yếu để giải bài toán VI \eqref{eq:1.1}, đó là: phương pháp Tseng extragradient (TEGM) (Tseng 2000), phương pháp extragradient dưới vi phân (SEGM) (Censor và cộng sự 2011a, b, 2010), và phương pháp chiếu-co (PCM) (Cholamjiak và cộng sự 2020). Về các cải biên thú vị của những phương pháp này, xem Gibali và cộng sự (2020), Ogwo và cộng sự (2023), Reich và cộng sự (2021), Reich và cộng sự (2022), Shehu và cộng sự (2019), Shehu và cộng sự (2022), Oyewole và Reich (2024). Phương pháp PCM được phát biểu như sau, xem Cholamjiak và cộng sự (2020):
+\[
+\begin{cases}
+x_1\in H,\\
+y_n = P_C(x_n-\lambda \Fc x_n),\\
+d(x_n,y_n) := (x_n-y_n)-\lambda(\Fc x_n-\Fc y_n),\\
+z_n = x_n-\rho\xi\, d(x_n,y_n),\\
+x_{n+1} = (1-\alpha_n-\beta_n)x_n+\beta_n z_n,
+\end{cases}
+\]
+trong đó $P_C$ là phép chiếu từ $H$ lên tập chấp nhận được $C$, $\rho\in(0,2)$, $\lambda\in(0,\tfrac{1}{L})$, $L$ là hằng số Lipschitz của toán tử giá, $\xi_n:=\dfrac{\tau(w_n,y_n)}{\nm{d(w_n,y_n)}^2}$, $\tau(w_n,y_n):=\inp{w_n-y_n}{d(w_n,y_n)}$, $\forall n\ge 1$. Ta lưu ý rằng trong khi cỡ bước ($\lambda$) trong Cholamjiak và cộng sự (2020) phụ thuộc vào hằng số Lipschitz (mà việc tính toán có thể khá khó khăn), thì phương pháp của chúng tôi trong bài báo này sử dụng các cỡ bước tự thích nghi hiệu quả hơn về mặt tính toán.
+
+Bài toán ngược tách (SIP) (Censor và cộng sự 2012) là một mô hình toán học khả dụng, nổi tiếng vì tính hữu ích và các ứng dụng của nó trong nhiều lĩnh vực rộng lớn như xử lý tín hiệu, khôi phục pha, khôi phục ảnh, nén dữ liệu, xạ trị điều biến cường độ, xem chẳng hạn Censor và cộng sự (2006), Godwin và cộng sự (2023), Eslamian và cộng sự (2018). Mô hình SIP được phát biểu như sau:
+\begin{equation}
+\text{Tìm } \hat{x}\in H_1 \text{ giải được } \bar{\Phi}_1
+\end{equation}
+sao cho
+\begin{equation}
+\hat{y} := A\hat{x}\in H_2 \text{ giải được } \bar{\Phi}_2,
+\end{equation}
+trong đó $H_1$ và $H_2$ là các không gian Hilbert thực, $\bar{\Phi}_1$ ký hiệu một bài toán ngược được phát biểu trong $H_1$, $\bar{\Phi}_2$ ký hiệu một bài toán ngược được phát biểu trong $H_2$, và $A:H_1\to H_2$ là một toán tử tuyến tính bị chặn. Kể từ khi SIP ra đời, nhiều nhà nghiên cứu đã đề xuất các tổng quát hóa và mở rộng thú vị. Một trong số đó là bài toán tách đẳng thức (SEP) của Moudafi và Al-Shemas (2013). Cho $H_1,H_2,H_3$ là các không gian Hilbert thực, và cho $C,Q$ là các tập con khác rỗng, đóng và lồi của $H_1$ và $H_2$ tương ứng. Cho $T_1,T_2$ là các toán tử tuyến tính bị chặn, xác định bởi $T_1:H_1\to H_3$ và $T_2:H_2\to H_3$, với các toán tử liên hợp $T_1^{*},T_2^{*}$ tương ứng. Bài toán SEP được định nghĩa là tìm $u\in C$ và $v\in Q$ sao cho
+\begin{equation}
+T_1u = T_2v. \label{eq:1.4}
+\end{equation}
+
+Ngoài ra, cho $\Fc:H_1\to H_1$ và $\Gc:H_2\to H_2$ là các ánh xạ đơn trị, và cho $C,Q,T_1,T_2$ được xác định như trong \eqref{eq:1.4}. Bài toán bất đẳng thức biến phân tách đẳng thức (SEVIP) được định nghĩa là tìm
+\begin{equation}
+x\in \VI(C,\Fc) \text{ và } y\in \VI(Q,\Gc),\quad \text{sao cho } T_1x=T_2y. \label{eq:1.5}
+\end{equation}
+Ta cũng lưu ý rằng nếu $H_2=H_3$ và $T_2=I$ (với $I$ là toán tử đồng nhất), thì SEVIP \eqref{eq:1.5} thu về bài toán bất đẳng thức biến phân tách (SVIP) được đề xuất bởi Censor và cộng sự (2012). Gần đây, Kwelegano và cộng sự (2022) đã đề xuất phương pháp hội tụ mạnh sau đây để giải bài toán VI tách đẳng thức cho các toán tử giả đơn điệu:
+
+\begin{algobox}{Thuật toán 1.1}
+\textbf{Bước 0.} Cho $l\in(0,1)$, $\mu^{*}>0$, $\xi^{*}\in(0,\tfrac{1}{\mu^{*}})$, chọn $(x_0,y_0)\in C\times Q$ tùy ý. Với bước lặp hiện tại $(x_n,y_n)$, tính $(x_{n+1},y_{n+1})$ như sau;
+
+\smallskip
+\textbf{Bước 1.} Tính: $u_n=P_C(x_n-\xi^{*}\Fc x_n)$, $r_n=P_Q(y_n-\xi^{*}\Gc y_n)$ và $r^{*}(x_n):=x_n-u_n$, $\kappa^{*}(y_n):=y_n-r_n$.
+
+\smallskip
+\textbf{Bước 2.} Tính: $a_n=x_n-m_n r^{*}(x_n)$ và $e_n=y_n-\lambda_n^{*}\kappa^{*}(y_n)$, trong đó $m_n=l^{j_n}$, $\lambda_n^{*}=l^{k_n}$, và $j_n,k_n$ lần lượt là các số nguyên không âm $j$ và $k$ nhỏ nhất thỏa mãn
+\begin{align*}
+&\inp{\Fc x_n-\Fc[x_n-l^{j}r^{*}(x_n)]}{r^{*}(x_n)}\le \mu^{*}\nm{r^{*}(x_n)}^2;\\
+\text{và }\ &\inp{\Gc y_n-\Gc[y_n-l^{k}\kappa^{*}(y_n)]}{\kappa^{*}(y_n)}\le \mu^{*}\nm{\kappa^{*}(y_n)}^2.
+\end{align*}
+
+\smallskip
+\textbf{Bước 3.} Tính:
+\[
+\begin{cases}
+z_n=P_C[x_n-\zeta T_1^{*}(T_1x_n-T_2y_n)],\\
+x_{n+1}=\alpha_n f(x_n)+(1-\alpha_n)[a_n^{*}P_{C_n}x_n+(1-a_n^{*})z_n],\\
+t_n=P_Q[y_n-\zeta T_2^{*}(T_1x_n-T_2y_n)],\\
+y_{n+1}=\alpha_n g(y_n)+(1-\alpha_n)[a_n^{*}P_{Q_n}y_n+(1-a_n^{*})t_n].
+\end{cases}
+\]
+trong đó $C_n:=\{x\in C:h_n^{*}(x)\le 0\}$, $Q_n:=\{x\in Q:e_n^{*}(y)\le 0\}$, và $h_n^{*}(x)=\inp{\Fc a_n}{x-a_n}$, $e_n^{*}(y)=\inp{\Gc e_n}{y-e_n}$,
+
+\smallskip
+\textbf{Bước 4.} Đặt $n:=n+1$ và quay về \textbf{Bước 1}.
+
+\smallskip
+trong đó $f:C\to C$ và $g:Q\to Q$ là các ánh xạ co với các hệ số $\rho_1^{*},\rho_2^{*}\in(0,\tfrac{1}{2})$, với $\rho^{*}=\max\{\rho_1^{*},\rho_2^{*}\}$, và $\{a_n^{*}\}\subset\{\pi,\pi^{*}\}\subset(0,1)$.
+\end{algobox}
+
+Cho một ánh xạ phi tuyến $S:H\to H$, bài toán điểm bất động (FPP) được định nghĩa là tìm $p\in S$ sao cho
+\[
+Sp=p.
+\]
+Ta ký hiệu tập điểm bất động của $S$ là $\Fix{S}$. Cho $S_1:C\to C$ và $S_2:Q\to Q$ là các ánh xạ phi tuyến sao cho $\Fix{S_1}\ne\emptyset$ và $\Fix{S_2}\ne\emptyset$ là các tập điểm bất động của $S_1$ và $S_2$ tương ứng. Cho $C,Q,T_1,T_2$ được xác định như trong \eqref{eq:1.4}, khi đó bài toán điểm bất động tách đẳng thức (SEFPP) (Moudafi 2011; Reich và Tuyen 2022) được định nghĩa là tìm
+\begin{equation}
+x\in \Fix{S_1} \text{ và } y\in \Fix{S_2},\quad \text{sao cho } T_1x=T_2y. \label{eq:1.6}
+\end{equation}
+Boikano và Zegeye (2020) đã đề xuất thuật toán tự thích nghi sau đây để giải \eqref{eq:1.6}.
+
+\begin{algobox}{Thuật toán 1.2}
+\[
+\begin{cases}
+z_n=P_C[x_n-\zeta_n T_1^{*}(T_1x_n-T_2y_n)],\\
+x_{n+1}=\alpha_n z_n+(1-\alpha_n)Y_n z_n,\\
+t_n=P_Q[y_n+\zeta_n T_2^{*}(T_1x_n-T_2y_n)],\\
+y_{n+1}=\alpha_n t_n+(1-\alpha_n)J_n t_n,
+\end{cases}
+\]
+Trong đó,
+\begin{align*}
+Y_n &= [(1-\eta_n)I+\eta_n S_1[(1-\chi_n)I+\chi_n S_1]]\\
+J_n &= [(1-\eta_n)I+\eta_n S_2[(1-\chi_n)I+\chi_n S_2]].
+\end{align*}
+Trong đó $T_1:C\to H_1$ và $T_2:Q\to H_2$ là các ánh xạ tựa giả co, $\{\alpha_n\},\{\eta_n\},\{\chi_n\}$ là các dãy số thực trong $(0,1)$, và $\zeta_n>0$, $\forall n\ge 0$. Các tác giả đã chứng minh một kết quả hội tụ mạnh.
+\end{algobox}
+
+Bài toán bất đẳng thức biến phân đối ngẫu (DVI) của bài toán VI \eqref{eq:1.1} được định nghĩa là tìm điểm $x\in C$ sao cho
+\begin{equation}
+\inp{\Fc z}{z-x}\ge 0,\quad\forall z\in C. \label{eq:1.7}
+\end{equation}
+Ta ký hiệu tập nghiệm của DVI \eqref{eq:1.7} bởi $\Gam$. Đã biết rằng $\VI(C,\Fc)=\Gam$ mỗi khi $\Fc$ giả đơn điệu. Tuy nhiên, trong trường hợp $\Fc$ tựa đơn điệu, ta có $\VI(C,\Fc)\not\subseteq\Gam$. Do đó, các ánh xạ tựa đơn điệu là một lớp toán tử tổng quát hơn so với lớp giả đơn điệu (xem các tài liệu Ye và He 2015; Alakoya và cộng sự 2022; Uzor và cộng sự 2023).
+
+Trong công trình này, mục tiêu của chúng tôi là tìm nghiệm chung cho SEVIP \eqref{eq:1.5} và SEFPP \eqref{eq:1.6}, trong đó $\Fc$ và $\Gc$ tựa đơn điệu và liên tục Lipschitz. Cụ thể, chúng tôi hướng đến việc tìm $(x,y)\in\Omega$ sao cho
+\begin{equation}
+\Omega := \{x\in\Gam\cap \Fix{S_1},\ y\in\Gams\cap \Fix{S_2}:T_1x=T_2y\}\ne\emptyset, \label{eq:1.8}
+\end{equation}
+trong đó $\Gam$ và $\Gams$ lần lượt ký hiệu tập nghiệm của DVI liên quan đến các toán tử $\Fc$ và $\Gc$. Trong thời gian gần đây, các tác giả quan tâm đến việc xây dựng các phương pháp cung cấp nghiệm chung cho một số bài toán tối ưu và điểm bất động có dạng như \eqref{eq:1.8}. Lý do là các bài toán chung này có thể được chuyển trực tiếp thành các mô hình làm việc để giải quyết nhiều bài toán thực tế thú vị tồn tại trong truyền thông, kinh tế học, học máy, v.v.\ (xem Alakoya và cộng sự 2022; Censor và cộng sự 2006; Iiduka 2012). Eslamian (2017) đã đề xuất một phương pháp tìm nghiệm chung của bất đẳng thức biến phân tách đẳng thức cho các toán tử đơn điệu, liên tục Lipschitz, và bài toán điểm bất động chung tách đẳng thức của một họ hữu hạn các ánh xạ tựa không giãn. Kazmi và cộng sự (2019) đã đề xuất một thuật toán đồng thời để xấp xỉ nghiệm chung của bài toán VI tách đẳng thức cho các ánh xạ đơn điệu, liên tục Lipschitz, và bài toán điểm bất động tách đẳng thức đa tập cho hai họ đếm được các ánh xạ đa trị nửa co trong các không gian Hilbert thực. Rất gần đây, Izuchukwu và cộng sự (2020) đã đề xuất một thuật toán để xấp xỉ nghiệm chung của bài toán tách đẳng thức cho các họ hữu hạn các bất đẳng thức biến phân đơn điệu mạnh ngược kiểu $\tau$ và tập nghiệm của bài toán điểm bất động tách đẳng thức của các ánh xạ đa trị nửa co kiểu một trong các không gian Hilbert thực.
+
+Được thúc đẩy bởi các kết quả của Kwelegano và cộng sự (2022), Boikano và Zegeye (2020), Eslamian (2017), Kazmi và cộng sự (2019), và Izuchukwu và cộng sự (2020), trong bài báo này chúng tôi đề xuất một phương pháp chiếu-co Mann cải biên quán tính tự thích nghi mới (SIMMPCM) để xấp xỉ nghiệm chung của SEVIP cho các toán tử tựa đơn điệu và liên tục Lipschitz, cùng SEFPP cho các ánh xạ tựa giả co liên tục Lipschitz trong các không gian Hilbert thực. Phương pháp của chúng tôi không đòi hỏi bất kỳ thủ tục tìm kiếm theo tia nào, mà thay vào đó sử dụng một dãy các cỡ bước tự thích nghi không đơn điệu. Ngoài ra, chúng tôi chứng minh rằng dãy sinh bởi thuật toán hội tụ mạnh về nghiệm có chuẩn nhỏ nhất của bài toán \eqref{eq:1.8} dưới các điều kiện được nới lỏng. Một số thực nghiệm số chứng tỏ tính hiệu quả của thuật toán so với các phương pháp khác trong tài liệu. Hơn nữa, các kết quả của chúng tôi tổng quát hóa một số kết quả liên quan gần đây trong tài liệu.
+
+Bố cục của bài báo như sau: Trong Mục~\ref{sec:pre} chúng tôi đưa ra các kết quả và định nghĩa hữu ích cho phân tích. Trong Mục~\ref{sec:method} và Mục~\ref{sec:conv}, chúng tôi trình bày thuật toán và phân tích sự hội tụ mạnh (có và không có tính đơn điệu). Một số thực nghiệm số được trình bày trong Mục~\ref{sec:num} minh họa tính hiệu quả của thuật toán đề xuất so với các phương pháp hiện có trong tài liệu. Cuối cùng, chúng tôi đưa ra một số nhận xét kết luận về công trình trong Mục~\ref{sec:concl}.
+
+\chapter{Kiến thức chuẩn bị}\label{sec:pre}
+
+Trong suốt bài báo này, cho $C$ là một tập con khác rỗng, đóng và lồi của không gian Hilbert thực $H$. Ta ký hiệu sự hội tụ mạnh và hội tụ yếu của một dãy $\{x_n\}$ về một điểm $z^{*}\in H$ lần lượt bởi $x_n\to z^{*}$ và $x_n\wto z^{*}$. Ta cũng ký hiệu tập các giới hạn yếu của $\{x_n\}$ bởi $\omega_{*}(x_n)$, xác định như sau:
+\[
+\omega_{*}(x_n) := \{z^{*}\in H : x_{n_k}\wto z^{*} \text{ với dãy con } \{x_{n_k}\} \text{ nào đó của } \{x_n\}\}.
+\]
+
+\begin{definition}
+Cho $S:H\to H$ là một ánh xạ xác định trên không gian Hilbert thực $H$. Khi đó, với mọi $x,z\in H$, ánh xạ $S$ được gọi là:
+\begin{enumerate}[label=(\roman*)]
+\item \textit{liên tục $L$-Lipschitz}, với $L>0$, nếu
+\[
+\nm{Sx-Sz}\le L\nm{x-z}.
+\]
+$S$ được gọi là \textit{không giãn} nếu $L=1$; và \textit{ánh xạ co} nếu $L\in[0,1)$.
+\item \textit{tựa không giãn} trên $H$, nếu $\Fix{S}\ne\emptyset$ và
+\[
+\nm{Sx-k}\le\nm{x-k},\quad\forall k\in \Fix{S}.
+\]
+\item \textit{$\mu$-giả co chặt} trên $H$ nếu
+\[
+\nm{Sx-Sz}^2\le\nm{x-z}^2+\mu\nm{(I-S)x-(I-S)z}^2,
+\]
+trong đó $0\le\mu<1$. Nếu $\mu=1$ thì $S$ được gọi là \textit{giả co} trên $H$.
+\item \textit{$\sigma$-nửa co} (\textit{demicontractive}) nếu
+\[
+\nm{Sx-k}^2\le\nm{x-k}^2+\sigma\nm{(I-S)x}^2,\quad\forall k\in \Fix{S},\ \text{với } 0\le\sigma<1.
+\]
+\item \textit{tựa giả co} nếu
+\[
+\nm{Sx-k}^2\le\nm{x-k}^2+\nm{Sx-x}^2,\quad\forall k\in \Fix{S}.
+\]
+\item[(vii)] \textit{liên tục yếu theo dãy}, nếu với mỗi dãy $\{x_n\}\subset H$, $x_n\wto z^{*}$ kéo theo $Sx_n\wto Sz^{*}$.
+\end{enumerate}
+\end{definition}
+
+Rất rõ ràng rằng lớp các ánh xạ tựa giả co tổng quát hơn các lớp ánh xạ khác đã thảo luận ở trên (xem Alakoya và cộng sự 2022; Taiwo và cộng sự 2020). Dưới đây là một ví dụ chỉ ra một ánh xạ tựa giả co nhưng không phải là ánh xạ $\sigma$-nửa co.
+
+\begin{example}
+(Taiwo và cộng sự 2021) Cho $H$ là đoạn $[0,1]$ với giá trị tuyệt đối làm chuẩn. Xác định $S:H\to H$ như sau:
+\[
+Sx=\begin{cases}\tfrac{1}{2}, & x\in[0,\tfrac{1}{2}],\\[2pt] 0, & x\in(\tfrac{1}{2},1].\end{cases}
+\]
+Ta dễ dàng thấy rằng $\Fix{S}=\tfrac{1}{2}$. Ngoài ra, với $x\in[0,\tfrac{1}{2}]$, ta có
+\[
+\Bigl\lvert Sx-\tfrac{1}{2}\Bigr\rvert^2=\Bigl\lvert\tfrac{1}{2}-\tfrac{1}{2}\Bigr\rvert^2=0\le\Bigl\lvert x-\tfrac{1}{2}\Bigr\rvert^2+\Bigl\lvert x-\tfrac{1}{2}\Bigr\rvert^2,
+\]
+và với $x\in(\tfrac{1}{2},1]$, ta có
+\[
+\Bigl\lvert Sx-\tfrac{1}{2}\Bigr\rvert^2=\Bigl\lvert 0-\tfrac{1}{2}\Bigr\rvert^2=\tfrac{1}{4}<\Bigl\lvert x-\tfrac{1}{2}\Bigr\rvert^2+\abs{x-0}^2.
+\]
+Vậy, rõ ràng ta thấy rằng với $x\in[0,1]$,
+\[
+\Bigl\lvert Sx-S\bigl(\tfrac{1}{2}\bigr)\Bigr\rvert^2\le\Bigl\lvert x-\tfrac{1}{2}\Bigr\rvert^2+\abs{x-Sx}^2.
+\]
+Do đó, $S$ là tựa giả co. Bây giờ, ta tiếp tục chỉ ra rằng $S$ không phải là nửa co, tức là, $\nexists\,\sigma\in[0,1)$ sao cho
+\[
+\Bigl\lvert Sx-S\bigl(\tfrac{1}{2}\bigr)\Bigr\rvert^2\le\sigma\Bigl\lvert x-\tfrac{1}{2}\Bigr\rvert^2+\abs{x-Sx}^2,\quad\forall x\in[0,1].
+\]
+Bằng phản chứng, ta giả sử tồn tại $\sigma$ như vậy, khi đó ta có $\tfrac{1}{2}\le\tfrac{1}{\sigma+1}<1$. Với $\sigma$ như vậy, ta chọn $x$ sao cho $\tfrac{1}{2}<x\le\tfrac{1}{\sigma+1}$, để cho $\sigma<\tfrac{1-x}{x}$ và khi đó, ta có
+\[
+\Bigl\lvert x-\tfrac{1}{2}\Bigr\rvert^2+\sigma\abs{x-Sx}^2<\Bigl\lvert x-\tfrac{1}{2}\Bigr\rvert^2+\tfrac{1-x}{x}\abs{x-Sx}^2=\tfrac{1}{4}=\Bigl\lvert Sx-S\bigl(\tfrac{1}{2}\bigr)\Bigr\rvert^2.
+\]
+Do đó, $S$ không phải là nửa co.
+\end{example}
+
+\begin{definition}
+Giả sử $\Fc:H\to H$ là một ánh xạ đơn trị xác định trên không gian Hilbert thực $H$. Khi đó, với mọi $a,b\in H$, ánh xạ $\Fc$ được gọi là:
+\begin{enumerate}[label=(\roman*)]
+\item \textit{đơn điệu mạnh kiểu $\tau$}, nếu tồn tại $\tau>0$ sao cho $\inp{a-b}{\Fc a-\Fc b}\ge\tau\nm{a-b}^2$;
+\item \textit{đơn điệu}, nếu $\inp{\Fc a-\Fc b}{a-b}\ge 0$;
+\item \textit{giả đơn điệu}, nếu $\inp{\Fc a}{b-a}\ge 0\ \Longrightarrow\ \inp{\Fc b}{b-a}\ge 0$;
+\item \textit{tựa đơn điệu}, nếu $\inp{\Fc a}{b-a}>0\ \Longrightarrow\ \inp{\Fc b}{b-a}\ge 0$.
+\end{enumerate}
+\end{definition}
+
+\begin{lemma}[Ye và He 2015]\label{lem:2.4}
+Nếu một trong các điều kiện sau đúng,
+\begin{enumerate}[label=(\roman*)]
+\item $\Fc$ giả đơn điệu trên $C$ và $\VI(C,\Fc)\ne\emptyset$;
+\item $\Fc$ là gradient của $\Nc^{*}$, sao cho $\Nc^{*}$ là một hàm tựa lồi khả vi trên một tập mở $\Psi\supset C$ và đạt cực tiểu toàn cục trên $C$;
+\item $\Fc$ tựa đơn điệu trên $C$, $\operatorname{int}C\ne\emptyset$ và $\exists\,x\in\VI(C,\Fc)$ sao cho $\Fc x\ne 0$;
+\item $\Fc$ tựa đơn điệu trên $C$, $\Fc\ne 0$ trên $C$ và tồn tại $z\in\N$ sao cho $\forall w\in C$ với $z\le\nm{w}$, tồn tại $y\in C$ sao cho $z\ge\nm{y}$ và $\inp{\Fc w}{w-y}\ge 0$;
+\item $\Fc$ tựa đơn điệu trên $C$, $\Fc\ne 0$, và $C$ bị chặn,
+\end{enumerate}
+thì $\Gam\ne\emptyset$.
+\end{lemma}
+
+\begin{lemma}[Uzor và cộng sự 2022a]\label{lem:2.5}
+Cho $H$ là một không gian Hilbert thực. Khi đó các kết quả sau đúng, với mọi $x,y\in H$ và $\lambda\in\R$:
+\begin{enumerate}[label=(\roman*)]
+\item $\nm{x+y}^2\le\nm{x}^2+2\inp{y}{x+y}$;
+\item $\nm{\lambda x+(1-\lambda)y}^2=\lambda\nm{x}^2+(1-\lambda)\nm{y}^2-\lambda(1-\lambda)\nm{x-y}^2$;
+\item $\nm{x+y}^2=\nm{x}^2+2\inp{x}{y}+\nm{y}^2$.
+\end{enumerate}
+\end{lemma}
+
+\begin{definition}
+Phép chiếu mêtric $P_C:H\to C$ được xác định, với mỗi $z\in H$, là phần tử duy nhất $P_Cz\in C$ sao cho
+\[
+\nm{z-P_Cz}=\inf\{\nm{z-y}:y\in C\}.
+\]
+\end{definition}
+Đã biết rằng $P_C$ không giãn (xem Alakoya và cộng sự 2022; Goebel và Reich 1984). (Xem Bổ đề~\ref{lem:2.7} để biết thêm các đặc trưng của ánh xạ chiếu.)
+
+\begin{lemma}[Kopecká và Reich 2012]\label{lem:2.7}
+Giả sử $I$ là ánh xạ đồng nhất xác định trên không gian Hilbert thực $H$. Cho $C$ là một tập con khác rỗng, đóng, lồi của $H$. Khi đó, các kết quả sau đúng với mọi $x\in H$ và $a\in C$:
+\begin{enumerate}[label=(\roman*)]
+\item $b=P_Cx\iff\inp{x-b}{b-a}\ge 0$.
+\item $\nm{P_Cx+P_Ca}^2=\nm{x-a}^2-\nm{x-P_Cx}^2$.
+\item $\inp{x-a}{P_Cx-P_Ca}\ge\nm{P_Cx-P_Ca}^2$.
+\item $\nm{a-P_Cx}^2+\nm{x-P_Cx}^2\le\nm{x-a}^2$.
+\item $\inp{(I-P_C)x-(I-P_C)a}{x-a}\ge\nm{(I-P_C)x-(I-P_C)a}^2$.
+\end{enumerate}
+\end{lemma}
+
+\begin{lemma}[Ogwo và cộng sự 2023]\label{lem:2.8}
+Cho $S:H\to H$ là một toán tử phi tuyến sao cho $\Fix{S}\ne\emptyset$. Khi đó $I-S$ được gọi là \textit{nửa đóng tại không} nếu với mọi dãy $\{x_n\}$ sao cho $x_n\wto x$ và $(I-S)x_n\to 0$ thì kéo theo $(I-S)x=0$.
+\end{lemma}
+
+\begin{lemma}[Tan và Xu 1993]\label{lem:2.9}
+Cho $\{\zeta_n\}$ và $\{\theta_n\}$ là hai dãy số thực không âm sao cho
+\[
+\zeta_{n+1}\le\zeta_n+\theta_n,\quad\forall n\ge 1.
+\]
+Giả sử $\sum_{n=1}^{\infty}\theta_n<+\infty$, khi đó $\lim_{n\to\infty}\zeta_n$ tồn tại.
+\end{lemma}
+
+\begin{lemma}[Saejung và Yotkaew 2012]\label{lem:2.10}
+Cho $\{p_n\}$ là một dãy số thực. Giả sử $\{x_n\}$ là một dãy số thực không âm và $\{\alpha_n\}$ là một dãy trong $(0,1)$ với $\sum_{n=1}^{\infty}\alpha_n=+\infty$. Cho
+\[
+x_{n+1}\le(1-\alpha_n)x_n+\alpha_n p_n,\quad\text{với mọi } n\ge 1.
+\]
+Giả sử $\limsup_{k\to\infty}p_{n_k}\le 0$ với mọi dãy con $\{x_{n_k}\}$ của $\{x_n\}$ thỏa mãn $\liminf_{k\to\infty}(x_{n_k+1}-x_{n_k})\ge 0$, thì $\lim_{n\to\infty}x_n=0$.
+\end{lemma}
+
+\begin{lemma}[Alakoya và cộng sự 2022; Chang và cộng sự 2020]\label{lem:2.11}
+Cho $H$ là một không gian Hilbert thực và $S:H\to H$ là một ánh xạ $L$-Lipschitz với $L\ge 1$. Đặt $\mathcal{T}:=(1-\eta)I+\eta S[(1-\chi)I+\chi S]$. Giả sử $0<\eta<\chi<\dfrac{1}{1+\sqrt{1+L^2}}$, khi đó các kết quả sau đúng:
+\begin{enumerate}[label=(\roman*)]
+\item $\Fix{S}=F(S[(1-\chi)+\chi S])=F(\mathcal{T})$.
+\item Giả sử $I-S$ nửa đóng tại không, thì $I-\mathcal{T}$ cũng nửa đóng tại không.
+\item Giả sử $S:H\to H$ tựa giả co, thì ánh xạ $\mathcal{T}$ tựa không giãn.
+\end{enumerate}
+\end{lemma}
+
+\chapter{Phương pháp đề xuất}\label{sec:method}
+
+Ở đây, chúng tôi trình bày thuật toán của mình: một phương pháp chiếu-co Mann cải biên quán tính tự thích nghi (SIMMPCM) để xấp xỉ nghiệm chung của SEVIP liên quan đến các toán tử tựa đơn điệu, và SEFPP cho các ánh xạ tựa giả co liên tục Lipschitz trong các không gian Hilbert thực. Các kết quả của chúng tôi dựa trên một số giả thiết nhẹ như sau:
+
+\medskip
+\noindent\textbf{Giả thiết 3.1}\label{asm:3.1}
+\begin{enumerate}[label=(A\arabic*),leftmargin=*]
+\item Các tập chấp nhận được $C$ và $Q$ là các tập con khác rỗng, đóng và lồi của các không gian Hilbert thực $H_1$ và $H_2$ tương ứng.
+\item $\Fc:H_1\to H_1$ và $\Gc:H_2\to H_2$ là các ánh xạ tựa đơn điệu và liên tục Lipschitz, với các hằng số Lipschitz lần lượt là $\Dc_1,\Dc_2$, và thỏa mãn tính chất sau;
+\begin{enumerate}[label=(\roman*)]
+\item mỗi khi $\{x_n\}\subset C$, $x_n\wto x^{*}$, thì $\nm{\Fc x^{*}}\le\liminf_{n\to\infty}\nm{\Fc x_n}$, và
+\item mỗi khi $\{y_n\}\subset Q$, $y_n\wto y^{*}$, thì $\nm{\Gc y^{*}}\le\liminf_{n\to\infty}\nm{\Gc y_n}$, tương ứng.
+\end{enumerate}
+\item $T_1:H_1\to H_3$ và $T_2:H_2\to H_3$ là các toán tử tuyến tính bị chặn, với các toán tử liên hợp $T_1^{*}$ và $T_2^{*}$ tương ứng, $T_1\ne 0$, $T_2\ne 0$.
+\item $S_1:H_1\to H_1$ và $S_2:H_2\to H_2$ là các ánh xạ tựa giả co và liên tục Lipschitz, với các hằng số $L_1\ge 1$ và $L_2\ge 1$ tương ứng, và $I-S_i$ nửa đóng tại $0$, với mỗi $i=1,2$.
+\item Tập nghiệm $\Omega:=\{x\in\Gam\cap \Fix{S_1},\ y\in\Gams\cap \Fix{S_2}:T_1x=T_2y\}\ne\emptyset$.
+\item $\{\alpha_n\},\{\theta_n\}$, và $\{\delta_n\}$ là các dãy không âm sao cho: $\{\alpha_n\}\subset(0,1)$, $\lim_{n\to\infty}\alpha_n=0$, $\sum_{n=1}^{\infty}\alpha_n=\infty$, $\lim_{n\to\infty}\dfrac{\theta_n}{\alpha_n}=0$, $\lim_{n\to\infty}\dfrac{\delta_n}{\alpha_n}=0$.
+\item $\{\lambda_n\},\{\iota_n\}$, và $\{\beta_n\}$ là các dãy không âm sao cho: $\sum_{n=1}^{\infty}\lambda_n<+\infty$, $\sum_{n=1}^{\infty}\iota_n<+\infty$, $\{\beta_n\}\subset[a,b]\subset(0,1-\alpha_n)$, và $\ell\in(0,2)$.
+\item $\{\psi_n\}\subset(0,1)$ và $\{\sigma_n\}\subset(0,1)$, sao cho $0<a\le\psi_n,\sigma_n\le b<1$, và $0<\eta<\chi<\dfrac{1}{1+\sqrt{1+L^2}}$, với $L=\max\{L_1,L_2\}$.
+\end{enumerate}
+
+Thuật toán của chúng tôi như sau:
+
+\begin{algobox}{Thuật toán 3.2}
+\textbf{Bước 0.} Cho các dãy $\{\alpha_n\}_{n=1}^{\infty},\{\beta_n\}_{n=1}^{\infty},\{\nu_n\}_{n=1}^{\infty},\{\tau_n\}_{n=1}^{\infty}$ được chọn sao cho Giả thiết 3.1 được thỏa mãn. Chọn điểm ban đầu $(x_0,y_0)\in H_1\times H_2$, cho $\zeta\ge 0$, $\mu,\phi\in(0,1)$, $\xi_1>0$, $\kappa_1>0$, $\tau>0$, $\theta>0$, và đặt $n:=1$.
+
+\smallskip
+\textbf{Bước 1.} Với các bước lặp $x_{n-1},y_{n-1}$ và $x_n,y_n$ đã cho, chọn $\tau_n$ sao cho $0\le\tau_n\le\hat{\tau}_n$, và $\nu_n$ sao cho $0\le\nu_n\le\hat{\nu}_n$, với mỗi $n\ge 1$, trong đó;
+\begin{equation}
+\hat{\tau}_n=\begin{cases}\min\Bigl\{\tau,\ \dfrac{\theta_n}{\nm{x_n-x_{n-1}}}\Bigr\}, & \text{nếu } x_n\ne x_{n-1},\\[8pt] \tau, & \text{ngược lại}.\end{cases} \label{eq:3.1}
+\end{equation}
+
+\textbf{Bước 2.} Tính
+\[
+w_n=x_n+\tau_n(x_n-x_{n-1});
+\]
+
+\textbf{Bước 3.} Tính:
+\[
+\begin{cases}
+z_n=w_n-\zeta_n T_1^{*}(T_1w_n-T_2g_n),\\
+u_n=P_C(z_n-\xi_n\Fc z_n),\\
+v_n=z_n-\ell\gamma_n d_n,\\
+q_n=\psi_n v_n+(1-\psi_n)Y v_n,\\
+x_{n+1}=(1-\alpha_n-\beta_n)z_n+\beta_n q_n,
+\end{cases}
+\]
+trong đó,
+\begin{align}
+d_n &= z_n-u_n-\xi_n(\Fc z_n-\Fc u_n),\notag\\
+\gamma_n &= \begin{cases}\dfrac{\inp{z_n-u_n}{d_n}}{\nm{d_n}^2}, & \text{nếu } d_n\ne 0,\\[6pt] 0, & \text{ngược lại};\end{cases}\notag\\
+\xi_{n+1} &= \begin{cases}\min\Bigl\{\dfrac{\mu\nm{u_n-z_n}}{\nm{\Fc u_n-\Fc z_n}},\ \xi_n+\lambda_n\Bigr\}, & \text{nếu } \Fc u_n-\Fc z_n\ne 0,\\[6pt] \xi_n+\lambda_n, & \text{ngược lại},\end{cases}\notag\\
+\text{và}\quad Y &= (1-\eta)I+\eta S_1[(1-\chi)I+\chi S_1]. \label{eq:3.2}
+\end{align}
+
+\textbf{Bước 4.} Tính
+\begin{equation}
+\hat{\nu}_n=\begin{cases}\min\Bigl\{\nu,\ \dfrac{\delta_n}{\nm{y_n-y_{n-1}}}\Bigr\}, & \text{nếu } y_n\ne y_{n-1},\\[8pt] \nu, & \text{ngược lại}.\end{cases} \label{eq:3.3}
+\end{equation}
+
+\textbf{Bước 5.} Tính
+\[
+g_n=y_n+\nu_n(y_n-y_{n-1});
+\]
+
+\textbf{Bước 6.} Tính:
+\[
+\begin{cases}
+t_n=g_n+\zeta_n T_2^{*}(T_1w_n-T_2g_n),\\
+r_n=P_Q(t_n-\kappa_n\Gc t_n),\\
+s_n=t_n-g\rho_n f_n,\\
+b_n=\sigma_n s_n+(1-\sigma_n)J s_n,\\
+y_{n+1}=(1-\alpha_n-\beta_n)t_n+\beta_n b_n,
+\end{cases}
+\]
+trong đó,
+\begin{align}
+f_n &= t_n-r_n-\sigma_n(\Gc t_n-\Gc r_n),\notag\\
+\rho_n &= \begin{cases}\dfrac{\inp{t_n-r_n}{f_n}}{\nm{f_n}^2}, & \text{nếu } f_n\ne 0,\\[6pt] 0, & \text{ngược lại};\end{cases}\notag\\
+\kappa_{n+1} &= \begin{cases}\min\Bigl\{\dfrac{\phi\nm{t_n-r_n}}{\nm{\Gc t_n-\Gc r_n}},\ \kappa_n+\iota_n\Bigr\}, & \text{nếu } \Gc t_n-\Gc r_n\ne 0,\\[6pt] \kappa_n+\iota_n, & \text{ngược lại},\end{cases}\notag\\
+\text{và}\quad J &= (1-\eta)I+\eta S_2[(1-\chi)I+\chi S_2]. \label{eq:3.4}
+\end{align}
+\textit{Cập nhật:} với $\epsilon>0$ đủ nhỏ, chọn
+\[
+\zeta_n\in\left[\epsilon,\ \frac{2\nm{T_1w_n-T_2g_n}^2}{\nm{T_2^{*}(T_1w_n-T_2g_n)}^2+\nm{T_1^{*}(T_1w_n-T_2g_n)}^2}-\epsilon\right]\quad\text{nếu } T_1w_n\ne T_2g_n;
+\]
+ngược lại, $\zeta_n=\zeta$.
+
+\smallskip
+Đặt $n:=n+1$ và quay về \textbf{Bước 1}.
+\end{algobox}
+
+\begin{remark}
+Dưới đây là một số đặc điểm chính của Thuật toán 3.2 đề xuất.
+\begin{enumerate}[label=(\roman*)]
+\item Quan sát rằng trong phương pháp của chúng tôi, chỉ có một phép chiếu duy nhất lên mỗi tập chấp nhận được $C$ và $Q$. Khác với công trình của Kazmi và cộng sự (2019) với ba phép chiếu lên tập chấp nhận được ở mỗi bước lặp, vốn khó tính toán hơn nhiều.
+\item Các phương trình \eqref{eq:3.1} và \eqref{eq:3.3} của Thuật toán 3.2 biểu diễn các bước lặp quán tính, giúp tăng tốc độ hội tụ của phương pháp. Ngoài ra, lưu ý rằng \textbf{Bước 1} và \textbf{Bước 4} của thuật toán đề xuất dễ dàng cài đặt, nhờ hiểu biết trước về ước lượng $\nm{x_n-x_{n-1}}$ trước khi chọn $\tau_n$ và $\nu_n$.
+\item Chúng tôi giả thiết các toán tử giá là tựa đơn điệu, vì chúng được biết là tổng quát hơn và ít hạn chế hơn lớp các toán tử (giả) đơn điệu và đồng bức. (xem Alakoya và cộng sự 2022; Uzor và cộng sự 2023). Hơn nữa, chỉ có rất ít kết quả trong tài liệu về các bài toán tách đẳng thức liên quan đến các toán tử tựa đơn điệu.
+\item Cũng quan sát rằng cỡ bước $\{\zeta_n\}$ của chúng tôi tự thích nghi và không phụ thuộc vào chuẩn của các toán tử $T_1$ và $T_2$, đây là một cải tiến so với phương pháp được đề xuất bởi Moudafi và Al-Shemas (2013).
+\item Thuật toán đề xuất của chúng tôi hội tụ mạnh về nghiệm có chuẩn nhỏ nhất của bài toán \eqref{eq:1.8}.
+\end{enumerate}
+\end{remark}
+
+\begin{remark}\label{rem:3.4}
+Từ các điều kiện (A6)--(A8), \eqref{eq:3.1}, và \eqref{eq:3.3}, ta có
+\begin{align}
+\lim_{n\to\infty}\tau_n\nm{x_n-x_{n-1}}=0 &\quad\text{và}\quad \lim_{n\to\infty}\frac{\tau_n}{\alpha_n}\nm{x_n-x_{n-1}}=0. \label{eq:3.5}\\
+\lim_{n\to\infty}\nu_n\nm{y_n-y_{n-1}}=0 &\quad\text{và}\quad \lim_{n\to\infty}\frac{\nu_n}{\alpha_n}\nm{y_n-y_{n-1}}=0. \label{eq:3.6}
+\end{align}
+Ngoài ra, từ định nghĩa của $\zeta_n$, ta được
+\begin{align}
+\zeta_n &\le \frac{2\nm{T_1w_n-T_2g_n}^2}{\nm{T_2^{*}(T_1w_n-T_2g_n)}^2+\nm{T_1^{*}(T_1w_n-T_2g_n)}^2}-\epsilon\notag\\
+&\Longrightarrow (\zeta_n+\epsilon)[\nm{T_2^{*}(T_1w_n-T_2g_n)}^2+\nm{T_1^{*}(T_1w_n-T_2g_n)}^2]\le 2\nm{T_1w_n-T_2g_n}^2\notag\\
+&\Longrightarrow \zeta_n\cdot\epsilon[\nm{T_2^{*}(T_1w_n-T_2g_n)}^2+\nm{T_1^{*}(T_1w_n-T_2g_n)}^2]\notag\\
+&\le \zeta_n\Bigl(2\nm{T_1w_n-T_2g_n}^2-\zeta_n[\nm{T_2^{*}(T_1w_n-T_2g_n)}^2+\nm{T_1^{*}(T_1w_n-T_2g_n)}^2]\Bigr). \label{eq:3.7}
+\end{align}
+\end{remark}
+
+\chapter{Phân tích sự hội tụ}\label{sec:conv}
+
+Trong mục này, chúng tôi tiến hành phân tích sự hội tụ của thuật toán đề xuất. Trước tiên, chúng tôi thiết lập một số bổ đề cần thiết để chứng minh định lý hội tụ mạnh cho thuật toán.
+
+\begin{lemma}\label{lem:4.1}
+Cho $\{\xi_n\}$ và $\{\kappa_n\}$ là các dãy sinh bởi \eqref{eq:3.2} và \eqref{eq:3.4}, với giả thiết (A7) được thỏa mãn. Khi đó, ta có $\displaystyle\lim_{n\to\infty}\xi_n=\xi$, trong đó $\xi\in[\min\{\tfrac{\mu}{\Dc_1},\xi_1\},\xi_1+\Lambda]$, $\Lambda=\sum_{n=1}^{\infty}\lambda_n$, với hằng số $\Dc_1>0$, và $\displaystyle\lim_{n\to\infty}\kappa_n=\kappa$, trong đó $\kappa\in[\min\{\tfrac{\phi}{\Dc_2},\kappa_1\},\kappa_1+\Theta]$, $\Theta=\sum_{n=1}^{\infty}\iota_n$, với hằng số $\Dc_2>0$.
+\end{lemma}
+
+\begin{proof}
+Lưu ý rằng vì $\Fc$ liên tục $\Dc_1$-Lipschitz, nên xét trường hợp không tầm thường ($\nm{\Fc u_n-\Fc z_n}\ne 0$), ta có với mọi $n\ge 1$ rằng
+\[
+\frac{\mu\nm{u_n-z_n}}{\nm{\Fc u_n-\Fc z_n}}\ge\frac{\mu\nm{u_n-z_n}}{\Dc_1\nm{u_n-z_n}}=\frac{\mu}{\Dc_1}.
+\]
+Từ định nghĩa của $\xi_{n+1}$, ta biết rằng dãy $\{\xi_n\}$ bị chặn dưới và bị chặn trên lần lượt bởi $\min\{\tfrac{\mu}{\Dc_1},\xi_1\}$ và $\xi_1+\Lambda$. Áp dụng Bổ đề~\ref{lem:2.9}, ta thấy rằng $\lim_{n\to\infty}\xi_n$ tồn tại, và được ký hiệu là $\xi$, trong đó $\xi=\lim_{n\to\infty}\xi_n$, và $\xi\in[\min\{\tfrac{\mu}{\Dc_1},\xi_1\},\xi_1+\Lambda]$.
+
+Bằng cách lập luận theo cùng khuôn mẫu như trên, ta có $\lim_{n\to\infty}\kappa_n=\kappa$, trong đó $\kappa\in[\min\{\tfrac{\phi}{\Dc_2},\kappa_1\},\kappa_1+\Theta]$.
+\end{proof}
+
+\begin{lemma}\label{lem:4.2}
+Giả sử Thuật toán 3.2 thỏa mãn Giả thiết 3.1. Khi đó, bất đẳng thức sau đúng với mọi $(x^{*},y^{*})\in\Omega$.
+\[
+\nm{z_n-x^{*}}^2+\nm{t_n-y^{*}}^2\le\nm{w_n-x^{*}}^2+\nm{g_n-y^{*}}^2.
+\]
+\end{lemma}
+
+\begin{proof}
+Cho $(x^{*},y^{*})\in\Omega$. Khi đó, bằng cách áp dụng Bổ đề~\ref{lem:2.5}, ta có
+\begin{align}
+\nm{z_n-x^{*}}^2 &= \nm{w_n-\zeta_n T_1^{*}(T_1w_n-T_2g_n)-x^{*}}^2\notag\\
+&= \nm{w_n-x^{*}}^2+\zeta_n^2\nm{T_1^{*}(T_1w_n-T_2g_n)}^2-2\zeta_n\inp{w_n-x^{*}}{T_1^{*}(T_1w_n-T_2g_n)}\notag\\
+&= \nm{w_n-x^{*}}^2+\zeta_n^2\nm{T_1^{*}(T_1w_n-T_2g_n)}^2-2\zeta_n\inp{T_1w_n-T_1x^{*}}{T_1w_n-T_2g_n}\notag\\
+&= \nm{w_n-x^{*}}^2+\zeta_n^2\nm{T_1^{*}(T_1w_n-T_2g_n)}^2-\zeta_n\nm{T_1w_n-T_1x^{*}}^2\notag\\
+&\quad -\zeta_n\nm{T_1w_n-T_2g_n}^2+\zeta_n\nm{T_2g_n-T_1x^{*}}^2. \label{eq:4.1}
+\end{align}
+Tương tự, ta có
+\begin{align}
+\nm{t_n-y^{*}}^2 &= \nm{g_n+\zeta_n T_2^{*}(T_1w_n-T_2g_n)-y^{*}}^2\notag\\
+&= \nm{g_n-y^{*}}^2+\zeta_n^2\nm{T_2^{*}(T_1w_n-T_2g_n)}^2+2\zeta_n\inp{g_n-y^{*}}{T_2^{*}(T_1w_n-T_2g_n)}\notag\\
+&= \nm{g_n-y^{*}}^2+\zeta_n^2\nm{T_2^{*}(T_1w_n-T_2g_n)}^2+2\zeta_n\inp{T_2g_n-T_2y^{*}}{T_1w_n-T_2g_n}\notag\\
+&= \nm{g_n-y^{*}}^2+\zeta_n^2\nm{T_2^{*}(T_1w_n-T_2g_n)}^2-\zeta_n\nm{T_2g_n-T_2y^{*}}^2\notag\\
+&\quad -\zeta_n\nm{T_1w_n-T_2g_n}^2+\zeta_n\nm{T_1w_n-T_2y^{*}}^2. \label{eq:4.2}
+\end{align}
+Khi đó, bằng cách cộng \eqref{eq:4.1} và \eqref{eq:4.2}, ta được
+\begin{align*}
+\nm{z_n-x^{*}}^2+\nm{t_n-y^{*}}^2 &= \nm{w_n-x^{*}}^2+\nm{g_n-y^{*}}^2\\
+&\quad +\zeta_n^2[\nm{T_1^{*}(T_1w_n-T_2g_n)}^2+\nm{T_2^{*}(T_1w_n-T_2g_n)}^2]\\
+&\quad -\zeta_n[\nm{T_1w_n-T_1x^{*}}^2+\nm{T_2g_n-T_2y^{*}}^2]-2\zeta_n\nm{T_1w_n-T_2g_n}^2\\
+&\quad +\zeta_n[\nm{T_1w_n-T_2y^{*}}^2+\nm{T_2g_n-T_1x^{*}}^2].
+\end{align*}
+Do $T_1x^{*}=T_2y^{*}$, cùng với \eqref{eq:3.7}, ta thu được
+\begin{align}
+\nm{z_n-x^{*}}^2+\nm{t_n-y^{*}}^2 &= \nm{w_n-x^{*}}^2+\nm{g_n-y^{*}}^2\notag\\
+&\quad +\zeta_n\bigl[2\nm{T_1w_n-T_2g_n}^2-\zeta_n(\nm{T_1^{*}(T_1w_n-T_2g_n)}^2+\nm{T_2^{*}(T_1w_n-T_2g_n)}^2)\bigr]\notag\\
+&\le \nm{w_n-x^{*}}^2+\nm{g_n-y^{*}}^2\notag\\
+&\quad -\zeta_n\cdot\epsilon[\nm{T_1^{*}(T_1w_n-T_2g_n)}^2+\nm{T_2^{*}(T_1w_n-T_2g_n)}^2]\notag\\
+&\le \nm{w_n-x^{*}}^2+\nm{g_n-y^{*}}^2. \label{eq:4.3}
+\end{align}
+\end{proof}
+
+\begin{lemma}\label{lem:4.3}
+Giả sử Giả thiết 3.1 được thỏa mãn bởi Thuật toán 3.2. Khi đó, các bất đẳng thức sau đúng với mọi $(x^{*},y^{*})\in\Omega$.
+\[
+\begin{cases}
+\nm{q_n-x^{*}}^2\le\nm{z_n-x^{*}}^2-\dfrac{2-\ell}{\ell}\nm{z_n-v_n}^2-\psi_n(1-\psi_n)\nm{v_n-Yv_n},\\[6pt]
+\nm{z_n-u_n}^2\le\left[\dfrac{1}{\ell}\Bigl(\dfrac{\xi_{n+1}+\mu\xi_n}{\xi_{n+1}-\mu\xi_n}\Bigr)\nm{z_n-v_n}\right]^2.
+\end{cases}
+\]
+Ngoài ra,
+\[
+\begin{cases}
+\nm{b_n-y^{*}}^2\le\nm{t_n-y^{*}}^2-\dfrac{2-g}{g}\nm{t_n-s_n}^2-\kappa_n(1-\kappa_n)\nm{s_n-Js_n},\\[6pt]
+\nm{t_n-r_n}^2\le\left[\dfrac{1}{g}\Bigl(\dfrac{\kappa_{n+1}+\phi\kappa_n}{\kappa_{n+1}-\phi\kappa_n}\Bigr)\nm{t_n-s_n}\right]^2.
+\end{cases}
+\]
+\end{lemma}
+
+\begin{proof}
+Cho $(x^{*},y^{*})\in\Omega$, theo Bổ đề~\ref{lem:2.5} và tính không giãn của $Y$, ta được
+\begin{align}
+\nm{q_n-x^{*}}^2 &= \nm{\psi_n v_n+(1-\psi_n)Yv_n-x^{*}}^2\notag\\
+&= \psi_n\nm{v_n-x^{*}}^2+(1-\psi_n)\nm{Yv_n-x^{*}}^2-\psi_n(1-\psi_n)\nm{v_n-Yv_n}\notag\\
+&\le \psi_n\nm{v_n-x^{*}}^2+(1-\psi_n)\nm{v_n-x^{*}}^2-\psi_n(1-\psi_n)\nm{v_n-Yv_n}\notag\\
+&= \nm{v_n-x^{*}}^2-\psi_n(1-\psi_n)\nm{v_n-Yv_n}. \label{eq:4.4}
+\end{align}
+Theo định nghĩa của $\{v_n\}$, ta có
+\begin{equation}
+\nm{v_n-x^{*}}^2=\nm{z_n-x^{*}}^2-2\ell\gamma_n\inp{z_n-x^{*}}{d_n}+\ell^2\gamma_n^2\nm{d_n}^2. \label{eq:4.5}
+\end{equation}
+Theo định nghĩa của $\{d_n\}$, ta được:
+\begin{align}
+\inp{z_n-x^{*}}{d_n} &= \inp{z_n-u_n}{d_n}+\inp{u_n-x^{*}}{d_n}\notag\\
+&= \inp{z_n-u_n}{d_n}+\inp{u_n-x^{*}}{z_n-u_n-\xi_n(\Fc z_n-\Fc u_n)}. \label{eq:4.6}
+\end{align}
+Theo định nghĩa của $\{u_n\}$ và tính chất phép chiếu (xem Bổ đề~\ref{lem:2.7}), ta có
+\begin{equation}
+\inp{z_n-u_n-\xi_n\Fc z_n}{u_n-x^{*}}\ge 0. \label{eq:4.7}
+\end{equation}
+Vì $x^{*}\in\Gam$ và $u_n\in C$, ta thu được $\inp{\Fc u_n}{u_n-x^{*}}\ge 0$, và do tính dương của $\{\xi_n\}$, ta có
+\begin{equation}
+\xi_n\inp{\Fc u_n}{u_n-x^{*}}\ge 0. \label{eq:4.8}
+\end{equation}
+Do đó, ta có từ \eqref{eq:4.6} rằng
+\begin{equation}
+\inp{z_n-x^{*}}{d_n}\ge\inp{z_n-u_n}{d_n}. \label{eq:4.9}
+\end{equation}
+Từ định nghĩa của $\{v_n\}$, ta có
+\[
+\nm{v_n-z_n}=\nm{\ell\gamma_n d_n},
+\]
+Kết hợp \eqref{eq:4.5} và \eqref{eq:4.9}, ta có
+\begin{align}
+\nm{v_n-x^{*}}^2 &\le \nm{z_n-x^{*}}^2-2\ell\gamma_n\inp{z_n-u_n}{d_n}+\ell^2\gamma_n^2\nm{d_n}^2,\notag\\
+&= \nm{z_n-x^{*}}^2-2\ell\gamma_n^2\nm{d_n}^2+\ell^2\gamma_n^2\nm{d_n}^2\notag\\
+&= \nm{z_n-x^{*}}^2-\frac{2-\ell}{\ell}\nm{\ell\gamma_n d_n}^2\notag\\
+&= \nm{z_n-x^{*}}^2-\frac{2-\ell}{\ell}\nm{z_n-v_n}^2. \label{eq:4.10}
+\end{align}
+Kết hợp \eqref{eq:4.4}, \eqref{eq:4.10}, và các điều kiện đặt lên các tham số điều khiển, ta thu được
+\begin{align}
+\nm{q_n-x^{*}}^2 &\le \nm{z_n-x^{*}}^2-\frac{2-\ell}{\ell}\nm{z_n-v_n}^2-\psi_n(1-\psi_n)\nm{v_n-Yv_n}\notag\\
+&\le \nm{z_n-x^{*}}^2. \label{eq:4.11}
+\end{align}
+Tương tự, vì $y^{*}\in\Gams$, ta thu được
+\begin{align}
+\nm{b_n-y^{*}}^2 &\le \nm{t_n-y^{*}}^2-\frac{2-g}{g}\nm{t_n-s_n}^2-\sigma_n(1-\sigma_n)\nm{s_n-Js_n}\notag\\
+&\le \nm{t_n-y^{*}}^2. \label{eq:4.12}
+\end{align}
+Tiếp theo, từ \eqref{eq:3.2} và định nghĩa của $\{d_n\}$, ta có
+\begin{equation}
+\nm{\Fc z_n-\Fc u_n}\le\frac{\mu}{\xi_{n+1}}\nm{z_n-u_n},\quad\forall n\ge 1. \label{eq:4.13}
+\end{equation}
+Do đó, ta được
+\begin{align}
+\gamma_n\nm{d_n}^2=\inp{z_n-u_n}{d_n} &\ge \nm{z_n-u_n}^2-\xi_n\nm{\Fc z_n-\Fc u_n}\nm{z_n-u_n}\notag\\
+&\ge \Bigl(1-\frac{\mu\xi_n}{\xi_{n+1}}\Bigr)\nm{z_n-u_n}^2. \label{eq:4.14}
+\end{align}
+Ngoài ra,
+\begin{align}
+\nm{d_n} &\le \nm{z_n-u_n}+\xi_n\nm{\Fc z_n-\Fc u_n}\notag\\
+&\le \nm{z_n-u_n}+\frac{\mu\xi_n}{\xi_{n+1}}\nm{z_n-u_n}\notag\\
+&= \Bigl(1+\frac{\mu\xi_n}{\xi_{n+1}}\Bigr)\nm{z_n-u_n}. \label{eq:4.15}
+\end{align}
+Kết hợp \eqref{eq:4.14} và \eqref{eq:4.15}, ta được
+\[
+\gamma_n^2\nm{d_n}^2\ge\Bigl(1-\frac{\mu\xi_n}{\xi_{n+1}}\Bigr)^2\frac{\nm{z_n-u_n}^4}{\nm{d_n}^2}\ge\frac{\bigl(1-\frac{\mu\xi_n}{\xi_{n+1}}\bigr)^2}{\bigl(1+\frac{\mu\xi_n}{\xi_{n+1}}\bigr)^2}\nm{z_n-u_n}^2.
+\]
+Khi đó,
+\[
+\nm{v_n-z_n}^2=\ell^2\gamma_n^2\nm{d_n}^2\ge\ell^2\frac{\bigl(1-\frac{\mu\xi_n}{\xi_{n+1}}\bigr)^2}{\bigl(1+\frac{\mu\xi_n}{\xi_{n+1}}\bigr)^2}\nm{z_n-u_n}^2,
+\]
+và
+\[
+\nm{z_n-u_n}^2\le\left[\frac{1}{\ell}\Bigl(\frac{\xi_{n+1}+\mu\xi_n}{\xi_{n+1}-\mu\xi_n}\Bigr)\nm{z_n-v_n}\right]^2.
+\]
+Sử dụng \eqref{eq:3.4} và làm theo một thủ tục tương tự như trên, ta được:
+\[
+\nm{\Gc t_n-\Gc r_n}\le\frac{\phi}{\kappa_{n+1}}\nm{t_n-r_n},\quad\forall n\ge 1\quad\text{và,}\quad \nm{t_n-r_n}^2\le\left[\frac{1}{g}\Bigl(\frac{\kappa_{n+1}+\phi\kappa_n}{\kappa_{n+1}-\phi\kappa_n}\Bigr)\nm{t_n-s_n}\right]^2.
+\]
+\end{proof}
+
+\begin{lemma}\label{lem:4.4}
+Giả sử Thuật toán 3.2 thỏa mãn Giả thiết 3.1. Khi đó, $\{(x_n,y_n)\}$ bị chặn.
+\end{lemma}
+
+\begin{proof}
+Cho $x^{*}\in\Omega$. Khi đó, theo Bổ đề~\ref{lem:2.5} và định nghĩa của $\{w_n\}$, ta có
+\begin{align*}
+\nm{w_n-x^{*}} &= \nm{(x_n+\tau_n(x_n-x_{n-1}))-x^{*}}\\
+&\le \nm{x_n-x^{*}}+\tau_n\nm{x_n-x_{n-1}}\\
+&= \nm{x_n-x^{*}}+\alpha_n\frac{\tau_n}{\alpha_n}\nm{x_n-x_{n-1}}.
+\end{align*}
+Từ Nhận xét~\ref{rem:3.4}, ta có $\lim_{n\to\infty}\frac{\tau_n}{\alpha_n}\nm{x_n-x_{n-1}}=0$. Do đó, điều này kéo theo tồn tại $M_3>0$ sao cho
+\begin{align*}
+\frac{\tau_n}{\alpha_n}\nm{x_n-x_{n-1}}\le M_3,\quad\forall n\ge 1.\\
+\Longrightarrow \nm{w_n-x^{*}}\le\nm{x_n-x^{*}}+\alpha_n M_3.
+\end{align*}
+Do đó,
+\begin{equation}
+\nm{w_n-x^{*}}^2\le\nm{x_n-x^{*}}^2+2\alpha_n M_3\nm{x_n-x^{*}}+\alpha_n^2 M_3^2. \label{eq:4.16}
+\end{equation}
+Tương tự, sử dụng một thủ tục tương tự, ta được $\exists\,M_4>0$ sao cho
+\begin{equation}
+\nm{g_n-y^{*}}^2\le\nm{y_n-y^{*}}^2+2\alpha_n M_4\nm{y_n-y^{*}}+\alpha_n^2 M_4^2. \label{eq:4.17}
+\end{equation}
+Bằng cách cộng \eqref{eq:4.16} và \eqref{eq:4.17}, ta có
+\begin{align}
+\nm{w_n-x^{*}}^2 &+ \nm{g_n-y^{*}}^2\notag\\
+&\le \nm{x_n-x^{*}}^2+\nm{y_n-y^{*}}^2+2\alpha_n[M_3\nm{x_n-x^{*}}+M_4\nm{y_n-y^{*}}]+\alpha_n^2(M_3^2+M_4^2)\notag\\
+&\le \nm{x_n-x^{*}}^2+\nm{y_n-y^{*}}^2+2\alpha_n[M_3\nm{x_n-x^{*}}+M_4\nm{y_n-y^{*}}]+\alpha_n(M_3^2+M_4^2)\notag\\
+&= \nm{x_n-x^{*}}^2+\nm{y_n-y^{*}}^2+\alpha_n M_1^{*},\notag\\
+\text{trong đó}\quad M_1^{*} &= [2(M_3\nm{x_n-x^{*}}+M_4\nm{y_n-y^{*}})+M_3^2+M_4^2]>0. \label{eq:4.18}
+\end{align}
+Theo định nghĩa của $\{x_{n+1}\}$, ta được
+\begin{align}
+\nm{x_{n+1}-x^{*}} &= \nm{(1-\alpha_n-\beta_n)(z_n-x^{*})+\beta_n(q_n-x^{*})-\alpha_n x^{*}}\notag\\
+&\le \nm{(1-\alpha_n-\beta_n)(z_n-x^{*})+\beta_n(q_n-x^{*})}+\alpha_n\nm{x^{*}}. \label{eq:4.19}
+\end{align}
+Theo \eqref{eq:4.11} và Bổ đề~\ref{lem:2.5}, ta thu được
+\begin{align*}
+&\nm{(1-\alpha_n-\beta_n)(z_n-x^{*})+\beta_n(q_n-x^{*})}^2\\
+&= (1-\alpha_n-\beta_n)^2\nm{z_n-x^{*}}^2+2(1-\alpha_n-\beta_n)\beta_n\inp{z_n-x^{*}}{q_n-x^{*}}+\beta_n^2\nm{q_n-x^{*}}^2\\
+&\le (1-\alpha_n-\beta_n)^2\nm{z_n-x^{*}}^2+2(1-\alpha_n-\beta_n)\beta_n[\nm{z_n-x^{*}}^2+\nm{q_n-x^{*}}^2]+\beta_n^2\nm{q_n-x^{*}}^2\\
+&= (1-\alpha_n-\beta_n)(1-\alpha_n)\nm{z_n-x^{*}}^2+\beta_n(1-\alpha_n)\nm{q_n-x^{*}}^2\\
+&\le (1-\alpha_n-\beta_n)(1-\alpha_n)\nm{z_n-x^{*}}^2+\beta_n(1-\alpha_n)\nm{z_n-x^{*}}^2\\
+&= (1-\alpha_n)^2\nm{z_n-x^{*}}^2.
+\end{align*}
+Vậy, ta có
+\begin{equation}
+\nm{(1-\alpha_n-\beta_n)(z_n-x^{*})+\beta_n(q_n-x^{*})}\le(1-\alpha_n)\nm{z_n-x^{*}}. \label{eq:4.20}
+\end{equation}
+Kết hợp \eqref{eq:4.19} và \eqref{eq:4.20}, ta thu được
+\begin{equation}
+\nm{x_{n+1}-x^{*}}\le(1-\alpha_n)\nm{z_n-x^{*}}+\alpha_n\nm{x^{*}}. \label{eq:4.21}
+\end{equation}
+Từ \eqref{eq:4.21}, ta có
+\begin{equation}
+\nm{x_{n+1}-x^{*}}^2\le(1-\alpha_n)^2\nm{z_n-x^{*}}^2+2\alpha_n(1-\alpha_n)\nm{x^{*}}\nm{z_n-x^{*}}+\alpha_n^2\nm{x^{*}}^2. \label{eq:4.22}
+\end{equation}
+Làm theo một thủ tục tương tự, ta được
+\begin{equation}
+\nm{y_{n+1}-y^{*}}^2\le(1-\alpha_n)^2\nm{t_n-y^{*}}^2+2\alpha_n(1-\alpha_n)\nm{y^{*}}\nm{t_n-y^{*}}+\alpha_n^2\nm{y^{*}}^2. \label{eq:4.23}
+\end{equation}
+Cộng \eqref{eq:4.22} và \eqref{eq:4.23}, ta thu được
+\begin{align}
+\nm{x_{n+1}-x^{*}}^2+\nm{y_{n+1}-y^{*}}^2 &\le (1-\alpha_n)^2[\nm{z_n-x^{*}}^2+\nm{t_n-y^{*}}^2]\notag\\
+&\quad +2\alpha_n(1-\alpha_n)[\nm{x^{*}}\nm{z_n-x^{*}}+\nm{y^{*}}\nm{t_n-y^{*}}]+\alpha_n^2[\nm{x^{*}}^2+\nm{y^{*}}^2]\notag\\
+&\le (1-\alpha_n)[\nm{z_n-x^{*}}^2+\nm{t_n-y^{*}}^2]\notag\\
+&\quad +2\alpha_n[\nm{x^{*}}\nm{z_n-x^{*}}+\nm{y^{*}}\nm{t_n-y^{*}}]+\alpha_n[\nm{x^{*}}^2+\nm{y^{*}}^2]\notag\\
+&\le (1-\alpha_n)\Bigl[\nm{z_n-x^{*}}^2+\nm{t_n-y^{*}}^2\Bigr]+\alpha_n M_2^{*},\notag\\
+\text{trong đó}\quad M_2^{*} &= [2(\nm{x^{*}}\nm{z_n-x^{*}}+\nm{y^{*}}\nm{t_n-y^{*}})+\nm{x^{*}}^2+\nm{y^{*}}^2]>0. \label{eq:4.24}
+\end{align}
+Kết hợp \eqref{eq:4.24}, \eqref{eq:4.3}, và \eqref{eq:4.18}, ta thu được
+\begin{align*}
+\nm{x_{n+1}-x^{*}}^2+\nm{y_{n+1}-y^{*}}^2 &\le (1-\alpha_n)[\nm{z_n-x^{*}}^2+\nm{t_n-y^{*}}^2]+\alpha_n M_2^{*}\\
+&\le (1-\alpha_n)[\nm{w_n-x^{*}}^2+\nm{g_n-y^{*}}^2+\alpha_n M_1^{*}]+\alpha_n M_2^{*}\\
+&\le (1-\alpha_n)[\nm{x_n-x^{*}}^2+\nm{y_n-y^{*}}^2+\alpha_n M_1^{*}]+\alpha_n M_2^{*}\\
+&\le (1-\alpha_n)[\nm{x_n-x^{*}}^2+\nm{y_n-y^{*}}^2]+\alpha_n M_1^{*}+\alpha_n M_2^{*}\\
+&= (1-\alpha_n)[\nm{x_n-x^{*}}^2+\nm{y_n-y^{*}}^2]+\alpha_n M_3^{*}\\
+&\le \max\{\nm{x_n-x^{*}}^2+\nm{y_n-y^{*}}^2,\ M_3^{*}\}\\
+&\ \vdots\\
+&\le \max\Bigl\{\nm{x_{n_0}-x^{*}}^2+\nm{y_{n_0}-y^{*}}^2,\ M_3^{*}\Bigr\}.\\
+\text{trong đó}\quad M_3^{*} &= (M_1^{*}+M_2^{*})>0.
+\end{align*}
+Do đó, dãy $\{(x_n,y_n)\}$ bị chặn. Vì vậy, $\{z_n\},\{t_n\},\{q_n\}$, và $\{b_n\}$ cũng đều bị chặn.
+\end{proof}
+
+\begin{lemma}\label{lem:4.5}
+Giả sử Thuật toán 3.2 thỏa mãn Giả thiết 3.1. Khi đó, bất đẳng thức sau đúng với mọi $(x^{*},y^{*})\in\Omega$.
+\begin{align*}
+\beta_n(1-\alpha_n) &\Bigl[\frac{2-\ell}{\ell}\nm{z_n-v_n}^2+\frac{2-g}{g}\nm{t_n-s_n}^2+\psi_n(1-\psi_n)\nm{v_n-Yv_n}+\sigma_n(1-\sigma_n)\nm{s_n-Js_n}\Bigr]\\
+&\quad +(1-\alpha_n)\zeta_n\cdot\epsilon\Bigl[\nm{T_1^{*}(T_1w_n-T_2g_n)}^2+\nm{T_2^{*}(T_1w_n-T_2g_n)}^2\Bigr]\\
+&\le (1-\alpha_n)[\nm{x_n-x^{*}}^2+\nm{y_n-y^{*}}^2]-[\nm{x_{n+1}-x^{*}}^2+\nm{y_{n+1}-y^{*}}^2]+\alpha_n M_4^{*}\\
+&\quad +3M_5\alpha_n(1-\alpha_n)\frac{\tau_n}{\alpha_n}\nm{x_n-x_{n-1}}+3M_6\alpha_n(1-\alpha_n)\frac{\nu_n}{\alpha_n}\nm{y_n-y_{n-1}}.
+\end{align*}
+\end{lemma}
+
+\begin{proof}
+Cho $x^{*}\in\Omega$, khi đó theo định nghĩa của $\{w_n\}$ và Bổ đề~\ref{lem:2.5}, ta được
+\begin{align}
+\nm{w_n-x^{*}}^2 &= \nm{x_n+\tau_n(x_n-x_{n-1})-x^{*}}^2\notag\\
+&= \nm{x_n-x^{*}}^2+\tau_n^2\nm{x_n-x_{n-1}}^2+2\tau_n\inp{x_n-x^{*}}{x_n-x_{n-1}}\notag\\
+&\le \nm{x_n-x^{*}}^2+\tau_n^2\nm{x_n-x_{n-1}}^2+2\tau_n\nm{x_n-x^{*}}\nm{x_n-x_{n-1}}\notag\\
+&= \nm{x_n-x^{*}}^2+\tau_n\nm{x_n-x_{n-1}}(\tau_n\nm{x_n-x_{n-1}}+2\nm{x_n-x^{*}})\notag\\
+&\le \nm{x_n-x^{*}}^2+3M_5\tau_n\nm{x_n-x_{n-1}}\notag\\
+&= \nm{x_n-x^{*}}^2+3M_5\alpha_n\frac{\tau_n}{\alpha_n}\nm{x_n-x_{n-1}},\notag\\
+\text{trong đó}\quad M_5 &= \sup_{n\in\N}\{\nm{x_n-x^{*}},\tau_n\nm{x_n-x_{n-1}}\}>0. \label{eq:4.25}
+\end{align}
+Tương tự, ta có
+\begin{align}
+\nm{g_n-y^{*}}^2 &\le \nm{y_n-y^{*}}^2+3M_6\alpha_n\frac{\nu_n}{\alpha_n}\nm{y_n-y_{n-1}},\notag\\
+\text{trong đó}\quad M_6 &= \sup_{n\in\N}\{\nm{y_n-y^{*}},\nu_n\nm{y_n-y_{n-1}}\}>0. \label{eq:4.26}
+\end{align}
+Sử dụng \eqref{eq:4.25}, Bổ đề~\ref{lem:2.5}, và \eqref{eq:4.11}, ta có
+\begin{align}
+\nm{x_{n+1}-x^{*}}^2 &= \nm{(1-\alpha_n-\beta_n)(z_n-x^{*})+\beta_n(q_n-x^{*})-\alpha_n x^{*}}^2\notag\\
+&\le \nm{(1-\alpha_n-\beta_n)(z_n-x^{*})+\beta_n(q_n-x^{*})}^2-2\alpha_n\inp{x^{*}}{x_{n+1}-x^{*}}\notag\\
+&= (1-\alpha_n-\beta_n)^2\nm{z_n-x^{*}}^2+\beta_n^2\nm{q_n-x^{*}}^2\notag\\
+&\quad +2\beta_n(1-\alpha_n-\beta_n)\inp{z_n-x^{*}}{q_n-x^{*}}+2\alpha_n\inp{x^{*}}{x^{*}-x_{n+1}}\notag\\
+&\le (1-\alpha_n-\beta_n)^2\nm{z_n-x^{*}}^2+\beta_n^2\nm{q_n-x^{*}}^2\notag\\
+&\quad +\beta_n(1-\alpha_n-\beta_n)[\nm{z_n-x^{*}}^2+\nm{q_n-x^{*}}^2]+2\alpha_n\inp{x^{*}}{x^{*}-x_{n+1}}\notag\\
+&= (1-\alpha_n-\beta_n)(1-\alpha_n)\nm{z_n-x^{*}}^2\notag\\
+&\quad +\beta_n(1-\alpha_n)\nm{q_n-x^{*}}^2+2\alpha_n\inp{x^{*}}{x^{*}-x_{n+1}}\notag\\
+&\le (1-\alpha_n-\beta_n)(1-\alpha_n)\nm{z_n-x^{*}}^2+2\alpha_n\inp{x^{*}}{x^{*}-x_{n+1}}\notag\\
+&\quad +\beta_n(1-\alpha_n)\Bigl[\nm{z_n-x^{*}}^2-\frac{2-\ell}{\ell}\nm{z_n-v_n}^2-\psi_n(1-\psi_n)\nm{v_n-Yv_n}\Bigr]\notag\\
+&= (1-\alpha_n)^2\nm{z_n-x^{*}}^2+2\alpha_n\inp{x^{*}}{x^{*}-x_{n+1}}\notag\\
+&\quad -\beta_n(1-\alpha_n)\Bigl[\frac{2-\ell}{\ell}\nm{z_n-v_n}^2+\psi_n(1-\psi_n)\nm{v_n-Yv_n}\Bigr]\notag\\
+&\le (1-\alpha_n)\nm{z_n-x^{*}}^2+2\alpha_n\inp{x^{*}}{x^{*}-x_{n+1}}\notag\\
+&\quad -\beta_n(1-\alpha_n)\Bigl[\frac{2-\ell}{\ell}\nm{z_n-v_n}^2+\psi_n(1-\psi_n)\nm{v_n-Yv_n}\Bigr]. \label{eq:4.27}
+\end{align}
+Bằng cách làm theo một thủ tục tương tự như trên, ta thu được
+\begin{equation}
+\nm{y_{n+1}-y^{*}}^2\le(1-\alpha_n)\nm{t_n-y^{*}}^2+2\alpha_n\inp{y^{*}}{y^{*}-y_{n+1}}-\beta_n(1-\alpha_n)\Bigl[\frac{2-g}{g}\nm{t_n-s_n}^2+\sigma_n(1-\sigma_n)\nm{s_n-Js_n}\Bigr]. \label{eq:4.28}
+\end{equation}
+Ta cộng \eqref{eq:4.27}, \eqref{eq:4.28}, và \eqref{eq:4.3} để được
+\begin{align*}
+\nm{x_{n+1}-x^{*}}^2+\nm{y_{n+1}-y^{*}}^2 &\le (1-\alpha_n)[\nm{z_n-x^{*}}^2+\nm{t_n-y^{*}}^2]\\
+&\quad +2\alpha_n[\inp{x^{*}}{x^{*}-x_{n+1}}+\inp{y^{*}}{y^{*}-y_{n+1}}]-\beta_n(1-\alpha_n)\\
+&\quad \Bigl[\frac{2-\ell}{\ell}\nm{z_n-v_n}^2+\frac{2-g}{g}\nm{t_n-s_n}^2\\
+&\quad +\psi_n(1-\psi_n)\nm{v_n-Yv_n}+\sigma_n(1-\sigma_n)\nm{s_n-Js_n}\Bigr]\\
+&\le (1-\alpha_n)\Bigl[\nm{w_n-x^{*}}^2+\nm{g_n-y^{*}}^2-\zeta_n\cdot\epsilon[\nm{T_1^{*}(T_1w_n-T_2g_n)}^2\\
+&\quad +\nm{T_2^{*}(T_1w_n-T_2g_n)}^2]\Bigr]+2\alpha_n[\inp{x^{*}}{x^{*}-x_{n+1}}+\inp{y^{*}}{y^{*}-y_{n+1}}]\\
+&\quad -\beta_n(1-\alpha_n)\Bigl[\frac{2-\ell}{\ell}\nm{z_n-v_n}^2+\frac{2-g}{g}\nm{t_n-s_n}^2\\
+&\quad +\psi_n(1-\psi_n)\nm{v_n-Yv_n}+\sigma_n(1-\sigma_n)\nm{s_n-Js_n}\Bigr]\\
+&\le (1-\alpha_n)\Bigl[\nm{x_n-x^{*}}^2+\nm{y_n-y^{*}}^2+3M_5\alpha_n\frac{\tau_n}{\alpha_n}\nm{x_n-x_{n-1}}\\
+&\quad +3M_6\alpha_n\frac{\nu_n}{\alpha_n}\nm{y_n-y_{n-1}}\Bigr]-(1-\alpha_n)\zeta_n\cdot\epsilon\Bigl[\nm{T_1^{*}(T_1w_n-T_2g_n)}^2\\
+&\quad +\nm{T_2^{*}(T_1w_n-T_2g_n)}^2\Bigr]+2\alpha_n[\inp{x^{*}}{x^{*}-x_{n+1}}+\inp{y^{*}}{y^{*}-y_{n+1}}]\\
+&\quad -\beta_n(1-\alpha_n)\Bigl[\frac{2-\ell}{\ell}\nm{z_n-v_n}^2+\frac{2-g}{g}\nm{t_n-s_n}^2\\
+&\quad +\psi_n(1-\psi_n)\nm{v_n-Yv_n}+\sigma_n(1-\sigma_n)\nm{s_n-Js_n}\Bigr]\\
+&\le (1-\alpha_n)[\nm{x_n-x^{*}}^2+\nm{y_n-y^{*}}^2]+\alpha_n M_4^{*}\\
+&\quad +3M_5\alpha_n(1-\alpha_n)\frac{\tau_n}{\alpha_n}\nm{x_n-x_{n-1}}+3M_6\alpha_n(1-\alpha_n)\frac{\nu_n}{\alpha_n}\nm{y_n-y_{n-1}}\\
+&\quad -(1-\alpha_n)\zeta_n\cdot\epsilon\Bigl[\nm{T_1^{*}(T_1w_n-T_2g_n)}^2+\nm{T_2^{*}(T_1w_n-T_2g_n)}^2\Bigr]\\
+&\quad -\beta_n(1-\alpha_n)\Bigl[\frac{2-\ell}{\ell}\nm{z_n-v_n}^2+\frac{2-g}{g}\nm{t_n-s_n}^2\\
+&\quad +\psi_n(1-\psi_n)\nm{v_n-Yv_n}+\sigma_n(1-\sigma_n)\nm{s_n-Js_n}\Bigr],
+\end{align*}
+trong đó $M_4^{*}=[\nm{x^{*}}^2+\nm{x^{*}-x_{n+1}}^2+\nm{y^{*}}^2+\nm{y^{*}-y_{n+1}}^2]>0$. Do đó, ta có bất đẳng thức cần chứng minh.
+\end{proof}
+
+\begin{lemma}\label{lem:4.6}
+Giả sử Giả thiết 3.1 được thỏa mãn bởi Thuật toán 3.2. Khi đó, bất đẳng thức sau đúng với mọi $(x^{*},y^{*})\in\Omega$:
+\begin{align*}
+\nm{x_{n+1}-x^{*}}^2+\nm{y_{n+1}-y^{*}}^2 &\le (1-\alpha_n)[\nm{x_n-x^{*}}^2+\nm{y_n-y^{*}}^2]\\
+&\quad +\alpha_n\Bigl[3M_5(1-\alpha_n)\frac{\tau_n}{\alpha_n}\nm{x_n-x_{n-1}}+3M_6(1-\alpha_n)\frac{\nu_n}{\alpha_n}\nm{y_n-y_{n-1}}\\
+&\quad +2\beta_n\nm{z_n-q_n}\nm{x_{n+1}-x^{*}}+2\beta_n\nm{t_n-b_n}\nm{y_{n+1}-y^{*}}\\
+&\quad +2\inp{x^{*}}{x^{*}-x_{n+1}}+2\inp{y^{*}}{y^{*}-y_{n+1}}\Bigr].
+\end{align*}
+\end{lemma}
+
+\begin{proof}
+Cho $(x^{*},y^{*})\in\Omega$, và ta đặt $l_n=(1-\beta_n)z_n+\beta_n q_n$. Bằng cách áp dụng \eqref{eq:4.25}, \eqref{eq:4.11}, và Bổ đề~\ref{lem:2.5}, ta được
+\begin{align}
+\nm{l_n-x^{*}}^2 &= \nm{(1-\beta_n)(z_n-x^{*})+\beta_n(q_n-x^{*})}^2\notag\\
+&= (1-\beta_n)^2\nm{z_n-x^{*}}^2+\beta_n^2\nm{q_n-x^{*}}^2+2\beta_n(1-\beta_n)\inp{z_n-x^{*}}{q_n-x^{*}}\notag\\
+&\le (1-\beta_n)^2\nm{z_n-x^{*}}^2+\beta_n^2\nm{q_n-x^{*}}^2+2\beta_n(1-\beta_n)[\nm{z_n-x^{*}}^2+\nm{q_n-x^{*}}^2]\notag\\
+&= (1-\beta_n)\nm{z_n-x^{*}}^2+\beta_n\nm{q_n-x^{*}}^2\notag\\
+&\le (1-\beta_n)\nm{z_n-x^{*}}^2+\beta_n\nm{z_n-x^{*}}^2\notag\\
+&= \nm{z_n-x^{*}}^2. \label{eq:4.29}
+\end{align}
+Làm theo một thủ tục tương tự như trên, ta đặt $p_n=(1-\alpha_n)t_n+\beta_n b_n$, và ta thu được
+\begin{equation}
+\nm{p_n-y^{*}}^2\le\nm{t_n-y^{*}}^2. \label{eq:4.30}
+\end{equation}
+Bằng cách cộng \eqref{eq:4.29}, \eqref{eq:4.30}, và áp dụng \eqref{eq:4.25} và \eqref{eq:4.26}, ta có
+\begin{align}
+\nm{l_n-x^{*}}^2+\nm{p_n-y^{*}}^2 &\le \nm{z_n-x^{*}}^2+\nm{t_n-y^{*}}^2\notag\\
+&\le \nm{w_n-x^{*}}^2+\nm{g_n-y^{*}}^2\notag\\
+&\le \nm{x_n-x^{*}}^2+3M_5\alpha_n\frac{\tau_n}{\alpha_n}\nm{x_n-x_{n-1}}+\nm{y_n-y^{*}}^2+3M_6\alpha_n\frac{\nu_n}{\alpha_n}\nm{y_n-y_{n-1}}. \label{eq:4.31}
+\end{align}
+Ngoài ra, ta có
+\begin{align}
+x_{n+1} &= l_n-\alpha_n z_n\notag\\
+&= (1-\alpha_n)l_n-\alpha_n(z_n-l_n)\notag\\
+&= (1-\alpha_n)l_n-\alpha_n\beta_n(z_n-q_n). \label{eq:4.32}
+\end{align}
+Tương tự, ta thu được
+\begin{equation}
+y_{n+1}=(1-\alpha_n)p_n-\alpha_n\beta_n(t_n-b_n). \label{eq:4.33}
+\end{equation}
+Sử dụng \eqref{eq:4.33}, \eqref{eq:4.32}, cùng với Bổ đề~\ref{lem:2.5}, ta được
+\begin{align}
+\nm{x_{n+1}-x^{*}}^2 &= \nm{(1-\alpha_n)(l_n-x^{*})-[\alpha_n\beta_n(z_n-q_n)+\alpha_n x^{*}]}^2\notag\\
+&\le (1-\alpha_n)^2\nm{l_n-x^{*}}^2-2\inp{\alpha_n\beta_n(z_n-q_n)+\alpha_n x^{*}}{x_{n+1}-x^{*}}\notag\\
+&\le (1-\alpha_n)^2\nm{l_n-x^{*}}^2+2\alpha_n\beta_n\inp{z_n-q_n}{x^{*}-x_{n+1}}+2\alpha_n\inp{x^{*}}{x^{*}-x_{n+1}}\notag\\
+&\le (1-\alpha_n)\nm{l_n-x^{*}}^2+\alpha_n[2\beta_n\nm{z_n-q_n}\nm{x_{n+1}-x^{*}}+2\inp{x^{*}}{x^{*}-x_{n+1}}]. \label{eq:4.34}
+\end{align}
+Làm theo một thủ tục tương tự, ta thu được
+\begin{equation}
+\nm{y_{n+1}-y^{*}}^2\le(1-\alpha_n)\nm{p_n-y^{*}}^2+\alpha_n[2\beta_n\nm{t_n-b_n}\nm{y_{n+1}-y^{*}}+2\inp{y^{*}}{y^{*}-y_{n+1}}]. \label{eq:4.35}
+\end{equation}
+Cộng \eqref{eq:4.34}, \eqref{eq:4.35}, cùng với \eqref{eq:4.31}, ta được
+\begin{align*}
+\nm{x_{n+1}-x^{*}}^2+\nm{y_{n+1}-y^{*}}^2 &\le (1-\alpha_n)[\nm{l_n-x^{*}}^2+\nm{p_n-y^{*}}^2]\\
+&\quad +\alpha_n\Bigl[2\beta_n\nm{z_n-q_n}\nm{x_{n+1}-x^{*}}+2\beta_n\nm{t_n-b_n}\nm{y_{n+1}-y^{*}}\\
+&\quad +2\inp{x^{*}}{x^{*}-x_{n+1}}+2\inp{y^{*}}{y^{*}-y_{n+1}}\Bigr]\\
+&\le (1-\alpha_n)\Bigl[\nm{x_n-x^{*}}^2+3M_5\alpha_n\frac{\tau_n}{\alpha_n}\nm{x_n-x_{n-1}}+\nm{y_n-y^{*}}^2\\
+&\quad +3M_6\alpha_n\frac{\nu_n}{\alpha_n}\nm{y_n-y_{n-1}}\Bigr]\\
+&\quad +\alpha_n\Bigl[2\beta_n\nm{z_n-q_n}\nm{x_{n+1}-x^{*}}+2\beta_n\nm{t_n-b_n}\nm{y_{n+1}-y^{*}}\\
+&\quad +2\inp{x^{*}}{x^{*}-x_{n+1}}+2\inp{y^{*}}{y^{*}-y_{n+1}}\Bigr]\\
+&= (1-\alpha_n)[\nm{x_n-x^{*}}^2+\nm{y_n-y^{*}}^2]+\alpha_n\Bigl[3M_5(1-\alpha_n)\frac{\tau_n}{\alpha_n}\nm{x_n-x_{n-1}}\\
+&\quad +3M_6(1-\alpha_n)\frac{\nu_n}{\alpha_n}\nm{y_n-y_{n-1}}+2\beta_n\nm{z_n-q_n}\nm{x_{n+1}-x^{*}}\\
+&\quad +2\beta_n\nm{t_n-b_n}\nm{y_{n+1}-y^{*}}+2\inp{x^{*}}{x^{*}-x_{n+1}}+2\inp{y^{*}}{y^{*}-y_{n+1}}\Bigr].
+\end{align*}
+\end{proof}
+
+\begin{lemma}\label{lem:4.7}
+Giả sử Giả thiết 3.1 đúng đối với Thuật toán 3.2. Nếu tồn tại một dãy con $\{(z_{n_k},t_{n_k})\}$ của $\{(z_n,t_n)\}$ sao cho $(z_{n_k},t_{n_k})\wto(\hat{x},\hat{y})\in H_1\times H_2$, với $\lim_{k\to\infty}\nm{z_{n_k}-u_{n_k}}=0$ và $\lim_{k\to\infty}\nm{t_{n_k}-r_{n_k}}=0$. Khi đó, hoặc $(\hat{x},\hat{y})\in\Gam\times\Gams$ hoặc $\Fc\hat{x}=\Gc\hat{y}=0$.
+\end{lemma}
+
+\begin{proof}
+Ta đã biết rằng $\{z_n\}$ bị chặn, do đó $\omega_{*}(z_n)\ne\emptyset$. Khi đó với $\hat{x}\in\omega_{*}(z_n)$ tùy ý, tồn tại một dãy con $\{z_{n_k}\}$ của $\{z_n\}$ sao cho $z_{n_k}\wto\hat{x}$, $k\to\infty$. Theo giả thiết, ta có $u_{n_k}\wto\hat{x}\in C$. Ta xét hai trường hợp như sau.
+
+\medskip
+\noindent\textbf{Trường hợp 1:} Nếu $\limsup_{k\to\infty}\nm{\Fc u_{n_k}}=0$, điều này kéo theo $\lim_{k\to\infty}\nm{\Fc u_{n_k}}=\liminf_{k\to\infty}\nm{\Fc u_{n_k}}=0$. Theo điều kiện (A2), ta có $0\le\nm{\Fc\hat{x}}\le\liminf_{k\to\infty}\nm{\Fc u_{n_k}}=0$. Do đó, $\Fc\hat{x}=0$.
+
+\medskip
+\noindent\textbf{Trường hợp 2:} Nếu $\limsup_{k\to\infty}\nm{\Fc u_{n_k}}>0$. Không mất tính tổng quát, cho $\lim_{k\to\infty}\nm{\Fc u_{n_k}}=\mathcal{J}_{*}>0$. Do đó, tồn tại $n_2\in\N$ sao cho $\nm{\Fc u_{n_k}}>\dfrac{\mathcal{J}_{*}}{2}$, $\forall k\ge n_2$. Theo định nghĩa của $\{u_n\}$ và tính chất phép chiếu, $\forall x\in C$, ta thu được
+\begin{align}
+&\inp{u_{n_k}-z_{n_k}+\xi_{n_k}\Fc z_{n_k}}{x-u_{n_k}}\ge 0\notag\\
+&\Longrightarrow \inp{z_{n_k}-u_{n_k}}{x-u_{n_k}}\le\xi_{n_k}\inp{\Fc z_{n_k}}{x-u_{n_k}}\notag\\
+&\Longrightarrow \frac{1}{\xi_{n_k}}\inp{z_{n_k}-u_{n_k}}{x-u_{n_k}}\le\inp{\Fc u_{n_k}}{x-u_{n_k}}+\inp{\Fc z_{n_k}-\Fc u_{n_k}}{x-u_{n_k}}. \label{eq:4.36}
+\end{align}
+Ngoài ra, vì $\{u_{n_k}\}$ bị chặn, và $\lim_{k\to\infty}\xi_{n_k}=\xi>0$, $\lim_{k\to\infty}\nm{u_{n_k}-z_{n_k}}=0$, và theo tính liên tục Lipschitz của $\Fc$, ta có
+\begin{equation}
+0\le\liminf_{k\to\infty}\inp{\Fc u_{n_k}}{x-u_{n_k}}\le\limsup_{k\to\infty}\inp{\Fc u_{n_k}}{x-u_{n_k}}<+\infty. \label{eq:4.37}
+\end{equation}
+Nếu $\limsup_{k\to\infty}\inp{\Fc u_{n_k}}{x-u_{n_k}}>0$, thì tồn tại một dãy con $\{u_{n_{k_j}}\}$ sao cho $\lim_{j\to\infty}\inp{\Fc u_{n_{k_j}}}{x-u_{n_{k_j}}}>0$. Do đó, tồn tại $j_{*}\in\N$ sao cho $\inp{\Fc u_{n_{k_j}}}{x-u_{n_{k_j}}}>0$, $\forall j\ge j_{*}$. Theo tính tựa đơn điệu của $\Fc$, $\inp{\Fc x}{x-u_{n_{k_j}}}\ge 0$, $\forall j\ge j_{*}$. Do đó, $\hat{x}\in\Gam$, khi $j\to\infty$. Tuy nhiên, nếu $\limsup_{k\to\infty}\inp{\Fc u_{n_k}}{x-u_{n_k}}=0$, thì từ \eqref{eq:4.37}, ta có
+\[
+\lim_{k\to\infty}\inp{\Fc u_{n_k}}{x-u_{n_k}}=\liminf_{k\to\infty}\inp{\Fc u_{n_k}}{x-u_{n_k}}=\limsup_{k\to\infty}\inp{\Fc u_{n_k}}{x-u_{n_k}}=0.
+\]
+Ta đặt $\bar{\varsigma}_k=\abs{\inp{\Fc u_{n_k}}{x-u_{n_k}}}+\dfrac{1}{k+1}$. Khi đó,
+\begin{equation}
+\inp{\Fc u_{n_k}}{x-u_{n_k}}+\bar{\varsigma}_k>0. \label{eq:4.38}
+\end{equation}
+Cho $\bar{\varkappa}_{n_k}=\dfrac{\Fc u_{n_k}}{\nm{\Fc u_{n_k}}^2}$, $\forall k\ge n_2$. Khi đó, ta được
+\begin{equation}
+\inp{\Fc u_{n_k}}{\bar{\varkappa}_{n_k}}=1. \label{eq:4.39}
+\end{equation}
+Do đó từ \eqref{eq:4.38}, ta được $\inp{\Fc u_{n_k}}{x+\bar{\varsigma}_k\bar{\varkappa}_{n_k}-u_{n_k}}>0$, $\forall k\ge n_2$. Vì $\Fc$ tựa đơn điệu và liên tục Lipschitz, ta có $\inp{\Fc(x+\bar{\varsigma}_k\bar{\varkappa}_{n_k})}{x+\bar{\varsigma}_k\bar{\varkappa}_{n_k}-u_{n_k}}\ge 0$, $\forall k\ge n_2$. Do đó, $\forall k\ge n_2$, ta có
+\begin{align}
+\inp{\Fc x}{x+\bar{\varsigma}_k\bar{\varkappa}_{n_k}-u_{n_k}} &= \inp{\Fc x-\Fc(x+\bar{\varsigma}_k\bar{\varkappa}_{n_k})}{x+\bar{\varsigma}_k\bar{\varkappa}_{n_k}-u_{n_k}}\notag\\
+&\quad +\inp{\Fc(x+\bar{\varsigma}_k\bar{\varkappa}_{n_k})}{x+\bar{\varsigma}_k\bar{\varkappa}_{n_k}-u_{n_k}}\notag\\
+&\ge \inp{\Fc x-\Fc(x+\bar{\varsigma}_k\bar{\varkappa}_{n_k})}{x+\bar{\varsigma}_k\bar{\varkappa}_{n_k}-u_{n_k}}\notag\\
+&\ge -\nm{\Fc x-\Fc(x+\bar{\varsigma}_k\bar{\varkappa}_{n_k})}\nm{x+\bar{\varsigma}_k\bar{\varkappa}_{n_k}-u_{n_k}}\notag\\
+&\ge -\bar{\varsigma}_k\Dc_1\nm{\bar{\varkappa}_{n_k}}\nm{x+\bar{\varsigma}_k\bar{\varkappa}_{n_k}-u_{n_k}}\notag\\
+&= -\bar{\varsigma}_k\frac{\Dc_1}{\nm{\Fc u_{n_k}}}\nm{x+\bar{\varsigma}_k\bar{\varkappa}_{n_k}-u_{n_k}}\notag\\
+&\ge -\bar{\varsigma}_k\frac{2\Dc_1}{\mathcal{J}_{*}}\nm{x+\bar{\varsigma}_k\bar{\varkappa}_{n_k}-u_{n_k}}. \label{eq:4.40}
+\end{align}
+Vì $\{\nm{x+\bar{\varsigma}_k\bar{\varkappa}_{n_k}-u_{n_k}}\}$ bị chặn và $\lim_{k\to\infty}\bar{\varsigma}_k=0$. Khi đó, bằng cách cho $k\to\infty$ trong \eqref{eq:4.40}, ta thu được $\inp{\Fc x}{x-\hat{x}}\ge 0$, $\forall x\in C$. Do đó, $\hat{x}\in\Gam$. Bằng một thủ tục tương tự, ta được $\hat{y}\in\Gams$. Do đó, chứng minh hoàn tất.
+\end{proof}
+
+\begin{theorem}\label{thm:4.8}
+Giả sử Thuật toán 3.2 thỏa mãn Giả thiết 3.1 với $\Fc x\ne 0$, $\forall x\in C$ và $\Gc y\ne 0$, $\forall y\in Q$. Khi đó dãy $\{(x_n,y_n)\}$ hội tụ mạnh về $(\hat{x},\hat{y})\in\Omega$, trong đó $\hat{x}=P_A(0)$ và $\hat{y}=P_B(0)$; $A:=\Gam\cap \Fix{S_1}$ và $B:=\Gams\cap \Fix{S_2}$.
+\end{theorem}
+
+\begin{proof}
+Cho $(\hat{x},\hat{y})\in\Omega$, trong đó $\hat{x}=P_A(0)$ và $\hat{y}=P_B(0)$. Khi đó theo Bổ đề~\ref{lem:4.6}, ta có
+\begin{align}
+\nm{x_{n+1}-\hat{x}}^2 &+ \nm{y_{n+1}-\hat{y}}^2\le(1-\alpha_n)[\nm{x_n-\hat{x}}^2+\nm{y_n-\hat{y}}^2]+\alpha_n b_n^{*},\notag\\
+\text{trong đó}\quad b_n^{*} &= \Bigl[3M_5(1-\alpha_n)\frac{\tau_n}{\alpha_n}\nm{x_n-x_{n-1}}+3M_6(1-\alpha_n)\frac{\nu_n}{\alpha_n}\nm{y_n-y_{n-1}}\notag\\
+&\quad +2\beta_n\nm{z_n-q_n}\nm{x_{n+1}-\hat{x}}+2\beta_n\nm{t_n-b_n}\nm{y_{n+1}-\hat{y}}\notag\\
+&\quad +2\inp{\hat{x}}{\hat{x}-x_{n+1}}+2\inp{\hat{y}}{\hat{y}-y_{n+1}}\Bigr]. \label{eq:4.41}
+\end{align}
+Do đó, ta khẳng định rằng dãy $\{\nm{x_n-\hat{x}}+\nm{y_n-\hat{y}}\}$ hội tụ về không. Vì vậy, theo Bổ đề~\ref{lem:2.10}, chỉ cần chứng minh rằng $\limsup_{k\to\infty}b_n^{*}\le 0$, với mọi dãy con $\{\nm{x_{n_k}-\hat{x}}+\nm{y_{n_k}-\hat{y}}\}$ của $\{\nm{x_n-\hat{x}}+\nm{y_n-\hat{y}}\}$ thỏa mãn
+\begin{equation}
+\liminf_{k\to\infty}[(\nm{x_{n_k+1}-\hat{x}}+\nm{y_{n_k+1}-\hat{y}})-(\nm{x_{n_k}-\hat{x}}+\nm{y_{n_k}-\hat{y}})]\ge 0. \label{eq:4.42}
+\end{equation}
+Bây giờ, ta giả sử rằng $\{\nm{x_{n_k}-\hat{x}}+\nm{y_{n_k}-\hat{y}}\}$ là một dãy con của $\{\nm{x_n-\hat{x}}+\nm{y_n-\hat{y}}\}$, sao cho \eqref{eq:4.42} được thỏa mãn. Do đó, theo Bổ đề~\ref{lem:4.5}, ta được
+\begin{align*}
+\beta_{n_k}(1-\alpha_{n_k}) &\Bigl[\frac{2-\ell}{\ell}\nm{z_{n_k}-v_{n_k}}^2+\frac{2-g}{g}\nm{t_{n_k}-s_{n_k}}^2+\psi_{n_k}(1-\psi_{n_k})\nm{v_{n_k}-Yv_{n_k}}\\
+&\quad +\sigma_{n_k}(1-\sigma_{n_k})\nm{s_{n_k}-Js_{n_k}}\Bigr]+(1-\alpha_{n_k})\zeta_{n_k}\\
+&\quad \cdot\epsilon\Bigl[\nm{T_1^{*}(T_1w_{n_k}-T_2g_{n_k})}^2+\nm{T_2^{*}(T_1w_{n_k}-T_2g_{n_k})}^2\Bigr]\\
+&\le (1-\alpha_{n_k})[\nm{x_{n_k}-\hat{x}}^2+\nm{y_{n_k}-\hat{y}}^2]-[\nm{x_{n_k+1}-\hat{x}}^2+\nm{y_{n_k+1}-\hat{y}}^2]+\alpha_{n_k}M_4^{*}\\
+&\quad +3M_5\alpha_{n_k}(1-\alpha_{n_k})\frac{\tau_{n_k}}{\alpha_{n_k}}\nm{x_{n_k}-x_{n_k-1}}+3M_6\alpha_{n_k}(1-\alpha_{n_k})\frac{\nu_{n_k}}{\alpha_{n_k}}\nm{y_{n_k}-y_{n_k-1}}.
+\end{align*}
+Do đó, theo \eqref{eq:4.42}, Nhận xét~\ref{rem:3.4}, và các điều kiện đặt lên các tham số điều khiển, ta được
+\begin{align*}
+\lim_{k\to\infty}\Bigl[\beta_{n_k}(1-\alpha_{n_k}) &\Bigl[\frac{2-\ell}{\ell}\nm{z_{n_k}-v_{n_k}}^2+\frac{2-g}{g}\nm{t_{n_k}-s_{n_k}}^2+\psi_{n_k}(1-\psi_{n_k})\nm{v_{n_k}-Yv_{n_k}}\\
+&\quad +\sigma_{n_k}(1-\sigma_{n_k})\nm{s_{n_k}-Js_{n_k}}\Bigr]+(1-\alpha_{n_k})\zeta_{n_k}\\
+&\quad \cdot\epsilon\Bigl[\nm{T_1^{*}(T_1w_{n_k}-T_2g_{n_k})}^2+\nm{T_2^{*}(T_1w_{n_k}-T_2g_{n_k})}^2\Bigr]\Bigr]=0.
+\end{align*}
+Do đó, ta thu được
+\begin{align}
+&\lim_{k\to\infty}\nm{z_{n_k}-v_{n_k}}=0,\quad \lim_{k\to\infty}\nm{t_{n_k}-s_{n_k}}=0,\notag\\
+&\lim_{k\to\infty}\nm{v_{n_k}-Yv_{n_k}}=0,\quad \lim_{k\to\infty}\nm{s_{n_k}-Js_{n_k}}=0,\notag\\
+&\lim_{k\to\infty}[\nm{T_1^{*}(T_1w_{n_k}-T_2g_{n_k})}^2+\nm{T_2^{*}(T_1w_{n_k}-T_2g_{n_k})}^2]=0. \label{eq:4.43}
+\end{align}
+Do đó,
+\begin{align*}
+&\lim_{k\to\infty}\nm{T_1^{*}(T_1w_{n_k}-T_2g_{n_k})}=0,\quad \lim_{k\to\infty}\nm{T_2^{*}(T_1w_{n_k}-T_2g_{n_k})}=0,\\
+&\lim_{k\to\infty}\nm{(T_1w_{n_k}-T_2g_{n_k})}=0.
+\end{align*}
+Theo định nghĩa của $\{z_{n_k}\},\{t_{n_k}\}$ và bất đẳng thức trước đó, ta thấy rằng
+\begin{align}
+&\lim_{k\to\infty}\nm{z_{n_k}-w_{n_k}}=\lim_{k\to\infty}\zeta_{n_k}\nm{T_1^{*}(T_1w_{n_k}-T_2g_{n_k})}=0,\notag\\
+&\lim_{k\to\infty}\nm{t_{n_k}-g_{n_k}}=\lim_{k\to\infty}\zeta_{n_k}\nm{T_2^{*}(T_1w_{n_k}-T_2g_{n_k})}=0. \label{eq:4.44}
+\end{align}
+Ngoài ra, sử dụng Bổ đề~\ref{lem:4.3} và \eqref{eq:4.43}, ta được
+\begin{equation}
+\lim_{k\to\infty}\nm{z_{n_k}-u_{n_k}}=0,\quad \lim_{k\to\infty}\nm{t_{n_k}-r_{n_k}}=0. \label{eq:4.45}
+\end{equation}
+Theo Nhận xét~\ref{rem:3.4}, \textbf{Bước 2} và \textbf{Bước 5}, ta có
+\begin{align}
+&\lim_{k\to\infty}\nm{w_{n_k}-x_{n_k}}=\lim_{k\to\infty}\tau_{n_k}\nm{x_{n_k}-x_{n_k-1}}=0,\quad\text{và,}\notag\\
+&\lim_{k\to\infty}\nm{g_{n_k}-y_{n_k}}=\lim_{k\to\infty}\nu_{n_k}\nm{y_{n_k}-y_{n_k-1}}=0. \label{eq:4.46}
+\end{align}
+Khi đó, \eqref{eq:4.43}--\eqref{eq:4.46}, cùng với các điều kiện trên các tham số điều khiển, cho ta
+\begin{align}
+&\lim_{k\to\infty}\nm{z_{n_k}-x_{n_k}}=0;\ \lim_{k\to\infty}\nm{t_{n_k}-y_{n_k}}=0;\ \lim_{k\to\infty}\nm{u_{n_k}-v_{n_k}}=0;\notag\\
+&\lim_{k\to\infty}\nm{r_{n_k}-s_{n_k}}=0;\ \lim_{k\to\infty}\nm{q_{n_k}-v_{n_k}}=0;\ \lim_{k\to\infty}\nm{b_{n_k}-s_{n_k}}=0. \label{eq:4.47}
+\end{align}
+Sử dụng \eqref{eq:4.43}--\eqref{eq:4.47}, ta được
+\begin{align}
+&\lim_{k\to\infty}\nm{z_{n_k}-q_{n_k}}=\lim_{k\to\infty}\nm{t_{n_k}-b_{n_k}}=0\notag\\
+&\lim_{k\to\infty}\nm{u_{n_k}-x_{n_k}}=\lim_{k\to\infty}\nm{r_{n_k}-x_{n_k}}=0. \label{eq:4.48}
+\end{align}
+Áp dụng \eqref{eq:4.21}, \eqref{eq:4.47}, và sự kiện $\lim_{k\to\infty}\alpha_{n_k}=0$, ta có
+\begin{align}
+\nm{x_{n+1}-x_{n_k}} &\le (1-\alpha_{n_k})\nm{z_{n_k}-x_{n_k}}+\alpha_{n_k}\nm{x_{n_k}}\to 0.\text{ khi } n\to\infty\notag\\
+\text{do đó cũng vậy,}\quad &\lim_{k\to\infty}\nm{y_{n+1}-y_{n_k}}=\lim_{k\to\infty}\nm{x_{n+1}-w_{n_k}}=0,\text{ và } \lim_{k\to\infty}\nm{y_{n+1}-g_{n_k}}=0. \label{eq:4.49}
+\end{align}
+Để hoàn thành chứng minh, chỉ cần chứng minh rằng $(\omega_{*}(x_n),\omega_{*}(y_n))\in\Omega$. Vì $\{x_n\}$ và $\{y_n\}$ bị chặn, nên $\omega_{*}(x_n)$ và $\omega_{*}(y_n)$ khác rỗng. Vậy, ta chọn $\hat{x}\in\omega_{*}(x_n)$ và $\hat{y}\in\omega_{*}(y_n)$ tùy ý. Theo định nghĩa, tồn tại một dãy con $\{(x_{n_k},y_{n_k})\}$ của $\{(x_n,y_n)\}$ sao cho $(x_{n_k},y_{n_k})\wto(\hat{x},\hat{y})$, khi $k\to\infty$. Từ \eqref{eq:4.46} và \eqref{eq:4.48}, ta có $(\omega_{*}(x_n),\omega_{*}(y_n))=(\omega_{*}(w_n),\omega_{*}(g_n))=(\omega_{*}(u_n),\omega_{*}(r_n))$, tức là $(w_{n_k},g_{n_k})\wto(\hat{x},\hat{y})$, khi $k\to\infty$. Ta có $(\hat{x},\hat{y})\in C\times Q$ vì $(u_n,r_n)\in C\times Q$ và $C,Q$ đều đóng yếu. Bây giờ, vì ta giả sử $\Fc x\ne 0$, $\forall x\in C$ và $\Gc y\ne 0$, $\forall y\in Q$. Khi đó, $\Fc\hat{x}\ne 0$ và $\Gc\hat{y}\ne 0$. Bằng cách áp dụng Bổ đề~\ref{lem:4.7} và \eqref{eq:4.45}, ta được $(\hat{x},\hat{y})\in\Gam\times\Gams$. Do đó, $(\hat{x},\hat{y})\in\Omega$. Hơn nữa, vì $I-S_i$ nửa đóng tại không, $i=1,2$, nên theo Bổ đề~\ref{lem:2.11}, \eqref{eq:4.43} và \eqref{eq:4.47}, ta suy ra $\hat{x}=F(Y)=\Fix{S_1}$, và $\hat{y}=F(J)=\Fix{S_2}$. Do đó, ta có $(\hat{x},\hat{y})\in\Omega$. Lại nữa, vì $(T_1\hat{x}-T_2\hat{y})\in\omega_{*}(T_1w_n-T_2g_n)$, ta có từ tính nửa liên tục dưới yếu của chuẩn rằng
+\[
+\nm{T_1\hat{x}-T_2\hat{y}}\le\liminf_{n\to\infty}\nm{T_1w_n-T_2g_n}=0.
+\]
+
+Do đó, $(\hat{x},\hat{y})\in\Omega$. Bây giờ, vì $\hat{x}\in\omega_{*}(x_n)$ và $\hat{y}\in\omega_{*}(y_n)$ được chọn tùy ý, điều này chỉ ra rằng $(\omega_{*}(x_n),\omega_{*}(y_n))\in\Omega$. Tiếp theo, ta chứng minh rằng
+\[
+\limsup_{k\to\infty}\bigl(\inp{\hat{x}}{\hat{x}-x_{n+1}}+\inp{\hat{y}}{\hat{y}-y_{n+1}}\bigr)\le 0.
+\]
+Do tính bị chặn của $\{x_{n_k}\}$, tồn tại một dãy con $\{x_{n_{k_j}}\}$ của $\{x_{n_k}\}$ hội tụ yếu về một $x^{\dagger}\in H$ nào đó, và sao cho
+\begin{equation}
+\lim_{j\to\infty}\inp{\hat{x}}{\hat{x}-x_{n_{k_j}}}=\limsup_{k\to\infty}\inp{\hat{x}}{\hat{x}-x_{n_k}}. \label{eq:4.50}
+\end{equation}
+Vì $\hat{x}=P_A(0)$, khi đó sử dụng \eqref{eq:4.50}, ta thu được
+\begin{equation}
+\limsup_{k\to\infty}\inp{\hat{x}}{\hat{x}-x_{n_k}}=\lim_{j\to\infty}\inp{\hat{x}}{\hat{x}-x_{n_{k_j}}}=\inp{\hat{x}}{\hat{x}-x^{\dagger}}\le 0. \label{eq:4.51}
+\end{equation}
+Vậy, theo \eqref{eq:4.47} và \eqref{eq:4.51}, ta được
+\begin{equation}
+\limsup_{k\to\infty}\inp{\hat{x}}{\hat{x}-x_{n_k+1}}=\limsup_{k\to\infty}\inp{\hat{x}}{\hat{x}-x_{n_k}}=\inp{\hat{x}}{\hat{x}-x^{\dagger}}\le 0. \label{eq:4.52}
+\end{equation}
+Ngoài ra, vì $\hat{y}=P_B(0)$, bằng cách làm theo một thủ tục tương tự, ta thu được
+\begin{equation}
+\limsup_{k\to\infty}\inp{\hat{y}}{\hat{y}-y_{n_k+1}}=\limsup_{k\to\infty}\inp{\hat{y}}{\hat{y}-y_{n_k}}=\inp{\hat{y}}{\hat{y}-y^{\dagger}}\le 0. \label{eq:4.53}
+\end{equation}
+Bằng cách cộng \eqref{eq:4.52} và \eqref{eq:4.53}, ta có
+\begin{equation}
+\Bigl(\limsup_{k\to\infty}\inp{\hat{x}}{\hat{x}-x_{n_k+1}}+\limsup_{k\to\infty}\inp{\hat{y}}{\hat{y}-y_{n_k+1}}\Bigr)\le 0. \label{eq:4.54}
+\end{equation}
+Do đó, từ \eqref{eq:4.47}, \eqref{eq:4.54}, và \eqref{eq:4.48}, ta được
+\[
+\limsup_{k\to\infty}b_n^{*}\le 0.
+\]
+Khi đó, bằng cách áp dụng Bổ đề~\ref{lem:2.10} cho \eqref{eq:4.41}, ta thấy rằng $\{\nm{x_n-\hat{x}}+\nm{y_n-\hat{y}}\}$ hội tụ về không. Do đó, $\lim_{n\to\infty}\nm{x_n-\hat{x}}=0$ và $\lim_{n\to\infty}\nm{y_n-\hat{y}}=0$. Vì vậy, $\{(x_n,y_n)\}$ hội tụ mạnh về $(\hat{x},\hat{y})$.
+\end{proof}
+
+\begin{remark}
+Việc nới lỏng điều kiện $\Fc x\ne 0$, $\forall x\in C$ và $\Gc y\ne 0$, $\forall y\in Q$ đang là mối quan tâm của các nhà nghiên cứu gần đây. Chúng tôi sẽ khảo sát những cách khả dĩ để lấp đầy khoảng trống này trong nghiên cứu tương lai.
+\end{remark}
+
+\begin{remark}\label{rem:4.10}
+Trong phần tiếp theo, chúng tôi trình bày kết quả hội tụ mạnh mà không cần tính chất đơn điệu, dưới điều kiện (A2$^{*}$) sau đây:
+\end{remark}
+
+\noindent(A2$^{*}$)\quad $\Fc:H_1\to H_1$ và $\Gc:H_2\to H_2$ là các ánh xạ liên tục Lipschitz, với các hằng số Lipschitz lần lượt là $\Dc_1,\Dc_2$, và thỏa mãn tính chất sau;
+\begin{enumerate}[label=(\roman*)]
+\item $\Fc$ và $\Gc$ liên tục yếu theo dãy trên $C$ và $Q$ tương ứng,
+\item Nếu $x_n\wto x^{*}$ và $\limsup_{n\to\infty}\inp{\Fc x_n}{x_n}\le\inp{\Fc x^{*}}{x^{*}}\Longrightarrow\lim_{n\to\infty}\inp{\Fc x_n}{x_n}=\inp{\Fc x^{*}}{x^{*}}$, và
+\item[(ii)] Nếu $y_n\wto y^{*}$ và $\limsup_{n\to\infty}\inp{\Gc y_n}{y_n}\le\inp{\Gc y^{*}}{y^{*}}\Longrightarrow\lim_{n\to\infty}\inp{\Gc y_n}{y_n}=\inp{\Gc y^{*}}{y^{*}}$.
+\end{enumerate}
+
+\begin{lemma}\label{lem:4.11}
+Giả sử các giả thiết A1, A2$^{*}$, A3--A8 đúng đối với Thuật toán 3.2. Nếu tồn tại một dãy con $\{(z_{n_k},t_{n_k})\}$ của $\{(z_n,t_n)\}$ sao cho $(z_{n_k},t_{n_k})\wto(\hat{x},\hat{y})\in H_1\times H_2$, với $\lim_{k\to\infty}\nm{z_{n_k}-u_{n_k}}=0$ và $\lim_{k\to\infty}\nm{t_{n_k}-r_{n_k}}=0$. Khi đó, hoặc $(\hat{x},\hat{y})\in\Gam\times\Gams$ hoặc $\Fc\hat{x}=\Gc\hat{y}=0$.
+\end{lemma}
+
+\begin{proof}
+Bằng một thủ tục tương tự như trong Bổ đề~\ref{lem:4.7}, ta cố định $x\in C$. Sử dụng giả thiết, vì $y_{n_k}\wto\hat{x}\in C$, và theo \eqref{eq:4.37}, ta có
+\[
+\liminf_{k\to\infty}\inp{\Fc u_{n_k}}{x-u_{n_k}}\ge 0.
+\]
+Bây giờ ta chọn một dãy dương $\{\bar{\varsigma}_k\}$ sao cho $\bar{\varsigma}_k\to 0$, $k\to\infty$, và
+\[
+\inp{\Fc u_{n_k}}{x-u_{n_k}}+\bar{\varsigma}_k>0,\quad\forall k\in\N.
+\]
+Do đó,
+\begin{equation}
+\inp{\Fc u_{n_k}}{x}+\bar{\varsigma}_k>\inp{\Fc u_{n_k}}{u_{n_k}},\quad\forall k\in\N. \label{eq:4.55}
+\end{equation}
+Bằng cách đặt $x=\hat{x}$ trong \eqref{eq:4.55}, ta thu được
+\begin{equation}
+\inp{\Fc u_{n_k}}{\hat{x}}+\bar{\varsigma}_k>\inp{\Fc u_{n_k}}{u_{n_k}},\quad\forall k\in\N. \label{eq:4.56}
+\end{equation}
+Theo điều kiện (A2$^{*}$)(ii) và vì $u_{n_k}\wto\hat{x}$, $k\to\infty$, ta có
+\begin{equation}
+\inp{\Fc\hat{x}}{\hat{x}}\ge\limsup_{k\to\infty}\inp{\Fc u_{n_k}}{u_{n_k}}\Longrightarrow\lim_{k\to\infty}\inp{\Fc u_{n_k}}{u_{n_k}}=\inp{\Fc\hat{x}}{\hat{x}}. \label{eq:4.57}
+\end{equation}
+Do đó, sử dụng \eqref{eq:4.55}--\eqref{eq:4.57}, ta thu được
+\begin{align*}
+\inp{\Fc\hat{x}}{x} &= \lim_{k\to\infty}(\inp{\Fc u_{n_k}}{x}+\bar{\varsigma}_k)\\
+&\ge \liminf_{k\to\infty}\inp{\Fc u_{n_k}}{u_{n_k}}\\
+&= \lim_{k\to\infty}\inp{\Fc u_{n_k}}{u_{n_k}}\\
+&= \inp{\Fc\hat{x}}{\hat{x}}.
+\end{align*}
+Do đó, $\inp{\Fc\hat{x}}{x-\hat{x}}\ge 0$, $\forall x\in C$. Vậy, $\hat{x}\in\Gam$. Điều này kéo theo hoặc $\hat{x}\in\Gam$, hoặc $\Fc\hat{x}=0$. Tương tự, ta cũng được $\hat{y}\in\Gams$. Điều này hoàn tất chứng minh.
+\end{proof}
+
+\begin{theorem}\label{thm:4.12}
+Giả sử Thuật toán 3.2 thỏa mãn các giả thiết A1, A2$^{*}$, A3--A8 với $\Fc x\ne 0$, $\forall x\in C$ và $\Gc y\ne 0$, $\forall y\in Q$. Khi đó dãy $\{(x_n,y_n)\}$ hội tụ mạnh về $(\hat{x},\hat{y})\in\Omega$, trong đó $\hat{x}=P_A(0)$ và $\hat{y}=P_B(0)$; $A:=\Gam\cap \Fix{S_1}$ và $B:=\Gams\cap \Fix{S_2}$.
+\end{theorem}
+
+\begin{proof}
+Áp dụng Bổ đề~\ref{lem:4.11} và làm theo một thủ tục tương tự trong Định lý~\ref{thm:4.8}, ta thu được kết quả mong muốn.
+\end{proof}
+
+\chapter{Các ví dụ số}\label{sec:num}
+
+Trong mục này, chúng tôi tiến hành một số thực nghiệm số để chứng tỏ tính hiệu quả của Thuật toán 3.2 đề xuất (viết tắt: Thuật toán đề xuất), so với Thuật toán 1.1 được đề xuất bởi Kwelegano và cộng sự (2022), Phụ lục 6.1 được đề xuất bởi Taiwo và cộng sự (2020), Phụ lục 6.2 được đề xuất bởi Chang và cộng sự (2015), và Phụ lục 6.3 được đề xuất bởi Wang và Fang (2017). Các thực nghiệm của chúng tôi được thực hiện bằng MATLAB R2021(b). Tiêu chuẩn dừng được sử dụng cho mỗi thực nghiệm là $\nm{x_{n+1}-x_n}+\nm{y_{n+1}-y_n}<10^{-9}$.
+
+Các thực nghiệm số của chúng tôi được thực hiện với các ví dụ dưới đây:
+
+\begin{example}\label{ex:5.1}
+(Kwelegano và cộng sự 2022) Cho $H_1=H_2=H_3=\R^2$ được trang bị chuẩn
+\[
+\nm{x}:=\inp{x}{x}^{\frac{1}{2}}=\Bigl\{\sum_{n=1}^{2}\nm{x_n}^2\Bigr\}^{\frac{1}{2}}\quad\text{với mọi } x\in\R^2,
+\]
+và tích vô hướng
+\[
+\inp{x}{z}=\sum_{n=1}^{2}x_n z_n,\quad x,z\in\R^2.
+\]
+Cho $C$ và $Q$ được xác định bởi $C=\{x\in\R^2:\nm{x}\le 2\}$ và $Q=\{y\in\R^2:\nm{y}\le 1\}$ tương ứng. Cho các ánh xạ $\Fc:\R^2\to\R^2$ và $\Gc:\R^2\to\R^2$ được xác định bởi
+\[
+\Fc x=\Fc(x_1,x_2)=\begin{cases}\bigl(3-\sqrt{x_1^2+x_2^2}\bigr)(x_1,x_2), & \text{nếu } x\in C,\\ (x_1,x_2), & \text{nếu } x\notin C,\end{cases}
+\]
+và
+\[
+\Gc y=\Gc(y_1,y_2)=(1-y_2,y_1),\quad\text{tương ứng}.
+\]
+Rõ ràng, $C$ và $Q$ là các tập con khác rỗng, đóng và lồi của $\R^2$. Ngoài ra, $\Fc$ và $\Gc$ là các ánh xạ liên tục đều và liên tục yếu theo dãy trên các tập con của $C$ và $Q$ tương ứng. Ta cũng lưu ý rằng $\Fc$ và $\Gc$ giả đơn điệu trên $\R^2$. Ta chọn $T_1x=T(x_1,x_2)=(3x_1,6x_2)$, $T_2y=T_2(y_1,y_2)=(7y_1,0)$, với các liên hợp $T_1^{*}x=T_1x=5x$, $T_2^{*}y=T_2y=2y$. Cho $Sx=-\tfrac{5}{4}x$ là một toán tử tựa giả co $\tfrac{5}{4}$-Lipschitz. Ta chọn $S_1(x_1,x_2)=(-\tfrac{5}{3}x_1,x_2)$, $S_2(y_1,y_2)=(-\tfrac{4}{5}y_1,y_2)$, trong đó $S_1,S_2$ là các ánh xạ tựa giả co Lipschitz (Bảng~\ref{tab:1}).
+
+Các lựa chọn điểm khởi đầu $x_0,x_1,y_0$ và $y_1$ được sinh ngẫu nhiên trong $\R^2$ như sau:
+
+\noindent\textbf{Trường hợp 1:} $x_0=\mathrm{rand}(2,1)$, $x_1=\mathrm{rand}(2,1)$, $y_0=\mathrm{rand}(2,1)$, $y_1=\mathrm{rand}(2,1)$;
+
+\noindent\textbf{Trường hợp 2:} $x_0=\mathrm{rand}(2,1)$, $x_1=0.2\times\mathrm{rand}(2,1)$, $y_0=\mathrm{rand}(2,1)$, $y_1=0.3\times\mathrm{rand}(2,1)$;
+
+\noindent\textbf{Trường hợp 3:} $x_0=3\times\mathrm{rand}(2,1)$, $x_1=\mathrm{rand}(2,1)$, $y_0=2\times\mathrm{rand}(2,1)$, $y_1=\mathrm{rand}(2,1)$;
+
+\noindent\textbf{Trường hợp 4:} $x_0=0.5\times\mathrm{rand}(2,1)$, $x_1=0.2\times\mathrm{rand}(2,1)$, $y_0=2\times\mathrm{rand}(2,1)$, $y_1=0.3\times\mathrm{rand}(2,1)$.
+\end{example}
+
+\begin{example}\label{ex:5.2}
+(Taiwo và cộng sự 2020) Cho $H_1=H_2=H_3=(l_2(\R),\nm{\cdot})$, sao cho $l_2(\R):=\{x=(x_1,x_2,\ldots,x_n,\ldots);x_k\in\R:\{\sum_{k=1}^{\infty}\abs{x_k}^2<+\infty\}\}$, và chuẩn xác định trên $l_2(\R)$ như sau:
+\[
+\Bigl(\sum_{k=1}^{\infty}\abs{x_k}^2\Bigr)^{\frac{1}{2}},\quad\forall x\in l_2(\R).
+\]
+Ta xác định các tập chấp nhận được $C$ và $Q$ như sau: $C:=\{x\in l_2(\R):x_k\ge 0,k\ge 1\}$ và $Q:=\{y\in l_2(\R):y_j\ge 0,j\ge 1\}$. Cho $S_1:H_1\to H_1$ và $S_2:H_2\to H_2$ được xác định bởi $S_1(x)=-\tfrac{5}{4}x$ và $S_2(y)=-2y$ tương ứng. Khi đó $S_1$ là ánh xạ tựa giả co $\tfrac{5}{4}$-Lipschitz, và $S_2$ là ánh xạ tựa giả co $2$-Lipschitz. Ta chọn $T_1x=\tfrac{1}{2}x$ và $T_2y=3y$. Ngoài ra, $\Fc$ và $\Gc$ là các ánh xạ giả đơn điệu được xác định bởi $\Fc=\tfrac{1}{3}x$, $\Gc=\tfrac{1}{5}y$. Ta chọn các điểm khởi đầu khác nhau như sau:
+
+\noindent\textbf{Trường hợp 1:} $x_0=(1,0.1,0.01,\cdots)$, $x_1=(3,1,\tfrac{1}{3},\cdots)$, $y_0=(2,0.2,0.02,\cdots)$, $y_1=(2,1,\tfrac{1}{2},\cdots)$;
+
+\noindent\textbf{Trường hợp 2:} $x_0=(1,\tfrac{1}{2},\tfrac{1}{4},\cdots)$, $x_1=(2,1,\tfrac{1}{2},\cdots)$, $y_0=(\tfrac{3}{2},\tfrac{1}{2},\tfrac{1}{6},\cdots)$, $y_1=(3,1,\tfrac{1}{3},\cdots)$;
+
+\noindent\textbf{Trường hợp 3:} $x_0=(2,0.2,0.02,\cdots)$, $x_1=(1,\tfrac{1}{2},\tfrac{1}{4},\cdots)$, $y_0=(1,\tfrac{1}{3},\tfrac{1}{9},\cdots)$, $y_1=(3,1,\tfrac{1}{3},\cdots)$;
+
+\noindent\textbf{Trường hợp 4:} $x_0=(1,\tfrac{1}{2},\tfrac{1}{4},\cdots)$, $x_1=(2,0.2,0.02,\cdots)$, $y_0=(\tfrac{3}{2},\tfrac{1}{2},\tfrac{1}{6},\cdots)$, $y_1=(1,0.1,0.01,\cdots)$.
+\end{example}
+
+\begin{remark}\label{rem:5.3}
+Các quan sát sau đây được rút ra từ các Ví dụ số~\ref{ex:5.1}--\ref{ex:5.2} trong các nhận xét dưới đây:
+\begin{enumerate}[label=(\arabic*).]
+\item Rõ ràng từ các Hình 1--8 và các Bảng~\ref{tab:2} và \ref{tab:3}, Thuật toán 3.2 đề xuất dễ cài đặt, hiệu quả và chính xác trong việc xử lý bài toán đề xuất cùng các ứng dụng trong cả không gian hữu hạn chiều lẫn vô hạn chiều.
+\item Từ Bảng~\ref{tab:2}, Bảng~\ref{tab:3} và các Hình 1--8, số bước lặp của phương pháp đề xuất vẫn nhất quán, tức là, có dáng điệu ổn định bất kể điểm khởi đầu. Đáng tiếc, ta không có dáng điệu tương tự ở hầu hết các phương pháp hiện có mà chúng tôi so sánh.
+\item Thuật toán 3.2 đề xuất được so sánh với phiên bản không quán tính của nó ($\tau_n=\nu_n=0$). Rõ ràng từ các kết quả của các ví dụ số, phương pháp đề xuất hoạt động tốt hơn phiên bản không quán tính của nó về thời gian CPU và số bước lặp trong tất cả các trường hợp được xét. Xem các Hình 1--8 và các Bảng~\ref{tab:2}--\ref{tab:3}. Điều này ủng hộ lý thuyết đằng sau việc sử dụng kỹ thuật quán tính để tăng tốc độ hội tụ cho các phương pháp lặp điểm bất động.
+\item Ngoài ra, chúng tôi so sánh Thuật toán 3.2 đề xuất với một số thuật toán hiện có: Thuật toán 1.1 được đề xuất bởi Kwelegano và cộng sự (2022), Phụ lục 6.1 được đề xuất bởi Taiwo và cộng sự (2020), Phụ lục 6.2 được đề xuất bởi Chang và cộng sự, và Phụ lục 6.3 được đề xuất bởi Wang và cộng sự. Các kết quả trong Hình 1--8 và các Bảng~\ref{tab:2} và \ref{tab:3} chỉ ra rằng phương pháp đề xuất vượt trội so với các phương pháp hiện có này về số bước lặp và tương đương về thời gian CPU.
+\end{enumerate}
+\end{remark}
+
+\begin{remark}
+Ghi chú về các hình vẽ: Bản gốc trình bày các Hình 1--4 (Ví dụ~\ref{ex:5.1}, các Trường hợp 1--4) và các Hình 5--8 (Ví dụ~\ref{ex:5.2}, các Trường hợp 1--4) dưới dạng các đồ thị sai số ($\nm{x_{n+1}-x_n}+\nm{y_{n+1}-y_n}$) theo số bước lặp $n$, so sánh sáu phương pháp: Thuật toán Kwelegano và cộng sự, Thuật toán Taiwo và cộng sự, Thuật toán Chang và cộng sự, Thuật toán Wang \& Fang, Thuật toán đề xuất (không quán tính), và Thuật toán đề xuất. Các đồ thị này là kết quả mô phỏng MATLAB nên không được tái tạo trong bản dịch; số liệu định lượng tương ứng được cho trong các Bảng~\ref{tab:2} và \ref{tab:3}.
+\end{remark}
+
+% -------- Bảng 1: Tham số điều khiển --------
+\begin{sidewaystable}[htbp]
+\centering
+\caption{Các tham số điều khiển cho các Ví dụ~\ref{ex:5.1}--\ref{ex:5.2}}\label{tab:1}
+\small
+\setlength{\tabcolsep}{8pt}
+\renewcommand{\arraystretch}{1.6}
+\begin{tabular}{@{}l l l l l l@{}}
+\toprule
+\textbf{Phương pháp} & & & & & \\
+\midrule
+Thuật toán Kwelegano và cộng sự &
+$\zeta_n=\dfrac{n}{100n+1}$, $l=0.87$ & $\alpha_n=0.60$ & $\mu^{*}=2.0$ & $\xi^{*}=0.01$ & $a_n^{*}=0.67$ \\
+Thuật toán Taiwo và cộng sự &
+$\zeta_n=\dfrac{n}{100n+1}$ & $\alpha_n=\dfrac{1}{n+1}$ & $\eta_n^{*}=\dfrac{40n+1}{50}$ & $\chi_n^{*}=\dfrac{30n+1}{40n}$ & \\
+Thuật toán Chang và cộng sự &
+$\zeta_n=0.004$ & $\alpha_n=\dfrac{1}{n+1}$ & $\eta_n=1-\eta_n^{*}$ & $\chi_n=1-\chi_n^{*}$ & \\
+Thuật toán Wang \& Fang &
+$\zeta_n=0.004$ & $\alpha_n=\dfrac{1}{n+1}$ & $\psi_n=\dfrac{30n+1}{40n}$ & & \\
+Thuật toán đề xuất (không quán tính) &
+$\zeta_n=0.004$ & $\alpha_n=\dfrac{1}{n+1}$ & $\beta_n=\dfrac{1-\alpha_n}{2}$ & $\eta=\dfrac{1}{11}$ & $\chi=\dfrac{1}{10}$ \\
+& $\tau_n=0$ & $\nu_n=0$ & $\psi_n=\dfrac{2n}{5n+3}$ & $\sigma_n=\dfrac{2n}{5n+3}$ & $\lambda_n=\dfrac{100}{(n+1)^2}$ \\
+& $\iota_n=\dfrac{100}{(n+1)^2}$ & $\tau_n=0.1$ & $\xi_n=1.51$ & $\mu_n=0.78$ & $\phi_n=0.89$ \\
+& $\kappa_n=1.25$ & $l=0.87$ & $g=0.87$ & & \\
+Thuật toán đề xuất 3.2 &
+$\zeta_n=0.004$ & $\alpha_n=\dfrac{1}{n+1}$ & $\beta_n=\dfrac{1-\alpha_n}{2}$ & $\eta=\dfrac{1}{11}$ & $\chi=\dfrac{1}{10}$ \\
+& $\theta_n=\dfrac{1}{(2n+1)^3}$ & $\delta_n=\dfrac{1}{(2n+1)^3}$ & $\tau_n=0.10$ & $\nu_n=0.10$ & $\psi_n=\dfrac{2n}{5n+3}$ \\
+& $\sigma_n=\dfrac{2n}{5n+3}$ & $\lambda_n=\dfrac{100}{(n+1)^2}$ & $\iota_n=\dfrac{100}{(n+1)^2}$ & $\tau_n=0.1$ & $\xi_n=1.51$ \\
+& $\mu_n=0.78$ & $\phi_n=0.89$ & $\kappa_n=1.25$ & $l=0.87$ & $g=0.87$ \\
+\bottomrule
+\end{tabular}
+
+\smallskip
+\footnotesize\textit{Ghi chú:} Bảng tái tạo đúng theo bản gốc (in ngang). Một số ký hiệu tham số trùng tên nhưng thuộc các phương pháp khác nhau; bản gốc cũng liệt kê $\tau_n$ hai lần trong hai hàng cuối.
+\end{sidewaystable}
+
+% -------- Bảng 2: Kết quả số cho Ví dụ 5.1 --------
+\begin{table}[htbp]
+\centering
+\caption{Kết quả số cho Ví dụ~\ref{ex:5.1}}\label{tab:2}
+\small
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{@{}l cc cc cc cc@{}}
+\toprule
+& \multicolumn{2}{c}{Trường hợp 1} & \multicolumn{2}{c}{Trường hợp 2} & \multicolumn{2}{c}{Trường hợp 3} & \multicolumn{2}{c}{Trường hợp 4}\\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}\cmidrule(lr){8-9}
+& Số lặp & CPU & Số lặp & CPU & Số lặp & CPU & Số lặp & CPU\\
+\midrule
+Thuật toán Kwelegano và cộng sự & 37 & 0.0071 & 37 & 0.0080 & 38 & 0.0078 & 37 & 0.0076\\
+Thuật toán Taiwo và cộng sự & 40 & 0.0062 & 40 & 0.0068 & 41 & 0.0060 & 41 & 0.0062\\
+Thuật toán Chang và cộng sự & 122 & 0.0047 & 115 & 0.0056 & 129 & 0.0049 & 104 & 0.0047\\
+Thuật toán Wang \& Fang & 41 & 0.0041 & 40 & 0.0054 & 42 & 0.0041 & 41 & 0.0047\\
+Thuật toán đề xuất (không quán tính) & 30 & 0.0214 & 30 & 0.0237 & 30 & 0.0211 & 30 & 0.0217\\
+Thuật toán đề xuất 3.2 & 26 & 0.0121 & 26 & 0.0147 & 26 & 0.0124 & 26 & 0.0133\\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+% -------- Bảng 3: Kết quả số cho Ví dụ 5.2 --------
+\begin{table}[htbp]
+\centering
+\caption{Kết quả số cho Ví dụ~\ref{ex:5.2}}\label{tab:3}
+\small
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{@{}l cc cc cc cc@{}}
+\toprule
+& \multicolumn{2}{c}{Trường hợp 1} & \multicolumn{2}{c}{Trường hợp 2} & \multicolumn{2}{c}{Trường hợp 3} & \multicolumn{2}{c}{Trường hợp 4}\\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}\cmidrule(lr){8-9}
+& Số lặp & CPU & Số lặp & CPU & Số lặp & CPU & Số lặp & CPU\\
+\midrule
+Thuật toán Kwelegano và cộng sự & 40 & 0.0067 & 40 & 0.0067 & 41 & 0.0068 & 40 & 0.0066\\
+Thuật toán Taiwo và cộng sự & 24 & 0.0048 & 24 & 0.0042 & 25 & 0.0040 & 24 & 0.0042\\
+Thuật toán Chang và cộng sự & 133 & 0.0067 & 140 & 0.0063 & 149 & 0.0061 & 140 & 0.0063\\
+Thuật toán Wang \& Fang & 18 & 0.0035 & 18 & 0.0033 & 18 & 0.0038 & 18 & 0.0036\\
+Thuật toán đề xuất (không quán tính) & 20 & 0.0213 & 20 & 0.0203 & 20 & 0.0204 & 20 & 0.0208\\
+Thuật toán đề xuất 3.2 & 15 & 0.0125 & 15 & 0.0123 & 15 & 0.0124 & 15 & 0.0122\\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+\chapter{Kết luận}\label{sec:concl}
+
+Trong bài báo này, chúng tôi đã nghiên cứu bài toán bất đẳng thức biến phân tách đẳng thức và bài toán điểm bất động liên quan đến một lớp toán tử tổng quát hơn, cụ thể là các ánh xạ tựa đơn điệu và tựa giả co trong các không gian Hilbert thực. Một thuật toán chiếu và co quán tính tự thích nghi được trình bày và phân tích dưới một số điều kiện nhẹ. Chúng tôi đã chứng minh hai định lý hội tụ mạnh có và không có liên hệ với tính đơn điệu. Ngoài ra, một số tính toán số đã được thực hiện để minh họa tính hiệu quả của thuật toán đề xuất so với các kết quả liên quan trong tài liệu.
+
+\chapter*{Phụ lục 6.1}
+\addcontentsline{toc}{chapter}{Phụ lục 6.1}
+
+Thuật toán 3.1 trong Taiwo và cộng sự (2020)
+\[
+\begin{cases}
+\text{chọn tùy ý } x_0\in H_1, y_0\in H_2,\\
+z_n=x_n-\zeta_n T_1^{*}(T_1x_n-T_2y_n),\\
+x_{n+1}=T_n(\alpha_n s_1^{*}(z_n)+(1-\alpha_n)z_n),\\
+t_n=y_n+\zeta_n T_2^{*}(T_1x_n-T_2y_n),\\
+y_{n+1}=U_n(\alpha_n s_2^{*}(t_n)+(1-\alpha_n)t_n),
+\end{cases}
+\]
+trong đó $T_n=\eta_n^{*}I+(1-\eta_n^{*})S_1[\chi_n^{*}I+(1-\chi_n^{*})S_1]$ và $U_n=\eta_n^{*}I+(1-\eta_n^{*})S_2[\chi_n^{*}I+(1-\chi_n^{*})S_2]$. Ngoài ra, $s_1^{*}:H_1\to H_1$ và $s_2^{*}:H_2\to H_2$ là các ánh xạ $L_1$- và $L_2$-Lipschitz và giả co mạnh với các hằng số $\tau_1^{*},\tau_2^{*}\in[0,1)$.
+
+\chapter*{Phụ lục 6.2}
+\addcontentsline{toc}{chapter}{Phụ lục 6.2}
+
+Thuật toán 3.1 trong Chang và cộng sự (2015)
+\[
+\begin{cases}
+\text{Cho } x_0\in H_1, y_0\in H_2 \text{ được chọn tùy ý},\\
+z_n=x_n-\zeta_n T_1^{*}(T_1x_n-T_2y_n),\\
+x_{n+1}=\alpha_n x_n+(1-\alpha_n)Y_n z_n,\\
+t_n=y_n+\zeta_n T_2^{*}(T_1x_n-T_2y_n),\\
+y_{n+1}=\alpha_n y_n+(1-\alpha_n)J_n t_n,
+\end{cases}
+\]
+trong đó $\zeta_n\in\Bigl(0,\min\bigl(\tfrac{1}{\nm{T_1}^2},\tfrac{1}{\nm{T_2}^2}\bigr)\Bigr)$, $\alpha_n\in(0,1)$, $\forall n\ge 1$.
+
+\chapter*{Phụ lục 6.3}
+\addcontentsline{toc}{chapter}{Phụ lục 6.3}
+
+trong Wang và Fang (2017)
+\[
+\begin{cases}
+\text{chọn } x_0\in H_1, y_0\in H_2 \text{ tùy ý},\\
+z_n=x_n-\zeta_n T_1^{*}(T_1x_n-T_2y_n),\\
+x_{n+1}=\alpha_n f(x_n)+(1-\alpha_n)((1-\psi_n)z_n+\psi_n S_1z_n),\\
+t_n=y_n+\zeta_n T_2^{*}(T_1x_n-T_2y_n),\\
+y_{n+1}=\alpha_n g(y_n)+(1-\alpha_n)((1-\psi_n)t_n+\psi_n S_2t_n),
+\end{cases}
+\]
+trong đó $\zeta_n=\Bigl(\epsilon,\ \dfrac{2}{\lambda_{T_1^{*}}+\lambda_{T_2^{*}}}-\epsilon\Bigr)$, với $\epsilon>0$ đủ nhỏ, và $\lambda_{T_1^{*}}$ và $\lambda_{T_2^{*}}$ là bán kính phổ của $T_1^{*}T_1$ và $T_2^{*}T_2$ tương ứng, $f:H_1\to H_1$ và $g:H_2\to H_2$ là các ánh xạ co với các hằng số $\hat{\rho}_1,\hat{\rho}_2\in[0,1)$ tương ứng, và $\alpha_n\in[0,1]$, $\psi_n\in(0,1)$.
+
+\chapter*{Lời cảm ơn và các công bố}
+\addcontentsline{toc}{chapter}{Lời cảm ơn và các công bố}
+
+\noindent\textbf{Lời cảm ơn.} Các tác giả chân thành cảm ơn các phản biện ẩn danh vì sự đọc kỹ lưỡng, các nhận xét mang tính xây dựng và những gợi ý hữu ích đã cải thiện bản thảo. Tác giả thứ nhất được tài trợ bởi Quỹ Nghiên cứu Quốc gia (NRF) của Nam Phi thông qua chương trình Incentive Funding for Rated Researchers (Grant Number 119903) và DSI-NRF Center of Excellence in Mathematical and Statistical Sciences (CoE-MaSS), Nam Phi (Grant Number 2022-087-OPA). Tác giả thứ hai cũng cảm ơn International Mathematical Union Breakout Graduate Fellowship (IMU-BGF) cho nghiên cứu tiến sĩ của mình. Các quan điểm được nêu và kết luận đạt được là của các tác giả và không nhất thiết được quy cho NRF, CoE-MaSS và IMU.
+
+\medskip
+\noindent\textbf{Đóng góp của các tác giả.} Ý tưởng của bài báo do AG, OTM và VAU đưa ra, phương pháp luận bởi VAU, phân tích hình thức, khảo sát và soạn thảo bản gốc bởi VAU, phần mềm và kiểm chứng bởi OTM, viết -- rà soát và biên tập bởi OTM và AG, quản trị dự án và giám sát bởi OTM và AG. Tất cả các tác giả đã chấp nhận trách nhiệm về toàn bộ nội dung của bản thảo này và phê duyệt việc nộp bản thảo.
+
+\medskip
+\noindent\textbf{Tài trợ.} Tài trợ truy cập mở được cung cấp bởi University of KwaZulu-Natal. Tác giả thứ nhất được tài trợ bởi Quỹ Nghiên cứu Quốc gia (NRF) của Nam Phi (Grant Number 119903) và CoE-MaSS (Grant Number 2022-087-OPA). Tác giả thứ hai được tài trợ bởi International Mathematical Union Graduate Breakout Fellowship (IMU-GBF).
+
+\medskip
+\noindent\textbf{Tính khả dụng của dữ liệu.} Không áp dụng.
+
+\medskip
+\noindent\textbf{Tính khả dụng của mã nguồn.} Các mã Matlab dùng để chạy các thực nghiệm số có sẵn theo yêu cầu gửi đến các tác giả.
+
+\medskip
+\noindent\textbf{Xung đột lợi ích.} Các tác giả tuyên bố không có xung đột lợi ích.
+
+\medskip
+\noindent\textbf{Phê duyệt đạo đức.} Không áp dụng.
+
+\medskip
+\noindent\textbf{Truy cập mở (Open Access).} Bài báo này được cấp phép theo Giấy phép Creative Commons Attribution 4.0 International (CC BY 4.0), cho phép sử dụng, chia sẻ, phóng tác, phân phối và tái tạo trong bất kỳ phương tiện hay định dạng nào, miễn là bạn ghi nguồn thích hợp cho (các) tác giả gốc và nguồn, cung cấp một liên kết đến giấy phép Creative Commons, và chỉ rõ nếu có thay đổi. Để xem một bản sao của giấy phép này, truy cập \url{http://creativecommons.org/licenses/by/4.0/}.
+
+\chapter*{Tài liệu tham khảo}
+\addcontentsline{toc}{chapter}{Tài liệu tham khảo}
+{\small
+\setlength{\parindent}{0pt}
+\newcommand{\refitem}[1]{\par\hangindent=1.6em #1\par\vspace{2pt}}
+
+\refitem{Alakoya TO, Mewomo OT, Shehu Y (2022) Strong convergence results for quasimonotone variational inequalities. Math Methods Oper Res 95:249--279}
+\refitem{Alakoya TO, Uzor VA, Mewomo OT, Yao J-C (2022) On a system of monotone variational inclusion problems with fixed-point constraint. J Inequal Appl 2022(47):33}
+\refitem{Bauschke HH, Combettes PL (2001) A weak-to-strong convergence principle for Féjer. Math Oper Res 26(2):248--264}
+\refitem{Boikano OA, Zegeye H (2020) The split equality fixed point problem of quasi-pseudo-contractive mapping without knowledge of norms. Numer Funct Anal Optim 41(7):759--777}
+\refitem{Censor Y, Borteld T, Martin B, Trofimov A (2006) A unified approach for inversion problems in intensity-modulated radiation therapy. Phys Med Biol 51:2353--2365}
+\refitem{Censor Y, Gibali A, Reich S (2011) The subgradient extragradient method for solving variational inequalities in Hilbert spaces. J Optim Theory Appl 48:318--335}
+\refitem{Censor Y, Gibali A, Reich S (2011) Strong convergence of subgradient extragradient methods for the variational inequality problem in Hilbert space. Optim Methods Softw 46:827--845}
+\refitem{Censor Y, Gibali A, Reich S (2010) Extensions of Korpelevich's extragradient method for the variational inequality problem in Euclidean space. Optimization 61(9):1119--1132}
+\refitem{Censor Y, Gibali A, Reich S (2012) Algorithms for the split variational inequality problem. Numer Algorithms 59(2):301--323}
+\refitem{Chang S, Yao JC, Wen CF, Zhao L (2020) On the split equality fixed point problem of Quasi-pseudo-contractive mappings without prior knowledge of operator norms with applications. J Optim Theory Appl 185:343--360. https://doi.org/10.1007/s10957-020-01651-8}
+\refitem{Chang S, Wang L, Qin L (2015) Split equality fixed point problem for quasi-pseudo-contractive mappings with applications. Fixed Point Theory Appl 2015(208):12}
+\refitem{Cholamjiak P, Thong DV, Cho YJ (2020) A novel inertial projection and contraction method for solving pseudo-monotone variational inequality problems. Acta Appl Math 169:217--245. https://doi.org/10.1007/s10440-019-00297-7}
+\refitem{Eslamian M (2017) Strong convergence of split equality variational inequality and fixed point problem. Riv Mat Univ Parma 8:225--246}
+\refitem{Eslamian M, Shehu Y, Iyiola OS (2018) A strong convergence theorem for a general split equality problem with applications to optimization and equilibrium problem. Calcolo 55:48}
+\refitem{Fichera G (1963) Sul problema elastostatico di signorini con ambigue condizioni al contorno. Atti Accad Naz Lincei Rend Cl Sci Fis Mat Nat 34(8):138--142}
+\refitem{Goebel K, Reich S (1984) Uniform convexity, hyperbolic geometry, and nonexpansive mappings. Marcel Dekker, New York}
+\refitem{Gibali A, Jolaoso LO, Mewomo OT, Taiwo A (2020) Fast and simple Bregman projection methods for solving variational inequalities and related problems in Banach spaces. Results Math 75(4):36}
+\refitem{Godwin EC, Mewomo OT, Alakoya TO (2023) A strongly convergent algorithm for solving multiple set split equality equilibrium and fixed point problems in Banach spaces. Proc Edinb Math Soc DOI:S0013091523000251}
+\refitem{Iiduka H (2012) Fixed point optimization algorithm and its application to network bandwidth allocation. J Comput Appl Math 236(7):1733--1742}
+\refitem{Izuchukwu C, Okeke CC, Mewomo OT (2020) Systems of variational inequalities and multiple-set split equality fixed point problems for countable families of multivalued type-one mappings of the demicontractive type. Ukr Math J 71:11}
+\refitem{Kazmi KR, Furkan M, Ali R (2019) Simultaneous extragradient iterative method to a split equality fixed point problem and a multiple-sets split equality fixed point problem for multi-valued demicontractive mappings. Adv Fixed Point Theory 9(2):111--134}
+\refitem{Kopecká E, Reich S (2012) A note on alternating projections in Hilbert space. J Fixed Point Theory Appl 12(1--2):41--47}
+\refitem{Kwelegano KMT, Zegeye H, Boikanyo OA (2022) An iterative method for split equality variational inequality problems for non-Lipschitz pseudomonotone mappings. Rend Circ Mat Palermo 71:325--348}
+\refitem{Liu Z, Zeng S, Motreanu D (2016) Evolutionary problems driven by variational inequalities. J Differ Equ 260(9):6787--6799}
+\refitem{Moudafi A, Al-Shemas E (2013) Simultaneous iterative methods for split equality problem. Trans Math Progr Appl 1:1--11}
+\refitem{Moudafi A (2011) Split monotone variational inclusions. J Optim Theory Appl 150:275--283}
+\refitem{Ogwo GN, Alakoya TO, Mewomo OT (2023) Iterative algorithm with self-adaptive step size for approximating the common solution of variational inequality and fixed point problems. Optimization 72(3):677--711}
+\refitem{Oyewole OK, Reich S (2024) Two subgradient extragradient methods based on the golden ration technique for solving variational inequality problems. Numer Algor. https://doi.org/10.1007/s11075-023-01746-z}
+\refitem{Polyak BT (1964) Some methods of speeding up the convergence of iteration methods. Politehn Univ Bucharest Sci Bull Ser A Appl Math Phys 4(5):1--17}
+\refitem{Reich S, Thong DV, Cholamjiak P, Long LV (2021) Inertial projection-type methods for solving pseudomonotone variational inequality problems in Hilbert space. Numer Algor 88:813--835}
+\refitem{Reich S, Tuyen TM, Sunthrayuth P, Cholamjiak P (2022) Two new inertial algorithms for solving variational inequalities in reflexive Banach spaces. Numer Func Anal Optim 42(16):1954--1984}
+\refitem{Reich S, Tuyen TM (2022) A new approach to solving split equality problems in Hilbert spaces. Optimization 71:4423--4445}
+\refitem{Saejung S, Yotkaew P (2012) Approximation of zeros of inverse strongly monotone operators in Banach spaces. Nonlinear Anal 75:742--750}
+\refitem{Shehu Y, Vuong PT, Cholamjiak P (2019) A self-adaptive projection method with an inertial technique for split feasibility problems in Banach spaces with applications to image restoration problems. J Fixed Point Theory Appl 21:5}
+\refitem{Shehu Y, Iyiola OS, Reich S (2022) A modified inertial subgradient extragradient method for solving variational inequalities. Optim Eng 23:421--449}
+\refitem{Stampacchia G (1968) Variational Inequalities, In: Theory and Applications of Monotone Operators, Proceedings of the NATO Advanced Study Institute, Venice, Italy. Edizioni Odersi, Gubbio, Italy, 102--192}
+\refitem{Sun W, Lu G, Jin Y, Park C (2022) Self adaptive algorithm for the split problem of the quasi-pseudocontractive operators in Hilbert spaces. AIMS Math 7(5):8715--8732}
+\refitem{Taiwo A, Jolaoso LO, Mewomo OT (2021) Viscosity approximation method for solving the multiple-set split equality common fixed-point problems for quasi-pseudocontractive mappings in Hilbert spaces. J Ind Manag Optim 17(5):2733--2759}
+\refitem{Taiwo A, Jolaoso LO, Mewomo OT (2020) Generalised alternative regularisation method for solving split equality common fixed point problem for quasi-pseudocontractive mappings in Hilbert spaces. Ric di Mat 69:235--259}
+\refitem{Tan B, Li S, Qin X (2021) An accelerated extragradient algorithm for bilevel pseudomonotone variational inequality problems with application to optimal control problems. Rev R Acad Cienc Exactas Fis Nat Ser A Math 115:174}
+\refitem{Tan KK, Xu K (1993) Approximating fixed points of nonexpansive mappings by the ishikawa iteration process. J Math Anal Appl 178:301--308}
+\refitem{Tseng P (2000) A modified forward-backward splitting method for maximal monotone mappings. SIAM J Control Optim 38:431--446}
+\refitem{Uzor VA, Alakoya TO, Mewomo OT (2022) Strong convergence of a self-adaptive inertial Tseng's extragradient method for pseudomonotone variational inequalities and fixed point problems. Open Math 20(1):234--257}
+\refitem{Uzor VA, Alakoya TO, Mewomo OT (2022) On split monotone variational inclusion problem with multiple output sets with fixed points constraints. Comput Methods Appl Math. https://doi.org/10.1515/cmam-2022-0199}
+\refitem{Uzor VA, Alakoya TO, Mewomo OT, Gibali A (2023) Solving quasimonotone and non-monotone variational inequalities. Math Meth Oper Res 98:461--498}
+\refitem{Wang YQ, Fang XL (2017) Viscosity approximation methods for the multiple-set split equality common fixed-point problems of demicontractive mappings. J Nonlinear Sci Appl 10:4254--4268}
+\refitem{Zeng J, Chen J, Ju X (2020) Fixed-time stability of projection neurodynamic method for solving pseudomonotone variational inequalities. Neurocomputing 505:402--412}
+\refitem{Ye ML, He YR (2015) A double projection method for solving variational inequalities without monotonicity. Comput Optim Appl 60:141--150}
+\par}
+
+\vfill
+\noindent\rule{\linewidth}{0.4pt}\\[2pt]
+{\footnotesize\textit{Nguồn gốc:} O. T. Mewomo, V. A. Uzor, A. Gibali, ``A strongly convergent algorithm for solving split equality problems beyond monotonicity,'' \textit{Computational and Applied Mathematics} (2024) 43:326. \url{https://doi.org/10.1007/s40314-024-02829-w}. Bài báo gốc phát hành theo giấy phép CC BY 4.0. Bản dịch tiếng Việt này nhằm mục đích học thuật, giữ nguyên toàn bộ nội dung toán học của bản gốc.}
+
+\end{document}

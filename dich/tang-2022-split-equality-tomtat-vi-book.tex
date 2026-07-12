@@ -1,0 +1,151 @@
+%=======================================================================
+%  TÀI LIỆU TÓM TẮT & CHÚ GIẢI TIẾNG VIỆT (phục vụ học tập)
+%  Dựa trên bài báo:
+%    Yan Tang & Haiyun Zhou,
+%    "New iterative algorithms with self-adaptive step size for solving
+%     split equality fixed point problem and its applications",
+%    Optimization Methods and Software (2022).
+%    DOI: 10.1080/10556788.2022.2117357
+%
+%  LƯU Ý BẢN QUYỀN: Bài gốc do Taylor & Francis xuất bản, KHÔNG phải bài
+%  truy cập mở (không có giấy phép Creative Commons). Do đó tài liệu này
+%  KHÔNG phải bản dịch/sao chép toàn văn, mà là TÓM TẮT & CHÚ GIẢI bằng
+%  tiếng Việt phục vụ học tập/nghiên cứu: nêu bài toán, trích dẫn ngắn các
+%  công thức thuật toán và phát biểu định lý để bình luận, và diễn giải ý
+%  tưởng. Nội dung, chứng minh và số liệu đầy đủ: xin xem bài báo gốc.
+%
+%  ĐỊNH DẠNG SÁCH (documentclass book). Biên dịch: pdfLaTeX (cần gói vntex). Chạy pdflatex HAI lượt.
+%=======================================================================
+\documentclass[11pt,a4paper,oneside]{book}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T5]{fontenc}
+\usepackage[vietnamese]{babel}
+% XeLaTeX/LuaLaTeX: thay 3 dòng trên bằng fontspec + polyglossia + \setmainlanguage{vietnamese}
+
+\usepackage{amsmath,amssymb,amsthm,amsfonts,mathtools}
+\usepackage{enumitem}
+\usepackage[margin=2.4cm]{geometry}
+\usepackage[hidelinks]{hyperref}
+\usepackage{xurl}
+\allowdisplaybreaks
+\setlength{\emergencystretch}{3em}
+
+\theoremstyle{plain}
+\newtheorem{theorem}{Định lý}
+\theoremstyle{definition}
+\newtheorem*{algoA}{Thuật toán 3.1 (hội tụ yếu)}
+\newtheorem*{algoB}{Thuật toán 3.2 (hội tụ mạnh)}
+
+\newcommand{\inp}[2]{\langle #1,\,#2\rangle}
+\newcommand{\nm}[1]{\lVert #1\rVert}
+\newcommand{\Fix}{\operatorname{Fix}}
+
+\title{\vspace{-1.2cm}\bfseries Tóm tắt \& chú giải tiếng Việt\\[4pt]
+\large ``Các thuật toán lặp mới với cỡ bước tự thích nghi cho bài toán điểm bất động tách đẳng thức và ứng dụng''}
+\author{\normalsize Bài gốc: Yan Tang \& Haiyun Zhou (2022)}
+\date{\small Optimization Methods and Software (2022), DOI: 10.1080/10556788.2022.2117357\\[2pt]
+\textit{Tài liệu học tập (tóm tắt \& chú giải) --- bài gốc KHÔNG truy cập mở, đây không phải bản dịch toàn văn.}}
+
+\newenvironment{abstract}{\begin{quotation}\small\noindent\textbf{Tóm tắt.\ }}{\end{quotation}\normalsize}
+
+\begin{document}
+\frontmatter
+\maketitle
+
+\begin{abstract}
+\noindent Tài liệu này tóm tắt và chú giải bằng tiếng Việt bài báo của Tang \& Zhou (2022). Bài báo đề xuất các thuật toán lặp với \emph{cỡ bước tự thích nghi} (không cần biết chuẩn của các toán tử tuyến tính) để giải \emph{bài toán điểm bất động tách đẳng thức} (SEFPP) cho lớp ánh xạ \emph{tựa giả co} (quasi-pseudo-contractive), gồm một phiên bản \emph{hội tụ yếu} (Thuật toán 3.1) và một phiên bản \emph{hội tụ mạnh} về nghiệm chuẩn nhỏ nhất (Thuật toán 3.2). Cuối bài, các kết quả được áp dụng cho \emph{bài toán cân bằng tách đẳng thức} và \emph{bài toán bao hàm thức tách đẳng thức}.
+\end{abstract}
+\tableofcontents
+\mainmatter
+
+\chapter{Bài toán}
+
+Cho $H_1,H_2,H_3$ là các không gian Hilbert thực. \textbf{Bài toán tách đẳng thức (SEP)}: tìm $x\in H_1,\ y\in H_2$ sao cho $Ax=By$, trong đó $A:H_1\to H_3$, $B:H_2\to H_3$ là các toán tử tuyến tính bị chặn.
+
+Coi mỗi tập nghiệm như tập điểm bất động của một ánh xạ, ta được \textbf{bài toán điểm bất động tách đẳng thức (SEFPP)}:
+\[
+\text{tìm } x\in\Fix(S),\ y\in\Fix(T)\ \text{ sao cho } Ax=By, \tag{6}
+\]
+với tập nghiệm $\Omega=\{(x,y):x\in\Fix(S),\ y\in\Fix(T),\ Ax=By\}$.
+
+\medskip
+\noindent\textbf{Điều kiện (trích).}
+\begin{itemize}[leftmargin=1.4em,itemsep=1pt]
+\item \textbf{Đk 3.1:} $A:H_1\to H_3$, $B:H_2\to H_3$ tuyến tính bị chặn, với liên hợp $A^{*},B^{*}$ (trong hữu hạn chiều $A^{*}=A^{T}$, $B^{*}=B^{T}$).
+\item \textbf{Đk 3.2:} $S:H_1\to H_1$, $T:H_2\to H_2$ là hai ánh xạ $L$-Lipschitz \emph{tựa giả co}, $L\ge 1$, $\Fix(S)\ne\emptyset$, $\Fix(T)\ne\emptyset$, và $\Omega\ne\emptyset$.
+\end{itemize}
+\noindent Ký hiệu: $f(x,y)=\nm{Ax-By}^2$, $w(x,y)=A^{*}(Ax-By)$, $v(x,y)=B^{*}(By-Ax)$.
+
+\chapter{Thuật toán (trích dẫn để chú giải)}
+
+Hai toán tử phụ trợ (kiểu ``ổn định hóa'' ánh xạ tựa giả co thành tựa không giãn):
+\[
+U:=(1-\xi)I+\xi S\bigl((1-\eta)I+\eta S\bigr),\qquad V:=(1-\xi)I+\xi T\bigl((1-\eta)I+\eta T\bigr),
+\]
+và cỡ bước \emph{tự thích nghi} (không cần chuẩn của $A,B$):
+\[
+\rho_n=\begin{cases}\dfrac{f(x_n,y_n)}{\nm{w(x_n,y_n)}^2+\nm{v(x_n,y_n)}^2}, & \text{nếu } \nm{w(x_n,y_n)}^2+\nm{v(x_n,y_n)}^2\ne 0,\\[6pt]0,&\text{ngược lại.}\end{cases}
+\]
+
+\begin{algoA}
+Chọn $(x_0,y_0)\in H_1\times H_2$. Với $(x_n,y_n)$, tính
+\[
+\begin{cases}
+x_{n+1}=x_n-\alpha_n\bigl(x_n-U(x_n-\rho_n A^{*}(Ax_n-By_n))\bigr),\\
+y_{n+1}=y_n-\alpha_n\bigl(y_n-V(y_n-\rho_n B^{*}(By_n-Ax_n))\bigr).
+\end{cases} \tag{7}
+\]
+Nếu $w(x_n,y_n)=0$ hoặc $v(x_n,y_n)=0$ thì dừng.
+\end{algoA}
+
+\begin{algoB}
+Chọn $(x_0,y_0)\in H_1\times H_2$. Với $(x_n,y_n)$, tính
+\[
+\begin{cases}
+w_n=x_n-\alpha_n\bigl(x_n-U(x_n-\rho_n A^{*}(Ax_n-By_n))\bigr),\\
+x_{n+1}=(1-\beta_n-\gamma_n)x_n+\beta_n w_n;\\
+\mu_n=y_n-\alpha_n\bigl(y_n-V(y_n-\rho_n B^{*}(By_n-Ax_n))\bigr),\\
+y_{n+1}=(1-\beta_n-\gamma_n)y_n+\beta_n\mu_n.
+\end{cases} \tag{8}
+\]
+\end{algoB}
+\noindent Thành phần $\gamma_n$ (kéo về gốc) tạo nên \emph{hội tụ mạnh} về nghiệm chuẩn nhỏ nhất; khi $\beta_n=1,\gamma_n=0$ thì Thuật toán 3.2 trở về Thuật toán 3.1 (Nhận xét 3.8).
+
+\chapter{Kết quả hội tụ}
+
+\begin{theorem}[Định lý 3.1 --- hội tụ yếu]
+Với $S,T$ nửa đóng (demiclosed) tại $0$ và
+\[
+0<\xi<\eta<\frac{1}{1+\sqrt{1+L^2}},\qquad 0<a\le\alpha_n\le b<1,
+\]
+với $a,b$ là hằng số trong $(0,1)$, thì dãy $(x_n,y_n)$ sinh bởi Thuật toán 3.1 hội tụ \emph{yếu} về một nghiệm của (6).
+\end{theorem}
+
+\begin{theorem}[Định lý 3.4 --- hội tụ mạnh]
+Dưới các điều kiện tương tự cùng ràng buộc trên $\{\beta_n\},\{\gamma_n\}$ (đặc biệt $\lim_{n\to\infty}(1-\beta_n)\beta_n>0$ và $\gamma_n\to0$ theo kiểu Halpern), dãy $(x_n,y_n)$ sinh bởi Thuật toán 3.2 hội tụ \emph{mạnh} về nghiệm $z=P_{\Omega}(0,0)$ của (6) --- tức nghiệm có \emph{chuẩn nhỏ nhất}.
+\end{theorem}
+
+\noindent\emph{Ý tưởng chứng minh (tóm tắt).} (i) Nhờ cỡ bước $\rho_n$ và cấu trúc $U,V$ (biến ánh xạ tựa giả co thành tựa không giãn, nửa đóng tại 0), chứng minh dãy bị chặn và các đại lượng sai khác $\to0$. (ii) Với hội tụ yếu: dùng tính nửa đóng để mọi điểm tụ yếu là nghiệm, rồi dùng bổ đề Opial. (iii) Với hội tụ mạnh: thêm bước kéo về gốc $\gamma_n$ và dùng bổ đề kiểu Saejung--Yotkaew/Maingé để ép về nghiệm chuẩn nhỏ nhất $P_{\Omega}(0,0)$.
+
+\chapter{Ứng dụng}
+
+Bằng cách chọn $S,T$ là toán tử điểm gần kề (proximal/resolvent) tương ứng, các thuật toán trên được áp dụng để giải:
+\begin{itemize}[leftmargin=1.4em,itemsep=1pt]
+\item \textbf{Bài toán cân bằng tách đẳng thức} (split equality equilibrium problem);
+\item \textbf{Bài toán bao hàm thức tách đẳng thức} (split equality inclusion problem).
+\end{itemize}
+Kèm theo là các thực nghiệm số minh họa tính hiệu quả (chi tiết xem bài gốc).
+
+\chapter{Đóng góp chính}
+\begin{itemize}[leftmargin=1.4em,itemsep=1pt]
+\item Cỡ bước \emph{tự thích nghi} $\rho_n$ \emph{không cần biết chuẩn} của $A,B$ --- khắc phục nhược điểm của nhiều phương pháp trước.
+\item Xử lý lớp ánh xạ \emph{tựa giả co} (tổng quát hơn không giãn/nửa co) nhờ toán tử ổn định hóa $U,V$.
+\item Có cả phiên bản hội tụ \emph{mạnh} về nghiệm chuẩn nhỏ nhất, cùng ứng dụng cho bài toán cân bằng và bao hàm thức tách đẳng thức.
+\end{itemize}
+
+\vfill
+\noindent\rule{\linewidth}{0.4pt}\\[2pt]
+{\footnotesize\textit{Nguồn:} Y. Tang \& H. Zhou, ``New iterative algorithms with self-adaptive step size for solving split equality fixed point problem and its applications,'' \textit{Optimization Methods and Software} (2022), \url{https://doi.org/10.1080/10556788.2022.2117357}. Bài gốc thuộc bản quyền Taylor \& Francis (\emph{không} truy cập mở). Tài liệu này là \emph{tóm tắt \& chú giải} phục vụ học tập, chỉ trích dẫn ngắn các công thức/định lý để bình luận; để có nội dung, chứng minh và số liệu đầy đủ, vui lòng tham khảo bài báo gốc qua thư viện/CSDL có bản quyền.}
+
+\end{document}
