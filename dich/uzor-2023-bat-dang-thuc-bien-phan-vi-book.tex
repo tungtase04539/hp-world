@@ -14,20 +14,7 @@
 %
 %  ĐỊNH DẠNG SÁCH (documentclass book). Biên dịch: pdfLaTeX (cần gói vntex). Chạy pdflatex HAI lượt.
 %=======================================================================
-\documentclass[11pt,a4paper,oneside]{book}
-
-\usepackage[utf8]{inputenc}
-\usepackage[T5]{fontenc}
-\usepackage[vietnamese]{babel}
-% XeLaTeX/LuaLaTeX: thay 3 dòng trên bằng fontspec + polyglossia + \setmainlanguage{vietnamese}
-
-\usepackage{amsmath,amssymb,amsthm,amsfonts,mathtools}
-\usepackage{enumitem}
-\usepackage[margin=2.4cm]{geometry}
-\usepackage[hidelinks]{hyperref}
-\usepackage{xurl}
-\allowdisplaybreaks
-\setlength{\emergencystretch}{3em}
+\documentclass{MyBook}
 
 \theoremstyle{plain}
 \newtheorem{theorem}{Định lý}
@@ -47,8 +34,6 @@
 \author{\normalsize Bài gốc: V. A. Uzor, T. O. Alakoya, O. T. Mewomo, A. Gibali (2023)}
 \date{\small Math. Methods Oper. Res. (2023) 98:461--498 --- giấy phép CC BY 4.0\\[2pt]
 \textit{Tài liệu học tập: tóm tắt, phát biểu thuật toán/định lý và diễn giải bằng tiếng Việt (không phải bản dịch nguyên văn).}}
-
-\newenvironment{abstract}{\begin{quotation}\small\noindent\textbf{Tóm tắt.\ }}{\end{quotation}\normalsize}
 
 \begin{document}
 \frontmatter

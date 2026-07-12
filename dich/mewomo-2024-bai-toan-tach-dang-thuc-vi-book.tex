@@ -13,29 +13,15 @@
 %  Biên dịch bằng pdfLaTeX (cần gói vntex cho bảng mã T5).
 %  Nếu muốn dùng XeLaTeX/LuaLaTeX, xem chú thích ở phần đầu preamble.
 %=======================================================================
-\documentclass[11pt,a4paper,oneside]{book}
+\documentclass{MyBook}
 
 % ------- Hỗ trợ tiếng Việt (pdfLaTeX) -------
-\usepackage[utf8]{inputenc}
-\usepackage[T5]{fontenc}
-\usepackage[vietnamese]{babel}
 % --- Nếu dùng XeLaTeX/LuaLaTeX, hãy thay ba dòng trên bằng: ---
 %   \usepackage{fontspec}
 %   \usepackage{polyglossia}
 %   \setmainlanguage{vietnamese}
 
-\usepackage{amsmath,amssymb,amsthm,amsfonts,mathtools}
-\usepackage{bm}
-\usepackage{enumitem}
-\usepackage{graphicx}
-\usepackage{booktabs}
-\usepackage{array}
-\usepackage{rotating}   % cho bảng nằm ngang (sidewaystable) như bản gốc
-\usepackage[margin=2cm]{geometry}
-\usepackage[hidelinks]{hyperref}
-\usepackage{xurl}                 % cho phép ngắt dòng bên trong URL/DOI dài
 \allowdisplaybreaks              % cho phép ngắt trang trong các khối align dài
-\setlength{\emergencystretch}{3em} % hấp thụ phần tràn lề nhỏ ở đoạn văn
 
 % ------- Định lý, bổ đề... (đánh số theo mục, dùng chung bộ đếm) -------
 \theoremstyle{plain}
@@ -51,7 +37,6 @@
 \theoremstyle{remark}
 \newtheorem{remark}[theorem]{Nhận xét}
 
-\renewcommand{\proofname}{Chứng minh}
 \numberwithin{equation}{chapter}
 
 % ------- Ký hiệu tắt -------
@@ -79,8 +64,6 @@
 \author{Oluwatosin Temitope Mewomo \and Victor Amarachi Uzor \and Aviv Gibali}
 \date{\small Comput. Appl. Math. (2024) 43:326\\[2pt]
 \textit{Bản dịch tiếng Việt --- giữ nguyên toàn bộ nội dung toán học của bản gốc (CC BY 4.0).}}
-
-\newenvironment{abstract}{\begin{quotation}\small\noindent\textbf{Tóm tắt.\ }}{\end{quotation}\normalsize}
 
 \begin{document}
 \frontmatter

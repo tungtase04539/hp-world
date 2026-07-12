@@ -16,20 +16,7 @@
 %
 %  ĐỊNH DẠNG SÁCH (documentclass book). Biên dịch: pdfLaTeX (cần gói vntex). Chạy pdflatex HAI lượt.
 %=======================================================================
-\documentclass[11pt,a4paper,oneside]{book}
-
-\usepackage[utf8]{inputenc}
-\usepackage[T5]{fontenc}
-\usepackage[vietnamese]{babel}
-% XeLaTeX/LuaLaTeX: thay 3 dòng trên bằng fontspec + polyglossia + \setmainlanguage{vietnamese}
-
-\usepackage{amsmath,amssymb,amsthm,amsfonts,mathtools}
-\usepackage{enumitem}
-\usepackage[margin=2.4cm]{geometry}
-\usepackage[hidelinks]{hyperref}
-\usepackage{xurl}
-\allowdisplaybreaks
-\setlength{\emergencystretch}{3em}
+\documentclass{MyBook}
 
 \theoremstyle{plain}
 \newtheorem{theorem}{Định lý}
@@ -46,8 +33,6 @@
 \author{\normalsize Bài gốc: Yan Tang \& Haiyun Zhou (2022)}
 \date{\small Optimization Methods and Software (2022), DOI: 10.1080/10556788.2022.2117357\\[2pt]
 \textit{Tài liệu học tập (tóm tắt \& chú giải) --- bài gốc KHÔNG truy cập mở, đây không phải bản dịch toàn văn.}}
-
-\newenvironment{abstract}{\begin{quotation}\small\noindent\textbf{Tóm tắt.\ }}{\end{quotation}\normalsize}
 
 \begin{document}
 \frontmatter

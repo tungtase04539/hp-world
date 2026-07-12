@@ -18,20 +18,7 @@
 %
 %  ĐỊNH DẠNG SÁCH (documentclass book). Biên dịch: pdfLaTeX (cần gói vntex). Chạy pdflatex HAI lượt.
 %=======================================================================
-\documentclass[11pt,a4paper,oneside]{book}
-
-\usepackage[utf8]{inputenc}
-\usepackage[T5]{fontenc}
-\usepackage[vietnamese]{babel}
-% XeLaTeX/LuaLaTeX: thay 3 dòng trên bằng fontspec + polyglossia + \setmainlanguage{vietnamese}
-
-\usepackage{amsmath,amssymb,amsthm,amsfonts,mathtools}
-\usepackage{enumitem}
-\usepackage[margin=2.2cm]{geometry}
-\usepackage[hidelinks]{hyperref}
-\usepackage{xurl}
-\allowdisplaybreaks
-\setlength{\emergencystretch}{3em}
+\documentclass{MyBook}
 
 \theoremstyle{plain}
 \newtheorem{theorem}{Định lý}
@@ -48,8 +35,6 @@
 \author{\normalsize Bài gốc: G. Mekuriaw, H. Zegeye, M. H. Takele, A. R. Tufa (2024)}
 \date{\small Applicable Analysis (2024) 103:17, 3267--3294, DOI: 10.1080/00036811.2024.2348669\\[2pt]
 \textit{Tài liệu học tập (tóm tắt \& chú giải) --- bài gốc CC BY-NC-ND (không cho phép bản phái sinh/dịch), đây không phải bản dịch toàn văn.}}
-
-\newenvironment{abstract}{\begin{quotation}\small\noindent\textbf{Tóm tắt.\ }}{\end{quotation}\normalsize}
 
 \begin{document}
 \frontmatter
