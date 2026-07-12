@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { makeHumanoid } from './character.js';
+import { IS_MOBILE } from './assets.js';
 import { ROADS_DT, ROADS_REGION } from './terrain.js';
 
 function mat(color, opts = {}) { return new THREE.MeshLambertMaterial({ color, ...opts }); }
@@ -113,7 +114,7 @@ export function createTraffic(scene, world) {
   const bikeColors = [0xd8332a, 0x2e86c1, 0x28a05c, 0xe8a020, 0x555a66, 0xb85ae8];
   BIKE_PATHS.forEach((path, li) => {
     const L = pathLength(path, false);
-    for (let k = 0; k < 2; k++) {
+    for (let k = 0; k < (IS_MOBILE ? 1 : 2); k++) {   // mobile: nửa lưu lượng xe
       const mesh = makeTrafficBike(bikeColors[(li * 2 + k) % bikeColors.length]);
       scene.add(mesh);
       bikes.push({
@@ -139,7 +140,7 @@ export function createTraffic(scene, world) {
   // ---------- Người đi bộ ----------
   const allWalks = [...WALK_PATHS, ...(world.walkPaths || [])];
   allWalks.forEach((p, i) => {
-    const n = i < 5 ? 2 : 1; // trung tâm đông hơn
+    const n = IS_MOBILE ? 1 : (i < 5 ? 2 : 1); // trung tâm đông hơn; mobile giảm tải
     const L = pathLength(p, false);
     for (let k = 0; k < n; k++) {
       const rig = makeHumanoid({
@@ -177,15 +178,23 @@ export function createTraffic(scene, world) {
   tourBoat(2700, 1400, 160, 0.035, 4);  // trên đường biển ra đảo
 
   // ---------- Cập nhật mỗi khung hình ----------
+  let frameNo = 0;
   function update(dt, time, playerPos) {
-    for (const b of bikes) {
+    frameNo++;
+    for (let bi = 0; bi < bikes.length; bi++) {
+      const b = bikes[bi];
+      // xa >700m: cập nhật 1/4 nhịp (dồn dt để tốc độ không đổi) — sương 4200 nhưng xe 2m gần như vô hình
+      b.acc = (b.acc || 0) + dt;
+      const ddx = playerPos.x - b.mesh.position.x, ddz = playerPos.z - b.mesh.position.z;
+      if (ddx * ddx + ddz * ddz > 490000 && (frameNo + bi) % 4 !== 0) continue;
+      const step = b.acc; b.acc = 0;
       // né người chơi: chậm lại khi tới gần
-      const d = Math.hypot(playerPos.x - b.mesh.position.x, playerPos.z - b.mesh.position.z);
+      const d = Math.hypot(ddx, ddz);
       const slow = d < 6 ? Math.max(0.15, (d - 2) / 4) : 1;
       if (b.closed) {
-        b.s = (b.s + b.speed * slow * dt) % b.L;
+        b.s = (b.s + b.speed * slow * step) % b.L;
       } else {
-        b.s += b.speed * slow * dt * b.dir;
+        b.s += b.speed * slow * step * b.dir;
         if (b.s > b.L) { b.s = b.L; b.dir = -1; }
         if (b.s < 0) { b.s = 0; b.dir = 1; }
       }
@@ -198,8 +207,13 @@ export function createTraffic(scene, world) {
       b.mesh.rotation.y = head;
     }
 
-    for (const w of walkers) {
-      w.s += w.speed * dt * w.dir;
+    for (let wi = 0; wi < walkers.length; wi++) {
+      const w = walkers[wi];
+      w.acc = (w.acc || 0) + dt;
+      const ddx = playerPos.x - w.rig.group.position.x, ddz = playerPos.z - w.rig.group.position.z;
+      if (ddx * ddx + ddz * ddz > 490000 && (frameNo + wi) % 4 !== 0) continue;   // xa: bỏ cả animate chân tay
+      const step = w.acc; w.acc = 0;
+      w.s += w.speed * step * w.dir;
       if (w.s > w.L) { w.s = w.L; w.dir = -1; }
       if (w.s < 0) { w.s = 0; w.dir = 1; }
       const p = samplePath(w.path, w.s, false);
@@ -209,7 +223,7 @@ export function createTraffic(scene, world) {
       const wx = p.x + ox, wz = p.z + oz;
       w.rig.group.position.set(wx, groundHeight(wx, wz), wz);
       w.rig.group.rotation.y = head;
-      w.rig.animate(dt, 0.55, time + w.s);
+      w.rig.animate(step, 0.55, time + w.s);
     }
 
     for (const tb of tourBoats) {

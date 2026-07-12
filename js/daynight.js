@@ -95,21 +95,23 @@ export function createDayNight(scene, world) {
   scene.add(stars);
 
   let dayT = 0.3; // ~9h sáng
+  const _sunDir = new THREE.Vector3();
 
+  // buffer tái dùng — sample() chạy mỗi khung, clone Color 3 lần/khung là rác GC vô ích
+  const _smp = { sky: new THREE.Color(), fog: new THREE.Color(), sun: new THREE.Color(), sunI: 0, hemiI: 0, night: 0 };
   function sample(t) {
     let a = KEYS[0], b = KEYS[KEYS.length - 1];
     for (let i = 0; i < KEYS.length - 1; i++) {
       if (t >= KEYS[i].t && t <= KEYS[i + 1].t) { a = KEYS[i]; b = KEYS[i + 1]; break; }
     }
     const k = (t - a.t) / Math.max(1e-5, b.t - a.t);
-    return {
-      sky: a.sky.clone().lerp(b.sky, k),
-      fog: a.fog.clone().lerp(b.fog, k),
-      sun: a.sun.clone().lerp(b.sun, k),
-      sunI: a.sunI + (b.sunI - a.sunI) * k,
-      hemiI: a.hemiI + (b.hemiI - a.hemiI) * k,
-      night: a.night + (b.night - a.night) * k,
-    };
+    _smp.sky.copy(a.sky).lerp(b.sky, k);
+    _smp.fog.copy(a.fog).lerp(b.fog, k);
+    _smp.sun.copy(a.sun).lerp(b.sun, k);
+    _smp.sunI = a.sunI + (b.sunI - a.sunI) * k;
+    _smp.hemiI = a.hemiI + (b.hemiI - a.hemiI) * k;
+    _smp.night = a.night + (b.night - a.night) * k;
+    return _smp;
   }
 
   return {
@@ -135,15 +137,15 @@ export function createDayNight(scene, world) {
       sun.intensity = s.sunI;
       moonGlow.intensity = s.night * 0.22;
 
-      // quỹ đạo mặt trời quanh người chơi
+      // quỹ đạo mặt trời quanh người chơi (vector tái dùng — không cấp phát mỗi khung)
       const ang = (dayT - 0.25) * Math.PI * 2;
-      const sunDir = new THREE.Vector3(Math.cos(ang), Math.sin(ang), 0.35).normalize();
-      sun.position.copy(playerPos).addScaledVector(sunDir, 250);
+      _sunDir.set(Math.cos(ang), Math.sin(ang), 0.35).normalize();
+      sun.position.copy(playerPos).addScaledVector(_sunDir, 250);
       sun.target.position.copy(playerPos);
-      sunBall.position.copy(playerPos).addScaledVector(sunDir, 640);
-      sunBall.visible = sunDir.y > -0.06;
-      moonBall.position.copy(playerPos).addScaledVector(sunDir.clone().negate(), 640);
-      moonBall.visible = sunDir.y < 0.06;
+      sunBall.position.copy(playerPos).addScaledVector(_sunDir, 640);
+      sunBall.visible = _sunDir.y > -0.06;
+      moonBall.position.copy(playerPos).addScaledVector(_sunDir, -640);
+      moonBall.visible = _sunDir.y < 0.06;
       starMat.opacity = s.night * 0.9;
       stars.position.copy(playerPos);
 

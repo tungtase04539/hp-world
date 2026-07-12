@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
-import { registerModel, shrinkTexturesForMobile } from './assets.js';
+import { registerModel, shrinkTexturesForMobile, IS_MOBILE } from './assets.js';
 import {
   WORLD_BOUNDS, LM, LM_DIR, LM_FACE, EXTRAS, TREES, PARKS, RAIL, DT_BOX, RIVERS, ROADS_DT, ROADS_REGION, BRIDGES, BUILDINGS,
   groundHeight, groundHeightNoDeck, isWater, landAt, riverFactor,
@@ -443,6 +443,7 @@ export function buildWorld(scene) {
   water.name = 'water';
   scene.add(water);
   world.waterMat = waterMat;
+  water.userData.dyn = true;
   updaters.push((dt, time) => { water.position.y = Math.sin(time * 0.8) * 0.06; });
 
   // ---------- Đường phố THẬT (merge geometry để nhẹ GPU) ----------
@@ -1873,10 +1874,13 @@ export function buildWorld(scene) {
   {
     const CELL_W = 512, CELL_H = 80, COLS = 8, ROWS = 51, PER = COLS * ROWS;   // 408 biển/atlas 4096²
     const bg = ['#c62828', '#1c56a0', '#1f7a3c', '#d8862a', '#26262c', '#8e2f80'];
+    // MOBILE: atlas 4096² ≈ 85MB VRAM/tấm không nén — thu 1/4 cạnh (1024², chữ vẫn đọc được
+    // ở cự ly chơi trên màn nhỏ); desktop giữ nguyên 100%
+    const MS = IS_MOBILE ? 0.25 : 1;
     for (let a = 0; a < Math.ceil(SHOP_SIGNS.length / PER); a++) {
       const items = SHOP_SIGNS.slice(a * PER, (a + 1) * PER);
-      const cv = document.createElement('canvas'); cv.width = COLS * CELL_W; cv.height = ROWS * CELL_H;
-      const g = cv.getContext('2d');
+      const cv = document.createElement('canvas'); cv.width = COLS * CELL_W * MS; cv.height = Math.ceil(ROWS * CELL_H * MS);
+      const g = cv.getContext('2d'); g.scale(MS, MS);
       items.forEach(([, , , name], k) => {
         const cx = (k % COLS) * CELL_W, cy = ((k / COLS) | 0) * CELL_H;
         g.fillStyle = bg[(name.length + k) % bg.length]; g.fillRect(cx, cy, CELL_W, CELL_H);
@@ -2308,6 +2312,7 @@ export function buildWorld(scene) {
       new THREE.MeshLambertMaterial({ color: 0xeafaff, transparent: true, opacity: 0.7 }));
     jet.position.set(ftX, LAND_H + 3, ftZ);
     scene.add(jet);
+    jet.userData.dyn = true;
     updaters.push((dt, time) => { jet.scale.y = 0.8 + Math.sin(time * 3) * 0.2; });
     addCollider(ftX, ftZ, 5.5);
     const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.2, 16, 6), mat(0xd8d8d8));
@@ -2317,6 +2322,7 @@ export function buildWorld(scene) {
       new THREE.MeshLambertMaterial({ color: 0xd8332a, side: THREE.DoubleSide }));
     vnFlag.position.set(pcx + 20, LAND_H + 14.5, pcz - 6);
     scene.add(vnFlag);
+    vnFlag.userData.dyn = true;
     updaters.push((dt, time) => { vnFlag.rotation.y = Math.sin(time * 1.8) * 0.35; });
     const bedColors = [0xe8402a, 0xf2ce4b, 0xe87ab8, 0xffffff, 0xf28c3a];
     [[pcx - 16, pcz + 12], [pcx + 16, pcz + 10], [pcx - 22, pcz - 2], [pcx + 22, pcz - 2]].forEach(([bx, bz], bi) => {
@@ -2840,6 +2846,7 @@ export function buildWorld(scene) {
   }
   ship(6500, 140, 95, 0x555a44, 0xe8e8e0, -0.1);           // tàu ra cửa biển trên sông Cấm
   const seaShip = ship(16000, 20000, 130, 0x7d2b20, 0xe8e8e0); // tàu tuần du ngoài khơi
+  seaShip.userData.dyn = true;
   updaters.push((dt, time) => {
     const ang = time * 0.02;
     seaShip.position.set(16000 + Math.cos(ang) * 2500, Math.sin(time * 0.7) * 0.15, 20000 + Math.sin(ang) * 1800);
@@ -2982,6 +2989,7 @@ export function buildWorld(scene) {
     beamPivot.add(beam);
     g.add(beamPivot);
     world.lighthouseBeam = { pivot: beamPivot, mat: beamMat };
+    beamPivot.userData.dyn = true;
     updaters.push((dt, time) => { beamPivot.rotation.y = time * 0.5; });
     g.position.set(hx, y0, hz);
     scene.add(g);
@@ -3489,6 +3497,7 @@ export function buildWorld(scene) {
     const fl = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 1.4),
       new THREE.MeshLambertMaterial({ color: 0xd8332a, side: THREE.DoubleSide }));
     fl.position.set(1.1, 8.2, 4); g.add(fl);
+    fl.userData.dyn = true;
     updaters.push((dt, time) => { fl.rotation.y = Math.sin(time * 1.7 + sx) * 0.35; });
     // cổng + bảng tên quay ra phố (local +z)
     for (const gx of [-4.4, 4.4]) {
@@ -3691,6 +3700,7 @@ export function buildWorld(scene) {
     const fl = new THREE.Mesh(new THREE.PlaneGeometry(3, 1.9),
       new THREE.MeshLambertMaterial({ color: 0xd8332a, side: THREE.DoubleSide }));
     fl.position.set(1.5, 22, 0); g.add(fl);
+    fl.userData.dyn = true;
     updaters.push((dt, time) => { fl.rotation.y = Math.sin(time * 1.6 + 7) * 0.35; });
     const sign = new THREE.Mesh(new THREE.BoxGeometry(14, 1.3, 0.3),
       new THREE.MeshLambertMaterial({ map: signTexture('UBND THÀNH PHỐ', '#7a1f1f', '#ffe9b8') }));
@@ -4023,6 +4033,7 @@ export function buildWorld(scene) {
       g.rotation.y = rot;
       scene.add(g);
       const x0 = x, z0 = z, ph = x * 0.7;
+      g.userData.dyn = true;
       updaters.push((dt, time) => {
         g.position.y = 0.12 + Math.sin(time * 1.1 + ph) * 0.07;
         g.position.x = x0 + Math.sin(time * 0.13 + ph) * 3;
@@ -4217,7 +4228,7 @@ export function buildWorld(scene) {
   for (const [fx, fz] of flowerSpots) {
     const p = new THREE.Mesh(new THREE.OctahedronGeometry(0.55), pickupMat);
     p.position.set(fx, groundHeight(fx, fz) + 1.3, fz);
-    p.userData.baseY = p.position.y;
+    p.userData.baseY = p.position.y; p.userData.dyn = true;
     scene.add(p);
     flowerPickups.push(p);
   }
@@ -4251,7 +4262,7 @@ export function buildWorld(scene) {
     clouds.push(c);
   }
   // Mây TRÔI theo gió — tốc độ hợp tỉ lệ 1:1 (trước để 2.2 m/s, ở thế giới 55km nhìn như đứng im)
-  clouds.forEach((c, i) => { c.userData.drift = 13 + (i % 5) * 3.5; });   // ~13–27 m/s mỗi đám
+  clouds.forEach((c, i) => { c.userData.drift = 13 + (i % 5) * 3.5; c.userData.dyn = true; });   // ~13–27 m/s mỗi đám
   updaters.push((dt) => {
     for (const c of clouds) {
       c.position.x += dt * c.userData.drift;
@@ -4273,6 +4284,7 @@ export function buildWorld(scene) {
       gl.userData.seed = i * 1.7;
       gulls.add(gl);
     }
+    gulls.userData.dyn = true;
     scene.add(gulls);
     updaters.push((dt, time) => {
       gulls.children.forEach((gl, i) => {
@@ -4321,6 +4333,21 @@ export function buildWorld(scene) {
   loadHeroTrees();   // nạp GLB cây phượng ảnh-thật rồi dựng InstancedMesh (bất đồng bộ)
   loadHeroBeds();    // nạp GLB luống hoa ảnh-thật rồi dựng InstancedMesh
   // LƯU Ý: KHÔNG gọi streetTree/bakeTree sau flushTrees() — cây sẽ vô hình + collider ma.
+
+  // ĐÓNG BĂNG ma trận local cho toàn bộ thế giới TĨNH (~6.400 object khỏi recompose mỗi khung).
+  // Vật world.js tự animate đã đánh dấu userData.dyn (nước, thiên nga, mây, hải âu, cờ, tàu,
+  // hải đăng, hoa nhặt) — cả cây con của chúng đều được chừa. Gọi từ main.js SAU buildWorld,
+  // TRƯỚC khi tạo NPC/xe/traffic (mấy thứ đó thêm vào sau nên vẫn matrixAutoUpdate mặc định).
+  world.freezeStatic = () => {
+    scene.updateMatrixWorld(true);
+    scene.traverse((o) => {
+      if (o === scene || o.userData.dyn) return;
+      let p = o.parent;
+      while (p) { if (p.userData && p.userData.dyn) return; p = p.parent; }
+      o.updateMatrix();
+      o.matrixAutoUpdate = false;
+    });
+  };
 
   return world;
 }

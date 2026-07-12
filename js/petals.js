@@ -1,8 +1,10 @@
 import * as THREE from 'three';
 
 // Cánh phượng đỏ 3D bay trong gió quanh dải trung tâm (instanced để nhẹ)
-const COUNT = 200;
-const RANGE = 42, HEIGHT = 20;
+// RANGE/HEIGHT thu lại (42/20 → 30/15): cánh hoa từng bay như "confetti giữa trời trống"
+// cách xa mọi tán cây; giờ quẩn quanh tầm tán phượng
+const COUNT = 170;
+const RANGE = 30, HEIGHT = 15;
 
 export function createPetals(scene) {
   const geo = new THREE.PlaneGeometry(0.4, 0.24);
@@ -26,8 +28,10 @@ export function createPetals(scene) {
       phase: Math.random() * Math.PI * 2,
       sway: 0.6 + Math.random() * 1.1,
       spin: 2 + Math.random() * 3,
+      gy: 2,   // cao độ đất cache — cập nhật so le (groundHeight từng bị gọi 200 lần/khung)
     });
   }
+  let frameNo = 0;
 
   return {
     // strength 0..1: chỉ rơi dày ở khu trung tâm
@@ -37,16 +41,19 @@ export function createPetals(scene) {
       if (mat.opacity < 0.02) { mesh.visible = false; return; }
       mesh.visible = true;
       const cx = playerPos.x, cz = playerPos.z;
+      frameNo++;
       for (let i = 0; i < COUNT; i++) {
         const p = parts[i];
         p.y -= p.fall * dt;
         p.x += Math.sin(time * p.sway + p.phase) * dt * 1.6 + dt * 0.7;
         p.z += Math.cos(time * p.sway * 0.8 + p.phase) * dt * 1.2;
-        const gy = groundHeight(cx + p.x, cz + p.z);
-        if (p.y < Math.max(gy, 0) + 0.15) {
+        // cao độ đất: cập nhật SO LE mỗi cánh 1 lần/20 khung (đủ chính xác cho điểm chạm đất)
+        if ((i + frameNo) % 20 === 0) p.gy = groundHeight(cx + p.x, cz + p.z);
+        if (p.y < Math.max(p.gy, 0) + 0.15) {
           p.x = (Math.random() - 0.5) * RANGE * 2;
           p.z = (Math.random() - 0.5) * RANGE * 2;
           p.y = HEIGHT * (0.7 + Math.random() * 0.3);
+          p.gy = groundHeight(cx + p.x, cz + p.z);
         }
         if (Math.abs(p.x) > RANGE) p.x = -Math.sign(p.x) * RANGE * 0.95;
         if (Math.abs(p.z) > RANGE) p.z = -Math.sign(p.z) * RANGE * 0.95;

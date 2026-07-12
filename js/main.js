@@ -35,7 +35,8 @@ renderer.shadowMap.enabled = !isTouchDevice;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 16000);
+// far 6000: sương mù kết thúc ~4200 nên mọi thứ xa hơn đều chìm trong sương — 16000 chỉ tốn cull/vẽ thừa
+const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 6000);
 
 // Môi trường phản chiếu cho vật liệu PBR (mô hình GLB không bị xỉn/tối)
 {
@@ -66,6 +67,8 @@ window.addEventListener('resize', () => {
 
 // ============ Thế giới ============
 const world = buildWorld(scene);
+// đóng băng ma trận local của thế giới tĩnh (NPC/xe/traffic tạo SAU nên không bị ảnh hưởng)
+world.freezeStatic();
 const dayNight = createDayNight(scene, world);
 const petals = createPetals(scene);
 const signs = buildLandmarkSigns(scene, world);
@@ -308,7 +311,9 @@ function handleInteract() {
 
 // ============ Vòng lặp chính ============
 const clock = new THREE.Clock();
-let time = 0, clockUITimer = 0;
+let time = 0, clockUITimer = 0, minimapTimer = 1, interactTimer = 1, shadowTimer = 0;
+// bóng đổ render theo nhịp riêng (xem cuối animate) — tắt autoUpdate mỗi khung
+if (renderer.shadowMap.enabled) renderer.shadowMap.autoUpdate = false;
 let started = false;
 // tự hạ chất lượng trên máy yếu: đo FPS 5 giây đầu, dưới 26 thì tắt bóng đổ + bloom
 let fpsFrames = 0, fpsStart = 0, qualityChecked = false;
@@ -348,8 +353,13 @@ function animate() {
     }
 
     if (!modal && !cine.active) {
-      const act = nearestInteraction();
-      ui.setPrompt(act ? (input.isTouch ? act.label.replace('<b>E</b>', '✦') : act.label) : null);
+      // 10Hz là đủ cho prompt tương tác (trước: quét mọi ứng viên + dựng chuỗi label 60 lần/s)
+      interactTimer += dt;
+      if (interactTimer > 0.1) {
+        interactTimer = 0;
+        const act = nearestInteraction();
+        ui.setPrompt(act ? (input.isTouch ? act.label.replace('<b>E</b>', '✦') : act.label) : null);
+      }
     } else {
       ui.setPrompt(null);
     }
@@ -403,7 +413,19 @@ function animate() {
     clockUITimer += dt;
     if (clockUITimer > 0.5) { clockUITimer = 0; ui.setClock(dayNight.clockString); }
 
-    drawMinimap(pState.pos.x, pState.pos.z, pState.mounted ? pState.mounted.heading : pState.yaw);
+    // minimap canvas 2D: 10Hz là đủ mượt (trước vẽ lại 60Hz)
+    minimapTimer += dt;
+    if (minimapTimer > 0.1) {
+      minimapTimer = 0;
+      drawMinimap(pState.pos.x, pState.pos.z, pState.mounted ? pState.mounted.heading : pState.yaw);
+    }
+
+    // shadow map: mặt trời trôi rất chậm — render bóng 8Hz thay vì mỗi khung
+    // (PCFSoft 2048² từng tốn ~745 draw call + ~2M tam giác PHỤ mỗi khung)
+    if (renderer.shadowMap.enabled && dayNight.sun.castShadow) {
+      shadowTimer += dt;
+      if (shadowTimer > 0.12) { shadowTimer = 0; renderer.shadowMap.needsUpdate = true; }
+    }
   }
 
   if (composer) composer.render();
