@@ -1742,24 +1742,32 @@ export function buildWorld(scene) {
     return new THREE.MeshLambertMaterial({ map, emissiveMap, emissive: 0xffcc77, emissiveIntensity: 0 });
   });
   world.facadeMats = facadeMats;
+  // BAKE nhà infill theo material (trước: mỗi nhà 1 Group + 2 mesh → ~380 nhà = ~760 mesh rời;
+  // giờ gộp thành ≤ facadeMats.length + roofMats.length mesh). Mặt +y/-y đổi từ wallMats sang
+  // facadeMats (chỉ là nắp hộp dưới mái chóp, không nhìn thấy). houseFlush() gọi SAU vòng đặt nhà.
+  const _houseBodyG = new Map(), _houseRoofG = new Map();
   function house(x, z, w = 8, d = 7, hgt = 6, rotY = 0, wallOverride = null) {
-    const g = new THREE.Group();
     const idx = Math.floor(Math.abs(x * 7 + z * 13)) % facadeMats.length;
-    const fmat = wallOverride || facadeMats[idx];
-    const plain = wallOverride || wallMats[idx];
-    const body = new THREE.Mesh(new THREE.BoxGeometry(w, hgt, d), [fmat, fmat, plain, plain, fmat, fmat]);
-    body.position.y = hgt / 2;
-    g.add(body);
-    const roof = new THREE.Mesh(new THREE.ConeGeometry(Math.max(w, d) * 0.78, 2.6, 4),
-      roofMats[Math.floor(Math.abs(x * 3 + z * 5)) % roofMats.length]);
-    roof.position.y = hgt + 1.3;
-    roof.rotation.y = Math.PI / 4;
-    g.add(roof);
-    g.position.set(x, groundHeight(x, z), z);
-    g.rotation.y = rotY;
-    scene.add(g);
+    const gy = groundHeight(x, z);
+    const body = new THREE.BoxGeometry(w, hgt, d);
+    body.translate(0, hgt / 2, 0); body.rotateY(rotY); body.translate(x, gy, z);
+    const bKey = wallOverride ? '_ov' : String(idx);
+    let bl = _houseBodyG.get(bKey); if (!bl) _houseBodyG.set(bKey, bl = { m: wallOverride || facadeMats[idx], g: [] });
+    bl.g.push(body);
+    const rIdx = Math.floor(Math.abs(x * 3 + z * 5)) % roofMats.length;
+    const roof = new THREE.ConeGeometry(Math.max(w, d) * 0.78, 2.6, 4);
+    roof.rotateY(Math.PI / 4 + rotY); roof.translate(x, gy + hgt + 1.3, z);
+    let rl = _houseRoofG.get(rIdx); if (!rl) _houseRoofG.set(rIdx, rl = { m: roofMats[rIdx], g: [] });
+    rl.g.push(roof);
     addCollider(x, z, Math.max(w, d) * 0.62);
-    return g;
+  }
+  function houseFlush() {
+    for (const bucket of [..._houseBodyG.values(), ..._houseRoofG.values()]) {
+      if (!bucket.g.length) continue;
+      const m = new THREE.Mesh(mergeGeometries(bucket.g), bucket.m);
+      m.castShadow = true; m.receiveShadow = true; m.name = 'house_infill'; scene.add(m);
+      bucket.g.forEach((x2) => x2.dispose()); bucket.g.length = 0;
+    }
   }
 
   // ---- KHÔNG ĐẶT NHÀ ở KHÔNG GIAN MỞ: công viên, dải vườn hoa, quảng trường Nhà hát, ven hồ Tam Bạc, đè đường cắt ----
@@ -1940,6 +1948,7 @@ export function buildWorld(scene) {
         }
       }
     }
+    houseFlush();   // gộp ~380 nhà × 2 mesh → ~10 mesh theo material
   }
 
   // ---------- DÃY SHOPHOUSE LIỀN MẠCH dọc PHỐ CHÍNH 'p'/'s' lõi trung tâm ----------
@@ -2614,27 +2623,25 @@ export function buildWorld(scene) {
     scene.add(g);
     return g;
   }
+  // GỘP geometry theo material (trước đây mỗi đoạn 4m = 3 Mesh riêng → 2 cầu ~2.000 mesh
+  // = 36% mesh scene + ~1.200 material trùng; giờ mỗi cầu còn vài mesh)
   function bridgeDeckAndRails(g, b, railColor) {
-    const deckMat = mat(0xcfd4da);
+    const deckG = [], railG = [];
     for (let z = -b.half; z <= b.half; z += 4) {
       const tt = z / b.half;
       const y = LAND_H + b.rise * Math.max(0, 1 - tt * tt);
-      const seg = new THREE.Mesh(new THREE.BoxGeometry(28, 0.8, 4.4), deckMat);
-      seg.position.set(0, y - 0.45, z);
-      g.add(seg);
-      for (const sx of [-13.4, 13.4]) {
-        const rail = new THREE.Mesh(new THREE.BoxGeometry(0.4, 1.4, 4.4), mat(railColor));
-        rail.position.set(sx, y + 0.55, z);
-        g.add(rail);
-      }
+      const seg = new THREE.BoxGeometry(28, 0.8, 4.4); seg.translate(0, y - 0.45, z); deckG.push(seg);
+      for (const sx of [-13.4, 13.4]) { const rl = new THREE.BoxGeometry(0.4, 1.4, 4.4); rl.translate(sx, y + 0.55, z); railG.push(rl); }
     }
+    const dm = new THREE.Mesh(mergeGeometries(deckG), mat(0xcfd4da)); deckG.forEach((x) => x.dispose()); g.add(dm);
+    const rm = new THREE.Mesh(mergeGeometries(railG), mat(railColor)); railG.forEach((x) => x.dispose()); g.add(rm);
   }
   {
     // Cầu Hoàng Văn Thụ: HAI vòm thép đỏ nghiêng vào nhau — dáng "cánh chim biển" thật
     const b = BRIDGES[0];
     const g = bridgeGroup(b);
     bridgeDeckAndRails(g, b, 0xe8524a);
-    const red = mat(0xd8402e);
+    const redG = [], cabG = [], pierG = [], capG = [];
     const TILT = 0.24, RIB_X = 14, ARCH_H = 45, AS = 200; // 1:1 — nhịp chính 200m, vòm 45m
     for (const s of [-1, 1]) {
       const arcPts = [];
@@ -2642,22 +2649,18 @@ export function buildWorld(scene) {
         const tt = i / 24;
         arcPts.push(new THREE.Vector3(0, Math.sin(tt * Math.PI) * ARCH_H + 2, (tt - 0.5) * AS));
       }
-      const rib = new THREE.Mesh(
-        new THREE.TubeGeometry(new THREE.CatmullRomCurve3(arcPts), 40, 1.4, 8), red);
-      rib.position.set(s * RIB_X, 0, 0);
-      rib.rotation.z = -s * TILT;
-      g.add(rib);
+      const rib = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(arcPts), 40, 1.4, 8);
+      rib.rotateZ(-s * TILT); rib.translate(s * RIB_X, 0, 0); redG.push(rib);
     }
     // giằng ngang nối hai đỉnh vòm
     for (const tt of [0.34, 0.5, 0.66]) {
       const y = Math.sin(tt * Math.PI) * ARCH_H + 2;
       const xOff = RIB_X - Math.sin(TILT) * y;
-      const brace = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, xOff * 2 * Math.cos(TILT) + 1, 6), red);
-      brace.rotation.z = Math.PI / 2;
-      brace.position.set(0, y * Math.cos(TILT), (tt - 0.5) * AS);
-      g.add(brace);
+      const brace = new THREE.CylinderGeometry(0.55, 0.55, xOff * 2 * Math.cos(TILT) + 1, 6);
+      brace.rotateZ(Math.PI / 2); brace.translate(0, y * Math.cos(TILT), (tt - 0.5) * AS); redG.push(brace);
     }
     // dây treo ĐAN CHÉO (network arch — đặc trưng thật của cầu Hoàng Văn Thụ)
+    const _upV = new THREE.Vector3(0, 1, 0), _q = new THREE.Quaternion(), _m4 = new THREE.Matrix4(), _one = new THREE.Vector3(1, 1, 1), _p3 = new THREE.Vector3(), _v3 = new THREE.Vector3();
     for (let i = 2; i <= 22; i += 2) {
       const tt = i / 24;
       const topYr = Math.sin(tt * Math.PI) * ARCH_H + 2;
@@ -2673,11 +2676,12 @@ export function buildWorld(scene) {
           const dz = zd - zz;
           const len = Math.hypot(topY - deckY, topX - s * 13, dz);
           if (len < 2) continue;
-          const cable = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.11, len, 4), mat(0xe8e0d8));
-          cable.position.set((topX + s * 13) / 2, (topY + deckY) / 2, zz + dz / 2);
-          const v = new THREE.Vector3(topX - s * 13, topY - deckY, -dz).normalize();
-          cable.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), v);
-          g.add(cable);
+          const cable = new THREE.CylinderGeometry(0.11, 0.11, len, 4);
+          _v3.set(topX - s * 13, topY - deckY, -dz).normalize();
+          _q.setFromUnitVectors(_upV, _v3);
+          _p3.set((topX + s * 13) / 2, (topY + deckY) / 2, zz + dz / 2);
+          cable.applyMatrix4(_m4.compose(_p3, _q, _one));
+          cabG.push(cable);
         }
       }
     }
@@ -2689,20 +2693,21 @@ export function buildWorld(scene) {
         const deckY = LAND_H + b.rise * Math.max(0, 1 - ttd * ttd);
         if (deckY < 2.6) continue;
         for (const sx of [-9, 9]) {
-          const pier = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.9, deckY - 0.2, 8), mat(0xb9bec4));
-          pier.position.set(sx, (deckY - 0.2) / 2, along);
-          g.add(pier);
+          const pier = new THREE.CylinderGeometry(1.6, 1.9, deckY - 0.2, 8);
+          pier.translate(sx, (deckY - 0.2) / 2, along); pierG.push(pier);
         }
-        const cap = new THREE.Mesh(new THREE.BoxGeometry(24, 1.4, 3), mat(0xa9aeb4));
-        cap.position.set(0, deckY - 0.9, along);
-        g.add(cap);
+        const cap = new THREE.BoxGeometry(24, 1.4, 3); cap.translate(0, deckY - 0.9, along); capG.push(cap);
       }
+    }
+    for (const [arr, c] of [[redG, 0xd8402e], [cabG, 0xe8e0d8], [pierG, 0xb9bec4], [capG, 0xa9aeb4]]) {
+      if (arr.length) { const m = new THREE.Mesh(mergeGeometries(arr), mat(c)); arr.forEach((x) => x.dispose()); g.add(m); }
     }
   }
   {
     const b = BRIDGES[1];
     const g = bridgeGroup(b);
     bridgeDeckAndRails(g, b, 0x88b8c8);
+    const pierG = [], pylG = [], cabG = [];
     for (const dir of [-1, 1]) {
       for (let a = 150; a < b.half - 12; a += 42) {
         const along = dir * a;
@@ -2710,21 +2715,14 @@ export function buildWorld(scene) {
         const deckY = LAND_H + b.rise * Math.max(0, 1 - ttd * ttd);
         if (deckY < 2.6) continue;
         for (const sx of [-9, 9]) {
-          const pier = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.9, deckY - 0.2, 8), mat(0xb9bec4));
-          pier.position.set(sx, (deckY - 0.2) / 2, along);
-          g.add(pier);
+          const pier = new THREE.CylinderGeometry(1.6, 1.9, deckY - 0.2, 8);
+          pier.translate(sx, (deckY - 0.2) / 2, along); pierG.push(pier);
         }
       }
     }
     for (const dz of [-65, 65]) {
-      for (const dx of [-11, 11]) {
-        const pylon = new THREE.Mesh(new THREE.BoxGeometry(3, 101, 3), mat(0xb8c4c8));
-        pylon.position.set(dx, 50, dz);
-        g.add(pylon);
-      }
-      const beam = new THREE.Mesh(new THREE.BoxGeometry(26, 2.6, 2.6), mat(0xb8c4c8));
-      beam.position.set(0, 92, dz);
-      g.add(beam);
+      for (const dx of [-11, 11]) { const pylon = new THREE.BoxGeometry(3, 101, 3); pylon.translate(dx, 50, dz); pylG.push(pylon); }
+      const beam = new THREE.BoxGeometry(26, 2.6, 2.6); beam.translate(0, 92, dz); pylG.push(beam);
       for (let k = 1; k <= 8; k++) {
         for (const dir of [-1, 1]) {
           const zz = dz + dir * k * 15;
@@ -2734,12 +2732,15 @@ export function buildWorld(scene) {
           const topY = 95;
           const dzLen = Math.abs(zz - dz);
           const len = Math.hypot(topY - deckY, dzLen);
-          const cable = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, len, 4), mat(0xd8e0e4));
-          cable.position.set(0, (topY + deckY) / 2, (zz + dz) / 2);
-          cable.rotation.x = Math.atan2(dzLen, topY - deckY) * Math.sign(zz - dz);
-          g.add(cable);
+          const cable = new THREE.CylinderGeometry(0.13, 0.13, len, 4);
+          cable.rotateX(Math.atan2(dzLen, topY - deckY) * Math.sign(zz - dz));
+          cable.translate(0, (topY + deckY) / 2, (zz + dz) / 2);
+          cabG.push(cable);
         }
       }
+    }
+    for (const [arr, c] of [[pierG, 0xb9bec4], [pylG, 0xb8c4c8], [cabG, 0xd8e0e4]]) {
+      if (arr.length) { const m = new THREE.Mesh(mergeGeometries(arr), mat(c)); arr.forEach((x) => x.dispose()); g.add(m); }
     }
   }
 
@@ -3111,19 +3112,26 @@ export function buildWorld(scene) {
         const B = new THREE.Matrix4().makeScale(1 / h, 1 / h, 1 / h)
           .multiply(new THREE.Matrix4().makeTranslation(-cx, -box.min.y, -cz))
           .multiply(mesh.matrixWorld);
-        const inst = new THREE.InstancedMesh(mesh.geometry, mesh.material, slots.length);
-        inst.frustumCulled = false;
+        // CHIA Ô 250m + computeBoundingSphere → frustum culling THẬT (trước: frustumCulled=false
+        // → 7,2 TRIỆU tam giác cây hero submit MỌI khung dù camera nhìn đâu — 70% tam giác scene)
+        const tiles = new Map();
+        for (const t of slots) { const k = Math.floor(t.x / 250) + ',' + Math.floor(t.z / 250); let l = tiles.get(k); if (!l) tiles.set(k, l = []); l.push(t); }
         const trs = new THREE.Matrix4(), m = new THREE.Matrix4();
         const q = new THREE.Quaternion(), sv = new THREE.Vector3(), pv = new THREE.Vector3();
-        slots.forEach((t, i) => {
-          q.setFromEuler(new THREE.Euler(0, t.yaw, 0));
-          sv.setScalar(t.scale); pv.set(t.x, t.y, t.z);
-          trs.compose(pv, q, sv);
-          m.multiplyMatrices(trs, B);        // instance = TRS · B
-          inst.setMatrixAt(i, m);
-        });
-        inst.instanceMatrix.needsUpdate = true;
-        scene.add(inst);
+        for (const l of tiles.values()) {
+          const inst = new THREE.InstancedMesh(mesh.geometry, mesh.material, l.length);
+          l.forEach((t, i) => {
+            q.setFromEuler(new THREE.Euler(0, t.yaw, 0));
+            sv.setScalar(t.scale); pv.set(t.x, t.y, t.z);
+            trs.compose(pv, q, sv);
+            m.multiplyMatrices(trs, B);        // instance = TRS · B
+            inst.setMatrixAt(i, m);
+          });
+          inst.instanceMatrix.needsUpdate = true;
+          inst.computeBoundingSphere();        // bao đúng các instance trong Ô
+          inst.name = 'hero_trees';
+          scene.add(inst);
+        }
       }, undefined, (err) => console.error('hero tree', file, err));
     });
   }
@@ -3152,7 +3160,6 @@ export function buildWorld(scene) {
         .multiply(new THREE.Matrix4().makeTranslation(-cx, -box.min.y, -cz))
         .multiply(mesh.matrixWorld);
       const inst = new THREE.InstancedMesh(mesh.geometry, mesh.material, heroBeds.length);
-      inst.frustumCulled = false;
       const trs = new THREE.Matrix4(), m = new THREE.Matrix4();
       const q = new THREE.Quaternion(), sv = new THREE.Vector3(), pv = new THREE.Vector3();
       heroBeds.forEach((bd, i) => {
@@ -4069,13 +4076,13 @@ export function buildWorld(scene) {
     const pathM = mat(0xd8cba8);
     const bedRimM = mat(0xa89878);
     const lawnM = mat(0x6fae4e);
+    // GOM geometry bồn hoa theo material (trước: 2 mesh/bồn × ~262 bồn = ~524 mesh rời
+    // ngay khu trung tâm đông người chơi → giờ 8 mesh)
+    const rimGeos = [], domeGeos = flowerCols.map(() => []);
     function flowerBed(bx, bz, r, seed) {
-      const rim = new THREE.Mesh(new THREE.CylinderGeometry(r, r + 0.3, 0.4, 10), bedRimM);
-      rim.position.set(bx, LAND_H + 0.2, bz); rim.receiveShadow = true; scene.add(rim);
-      const dome = new THREE.Mesh(
-        new THREE.SphereGeometry(r * 0.92, 8, 5, 0, Math.PI * 2, 0, Math.PI / 2),
-        flowerDomeM[seed % flowerCols.length]);
-      dome.position.set(bx, LAND_H + 0.38, bz); dome.scale.y = 0.5; scene.add(dome);
+      const rim = new THREE.CylinderGeometry(r, r + 0.3, 0.4, 10); rim.translate(bx, LAND_H + 0.2, bz); rimGeos.push(rim);
+      const dome = new THREE.SphereGeometry(r * 0.92, 8, 5, 0, Math.PI * 2, 0, Math.PI / 2);
+      dome.scale(1, 0.5, 1); dome.translate(bx, LAND_H + 0.38, bz); domeGeos[seed % flowerCols.length].push(dome);
     }
     // MỖI Ô ĐẤT có HƯỚNG RIÊNG (phố cong, ô xéo khác nhau) → KHÔNG dùng 1 góc lưới chung
     // (dùng chung làm vườn xiên so với mép ô). Tính HÌNH CHỮ NHẬT BAO DIỆN TÍCH NHỎ NHẤT của
@@ -4173,6 +4180,9 @@ export function buildWorld(scene) {
       }
       // KHÔNG chặn giữa vườn (trừ Nhà Kèn) — công viên/vườn hoa ĐI ĐƯỢC
     }
+    // xả bồn hoa đã gom → 1 mesh vành + 7 mesh vòm hoa theo màu
+    if (rimGeos.length) { const m = new THREE.Mesh(mergeGeometries(rimGeos), bedRimM); m.receiveShadow = true; m.name = 'flowerbed_rims'; scene.add(m); rimGeos.forEach((x) => x.dispose()); }
+    domeGeos.forEach((arr, i) => { if (!arr.length) return; const m = new THREE.Mesh(mergeGeometries(arr), flowerDomeM[i]); m.name = 'flowerbed_domes_' + i; scene.add(m); arr.forEach((x) => x.dispose()); });
   }
 
   // ---------- Hoa phượng nhặt (nhiệm vụ) ----------
