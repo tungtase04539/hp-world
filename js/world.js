@@ -615,6 +615,9 @@ export function buildWorld(scene) {
     }
   }
 
+  // Cây trồng bởi các khối CHẠY SỚM (kè hồ...) phải HOÃN tới cuối buildWorld: streetTree/heroTree
+  // đóng trên các const (TREE_TILE, geometry cây...) khai báo phía dưới → gọi sớm là TDZ ReferenceError.
+  const lateTrees = [];   // [x, z, hero?]
   // ---------- KÈ HỒ TAM BẠC: lan can sắt xanh + ghế đá granite + cột đèn đôi Pháp cổ (pano_004-013, 028-037) ----------
   // Neo theo TRỤC HỒ (không theo tim đường) → lan can bám đúng mép nước cả 2 bờ, thứ tự thật
   // từ hồ ra: nước → LAN CAN (mép kè) → đèn → GHẾ ĐÁ (trên vỉa hè caro, quay mặt ra hồ) → vỉa hè → đường.
@@ -770,7 +773,7 @@ export function buildWorld(scene) {
         // HÀNG CÂY cổ thụ ven kè mỗi ~18m (né chu kỳ ghế 26/đèn 31 và khoang pergola)
         if (tR % 18 < 2.6 && tR % 26 >= 2.6 && tR % 31 >= 2.6 && !(isNorth && (mPer < 8 || mPer > 116))) {
           const tx = cx0 + nx * 4.6, tz = cz0 + nz * 4.6;
-          if (okSpot(tx, tz)) streetTree(tx, tz);
+          if (okSpot(tx, tz)) lateTrees.push([tx, tz, 0]);
         }
         // THÙNG RÁC ĐÔI phân loại mỗi ~52m, sát lan can
         if (tR % 52 < 2.6) {
@@ -836,7 +839,7 @@ export function buildWorld(scene) {
         const pn = new THREE.BoxGeometry(1.62, 1.12, 0.12); pn.rotateY(p.barAng); pn.translate(p.x, gy + 1.9, p.z); postWhite.push(pn);
       }
       // CÂY ĐA cổ thụ quảng trường ven hồ (pano_035, x≈-380 bờ nam)
-      { const p = projQuay(-380, 250, 6.5); if (p && okSpot(p.x, p.z)) { heroTree(p.x, p.z); streetTree(p.x + 7, p.z + 3); } }
+      { const p = projQuay(-380, 250, 6.5); if (p && okSpot(p.x, p.z)) { lateTrees.push([p.x, p.z, 1], [p.x + 7, p.z + 3, 0]); } }
       if (perG.length) addMerged(perG, mat(0xa63c28), 'lake_pergolas');            // gỗ sơn đỏ-cam
       if (binGreen.length) addMerged(binGreen, mat(0x2f8a4c), 'lake_bins_g');      // thùng rác xanh lá
       if (binBlue.length) addMerged(binBlue, mat(0x2668b8), 'lake_bins_b');        // thùng rác xanh dương
@@ -4288,5 +4291,8 @@ export function buildWorld(scene) {
   flushTrees();      // GỘP toàn bộ cây procedural đã bake → vài mesh tĩnh (giảm ~8700 draw call)
   loadHeroTrees();   // nạp GLB cây phượng ảnh-thật rồi dựng InstancedMesh (bất đồng bộ)
   loadHeroBeds();    // nạp GLB luống hoa ảnh-thật rồi dựng InstancedMesh
+  // trồng cây đã hoãn từ các khối chạy sớm (mọi const cây đều đã khởi tạo tới đây)
+  for (const [tx2, tz2, hero] of lateTrees) { if (hero) heroTree(tx2, tz2); else streetTree(tx2, tz2); }
+
   return world;
 }
