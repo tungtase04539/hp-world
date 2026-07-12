@@ -1048,7 +1048,9 @@ export function buildWorld(scene) {
         const rotY = Math.atan2(x2 - x1, z2 - z1);       // dọc đường
         const px = Math.cos(rotY), pz = -Math.sin(rotY); // pháp tuyến
         for (let d = 4; d < segLen - 4; d += 1.35) {      // khoảng cách xe san sát
-          if (rnd() > 0.62) continue;                     // thưa vừa phải
+          // V5-fix: xe đỗ theo CỤM trước cửa hàng (model đọc dải liên tục thành "cọc chắn dày đặc")
+          if (Math.sin((d + x1) * 0.35) < 0.15) continue;
+          if (rnd() > 0.55) continue;
           const mx = x1 + dxn * d, mz = z1 + dzn * d;
           if (mx * mx + mz * mz > 1400 * 1400) continue;  // vùng trung tâm mở rộng
           const side = rnd() < 0.5 ? 1 : -1;
@@ -3463,8 +3465,9 @@ export function buildWorld(scene) {
     }
 
     // Cao ốc văn phòng kính 11 tầng sau góc chợ Lãn Ông (pano_002 h45)
+    // V5-fix: lùi 34m→55m khỏi pano_002 — đặt 34m "che phần lớn góc nhìn" (thật ở xa sau dãy chợ)
     {
-      const cx = -262, cz = 106, FL = 11, H = FL * 3.4;
+      const cx = -247, cz = 92, FL = 11, H = FL * 3.4;
       const g = new THREE.Group();
       const body = new THREE.Mesh(new THREE.BoxGeometry(16, H, 14), mat(0x9aa8b2)); body.position.y = H / 2; g.add(body);
       for (let f = 0; f < FL; f++) { const band = new THREE.Mesh(new THREE.BoxGeometry(16.15, 1.9, 14.15), new THREE.MeshLambertMaterial({ color: 0x5f8fb4 })); band.position.y = f * 3.4 + 2.1; g.add(band); }
