@@ -1982,9 +1982,25 @@ export function buildWorld(scene) {
     const lmPtsS = Object.values(LM);
     let ss = 660317; const srnd = () => { ss = (ss * 1103515245 + 12345) & 0x7fffffff; return ss / 0x7fffffff; };
     const placedS = [];
-    // PANO-LOOP V2: 780 chỉ phủ ~12% lô mặt phố (bước 4.7m×2 bên) → dãy phố đứt quãng khắp nơi
-    // (76 finding house sev3). 3000 phủ trọn lõi; vẫn 1 mesh gộp — không thêm draw call.
-    const CAP = 3000;
+    // PANO-LOOP V2: 780 chỉ phủ ~12% lô mặt phố → 3000. CỤM HOUSE (V5+): dãy phải LIỀN KỀ
+    // như thực địa — đi dọc từng PHÍA phố, tiến đúng bằng bề rộng lô (không bước cố định),
+    // lô bị guard chặn chỉ nhảy 2m rồi thử tiếp → khe hở tối thiểu. Vẫn 1 mesh gộp.
+    const CAP = 6500;
+    // toàn bộ điều kiện đặt 1 lô (giữ NGUYÊN bộ guard chống regression: 3 kiểu ô đất,
+    // vành 830m, pano là nguồn sự thật) — buffer nhà OSM 13→8.5m để dãy lấp SÁT cạnh nhà thật
+    const slotOK = (gx, gz, dxn, dzn, nx, nz, w, dp) => {
+      if (Math.abs(groundHeightNoDeck(gx, gz) - LAND_H) > 0.3) return false;
+      if (riverFactor(gx, gz) > 0.01) return false;
+      if (_gridNear(_bldGrid, gx, gz, 8.5)) return false;          // không đè nhà OSM thật (sát hơn: hết khe cạnh nhà thật)
+      if (!houseEvidence(gx, gz)) return false;                    // BẢN ĐỒ NHÀ (pano+OSM): không bằng chứng → cấm
+      if (openSpace(gx, gz) || onOtherRoad(gx, gz)) return false;  // né vườn hoa/quảng trường/ven hồ/đường cắt
+      if (panoDenies(gx, gz)) return false;                        // pano thật không thấy nhà ở hướng này
+      if (!cornersDry(gx, gz, dxn, dzn, w / 2, nx, nz, dp / 2)) return false; // 4 góc phải là đất
+      for (const [lx, lz] of lmPtsS) if ((gx - lx) ** 2 + (gz - lz) ** 2 < 34 * 34) return false;
+      for (const [ox, oz] of placedS) if ((gx - ox) ** 2 + (gz - oz) ** 2 < 4.1 * 4.1) return false;
+      if (groundHeight(gx, gz) < LAND_H - 0.5) return false;
+      return true;
+    };
     outerShop:
     for (let ri = 0; ri < ROADS_DT.length; ri++) {
       const r = ROADS_DT[ri]; if (r.c !== 'p' && r.c !== 's') continue;
@@ -1994,29 +2010,22 @@ export function buildWorld(scene) {
         const segLen = Math.hypot(x2 - x1, z2 - z1); if (segLen < 9) continue;
         const dxn = (x2 - x1) / segLen, dzn = (z2 - z1) / segLen, rotY = Math.atan2(x2 - x1, z2 - z1);
         const nx = Math.cos(rotY), nz = -Math.sin(rotY);           // pháp tuyến
-        for (let d = 3; d < segLen - 3; d += 4.7) {                 // shophouse sát nhau
-          const mx = x1 + dxn * d, mz = z1 + dzn * d;
-          // V3-fix: vành 830-980 trùm khu CƠ QUAN KHUÔN VIÊN/đất giải tỏa (Cảng vụ ~878m, pano_019
-          // regression -1.4) → thu về 830; mật độ lõi vẫn giữ nhờ CAP 3000
-          if (mx * mx + mz * mz > 830 * 830) continue;
-          for (const side of [1, -1]) {
-            const off = side * (wRoad / 2 + 5.6);                    // sau vỉa hè (building-line)
+        for (const side of [1, -1]) {                               // từng PHÍA phố: dãy liền kề độc lập
+          let d = 2.2;
+          while (d < segLen - 2.2) {
+            const w = 4.2 + srnd() * 1.4, dp = 6.5 + srnd() * 1.5;  // lô ~4.2-5.6m như thực địa
+            if (d + w > segLen - 2.2) break;
+            const dc = d + w / 2;
+            const mx = x1 + dxn * dc, mz = z1 + dzn * dc;
+            // V3-fix: vành 830-980 trùm khu CƠ QUAN KHUÔN VIÊN/đất giải tỏa → giữ trong 830m
+            if (mx * mx + mz * mz > 830 * 830) { d += 3.0; continue; }
+            // MẶT TIỀN THẲNG HÀNG: tâm lùi theo dp để mặt trước luôn cách mép đường 2.3m
+            const off = side * (wRoad / 2 + 2.3 + dp / 2);
             const gx = mx + off * nx, gz = mz + off * nz;
-            if (Math.abs(groundHeightNoDeck(gx, gz) - LAND_H) > 0.3) continue;
-            if (riverFactor(gx, gz) > 0.01) continue;
-            if (_gridNear(_bldGrid, gx, gz, 13)) continue;           // không đè nhà OSM thật
-            if (!houseEvidence(gx, gz)) continue;                     // BẢN ĐỒ NHÀ (pano+OSM): không bằng chứng → cấm
-            if (openSpace(gx, gz) || onOtherRoad(gx, gz)) continue;  // né vườn hoa/quảng trường/ven hồ/đường cắt
-            if (panoDenies(gx, gz)) continue;                         // pano thật không thấy nhà ở hướng này
-            if (!cornersDry(gx, gz, dxn, dzn, 2.6, nx, nz, 4.0)) continue; // 4 góc phải là đất — hết nhà lội nước
-            let ok = true;
-            for (const [lx, lz] of lmPtsS) { if ((gx - lx) ** 2 + (gz - lz) ** 2 < 34 * 34) { ok = false; break; } }
-            if (!ok) continue;
-            for (const [ox, oz] of placedS) { if ((gx - ox) ** 2 + (gz - oz) ** 2 < 4.1 * 4.1) { ok = false; break; } }
-            if (!ok) continue;
-            const gy = groundHeight(gx, gz); if (gy < LAND_H - 0.5) continue;
+            if (!slotOK(gx, gz, dxn, dzn, nx, nz, w, dp)) { d += 2.0; continue; }
+            const gy = groundHeight(gx, gz);
             const floors = (mx * mx + mz * mz < 480 * 480 ? 3 : 2) + ((srnd() * 4) | 0);   // lõi 3-6 tầng, ngoài 2-5 (pano V1: trung tâm cao hơn)
-            const h = floors * 3.3, w = 4.0 + srnd() * 1.2, dp = 6.5 + srnd() * 1.5;
+            const h = floors * 3.3;
             const bay = bayCols[(Math.abs(gx * 7 + gz * 13) | 0) % bayCols.length];
             const sgn = signCols[(Math.abs(gx * 5 + gz * 11) | 0) % signCols.length];
             const fz = dp / 2;                                        // mặt tiền (local +Z)
@@ -2067,6 +2076,7 @@ export function buildWorld(scene) {
             shopGeos.push(merged1); placedS.push([gx, gz]);
             addCollider(gx, gz, Math.max(w, dp) * 0.5);
             if (shopGeos.length >= CAP) break outerShop;
+            d += w + 0.08;                                          // lô kế tiếp SÁT lô này — tường phố liền kề
           }
         }
       }

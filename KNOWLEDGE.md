@@ -315,6 +315,17 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-12 (al)** [CỤM HOUSE: DÃY SHOPHOUSE LIỀN KỀ TOÀN DẢI TRUNG TÂM]: cụm ăn điểm lớn nhất
+    từ pano-loop V1 (dãy phố "đứt quãng khắp nơi"). Đổi thuật toán đặt lô trong khối shophouse_infill:
+    (1) đi dọc TỪNG PHÍA phố p/s, TIẾN ĐÚNG BẰNG BỀ RỘNG LÔ (w 4.2-5.6m + 8cm) thay vì bước cố định
+    4.7m → mặt tiền chạm mặt tiền như thực địa; lô bị guard chặn chỉ nhảy 2m rồi thử tiếp;
+    (2) MẶT TIỀN THẲNG HÀNG: tâm nhà lùi theo dp (off = wRoad/2 + 2.3 + dp/2) để mặt trước luôn
+    cách mép đường đúng 2.3m (trước đây tâm cố định + dp ngẫu nhiên → mặt tiền thụt thò ±0.75m);
+    (3) buffer né nhà OSM thật 13→8.5m — nguồn khe hở lớn nhất (mỗi nhà thật khoét lỗ 26m trên dãy);
+    (4) CAP 3000→6500 (đo tổng dài p/s trong vành 830m = 13.9km → tối đa 5585 lô, trần không cạn
+    giữa chừng — tránh lặp bài học "khu cuối danh sách trống"); guard giữ NGUYÊN (3 kiểu ô đất,
+    vành 830m, panoDenies/houseEvidence/openSpace/cornersDry). Vẫn 1 mesh gộp — 0 draw call thêm.
+    Đối chiếu trước/sau bằng snap_house.mjs (5 pano lõi × 2 heading, đúng công thức chụp §8b).
 - **2026-07-12 (ak)** [SWEEP TỐC ĐỘ+CHẤT LƯỢNG 14-AGENT — 59 finding sau phản biện đối kháng]:
     Quy trình: 7 agent soi (1 ĐO runtime headless + 6 lăng kính code/ảnh) → 7 agent phản biện
     bác bỏ/xác nhận từng finding → chỉ sửa cái sống sót. SỐ ĐO TRƯỚC/SAU (probe scene):
