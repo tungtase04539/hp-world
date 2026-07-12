@@ -19,11 +19,20 @@
 \ProcessOptions\relax
 \LoadClass[11pt,a4paper,oneside]{book}
 
-% ---- Hỗ trợ tiếng Việt (pdfLaTeX). Với XeLaTeX/LuaLaTeX hãy thay bằng
-%      fontspec + polyglossia + \setmainlanguage{vietnamese}. ----
-\RequirePackage[utf8]{inputenc}
-\RequirePackage[T5]{fontenc}
-\RequirePackage[vietnamese]{babel}
+% ---- Hỗ trợ tiếng Việt (TỰ NHẬN DIỆN trình biên dịch) ----
+%  * XeLaTeX/LuaLaTeX (KHUYẾN NGHỊ): dùng fontspec + polyglossia, phông
+%    Latin Modern có sẵn glyph tiếng Việt -> KHÔNG cần cài gói vntex.
+%  * pdfLaTeX: dùng T5 + babel (cần gói vntex).
+\RequirePackage{iftex}
+\ifPDFTeX
+  \RequirePackage[utf8]{inputenc}
+  \RequirePackage[T5]{fontenc}
+  \RequirePackage[vietnamese]{babel}
+\else
+  \RequirePackage{fontspec}
+  \RequirePackage{polyglossia}
+  \setmainlanguage{vietnamese}
+\fi
 
 % ---- Gói toán & trình bày ----
 \RequirePackage{amsmath,amssymb,amsthm,amsfonts,mathtools}

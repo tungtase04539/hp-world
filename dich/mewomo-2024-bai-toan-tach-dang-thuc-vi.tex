@@ -1,3 +1,5 @@
+% !TeX program = xelatex
+% !TeX encoding = UTF-8
 %=======================================================================
 %  BẢN DỊCH TIẾNG VIỆT
 %  "A strongly convergent algorithm for solving split equality
@@ -16,9 +18,16 @@
 \documentclass[11pt,a4paper]{article}
 
 % ------- Hỗ trợ tiếng Việt (pdfLaTeX) -------
-\usepackage[utf8]{inputenc}
-\usepackage[T5]{fontenc}
-\usepackage[vietnamese]{babel}
+\usepackage{iftex}
+\ifPDFTeX
+  \usepackage[utf8]{inputenc}
+  \usepackage[T5]{fontenc}
+  \usepackage[vietnamese]{babel}
+\else
+  \usepackage{fontspec}
+  \usepackage{polyglossia}
+  \setmainlanguage{vietnamese}
+\fi
 % --- Nếu dùng XeLaTeX/LuaLaTeX, hãy thay ba dòng trên bằng: ---
 %   \usepackage{fontspec}
 %   \usepackage{polyglossia}

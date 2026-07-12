@@ -1,3 +1,5 @@
+% !TeX program = xelatex
+% !TeX encoding = UTF-8
 %=======================================================================
 %  TÀI LIỆU TÓM TẮT & CHÚ GIẢI TIẾNG VIỆT (phục vụ học tập)
 %  Dựa trên bài báo:
@@ -20,9 +22,16 @@
 %=======================================================================
 \documentclass[11pt,a4paper]{article}
 
-\usepackage[utf8]{inputenc}
-\usepackage[T5]{fontenc}
-\usepackage[vietnamese]{babel}
+\usepackage{iftex}
+\ifPDFTeX
+  \usepackage[utf8]{inputenc}
+  \usepackage[T5]{fontenc}
+  \usepackage[vietnamese]{babel}
+\else
+  \usepackage{fontspec}
+  \usepackage{polyglossia}
+  \setmainlanguage{vietnamese}
+\fi
 % XeLaTeX/LuaLaTeX: thay 3 dòng trên bằng fontspec + polyglossia + \setmainlanguage{vietnamese}
 
 \usepackage{amsmath,amssymb,amsthm,amsfonts,mathtools}
