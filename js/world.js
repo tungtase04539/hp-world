@@ -615,9 +615,6 @@ export function buildWorld(scene) {
     }
   }
 
-  // Cây trồng bởi các khối CHẠY SỚM (kè hồ...) phải HOÃN tới cuối buildWorld: streetTree/heroTree
-  // đóng trên các const (TREE_TILE, geometry cây...) khai báo phía dưới → gọi sớm là TDZ ReferenceError.
-  const lateTrees = [];   // [x, z, hero?]
   // ---------- KÈ HỒ TAM BẠC: lan can sắt xanh + ghế đá granite + cột đèn đôi Pháp cổ (pano_004-013, 028-037) ----------
   // Neo theo TRỤC HỒ (không theo tim đường) → lan can bám đúng mép nước cả 2 bờ, thứ tự thật
   // từ hồ ra: nước → LAN CAN (mép kè) → đèn → GHẾ ĐÁ (trên vỉa hè caro, quay mặt ra hồ) → vỉa hè → đường.
@@ -763,18 +760,20 @@ export function buildWorld(scene) {
         for (let s = -4.8; s <= 4.8; s += 1.2) { const sl = new THREE.BoxGeometry(0.09, 0.07, 3.4); sl.rotateY(barAng); sl.translate(cx + ux * s, gy + 2.78, cz + uz * s); perG.push(sl); }
       };
       // đi vòng CHU VI hồ theo đúng samples của kè (mỗi 2.6m, pháp tuyến ra ngoài)
+      const edgeLen = LAKE_POLY.map((p, e) => { const q = LAKE_POLY[(e + 1) % LAKE_POLY.length]; return Math.hypot(q[0] - p[0], q[1] - p[1]); });
       let tPr = 0;
-      for (const [cx0, cz0, ux, uz, nx, nz] of samples) {
+      for (const [cx0, cz0, ux, uz, nx, nz, eIdx] of samples) {
         tPr += 2.6;
         const barAng = Math.atan2(ux, uz) + Math.PI / 2;
-        const isNorth = nz < -0.35;                                   // bờ bắc = phố đi bộ Quang Trung
+        // bờ bắc = phố đi bộ Quang Trung: pháp tuyến hướng bắc VÀ cạnh DÀI (mũi tây hồ cong
+        // cũng có đoạn nz<-0.35 → pergola từng mọc lạc ra đầu tây)
+        const isNorth = nz < -0.35 && edgeLen[eIdx] > 150;
         const mPer = ((tPr - 15.5) % 124 + 124) % 124;
         const tR = Math.round(tPr);
-        // HÀNG CÂY cổ thụ ven kè mỗi ~18m (né chu kỳ ghế 26/đèn 31 và khoang pergola)
-        if (tR % 18 < 2.6 && tR % 26 >= 2.6 && tR % 31 >= 2.6 && !(isNorth && (mPer < 8 || mPer > 116))) {
-          const tx = cx0 + nx * 4.6, tz = cz0 + nz * 4.6;
-          if (okSpot(tx, tz)) lateTrees.push([tx, tz, 0]);
-        }
+        const m26 = tPr % 26;                                         // pha chu kỳ ghế đá
+        // (hàng cây cổ thụ ven kè do khối "HÀNG CÂY CỔ THỤ TRÊN KÈ HỒ" phía dưới trồng — mỗi 14m
+        //  theo chu vi LAKE_POLY; KHÔNG trồng ở đây: streetTree gọi lúc này là TDZ + trồng sau
+        //  flushTrees() sẽ thành cây vô hình kèm collider ma)
         // THÙNG RÁC ĐÔI phân loại mỗi ~52m, sát lan can
         if (tR % 52 < 2.6) {
           const rx = cx0 + nx * 2.5, rz = cz0 + nz * 2.5;
@@ -784,8 +783,9 @@ export function buildWorld(scene) {
             const b2 = new THREE.BoxGeometry(0.42, 0.62, 0.42); b2.translate(rx - ux * 0.26, ry + 0.44, rz - uz * 0.26); binBlue.push(b2);
           }
         }
-        // PERGOLA gỗ đỏ chỉ bờ bắc (phố đi bộ Quang Trung), tâm mỗi 124m
-        if (isNorth && mPer < 2.6) {
+        // PERGOLA gỗ đỏ chỉ bờ bắc (phố đi bộ Quang Trung), tâm mỗi 124m; né chu kỳ GHẾ ĐÁ
+        // (khoang ±6m quanh tâm không được dính pha ghế 0..2.6 mod 26 → yêu cầu m26 ∈ [8.6,17.4])
+        if (isNorth && mPer < 2.6 && m26 > 8.6 && m26 < 17.4) {
           const px2 = cx0 + nx * 4.0, pz2 = cz0 + nz * 4.0;
           if (okSpot(px2, pz2) && okSpot(px2 + ux * 5, pz2 + uz * 5) && okSpot(px2 - ux * 5, pz2 - uz * 5)) pergolaAt(px2, pz2, barAng, ux, uz, nx, nz);
         }
@@ -838,8 +838,7 @@ export function buildWorld(scene) {
         const fr = new THREE.BoxGeometry(1.8, 1.3, 0.1); fr.rotateY(p.barAng); fr.translate(p.x, gy + 1.9, p.z); postRed.push(fr);
         const pn = new THREE.BoxGeometry(1.62, 1.12, 0.12); pn.rotateY(p.barAng); pn.translate(p.x, gy + 1.9, p.z); postWhite.push(pn);
       }
-      // CÂY ĐA cổ thụ quảng trường ven hồ (pano_035, x≈-380 bờ nam)
-      { const p = projQuay(-380, 250, 6.5); if (p && okSpot(p.x, p.z)) { lateTrees.push([p.x, p.z, 1], [p.x + 7, p.z + 3, 0]); } }
+      // (cây đa quảng trường ven hồ: đã có banyanTree(-383,245) ở khối cây đa phía dưới)
       if (perG.length) addMerged(perG, mat(0xa63c28), 'lake_pergolas');            // gỗ sơn đỏ-cam
       if (binGreen.length) addMerged(binGreen, mat(0x2f8a4c), 'lake_bins_g');      // thùng rác xanh lá
       if (binBlue.length) addMerged(binBlue, mat(0x2668b8), 'lake_bins_b');        // thùng rác xanh dương
@@ -1163,12 +1162,23 @@ export function buildWorld(scene) {
           const mx = x1 + dxn * d, mz = z1 + dzn * d;
           if (mx * mx + mz * mz > 1400 * 1400) continue;  // vùng trung tâm mở rộng
           const side = rnd() < 0.5 ? 1 : -1;
-          const off = side * (wRoad / 2 + 0.85 + rnd() * 0.5);
+          // 1.9-2.4m khỏi mép nhựa: tránh dải cột đèn/cột cờ/băng rôn (+1.0..+1.5) — hết xe xuyên cột
+          const off = side * (wRoad / 2 + 1.9 + rnd() * 0.5);
           const gx = mx + off * px, gz = mz + off * pz;
           const gy = groundHeight(gx, gz);
           if (gy < LAND_H - 0.5 || isWater(gx, gz)) continue;   // né sông/cầu
-          // mũi quay VÀO vỉa hè (vuông góc đường), lệch nhẹ cho tự nhiên
-          slots.push([gx, gy, gz, rotY + Math.PI / 2 + (rnd() - 0.5) * 0.25, (rnd() * scoolCols.length) | 0]);
+          // né LÒNG ĐƯỜNG KHÁC tại giao lộ (pháp tuyến phố A rơi vào mặt nhựa phố B)
+          { let onRoad = false;
+            for (const r2 of ROADS_DT) { if (r2.c === 'w') continue; const hw2 = ROAD_W[r2.c] / 2 + 0.3;
+              for (let j = 0; j < r2.pts.length - 1; j++) { const [ax2, az2] = r2.pts[j], [bx2, bz2] = r2.pts[j + 1];
+                if (Math.max(ax2, bx2) < gx - 30 || Math.min(ax2, bx2) > gx + 30 || Math.max(az2, bz2) < gz - 30 || Math.min(az2, bz2) > gz + 30) continue;
+                const ddx = bx2 - ax2, ddz = bz2 - az2, l22 = ddx * ddx + ddz * ddz || 1e-9;
+                let tt = ((gx - ax2) * ddx + (gz - az2) * ddz) / l22; tt = Math.max(0, Math.min(1, tt));
+                if (Math.hypot(gx - (ax2 + ddx * tt), gz - (az2 + ddz * tt)) < hw2) { onRoad = true; break; } }
+              if (onRoad) break; }
+            if (onRoad) continue; }
+          // mũi quay VÀO vỉa hè (vuông góc đường), lệch nhẹ cho tự nhiên; +0.18 đứng TRÊN mặt lát vỉa hè
+          slots.push([gx, gy + 0.18, gz, rotY + Math.PI / 2 + (rnd() - 0.5) * 0.25, (rnd() * scoolCols.length) | 0]);
           if (slots.length >= 480) break;
         }
         if (slots.length >= 480) break;
@@ -1825,11 +1835,12 @@ export function buildWorld(scene) {
             const off = side * (wRoad / 2 + 3.4);                 // sát mặt nhà (sau vỉa hè)
             const gx = mx + off * px, gz = mz + off * pz;
             const gy = groundHeight(gx, gz); if (gy < LAND_H - 0.5 || isWater(gx, gz)) continue;
+            if (lakeSD(gx, gz) < 24) continue;                               // dải promenade ven hồ KHÔNG có nhà → không bạt/biển lơ lửng
             if (openSpace(gx, gz) || onOtherRoad(gx, gz)) continue;          // không mọc ở hồ/quảng trường/vườn hoa/lòng đường
             if (!houseEvidence(gx, gz) || panoDenies(gx, gz)) continue;      // phải có NHÀ thật ở đây (pano/OSM xác nhận)
             const faceY = Math.atan2(-side * px, -side * pz);      // protrusion hướng ra đường
-            if (ar() < 0.82) awnSlots.push([gx, gy, gz, faceY, (ar() * awnCols.length) | 0]);
-            if (ar() < 0.5) signSlots.push([gx, gy + 2.0, gz, faceY, (ar() * signCols.length) | 0]);
+            if (ar() < 0.82) awnSlots.push([gx, gy + 0.18, gz, faceY, (ar() * awnCols.length) | 0]);
+            if (ar() < 0.5) signSlots.push([gx, gy + 2.18, gz, faceY, (ar() * signCols.length) | 0]);
             if (awnSlots.length >= 300) break;
           }
           if (awnSlots.length >= 300) break;
@@ -3564,11 +3575,19 @@ export function buildWorld(scene) {
     compound(326, -826, 38, 13, 3, 0xead9a8, 0x3f6e50, -135 * Math.PI / 180);
 
     // FUNZ/quán trà (pano_010 h0, ~156 Quang Trung): 3 tầng mặt tiền ĐEN + gân hồng, quay Nam về pano
+    // (band trên cùng TỪNG trùm kín mái → nhìn từ trên là ô hồng lạc tông; mặt tiền từng trống trơn)
     {
       const cx = -798, cz = 221, W = 10, FL = 3, H = FL * 3.3;
       const g = new THREE.Group();
       const body = new THREE.Mesh(new THREE.BoxGeometry(W, H, 8), mat(0x1e1e22)); body.position.y = H / 2; g.add(body);
-      for (let f = 0; f <= FL; f++) { const band = new THREE.Mesh(new THREE.BoxGeometry(W + 0.15, 0.22, 8.15), mat(0xd4527e)); band.position.y = f * 3.3 + 0.1; g.add(band); }
+      for (let f = 0; f < FL; f++) { const band = new THREE.Mesh(new THREE.BoxGeometry(W + 0.15, 0.22, 8.15), mat(0xd4527e)); band.position.y = f * 3.3 + 0.1; g.add(band); }
+      const roofS = new THREE.Mesh(new THREE.BoxGeometry(W + 0.1, 0.25, 8.1), mat(0x6a6d72)); roofS.position.y = H + 0.08; g.add(roofS);   // mái bê tông xám
+      // tầng trệt: cửa kính + khung + biển hiệu hồng chữ trắng (nhìn ra phố phía Nam, local +Z... group xoay π nên mặt tiền = -Z local)
+      const glass = new THREE.Mesh(new THREE.BoxGeometry(W - 1.6, 2.5, 0.12), sharedMats.window); glass.position.set(0, 1.35, -4.02); g.add(glass);
+      for (const sx of [-(W - 1.6) / 2 - 0.2, (W - 1.6) / 2 + 0.2]) { const fr = new THREE.Mesh(new THREE.BoxGeometry(0.3, 2.7, 0.16), mat(0x0f0f12)); fr.position.set(sx, 1.35, -4.02); g.add(fr); }
+      const signTex = makeTex(256, 48, (gc, w2, h2) => { gc.fillStyle = '#1a1a1e'; gc.fillRect(0, 0, w2, h2); gc.fillStyle = '#ff6fa5'; gc.font = 'bold 30px sans-serif'; gc.textAlign = 'center'; gc.textBaseline = 'middle'; gc.fillText('FUNZ · TRÀ & BAR', w2 / 2, h2 / 2 + 1); });
+      const sign = new THREE.Mesh(new THREE.PlaneGeometry(W - 2, 1.0), new THREE.MeshLambertMaterial({ map: signTex })); sign.position.set(0, 3.1, -4.06); sign.rotation.y = Math.PI; g.add(sign);
+      for (let f = 1; f < FL; f++) { const win = new THREE.Mesh(new THREE.BoxGeometry(W - 2.4, 1.2, 0.1), sharedMats.window); win.position.set(0, f * 3.3 + 1.7, -4.01); g.add(win); }
       g.position.set(cx, groundHeight(cx, cz), cz); g.rotation.y = Math.PI; scene.add(g);
       addCollider(cx, cz, 6);
     }
@@ -4291,8 +4310,7 @@ export function buildWorld(scene) {
   flushTrees();      // GỘP toàn bộ cây procedural đã bake → vài mesh tĩnh (giảm ~8700 draw call)
   loadHeroTrees();   // nạp GLB cây phượng ảnh-thật rồi dựng InstancedMesh (bất đồng bộ)
   loadHeroBeds();    // nạp GLB luống hoa ảnh-thật rồi dựng InstancedMesh
-  // trồng cây đã hoãn từ các khối chạy sớm (mọi const cây đều đã khởi tạo tới đây)
-  for (const [tx2, tz2, hero] of lateTrees) { if (hero) heroTree(tx2, tz2); else streetTree(tx2, tz2); }
+  // LƯU Ý: KHÔNG gọi streetTree/bakeTree sau flushTrees() — cây sẽ vô hình + collider ma.
 
   return world;
 }
