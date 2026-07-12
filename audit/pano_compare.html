@@ -59,7 +59,7 @@ function show(i,h){
  else gw.innerHTML='<div class="nogame">CHƯA CHỤP hướng '+hd+'° trong game'+(gi<0?' (mới chụp 4 hướng chính 0/90/180/270)':'')+'</div>';
  document.getElementById('gchk').textContent=has?'✓':'✗';
  document.getElementById('info').innerHTML='<b>'+id+'</b> · heading '+hd+'° · điểm: <b>'+(d.s==null?'chưa chấm':d.s+'/10')+'</b> — '+d.t;
- document.querySelectorAll('.grid button').forEach((b,k)=>b.classList.toggle('cur',k===cur));
+ document.querySelectorAll('.grid button').forEach(b=>b.classList.toggle('cur',+b.dataset.i===cur));
  document.getElementById('imReal').onclick=e=>window.open(e.target.src);
 }
 function buildGrid(){

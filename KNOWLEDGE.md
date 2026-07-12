@@ -315,6 +315,29 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-12 (ak)** [SWEEP TỐC ĐỘ+CHẤT LƯỢNG 14-AGENT — 59 finding sau phản biện đối kháng]:
+    Quy trình: 7 agent soi (1 ĐO runtime headless + 6 lăng kính code/ảnh) → 7 agent phản biện
+    bác bỏ/xác nhận từng finding → chỉ sửa cái sống sót. SỐ ĐO TRƯỚC/SAU (probe scene):
+    mesh 5.694→2.425, material 2.646→1.230, geometry 3.513→2.406.
+    TỐC ĐỘ đã sửa: (1) 2 cầu lớn ~2.000 mesh rời (36% mesh scene, mat() trong vòng lặp
+    ~1.220 material trùng) → merge theo material còn ~6 mesh/cầu; (2) cây hero GLB
+    frustumCulled=false = 7,2 TRIỆU tam giác submit MỌI khung (70% tam giác scene) → chia ô
+    250m + InstancedMesh.computeBoundingSphere() (r160 tự tính theo instance) → cull thật;
+    (3) bồn hoa 524 mesh→8, nhà infill 380 nhà 760 mesh→bake ~10 (mẫu bakeTree);
+    (4) freezeStatic(): matrixAutoUpdate=false ~6.400 object tĩnh, vật animate đánh dấu
+    userData.dyn (11 chỗ trong world.js — thêm updater MỚI phải nhớ đánh dấu!);
+    (5) shadow 8Hz (autoUpdate=false + needsUpdate theo nhịp), camera.far 16000→6000 (fog 4200),
+    minimap/nearestInteraction 10Hz, daynight/petals hết cấp phát mỗi khung, petals ground
+    cache so le 1/20 khung, traffic xa >700m nhịp 1/4 (dồn dt giữ tốc độ);
+    (6) MOBILE: atlas biển 4096²→1024² (255MB→16MB VRAM), nửa lưu lượng traffic.
+    CHẤT LƯỢNG đã sửa: lateTrees vô hình+collider ma (trồng sau flushTrees — GỠ, đã có khối
+    trồng đúng); xe máy đỗ giữa lòng đường khác + xuyên cột (né đường + dịch dải 1.9-2.4m);
+    vật vỉa hè lún 0.18m (mặt lát dày 0.18 — cộng bù, dùng cho MỌI vật đặt vỉa hè);
+    bạt/biển lơ lửng promenade (chặn lakeSD<24); pergola lạc mũi tây hồ (cạnh >150m) + né ghế;
+    FUNZ hết hộp đen/ô hồng trùm mái (mặt kính + biển + mái xám); trang compare highlight
+    theo data-i. Số đo build-time đáng nhớ: groundHeightNoDeck ~330k lần dựng chỉ 0,25s,
+    lakeSD 899ns/lần — KHÔNG phải điểm nóng, đừng cache; nút cổ chai load = compile shader
+    + upload texture khung đầu (native, sau JS).
 - **2026-07-12 (aj)** [PROMENADE HỒ "ĐIỂM 8-9" + 2 BÀI HỌC QUY TRÌNH]:
     Nâng chi tiết kè hồ theo pano_004-013/028-037: hàng CÂY CỔ THỤ dọc kè ~18m cả chu vi
     (né chu kỳ ghế 26/đèn 31), PERGOLA gỗ đỏ bờ bắc mỗi 124m (tâm ≡15.5 mod 124 → cách đèn
