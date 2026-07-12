@@ -738,6 +738,106 @@ export function buildWorld(scene) {
     if (benchG.length) addMerged(benchG, mat(0xd6d2c6), 'lake_benches');        // ghế đá granite
     if (lampPostG.length) addMerged(lampPostG, mat(0x23282b), 'lake_lampposts'); // trụ gang đen
     if (globeG.length) { const gm = new THREE.Mesh(mergeGeometries(globeG), sharedMats.lampGlow); gm.name = 'lake_lampglobes'; scene.add(gm); globeG.forEach((g) => g.dispose()); }
+
+    // ---------- PROMENADE HỒ TAM BẠC mức chi tiết cao (pano_004-013, 028-037) ----------
+    // Theo pano: HÀNG CÂY CỔ THỤ dọc kè (007-012, 028-033), GIÀN PERGOLA GỖ ĐỎ + PAVILION
+    // nghỉ chân phố đi bộ Quang Trung (009, 011), THÙNG RÁC ĐÔI phân loại (005), TRẠM XE ĐẠP
+    // công cộng xanh dương (030), CỘT ÁP PHÍCH khung đỏ (012, 032), CÂY ĐA quảng trường (035).
+    {
+      const dryLand = (x, z) => Math.abs(groundHeightNoDeck(x, z) - LAND_H) < 0.4;
+      const okSpot = (x, z) => dryLand(x, z) && !nearCross(x, z, 10);
+      const perG = [], binGreen = [], binBlue = [], bikeG = [], postRed = [], postWhite = [];
+      // pergola 10×3m gỗ đỏ: 4 cột + 2 dầm dọc + thanh chớp — tâm cách đèn ≥13m (chu kỳ 31, tâm ≡15.5 mod 124)
+      const pergolaAt = (cx, cz, barAng, ux, uz, nx2, nz2) => {
+        const gy = groundHeight(cx, cz);
+        for (const su of [-4.6, 4.6]) for (const sv of [-1.4, 1.4]) {
+          const p = new THREE.BoxGeometry(0.16, 2.6, 0.16);
+          p.translate(cx + ux * su + nx2 * sv, gy + 1.3, cz + uz * su + nz2 * sv); perG.push(p);
+        }
+        for (const sv of [-1.4, 1.4]) { const b = new THREE.BoxGeometry(10.4, 0.14, 0.14); b.rotateY(barAng); b.translate(cx + nx2 * sv, gy + 2.66, cz + nz2 * sv); perG.push(b); }
+        for (let s = -4.8; s <= 4.8; s += 1.2) { const sl = new THREE.BoxGeometry(0.09, 0.07, 3.4); sl.rotateY(barAng); sl.translate(cx + ux * s, gy + 2.78, cz + uz * s); perG.push(sl); }
+      };
+      for (const [ax, az, bx2, bz2, HALF] of LAKE_SEGS) {
+        const dx = bx2 - ax, dz = bz2 - az, L = Math.hypot(dx, dz);
+        const ux = dx / L, uz = dz / L, nx = -uz, nz = ux;
+        const barAng = Math.atan2(ux, uz) + Math.PI / 2;
+        for (const side of [-1, 1]) {
+          for (let t = 6; t < L - 6; t += 2.6) {
+            const cx0 = ax + ux * t, cz0 = az + uz * t;
+            // HÀNG CÂY cổ thụ ven kè mỗi ~18m (né chu kỳ ghế 26/đèn 31 và khoang pergola)
+            const mPer = ((t - 15.5) % 124 + 124) % 124;
+            if (Math.round(t) % 18 < 2.6 && Math.round(t) % 26 >= 2.6 && Math.round(t) % 31 >= 2.6 && !(side < 0 && (mPer < 8 || mPer > 116))) {
+              const tx = cx0 + nx * side * (HALF + 4.6), tz = cz0 + nz * side * (HALF + 4.6);
+              if (okSpot(tx, tz)) streetTree(tx, tz);
+            }
+            // THÙNG RÁC ĐÔI phân loại mỗi ~52m, sát lan can
+            if (Math.round(t) % 52 < 2.6) {
+              const rx = cx0 + nx * side * (HALF + 2.5), rz = cz0 + nz * side * (HALF + 2.5);
+              if (okSpot(rx, rz)) {
+                const ry = groundHeight(rx, rz);
+                const b1 = new THREE.BoxGeometry(0.42, 0.62, 0.42); b1.translate(rx + ux * 0.26, ry + 0.44, rz + uz * 0.26); binGreen.push(b1);
+                const b2 = new THREE.BoxGeometry(0.42, 0.62, 0.42); b2.translate(rx - ux * 0.26, ry + 0.44, rz - uz * 0.26); binBlue.push(b2);
+              }
+            }
+            // PERGOLA gỗ đỏ chỉ bờ bắc (phố đi bộ Quang Trung), tâm mỗi 124m
+            if (side < 0 && mPer < 2.6 && t > 20 && t < L - 20) {
+              const px2 = cx0 + nx * side * (HALF + 4.0), pz2 = cz0 + nz * side * (HALF + 4.0);
+              if (okSpot(px2, pz2) && okSpot(px2 + ux * 5, pz2 + uz * 5) && okSpot(px2 - ux * 5, pz2 - uz * 5)) pergolaAt(px2, pz2, barAng, ux, uz, nx * side, nz * side);
+            }
+          }
+        }
+      }
+      // helper: chiếu 1 điểm neo pano lên trục hồ rồi đặt vật ở offset cách mép nước
+      const projQuay = (px, pz, off) => {
+        let bd = 1e9, r = null;
+        for (const [ax, az, bx2, bz2, HALF] of LAKE_SEGS) {
+          const dx = bx2 - ax, dz = bz2 - az, l2 = dx * dx + dz * dz;
+          let t = ((px - ax) * dx + (pz - az) * dz) / l2; t = Math.max(0.05, Math.min(0.95, t));
+          const qx = ax + dx * t, qz = az + dz * t, d = Math.hypot(px - qx, pz - qz);
+          if (d < bd) { bd = d; const L = Math.sqrt(l2), ux = dx / L, uz = dz / L; const sgn = ((px - qx) * -uz + (pz - qz) * ux) >= 0 ? 1 : -1; r = { x: qx + -uz * sgn * (HALF + off), z: qz + ux * sgn * (HALF + off), ux, uz, barAng: Math.atan2(ux, uz) + Math.PI / 2 }; }
+        }
+        return r;
+      };
+      // PAVILION nghỉ chân gỗ đỏ-cam mái bằng ~10×3.6m (pano_011, bờ bắc x≈-877)
+      { const p = projQuay(-877, 260, 4.2);
+        if (p && okSpot(p.x, p.z)) {
+          const gy = groundHeight(p.x, p.z);
+          for (const su of [-4.4, 0, 4.4]) for (const sv of [-1.5, 1.5]) { const c = new THREE.BoxGeometry(0.18, 2.7, 0.18); c.translate(p.x + p.ux * su + -p.uz * sv, gy + 1.35, p.z + p.uz * su + p.ux * sv); perG.push(c); }
+          const roof = new THREE.BoxGeometry(10.6, 0.22, 4.0); roof.rotateY(p.barAng); roof.translate(p.x, gy + 2.82, p.z); perG.push(roof);
+          const seat = new THREE.BoxGeometry(9.4, 0.1, 0.5); seat.rotateY(p.barAng); seat.translate(p.x + -p.uz * 1.0, gy + 0.46, p.z + p.ux * 1.0); perG.push(seat);
+          addCollider(p.x, p.z, 2.4);
+        } }
+      // TRẠM XE ĐẠP công cộng xanh dương (pano_030, bờ nam Nguyễn Đức Cảnh x≈-690)
+      { const p = projQuay(-690, 300, 4.0);
+        if (p && okSpot(p.x, p.z)) {
+          const gy = groundHeight(p.x, p.z);
+          const rack = new THREE.BoxGeometry(7.6, 0.09, 0.09); rack.rotateY(p.barAng); rack.translate(p.x, gy + 0.72, p.z); bikeG.push(rack);
+          for (let k = -3; k <= 3; k++) {
+            const bx = p.x + p.ux * k * 1.1, bz = p.z + p.uz * k * 1.1;
+            const frame = new THREE.BoxGeometry(0.08, 0.5, 1.5); frame.rotateY(p.barAng + Math.PI / 2); frame.translate(bx, gy + 0.55, bz); bikeG.push(frame);
+            const fx = Math.sin(p.barAng + Math.PI / 2), fz = Math.cos(p.barAng + Math.PI / 2); // hướng thân xe (vuông góc rack)
+            for (const w of [-0.62, 0.62]) { const wg = new THREE.CylinderGeometry(0.3, 0.3, 0.05, 10); wg.rotateZ(Math.PI / 2); wg.rotateY(p.barAng); wg.translate(bx + fx * w, gy + 0.3, bz + fz * w); bikeG.push(wg); }
+          }
+          addCollider(p.x, p.z, 1.6);
+        } }
+      // CỘT ÁP PHÍCH khung đỏ ven hồ (pano_012 bờ bắc x≈-957; pano_032 bờ nam x≈-576)
+      for (const [axp, azp] of [[-957, 250], [-576, 300]]) {
+        const p = projQuay(axp, azp, 2.8);
+        if (!p || !okSpot(p.x, p.z)) continue;
+        const gy = groundHeight(p.x, p.z);
+        for (const s of [-0.75, 0.75]) { const c = new THREE.BoxGeometry(0.1, 2.6, 0.1); c.translate(p.x + p.ux * s, gy + 1.3, p.z + p.uz * s); postRed.push(c); }
+        const fr = new THREE.BoxGeometry(1.8, 1.3, 0.1); fr.rotateY(p.barAng); fr.translate(p.x, gy + 1.9, p.z); postRed.push(fr);
+        const pn = new THREE.BoxGeometry(1.62, 1.12, 0.12); pn.rotateY(p.barAng); pn.translate(p.x, gy + 1.9, p.z); postWhite.push(pn);
+      }
+      // CÂY ĐA cổ thụ quảng trường ven hồ (pano_035, x≈-380 bờ nam)
+      { const p = projQuay(-380, 250, 6.5); if (p && okSpot(p.x, p.z)) { heroTree(p.x, p.z); streetTree(p.x + 7, p.z + 3); } }
+      if (perG.length) addMerged(perG, mat(0xa63c28), 'lake_pergolas');            // gỗ sơn đỏ-cam
+      if (binGreen.length) addMerged(binGreen, mat(0x2f8a4c), 'lake_bins_g');      // thùng rác xanh lá
+      if (binBlue.length) addMerged(binBlue, mat(0x2668b8), 'lake_bins_b');        // thùng rác xanh dương
+      if (bikeG.length) addMerged(bikeG, mat(0x2e6fd0), 'lake_bikestation');       // trạm xe đạp công cộng
+      if (postRed.length) addMerged(postRed, mat(0xb32424), 'lake_posters');       // khung áp phích đỏ
+      if (postWhite.length) addMerged(postWhite, mat(0xf1ece0), 'lake_posterpanels');
+    }
   }
 
   // ---------- CỘT ĐÈN GANG TRANG TRÍ kiểu Pháp cổ (đèn 3 cầu) dọc dải vườn hoa trung tâm ----------
