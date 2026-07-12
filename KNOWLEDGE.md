@@ -287,6 +287,19 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
    từng lô ~5m (thực địa hiếm khi có khoảng trống); LANDMARK — từng công trình đặc trưng
    thiếu phải dựng riêng (danh sách trong scratchpad cluster_report.txt / compare/*.json).
 
+### Bài học V2-V4 (bổ sung)
+- **Ô ĐẤT có 3 KIỂU, không phải 1**: (a) phố shophouse liền kề; (b) CƠ QUAN KHUÔN VIÊN
+  (nhà chính + sân + rào sắt + cổng — dùng `compound()`); (c) đất giải tỏa/trống. Lấp
+  shophouse vào kiểu (b)/(c) là REGRESSION (pano_019 −1.4 điểm). Vành 830-980m quanh cảng
+  nhiều kiểu (b) → giữ shophouse trong 830m, ngoài đó chỉ đặt khi biết rõ kiểu ô.
+- **Biển hiệu TÊN THẬT hàng loạt**: catalog có tên trong nháy đơn ở `features` → gen_shopsigns.mjs
+  sinh js/shopsigns.js (954 biển); vẽ TEXTURE-ATLAS 4096² (408 biển/atlas, ô 512×80) → 3 draw call.
+  Công thức vị trí: pano + 14m theo heading; biển quay mặt về pano (`rotY = −heading·π/180`).
+- Chấm lại sau mỗi đợt sửa BẮT BUỘC có nhóm đối chứng cùng pano — mẫu nhỏ (<10) chỉ đủ bắt
+  regression lớn, không đủ kết luận tăng/giảm nhẹ (variance ±0.5).
+- Endpoint tunnel chịu tải kém với payload ảnh lớn: nén game PNG→JPEG 640px q68 trước khi gửi;
+  lỗi trả về cả trang HTML (không phải JSON) → parse phải bọc try/catch + retry.
+
 ### Số liệu V1 (50 pano đầu, cùng thang chấm)
 - v1 (camera dist1.5): TB 2.85/10 → v2 (camera chuẩn, chưa sửa nội dung): ~2.7-2.9
 - v3 (sau 7 fix): trên nhóm so sánh được +0.4~0.5 điểm (+23%); pano khu Ga +0.6.
