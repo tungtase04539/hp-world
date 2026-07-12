@@ -322,9 +322,11 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     (2) MẶT TIỀN THẲNG HÀNG: tâm nhà lùi theo dp (off = wRoad/2 + 2.3 + dp/2) để mặt trước luôn
     cách mép đường đúng 2.3m (trước đây tâm cố định + dp ngẫu nhiên → mặt tiền thụt thò ±0.75m);
     (3) buffer né nhà OSM thật 13→8.5m — nguồn khe hở lớn nhất (mỗi nhà thật khoét lỗ 26m trên dãy);
-    (4) CAP 3000→6500 (đo tổng dài p/s trong vành 830m = 13.9km → tối đa 5585 lô, trần không cạn
-    giữa chừng — tránh lặp bài học "khu cuối danh sách trống"); guard giữ NGUYÊN (3 kiểu ô đất,
-    vành 830m, panoDenies/houseEvidence/openSpace/cornersDry). Vẫn 1 mesh gộp — 0 draw call thêm.
+    (4) gồm cả phố 't' trong vành (đối chứng 5 pano: điểm trên phố s đổi 33-43% pixel, điểm trên
+    phố t/r 0% — phố t trung tâm thực địa cũng là tường shophouse); nhà rời 'r'/'t' bỏ 't' TRONG
+    vành 830m (tránh chồng lô); (5) CAP 3000→8600 (đo p/s/t trong vành = 20.9km → tối đa 8400 lô,
+    trần không cạn giữa chừng — tránh lặp bài học "khu cuối danh sách trống"); guard giữ NGUYÊN
+    (3 kiểu ô đất, vành 830m, panoDenies/houseEvidence/openSpace/cornersDry). Vẫn 1 mesh gộp.
     Đối chiếu trước/sau bằng snap_house.mjs (5 pano lõi × 2 heading, đúng công thức chụp §8b).
 - **2026-07-12 (ak)** [SWEEP TỐC ĐỘ+CHẤT LƯỢNG 14-AGENT — 59 finding sau phản biện đối kháng]:
     Quy trình: 7 agent soi (1 ĐO runtime headless + 6 lăng kính code/ảnh) → 7 agent phản biện

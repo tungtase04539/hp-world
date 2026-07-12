@@ -1918,6 +1918,8 @@ export function buildWorld(scene) {
       // → các phố 't' phía đông không bao giờ được đặt nhà. Nâng 210→380 (mesh vẫn gộp, không thêm draw call).
       for (let i = 0; i < r.pts.length - 1 && count < 380; i++) {
         const [x1, z1] = r.pts[i], [x2, z2] = r.pts[i + 1];
+        // phố 't' TRONG vành 830m giờ thuộc dãy shophouse liền kề — bỏ nhà rời ở đó (tránh chồng lô)
+        if (r.c === 't' && (((x1 + x2) / 2) ** 2 + ((z1 + z2) / 2) ** 2) < 830 * 830) continue;
         const len = Math.hypot(x2 - x1, z2 - z1);
         const rotY = Math.atan2(x2 - x1, z2 - z1);
         const px = Math.cos(rotY), pz = -Math.sin(rotY);
@@ -1985,7 +1987,8 @@ export function buildWorld(scene) {
     // PANO-LOOP V2: 780 chỉ phủ ~12% lô mặt phố → 3000. CỤM HOUSE (V5+): dãy phải LIỀN KỀ
     // như thực địa — đi dọc từng PHÍA phố, tiến đúng bằng bề rộng lô (không bước cố định),
     // lô bị guard chặn chỉ nhảy 2m rồi thử tiếp → khe hở tối thiểu. Vẫn 1 mesh gộp.
-    const CAP = 6500;
+    // CAP theo ĐO thực tế: p/s/t trong vành 830m = 20.9km → tối đa 8400 lô (trần không cạn giữa chừng)
+    const CAP = 8600;
     // toàn bộ điều kiện đặt 1 lô (giữ NGUYÊN bộ guard chống regression: 3 kiểu ô đất,
     // vành 830m, pano là nguồn sự thật) — buffer nhà OSM 13→8.5m để dãy lấp SÁT cạnh nhà thật
     const slotOK = (gx, gz, dxn, dzn, nx, nz, w, dp) => {
@@ -2003,7 +2006,8 @@ export function buildWorld(scene) {
     };
     outerShop:
     for (let ri = 0; ri < ROADS_DT.length; ri++) {
-      const r = ROADS_DT[ri]; if (r.c !== 'p' && r.c !== 's') continue;
+      // gồm cả phố 't' (pano 131/492: phố t trung tâm thực địa cũng là tường shophouse liền kề)
+      const r = ROADS_DT[ri]; if (r.c !== 'p' && r.c !== 's' && r.c !== 't') continue;
       const wRoad = ROAD_W[r.c];
       for (let i = 0; i < r.pts.length - 1; i++) {
         const [x1, z1] = r.pts[i], [x2, z2] = r.pts[i + 1];
