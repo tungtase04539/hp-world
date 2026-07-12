@@ -315,6 +315,22 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-12 (aj)** [PROMENADE HỒ "ĐIỂM 8-9" + 2 BÀI HỌC QUY TRÌNH]:
+    Nâng chi tiết kè hồ theo pano_004-013/028-037: hàng CÂY CỔ THỤ dọc kè ~18m cả chu vi
+    (né chu kỳ ghế 26/đèn 31), PERGOLA gỗ đỏ bờ bắc mỗi 124m (tâm ≡15.5 mod 124 → cách đèn
+    ≥13m), PAVILION nghỉ chân (pano_011 x≈-877), THÙNG RÁC ĐÔI xanh lá/dương ~52m, TRẠM XE
+    ĐẠP công cộng (pano_030), CỘT ÁP PHÍCH đỏ (pano_012/032), CÂY ĐA quảng trường (pano_035);
+    vật trên mặt lát +0.24 (SLAB); guard: đất chuẩn + lakeSD>0.8 + cách mép nhựa ≥1m.
+    BÀI HỌC 1 [NHÁNH SONG SONG]: 2 phiên cùng đẩy 1 nhánh — push rejected thì fetch+rebase,
+    NHƯNG code vừa rebase có thể gọi API đã bị phiên kia THAY (LAKE_SEGS→LAKE_POLY):
+    node --check vẫn qua vì chỉ là identifier chưa định nghĩa lúc parse. Sau rebase PHẢI
+    grep các symbol mình dùng + smoke-test runtime rồi mới push.
+    BÀI HỌC 2 [TDZ]: streetTree/heroTree đóng trên const (TREE_TILE...) khai báo SÂU dưới
+    buildWorld → khối chạy sớm (kè hồ ~line 600) gọi trực tiếp là ReferenceError TRẮNG MÀN,
+    node --check không bắt. Chuẩn: khối sớm push vào `lateTrees`, trồng ở CUỐI buildWorld.
+    Smoke-test bắt buộc trước push: mở page headless, chờ window.__hp xuất hiện (<20s) + 0
+    pageerror (scratchpad probe_err.mjs). Trang compare: grid xếp theo id 001-551 (trước xếp
+    theo lô chấm nên bắt đầu 007), xanh lá = ≥8 điểm (chuẩn mới user chốt), vàng 5-8, đỏ <5.
 - **2026-07-09 (ai)** [HỒ TAM BẠC = POLYGON OSM THẬT — BÀI HỌC LỚN: ĐỪNG XẤP XỈ ĐỊA VẬT CÓ DỮ LIỆU THẬT]:
     User chê "hồ thành chữ nhật, 2 đầu sai, vỉa hè thụt ra thụt vào" → nguyên nhân gốc là mọi
     phiên bản trước đều XẤP XỈ hồ bằng trục thẳng + bề rộng. Sửa đúng: tải polygon nước OSM
