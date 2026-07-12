@@ -745,11 +745,13 @@ export function buildWorld(scene) {
     // công cộng xanh dương (030), CỘT ÁP PHÍCH khung đỏ (012, 032), CÂY ĐA quảng trường (035).
     {
       const dryLand = (x, z) => Math.abs(groundHeightNoDeck(x, z) - LAND_H) < 0.4;
-      const okSpot = (x, z) => dryLand(x, z) && !nearCross(x, z, 10);
+      const roadClear = (x, z) => { for (const s of parSegs) if (_sd(x, z, s[0], s[1], s[2], s[3]) < s[4] + 1.0) return false; return true; };
+      const okSpot = (x, z) => dryLand(x, z) && lakeSD(x, z) > 0.8 && roadClear(x, z);
+      const SLAB = 0.24;                                              // vật đứng TRÊN mặt lát caro kè
       const perG = [], binGreen = [], binBlue = [], bikeG = [], postRed = [], postWhite = [];
       // pergola 10×3m gỗ đỏ: 4 cột + 2 dầm dọc + thanh chớp — tâm cách đèn ≥13m (chu kỳ 31, tâm ≡15.5 mod 124)
       const pergolaAt = (cx, cz, barAng, ux, uz, nx2, nz2) => {
-        const gy = groundHeight(cx, cz);
+        const gy = groundHeight(cx, cz) + SLAB;
         for (const su of [-4.6, 4.6]) for (const sv of [-1.4, 1.4]) {
           const p = new THREE.BoxGeometry(0.16, 2.6, 0.16);
           p.translate(cx + ux * su + nx2 * sv, gy + 1.3, cz + uz * su + nz2 * sv); perG.push(p);
@@ -757,51 +759,55 @@ export function buildWorld(scene) {
         for (const sv of [-1.4, 1.4]) { const b = new THREE.BoxGeometry(10.4, 0.14, 0.14); b.rotateY(barAng); b.translate(cx + nx2 * sv, gy + 2.66, cz + nz2 * sv); perG.push(b); }
         for (let s = -4.8; s <= 4.8; s += 1.2) { const sl = new THREE.BoxGeometry(0.09, 0.07, 3.4); sl.rotateY(barAng); sl.translate(cx + ux * s, gy + 2.78, cz + uz * s); perG.push(sl); }
       };
-      for (const [ax, az, bx2, bz2, HALF] of LAKE_SEGS) {
-        const dx = bx2 - ax, dz = bz2 - az, L = Math.hypot(dx, dz);
-        const ux = dx / L, uz = dz / L, nx = -uz, nz = ux;
+      // đi vòng CHU VI hồ theo đúng samples của kè (mỗi 2.6m, pháp tuyến ra ngoài)
+      let tPr = 0;
+      for (const [cx0, cz0, ux, uz, nx, nz] of samples) {
+        tPr += 2.6;
         const barAng = Math.atan2(ux, uz) + Math.PI / 2;
-        for (const side of [-1, 1]) {
-          for (let t = 6; t < L - 6; t += 2.6) {
-            const cx0 = ax + ux * t, cz0 = az + uz * t;
-            // HÀNG CÂY cổ thụ ven kè mỗi ~18m (né chu kỳ ghế 26/đèn 31 và khoang pergola)
-            const mPer = ((t - 15.5) % 124 + 124) % 124;
-            if (Math.round(t) % 18 < 2.6 && Math.round(t) % 26 >= 2.6 && Math.round(t) % 31 >= 2.6 && !(side < 0 && (mPer < 8 || mPer > 116))) {
-              const tx = cx0 + nx * side * (HALF + 4.6), tz = cz0 + nz * side * (HALF + 4.6);
-              if (okSpot(tx, tz)) streetTree(tx, tz);
-            }
-            // THÙNG RÁC ĐÔI phân loại mỗi ~52m, sát lan can
-            if (Math.round(t) % 52 < 2.6) {
-              const rx = cx0 + nx * side * (HALF + 2.5), rz = cz0 + nz * side * (HALF + 2.5);
-              if (okSpot(rx, rz)) {
-                const ry = groundHeight(rx, rz);
-                const b1 = new THREE.BoxGeometry(0.42, 0.62, 0.42); b1.translate(rx + ux * 0.26, ry + 0.44, rz + uz * 0.26); binGreen.push(b1);
-                const b2 = new THREE.BoxGeometry(0.42, 0.62, 0.42); b2.translate(rx - ux * 0.26, ry + 0.44, rz - uz * 0.26); binBlue.push(b2);
-              }
-            }
-            // PERGOLA gỗ đỏ chỉ bờ bắc (phố đi bộ Quang Trung), tâm mỗi 124m
-            if (side < 0 && mPer < 2.6 && t > 20 && t < L - 20) {
-              const px2 = cx0 + nx * side * (HALF + 4.0), pz2 = cz0 + nz * side * (HALF + 4.0);
-              if (okSpot(px2, pz2) && okSpot(px2 + ux * 5, pz2 + uz * 5) && okSpot(px2 - ux * 5, pz2 - uz * 5)) pergolaAt(px2, pz2, barAng, ux, uz, nx * side, nz * side);
-            }
+        const isNorth = nz < -0.35;                                   // bờ bắc = phố đi bộ Quang Trung
+        const mPer = ((tPr - 15.5) % 124 + 124) % 124;
+        const tR = Math.round(tPr);
+        // HÀNG CÂY cổ thụ ven kè mỗi ~18m (né chu kỳ ghế 26/đèn 31 và khoang pergola)
+        if (tR % 18 < 2.6 && tR % 26 >= 2.6 && tR % 31 >= 2.6 && !(isNorth && (mPer < 8 || mPer > 116))) {
+          const tx = cx0 + nx * 4.6, tz = cz0 + nz * 4.6;
+          if (okSpot(tx, tz)) streetTree(tx, tz);
+        }
+        // THÙNG RÁC ĐÔI phân loại mỗi ~52m, sát lan can
+        if (tR % 52 < 2.6) {
+          const rx = cx0 + nx * 2.5, rz = cz0 + nz * 2.5;
+          if (okSpot(rx, rz)) {
+            const ry = groundHeight(rx, rz) + SLAB;
+            const b1 = new THREE.BoxGeometry(0.42, 0.62, 0.42); b1.translate(rx + ux * 0.26, ry + 0.44, rz + uz * 0.26); binGreen.push(b1);
+            const b2 = new THREE.BoxGeometry(0.42, 0.62, 0.42); b2.translate(rx - ux * 0.26, ry + 0.44, rz - uz * 0.26); binBlue.push(b2);
           }
         }
+        // PERGOLA gỗ đỏ chỉ bờ bắc (phố đi bộ Quang Trung), tâm mỗi 124m
+        if (isNorth && mPer < 2.6) {
+          const px2 = cx0 + nx * 4.0, pz2 = cz0 + nz * 4.0;
+          if (okSpot(px2, pz2) && okSpot(px2 + ux * 5, pz2 + uz * 5) && okSpot(px2 - ux * 5, pz2 - uz * 5)) pergolaAt(px2, pz2, barAng, ux, uz, nx, nz);
+        }
       }
-      // helper: chiếu 1 điểm neo pano lên trục hồ rồi đặt vật ở offset cách mép nước
+      // helper: chiếu 1 điểm neo pano lên MÉP POLYGON hồ rồi đặt vật ở offset ra ngoài mép nước
       const projQuay = (px, pz, off) => {
         let bd = 1e9, r = null;
-        for (const [ax, az, bx2, bz2, HALF] of LAKE_SEGS) {
+        for (let e = 0; e < LAKE_POLY.length; e++) {
+          const [ax, az] = LAKE_POLY[e], [bx2, bz2] = LAKE_POLY[(e + 1) % LAKE_POLY.length];
           const dx = bx2 - ax, dz = bz2 - az, l2 = dx * dx + dz * dz;
-          let t = ((px - ax) * dx + (pz - az) * dz) / l2; t = Math.max(0.05, Math.min(0.95, t));
+          let t = ((px - ax) * dx + (pz - az) * dz) / l2; t = Math.max(0.08, Math.min(0.92, t));
           const qx = ax + dx * t, qz = az + dz * t, d = Math.hypot(px - qx, pz - qz);
-          if (d < bd) { bd = d; const L = Math.sqrt(l2), ux = dx / L, uz = dz / L; const sgn = ((px - qx) * -uz + (pz - qz) * ux) >= 0 ? 1 : -1; r = { x: qx + -uz * sgn * (HALF + off), z: qz + ux * sgn * (HALF + off), ux, uz, barAng: Math.atan2(ux, uz) + Math.PI / 2 }; }
+          if (d >= bd) continue;
+          bd = d;
+          const L = Math.sqrt(l2), ux = dx / L, uz = dz / L;
+          let nx = -uz, nz = ux;
+          if (lakeSD(qx + nx * 3, qz + nz * 3) < 0) { nx = -nx; nz = -nz; }   // pháp tuyến ra ngoài hồ
+          r = { x: qx + nx * off, z: qz + nz * off, ux, uz, barAng: Math.atan2(ux, uz) + Math.PI / 2 };
         }
         return r;
       };
       // PAVILION nghỉ chân gỗ đỏ-cam mái bằng ~10×3.6m (pano_011, bờ bắc x≈-877)
       { const p = projQuay(-877, 260, 4.2);
         if (p && okSpot(p.x, p.z)) {
-          const gy = groundHeight(p.x, p.z);
+          const gy = groundHeight(p.x, p.z) + SLAB;
           for (const su of [-4.4, 0, 4.4]) for (const sv of [-1.5, 1.5]) { const c = new THREE.BoxGeometry(0.18, 2.7, 0.18); c.translate(p.x + p.ux * su + -p.uz * sv, gy + 1.35, p.z + p.uz * su + p.ux * sv); perG.push(c); }
           const roof = new THREE.BoxGeometry(10.6, 0.22, 4.0); roof.rotateY(p.barAng); roof.translate(p.x, gy + 2.82, p.z); perG.push(roof);
           const seat = new THREE.BoxGeometry(9.4, 0.1, 0.5); seat.rotateY(p.barAng); seat.translate(p.x + -p.uz * 1.0, gy + 0.46, p.z + p.ux * 1.0); perG.push(seat);
@@ -810,7 +816,7 @@ export function buildWorld(scene) {
       // TRẠM XE ĐẠP công cộng xanh dương (pano_030, bờ nam Nguyễn Đức Cảnh x≈-690)
       { const p = projQuay(-690, 300, 4.0);
         if (p && okSpot(p.x, p.z)) {
-          const gy = groundHeight(p.x, p.z);
+          const gy = groundHeight(p.x, p.z) + SLAB;
           const rack = new THREE.BoxGeometry(7.6, 0.09, 0.09); rack.rotateY(p.barAng); rack.translate(p.x, gy + 0.72, p.z); bikeG.push(rack);
           for (let k = -3; k <= 3; k++) {
             const bx = p.x + p.ux * k * 1.1, bz = p.z + p.uz * k * 1.1;
@@ -824,7 +830,7 @@ export function buildWorld(scene) {
       for (const [axp, azp] of [[-957, 250], [-576, 300]]) {
         const p = projQuay(axp, azp, 2.8);
         if (!p || !okSpot(p.x, p.z)) continue;
-        const gy = groundHeight(p.x, p.z);
+        const gy = groundHeight(p.x, p.z) + SLAB;
         for (const s of [-0.75, 0.75]) { const c = new THREE.BoxGeometry(0.1, 2.6, 0.1); c.translate(p.x + p.ux * s, gy + 1.3, p.z + p.uz * s); postRed.push(c); }
         const fr = new THREE.BoxGeometry(1.8, 1.3, 0.1); fr.rotateY(p.barAng); fr.translate(p.x, gy + 1.9, p.z); postRed.push(fr);
         const pn = new THREE.BoxGeometry(1.62, 1.12, 0.12); pn.rotateY(p.barAng); pn.translate(p.x, gy + 1.9, p.z); postWhite.push(pn);
