@@ -343,9 +343,10 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     cây/bụi DẢI PHÂN CÁCH chắn làn trên đoạn phố thật KHÔNG có dải (MEDIANS OSM lấy nguyên tuyến
     đại lộ nhưng dải thật chỉ có từng đoạn; đối chiếu ảnh pano_153: Điện Biên Phủ mặt đường liền).
     Sửa: `MEDIAN_SKIP` [x,z,r=90] quanh 3 điểm xác nhận (572,-451)/(667.9,-640.2)/(589.3,-204) —
-    muốn thêm đoạn phải có ẢNH chứng minh. CÒN TỒN từ prop-hunt (làm vòng sau): hòn non bộ giữa
-    tim đường (267,-792.7); 2 thanh LƠ LỬNG giữa trời (-547.6,788.8) — nghi vật đặt sai Y;
-    cột điện/quầy hàng trong lòng đường (164.3,6.7)/(6.1,-866)/(90.3,-729.4).
+    muốn thêm đoạn phải có ẢNH chứng minh. CÒN TỒN từ prop-hunt: cột điện/quầy hàng
+    trong lòng đường (164.3,6.7)/(6.1,-866)/(90.3,-729.4). ĐÃ XỬ LÝ SAU ĐÓ: hòn non bộ (267,-792.7)
+    tự hết nhờ clearedZone Hoàng Diệu; "2 thanh lơ lửng" (-547.6,788.8) hóa ra là BIỂN TÊN THẬT treo
+    giữa đồng trống (khu >830m không có nhà sinh ra) → guard: ngoài vành 830m phải có nhà OSM <35m.
     Data: scratchpad prophunt/findings.json (22 mục, kèm 60 ảnh).
 - **2026-07-13 (ao)** [DẢI HOÀNG DIỆU VEN CẢNG — vùng trũng 0.9-2.3 điểm (pano_015-021)]:
     Thực địa 10/2024 (catalog + findings 5.6-sol-xhigh): BẮC đường = bãi GIẢI TỎA trống đầy gạch

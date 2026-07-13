@@ -2606,6 +2606,9 @@ const lmTower = (x, z, ry, W, D, FL, FH, wallMat, name) => {
         const gy = groundHeightNoDeck(x, z);
         if (Math.abs(gy - LAND_H) > 0.5 || isWater(x, z)) return;
         if (clearedZone(x, z)) return;   // bãi giải tỏa Hoàng Diệu: hết nhà thì hết biển
+        // NGOÀI vành sinh nhà (>830m) mà không có nhà OSM gần → biển treo LƠ LỬNG giữa đồng
+        // (prop-hunt: "SỐ 270/274 TÔ HIỆU" nổi giữa bãi cỏ) — chỉ đặt khi có nhà render được
+        if (x * x + z * z > 830 * 830 && !_gridNear(_bldGrid, x, z, 35)) return;
         const pg = new THREE.PlaneGeometry(4.2, 0.85);
         const u0 = (k % COLS) / COLS, v1 = 1 - ((k / COLS) | 0) / ROWS, v0 = v1 - 1 / ROWS;
         const uv = pg.attributes.uv;
