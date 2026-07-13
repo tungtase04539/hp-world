@@ -4242,6 +4242,10 @@ export function buildWorld(scene) {
       if (zebraG.length) addMerged(zebraG, mat(0xe8e6df), 'zebra_crossings');
     }
 
+    // ĐOẠN KHÔNG CÓ DẢI PHÂN CÁCH THẬT (prop-hunt + đối chiếu ảnh pano_153/225/195: mặt đường
+    // liền chỉ vạch vàng, bồn cây giữa đường là bịa) — MEDIANS OSM lấy cả tuyến nhưng dải thật
+    // chỉ có từng đoạn. Bán kính 90m quanh điểm đã xác nhận bằng ảnh.
+    const MEDIAN_SKIP = [[572, -451.2, 90], [667.9, -640.2, 90], [589.3, -204, 90]];
     for (const line of MEDIANS) {
       let acc = 0;
       for (let i = 0; i < line.length - 1; i++) {
@@ -4251,6 +4255,7 @@ export function buildWorld(scene) {
         const th = Math.atan2(-d[1], d[0]);
         for (let s = 6; s < segL - 6; s += 10) {
           const mx = x1 + d[0] * s, mz = z1 + d[1] * s;
+          if (MEDIAN_SKIP.some(([qx, qz, qr]) => (mx - qx) ** 2 + (mz - qz) ** 2 < qr * qr)) continue;
           if (INTERSECTIONS.some(([px, pz]) => (px - mx) ** 2 + (pz - mz) ** 2 < 14 * 14)) continue;
           if (isWater(mx, mz)) continue;
           const y = groundHeightNoDeck(mx, mz);

@@ -315,6 +315,15 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-13 (ap)** [PROP-HUNT AGENT: 22 finding — MEDIAN BỊA TRÊN PHỐ HẸP]: agent quét 60 ảnh
+    dọc phố p/s + giám khảo 5.6-sol-xhigh → 19 finding HIGH. Mẫu lớn nhất (13/22): bồn trắng +
+    cây/bụi DẢI PHÂN CÁCH chắn làn trên đoạn phố thật KHÔNG có dải (MEDIANS OSM lấy nguyên tuyến
+    đại lộ nhưng dải thật chỉ có từng đoạn; đối chiếu ảnh pano_153: Điện Biên Phủ mặt đường liền).
+    Sửa: `MEDIAN_SKIP` [x,z,r=90] quanh 3 điểm xác nhận (572,-451)/(667.9,-640.2)/(589.3,-204) —
+    muốn thêm đoạn phải có ẢNH chứng minh. CÒN TỒN từ prop-hunt (làm vòng sau): hòn non bộ giữa
+    tim đường (267,-792.7); 2 thanh LƠ LỬNG giữa trời (-547.6,788.8) — nghi vật đặt sai Y;
+    cột điện/quầy hàng trong lòng đường (164.3,6.7)/(6.1,-866)/(90.3,-729.4).
+    Data: scratchpad prophunt/findings.json (22 mục, kèm 60 ảnh).
 - **2026-07-13 (ao)** [DẢI HOÀNG DIỆU VEN CẢNG — vùng trũng 0.9-2.3 điểm (pano_015-021)]:
     Thực địa 10/2024 (catalog + findings 5.6-sol-xhigh): BẮC đường = bãi GIẢI TỎA trống đầy gạch
     vụn nhìn ra cần cẩu cảng (game từng lấp kín nhà); NAM = dãy showroom/gara ô tô thấp mái tôn
