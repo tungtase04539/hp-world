@@ -315,6 +315,25 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-13 (ao)** [DẢI HOÀNG DIỆU VEN CẢNG — vùng trũng 0.9-2.3 điểm (pano_015-021)]:
+    Thực địa 10/2024 (catalog + findings 5.6-sol-xhigh): BẮC đường = bãi GIẢI TỎA trống đầy gạch
+    vụn nhìn ra cần cẩu cảng (game từng lấp kín nhà); NAM = dãy showroom/gara ô tô thấp mái tôn
+    xanh biển to; cây = xà cừ CẮT TRỤI, không phượng. Đã dựng trong world.js (khối sau FEATURED_CLEAR):
+    (1) `clearedZone(x,z)` theo trục HD_A=(315,-809.5) u=(0.9795,-0.2012) L=360, across 7..140 bắc,
+    CHỪA khuôn viên Cảng vụ r45 — cài guard vào: nhà OSM footprint, shophouse, nhà tự mọc,
+    block_infill, mái hiên/biển, biển tên thật. Nền: tấm đất nâu + 260 gạch vụn instanced +
+    3 mảng tường dở + xe đỗ rải rác. (2) Dãy 8 SHOWROOM procedural nam đường (TOẢN AUTO, TÙNG LÂM
+    AUTO...) mái vòm tôn xanh/mái bằng + kính trệt + biển chữ to; mỗi khối tự PUSH vào
+    FEATURED_CLEAR (mảng const nhưng mutable — pattern cho công trình sinh động).
+    (3) Công trình đích danh mới (đã dời khỏi tim đường): Solis Hotel (424.5,-815.4), TT HỘI NGHỊ TP
+    (284.2,-831.8) 66m vàng kem mái xanh + hàng cột + ĐÀI PHUN trước sân (pano_020 từng 1.1 điểm),
+    biệt thự Vietcombank (300.5,-783.5), tháp EximBank 12T (391.9,-40.3) + cao ốc kính 15T
+    (428.2,-61.4) nút Minh Khai (pano_021 từng 0.9). Helper `bandTower()` (thân + băng kính
+    sharedMats.window mỗi tầng + biển canvas). (4) `hdTreeBelt` ±30m: streetTree ÉP shadeTree;
+    vòng heroTree cũng phải qua guard này (cây phượng hero Meshy từng đứng giữa hành lang —
+    heroTree KHÔNG đi qua dispatcher streetTree, nhớ guard riêng!).
+    Kiểm: diag 0 lỗi, 0 JS error, render đối chiếu pano_017/020/015 khớp cấu trúc
+    (bãi trống thấy cầu HVT xa, TT Hội nghị + đài phun, showroom vòm xanh).
 - **2026-07-13 (an)** [PANO-LOOP V6: 4 CỤM NỘI DUNG + ENDPOINT LOCAL MỚI + BÀI HỌC ĐỒNG HỒ TRÔI]:
     ENDPOINT GIÁM KHẢO MỚI: http://localhost:20128/v1, model `cx/gpt-5.6-sol-xhigh` (KHÔNG hiện
     trong /v1/models nhưng gọi được; Bearer bất kỳ; suy luận chậm — timeout ≥600s; cx/gpt-5.5
