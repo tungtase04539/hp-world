@@ -315,6 +315,13 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-14 (bd)** [ĐỐI CHỨNG ĐỢT 3: 1.97 → 3.04 (+1.08, 117 cặp) — V0 SÔNG TRẢ LÃI +2.00]:
+    TAYSONG +2.00 (1.97→3.96 — nắn sông là fix giá trị nhất 3 đợt: pano_125 0.5→5.1, 208 2→5.5,
+    494 1.5→5.5); DONGLOI +0.84; BACSONG +0.74. TỔNG 3 ĐỢT: ~280 pano vùng trũng 0.3-2.5 đã kéo
+    lên TB ~3.0-3.3, không còn regression hệ thống. 7 ca giảm rải rác ≤1.0 (không cùng nguyên
+    nhân) → danh sách TINH CHỈNH vòng sau: pano_414 (shophouse lấp MẶT công viên — inPark chỉ
+    phủ polygon, không phủ dải mặt đường ven công viên), 018/314/157/505/381/107.
+    BƯỚC KẾ: re-scan toàn dải 551 (baseline mới sau 3 đợt) → sang giai đoạn TINH leo 4→8.
 - **2026-07-14 (bc)** [ĐỢT 3 TÂY-SÔNG + V0 NẮN SÔNG TAM BẠC — sửa gốc rễ 16 pano]:
     PHÁT HIỆN GỐC RỄ (agent taysong): trục sông Tam Bạc OSM lệch NAM 5-30m — tim Phố Tam Bạc
     NGẬP (pano_204 gh=-1.5) còn dải ven Thế Lữ thành đất nên infill lấp nhà "phía sông".
