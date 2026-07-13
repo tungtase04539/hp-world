@@ -618,6 +618,71 @@ export function buildWorld(scene) {
     }
   }
 
+  // ---------- QUẢNG TRƯỜNG NHÀ HÁT: nền đá xám + bonsai kiềng gỗ + đồ quảng trường ----------
+  // PLAN corridor4056 V2 (pano_055 h270: nền đá xám khổ lớn + 2 hàng bonsai chậu kiềng cọc gỗ
+  // + cột đèn pha + kiosk báo + trạm xe đạp). Trục road#9: A=(41,59) u=(0.2989,0.9543) n_tây=(-0.9543,0.2989)
+  {
+    const AX = 41, AZ = 59, UX = 0.2989, UZ = 0.9543, NX = -0.9543, NZ = 0.2989;
+    const P = (along, lat) => [AX + UX * along + NX * lat, AZ + UZ * along + NZ * lat];
+    // nền đá xám khổ lớn (quad theo PLAN, +0.045 — THẤP hơn sân tròn hoa văn +0.06 nên không z-fight)
+    const sqTex = makeTex(256, 256, (g, w, h) => {
+      g.fillStyle = '#b9bcb9'; g.fillRect(0, 0, w, h);
+      for (let i = 0; i < 240; i++) { const v = 170 + Math.random() * 26 | 0; g.fillStyle = `rgba(${v},${v+2},${v},0.5)`; g.fillRect(Math.random()*w, Math.random()*h, 3, 3); }
+      g.strokeStyle = 'rgba(70,74,72,.42)'; g.lineWidth = 2;
+      const s = w / 4;
+      for (let i = 0; i <= 4; i++) { g.beginPath(); g.moveTo(i*s,0); g.lineTo(i*s,h); g.moveTo(0,i*s); g.lineTo(w,i*s); g.stroke(); }
+    });
+    sqTex.wrapS = sqTex.wrapT = THREE.RepeatWrapping; sqTex.repeat.set(14, 14);
+    const shp = new THREE.Shape([[12,45],[62,58],[78,140],[20,152]].map(([x,z]) => new THREE.Vector2(x, -z)));
+    const sg = new THREE.ShapeGeometry(shp); sg.rotateX(-Math.PI / 2);
+    { const p = sg.attributes.position, uv = new Float32Array(p.count * 2);
+      for (let i = 0; i < p.count; i++) { uv[i*2] = p.getX(i) / 4.2; uv[i*2+1] = p.getZ(i) / 4.2; }
+      sg.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); }
+    const sqMesh = new THREE.Mesh(sg, new THREE.MeshLambertMaterial({ map: sqTex }));
+    sqMesh.position.y = LAND_H + 0.045; sqMesh.receiveShadow = true; sqMesh.name = 'opera_sq_stone'; scene.add(sqMesh);
+    // 16 bonsai chậu đá + kiềng 3 cọc gỗ (2 hàng lat 12/24, along 6..83)
+    const potG = [], greenG = [], woodG = [];
+    for (const lat of [12, 24]) for (let k = 0; k < 8; k++) {
+      const [bx, bz] = P(6 + k * 11, lat);
+      const gy = LAND_H + 0.045;
+      const pot = new THREE.CylinderGeometry(0.55, 0.7, 0.7, 8); pot.translate(bx, gy + 0.35, bz); potG.push(pot);
+      const ball = new THREE.IcosahedronGeometry(0.95, 1); ball.scale(1, 0.8, 1); ball.translate(bx, gy + 1.75, bz); greenG.push(ball);
+      const trunk = new THREE.CylinderGeometry(0.09, 0.12, 0.9, 5); trunk.translate(bx, gy + 1.1, bz); woodG.push(trunk);
+      for (let c = 0; c < 3; c++) { const a = c / 3 * Math.PI * 2 + k;
+        const st = new THREE.CylinderGeometry(0.035, 0.035, 1.5, 4);
+        st.rotateZ(0.42); st.rotateY(a); st.translate(bx + Math.cos(a) * 0.55, gy + 0.95, bz + Math.sin(a) * 0.55); woodG.push(st); }
+      addCollider(bx, bz, 0.75);
+    }
+    addMerged(potG, mat(0x9aa0a2), 'sq_bonsai_pots');
+    addMerged(greenG, sharedMats.leafDark, 'sq_bonsai_green');
+    addMerged(woodG, mat(0x8a6a42), 'sq_bonsai_wood');
+    // 2 cột đèn pha 14m cụm 4 pha
+    for (const [lx, lz] of [[23.1, 85.6], [42.8, 131.8]]) {
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.3, 14, 8), mat(0x8f979c));
+      pole.position.set(lx, LAND_H + 7, lz); scene.add(pole);
+      for (let c = 0; c < 4; c++) { const a = c / 4 * Math.PI * 2 + 0.4;
+        const head = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.3, 0.45), sharedMats.lampGlow);
+        head.position.set(lx + Math.cos(a) * 0.75, LAND_H + 13.6, lz + Math.sin(a) * 0.75); head.rotation.y = -a; scene.add(head); }
+      addCollider(lx, lz, 0.5);
+    }
+    // kiosk báo trắng-xanh + trạm xe đạp công cộng + biển LED 2 cột
+    { const [kx, kz] = [64.4, 93.6];
+      const k1 = new THREE.Mesh(new THREE.BoxGeometry(2.5, 2.4, 2), mat(0xf2f5f4)); k1.position.set(kx, LAND_H + 1.2, kz); scene.add(k1);
+      const k2 = new THREE.Mesh(new THREE.BoxGeometry(2.7, 0.24, 2.2), mat(0x1f6fae)); k2.position.set(kx, LAND_H + 2.55, kz); scene.add(k2);
+      addCollider(kx, kz, 1.6); }
+    { const [tx, tz] = [67.9, 108.2];
+      const roof = new THREE.Mesh(new THREE.BoxGeometry(6.4, 0.16, 1.8), mat(0x2f6bd8)); roof.position.set(tx, LAND_H + 2.5, tz); scene.add(roof);
+      for (const s of [-2.9, 2.9]) { const p2 = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.08, 2.5, 6), mat(0x8f979c)); p2.position.set(tx + s, LAND_H + 1.25, tz); scene.add(p2); }
+      for (let b = 0; b < 6; b++) { const bike = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.85, 1.5), mat(0x2f6bd8)); bike.position.set(tx - 2.5 + b, LAND_H + 0.6, tz); scene.add(bike); }
+      addCollider(tx, tz, 3.4); }
+    { const [bx2, bz2] = [63.4, 83.4];
+      const ledTex = makeTex(256, 128, (g, w, h) => { g.fillStyle = '#12161c'; g.fillRect(0,0,w,h); g.fillStyle = '#e33'; g.fillRect(10,10,w-20,26); g.fillStyle = '#ffd21a'; g.font = 'bold 30px sans-serif'; g.textAlign='center'; g.fillText('HẢI PHÒNG', w/2, h*0.68); });
+      const led = new THREE.Mesh(new THREE.PlaneGeometry(8, 4), new THREE.MeshLambertMaterial({ map: ledTex, side: THREE.DoubleSide }));
+      led.position.set(bx2, LAND_H + 4.6, bz2); led.rotation.y = Math.atan2(-0.9543, 0.2989); scene.add(led);
+      for (const s of [-3.6, 3.6]) { const p3 = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.16, 4.6, 6), mat(0x565c60)); const [px3, pz3] = [bx2 + UX * s, bz2 + UZ * s]; p3.position.set(px3, LAND_H + 2.3, pz3); scene.add(p3); }
+      addCollider(bx2, bz2, 1.2); }
+  }
+
   // ---------- KÈ HỒ TAM BẠC: lan can sắt xanh + ghế đá granite + cột đèn đôi Pháp cổ (pano_004-013, 028-037) ----------
   // Neo theo TRỤC HỒ (không theo tim đường) → lan can bám đúng mép nước cả 2 bờ, thứ tự thật
   // từ hồ ra: nước → LAN CAN (mép kè) → đèn → GHẾ ĐÁ (trên vỉa hè caro, quay mặt ra hồ) → vỉa hè → đường.
