@@ -315,6 +315,13 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-13 (ax)** [MẶT TRẬN ĐÔNG — Lê Quang Đạo/ĐBP đông/Lê Lợi (agent nháp + kiểm hình học)]:
+    12 block helper dg* (dgMedian dải phân cách cây bụi đại lộ đôi LQĐ — fix road sev3 của 2 pano
+    tệ nhất 478/215; cụm công sở ĐBP Hải quan/Bảo Việt/ACB; GREE (966.6,-328.7) 1 block ăn 2 pano
+    trùng tọa độ 091+444; nhà Pháp arcade W44 + Samsung villa; kho Gence; phố xe đạp Lê Lợi)
+    + 5 corridor (LKT, ĐBP đông, Lê Lợi ×2, LQĐ — houseEvidence 65-80% dọc tuyến, probe.mjs của
+    agent). Khu này hóa ra KHÔNG phải Lê Hồng Phong — ảnh thật xác nhận Lê Quang Đạo đại lộ đôi.
+    Render kiểm pano_478: median cây + nhà mới + ô bạt xanh khớp thật. Diag 0 lỗi.
 - **2026-07-13 (aw)** [ĐỐI CHỨNG BẮC: 1.33 → 1.96 (+0.63) + XỬ LÝ 3 REGRESSION]:
     30 cặp: tăng tốt pano_219 +2.8, 499 +2.5, 423 +2.3 (phố thuyền/cổng X46/corridor Tam Bạc ăn
     điểm); NHƯNG 3 regression (420 0.9→0.5, 330 1→0.5, 422 2→0.8) — corridor Thất Khê
