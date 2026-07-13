@@ -315,6 +315,15 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-14 (ay)** [ĐỢT 2 HOÀN TẤT TÍCH HỢP: TRUNG TÂM-BẮC (tb*) + TÂY-BẮC (tw*)]:
+    TTBAC 15 block (cụm nút HVT×NTP, Bệnh viện Phụ Sản + cổng mầm non, phố công sở Pháp ĐTH,
+    ELISE đế phố trước tháp Hoàng Long — agent TỰ phân tích xung đột với 5 công trình đã có,
+    Agribank đã dịch tây né BIDV) + 3 ZONE khuôn viên vào openSpace (Z-TTB1 corridor xiên theo
+    tim ĐTH bắc, Z-TTB2 bệnh viện, Z-TTB3 nút NTP) — trị bệnh hệ thống S1 "shophouse canyon
+    nơi thật là khuôn viên" (≥14 pano). TAYBAC 12 block khu Phạm Phú Thứ/Bạch Đằng (THPT Lê
+    Hồng Phong, trường Trần Văn Ơn, trạm y tế Hạ Lý, PICO + pylon cao thế, nhà hàng Gia Viên,
+    dãy BIDV/Đại Phát). Diag 0 lỗi. Còn S5 (3 biển shopsigns giữa lòng đường 220/051/391) +
+    S2 cây cổ thụ + S3 đèn — vòng sau. Đợt 2 đủ 5 mặt trận: DONG đã push (ax), giờ TTBAC+TAYBAC.
 - **2026-07-13 (ax)** [MẶT TRẬN ĐÔNG — Lê Quang Đạo/ĐBP đông/Lê Lợi (agent nháp + kiểm hình học)]:
     12 block helper dg* (dgMedian dải phân cách cây bụi đại lộ đôi LQĐ — fix road sev3 của 2 pano
     tệ nhất 478/215; cụm công sở ĐBP Hải quan/Bảo Việt/ACB; GREE (966.6,-328.7) 1 block ăn 2 pano
