@@ -96,6 +96,23 @@ export const LAKE_POLY = [
   [-1006.2, 346.6], [-392.5, 218.9], [-401.6, 172.8], [-608.7, 215.4], [-769.3, 246.1],
   [-977.2, 287.5], [-1039.5, 299.7], [-1076.1, 302.8], [-1113.8, 302.2], [-1150.8, 299.2],
 ];
+// HỒ SEN (quận Lê Chân, ~85×195m) — cell_nam V1: hồ thật hoàn toàn THIẾU trong terrain
+// (8 pano water sev3). Polygon đã chừa lòng đường + kè >=10m khỏi tim các phố #294/#44/#102.
+export const HOSEN_POLY = [
+  [-55, 865], [5, 852], [14, 950], [34, 988], [43, 1040], [0, 1056], [-40, 1050], [-52, 960],
+];
+export function hoSenSD(x, z) {
+  if (x < -75 || x > 63 || z < 832 || z > 1076) return 1e6;   // bbox nhanh
+  let inside = false, bd = 1e9;
+  for (let i = 0, j = HOSEN_POLY.length - 1; i < HOSEN_POLY.length; j = i++) {
+    const [xi, zi] = HOSEN_POLY[i], [xj, zj] = HOSEN_POLY[j];
+    if ((zi > z) !== (zj > z) && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) inside = !inside;
+    const d = distToSeg(x, z, xi, zi, xj, zj);
+    if (d < bd) bd = d;
+  }
+  return inside ? -bd : bd;
+}
+
 // khoảng cách CÓ DẤU tới bờ hồ: ÂM = trong hồ (nước), DƯƠNG = trên đất
 export function lakeSD(x, z) {
   let inside = false, bd = 1e9;
@@ -216,6 +233,11 @@ export function groundHeightNoDeck(x, z) {
     // ĐÔNG ĐẬP Lê Chân: thực tế là ĐẤT (dải vườn hoa + Triển lãm) nhưng mask nước OSM cũ
     // kéo tới ~x=-240 → lấp thành đất phố (user: "đằng sau nhà triển lãm có hồ đâu")
     else if (x > -400 && z > 100 && z < 240 && h < 1.6) h = LAND_H;
+  }
+  // HỒ SEN (cell_nam V1): kênh theo polygon thật, taluy kè 2m — ngoài mép giữ đất phố
+  if (x > -75 && x < 63 && z > 832 && z < 1076) {
+    const sd = hoSenSD(x, z);
+    if (sd < 0) h = lerp(-3, 1.7, smoothstep(-2, 0, sd));
   }
   return h;
 }

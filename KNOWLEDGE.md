@@ -315,6 +315,25 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-13 (at)** [MẶT TRẬN NAM + TÂY — HỒ SEN + 9 HÀNH LANG + 21 CÔNG TRÌNH (2 agent nháp)]:
+    Chiến dịch phủ ô ngoài lõi đợt 1 (37 pano NAM Tô Hiệu/hồ Sen + 4 pano TÂY Hai Bà Trưng, điểm 0.3-3.0).
+    (1) HỒ SEN đào mới trong terrain.js: HOSEN_POLY 8 đỉnh ~85×195m quanh (-10,950) + hoSenSD()
+    (pattern LAKE_POLY) — hồ thật hoàn toàn THIẾU, 8 pano dính water sev3. Lưới thô dìm cả bbox
+    + lưới mịn 5m 'hosen_ground' (bài học ô lưới 112m). Kè: lan can đỏ + NHỊP VÒM THÉP TRẮNG bờ
+    tây mỗi 35m + phượng bờ đông + đài phun (-10,950) + cầu vòm bắc — khớp ảnh pano_322 rõ rệt.
+    waterbfs 5/5 ✓ (hồ cô lập không gãy flood-fill).
+    (2) EXT_CORRIDORS: 10 hành lang dãy liền kề NGOÀI vành 830m theo ĐOẠN TUYẾN (C1 Tô Hiệu,
+    C2 Chùa Hàng, C3 Dư Hàng, C4 Hồ Sen, C5 Chợ Con, C6 Vòng Hồ Sen, C7 Hàng Kênh, C8/C9 ngõ,
+    TÂY Hai Bà Trưng) — shophouse_infill nhận cả 'r' trong corridor, nhà rời né bbox 2 khu.
+    Guard mới: hoSenSD<12 (slotOK) + hoSenSD<10 (openSpace) + zone chợ Cột Đèn (-427,943) r28
+    + 2 cụm FOOD ô dù chợ.
+    (3) 21 block công trình đích danh chèn TRONG block lô 2 (dùng chung helper lmSign/lmFacade/
+    lmOK/lmTower — drafts NAM tái dùng, drafts TÂY helper hb* riêng): UBND+NVH quận Lê Chân,
+    cổng công viên cánh sen, chợ Con hall 58×38 (mặt cách pano 8m ĐÚNG thật — cần cổng mở thay
+    tường phẳng vòng sau), SAMNEC, Đông Dương Hotel, WinMart+, DOJI LED, chợ Kỳ Đồng (băng rôn
+    đúng chữ ảnh thật), Trung Quân 5T, trụ sở vàng compound... Diag 0 lỗi, 0 JS error.
+    TỒN (PLAN 2 mặt trận): median hoa giấy Hồ Sen z940-1146; cổng chợ mở; 5 biển shopsigns giữa
+    lòng đường khu TÂY cần xóa ở nguồn; ngõ 326/ngõ chợ thiếu trong ROADS_DT (việc process_osm).
 - **2026-07-13 (as)** [QUẢNG TRƯỜNG NHÀ HÁT V2 — nền đá + bonsai kiềng + đồ quảng trường]:
     theo PLAN corridor4056 V2 (pano_055): nền ĐÁ XÁM khổ lớn ShapeGeometry quad (12,45)-(62,58)-
     (78,140)-(20,152) +0.045 (thấp hơn sân tròn hoa văn +0.06 — không cần đục lỗ, sân vẽ đè);
