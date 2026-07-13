@@ -129,6 +129,18 @@ export function lakeSD(x, z) {
 // dải phố chợ Đổ/Lý Thường Kiệt (pano_135/200: "mặt nước lấn promenade/mặt phố") và cấm cả
 // dải đất ven sông xây nhà (cornersDry fail) → thu về 10m (taluy sát kè, kênh giữ nguyên w).
 for (const r of RIVERS) if (r.w === 55) r.sh = 10;
+// SÔNG TAM BẠC đoạn phố cổ (x -1092..-506): trục OSM lệch NAM 5-30m — đè tim Phố Tam Bạc
+// (pano_204/208/210/211/473 gh<1.6) và biến dải ven Thế Lữ thành đất xây nhà (cell_taysong V0).
+// Nắn về TRUNG TUYẾN tim Thế Lữ (#243) ↔ tim Phố Tam Bạc (#82), thu w 55→38 (kè cứng đô thị).
+for (const r of RIVERS) {
+  const i = r.pts.findIndex((p) => p[0] === -878 && p[1] === -9);
+  if (i > 0) {
+    r.w = 38;
+    r.pts.splice(i - 1, 2,
+      [-1092, 50], [-1030, 29], [-960, 8], [-900, -8], [-840, -19.5],
+      [-780, -29], [-700, -38], [-620, -47], [-506, -76]);
+  }
+}
 const riverIdx = makeBucketIndex(RIVERS.map((r) => ({ pts: r.pts, meta: [r.w, r.sh || 28] })));
 const regionIdx = makeBucketIndex(ROADS_REGION.map((r) => ({ pts: r.pts, meta: 0 })));
 const dtRoadIdx = makeBucketIndex(ROADS_DT.map((r) => ({ pts: r.pts, meta: r.c })));

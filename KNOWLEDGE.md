@@ -315,6 +315,17 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-14 (bc)** [ĐỢT 3 TÂY-SÔNG + V0 NẮN SÔNG TAM BẠC — sửa gốc rễ 16 pano]:
+    PHÁT HIỆN GỐC RỄ (agent taysong): trục sông Tam Bạc OSM lệch NAM 5-30m — tim Phố Tam Bạc
+    NGẬP (pano_204 gh=-1.5) còn dải ven Thế Lữ thành đất nên infill lấp nhà "phía sông".
+    V0 (terrain.js): splice RIVERS đoạn x -1092..-506 về TRUNG TUYẾN 2 tim đường, w 55→38.
+    KIỂM SAU NẮN: 21/21 đỉnh tim đường trong hộp khô, chợ Sắt/đền Tam Kỳ khô, hồ nguyên,
+    waterbfs 5/5 ✓ (probe điểm ĐOÁN có thể rơi ngoài lòng đường — phải quét ĐỈNH POLYLINE thật).
+    15 block ts* (chợ Lan Phong + lô giải tỏa PBC — cụm 0.5-1.0 tệ nhất toàn dải; kè caro 2 bờ
+    sông; chợ LTK 12 nhà + sạp; công sở Công an W40 ăn 2 pano; mầm non compound) + 4 corridor
+    (LTK 'r', Hạ Lý tây, Phố Tam Bạc tây, Thế Lữ tây) + zone kè sông 42m vào openSpace.
+    Agent smoke-run vòng 1 bắt 16 lỗi tự sửa (đường game #31 lệch bắc 7m so tim thật!).
+    Render pano_204: sông đúng chỗ, phố khô, NACHA HOTPOT đúng tên. ĐỢT 3 TÍCH HỢP XONG CẢ 3.
 - **2026-07-14 (bb)** [ĐỢT 3 MẶT TRẬN BẮC-SÔNG — cầu Lạc Long + công viên ĐBP + kho Pháp]:
     15 block bs* (lan can cầu Lạc Long hoa văn vòng trắng + bó vỉa đỏ-trắng + cau vua — 6 pano
     ~14 fix sev3; công viên ĐBP tây; trường mầm non Ngôi Sao 2 + Đảng ủy KKT ăn đôi 2 pano trùng
