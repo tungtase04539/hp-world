@@ -315,6 +315,16 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-13 (au)** [MẶT TRẬN BẮC — Hạ Lý/Thượng Lý/nút cầu HVT (agent nháp + smoke-run)]:
+    15 block helper bc* (không đụng lm*/hb*): cổng doanh trại X46 (-617.4,-782.8 — pano tệ nhất
+    dải 0.4đ), PHỐ THUYỀN Tam Bạc (7 lều bạt trên bãi ướt NoDeck<1.75 — chủ đích, phủ 7 pano),
+    zone cảng 5 kho + 4 cẩu chân đế cam (vá h90 các pano trên cầu), đảo hòn non bộ + tập thể 5T
+    nút HVT, bể bơi Hạ Lý tường tranh, chợ ăn... Agent tự smoke-run three+terrain: 445 mesh,
+    91 collider, 0 collider lấn lòng đường. +3 corridor BẮC vào EXT_CORRIDORS (Tam Bạc bờ đông,
+    Ngõ 80, Thất Khê; BỎ Phan Đình Phùng — thật mật độ thấp). Cảnh báo giữ: pano_383 là nước
+    (lòng Cấm lệch 80m); băng deck cầu HVT x55..90 z-860..-960 cấm dựng.
+    TỒN LỚN (ngoài phạm vi nhà): vòm thép đỏ + nhánh xoắn cầu HVT nhìn từ TRÊN CẦU (~12 fix sev3)
+    — phải làm ở tầng mô hình cầu.
 - **2026-07-13 (at)** [MẶT TRẬN NAM + TÂY — HỒ SEN + 9 HÀNH LANG + 21 CÔNG TRÌNH (2 agent nháp)]:
     Chiến dịch phủ ô ngoài lõi đợt 1 (37 pano NAM Tô Hiệu/hồ Sen + 4 pano TÂY Hai Bà Trưng, điểm 0.3-3.0).
     (1) HỒ SEN đào mới trong terrain.js: HOSEN_POLY 8 đỉnh ~85×195m quanh (-10,950) + hoSenSD()
