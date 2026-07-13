@@ -4651,7 +4651,8 @@ const bcPalm = (parent, lx, lz, h = 9) => {
       [[-751.4, 600.6], [-929.6, 637.2]],
       [[-533, -897], [-430, -731]],
       [[-588.4, -300], [-588.4, -350]],
-      [[10, -785], [150, -779]],
+      // Thất Khê [[10,-785],[150,-779]] ĐÃ GỠ: pano_420/422 regression (2→0.8) — thực địa là
+      // KHUÔN VIÊN tập thể sân cây, nhà lùi sâu, không phải shophouse sát vỉa (bài học 3 kiểu ô đất)
     ];
     const nearExtCorridor = (x, z) => {
       for (const line of EXT_CORRIDORS) for (let i = 0; i < line.length - 1; i++) {
