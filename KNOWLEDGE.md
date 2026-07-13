@@ -315,6 +315,15 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-14 (bb)** [ĐỢT 3 MẶT TRẬN BẮC-SÔNG — cầu Lạc Long + công viên ĐBP + kho Pháp]:
+    15 block bs* (lan can cầu Lạc Long hoa văn vòng trắng + bó vỉa đỏ-trắng + cau vua — 6 pano
+    ~14 fix sev3; công viên ĐBP tây; trường mầm non Ngôi Sao 2 + Đảng ủy KKT ăn đôi 2 pano trùng
+    tọa độ; kho Pháp Cù Chính Lan + kho hoang Phà Bính; tháp 12T lưới xanh + cần cẩu) + 2 ZONE
+    (Z-BS1 polygon công viên ĐBP — shophouse từng lấp; Z-BS2 hành lang cầu Lạc Long ±26m).
+    Agent smoke-run tự bắt 2 lỗi thật (Mesh.position read-only; 4 collider trong lòng đường —
+    đã dời). KỶ LUẬT corridor: 0 corridor mới — mọi đoạn xem ảnh đều kiểu (b)/(c); Thế Lữ tây
+    NGHI shophouse nhưng chưa xem ảnh → để vòng sau (đúng bài học Thất Khê). Render kiểm
+    pano_062 cầu Lạc Long khớp chi tiết. Diag 0 lỗi.
 - **2026-07-14 (ba)** [ĐỢT 3 MẶT TRẬN ĐÔNG-LÕI — chuẩn quy trình agent tốt nhất tới nay]:
     15 block dl* (Legend + biệt thự rào đen pano_359 0.6đ; chợ Nguyễn Khuyến + ô dù; 4 compound
     tây Lê Đại Hành; SVĐ Lạch Tray + trường) — agent TỰ smoke-run trên three vendor + terrain
