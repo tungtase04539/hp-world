@@ -315,6 +315,13 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-14 (be)** [HEATMAP TOÀN DẢI LẦN 2 — 2.12 → 2.84 (+0.70), KHÔNG CÒN VÙNG CHẾT]:
+    492 pano, so theo cặp 453: 2.14→2.84. Phân bố: <3 điểm 400→263; 3-5: 98→214; 5-8: 3→15.
+    Ô tệ nhất giờ TB 2.0-2.3 (trước 0.9-1.5). Cụm lỗi vẫn house>landmark>tree>sidewalk.
+    VÙNG TRŨNG MỚI CHO ĐỢT 4: cả CỘT x=600 chưa từng phủ — ô (600,-300) 21 pano TB 2.01,
+    (600,-600) 10, (600,-900) 6, (600,300) 5 (khu giữa lõi và Lê Quang Đạo: Lạch Tray đông/
+    Cầu Rào hướng/Đà Nẵng?); cùng (0,-900) 2.08 + (-300,-300) 2.32 (đã phủ nhưng cần TINH).
+    Data: scratchpad compare_full2/ (492 json) + gamepano_full2/ (2204 ảnh mới).
 - **2026-07-14 (bd)** [ĐỐI CHỨNG ĐỢT 3: 1.97 → 3.04 (+1.08, 117 cặp) — V0 SÔNG TRẢ LÃI +2.00]:
     TAYSONG +2.00 (1.97→3.96 — nắn sông là fix giá trị nhất 3 đợt: pano_125 0.5→5.1, 208 2→5.5,
     494 1.5→5.5); DONGLOI +0.84; BACSONG +0.74. TỔNG 3 ĐỢT: ~280 pano vùng trũng 0.3-2.5 đã kéo
