@@ -315,6 +315,29 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-13 (an)** [PANO-LOOP V6: 4 CỤM NỘI DUNG + ENDPOINT LOCAL MỚI + BÀI HỌC ĐỒNG HỒ TRÔI]:
+    ENDPOINT GIÁM KHẢO MỚI: http://localhost:20128/v1, model `cx/gpt-5.6-sol-xhigh` (KHÔNG hiện
+    trong /v1/models nhưng gọi được; Bearer bất kỳ; suy luận chậm — timeout ≥600s; cx/gpt-5.5
+    nhanh hơn nhưng chấm LỎNG hơn hẳn: 4.01 vs 3.32 trên cùng bộ ảnh → mọi đối chứng phải cùng
+    giám khảo). Pipeline Windows trọn gói trong scratchpad: cap.mjs (chụp §8b) → score_v6.py
+    (chấm 3 luồng song song, rubric V1 y nguyên) → pair_report.py (đối chứng theo cặp).
+    4 CỤM SỬA (từ trọng số lỗi house>landmark>tree>sign của lô V1 50 pano):
+    (1) XE ĐỖ: ô tô đỗ phủ cả phố 's'/'t' (trước chỉ 'p'), cap 200→520, né lakeSD<20 + nearFeatured;
+    xe máy đỗ thêm phố 't', cap 480→620. (2) CÂY XANH: vòng cây+đèn dải trung tâm thêm nhánh
+    "fill" streetTree (cap 300) phủ MỌI phố p/s/t sau khi hết quota hero/đèn — khu Ga hết trống;
+    tỉ lệ phượng 27%→20% (ven hồ 12%→8%). (3) SHOPHOUSE PHỐ 'r' KHU CHỢ ĐỔ: hành lang
+    R_CORRIDOR (x -520..-80, z -260..80) cho phố 'r' vào dãy liền kề (nhà cũ 2-4 tầng), nhà rời
+    'r' bỏ trong hành lang (tránh chồng lô). (4) MẶT TIỀN NHÀ OSM: vân tầng 0.82→0.74, tầng trệt
+    tối 0.15-3.1m, DẢI BIỂN HIỆU MÀU 3.1-4.15m (bảng màu shophouse) cho nhà trung tâm <780m —
+    hết "hộp nhạt trống trơn" (pano_009). LƯU Ý TDZ: trong try-block nhà OSM có `const central`
+    thứ 2 (mái ngói) — KHÔNG dùng tên đó phía trên, tính thẳng điều kiện.
+    ĐỐI CHỨNG lô V1 (44 cặp, cùng giám khảo 5.6-sol-xhigh): TB 3.35→3.41 (+0.06); pano mục tiêu
+    tăng rõ: 010 +1.1, 043 +1.0, 025 +0.9, 022/019 +0.7; phần giảm ≤0.5 = variance đã biết.
+    BÀI HỌC PIPELINE MỚI — ĐỒNG HỒ TRÔI: setTime(0.35) chỉ đặt 1 LẦN đầu phiên chụp, mà 1 ngày
+    game = 300s → lô 200 ảnh trôi sang HOÀNG HÔN/ĐÊM ở nửa cuối (pano_032 trời cam cả trước lẫn
+    sau) → giám khảo chấm lệch cả cụm. Sửa: setTime TRƯỚC MỖI teleport trong script chụp.
+    Vùng trũng nhất toàn lô (điểm 0.9-2.3, chưa xử lý): dải Hoàng Diệu ven cảng pano_015-021
+    (đất giải tỏa + kho xưởng + Cảng vụ) — ưu tiên #1 của vòng sau cùng cụm LANDMARK hàng loạt.
 - **2026-07-13 (am)** [GAMEPLAY GÃY + CÔNG TRÌNH ĐÍCH DANH GIỮA ĐƯỜNG + NƯỚC PANO_135 — phiên máy local Windows]:
     MÔI TRƯỜNG MỚI: repo clone về máy Windows của user; GLB trích thẳng từ nhánh assets-storage
     (`git show origin/assets-storage:assets/x.glb > assets/x.glb` — clone đầy đủ có sẵn object, không cần mạng);

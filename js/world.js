@@ -1147,9 +1147,11 @@ export function buildWorld(scene) {
     const slots = [];
     let seed = 20260706;
     const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+    // gồm cả phố 't' (khu Ga pano_022/023: xe máy đỗ kín vỉa hè phố t như phố s); cap 480→620
+    const SCOOTER_CAP = 620;
     for (let ri = 0; ri < ROADS_DT.length; ri++) {
       const r = ROADS_DT[ri];
-      if (r.c !== 'p' && r.c !== 's') continue;
+      if (r.c !== 'p' && r.c !== 's' && r.c !== 't') continue;
       const wRoad = ROAD_W[r.c];
       for (let i = 0; i < r.pts.length - 1; i++) {
         const [x1, z1] = r.pts[i], [x2, z2] = r.pts[i + 1];
@@ -1182,11 +1184,11 @@ export function buildWorld(scene) {
             if (onRoad) continue; }
           // mũi quay VÀO vỉa hè (vuông góc đường), lệch nhẹ cho tự nhiên; +0.18 đứng TRÊN mặt lát vỉa hè
           slots.push([gx, gy + 0.18, gz, rotY + Math.PI / 2 + (rnd() - 0.5) * 0.25, (rnd() * scoolCols.length) | 0]);
-          if (slots.length >= 480) break;
+          if (slots.length >= SCOOTER_CAP) break;
         }
-        if (slots.length >= 480) break;
+        if (slots.length >= SCOOTER_CAP) break;
       }
-      if (slots.length >= 480) break;
+      if (slots.length >= SCOOTER_CAP) break;
     }
     if (slots.length) {
       const bodyInst = new THREE.InstancedMesh(bodyGeo, mat(0xcccccc), slots.length);
@@ -1359,55 +1361,11 @@ export function buildWorld(scene) {
     if (frondG.length) addMerged(frondG, sharedMats.leafDark, 'rockery_palmfronds');
   }
 
-  // ---------- Ô TÔ ĐỖ dọc đại lộ (thực tế nhiều ô tô đỗ; game trước thiên về xe máy) ----------
-  {
-    const carG = [], wheelG = [];
-    const box = (arr, w, h, l, x, y, z) => { const g = new THREE.BoxGeometry(w, h, l); g.translate(x, y, z); arr.push(g); };
-    box(carG, 1.72, 0.5, 4.2, 0, 0.55, 0);            // thân
-    box(carG, 1.5, 0.5, 2.2, 0, 1.0, -0.15);          // ca-bin
-    { const wl = (z) => { for (const sx of [0.82, -0.82]) { const g = new THREE.CylinderGeometry(0.32, 0.32, 0.2, 10); g.rotateZ(Math.PI/2); g.translate(sx, 0.32, z); wheelG.push(g); } }; wl(1.35); wl(-1.35); }
-    const carGeo = mergeGeometries(carG), wheelGeo = mergeGeometries(wheelG);
-    carG.forEach((g) => g.dispose()); wheelG.forEach((g) => g.dispose());
-    const carCols = [0x1c1c20, 0xe4e2dc, 0xb0b3b6, 0x9c2f28, 0x64686e, 0x24354f, 0x3a3f45].map((c) => new THREE.Color(c));
-    const slots = [];
-    let cs = 20260707; const cr = () => { cs = (cs * 1103515245 + 12345) & 0x7fffffff; return cs / 0x7fffffff; };
-    for (let ri = 0; ri < ROADS_DT.length; ri++) {
-      const r = ROADS_DT[ri]; if (r.c !== 'p') continue;
-      const wRoad = ROAD_W[r.c];
-      for (let i = 0; i < r.pts.length - 1; i++) {
-        const [x1, z1] = r.pts[i], [x2, z2] = r.pts[i + 1];
-        const segLen = Math.hypot(x2 - x1, z2 - z1); if (segLen < 12) continue;
-        const dxn = (x2 - x1) / segLen, dzn = (z2 - z1) / segLen, rotY = Math.atan2(x2 - x1, z2 - z1);
-        const px = Math.cos(rotY), pz = -Math.sin(rotY);
-        for (let d = 6; d < segLen - 6; d += 5.5) {
-          if (cr() > 0.5) continue;
-          const mx = x1 + dxn * d, mz = z1 + dzn * d;
-          if (mx * mx + mz * mz > 1350 * 1350) continue;
-          const side = cr() < 0.5 ? 1 : -1;
-          const off = side * (wRoad / 2 + 1.3);
-          const gx = mx + off * px, gz = mz + off * pz;
-          const gy = groundHeight(gx, gz); if (gy < LAND_H - 0.5 || isWater(gx, gz)) continue;
-          slots.push([gx, gy, gz, rotY + (cr() - 0.5) * 0.12, (cr() * carCols.length) | 0]);
-          if (slots.length >= 200) break;
-        }
-        if (slots.length >= 200) break;
-      }
-      if (slots.length >= 200) break;
-    }
-    if (slots.length) {
-      const carInst = new THREE.InstancedMesh(carGeo, mat(0xcccccc), slots.length);
-      const whInst = new THREE.InstancedMesh(wheelGeo, mat(0x18181b), slots.length);
-      const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), s = new THREE.Vector3(1, 1, 1), p = new THREE.Vector3();
-      slots.forEach(([x, y, z, ry, ci], k) => { e.set(0, ry, 0); q.setFromEuler(e); p.set(x, y, z); m.compose(p, q, s); carInst.setMatrixAt(k, m); whInst.setMatrixAt(k, m); carInst.setColorAt(k, carCols[ci]); });
-      carInst.instanceMatrix.needsUpdate = true; whInst.instanceMatrix.needsUpdate = true; if (carInst.instanceColor) carInst.instanceColor.needsUpdate = true;
-      carInst.castShadow = whInst.castShadow = true; carInst.name = 'parked_cars'; scene.add(carInst); scene.add(whInst);
-    }
-  }
-
   // CÔNG TRÌNH ĐÍCH DANH + vùng quang đãng quanh — MỌI khối nhà infill (shophouse liền kề,
   // nhà tự mọc, block_infill) phải né, không thì mọc đè/che mặt tiền (bài học pano_158/354/358:
   // dãy shophouse liền kề từng nuốt chửng tháp KS Hữu Nghị & nhà Pháp arcade).
   // Tọa độ = tọa độ ĐÃ DỜI KHỎI TIM ĐƯỜNG của từng công trình (đồng bộ với khối dựng bên dưới).
+  // KHAI BÁO TRƯỚC khối ô tô đỗ (khối đầu tiên dùng nearFeatured) — TDZ, xem bài học (aj).
   const FEATURED_CLEAR = [
     [257.5, -484.9, 30],   // KS Hữu Nghị
     [-11.8, -256.6, 22],   // tòa Hoàng Long (góc nam ngã ba TQK)
@@ -1424,7 +1382,59 @@ export function buildWorld(scene) {
     return false;
   };
 
+  // ---------- Ô TÔ ĐỖ dọc phố (thực tế ô tô đỗ kín 2 bên cả phố lớn lẫn phố vừa khu Ga) ----------
+  {
+    const carG = [], wheelG = [];
+    const box = (arr, w, h, l, x, y, z) => { const g = new THREE.BoxGeometry(w, h, l); g.translate(x, y, z); arr.push(g); };
+    box(carG, 1.72, 0.5, 4.2, 0, 0.55, 0);            // thân
+    box(carG, 1.5, 0.5, 2.2, 0, 1.0, -0.15);          // ca-bin
+    { const wl = (z) => { for (const sx of [0.82, -0.82]) { const g = new THREE.CylinderGeometry(0.32, 0.32, 0.2, 10); g.rotateZ(Math.PI/2); g.translate(sx, 0.32, z); wheelG.push(g); } }; wl(1.35); wl(-1.35); }
+    const carGeo = mergeGeometries(carG), wheelGeo = mergeGeometries(wheelG);
+    carG.forEach((g) => g.dispose()); wheelG.forEach((g) => g.dispose());
+    const carCols = [0x1c1c20, 0xe4e2dc, 0xb0b3b6, 0x9c2f28, 0x64686e, 0x24354f, 0x3a3f45].map((c) => new THREE.Color(c));
+    const slots = [];
+    let cs = 20260707; const cr = () => { cs = (cs * 1103515245 + 12345) & 0x7fffffff; return cs / 0x7fffffff; };
+    // PANO-LOOP: khu Ga (pano_022/023) thật KÍN ô tô đỗ 2 bên phố s/t nhưng game chỉ rải phố 'p'
+    // → phủ cả 'p'/'s'/'t'; cap 200→520 (trần cạn theo thứ tự ROADS_DT là bài học cũ);
+    // phố 's'/'t' hẹp hơn nên thưa hơn phố 'p' một chút (bước 5.5→7)
+    const CAR_CAP = 520;
+    for (let ri = 0; ri < ROADS_DT.length; ri++) {
+      const r = ROADS_DT[ri]; if (r.c !== 'p' && r.c !== 's' && r.c !== 't') continue;
+      const wRoad = ROAD_W[r.c];
+      const step = r.c === 'p' ? 5.5 : 7;
+      for (let i = 0; i < r.pts.length - 1; i++) {
+        const [x1, z1] = r.pts[i], [x2, z2] = r.pts[i + 1];
+        const segLen = Math.hypot(x2 - x1, z2 - z1); if (segLen < 12) continue;
+        const dxn = (x2 - x1) / segLen, dzn = (z2 - z1) / segLen, rotY = Math.atan2(x2 - x1, z2 - z1);
+        const px = Math.cos(rotY), pz = -Math.sin(rotY);
+        for (let d = 6; d < segLen - 6; d += step) {
+          if (cr() > 0.5) continue;
+          const mx = x1 + dxn * d, mz = z1 + dzn * d;
+          if (mx * mx + mz * mz > 1350 * 1350) continue;
+          const side = cr() < 0.5 ? 1 : -1;
+          const off = side * (wRoad / 2 + 1.3);
+          const gx = mx + off * px, gz = mz + off * pz;
+          const gy = groundHeight(gx, gz); if (gy < LAND_H - 0.5 || isWater(gx, gz)) continue;
+          if (lakeSD(gx, gz) < 20 || nearFeatured(gx, gz)) continue;   // không đỗ trên promenade/sân công trình
+          slots.push([gx, gy, gz, rotY + (cr() - 0.5) * 0.12, (cr() * carCols.length) | 0]);
+          if (slots.length >= CAR_CAP) break;
+        }
+        if (slots.length >= CAR_CAP) break;
+      }
+      if (slots.length >= CAR_CAP) break;
+    }
+    if (slots.length) {
+      const carInst = new THREE.InstancedMesh(carGeo, mat(0xcccccc), slots.length);
+      const whInst = new THREE.InstancedMesh(wheelGeo, mat(0x18181b), slots.length);
+      const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), s = new THREE.Vector3(1, 1, 1), p = new THREE.Vector3();
+      slots.forEach(([x, y, z, ry, ci], k) => { e.set(0, ry, 0); q.setFromEuler(e); p.set(x, y, z); m.compose(p, q, s); carInst.setMatrixAt(k, m); whInst.setMatrixAt(k, m); carInst.setColorAt(k, carCols[ci]); });
+      carInst.instanceMatrix.needsUpdate = true; whInst.instanceMatrix.needsUpdate = true; if (carInst.instanceColor) carInst.instanceColor.needsUpdate = true;
+      carInst.castShadow = whInst.castShadow = true; carInst.name = 'parked_cars'; scene.add(carInst); scene.add(whInst);
+    }
+  }
+
   // ---------- CÔNG TRÌNH ĐẶC TRƯNG dải trung tâm (procedural tỉ mỉ theo mô tả pano) ----------
+  // (FEATURED_CLEAR/nearFeatured khai báo Ở TRÊN, trước khối ô tô đỗ)
   {
     // texture mặt tiền lưới cửa sổ trên nền màu tòa nhà
     const facadeTex = (baseCss, winCss, cols, rows) => {
@@ -1618,6 +1628,9 @@ export function buildWorld(scene) {
     const wallPalette = [0xf5e4b8, 0xf0cfa0, 0xdfe8dc, 0xf4b8a0, 0xcfe0ee, 0xf7efc9, 0xe8d0b0, 0xd8c8a8]
       .map((c) => new THREE.Color(c));
     const roofPalette = [0xc24a30, 0x96603c, 0xa84036, 0x8a8f96].map((c) => new THREE.Color(c));
+    // dải biển hiệu màu trên mép tầng trệt (pano_009: nhà OSM từng là hộp nhạt TRỐNG TRƠN
+    // trong khi thật là shophouse kín biển) — cùng bảng màu với shophouse_infill
+    const signPalette = [0xc62828, 0x1c56a0, 0x1f7a3c, 0xd8862a, 0x26262c, 0x8e2f80].map((c) => new THREE.Color(c));
     // ngói dốc kiểu Pháp cổ / nhà phố cũ cho DÃY TRUNG TÂM (nhà thấp tầng)
     const tilePalette = [0xb5462c, 0xc85a34, 0xa23c28, 0x9c5636, 0xbb5a30].map((c) => new THREE.Color(c));
     // Mái hip (4 dốc) phủ lên bbox footprint — đọc ngay ra "phố cổ mái ngói".
@@ -1718,8 +1731,9 @@ export function buildWorld(scene) {
           let shade = isRoof ? 0.95 : 0.84 + 0.16 * Math.abs(nrm.getX(i));
           if (!isRoof) {
             // vân tầng: dải đậm/nhạt xen kẽ theo đúng nấc đùn (không bị nội suy làm nhòe)
+            // 0.82→0.74: tương phản mạnh hơn — hộp OSM từng đọc thành "tường nhạt trống trơn" (pano_009)
             const rowH = h / steps;
-            const band = Math.floor(posA.getY(i) / rowH + 0.01) % 2 === 0 ? 1 : 0.82;
+            const band = Math.floor(posA.getY(i) / rowH + 0.01) % 2 === 0 ? 1 : 0.74;
             shade *= band;
           }
           if (glassy && !isRoof) {
@@ -1728,11 +1742,19 @@ export function buildWorld(scene) {
             cols[i * 3 + 2] = 0.64 * shade;
             continue;
           }
-          // TẦNG TRỆT SHOPFRONT: nhà ống VN tầng 1 là cửa hàng/kính/cửa cuốn tối màu ấm
+          // TẦNG TRỆT SHOPFRONT + DẢI BIỂN HIỆU: nhà ống VN tầng 1 là cửa hàng tối màu,
+          // trên mép trệt là băng biển hiệu màu (khu trung tâm) — như shophouse_infill
           if (!isRoof) {
             const yRel = posA.getY(i) - LAND_H;
-            if (yRel > 0.15 && yRel < 3.5) {
+            if (yRel > 0.15 && yRel < 3.1) {
               cols[i * 3] = 0.34 * shade; cols[i * 3 + 1] = 0.31 * shade; cols[i * 3 + 2] = 0.29 * shade;
+              continue;
+            }
+            // KHÔNG dùng biến `central` ở đây — trong try này có `const central` KHÁC khai báo
+            // phía dưới (mái ngói) → TDZ ReferenceError (bài học aj); tính thẳng điều kiện
+            if ((cx * cx + cz * cz) < 780 * 780 && yRel >= 3.1 && yRel < 4.15 && h > 5) {
+              const sc = signPalette[hash % signPalette.length];
+              cols[i * 3] = sc.r * 0.95; cols[i * 3 + 1] = sc.g * 0.95; cols[i * 3 + 2] = sc.b * 0.95;
               continue;
             }
           }
@@ -1979,6 +2001,9 @@ export function buildWorld(scene) {
         const [x1, z1] = r.pts[i], [x2, z2] = r.pts[i + 1];
         // phố 't' TRONG vành 830m giờ thuộc dãy shophouse liền kề — bỏ nhà rời ở đó (tránh chồng lô)
         if (r.c === 't' && (((x1 + x2) / 2) ** 2 + ((z1 + z2) / 2) ** 2) < 830 * 830) continue;
+        // phố 'r' hành lang chợ Đổ cũng đã vào dãy liền kề — bỏ nhà rời (tránh chồng lô)
+        { const mxr = (x1 + x2) / 2, mzr = (z1 + z2) / 2;
+          if (r.c === 'r' && mxr > -520 && mxr < -80 && mzr > -260 && mzr < 80) continue; }
         const len = Math.hypot(x2 - x1, z2 - z1);
         const rotY = Math.atan2(x2 - x1, z2 - z1);
         const px = Math.cos(rotY), pz = -Math.sin(rotY);
@@ -2065,13 +2090,17 @@ export function buildWorld(scene) {
       if (groundHeight(gx, gz) < LAND_H - 0.5) return false;
       return true;
     };
+    // KHU PHỐ CŨ CHỢ ĐỔ (pano_135): phố 'r' ở đây thực địa cũng là tường shophouse cũ liền kề
+    // dày đặc biển hiệu — cho 'r' vào dãy liền kề CHỈ trong hành lang này (nơi khác giữ nhà rời)
+    const R_CORRIDOR = (x, z) => x > -520 && x < -80 && z > -260 && z < 80;
     outerShop:
     for (let ri = 0; ri < ROADS_DT.length; ri++) {
       // gồm cả phố 't' (pano 131/492: phố t trung tâm thực địa cũng là tường shophouse liền kề)
-      const r = ROADS_DT[ri]; if (r.c !== 'p' && r.c !== 's' && r.c !== 't') continue;
+      const r = ROADS_DT[ri]; if (r.c !== 'p' && r.c !== 's' && r.c !== 't' && r.c !== 'r') continue;
       const wRoad = ROAD_W[r.c];
       for (let i = 0; i < r.pts.length - 1; i++) {
         const [x1, z1] = r.pts[i], [x2, z2] = r.pts[i + 1];
+        if (r.c === 'r' && !R_CORRIDOR((x1 + x2) / 2, (z1 + z2) / 2)) continue;
         const segLen = Math.hypot(x2 - x1, z2 - z1); if (segLen < 9) continue;
         const dxn = (x2 - x1) / segLen, dzn = (z2 - z1) / segLen, rotY = Math.atan2(x2 - x1, z2 - z1);
         const nx = Math.cos(rotY), nz = -Math.sin(rotY);           // pháp tuyến
@@ -2089,7 +2118,9 @@ export function buildWorld(scene) {
             const gx = mx + off * nx, gz = mz + off * nz;
             if (!slotOK(gx, gz, dxn, dzn, nx, nz, w, dp)) { d += 2.0; continue; }
             const gy = groundHeight(gx, gz);
-            const floors = (mx * mx + mz * mz < 480 * 480 ? 3 : 2) + ((srnd() * 4) | 0);   // lõi 3-6 tầng, ngoài 2-5 (pano V1: trung tâm cao hơn)
+            // phố 'r' khu chợ Đổ: nhà ống CŨ thấp 2-4 tầng (pano_135); phố lớn giữ 2-6
+            const floors = r.c === 'r' ? 2 + ((srnd() * 3) | 0)
+              : (mx * mx + mz * mz < 480 * 480 ? 3 : 2) + ((srnd() * 4) | 0);   // lõi 3-6 tầng, ngoài 2-5 (pano V1: trung tâm cao hơn)
             const h = floors * 3.3;
             const bay = bayCols[(Math.abs(gx * 7 + gz * 13) | 0) % bayCols.length];
             const sgn = signCols[(Math.abs(gx * 5 + gz * 11) | 0) % signCols.length];
@@ -3400,21 +3431,23 @@ export function buildWorld(scene) {
     // BÀI HỌC PANO-LOOP V1 (39 finding tree): ven hồ Tam Bạc thực địa là xà cừ/bàng tán XANH
     // + cây cắt tỉa, phượng đỏ chỉ điểm xuyết → trong hành lang hồ (lakeSD<45) hạ phượng còn ~12%.
     if (lakeSD(x, z) < 45) {
-      if (h < 0.80) shadeTree(x, z);
+      if (h < 0.84) shadeTree(x, z);         // ven hồ phượng 12%→8% (pano_030 h090 vẫn đọc "đỏ dày")
       else if (h < 0.92) phuongTree(x, z);
       else palm(x, z);
       return;
     }
-    if (h < 0.63) shadeTree(x, z);           // V3-fix: model chê "hoa đỏ dày" cả ngoài hồ → phượng 35%→27%
+    if (h < 0.70) shadeTree(x, z);           // phượng 27%→20% (pano_019/030: thật đa số tán xanh)
     else if (h < 0.90) phuongTree(x, z);
     else palm(x, z);
   }
   {
-    // phượng + đèn dọc các trục trung tâm gần Nhà hát lớn
+    // phượng + đèn dọc các trục trung tâm gần Nhà hát lớn; SAU quota hero/đèn: trồng tiếp
+    // streetTree (đa số xanh) dọc MỌI phố p/s/t — pano-loop: khu Ga (022/023) thật rợp cây
+    // nhưng game trống trơn vì vòng này hết quota ngay ở lõi (cây bake theo ô 500m, rẻ)
     const lmPts = Object.values(LM);
-    let nTree = 0, nLamp = 0, sideFlip = 1;
+    let nTree = 0, nLamp = 0, nFill = 0, sideFlip = 1;
     for (const r of ROADS_DT) {
-      if (r.c !== 's' && r.c !== 'p') continue;
+      if (r.c !== 's' && r.c !== 'p' && r.c !== 't') continue;
       for (let i = 0; i < r.pts.length - 1; i++) {
         const [x1, z1] = r.pts[i], [x2, z2] = r.pts[i + 1];
         const mx = (x1 + x2) / 2, mz = (z1 + z2) / 2;
@@ -3430,10 +3463,11 @@ export function buildWorld(scene) {
           const tz = z1 + (z2 - z1) * t + off * pz;
           if (Math.abs(groundHeightNoDeck(tx, tz) - LAND_H) > 0.3) continue;
           if (lmPts.some(([lx, lz]) => (tx - lx) ** 2 + (tz - lz) ** 2 < 24 * 24)) continue;
-          if (nTree <= nLamp * 1.6 && nTree < 46) {
+          if (nearFeatured(tx, tz)) continue;
+          if (r.c !== 't' && nTree <= nLamp * 1.6 && nTree < 46) {
             heroTree(tx, tz);       // dải trung tâm: cây phượng ảnh-thật (Meshy)
             nTree++;
-          } else if (nLamp < 30) {
+          } else if (r.c !== 't' && nLamp < 30) {
             const y = groundHeight(tx, tz);
             const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.18, 5, 6), mat(0x38424a));
             pole.position.set(tx, y + 2.5, tz);
@@ -3442,6 +3476,9 @@ export function buildWorld(scene) {
             bulb.position.set(tx, y + 5.2, tz);
             scene.add(bulb);
             nLamp++;
+          } else if (nFill < 300) {
+            streetTree(tx, tz);     // phủ xanh phần còn lại (khu Ga, phố t...) — bake, ~vài draw call
+            nFill++;
           }
         }
       }
