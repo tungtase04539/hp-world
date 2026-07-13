@@ -315,6 +315,15 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-13 (ar)** [HEATMAP TOÀN BỘ 551 PANO — giám khảo 5.6-sol-xhigh, baseline sau commit 190bd65]:
+    501/551 chấm được (50 parse fail). **TB TOÀN DẢI 2.12/10, median 2** — thấp hơn hẳn lô V1 lõi
+    (3.4) vì 2/3 số pano nằm NGOÀI dải lõi đã làm: phân bố <3: 400 pano, 3-5: 98, 5-8: 3, 8+: 0.
+    Trọng số lỗi: house 2720 > landmark 1934 > sidewalk 796 > tree 755 > road 661 > rail 331.
+    8 Ô 300m TỆ NHẤT (TB 0.9-1.5) đều ở RÌA phủ sóng pano: (−300..300, ±900) = trục Tô Hiệu/
+    Trần Nguyên Hãn phía nam + Hạ Lý/Tam Bạc bắc; (−600,−300) khu Thượng Lý; (−900,600) An Dương.
+    KẾT LUẬN LỘ TRÌNH: muốn TB ≥8 phải phủ nội dung RA NGOÀI dải lõi theo từng ô 300m (mỗi ô là
+    1 "chiến dịch Hoàng Diệu" mini: catalog per-heading + zone + dãy nhà + công trình đích danh).
+    Data: scratchpad compare_full_sol56/ (501 json) + heatmap_summary.json; ảnh gamepano_full/.
 - **2026-07-13 (aq)** [HÀNH LANG 040-056 (đợt 1) + LÔ 2: 19 CÔNG TRÌNH ĐÍCH DANH từ agent]:
     Theo PLAN corridor4056 (agent phân tích 11 pano điểm 2-3.1, lưu scratchpad): (V1) openSpace
     thêm ZONE QUẢNG TRƯỜNG NHÀ HÁT dọc road#9 (41,59)->(67,142): tây sâu 95m along -8..95, đông 45m
