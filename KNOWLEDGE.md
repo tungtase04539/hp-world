@@ -315,6 +315,12 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-13 (av)** [ĐỐI CHỨNG CHIẾN DỊCH NAM+TÂY: TB 1.18 → 3.15 (+1.97), 0 REGRESSION]:
+    36 cặp cùng giám khảo 5.6-sol-xhigh sau tích hợp (at). Tăng mạnh nhất: pano_278 0.9→5.2,
+    279 1.5→5.5, 281 1.2→5.0 (cả khu TÂY Hai Bà Trưng lên 4.4-5.5); NAM: 185 0.6→4.2, 172 0.9→4.2.
+    KẾT LUẬN: công thức "chiến dịch ô" (agent phân tích ảnh thật per-heading → hành lang dãy liền kề
+    + công trình đích danh nháp sẵn → tích hợp + FEATURED_CLEAR + guard) cho +2..+4 điểm/ô một vòng,
+    không regression. Nhân bản cho các ô còn lại (0,±900), (300,900), (-600,-900)... như task ghi.
 - **2026-07-13 (au)** [MẶT TRẬN BẮC — Hạ Lý/Thượng Lý/nút cầu HVT (agent nháp + smoke-run)]:
     15 block helper bc* (không đụng lm*/hb*): cổng doanh trại X46 (-617.4,-782.8 — pano tệ nhất
     dải 0.4đ), PHỐ THUYỀN Tam Bạc (7 lều bạt trên bãi ướt NoDeck<1.75 — chủ đích, phủ 7 pano),
