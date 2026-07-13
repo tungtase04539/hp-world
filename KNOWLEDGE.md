@@ -315,6 +315,20 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-13 (aq)** [HÀNH LANG 040-056 (đợt 1) + LÔ 2: 19 CÔNG TRÌNH ĐÍCH DANH từ agent]:
+    Theo PLAN corridor4056 (agent phân tích 11 pano điểm 2-3.1, lưu scratchpad): (V1) openSpace
+    thêm ZONE QUẢNG TRƯỜNG NHÀ HÁT dọc road#9 (41,59)->(67,142): tây sâu 95m along -8..95, đông 45m
+    — nguyên nhân gốc pano_055/056 (2.0/1.3): vòng r62 quanh square không phủ hành lang nên shophouse
+    lấp kín quảng trường; render sau fix: quảng trường mở thoáng thấy cột cờ + skyline. (V5) rect cấm
+    infill quanh mặt tiền Bảo tàng x 64..135 z -535..-466. (V3) Harbour View dời (784.7,-695.7)->
+    (773.9,-732) — khối cũ chắn trục nhìn pano_042 h180; biển HARBOUR VIEW gắn LÊN mặt tiền.
+    LÔ 2 công trình đích danh (agent lm_drafts nháp, đã node --check + tự tính tọa độ dời tim đường
+    + kiểm bearing theo bucket heading): 12 block ≈ 19 công trình chèn cuối khối CÔNG TRÌNH ĐẶC TRƯNG
+    (skyline Trần Phú 18T+12T+6T, HP BBQ + billboard, VPBank PNL, cụm Đông Mận/NT69/LC116, Victory-MSB,
+    HD Bank + North Hotel, tòa y tế, VietABank, BIDV, TT Văn hóa...) — mỗi khối tự FEATURED_CLEAR.push.
+    clearedZone Hoàng Diệu carve-out (636.5,-894.7) r20 cho nhà hàng bo cong. Diag 0 lỗi.
+    CÒN theo PLAN (chưa làm): nền đá xám quảng trường + bonsai kiềng gỗ (V2), công viên Trần Phú bỏ
+    "mô màu"/cây đỏ (V13/T4), vỉa hè đá xám khổ lớn Trần Phú (T6), đèn cần vươn thay đèn cầu (T5).
 - **2026-07-13 (ap)** [PROP-HUNT AGENT: 22 finding — MEDIAN BỊA TRÊN PHỐ HẸP]: agent quét 60 ảnh
     dọc phố p/s + giám khảo 5.6-sol-xhigh → 19 finding HIGH. Mẫu lớn nhất (13/22): bồn trắng +
     cây/bụi DẢI PHÂN CÁCH chắn làn trên đoạn phố thật KHÔNG có dải (MEDIANS OSM lấy nguyên tuyến
