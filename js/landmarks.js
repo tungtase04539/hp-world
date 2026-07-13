@@ -17,7 +17,7 @@ const P = {
   quanhoa: [LM.quanhoa[0] + 25, LM.quanhoa[1] + 14],
   lechan: [LM.lechan[0] + 20, LM.lechan[1] + 20],
   lake: [LM.lake[0], LM.lake[1] + 68],
-  market: [LM.market[0] + 5, LM.market[1] - 75], // phía bắc — nam là đầu hồ Tam Bạc
+  market: [LM.market[0] + 85, LM.market[1]], // phía ĐÔNG (bắc là sông Tam Bạc, nam là hồ — offset cũ +5,-75 rơi xuống sông h=-2.3)
   cathedral: [LM.cathedral[0] + LM_FACE.cathedral[0] * 42, LM.cathedral[1] + LM_FACE.cathedral[1] * 42],
   postoffice: [LM.postoffice[0] + LM_FACE.postoffice[0] * 40, LM.postoffice[1] + LM_FACE.postoffice[1] * 40],
   museum: [LM.museum[0] + LM_FACE.museum[0] * 32, LM.museum[1] + LM_FACE.museum[1] * 32],
@@ -358,6 +358,12 @@ export const LANDMARKS = [
 ];
 
 export function buildLandmarkSigns(scene, world) {
+  // Biển Đồ Sơn: tâm bãi OSM là ĐỒI cao 43m (không tiếp cận được) — neo về đất khô sát bãi
+  // cát thật do world dò ra (cùng khu ô dù + Bến Nghiêng). Minimap/quest dùng chung object nên theo luôn.
+  if (world.dosonSign) {
+    const ds = LANDMARKS.find((l) => l.id === 'doson');
+    ds.x = world.dosonSign[0]; ds.z = world.dosonSign[1];
+  }
   const signs = [];
   for (const lm of LANDMARKS) {
     const y = world.groundHeight(lm.x, lm.z);

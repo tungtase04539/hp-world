@@ -315,6 +315,47 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-13 (am)** [GAMEPLAY GÃY + CÔNG TRÌNH ĐÍCH DANH GIỮA ĐƯỜNG + NƯỚC PANO_135 — phiên máy local Windows]:
+    MÔI TRƯỜNG MỚI: repo clone về máy Windows của user; GLB trích thẳng từ nhánh assets-storage
+    (`git show origin/assets-storage:assets/x.glb > assets/x.glb` — clone đầy đủ có sẵn object, không cần mạng);
+    server `python -m http.server`; test bằng playwright-core + Chrome hệ thống
+    (`executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe'`, headless — công thức chụp §8b
+    giữ nguyên nhưng PHẢI ẩn thêm `#touchControls` (máy có màn cảm ứng) và ẩn cánh phượng bằng
+    `inst.count = 0` chứ KHÔNG phải visible=false — petals.update tự bật visible mỗi khung).
+    `tools/waterbfs.mjs` sửa import hardcode `/home/user/...` → `'../js/terrain.js'` (chạy mọi máy).
+    GAMEPLAY GÃY (3 lỗi từ `__hp.diag()` — trước phiên này diag chưa được chạy lại sau nhiều đợt sửa map):
+    (1) THUYỀN BẾN BÍNH MẮC CẠN h=2.0: sông cong + polyline thưa → mép nước thật (z≈-952) cách shoreZ
+    suy từ "điểm polyline gần nhất + w/2" (z=-798) tới ~155m. Sửa: PROBE NoDeck dọc trục bến tìm mép
+    nước thật rồi mới buildPier. BÀI HỌC: mọi thứ neo theo điểm polyline sông phải probe lại mép nước.
+    (2) MẤT TOÀN BỘ CỤM ĐỒ SƠN (ô dù + Bến Nghiêng + thuyền; ngư dân rơi về fallback hệ 1:10 (388,1896)):
+    `findShore(searchR=320)` trả null — tâm bãi OSM (way 693082800) là ĐỒI cao 43m, dải cát thật cách
+    400m về đông → searchR 320→700. Biển địa danh Đồ Sơn neo theo `world.dosonSign` (đất khô sát bãi,
+    landmarks.js mutate lm.x/z nên minimap/quest theo luôn); biển Chợ Sắt offset (+5,-75) chìm sông
+    Tam Bạc → (+85,0) phía đông.
+    (3) CÔNG TRÌNH ĐÍCH DANH V2 ĐẶT TẠI TIM ĐƯỜNG (tọa độ pano, chưa từng áp công thức dời §8b):
+    camera pano_158 CHUI VÀO TRONG tháp KS Hữu Nghị (backface culling → nhìn xuyên, tưởng thiếu tháp).
+    Dời theo HƯỚNG THẤY TRONG CATALOG audit_done: Hữu Nghị (257,-452)→(257.5,-484.9) (h000=bắc);
+    Hoàng Long (10.2,-269.4)→(-11.8,-256.6) GÓC NAM ngã ba (h270; đặt thẳng trục tây từng CHẶN NGANG
+    đường — render kiểm chứng); nhà Pháp/Hội LHPN (236.5,-265.1)→(237,-292) + W 16→28 + `rotation.y=0`
+    ép mặt vòm quay nam (faceRoad bắt nhầm phố đông gần hơn). Cột cờ pano_407 (-28,120) giữa lòng
+    đường → (-18.7,118.3) đảo bonsai phía đông.
+    GUARD MỚI `FEATURED_CLEAR`/`nearFeatured(x,z)` (world.js, trước khối công trình đặc trưng):
+    shophouse_infill + nhà tự mọc + block_infill + mái hiên/biển + NHÀ OSM FOOTPRINT đều né vùng
+    công trình đích danh — commit HOUSE 07-12 từng nuốt chửng tháp Hữu Nghị & nhà Pháp (regression
+    lộ ra khi chấm lại). THÊM CÔNG TRÌNH ĐÍCH DANH MỚI → PHẢI thêm dòng vào FEATURED_CLEAR.
+    MỚI: KS HARBOUR VIEW (pano_042 h45, [784.7,-695.7]): tân thuộc địa 5 tầng kem dài 66m dọc Trần Phú,
+    vòm trắng tầng trệt + porte-cochère; collider 3 VÒNG dọc trục dài (1 vòng lớn sẽ trùm lòng đường).
+    NƯỚC PANO_135 (tồn đọng "rủi ro cao" từ (ab)): sh sông Tam Bạc (w=55) 28→10 trong terrain.js —
+    sông trong phố có kè cứng; nước hết loang lên dải phố chợ Đổ/Lý Thường Kiệt VÀ mở dải đất ven
+    sông cho nhà mọc (trước cornersDry chặn sạch). Kiểm: waterbfs 5/5 bến ✓, chợ Sắt/đền Tam Kỳ khô ✓,
+    lòng hồ + kênh Tam Bạc vẫn nước ✓, diag 0 lỗi ✓.
+    CHẤM ĐIỂM (Claude vision so trực tiếp composite THẬT/GAME, 14 pano mẫu × 2 heading):
+    TB 4.0 → ~4.9/10. Nhảy lớn: pano_158 2.5→5, 354 3→5, 358 2→5, 135 1.75→3.5, 042 3→4.5, 407 4→5.5.
+    TỒN LỚN THEO THỨ TỰ ĂN ĐIỂM: (a) phố 'r' khu chợ Đổ (pano_135) vẫn hộp xám thưa — dãy liền kề
+    chưa phủ phố 'r'; (b) Ô TÔ + XE MÁY ĐỖ + CÂY XANH thiếu nặng khu Ga (pano_022/023 thật kín xe đỗ
+    2 bên); (c) phượng đỏ quá dày nơi thật là cây xanh (pano_019/030); (d) nhà OSM footprint = hộp
+    nhạt trống trơn (pano_009 h000) — cần shopfront tầng trệt + màu như shophouse_infill; (e) vài prop
+    lẻ còn ở tim đường (bàn trắng pano_158). Blocklist ảnh rác xác nhận lại: pano_001_h000 = YouTube.
 - **2026-07-12 (al)** [CỤM HOUSE: DÃY SHOPHOUSE LIỀN KỀ TOÀN DẢI TRUNG TÂM]: cụm ăn điểm lớn nhất
     từ pano-loop V1 (dãy phố "đứt quãng khắp nơi"). Đổi thuật toán đặt lô trong khối shophouse_infill:
     (1) đi dọc TỪNG PHÍA phố p/s, TIẾN ĐÚNG BẰNG BỀ RỘNG LÔ (w 4.2-5.6m + 8cm) thay vì bước cố định

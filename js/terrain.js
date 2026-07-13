@@ -108,6 +108,10 @@ export function lakeSD(x, z) {
   return inside ? -bd : bd;
 }
 
+// Sông Tam Bạc (w=55) đoạn trong phố có KÈ CỨNG — bờ thoải mặc định 28m làm nước loang lên
+// dải phố chợ Đổ/Lý Thường Kiệt (pano_135/200: "mặt nước lấn promenade/mặt phố") và cấm cả
+// dải đất ven sông xây nhà (cornersDry fail) → thu về 10m (taluy sát kè, kênh giữ nguyên w).
+for (const r of RIVERS) if (r.w === 55) r.sh = 10;
 const riverIdx = makeBucketIndex(RIVERS.map((r) => ({ pts: r.pts, meta: [r.w, r.sh || 28] })));
 const regionIdx = makeBucketIndex(ROADS_REGION.map((r) => ({ pts: r.pts, meta: 0 })));
 const dtRoadIdx = makeBucketIndex(ROADS_DT.map((r) => ({ pts: r.pts, meta: r.c })));

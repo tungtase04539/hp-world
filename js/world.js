@@ -595,8 +595,10 @@ export function buildWorld(scene) {
   }
 
   // ---------- CỘT CỜ LỚN giữa quảng trường (theo pano pano_407 [~-30,127]) ----------
+  // Tọa độ pano = TIM ĐƯỜNG → cột từng đứng chình ình giữa lòng đường; dời sang đảo/quảng
+  // trường bonsai phía ĐÔNG đường (chiếu lên đoạn đường gần nhất + đẩy ngang nửa lòng + 4m)
   {
-    const fx = -28, fz = 120, gy = groundHeight(fx, fz);
+    const fx = -18.7, fz = 118.3, gy = groundHeight(fx, fz);
     if (gy > LAND_H - 0.5 && !isWater(fx, fz)) {
       const PH = 13;
       const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.2, PH, 10), mat(0xd8dce0));
@@ -1402,6 +1404,26 @@ export function buildWorld(scene) {
     }
   }
 
+  // CÔNG TRÌNH ĐÍCH DANH + vùng quang đãng quanh — MỌI khối nhà infill (shophouse liền kề,
+  // nhà tự mọc, block_infill) phải né, không thì mọc đè/che mặt tiền (bài học pano_158/354/358:
+  // dãy shophouse liền kề từng nuốt chửng tháp KS Hữu Nghị & nhà Pháp arcade).
+  // Tọa độ = tọa độ ĐÃ DỜI KHỎI TIM ĐƯỜNG của từng công trình (đồng bộ với khối dựng bên dưới).
+  const FEATURED_CLEAR = [
+    [257.5, -484.9, 30],   // KS Hữu Nghị
+    [-11.8, -256.6, 22],   // tòa Hoàng Long (góc nam ngã ba TQK)
+    [237, -292, 26],       // nhà Pháp arcade (Hội LHPN)
+    [784.7, -695.7, 46],   // KS Harbour View
+    [-302, 172, 32],       // TT Triển lãm & Mỹ thuật
+    [474, 6, 28],          // Sở KH&CN
+    [326, -826, 40],       // Cảng vụ (compound + sân)
+    [-798, 221, 13],       // FUNZ
+    [-247, 92, 16],        // cao ốc kính Lãn Ông
+  ];
+  const nearFeatured = (x, z) => {
+    for (const f of FEATURED_CLEAR) if ((x - f[0]) ** 2 + (z - f[1]) ** 2 < f[2] * f[2]) return true;
+    return false;
+  };
+
   // ---------- CÔNG TRÌNH ĐẶC TRƯNG dải trung tâm (procedural tỉ mỉ theo mô tả pano) ----------
   {
     // texture mặt tiền lưới cửa sổ trên nền màu tòa nhà
@@ -1425,9 +1447,11 @@ export function buildWorld(scene) {
       return ry;
     };
 
-    // (1) KHÁCH SẠN HỮU NGHỊ — tháp 12 tầng, khối ban công hộp nhô ra đặc trưng (pano_158 [257,-452])
+    // (1) KHÁCH SẠN HỮU NGHỊ — tháp 12 tầng, khối ban công hộp nhô ra đặc trưng
+    // pano_158 [257,-452] thấy tháp ở h000 (BẮC) — tọa độ pano là TIM ĐƯỜNG Điện Biên Phủ,
+    // đặt tại đó camera pano chui VÀO trong tháp → dời 33m về bắc (phía vỉa hè + sân khách sạn)
     {
-      const hx = 257, hz = -451.9, gy = groundHeight(hx, hz);
+      const hx = 257.5, hz = -484.9, gy = groundHeight(hx, hz);
       if (gy > LAND_H - 0.5 && !isWater(hx, hz)) {
         const grp = new THREE.Group(); grp.position.set(hx, gy, hz); grp.rotation.y = faceRoad(hx, hz);
         const W = 22, D = 15, FL = 12, FH = 3.2, H = FL * FH;
@@ -1445,9 +1469,12 @@ export function buildWorld(scene) {
       }
     }
 
-    // (2) TÒA HOÀNG LONG — tân cổ điển mạ vàng, hàng cột + đầu hồi + cặp sư tử (pano_354 [10,-269])
+    // (2) TÒA HOÀNG LONG — tân cổ điển mạ vàng, hàng cột + đầu hồi + cặp sư tử
+    // pano_354 [10,-269] thấy tòa ở h270 (TÂY, catalog audit) — tọa độ pano là tim đường
+    // Trần Quang Khải (chạy Đ-T) → tòa ở GÓC NAM ngã ba, lệch tây ~22m + nam khỏi lòng đường
+    // (đặt thẳng trục tây từng CHẶN NGANG đường — render kiểm chứng)
     {
-      const bx = 10.2, bz = -269.4, gy = groundHeight(bx, bz);
+      const bx = -11.8, bz = -256.6, gy = groundHeight(bx, bz);
       if (gy > LAND_H - 0.5 && !isWater(bx, bz)) {
         const grp = new THREE.Group(); grp.position.set(bx, gy, bz); grp.rotation.y = faceRoad(bx, bz);
         const W = 18, D = 13, FL = 5, FH = 3.6, H = FL * FH;
@@ -1468,21 +1495,50 @@ export function buildWorld(scene) {
       }
     }
 
-    // (3) NHÀ PHÁP 2 TẦNG HÀNH LANG CUỐN VÒM (pano_358 [237,-265]) — vàng, cửa vòm
+    // (3) NHÀ PHÁP 2 TẦNG HÀNH LANG CUỐN VÒM — Hội LH Phụ nữ HP (pano_358 thấy ở h000 BẮC,
+    // thật rộng ~45m, LÙI SAU HÀNG RÀO + SÂN). Tọa độ pano là tim đường Trần Quang Khải
+    // → dời 27m về bắc (17m từng làm mặt tiền dí sát camera — render kiểm chứng).
     {
-      const bx = 236.5, bz = -265.1, gy = groundHeight(bx, bz);
+      const bx = 237, bz = -292, gy = groundHeight(bx, bz);
       if (gy > LAND_H - 0.5 && !isWater(bx, bz)) {
-        const grp = new THREE.Group(); grp.position.set(bx, gy, bz); grp.rotation.y = faceRoad(bx, bz);
-        const W = 16, D = 11, H = 8.4;
-        const body = new THREE.Mesh(new THREE.BoxGeometry(W, H, D), facadeTex('#e4c96f', '#7a5a20', 5, 2)); body.position.set(0, H / 2, 0); grp.add(body);
+        // mặt vòm quay NAM (+z) ra Trần Quang Khải — faceRoad từng bắt nhầm phố phía đông gần hơn
+        const grp = new THREE.Group(); grp.position.set(bx, gy, bz); grp.rotation.y = 0;
+        const W = 28, D = 11, H = 8.4;
+        const body = new THREE.Mesh(new THREE.BoxGeometry(W, H, D), facadeTex('#e4c96f', '#7a5a20', 7, 2)); body.position.set(0, H / 2, 0); grp.add(body);
         // hành lang cuốn vòm tầng trệt: các cột + vòm bán nguyệt
         const archG = [];
-        for (let c = -2; c <= 2; c++) { const pil = new THREE.BoxGeometry(0.7, 4.2, 0.7); pil.translate(c * 3.4, 2.1, D / 2 + 0.4); archG.push(pil);
-          const arc = new THREE.TorusGeometry(1.2, 0.28, 6, 14, Math.PI); arc.rotateY(0); arc.translate(c * 3.4 + 1.7, 4.2, D / 2 + 0.4); archG.push(arc); }
+        for (let c = -2; c <= 2; c++) { const pil = new THREE.BoxGeometry(0.7, 4.2, 0.7); pil.translate(c * 5.0, 2.1, D / 2 + 0.4); archG.push(pil);
+          const arc = new THREE.TorusGeometry(1.6, 0.28, 6, 14, Math.PI); arc.rotateY(0); arc.translate(c * 5.0 + 2.5, 4.2, D / 2 + 0.4); archG.push(arc); }
         grp.add(new THREE.Mesh(mergeGeometries(archG), mat(0xefe6cf))); archG.forEach((g) => g.dispose());
         const roof = new THREE.Mesh(new THREE.BoxGeometry(W + 1.4, 0.8, D + 1.4), mat(0x7a3b2a)); roof.position.set(0, H + 0.4, 0); grp.add(roof);
         grp.traverse((o) => { if (o.isMesh) o.castShadow = true; }); grp.name = 'nha_phap_arcade'; scene.add(grp);
         addCollider(bx, bz, Math.max(W, D) / 2 + 1);
+      }
+    }
+
+    // (4) KHÁCH SẠN HARBOUR VIEW (pano_042 h40 — tân thuộc địa 5 tầng kem trắng, dài ~70m
+    // dọc Trần Phú, vòm tầng trệt + sảnh porte-cochère). Trước đây chỉ là hộp beige trống.
+    {
+      const bx = 784.7, bz = -695.7, gy = groundHeight(bx, bz);
+      if (gy > LAND_H - 0.5 && !isWater(bx, bz)) {
+        const grp = new THREE.Group(); grp.position.set(bx, gy, bz); grp.rotation.y = faceRoad(bx, bz);
+        const W = 66, D = 18, FL = 5, FH = 3.5, H = FL * FH;
+        const body = new THREE.Mesh(new THREE.BoxGeometry(W, H, D), facadeTex('#f1ead7', '#4a6a55', 12, 5)); body.position.set(0, H / 2, 0); grp.add(body);
+        // dải vòm/cột trắng tầng trệt
+        const archG = [];
+        for (let c = -6; c <= 6; c++) { const pil = new THREE.BoxGeometry(0.8, 4.0, 0.8); pil.translate(c * 4.9, 2.0, D / 2 + 0.45); archG.push(pil); }
+        const band = new THREE.BoxGeometry(W, 0.7, 1.4); band.translate(0, 4.15, D / 2 + 0.2); archG.push(band);
+        grp.add(new THREE.Mesh(mergeGeometries(archG), mat(0xfdf8ec))); archG.forEach((g) => g.dispose());
+        // sảnh porte-cochère giữa mặt tiền
+        const porch = new THREE.Mesh(new THREE.BoxGeometry(10, 0.5, 6), mat(0xf7f2e2)); porch.position.set(0, 4.1, D / 2 + 3.4); grp.add(porch);
+        for (const sx of [-4, 4]) for (const sz of [D / 2 + 1.2, D / 2 + 5.4]) {
+          const col = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.36, 3.9, 10), mat(0xfdf8ec)); col.position.set(sx, 1.95, sz); grp.add(col);
+        }
+        const roof = new THREE.Mesh(new THREE.BoxGeometry(W + 1.6, 0.9, D + 1.6), mat(0xc9bfa4)); roof.position.set(0, H + 0.45, 0); grp.add(roof);
+        grp.traverse((o) => { if (o.isMesh) o.castShadow = true; }); grp.name = 'ks_harbourview'; scene.add(grp);
+        // collider 3 vòng dọc trục dài (1 vòng lớn sẽ trùm cả lòng đường)
+        const ryHV = grp.rotation.y;
+        for (const lx of [-22, 0, 22]) { const [ccx, ccz] = localPt(bx, bz, lx, 0, ryHV); addCollider(ccx, ccz, 12); }
       }
     }
   }
@@ -1631,6 +1687,8 @@ export function buildWorld(scene) {
       cx /= poly.length; cz /= poly.length;
       // chừa chỗ cho mô hình địa danh 3D chi tiết & mặt nước
       if (lmSkip.some(([lx, lz, r]) => (cx - lx) ** 2 + (cz - lz) ** 2 < r * r)) continue;
+      // chừa chỗ cho công trình đích danh procedural (khối OSM trơn từng chồng đè lên KS Harbour View)
+      if (nearFeatured(cx, cz)) continue;
       if (riverFactor(cx, cz) > 0.01 || Math.abs(groundHeightNoDeck(cx, cz) - LAND_H) > 0.4) continue;
       const hash = Math.abs(Math.floor(cx * 13 + cz * 7));
       // Lõi trung tâm: phố thương mại thực tế 3-5 tầng liền mạch (đối chiếu pano) → nâng nhà generic
@@ -1847,6 +1905,7 @@ export function buildWorld(scene) {
             if (lakeSD(gx, gz) < 24) continue;                               // dải promenade ven hồ KHÔNG có nhà → không bạt/biển lơ lửng
             if (openSpace(gx, gz) || onOtherRoad(gx, gz)) continue;          // không mọc ở hồ/quảng trường/vườn hoa/lòng đường
             if (!houseEvidence(gx, gz) || panoDenies(gx, gz)) continue;      // phải có NHÀ thật ở đây (pano/OSM xác nhận)
+            if (nearFeatured(gx, gz)) continue;                              // không dán bạt/biển lơ lửng lên công trình đích danh
             const faceY = Math.atan2(-side * px, -side * pz);      // protrusion hướng ra đường
             if (ar() < 0.82) awnSlots.push([gx, gy + 0.18, gz, faceY, (ar() * awnCols.length) | 0]);
             if (ar() < 0.5) signSlots.push([gx, gy + 2.18, gz, faceY, (ar() * signCols.length) | 0]);
@@ -1936,6 +1995,7 @@ export function buildWorld(scene) {
             if (!houseEvidence(hx, hz)) continue;                      // BẢN ĐỒ NHÀ (pano+OSM): không bằng chứng → cấm
             if (openSpace(hx, hz) || onOtherRoad(hx, hz)) continue;   // né vườn hoa/quảng trường/ven hồ/đường cắt
             if (panoDenies(hx, hz)) continue;                          // pano thật không thấy nhà ở hướng này
+            if (nearFeatured(hx, hz)) continue;                        // không đè/che công trình đích danh
             if (!cornersDry(hx, hz, Math.sin(rotY), Math.cos(rotY), 4.0, px, pz, 3.8)) continue; // 4 góc là đất
             let ok = true;
             for (const [lx, lz] of lmPts) {
@@ -1998,6 +2058,7 @@ export function buildWorld(scene) {
       if (!houseEvidence(gx, gz)) return false;                    // BẢN ĐỒ NHÀ (pano+OSM): không bằng chứng → cấm
       if (openSpace(gx, gz) || onOtherRoad(gx, gz)) return false;  // né vườn hoa/quảng trường/ven hồ/đường cắt
       if (panoDenies(gx, gz)) return false;                        // pano thật không thấy nhà ở hướng này
+      if (nearFeatured(gx, gz)) return false;                      // không đè/che công trình đích danh
       if (!cornersDry(gx, gz, dxn, dzn, w / 2, nx, nz, dp / 2)) return false; // 4 góc phải là đất
       for (const [lx, lz] of lmPtsS) if ((gx - lx) ** 2 + (gz - lz) ** 2 < 34 * 34) return false;
       for (const [ox, oz] of placedS) if ((gx - ox) ** 2 + (gz - oz) ** 2 < 4.1 * 4.1) return false;
@@ -2152,6 +2213,7 @@ export function buildWorld(scene) {
         if (_gridNear(_bldGrid, x, z, 13)) continue;                  // né nhà OSM thật
         if (!(_gridNear(_bldGrid, x, z, 60) || _gridNear(_phGrid, x, z, 40))) continue; // Ô PHẢI CÓ BẰNG CHỨNG nhà
         if (openSpace(x, z) || panoDenies(x, z)) continue;
+        if (nearFeatured(x, z)) continue;                             // không đè/che công trình đích danh
         let lmHit = false; for (const [lx, lz] of lmPtsB) { if ((x - lx) ** 2 + (z - lz) ** 2 < 30 * 30) { lmHit = true; break; } }
         if (lmHit) continue;
         if (!cornersDry(x, z, 1, 0, 3.4, 0, 1, 3.4)) continue;
@@ -2901,14 +2963,22 @@ export function buildWorld(scene) {
 
   // Bến Bính (bờ nam sông Cấm, trung tâm)
   const bbBank = nearestRiverPoint(-30) || [-12, -166, 62];
-  const bbShoreZ = bbBank[1] + bbBank[2] / 2 + 6;
+  let bbShoreZ = bbBank[1] + bbBank[2] / 2 + 6;
+  // Polyline sông thưa + sông cong → mép nước thật có thể cách điểm polyline hàng trăm mét
+  // (từng làm thuyền Bến Bính mắc cạn h=2.0 ở z=-883 trong khi nước bắt đầu ~z=-952).
+  // Dò mép nước THẬT dọc trục bến rồi neo chân bến ngay trên bờ.
+  for (let tz = bbShoreZ; tz > bbShoreZ - 400; tz -= 4) {
+    if (groundHeightNoDeck(-24, tz) < 0.25) { bbShoreZ = tz + 8; break; }
+  }
   const benBinh = buildPier(-24, bbShoreZ, 0, -1);
   world.npcSpots.captain = [-32, bbShoreZ + 14];
   world.vehicleSpawns.push({ type: 'boat', x: benBinh.boatSpot[0], z: benBinh.boatSpot[1], heading: 0 });
 
   // ---------- ĐỒ SƠN: bãi tắm + Bến Nghiêng + biệt thự Bảo Đại ----------
   {
-    const shore = findShore(LM.doson[0], LM.doson[1], 320);
+    // searchR 320→700: tâm bãi OSM (way 693082800) nằm TRÊN ĐỒI (h≈43) — dải cát thật cách
+    // ~400m về phía đông; 320 từng trả null → MẤT toàn bộ ô dù + Bến Nghiêng + thuyền Đồ Sơn
+    const shore = findShore(LM.doson[0], LM.doson[1], 700);
     const umbColors = [0xe8524a, 0x2e86c1, 0xe8a020, 0x28a05c];
     let placedBeach = [];
     if (shore) {
@@ -2931,6 +3001,13 @@ export function buildWorld(scene) {
       world.vehicleSpawns.push({ type: 'boat', x: pier.boatSpot[0], z: pier.boatSpot[1], heading: pier.rotY });
       world.npcSpots.fisherman = [pbx - shore.seaDir[0] * 8, pbz - shore.seaDir[1] * 8];
       world.dosonBeach = shore.pierBase;
+      // Vị trí biển địa danh Đồ Sơn: lùi từ bãi vào ĐẤT KHÔ gần nhất (tâm bãi OSM là đồi 43m
+      // → biển từng "KHÔNG TIẾP CẬN ĐƯỢC"); landmarks.js sẽ neo biển + chấm minimap vào đây
+      let dsx = pbx, dsz = pbz;
+      for (let k = 0; k < 40 && groundHeightNoDeck(dsx, dsz) < 1.4; k++) {
+        dsx -= shore.seaDir[0] * 6; dsz -= shore.seaDir[1] * 6;
+      }
+      world.dosonSign = [Math.round(dsx), Math.round(dsz)];
     }
     // biệt thự Bảo Đại — node OSM thật trên đồi Vụng
     const villaXZ = EXTRAS.baodai;

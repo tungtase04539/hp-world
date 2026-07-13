@@ -1,5 +1,5 @@
 // Flood toàn bộ vùng nước từ Bến Bính, kiểm tra tới được các bến không
-import { groundHeightNoDeck, WORLD_BOUNDS as W } from '/home/user/hp-world/js/terrain.js';
+import { groundHeightNoDeck, WORLD_BOUNDS as W } from '../js/terrain.js';
 const STEP = 40;
 const GW = Math.ceil((W.maxX - W.minX) / STEP), GH = Math.ceil((W.maxZ - W.minZ) / STEP);
 const wet = new Uint8Array(GW * GH);
