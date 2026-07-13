@@ -315,6 +315,14 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-14 (ba)** [ĐỢT 3 MẶT TRẬN ĐÔNG-LÕI — chuẩn quy trình agent tốt nhất tới nay]:
+    15 block dl* (Legend + biệt thự rào đen pano_359 0.6đ; chợ Nguyễn Khuyến + ô dù; 4 compound
+    tây Lê Đại Hành; SVĐ Lạch Tray + trường) — agent TỰ smoke-run trên three vendor + terrain
+    thật (306 mesh, 90 collider, 43/43 bearing đúng bucket, 0 lấn lòng đường), TỰ bắt & sửa
+    6 lỗi hướng mặt tiền và 2 vị trí lấn đường TRƯỚC khi nộp. Phân loại kiểu ô đất 22 đoạn:
+    Hồ Xuân Hương THUẦN biệt thự Pháp → CẤM corridor (tránh regression Thất Khê). +3 corridor
+    (chợ NK, LĐH, Lạch Tray SE) + 3 điểm MEDIAN_SKIP ĐBP giữa (pano_155-160 mặt đường liền).
+    Render kiểm pano_467: phố chợ + ô dù khớp thật. Diag 0 lỗi.
 - **2026-07-14 (az)** [ĐỐI CHỨNG ĐỢT 2: 1.78 → 3.12 (+1.35, 63 cặp) — CẢ 3 MẶT TRẬN DƯƠNG]:
     TTBAC +1.31 (28 cặp), DONG +1.47 (20), TAYBAC +1.25 (15). Đỉnh: pano_478 1.1→4.7,
     253 1.5→4.8, 362 3.1→6.0 (điểm cao nhất toàn dải tới nay). Regression duy nhất pano_094
