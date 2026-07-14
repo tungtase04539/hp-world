@@ -315,6 +315,15 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-14 (bi)** [ĐỢT 4 CỘT-600 — siêu khối Hải quân + Chu Văn An + 28 công trình]:
+    2 agent (đều smoke-run PASS 0 collider lấn lòng): BẮC 13 block cb* (tường rào MỎ NEO + hoa
+    sen quanh SIÊU KHỐI Hải quân/Cảng giữa LTT-ĐBP-THĐ — regression hệ thống nuốt pano tệ nhất
+    545=0.5/454=0.9; Nhà khách Hải Quân, Công sở Hàng hải, nội thất vườn hoa giàn vòm trắng/đài
+    phun nan/cau vua); NAM 15 block cn* (corridor Chu Văn An hand-fill vì đường OSM lệch 10m tây,
+    SHP Plaza, tháp VNPT, cây đa 5-pano, Bossam/KFC). Z-CB1 polygon siêu khối khai báo `inSuperblock`
+    SỚM (trước vòng OSM) để dùng CẢ vòng OSM lẫn openSpace không TDZ (áp bài học bh ngay). +1 corridor
+    LTT nam. Render pano_545: có tường + phố thay shophouse lấp. Diag 0 lỗi, errcheck sạch.
+    TỒN: đường Chu Văn An lệch 10m tây (nên nắn V0 như Tam Bạc vòng sau).
 - **2026-07-14 (bh)** [VÒNG TINH bước 1 — nút giao HVT + guard openSpace OSM + 3 corridor; LẶP LỖI TDZ]:
     Agent TINH chẩn đoán 26 pano đã phủ: 13/26 THỰC RA là 1 landmark cầu HVT (camera trên cầu vượt,
     game render phố mặt đất + shophouse). Bước 1 (an toàn): openSpace += nút giao HVT
