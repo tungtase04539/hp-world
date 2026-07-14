@@ -519,7 +519,9 @@ window.__hp = {
   // Chụp "VỆ TINH": camera TRỰC GIAO nhìn thẳng xuống tâm (cx,cz), phủ ±half mét,
   // Bắc (−z) hướng LÊN, Đông (+x) sang PHẢI — đúng chiều bản đồ. Để so cấu trúc đường/vị trí nhà.
   aerial(cx, cz, half = 400, alt = 1200) {
-    const c = new THREE.OrthographicCamera(-half, half, half, -half, 1, alt + 500);
+    const el = renderer.domElement;
+    const asp = (el.width / el.height) || 1;   // khớp tỉ lệ viewport (half = NỬA chiều DỌC)
+    const c = new THREE.OrthographicCamera(-half * asp, half * asp, half, -half, 1, alt + 500);
     c.position.set(cx, alt, cz);
     c.up.set(0, 0, -1);
     c.lookAt(cx, 0, cz);

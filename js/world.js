@@ -16944,7 +16944,7 @@ function cuBuildCurbs(deps) {
     const geos = []; const lmPtsB = Object.values(LM);
     let bs = 424241; const brnd = () => { bs = (bs * 1103515245 + 12345) & 0x7fffffff; return bs / 0x7fffffff; };
     let nB = 0;
-    const CAPB = 9500;   // vệ tinh GE: lòng ô kín mái ~100% → lưới dày, nhà gần chạm nhau
+    const CAPB = 15000;   // vệ tinh GE: lòng ô kín mái ~100% → lưới dày, nhà gần chạm nhau (tăng 9500→15000: thực tế kín đặc hơn)
     // (PANO-LOOP V1: 5600 cạn quanh gx≈0 → cả dải đông tới Ga trống; 9500 đủ quét hết lưới, vẫn 1 mesh gộp)
     // KHU PHÂN LÔ LIỀN KỀ MỚI cạnh THPT Lê Hồng Phong (GE ảnh 4: dãy nhà trắng đều) — georef từ ảnh
     {
@@ -16968,8 +16968,8 @@ function cuBuildCurbs(deps) {
         }
       }
     }
-    for (let gx = -1100; gx <= 900 && nB < CAPB; gx += 10.5) {
-      for (let gz = -900; gz <= 560 && nB < CAPB; gz += 10.5) {
+    for (let gx = -1100; gx <= 900 && nB < CAPB; gx += 8.5) {
+      for (let gz = -900; gz <= 560 && nB < CAPB; gz += 8.5) {
         const x = gx + (brnd() - 0.5) * 4, z = gz + (brnd() - 0.5) * 4;
         if (Math.abs(groundHeightNoDeck(x, z) - LAND_H) > 0.3) continue;
         if (riverFactor(x, z) > 0.01) continue;
@@ -16977,8 +16977,8 @@ function cuBuildCurbs(deps) {
         if (big < 17.5 || alley < 16 || rail < 15) continue;         // trong LÒNG ô, không đè dải nhà mặt phố/ngõ/ray
         if (big > 130 && alley > 130) continue;                       // quá xa mọi đường = ngoại vi trống
         if (nearPanoCam(x, z, 5)) continue;                           // KEEP-CLEAR camera pano
-        if (_gridNear(_bldGrid, x, z, 13)) continue;                  // né nhà OSM thật
-        if (!(_gridNear(_bldGrid, x, z, 60) || _gridNear(_phGrid, x, z, 40))) continue; // Ô PHẢI CÓ BẰNG CHỨNG nhà
+        if (_gridNear(_bldGrid, x, z, 10.5)) continue;                // né nhà OSM thật (13→10.5: nhà infill sát cụm OSM hơn)
+        if (!(_gridNear(_bldGrid, x, z, 95) || _gridNear(_phGrid, x, z, 60))) continue; // Ô PHẢI CÓ BẰNG CHỨNG nhà (nới 60→95: lấp kín giữa cụm OSM như thực tế)
         if (openSpace(x, z) || panoDenies(x, z)) continue;
         if (nearFeatured(x, z)) continue;                             // không đè/che công trình đích danh
         if (clearedZone(x, z)) continue;                              // bãi giải tỏa Hoàng Diệu

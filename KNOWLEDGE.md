@@ -315,6 +315,16 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-15 (ca)** [ĐỐI CHIẾU 8 ẢNH VỆ TINH THẬT — tăng mật độ nhà dân]: user cấp 8 ảnh Google Earth
+    top-down (1100d,35y,0t) 3 hàng lat 20.85524/20.85976/20.86383. Chụp game aerial khớp khung (viewport
+    1600×775, aerial half=385 → ~1590×770m; sửa aerial() dùng aspect canvas). ĐỐI CHIẾU: đường/sông
+    (Tam Bạc, Cấm)/vị trí landmark (Nhà thờ, ga, An Biên, Nguyễn Bình Khiêm) ĐÚNG (OSM by-construction).
+    LỖI #1: MẬT ĐỘ NHÀ DÂN QUÁ THƯA — thực tế kín tường-sát-tường, game nhiều mảng trống. FIX block_infill:
+    CAPB 9500→15000, bước lưới 10.5→8.5, bằng chứng-nhà 60→95m, buffer OSM 13→10.5 → aerial giờ kín gần
+    như thật, guard nước/công viên vẫn giữ (0 lấp sai). Perf 2710→3063 draw call (+0.1M tris). CÒN: khu
+    Bắc/cảng (z<-900, ngoài range block_infill) + ô thiếu OSM data vẫn trống; cloverleaf cầu Lạc Long
+    chưa dựng. CÔNG CỤ: tools/pano_loop/aerial.mjs (overview + N tile). Quy đổi: lon=106.68182+x/104030,
+    lat=20.85750−z/110574.
 - **2026-07-15 (bz)** [CHỤP VỆ TINH TRONG GAME — QA cấu trúc đường/vị trí]: user chốt ưu tiên ĐÚNG
     CẤU TRÚC (đường xá, vị trí công trình/nhà dân/công trình công cộng) + muốn ảnh vệ tinh top-down để
     so. Thêm `window.__hp.aerial(cx,cz,half,alt)`: OrthographicCamera nhìn thẳng xuống, Bắc(−z) lên,
