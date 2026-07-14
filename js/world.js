@@ -1850,7 +1850,7 @@ export function buildWorld(scene) {
     { const wl = (z) => { for (const sx of [0.82, -0.82]) { const g = new THREE.CylinderGeometry(0.32, 0.32, 0.2, 10); g.rotateZ(Math.PI/2); g.translate(sx, 0.32, z); wheelG.push(g); } }; wl(1.35); wl(-1.35); }
     const carGeo = mergeGeometries(carG), wheelGeo = mergeGeometries(wheelG);
     carG.forEach((g) => g.dispose()); wheelG.forEach((g) => g.dispose());
-    const carCols = [0x1c1c20, 0xe4e2dc, 0xb0b3b6, 0x9c2f28, 0x64686e, 0x24354f, 0x3a3f45].map((c) => new THREE.Color(c));
+    const carCols = [0xe6e7ea, 0xf0f0f2, 0xc2c6cc, 0x9aa0a6, 0xb5443a, 0x4a6ea0, 0x3a3f45].map((c) => new THREE.Color(c));   // tông sáng thực tế (đa số trắng/bạc — bài học bx: xe đỗ từng đen thui)
     const slots = [];
     let cs = 20260707; const cr = () => { cs = (cs * 1103515245 + 12345) & 0x7fffffff; return cs / 0x7fffffff; };
     // PANO-LOOP: khu Ga (pano_022/023) thật KÍN ô tô đỗ 2 bên phố s/t nhưng game chỉ rải phố 'p'
@@ -15887,7 +15887,7 @@ function buildDensity(ctx) {
     { const wl = (z) => { for (const sx of [0.8, -0.8]) { const g = new THREE.CylinderGeometry(0.32, 0.32, 0.2, 10); g.rotateZ(Math.PI / 2); g.translate(sx, 0.32, z); wheelG.push(g); } }; wl(1.32); wl(-1.32); }
     const carGeo = mergeGeometries(carG), wheelGeo = mergeGeometries(wheelG);
     disposeAll(carG); disposeAll(wheelG);
-    const cols = [0x1c1c20, 0xe4e2dc, 0xb0b3b6, 0x9c2f28, 0x64686e, 0x24354f, 0x3a3f45].map((c) => new THREE.Color(c));
+    const cols = [0xe6e7ea, 0xf0f0f2, 0xc2c6cc, 0x9aa0a6, 0xb5443a, 0x4a6ea0, 0x3a3f45].map((c) => new THREE.Color(c));   // tông sáng thực tế (đa số trắng/bạc — bài học bx: xe đỗ từng đen thui)
 
     const slots = [];
     forEachSidewalkSlot(CFG.CAR, (x, y, z, rotY, side, rnd) => {
