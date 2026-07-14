@@ -315,6 +315,13 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-14 (br)** [VÒNG TINH 6-AGENT (lô 1/2): T5+T4+T2 = 28 block]:
+    T5 LÕI-TRUNG 7 block v5* (TT Y tế Hồng Bàng, công sở Pháp arcade, PVcomBank, lô phá dỡ cột
+    Corinthian); T4 ĐÔNG-GIỮA 9 block v4* (toà Pháp cổ mansard 44m, Le Jardin, chợ N.Khuyến +
+    dọn 6 camera-blocker); T2 ĐÔNG-BẮC 12 block v2* (v2-1 dọn nút ĐBP×THĐ "tường xám che camera"
+    pano_195 0.9 + vườn hoa, cổng Hải Thành hải quân, VIB/GAC). Cả 3 agent smoke-run PASS 0 lấn
+    lòng đường, tự tránh ~260 công trình đã có (đọc FEATURED_CLEAR trước). Render pano_195 nút giao
+    mở thoáng + tháp Pullman, pano_432 TT Y tế. Diag 0 lỗi, errcheck sạch. Còn T1/T3/T6.
 - **2026-07-14 (bq)** [HEATMAP LẦN 3 (sau đợt 4): TB 2.97 — tiến trình 2.12→2.84→2.97]:
     502 pano. Phân bố <3: 400→263→251; 3-5: 98→214→232; 5-8: 3→15→19. So cặp lần2→3: 2.84→2.91.
     CHƯA gồm đợt 5 (+0.41/84 pano) + vòng tinh 6 agent (v1-v6, 134 pano <3.0 đang chạy) → thực tế
