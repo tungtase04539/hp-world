@@ -3,6 +3,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { buildWorld, groundHeight, groundHeightNoDeck, landAt, WORLD_BOUNDS, LM, EXTRAS } from './world.js';
 import { createTraffic } from './traffic.js';
@@ -29,7 +30,7 @@ const renderer = new THREE.WebGLRenderer({ canvas, antialias: !isTouchDevice });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, isTouchDevice ? 1.2 : 2)); // mobile hạ 1.2 chống crash
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.26;
+renderer.toneMappingExposure = 1.18;
 // bóng đổ thời gian thực (tắt trên di động để giữ mượt)
 renderer.shadowMap.enabled = !isTouchDevice;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -49,13 +50,22 @@ const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerH
 const usePost = !isTouchDevice;
 let composer = null, bloomPass = null;
 const cine = initCinematic({ renderer, camera });   // chế độ đạo diễn (trailer/cutscene) — off mặc định
+// GRADE: giảm bão hòa + ấm nhẹ (bớt "trời xanh gắt/washed HDR" — dấu hiệu game rõ nhất). ChatGPT + cell_render.
+const GradeShader = {
+  uniforms: { tDiffuse: { value: null }, saturation: { value: 0.88 }, tint: { value: new THREE.Color(1.0, 0.985, 0.945) } },
+  vertexShader: 'varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
+  fragmentShader: 'uniform sampler2D tDiffuse; uniform float saturation; uniform vec3 tint; varying vec2 vUv;' +
+    'void main(){ vec4 c=texture2D(tDiffuse,vUv); float l=dot(c.rgb,vec3(0.2126,0.7152,0.0722)); c.rgb=mix(vec3(l),c.rgb,saturation); c.rgb*=tint; gl_FragColor=c; }',
+};
 if (usePost) {
   composer = new EffectComposer(renderer);
   composer.addPass(new RenderPass(scene, camera));
   bloomPass = new UnrealBloomPass(
-    new THREE.Vector2(window.innerWidth, window.innerHeight), 0.3, 0.55, 0.82);
+    new THREE.Vector2(window.innerWidth, window.innerHeight), 0.15, 0.5, 0.9);  // threshold 0.82->0.9: chỉ đèn/emissive bloom
   composer.addPass(bloomPass);
   composer.addPass(new OutputPass());
+  composer.addPass(new ShaderPass(GradeShader));                 // grade pass cuối
+  composer.renderTarget1.samples = 4; composer.renderTarget2.samples = 4;   // MSAA 4x (EffectComposer bỏ antialias khi post)
 }
 
 window.addEventListener('resize', () => {
@@ -391,7 +401,7 @@ function animate() {
     else if (cine.active) cine.update(dt); else updateCamera(dt);   // đạo diễn lo camera khi bật
     const sky = dayNight.update(dt, pState.pos);
     // đêm bloom mạnh hơn cho đèn phố & cửa sổ rực rỡ
-    if (bloomPass) bloomPass.strength = 0.1 + sky.night * 0.6;
+    if (bloomPass) bloomPass.strength = 0.025 + sky.night * 0.55;   // ban ngày gần tắt bloom
 
     // cánh phượng quanh dải trung tâm (tâm ~ giữa hồ Tam Bạc và Nhà hát lớn)
     const dCity = Math.hypot(

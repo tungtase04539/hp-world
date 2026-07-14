@@ -315,6 +315,14 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-15 (ce)** [MỤC TIÊU 8 + NÂNG CẤP RENDER (user gỡ ràng buộc low-poly)]: hội ý ChatGPT — PANO→8
+    ROI: #1 bố cục/setback, #2 hình học/silhouette (mái/awning/ban công), #3 vật liệu/ánh sáng. Lỗi hiển thị
+    (nhà/vỉa hè tràn đường, sai hướng/setback) phát hiện bằng topology 2D (footprint∩lòng-đường, facade-edge
+    scoring). NÂNG RENDER (main.js, an toàn, khử "washed HDR glow" = dấu-hiệu-game #1): bloom threshold
+    0.82→0.9 + strength ban ngày 0.1→0.025; exposure 1.26→1.18; +GRADE ShaderPass (saturation 0.88 + tint
+    ấm bớt trời-xanh-gắt); MSAA 4x trên composer.renderTarget1/2 (EffectComposer BỎ antialias khi post bật —
+    fix rẻ nhất). BÀI HỌC: lib/jsm CHỈ có RenderPass/Bloom/Output/ShaderPass — KHÔNG có SSAOPass/SMAAPass
+    (phải vendor tay từ three examples; SSAO perf thấp vì +3000 draw call → BỎ). 192 MeshLambert/0 Standard.
 - **2026-07-15 (cd)** [MỤC TIÊU 7 — TRẠNG THÁI CUỐI 3 VÒNG, đo TRUNG BÌNH]: chấm sat 3 lần (6.30/5.62/
     5.97) → VỆ TINH **TB 5.96/7** (từ 5.64; +0.32 thật, verify mắt: arc liền/cloverleaf double-loop/cảng
     kho/mật-độ khớp/nước bớt cyan). PANO **4.13/7** (chững — ~70 block nhà đúng thêm nhưng điểm không nhích).
