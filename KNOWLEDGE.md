@@ -315,6 +315,14 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-14 (bj)** [ĐỐI CHỨNG ĐỢT 4: 2.16→2.54 (+0.39) + sửa regression che camera]:
+    84 cặp: CỘT-600 BẮC +0.79 (siêu khối trị regression: pano_454 0.9→4.3, 223 2.4→5.8, 224 3.1→6.2),
+    NAM +0.27, TINH -0.04 (đứng yên — nhóm cầu HVT chưa dựng vòm, bước 2). REGRESSION: SHP Plaza
+    (545,707)+VNPT (519,686) che khung camera pano_057/058 (-1.9) — nhưng CHÍNH chúng cho 223/224
+    +3.4 → KHÔNG vô hiệu, DỜI +11m ra xa camera theo vector; render 058 thấy cao ốc + phố thông.
+    BÀI HỌC: landmark cao tầng đặt gần pano phải kiểm setback KHÔNG che chính camera pano ngay
+    trước nó (khác với che pano XA — cái đó đúng). TỒN: nhóm cầu HVT (pano_284/285/330...) cần
+    dựng vòm thép đỏ + mở deck/ramp = việc lớn nhất còn lại; cụm G2 nhà quá cao (351/157).
 - **2026-07-14 (bi)** [ĐỢT 4 CỘT-600 — siêu khối Hải quân + Chu Văn An + 28 công trình]:
     2 agent (đều smoke-run PASS 0 collider lấn lòng): BẮC 13 block cb* (tường rào MỎ NEO + hoa
     sen quanh SIÊU KHỐI Hải quân/Cảng giữa LTT-ĐBP-THĐ — regression hệ thống nuốt pano tệ nhất

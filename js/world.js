@@ -10148,7 +10148,7 @@ const cnUmb = (x, z, hex) => {                             // ô dù chợ cóc 
 //     biển 'SHP PLAZA') — pano_058 h180 / pano_059 h270 sev3 (ảnh 059_h270:
 //     tháp kính lam, quảng trường sảnh cột, taxi). Bờ TÂY-BẮC Lạch Tray ===
 {
-  const bx = 545.4, bz = 707.3, ry = 1.668;               // mặt +Z quay TÂY-NAM ra Lạch Tray
+  const bx = 549.3, bz = 717.6, ry = 1.668;               // dời +11m khỏi camera pano_057/058 (regression che khung)
   if (cnOK(bx, bz)) {
     const g = cnTower(bx, bz, ry, 34, 22, 12, 3.4, new THREE.MeshLambertMaterial({ color: 0x2f5f7e }), 'cn_shpplaza');
     const pod = new THREE.Mesh(new THREE.BoxGeometry(38, 7.0, 26), sharedMats.window); pod.position.y = 3.5; g.add(pod);   // đế sảnh kính
@@ -10163,7 +10163,7 @@ const cnUmb = (x, z, hex) => {                             // ô dù chợ cóc 
 //     'NƯỚC ÉP SỐ 4 LẠCH TRAY' — pano_435 h180/h270 sev3 (ảnh 435_h180: tháp kính
 //     lớn, đế vinaphone xanh, đường ray cắt ngang). Bờ NAM Lạch Tray (né đường ray) ===
 {
-  const bx = 519.6, bz = 686.5, ry = -2.990;              // mặt +Z quay BẮC ra Lạch Tray
+  const bx = 512.5, bz = 694.9, ry = -2.990;              // dời +11m khỏi camera pano_057/058
   if (cnOK(bx, bz)) {
     const g = cnTower(bx, bz, ry, 26, 24, 24, 3.2, cnFacade('#c9d0d6', '#54718a', 8, 20), 'cn_vnpt_tower');
     const pod = new THREE.Mesh(new THREE.BoxGeometry(30, 6.4, 27), sharedMats.window); pod.position.y = 3.2; g.add(pod);
