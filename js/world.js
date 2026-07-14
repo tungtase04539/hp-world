@@ -18785,6 +18785,16 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
         }
       }
     }
+    // MÁI CHÓP đỏ cho block_infill (cell_massing): 0 draw call (gộp vertexColor). Đòn bẩy vệ tinh.
+    const _pyrRoof = (w, d, rh, rgb, eave = 0.5) => {
+      const g = new THREE.CylinderGeometry(0.02, 1, rh, 4);
+      g.rotateY(Math.PI / 4);
+      g.scale(Math.SQRT2 * (w / 2 + eave), 1, Math.SQRT2 * (d / 2 + eave));
+      g.translate(0, rh / 2, 0); g.computeVertexNormals();
+      const n = g.attributes.position.count, c = new Float32Array(n * 3), nr = g.attributes.normal;
+      for (let i = 0; i < n; i++) { const sh = 0.78 + 0.22 * Math.max(0, nr.getY(i) * 0.5 + 0.5); c[i*3]=rgb[0]*sh; c[i*3+1]=rgb[1]*sh; c[i*3+2]=rgb[2]*sh; }
+      g.setAttribute('color', new THREE.BufferAttribute(c, 3)); return g;
+    };
     for (let gx = -1100; gx <= 900 && nB < CAPB; gx += 8.5) {
       for (let gz = -900; gz <= 560 && nB < CAPB; gz += 8.5) {
         const x = gx + (brnd() - 0.5) * 4, z = gz + (brnd() - 0.5) * 4;
@@ -18810,9 +18820,14 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
         { const nrm = box.attributes.normal, cn = box.attributes.position.count, c = new Float32Array(cn * 3);
           for (let v = 0; v < cn; v++) { const isR = nrm.getY(v) > 0.6; const t = isR ? rc : wc; const sh = isR ? 0.96 : 0.8 + 0.2 * Math.abs(nrm.getX(v)); c[v * 3] = t[0] * sh; c[v * 3 + 1] = t[1] * sh; c[v * 3 + 2] = t[2] * sh; }
           box.setAttribute('color', new THREE.BufferAttribute(c, 3)); }
-        box.rotateY((brnd() * 4 | 0) * Math.PI / 2 + (brnd() - 0.5) * 0.2);
-        box.translate(x, gy + h / 2, z);
-        geos.push(box); addCollider(x, z, Math.max(w, d) * 0.52); nB++;
+        const _ang = (brnd() * 4 | 0) * Math.PI / 2 + (brnd() - 0.5) * 0.2;
+        box.rotateY(_ang); box.translate(x, gy + h / 2, z);
+        geos.push(box);
+        if ((Math.abs(x * 11 + z * 17) | 0) % 100 < 72) {
+          const _rr = _pyrRoof(w, d, 1.8 + (Math.abs(x * 3 + z) % 3) * 0.5, rc, 0.35);
+          _rr.rotateY(_ang); _rr.translate(x, gy + h, z); geos.push(_rr);
+        }
+        addCollider(x, z, Math.max(w, d) * 0.52); nB++;
       }
     }
     if (geos.length) {
