@@ -315,6 +315,14 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-14 (bp)** [PERF: CACHE MATERIAL — 6299→2645 (-58%), 0 rủi ro]:
+    Sau 5 đợt: mesh 9668, material 6299, draw call 2393, tris 6-7M. mat() giờ CACHE khi opts RỖNG
+    (tường đặc trùng màu = phần lớn ~250 công trình). AN TOÀN TUYỆT ĐỐI: mọi chỗ mutate material
+    runtime (daynight lampGlow/window/facadeMats/lighthouseLamp) dùng sharedMats/facadeMats CÓ OPTS
+    → không cache; đèn tín hiệu MeshBasicMaterial RIÊNG. Material cache chỉ-đọc, 2 mesh share vô hại.
+    Materials 6299→2645. Draw call KHÔNG đổi (cache material không giảm call — cần merge geometry,
+    rủi ro hơn, HOÃN). Hình ảnh không đổi (chỉ share khi cùng màu cùng loại). errcheck + diag sạch.
+    CÒN: merge geometry landmark để hạ draw call 2393 (task sweep) — rủi ro cao hơn, làm khi cần.
 - **2026-07-14 (bo)** [ĐỐI CHỨNG ĐỢT 5: 2.46→2.87 (+0.41, 81 cặp)]:
     LOINAM +0.63 (pano_243 2→5.5, 245 1.1→3.6, 276 1.6→4), TAYXA +0.44, DONGGIUA +0.04 (ĐBP đông
     đã đông, khó tăng). 8 ca giảm ≤0.8 (327/424/150/306...) — KHÔNG hệ thống: mỗi pano cần landmark

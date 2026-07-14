@@ -29,7 +29,17 @@ function rectFactor(x, x1, x2, z, z1, z2, m) {
   return smoothstep(x1 - m, x1, x) * (1 - smoothstep(x2, x2 + m, x))
        * smoothstep(z1 - m, z1, z) * (1 - smoothstep(z2, z2 + m, z));
 }
-function mat(color, opts = {}) { return new THREE.MeshLambertMaterial({ color, ...opts }); }
+// CACHE material khi opts RỖNG (tường đặc trùng màu = phần lớn ~250 công trình đích danh):
+// giảm materials 6299→~vài trăm. AN TOÀN: mọi chỗ mutate material runtime dùng sharedMats/
+// facadeMats (đều có opts → không cache) hoặc MeshBasicMaterial riêng (đèn tín hiệu). Material
+// cache chỉ đọc (color cố định), 2 mesh share vô hại (castShadow/frustumCulled không đụng material).
+const _matCache = new Map();
+function mat(color, opts = {}) {
+  for (const _ in opts) return new THREE.MeshLambertMaterial({ color, ...opts });   // có opts → không cache
+  let m = _matCache.get(color);
+  if (!m) { m = new THREE.MeshLambertMaterial({ color }); _matCache.set(color, m); }
+  return m;
+}
 
 // Góc quay quanh Y để trục dài của mô hình (local X) trùng cạnh dài thật (LM_DIR),
 // và mặt tiền (local +Z) quay về hướng LM_FACE
