@@ -315,6 +315,17 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-14 (bf)** [ĐO PERF SAU 21 COMMIT — draw call 520→2173, cần SWEEP LANDMARK sau khi phủ xong]:
+    Probe tại quảng trường lõi (đông nhất): mesh 6390, InstancedMesh 57, **material 4241** (base
+    sweep 1230), **draw call 2173** (base 520), **tris render 7.16M** (base 5.87M), memTex 315.
+    NGUYÊN NHÂN: ~150 công trình đích danh agent nháp = Group nhiều mesh KHÔNG merge + mat() tạo
+    material mới mỗi lần. ĐÁNH GIÁ: chấp nhận được trên GPU desktop thật (đánh đổi có chủ đích cho
+    độ giống thật); CHƯA tối ưu vội vì (a) cache mat() toàn cục RỦI RO — đèn tín hiệu world.js:11910
+    setHex runtime + daynight mutate lampGlow/window/facadeMats/lighthouseLamp emissiveIntensity,
+    cache trùng màu sẽ lan bug; (b) tối ưu rải rác giữa chừng dễ hỏng. KẾ HOẠCH: sau khi phủ hết
+    ô (đợt 4-5) làm 1 ĐỢT SWEEP GỘP LANDMARK — merge geometry mỗi công trình theo material
+    (mẫu như flushTrees/bake cầu ở sweep ak), cache material tường tĩnh (loại trừ list mutate).
+    MOBILE cần chú ý: material 4241 + tris 7M — kiểm autoQuality + IS_MOBILE có đủ hạ tải không.
 - **2026-07-14 (be)** [HEATMAP TOÀN DẢI LẦN 2 — 2.12 → 2.84 (+0.70), KHÔNG CÒN VÙNG CHẾT]:
     492 pano, so theo cặp 453: 2.14→2.84. Phân bố: <3 điểm 400→263; 3-5: 98→214; 5-8: 3→15.
     Ô tệ nhất giờ TB 2.0-2.3 (trước 0.9-1.5). Cụm lỗi vẫn house>landmark>tree>sidewalk.
