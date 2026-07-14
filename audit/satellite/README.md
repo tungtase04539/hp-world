@@ -26,3 +26,18 @@ Tôi chạy `tools/pano_loop/score_sat.py` (ChatGPT chấm CẤU TRÚC từng ti
 ghép cạnh nhau thật/game, gộp với điểm pano → **QA hai lớp**:
 - điểm vệ tinh thấp = sai đường/vị trí/mật độ → sửa `tools/process_osm.mjs` / generator.
 - điểm pano thấp = sai bề mặt phố → grid cấu trúc+màu nhà chính.
+
+## KẾT QUẢ CHẤM CẤU TRÚC (2026-07-15, gpt-5.6-sol-xhigh) — TB 5.64/10
+| tile | khu | điểm |
+|---|---|---|
+| 2 | An Biên/Đền Nghè | 6.7 |
+| 7 | Bạch Đằng/cầu Lạc Long | 6.6 |
+| 3 | An Biên/ga | 6.3 |
+| 6 | Nhà hát/Quang Trung | 6.3 |
+| 1 | Tam Bạc lake/Ngô Quyền | 5.6 |
+| 5 | Nhà thờ/Tam Bạc arc | 5.2 |
+| 8 | Hoàng Diệu/Cảng | 4.4 |
+| 4 | Lê Hồng Phong/Tam Bạc arc | 4.0 |
+
+**Lỗi cấu trúc phát hiện:** (t4) sông Tam Bạc arc vẽ ĐỨT KHÚC thành vũng rời (cần liền mạch);
+(t8) khu Bắc/cảng thưa + thiếu nhà kho cảng. So sánh: pano(bề mặt) 4.14/6, vệ tinh(cấu trúc) 5.64/6.
