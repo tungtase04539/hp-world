@@ -16145,6 +16145,220 @@ function cuBuildCurbs(deps) {
   }
 
 
+  // ===== GRIND BỀ MẶT sa GIỮA-TÂY (12 block) =====
+/* =====================================================================
+   CELL_SA — MẶT TRẬN GIỮA-TÂY (lõi Hồng Bàng / Lê Chân): 12 DÃY NHÀ CHÍNH
+   đích danh cho các phố GIỮA-TÂY còn TRỐNG THẬT trong khung
+   x∈[-600,-100], z∈[-450,350]:
+     Kỳ Đồng (TT Y tế Q.Hồng Bàng) · Phan Bội Châu (ẩm thực/cà phê) ·
+     Lãn Ông (PG Bank) · Lý Thường Kiệt (shophouse san sát) ·
+     Mê Linh (thời trang) · Quang Trung (chăn ga/đồ chơi) ·
+     Nguyễn Đức Cảnh ven hồ (SIXDO/Mixue/VietABank).
+
+   MỤC TIÊU (minh hoạ, KHÔNG photoreal): nhà CHÍNH đúng KHỐI (vị trí/tầng/
+   bề rộng) + đúng MÀU + đúng LOẠI (shophouse liền kề · công sở khuôn viên ·
+   mặt kính). Nguồn màu/tầng: audit/audit_done.json; tọa độ pano tim đường:
+   tools/pano_loop/capture_list.json.
+
+   CHỌN Ô: đã grep world.js FEATURED_CLEAR + đọc block đã tích hợp
+   (CELL_TAY hb* / CELL_S1 / CELL_S2 s2* / CELL_TAYSONG ts* / CELL_LOINAM ln* /
+   CELL_BAC bc* / CELL_BACSONG bs*) + prox-scan: CHỈ giữ pano có công trình
+   đích-danh gần nhất ≥40m (12 pano: 498/433/432/434/131/132/137/497/262/003/033).
+
+   HÌNH HỌC (khớp bài học pano-loop): pano = TIM ĐƯỜNG (xe Google). Dời theo
+   PHÁP TUYẾN một khoảng `off = front + D/2`, với `front` = khoảng cách MẶT TIỀN
+   tới tim. `front` đã chọn RIÊNG mỗi dãy để mặt tiền cách CAMERA PANO THẬT ≥6.6m
+   (camera lệch tim tới ~3m ở phố hẹp → tính lean, xem cell_sa/lean.mjs), tránh
+   lỗi #1 "camera bị nhà che kín". Smoke-run: roadClr≥2.6m, camMin≥6.6m, 0 nước.
+
+   VỊ TRÍ DÁN: js/world.js — trong buildWorld, CÙNG CHỖ CELL_S2/CELL_TAYSONG
+   (sau khối "CÔNG TRÌNH ĐẶC TRƯNG" + các cell shophouse, TRƯỚC vòng OSM/
+   block_infill). Helper sa* + SA_ROWS + vòng đặt khai báo Ở CẤP buildWorld
+   (giống s2* và ts*), KHÔNG bọc {} ngoài cùng. FEATURED_CLEAR.push mỗi lô → đuổi
+   nhà OSM/infill generic khỏi mặt tiền đích-danh.
+
+   SCOPE có sẵn (KHÔNG khai báo lại): THREE, mat, makeTex, sharedMats,
+   addCollider, FEATURED_CLEAR, groundHeight, groundHeightNoDeck, isWater,
+   localPt, scene, mergeGeometries.
+   ===================================================================== */
+
+// ============ HELPER TỰ CHỨA sa* (khai báo 1 LẦN, cấp buildWorld) ============
+const _saFC = new Map();                 // cache material mặt tiền (≤ ~24 material)
+// texture nhà ống: nền tường + hàng cửa sổ mỗi tầng + cửa cuốn/kính trệt + băng biển
+const saFacade = (wallCss, bandCss, floors, bays) => {
+  const key = wallCss + '|' + bandCss + '|' + floors + '|' + bays;
+  let m = _saFC.get(key);
+  if (m) return m;
+  const FPX = 128, W = bays * 96;
+  const tex = makeTex(W, FPX * floors, (g, w, h) => {
+    g.fillStyle = wallCss; g.fillRect(0, 0, w, h);
+    const bw = w / bays;
+    for (let f = 0; f < floors; f++) {
+      const y0 = h - (f + 1) * FPX;                     // f=0 = tầng trệt (dưới cùng)
+      for (let b = 0; b < bays; b++) {
+        const x0 = b * bw;
+        if (f === 0) {                                  // trệt: cửa cuốn tối + băng biển
+          g.fillStyle = '#2a2d33'; g.fillRect(x0 + bw * 0.08, y0 + FPX * 0.30, bw * 0.84, FPX * 0.56);
+          g.fillStyle = bandCss;   g.fillRect(x0, y0 + FPX * 0.06, bw, FPX * 0.20);
+        } else {                                        // trên: khung cửa trắng + kính xanh xám
+          g.fillStyle = '#f4f1e8'; g.fillRect(x0 + bw * 0.14, y0 + FPX * 0.16, bw * 0.72, FPX * 0.62);
+          g.fillStyle = '#4a6b82'; g.fillRect(x0 + bw * 0.20, y0 + FPX * 0.22, bw * 0.60, FPX * 0.50);
+        }
+      }
+    }
+  });
+  tex.wrapS = THREE.RepeatWrapping; tex.repeat.set(bays, 1);
+  m = new THREE.MeshLambertMaterial({ map: tex });
+  _saFC.set(key, m); return m;
+};
+
+// biển hiệu chữ (MeshBasic — không ăn nắng, đọc rõ như biển thật)
+const saSign = (txt, bg, fg, size) => new THREE.MeshBasicMaterial({
+  side: THREE.DoubleSide,
+  map: makeTex(512, 128, (g, w, h) => {
+    g.fillStyle = bg || '#c01822'; g.fillRect(0, 0, w, h);
+    g.fillStyle = fg || '#ffffff'; g.font = 'bold ' + (size || 44) + 'px system-ui, sans-serif';
+    g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, w / 2, h / 2 + 4, w - 22);
+  }),
+});
+
+// DÃY NHÀ CHÍNH: cx,cz = TIM ĐƯỜNG; (nx,nz) = pháp tuyến ĐƠN VỊ (+n);
+// side=±1 chọn bờ; front = khoảng cách mặt tiền→tim; D = độ sâu nhà;
+// lots = [{w, fl, wall, band, sign, sfg, ssz, kind:'gov'|'glass'|undefined}]
+const saRow = (cx, cz, nx, nz, side, front, D, lots, name) => {
+  const off = front + D / 2;
+  const gx = cx + side * nx * off, gz = cz + side * nz * off;
+  if (isWater(gx, gz)) return null;                     // né lòng sông/hồ (nhà lơ lửng)
+  const th = Math.atan2(-side * nx, -side * nz);        // mặt tiền (local +Z) quay về tim
+  const g = new THREE.Group();
+  g.position.set(gx, groundHeight(gx, gz), gz); g.rotation.y = th;
+  const total = lots.reduce((s, l) => s + l.w, 0);
+  let run = -total / 2;
+  for (const L of lots) {
+    const lxc = run + L.w / 2, FL = L.fl || 3, H = FL * 3.3;
+    if (L.kind === 'gov') {                             // CÔNG SỞ / KHUÔN VIÊN: hộp kem + băng biển rộng + bệ
+      const body = new THREE.Mesh(new THREE.BoxGeometry(L.w, H, D), mat(L.wall || 0xe7dcc0));
+      body.position.set(lxc, H / 2, 0); g.add(body);
+      for (let f = 1; f < FL; f++) {                    // hàng cửa sổ băng ngang
+        const win = new THREE.Mesh(new THREE.BoxGeometry(L.w * 0.9, 1.2, 0.1), sharedMats.window);
+        win.position.set(lxc, f * 3.3 + 1.5, D / 2 + 0.05); g.add(win);
+      }
+      const plinth = new THREE.Mesh(new THREE.BoxGeometry(L.w + 0.6, 1.0, D + 0.6), mat(0xbdb6a4));
+      plinth.position.set(lxc, 0.5, 0); g.add(plinth);
+    } else if (L.kind === 'glass') {                    // MẶT KÍNH (cà phê / showroom / thời trang cao cấp)
+      const body = new THREE.Mesh(new THREE.BoxGeometry(L.w, H, D), mat(L.wall || 0x2a2d33));
+      body.position.set(lxc, H / 2, 0); g.add(body);
+      const gl = new THREE.Mesh(new THREE.BoxGeometry(L.w * 0.92, H - 1.0, 0.16), sharedMats.window);
+      gl.position.set(lxc, (H - 1.0) / 2 + 0.3, D / 2 + 0.05); g.add(gl);
+    } else {                                            // SHOPHOUSE nhà ống: facade texture
+      const bays = Math.max(1, Math.round(L.w / 4));
+      const body = new THREE.Mesh(new THREE.BoxGeometry(L.w, H, D),
+        saFacade(L.wall || '#ecdcb0', L.band || '#c01822', FL, bays));
+      body.position.set(lxc, H / 2, 0); g.add(body);
+      const glass = new THREE.Mesh(new THREE.BoxGeometry(L.w * 0.84, 2.3, 0.1), sharedMats.window);
+      glass.position.set(lxc, 1.35, D / 2 + 0.05); g.add(glass);
+    }
+    // mái phẳng bê tông mảnh (đồng nhất khối phố)
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(L.w + 0.3, 0.4, D + 0.3), mat(0xb8b2a2));
+    roof.position.set(lxc, H + 0.2, 0); g.add(roof);
+    if (L.sign) {                                       // băng biển hiệu tầng trệt
+      const s = new THREE.Mesh(new THREE.PlaneGeometry(Math.min(L.w * 0.94, 13), 1.15),
+        saSign(L.sign, L.band, L.sfg, L.ssz));
+      s.position.set(lxc, (L.kind === 'gov' ? 3.0 : 3.2), D / 2 + 0.08); g.add(s);
+    }
+    const [wx, wz] = localPt(gx, gz, lxc, 0, th);
+    addCollider(wx, wz, Math.max(2.5, Math.min(L.w, D) / 2));
+    FEATURED_CLEAR.push([wx, wz, Math.max(L.w, D) / 2 + 6]);   // đuổi OSM/infill khỏi mặt tiền
+    run += L.w;
+  }
+  g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  g.name = name; scene.add(g);
+  return g;
+};
+
+// ============ DỮ LIỆU 12 DÃY (front đã chọn để mặt tiền cách camera pano ≥6.6m) ============
+// (cx,cz)=tim đường (chiếu pano lên ROADS_DT); (nx,nz)=pháp tuyến +n; side ±1.
+const SA_ROWS = [
+  // --- (SA-1) KỲ ĐỒNG bờ BẮC: TT Y TẾ Q.HỒNG BÀNG (34 Kỳ Đồng) + thiết bị y tế + thời trang ---
+  //     pano_432/433/498 (Phố Kỳ Đồng ~34-49, giao Hoàng Văn Thụ). Road 'r'. Camera
+  //     lệch mạnh về bờ bắc → front 9.5m để không che camera. Công sở kem biển xanh.
+  { name: 'sa_kydong_bac', cx: -194.1, cz: -106.1, nx: 0.425, nz: -0.905, side: 1, front: 9.5, D: 10, lots: [
+    { w: 20, fl: 3, kind: 'gov', wall: 0xe7dcc0, band: '#1c56a0', sign: 'TT Y TẾ Q. HỒNG BÀNG', sfg: '#e23b2e', ssz: 34 },
+    { w: 6, fl: 3, wall: '#dbe6ea', band: '#1c56a0', sign: 'THIẾT BỊ Y TẾ' },
+    { w: 5, fl: 3, wall: '#ead9a8', band: '#8a2f2f' },
+    { w: 6, fl: 3, wall: '#f3cdd6', band: '#c0397a', sign: 'Quỳnh Thái' },
+  ] },
+  // --- (SA-2) KỲ ĐỒNG bờ NAM: Made in Vietnam VNXK + The 1993 Coffee + Gia Linh ---
+  { name: 'sa_kydong_nam', cx: -203.9, cz: -109.7, nx: 0.430, nz: -0.903, side: -1, front: 5.5, D: 9, lots: [
+    { w: 6, fl: 3, wall: '#eae3d4', band: '#c01822', sign: 'MADE IN VIETNAM' },
+    { w: 6, fl: 3, kind: 'glass', wall: 0x26282e, sign: 'The 1993', band: '#1f6f4a' },
+    { w: 5, fl: 3, wall: '#f2ede2', band: '#c01822', sign: 'Gia Linh' },
+    { w: 5, fl: 3, wall: '#ecdcb0', band: '#1c56a0' },
+  ] },
+  // --- (SA-3) KỲ ĐỒNG × LÝ THƯỜNG KIỆT (56 Kỳ Đồng): Khoa ATVSTP + nhà ống cũ + Minh Thắng ---
+  { name: 'sa_kydong_434', cx: -263.3, cz: -137.9, nx: 0.430, nz: -0.903, side: -1, front: 5.4, D: 9, lots: [
+    { w: 10, fl: 3, kind: 'gov', wall: 0xf0ead6, band: '#c01822', sign: 'TTYT · KHOA ATVSTP', ssz: 30 },
+    { w: 5, fl: 2, wall: '#d8c88f' },
+    { w: 5, fl: 2, wall: '#e8d9a8', band: '#1c56a0', sign: 'Minh Thắng' },
+  ] },
+  // --- (SA-4) PHAN BỘI CHÂU ~30-41 (bờ bắc): Cafe Trà Cúc đá đen + hàng xách tay + nhà ống vàng ---
+  { name: 'sa_pbc131', cx: -191.2, cz: 24.3, nx: 0.184, nz: 0.983, side: -1, front: 6.6, D: 9, lots: [
+    { w: 6, fl: 3, kind: 'glass', wall: 0x26282e, band: '#111318', sign: 'Trà Cúc' },
+    { w: 5, fl: 3, wall: '#7c6a58', band: '#3a2e22', sign: 'HÀNG XÁCH TAY' },
+    { w: 5, fl: 3, wall: '#d9c9a0', band: '#1c56a0' },
+  ] },
+  // --- (SA-5) PHAN BỘI CHÂU ~18-23 (đầu phố ẩm thực): Cafe 18 + Cơm thố Bách Khoa + Bún Ngan ---
+  { name: 'sa_pbc132', cx: -114.1, cz: 9.9, nx: 0.184, nz: 0.983, side: -1, front: 6.6, D: 9, lots: [
+    { w: 8, fl: 3, kind: 'glass', wall: 0x6b533c, band: '#2e6ea5', sign: 'CAFE 18' },
+    { w: 6, fl: 3, wall: '#efd98a', band: '#c01822', sign: 'CƠM THỐ BÁCH KHOA', ssz: 34 },
+    { w: 5, fl: 3, wall: '#f2ede2', band: '#d8862a', sign: 'BÚN NGAN 16' },
+  ] },
+  // --- (SA-6) LÃN ÔNG ~21-34: PG Bank cam-trắng + cửa hàng phụ kiện da + thời trang kính ---
+  { name: 'sa_lanong137', cx: -307.7, cz: 69.0, nx: -0.954, nz: 0.298, side: -1, front: 6.6, D: 9, lots: [
+    { w: 8, fl: 3, wall: '#f2f2f0', band: '#e46a1b', sign: 'PG BANK', ssz: 46 },
+    { w: 5, fl: 4, wall: '#e2ded4', band: '#c01822', sign: 'ANH · PVC' },
+    { w: 5, fl: 3, kind: 'glass', wall: 0xeef1f4, band: '#232326' },
+  ] },
+  // --- (SA-7) LÝ THƯỜNG KIỆT ~115-146 bờ ĐN: 11994 Barbers đá đen + chợ quần áo + Trầm Thống ---
+  { name: 'sa_ltk497_se', cx: -315.9, cz: -84.2, nx: -0.829, nz: -0.559, side: -1, front: 5.4, D: 8, lots: [
+    { w: 8, fl: 2, wall: '#232326', band: '#c9a227', sign: '11994 BARBERS', sfg: '#c9a227' },
+    { w: 8, fl: 3, wall: '#e6d3a8', band: '#8a5a2f', sign: 'THỜI TRANG' },
+    { w: 4, fl: 3, wall: '#3a3d42', band: '#b8860b', sign: 'TRẦM THỐNG', sfg: '#e8c766' },
+  ] },
+  // --- (SA-8) LÝ THƯỜNG KIỆT bờ TB: nhà ống ban công vòm vàng + shophouse đá đen + nhà ống vàng ---
+  { name: 'sa_ltk497_nw', cx: -315.9, cz: -84.2, nx: -0.829, nz: -0.559, side: 1, front: 9.0, D: 8, lots: [
+    { w: 4, fl: 3, wall: '#ecdcac', band: '#1c56a0' },
+    { w: 5, fl: 3, kind: 'glass', wall: 0x2c2f34 },
+    { w: 5, fl: 3, wall: '#e8d9a8', band: '#c01822' },
+  ] },
+  // --- (SA-9) MÊ LINH ~27 bờ ĐÔNG: 2M Shoes & more (đen-hồng) + Mochi Store quà tặng ---
+  { name: 'sa_melinh262_e', cx: -181.3, cz: 352.3, nx: -0.992, nz: 0.125, side: -1, front: 7.6, D: 10, lots: [
+    { w: 14, fl: 3, wall: '#26282e', band: '#e0559a', sign: '2M SHOES & MORE', ssz: 34 },
+    { w: 8, fl: 2, wall: '#f3d0da', band: '#c0397a', sign: 'MOCHI' },
+  ] },
+  // --- (SA-10) MÊ LINH bờ TÂY: 4TEEN thời trang trắng/xám kính + shophouse vàng/xám ---
+  { name: 'sa_melinh262_w', cx: -181.3, cz: 352.3, nx: -0.992, nz: 0.125, side: 1, front: 7.6, D: 9, lots: [
+    { w: 12, fl: 2, kind: 'glass', wall: 0xe9ebee, band: '#232326', sign: '4TEEN' },
+    { w: 8, fl: 2, wall: '#e2d7b4', band: '#1c56a0' },
+  ] },
+  // --- (SA-11) QUANG TRUNG ~70-92 bờ BẮC (đối diện hồ): Tổng kho chăn ga + Vua Đồ Chơi + gia dụng ---
+  { name: 'sa_quangtrung003', cx: -325.7, cz: 139.0, nx: -0.197, nz: -0.980, side: 1, front: 7.6, D: 10, lots: [
+    { w: 6, fl: 4, wall: '#eceae2', band: '#e46a1b', sign: 'CHĂN GA GỐI ĐỆM', ssz: 32 },
+    { w: 6, fl: 4, wall: '#f2ede2', band: '#c01822', sign: 'VUA ĐỒ CHƠI' },
+    { w: 6, fl: 4, wall: '#e6ded0', band: '#1c56a0', sign: 'GIA DỤNG' },
+  ] },
+  // --- (SA-12) NGUYỄN ĐỨC CẢNH ~46 ven hồ (bờ ĐÔNG): SIXDO + Mixue + JK Jeans + VietABank ---
+  { name: 'sa_ndc033', cx: -499.6, cz: 261.6, nx: 0.203, nz: 0.979, side: 1, front: 8.6, D: 9, lots: [
+    { w: 6, fl: 4, kind: 'glass', wall: 0x1c1c20, band: '#232326', sign: 'SIXDO' },
+    { w: 5, fl: 2, wall: '#f2ede2', band: '#e5342b', sign: 'MIXUE', ssz: 46 },
+    { w: 5, fl: 3, wall: '#2f4d82', band: '#1c56a0', sign: 'JK JEANS' },
+    { w: 6, fl: 4, wall: '#efe3b6', band: '#c01822', sign: 'VietABank', sfg: '#f2c200' },
+  ] },
+];
+
+for (const R of SA_ROWS) saRow(R.cx, R.cz, R.nx, R.nz, R.side, R.front, R.D, R.lots, R.name);
+
+
   // ===== FIX t7 (cell_struct2): CLOVERLEAF cầu Lạc Long (double-loop, thiếu 1 vòng) =====
   {
     const _loopPoints = (cx, cz, r, a0, a1, n) => {
