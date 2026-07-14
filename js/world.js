@@ -18099,6 +18099,21 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
       if (cx > -300 && cx < 120 && cz > -1045 && cz < -845) continue;
       if (inSuperblock(cx, cz)) continue;   // siêu khối Hải quân/Cảng: nhà lùi sau tường, không OSM interior
       if (nearPanoCam(cx, cz, 5)) continue;   // KEEP-CLEAR: nhà OSM không đè camera pano (lỗi #1: tường che kín)
+      // GUARD LÒNG ĐƯỜNG (QA topology): OSM footprint đè tim đường (data lệch/service-road) → BỎ
+      // (thà vắng còn hơn nhà nằm giữa đường; đối chiếu pano hiếm khi là nhà thật giữa phố).
+      { const _hsd = (px, pz, ax, az, bx, bz) => { const dx = bx - ax, dz = bz - az, l2 = dx * dx + dz * dz; let t = l2 ? ((px - ax) * dx + (pz - az) * dz) / l2 : 0; t = Math.max(0, Math.min(1, t)); return Math.hypot(px - (ax + dx * t), pz - (az + dz * t)); };
+        let hit = 0, ntot = 0;
+        for (let i = 0; i < poly.length; i++) {
+          const [ax, az] = poly[i], [bx, bz] = poly[(i + 1) % poly.length];
+          const Ls = Math.hypot(bx - ax, bz - az), st = Math.max(1, Math.ceil(Ls / 2));
+          for (let s = 0; s <= st; s++) { ntot++;
+            const px = ax + (bx - ax) * s / st, pz = az + (bz - az) * s / st;
+            for (const r of ROADS_DT) { if (r.c === 'w') continue; const hw = ROAD_W[r.c] / 2;
+              let br = false;
+              for (let k = 0; k < r.pts.length - 1; k++) if (_hsd(px, pz, r.pts[k][0], r.pts[k][1], r.pts[k + 1][0], r.pts[k + 1][1]) < hw - 0.5) { hit++; br = true; break; }
+              if (br) break; } }
+        }
+        if (hit / Math.max(1, ntot) > 0.15) continue; }
       if (riverFactor(cx, cz) > 0.01 || Math.abs(groundHeightNoDeck(cx, cz) - LAND_H) > 0.4) continue;
       const hash = Math.abs(Math.floor(cx * 13 + cz * 7));
       // Lõi trung tâm: phố thương mại thực tế 3-5 tầng liền mạch (đối chiếu pano) → nâng nhà generic
