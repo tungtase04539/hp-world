@@ -315,6 +315,12 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-14 (bt)** [LỖI HỆ THỐNG G4 — công viên "mô màu"]: generator bồn hoa (`flowerBed`) rải
+    vòm bán cầu theo lưới 17m KHẮP mọi GARDENS, palette 7 màu neon (hồng 0xff5fa2, tím 0x9b59b6, cam
+    0xff8c00) + emissiveIntensity 0.14 (tự phát sáng) → nhìn HOẠT HÌNH, GPT trừ điểm mọi pano có công
+    viên/vườn hoa. SỬA: palette → 4 XANH topiary (bụi tròn cắt tỉa — thực tế VN) + đỏ gạch + vàng nghệ
+    + hồng NHẠT, emissive 0.14→0.05. 1 dòng đổi màu ăn nhiều pano cùng lúc (fix tầng generator > chèn
+    block rời). BÀI HỌC: khi 1 khiếm khuyết thẩm mỹ LẶP ở nhiều pano → sửa GENERATOR, đừng vá từng ô.
 - **2026-07-14 (bs)** [VÒNG TINH 6-AGENT (lô 2/2): T1+T3+T6 = 29 block, XỬ TRÙNG LẶP]:
     T1 LÕI-TÂY 11 block v1* (PROMENADE 2 bờ Tam Bạc caro+lan can+hoa giấy — render pano_197 khớp
     đẹp, hết nhà lấn kè; dãy marble Thế Lữ + nhà cổ); T6 NAM 11 block v6* (HXH biệt thự Pháp, mầm

@@ -16028,10 +16028,13 @@ const v1House = (cx, cz, ry, W, D, FL, facMat, name, roofHex = 0xb8b2a2) => {
   // ---------- DẢI VƯỜN HOA TRUNG TÂM (chuỗi vườn hoa đặc trưng Hải Phòng) ----------
   // An Biên → Ng.Văn Trỗi → Ng.Bỉnh Khiêm → Nguyễn Du(Nhà Kèn) → Kim Đồng → Tố Hữu
   {
-    const flowerCols = [0xe8402a, 0xf4c430, 0xff5fa2, 0xff8c00, 0x9b59b6, 0xfdfdfd, 0xe74c3c];
+    // Bồn công viên VN thực tế = phần lớn BỤI TRÒN CẮT TỈA XANH (topiary) + điểm hoa đỏ/vàng dịu,
+    // KHÔNG phải thảm vòm neon hồng/tím/cam. Palette: 4 xanh (topiary) + đỏ gạch + vàng nghệ + hồng nhạt.
+    // (bài học bt: vòm hoa bão hòa + emissive cao → GPT chấm "hoạt hình/mô màu", trừ điểm nhiều pano công viên)
+    const flowerCols = [0x4c8b3f, 0x3f7d3a, 0x5a9a48, 0xc0392b, 0x4c8b3f, 0xd4a017, 0xcf7a8f];
     // material bồn hoa CHIA SẺ theo màu (trước: tạo material mới mỗi bồn — hàng trăm bồn)
     const flowerDomeM = flowerCols.map((col) =>
-      new THREE.MeshLambertMaterial({ color: col, emissive: col, emissiveIntensity: 0.14, flatShading: true }));
+      new THREE.MeshLambertMaterial({ color: col, emissive: col, emissiveIntensity: 0.05, flatShading: true }));
     const hedgeM = mat(0x3f7a3a);
     const pathM = mat(0xd8cba8);
     const bedRimM = mat(0xa89878);
