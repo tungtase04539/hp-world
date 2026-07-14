@@ -12251,6 +12251,991 @@ const v2Tower = (x, z, ry, W, D, FL, FH, wallMat, name) => {
 }
 
 
+
+  // ===== TINH T3 TÂY-GIỮA: 7 block landmark đông sông (BỎ block A promenade trùng T1 + C TTYT trùng T5; helper v3*) =====
+// ============================================================================
+// CELL_T3 — VÒNG TINH cụm T3_TÂY-GIỮA (9 block). Khu tây Quang Trung/Hùng Vương/
+// Tam Bạc-tây; nhưng phần TÂY (x<-450: PBC/LTK/Hạ Lý/Thế Lữ/Phố Tam Bạc) ĐÃ do
+// CELL_TAYSONG (ts*, ~world.js:8257) + EXT_CORRIDORS phủ → KHÔNG nháp lại ở đó.
+// Cell này chỉ đánh khu ĐÔNG-CHƯA-PHỦ: phố cổ Lý Thường Kiệt/Kỳ Đồng (x -200..-430)
+// + kè sông Tam Bạc ĐÔNG (x -280..-420, đoạn openSpace kè chỉ tới (-383,-190) —
+// đông hơn là G1: infill lấp nhầm phía sông). Nguồn: compare_full3 + compare_full2
+// (pano_546) + 28 ẢNH THẬT (14 pano×2 heading) + probe ROADS_DT/terrain phiên này
+// (cell_t3/probe.mjs + xsec.mjs + place.mjs — mọi anchor gh=2.00, không nước).
+//
+// VỊ TRÍ DÁN: js/world.js — CUỐI khối "CÔNG TRÌNH ĐẶC TRƯNG" (sau block cell_taysong
+// ts* ~line 9390, TRƯỚC khối OSM/shophouse_infill) để FEATURED_CLEAR.push đuổi được
+// nhà OSM/infill (nearFeatured, world.js:11964) — các pano này NẰM TRONG R_CORRIDOR
+// (world.js:11975 x -520..-80, z -260..80) nên infill 'r' generic đang mọc; block
+// landmark thay nó bằng công trình đích danh, FEATURED_CLEAR gỡ "tường nuốt camera".
+//
+// KHÔNG import. Prefix RIÊNG "v3" (KHÔNG đụng lm/ts/hb/bc/dg/tb/tw/dl/bs/cb/cn/dm/
+// tx/ln). Scope giả định trong buildWorld: THREE, mat, makeTex, sharedMats,
+// addCollider, FEATURED_CLEAR, groundHeight, groundHeightNoDeck, isWater, localPt,
+// scene, mergeGeometries, LAND_H.
+//
+// QUY TẮC TỌA ĐỘ: pano=tim đường; dời pháp tuyến = nửa_lòng(t=4/r=2.75)+2.3 vỉa+D/2;
+// bearing pano→công trình khớp bucket heading giám khảo (place.mjs đã kiểm từng cái).
+// ============================================================================
+const __v3stats = {};
+
+// === HELPER v3 (dán 1 LẦN trước 9 block) ===
+const v3Hex = (n) => (typeof n === 'number' ? '#' + (n & 0xffffff).toString(16).padStart(6, '0') : n);
+const v3Sign = (txt, bg, fg = '#ffffff', px = 44) => new THREE.MeshLambertMaterial({
+  map: makeTex(512, 84, (g, w, h) => {
+    g.fillStyle = bg; g.fillRect(0, 0, w, h);
+    g.fillStyle = fg; g.font = `bold ${px}px system-ui, sans-serif`;
+    g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, w / 2, h / 2 + 2, w - 24);
+  }),
+});
+const v3SignV = (txt, bg, fg = '#ffffff', px = 38) => new THREE.MeshLambertMaterial({
+  map: makeTex(64, 512, (g, w, h) => {
+    g.fillStyle = bg; g.fillRect(0, 0, w, h);
+    g.fillStyle = fg; g.font = `bold ${px}px system-ui, sans-serif`; g.textAlign = 'center';
+    g.save(); g.translate(w / 2, h / 2); g.rotate(Math.PI / 2); g.fillText(txt, 0, 12, h - 30); g.restore();
+  }),
+});
+const v3Facade = (baseCss, winCss, cols, rows) => new THREE.MeshLambertMaterial({
+  map: makeTex(256, 256, (g, w, h) => {
+    g.fillStyle = baseCss; g.fillRect(0, 0, w, h);
+    const mx = w * 0.1, my = h * 0.12, cw = (w - mx * 2) / cols, ch = (h - my * 2) / rows;
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+      g.fillStyle = winCss; g.fillRect(mx + c * cw + cw * 0.18, my + r * ch + ch * 0.18, cw * 0.62, ch * 0.6);
+    }
+  }),
+});
+const v3Stripe = (a, b) => new THREE.MeshLambertMaterial({
+  map: makeTex(128, 64, (g, w, h) => { for (let i = 0; i < 8; i++) { g.fillStyle = i % 2 ? a : b; g.fillRect(i * w / 8, 0, w / 8, h); } }),
+});
+const v3Caro = (() => { // gạch caro đỏ-xám promenade (audit pano_298/203/134 "vỉa hè caro đỏ-xám")
+  const t = makeTex(128, 128, (g) => {
+    for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) { g.fillStyle = (i + j) % 2 ? '#b8574a' : '#9aa0a2'; g.fillRect(i * 32, j * 32, 32, 32); }
+  });
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(0.25, 0.25);
+  return new THREE.MeshLambertMaterial({ map: t });
+})();
+const v3OK = (x, z) => Math.abs(groundHeightNoDeck(x, z) - 2) < 0.34 && !isWater(x, z);
+const v3Grp = (x, z, ry, name) => { const g = new THREE.Group(); g.position.set(x, groundHeight(x, z), z); g.rotation.y = ry; g.name = name; return g; };
+const v3Done = (g, x, z, span, clr = 8) => {
+  g.traverse((o) => { if (o.isMesh) o.castShadow = true; }); scene.add(g);
+  addCollider(x, z, span * 0.5); FEATURED_CLEAR.push([x, z, span / 2 + clr]);
+};
+// nhà phố đích danh: trả về group (để block thêm chi tiết) hoặc null nếu guard đất
+const v3Shop = (o) => {
+  if (!v3OK(o.x, o.z)) return null;
+  const W = o.W, D = o.D || 8, FL = o.FL || 3, FH = 3.3, H = FL * FH;
+  const g = v3Grp(o.x, o.z, o.ry, o.name || 'v3shop');
+  const body = new THREE.Mesh(new THREE.BoxGeometry(W, H, D),
+    v3Facade(v3Hex(o.wall == null ? 0xe8ddc7 : o.wall), o.winCss || '#5a6a70', Math.max(2, Math.round(W / 2.4)), FL));
+  body.position.y = H / 2; g.add(body);
+  const glass = new THREE.Mesh(new THREE.BoxGeometry(W * 0.86, 2.4, 0.1), sharedMats.window);
+  glass.position.set(0, 1.3, D / 2 + 0.06); g.add(glass);
+  if (o.base != null) { const b = new THREE.Mesh(new THREE.BoxGeometry(W, 3.0, D + 0.12), mat(o.base)); b.position.y = 1.5; g.add(b); }
+  if (o.awn) { const a = new THREE.Mesh(new THREE.BoxGeometry(W * 0.96, 0.22, 1.5), v3Stripe(o.awn[0], o.awn[1])); a.position.set(0, 3.05, D / 2 + 0.75); g.add(a); }
+  if (o.sign) { const s = new THREE.Mesh(new THREE.PlaneGeometry(Math.max(W * 0.9, 4.2), 1.2), v3Sign(o.sign, o.bg || '#b23122', o.fg || '#ffffff', o.fs || 38)); s.position.set(0, FL >= 3 ? H - 1.2 : 3.5, D / 2 + 0.12); g.add(s); }
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(W + 0.5, 0.5, D + 0.5), mat(0xb8b2a2)); roof.position.y = H + 0.25; g.add(roof);
+  v3Done(g, o.x, o.z, Math.max(W, D), o.clr || 8);
+  return g;
+};
+// gy tùy chọn: promenade kè cứng đặt CỐ ĐỊNH y=LAND_H (mặt kè trên mép nước, terrain
+// taluy dốc không còn đất khô — kè đô thị thật là bệ ngang cao độ phố, nước ở dưới).
+const v3Lamp = (x, z, dbl, gy) => { // đèn cổ (đôi) xanh rêu ven sông
+  if (gy == null) { if (!v3OK(x, z)) return; gy = groundHeight(x, z); }
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.13, 4.4, 7), mat(0x25402f));
+  pole.position.set(x, gy + 2.2, z); pole.castShadow = true; scene.add(pole);
+  for (const off of (dbl ? [-0.7, 0.7] : [0])) { const gl = new THREE.Mesh(new THREE.SphereGeometry(0.32, 8, 6), sharedMats.lampGlow); gl.position.set(x + off, gy + 4.4, z); scene.add(gl); }
+};
+const v3Willow = (x, z, gy) => { // liễu rủ / cây non có cọc
+  if (gy == null) { if (!v3OK(x, z)) return; gy = groundHeight(x, z); }
+  const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.28, 4.2, 7), mat(0x6b4f35)); tr.position.set(x, gy + 2.0, z); tr.castShadow = true; scene.add(tr);
+  const ca = new THREE.Mesh(new THREE.SphereGeometry(2.6, 9, 7), mat(0x6f9d54)); ca.scale.set(1, 0.72, 1); ca.position.set(x, gy + 4.6, z); ca.castShadow = true; scene.add(ca);
+  const st = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 2.2, 5), mat(0x9a7b4f)); st.position.set(x + 0.3, gy + 1.1, z); scene.add(st);
+};
+const v3RailSeg = (x1, z1, x2, z2, col, gy) => { // 1 nhịp lan can (2 thanh + trụ)
+  const dx = x2 - x1, dz = z2 - z1, L = Math.hypot(dx, dz);
+  if (L < 0.1 || L > 8) return; const cx = (x1 + x2) / 2, cz = (z1 + z2) / 2, ry = Math.atan2(dx, dz);
+  if (gy == null) { if (!v3OK(x1, z1) || !v3OK(x2, z2)) return; gy = groundHeight(cx, cz); }
+  for (const hy of [0.95, 0.5]) { const b = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, L), mat(col)); b.position.set(cx, gy + hy, cz); b.rotation.y = ry; b.castShadow = true; scene.add(b); }
+  const p = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.95, 0.07), mat(col)); p.position.set(x1, gy + 0.48, z1); scene.add(p);
+};
+const v3Deck = (cx, cz, ry, w, d, gy) => { // dải promenade caro
+  if (w < 0.6) return; const m = new THREE.Mesh(new THREE.BoxGeometry(w, 0.06, d), v3Caro);
+  m.position.set(cx, (gy == null ? groundHeight(cx, cz) : gy) + 0.03, cz); m.rotation.y = ry; scene.add(m);
+};
+// đặt dãy nhà đích danh dọc pháp tuyến 1 phía phố: base anchor + bước dọc tangent
+const v3Row = (bx, bz, tx, tz, ry, list) => { // list: [{off, ...v3Shop opts}]
+  let n = 0; for (const it of list) { const x = bx + tx * it.off, z = bz + tz * it.off; if (v3Shop(Object.assign({ x, z, ry }, it))) n++; } return n;
+};
+
+// === (B) DÃY NHÀ CŨ/PHÁP PHÍA TRONG bờ đông (pano_202 h90 "nhà Pháp đổ nát cửa chớp
+//     xanh + nhà kính bo góc 4T + Uno BEER MORE"; pano_203 h90 "nhà 132 2T cửa dập nổi
+//     + nhà dây leo 3T mái hiên sọc cam-trắng"). Phía TRONG (-N, gh=2) đối diện sông. ===
+{
+  let n = 0;
+  // nhà Pháp 2T đổ nát cửa chớp xanh (pano_202, ry faces road)
+  const gp = v3Shop({ x: -272.6, z: -192.4, ry: -1.912, W: 7, D: 8, FL: 2, wall: 0xcabf9e, winCss: '#3f6f8a', sign: 'UNO — BEER MORE', bg: '#1c3f6e', fs: 32, name: 'v3_phap_202' });
+  if (gp) { n++; for (const fy of [3.6]) { const bal = new THREE.Mesh(new THREE.BoxGeometry(7 * 0.9, 0.5, 0.4), mat(0x3f6f8a)); bal.position.set(0, fy, 8 / 2 + 0.25); gp.add(bal); } }
+  // nhà kính bo góc 4T kề (bước dọc tangent đông)
+  if (v3Shop({ x: -266.0, z: -181.0, ry: -1.912, W: 6, D: 8, FL: 4, wall: 0xd8dee2, winCss: '#33566b', name: 'v3_bogoc_202' })) n++;
+  // nhà số 132 2T + nhà dây leo 3T mái hiên sọc (pano_203)
+  if (v3Shop({ x: -312.9, z: -129.6, ry: -2.356, W: 6, D: 8, FL: 2, wall: 0xe4d7b6, sign: 'NHÀ 132', bg: '#7a5a2a', fs: 40, name: 'v3_n132_203' })) n++;
+  if (v3Shop({ x: -307.0, z: -135.4, ry: -2.356, W: 6, D: 8, FL: 3, wall: 0xbfae86, awn: ['#e07b3c', '#f2ead6'], name: 'v3_dayleo_203' })) n++;
+  __v3stats.B = n;
+}
+
+// === (D) MADE IN VIETNAM #36 + SHOPHOUSE CỔ #39 + THIẾT BỊ Y TẾ/BÚN CHẢ (pano_498=2.1:
+//     h0 "#36 3T ban công cong, cửa kính, biển/logo"; h180 "#39 3T vàng kem phù điêu,
+//     cửa lá sách"; h90 "dãy 2T Thiết bị Y tế/Bún Chả"). #36 chẵn & #39 lẻ = 2 bờ phố. ===
+{
+  let n = 0;
+  const m36 = v3Shop({ x: -200.1, z: -117.9, ry: -0.444, W: 6, D: 7, FL: 3, wall: 0xefdcc8, winCss: '#556', sign: 'MADE IN VIETNAM 36', bg: '#c2410c', fs: 30, name: 'v3_madeinvn_36' });
+  if (m36) { n++; const bal = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, 0.5, 14, 1, false, -Math.PI / 2, Math.PI), mat(0xf3ece0)); bal.scale.z = 0.5; bal.position.set(0, 3.5, 7 / 2 + 0.2); m36.add(bal); }
+  if (v3Shop({ x: -194.4, z: -120.5, ry: -0.444, W: 5, D: 7, FL: 2, wall: 0xe2d5b2, sign: 'THIẾT BỊ Y TẾ 36 — BÚN CHẢ', bg: '#0e6a4a', fs: 28, name: 'v3_ytebuncha' })) n++;
+  const c39 = v3Shop({ x: -207.8, z: -101.5, ry: 2.698, W: 6, D: 7, FL: 3, wall: 0xe8cf7f, winCss: '#7a5a2a', sign: 'CH 39', bg: '#8e1f24', fs: 40, name: 'v3_shopco_39' });
+  if (c39) { n++; // phù điêu diềm + đèn Pháp
+    const cor = new THREE.Mesh(new THREE.BoxGeometry(6 + 0.3, 0.5, 7 + 0.3), mat(0xd8b452)); cor.position.y = 3.3 * 3 - 0.2; c39.add(cor);
+    const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.28, 8, 6), sharedMats.lampGlow); lamp.position.set(6 / 2 + 0.4, 3.2, 7 / 2 + 0.3); c39.add(lamp);
+  }
+  __v3stats.D = n;
+}
+
+// === (E) TRẦM THỐNG 115 (đá đen) + 11994 BARBERSHOP + NHÀ #146 ban công vòm (pano_497=2.9:
+//     h90 "Trầm Thống 115 mặt đá đen, ban công T2, biển vàng, thùng rượu"; h180 "11994
+//     Barbershop, barber pole"; h0 "#146 ban công vòm cong, cửa xếp"). #115 lẻ/#146 chẵn. ===
+{
+  let n = 0;
+  const tt = v3Shop({ x: -308.4, z: -79.1, ry: -2.164, W: 6, D: 8, FL: 3, wall: 0x2b2b30, winCss: '#c9a84a', sign: 'TRẦM THỐNG 115', bg: '#141414', fg: '#f2c94c', fs: 34, name: 'v3_tramthong_115' });
+  if (tt) { n++; const bal = new THREE.Mesh(new THREE.BoxGeometry(6 * 0.9, 0.5, 0.5), mat(0x3a3a3a)); bal.position.set(0, 3.6, 8 / 2 + 0.28); tt.add(bal); }
+  const bb = v3Shop({ x: -302.7, z: -87.6, ry: -2.164, W: 5, D: 8, FL: 2, wall: 0x33414a, sign: '11994 BARBERSHOP', bg: '#8e1f24', fs: 34, name: 'v3_barber_11994' });
+  if (bb) { n++; const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 1.4, 8), v3Stripe('#c1201a', '#ffffff')); pole.position.set(5 / 2 - 0.3, 2.6, 8 / 2 + 0.2); bb.add(pole); }
+  const h146 = v3Shop({ x: -317.8, z: -97.5, ry: 0.978, W: 6, D: 8, FL: 3, wall: 0xe6dbc2, sign: '146', bg: '#7a5a2a', fs: 40, name: 'v3_nha_146' });
+  if (h146) { n++; const arch = new THREE.Mesh(new THREE.TorusGeometry(1.3, 0.18, 6, 12, Math.PI), mat(0xf3ece0)); arch.position.set(0, 3.6, 8 / 2 + 0.25); h146.add(arch); }
+  __v3stats.E = n;
+}
+
+// === (F) CỤM MẶT TIỀN ĐEN SÁNG LÂN/BIBIA + DÃY TRANG NGUYÊN/D&G/KIM THANH (pano_136=2.9:
+//     h90 "Sáng Lân, Tâm Ngọc Hương/Bibia mặt tiền đen-vàng 3T"; h270 "dãy nhà ống 3T
+//     Trang Nguyên–D&G–Kim Thanh, ban công con tiện"). 2 bờ phố t (Cầu Đất/Kỳ Đồng). ===
+{
+  let n = 0;
+  n += v3Row(-320, -5, 0.30, 0.95, -1.268, [
+    { off: 0, W: 6, D: 8, FL: 3, wall: 0x26262a, winCss: '#d8b452', sign: 'SÁNG LÂN', bg: '#141414', fg: '#f2c94c', fs: 40, name: 'v3_sanglan' },
+    { off: 7, W: 6, D: 8, FL: 3, wall: 0x2c2c31, sign: 'BIBIA — CIGAR & WINE', bg: '#141414', fg: '#c9a84a', fs: 28, name: 'v3_bibia' },
+  ]);
+  n += v3Row(-339.7, 1.2, 0.30, 0.95, 1.874, [
+    { off: -4, W: 5, D: 8, FL: 3, wall: 0xd9c9a8, sign: 'TRANG NGUYÊN', bg: '#1553a0', fs: 36, name: 'v3_trangnguyen' },
+    { off: 2, W: 5, D: 8, FL: 3, wall: 0xcdbb90, sign: 'D&G', bg: '#141414', fs: 44, name: 'v3_dg' },
+    { off: 8, W: 5, D: 8, FL: 3, wall: 0xe0d3b0, sign: 'KIM THANH', bg: '#8e1f24', fs: 40, name: 'v3_kimthanh' },
+  ]);
+  __v3stats.F = n;
+}
+
+// === (G) XUÂN SU SU (quán góc 2T) + NHÀ TẬP THỂ VÀNG 4T ban công dài (pano_490=2.5:
+//     h90/h180 "quán góc Xuân Su Su cà phê sát vỉa hè"; h0/h270 "nhà tập thể cũ 4T,
+//     ban công dài". GỠ "tường đầu hồi khổng lồ che giao lộ + bãi trống" (h270)). ===
+{
+  let n = 0;
+  const xs = v3Shop({ x: -331.6, z: -42, ry: -1.268, W: 6, D: 8, FL: 2, wall: 0xe7d9b4, sign: 'XUÂN SU SU', bg: '#b45309', fs: 40, awn: ['#c1201a', '#f2ead6'], name: 'v3_xuansusu' });
+  if (xs) n++;
+  const tene = v3Shop({ x: -351.3, z: -35.8, ry: 1.874, W: 12, D: 9, FL: 4, wall: 0xe3cf8f, winCss: '#7a6a45', name: 'v3_tapthe_490' });   // s+ along0 → bear253 h270 (đối diện Xuân Su Su)
+  if (tene) { n++; for (const fy of [3.6, 6.9, 10.2]) { const bal = new THREE.Mesh(new THREE.BoxGeometry(12 * 0.94, 0.5, 0.5), mat(0xcaba86)); bal.position.set(0, fy, 9 / 2 + 0.28); tene.add(bal); } }
+  FEATURED_CLEAR.push([-345.5, -37.6, 13]);   // gỡ tường đầu hồi + bãi trống (h270)
+  __v3stats.G = n;
+}
+
+// === (H) CỤM HAN16/AKOS/DOÃN THÚY/PHƯƠNG LỢI + TƯỜNG HÔNG NHÀ LỚN 4T (pano_128=1.5:
+//     h180 "cụm shophouse 3T HAN16–AKOS–Doãn Thúy–Phương Lợi, mái hiên, biển, vali";
+//     h0 "tường hông nhà lớn 4T vàng kem, cầu thang ngoài". GỠ "mái nâu quá khổ xuyên
+//     camera" bằng FEATURED_CLEAR tại pano). ===
+{
+  let n = 0;
+  n += v3Row(-428.1, 79.2, 0.98, -0.18, -2.956, [
+    { off: -6, W: 5, D: 8, FL: 3, wall: 0xdcc9a0, sign: 'HAN16 — VALI', bg: '#1553a0', fs: 34, awn: ['#1553a0', '#f2ead6'], name: 'v3_han16' },
+    { off: 0, W: 5, D: 8, FL: 3, wall: 0xd2c095, sign: 'AKOS', bg: '#8e1f24', fs: 42, name: 'v3_akos' },
+    { off: 6, W: 5, D: 8, FL: 3, wall: 0xe1d4b1, sign: 'DOÃN THÚY', bg: '#0e8a45', fs: 38, name: 'v3_doanthuy' },
+    { off: 12, W: 5, D: 8, FL: 3, wall: 0xd8c79c, sign: 'PHƯƠNG LỢI', bg: '#b45309', fs: 38, name: 'v3_phuongloi' },
+  ]);
+  const bw = v3Shop({ x: -431.9, z: 59, ry: 0.185, W: 12, D: 10, FL: 4, wall: 0xe6d6a4, winCss: '#7a6a45', name: 'v3_tuonghong_128' });
+  if (bw) { n++; const stair = new THREE.Mesh(new THREE.BoxGeometry(0.7, 4 * 3.3, 1.2), mat(0xb9a878)); stair.position.set(12 / 2 - 0.5, 4 * 3.3 / 2, 10 / 2 + 0.6); bw.add(stair); }
+  FEATURED_CLEAR.push([-429.1, 73.9, 12]);   // gỡ mái nâu quá khổ xuyên camera (h180)
+  __v3stats.H = n;
+}
+
+// === (I) NGÕ CỔ 2 TẦNG + MURAL (pano_546=0.5: "ngõ hẹp kéo dài, dãy nhà cổ 2 tầng,
+//     cửa xếp sắt, mural nhiệt đới"; WRONG "camera bị chặn bởi tường xám khổng lồ").
+//     GỠ tường bằng FEATURED_CLEAR + 2 nhà cổ 2T khung ngõ + mural. Ngõ 'r' hẹp. ===
+{
+  let n = 0;
+  FEATURED_CLEAR.push([-322.8, -20.6, 11]);   // gỡ tường xám nuốt camera (h0/h90/h270)
+  const h1 = v3Shop({ x: -320.7, z: -12.9, ry: -2.877, W: 6, D: 6, FL: 2, wall: 0xd7c8a6, winCss: '#5a4a30', sign: 'CỬA XẾP', bg: '#6b5a33', fs: 34, name: 'v3_ngo546_a' });
+  if (h1) n++;
+  const h2 = v3Shop({ x: -324.9, z: -28.3, ry: 0.264, W: 6, D: 6, FL: 2, wall: 0xcbb896, name: 'v3_ngo546_b' });
+  if (h2) { n++; const mural = new THREE.Mesh(new THREE.PlaneGeometry(4.5, 2.6), v3Sign('MURAL NHIỆT ĐỚI', '#1f7a4d', '#ffe08a', 30)); mural.position.set(0, 2.4, 6 / 2 + 0.08); h2.add(mural); }
+  __v3stats.I = n;
+}
+
+
+
+  // ===== TINH T6 NAM: 11 block (HXH biệt thự Pháp, mầm non cổng cầu vồng, VietinBank, Cát Cụt; helper v6*) =====
+// ============================================================================
+// CELL_T6 (cụm TINH T6_NAM) — landmark ĐÍCH DANH cho các pano CHƯA TINH.
+// Nguồn: SP/compare_full3/*.json + audit/audit_done.json (ảnh thật ≥14 pano×2 heading).
+// Dán vào js/world.js NGAY TRƯỚC khối OSM "1.200+ TÒA NHÀ THẬT" / shophouse liền kề
+// (sau FEATURED_CLEAR khai báo, để nearFeatured() đuổi nhà OSM/infill sai chỗ).
+//
+// ĐÃ LOẠI (đã có block khác — KHÔNG nháp lại): 388(cn VĂN XUÂN/YADEA), 469/317(LN7 F88/IFAN),
+//   470/372(DL3/LN4 chợ NK/NINE CHICKEN), 160(DL15 Manoir), 429(TB7 BV Phụ sản),
+//   049(TB9 UBND HVT/HANA), 389(AN TRÀ), 244(TX3 Sao Mai), 477(cell_tinh corridor PBT).
+//
+// FRAME theo pano = TIM ĐƯỜNG (xe Google). Mỗi công trình DỜI khỏi tim theo pháp tuyến
+// N=(-Uz,Ux): off = sign·(nửa_lòng[p6.5/s5/t4/r2.75] + 2.3 vỉa hè + D/2 [+ sân]); along nhỏ.
+// Mặt tiền (local +Z) quay VỀ tim đường (v6Ry). groundHeightNoDeck≈2.0.
+// Scope buildWorld: THREE, mat, makeTex, sharedMats, addCollider, FEATURED_CLEAR,
+//   groundHeight, groundHeightNoDeck, isWater, localPt, scene, mergeGeometries.
+// ============================================================================
+
+// === HELPERS v6 (prefix RIÊNG — không trùng dl*/cn*/tx*/ln*/hb*/tb*/cb*/lm*) ===
+const v6OK = (x, z) => Math.abs(groundHeightNoDeck(x, z) - 2.0) < 0.4 && !isWater(x, z);
+const v6Sign = (txt, bg, fg = '#ffffff', px = 42) => new THREE.MeshLambertMaterial({
+  map: makeTex(512, 88, (g, w, h) => {
+    g.fillStyle = bg; g.fillRect(0, 0, w, h);
+    g.fillStyle = fg; g.font = `bold ${px}px system-ui, sans-serif`;
+    g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, w / 2, h / 2 + 2, w - 24);
+  }),
+});
+const v6Facade = (baseCss, winCss, cols, rows) => new THREE.MeshLambertMaterial({
+  map: makeTex(256, 256, (g, w, h) => {
+    g.fillStyle = baseCss; g.fillRect(0, 0, w, h);
+    const mx = w * 0.12, my = h * 0.12, cw = (w - mx * 2) / cols, ch = (h - my * 2) / rows;
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+      g.fillStyle = winCss; g.fillRect(mx + c * cw + cw * 0.16, my + r * ch + ch * 0.16, cw * 0.68, ch * 0.66);
+    }
+  }),
+});
+// road frame helpers: A=điểm tim của pano gốc, U=hướng dọc phố; N=(-Uz,Ux)
+const v6Pt = (F, s, off) => [F.A[0] + F.U[0] * s + (-F.U[1]) * off, F.A[1] + F.U[1] * s + F.U[0] * off];
+const v6Off = (F, D, san = 0) => F.half + 2.3 + D / 2 + san;               // độ lớn pháp tuyến
+const v6Ry = (F, off) => { const nx = -F.U[1], nz = F.U[0]; return off >= 0 ? Math.atan2(-nx, -nz) : Math.atan2(nx, nz); };
+// khối hộp shophouse/landmark cơ bản (đặt tại x,z; mặt +Z = ry)
+const v6Box = (x, z, ry, W, H, D, wallMat, name) => {
+  if (!v6OK(x, z)) return null;
+  const g = new THREE.Group(); g.position.set(x, groundHeight(x, z), z); g.rotation.y = ry;
+  const body = new THREE.Mesh(new THREE.BoxGeometry(W, H, D), wallMat); body.position.y = H / 2; g.add(body);
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(W + 0.4, 0.4, D + 0.4), mat(0xb2ac9c)); roof.position.y = H + 0.2; g.add(roof);
+  g.name = name; scene.add(g);
+  return g;
+};
+const v6Board = (g, txt, bg, fg, W, D, y, px = 32) => {
+  const s = new THREE.Mesh(new THREE.PlaneGeometry(Math.max(W * 0.9, 3), 1.15), v6Sign(txt, bg, fg, px));
+  s.position.set(0, y, D / 2 + 0.09); g.add(s);
+};
+const v6Wins = (g, W, D, H, FL) => {                                        // dải cửa sổ tầng
+  const FH = H / FL;
+  for (let f = 0; f < FL; f++) {
+    const win = new THREE.Mesh(new THREE.BoxGeometry(W * 0.78, 1.35, 0.12), sharedMats.window);
+    win.position.set(0, f * FH + FH * 0.62, D / 2 + 0.05); g.add(win);
+  }
+};
+const v6Fin = (g, x, z, r, clearR) => {                                     // shadow + collider + FEATURED_CLEAR (nhà HẸP)
+  g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  addCollider(x, z, r); FEATURED_CLEAR.push([x, z, clearR]);
+};
+const v6FinW = (g, x, z, W, D, ry, clearR) => {                            // nhà RỘNG: hàng collider dọc trục dài (không phình lòng đường)
+  g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  const n = Math.max(1, Math.round(W / Math.max(D, 4)));
+  for (let i = 0; i <= n; i++) { const [cx, cz] = localPt(x, z, -W / 2 + W * i / n, 0, ry); addCollider(cx, cz, D / 2 * 0.95); }
+  FEATURED_CLEAR.push([x, z, clearR]);
+};
+const v6Fence = (F, s0, s1, off, hex) => {                                  // rào sắt dọc phố
+  const [ax, az] = v6Pt(F, s0, off), [bx, bz] = v6Pt(F, s1, off);
+  const n = Math.max(2, Math.round(Math.hypot(bx - ax, bz - az) / 3));
+  const rail = new THREE.Group();
+  for (let i = 0; i <= n; i++) {
+    const px = ax + (bx - ax) * i / n, pz = az + (bz - az) * i / n;
+    if (!v6OK(px, pz)) continue;
+    const p = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.5, 0.12), mat(hex));
+    p.position.set(px, groundHeight(px, pz) + 0.75, pz); p.castShadow = true; rail.add(p);
+  }
+  rail.name = 'v6_fence'; scene.add(rail);
+};
+const v6Gate = (x, z, ry, w, hex) => {                                      // cổng 2 trụ + xà ngang
+  if (!v6OK(x, z)) return;
+  const g = new THREE.Group(); g.position.set(x, groundHeight(x, z), z); g.rotation.y = ry;
+  for (const sx of [-w / 2, w / 2]) { const p = new THREE.Mesh(new THREE.BoxGeometry(0.5, 3.0, 0.5), mat(hex)); p.position.set(sx, 1.5, 0); g.add(p); }
+  const top = new THREE.Mesh(new THREE.BoxGeometry(w + 0.6, 0.5, 0.5), mat(hex)); top.position.y = 3.1; g.add(top);
+  g.traverse((o) => { if (o.isMesh) o.castShadow = true; }); g.name = 'v6_gate'; scene.add(g);
+  addCollider(x - w / 2, z, 0.4); addCollider(x + w / 2, z, 0.4);
+};
+
+// road frames (A = tim đường CỦA pano gốc; đo bằng roadprobe từ ROADS_DT)
+const F_HXH = { A: [111.0, -564.4], U: [0.997, -0.073], half: 2.75 };  // Hồ Xuân Hương (501); 502 ~ s+31
+const F_DTH = { A: [34.5, -208.1], U: [0.024, 1.000], half: 5 };       // Đinh Tiên Hoàng (430)
+const F_TQK = { A: [-175.4, -266.8], U: [0.997, 0.077], half: 4 };     // Trần Quang Khải (352)
+const F_HBT = { A: [-534, 556], U: [-0.980, 0.197], half: 5 };         // Hai Bà Trưng (151 gốc; 376 s-253,377 s-213,378 s-132,379 s-61)
+const F_CDA = { A: [317.5, 485.9], U: [-0.754, -0.657], half: 5 };     // Cầu Đất (371 gốc; 369 s-81)
+const F_NDC = { A: [-350.5, 230.7], U: [0.979, -0.203], half: 5 };     // Nguyễn Đức Cảnh quảng trường (426; 427 s+89)
+const F_CCU = { A: [-564.8, 395.9], U: [0.189, 0.982], half: 4 };      // Cát Cụt (148 gốc; 149 s+41, 150 s+123)
+
+// ────────────────────────────────────────────────────────────────────────────
+// === (1) HỒ XUÂN HƯƠNG số 19-38 (pano_501=0.9 THẤP NHẤT, pano_502=1.3) ===
+//   501: Nina Store 38 (2T cửa cuốn xanh, bờ BẮC) + biệt thự Pháp mái đỏ + rào
+//   trắng con tiện (bờ NAM, sân vườn). 502: Nature's Tea & Coffee 19 (2T xanh rêu,
+//   ô dù kem, bờ NAM) + nhà 26D cổng vòm cuốn 1T (bờ BẮC). Phố 'r' half2.75.
+//   +N (off>0) = NAM; -N = BẮC. Bearing khớp: Nina H0(bắc)✓, biệt thự H180(nam)✓.
+{
+  // Nina Store 38 — bờ BẮC (-N), 2T trắng-vàng ố
+  { const D = 9, off = -v6Off(F_HXH, D); const [x, z] = v6Pt(F_HXH, 0, off);
+    const g = v6Box(x, z, v6Ry(F_HXH, off), 8, 6.8, D, v6Facade('#ece3cf', '#7a6a44', 3, 2), 'v6_hxh_nina38');
+    if (g) { const door = new THREE.Mesh(new THREE.BoxGeometry(5, 2.6, 0.14), mat(0x2f7a45)); door.position.set(0, 1.4, D / 2 + 0.06); g.add(door);
+      v6Board(g, 'Nina Store · 38 Hồ Xuân Hương', '#c62828', '#ffe9b0', 8, D, 5.4, 26); v6Fin(g, x, z, 4.6, 12); } }
+  // Nature's Tea & Coffee 19 — bờ NAM (+N) tại 502 (s+31), 2T tường vàng, biển xanh rêu
+  { const D = 9, off = v6Off(F_HXH, D); const [x, z] = v6Pt(F_HXH, 31, off);
+    const g = v6Box(x, z, v6Ry(F_HXH, off), 12, 6.6, D, v6Facade('#e7d7a8', '#6a5a34', 4, 2), 'v6_hxh_naturestea');
+    if (g) { const glass = new THREE.Mesh(new THREE.BoxGeometry(9, 2.6, 0.12), sharedMats.window); glass.position.set(0, 1.5, D / 2 + 0.06); g.add(glass);
+      v6Board(g, "NATURE'S TEA & COFFEE · 19", '#3f5f42', '#ffffff', 12, D, 5.1, 26);
+      for (const sx of [-3, 3]) { const um = new THREE.Mesh(new THREE.CylinderGeometry(1.9, 1.9, 0.3, 10), mat(0xe8ddc4)); um.position.set(sx, 3.0, D / 2 + 2.6); g.add(um); }
+      v6Fin(g, x, z, 6, 14); } }
+  // nhà 26D cổng vòm cuốn 1T — bờ BẮC (-N) tại 502, vàng ố loang
+  { const D = 8, off = -v6Off(F_HXH, D); const [x, z] = v6Pt(F_HXH, 31, off);
+    const g = v6Box(x, z, v6Ry(F_HXH, off), 10, 4.2, D, mat(0xcbb98a), 'v6_hxh_26d');
+    if (g) { const arch = new THREE.Mesh(new THREE.TorusGeometry(1.5, 0.35, 6, 12, Math.PI), mat(0x6a5a3a)); arch.position.set(0, 2.6, D / 2 + 0.2); g.add(arch);
+      const door = new THREE.Mesh(new THREE.BoxGeometry(2.6, 2.6, 0.12), mat(0x3f6a52)); door.position.set(0, 1.3, D / 2 + 0.05); g.add(door); v6Fin(g, x, z, 5, 11); } }
+  // biệt thự Pháp 2T mái ngói ĐỎ + rào trắng con tiện + khối gạch đỏ sau (bờ NAM 501, sân 4m)
+  { const D = 13, off = v6Off(F_HXH, D, 4); const [x, z] = v6Pt(F_HXH, 2, off);
+    const g = v6Box(x, z, v6Ry(F_HXH, off), 16, 7.4, D, v6Facade('#f0e3b6', '#7a6a3a', 5, 2), 'v6_hxh_villa');
+    if (g) { const hip = new THREE.Mesh(new THREE.ConeGeometry(12, 3.0, 4), mat(0x9a3f2c)); hip.rotation.y = Math.PI / 4; hip.position.y = 8.9; g.add(hip);
+      const brick = new THREE.Mesh(new THREE.BoxGeometry(9, 9.6, 8), mat(0x8a4b3a)); brick.position.set(-11, 4.8, -1); g.add(brick);   // khối gạch đỏ 3T sau
+      v6FinW(g, x, z, 16, D, v6Ry(F_HXH, off), 18); }
+    v6Fence(F_HXH, -6, 10, v6Off(F_HXH, 0, 1), 0xf2f0ea);      // rào trắng con tiện dọc mép sân
+  }
+}
+
+// === (2) ĐINH TIÊN HOÀNG — TRƯỜNG MẦM NON cổng cầu vồng + ACS (pano_430=1.5) ===
+//   430 h90(0.5): "toàn bộ trường mầm non 2T, cổng cầu vồng, tường lâu đài, tranh
+//   thú, bảng LED đỏ, khối lớp xanh-vàng, W~40". Phố 's' N-S; mầm non bờ ĐÔNG (-N),
+//   ACS văn phòng 2T bờ TÂY (+N). Bearing: mầm non H45/H90(đông)✓, ACS H315(tây)✓.
+{
+  const D = 12, off = -v6Off(F_DTH, D); const [x, z] = v6Pt(F_DTH, 0, off);
+  const g = v6Box(x, z, v6Ry(F_DTH, off), 34, 7.0, D, v6Facade('#3fae54', '#f4d84a', 8, 2), 'v6_dth_mamnon');
+  if (g) {
+    // cổng cầu vồng (nhiều cung tròn màu) trước mặt tiền
+    const cols = [0xd23b3b, 0xe8802a, 0xf2c400, 0x3fae54, 0x2f7ac8, 0x7a3fb0];
+    for (let i = 0; i < cols.length; i++) { const arc = new THREE.Mesh(new THREE.TorusGeometry(4.2 - i * 0.55, 0.28, 6, 16, Math.PI), mat(cols[i])); arc.position.set(0, 0.2, D / 2 + 2.2); g.add(arc); }
+    const led = new THREE.Mesh(new THREE.BoxGeometry(18, 0.9, 0.12), new THREE.MeshBasicMaterial({ color: 0xc21010 })); led.position.set(0, 7.4, D / 2 + 0.1); g.add(led);   // băng LED đỏ chạy chữ
+    v6Board(g, 'TRƯỜNG MẦM NON', '#1c56a0', '#ffe14d', 20, D, 5.6, 34);
+    v6FinW(g, x, z, 34, D, v6Ry(F_DTH, off), 26);
+  }
+  // ACS Việt Nam — văn phòng 2T trắng biển xanh, bờ TÂY (+N)
+  { const D2 = 8, off2 = v6Off(F_DTH, D2); const [x2, z2] = v6Pt(F_DTH, 6, off2);
+    const g2 = v6Box(x2, z2, v6Ry(F_DTH, off2), 8, 7.0, D2, v6Facade('#f2f0ea', '#5a6a72', 3, 2), 'v6_dth_acs');
+    if (g2) { v6Board(g2, 'CÔNG TY CP ACS VIỆT NAM', '#1550a0', '#ffffff', 8, D2, 4.0, 24); v6Fin(g2, x2, z2, 5, 11); } }
+}
+
+// === (3) TRẦN QUANG KHẢI — VIETINBANK sảnh vòm bán nguyệt + góc bo tròn (352=2.0,
+//   476=2.5). 352 h0=0.2 "camera LỌT vào khối nhà" (G1 generator lấp nhầm) → FEATURED_CLEAR
+//   dọn + đặt VietinBank LÙI sâu bờ BẮC. Ảnh 352 h0: kính sẫm-trắng 5T, sảnh vòm
+//   bán nguyệt cột tròn, cầu thang đá, cột cờ. 476: nhà góc bo tròn 3T trắng viền xanh.
+{
+  // dọn khối OSM nuốt camera ngay tại pano_352
+  FEATURED_CLEAR.push([-175, -272.2, 13]);
+  // VietinBank 5T — bờ BẮC (-N), DỊCH +6 ĐÔNG né phố 'r' cắt (x≈-181 N-S), W14 D10 san2
+  { const D = 10, off = -v6Off(F_TQK, D, 2); const [x, z] = v6Pt(F_TQK, 6, off);
+    const g = v6Box(x, z, v6Ry(F_TQK, off), 14, 17, D, v6Facade('#cfd6db', '#2f4a5a', 4, 5), 'v6_tqk_vietinbank');
+    if (g) {
+      const glass = new THREE.Mesh(new THREE.BoxGeometry(14, 15, 0.3), sharedMats.window); glass.position.set(0, 8, D / 2 + 0.1); g.add(glass);
+      // sảnh vòm bán nguyệt: nửa trụ ngang + 3 cột tròn
+      const portico = new THREE.Mesh(new THREE.CylinderGeometry(4.4, 4.4, 10, 16, 1, false, 0, Math.PI), mat(0xeef1f3));
+      portico.rotation.z = Math.PI / 2; portico.rotation.y = Math.PI / 2; portico.position.set(0, 5.0, D / 2 + 2.6); g.add(portico);
+      for (const cx of [-4, 0, 4]) { const col = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 5, 12), mat(0xeef1f3)); col.position.set(cx, 2.5, D / 2 + 4.2); g.add(col); }
+      const stair = new THREE.Mesh(new THREE.BoxGeometry(11, 0.8, 3), mat(0xbfc4c8)); stair.position.set(0, 0.4, D / 2 + 4.6); g.add(stair);
+      v6Board(g, 'VIETINBANK', '#1c56a0', '#ffffff', 14, D, 15.2, 40);
+      v6FinW(g, x, z, 14, D, v6Ry(F_TQK, off), 17);
+    } }
+  // (bỏ nhà góc bo tròn 476 — nằm ĐÚNG mép nút giao r×t, collider phình lòng phố cắt;
+  //  476 score 2.5 + không có finding compare_full3 → ưu tiên thấp, KHÔNG dựng)
+  // dãy shophouse cũ 3-4T bờ NAM (+N) — Thừa Phát Lại / Quý Hằng (352 h180)
+  { const names = [['THỪA PHÁT LẠI', '#1c56a0'], ['KHÁCH SẠN QUÝ HẰNG', '#b03a2a']];
+    for (let i = 0; i < names.length; i++) { const D = 8, off = v6Off(F_TQK, D); const [x, z] = v6Pt(F_TQK, -4 + i * 7, off);
+      const g = v6Box(x, z, v6Ry(F_TQK, off), 6, 12, D, v6Facade('#e2cf9a', '#7a6a44', 2, 4), 'v6_tqk_shop' + i);
+      if (g) { v6Wins(g, 6, D, 12, 4); v6Board(g, names[i][0], names[i][1], '#ffffff', 6, D, 3.4, 26); v6Fin(g, x, z, 4, 9); } } }
+}
+
+// === (4) HAI BÀ TRƯNG 143-190 bờ BẮC (+N: H0/H270) — mầm non tranh(376) +
+//   HUYỀN áo cưới(377) + Kim Anh Boutique(378) + MR LEAN(379). Trục #233,
+//   half5. s: 376=-253, 377=-213, 378=-132, 379=-61. (LN2/LN3/hb* ở s>0 khác đoạn.)
+{
+  // MN tường tranh 143 (376) — khuôn viên rào thấp, W30
+  { const D = 11, off = v6Off(F_HBT, D, 3); const [x, z] = v6Pt(F_HBT, -253, off);
+    const g = v6Box(x, z, v6Ry(F_HBT, off), 26, 6.6, D, v6Facade('#e8c94a', '#3fae54', 7, 2), 'v6_hbt_mamnon143');
+    if (g) { const mural = new THREE.Mesh(new THREE.BoxGeometry(24, 1.4, 0.14), v6Sign('MẦM NON · tranh cổ tích', '#2f7ac8', '#ffe14d', 30)); mural.position.set(0, 0.9, D / 2 + 1.6); g.add(mural);
+      v6Board(g, 'TRƯỜNG MẦM NON', '#1c56a0', '#ffe14d', 18, D, 5.2, 32); v6FinW(g, x, z, 26, D, v6Ry(F_HBT, off), 20); }
+    v6Fence(F_HBT, -259, -247, v6Off(F_HBT, 0, 1), 0x3f9a52); }
+  // studio HUYỀN áo cưới 146 (377) — 4T trắng-xám kính, biển đen
+  { const D = 9, off = v6Off(F_HBT, D); const [x, z] = v6Pt(F_HBT, -213, off);
+    const g = v6Box(x, z, v6Ry(F_HBT, off), 5.5, 13.6, D, v6Facade('#eceae4', '#3a3d42', 2, 4), 'v6_hbt_huyen146');
+    if (g) { const glass = new THREE.Mesh(new THREE.BoxGeometry(4.4, 3.0, 0.12), sharedMats.window); glass.position.set(0, 1.6, D / 2 + 0.06); g.add(glass);
+      v6Board(g, 'HUYỀN · Áo cưới', '#17181a', '#ffffff', 5.5, D, 3.4, 30); v6Fin(g, x, z, 4, 9); } }
+  // Kim Anh Boutique 178 (378) — 3T trắng, mái tôn đỏ, biển trắng
+  { const D = 9, off = v6Off(F_HBT, D); const [x, z] = v6Pt(F_HBT, -132, off);
+    const g = v6Box(x, z, v6Ry(F_HBT, off), 6, 10.2, D, v6Facade('#f2f0ea', '#5a6067', 2, 3), 'v6_hbt_kimanh178');
+    if (g) { v6Wins(g, 6, D, 10.2, 3); v6Board(g, 'Kim Anh Boutique · 178', '#22252a', '#ffffff', 6, D, 3.4, 26); v6Fin(g, x, z, 4, 9); } }
+  // MR LEAN – SELENA + MAI PHẠM 179 (379) — 4T trắng biển cam
+  { const D = 9, off = v6Off(F_HBT, D); const [x, z] = v6Pt(F_HBT, -61, off);
+    const g = v6Box(x, z, v6Ry(F_HBT, off), 6, 13.4, D, v6Facade('#f2f0ea', '#5a6067', 2, 4), 'v6_hbt_mrlean179');
+    if (g) { v6Board(g, 'MR LEAN · Healthy', '#e08428', '#ffffff', 6, D, 3.4, 28); v6Board(g, 'SELENA DRESS', '#22252a', '#ffe9b0', 6, D, 6.6, 26); v6Fin(g, x, z, 4, 9); }
+    const g2 = v6Box(...(() => { const [xx, zz] = v6Pt(F_HBT, -55, off); return [xx, zz, v6Ry(F_HBT, off), 4, 7.0, D, mat(0xf4f2ec), 'v6_hbt_maipham']; })());
+    if (g2) { v6Board(g2, 'MAI PHẠM', '#c21818', '#ffffff', 4, D, 4.0, 30); v6Fin(g2, v6Pt(F_HBT, -55, off)[0], v6Pt(F_HBT, -55, off)[1], 3, 7); } }
+}
+
+// === (5) HAI BÀ TRƯNG 143-190 bờ NAM (-N: H180/H90) — Phượng Uyên Spa(376) +
+//   OPPO 5T(377) + quán cấp4 mái ngói(378) + nhà Pháp vàng+ANNA(379). ===
+{
+  // Phượng Uyên Spa 129 (376) — 3T trắng-vàng
+  { const D = 8, off = -v6Off(F_HBT, D); const [x, z] = v6Pt(F_HBT, -253, off);
+    const g = v6Box(x, z, v6Ry(F_HBT, off), 8, 10.2, D, v6Facade('#f2ead2', '#6a6a72', 3, 3), 'v6_hbt_phuonguyen');
+    if (g) { v6Board(g, 'PHƯỢNG UYÊN Spa · Beauty · 129', '#b0367a', '#ffffff', 8, D, 5.2, 24); v6Fin(g, x, z, 5, 10); } }
+  // OPPO 5T mặt tiền 8m + Made in Vietnam 2T (377)
+  { const D = 9, off = -v6Off(F_HBT, D); const [x, z] = v6Pt(F_HBT, -213, off);
+    const g = v6Box(x, z, v6Ry(F_HBT, off), 8, 17, D, v6Facade('#e6e8ea', '#5a6067', 3, 5), 'v6_hbt_oppo');
+    if (g) { v6Board(g, 'OPPO', '#0a7a44', '#ffffff', 8, D, 15.2, 46); v6Fin(g, x, z, 5, 11); }
+    const [x2, z2] = v6Pt(F_HBT, -206, off); const g2 = v6Box(x2, z2, v6Ry(F_HBT, off), 4, 7, D, mat(0xf4f2ec), 'v6_hbt_madeinvn');
+    if (g2) { v6Board(g2, 'Made in Vietnam', '#1c56a0', '#ffffff', 4, D, 4.0, 24); v6Fin(g2, x2, z2, 3, 7); } }
+  // quán cấp 4 mái ngói + bạt cam-xanh 176 (378)
+  { const D = 8, off = -v6Off(F_HBT, D); const [x, z] = v6Pt(F_HBT, -132, off);
+    const g = v6Box(x, z, v6Ry(F_HBT, off), 10, 3.6, D, mat(0xd8cbb0), 'v6_hbt_quan176');
+    if (g) { const hip = new THREE.Mesh(new THREE.ConeGeometry(8, 2.2, 4), mat(0x9a3f2c)); hip.rotation.y = Math.PI / 4; hip.position.y = 4.6; g.add(hip);
+      const bat = new THREE.Mesh(new THREE.BoxGeometry(9, 0.15, 3), mat(0xe0842a)); bat.position.set(0, 3.4, D / 2 + 1.6); g.add(bat);
+      v6Board(g, 'BÁNH ĐA · BÚN · NEM CHUA', '#c21818', '#ffe9b0', 10, D, 2.6, 24); v6Fin(g, x, z, 6, 12); } }
+  // nhà Pháp vàng 2T cửa vòm chớp xanh + ANNA BOUTIQUE 179 (379)
+  { const D = 10, off = -v6Off(F_HBT, D); const [x, z] = v6Pt(F_HBT, -61, off);
+    const g = v6Box(x, z, v6Ry(F_HBT, off), 12, 7.4, D, v6Facade('#e9d59a', '#3f6a52', 4, 2), 'v6_hbt_phap179');
+    if (g) { const hip = new THREE.Mesh(new THREE.ConeGeometry(9, 2.6, 4), mat(0x9a5a3c)); hip.rotation.y = Math.PI / 4; hip.position.y = 8.6; g.add(hip);
+      for (const cx of [-4, 0, 4]) { const arc = new THREE.Mesh(new THREE.TorusGeometry(1.1, 0.18, 6, 10, Math.PI), mat(0xf4ecd0)); arc.position.set(cx, 5.2, D / 2 + 0.12); g.add(arc); }
+      v6Fin(g, x, z, 7, 14); }
+    const [x2, z2] = v6Pt(F_HBT, -68, off); const g2 = v6Box(x2, z2, v6Ry(F_HBT, off), 6, 7, D, mat(0xf4f2ec), 'v6_hbt_anna179');
+    if (g2) { v6Board(g2, 'ANNA BOUTIQUE · 179', '#c21860', '#ffffff', 6, D, 4.0, 24); v6Fin(g2, x2, z2, 4, 9); } }
+}
+
+// === (6) CẦU ĐẤT 158/181 — gạch Pháp cửa vòm nhọn + cầu thang(371) + Bà Cụ bánh
+//   đa cua nhà Pháp cổ(369). Trục #s (317.5,485.9); 369 s-81. +N(H0/H90)/-N(H180/H270).
+//   (LN4 ở pano_372 s0 khác — NINE CHICKEN/KIM NHAN; ĐÂY cách 60-170m ĐB.)
+{
+  // công trình gạch Pháp 3T cửa vòm nhọn + cầu thang bê tông lan can đỏ-trắng (371 H0, +N)
+  { const D = 12, off = v6Off(F_CDA, D); const [x, z] = v6Pt(F_CDA, 0, off);
+    const g = v6Box(x, z, v6Ry(F_CDA, off), 18, 10.8, D, mat(0x9a4b38), 'v6_cda_gachphap158');
+    if (g) { const hip = new THREE.Mesh(new THREE.ConeGeometry(13, 2.6, 4), mat(0x7a2718)); hip.rotation.y = Math.PI / 4; hip.position.y = 12.1; g.add(hip);
+      for (const cx of [-6, -2, 2, 6]) { const arc = new THREE.Mesh(new THREE.TorusGeometry(1.0, 0.2, 6, 8, Math.PI), mat(0xc9a98a)); arc.rotation.z = Math.PI; arc.scale.y = 1.5; arc.position.set(cx, 6.0, D / 2 + 0.12); g.add(arc); }
+      const stair = new THREE.Mesh(new THREE.BoxGeometry(6, 1.2, 3), mat(0xcfc9bd)); stair.position.set(0, 0.6, D / 2 + 2.4); g.add(stair);
+      for (const sx of [-3, 3]) { const rail = new THREE.Mesh(new THREE.BoxGeometry(0.2, 1.2, 3), mat(0xc21818)); rail.position.set(sx, 1.8, D / 2 + 2.4); g.add(rail); }
+      v6FinW(g, x, z, 18, D, v6Ry(F_CDA, off), 17); } }
+  // RECORD ROOM 2T đen (371 H0, +N kề)
+  { const D = 8, off = v6Off(F_CDA, D); const [x, z] = v6Pt(F_CDA, 12, off);
+    const g = v6Box(x, z, v6Ry(F_CDA, off), 8, 7, D, mat(0x24262a), 'v6_cda_recordroom');
+    if (g) { const glass = new THREE.Mesh(new THREE.BoxGeometry(6.4, 3.2, 0.12), sharedMats.window); glass.position.set(0, 1.7, D / 2 + 0.06); g.add(glass); v6Board(g, 'RECORD ROOM', '#c21818', '#ffffff', 8, D, 4.6, 30); v6Fin(g, x, z, 5, 10); } }
+  // ÁO DÀI HÀ MY 158 2T đen (371 H180, -N bờ đối diện)
+  { const D = 8, off = -v6Off(F_CDA, D); const [x, z] = v6Pt(F_CDA, 0, off);
+    const g = v6Box(x, z, v6Ry(F_CDA, off), 7, 7, D, mat(0x22252a), 'v6_cda_hamy158');
+    if (g) { v6Board(g, 'ÁO DÀI HÀ MY · 158', '#e8b23a', '#22252a', 7, D, 4.4, 26); v6Fin(g, x, z, 5, 9); } }
+  // Bà Cụ bánh đa cua — nhà Pháp cổ 2T xanh rêu, biển đỏ, dàn đèn lồng (369 H0, +N)
+  { const D = 12, off = v6Off(F_CDA, D); const [x, z] = v6Pt(F_CDA, -81, off);
+    const g = v6Box(x, z, v6Ry(F_CDA, off), 12, 7.4, D, v6Facade('#8a9a7a', '#4a5a44', 4, 2), 'v6_cda_bacu181');
+    if (g) { const hip = new THREE.Mesh(new THREE.ConeGeometry(9, 2.6, 4), mat(0x7a5230)); hip.rotation.y = Math.PI / 4; hip.position.y = 8.6; g.add(hip);
+      const cols = [0xd23b3b, 0xf2c400, 0x2f7ac8, 0xe8802a];
+      for (let i = 0; i < 6; i++) { const lb = new THREE.Mesh(new THREE.SphereGeometry(0.35, 8, 6), new THREE.MeshBasicMaterial({ color: cols[i % 4] })); lb.position.set(-4.5 + i * 1.8, 4.4, D / 2 + 1.2); g.add(lb); }
+      v6Board(g, 'Bà Cụ · BÁNH ĐA CUA HẢI PHÒNG', '#c21818', '#ffe9b0', 12, D, 5.2, 24); v6Fin(g, x, z, 8, 15); } }
+  // EURO FASHION + THIỆP CƯỚI (369 H180, -N)
+  { const D = 8, off = -v6Off(F_CDA, D); const [x, z] = v6Pt(F_CDA, -81, off);
+    const g = v6Box(x, z, v6Ry(F_CDA, off), 8, 7, D, mat(0x2a2c30), 'v6_cda_euro');
+    if (g) { v6Board(g, 'EURO FASHION SHOP', '#e8b23a', '#22252a', 8, D, 4.4, 26); v6Fin(g, x, z, 5, 10); } }
+}
+
+// === (7) NGUYỄN ĐỨC CẢNH quảng trường vườn hoa Tam Bạc — Đô Đô + SCOTS ENGLISH
+//   (tượng vàng)(426) + cao tầng kính 13T(427). Trục #s (-350.5,230.7); 427 s+89.
+//   +N (nam, H90/H180) = dãy shophouse; -N (bắc, H0/H270) = quảng trường (để trống).
+//   (TT Triển lãm ĐÃ có ở (-302,172); CHỈ bổ sung dãy đối diện + tháp kính.)
+{
+  // Đô Đô shophouse 3T đỏ (426 H90, +N)
+  { const D = 8, off = v6Off(F_NDC, D); const [x, z] = v6Pt(F_NDC, -4, off);
+    const g = v6Box(x, z, v6Ry(F_NDC, off), 6, 10.2, D, v6Facade('#c23a2a', '#f2ead2', 2, 3), 'v6_ndc_dodo');
+    if (g) { v6Board(g, 'ĐÔ ĐÔ', '#22252a', '#ffe08a', 6, D, 5.2, 34); v6Fin(g, x, z, 4, 9); } }
+  // Scots English 4T xanh dương kính + tượng vàng trước cửa (426 H135, +N)
+  { const D = 9, off = v6Off(F_NDC, D); const [x, z] = v6Pt(F_NDC, 5, off);
+    const g = v6Box(x, z, v6Ry(F_NDC, off), 7, 13.6, D, v6Facade('#1c56a0', '#cfe0f0', 2, 4), 'v6_ndc_scots');
+    if (g) { v6Board(g, 'SCOTS ENGLISH', '#12409e', '#ffffff', 7, D, 5.4, 30);
+      const statue = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.5, 2.2, 8), mat(0xd4af37)); statue.position.set(3, 1.1, D / 2 + 1.8); g.add(statue);
+      v6Fin(g, x, z, 5, 10); } }
+  // cao tầng kính 13T (427 H90, +N) — khối hộp kính xám-trắng W30
+  { const D = 16, off = v6Off(F_NDC, D); const [x, z] = v6Pt(F_NDC, 89, off);
+    const g = v6Box(x, z, v6Ry(F_NDC, off), 26, 44, D, v6Facade('#aeb8c0', '#5a6a76', 6, 13), 'v6_ndc_tower13');
+    if (g) { const glass = new THREE.Mesh(new THREE.BoxGeometry(24, 42, 0.3), sharedMats.window); glass.position.set(0, 22, D / 2 + 0.12); g.add(glass); v6FinW(g, x, z, 26, D, v6Ry(F_NDC, off), 24); } }
+}
+
+// === (8) CÁT CỤT 30-32 — cổng vòm ngõ KDC 30 + medela Mẹ&Bé/Stella + Shop MiiU
+//   (pano_148=2.8). Trục #t (-564.8,395.9) half4. -N(H0/H90)=đông; +N(H180/H270)=tây.
+{
+  // medela Mẹ&Bé / Stella / An Decor 32 — 4T đỏ-hồng biển vàng (H0/H270, đông -N)
+  { const D = 9, off = -v6Off(F_CCU, D); const [x, z] = v6Pt(F_CCU, 0, off);
+    const g = v6Box(x, z, v6Ry(F_CCU, off), 12, 13.4, D, v6Facade('#c23a4a', '#f2ead2', 4, 4), 'v6_ccu_medela32');
+    if (g) { v6Board(g, 'medela · MẸ & BÉ · 32 Cát Cụt', '#e8b23a', '#22252a', 12, D, 6.6, 24); v6Board(g, 'Stella · An Decor', '#22252a', '#ffe08a', 12, D, 3.4, 26); v6FinW(g, x, z, 12, D, v6Ry(F_CCU, off), 13); } }
+  // cổng vòm biển xanh KHU DÂN CƯ 30 Cát Cụt (ngõ hẹp, đông -N kề medela)
+  { const D = 5, off = -v6Off(F_CCU, D); const [x, z] = v6Pt(F_CCU, 8, off);
+    if (v6OK(x, z)) { const g = new THREE.Group(); g.position.set(x, groundHeight(x, z), z); g.rotation.y = v6Ry(F_CCU, off);
+      const arch = new THREE.Mesh(new THREE.TorusGeometry(1.8, 0.4, 6, 14, Math.PI), mat(0xd9cfc0)); arch.position.set(0, 4.0, 0); g.add(arch);
+      for (const sx of [-2.2, 2.2]) { const p = new THREE.Mesh(new THREE.BoxGeometry(0.7, 4.0, 0.7), mat(0xd9cfc0)); p.position.set(sx, 2.0, 0); g.add(p); }
+      const s = new THREE.Mesh(new THREE.PlaneGeometry(4.6, 1.0), v6Sign('KHU DÂN CƯ 30 Cát Cụt', '#1c56a0', '#ffffff', 24)); s.position.set(0, 5.2, 0.1); g.add(s);
+      g.traverse((o) => { if (o.isMesh) o.castShadow = true; }); g.name = 'v6_ccu_cong30'; scene.add(g); addCollider(x - 2.2, z, 0.5); addCollider(x + 2.2, z, 0.5); FEATURED_CLEAR.push([x, z, 6]); } }
+  // Shop MiiU 3T + quán giải khát mái bạt đỏ 30 — tây (+N, H180)
+  { const D = 8, off = v6Off(F_CCU, D); const [x, z] = v6Pt(F_CCU, 0, off);
+    const g = v6Box(x, z, v6Ry(F_CCU, off), 12, 10.2, D, v6Facade('#f2f0ea', '#c2487a', 4, 3), 'v6_ccu_miiu');
+    if (g) { const bat = new THREE.Mesh(new THREE.BoxGeometry(6, 0.14, 2.4), mat(0xc21818)); bat.position.set(3, 3.3, D / 2 + 1.4); g.add(bat);
+      v6Board(g, 'Shop MiiU · quần áo trẻ em', '#c2487a', '#ffffff', 12, D, 5.2, 24); v6FinW(g, x, z, 12, D, v6Ry(F_CCU, off), 13); } }
+}
+
+// === (9) CÁT CỤT 54 — TRỤ SỞ UBND PHƯỜNG (kiểu b: nhà chính+sân+cổng+rào) +
+//   Gia Huy Coffee&Cake + Huy Hùng Fashion (pano_149=2.5). s+41 trên #t. ===
+{
+  // trụ sở phường 2T W20, sân lùi, cổng mái + rào sắt xanh (tây +N, H180)
+  { const D = 12, off = v6Off(F_CCU, D, 6); const [x, z] = v6Pt(F_CCU, 41, off);
+    const g = v6Box(x, z, v6Ry(F_CCU, off), 20, 8.4, D, v6Facade('#f0e6c8', '#7a6a44', 6, 2), 'v6_ccu_ubnd54');
+    if (g) { v6Board(g, 'UBND PHƯỜNG AN BIÊN · Cát Cụt', '#1c56a0', '#ffffff', 20, D, 6.4, 26);
+      const flag = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 0.9), v6Sign('★', '#c8281e', '#ffe14d', 50)); flag.position.set(-7, 9.2, 0); g.add(flag); v6FinW(g, x, z, 20, D, v6Ry(F_CCU, off), 20); }
+    v6Fence(F_CCU, 35, 47, v6Off(F_CCU, 0, 1), 0x2a6a3a);
+    { const [gx, gz] = v6Pt(F_CCU, 41, v6Off(F_CCU, 0, 1)); v6Gate(gx, gz, v6Ry(F_CCU, off), 5, 0xd8c9a8); } }
+  // Gia Huy Coffee & Cake 3T + nhà tân cổ trắng (đông -N, H90)
+  { const D = 8, off = -v6Off(F_CCU, D); const [x, z] = v6Pt(F_CCU, 41, off);
+    const g = v6Box(x, z, v6Ry(F_CCU, off), 5, 10.2, D, v6Facade('#e6ddc9', '#6a6a5a', 2, 3), 'v6_ccu_giahuycafe');
+    if (g) { const um = new THREE.Mesh(new THREE.CylinderGeometry(1.7, 1.7, 0.3, 10), mat(0xf4f2ec)); um.position.set(0, 2.8, D / 2 + 2.2); g.add(um);
+      v6Board(g, 'Gia Huy · COFFEE & CAKE', '#3a3d42', '#ffe9b0', 5, D, 5.2, 24); v6Fin(g, x, z, 4, 9); } }
+  // Huy Hùng Fashion / Tôm biển 4T (tây +N, H270)
+  { const D = 8, off = v6Off(F_CCU, D); const [x, z] = v6Pt(F_CCU, 49, off);
+    const g = v6Box(x, z, v6Ry(F_CCU, off), 5, 13.4, D, v6Facade('#dfe6ea', '#5a6067', 2, 4), 'v6_ccu_huyhung');
+    if (g) { v6Board(g, 'Huy Hùng Fashion', '#1c56a0', '#ffffff', 5, D, 5.2, 26); v6Fin(g, x, z, 4, 9); } }
+}
+
+// === (10) CÁT CỤT 85-88 — Gia Huy hải sản (bạt xanh sọc) + cổng vòm ngõ 20 +
+//   Phương Mai 87 + Charm Boutique/Hoàng M (pano_150=2.0). s+123 trên #t. ===
+{
+  // Gia Huy hải sản 3T + mái BẠT XANH sọc + tủ kính (đông -N, H45/H90)
+  { const D = 9, off = -v6Off(F_CCU, D); const [x, z] = v6Pt(F_CCU, 123, off);
+    const g = v6Box(x, z, v6Ry(F_CCU, off), 12, 10.2, D, v6Facade('#e2cf9a', '#7a6a44', 4, 3), 'v6_ccu_giahuy_hs');
+    if (g) { const bat = new THREE.Mesh(new THREE.BoxGeometry(11, 0.16, 3.2), mat(0x2f6db5)); bat.position.set(0, 3.4, D / 2 + 1.8); g.add(bat);
+      v6Board(g, 'GIA HUY · CUA HẤP · CHẢ NEM CUA BỂ', '#c21818', '#ffe9b0', 12, D, 5.4, 22); v6FinW(g, x, z, 12, D, v6Ry(F_CCU, off), 13); } }
+  // cổng vòm ngõ 20 Cát Cụt (đông -N kề Gia Huy)
+  { const D = 5, off = -v6Off(F_CCU, D); const [x, z] = v6Pt(F_CCU, 132, off);
+    if (v6OK(x, z)) { const g = new THREE.Group(); g.position.set(x, groundHeight(x, z), z); g.rotation.y = v6Ry(F_CCU, off);
+      const arch = new THREE.Mesh(new THREE.TorusGeometry(1.6, 0.35, 6, 14, Math.PI), mat(0xd6c7b0)); arch.position.set(0, 3.6, 0); g.add(arch);
+      for (const sx of [-2, 2]) { const p = new THREE.Mesh(new THREE.BoxGeometry(0.6, 3.6, 0.6), mat(0xd6c7b0)); p.position.set(sx, 1.8, 0); g.add(p); }
+      const s = new THREE.Mesh(new THREE.PlaneGeometry(4, 0.9), v6Sign('Ngõ 20 Cát Cụt', '#1c56a0', '#ffffff', 26)); s.position.set(0, 4.7, 0.1); g.add(s);
+      g.traverse((o) => { if (o.isMesh) o.castShadow = true; }); g.name = 'v6_ccu_cong20'; scene.add(g); addCollider(x - 2, z, 0.5); addCollider(x + 2, z, 0.5); FEATURED_CLEAR.push([x, z, 6]); } }
+  // Phương Mai 87 + Charm Boutique / Hoàng M (tây +N, H225/H270)
+  { const D = 8, off = v6Off(F_CCU, D); const [x, z] = v6Pt(F_CCU, 123, off);
+    const g = v6Box(x, z, v6Ry(F_CCU, off), 6, 10.2, D, v6Facade('#e6cf88', '#7a6a44', 2, 3), 'v6_ccu_phuongmai87');
+    if (g) { v6Board(g, 'Phương Mai · 87 Cát Cụt', '#c21818', '#ffffff', 6, D, 5.2, 24); v6Fin(g, x, z, 4, 9); }
+    const [x2, z2] = v6Pt(F_CCU, 130, off); const g2 = v6Box(x2, z2, v6Ry(F_CCU, off), 6, 10.2, D, v6Facade('#f0d8d8', '#8a6a6a', 2, 3), 'v6_ccu_charm');
+    if (g2) { const bat = new THREE.Mesh(new THREE.BoxGeometry(5, 0.14, 2.2), mat(0x8a5230)); bat.position.set(0, 3.3, D / 2 + 1.2); g2.add(bat); v6Board(g2, 'CHARM BOUTIQUE · HOÀNG M', '#c2487a', '#ffffff', 6, D, 5.2, 22); v6Fin(g2, x2, z2, 4, 9); } }
+}
+
+// === (11) GIAO CÁT CỤT × HAI BÀ TRƯNG (nút ~(-534,556)) — thư viện/trụ sở xanh-vàng
+//   ban công vòm + Chi Chuối Chiên góc + Fan Shop (pano_151=2.1). ĐẶT THEO GÓC PHẦN TƯ
+//   (tọa độ tường minh, KHÔNG offset 1-trục — 2 phố ~vuông góc nên offset đơn đẩy vào phố cắt). ===
+{
+  const faceJ = (x, z) => Math.atan2(-534 - x, 556 - z);   // mặt +Z quay VỀ tâm nút
+  // thư viện/công sở xanh-vàng 3T ban công vòm — góc TÂY-NAM, LÙI sâu khỏi 2 phố (H180)
+  { const x = -550, z = 580;
+    const g = v6Box(x, z, faceJ(x, z), 12, 10.2, 10, v6Facade('#2f6db0', '#f2d84a', 4, 3), 'v6_hbt_thuvien151');
+    if (g) { for (const cx of [-4, 0, 4]) { const arc = new THREE.Mesh(new THREE.TorusGeometry(1.2, 0.2, 6, 10, Math.PI), mat(0xf2ead2)); arc.position.set(cx, 6.8, 10 / 2 + 0.12); g.add(arc); }
+      v6Board(g, 'THƯ VIỆN SÁCH ĐỌC MIỄN PHÍ · UBND phường', '#c21818', '#ffe14d', 12, 10, 5.2, 22); v6FinW(g, x, z, 12, 10, faceJ(x, z), 13); } }
+  // Chi Chuối Chiên vàng 3T — góc TÂY-BẮC (H270/H315)
+  { const x = -549, z = 540;
+    const g = v6Box(x, z, faceJ(x, z), 6, 10.2, 8, v6Facade('#e8c94a', '#7a6a34', 2, 3), 'v6_hbt_chichuoi');
+    if (g) { v6Board(g, 'CHI CHUỐI CHIÊN', '#c21818', '#ffe08a', 6, 8, 5.2, 28); v6Fin(g, x, z, 4, 9); } }
+  // Fan Shop thời trang 3T trắng-xám — góc ĐÔNG-NAM (H90)
+  { const x = -519, z = 570;
+    const g = v6Box(x, z, faceJ(x, z), 6, 10.2, 8, v6Facade('#eceae4', '#5a6067', 2, 3), 'v6_ccu_fanshop');
+    if (g) { const glass = new THREE.Mesh(new THREE.BoxGeometry(4.6, 3.0, 0.12), sharedMats.window); glass.position.set(0, 1.6, 8 / 2 + 0.06); g.add(glass); v6Board(g, 'Fan Shop', '#22252a', '#ffffff', 6, 8, 4.4, 30); v6Fin(g, x, z, 4, 9); } }
+}
+
+
+
+  // ===== TINH T1 LÕI-TÂY: 11 block promenade Tam Bạc 2 bờ + dãy marble/nhà cổ (helper v1*) =====
+// ============================================================================
+// NHÁP CỤM T1_LÕI-TÂY (dải sông Tam Bạc nam + phố Hạ Lý/Thế Lữ) — 11 block, prefix v1
+//
+// PANO NGUỒN: 21 pano 1.0-2.9 (compare_full3 + compare_full2). Đã XEM 14 pano×2
+// heading ảnh thật + 3 ảnh game (197/301 h270/h090 game = SÔNG SÁT MÉP ĐƯỜNG, KHÔNG
+// promenade; 197_h270 game có 1 nhà vàng lấn kè). Đã grep FEATURED_CLEAR + đọc
+// block bc*(B4/B5/B6 = 547/548/549/531 ngõ 80 Hạ Lý ĐÃ DỰNG) + bs*(BS1/BS2 cầu
+// Lạc Long + arcade Pháp + THU NA MART + PHÚC AN = 074/075/076 ĐÃ DỰNG) → KHÔNG nháp lại.
+//
+// KHÁM PHÁ HÌNH HỌC (probe terrain + ROADS_DT): sông Tam Bạc = polyline
+// [[-314,-182],[-282,-299],[-313,-459]] w55, chảy N-S, VÒNG sang đông tại z-299.
+//   BỜ ĐÔNG (P. Tam Bạc, nhà cổ):  196/197/198/200 — sông ở PHÍA TÂY.
+//   BỜ TÂY (P. Thế Lữ, marble mới): 300/301/302/303 — sông ở PHÍA ĐÔNG.
+//   Nội địa tây (P. Hạ Lý, nhà cổ): 102/104/105/106 — KHÔNG sông.
+// Lỗi hệ thống G1: CẢ 2 BỜ THIẾU promenade (caro đỏ-xám + lan can sắt xanh + đèn
+//   đôi Pháp + cây chống cọc + hoa giấy) — mọi heading nhìn sông đạt 1.5-2.5.
+// Lỗi G3: shophouse tên thật thiếu (Nhà PP Thế Lữ, GẠO, Đức Anh, KEM THANH,
+//   Nhà May Phương Thành, OANH Coffee, KAI TEA, nhà 52-54 vòm, May Ngọc Hà).
+//
+// VỊ TRÍ DÁN: js/world.js, SAU khai báo FEATURED_CLEAR (:1478) + inSuperblock (:1519),
+// TRƯỚC vòng OSM BUILDINGS/shophouse_infill/block_infill — để FEATURED_CLEAR.push()
+// ở đây đuổi nhà OSM/infill (nearFeatured :1489). An toàn cạnh block bc*/bs* (khác toạ độ).
+//
+// TỌA ĐỘ đã DỜI KHỎI TIM ĐƯỜNG: chiếu pano lên đoạn t/s ROADS_DT gần nhất, đẩy pháp
+// tuyến (nửa_lòng t4/s5 + 2.3 vỉa + D/2) về phía heading fix (script place_t1.mjs).
+// Promenade neo theo TIM ĐƯỜNG của từng pano ven sông + đi men mép nước (probe dry).
+// Mọi anchor probe groundHeightNoDeck≈2.0, !isWater. node --check + smoke-run PASS.
+//
+// Scope giả định trong buildWorld: THREE, mat, makeTex, sharedMats, addCollider,
+// FEATURED_CLEAR, groundHeight, groundHeightNoDeck, isWater, LAND_H, localPt, scene,
+// mergeGeometries. KHÔNG import. Prefix v1 (KHÔNG đụng lm/hb/bc/dg/tb/tw/dl/bs/ts/cb/cn/ti/dm/ln/tx).
+// ============================================================================
+
+// === HELPER v1 (dán 1 LẦN trước các block) ===
+const v1OK = (x, z) => Math.abs(groundHeightNoDeck(x, z) - LAND_H) < 0.4 && !isWater(x, z);
+const v1dry = (x, z) => Math.abs(groundHeightNoDeck(x, z) - LAND_H) < 0.4;
+const v1Sign = (txt, bg, fg = '#ffffff', px = 46) => new THREE.MeshLambertMaterial({
+  map: makeTex(512, 96, (g, w, h) => {
+    g.fillStyle = bg; g.fillRect(0, 0, w, h);
+    g.fillStyle = fg; g.font = `bold ${px}px system-ui, sans-serif`;
+    g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, w / 2, h / 2 + 2, w - 24);
+  }),
+});
+const v1Fac = (baseCss, winCss, cols, rows) => new THREE.MeshLambertMaterial({
+  map: makeTex(256, 256, (g, w, h) => {
+    g.fillStyle = baseCss; g.fillRect(0, 0, w, h);
+    const mx = w * 0.1, my = h * 0.1, cw = (w - mx * 2) / cols, ch = (h - my * 2) / rows;
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+      g.fillStyle = winCss; g.fillRect(mx + c * cw + cw * 0.16, my + r * ch + ch * 0.15, cw * 0.68, ch * 0.68);
+    }
+  }),
+});
+const v1caro = () => {                                  // gạch caro đỏ-xám kè Tam Bạc (theo sidewalkMaterial)
+  const t = makeTex(256, 256, (g, w, h) => {
+    const s = w / 4;
+    for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) {
+      const rr = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453, rv = rr - Math.floor(rr);
+      g.fillStyle = rv < 0.72 ? '#9e523a' : rv < 0.88 ? '#8e4632' : '#a09888'; g.fillRect(x * s, y * s, s, s);
+    }
+    g.strokeStyle = 'rgba(40,20,12,.28)'; g.lineWidth = 2;
+    for (let i = 0; i <= 4; i++) { g.beginPath(); g.moveTo(i * s, 0); g.lineTo(i * s, h); g.moveTo(0, i * s); g.lineTo(w, i * s); g.stroke(); }
+  });
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  return new THREE.MeshLambertMaterial({ map: t });
+};
+// shophouse hộp chuẩn (thân + mái + collider + FEATURED_CLEAR); trả group để gắn biển
+const v1House = (cx, cz, ry, W, D, FL, facMat, name, roofHex = 0xb8b2a2) => {
+  if (!v1OK(cx, cz)) return null;
+  const g = new THREE.Group(); g.position.set(cx, groundHeight(cx, cz), cz); g.rotation.y = ry;
+  const H = FL * 3.3;
+  const body = new THREE.Mesh(new THREE.BoxGeometry(W, H, D), facMat); body.position.y = H / 2; g.add(body);
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(W + 0.5, 0.5, D + 0.5), mat(roofHex)); roof.position.y = H + 0.25; g.add(roof);
+  g.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+  g.name = name; scene.add(g);
+  addCollider(cx, cz, Math.min(W, D) * 0.5); FEATURED_CLEAR.push([cx, cz, Math.max(W, D) / 2 + 3]);
+  return g;
+};
+
+// === (V1-1) PROMENADE SÔNG TAM BẠC 2 BỜ — caro đỏ-xám + lan can sắt xanh (0x2e5e46)
+//     + đèn đôi Pháp (trụ đen 0x23282b + 2 cầu sáng) + cây non chống cọc 3 chân
+//     + hoa giấy (magenta). 7 đoạn ven sông (196/200 quá cạn hoặc = park nên bỏ):
+//     bờ ĐÔNG 200/198/197, bờ TÂY 300/301/302/303. Neo tim đường của TỪNG pano,
+//     đi men mép nước (probe dry mỗi 2m theo pháp tuyến sông). Trị G1 "sông sát mép
+//     đường + nhà lấn kè" ở ~10 heading. Mẫu: kè hồ Tam Bạc world.js:730-852. ===
+{
+  const caroMat = v1caro(), railMat = mat(0x2e5e46), poleMat = mat(0x23282b), bougMat = mat(0xc52a7a);
+  const caroG = [], railG = [], poleG = [], globeG = [], trunkG = [], leafG = [], stakeG = [], bougG = [];
+  // [tx,tz, ux,uz, snx,snz]  sn = pháp tuyến ĐƠN VỊ hướng RA SÔNG (probe dry_t1.mjs)
+  const SEGS = [
+    [-253.9, -291.6, -0.059, 0.998, -1.00, -0.06],  // 200 bờ đông (cạn ~6m → phần lớn tự skip)
+    [-251.2, -383.3, 0.253, 0.968, -0.97, 0.25],    // 198 bờ đông
+    [-261.6, -423.3, 0.253, 0.968, -0.97, 0.25],    // 197 bờ đông
+    [-361.4, -212.9, 0.287, -0.958, 0.96, 0.29],    // 300 bờ tây
+    [-333.0, -381.3, -0.014, -1.000, 1.00, -0.01],  // 301 bờ tây
+    [-347.2, -419.5, -0.353, -0.936, 0.94, -0.35],  // 302 bờ tây
+    [-362.2, -459.4, -0.353, -0.936, 0.94, -0.35],  // 303 bờ tây
+  ];
+  for (const [tx, tz, ux, uz, snx, snz] of SEGS) {
+    const barAng = Math.atan2(ux, uz) + Math.PI / 2;    // thanh/dải nằm dọc bờ
+    for (let a = -16; a <= 16; a += 2.5) {              // giữ gần pano, tránh trôi vào phố cắt ngang
+      const bx = tx + ux * a, bz = tz + uz * a;
+      // tìm mép nước theo pháp tuyến sông
+      let edge = -1;
+      for (let d = 4; d <= 32; d += 2) { const x = bx + snx * d, z = bz + snz * d; if (!v1dry(x, z)) { edge = d - 2; break; } }
+      if (edge < 6) continue;                            // đoạn cạn/không kè → bỏ
+      const capEdge = Math.min(edge, 16);
+      // CARO từ mép nhựa (d=5) tới mép nước
+      const inner = 5, outer = capEdge, mid = (inner + outer) / 2, wA = outer - inner;
+      if (wA > 0.8) {
+        const sx = bx + snx * mid, sz = bz + snz * mid;
+        if (v1dry(sx, sz)) {
+          const pg = new THREE.BoxGeometry(2.5, 0.2, wA); pg.rotateY(barAng); pg.translate(sx, groundHeight(sx, sz) + 0.1, sz);
+          const pp = pg.attributes.position, puv = new Float32Array(pp.count * 2), S = 1 / 1.6, si = Math.sin(Math.atan2(ux, uz)), co = Math.cos(Math.atan2(ux, uz));
+          for (let k = 0; k < pp.count; k++) { const vx = pp.getX(k), vz = pp.getZ(k); puv[k * 2] = (vx * si + vz * co) * S; puv[k * 2 + 1] = (vx * co - vz * si) * S; }
+          pg.setAttribute('uv', new THREE.BufferAttribute(puv, 2)); caroG.push(pg);
+        }
+      }
+      // LAN CAN sắt xanh tại mép nước
+      const rx = bx + snx * capEdge, rz = bz + snz * capEdge;
+      if (v1dry(rx, rz)) {
+        const gy = groundHeight(rx, rz) + 0.2;
+        const post = new THREE.BoxGeometry(0.07, 0.95, 0.07); post.translate(rx, gy + 0.48, rz); railG.push(post);
+        for (const hh of [0.5, 0.9]) { const r2 = new THREE.BoxGeometry(2.5, 0.06, 0.05); r2.rotateY(barAng); r2.translate(rx, gy + hh, rz); railG.push(r2); }
+        addCollider(rx, rz, 0.8);
+        if (Math.round(a + 16) % 10 < 2.5) FEATURED_CLEAR.push([bx + snx * (capEdge / 2), bz + snz * (capEdge / 2), capEdge / 2 + 3]);
+        // hoa giấy magenta rủ trên lan can mỗi ~10m
+        if (Math.round(a + 16) % 10 < 2.5) { const bl = new THREE.SphereGeometry(0.5, 6, 5); bl.scale(1, 0.6, 1); bl.translate(rx, gy + 1.05, rz); bougG.push(bl); }
+      }
+      // ĐÈN ĐÔI Pháp mỗi ~28m tại d=capEdge-2 (trên caro)
+      if (Math.round(a + 16) % 28 < 2.5) {
+        const lx = bx + snx * (capEdge - 2), lz = bz + snz * (capEdge - 2);
+        if (v1dry(lx, lz)) {
+          const ly = groundHeight(lx, lz) + 0.2;
+          const pl = new THREE.CylinderGeometry(0.07, 0.11, 3.6, 8); pl.translate(lx, ly + 1.8, lz); poleG.push(pl);
+          const arm = new THREE.BoxGeometry(1.5, 0.07, 0.07); arm.rotateY(barAng); arm.translate(lx, ly + 3.55, lz); poleG.push(arm);
+          for (const s of [-0.62, 0.62]) { const gl = new THREE.SphereGeometry(0.17, 8, 6); gl.translate(lx + ux * s, ly + 3.72, lz + uz * s); globeG.push(gl); }
+        }
+      }
+      // CÂY NON chống cọc 3 chân mỗi ~14m tại d=capEdge-4 (KHÔNG collider — cây non mảnh,
+      // né đè lòng phố cắt ngang khi promenade chạm nút giao)
+      if (Math.round(a + 16) % 14 < 2.5) {
+        const cx2 = bx + snx * Math.max(capEdge - 4, 6.5), cz2 = bz + snz * Math.max(capEdge - 4, 6.5);
+        if (v1dry(cx2, cz2)) {
+          const cy = groundHeight(cx2, cz2);
+          const tr = new THREE.CylinderGeometry(0.09, 0.13, 4.2, 6); tr.translate(cx2, cy + 2.1, cz2); trunkG.push(tr);
+          const lf = new THREE.SphereGeometry(1.3, 7, 6); lf.scale(1, 1.2, 1); lf.translate(cx2, cy + 4.6, cz2); leafG.push(lf);
+          for (const ang of [0, 2.1, 4.2]) { const st = new THREE.CylinderGeometry(0.04, 0.04, 1.9, 4); st.rotateZ(0.32); st.translate(cx2 + Math.cos(ang) * 0.5, cy + 0.9, cz2 + Math.sin(ang) * 0.5); stakeG.push(st); }
+        }
+      }
+    }
+  }
+  const addM = (arr, m, nm) => { if (arr.length) { const me = new THREE.Mesh(mergeGeometries(arr), m); me.name = nm; me.castShadow = true; me.receiveShadow = true; scene.add(me); } };
+  addM(caroG, caroMat, 'v1_tambac_caro');
+  addM(railG, railMat, 'v1_tambac_rail');
+  addM(poleG, poleMat, 'v1_tambac_lamppost');
+  if (globeG.length) { const gm = new THREE.Mesh(mergeGeometries(globeG), sharedMats.lampGlow); gm.name = 'v1_tambac_lampglobe'; scene.add(gm); }
+  addM(trunkG, sharedMats.trunk, 'v1_tambac_treetrunk');
+  addM(leafG, sharedMats.leafGreen, 'v1_tambac_treeleaf');
+  addM(stakeG, mat(0x8a6f4a), 'v1_tambac_stakes');
+  addM(bougG, bougMat, 'v1_tambac_bougain');
+}
+
+// === (V1-2) NỘI THẤT KÈ BỜ ĐÔNG — cột áp phích ĐỎ tuyên truyền + tủ điện xám +
+//     trạm xe đạp công cộng + thùng rác đôi (pano_200 h0/h180: "bảng tuyên truyền
+//     đỏ ĐẢNG CỘNG SẢN VN QUANG VINH MUÔN NĂM, tủ điện, trạm xe đạp, cọc đỏ-trắng").
+//     Đặt trên caro bờ đông sát lan can, d≈8 từ tim #200. ===
+{
+  const bx0 = -253.9, bz0 = -291.6, ux = -0.059, uz = 0.998, snx = -1.00, snz = -0.06;
+  const put = (along, dOut) => { const x = bx0 + ux * along + snx * dOut, z = bz0 + uz * along + snz * dOut; return v1dry(x, z) ? [x, z, groundHeight(x, z)] : null; };
+  // cột áp phích đỏ 2 mặt
+  let p = put(-6, 5);
+  if (p) {
+    const g = new THREE.Group(); g.name = 'v1_kedong_board';
+    const post = new THREE.Mesh(new THREE.BoxGeometry(0.2, 3.4, 0.2), mat(0x9a2018)); post.position.set(p[0], p[2] + 1.7, p[1]); g.add(post);
+    const bd = new THREE.Mesh(new THREE.BoxGeometry(1.5, 2.0, 0.18), v1Sign('ĐẢNG CỘNG SẢN VIỆT NAM QUANG VINH MUÔN NĂM', '#c0201a', '#ffe066', 34));
+    bd.position.set(p[0], p[2] + 3.4, p[1]); bd.rotation.y = Math.atan2(-snx, -snz); g.add(bd);
+    g.traverse((o) => { if (o.isMesh) o.castShadow = true; }); scene.add(g); addCollider(p[0], p[1], 0.5);
+  }
+  // tủ điện xám lớn
+  p = put(2, 6);
+  if (p) { const c = new THREE.Mesh(new THREE.BoxGeometry(2.6, 2.4, 1.4), mat(0x9a9d9f)); c.position.set(p[0], p[2] + 1.2, p[1]); c.rotation.y = Math.atan2(ux, uz); c.castShadow = true; c.name = 'v1_kedong_cabinet'; scene.add(c); addCollider(p[0], p[1], 1.3); }
+  // trạm xe đạp công cộng (thanh xanh + 4 xe cọc)
+  p = put(12, 5.5);
+  if (p) {
+    const g = new THREE.Group(); g.name = 'v1_kedong_bikeshare';
+    const rack = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.5, 0.3), mat(0x2f6db5)); rack.position.set(p[0], p[2] + 0.9, p[1]); rack.rotation.y = Math.atan2(ux, uz); g.add(rack);
+    for (const s of [-1.5, -0.5, 0.5, 1.5]) { const w = new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.05, 6, 12), mat(0x33383c)); w.position.set(p[0] + ux * s, p[2] + 0.4, p[1] + uz * s); w.rotation.y = Math.atan2(ux, uz); g.add(w); }
+    g.traverse((o) => { if (o.isMesh) o.castShadow = true; }); scene.add(g); addCollider(p[0], p[1], 2.0);
+  }
+  // thùng rác đôi (xanh lá + xanh dương)
+  p = put(-14, 5);
+  if (p) { for (const [s, col] of [[-0.4, 0x2e7d4f], [0.4, 0x2f6db5]]) { const b = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.9, 0.6), mat(col)); b.position.set(p[0] + ux * s, p[2] + 0.45, p[1] + uz * s); b.castShadow = true; b.name = 'v1_kedong_bin'; scene.add(b); } }
+}
+
+// === (V1-3) NHÀ PHÂN PHỐI THẾ LỮ + BÉ BỐNG (cà phê muối, ô dù tím) + KEM THANH —
+//     bờ TÂY Thế Lữ, marble trắng 4T, tầng trệt kính, billboard đỏ "Nhà Phân Phối
+//     Thế Lữ" (pano_301 h270; ảnh 301_h270 khớp). place_t1: (-344.8,-381.2) ry1.585. ===
+{
+  const g = v1House(-344.8, -381.2, 1.585, 12, 11, 4, v1Fac('#efece5', '#4a5560', 3, 4), 'v1_nhapp_thelu');
+  if (g) {
+    // billboard đỏ ngang trên tầng 1
+    const bb = new THREE.Mesh(new THREE.PlaneGeometry(11, 1.9), v1Sign('NHÀ PHÂN PHỐI THẾ LỮ', '#b81f1f', '#ffffff', 44));
+    bb.position.set(0, 4.2, 11 / 2 + 0.08); g.add(bb);
+    // cửa kính tầng trệt
+    const gl = new THREE.Mesh(new THREE.BoxGeometry(9, 3.0, 0.1), sharedMats.window); gl.position.set(0, 1.6, 11 / 2 + 0.05); g.add(gl);
+    g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  }
+  // Bé Bống + KEM THANH: ô dù tím + biển KEM THANH sát nam, trên vỉa hè (localPt phía đông nhà)
+  const [ux2, uz2] = [-0.014, -1.0];                    // dọc phố ~ -z
+  const px = -344.8 + ux2 * 8 + 1.0 * 5.6, pz = -381.2 + uz2 * 8;   // dịch nam 8m, ra đông 5.6m
+  if (v1dry(px, pz)) {
+    const gy = groundHeight(px, pz), g2 = new THREE.Group(); g2.name = 'v1_bebong_kemthanh';
+    for (const s of [-1.2, 1.2]) {
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 2.2, 6), mat(0x999)); pole.position.set(px + ux2 * s, gy + 1.1, pz + uz2 * s); g2.add(pole);
+      const um = new THREE.Mesh(new THREE.ConeGeometry(1.7, 0.7, 8), mat(0x8a5fae)); um.position.set(px + ux2 * s, gy + 2.5, pz + uz2 * s); g2.add(um);
+    }
+    const sg = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 0.7), v1Sign('KEM THANH', '#1f4fa0', '#ffffff', 40));
+    sg.position.set(px + ux2 * 3, gy + 2.4, pz + uz2 * 3); sg.rotation.y = Math.PI / 2; g2.add(sg);
+    g2.traverse((o) => { if (o.isMesh) o.castShadow = true; }); scene.add(g2);
+  }
+}
+
+// === (V1-4) DÃY MARBLE THẾ LỮ: TT BỒI DƯỠNG ĐỨC ANH + KEM TRÁI DỪA + Kinh Dịch —
+//     bờ TÂY, 3 lô marble trắng liền kề, cửa cuốn/cổng trắng, băng rôn đỏ (pano_302
+//     h270; ảnh 302_h270 khớp số nhà 12-14). place_t1: (-358.2,-415.4) ry1.932. ===
+{
+  const cx = -358.2, cz = -415.4, ry = 1.932, ux2 = -0.353, uz2 = -0.936;   // dọc phố
+  const facs = [v1Fac('#e7e2d8', '#565f66', 2, 4), v1Fac('#ded8cc', '#4f585f', 2, 4), v1Fac('#e9e5dc', '#5a636a', 2, 4)];
+  for (let i = 0; i < 3; i++) {
+    const bx = cx + ux2 * (i - 1) * 7.2, bz = cz + uz2 * (i - 1) * 7.2;
+    const g = v1House(bx, bz, ry, 6.8, 11, 4, facs[i], 'v1_thelu_marble_' + i);
+    if (g && i === 1) {                                 // lô giữa: băng rôn đỏ Đức Anh
+      const bn = new THREE.Mesh(new THREE.PlaneGeometry(6.2, 1.1), v1Sign('TT BỒI DƯỠNG KIẾN THỨC ĐỨC ANH', '#b01e1e', '#ffe680', 30));
+      bn.position.set(0, 4.0, 11 / 2 + 0.07); g.add(bn); g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+    }
+    if (g && i === 2) {                                 // lô nam: KEM TRÁI DỪA
+      const bn = new THREE.Mesh(new THREE.PlaneGeometry(4.0, 0.8), v1Sign('KEM TRÁI DỪA', '#2f6d5a', '#ffffff', 40));
+      bn.position.set(0, 4.2, 11 / 2 + 0.07); g.add(bn); g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+    }
+  }
+}
+
+// === (V1-5) NHÀ HÀNG GẠO — góc Thế Lữ gần cầu, hiện đại trắng, logo tròn đen "GẠO"
+//     + mặt trời cam, mái hiên tôn xanh-xám, đá sẫm tầng trệt (pano_303 h180 + 302
+//     h270). place_t1: (-373.7,-455.0) ry1.932, mặt về đông ra Thế Lữ. ===
+{
+  const g = v1House(-373.7, -455.0, 1.932, 13, 12, 3, v1Fac('#f2efe9', '#3a4048', 3, 3), 'v1_gao');
+  if (g) {
+    // tầng trệt đá sẫm
+    const base = new THREE.Mesh(new THREE.BoxGeometry(13.2, 3.4, 12.2), mat(0x2b2f33)); base.position.y = 1.7; g.add(base);
+    // biển GẠO trắng + logo tròn cam
+    const sg = new THREE.Mesh(new THREE.PlaneGeometry(6.5, 2.2), v1Sign('GẠO', '#161616', '#ffffff', 120));
+    sg.position.set(2, 4.0, 12 / 2 + 0.08); g.add(sg);
+    const sun = new THREE.Mesh(new THREE.CircleGeometry(0.95, 16), mat(0xe8952e)); sun.position.set(-3.4, 4.0, 12 / 2 + 0.1); g.add(sun);
+    // mái hiên tôn xanh-xám
+    const aw = new THREE.Mesh(new THREE.BoxGeometry(13.4, 0.14, 2.4), mat(0x5a6b74)); aw.position.set(0, 3.1, 12 / 2 + 1.1); aw.rotation.x = -0.12; g.add(aw);
+    g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  }
+}
+
+// === (V1-6) NHÀ MAY PHƯƠNG THÀNH + dãy nhà cổ xuống cấp — bờ ĐÔNG Tam Bạc, 3 lô
+//     2-3T gạch/vữa loang, cửa vòm, bạt sọc xanh, biển xanh lá "Nhà May Phương Thành"
+//     (pano_197 h90 + 198 h90; ảnh 197_h090 khớp). place_t1 197h90: (-250.7,-426.1) ry-1.315. ===
+{
+  const cx = -250.7, cz = -426.1, ry = -1.315, ux2 = 0.253, uz2 = 0.968;    // dọc phố
+  const facs = [v1Fac('#c9a06a', '#5a4630', 2, 2), v1Fac('#b98f6e', '#4a3826', 2, 3), v1Fac('#d8cdb8', '#5f513a', 2, 2)];
+  for (let i = 0; i < 3; i++) {
+    const bx = cx + ux2 * (i - 1) * 6.4, bz = cz + uz2 * (i - 1) * 6.4;
+    const FL = i === 1 ? 3 : 2;
+    const g = v1House(bx, bz, ry, 6.0, 10, FL, facs[i], 'v1_tambac_oldrow_' + i, 0x7a3a28);
+    if (g) {
+      // mái hiên bạt sọc xanh
+      const aw = new THREE.Mesh(new THREE.BoxGeometry(5.8, 0.12, 1.8), mat(0x2f5f9e)); aw.position.set(0, FL * 3.3 * 0.32, 10 / 2 + 0.8); aw.rotation.x = -0.14; g.add(aw);
+      if (i === 0) { const sg = new THREE.Mesh(new THREE.PlaneGeometry(5.2, 1.0), v1Sign('NHÀ MAY PHƯƠNG THÀNH', '#1f6b3a', '#eaf3e6', 30)); sg.position.set(0, FL * 3.3 * 0.46, 10 / 2 + 0.06); g.add(sg); }
+      g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+    }
+  }
+}
+
+// === (V1-7) OANH COFFEE + DỊCH VỤ TÀI CHÍNH + Café 58 — bờ ĐÔNG Tam Bạc bắc, cụm
+//     3T: OANH gỗ nâu + logo đồng hồ + sân thượng cây, nhà tài chính đỏ, Café 58 trắng
+//     (pano_200 h90 + 198 h90; ảnh 200_h090 khớp). place_t1 200h90: (-242.6,-290.9) ry-1.63. ===
+{
+  const cx = -242.6, cz = -290.9, ry = -1.63, ux2 = -0.059, uz2 = 0.998;
+  // OANH (giữa) 3T
+  const g = v1House(cx, cz, ry, 7, 11, 3, v1Fac('#8a6a48', '#3a2c1c', 2, 3), 'v1_oanh_coffee');
+  if (g) {
+    const sg = new THREE.Mesh(new THREE.PlaneGeometry(6.0, 1.5), v1Sign('OANH COFFEE', '#5a3a1c', '#e8c98a', 46)); sg.position.set(0, 5.4, 11 / 2 + 0.07); g.add(sg);
+    const aw = new THREE.Mesh(new THREE.BoxGeometry(6.4, 0.12, 2.0), mat(0xdedad0)); aw.position.set(0, 3.4, 11 / 2 + 0.9); aw.rotation.x = -0.12; g.add(aw);
+    // cây sân thượng
+    for (const s of [-2, 0, 2]) { const lf = new THREE.Mesh(new THREE.SphereGeometry(0.7, 6, 5), sharedMats.leafDark); lf.position.set(ux2 * s * 0.0 + s * 0.9, 3 * 3.3 + 0.5, 11 / 2 - 0.5); g.add(lf); }
+    g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  }
+  // DỊCH VỤ TÀI CHÍNH (bắc) 2T + Café 58 (nam) 3T
+  const gf = v1House(cx + ux2 * 8, cz + uz2 * 8, ry, 6, 10, 2, v1Fac('#c8b89a', '#4a3c28', 2, 2), 'v1_taichinh');
+  if (gf) { const sg = new THREE.Mesh(new THREE.PlaneGeometry(5.2, 1.6), v1Sign('DỊCH VỤ TÀI CHÍNH', '#ffffff', '#c0201a', 34)); sg.position.set(0, 3.2, 10 / 2 + 0.06); gf.add(sg); gf.traverse((o) => { if (o.isMesh) o.castShadow = true; }); }
+  const gc = v1House(cx - ux2 * 8, cz - uz2 * 8, ry, 6, 10, 3, v1Fac('#e2ddd2', '#556069', 2, 3), 'v1_cafe58');
+  if (gc) { const sg = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 0.8), v1Sign('Café 58', '#2b2b2b', '#ffffff', 40)); sg.position.set(0, 3 * 3.3 * 0.9, 10 / 2 + 0.06); gc.add(sg); gc.traverse((o) => { if (o.isMesh) o.castShadow = true; }); }
+}
+
+// === (V1-8) KAI TEA — nhà Pháp GÓC 2T vàng kem, cửa vòm, mái ngói, biển "KAI TEA"/"TRÀ"
+//     góc Điện Biên Phủ × Tam Bạc (pano_196 h90; ảnh 196_h090 khớp — nhà góc vàng cũ).
+//     Đặt góc đông-bắc nút Điện Biên Phủ×Tam Bạc, né 's' đầu cầu (probe spot.mjs):
+//     (-247,-447) d15 s, mặt về TÂY-NAM ra pano_196 (-267.9,-462.9). ===
+{
+  const g = v1House(-247, -447, -2.0, 13, 10, 2, v1Fac('#d8c184', '#6a5a35', 3, 2), 'v1_kai_tea', 0x8a4a34);
+  if (g) {
+    // dải vòm cuốn tầng trệt (5 vòm)
+    for (let i = 0; i < 5; i++) { const ar = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, 0.3, 10, 1, false, 0, Math.PI), mat(0xc9b273)); ar.rotation.z = -Math.PI / 2; ar.position.set(-5 + i * 2.5, 2.6, 10 / 2 + 0.05); g.add(ar); }
+    const sg = new THREE.Mesh(new THREE.PlaneGeometry(4.5, 1.0), v1Sign('KAI TEA', '#2f6db5', '#ffffff', 46)); sg.position.set(-3, 4.0, 10 / 2 + 0.08); g.add(sg);
+    const sg2 = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 1.0), v1Sign('TRÀ', '#ffffff', '#2f6db5', 56)); sg2.position.set(3.5, 4.0, 10 / 2 + 0.08); g.add(sg2);
+    g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  }
+}
+
+// === (V1-9) CAO ỐC XÂY DỞ 15T lưới xanh + cần cẩu — skyline bên kia sông, HIỆN diện
+//     trong pano_074/300/301/302/303 h90/h270 ("cao ốc 15T quây lưới xanh + cần cẩu").
+//     Đặt SAU dãy bờ đông, né 'r' nội bộ (probe spot.mjs): (-198,-362) d~17 r,
+//     cao ~48m, KHÔNG che camera bờ đông (lùi ~50m sau x-250). ===
+{
+  const bx = -198, bz = -362;
+  if (v1OK(bx, bz)) {
+    const g = new THREE.Group(); g.position.set(bx, groundHeight(bx, bz), bz); g.name = 'v1_tower15t';
+    const H = 15 * 3.2, W = 20, D = 20;
+    const core = new THREE.Mesh(new THREE.BoxGeometry(W, H, D), v1Fac('#c9cdc4', '#7a8074', 5, 15)); core.position.y = H / 2; g.add(core);
+    // lưới xanh công trường quây ngoài
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(W + 0.6, H * 0.82, D + 0.6), new THREE.MeshLambertMaterial({ color: 0x4f8f5f, transparent: true, opacity: 0.62 })); mesh.position.y = H * 0.41; g.add(mesh);
+    // cần cẩu tháp: cột + tay cần ngang
+    const mast = new THREE.Mesh(new THREE.BoxGeometry(0.8, H + 14, 0.8), mat(0xe0c020)); mast.position.set(W / 2 + 2, (H + 14) / 2, D / 2 - 2); g.add(mast);
+    const jib = new THREE.Mesh(new THREE.BoxGeometry(30, 0.6, 0.6), mat(0xe0c020)); jib.position.set(W / 2 + 2 + 8, H + 13, D / 2 - 2); g.add(jib);
+    g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+    scene.add(g); addCollider(bx, bz, 10); FEATURED_CLEAR.push([bx, bz, 18]);
+  }
+}
+
+// === (V1-10) NHÀ 52-54 vòm (Pháp trắng, con tiện, "CHO THUÊ 52+54") + NEU showroom kính —
+//     phố HẠ LÝ nội địa (pano_105 h270 + 104 h90; ảnh 105_h270/104_h090 khớp).
+//     place_t1 105h270: (-387.9,-261.9) ry1.232 ; 104h90: (-352.3,-291.9) ry-1.91. ===
+{
+  // nhà 52-54 Pháp trắng 2T, ban công con tiện + cửa vòm
+  const g = v1House(-387.9, -261.9, 1.232, 12, 11, 2, v1Fac('#efece4', '#7a7266', 3, 2), 'v1_nha5254');
+  if (g) {
+    for (let i = 0; i < 2; i++) { const ar = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.4, 0.3, 12, 1, false, 0, Math.PI), mat(0xdedad0)); ar.rotation.z = -Math.PI / 2; ar.position.set(-3 + i * 6, 3.0, 11 / 2 + 0.05); g.add(ar); }
+    // ban công con tiện T1
+    const bal = new THREE.Mesh(new THREE.BoxGeometry(11, 0.9, 0.3), mat(0xe6e2d8)); bal.position.set(0, 3.6, 11 / 2 + 0.5); g.add(bal);
+    const sg = new THREE.Mesh(new THREE.PlaneGeometry(2.0, 1.0), v1Sign('CHO THUÊ 52+54', '#c0201a', '#ffffff', 26)); sg.position.set(4.4, 4.2, 11 / 2 + 0.06); g.add(sg);
+    g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  }
+  // NEU showroom kính 3T
+  const gn = v1House(-352.3, -291.9, -1.91, 11, 11, 3, v1Fac('#dcd7cd', '#40474e', 3, 3), 'v1_neu_showroom');
+  if (gn) {
+    const gl = new THREE.Mesh(new THREE.BoxGeometry(9, 3.2, 0.1), sharedMats.window); gl.position.set(0, 1.7, 11 / 2 + 0.05); gn.add(gl);
+    const sg = new THREE.Mesh(new THREE.PlaneGeometry(4.5, 0.9), v1Sign('NEU', '#8a1c1c', '#ffffff', 60)); sg.position.set(0, 4.0, 11 / 2 + 0.06); gn.add(sg);
+    gn.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  }
+}
+
+// === (V1-11) MAY NGỌC HÀ + A CLOSET (ngõ nhánh) + SÚP ỚT — phố HẠ LÝ nội địa nam+bắc
+//     (pano_102 h270 "May Ngọc Hà 2T–ngõ–A Closet trắng 3T"; pano_106 h0 "SÚP ỚT +
+//     nhà ống cũ 2T bạt xanh"). place_t1 102h270:(-400.1,-420.1)ry1.89; 106h270:(-407.9,-235.4)ry0.758. ===
+{
+  // May Ngọc Hà 2T (áo dài, biển đỏ trên nền vàng)
+  const g1 = v1House(-400.1, -420.1, 1.89, 7, 10, 2, v1Fac('#d8cbb0', '#5a4c34', 2, 2), 'v1_mayngocha');
+  if (g1) { const sg = new THREE.Mesh(new THREE.PlaneGeometry(6.2, 1.2), v1Sign('MAY NGỌC HÀ', '#e8dfa8', '#b81f1f', 34)); sg.position.set(0, 3.2, 10 / 2 + 0.06); g1.add(sg); g1.traverse((o) => { if (o.isMesh) o.castShadow = true; }); }
+  // A Closet trắng 3T (dịch nam 10m, có khe ngõ nhánh giữa)
+  const ux2 = 0.313, uz2 = 0.950;
+  const g2 = v1House(-400.1 + ux2 * 10, -420.1 + uz2 * 10, 1.89, 6.5, 10, 3, v1Fac('#eceae4', '#4a5058', 2, 3), 'v1_acloset');
+  if (g2) { const sg = new THREE.Mesh(new THREE.PlaneGeometry(4.0, 0.9), v1Sign('A CLOSET', '#2b2b2b', '#ffffff', 44)); sg.position.set(0, 4.2, 10 / 2 + 0.06); g2.add(sg); g2.traverse((o) => { if (o.isMesh) o.castShadow = true; }); }
+  // SÚP ỚT + nhà ống cũ 2T bạt xanh (phố Hạ Lý bắc)
+  const g3 = v1House(-407.9, -235.4, 0.758, 7, 10, 2, v1Fac('#c7b998', '#544733', 2, 2), 'v1_supot', 0x7a3a28);
+  if (g3) {
+    const aw = new THREE.Mesh(new THREE.BoxGeometry(6.6, 0.12, 1.8), mat(0x2f5f9e)); aw.position.set(0, 2.1, 10 / 2 + 0.8); aw.rotation.x = -0.14; g3.add(aw);
+    const sg = new THREE.Mesh(new THREE.PlaneGeometry(3.6, 0.9), v1Sign('SÚP ỚT', '#c0201a', '#ffe066', 46)); sg.position.set(0, 3.0, 10 / 2 + 0.06); g3.add(sg);
+    g3.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  }
+}
+
+
   }
 
   // (MÁI HIÊN BẠT + BIỂN HIỆU chuyển xuống SAU khối bằng-chứng-nhà: cần houseEvidence/openSpace/panoDenies
@@ -12600,6 +13585,13 @@ const v2Tower = (x, z, ry, W, D, FL, FH, wallMat, name) => {
             x < (px2[j2][0] - px2[i2][0]) * (z - px2[i2][1]) / (px2[j2][1] - px2[i2][1]) + px2[i2][0]) inside = !inside;
       }
       if (inside) return true; }
+    // PROMENADE 2 BỜ TAM BẠC đoạn nam đập (cell_t1: game render sông sát mép đường, thiếu kè)
+    { const pe=[[-252,-286],[-249,-388],[-266,-430],[-286,-427],[-270,-386],[-272,-286]];
+      let ins=false; for(let i=0,j=5;i<6;j=i++){ if((pe[i][1]>z)!==(pe[j][1]>z)&&
+        x<(pe[j][0]-pe[i][0])*(z-pe[i][1])/(pe[j][1]-pe[i][1])+pe[i][0]) ins=!ins; } if(ins) return true; }
+    { const pw=[[-359,-210],[-331,-378],[-345,-462],[-320,-462],[-318,-378],[-346,-210]];
+      let ins=false; for(let i=0,j=5;i<6;j=i++){ if((pw[i][1]>z)!==(pw[j][1]>z)&&
+        x<(pw[j][0]-pw[i][0])*(z-pw[i][1])/(pw[j][1]-pw[i][1])+pw[i][0]) ins=!ins; } if(ins) return true; }
     // KÈ SÔNG TAM BẠC đoạn phố (cell_taysong): dải 2 bờ = promenade, không nhà
     for (const s of [[-1092, 50, -960, 8], [-960, 8, -840, -19.5], [-840, -19.5, -700, -38], [-700, -38, -506, -76], [-506, -76, -383, -190]])
       if (_segD(x, z, s[0], s[1], s[2], s[3]) < 42) return true;

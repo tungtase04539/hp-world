@@ -315,6 +315,15 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-14 (bs)** [VÒNG TINH 6-AGENT (lô 2/2): T1+T3+T6 = 29 block, XỬ TRÙNG LẶP]:
+    T1 LÕI-TÂY 11 block v1* (PROMENADE 2 bờ Tam Bạc caro+lan can+hoa giấy — render pano_197 khớp
+    đẹp, hết nhà lấn kè; dãy marble Thế Lữ + nhà cổ); T6 NAM 11 block v6* (HXH biệt thự Pháp, mầm
+    non cổng cầu vồng, VietinBank dọn camera-lọt-khối, Cát Cụt UBND An Biên); T3 TÂY-GIỮA 7 block
+    v3* (landmark đông sông). TRÙNG LẶP 6-AGENT-SONG-SONG (ranh giới ô cắt qua sông): T1+T3 CẢ HAI
+    dựng promenade Tam Bạc + T3+T5 cả hai TTYT Hồng Bàng (cách 85m) → BỎ block A (promenade) + C
+    (TTYT) của T3 khi tích hợp, giữ 7 landmark còn lại. BÀI HỌC: chạy nhiều agent cùng khu chồng
+    lấn phải TRIAGE trùng khi tích hợp (promenade/landmark cùng địa vật) — kiểm khoảng cách tọa độ
+    trước khi chèn. Cả 6 agent smoke PASS 0 lấn lòng đường. VÒNG TINH 6-AGENT XONG (57 block, 134 pano).
 - **2026-07-14 (br)** [VÒNG TINH 6-AGENT (lô 1/2): T5+T4+T2 = 28 block]:
     T5 LÕI-TRUNG 7 block v5* (TT Y tế Hồng Bàng, công sở Pháp arcade, PVcomBank, lô phá dỡ cột
     Corinthian); T4 ĐÔNG-GIỮA 9 block v4* (toà Pháp cổ mansard 44m, Le Jardin, chợ N.Khuyến +
