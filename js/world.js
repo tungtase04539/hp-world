@@ -128,6 +128,171 @@ function sidewalkMaterial(type) {
   const m = new THREE.MeshLambertMaterial({ map: tex });
   _swMatCache[type] = m; return m;
 }
+// ===== FACADE TEXTURE NHÀ ỐNG procedural (cell_facade, prefix fc*) — cache ≤30 texture =====
+/* ---- bảng màu dùng chung với world.js (đồng bộ nhà generic hiện có) ---- */
+const FC_WALL = ['#f5e4b8', '#f0cfa0', '#dfe8dc', '#f4b8a0', '#cfe0ee', '#f7efc9']; // world.js:15770
+const FC_SIGN = ['#c62828', '#1c56a0', '#1f7a3c', '#d8862a', '#26262c', '#8e2f80']; // world.js:15579
+const FC_GLASS = '#4a6b82';   // kính cửa sổ xanh xám
+const FC_FRAME = '#f4f1e8';   // khung cửa trắng kem
+const FC_SHUT  = '#2a2d33';   // cửa cuốn / kính tối tầng trệt
+
+/* nhiễu bẩn tường (bản sao speckle world.js:78) */
+function fcSpeckle(g, x, y, w, h, n, alpha) {
+  for (let i = 0; i < n; i++) {
+    g.fillStyle = `rgba(0,0,0,${(alpha * Math.random()).toFixed(3)})`;
+    g.fillRect(x + Math.random() * w, y + Math.random() * h, 2, 2);
+  }
+}
+
+/* bản sao makeTex world.js:70 — nếu tích hợp, DÙNG LẠI makeTex cũ, bỏ hàm này */
+function fcMakeTex(w, h, draw) {
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  draw(c.getContext('2d'), w, h);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+/* ----------------------------------------------------------------------------
+ *  fcFacadeTex(opts) → THREE.CanvasTexture
+ *  1 GIAN (bay) rộng, cao đủ `floors` tầng. RepeatWrapping ngang để lặp thành
+ *  dãy gian; ClampToEdge dọc (1 nhà = trọn chiều cao texture).
+ *    floors : số tầng (1..8) — quyết định số hàng cửa sổ
+ *    wall   : index màu tường (0..FC_WALL.length-1)
+ *    sign   : index màu biển hiệu (0..FC_SIGN.length-1)
+ * -------------------------------------------------------------------------- */
+function fcFacadeTex({ floors = 4, wall = 0, sign = 0 } = {}) {
+  floors = Math.max(1, Math.min(8, floors | 0));
+  const up = floors - 1;                       // số tầng TRÊN (có cửa sổ)
+  const W = 256;                               // rộng 1 gian
+  const FPX = 128, GPX = 150;                  // cao 1 tầng trên / tầng trệt (px)
+  const H = GPX + up * FPX;
+  const wallC = FC_WALL[wall % FC_WALL.length];
+  const signC = FC_SIGN[sign % FC_SIGN.length];
+
+  return fcMakeTex(W, H, (g, w, h) => {
+    // nền tường
+    g.fillStyle = wallC; g.fillRect(0, 0, w, h);
+
+    /* ---- các tầng TRÊN (từ đỉnh xuống) : cửa sổ + ban công lam + phân tầng ---- */
+    for (let k = 0; k < up; k++) {
+      const y0 = k * FPX;
+      // đường phân tầng (slab) đậm ở đáy mỗi tầng
+      g.fillStyle = 'rgba(0,0,0,0.10)'; g.fillRect(0, y0 + FPX - 6, w, 6);
+
+      // cửa sổ giữa gian: khung trắng + kính xanh + gờ lanh-tô
+      const ww = w * 0.46, wh = FPX * 0.5, wx = (w - ww) / 2, wy = y0 + FPX * 0.20;
+      g.fillStyle = '#c9c2ad'; g.fillRect(wx - 5, wy + wh, ww + 10, 5);       // bệ cửa
+      g.fillStyle = FC_FRAME;  g.fillRect(wx - 4, wy - 4, ww + 8, wh + 8);    // khung
+      g.fillStyle = FC_GLASS;  g.fillRect(wx, wy, ww, wh);                    // kính
+      // phản quang chéo trên kính
+      g.fillStyle = 'rgba(255,255,255,0.12)';
+      g.beginPath(); g.moveTo(wx, wy + wh); g.lineTo(wx + ww * 0.55, wy);
+      g.lineTo(wx + ww, wy); g.lineTo(wx, wy + wh); g.fill();
+      // nan chia kính (2 cánh + hoa sắt)
+      g.strokeStyle = FC_FRAME; g.lineWidth = 4;
+      g.beginPath(); g.moveTo(wx + ww / 2, wy); g.lineTo(wx + ww / 2, wy + wh);
+      g.moveTo(wx, wy + wh * 0.5); g.lineTo(wx + ww, wy + wh * 0.5); g.stroke();
+
+      // BAN CÔNG LAM NGANG: dải lan can lam nhôm chạy hết bề rộng trước cửa
+      const by = y0 + FPX * 0.72, bh = FPX * 0.20;
+      g.fillStyle = 'rgba(150,150,150,0.55)'; g.fillRect(0, by, w, bh);        // tấm lam mờ
+      g.strokeStyle = 'rgba(70,70,70,0.6)'; g.lineWidth = 3;                   // nan lam đứng
+      for (let sx = 8; sx < w; sx += 16) { g.beginPath(); g.moveTo(sx, by); g.lineTo(sx, by + bh); g.stroke(); }
+      g.fillStyle = 'rgba(40,40,40,0.5)'; g.fillRect(0, by - 3, w, 3);         // tay vịn trên
+
+      // đôi khi cục nóng điều hoà cạnh cửa
+      if (((k + wall) % 3) === 0) { g.fillStyle = '#d7d8d4'; g.fillRect(w * 0.06, y0 + FPX * 0.30, w * 0.14, FPX * 0.20); }
+    }
+
+    /* ---- TẦNG TRỆT : cửa cuốn + kính shopfront + BIỂN HIỆU ngang ---- */
+    const gy = up * FPX;
+    // biển hiệu ngang (băng màu) chiếm ~30% trên của tầng trệt
+    const sgnH = GPX * 0.30;
+    g.fillStyle = signC; g.fillRect(0, gy, w, sgnH);
+    g.fillStyle = 'rgba(0,0,0,0.18)'; g.fillRect(0, gy + sgnH - 4, w, 4);      // bóng mép biển
+    // "chữ" mờ trên biển = khối sáng (KHÔNG chữ thật → không méo, không đè biển thật)
+    g.fillStyle = 'rgba(255,255,255,0.82)';
+    for (let bx = w * 0.14; bx < w * 0.86; bx += w * 0.11) g.fillRect(bx, gy + sgnH * 0.34, w * 0.075, sgnH * 0.32);
+
+    // thân tầng trệt: cửa cuốn tối + 1 khe kính cửa
+    const sy = gy + sgnH, sh = GPX - sgnH;
+    g.fillStyle = FC_SHUT; g.fillRect(w * 0.04, sy, w * 0.92, sh);             // cửa cuốn
+    g.strokeStyle = 'rgba(255,255,255,0.06)'; g.lineWidth = 2;                 // nan cuốn ngang
+    for (let ly = sy + 6; ly < gy + GPX; ly += 9) { g.beginPath(); g.moveTo(w * 0.04, ly); g.lineTo(w * 0.96, ly); g.stroke(); }
+    g.fillStyle = FC_GLASS; g.fillRect(w * 0.60, sy + sh * 0.18, w * 0.30, sh * 0.66); // ô kính/cửa
+    g.fillStyle = 'rgba(255,255,255,0.10)'; g.fillRect(w * 0.60, sy + sh * 0.18, w * 0.30, sh * 0.14);
+
+    /* ---- ánh sáng tổng + bẩn ---- */
+    const grad = g.createLinearGradient(0, 0, 0, h);
+    grad.addColorStop(0, 'rgba(0,0,0,0.16)');   // tối dưới mái
+    grad.addColorStop(0.12, 'rgba(0,0,0,0)');
+    grad.addColorStop(0.9, 'rgba(0,0,0,0)');
+    grad.addColorStop(1, 'rgba(0,0,0,0.10)');   // tối chân tường
+    g.fillStyle = grad; g.fillRect(0, 0, w, h);
+    fcSpeckle(g, 0, 0, w, h, 120, 0.05);
+  });
+}
+
+/* ----------------------------------------------------------------------------
+ *  fcFacadeMaterial(floors, wall, sign) → MMeshLambertMaterial (CACHE)
+ *  Toàn thành phố chỉ tạo ≤ 5×6 = 30 material/texture dùng chung.
+ * -------------------------------------------------------------------------- */
+const _fcMatCache = new Map();
+function fcFacadeMaterial(floors, wall, sign) {
+  // gom số tầng thành nhóm để giảm số texture (2-3-4-5-6+)
+  const fk = Math.max(2, Math.min(6, floors | 0));
+  const wk = ((wall | 0) % FC_WALL.length + FC_WALL.length) % FC_WALL.length;
+  const sk = ((sign | 0) % FC_SIGN.length + FC_SIGN.length) % FC_SIGN.length;
+  const key = `${fk}|${wk}|${sk}`;
+  let m = _fcMatCache.get(key);
+  if (!m) {
+    const tex = fcFacadeTex({ floors: fk, wall: wk, sign: sk });
+    tex.wrapS = THREE.RepeatWrapping;          // lặp NGANG theo số gian
+    tex.wrapT = THREE.ClampToEdgeWrapping;     // dọc: trọn 1 nhà
+    tex.anisotropy = 8;
+    m = new THREE.MeshLambertMaterial({ map: tex });
+    _fcMatCache.set(key, m);
+  }
+  return m;
+}
+
+/* ----------------------------------------------------------------------------
+ *  fcFrontQuad(w, h, opts) → BufferGeometry (1 quad mặt tiền, UV đã bake)
+ *  Quad đứng ở mặt +Z local (mặt tiền), gốc chân tại y=0, đẩy ra +0.03 chống
+ *  z-fighting với hộp nhà. Bake u = 0..nBays để RepeatWrapping lặp theo gian.
+ *  Trả geometry để MERGE vào bucket theo material (fcFacadeMaterial) —
+ *  chỉ +1 draw call / material dùng chung, KHÔNG +1/nhà.
+ *
+ *  CÁCH DÙNG (ít rủi ro nhất — chỉ thêm, không sửa logic đặt nhà):
+ *    // sau khi có (gx,gz,gy,w,dp,floors,faceAng) của 1 lô shophouse/nhà:
+ *    const wall = seedIdx(gx,gz,FC_WALL.length), sign = seedIdx(gx,gz,FC_SIGN.length);
+ *    const q = fcFrontQuad(w, floors*3.3, { depth: dp, floors });
+ *    q.applyMatrix4(new THREE.Matrix4().makeTranslation(gx,gy,gz)
+ *                    .multiply(new THREE.Matrix4().makeRotationY(faceAng)));
+ *    const key = fcKey(floors, wall, sign);           // gom theo material
+ *    (frontBucket[key] ||= []).push(q);
+ *    // ... cuối vòng: mỗi bucket → 1 Mesh(mergeGeometries(list), fcFacadeMaterial(...))
+ *  Hộp nhà (thân + mái + 3 mặt kia) GIỮ NGUYÊN vertex-color merge như hiện tại.
+ * -------------------------------------------------------------------------- */
+function fcFrontQuad(w, h, { depth = 7, floors = 4, bayW = 4 } = {}) {
+  const nBays = Math.max(1, Math.round(w / bayW));
+  const g = new THREE.PlaneGeometry(w, h);     // mặc định nằm ở XY, hướng +Z
+  g.translate(0, h / 2, depth / 2 + 0.03);     // chân tại y=0, mặt tiền ra +Z
+  const uv = g.attributes.uv;
+  for (let i = 0; i < uv.count; i++) uv.setX(i, uv.getX(i) * nBays); // lặp ngang
+  uv.needsUpdate = true;
+  return g;
+}
+
+/* helpers gom bucket */
+function fcSeedIdx(x, z, n) { return Math.abs((x * 7 + z * 13) | 0) % n; }
+function fcKey(floors, wall, sign) {
+  const fk = Math.max(2, Math.min(6, floors | 0));
+  return `${fk}|${wall % FC_WALL.length}|${sign % FC_SIGN.length}`;
+}
+
 function facadeTextures(colorCss) {
   const draw = (em) => (g, w, h) => {
     g.fillStyle = em ? '#000' : colorCss;
@@ -15624,6 +15789,22 @@ function rdStopBarsAndZebra() {
       return g;
     }
     let nBld = 0, nRoof = 0;
+    // FACADE TEXTURE: bucket front-quad theo material + tìm điểm đường gần nhất (cell_facade)
+    const _fcFront = new Map();
+    const _fcSegNearest = (px, pz) => {
+      let bd = 1e9, bx = 0, bz = 0;
+      for (const r of ROADS_DT) {
+        if (r.c === 'w') continue;
+        for (let i = 0; i < r.pts.length - 1; i++) {
+          const [x1, z1] = r.pts[i], [x2, z2] = r.pts[i + 1];
+          const dx = x2 - x1, dz = z2 - z1, l2 = dx * dx + dz * dz;
+          let t = l2 ? ((px - x1) * dx + (pz - z1) * dz) / l2 : 0; t = Math.max(0, Math.min(1, t));
+          const qx = x1 + dx * t, qz = z1 + dz * t, d = (px - qx) ** 2 + (pz - qz) ** 2;
+          if (d < bd) { bd = d; bx = qx; bz = qz; }
+        }
+      }
+      return { d: Math.sqrt(bd), x: bx, z: bz };
+    };
     for (const b of BUILDINGS) {
       // làm sạch đa giác: bỏ điểm trùng/kề sát (đa giác bẩn làm tam giác hóa nổ tung)
       const poly = [];
@@ -15723,6 +15904,30 @@ function rdStopBarsAndZebra() {
           continue;
         }
         bldGeos.push(g2);
+        // FACADE TEXTURE mặt tiền (cell_facade): chỉ shophouse 2-6 tầng gần đường (không cao ốc kính)
+        if (!glassy && lv >= 2 && lv <= 6) {
+          const rp = _fcSegNearest(cx, cz);
+          if (rp.d < 60) {
+            let be = null, bem = 1e9;
+            for (let i = 0; i < poly.length; i++) {
+              const a0 = poly[i], b0 = poly[(i + 1) % poly.length];
+              const mx = (a0[0] + b0[0]) / 2, mz = (a0[1] + b0[1]) / 2;
+              const dd = (mx - rp.x) ** 2 + (mz - rp.z) ** 2;
+              if (dd < bem) { bem = dd; be = [a0, b0, mx, mz]; }
+            }
+            const ew = Math.hypot(be[1][0] - be[0][0], be[1][1] - be[0][1]);
+            if (ew >= 3 && ew <= 60) {
+              const mx = be[2], mz = be[3];
+              let nx = mx - cx, nz = mz - cz; const nl = Math.hypot(nx, nz) || 1; nx /= nl; nz /= nl;
+              const outAng = Math.atan2(nx, nz);
+              const wallIdx = fcSeedIdx(cx, cz, FC_WALL.length), signIdx = fcSeedIdx(cx + 7, cz + 3, FC_SIGN.length);
+              const q = fcFrontQuad(ew, h, { depth: 0, floors: lv });
+              q.applyMatrix4(new THREE.Matrix4().makeTranslation(mx, LAND_H, mz).multiply(new THREE.Matrix4().makeRotationY(outAng)));
+              const key = fcKey(lv, wallIdx, signIdx);
+              let l = _fcFront.get(key); if (!l) _fcFront.set(key, l = []); l.push(q);
+            }
+          }
+        }
         // Mái ngói dốc kiểu Pháp cổ cho nhà THẤP tầng ở DÃY TRUNG TÂM (không kính, footprint gọn)
         const central = rectFactor(cx, DT_BOX.x1, DT_BOX.x2, cz, DT_BOX.z1, DT_BOX.z2, 60);
         const w0 = maxX - minX, d0 = maxZ - minZ;
@@ -15752,6 +15957,13 @@ function rdStopBarsAndZebra() {
       const mesh = new THREE.Mesh(merged, new THREE.MeshLambertMaterial({ vertexColors: true }));
       mesh.name = 'buildings';
       scene.add(mesh);
+    }
+    for (const [key, list] of _fcFront) {
+      if (!list.length) continue;
+      const [fk, wk, sk] = key.split('|').map(Number);
+      const fmesh = new THREE.Mesh(mergeGeometries(list.map((g) => (g.index ? g.toNonIndexed() : g))), fcFacadeMaterial(fk, wk, sk));
+      list.forEach((g) => g.dispose());
+      fmesh.name = 'osm_facades'; scene.add(fmesh);
     }
   }
   function nearRealBuilding(x, z) {

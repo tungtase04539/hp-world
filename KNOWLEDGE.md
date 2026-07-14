@@ -315,6 +315,15 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-14 (bw)** [FACADE TEXTURE OSM — đòn bẩy đồ hoạ phá trần low-poly]: nhà OSM generic là
+    hộp vertexColor phẳng (không cửa sổ) → judge chấm 2-3đ. Thêm generator texture mặt tiền procedural
+    (cell_facade fc*): canvas 1 gian (cửa cuốn+kính trệt, băng biển, cửa sổ khung+kính, ban công lam,
+    cục nóng), CACHE ≤30 material (key floors|wall|sign), RepeatWrapping ngang theo nBays=round(w/4)
+    chống méo. Cắm front-quad CHỈ mặt tiền hướng-đường (cạnh footprint gần ROADS_DT nhất, pháp tuyến
+    ra ngoài, +0.03 chống z-fight), bucket→merge, chỉ +≤48 draw call. GATE: !glassy + 2-6 tầng +
+    rp.d<60m + cạnh 3-60m. LƯU Ý: lõi trung tâm nay phần lớn là LANDMARK BLOCK (bị nearFeatured skip)
+    nên facade chỉ áp ~434 nhà generic ngoài rìa/khe — tác động vừa phải, KHÔNG phủ trung tâm. Muốn
+    phủ lõi phải texture cả block_infill + landmark generator (vòng sau).
 - **2026-07-14 (bv)** [GÓI HỆ THỐNG VÒNG 1 — nâng SÀN mọi pano]: (a) ĐƯỜNG: tim đường VÀNG đứt
     (0xf2c200, phủ vạch trắng cũ) + stop bar tại nút — decal MeshBasic gộp 1 draw call, guard isWater/
     dốc/né MEDIANS (cell_road). (b) CÂY: hạ glow phượng toàn cục sharedMats.flower emissive 0.35→0.10 +
