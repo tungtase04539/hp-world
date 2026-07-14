@@ -315,6 +315,16 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-15 (cd)** [MỤC TIÊU 7 — TRẠNG THÁI CUỐI 3 VÒNG, đo TRUNG BÌNH]: chấm sat 3 lần (6.30/5.62/
+    5.97) → VỆ TINH **TB 5.96/7** (từ 5.64; +0.32 thật, verify mắt: arc liền/cloverleaf double-loop/cảng
+    kho/mật-độ khớp/nước bớt cyan). PANO **4.13/7** (chững — ~70 block nhà đúng thêm nhưng điểm không nhích).
+    KẾT LUẬN CHIẾN LƯỢC (quan trọng cho vòng sau): (1) VỆ TINH tới 7 KHẢ THI nhưng GRIND CHẬM qua nhiễu
+    ±0.35 — mỗi visual-fix đúng chỉ +0.1-0.3, khó tách khỏi nhiễu; cần nhiều vòng + đo trung-bình. (2) PANO
+    7 BẤT KHẢ với low-poly minh-họa vs judge-ảnh-thật: cả per-pano lẫn hệ-thống đều phẳng ở ~4.1-4.35;
+    phá trần cần photoreal (user đã loại). ⇒ tối ưu: dồn vệ tinh (garden granite t6 + lấp thưa arc/cảng +
+    màu nước hồ vertexColor chưa sửa được) tới 7; pano giữ nội-dung-đúng ở trần. TỒN: garden granite là
+    thay generator body (rủi ro, để agent verify kỹ); màu hồ/sông là vertexColor terrain (cDeep 0x6fa393
+    đáy — cyan thấy là waterMat plane phủ, đã hạ nhưng lake vẫn xanh: cần soi thêm mesh nào render lake surface).
 - **2026-07-15 (cc)** [MỤC TIÊU 7 VÒNG 1 + bài học xương-máu]: 5 agent (structure + s1-s4 bề mặt).
     ĐO HAI LỚP: vệ tinh 5.64→~5.85 (t4 arc 4.0→5.2, t8 cảng 4.4→5.6 — FIX ĐÚNG CHỖ ĂN ĐIỂM +1.2/tile);
     pano 4.14→4.08 (mẫu rộng) + pano-đã-sửa chỉ 4.35 → **BỀ MẶT CHỮNG ~4.1-4.35, TRẦN LOW-POLY tầm mắt**
