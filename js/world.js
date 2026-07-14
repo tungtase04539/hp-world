@@ -661,9 +661,9 @@ export function buildWorld(scene) {
 
   // ---------- Mặt nước ----------
   const waterMat = new THREE.MeshPhongMaterial({
-    // Nước thật HP (Tam Bạc/Cấm) đục nâu-xám, KHÔNG cyan chói. Hạ bão hòa + shininess (cell_struct3):
-    // 1 chỗ chữa "nước chói thẳng rời" cho t1/t2/t4/t5/t8 + biển cùng lúc.
-    color: 0x4b7a80, transparent: true, opacity: 0.9, shininess: 26, specular: 0x3a5a60,
+    // Nước thật HP (Tam Bạc/Cấm) ĐỤC XÁM-LỤC phù sa, bão hòa THẤP, KHÔNG cyan. Fix mạnh (audit vệ tinh
+    // R1 — tell #1): specular top-down đẩy teal thành cyan → hạ shininess 26→3 + specular tối + màu lục-xám.
+    color: 0x6b7a68, transparent: true, opacity: 0.82, shininess: 3, specular: 0x20241f,
   });
   const water = new THREE.Mesh(new THREE.PlaneGeometry(W, D, 1, 1), waterMat);
   water.rotation.x = -Math.PI / 2;
@@ -18007,7 +18007,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     // trong khi thật là shophouse kín biển) — cùng bảng màu với shophouse_infill
     const signPalette = [0xc62828, 0x1c56a0, 0x1f7a3c, 0xd8862a, 0x26262c, 0x8e2f80].map((c) => new THREE.Color(c));
     // ngói dốc kiểu Pháp cổ / nhà phố cũ cho DÃY TRUNG TÂM (nhà thấp tầng)
-    const tilePalette = [0xb5462c, 0xc85a34, 0xa23c28, 0x9c5636, 0xbb5a30].map((c) => new THREE.Color(c));
+    const tilePalette = [0x9c3a22, 0xac4a28, 0x883220, 0x8a4a2e, 0x9e4224].map((c) => new THREE.Color(c));   // ngói sẫm hơn (audit R2)
     // Mái hip (4 dốc) phủ lên bbox footprint — đọc ngay ra "phố cổ mái ngói".
     function hipRoofGeo(x0, x1, z0, z1, yT, rh, col) {
       const o = 0.7;                       // đua mái (eaves)
@@ -18757,7 +18757,8 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
       return [big, alley, rail];
     };
     const wallTones = [[0.93, 0.87, 0.70], [0.90, 0.79, 0.62], [0.86, 0.88, 0.84], [0.92, 0.74, 0.62], [0.82, 0.85, 0.89], [0.88, 0.82, 0.68]];
-    const roofTones = [[0.70, 0.28, 0.18], [0.64, 0.38, 0.24], [0.55, 0.57, 0.60], [0.45, 0.48, 0.52], [0.68, 0.25, 0.20]]; // ngói đỏ + tôn xám
+    // Mái sẫm hơn (audit vệ tinh R2): thật đỏ-gạch SÂU + nâu đất, không hồng nhạt. Đỏ chủ đạo + 1 nâu + 1 tôn xám.
+    const roofTones = [[0.52, 0.20, 0.14], [0.60, 0.29, 0.18], [0.46, 0.25, 0.16], [0.50, 0.52, 0.55], [0.42, 0.17, 0.13]]; // ngói đỏ sẫm/nâu + tôn xám
     const geos = []; const lmPtsB = Object.values(LM);
     let bs = 424241; const brnd = () => { bs = (bs * 1103515245 + 12345) & 0x7fffffff; return bs / 0x7fffffff; };
     let nB = 0;
