@@ -719,7 +719,7 @@ export function buildWorld(scene) {
   }
   for (let ri = 0; ri < ROADS_DT.length; ri++) {
     const r = ROADS_DT[ri];
-    const hasSW = r.c === 'p' || r.c === 's';
+    const hasSW = r.c === 'p' || r.c === 's' || r.c === 't';   // A1: bật vỉa hè phố t (145 pano trước đây trống — cell_curb)
     layRoad(r.pts, ROAD_W[r.c], {
       sidewalk: hasSW,
       swType: hasSW ? (SIDEWALK_BY_ROAD[ri] || SIDEWALK_DEFAULT) : null,
@@ -15661,6 +15661,436 @@ function rdStopBarsAndZebra() {
   }
   void localPt; void makeTex;  // giữ tham chiếu scope cho phần tích hợp (draft)
 }
+
+
+  // ===== HỆ THỐNG MẬT ĐỘ: người đi bộ + xe bổ sung (cell_dens, prefix de*) =====
+  {
+const CFG = {
+  // Người đi bộ — thuần additive (0 hiện có). Rải p/s/t/r, cụm nhỏ + lẻ.
+  PED:  { cap: 620, radius: 1250, classes: { p: 1, s: 1, t: 1, r: 1 },
+          spacing: 1.35, clusterMin: 1, clusterMax: 3, clusterGap: 13,
+          offBase: 2.1, offJit: 1.1, hatFrac: 0.22, startChance: 0.42, seed: 20260714 },
+
+  // Xe máy đỗ — MẶC ĐỊNH 'r' (bổ sung parked_scooters p/s/t). Cụm 3-6 san sát, nghiêng vào vỉa hè.
+  BIKE: { cap: 360, radius: 1250, classes: { r: 1 },  // mở thêm: { r:1, t:1 } hoặc {p:1,s:1,t:1,r:1}
+          spacing: 0.95, clusterMin: 3, clusterMax: 6, clusterGap: 9,
+          offBase: 1.2, offJit: 0.5, startChance: 0.5, seed: 20260715 },
+
+  // Ô tô đỗ — MẶC ĐỊNH 'r' (bổ sung parked_cars p/s/t). Song song mép đường, thưa.
+  CAR:  { cap: 120, radius: 1200, classes: { r: 1 },
+          spacing: 5.4, clusterMin: 1, clusterMax: 3, clusterGap: 16,
+          offBase: 1.35, offJit: 0.3, startChance: 0.55, seed: 20260716 },
+};
+
+function buildDensity(ctx) {
+  const {
+    THREE, scene, mat, mergeGeometries,
+    groundHeight, groundHeightNoDeck, isWater, ROADS_DT,
+    avoid,                 // optional (x,z)=>bool: né hồ/promenade/sân công trình
+    debug = false,         // true: trả slots để smoke-run kiểm
+  } = ctx;
+
+  const LAND_H = 2;
+  const ROAD_W = { p: 13, s: 10, t: 8, r: 5.5, w: 3.5 };   // 1:1 mét thật (như world.js)
+
+  // ---------- guards tự chứa ----------
+  const onFlat = (x, z) => Math.abs(groundHeightNoDeck(x, z) - LAND_H) < 0.4; // né cầu dốc/đồi/mép nước
+  function _segD(px, pz, x1, z1, x2, z2) {
+    const dx = x2 - x1, dz = z2 - z1, l2 = dx * dx + dz * dz;
+    let t = l2 ? ((px - x1) * dx + (pz - z1) * dz) / l2 : 0; t = t < 0 ? 0 : t > 1 ? 1 : t;
+    return Math.hypot(px - (x1 + dx * t), pz - (z1 + dz * t));
+  }
+  // né LÒNG ĐƯỜNG mọi phố (trừ đi bộ 'w'): cách tim MỌI đoạn > nửa lòng + 0.5 m
+  function onAnyRoad(x, z) {
+    for (const r of ROADS_DT) {
+      if (r.c === 'w') continue;
+      const hw = ROAD_W[r.c] / 2 + 0.5, pts = r.pts;
+      for (let i = 0; i < pts.length - 1; i++) {
+        const ax = pts[i][0], az = pts[i][1], bx = pts[i + 1][0], bz = pts[i + 1][1];
+        if (Math.max(ax, bx) < x - 22 || Math.min(ax, bx) > x + 22 ||
+            Math.max(az, bz) < z - 22 || Math.min(az, bz) > z + 22) continue;
+        if (_segD(x, z, ax, az, bx, bz) < hw) return true;
+      }
+    }
+    return false;
+  }
+
+  // ---------- máy rải theo VỈA HÈ (dùng chung cho cả 3 loại) ----------
+  // emit(gx, gy, gz, rotY, side, rnd) — rotY = hướng đoạn đường (local +z), side ∈ {−1,+1}
+  function forEachSidewalkSlot(cfg, emit) {
+    let s = cfg.seed >>> 0;
+    const rnd = () => { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; };
+    let n = 0;
+    for (const r of ROADS_DT) {
+      if (!cfg.classes[r.c]) continue;
+      const hw = ROAD_W[r.c] / 2;
+      for (let i = 0; i < r.pts.length - 1; i++) {
+        const [x1, z1] = r.pts[i], [x2, z2] = r.pts[i + 1];
+        const L = Math.hypot(x2 - x1, z2 - z1);
+        if (L < 6) continue;
+        const ux = (x2 - x1) / L, uz = (z2 - z1) / L;
+        const rotY = Math.atan2(x2 - x1, z2 - z1);       // dọc đoạn
+        const px = Math.cos(rotY), pz = -Math.sin(rotY); // pháp tuyến (ngang đường)
+        let d = 3;
+        while (d < L - 3) {
+          if (rnd() > cfg.startChance) { d += cfg.clusterGap * (0.5 + rnd()); continue; }
+          const side = rnd() < 0.5 ? 1 : -1;
+          const count = cfg.clusterMin + ((rnd() * (cfg.clusterMax - cfg.clusterMin + 1)) | 0);
+          let placed = 0;
+          for (let k = 0; k < count; k++) {
+            const dd = d + k * cfg.spacing;
+            if (dd > L - 2) break;
+            const mx = x1 + ux * dd, mz = z1 + uz * dd;
+            if (mx * mx + mz * mz > cfg.radius * cfg.radius) continue;
+            const off = side * (hw + cfg.offBase + rnd() * cfg.offJit);
+            const gx = mx + off * px, gz = mz + off * pz;
+            if (isWater(gx, gz)) continue;
+            if (!onFlat(gx, gz)) continue;
+            if (onAnyRoad(gx, gz)) continue;            // đảm bảo 0 vật trong lòng đường
+            if (avoid && avoid(gx, gz)) continue;        // né hồ/sân (nếu ctx cấp)
+            emit(gx, groundHeight(gx, gz), gz, rotY, side, rnd);
+            placed++; n++;
+            if (n >= cfg.cap) return n;
+          }
+          d += (placed ? placed * cfg.spacing : cfg.spacing) + cfg.clusterGap * (0.4 + 0.7 * rnd());
+        }
+      }
+    }
+    return n;
+  }
+
+  // ---------- tiện ích hình học ----------
+  const _e = new THREE.Euler(), _m = new THREE.Matrix4();
+  const bakeBox = (arr, w, h, dp, x, y, z, rx = 0) => {
+    const g = new THREE.BoxGeometry(w, h, dp);
+    if (rx) { g.translate(0, -h / 2, 0); _e.set(rx, 0, 0); _m.makeRotationFromEuler(_e); _m.setPosition(x, y, z); g.applyMatrix4(_m); }
+    else g.translate(x, y, z);
+    arr.push(g);
+  };
+  const disposeAll = (a) => a.forEach((g) => g.dispose && g.dispose());
+
+  const report = { counts: {}, drawCalls: 0, slots: {} };
+  const M = new THREE.Matrix4(), Q = new THREE.Quaternion(), E = new THREE.Euler(), P = new THREE.Vector3();
+  const setInst = (inst, k, x, y, z, ry, sc) => {
+    E.set(0, ry, 0); Q.setFromEuler(E); P.set(x, y, z);
+    M.compose(P, Q, new THREE.Vector3(sc, sc, sc)); inst.setMatrixAt(k, M);
+  };
+
+  // =====================================================================
+  //  (c) NGƯỜI ĐI BỘ — khối low-poly 1 dáng mid-stride (đứng/đi), instanced
+  // =====================================================================
+  function dePedestrians() {
+    // dáng: chân trước/sau tách, tay đối xứng -> đọc "đang đi" dù tĩnh (mẹo crowd low-poly).
+    const bodyG = [], lowerG = [], headG = [], hatG = [];
+    // thân + tay (áo)
+    bakeBox(bodyG, 0.40, 0.52, 0.22, 0, 1.20, 0);                 // ngực
+    bakeBox(bodyG, 0.13, 0.58, 0.14, 0.235, 1.46, 0, +0.26);      // tay trái (ra sau)
+    bakeBox(bodyG, 0.13, 0.58, 0.14, -0.235, 1.46, 0, -0.30);     // tay phải (ra trước)
+    // hông + 2 chân (quần)
+    bakeBox(lowerG, 0.34, 0.20, 0.20, 0, 0.94, 0);                // hông
+    bakeBox(lowerG, 0.16, 0.88, 0.17, 0.11, 0.90, 0, -0.22);      // chân trái (ra trước)
+    bakeBox(lowerG, 0.16, 0.88, 0.17, -0.11, 0.90, 0, +0.24);     // chân phải (ra sau)
+    // đầu + cổ (da)
+    { const nk = new THREE.BoxGeometry(0.10, 0.10, 0.10); nk.translate(0, 1.52, 0); headG.push(nk); }
+    { const hd = new THREE.SphereGeometry(0.125, 6, 5); hd.translate(0, 1.66, 0); headG.push(hd); } // low-poly đầu (đủ ở tầm pano)
+    // nón lá (cone) — cụm con riêng, chỉ 1 phần đội
+    { const h = new THREE.ConeGeometry(0.27, 0.20, 12); h.translate(0, 1.76, 0); hatG.push(h); }
+
+    const bodyGeo = mergeGeometries(bodyG), lowerGeo = mergeGeometries(lowerG),
+          headGeo = mergeGeometries(headG), hatGeo = mergeGeometries(hatG);
+    disposeAll(bodyG); disposeAll(lowerG); disposeAll(headG); disposeAll(hatG);
+
+    const shirtCols = [0xdedad2, 0x3a6ea5, 0xb5473a, 0x4a7a52, 0x6a6f76, 0xd8b24a, 0xc86a92, 0x2f3540, 0xe0e4e8, 0x8a5a3c].map((c) => new THREE.Color(c));
+    const pantCols  = [0x2a2d33, 0x3a3f46, 0x24303a, 0x5a5148, 0x1f2430, 0x6b6257, 0x40454c].map((c) => new THREE.Color(c));
+    const skinCols  = [0xe8b98c, 0xdca877, 0xc99060, 0xf0c79a].map((c) => new THREE.Color(c));
+    const hatCol = new THREE.Color(0xd9c48a);
+
+    const slots = [];
+    forEachSidewalkSlot(CFG.PED, (x, y, z, rotY, side, rnd) => {
+      // hướng: 62% dọc vỉa hè (đi tới/lui), còn lại quay linh tinh
+      const face = rnd() < 0.62 ? (rotY + (rnd() < 0.5 ? 0 : Math.PI)) : rnd() * Math.PI * 2;
+      const sc = 0.93 + rnd() * 0.15;                       // cao ~1.6–1.85 m
+      const hat = rnd() < CFG.PED.hatFrac;
+      slots.push([x, y, z, face + (rnd() - 0.5) * 0.3, sc,
+                  (rnd() * shirtCols.length) | 0, (rnd() * pantCols.length) | 0, (rnd() * skinCols.length) | 0, hat]);
+    });
+    if (debug) report.slots.pedestrians = slots.map((s) => ({ x: s[0], z: s[2] }));
+    if (!slots.length) { report.counts.pedestrians = 0; return; }
+
+    const N = slots.length, nHat = slots.reduce((a, s) => a + (s[8] ? 1 : 0), 0);
+    const bodyInst = new THREE.InstancedMesh(bodyGeo, mat(0xcccccc), N);
+    const lowerInst = new THREE.InstancedMesh(lowerGeo, mat(0xcccccc), N);
+    const headInst = new THREE.InstancedMesh(headGeo, mat(0xcccccc), N);
+    const hatInst = nHat ? new THREE.InstancedMesh(hatGeo, mat(hatCol.getHex()), nHat) : null;
+    let hi = 0;
+    slots.forEach(([x, y, z, ry, sc, sci, pci, kci, hat], k) => {
+      setInst(bodyInst, k, x, y, z, ry, sc); setInst(lowerInst, k, x, y, z, ry, sc); setInst(headInst, k, x, y, z, ry, sc);
+      bodyInst.setColorAt(k, shirtCols[sci]); lowerInst.setColorAt(k, pantCols[pci]); headInst.setColorAt(k, skinCols[kci]);
+      if (hat && hatInst) { setInst(hatInst, hi, x, y, z, ry, sc); hatInst.setColorAt(hi, hatCol); hi++; }
+    });
+    for (const m of [bodyInst, lowerInst, headInst, hatInst]) {
+      if (!m) continue;
+      m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true;
+      m.castShadow = true; scene.add(m);
+    }
+    bodyInst.name = 'de_ped_body'; lowerInst.name = 'de_ped_lower'; headInst.name = 'de_ped_head';
+    if (hatInst) hatInst.name = 'de_ped_hat';
+    report.counts.pedestrians = N; report.counts.pedestrianHats = nHat;
+    report.drawCalls += 3 + (hatInst ? 1 : 0);
+  }
+
+  // =====================================================================
+  //  (a) XE MÁY ĐỖ NGHIÊNG VỈA HÈ — cụm 3-6, nghiêng mũi vào trong
+  // =====================================================================
+  function deParkedBikes() {
+    const bodyG = [], darkG = [];
+    const box = (arr, w, h, l, x, y, z) => { const g = new THREE.BoxGeometry(w, h, l); g.translate(x, y, z); arr.push(g); };
+    const wheel = (z) => { const g = new THREE.CylinderGeometry(0.27, 0.27, 0.14, 10); g.rotateZ(Math.PI / 2); g.translate(0, 0.27, z); darkG.push(g); };
+    wheel(-0.6); wheel(0.6);
+    box(bodyG, 0.44, 0.16, 1.3, 0, 0.5, 0);       // thân/sàn
+    box(bodyG, 0.4, 0.32, 0.48, 0, 0.55, 0.48);   // yếm
+    box(bodyG, 0.42, 0.16, 0.58, 0, 0.74, -0.3);  // yên
+    box(bodyG, 0.32, 0.28, 0.24, 0, 0.9, -0.62);  // cốp đuôi
+    box(darkG, 0.1, 0.5, 0.1, 0, 0.9, 0.58);      // cổ phuộc
+    box(darkG, 0.54, 0.07, 0.09, 0, 1.1, 0.6);    // ghi-đông
+    const bodyGeo = mergeGeometries(bodyG), darkGeo = mergeGeometries(darkG);
+    disposeAll(bodyG); disposeAll(darkG);
+    const cols = [0xb23a2f, 0x2b2b2f, 0x3a5a8a, 0xd8d2c4, 0x6a6f76, 0x9c2f28, 0x24303a, 0xc7a24a].map((c) => new THREE.Color(c));
+
+    const slots = [];
+    forEachSidewalkSlot(CFG.BIKE, (x, y, z, rotY, side, rnd) => {
+      // mũi quay VÀO trong (vuông góc đường), lệch nhẹ; +0.16 đứng trên mặt lát
+      const nose = rotY + Math.PI / 2 * (side < 0 ? 1 : -1) + (rnd() - 0.5) * 0.25;
+      slots.push([x, y + 0.16, z, nose, (rnd() * cols.length) | 0]);
+    });
+    if (debug) report.slots.bikes = slots.map((s) => ({ x: s[0], z: s[2] }));
+    if (!slots.length) { report.counts.bikes = 0; return; }
+    const bodyInst = new THREE.InstancedMesh(bodyGeo, mat(0xcccccc), slots.length);
+    const darkInst = new THREE.InstancedMesh(darkGeo, mat(0x1c1c1f), slots.length);
+    slots.forEach(([x, y, z, ry, ci], k) => { setInst(bodyInst, k, x, y, z, ry, 1); setInst(darkInst, k, x, y, z, ry, 1); bodyInst.setColorAt(k, cols[ci]); });
+    bodyInst.instanceMatrix.needsUpdate = true; darkInst.instanceMatrix.needsUpdate = true;
+    if (bodyInst.instanceColor) bodyInst.instanceColor.needsUpdate = true;
+    bodyInst.castShadow = darkInst.castShadow = true;
+    bodyInst.name = 'de_parked_bikes'; darkInst.name = 'de_parked_bikes_dark';
+    scene.add(bodyInst); scene.add(darkInst);
+    report.counts.bikes = slots.length; report.drawCalls += 2;
+  }
+
+  // =====================================================================
+  //  (b) Ô TÔ ĐỖ MÉP ĐƯỜNG — song song, thưa
+  // =====================================================================
+  function deCurbCars() {
+    const carG = [], wheelG = [];
+    const box = (arr, w, h, l, x, y, z) => { const g = new THREE.BoxGeometry(w, h, l); g.translate(x, y, z); arr.push(g); };
+    box(carG, 1.7, 0.5, 4.15, 0, 0.55, 0);
+    box(carG, 1.48, 0.5, 2.15, 0, 1.0, -0.15);
+    { const wl = (z) => { for (const sx of [0.8, -0.8]) { const g = new THREE.CylinderGeometry(0.32, 0.32, 0.2, 10); g.rotateZ(Math.PI / 2); g.translate(sx, 0.32, z); wheelG.push(g); } }; wl(1.32); wl(-1.32); }
+    const carGeo = mergeGeometries(carG), wheelGeo = mergeGeometries(wheelG);
+    disposeAll(carG); disposeAll(wheelG);
+    const cols = [0x1c1c20, 0xe4e2dc, 0xb0b3b6, 0x9c2f28, 0x64686e, 0x24354f, 0x3a3f45].map((c) => new THREE.Color(c));
+
+    const slots = [];
+    forEachSidewalkSlot(CFG.CAR, (x, y, z, rotY, side, rnd) => {
+      slots.push([x, y, z, rotY + (rnd() - 0.5) * 0.1, (rnd() * cols.length) | 0]);
+    });
+    if (debug) report.slots.cars = slots.map((s) => ({ x: s[0], z: s[2] }));
+    if (!slots.length) { report.counts.cars = 0; return; }
+    const carInst = new THREE.InstancedMesh(carGeo, mat(0xcccccc), slots.length);
+    const whInst = new THREE.InstancedMesh(wheelGeo, mat(0x18181b), slots.length);
+    slots.forEach(([x, y, z, ry, ci], k) => { setInst(carInst, k, x, y, z, ry, 1); setInst(whInst, k, x, y, z, ry, 1); carInst.setColorAt(k, cols[ci]); });
+    carInst.instanceMatrix.needsUpdate = true; whInst.instanceMatrix.needsUpdate = true;
+    if (carInst.instanceColor) carInst.instanceColor.needsUpdate = true;
+    carInst.castShadow = whInst.castShadow = true;
+    carInst.name = 'de_curb_cars'; whInst.name = 'de_curb_cars_wheels';
+    scene.add(carInst); scene.add(whInst);
+    report.counts.cars = slots.length; report.drawCalls += 2;
+  }
+
+  dePedestrians();
+  deParkedBikes();
+  deCurbCars();
+  return report;
+}
+
+  buildDensity({ THREE, scene, mat, mergeGeometries, groundHeight, groundHeightNoDeck, isWater, ROADS_DT, avoid: (x, z) => nearFeatured(x, z) });
+  }
+
+
+  // ===== HỆ THỐNG BÓ VỈA (cell_curb, prefix cu*): mặt đứng bê tông mép đường p/s/t =====
+  {
+const CU = {
+  ROAD_W:     { p: 13, s: 10, t: 8 }, // KHỚP ROAD_W world.js — chỉ p/s/t có bó vỉa (bỏ r/w)
+  CURB_W:     0.18,   // bề rộng mặt bó vỉa (m); mép TRONG flush mép nhựa
+  CURB_RISE:  0.14,   // mặt đứng bó vỉa cao hơn MẶT NHỰA (m) — bó vỉa thật ~12-18cm
+  CURB_H:     0.30,   // chiều cao hộp (phần dưới chôn dưới vỉa hè/đất)
+  ROAD_TOP_DY:0.07,   // mặt nhựa = my + 0.07 (asphalt box cao 0.14, tâm tại my)
+  MY_LIFT:    0.04,   // my = (h1+h2)/2 + 0.04  (KHỚP layRoad)
+  CHUNK:      30,     // chia nhỏ đoạn (KHỚP layRoad — bám dốc cầu)
+  NODE_R:     8,      // bán kính CƠ BẢN né nút giao (cộng thêm half lòng đường)
+  MIN_H:      0.6,    // bỏ đoạn cao độ < 0.6 (mép nước / ngập)
+  MAX_DH:     6,      // bỏ đoạn gãy cao độ > 6m (nhịp cầu vòm)
+  LAND_H:     2,      // KHỚP LAND_H world.js
+  COLOR:      0xbdb9ad, // bê tông xám ẤM (đối chiếu pano_050/300/400/500)
+};
+
+// --- Nút giao: coord xuất hiện ở >=2 road KHÁC NHAU, hoặc là đầu/cuối 1 road ---
+// (thu từ TOÀN BỘ ROADS_DT kể cả r/w để bó vỉa p/s/t biết dừng ở ngã r/w cắt vào)
+function cuJunctionNodes(ROADS_DT) {
+  const seen = new Map();                       // key "x,z" -> Set(roadIdx)
+  const key = (x, z) => Math.round(x) + ',' + Math.round(z);
+  ROADS_DT.forEach((r, ri) => {
+    for (const [x, z] of r.pts) {
+      const k = key(x, z);
+      let s = seen.get(k); if (!s) { s = new Set(); seen.set(k, s); }
+      s.add(ri);
+    }
+  });
+  const nodes = [];
+  for (const [k, set] of seen) if (set.size >= 2) { const [x, z] = k.split(',').map(Number); nodes.push([x, z]); }
+  for (const r of ROADS_DT) {                    // đầu/cuối (T-end)
+    const a = r.pts[0], b = r.pts[r.pts.length - 1];
+    nodes.push([a[0], a[1]]); nodes.push([b[0], b[1]]);
+  }
+  return nodes;
+}
+
+// --- Lưới băm không gian cho nút giao (tra cứu nhanh) ---
+function cuNodeGrid(nodes, cell) {
+  const g = new Map();
+  const key = (ix, iz) => ix + ',' + iz;
+  for (const [x, z] of nodes) {
+    const kk = key(Math.floor(x / cell), Math.floor(z / cell));
+    let a = g.get(kk); if (!a) { a = []; g.set(kk, a); }
+    a.push([x, z]);
+  }
+  return { g, cell };
+}
+function cuNearNode(grid, x, z, r) {
+  const { g, cell } = grid;
+  const ix = Math.floor(x / cell), iz = Math.floor(z / cell), r2 = r * r;
+  for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) {
+    const arr = g.get((ix + a) + ',' + (iz + b)); if (!arr) continue;
+    for (const [nx, nz] of arr) if ((nx - x) * (nx - x) + (nz - z) * (nz - z) < r2) return true;
+  }
+  return false;
+}
+
+// --- Lưới lòng đường: mọi ĐOẠN p/s/t (kèm half + roadIdx) băm vào ô 8m ---
+// Dùng để CHẶN bó vỉa lọt vào làn KHÁC (đại lộ đôi, đường song song sát, góc nút).
+function cuLumenGrid(ROADS_DT, C) {
+  const cell = 8, g = new Map();
+  const put = (ix, iz, seg) => { const k = ix + ',' + iz; let a = g.get(k); if (!a) { a = []; g.set(k, a); } if (a[a.length - 1] !== seg) a.push(seg); };
+  ROADS_DT.forEach((r, ri) => {
+    const half = (C.ROAD_W[r.c] || 0) / 2; if (!half) return;
+    for (let i = 0; i < r.pts.length - 1; i++) {
+      const [ax, az] = r.pts[i], [bx, bz] = r.pts[i + 1];
+      const seg = { ax, az, bx, bz, half, ri };
+      const L = Math.hypot(bx - ax, bz - az), n = Math.max(1, Math.ceil(L / 2)); // bước 2m
+      for (let s = 0; s <= n; s++) {
+        const t = s / n, x = ax + (bx - ax) * t, z = az + (bz - az) * t;
+        put(Math.floor(x / cell), Math.floor(z / cell), seg);
+      }
+    }
+  });
+  return { g, cell };
+}
+function cuDistPtSeg(px, pz, ax, az, bx, bz) {
+  const dx = bx - ax, dz = bz - az, L2 = dx * dx + dz * dz;
+  let t = L2 ? ((px - ax) * dx + (pz - az) * dz) / L2 : 0;
+  t = t < 0 ? 0 : t > 1 ? 1 : t;
+  return Math.hypot(px - (ax + dx * t), pz - (az + dz * t));
+}
+// true nếu điểm nằm SÂU > tol trong lòng 1 đường KHÁC (ownRi bỏ qua)
+function cuInForeignLumen(grid, x, z, ownRi, tol) {
+  const { g, cell } = grid, ix = Math.floor(x / cell), iz = Math.floor(z / cell);
+  const done = new Set();
+  for (let a = -2; a <= 2; a++) for (let b = -2; b <= 2; b++) {   // 5x5: phủ bán kính tra ~6.5m
+    const arr = g.get((ix + a) + ',' + (iz + b)); if (!arr) continue;
+    for (const s of arr) {
+      if (s.ri === ownRi || done.has(s)) continue; done.add(s);
+      if (cuDistPtSeg(x, z, s.ax, s.az, s.bx, s.bz) < s.half - tol) return true;
+    }
+  }
+  return false;
+}
+
+// --- Generator THUẦN (không đụng THREE) — trả danh sách hộp bó vỉa để build/kiểm ---
+// Mỗi phần tử: { x,y,z (tâm hộp), rotY,rotX, len,w,h, innerFace (khoảng cách mép
+//   trong tới tim đường — để smoke-run kiểm intrusion), cx,cz (tim đoạn) }
+function cuCurbSegments(deps) {
+  const { ROADS_DT, groundHeightNoDeck, isWater } = deps;
+  const C = deps.CU || CU;
+  const grid = cuNodeGrid(cuJunctionNodes(ROADS_DT), C.NODE_R);
+  const lumen = cuLumenGrid(ROADS_DT, C);
+  const out = [];
+  for (let ri = 0; ri < ROADS_DT.length; ri++) {
+    const r = ROADS_DT[ri];
+    const wRoad = C.ROAD_W[r.c]; if (!wRoad) continue;     // chỉ p/s/t
+    const half = wRoad / 2;
+    for (let i = 0; i < r.pts.length - 1; i++) {
+      const [x1, z1] = r.pts[i], [x2, z2] = r.pts[i + 1];
+      const segLen = Math.hypot(x2 - x1, z2 - z1);
+      if (segLen < 1) continue;
+      const rotY = Math.atan2(x2 - x1, z2 - z1);
+      const nCh = Math.max(1, Math.ceil(segLen / C.CHUNK));
+      for (let c = 0; c < nCh; c++) {
+        const t1 = c / nCh, t2 = (c + 1) / nCh;
+        const cx1 = x1 + (x2 - x1) * t1, cz1 = z1 + (z2 - z1) * t1;
+        const cx2 = x1 + (x2 - x1) * t2, cz2 = z1 + (z2 - z1) * t2;
+        const mx = (cx1 + cx2) / 2, mz = (cz1 + cz2) / 2;
+        const len = segLen / nCh;
+        const g1 = groundHeightNoDeck(cx1, cz1), g2 = groundHeightNoDeck(cx2, cz2);
+        const h1 = Math.max(g1, C.LAND_H), h2 = Math.max(g2, C.LAND_H);
+        if (Math.abs(h1 - h2) > C.MAX_DH) continue;                       // gãy / cầu
+        if (isWater(mx, mz) || isWater(cx1, cz1) || isWater(cx2, cz2)) continue; // nước
+        if (Math.min(g1, g2) < C.MIN_H) continue;                         // mép nước
+        if (cuNearNode(grid, mx, mz, C.NODE_R + half)) continue;          // nút giao
+        const my = (h1 + h2) / 2 + C.MY_LIFT;
+        const rotX = Math.atan2(h1 - h2, len);
+        const px = Math.cos(rotY), pz = -Math.sin(rotY);
+        const centerY = my + C.ROAD_TOP_DY + C.CURB_RISE - C.CURB_H / 2;  // top = mặt nhựa + RISE
+        for (const side of [-1, 1]) {
+          const off = side * (half + C.CURB_W / 2);                       // mép trong tại đúng `half`
+          const cxp = mx + off * px, czp = mz + off * pz;                 // TÂM hộp bó vỉa
+          const iex = mx + side * half * px, iez = mz + side * half * pz; // MÉP TRONG bó vỉa
+          if (isWater(cxp, czp) || isWater(iex, iez)) continue;           // né nước theo TỪNG bên
+          if (cuInForeignLumen(lumen, iex, iez, ri, 0.3)) continue;       // né lọt làn khác
+          out.push({
+            x: cxp, y: centerY, z: czp,
+            rotY, rotX, len, w: C.CURB_W, h: C.CURB_H,
+            innerFace: half, cx: mx, cz: mz,
+          });
+        }
+      }
+    }
+  }
+  return out;
+}
+
+// --- Builder THREE: gộp toàn bộ hộp bó vỉa thành 1 mesh (1 draw call) ---
+function cuBuildCurbs(deps) {
+  const { THREE, scene, mat, mergeGeometries } = deps;
+  const C = deps.CU || CU;
+  const segs = cuCurbSegments(deps);
+  if (!segs.length) return null;
+  const geos = [];
+  const m4 = new THREE.Matrix4(), q4 = new THREE.Quaternion(), e4 = new THREE.Euler(), s4 = new THREE.Vector3(1, 1, 1);
+  for (const s of segs) {
+    const g = new THREE.BoxGeometry(s.w, s.h, s.len + 0.4);   // +0.4 chồng mép tránh hở
+    e4.set(s.rotX, s.rotY, 0); q4.setFromEuler(e4);
+    m4.compose(new THREE.Vector3(s.x, s.y, s.z), q4, s4);
+    g.applyMatrix4(m4);
+    geos.push(g);
+  }
+  const merged = mergeGeometries(geos);
+  geos.forEach((g) => g.dispose());
+  const mesh = new THREE.Mesh(merged, mat(C.COLOR));
+  mesh.name = 'street_curbs'; mesh.receiveShadow = true; scene.add(mesh);
+  return mesh;
+}
+
+  cuBuildCurbs({ THREE, scene, mat, mergeGeometries, groundHeightNoDeck, isWater, ROADS_DT });
+  }
 
   }
 

@@ -315,6 +315,14 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-14 (bx)** [GÓI HỆ THỐNG VÒNG 2 — người/bó vỉa/vỉa hè t]: (a) NGƯỜI ĐI BỘ nền (cell_dens
+    de*): game đã có xe máy/ô tô đỗ (cap 620/520) nhưng 0 người nền → judge chê "phố vắng"; thêm
+    dePedestrians instanced (~620, 22% nón lá) + bổ sung xe 'r', +8 draw call, avoid=nearFeatured.
+    (b) BÓ VỈA (cell_curb cu*): mặt đứng bê tông 0xbdb9ad nổi 0.14m mép trong p/s/t 2 bên (8795 hộp→
+    1 draw call, guard nước/nút/lọt-làn) — render đúng, khớp finding "curb rõ" lặp nhiều pano. (c) A1:
+    bật vỉa hè phố t (hasSW += 't') — 145 pano phố t trước đây trống vỉa hè. TỒN ĐỌNG PHÁT HIỆN:
+    parked_cars CŨ render ĐEN THUI (material tối/không bắt sáng) — blob đen xấu ở nhiều pano, cần fix
+    palette/vật liệu xe (vòng sau).
 - **2026-07-14 (bw)** [FACADE TEXTURE OSM — đòn bẩy đồ hoạ phá trần low-poly]: nhà OSM generic là
     hộp vertexColor phẳng (không cửa sổ) → judge chấm 2-3đ. Thêm generator texture mặt tiền procedural
     (cell_facade fc*): canvas 1 gian (cửa cuốn+kính trệt, băng biển, cửa sổ khung+kính, ban công lam,
