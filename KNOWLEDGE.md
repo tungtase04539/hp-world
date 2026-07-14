@@ -315,6 +315,15 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-15 (bz)** [CHỤP VỆ TINH TRONG GAME — QA cấu trúc đường/vị trí]: user chốt ưu tiên ĐÚNG
+    CẤU TRÚC (đường xá, vị trí công trình/nhà dân/công trình công cộng) + muốn ảnh vệ tinh top-down để
+    so. Thêm `window.__hp.aerial(cx,cz,half,alt)`: OrthographicCamera nhìn thẳng xuống, Bắc(−z) lên,
+    Đông(+x) phải (đúng chiều bản đồ); `aerialOff()` trả lại. main.js animate: khi `_aerialCam` set thì
+    bỏ updateCamera + render trực tiếp (bỏ composer/bloom). Harness `tools/pano_loop/aerial.mjs` (ẩn UI
+    bằng visibility, chụp full-page). Cho ảnh "vệ tinh" game SẠCH thấy rõ mạng đường + footprint nhà +
+    sông/hồ + ga — QA khớp OSM/thực tế. LƯU Ý: game sinh TỪ OSM (ROADS_DT + BUILDINGS footprint thật)
+    nên đường & vị trí nhà ĐÚNG THEO OSM by-construction; aerial để soi lỗi thô + đối chiếu ảnh vệ tinh
+    thật. 8 ảnh vệ tinh thật CHƯA có trong repo — cần user cấp hoặc chụp Google Maps (bản quyền, hỏi trước).
 - **2026-07-15 (by)** [MỤC TIÊU CHỈNH: 6đ MINH HỌA + lỗi #1 camera-engulf]: User chốt mục tiêu **6/10,
     MINH HỌA (không photoreal), đúng cấu trúc + màu, nhìn là biết Hải Phòng**. BÀI HỌC ĐO LƯỜNG xương-máu:
     scorer PHẢI đúng tiêu chí — thước "giống ảnh thật" phạt oan low-poly → chấm ~2đ sai lệch; thước

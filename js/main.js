@@ -387,7 +387,8 @@ function animate() {
     }
 
     traffic.update(dt, time, pState.pos);
-    if (cine.active) cine.update(dt); else updateCamera(dt);   // đạo diễn lo camera khi bật
+    if (window.__hp && window.__hp._aerialCam) { /* chế độ vệ tinh: giữ camera top-down, không cập nhật */ }
+    else if (cine.active) cine.update(dt); else updateCamera(dt);   // đạo diễn lo camera khi bật
     const sky = dayNight.update(dt, pState.pos);
     // đêm bloom mạnh hơn cho đèn phố & cửa sổ rực rỡ
     if (bloomPass) bloomPass.strength = 0.1 + sky.night * 0.6;
@@ -428,7 +429,8 @@ function animate() {
     }
   }
 
-  if (composer) composer.render();
+  if (window.__hp && window.__hp._aerialCam) renderer.render(scene, window.__hp._aerialCam);
+  else if (composer) composer.render();
   else renderer.render(scene, camera);
 }
 
@@ -513,6 +515,19 @@ window.__hp = {
     );
   },
   setTime(v) { dayNight.t = v; },
+  _aerialCam: null,
+  // Chụp "VỆ TINH": camera TRỰC GIAO nhìn thẳng xuống tâm (cx,cz), phủ ±half mét,
+  // Bắc (−z) hướng LÊN, Đông (+x) sang PHẢI — đúng chiều bản đồ. Để so cấu trúc đường/vị trí nhà.
+  aerial(cx, cz, half = 400, alt = 1200) {
+    const c = new THREE.OrthographicCamera(-half, half, half, -half, 1, alt + 500);
+    c.position.set(cx, alt, cz);
+    c.up.set(0, 0, -1);
+    c.lookAt(cx, 0, cz);
+    c.updateProjectionMatrix();
+    this._aerialCam = c;
+    return { cx, cz, half };
+  },
+  aerialOff() { this._aerialCam = null; },
   // liệt kê cụm mesh GLB (material PBR của Meshy) + vị trí thế giới — công cụ audit
   glbs() {
     const out = new Map();
