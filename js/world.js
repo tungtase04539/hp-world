@@ -1390,7 +1390,7 @@ export function buildWorld(scene) {
   // ---------- CÂY XĂNG PETROLIMEX (mái che khung thép sơn khoang xanh–cam đặc trưng) ----------
   {
     const whiteG = [], orangeG = [], blueG = [], pumpG = [], darkG = [];
-    const RAW = [[168.6,7.9],[224.6,-20],[211.7,80.4],[-897,-471.1],[664.9,-799]];
+    const RAW = [[205.4,35.1],[-897,-471.1],[664.9,-799]];   // 3 điểm cũ là tọa độ PANO=tim đường (cell_donggiua): trạm thật ~(205,35)
     const GAS = []; for (const c of RAW) { if (!GAS.some((k) => Math.hypot(k[0]-c[0], k[1]-c[1]) < 60)) GAS.push(c); }
     for (const [x, z] of GAS) {
       const gy = groundHeight(x, z); if (gy < LAND_H - 0.5 || isWater(x, z)) continue;
@@ -10260,6 +10260,241 @@ const cnUmb = (x, z, hex) => {                             // ô dù chợ cóc 
   }
   // hàng cọ mép công viên (phía BẮC-TÂY đối diện)
   for (let t = -2; t <= 40; t += 9) { const cx = A[0] + ux * t - nx * 13, cz = A[1] + uz * t - nz * 13; cnPalm(cx, cz); }
+}
+
+
+
+  // ===== CELL_DONGGIUA: 9 block ĐBP đông/Trần Bình Trọng (agent, helper dm*) =====
+// ============================================================================
+// CELL_DONGGIUA — NHÁP ĐỢT 5 (MẶT TRẬN ĐÔNG-GIỮA)
+// Dải x 150..450, z -150..-750: Trần Phú (nút Minh Khai) + Trần Hưng Đạo giữa +
+// công viên trung tâm (PARK#6 328,-34 / PARK#7 119,68) + Phan Chu Trinh + Minh Khai nam.
+//
+// VỊ TRÍ DÁN: js/world.js, trong/ngay sau khối "CÔNG TRÌNH ĐẶC TRƯNG dải trung tâm"
+// (SAU khai báo FEATURED_CLEAR :1468, TRƯỚC vòng OSM BUILDINGS + block_infill :11061)
+// — để FEATURED_CLEAR.push() ở đây đuổi nhà OSM/infill (nearFeatured :1480, block_infill :11072).
+//
+// Scope buildWorld: THREE, mat, makeTex, sharedMats, addCollider, FEATURED_CLEAR,
+//   groundHeight, groundHeightNoDeck, isWater, LAND_H, localPt, mergeGeometries, scene.
+// Prefix RIÊNG "dm" (KHÔNG trùng: lm/dl/bs/ts/cb/cn/dg... — dg là CELL_DONG).
+//
+// QUY TẮC TỌA ĐỘ: pano = TIM ĐƯỜNG. Nhà dời theo pháp tuyến = nửa_lòng + 2.3(vỉa hè) + D/2.
+//   Đơn vị đường (từ ROADS_DT thật): TP=Trần Phú u(0.826,-0.563); THD=Trần Hưng Đạo
+//   u(0.894,-0.446); PCT=Phan Chu Trinh u(1,0). Park#6 ở BẮC Trần Phú (sgn -1).
+// ============================================================================
+
+// ---------- HELPER dm* (dán 1 LẦN, trước các block) ----------
+const dmOK = (x, z) => Math.abs(groundHeightNoDeck(x, z) - LAND_H) < 0.4 && !isWater(x, z);
+const dmSign = (txt, bg, fg = '#ffffff', px = 46) => new THREE.MeshLambertMaterial({
+  map: makeTex(512, 84, (g, w, h) => {
+    g.fillStyle = bg; g.fillRect(0, 0, w, h);
+    g.fillStyle = fg; g.font = `bold ${px}px system-ui, sans-serif`;
+    g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, w / 2, h / 2 + 2, w - 24);
+  }),
+});
+const dmFacade = (baseCss, winCss, cols, rows) => new THREE.MeshLambertMaterial({
+  map: makeTex(256, 256, (g, w, h) => {
+    g.fillStyle = baseCss; g.fillRect(0, 0, w, h);
+    const mx = w * 0.1, my = h * 0.1, cw = (w - mx * 2) / cols, ch = (h - my * 2) / rows;
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+      g.fillStyle = winCss; g.fillRect(mx + c * cw + cw * 0.16, my + r * ch + ch * 0.16, cw * 0.68, ch * 0.66);
+    }
+  }),
+});
+// pano(px,pz) trên tim đường u=(ux,uz); dời DỌC 'along' + NGANG 'off' về phía sgn(±1) của pháp tuyến trái.
+// Trả tâm nhà + ry (mặt tiền local +Z quay NGƯỢC pháp tuyến, tức về phía đường).
+const dmFront = (px, pz, ux, uz, along, sgn, off) => {
+  const nx = -uz, nz = ux;                         // pháp tuyến trái
+  const cx = px + ux * along + sgn * nx * off;
+  const cz = pz + uz * along + sgn * nz * off;
+  const ry = Math.atan2(-sgn * nx, -sgn * nz);     // local +Z -> (sin ry, cos ry) = hướng về đường
+  return { cx, cz, ry };
+};
+// Nhà hộp có mặt tiền texture: W×D, FL tầng × FH cao. Đặt tại (cx,cz) xoay ry. Tự collider + FEATURED_CLEAR.
+const dmBox = (cx, cz, ry, W, D, FL, FH, wallMat, name) => {
+  if (!dmOK(cx, cz)) return null;
+  const g = new THREE.Group(); g.position.set(cx, groundHeight(cx, cz), cz); g.rotation.y = ry;
+  const H = FL * FH;
+  const body = new THREE.Mesh(new THREE.BoxGeometry(W, H, D), wallMat); body.position.y = H / 2; g.add(body);
+  const para = new THREE.Mesh(new THREE.BoxGeometry(W + 0.3, 0.5, D + 0.3), mat(0xcfc8b6)); para.position.y = H + 0.25; g.add(para);
+  g.traverse((o) => { if (o.isMesh) o.castShadow = o.receiveShadow = true; });
+  g.name = name; scene.add(g);
+  addCollider(cx, cz, Math.max(W, D) * 0.5);
+  FEATURED_CLEAR.push([cx, cz, Math.max(W, D) / 2 + 8]);
+  return g;
+};
+
+// === (dm1) DỌN CÔNG VIÊN + NÚT GIAO: đuổi shophouse/infill lấp KHE giữa PARK#6 & PARK#7
+//     (x~200..235 = khu cây xăng/nút Trần Hưng Đạo–Trần Phú, inPark KHÔNG phủ), mép ĐÔNG
+//     park (x>388), và khối "che kín" pano_431 (Phan Chu Trinh). FEATURED_CLEAR CHỈ đuổi
+//     FILL (OSM/shophouse/block_infill), KHÔNG đụng landmark. Fix headings 0-0.5 của
+//     021/236/431/475/535 + mở lại "công viên/nút giao" cho 385/402/401/398/399/400. ===
+{
+  const CLR = [
+    [205, 30, 20], [216, 12, 20], [226, -6, 18], [210, 48, 16], [193, 66, 16],  // KHE gas/nút giữa 2 park
+    [235, -20, 16], [244, -34, 14],                                             // rìa tây PARK#6 (sau gas)
+    [396, -52, 15], [406, -46, 13], [388, -66, 13],                             // mép ĐÔNG park quanh nút Minh Khai
+    [203.5, -121.4, 13], [212, -110, 11],                                       // pano_431: gỡ khối che camera Phan Chu Trinh
+    [217, -36, 11],                                                             // pano_535 h180: gỡ vách chắn lòng đường
+  ];
+  for (const c of CLR) FEATURED_CLEAR.push(c);
+}
+
+// === (dm2) AHA COFFEE góc Phan Chu Trinh (pano_431 203.5,-121.4 — 0.9đ, tệ nhất ô).
+//     Thực địa (h0/h270): quán cà phê 2 tầng mặt mở, hiên gỗ + lan can, mái đua xanh,
+//     biển hộp "aha coffee" đen-trắng, cờ đỏ. Nằm phía BẮC phố hẹp (u E-W), mặt về NAM. ===
+{
+  const { cx, cz, ry } = dmFront(203.5, -121.4, 1, 0, 0, -1, 9);   // bắc phố, off = 2.75+2.3+4
+  const g = dmBox(cx, cz, ry, 12, 8, 2, 3.4, dmFacade('#efe7d6', '#3a4a52', 3, 2), 'dm_aha');
+  if (g) {
+    const aw = new THREE.Mesh(new THREE.BoxGeometry(12.4, 0.4, 2.2), mat(0x2f6b64));  // mái đua xanh trên tầng trệt
+    aw.position.set(0, 3.4, 4.1); g.add(aw);
+    const s = new THREE.Mesh(new THREE.PlaneGeometry(4.2, 1.3), dmSign('aha coffee', '#1b1b1b', '#e9eef0', 40));
+    s.position.set(0, 5.4, 4.02); g.add(s);
+    for (const lx of [-4.5, 4.5]) {                                              // ô dù + bàn ghế vỉa hè
+      const u = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, 0.1, 8), mat(0x6b4a2a)); u.position.set(lx, 2.4, 5.6); g.add(u);
+    }
+    g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  }
+}
+
+// === (dm3) GIABAO EDU — tháp trắng GÓC BO TRÒN ~7T (pano_236 224.6,-20 — 2.5đ, h0=1.0).
+//     Thực địa: tháp trắng mặt kính, cạnh bo cong ở góc nút, ban công cong; đế: GIABAO EDU
+//     (hồng) + PHAM café (đen), số 18. Bắc Trần Hưng Đạo, mặt về NAM ra nút. ===
+{
+  const { cx, cz, ry } = dmFront(224.6, -20, 0.894, -0.446, 6, -1, 13);   // bắc THD, off = 2.75+2.3+8
+  const g = dmBox(cx, cz, ry, 15, 15, 7, 3.3, dmFacade('#eef1f4', '#8fb4d6', 4, 7), 'dm_giabao');
+  if (g) {
+    const H = 7 * 3.3;
+    const corner = new THREE.Mesh(new THREE.CylinderGeometry(4.2, 4.2, H, 20, 1, false, 0, Math.PI), dmFacade('#f4f6f8', '#9fc0dd', 2, 7));
+    corner.position.set(0, H / 2, 7.5); corner.rotation.y = Math.PI; g.add(corner);                 // trụ bo tròn ở góc phố
+    const s1 = new THREE.Mesh(new THREE.PlaneGeometry(9, 1.5), dmSign('GIABAO EDU', '#c0397a', '#ffffff', 40));
+    s1.position.set(0, 4.0, 7.7); g.add(s1);
+    const s2 = new THREE.Mesh(new THREE.PlaneGeometry(6, 1.1), dmSign('PHAM · CAFÉ', '#1a1a1a', '#e8e8e8', 38));
+    s2.position.set(0, 2.4, 7.7); g.add(s2);
+    g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  }
+}
+
+// === (dm4) HONDA HEAD + OCB — showroom 5T KHUNG ĐỎ mặt kính (pano_401 329.8,18.2 h90=2.5;
+//     402 h180). Thực địa: showroom xe máy kính lớn viền ĐỎ, biển "HEAD", đế xanh OCB.
+//     NAM Trần Phú, dịch ĐÔNG ~14m, mặt về BẮC ra phố/công viên. ===
+{
+  const { cx, cz, ry } = dmFront(329.8, 18.2, 0.826, -0.563, 14, 1, 17);   // nam TP, off = 5+2.3+10
+  const g = dmBox(cx, cz, ry, 20, 16, 5, 3.4, dmFacade('#20242a', '#5b6b78', 5, 5), 'dm_hondahead');
+  if (g) {
+    const H = 5 * 3.4;
+    const frame = new THREE.Mesh(new THREE.BoxGeometry(21, H + 0.4, 0.6), mat(0xc42026)); frame.position.set(0, H / 2, 8.2); g.add(frame); // viền đỏ mặt tiền
+    const glass = new THREE.Mesh(new THREE.BoxGeometry(18.5, H - 1, 0.3), sharedMats.window || mat(0x9fc0dd)); glass.position.set(0, H / 2, 8.3); g.add(glass);
+    const s = new THREE.Mesh(new THREE.PlaneGeometry(6, 1.5), dmSign('HEAD', '#c42026', '#ffffff', 52)); s.position.set(6, H - 2, 8.35); g.add(s);
+    const ocb = new THREE.Mesh(new THREE.PlaneGeometry(6, 1.2), dmSign('OCB', '#0a7c3f', '#ffffff', 46)); ocb.position.set(-6, 2.0, 8.35); g.add(ocb);
+    g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  }
+}
+
+// === (dm5) PH HOTEL 8T trắng + showroom Honda kề (pano_402 365.1,-6.7 h270=4; 385).
+//     Thực địa: khối KS trắng ~8T ban công đen, đế showroom xe. NAM Trần Phú, mặt về BẮC. ===
+{
+  const { cx, cz, ry } = dmFront(365.1, -6.7, 0.826, -0.563, 4, 1, 18);
+  const g = dmBox(cx, cz, ry, 16, 15, 8, 3.3, dmFacade('#f0ede4', '#b9b3a3', 3, 8), 'dm_phhotel');
+  if (g) {
+    const H = 8 * 3.3;
+    for (let f = 1; f < 8; f++) {                                              // ban công đen ngang
+      const bal = new THREE.Mesh(new THREE.BoxGeometry(16.4, 0.3, 0.5), mat(0x2a2a2a)); bal.position.set(0, f * 3.3, 7.6); g.add(bal);
+    }
+    const s = new THREE.Mesh(new THREE.PlaneGeometry(7, 1.6), dmSign('PH HOTEL', '#8a1f1f', '#ffe9b0', 44)); s.position.set(0, H - 2, 7.7); g.add(s);
+    g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  }
+}
+
+// === (dm6) LIEN A — showroom nội thất 3T mặt LƯỢN SÓNG + graphic con mắt (pano_237 168.6,7.9
+//     — 2.8đ, h0=2). Thực địa: khối be/nâu ~25m mặt cắt lượn sóng, hình con mắt lớn, logo
+//     LIEN A xanh, ô dù café. Bắc Trần Hưng Đạo, mặt về NAM. ===
+{
+  const { cx, cz, ry } = dmFront(168.6, 7.9, 0.894, -0.446, 0, -1, 13);
+  const g = dmBox(cx, cz, ry, 25, 14, 3, 3.6, dmFacade('#c7bda6', '#9a8f78', 6, 3), 'dm_liena');
+  if (g) {
+    const H = 3 * 3.6;
+    const wave = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 3.2, H, 16, 1, false, 0, Math.PI * 0.6), mat(0xc7bda6));
+    wave.position.set(-6, H / 2, 6.8); g.add(wave);                            // gợn sóng mặt tiền (gần đúng)
+    const eye = new THREE.Mesh(new THREE.CircleGeometry(2.0, 20), dmSign('◉', '#c7bda6', '#2a5a86', 120)); eye.position.set(-6, H * 0.55, 7.05); g.add(eye);
+    const s = new THREE.Mesh(new THREE.PlaneGeometry(9, 1.8), dmSign('LIEN A', '#2a5a86', '#ffffff', 56)); s.position.set(6, H - 2.2, 7.05); g.add(s);
+    g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  }
+}
+
+// === (dm7) MÉP CÔNG VIÊN TRẦN PHÚ: quảng trường lát CARO đỏ-xám + hàng cây CẮT TRỤI cổ thụ
+//     + rào cây thấp. Fix cụm "vỉa hè caro/nền lát rộng/cây cắt trụi" lặp ở 021/385/475/
+//     236/237/401/402/542 (severity 2-3 GẦN như mọi pano). Phía BẮC Trần Phú (trong park). ===
+{
+  const A = [256, 60], u = [0.826, -0.563], L = 190;                          // trục Trần Phú
+  const nx = -u[1], nz = u[0];                                                 // pháp tuyến trái (về BẮC/park)
+  const tiles = [], trunkG = [], stubG = [], hedgeG = [];
+  const checker = makeTex(128, 128, (g, w, h) => {
+    for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) { g.fillStyle = (i + j) % 2 ? '#b24a3a' : '#8f9298'; g.fillRect(i * 32, j * 32, 32, 32); }
+  });
+  checker.wrapS = checker.wrapT = THREE.RepeatWrapping; checker.repeat.set(24, 2);
+  for (let d = 8; d < L; d += 4.5) {
+    const bx = A[0] + u[0] * d, bz = A[1] + u[1] * d;
+    const px = bx - nx * 10, pz = bz - nz * 10;                                // 10m vào park (sgn -1)
+    if (!dmOK(px, pz)) continue;
+    // cây cắt trụi: thân dày + vài cụt nhánh, tán thưa
+    if ((d | 0) % 12 < 5) {
+      const tr = new THREE.CylinderGeometry(0.42, 0.55, 6.5, 8); tr.translate(px, LAND_H + 3.25, pz); trunkG.push(tr);
+      for (const a of [0.6, 2.4, 4.5]) { const st = new THREE.CylinderGeometry(0.14, 0.22, 1.8, 6); st.rotateZ(0.8); st.rotateY(a); st.translate(px + Math.cos(a) * 0.8, LAND_H + 6.2, pz + Math.sin(a) * 0.8); stubG.push(st); }
+    }
+    // rào cây thấp mép quảng trường
+    const hg = new THREE.BoxGeometry(4.6, 0.7, 0.8); hg.translate(bx - nx * 4.5, LAND_H + 0.35, bz - nz * 4.5); hedgeG.push(hg);
+  }
+  // dải lát caro (2 hình chữ nhật dài phủ mép park)
+  const plaza = new THREE.Mesh(new THREE.PlaneGeometry(L - 10, 12), new THREE.MeshLambertMaterial({ map: checker }));
+  plaza.rotation.x = -Math.PI / 2; plaza.rotation.z = Math.atan2(u[1], u[0]);
+  plaza.position.set(A[0] + u[0] * L / 2 - nx * 8, LAND_H + 0.03, A[1] + u[1] * L / 2 - nz * 8);
+  plaza.receiveShadow = true; plaza.name = 'dm_park_plaza'; scene.add(plaza);
+  const addM = (arr, m, nm) => { if (arr.length) { const mesh = new THREE.Mesh(mergeGeometries(arr), m); mesh.castShadow = true; mesh.name = nm; scene.add(mesh); } };
+  addM(trunkG, sharedMats.trunk || mat(0x6b4a2a), 'dm_park_trunks');
+  addM(stubG, sharedMats.trunk || mat(0x6b4a2a), 'dm_park_stubs');
+  addM(hedgeG, mat(0x3f7a3a), 'dm_park_hedge');
+}
+
+// === (dm8) DÃY BIỆT THỰ PHÁP 2T Trần Hưng Đạo (pano_535 217.2,-35.6 h270=1; 237/236 h270).
+//     Thực địa: biệt thự vàng-hồng 2 tầng, cửa lá sách xanh, ban công + rào sắt. Thay dãy
+//     shophouse cao generic BẮC Trần Hưng Đạo, TÂY GIABAO. Guard dmOK — bỏ ô rơi đường/park. ===
+{
+  const cols = ['#e8d9a8', '#e6c2b0', '#dcd2b4'];
+  for (let i = 0; i < 3; i++) {                                                // 3 lô (không lấn LIEN A ~x163)
+    const along = -14 - i * 13;                                                // lùi TÂY dọc THD từ GIABAO
+    const { cx, cz, ry } = dmFront(224.6, -20, 0.894, -0.446, along, -1, 11);
+    const g = dmBox(cx, cz, ry, 11, 11, 2, 3.5, dmFacade(cols[i], '#2f5a4a', 3, 2), 'dm_villa' + i);
+    if (g) {
+      const roof = new THREE.Mesh(new THREE.BoxGeometry(11.6, 0.6, 11.6), mat(0x9c4a34)); roof.position.y = 2 * 3.5 + 0.3; g.add(roof); // mái ngói đỏ
+      const bal = new THREE.Mesh(new THREE.BoxGeometry(11.2, 0.3, 0.4), mat(0xf0ead6)); bal.position.set(0, 3.5, 5.6); g.add(bal);      // ban công
+      g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+    }
+  }
+}
+
+// === (dm9) MINH KHAI NAM z≈-452 (pano_156 327.3,-451.8 =2.0; 159 210.7,-459 =2.1): trụ sở
+//     HỘI CHỮ THẬP ĐỎ 2T + KIM THÀNH HOTEL 4T + ACB 3T trắng-xanh. Phố ~E-W (u≈1,0), nhà
+//     hai bên; guard dmOK. (Highlands sân dù đã có :6659 — xem PLAN: dù TÍM→ĐỎ.) ===
+{
+  // Hội Chữ thập đỏ 2T (bắc phố, nút 156)
+  {
+    const { cx, cz, ry } = dmFront(327.3, -451.8, 1, 0, 4, -1, 10);
+    const g = dmBox(cx, cz, ry, 13, 10, 2, 3.5, dmFacade('#eee8d8', '#b7351f', 4, 2), 'dm_hoictd');
+    if (g) { const s = new THREE.Mesh(new THREE.PlaneGeometry(9, 1.4), dmSign('HỘI CHỮ THẬP ĐỎ', '#ffffff', '#c01a1a', 34)); s.position.set(0, 5.2, 5.1); g.add(s); g.traverse((o) => { if (o.isMesh) o.castShadow = true; }); }
+  }
+  // Kim Thành Hotel 4T + ACB 3T (nút 159, hai góc phía nam/đối diện)
+  {
+    const { cx, cz, ry } = dmFront(210.7, -459, 1, 0, -6, 1, 11);
+    const g = dmBox(cx, cz, ry, 12, 12, 4, 3.4, dmFacade('#e9d7ab', '#8a2f22', 3, 4), 'dm_kimthanh');
+    if (g) { const s = new THREE.Mesh(new THREE.PlaneGeometry(8, 1.5), dmSign('KIM THÀNH HOTEL', '#7a1f1f', '#ffe9b0', 34)); s.position.set(0, 4 * 3.4 - 1.6, 6.1); g.add(s); g.traverse((o) => { if (o.isMesh) o.castShadow = true; }); }
+  }
+  {
+    const { cx, cz, ry } = dmFront(210.7, -459, 1, 0, 12, -1, 10);
+    const g = dmBox(cx, cz, ry, 11, 10, 3, 3.4, dmFacade('#f2f4f6', '#0e6fbf', 4, 3), 'dm_acb');
+    if (g) { const s = new THREE.Mesh(new THREE.PlaneGeometry(7, 1.4), dmSign('ACB', '#0056a4', '#ffffff', 48)); s.position.set(0, 3 * 3.4 - 1.4, 5.1); g.add(s); g.traverse((o) => { if (o.isMesh) o.castShadow = true; }); }
+  }
 }
 
 

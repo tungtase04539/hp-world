@@ -315,6 +315,15 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-14 (bl)** [ĐỢT 5 ĐÔNG-GIỮA — Petrolimex khỏi tim đường + 9 landmark]:
+    EDIT gốc rễ: RAW cây xăng Petrolimex (world.js) 3 điểm đầu là TỌA ĐỘ PANO=tim đường (mái che
+    3 cột giữa lòng đường bao lâu nay) → thay bằng trạm thật (205.4,35.1); render pano_475: camera
+    đứng ĐÚNG dưới mái che, 2 cột 2 bên khớp ảnh thật. 9 block dm* (dm1 dọn khe giữa 2 park lõi
+    Trần Hưng Đạo×Trần Phú che camera 021/236/431/475/535; Aha Coffee, GIABAO EDU tháp bo tròn,
+    Honda HEAD+OCB, PH Hotel, LIEN A lượn sóng; biệt thự Pháp 2T thay shophouse; mép công viên
+    Trần Phú lát caro + cây cắt trụi). Render pano_535 villa đúng lề, pano_475 Petrolimex khớp.
+    Diag 0 lỗi, errcheck sạch. BÀI HỌC: prop hardcode theo pano (cây xăng, chữ HP, non bộ) đều
+    nên rà lại — tọa độ pano = tim đường, đặt thẳng lên đó là giữa lòng đường.
 - **2026-07-14 (bk)** [GIỚI HẠN THỰC TẾ: nhóm nút giao cầu HVT — KHÔNG đào thêm]:
     Cầu HVT ĐÃ CÓ vòm thép đỏ đầy đủ (2 vòm nghiêng ARCH_H=45 + dây network-arch + giằng) ở
     NHỊP CHÍNH quanh tâm (15,-1391). Nhóm 13 pano nút giao (284/285/330/329/217/282/283/346/347/
