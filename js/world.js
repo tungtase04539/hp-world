@@ -16109,6 +16109,41 @@ function cuBuildCurbs(deps) {
   cuBuildCurbs({ THREE, scene, mat, mergeGeometries, groundHeightNoDeck, isWater, ROADS_DT });
   }
 
+
+  // ===== FIX t8 (cell_struct): CỤM NHÀ KHO CẢNG mở rộng (block_infill dừng ở z=-900) =====
+  {
+    const bcOK = (x, z) => !isWater(x, z) && groundHeight(x, z) > 1.4;
+    const roofM = [mat(0x9c6b4a), mat(0x8f8a5f), mat(0x8a7a5a)];
+    const wallM = mat(0x8c8a7e);
+    const CLV = [-118, -927], CLV_R = 160;
+    const near = (x, z, cx, cz, r) => ((x - cx) ** 2 + (z - cz) ** 2) < r * r;
+    const rows = [
+      [-938, [[470, 100], [590, 100], [710, 120], [840, 90]]],
+      [-905, [[60, 110], [500, 110], [640, 110], [790, 130]]],
+      [-872, [[120, 90], [560, 120], [720, 110]]],
+    ];
+    let wi = 100;
+    for (const [zc, units] of rows) for (const [xc, W] of units) {
+      if (!bcOK(xc, zc)) continue;
+      if (near(xc, zc, CLV[0], CLV[1], CLV_R)) continue;
+      if (xc > 120 && xc < 420 && zc < -890) continue;
+      const g = new THREE.Group();
+      g.position.set(xc, groundHeight(xc, zc), zc);
+      const D = 22, H = 6.0;
+      const body = new THREE.Mesh(new THREE.BoxGeometry(W, H, D), wallM);
+      body.position.y = H / 2; g.add(body);
+      for (const sgn of [-1, 1]) {
+        const rf = new THREE.Mesh(new THREE.BoxGeometry(W + 1, 0.18, D * 0.58), roofM[wi % 3]);
+        rf.position.set(0, H + 0.95, sgn * D * 0.22); rf.rotation.x = -sgn * 0.32; g.add(rf);
+      }
+      g.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+      g.name = 'port_kho_' + wi; scene.add(g);
+      for (const lx of [-W / 3, 0, W / 3]) addCollider(xc + lx, zc, D / 2 + 1);
+      FEATURED_CLEAR.push([xc, zc, W / 2 + 8]);
+      wi++;
+    }
+  }
+
   }
 
   // (MÁI HIÊN BẠT + BIỂN HIỆU chuyển xuống SAU khối bằng-chứng-nhà: cần houseEvidence/openSpace/panoDenies

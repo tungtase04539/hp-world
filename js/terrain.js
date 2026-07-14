@@ -141,6 +141,12 @@ for (const r of RIVERS) {
       [-780, -29], [-700, -38], [-620, -47], [-506, -76]);
   }
 }
+// FIX t4 (cell_struct): sông Tam Bạc arc LIỀN MẠCH — splice ở trên xoá đỉnh nối (-1257,148)
+// làm arc tách khỏi nhánh rộng. Nối lại + làm dày (w38→48) → nước liền, hết "đứt khúc" trên vệ tinh.
+for (const r of RIVERS) {
+  if (r.pts.some((p) => p[0] === -314 && p[1] === -182)) { r.w = 48; r.sh = 14; }
+}
+RIVERS.push({ w: 48, sh: 14, pts: [[-1257, 148], [-1250, 108], [-1238, 72], [-1220, 50], [-1150, 44], [-1092, 50]] });
 const riverIdx = makeBucketIndex(RIVERS.map((r) => ({ pts: r.pts, meta: [r.w, r.sh || 28] })));
 const regionIdx = makeBucketIndex(ROADS_REGION.map((r) => ({ pts: r.pts, meta: 0 })));
 const dtRoadIdx = makeBucketIndex(ROADS_DT.map((r) => ({ pts: r.pts, meta: r.c })));

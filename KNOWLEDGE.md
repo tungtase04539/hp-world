@@ -315,6 +315,15 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-15 (cb)** [FIX CẤU TRÚC từ QA vệ tinh — arc + cảng, mục tiêu 7]: score_sat 8 tile TB 5.64;
+    2 tile thấp nhất t4=4.0 (sông Tam Bạc arc ĐỨT KHÚC) + t8=4.4 (cảng thưa). ROOT-CAUSE (agent verify):
+    t4 = vòng splice terrain.js:135 dùng `splice(i-1,2,...)` XOÁ đỉnh nối (-1257,148) → arc R#3 tách khỏi
+    nhánh rộng R#2 → 2 thân nước rời; + arc mảnh (w38). FIX (sau splice, trước riverIdx): làm dày arc
+    w38→48 sh14 (định danh qua đỉnh -314,-182) + RIVERS.push polyline 6 điểm nối (-1257,148)→(-1092,50)
+    bám mép tránh ô lake-override. Render aerial: arc LIỀN MẠCH. t8 = block_infill dừng gz=-900 nên dải
+    cảng z<-900 trống; FIX: cụm nhà kho port_kho_* (3 dãy, guard bcOK=!water&gh>1.4, né cloverleaf
+    (-118,-927) r160 + B13). BÀI HỌC: ảnh Google Earth "vệ tinh" thực ra 3D NGHIÊNG (camera 1104m, nút 3D)
+    → cạnh méo, KHÔNG nắn trục sông theo nó; giữ hình OSM, chỉ sửa lỗi topology (khe đứt/độ dày).
 - **2026-07-15 (ca)** [ĐỐI CHIẾU 8 ẢNH VỆ TINH THẬT — tăng mật độ nhà dân]: user cấp 8 ảnh Google Earth
     top-down (1100d,35y,0t) 3 hàng lat 20.85524/20.85976/20.86383. Chụp game aerial khớp khung (viewport
     1600×775, aerial half=385 → ~1590×770m; sửa aerial() dùng aspect canvas). ĐỐI CHIẾU: đường/sông
