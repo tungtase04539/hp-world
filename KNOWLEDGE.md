@@ -315,6 +315,17 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-15 (by)** [MỤC TIÊU CHỈNH: 6đ MINH HỌA + lỗi #1 camera-engulf]: User chốt mục tiêu **6/10,
+    MINH HỌA (không photoreal), đúng cấu trúc + màu, nhìn là biết Hải Phòng**. BÀI HỌC ĐO LƯỜNG xương-máu:
+    scorer PHẢI đúng tiêu chí — thước "giống ảnh thật" phạt oan low-poly → chấm ~2đ sai lệch; thước
+    "minh họa đúng cấu trúc/màu/nhận diện, KHÔNG trừ vì low-poly" mới đúng → game thực ra **4.14/6**
+    (không phải 1.98). Đo lift phải A/B CÙNG scorer build cũ↔mới. Prompt đúng ở scratchpad/score_direct.py.
+    LỖI #1 KÉO ĐIỂM (ChatGPT + mắt xác nhận): CAMERA BỊ NHÀ CHE KÍN (pano_351/498/307 = 1.6-2.3). Thêm
+    hệ KEEP-CLEAR: js/panoclear.js (551 toạ độ camera pano) + nearPanoCam(x,z,r) spatial-hash, guard vào
+    OSM/shophouse slotOK/house/block_infill (cấm nhà procedural trong 5m quanh camera). PHÁT HIỆN: các ca
+    engulf TỆ NHẤT là LANDMARK BLOCK đặt tay ~4m camera (mesh noname) — guard procedural KHÔNG bắt được,
+    phải sửa từng block. CÔNG CỤ MỚI: `window.__hp.pick(nx,ny)` raycast từ camera → tên+toạ độ mesh che
+    (auto-hunt engulf). Endpoint chỉ 1 job score/lần (serialize, ~9s/ảnh); nhiều job = nghẽn 0 kết quả.
 - **2026-07-14 (bx)** [GÓI HỆ THỐNG VÒNG 2 — người/bó vỉa/vỉa hè t]: (a) NGƯỜI ĐI BỘ nền (cell_dens
     de*): game đã có xe máy/ô tô đỗ (cap 620/520) nhưng 0 người nền → judge chê "phố vắng"; thêm
     dePedestrians instanced (~620, 22% nón lá) + bổ sung xe 'r', +8 draw call, avoid=nearFeatured.

@@ -12,6 +12,23 @@ import { STREETS, INTERSECTIONS, MEDIANS, GARDENS } from './mapdata.js';
 import { SIDEWALK_BY_ROAD, SIDEWALK_DEFAULT } from './sidewalks.js';
 import { PANO_SIDES } from './panosides.js';
 import { PANO_HOUSES } from './housemap.js';
+import { PANO_CAM } from './panoclear.js';
+
+// KEEP-CLEAR quanh 551 camera pano (lỗi #1 kéo điểm: nhà procedural đè camera → tường che kín).
+// Spatial-hash để guard nhanh trong các vòng dựng nhà. R mặc định 5m (nửa lòng đường hẹp nhất).
+const _panoGrid = new Map();
+for (const [px, pz] of PANO_CAM) {
+  const k = Math.floor(px / 8) + ',' + Math.floor(pz / 8);
+  let l = _panoGrid.get(k); if (!l) _panoGrid.set(k, l = []); l.push([px, pz]);
+}
+function nearPanoCam(x, z, r = 5) {
+  const cx = Math.floor(x / 8), cz = Math.floor(z / 8), r2 = r * r;
+  for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) {
+    const l = _panoGrid.get((cx + dx) + ',' + (cz + dz)); if (!l) continue;
+    for (const [px, pz] of l) if ((x - px) ** 2 + (z - pz) ** 2 < r2) return true;
+  }
+  return false;
+}
 import { SHOP_SIGNS } from './shopsigns.js';
 
 // Thế giới dựng từ dữ liệu OpenStreetMap thật của Hải Phòng (tỉ lệ 1:10,
@@ -16264,6 +16281,7 @@ function cuBuildCurbs(deps) {
       // KHÔNG gọi openSpace() ở đây: nó + _sqX/_majSeg khai báo SAU vòng này → TDZ (bài học aj).
       if (cx > -300 && cx < 120 && cz > -1045 && cz < -845) continue;
       if (inSuperblock(cx, cz)) continue;   // siêu khối Hải quân/Cảng: nhà lùi sau tường, không OSM interior
+      if (nearPanoCam(cx, cz, 5)) continue;   // KEEP-CLEAR: nhà OSM không đè camera pano (lỗi #1: tường che kín)
       if (riverFactor(cx, cz) > 0.01 || Math.abs(groundHeightNoDeck(cx, cz) - LAND_H) > 0.4) continue;
       const hash = Math.abs(Math.floor(cx * 13 + cz * 7));
       // Lõi trung tâm: phố thương mại thực tế 3-5 tầng liền mạch (đối chiếu pano) → nâng nhà generic
@@ -16421,6 +16439,7 @@ function cuBuildCurbs(deps) {
   // facadeMats (chỉ là nắp hộp dưới mái chóp, không nhìn thấy). houseFlush() gọi SAU vòng đặt nhà.
   const _houseBodyG = new Map(), _houseRoofG = new Map();
   function house(x, z, w = 8, d = 7, hgt = 6, rotY = 0, wallOverride = null) {
+    if (nearPanoCam(x, z, 5)) return;   // KEEP-CLEAR camera pano (lỗi #1: nhà rời che kín camera)
     const idx = Math.floor(Math.abs(x * 7 + z * 13)) % facadeMats.length;
     const gy = groundHeight(x, z);
     const body = new THREE.BoxGeometry(w, hgt, d);
@@ -16739,6 +16758,7 @@ function cuBuildCurbs(deps) {
     const slotOK = (gx, gz, dxn, dzn, nx, nz, w, dp) => {
       if (Math.abs(groundHeightNoDeck(gx, gz) - LAND_H) > 0.3) return false;
       if (riverFactor(gx, gz) > 0.01) return false;
+      if (nearPanoCam(gx, gz, 5)) return false;                    // KEEP-CLEAR camera pano (lỗi #1 che kín)
       if (_gridNear(_bldGrid, gx, gz, 8.5)) return false;          // không đè nhà OSM thật (sát hơn: hết khe cạnh nhà thật)
       if (!houseEvidence(gx, gz)) return false;                    // BẢN ĐỒ NHÀ (pano+OSM): không bằng chứng → cấm
       if (openSpace(gx, gz) || onOtherRoad(gx, gz)) return false;  // né vườn hoa/quảng trường/ven hồ/đường cắt
@@ -16934,6 +16954,7 @@ function cuBuildCurbs(deps) {
           if (Math.abs(groundHeightNoDeck(rx, rz) - LAND_H) > 0.3 || riverFactor(rx, rz) > 0.01) continue;
           const [big2, alley2] = roadDists(rx, rz);
           if (big2 < 17.5 || alley2 < 7) continue;                  // đường phân lô nhỏ: chỉ cần cách 7m
+          if (nearPanoCam(rx, rz, 5)) continue;                     // KEEP-CLEAR camera pano
           if (_gridNear(_bldGrid, rx, rz, 12)) continue;
           if (openSpace(rx, rz)) continue;
           const h2 = 12.8, gy2 = groundHeight(rx, rz);              // liền kề mới 4 tầng, trắng kem, mái xám
@@ -16955,6 +16976,7 @@ function cuBuildCurbs(deps) {
         const [big, alley, rail] = roadDists(x, z);
         if (big < 17.5 || alley < 16 || rail < 15) continue;         // trong LÒNG ô, không đè dải nhà mặt phố/ngõ/ray
         if (big > 130 && alley > 130) continue;                       // quá xa mọi đường = ngoại vi trống
+        if (nearPanoCam(x, z, 5)) continue;                           // KEEP-CLEAR camera pano
         if (_gridNear(_bldGrid, x, z, 13)) continue;                  // né nhà OSM thật
         if (!(_gridNear(_bldGrid, x, z, 60) || _gridNear(_phGrid, x, z, 40))) continue; // Ô PHẢI CÓ BẰNG CHỨNG nhà
         if (openSpace(x, z) || panoDenies(x, z)) continue;
