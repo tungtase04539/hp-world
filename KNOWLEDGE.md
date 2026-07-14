@@ -315,6 +315,14 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-14 (bn)** [ĐỢT 5 LÕI-NAM — chợ Nguyễn Khuyến + Hai Bà Trưng Pháp cổ + 13 landmark]:
+    13 block ln* (LN1 chợ Nguyễn Khuyến ô dù+sạp — pano_468 1.0 tệ nhất, tường nâu block_infill nuốt
+    camera → Z-LN-MARKET dọn; công thự Pháp đổ nát/nhà turret hồng/biệt thự Hai Bà Trưng; trụ sở
+    công an Lê Chân kiểu (b); tiệm vàng SJC/PNJ Cầu Đất; F88/VietinBank Tô Hiệu) + 2 zone
+    (Z-LN-MARKET chợ, Z-LN-RAIL hành lang đường sắt Mê Linh). BÀI HỌC agent áp: landmark neo tại
+    tim đường CỦA CHÍNH PANO đó + along nhỏ (neo 1 pano rồi along lớn → TRÔI khỏi đường cong sang
+    phố cắt). Smoke PASS 362 collider 0 lấn lòng. Render pano_468 chợ khớp. Diag 0 lỗi. ĐỢT 5 XONG
+    cả 3 mặt trận (LÕI-NAM/ĐÔNG-GIỮA/TÂY-XA, 84 pano).
 - **2026-07-14 (bm)** [ĐỢT 5 TÂY-XA — Chùa HBT + Phan Đình Phùng công nghiệp + An Dương]:
     8 block tx* (TX1 Chùa Hai Bà Trưng cổng tam quan vàng — pano_276 h180 0.5→khớp; dãy Cát Cụt
     tên thật, 2 trường Sao Mai/Nguyễn Văn Tố, khu công ty+X46 Phan Đình Phùng kiểu (b)/(c) KHÔNG
