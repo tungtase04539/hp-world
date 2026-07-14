@@ -9517,6 +9517,9 @@ const tsShop = (bx, bz, ry, W, FL, wallMat, txt, sbg, sfg, opt = {}) => {
       // chừa chỗ cho công trình đích danh procedural (khối OSM trơn từng chồng đè lên KS Harbour View)
       if (nearFeatured(cx, cz)) continue;
       if (clearedZone(cx, cz)) continue;   // bãi giải tỏa Hoàng Diệu: footprint cũ đã bị phá (10/2024)
+      // NÚT GIAO CẦU HVT: nhà OSM không mọc trên cầu vượt (cell_tinh — pano_330...).
+      // KHÔNG gọi openSpace() ở đây: nó + _sqX/_majSeg khai báo SAU vòng này → TDZ (bài học aj).
+      if (cx > -300 && cx < 120 && cz > -1045 && cz < -845) continue;
       if (riverFactor(cx, cz) > 0.01 || Math.abs(groundHeightNoDeck(cx, cz) - LAND_H) > 0.4) continue;
       const hash = Math.abs(Math.floor(cx * 13 + cz * 7));
       // Lõi trung tâm: phố thương mại thực tế 3-5 tầng liền mạch (đối chiếu pano) → nâng nhà generic
@@ -9711,12 +9714,20 @@ const tsShop = (bx, bz, ry, W, FL, wallMat, txt, sbg, sfg, opt = {}) => {
       }
       if (inside) return true; }
     // KÈ SÔNG TAM BẠC đoạn phố (cell_taysong): dải 2 bờ = promenade, không nhà
-    for (const s of [[-1092, 50, -960, 8], [-960, 8, -840, -19.5], [-840, -19.5, -700, -38], [-700, -38, -506, -76]])
+    for (const s of [[-1092, 50, -960, 8], [-960, 8, -840, -19.5], [-840, -19.5, -700, -38], [-700, -38, -506, -76], [-506, -76, -383, -190]])
       if (_segD(x, z, s[0], s[1], s[2], s[3]) < 42) return true;
     // Z-BS2: hành lang cầu Lạc Long ±26m (pano_062/072-076 — nhà ống từng kẹp 2 bên cầu)
     { const dx2 = x + 268, dz2 = z + 525;
       const al2 = dx2 * -0.98009 + dz2 * 0.19861, ac2 = dx2 * -0.19864 + dz2 * -0.98008;
       if (al2 > -8 && al2 < 235 && Math.abs(ac2) < 26) return true; }
+    // NÚT GIAO CẦU HOÀNG VĂN THỤ (cell_tinh: pano_330/283/346/282/329/347/312/217/284/285 —
+    // camera trên cầu vượt, không có nhà mặt đất; game từng lấp shophouse/cột điện)
+    if (x > -300 && x < 120 && z > -1045 && z < -845) return true;
+    // Công viên rào sắt Bạch Đằng (pano_414 bắc) + bãi san lấp Bến Bính (pano_381)
+    if (x > -648 && x < -512 && z > -540 && z < -477) return true;
+    if (x > -310 && x < -215 && z > -590 && z < -468) return true;
+    // Bãi đỗ/quảng trường Cầu Đất (pano_420) quanh (90,-757)
+    if (Math.hypot(x - 90, z + 757) < 40) return true;
     // KÈ HỒ (pano_004-013/028-037: lan can+ghế đá+đèn, KHÔNG nhà): cấm phía-hồ (cross<0) trong 25m dọc 2 tuyến bờ
     for (const [ax, az, bx, bz, x0, x1] of [[-211, 116, -1052, 285, -1e9, 1e9], [-1007, 367, -20, 162, -1050, -260]]) {
       if (x < x0 || x > x1) continue;
@@ -9972,6 +9983,10 @@ const tsShop = (bx, bz, ry, W, FL, wallMat, txt, sbg, sfg, opt = {}) => {
       [[-751.4, 600.6], [-929.6, 637.2]],
       [[-533, -897], [-430, -731]],
       [[-588.4, -300], [-588.4, -350]],
+      // VÒNG TINH (cell_tinh — phố 'r' bị cổng vành, lộ trống che GLB nhà thờ):
+      [[-243, -397], [-120, -395]],   // Phạm Bá Trực (pano_477)
+      [[-217, -455], [-215, -388]],   // Cầu Đất nhánh N-S (pano_489)
+      [[449, -655], [449, -560]],     // Cầu Đất đông (pano_505)
       // MẶT TRẬN TÂY-SÔNG (cell_taysong):
       [[-435, -7], [-565, 17], [-814, 91], [-931, 136]],
       [[-830, -111], [-1050, -81]],

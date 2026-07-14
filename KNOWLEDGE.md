@@ -315,6 +315,20 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-14 (bh)** [VÒNG TINH bước 1 — nút giao HVT + guard openSpace OSM + 3 corridor; LẶP LỖI TDZ]:
+    Agent TINH chẩn đoán 26 pano đã phủ: 13/26 THỰC RA là 1 landmark cầu HVT (camera trên cầu vượt,
+    game render phố mặt đất + shophouse). Bước 1 (an toàn): openSpace += nút giao HVT
+    (x -300..120, z -1045..-845) + công viên 414/420/381 + kè Tam Bạc tới (-383,-190);
+    +3 corridor 'r' (Phạm Bá Trực/Cầu Đất/Cầu Đất đông — lấp trống che GLB nhà thờ).
+    ⚠️ LẶP LỖI TDZ (đã có bài học aj/memory mà vẫn mắc!): thêm `if (openSpace(cx,cz)) continue`
+    vào vòng OSM BUILDINGS → "Cannot access '_sqX' before initialization" (openSpace + _sqX/_majSeg
+    khai báo SAU vòng OSM ~150 dòng). errcheck.mjs bắt ngay; sửa = rect INLINE nút giao thay vì
+    gọi openSpace. BÀI HỌC CỦNG CỐ: guard mới cho vòng chạy SỚM (OSM BUILDINGS ~9520) chỉ được
+    dùng biến/hàm khai báo TRƯỚC đó (clearedZone/nearFeatured OK; openSpace/onOtherRoad KHÔNG).
+    Render: pano_330 nút giao sạch shophouse, pano_031 (điểm cao 6-7) nguyên vẹn. Bước 2 (vòm
+    thép đỏ HVT ti_hvtArch) HOÃN — đụng mô hình cầu sẵn có, cần render kiểm riêng. Diag 0 lỗi.
+    LƯU Ý QUY TRÌNH: world.js giờ ~12k dòng/~180 công trình → buildWorld mất ~15-25s, __hp chưa
+    có KHÔNG có nghĩa lỗi; luôn dùng errcheck.mjs (bắt pageerror từ goto) khi nghi treo.
 - **2026-07-14 (bg)** [S5 — biển tên thật hết treo giữa lòng đường]: khối real_shop_signs thêm
     guard `onOtherRoad(x,z)` (biển +14m từ pano rơi vào lòng phố CẮT NGANG tại ngã tư — pano_220
     "BƯU ĐIỆN"/051 "T.HOUSE"/391 "ĐỒ UỐNG"). onOtherRoad khai báo :9727 TRƯỚC khối biển :9807 nên
