@@ -1,31 +1,28 @@
-# Đối chiếu ảnh vệ tinh (QA cấu trúc: đường xá + vị trí công trình)
+# Đối chiếu vệ tinh (QA cấu trúc) — kết hợp với pano
 
-Mỗi tile phủ **640m × 640m** (±320m quanh tâm), **Bắc hướng lên, Đông sang phải**.
-Ảnh game (`game_tN.png`) đã chụp sẵn bằng `window.__hp.aerial()` → `tools/pano_loop/aerial.mjs`.
+Hai lớp QA bổ trợ:
+- **Pano** (551 ảnh street-view): soi BỀ MẶT phố (nhà/biển/màu tầng mắt người).
+- **Vệ tinh** (8 tile top-down): soi CẤU TRÚC (đường, sông, vị trí & mật độ nhà, công trình lớn).
 
-## Cách lấy 8 ảnh vệ tinh THẬT
-Với mỗi tile: mở **Google Maps → chế độ Vệ tinh (Satellite)** tại toạ độ dưới,
-xoay **Bắc lên**, zoom sao cho khung phủ ~**640m ngang** (≈ thanh tỉ lệ 100m × ~6),
-chụp màn hình vùng vuông, lưu vào thư mục này với đúng tên `real_tN.png`.
+`game_N.png` = ảnh game chụp bằng `__hp.aerial` (build hiện tại), khớp đúng 8 tâm bạn đã chụp.
 
-| tile | tâm (lat, lon) | lưu tên |
-|------|----------------|---------|
-| t1 | 20.85976, 106.67413 | real_t1.png |
-| t2 | 20.85976, 106.67913 | real_t2.png |
-| t3 | 20.85976, 106.68413 | real_t3.png |
-| t4 | 20.85976, 106.68874 | real_t4.png |
-| t5 | 20.85316, 106.67413 | real_t5.png |
-| t6 | 20.85316, 106.67913 | real_t6.png |
-| t7 | 20.85316, 106.68413 | real_t7.png |
-| t8 | 20.85316, 106.68874 | real_t8.png |
+## Bạn cần: lưu 8 ảnh vệ tinh THẬT vào thư mục này, đúng tên `real_1.png` … `real_8.png`
 
-overview (toàn dải, ±1100m): tâm 20.85660, 106.68086 → `real_overview.png` (tuỳ chọn).
+| tile | khu vực | tâm thật (lat, lon) |
+|------|---------|----------------------|
+| real_1 | Tây-Nam: hồ Tam Bạc / BV Quốc tế / THPT Ngô Quyền | 20.85524, 106.67509 |
+| real_2 | An Biên / Đền Nghè | 20.85691, 106.67675 |
+| real_3 | An Biên / ga / Nguyễn Bình Khiêm | 20.85738, 106.68114 |
+| real_4 | Tây-Bắc: Lê Hồng Phong / Trần Văn Ơn / Nhà thờ / Tam Bạc arc | 20.86135, 106.67113 |
+| real_5 | Nhà thờ / Tam Bạc arc | 20.86131, 106.67884 |
+| real_6 | Trung-Bắc: Nhà hát / Quang Trung / Minh Khai | 20.86182, 106.68172 |
+| real_7 | Bắc: Bạch Đằng / cầu Lạc Long / sông Cấm tây | 20.86583, 106.67294 |
+| real_8 | Bắc: Hoàng Diệu / Cảng / sông Cấm đông | 20.86585, 106.67983 |
 
-Mẹo nhanh: dán trực tiếp vào ô tìm kiếm Google Maps chuỗi `20.85976, 106.67413`
-rồi bật lớp Vệ tinh — nó nhảy đúng tâm.
+(Chính là 8 ảnh Google Earth bạn vừa gửi — chỉ cần lưu file với đúng tên trên.)
 
-## Sau khi thả đủ ảnh
-Báo tôi — tôi sẽ tự căn tỉ lệ, ghép cạnh nhau (thật/game), và soi:
-đường có đúng vị trí/hướng không, ô phố & footprint nhà có khớp không,
-công trình công cộng lớn có đúng chỗ không → sửa `tools/process_osm.mjs`
-hoặc dữ liệu nguồn nếu lệch.
+## Sau khi lưu xong → nhắn tôi
+Tôi chạy `tools/pano_loop/score_sat.py` (ChatGPT chấm CẤU TRÚC từng tile 0-10),
+ghép cạnh nhau thật/game, gộp với điểm pano → **QA hai lớp**:
+- điểm vệ tinh thấp = sai đường/vị trí/mật độ → sửa `tools/process_osm.mjs` / generator.
+- điểm pano thấp = sai bề mặt phố → grid cấu trúc+màu nhà chính.
