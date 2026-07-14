@@ -315,6 +315,13 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-14 (bo)** [ĐỐI CHỨNG ĐỢT 5: 2.46→2.87 (+0.41, 81 cặp)]:
+    LOINAM +0.63 (pano_243 2→5.5, 245 1.1→3.6, 276 1.6→4), TAYXA +0.44, DONGGIUA +0.04 (ĐBP đông
+    đã đông, khó tăng). 8 ca giảm ≤0.8 (327/424/150/306...) — KHÔNG hệ thống: mỗi pano cần landmark
+    RIÊNG chưa dựng (TOKY LIFE, tòa Pháp Minh Khai, Gia Huy Cát Cụt) + variance ±0.5 → không rollback
+    (net dương), đưa vào danh sách tinh vòng cuối. TỔNG 5 ĐỢT: ~450 pano đã phủ+tinh; các ô còn lại
+    chủ yếu cần landmark tên-thật cụ thể (đường biên lợi ích giảm dần). BƯỚC KẾ: chờ re-scan #3 chốt
+    số tổng → cân nhắc SWEEP PERF (task đã hoạch định) trước khi tinh tiếp.
 - **2026-07-14 (bn)** [ĐỢT 5 LÕI-NAM — chợ Nguyễn Khuyến + Hai Bà Trưng Pháp cổ + 13 landmark]:
     13 block ln* (LN1 chợ Nguyễn Khuyến ô dù+sạp — pano_468 1.0 tệ nhất, tường nâu block_infill nuốt
     camera → Z-LN-MARKET dọn; công thự Pháp đổ nát/nhà turret hồng/biệt thự Hai Bà Trưng; trụ sở
