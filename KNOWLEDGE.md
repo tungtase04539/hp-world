@@ -315,6 +315,14 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-14 (bu)** [ĐO KHÁCH QUAN — TRẦN ĐIỂM & CHIẾN LƯỢC LOOP]: chấm lại 125 pano vòng tinh
+    6-agent bằng gpt-5.6-sol-xhigh: TB **2.11 → 2.70 (+0.58)**, nhưng tuyệt đối vẫn RẤT thấp (1/125 ≥5,
+    73/125 <3), 10 regression >0.4. Đọc findings: judge THƯỞNG khi khớp công trình cụ thể (nên +0.58 thật)
+    nhưng render low-poly chỉ được điểm-phần; nhiều pano bất khả (pano_264 camera TRONG cửa hàng ảnh).
+    KẾT LUẬN CHIẾN LƯỢC: ghép nhà per-pano cho +~0.5/vòng, trần thấp → KHÔNG đủ tới 8. Findings lặp đòi
+    yếu tố HỆ THỐNG (vỉa hè block xám + curb, tim đường VÀNG, cây đúng loài/mật độ, xe/người, dây điện,
+    vật liệu/ánh sáng). Gói hệ thống nâng SÀN đồng loạt 551 pano → ROI cao hơn ghép nhà lẻ. BÀI HỌC: khi
+    +điểm/vòng cận biên, DỪNG thêm nhà, chuyển sang nâng chất lượng render hệ thống + đo lại.
 - **2026-07-14 (bt)** [LỖI HỆ THỐNG G4 — công viên "mô màu"]: generator bồn hoa (`flowerBed`) rải
     vòm bán cầu theo lưới 17m KHẮP mọi GARDENS, palette 7 màu neon (hồng 0xff5fa2, tím 0x9b59b6, cam
     0xff8c00) + emissiveIntensity 0.14 (tự phát sáng) → nhìn HOẠT HÌNH, GPT trừ điểm mọi pano có công
