@@ -16145,6 +16145,46 @@ function cuBuildCurbs(deps) {
   }
 
 
+  // ===== FIX t7 (cell_struct2): CLOVERLEAF cầu Lạc Long (double-loop, thiếu 1 vòng) =====
+  {
+    const _loopPoints = (cx, cz, r, a0, a1, n) => {
+      const pts = [];
+      for (let i = 0; i <= n; i++) { const a = a0 + (a1 - a0) * (i / n); pts.push([cx + Math.cos(a) * r, cz + Math.sin(a) * r]); }
+      return pts;
+    };
+    const _rampRibbon = (pts, width, y) => {
+      const geos = [];
+      for (let i = 0; i < pts.length - 1; i++) {
+        const [x1, z1] = pts[i], [x2, z2] = pts[i + 1];
+        const dx = x2 - x1, dz = z2 - z1, len = Math.hypot(dx, dz) || 1e-6;
+        const seg = new THREE.BoxGeometry(len + 0.6, 0.18, width);
+        seg.rotateY(Math.atan2(dz, dx)); seg.translate((x1 + x2) / 2, y + 0.09, (z1 + z2) / 2); geos.push(seg);
+      }
+      return geos;
+    };
+    const cx = -118, cz = -927, R = 40, W = 7, sep = R + 6;
+    const asphaltM = mat(0x3b4046), grassM = mat(0x6f9a4f), curbM = mat(0x8d8a82);
+    const y = groundHeight(cx, cz);
+    const geos = [];
+    const loops = [
+      { lx: cx - sep, lz: cz, a0: -Math.PI * 0.08, a1: Math.PI * 1.75 },
+      { lx: cx + sep, lz: cz, a0: Math.PI * 1.08, a1: Math.PI * -0.75 },
+    ];
+    for (const lp of loops) {
+      const pts = _loopPoints(lp.lx, lp.lz, R, lp.a0, lp.a1, 40);
+      for (const g of _rampRibbon(pts, W, y)) geos.push(g);
+      const curb = new THREE.CylinderGeometry(R - W / 2, R - W / 2, 0.3, 28); curb.translate(lp.lx, y + 0.15, lp.lz);
+      const grass = new THREE.CylinderGeometry(R - W / 2 - 1.2, R - W / 2 - 1.2, 0.34, 28); grass.translate(lp.lx, y + 0.2, lp.lz);
+      const cm = new THREE.Mesh(curb, curbM); cm.receiveShadow = true; scene.add(cm);
+      const gm = new THREE.Mesh(grass, grassM); gm.receiveShadow = true; scene.add(gm);
+      addCollider(lp.lx, lp.lz, R - W / 2 - 1);
+      FEATURED_CLEAR.push([lp.lx, lp.lz, R + 2]);
+    }
+    for (const g of _rampRibbon([[cx - sep + R, cz], [cx + sep - R, cz]], W, y)) geos.push(g);
+    if (geos.length) { const m = new THREE.Mesh(mergeGeometries(geos), asphaltM); geos.forEach((g) => g.dispose()); m.receiveShadow = true; m.name = 'cloverleaf_lacLong'; scene.add(m); }
+  }
+
+
   // ===== GRIND BỀ MẶT s2b NAM (11 block bù agent fail) =====
 /* =====================================================================
    CELL_S2B — MẶT TRẬN NAM (lô 2B): 11 KHỐI NHÀ CHÍNH đích danh cho pano
@@ -19600,6 +19640,8 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
           const tx = x1 + (x2 - x1) * t + off * px;
           const tz = z1 + (z2 - z1) * t + off * pz;
           if (Math.abs(groundHeightNoDeck(tx, tz) - LAND_H) > 0.3) continue;
+          // t6 (cell_struct2): thưa cây dải trung tâm ~40% — tán phượng hero bớt nối thành ribbon xanh đậm trên vệ tinh
+          if (tx > -260 && tx < 760 && Math.abs(tz + 250) < 220 && (Math.abs((tx * 7 + tz * 13) | 0) % 5) < 2) continue;
           if (lmPts.some(([lx, lz]) => (tx - lx) ** 2 + (tz - lz) ** 2 < 24 * 24)) continue;
           if (nearFeatured(tx, tz)) continue;
           if (hdTreeBelt(tx, tz)) { streetTree(tx, tz); nFill++; continue; } // Hoàng Diệu: xà cừ, cấm phượng hero
