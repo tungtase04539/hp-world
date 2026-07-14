@@ -315,6 +315,12 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-14 (bq)** [HEATMAP LẦN 3 (sau đợt 4): TB 2.97 — tiến trình 2.12→2.84→2.97]:
+    502 pano. Phân bố <3: 400→263→251; 3-5: 98→214→232; 5-8: 3→15→19. So cặp lần2→3: 2.84→2.91.
+    CHƯA gồm đợt 5 (+0.41/84 pano) + vòng tinh 6 agent (v1-v6, 134 pano <3.0 đang chạy) → thực tế
+    hiện ~3.1. XU HƯỚNG: mỗi vòng +0.1-0.15 toàn dải; leo 3→8 là chặng biên lợi ích giảm dần cần
+    landmark tên-thật cụ thể từng pano (đang làm) + có thể GLB ảnh thật cho công trình lớn. 3 lần
+    scan lưu: compare_full_sol56 (L1), compare_full2 (L2), compare_full3 (L3).
 - **2026-07-14 (bp)** [PERF: CACHE MATERIAL — 6299→2645 (-58%), 0 rủi ro]:
     Sau 5 đợt: mesh 9668, material 6299, draw call 2393, tris 6-7M. mat() giờ CACHE khi opts RỖNG
     (tường đặc trùng màu = phần lớn ~250 công trình). AN TOÀN TUYỆT ĐỐI: mọi chỗ mutate material
