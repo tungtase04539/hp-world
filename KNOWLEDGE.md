@@ -315,6 +315,15 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-14 (bk)** [GIỚI HẠN THỰC TẾ: nhóm nút giao cầu HVT — KHÔNG đào thêm]:
+    Cầu HVT ĐÃ CÓ vòm thép đỏ đầy đủ (2 vòm nghiêng ARCH_H=45 + dây network-arch + giằng) ở
+    NHỊP CHÍNH quanh tâm (15,-1391). Nhóm 13 pano nút giao (284/285/330/329/217/282/283/346/347/
+    312/348/381): camera thật đứng trên MẠNG LƯỚI RAMP cầu vượt — tính ra pano_284 cách tim cầu
+    chính 117m NGANG (along -421, across 117). Mở deckHeight across 10→117 = "cao nguyên" phi thực;
+    khớp đúng phải dựng cả interchange 3D (nhiều nhánh ramp cong riêng) = việc lớn hiệu quả không
+    chắc. QUYẾT ĐỊNH: KHÔNG đào thêm — zone nút giao đã dọn shophouse sai (pano_330 0.5→sạch), đó
+    là mức hợp lý. Cùng họ với pano trên cầu Bính/cầu Rào — giới hạn của tái tạo 1:1 mặt đất.
+    Không dựng ti_hvtArch (sẽ VÒM ĐÔI với cầu sẵn có).
 - **2026-07-14 (bj)** [ĐỐI CHỨNG ĐỢT 4: 2.16→2.54 (+0.39) + sửa regression che camera]:
     84 cặp: CỘT-600 BẮC +0.79 (siêu khối trị regression: pano_454 0.9→4.3, 223 2.4→5.8, 224 3.1→6.2),
     NAM +0.27, TINH -0.04 (đứng yên — nhóm cầu HVT chưa dựng vòm, bước 2). REGRESSION: SHP Plaza
