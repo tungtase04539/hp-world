@@ -315,6 +315,10 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-14 (bg)** [S5 — biển tên thật hết treo giữa lòng đường]: khối real_shop_signs thêm
+    guard `onOtherRoad(x,z)` (biển +14m từ pano rơi vào lòng phố CẮT NGANG tại ngã tư — pano_220
+    "BƯU ĐIỆN"/051 "T.HOUSE"/391 "ĐỒ UỐNG"). onOtherRoad khai báo :9727 TRƯỚC khối biển :9807 nên
+    dùng trực tiếp. Render pano_220: mặt đường thoáng. Diag 0 lỗi.
 - **2026-07-14 (bf)** [ĐO PERF SAU 21 COMMIT — draw call 520→2173, cần SWEEP LANDMARK sau khi phủ xong]:
     Probe tại quảng trường lõi (đông nhất): mesh 6390, InstancedMesh 57, **material 4241** (base
     sweep 1230), **draw call 2173** (base 520), **tris render 7.16M** (base 5.87M), memTex 315.
