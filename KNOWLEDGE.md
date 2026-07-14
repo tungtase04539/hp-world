@@ -315,6 +315,15 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-15 (cc)** [MỤC TIÊU 7 VÒNG 1 + bài học xương-máu]: 5 agent (structure + s1-s4 bề mặt).
+    ĐO HAI LỚP: vệ tinh 5.64→~5.85 (t4 arc 4.0→5.2, t8 cảng 4.4→5.6 — FIX ĐÚNG CHỖ ĂN ĐIỂM +1.2/tile);
+    pano 4.14→4.08 (mẫu rộng) + pano-đã-sửa chỉ 4.35 → **BỀ MẶT CHỮNG ~4.1-4.35, TRẦN LOW-POLY tầm mắt**
+    (thêm nhà đúng chỉ nhích nhẹ, khác hẳn cấu trúc). ⇒ vệ tinh 7 khả thi; pano 7 rất khó với low-poly.
+    BÀI HỌC 1: **KHÔNG tích hợp drafts.js trước khi agent BÁO HOÀN TẤT** — tích hợp bản s1 trung gian có
+    3 block trùng (đè GLB NHNN/Đảng ủy); agent xong sau mới ra bản final 6-block sạch → phải thay lại.
+    BÀI HỌC 2: `taskkill //IM python.exe` giết luôn http.server 8177 → errcheck báo ERR_CONNECTION_REFUSED
+    (không phải lỗi code) — khởi động lại server. BÀI HỌC 3: scorer gpt có NHIỄU run-to-run đáng kể
+    (t6 6.3↔4.4) → tin TB nhiều tile hơn per-tile 1 lần; agent fail giữa chừng vẫn để lại drafts.js dùng được.
 - **2026-07-15 (cb)** [FIX CẤU TRÚC từ QA vệ tinh — arc + cảng, mục tiêu 7]: score_sat 8 tile TB 5.64;
     2 tile thấp nhất t4=4.0 (sông Tam Bạc arc ĐỨT KHÚC) + t8=4.4 (cảng thưa). ROOT-CAUSE (agent verify):
     t4 = vòng splice terrain.js:135 dùng `splice(i-1,2,...)` XOÁ đỉnh nối (-1257,148) → arc R#3 tách khỏi
