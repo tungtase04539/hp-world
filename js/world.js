@@ -661,7 +661,9 @@ export function buildWorld(scene) {
 
   // ---------- Mặt nước ----------
   const waterMat = new THREE.MeshPhongMaterial({
-    color: 0x2b9fd4, transparent: true, opacity: 0.86, shininess: 130, specular: 0x99d4ee,
+    // Nước thật HP (Tam Bạc/Cấm) đục nâu-xám, KHÔNG cyan chói. Hạ bão hòa + shininess (cell_struct3):
+    // 1 chỗ chữa "nước chói thẳng rời" cho t1/t2/t4/t5/t8 + biển cùng lúc.
+    color: 0x4b7a80, transparent: true, opacity: 0.9, shininess: 26, specular: 0x3a5a60,
   });
   const water = new THREE.Mesh(new THREE.PlaneGeometry(W, D, 1, 1), waterMat);
   water.rotation.x = -Math.PI / 2;
