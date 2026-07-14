@@ -62,7 +62,7 @@ export const sharedMats = {
   leafGreen: mat(0x5cb84e, { flatShading: true }),
   leafGreen2: mat(0x7ecb5e, { flatShading: true }),
   leafDark: mat(0x3d8a44, { flatShading: true }),
-  flower: mat(0xe8402a, { emissive: 0xd42a12, emissiveIntensity: 0.35, flatShading: true }),
+  flower: mat(0xd8402c, { emissive: 0x8f2416, emissiveIntensity: 0.10, flatShading: true }),
   cloud: new THREE.MeshLambertMaterial({ color: 0xffffff, transparent: true, opacity: 0.92, flatShading: true }),
 };
 
@@ -15173,6 +15173,330 @@ const w1AddSign = (r, txt, bg, fg, y, px = 42, wRatio = 0.9, hh = 1.1) => {
 }
 
 
+
+  // ===== HỆ THỐNG ĐƯỜNG (cell_road): tim đường VÀNG + stop bar (decal MeshBasic, merge 1 draw call) =====
+  {
+function rdYellowCenterline() {
+  const INCLUDE_SECONDARY = false;   // true = vẽ cả 's' (nhiều phố 2 chiều hẹp không có tim vàng -> để false)
+  const DASH = 4.0, GAP = 4.0;       // vạch vàng đứt 4m, hở 4m (giống ĐBP thật)
+  const WIDTH = 0.45;                // RỘNG hơn vạch trắng sẵn có (0.35) -> phủ kín, hết lộ vệt trắng
+  const YELLOW = 0xf2c200;
+  const MED_CLEAR = 9;               // né dải phân cách vật lý (đại lộ đôi): trong 9m không vẽ tim vàng
+
+  // khoảng cách 1 điểm tới 1 đoạn (để né MEDIANS)
+  function segDist(px, pz, x1, z1, x2, z2) {
+    const dx = x2 - x1, dz = z2 - z1, l2 = dx * dx + dz * dz;
+    let t = l2 ? ((px - x1) * dx + (pz - z1) * dz) / l2 : 0;
+    t = Math.max(0, Math.min(1, t));
+    return Math.hypot(px - (x1 + dx * t), pz - (z1 + dz * t));
+  }
+  function nearMedian(px, pz) {
+    for (const line of MEDIANS) {
+      for (let i = 0; i < line.length - 1; i++) {
+        if (segDist(px, pz, line[i][0], line[i][1], line[i + 1][0], line[i + 1][1]) < MED_CLEAR) return true;
+      }
+    }
+    return false;
+  }
+
+  const geos = [];
+  for (const r of ROADS_DT) {
+    if (r.c !== 'p' && !(INCLUDE_SECONDARY && r.c === 's')) continue;
+    for (let i = 0; i < r.pts.length - 1; i++) {
+      const [x1, z1] = r.pts[i], [x2, z2] = r.pts[i + 1];
+      const segLen = Math.hypot(x2 - x1, z2 - z1);
+      if (segLen < DASH) continue;
+      const rotY = Math.atan2(x2 - x1, z2 - z1);     // local +z -> hướng đoạn đường
+      const ux = (x2 - x1) / segLen, uz = (z2 - z1) / segLen;
+      for (let s = GAP; s + DASH < segLen; s += DASH + GAP) {
+        const cs = s + DASH / 2;                     // tâm vạch dọc đoạn
+        const mx = x1 + ux * cs, mz = z1 + uz * cs;
+        if (isWater(mx, mz)) continue;
+        const y = groundHeightNoDeck(mx, mz);
+        if (Math.abs(y - LAND_H) > 1.0) continue;    // chỉ mặt phẳng (né dốc cầu/chỗ gãy)
+        if (nearMedian(mx, mz)) continue;            // né dải phân cách vật lý
+        const g = new THREE.BoxGeometry(WIDTH, 0.05, DASH);   // rộng(x) × cao × dài dọc đường(z)
+        g.rotateY(rotY);
+        g.translate(mx, y + 0.155, mz);
+        geos.push(g);
+      }
+    }
+  }
+  if (geos.length) {
+    const mesh = new THREE.Mesh(mergeGeometries(geos), new THREE.MeshBasicMaterial({ color: YELLOW }));
+    geos.forEach((g) => g.dispose());
+    mesh.name = 'rd_yellow_centerline';
+    scene.add(mesh);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ *  DRAFT B — VẠCH DỪNG (stop bar) tại nút giao lớn  +  (tùy chọn) ZEBRA nâng cấp
+ *  Bằng chứng pano: pano_046/152/062 có zebra + đèn tín hiệu; vạch DỪNG ngang là
+ *  companion còn THIẾU (game đã có zebra ở dòng 15844-15877, CHƯA có stop bar).
+ *
+ *  MẶC ĐỊNH AN TOÀN: chỉ vẽ STOP BAR (thuần additive, đặt NGOÀI dải zebra sẵn có
+ *  ~0.3m nên KHÔNG z-fight/không đè zebra). Muốn dùng zebra nâng cấp (rộng/sáng
+ *  hơn, MeshBasic) thì bật REPLACE_EXISTING_ZEBRA=true VÀ comment khối zebra cũ
+ *  (world.js dòng 15844-15877) để tránh vẽ 2 lớp chồng.
+ * ------------------------------------------------------------------------- */
+function rdStopBarsAndZebra() {
+  const REPLACE_EXISTING_ZEBRA = false;   // true -> PHẢI tắt khối zebra cũ (15844-15877)
+  const RADIUS = 1200;                     // chỉ nút giao trung tâm (giống zebra cũ dùng 1000)
+  const WHITE = 0xf0eee6;
+
+  const stopGeos = [], zebraGeos = [];
+  for (const [ix, iz] of INTERSECTIONS) {
+    if (ix * ix + iz * iz > RADIUS * RADIUS) continue;
+    if (isWater(ix, iz)) continue;
+    // đoạn đường p/s gần nhất -> hướng + nửa lòng (giống logic zebra cũ)
+    let bd = 1e9, ux = 1, uz = 0, hw = 5;
+    for (const r of ROADS_DT) {
+      if (r.c !== 'p' && r.c !== 's') continue;
+      for (let i = 0; i < r.pts.length - 1; i++) {
+        const [x1, z1] = r.pts[i], [x2, z2] = r.pts[i + 1];
+        const dx = x2 - x1, dz = z2 - z1, l2 = dx * dx + dz * dz; if (!l2) continue;
+        let t = ((ix - x1) * dx + (iz - z1) * dz) / l2; t = Math.max(0, Math.min(1, t));
+        const d = Math.hypot(ix - (x1 + dx * t), iz - (z1 + dz * t));
+        if (d < bd) { bd = d; const L = Math.sqrt(l2); ux = dx / L; uz = dz / L; hw = ROAD_W[r.c] / 2; }
+      }
+    }
+    if (bd > 6) continue;                              // nút không nằm trên p/s
+    const rotY = Math.atan2(ux, uz);                  // local +z -> dọc đường; local +x -> ngang đường
+    const px = -uz, pz = ux;                          // pháp tuyến (ngang đường)
+    for (const dir of [-1, 1]) {                      // 2 nhánh vào nút
+      // STOP BAR: đặt NGOÀI zebra cũ (zebra ở along=hw+3.2) -> along = hw+4.6 (thượng lưu),
+      // chỉ phủ NỬA PHẢI theo chiều xe tới nút (VN đi phải): lệch pháp tuyến +dir*hw/2.
+      const along = hw + 4.6;
+      const bx = ix + ux * dir * along + px * (dir * hw / 2);
+      const bz = iz + uz * dir * along + pz * (dir * hw / 2);
+      const y = groundHeightNoDeck(bx, bz);
+      if (Math.abs(y - LAND_H) > 0.4) continue;
+      const bar = new THREE.BoxGeometry(hw, 0.05, 0.5);  // dài(x)=nửa lòng ngang đường, dày(z)=0.5 dọc đường
+      bar.rotateY(rotY);
+      bar.translate(bx, y + 0.14, bz);
+      stopGeos.push(bar);
+
+      if (REPLACE_EXISTING_ZEBRA) {                   // zebra nâng cấp (rộng 2.6m, sáng MeshBasic)
+        const cx = ix + ux * dir * (hw + 3.2), cz = iz + uz * dir * (hw + 3.2);
+        const yz = groundHeightNoDeck(cx, cz);
+        if (Math.abs(yz - LAND_H) > 0.4) continue;
+        for (let k = -Math.floor(hw - 1); k <= Math.floor(hw - 1); k += 1.15) {
+          const sx = cx + px * k, sz = cz + pz * k;
+          const strip = new THREE.BoxGeometry(0.55, 0.05, 2.6);  // dài dọc đường 2.6m
+          strip.rotateY(rotY);
+          strip.translate(sx, yz + 0.13, sz);
+          zebraGeos.push(strip);
+        }
+      }
+    }
+  }
+  if (stopGeos.length) {
+    const m = new THREE.Mesh(mergeGeometries(stopGeos), new THREE.MeshBasicMaterial({ color: WHITE }));
+    stopGeos.forEach((g) => g.dispose());
+    m.name = 'rd_stopbars'; scene.add(m);
+  }
+  if (zebraGeos.length) {
+    const m = new THREE.Mesh(mergeGeometries(zebraGeos), new THREE.MeshBasicMaterial({ color: WHITE }));
+    zebraGeos.forEach((g) => g.dispose());
+    m.name = 'rd_zebra_v2'; scene.add(m);
+  }
+}
+    rdYellowCenterline();
+    rdStopBarsAndZebra();
+  }
+
+
+  // ===== HỆ THỐNG CÂY (cell_tree): hàng cau vua trước công sở + phượng allée + cổ thụ xà cừ =====
+  {
+  const LAND_H = 2;
+  const ROAD_W = { p: 13, s: 10, t: 8, r: 5.5, w: 3.5 };
+
+  // ---- vật liệu riêng của khối (mat() có cache khi opts rỗng) ----
+  const trPalmTrunkM = mat(0xc4bfb1);                                   // thân cau vua trắng-xám
+  const trRingM = mat(0x9a9186);                                        // bồn gốc / vòng bảo vệ bê tông
+  const trFlowerM = mat(0xd8402c, { emissive: 0x8f2416, emissiveIntensity: 0.08, flatShading: true }); // hoa phượng TRẦM, ít glow
+  const trLeafA = sharedMats.leafDark;                                  // xanh trầm (chủ đạo xà cừ)
+  const trLeafB = sharedMats.leafGreen2;                                // xanh sáng điểm
+
+  // ---- bucket gom geometry theo material ----
+  const B = new Map();  // material -> [BufferGeometry...]
+  const push = (m, geo) => { let a = B.get(m); if (!a) B.set(m, a = []); a.push(geo); };
+
+  // ---- helper: bake 1 geometry cơ bản với phép quay Euler(rx,0,rz) rồi tịnh tiến ----
+  const _e = new THREE.Euler(), _m = new THREE.Matrix4();
+  function trBake(mtl, geo, px, py, pz, rx = 0, rz = 0) {
+    if (rx || rz) { _e.set(rx, 0, rz); _m.makeRotationFromEuler(_e); _m.setPosition(px, py, pz); geo.applyMatrix4(_m); }
+    else geo.translate(px, py, pz);
+    push(mtl, geo);
+  }
+
+  // ---- guards ----
+  const trOK = (x, z) => Math.abs(groundHeightNoDeck(x, z) - LAND_H) < 0.4;   // trên đất phẳng
+  function _segD(px, pz, x1, z1, x2, z2) {
+    const dx = x2 - x1, dz = z2 - z1, l2 = dx * dx + dz * dz;
+    let t = l2 ? ((px - x1) * dx + (pz - z1) * dz) / l2 : 0; t = Math.max(0, Math.min(1, t));
+    return Math.hypot(px - (x1 + dx * t), pz - (z1 + dz * t));
+  }
+  // né LÒNG ĐƯỜNG mọi phố (trừ đi bộ 'w'): cách tim > nửa lòng + 0.8 m
+  function trOnRoad(x, z) {
+    for (const r of ROADS_DT) {
+      if (r.c === 'w') continue;
+      const hw = ROAD_W[r.c] / 2 + 0.8;
+      for (let i = 0; i < r.pts.length - 1; i++)
+        if (_segD(x, z, r.pts[i][0], r.pts[i][1], r.pts[i + 1][0], r.pts[i + 1][1]) < hw) return true;
+    }
+    return false;
+  }
+  // đoạn đường gần điểm nhất (để lấy tiếp tuyến + pháp tuyến vỉa hè)
+  function trNearestSeg(px, pz) {
+    let best = null;
+    for (const r of ROADS_DT) {
+      if (r.c === 'w') continue;
+      for (let i = 0; i < r.pts.length - 1; i++) {
+        const [x1, z1] = r.pts[i], [x2, z2] = r.pts[i + 1];
+        const dx = x2 - x1, dz = z2 - z1, l2 = dx * dx + dz * dz;
+        let t = l2 ? ((px - x1) * dx + (pz - z1) * dz) / l2 : 0; t = Math.max(0, Math.min(1, t));
+        const cx = x1 + dx * t, cz = z1 + dz * t, d = Math.hypot(px - cx, pz - cz);
+        if (!best || d < best.d) best = { d, cx, cz, dx, dz, c: r.c };
+      }
+    }
+    return best;
+  }
+
+  // ---- BỒN GỐC bê tông thấp (vòng bảo vệ) quanh gốc ----
+  function trBonGoc(x, z, y, r = 0.65) {
+    const ring = new THREE.CylinderGeometry(r, r + 0.14, 0.34, 8); ring.translate(x, y + 0.16, z); push(trRingM, ring);
+  }
+
+  // ---- CAU VUA (royal palm): thân cao trắng-xám thẳng + chùm lá cong đều ----
+  function trPalm(x, z, h = 11) {
+    if (!trOK(x, z) || trOnRoad(x, z)) return false;
+    const y = groundHeight(x, z);
+    trBake(trPalmTrunkM, new THREE.CylinderGeometry(0.15, 0.28, h, 7), x, y + h / 2, z);
+    for (let i = 0; i < 7; i++) {
+      const a = i * Math.PI * 2 / 7;
+      const fx = x + Math.cos(a) * 1.15, fz = z + Math.sin(a) * 1.15;
+      trBake(trLeafA, new THREE.ConeGeometry(0.26, 3.2, 4), fx, y + h + 0.4, fz, Math.sin(a) * 1.2, -Math.cos(a) * 1.2);
+    }
+    trBonGoc(x, z, y, 0.6);
+    addCollider(x, z, 0.55);
+    return true;
+  }
+
+  // ---- XÀ CỪ CỔ THỤ tán CỰC RỘNG (spreader ~8-9 m) + bole cao ----
+  function trBroad(x, z, h = 12, R = 8.2) {
+    if (!trOK(x, z) || trOnRoad(x, z)) return false;
+    const y = groundHeight(x, z);
+    const boleH = h * 0.5;
+    trBake(sharedMats.trunk, new THREE.CylinderGeometry(0.42, 0.68, boleH, 8), x, y + boleH / 2, z);
+    // 3 cành chính toả ngang
+    for (let i = 0; i < 3; i++) {
+      const a = i / 3 * Math.PI * 2;
+      trBake(sharedMats.trunk, new THREE.CylinderGeometry(0.16, 0.3, R * 0.5, 6),
+        x + Math.cos(a) * R * 0.28, y + boleH + 0.1, z + Math.sin(a) * R * 0.28, Math.cos(a) * 1.0, -Math.sin(a) * 1.0);
+    }
+    // tán nhiều lớp dẹt, giao thành mái rộng
+    const blobs = [[0, 0.55, 0, 1.0], [-0.6, 0.32, 0.5, 0.7], [0.6, 0.34, -0.45, 0.72], [0.15, 0.2, 0.66, 0.66], [-0.55, 0.24, -0.6, 0.64]];
+    blobs.forEach(([ox, oy, oz, rf], i) => {
+      const leaf = new THREE.IcosahedronGeometry(R * rf, 1); leaf.scale(1, 0.62, 1);
+      leaf.translate(x + ox * R, y + boleH + oy * h, z + oz * R);
+      push(i % 2 ? trLeafB : trLeafA, leaf);
+    });
+    trBonGoc(x, z, y, 0.95);
+    addCollider(x, z, 1.3);   // chỉ chặn gốc; tán trên cao đi dưới được
+    return true;
+  }
+
+  // ---- PHƯỢNG (allée) — tán xanh dẹt + vòm hoa đỏ TRẦM, nhỏ (đa số xanh) ----
+  function trPhuong(x, z, h = 9, bloom = 0) {
+    if (!trOK(x, z) || trOnRoad(x, z)) return false;
+    const y = groundHeight(x, z);
+    const boleH = h * 0.42, crownR = h * 0.42;
+    trBake(sharedMats.trunk, new THREE.CylinderGeometry(0.24, 0.5, boleH, 6), x, y + boleH / 2, z);
+    const green = [[0, 0.5, 0, 1.1], [-0.6, 0.05, 0.5, 0.8], [0.58, 0.08, -0.5, 0.82], [0.12, -0.06, 0.7, 0.74]];
+    green.forEach(([ox, oy, oz, rf], i) => {
+      const leaf = new THREE.IcosahedronGeometry(crownR * rf, 1); leaf.scale(1, 0.5, 1);
+      leaf.translate(x + ox * crownR, y + boleH + oy * h + crownR * 0.5, z + oz * crownR);
+      push(i % 2 ? trLeafB : trLeafA, leaf);
+    });
+    if (bloom > 0) {                                   // vòm hoa NHỎ, dẹt, phủ mặt trên
+      const reds = [[0, 0.62, 0, 0.6], [0.4, 0.5, 0.3, 0.36], [-0.35, 0.52, -0.28, 0.34]];
+      reds.forEach(([ox, oy, oz, rf]) => {
+        const fl = new THREE.IcosahedronGeometry(crownR * rf, 1); fl.scale(1, 0.3, 1);
+        fl.translate(x + ox * crownR, y + boleH + oy * h + crownR * 0.5, z + oz * crownR);
+        push(trFlowerM, fl);
+      });
+    }
+    trBonGoc(x, z, y, 0.6);
+    addCollider(x, z, 0.85);
+    return true;
+  }
+
+  // ==========================================================================
+  // (1) HÀNG CAU VUA TRANG TRỌNG trước 5 công sở lớn — bám vỉa hè, dời pháp tuyến
+  //     khỏi tim đường. Mỗi công sở: 1 hàng ~7 cây dọc phố chính gần nhất.
+  // ==========================================================================
+  const congSo = [
+    ['ubnd',   LM.ubnd],     // UBND / trụ sở, [161,-823]
+    ['nhnn',   LM.nhnn],     // Ngân hàng Nhà nước, [-238,-637]
+    ['museum', LM.museum],   // Bảo tàng HP, [91,-492]
+    ['thptnq', LM.thptnq],   // THPT Ngô Quyền, [-237,254]
+    ['opera',  LM.opera],    // Nhà hát lớn (quảng trường), [0,9]
+  ];
+  for (const [, [lx, lz]] of congSo) {
+    const seg = trNearestSeg(lx, lz); if (!seg) continue;
+    const L = Math.hypot(seg.dx, seg.dz) || 1, ux = seg.dx / L, uz = seg.dz / L;   // tiếp tuyến phố
+    // pháp tuyến hướng VỀ công trình (phía vỉa hè, không phải lòng đường)
+    let nx = -uz, nz = ux;
+    if (Math.hypot((seg.cx + nx * 3) - lx, (seg.cz + nz * 3) - lz) > Math.hypot(seg.cx - lx, seg.cz - lz)) { nx = -nx; nz = -nz; }
+    const off = ROAD_W[seg.c] / 2 + 2.6;                 // ra sát mép vỉa hè
+    // tâm hàng = hình chiếu công trình lên đường; trải ±3 nhịp 9 m
+    const bcx = seg.cx + nx * off, bcz = seg.cz + nz * off;
+    for (let k = -3; k <= 3; k++) {
+      const px = bcx + ux * k * 9, pz = bcz + uz * k * 9;
+      trPalm(px, pz, 10.5 + ((k + 3) % 3) * 0.9);       // cao 10.5-12.3 m, xen biến thể
+    }
+  }
+
+  // ==========================================================================
+  // (2) PHƯỢNG ALLÉE demo — 1 đoạn đại lộ (Bảo tàng, s) trồng 2 bên, nhịp 15 m.
+  //     (Điểm nhấn "Hoa Phượng Đỏ"; đa số cây để tán xanh, ~1/3 điểm hoa.)
+  // ==========================================================================
+  {
+    const A = [652, -450], C = [188, -455];             // đoạn phố s trước Bảo tàng (né tim đường)
+    const dx = C[0] - A[0], dz = C[1] - A[1], L = Math.hypot(dx, dz), ux = dx / L, uz = dz / L;
+    const nx = -uz, nz = ux;
+    for (let d = 24; d < L - 12; d += 15) {
+      const cx = A[0] + ux * d, cz = A[1] + uz * d;
+      for (const s of [1, -1]) {
+        const px = cx + nx * s * (ROAD_W.s / 2 + 3.0), pz = cz + nz * s * (ROAD_W.s / 2 + 3.0);
+        const hh = ((px * 3.3 + pz * 1.9) % 1 + 1) % 1;   // hash vị trí
+        trPhuong(px, pz, 8.5 + hh * 2.5, hh < 0.32 ? 1 : 0);   // ~32% điểm hoa
+      }
+    }
+  }
+
+  // ==========================================================================
+  // (3) VÀI XÀ CỪ CỔ THỤ tán rộng — mép quảng trường / bãi cỏ công sở (né landmark,
+  //     né lòng đường). Điểm chọn thủ công gần landmark nhưng lùi ra sân/bãi.
+  // ==========================================================================
+  for (const [x, z] of [[120, -470], [60, -470], [-210, 275], [-262, -612]]) {
+    trBroad(x, z, 12.5, 8.5);
+  }
+
+  // ---- XẢ bucket → mỗi material 1 mesh (merge, dispose) ----
+  for (const [mtl, geos] of B) {
+    if (!geos.length) continue;
+    const merged = mergeGeometries(geos.map((g) => (g.index ? g.toNonIndexed() : g)), false);
+    geos.forEach((g) => g.dispose());
+    const mesh = new THREE.Mesh(merged, mtl);
+    mesh.castShadow = true; mesh.receiveShadow = true; mesh.name = 'tr_hpTrees';
+    scene.add(mesh);
+  }
+  void localPt; void makeTex;  // giữ tham chiếu scope cho phần tích hợp (draft)
+}
+
   }
 
   // (MÁI HIÊN BẠT + BIỂN HIỆU chuyển xuống SAU khối bằng-chứng-nhà: cần houseEvidence/openSpace/panoDenies
@@ -17098,7 +17422,7 @@ const w1AddSign = (r, txt, bg, fg, y, px = 42, wRatio = 0.9, hh = 1.1) => {
     const s1 = frac(Math.sin(x * 1.73 + z * 0.91) * 43758.5);   // cỡ cây
     const s2 = frac(Math.sin(x * 0.41 + z * 2.31) * 12543.7);   // độ nở hoa
     const scale = 0.72 + s1 * 1.05;                              // ~5m .. ~12m
-    const bloom = s2 < 0.58 ? 1 : s2 < 0.84 ? 0.5 : 0;           // nở rộ / vừa / xanh
+    const bloom = s2 < 0.24 ? 1 : s2 < 0.42 ? 0.5 : 0;           // nở rộ / vừa / XANH (đa số) — tháng 12 thật chủ yếu xanh (bài học bu)
     const trunkH = 3.2 * scale, crownY = trunkH + 1.0 * scale, crownR = 3.2 * scale;
     const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.26 * scale, 0.55 * scale, trunkH, 6), sharedMats.trunk);
     trunk.position.y = trunkH / 2; g.add(trunk);
@@ -17125,9 +17449,9 @@ const w1AddSign = (r, txt, bg, fg, y, px = 42, wRatio = 0.9, hh = 1.1) => {
         ? [[0, 0.58, 0, 1.02], [-0.55, 0.48, 0.45, 0.64], [0.55, 0.48, -0.4, 0.66], [0.06, 0.52, 0.6, 0.6], [-0.1, 0.5, -0.55, 0.58]]
         : [[0, 0.56, 0, 0.86], [0.42, 0.48, 0.32, 0.52]];
       reds.forEach(([ox, oy, oz, rf], i) => {
-        const fl = new THREE.Mesh(canopyGeo(crownR * rf, x * 5.1 + z * 2.3 + i + 40), sharedMats.flower);
+        const fl = new THREE.Mesh(canopyGeo(crownR * rf * 0.72, x * 5.1 + z * 2.3 + i + 40), sharedMats.flower);
         fl.position.set(ox * crownR, crownY + oy * scale, oz * crownR);
-        fl.scale.y = 0.42;
+        fl.scale.y = 0.3;
         g.add(fl);
       });
     }

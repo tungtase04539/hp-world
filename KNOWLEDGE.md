@@ -315,6 +315,16 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-14 (bv)** [GÓI HỆ THỐNG VÒNG 1 — nâng SÀN mọi pano]: (a) ĐƯỜNG: tim đường VÀNG đứt
+    (0xf2c200, phủ vạch trắng cũ) + stop bar tại nút — decal MeshBasic gộp 1 draw call, guard isWater/
+    dốc/né MEDIANS (cell_road). (b) CÂY: hạ glow phượng toàn cục sharedMats.flower emissive 0.35→0.10 +
+    procedural phuongTree đa số XANH (bloom threshold 0.58→0.24, vòm đỏ rf×0.72, scale.y 0.42→0.3) —
+    tháng 12 thật phượng chủ yếu xanh. + hàng CAU VUA trước 5 công sở + phượng allée + xà cừ cổ thụ
+    (cell_tree). 2 BÀI HỌC XƯƠNG-MÁU: (1) IcosahedronGeometry là NON-INDEXED, Cone/Cylinder/Box là
+    INDEXED — trộn cùng 1 material bucket → mergeGeometries THROW "index attribute exists among some";
+    fix: `geos.map(g=>g.index?g.toNonIndexed():g)` trước merge. (2) ~46 phượng LÕI là heroTree GLB
+    Meshy (đỏ baked trong texture) — KHÔNG param-tune được; giữ nguyên (biểu tượng hoa phượng đỏ), chỉ
+    sửa procedural (ảnh hưởng phần lớn pano rìa).
 - **2026-07-14 (bu)** [ĐO KHÁCH QUAN — TRẦN ĐIỂM & CHIẾN LƯỢC LOOP]: chấm lại 125 pano vòng tinh
     6-agent bằng gpt-5.6-sol-xhigh: TB **2.11 → 2.70 (+0.58)**, nhưng tuyệt đối vẫn RẤT thấp (1/125 ≥5,
     73/125 <3), 10 regression >0.4. Đọc findings: judge THƯỞNG khi khớp công trình cụ thể (nên +0.58 thật)
