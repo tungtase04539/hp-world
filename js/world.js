@@ -18274,11 +18274,18 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
       } catch (e) { /* polygon lỗi -> bỏ qua */ }
     }
     if (bldGeos.length) {
-      const merged = mergeGeometries(bldGeos);
+      // PERF (Lô A): TILE hóa lưới 350m thay 1 mesh phủ cả thành phố → frustum + shadow cull được
+      // (bounding sphere 1-mesh chứa camera nên KHÔNG BAO GIỜ cull; 6M vertex qua shader mỗi khung + shadow).
+      const TILE = 350, buckets = new Map(), bldMat = new THREE.MeshLambertMaterial({ vertexColors: true });
+      for (const g of bldGeos) {
+        g.computeBoundingBox(); const bb = g.boundingBox;
+        const k = Math.floor((bb.min.x + bb.max.x) / 2 / TILE) + ',' + Math.floor((bb.min.z + bb.max.z) / 2 / TILE);
+        let l = buckets.get(k); if (!l) buckets.set(k, l = []); l.push(g);
+      }
+      for (const [k, list] of buckets) {
+        const mesh = new THREE.Mesh(mergeGeometries(list), bldMat); mesh.name = 'buildings_' + k; scene.add(mesh);
+      }
       bldGeos.forEach((g) => g.dispose());
-      const mesh = new THREE.Mesh(merged, new THREE.MeshLambertMaterial({ vertexColors: true }));
-      mesh.name = 'buildings';
-      scene.add(mesh);
     }
     for (const [key, list] of _fcFront) {
       if (!list.length) continue;
@@ -18895,9 +18902,18 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
       }
     }
     if (geos.length) {
-      const merged = mergeGeometries(geos); geos.forEach((g) => g.dispose());
-      const m = new THREE.Mesh(merged, new THREE.MeshLambertMaterial({ vertexColors: true }));
-      m.castShadow = true; m.receiveShadow = true; m.name = 'block_infill'; scene.add(m);
+      // PERF (Lô A): TILE 350m thay 1 mesh (tới 20000 hộp phủ cả thành phố → cull được main + shadow)
+      const TILE = 350, buckets = new Map(), biMat = new THREE.MeshLambertMaterial({ vertexColors: true });
+      for (const g of geos) {
+        g.computeBoundingBox(); const bb = g.boundingBox;
+        const k = Math.floor((bb.min.x + bb.max.x) / 2 / TILE) + ',' + Math.floor((bb.min.z + bb.max.z) / 2 / TILE);
+        let l = buckets.get(k); if (!l) buckets.set(k, l = []); l.push(g);
+      }
+      for (const [k, list] of buckets) {
+        const m = new THREE.Mesh(mergeGeometries(list), biMat);
+        m.castShadow = true; m.receiveShadow = true; m.name = 'block_infill_' + k; scene.add(m);
+      }
+      geos.forEach((g) => g.dispose());
     }
   }
 
