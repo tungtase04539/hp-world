@@ -357,7 +357,7 @@ addWay('postoffice', 242226546, null);
 addWay('museum', 1049831208, null);
 addWay('market', 1175766946, null);
 addNode('lechan', 106.67957, 20.85600);
-addNode('station', 106.68752, 20.85602);
+addNode('station', 106.68752, 20.85850);   // ga Hải Phòng THẬT (lat 20.856→20.8585, dời bắc ~275m — trước lệch nam làm rail yard t3 bị lọc)
 // LM.lake: tính từ polygon hồ thật (phần 6b)
 addNode('baodai', 106.79297, 20.68766);
 EXTRAS.baodai = LM.baodai; delete LM.baodai;
@@ -496,7 +496,7 @@ for (const w of load('osm_rail.json')) {
   for (const [x, z] of pts) { cx += x; cz += z; }
   cx /= pts.length; cz /= pts.length;
   const nearPort = Math.hypot(cx - LM.port[0], cz - LM.port[1]) < 1500;
-  const nearGa = Math.hypot(cx - LM.station[0], cz - LM.station[1]) < 350;
+  const nearGa = Math.hypot(cx - LM.station[0], cz - LM.station[1]) < 700;   // nới 350→700: giữ cả sân ga/rail yard (t3), không chỉ tuyến chính
   if ((nearPort || nearGa) && plLen(pts) > 200) RAIL.push({ pts });
 }
 console.log(`rail: ${RAIL.length} đoạn`);
