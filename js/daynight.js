@@ -4,6 +4,7 @@ import * as THREE from 'three';
 export const DAY_LENGTH = 300;
 
 const C = (hex) => new THREE.Color(hex);
+const _NIGHT_WATER = C(0x101c24);   // màu nước đêm — hoist để không cấp phát mỗi khung (fix GC churn)
 // Keyframe theo t (0 = nửa đêm, 0.5 = giữa trưa)
 const KEYS = [
   { t: 0.0,  sky: C(0x131d3a), fog: C(0x15203e), sun: C(0x2a3d66), sunI: 0.07, hemiI: 0.34, night: 1 },
@@ -169,7 +170,7 @@ export function createDayNight(scene, world) {
       // (BÀI HỌC: vòng này GHI ĐÈ waterMat.color mỗi khung → mọi chỉnh màu ở world.js vô hiệu;
       //  đây là nguồn thật của "nước cyan" trên vệ tinh. Đổi ngày=lục-xám đục, đêm=tối đục.)
       if (world.waterMat) {
-        world.waterMat.color.setHex(0x4d616c).lerp(new THREE.Color(0x101c24), glow);
+        world.waterMat.color.setHex(0x4d616c).lerp(_NIGHT_WATER, glow);   // (hoist Color — tránh rác GC mỗi khung)
       }
       return s;
     },

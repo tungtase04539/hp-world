@@ -52,9 +52,14 @@ function rectFactor(x, x1, x2, z, z1, z2, m) {
 // cache chỉ đọc (color cố định), 2 mesh share vô hại (castShadow/frustumCulled không đụng material).
 const _matCache = new Map();
 function mat(color, opts = {}) {
-  for (const _ in opts) return new THREE.MeshLambertMaterial({ color, ...opts });   // có opts → không cache
-  let m = _matCache.get(color);
-  if (!m) { m = new THREE.MeshLambertMaterial({ color }); _matCache.set(color, m); }
+  // PERF: cache CẢ material có opts theo key (màu+opts) — gộp material trùng (giảm 3808→~vài trăm, ít state-change,
+  // KHÔNG đổi visual). Material bị mutate per-frame (waterMat/facadeMats) tạo EXPLICIT, không qua mat() → an toàn.
+  let hasOpts = false; for (const _ in opts) { hasOpts = true; break; }
+  let key;
+  if (!hasOpts) key = 'c' + color;
+  else key = 'c' + color + '|' + Object.keys(opts).sort().map((k) => { const v = opts[k]; return k + '=' + (v && v.getHex ? 'C' + v.getHex() : v); }).join(';');
+  let m = _matCache.get(key);
+  if (!m) { m = new THREE.MeshLambertMaterial({ color, ...opts }); _matCache.set(key, m); }
   return m;
 }
 

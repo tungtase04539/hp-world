@@ -514,6 +514,8 @@ window.__hp = {
   },
   teleport(x, z, camYaw = 0, pitch = 0.3, dist = 14) {
     if (pState.mounted) { pState.mounted.mounted = false; pState.mounted = null; player.sit(false); }
+    x = Math.max(WORLD_BOUNDS.minX + 31, Math.min(WORLD_BOUNDS.maxX - 31, x));   // clamp vào biên đi-được (tránh kẹt ngoài map — tryMove chặn mọi bước khi ở ngoài)
+    z = Math.max(WORLD_BOUNDS.minZ + 31, Math.min(WORLD_BOUNDS.maxZ - 31, z));
     pState.pos.set(x, Math.max(groundHeight(x, z), 0), z);
     pState.vy = 0;
     cam.yaw = camYaw; cam.pitch = pitch; cam.dist = dist;

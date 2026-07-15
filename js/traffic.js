@@ -55,6 +55,7 @@ function samplePath(pts, s, closed) {
   for (let i = 0; i < n; i++) {
     const a = pts[i], b = pts[(i + 1) % pts.length];
     const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    if (len < 1e-6) continue;   // segment suy biến (2 điểm trùng) → tránh 0/0 = NaN
     if (s <= len) {
       const t = s / len;
       return {
