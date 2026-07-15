@@ -315,6 +315,12 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-15 (ch)** [VỆ TINH — MẬT ĐỘ RÌA TÂY/BẮC (t4/t7)]: block_infill lưới `gx≥-1100, gz≥-900` → rìa
+    tây (x<-1100, t4) + bắc (z<-900, bán đảo Sở GTVT/Bạch Đằng t7) TRỐNG dù real dày nhà. Đo `block_infill`
+    ~297k tri ≈ 12.7k nhà < CAPB 15000 ⇒ CHƯA bão hòa → mở biên KHÔNG cướp lõi. FIX: `gx -1750..900`,
+    `gz -1320..560`, CAPB 15000→20000. Guard evidence (`_bldGrid 95 || _phGrid 60`) + water/superblock tự
+    giới hạn (chừa sông Cấm/cảng). Verify: t4 bán đảo arc + t7 center-left lấp dày, lõi t3/t6 nguyên. BÀI HỌC:
+    trước khi mở biên generator có CAP, đo count thực (tri/建物) vs CAP — nếu chưa bão hòa thì mở an toàn.
 - **2026-07-15 (cg)** [VỆ TINH — DIỆT "KHỐI MÁI ĐỎ ĐẶC KHỔNG LỒ" (t4/t8)]: nhà OSM footprint LỚN
     (b.a>700m²: chợ/xưởng/cơ quan) bốc trúng ngói-đỏ `roofPalette` (3/4 màu đỏ) → đọc thành 1 mảng đỏ to
     bất thường trên vệ tinh (thực địa chỗ đó mái TÔN/BÊ TÔNG XÁM phẳng). FIX: thêm `roofBigPalette` (xám kim

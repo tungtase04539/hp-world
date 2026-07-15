@@ -18781,7 +18781,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     const geos = []; const lmPtsB = Object.values(LM);
     let bs = 424241; const brnd = () => { bs = (bs * 1103515245 + 12345) & 0x7fffffff; return bs / 0x7fffffff; };
     let nB = 0;
-    const CAPB = 15000;   // vệ tinh GE: lòng ô kín mái ~100% → lưới dày, nhà gần chạm nhau (tăng 9500→15000: thực tế kín đặc hơn)
+    const CAPB = 20000;   // vệ tinh GE: lòng ô kín mái ~100% → lưới dày, nhà gần chạm nhau (15000→20000: mở biên NW/N cần thêm quota rìa)
     // (PANO-LOOP V1: 5600 cạn quanh gx≈0 → cả dải đông tới Ga trống; 9500 đủ quét hết lưới, vẫn 1 mesh gộp)
     // KHU PHÂN LÔ LIỀN KỀ MỚI cạnh THPT Lê Hồng Phong (GE ảnh 4: dãy nhà trắng đều) — georef từ ảnh
     {
@@ -18815,8 +18815,8 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
       for (let i = 0; i < n; i++) { const sh = 0.78 + 0.22 * Math.max(0, nr.getY(i) * 0.5 + 0.5); c[i*3]=rgb[0]*sh; c[i*3+1]=rgb[1]*sh; c[i*3+2]=rgb[2]*sh; }
       g.setAttribute('color', new THREE.BufferAttribute(c, 3)); return g;
     };
-    for (let gx = -1100; gx <= 900 && nB < CAPB; gx += 8.5) {
-      for (let gz = -900; gz <= 560 && nB < CAPB; gz += 8.5) {
+    for (let gx = -1750; gx <= 900 && nB < CAPB; gx += 8.5) {   // mở biên TÂY -1100→-1750 (phủ rìa tây t4/t7 real dày nhà; guard evidence tự giới hạn)
+      for (let gz = -1320; gz <= 560 && nB < CAPB; gz += 8.5) {  // mở biên BẮC -900→-1320 (phủ bán đảo Sở GTVT/Bạch Đằng t7; guard water/superblock chừa sông Cấm+cảng)
         const x = gx + (brnd() - 0.5) * 4, z = gz + (brnd() - 0.5) * 4;
         if (Math.abs(groundHeightNoDeck(x, z) - LAND_H) > 0.3) continue;
         if (riverFactor(x, z) > 0.01) continue;
