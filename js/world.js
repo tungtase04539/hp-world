@@ -18857,6 +18857,42 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     }
   }
 
+  // KHO CẢNG Hoàng Diệu (tile8) — dải kho dài mái tôn XÁM song song sông Cấm, TRÊN đất vừa reclaim
+  // (real_8: dải kho CN lớn dọc bờ; đất reclaim để trống = void → lấp kho cho đúng silhouette cảng vệ tinh).
+  {
+    const khoGeos = [];
+    const khoRows = [
+      { z: -1000, x1: -400, x2: 480, d: 34 },
+      { z: -1072, x1: -380, x2: 480, d: 38 },
+      { z: -1148, x1: -240, x2: 460, d: 40 },
+    ];
+    let ks = 91237; const krnd = () => { ks = (ks * 1103515245 + 12345) & 0x7fffffff; return ks / 0x7fffffff; };
+    for (const row of khoRows) {
+      let x = row.x1;
+      while (x < row.x2) {
+        const w = 60 + krnd() * 68;
+        const cx = x + w / 2, cz = row.z + (krnd() - 0.5) * 10;
+        if (cx > row.x2) break;
+        const gy = groundHeight(cx, cz);
+        if (gy > LAND_H - 0.5 && !isWater(cx, cz) && Math.abs(groundHeightNoDeck(cx, cz) - LAND_H) < 0.4) {
+          const hh = 7 + krnd() * 3;
+          const box = new THREE.BoxGeometry(w, hh, row.d);
+          const rc = 0.55 + krnd() * 0.06;
+          const nrm = box.attributes.normal, cn = box.attributes.position.count, c = new Float32Array(cn * 3);
+          for (let v = 0; v < cn; v++) { const isR = nrm.getY(v) > 0.6; const sh = isR ? 0.98 : 0.82 + 0.14 * Math.abs(nrm.getX(v)); const t = isR ? rc + 0.06 : rc; c[v * 3] = t * sh * 0.98; c[v * 3 + 1] = t * sh; c[v * 3 + 2] = t * sh * 1.02; }
+          box.setAttribute('color', new THREE.BufferAttribute(c, 3));
+          box.translate(cx, gy + hh / 2, cz);
+          khoGeos.push(box); addCollider(cx, cz, Math.max(w, row.d) * 0.5);
+        }
+        x += w + 10 + krnd() * 14;
+      }
+    }
+    if (khoGeos.length) {
+      const mk = new THREE.Mesh(mergeGeometries(khoGeos), new THREE.MeshLambertMaterial({ vertexColors: true }));
+      mk.castShadow = true; mk.receiveShadow = true; mk.name = 'port_kho'; khoGeos.forEach((g) => g.dispose()); scene.add(mk);
+    }
+  }
+
   // vài tòa cao tầng khu Lê Hồng Phong (đông trung tâm)
   function tower(x, z, w, hgt, color) {
     const b = new THREE.Mesh(new THREE.BoxGeometry(w, hgt, w), mat(color));

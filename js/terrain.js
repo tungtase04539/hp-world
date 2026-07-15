@@ -147,6 +147,19 @@ for (const r of RIVERS) {
   if (r.pts.some((p) => p[0] === -314 && p[1] === -182)) { r.w = 48; r.sh = 14; }
 }
 RIVERS.push({ w: 48, sh: 14, pts: [[-1257, 148], [-1250, 108], [-1238, 72], [-1220, 50], [-1150, 44], [-1092, 50]] });
+// NẮN R3 (kênh Tam Bạc): đuôi cũ chạy XUYÊN tile6 (real 0 nước) → thay bằng trục thật x≈-860..-1133
+// qua cầu Lạc Long, chạm sông Cấm R1 tại [-1133,-1125] (audit nước georef + ChatGPT vet splice an toàn).
+{
+  const samePt = (a, b) => a[0] === b[0] && a[1] === b[1];
+  const findSeq = (pts, seq) => { outer: for (let i = 0; i <= pts.length - seq.length; i++) { for (let j = 0; j < seq.length; j++) if (!samePt(pts[i + j], seq[j])) continue outer; return i; } return -1; };
+  const OLD_R3_TAIL = [[-506, -61], [-314, -182], [-282, -299], [-313, -459], [-631, -952], [-591, -1055], [-414, -1138]];
+  const NEW_R3_TAIL = [[-506, -61], [-491, -393], [-482, -646], [-650, -705], [-930, -738], [-992, -862], [-1133, -1125]];
+  const cand = RIVERS.filter((r) => findSeq(r.pts, OLD_R3_TAIL) >= 0 || findSeq(r.pts, NEW_R3_TAIL) >= 0);
+  if (cand.length === 1 && findSeq(cand[0].pts, NEW_R3_TAIL) < 0) {
+    const at = findSeq(cand[0].pts, OLD_R3_TAIL);
+    if (at >= 0) cand[0].pts.splice(at, OLD_R3_TAIL.length, ...NEW_R3_TAIL.map((p) => p.slice()));
+  } else if (cand.length !== 1) { console.warn('R3 splice: match count =', cand.length, '(bỏ qua)'); }
+}
 const riverIdx = makeBucketIndex(RIVERS.map((r) => ({ pts: r.pts, meta: [r.w, r.sh || 28] })));
 const regionIdx = makeBucketIndex(ROADS_REGION.map((r) => ({ pts: r.pts, meta: 0 })));
 const dtRoadIdx = makeBucketIndex(ROADS_DT.map((r) => ({ pts: r.pts, meta: r.c })));
@@ -225,6 +238,35 @@ function hills(x, z, v) {
   return Math.max(0, h);
 }
 
+// KHU CẢNG Hoàng Diệu (tile7/8): sông Cấm R1 (w620, từ OSM) modeled quá RỘNG/nam → ngập dải cảng +
+// bán đảo Sở GTVT (real là ĐẤT tới z≈-1250). KHÔNG dời centerline/giảm w (rủi ro sông xuyên khu khác);
+// dùng OVERRIDE đất cục bộ polygon thuôn, feather bờ 18m, chạy CUỐI groundHeightNoDeck (audit + ChatGPT vet).
+const PORT_RECLAIM = [
+  [-480, -955], [-430, -1120], [-300, -1230], [320, -1230], [450, -1120], [500, -955], [500, -900], [-480, -900],
+];
+function _inPoly(x, z, poly) {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [xi, zi] = poly[i], [xj, zj] = poly[j];
+    if (((zi > z) !== (zj > z)) && x < (xj - xi) * (z - zi) / (zj - zi) + xi) inside = !inside;
+  }
+  return inside;
+}
+function _segDist(x, z, a, b) {
+  const vx = b[0] - a[0], vz = b[1] - a[1], vv = vx * vx + vz * vz;
+  let t = vv ? ((x - a[0]) * vx + (z - a[1]) * vz) / vv : 0; t = Math.max(0, Math.min(1, t));
+  return Math.hypot(x - (a[0] + t * vx), z - (a[1] + t * vz));
+}
+function reclaimPort(h, x, z) {
+  if (x < -490 || x > 510 || z < -1240 || z > -890) return h;   // bbox nhanh
+  if (!_inPoly(x, z, PORT_RECLAIM)) return h;
+  let d = Infinity;
+  for (let i = 0; i < PORT_RECLAIM.length; i++) d = Math.min(d, _segDist(x, z, PORT_RECLAIM[i], PORT_RECLAIM[(i + 1) % PORT_RECLAIM.length]));
+  let t = Math.min(1, d / 18); t = t * t * (3 - 2 * t);          // feather bờ 18m
+  const raised = 0.30 + (LAND_H - 0.30) * t;                     // dryH 0.30 > cutoff isWater 0.25
+  return Math.max(h, raised);
+}
+
 // ---------- Cao độ ----------
 export function groundHeightNoDeck(x, z) {
   const v = landAt(x, z);
@@ -257,6 +299,13 @@ export function groundHeightNoDeck(x, z) {
     const sd = hoSenSD(x, z);
     if (sd < 0) h = lerp(-3, 1.7, smoothstep(-2, 0, sd));
   }
+  // HỒ QUẦN NGỰA (tile3 góc Đông-Nam) — real CÓ hồ lớn nhưng game THIẾU (audit nước georef, t3=2.4).
+  // Ellipse tâm ~(600,228), tràn ra ngoài khung đông; carve nước, nhà tự loại qua isWater. Chỉ hạ (an toàn).
+  if (x > 455 && x < 760 && z > 120 && z < 340) {
+    const dx = (x - 600) / 138, dz = (z - 228) / 100, r2 = dx * dx + dz * dz;
+    if (r2 < 1) { const hl = lerp(-3, 1.9, smoothstep(0.45, 1.0, r2)); if (hl < h) h = hl; }
+  }
+  h = reclaimPort(h, x, z);   // ĐẤT cảng: chạy CUỐI (sau mọi carve sông/hồ) để R1 không ngập lại
   return h;
 }
 

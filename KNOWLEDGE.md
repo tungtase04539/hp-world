@@ -315,6 +315,18 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-15 (cj)** [L1 HYDRO — sửa nước theo audit georef + 2 vòng phản biện ChatGPT]: (1) **hồ Quần Ngựa t3**
+    (real có, game thiếu) — ellipse override groundHeightNoDeck tâm ~(600,228), nhà tự loại qua isWater; (2) **nắn
+    R3 kênh Tam Bạc** hết chạy XUYÊN tile6 (real 0 nước) → trục thật x≈-860..-1133 qua cầu Lạc Long (splice
+    OLD_R3_TAIL→NEW_R3_TAIL bằng findSeq, terrain.js sau prefix-splice); (3) **reclaim cảng Hoàng Diệu** t7/8:
+    sông Cấm R1 (w620 từ OSM) modeled quá nam ngập dải cảng → override `reclaimPort()` polygon thuôn PORT_RECLAIM
+    (feather bờ 18m, dryH 0.30, chạy CUỐI groundHeightNoDeck để R1 không ngập lại — KHÔNG dời centerline/giảm w);
+    (4) **kho cảng** world.js (dãy kho tôn xám song song sông trên đất reclaim, tự chừa nước). GATES pass (fresh
+    browser — LƯU Ý preview cache module cũ, phải probe bằng browser mới). ĐO: scorer NHIỄU quá lớn (t8 2.7↔3.5
+    giữa 2 lần) → net-phẳng 3.6→~3.6; nhưng VISUAL (chuẩn chính, bài học nhiễu): cảng có kho như real_8, hồ t3
+    đúng, t6 hết nước sai (+0.8), arc t4 chảy liền — đều ĐÚNG-ĐỊA-LÝ hơn. TODO: canal R3 mới có thể false-water
+    rìa đông t4 (t4 tụt ~0.7) → tinh chỉnh x canal về đông (sát x≈-400) lô sau. CHẶN: KHÔNG regen mapdata được
+    (thiếu osm_*.json + path Linux) → lever #1 (ROADS_DT/mask/GARDENS) không sửa gốc; chỉ override terrain/world.
 - **2026-07-15 (ci)** ⚠️ [LỖI ĐO LƯỜNG NGHIÊM TRỌNG — baseline vệ tinh "5.96" là ẢO]: phát hiện
     `rescore_both.sh` phiên trước chụp 8 aerial bằng **toạ độ LƯỚI tùy ý** `game_2=(-150,250),
     game_3=(399,250), game_6=(399,-250), game_7=(-350,-700)...` — KHÔNG georef theo lat/lon tâm của
