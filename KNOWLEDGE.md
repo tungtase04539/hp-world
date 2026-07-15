@@ -315,6 +315,15 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-15 (cm)** ⭐ [GỠ CHẶN LỚN — regenerate mapdata.js CHẠY ĐƯỢC trên Windows]: trước tưởng không regen
+    được (thiếu `osm_*.json` + path Linux). GIẢI: chạy `bash tools/fetch_osm.sh` TỰ TẢI lại 12 file OSM từ
+    **Overpass public** (overpass-api.de hay 406/dispatcher-busy → RETRY mirror `overpass.kumi.systems`; queries
+    to như buildings/roads_region mất vài phút/cái). fetch_osm.sh THIẾU query `osm_water_dt.json` (hồ Tam Bạc way
+    236743184) → đã bổ sung (§11). process_osm.mjs dòng 619 path Linux → sửa `new URL('../js/mapdata.js', import.meta.url)`
+    (portable). Regen ra mapdata.js chỉ khác bản cũ **5 dòng** (fresh OSM ~y hệt; MASK coastline vi chỉnh, GARDENS
+    to hơn) → mọi override terrain/world VẪN KHỚP (R3 splice vertices còn nguyên). ⇒ giờ SỬA ĐƯỢC GỐC: mạng đường
+    ROADS_DT, land-mask coastline, ga/station anchor, GARDENS. `osm_*.json` đã gitignore (regeneratable, nặng 4.8M).
+    LEVER #1 (đường) MỞ KHOÁ. Việc tiếp: fix ga station anchor (rail yard t3 bị lọc), refine mask/road tại nguồn.
 - **2026-07-15 (ck)** [L2/L3 — full-agent DRAFT + tích hợp: vườn/civic/anchor/mật độ additive world.js]: 3 agent
     song song nháp block tự chứa (node-check + guard đất `!isWater && |gh-LAND_H|<0.4`), tôi tích hợp: **garden6**
     (vườn NBK nêm cỏ + 2 đài phun (-116,-391)/(-95,-254) + 2 bồn tròn (316,-623)/(233,-537)); **civic8** (oval

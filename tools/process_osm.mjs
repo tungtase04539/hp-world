@@ -616,5 +616,5 @@ export const MEDIANS = ${JSON.stringify(MEDIANS)};
 export const GARDENS = ${JSON.stringify(GARDENS)};
 export const BUILDINGS = ${JSON.stringify(BUILDINGS)};
 `;
-fs.writeFileSync('/home/user/hp-world/js/mapdata.js', out);
+fs.writeFileSync(new URL('../js/mapdata.js', import.meta.url), out);   // relative (portable Win/Linux)
 console.log(`mapdata.js: ${(out.length / 1024).toFixed(0)}KB`);

@@ -44,4 +44,7 @@ q '[out:json][timeout:90];(way["leisure"~"^(park|garden|playground)$"](20.845,10
 # 10. Đường sắt (tuyến chính vào ga Hải Phòng)
 q '[out:json][timeout:90];way["railway"="rail"](20.82,106.55,20.90,106.75);out geom;' osm_rail.json
 
+# 11. Nước downtown (polygon hồ Tam Bạc way 236743184 — process_osm §6b cần). CHÚ Ý Overpass hay 406/busy → retry mirror.
+q '[out:json][timeout:90];(way["natural"="water"](20.845,106.652,20.884,106.712);way(id:236743184););out geom;' osm_water_dt.json
+
 echo 'Xong. Chạy: node process_osm.mjs'

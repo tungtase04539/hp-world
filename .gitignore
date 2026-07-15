@@ -3,3 +3,7 @@ glbview.html
 /rb
 node_modules
 water_debug.png
+
+# OSM data tải từ Overpass (regeneratable: bash tools/fetch_osm.sh) — nặng, không commit
+tools/osm_*.json
+tools/mask_debug.png
