@@ -18893,6 +18893,31 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     }
   }
 
+  // VƯỜN PARTERRE HÌNH SỐ 8 (khúc cua Tam Bạc ~(-985,-425), t4/t5) — real có vườn cảnh 2 vòng đặc trưng,
+  // game THIẾU (audit landmark, recognition-ROI cao). Top-down: 2 bồn cỏ tròn nối nhau + viền path be + hoa.
+  if (Math.abs(groundHeightNoDeck(-985, -425) - LAND_H) < 0.4 && !isWater(-985, -425)) {
+    const centers = [[-985, -455], [-985, -393]], gR = 25;
+    const grass = [], path = [], dotG = [];
+    let ps = 5501; const prnd = () => { ps = (ps * 1103515245 + 12345) & 0x7fffffff; return ps / 0x7fffffff; };
+    for (const [cx, cz] of centers) {
+      const gy = groundHeight(cx, cz);
+      const disk = new THREE.CircleGeometry(gR, 30); disk.rotateX(-Math.PI / 2); disk.translate(cx, gy + 0.05, cz); grass.push(disk);
+      const ro = new THREE.RingGeometry(gR - 1.5, gR + 0.8, 32); ro.rotateX(-Math.PI / 2); ro.translate(cx, gy + 0.08, cz); path.push(ro);
+      const ri = new THREE.RingGeometry(gR * 0.46, gR * 0.46 + 1.3, 26); ri.rotateX(-Math.PI / 2); ri.translate(cx, gy + 0.08, cz); path.push(ri);
+      for (let k = 0; k < 10; k++) {                                   // chấm hoa đỏ/vàng trên bồn
+        const a = prnd() * 6.283, rr = (0.55 + prnd() * 0.38) * gR;
+        const fx = cx + Math.cos(a) * rr, fz = cz + Math.sin(a) * rr;
+        const d = new THREE.CircleGeometry(1.5 + prnd() * 1.2, 8); d.rotateX(-Math.PI / 2); d.translate(fx, gy + 0.11, fz);
+        const isRed = prnd() < 0.5; const col = d.attributes.position.count, cc = new Float32Array(col * 3);
+        for (let v = 0; v < col; v++) { cc[v * 3] = isRed ? 0.78 : 0.86; cc[v * 3 + 1] = isRed ? 0.22 : 0.72; cc[v * 3 + 2] = isRed ? 0.18 : 0.16; }
+        d.setAttribute('color', new THREE.BufferAttribute(cc, 3)); dotG.push(d);
+      }
+    }
+    addMerged(grass, new THREE.MeshLambertMaterial({ color: 0x5a8f43 }), 'parterre_r4_grass');
+    addMerged(path, new THREE.MeshLambertMaterial({ color: 0xccbf9c }), 'parterre_r4_path');
+    if (dotG.length) addMerged(dotG, new THREE.MeshLambertMaterial({ vertexColors: true }), 'parterre_r4_flowers');
+  }
+
   // vài tòa cao tầng khu Lê Hồng Phong (đông trung tâm)
   function tower(x, z, w, hgt, color) {
     const b = new THREE.Mesh(new THREE.BoxGeometry(w, hgt, w), mat(color));
