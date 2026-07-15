@@ -22,8 +22,8 @@ for (const [px, pz] of PANO_CAM) {
   let l = _panoGrid.get(k); if (!l) _panoGrid.set(k, l = []); l.push([px, pz]);
 }
 function nearPanoCam(x, z, r = 5) {
-  const cx = Math.floor(x / 8), cz = Math.floor(z / 8), r2 = r * r;
-  for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) {
+  const cx = Math.floor(x / 8), cz = Math.floor(z / 8), r2 = r * r, cr = Math.max(1, Math.ceil(r / 8));
+  for (let dx = -cr; dx <= cr; dx++) for (let dz = -cr; dz <= cr; dz++) {   // quét neighborhood theo r (r>8 vẫn đúng)
     const l = _panoGrid.get((cx + dx) + ',' + (cz + dz)); if (!l) continue;
     for (const [px, pz] of l) if ((x - px) ** 2 + (z - pz) ** 2 < r2) return true;
   }
@@ -18102,7 +18102,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
       // KHÔNG gọi openSpace() ở đây: nó + _sqX/_majSeg khai báo SAU vòng này → TDZ (bài học aj).
       if (cx > -300 && cx < 120 && cz > -1045 && cz < -845) continue;
       if (inSuperblock(cx, cz)) continue;   // siêu khối Hải quân/Cảng: nhà lùi sau tường, không OSM interior
-      if (nearPanoCam(cx, cz, 5)) continue;   // KEEP-CLEAR: nhà OSM không đè camera pano (lỗi #1: tường che kín)
+      if (nearPanoCam(cx, cz, 5 + Math.min(11, 0.5 * Math.max(maxX - minX, maxZ - minZ)))) continue;   // KEEP-CLEAR footprint-aware: nhà OSM (kể cả lớn) không chôn camera pano (fix engulf pano_498/351)
       // GUARD LÒNG ĐƯỜNG (QA topology): OSM footprint đè tim đường (data lệch/service-road) → BỎ
       // (thà vắng còn hơn nhà nằm giữa đường; đối chiếu pano hiếm khi là nhà thật giữa phố).
       { const _hsd = (px, pz, ax, az, bx, bz) => { const dx = bx - ax, dz = bz - az, l2 = dx * dx + dz * dz; let t = l2 ? ((px - ax) * dx + (pz - az) * dz) / l2 : 0; t = Math.max(0, Math.min(1, t)); return Math.hypot(px - (ax + dx * t), pz - (az + dz * t)); };
