@@ -301,8 +301,9 @@ export function groundHeightNoDeck(x, z) {
   }
   // HỒ QUẦN NGỰA (tile3 góc Đông-Nam) — real CÓ hồ lớn nhưng game THIẾU (audit nước georef, t3=2.4).
   // Ellipse tâm ~(600,228), tràn ra ngoài khung đông; carve nước, nhà tự loại qua isWater. Chỉ hạ (an toàn).
-  if (x > 455 && x < 760 && z > 120 && z < 340) {
-    const dx = (x - 600) / 138, dz = (z - 228) / 100, r2 = dx * dx + dz * dz;
+  // (dời tâm SE + thu bắc: tránh chìm entity ga ở (635,172) — diag bắt được)
+  if (x > 500 && x < 760 && z > 185 && z < 360) {
+    const dx = (x - 628) / 116, dz = (z - 276) / 82, r2 = dx * dx + dz * dz;
     if (r2 < 1) { const hl = lerp(-3, 1.9, smoothstep(0.45, 1.0, r2)); if (hl < h) h = hl; }
   }
   h = reclaimPort(h, x, z);   // ĐẤT cảng: chạy CUỐI (sau mọi carve sông/hồ) để R1 không ngập lại
