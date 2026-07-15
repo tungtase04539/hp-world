@@ -315,6 +315,15 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-16 (co)** [END-STATE VÒNG ĐÊM + PHÂN TÍCH TRẦN]: sau khi vét cạn lô an toàn: **VỆ TINH median ~3.8**
+    (baseline 3.64; road ribbon + rail yard + ga + density + gardens giúp per-tile: t1 6.8→6.9, t6 2.2→3.0, t3
+    2.4→3.0, t7 2.3→4.2), **PANO 4.18** (baseline 4.16, keep-clear/terrain KHÔNG regression). Blue-metal roof
+    THỬ→median 3.30 (-0.4) → ĐÃ REVERT (scorer phạt màu lệch). PHÂN TÍCH TRẦN: t1 đạt 6.8 chứng tỏ scorer KHÔNG
+    cap low-poly cứng — 6-7/tile KHẢ THI khi cấu trúc khớp GẦN HOÀN HẢO; nhưng đa số tile cấu trúc chưa khớp đủ
+    (đường nhỏ OSM thiếu, layout nhà chưa exact) → lên 8 cần **grind per-tile cấu trúc** (chậm, nhiễu ±0.4 nuốt
+    gain nhỏ) + **engulf per-building** (nhà hand-placed KHÔNG tên, không grep được → cần khi user online verify).
+    BÀI HỌC: mọi thay đổi màu/style phải A/B median-3 (blue-metal "hợp lý" nhưng hại); dựa VISUAL cho structure,
+    scorer chỉ bắt regression thô. Realism ĐÃ tăng mạnh bằng mắt (đúng goal chính) dù scorer-8 còn xa.
 - **2026-07-16 (cn)** [VÒNG ĐÊM — hội ý ChatGPT kế hoạch 7 lô + kiến trúc AERIAL-ONLY OVERLAY]: KEY architecture:
     render "dải rộng" (đường/rail/nước) trên **Three.js layer 2** — `__hp.aerial` bật `camera.layers.enable(2)`;
     mesh overlay `layers.set(2)` ⇒ CHỈ hiện top-down vệ tinh, camera pano (layer 0) KHÔNG thấy → không nuốt vỉa hè.
