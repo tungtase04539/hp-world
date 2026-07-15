@@ -18815,6 +18815,12 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
       for (let i = 0; i < n; i++) { const sh = 0.78 + 0.22 * Math.max(0, nr.getY(i) * 0.5 + 0.5); c[i*3]=rgb[0]*sh; c[i*3+1]=rgb[1]*sh; c[i*3+2]=rgb[2]*sh; }
       g.setAttribute('color', new THREE.BufferAttribute(c, 3)); return g;
     };
+    // VÙNG REAL-DÀY nhưng game trống (audit georog): bỏ yêu cầu evidence OSM (vẫn giữ guard đường/nước/openSpace).
+    const _forceDense = (x, z) => (
+      (x > -1200 && x < -650 && z > -1250 && z < -800) ||   // bán đảo Sở GTVT/Bạch Đằng (t7)
+      (x > -1300 && x < -800 && z > -600 && z < -250) ||    // Lê Hồng Phong lấp (t4)
+      (x > -1050 && x < -750 && z > 380 && z < 600)         // Tam Bạc góc dưới-giữa (t1)
+    );
     for (let gx = -1750; gx <= 900 && nB < CAPB; gx += 8.5) {   // mở biên TÂY -1100→-1750 (phủ rìa tây t4/t7 real dày nhà; guard evidence tự giới hạn)
       for (let gz = -1320; gz <= 560 && nB < CAPB; gz += 8.5) {  // mở biên BẮC -900→-1320 (phủ bán đảo Sở GTVT/Bạch Đằng t7; guard water/superblock chừa sông Cấm+cảng)
         const x = gx + (brnd() - 0.5) * 4, z = gz + (brnd() - 0.5) * 4;
@@ -18825,7 +18831,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
         if (big > 130 && alley > 130) continue;                       // quá xa mọi đường = ngoại vi trống
         if (nearPanoCam(x, z, 5)) continue;                           // KEEP-CLEAR camera pano
         if (_gridNear(_bldGrid, x, z, 10.5)) continue;                // né nhà OSM thật (13→10.5: nhà infill sát cụm OSM hơn)
-        if (!(_gridNear(_bldGrid, x, z, 95) || _gridNear(_phGrid, x, z, 60))) continue; // Ô PHẢI CÓ BẰNG CHỨNG nhà (nới 60→95: lấp kín giữa cụm OSM như thực tế)
+        if (!(_gridNear(_bldGrid, x, z, 95) || _gridNear(_phGrid, x, z, 60) || _forceDense(x, z))) continue; // Ô PHẢI CÓ BẰNG CHỨNG nhà (hoặc vùng real-dày flagged)
         if (openSpace(x, z) || panoDenies(x, z)) continue;
         if (nearFeatured(x, z)) continue;                             // không đè/che công trình đích danh
         if (clearedZone(x, z)) continue;                              // bãi giải tỏa Hoàng Diệu
@@ -18916,6 +18922,158 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     addMerged(grass, new THREE.MeshLambertMaterial({ color: 0x5a8f43 }), 'parterre_r4_grass');
     addMerged(path, new THREE.MeshLambertMaterial({ color: 0xccbf9c }), 'parterre_r4_path');
     if (dotG.length) addMerged(dotG, new THREE.MeshLambertMaterial({ vertexColors: true }), 'parterre_r4_flowers');
+  }
+
+  // ===== garden6: VƯỜN HOA + ĐÀI PHUN tile6 (khớp real_6) =====
+  {
+    const grassG = [], pathG = [], waterG = [], stoneG = [], dotG = [], trunkG = [], leafG = [];
+    let gs = 60617; const grnd = () => { gs = (gs * 1103515245 + 12345) & 0x7fffffff; return gs / 0x7fffffff; };
+    const g6ok = (x, z) => !isWater(x, z) && Math.abs(groundHeightNoDeck(x, z) - LAND_H) < 0.4;
+    const fountain = (cx, cz, R) => {
+      if (!g6ok(cx, cz)) return;
+      const gy = groundHeight(cx, cz);
+      const water = new THREE.CircleGeometry(R, 28).rotateX(-Math.PI / 2); water.translate(cx, gy + 0.06, cz); waterG.push(water);
+      const rim = new THREE.RingGeometry(R, R + 1.3, 32).rotateX(-Math.PI / 2); rim.translate(cx, gy + 0.10, cz); stoneG.push(rim);
+      const ped = new THREE.CylinderGeometry(R * 0.18, R * 0.24, 1.1, 12); ped.translate(cx, gy + 0.55, cz); stoneG.push(ped);
+      const jet = new THREE.CylinderGeometry(0.12, 0.20, 2.2, 8); jet.translate(cx, gy + 2.20, cz); waterG.push(jet);
+      addCollider(cx, cz, R + 0.6);
+    };
+    const grassBasin = (cx, cz, R) => {
+      if (!g6ok(cx, cz)) return false;
+      const gy = groundHeight(cx, cz);
+      const disk = new THREE.CircleGeometry(R, 30).rotateX(-Math.PI / 2); disk.translate(cx, gy + 0.05, cz); grassG.push(disk);
+      const ring = new THREE.RingGeometry(R, R + 1.5, 34).rotateX(-Math.PI / 2); ring.translate(cx, gy + 0.08, cz); pathG.push(ring);
+      return true;
+    };
+    const tree = (x, z, r) => {
+      if (!g6ok(x, z)) return;
+      const gy = groundHeight(x, z);
+      const tr = new THREE.CylinderGeometry(0.35, 0.45, 3.2, 6); tr.translate(x, gy + 1.6, z); trunkG.push(tr);
+      const cr = new THREE.SphereGeometry(r, 8, 6); cr.translate(x, gy + 3.2 + r * 0.6, z); leafG.push(cr);
+      addCollider(x, z, 1.0);
+    };
+    const wedge = [[-95, -254, 16], [-100, -290, 20], [-108, -325, 24], [-112, -360, 26], [-116, -391, 22], [-118, -401, 14]];
+    for (const [x, z, r] of wedge) {
+      if (!g6ok(x, z)) continue;
+      const gy = groundHeight(x, z);
+      const disk = new THREE.CircleGeometry(r, 26).rotateX(-Math.PI / 2); disk.translate(x, gy + 0.04, z); grassG.push(disk);
+      for (let k = 0; k < 5; k++) {
+        const a = grnd() * 6.283, rr = grnd() * r * 0.8;
+        const fx = x + Math.cos(a) * rr, fz = z + Math.sin(a) * rr;
+        if (!g6ok(fx, fz)) continue;
+        const d = new THREE.CircleGeometry(1.4 + grnd() * 1.1, 8).rotateX(-Math.PI / 2); d.translate(fx, groundHeight(fx, fz) + 0.10, fz);
+        const isRed = grnd() < 0.5, col = d.attributes.position.count, cc = new Float32Array(col * 3);
+        for (let v = 0; v < col; v++) { cc[v * 3] = isRed ? 0.78 : 0.86; cc[v * 3 + 1] = isRed ? 0.22 : 0.72; cc[v * 3 + 2] = isRed ? 0.18 : 0.16; }
+        d.setAttribute('color', new THREE.BufferAttribute(cc, 3)); dotG.push(d);
+      }
+    }
+    fountain(-116, -391, 7);
+    fountain(-95, -254, 6);
+    for (const [tx, tz] of [[-98, -270], [-105, -305], [-114, -345], [-118, -378], [-100, -340], [-120, -395]]) tree(tx, tz, 3.2);
+    for (const [bx, bz] of [[316, -623], [233, -537]]) { if (grassBasin(bx, bz, 18)) fountain(bx, bz, 5); }
+    addMerged(grassG, mat(0x5a8f43), 'garden6_grass');
+    addMerged(pathG, mat(0xccbf9c), 'garden6_path');
+    addMerged(waterG, mat(0x2f7fb5), 'garden6_water');
+    addMerged(stoneG, mat(0xbfb49a), 'garden6_stone');
+    addMerged(trunkG, sharedMats.trunk, 'garden6_trunks');
+    addMerged(leafG, sharedMats.leafDark, 'garden6_leaves');
+    if (dotG.length) addMerged(dotG, new THREE.MeshLambertMaterial({ vertexColors: true }), 'garden6_flowers');
+  }
+
+  // ===== civic8: TỔ HỢP CIVIC ĐÔNG tile8 (khớp real_8) — đại lộ cắt z≥-985 + bỏ đài phun (310,-1089) tránh chồng kho =====
+  {
+    // (1) ĐƯỜNG CHẠY OVAL tâm (169,-832) — sân cỏ + băng đỏ + viền trắng
+    { const cx = 169, cz = -832;
+      if (!isWater(cx, cz) && Math.abs(groundHeightNoDeck(cx, cz) - LAND_H) < 0.4) {
+        const gy = groundHeight(cx, cz), sx = 60, sz = 42;
+        const infield = new THREE.CircleGeometry(1, 48); infield.rotateX(-Math.PI / 2); infield.scale(sx * 0.76, 1, sz * 0.72); infield.translate(cx, gy + 0.04, cz);
+        addMerged([infield], mat(0x5a8f43), 'civic8_track_infield');
+        const band = new THREE.RingGeometry(0.80, 1.0, 64); band.rotateX(-Math.PI / 2); band.scale(sx, 1, sz); band.translate(cx, gy + 0.06, cz);
+        addMerged([band], mat(0x9c4a34), 'civic8_track_band');
+        const lineO = new THREE.RingGeometry(0.985, 1.0, 64); lineO.rotateX(-Math.PI / 2); lineO.scale(sx, 1, sz); lineO.translate(cx, gy + 0.09, cz);
+        const lineI = new THREE.RingGeometry(0.80, 0.815, 64); lineI.rotateX(-Math.PI / 2); lineI.scale(sx, 1, sz); lineI.translate(cx, gy + 0.09, cz);
+        addMerged([lineO, lineI], mat(0xe8e6e0), 'civic8_track_lines'); addCollider(cx, cz, 10);
+      } }
+    // (2) PARTERRE + ĐÀI PHUN (123,-737)
+    { const cx = 123, cz = -737;
+      if (!isWater(cx, cz) && Math.abs(groundHeightNoDeck(cx, cz) - LAND_H) < 0.4) {
+        const gy = groundHeight(cx, cz), R = 15;
+        const grass = new THREE.CircleGeometry(R, 40); grass.rotateX(-Math.PI / 2); grass.translate(cx, gy + 0.04, cz);
+        addMerged([grass], mat(0x5a8f43), 'civic8_parterre_grass');
+        const rim = new THREE.RingGeometry(R - 1.4, R + 0.6, 40); rim.rotateX(-Math.PI / 2); rim.translate(cx, gy + 0.07, cz);
+        addMerged([rim], mat(0xccbf9c), 'civic8_parterre_path');
+        const basin = new THREE.CircleGeometry(4.2, 28); basin.rotateX(-Math.PI / 2); basin.translate(cx, gy + 0.10, cz);
+        addMerged([basin], mat(0x2f7fb5), 'civic8_parterre_water');
+        const jet = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.5, 2.4, 8), mat(0x2f7fb5)); jet.position.set(cx, gy + 1.2, cz); jet.name = 'civic8_parterre_jet'; scene.add(jet);
+        addCollider(cx, cz, 4.5);
+      } }
+    // (3) ĐẠI LỘ CÂY x≈310, z −800..−985 (cắt để tránh chồng kho z<-1000)
+    { const trunkG = [], darkG = [], lightG = [];
+      for (let z = -800; z >= -985; z -= 14) {
+        for (const x of [301, 319]) {
+          if (isWater(x, z) || Math.abs(groundHeightNoDeck(x, z) - LAND_H) > 0.4) continue;
+          const gy = groundHeight(x, z);
+          const tr = new THREE.CylinderGeometry(0.26, 0.32, 6, 7); tr.translate(x, gy + 3, z); trunkG.push(tr);
+          const c1 = new THREE.SphereGeometry(3.1, 8, 6); c1.translate(x, gy + 6.6, z); darkG.push(c1);
+          const c2 = new THREE.SphereGeometry(2.1, 8, 6); c2.translate(x + 0.8, gy + 7.6, z - 0.6); lightG.push(c2);
+          addCollider(x, z, 1.1);
+        }
+      }
+      addMerged(trunkG, sharedMats.trunk, 'civic8_ave_trunk');
+      addMerged(darkG, sharedMats.leafDark, 'civic8_ave_leafdark');
+      addMerged(lightG, sharedMats.leafGreen2, 'civic8_ave_leaflight');
+    }
+    // (5) TƯỜNG BAO (compound) tâm (410,-975) — dời bắc nhẹ tránh kho
+    { const cx = 410, cz = -968;
+      if (!isWater(cx, cz) && Math.abs(groundHeightNoDeck(cx, cz) - LAND_H) < 0.4) {
+        const gy = groundHeight(cx, cz), hw = 40, hd = 26, wh = 2.4, th = 1.0, wallG = [];
+        const segs = [[cx, cz - hd, hw * 2 + th, th], [cx, cz + hd, hw * 2 + th, th], [cx - hw, cz, th, hd * 2 - th], [cx + hw, cz, th, hd * 2 - th]];
+        for (const [sx, sz, ww, dd] of segs) {
+          const b = new THREE.BoxGeometry(ww, wh, dd); b.translate(sx, gy + wh / 2, sz); wallG.push(b);
+          const horiz = ww >= dd, len = Math.max(ww, dd), n = Math.max(1, Math.round(len / 8));
+          for (let i = 0; i <= n; i++) { const t = i / n - 0.5; addCollider(sx + (horiz ? t * len : 0), sz + (horiz ? 0 : t * len), th); }
+        }
+        addMerged(wallG, mat(0xcfc9ba), 'civic8_compound_wall');
+      } }
+  }
+
+  // ===== anchor: 3 CÔNG TRÌNH LỚN thiếu (Sở GTVT t7, Cảng vụ t8, BV Quốc tế t1) — vệ tinh top-down =====
+  {
+    const _anchorLand = (x, z) => !isWater(x, z) && Math.abs(groundHeightNoDeck(x, z) - LAND_H) < 0.4;
+    const _anchorVCol = (g, wallHex, roofHex) => {
+      const wc = new THREE.Color(wallHex), rc = new THREE.Color(roofHex);
+      const nrm = g.attributes.normal, cn = g.attributes.position.count, c = new Float32Array(cn * 3);
+      for (let v = 0; v < cn; v++) { const isRoof = nrm.getY(v) > 0.6; const t = isRoof ? rc : wc; const sh = isRoof ? 1.0 : 0.82 + 0.14 * Math.abs(nrm.getX(v)); c[v * 3] = t.r * sh; c[v * 3 + 1] = t.g * sh; c[v * 3 + 2] = t.b * sh; }
+      g.setAttribute('color', new THREE.BufferAttribute(c, 3)); return g;
+    };
+    const _anchorColliders = (cx, cz, w, d) => {
+      if (w >= d) for (const lx of [-w / 3, 0, w / 3]) addCollider(cx + lx, cz, d / 2 + 1);
+      else for (const lz of [-d / 3, 0, d / 3]) addCollider(cx, cz + lz, w / 2 + 1);
+    };
+    const _buildAnchor = (name, ax, az, wallHex, roofHex, blocks) => {
+      if (!_anchorLand(ax, az)) return;
+      const geos = [];
+      for (const b of blocks) {
+        const cx = ax + b.dx, cz = az + b.dz;
+        if (!_anchorLand(cx, cz)) continue;
+        const g = _anchorVCol(new THREE.BoxGeometry(b.w, b.h, b.d), wallHex, roofHex);
+        g.translate(cx, groundHeight(cx, cz) + b.h / 2, cz); geos.push(g);
+        _anchorColliders(cx, cz, b.w, b.d);
+      }
+      if (!geos.length) return;
+      const merged = mergeGeometries(geos); geos.forEach((g) => g.dispose());
+      const m = new THREE.Mesh(merged, new THREE.MeshLambertMaterial({ vertexColors: true }));
+      m.castShadow = true; m.receiveShadow = true; m.name = name; scene.add(m);
+    };
+    _buildAnchor('anchor_sogtvt', -938, -1182, 0xe8dcc0, 0x8a8f96, [
+      { dx: 0, dz: 0, w: 62, d: 42, h: 16 }, { dx: -4, dz: -31, w: 40, d: 16, h: 12 },
+    ]);
+    _buildAnchor('anchor_cangvu', -155, -1076, 0xdfe2e0, 0x8f949a, [
+      { dx: 0, dz: 0, w: 50, d: 34, h: 20 }, { dx: 0, dz: 24, w: 26, d: 12, h: 10 },
+    ]);
+    _buildAnchor('anchor_bvqt', -1013, 482, 0xf2f2ee, 0xbfc4c9, [
+      { dx: 0, dz: 0, w: 50, d: 34, h: 24 }, { dx: -37, dz: 4, w: 24, d: 46, h: 16 }, { dx: 37, dz: -2, w: 24, d: 40, h: 16 },
+    ]);
   }
 
   // vài tòa cao tầng khu Lê Hồng Phong (đông trung tâm)

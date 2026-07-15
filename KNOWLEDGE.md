@@ -315,6 +315,15 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-15 (ck)** [L2/L3 — full-agent DRAFT + tích hợp: vườn/civic/anchor/mật độ additive world.js]: 3 agent
+    song song nháp block tự chứa (node-check + guard đất `!isWater && |gh-LAND_H|<0.4`), tôi tích hợp: **garden6**
+    (vườn NBK nêm cỏ + 2 đài phun (-116,-391)/(-95,-254) + 2 bồn tròn (316,-623)/(233,-537)); **civic8** (oval
+    track (169,-832) + parterre (123,-737) + đại lộ cây x≈310 + tường bao — cắt tránh chồng kho); **anchor** (Sở
+    GTVT -938,-1182 / Cảng vụ -155,-1076 / BV Quốc tế -1013,482, BoxGeometry vertex-color mái). **Mật độ ĐÚNG CHỖ**
+    (không blanket — ChatGPT cảnh báo): `_forceDense` 3 rect real-dày (bán đảo t7, LHP t4, Tam Bạc t1) nới vào
+    điều kiện evidence block_infill (VẪN giữ guard đường/nước/openSpace). Verify aerial: t6 vườn+oval, t7 bán đảo
+    dày. BÀI HỌC agent-draft: yêu cầu block TỰ CHỨA + API whitelist + guard đất + node-check → tích hợp 1 phát,
+    dịch HTML-entity (`&gt;→>`), agent tự probe đất + dời tâm tránh nước (SGTVT 17m tây) — chất lượng cao, nhanh.
 - **2026-07-15 (cj)** [L1 HYDRO — sửa nước theo audit georef + 2 vòng phản biện ChatGPT]: (1) **hồ Quần Ngựa t3**
     (real có, game thiếu) — ellipse override groundHeightNoDeck tâm ~(600,228), nhà tự loại qua isWater; (2) **nắn
     R3 kênh Tam Bạc** hết chạy XUYÊN tile6 (real 0 nước) → trục thật x≈-860..-1133 qua cầu Lạc Long (splice
