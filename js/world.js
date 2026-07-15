@@ -8287,7 +8287,8 @@ const bsHipRoof = (W, D, hexa = 0x8a4a34, x = 0, y = 0, z = 0) => {
     const len = Math.hypot(x2 - x1, z2 - z1);
     const mw = new THREE.Mesh(new THREE.BoxGeometry(len, 2.0, 0.3), mat(0x8f8a68));
     mw.rotation.y = ry4; mw.castShadow = true;
-    mw.position.set((x1 + x2) / 2, groundHeightNoDeck((x1 + x2) / 2, (z1 + z2) / 2) + 1.0, (z1 + z2) / 2);
+    // clamp chân tường ≥ mặt nước (R3 canal nắn lại có thể ngập chân — tường rêu đứng mép nước, không chìm)
+    mw.position.set((x1 + x2) / 2, Math.max(groundHeightNoDeck((x1 + x2) / 2, (z1 + z2) / 2), 0.15) + 1.0, (z1 + z2) / 2);
     mw.name = 'bs_tuongreu_309'; scene.add(mw);
     const [nx, nz] = P4(12, 13, NW4);
     if (bsOK(nx, nz)) {
