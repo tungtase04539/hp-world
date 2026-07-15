@@ -18035,7 +18035,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
       [x, z, (k === 'thptnq' || k === 'thcsnq' || k === 'thcstp') ? 120 : 80]);
     const wallPalette = [0xf5e4b8, 0xf0cfa0, 0xdfe8dc, 0xf4b8a0, 0xcfe0ee, 0xf7efc9, 0xe8d0b0, 0xd8c8a8]
       .map((c) => new THREE.Color(c));
-    const roofPalette = [0xc24a30, 0x96603c, 0xa84036, 0x8a8f96, 0x566b78, 0xc24a30].map((c) => new THREE.Color(c));   // +mái tôn XANH-lam (đặc trưng HP thật) + đỏ ×2 (giữ đỏ chủ đạo)
+    const roofPalette = [0xc24a30, 0x96603c, 0xa84036, 0x8a8f96].map((c) => new THREE.Color(c));   // (blue-metal thử → scorer TỤT -0.4, đã revert; đỏ/nâu/xám khớp real hơn)
     // Mái nhà LỚN (chợ/xưởng/cơ quan, footprint >700m²): thực tế là mái TÔN/BÊ TÔNG XÁM phẳng,
     // KHÔNG ngói đỏ. Fix "khối mái đỏ đặc khổng lồ" trên vệ tinh (t4/t8): footprint lớn bốc trúng
     // ngói đỏ palette → đọc thành 1 mảng đỏ to bất thường (thực địa chỗ đó là nhà nhỏ dày HOẶC mái tôn xám).
@@ -18810,7 +18810,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     };
     const wallTones = [[0.93, 0.87, 0.70], [0.90, 0.79, 0.62], [0.86, 0.88, 0.84], [0.92, 0.74, 0.62], [0.82, 0.85, 0.89], [0.88, 0.82, 0.68]];
     // Mái sẫm hơn (audit vệ tinh R2): thật đỏ-gạch SÂU + nâu đất, không hồng nhạt. Đỏ chủ đạo + 1 nâu + 1 tôn xám.
-    const roofTones = [[0.52, 0.20, 0.14], [0.60, 0.29, 0.18], [0.46, 0.25, 0.16], [0.50, 0.52, 0.55], [0.42, 0.17, 0.13], [0.34, 0.42, 0.47]]; // ngói đỏ sẫm/nâu + tôn xám + tôn XANH-lam (HP thật)
+    const roofTones = [[0.52, 0.20, 0.14], [0.60, 0.29, 0.18], [0.46, 0.25, 0.16], [0.50, 0.52, 0.55], [0.42, 0.17, 0.13]]; // ngói đỏ sẫm/nâu + tôn xám (blue-metal thử → tụt, đã revert)
     const geos = []; const lmPtsB = Object.values(LM);
     let bs = 424241; const brnd = () => { bs = (bs * 1103515245 + 12345) & 0x7fffffff; return bs / 0x7fffffff; };
     let nB = 0;
