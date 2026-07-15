@@ -315,6 +315,13 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-15 (cg)** [VỆ TINH — DIỆT "KHỐI MÁI ĐỎ ĐẶC KHỔNG LỒ" (t4/t8)]: nhà OSM footprint LỚN
+    (b.a>700m²: chợ/xưởng/cơ quan) bốc trúng ngói-đỏ `roofPalette` (3/4 màu đỏ) → đọc thành 1 mảng đỏ to
+    bất thường trên vệ tinh (thực địa chỗ đó mái TÔN/BÊ TÔNG XÁM phẳng). FIX: thêm `roofBigPalette` (xám kim
+    loại 0x9198a0..0x8f8a80), `roofC = (b.a>700?roofBigPalette:roofPalette)[hash%len]` (world.js:18138). Verify
+    aerial t4/t8: khối đỏ khổng lồ→mái xám, nhà nhỏ vẫn ngói đỏ dày. BÀI HỌC chẩn đoán vệ tinh: dùng browser
+    `scene.traverse` + bbox/pixel-sample để định danh mesh artifact; nhưng CẢNH GIÁC bbox của mesh GỘP (merged
+    bucket cây) to mà nội dung RẢI — kiểm `distinct-cell` trước khi quy tội, kẻo đổ oan (đã suýt sửa nhầm phượng).
 - **2026-07-15 (cf)** [DIỆT DỨT ĐIỂM "NƯỚC CYAN" — bug vệ tinh #1, truy nhiều vòng]: ROOT CAUSE tìm ra bằng
     lấy mẫu pixel aerial (lake=#2b96b6, R=0x2b — KHÔNG khớp waterMat 0x6b7a68 R=0x6b) → `js/daynight.js:170`
     GHI ĐÈ `world.waterMat.color.setHex(0x2b9fd4)` MỖI KHUNG theo chu kỳ ngày/đêm ⇒ mọi chỉnh màu ở world.js

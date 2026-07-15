@@ -18003,6 +18003,10 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     const wallPalette = [0xf5e4b8, 0xf0cfa0, 0xdfe8dc, 0xf4b8a0, 0xcfe0ee, 0xf7efc9, 0xe8d0b0, 0xd8c8a8]
       .map((c) => new THREE.Color(c));
     const roofPalette = [0xc24a30, 0x96603c, 0xa84036, 0x8a8f96].map((c) => new THREE.Color(c));
+    // Mái nhà LỚN (chợ/xưởng/cơ quan, footprint >700m²): thực tế là mái TÔN/BÊ TÔNG XÁM phẳng,
+    // KHÔNG ngói đỏ. Fix "khối mái đỏ đặc khổng lồ" trên vệ tinh (t4/t8): footprint lớn bốc trúng
+    // ngói đỏ palette → đọc thành 1 mảng đỏ to bất thường (thực địa chỗ đó là nhà nhỏ dày HOẶC mái tôn xám).
+    const roofBigPalette = [0x9198a0, 0x828890, 0xa6aab0, 0x8f8a80].map((c) => new THREE.Color(c));
     // dải biển hiệu màu trên mép tầng trệt (pano_009: nhà OSM từng là hộp nhạt TRỐNG TRƠN
     // trong khi thật là shophouse kín biển) — cùng bảng màu với shophouse_infill
     const signPalette = [0xc62828, 0x1c56a0, 0x1f7a3c, 0xd8862a, 0x26262c, 0x8e2f80].map((c) => new THREE.Color(c));
@@ -18135,7 +18139,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
         const cnt = posA.count;
         const cols = new Float32Array(cnt * 3);
         const wall = wallPalette[hash % wallPalette.length];
-        const roofC = roofPalette[hash % roofPalette.length];
+        const roofC = (b.a > 700 ? roofBigPalette : roofPalette)[hash % roofPalette.length];
         const glassy = h > 30; // CHỈ cao ốc thật (~9+ tầng) mới tông kính; shophouse 3-6 tầng giữ tường sơn màu
         for (let i = 0; i < cnt; i++) {
           const isRoof = nrm.getY(i) > 0.6;
