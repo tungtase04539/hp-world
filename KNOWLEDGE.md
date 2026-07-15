@@ -315,6 +315,13 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-15 (cf)** [DIỆT DỨT ĐIỂM "NƯỚC CYAN" — bug vệ tinh #1, truy nhiều vòng]: ROOT CAUSE tìm ra bằng
+    lấy mẫu pixel aerial (lake=#2b96b6, R=0x2b — KHÔNG khớp waterMat 0x6b7a68 R=0x6b) → `js/daynight.js:170`
+    GHI ĐÈ `world.waterMat.color.setHex(0x2b9fd4)` MỖI KHUNG theo chu kỳ ngày/đêm ⇒ mọi chỉnh màu ở world.js
+    (waterMat) bị vô hiệu. FIX: đổi ngày `0x6b7a68` (xám-lục đục phù sa) lerp đêm `0x141d1a`. Verify: lake
+    pixel #2b96b6→#647769, khớp Tam Bạc thật (real_1: xám-lục đục, KHÔNG cyan). BÀI HỌC KIM CHỈ NAM: khi
+    một màu "không chịu đổi" dù đã sửa nơi khởi tạo material → GREP toàn `js/` tìm nơi GÁN LẠI `.color/.setHex`
+    per-frame (daynight/animate); lấy MẪU PIXEL để so hex đúng thủ phạm thay vì đoán.
 - **2026-07-15 (ce)** [MỤC TIÊU 8 + NÂNG CẤP RENDER (user gỡ ràng buộc low-poly)]: hội ý ChatGPT — PANO→8
     ROI: #1 bố cục/setback, #2 hình học/silhouette (mái/awning/ban công), #3 vật liệu/ánh sáng. Lỗi hiển thị
     (nhà/vỉa hè tràn đường, sai hướng/setback) phát hiện bằng topology 2D (footprint∩lòng-đường, facade-edge
