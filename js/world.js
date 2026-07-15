@@ -777,9 +777,13 @@ export function buildWorld(scene) {
           const my = (h1 + h2) / 2 + 0.02;
           const len = segLen / nCh;
           const rotX = Math.atan2(h1 - h2, len);
-          pushBox(ballastGeos, 3, 0.16, len + 0.8, mx, my, mz, rotY, rotX);
+          // SÂN GA Hải Phòng: dải ballast RỘNG nhiều ray song song (real_3 = dải xám rộng, không phải nét mảnh)
+          const yard = Math.hypot(mx - LM.station[0], mz - LM.station[1]) < 230;
+          const bw = yard ? 42 : 3;
+          pushBox(ballastGeos, bw, 0.16, len + 0.8, mx, my, mz, rotY, rotX);
           const px2 = Math.cos(rotY), pz2 = -Math.sin(rotY);
-          for (const off of [-0.5, 0.5]) {   // khổ ray 1000mm thật
+          const offs = yard ? [-18, -14, -10, -6, -2, 2, 6, 10, 14, 18] : [-0.5, 0.5];   // yard: ~10 ray song song
+          for (const off of offs) {   // khổ ray 1000mm thật (ngoài yard)
             pushBox(railGeos, 0.17, 0.14, len + 0.8, mx + off * px2, my + 0.15, mz + off * pz2, rotY, rotX);
           }
         }
