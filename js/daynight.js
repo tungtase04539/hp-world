@@ -169,7 +169,7 @@ export function createDayNight(scene, world) {
       // (BÀI HỌC: vòng này GHI ĐÈ waterMat.color mỗi khung → mọi chỉnh màu ở world.js vô hiệu;
       //  đây là nguồn thật của "nước cyan" trên vệ tinh. Đổi ngày=lục-xám đục, đêm=tối đục.)
       if (world.waterMat) {
-        world.waterMat.color.setHex(0x6b7a68).lerp(new THREE.Color(0x141d1a), glow);
+        world.waterMat.color.setHex(0x4d616c).lerp(new THREE.Color(0x101c24), glow);
       }
       return s;
     },

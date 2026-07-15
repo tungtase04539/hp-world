@@ -315,6 +315,17 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-15 (ci)** ⚠️ [LỖI ĐO LƯỜNG NGHIÊM TRỌNG — baseline vệ tinh "5.96" là ẢO]: phát hiện
+    `rescore_both.sh` phiên trước chụp 8 aerial bằng **toạ độ LƯỚI tùy ý** `game_2=(-150,250),
+    game_3=(399,250), game_6=(399,-250), game_7=(-350,-700)...` — KHÔNG georef theo lat/lon tâm của
+    `real_N` (README §audit/satellite). ⇒ scorer so game-khu-A với real-khu-B (KHÁC khu) → điểm 5.64–5.96
+    LÀ VÔ NGHĨA (may khớp lờ mờ vì đâu cũng "phố đỏ dày"). Toạ độ ĐÚNG (georef từ lat/lon qua CÙNG công thức
+    đặt pano, verify khớp readout GE của ảnh): xem `tools/pano_loop/tiles8_georef.json`. Chấm ĐÚNG khu →
+    **baseline THẬT ~3.6/10** (t1 6.8, t2 3.3, t3 2.4, t4 3.2, t5 4.9, t6 2.2, t7 2.3, t8 4.0). Fix nước/mái/
+    mật độ KHÔNG gây "regression" — chỉ là lần đầu đo ĐÚNG. Nước màu (cyan/lục/lam-slate) tác động điểm NHỎ
+    (~±0.1) khi so đúng khu; giữ lam-slate `0x4d616c` (thực tế). BÀI HỌC XƯƠNG MÁU: **mọi tile QA phải georef
+    tâm ảnh thật; kiểm chéo toạ độ chụp trước khi tin điểm số.** Lỗi thật lộ ra: game có NƯỚC ở khu real KHÔNG
+    có nước (Tam Bạc arc tràn sang t6), mật độ/đường lệch — đó là việc cần làm để lên 8 THẬT.
 - **2026-07-15 (ch)** [VỆ TINH — MẬT ĐỘ RÌA TÂY/BẮC (t4/t7)]: block_infill lưới `gx≥-1100, gz≥-900` → rìa
     tây (x<-1100, t4) + bắc (z<-900, bán đảo Sở GTVT/Bạch Đằng t7) TRỐNG dù real dày nhà. Đo `block_infill`
     ~297k tri ≈ 12.7k nhà < CAPB 15000 ⇒ CHƯA bão hòa → mở biên KHÔNG cướp lõi. FIX: `gx -1750..900`,
