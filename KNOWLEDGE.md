@@ -315,6 +315,16 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-16 (cp)** [CHIẾN DỊCH QA + PERF — ChatGPT + 3 agent, fix bug + mượt hơn, 0 giảm quality]: agent-audit xác nhận
+    code **phòng thủ rất tốt** (0 crash/NaN nghiêm trọng, 0 floating solid, 0 JS error). Fix: **logic** (daynight hoist
+    `_NIGHT_WATER` tránh GC mỗi khung; main.js clamp `teleport` vào WORLD_BOUNDS; traffic.js guard `samplePath` len<1e-6);
+    **image** (tường rêu 309 clamp chân ≥ mặt nước — R3 canal ngập); `mat()` cache cả opts-material. **PERF (đòn bẩy
+    lớn — agent phát hiện):** `buildings`/`block_infill` trước là **1 mesh phủ CẢ thành phố** → bounding sphere chứa
+    camera → KHÔNG BAO GIỜ frustum/shadow cull → 6M vertex mỗi khung + shadow rasterize lại tất cả. FIX **tile hóa 350m**
+    (Lô A, như TREE_TILE) + **skip castShadow mesh phẳng** (Lô B) + **autoQuality đa-bước liên tục** (Lô C). VALIDATE
+    (fps_probe headless): nhìn RA rìa → draw calls **2944→416**, tris **6.55M→2.9M**, FPS **~4×** (frustum cull giờ có
+    tác dụng). Visual IDENTICAL (pano_225 + game_3), 0 JS error. Công cụ QA: `scratchpad/qa_scan.mjs` (perf+display),
+    `diag_win.mjs`, `fps_probe.mjs`. Đòn bẩy còn (chưa làm): tile roads/sidewalks, gate updaters xa, DPR cap.
 - **2026-07-16 (co)** [END-STATE VÒNG ĐÊM + PHÂN TÍCH TRẦN]: sau khi vét cạn lô an toàn: **VỆ TINH median ~3.8**
     (baseline 3.64; road ribbon + rail yard + ga + density + gardens giúp per-tile: t1 6.8→6.9, t6 2.2→3.0, t3
     2.4→3.0, t7 2.3→4.2), **PANO 4.18** (baseline 4.16, keep-clear/terrain KHÔNG regression). Blue-metal roof
