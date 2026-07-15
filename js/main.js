@@ -328,20 +328,20 @@ let time = 0, clockUITimer = 0, minimapTimer = 1, interactTimer = 1, shadowTimer
 // bóng đổ render theo nhịp riêng (xem cuối animate) — tắt autoUpdate mỗi khung
 if (renderer.shadowMap.enabled) renderer.shadowMap.autoUpdate = false;
 let started = false;
-// tự hạ chất lượng trên máy yếu: đo FPS 5 giây đầu, dưới 26 thì tắt bóng đổ + bloom
-let fpsFrames = 0, fpsStart = 0, qualityChecked = false;
+// AUTO-QUALITY ĐA-BƯỚC + LIÊN TỤC (Lô C): máy MẠNH giữ FULL quality (bước 0); máy yếu hạ DẦN theo tải BỀN
+// (đo FPS mỗi 4s). Bước 1: tắt bloom + pixelRatio 1.5. Bước 2: tắt bóng đổ + pixelRatio 1. Không hồi (chống dao động).
+let fpsFrames = 0, fpsStart = 0, _qStep = 0;
+const _DPR = Math.min(window.devicePixelRatio || 1, 2);
 function autoQuality() {
-  if (qualityChecked) return;
   if (!fpsStart) { fpsStart = time; fpsFrames = 0; }
   fpsFrames++;
-  if (time - fpsStart > 5) {
-    qualityChecked = true;
+  if (time - fpsStart > 4) {
     const fps = fpsFrames / (time - fpsStart);
-    if (fps < 26) {
-      dayNight.sun.castShadow = false;
-      renderer.shadowMap.autoUpdate = false;
-      if (bloomPass) bloomPass.enabled = false;
-      renderer.setPixelRatio(1);
+    fpsStart = time; fpsFrames = 0;
+    if (fps < 24 && _qStep < 2) {
+      _qStep++;
+      if (_qStep === 1) { if (bloomPass) bloomPass.enabled = false; renderer.setPixelRatio(Math.min(_DPR, 1.5)); }
+      else { dayNight.sun.castShadow = false; renderer.shadowMap.autoUpdate = false; renderer.setPixelRatio(1); }
     }
   }
 }
