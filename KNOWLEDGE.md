@@ -315,6 +315,17 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-16 (cn)** [VÒNG ĐÊM — hội ý ChatGPT kế hoạch 7 lô + kiến trúc AERIAL-ONLY OVERLAY]: KEY architecture:
+    render "dải rộng" (đường/rail/nước) trên **Three.js layer 2** — `__hp.aerial` bật `camera.layers.enable(2)`;
+    mesh overlay `layers.set(2)` ⇒ CHỈ hiện top-down vệ tinh, camera pano (layer 0) KHÔNG thấy → không nuốt vỉa hè.
+    ĐÃ LÀM: (Lô1) **road ribbons** aerial-only rộng p20/s15/t11/r7+region18 (world.js sau mesh 'roads') — verify
+    pano_225 KHÔNG đổi; (rail) **sân ga ballast rộng 42m + 10 ray** quanh LM.station; (ga source-fix) station
+    lat→20.8585 + nearGa 700. Checkpoint aerial: baseline median 3.64 → **3.74** (t7 2.3→4.2, t6 2.2→3.0, t3
+    2.4→3.0; nhiễu ±0.4 nuốt aggregate nhưng per-tile thắng rõ). TEST: `scratchpad/diag_win.mjs` (JS err +
+    __hp.diag entity) — bắt được hồ t3 chìm entity ga (đã fix, dời hồ SE), boat0 z=-883 là lỗi pre-existing biết
+    trước. Lô còn lại ChatGPT: ENGULF-551 (detector point-in-footprint+rays, RR-vừa), water ribbons, facade pano
+    (PANO_DETAIL layer 3), gardens/anchors, calibration. Quy tắc đêm: 1 lô=1 commit xanh, gate pano-diff≤0.1% +
+    diag 0-error, revert khi đỏ. Scorer nhiễu → dựa VISUAL + geometry, chấm median-3 thưa (đừng đốt endpoint).
 - **2026-07-15 (cm)** ⭐ [GỠ CHẶN LỚN — regenerate mapdata.js CHẠY ĐƯỢC trên Windows]: trước tưởng không regen
     được (thiếu `osm_*.json` + path Linux). GIẢI: chạy `bash tools/fetch_osm.sh` TỰ TẢI lại 12 file OSM từ
     **Overpass public** (overpass-api.de hay 406/dispatcher-busy → RETRY mirror `overpass.kumi.systems`; queries
