@@ -794,6 +794,35 @@ export function buildWorld(scene) {
   }
 
   addMerged(asphaltGeos, mat(0x4c5158), 'roads');
+  // AERIAL RIBBONS (Lô 1 — layer 2 CHỈ hiện top-down): dải đường RỘNG cho silhouette vệ tinh khớp real
+  // (đại lộ real rộng ~gấp rưỡi base); pano vẫn dùng base road (không nuốt vỉa hè). Draped +0.13m.
+  {
+    const RIBBON_W = { p: 20, s: 15, t: 11, r: 7 };
+    const geos = [];
+    for (const r of ROADS_DT) {
+      const rw = RIBBON_W[r.c]; if (!rw) continue;   // 'w' foot bỏ
+      for (let i = 0; i < r.pts.length - 1; i++) {
+        const [x1, z1] = r.pts[i], [x2, z2] = r.pts[i + 1];
+        const segLen = Math.hypot(x2 - x1, z2 - z1); if (segLen < 1) continue;
+        const rotY = Math.atan2(x2 - x1, z2 - z1);
+        const mx = (x1 + x2) / 2, mz = (z1 + z2) / 2;
+        const my = Math.max(groundHeightNoDeck(mx, mz), LAND_H) + 0.13;
+        pushBox(geos, rw, 0.05, segLen + rw, mx, my, mz, rotY, 0);   // overlap +rw ở nút giao
+      }
+    }
+    for (const r of ROADS_REGION) {   // trục vùng rộng
+      for (let i = 0; i < r.pts.length - 1; i++) {
+        const [x1, z1] = r.pts[i], [x2, z2] = r.pts[i + 1];
+        const segLen = Math.hypot(x2 - x1, z2 - z1); if (segLen < 1) continue;
+        const rotY = Math.atan2(x2 - x1, z2 - z1);
+        const mx = (x1 + x2) / 2, mz = (z1 + z2) / 2;
+        if (Math.abs(groundHeightNoDeck(mx, mz) - LAND_H) > 0.5) continue;   // chỉ đoạn trên đất phẳng trung tâm
+        const my = LAND_H + 0.13;
+        pushBox(geos, 18, 0.05, segLen + 18, mx, my, mz, rotY, 0);
+      }
+    }
+    if (geos.length) { const m = new THREE.Mesh(mergeGeometries(geos), mat(0x53585f)); geos.forEach((g) => g.dispose()); m.layers.set(2); m.name = 'aerial_road_ribbon'; scene.add(m); }
+  }
   // VỈA HÈ ĐA DẠNG theo từng nơi (phân loại từ pano Street View — R1a): mặc định xám bê tông,
   // ca-rô đỏ-xám ở bờ sông Tam Bạc/quảng trường, terracotta/con sâu ở vài đoạn. UV đã bake thẳng
   // theo hướng đoạn đường ở layRoad → gộp thẳng theo từng KIỂU, mỗi kiểu một material riêng.

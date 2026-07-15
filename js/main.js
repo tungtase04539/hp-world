@@ -535,6 +535,7 @@ window.__hp = {
     c.position.set(cx, alt, cz);
     c.up.set(0, 0, -1);
     c.lookAt(cx, 0, cz);
+    c.layers.enable(2);   // AERIAL-ONLY overlay (dải đường/nước rộng): layer 2 CHỈ hiện top-down, pano không thấy
     c.updateProjectionMatrix();
     this._aerialCam = c;
     return { cx, cz, half };
