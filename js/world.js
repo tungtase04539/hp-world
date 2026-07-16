@@ -762,7 +762,7 @@ export function buildWorld(scene) {
     scene.add(mesh);
   }
   // PERF (Lô A mở rộng): gộp theo LƯỚI 350m thay 1 mesh phủ cả thành phố → frustum-cull được (đường/vỉa hè).
-  function addMergedTiled(geos, material, name, tile = 350) {
+  function addMergedTiled(geos, material, name, tile = 450) {
     if (!geos.length) return;
     const buckets = new Map();
     for (const g of geos) {
@@ -18288,7 +18288,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     if (bldGeos.length) {
       // PERF (Lô A): TILE hóa lưới 350m thay 1 mesh phủ cả thành phố → frustum + shadow cull được
       // (bounding sphere 1-mesh chứa camera nên KHÔNG BAO GIỜ cull; 6M vertex qua shader mỗi khung + shadow).
-      const TILE = 350, buckets = new Map(), bldMat = new THREE.MeshLambertMaterial({ vertexColors: true });
+      const TILE = 450, buckets = new Map(), bldMat = new THREE.MeshLambertMaterial({ vertexColors: true });
       for (const g of bldGeos) {
         g.computeBoundingBox(); const bb = g.boundingBox;
         const k = Math.floor((bb.min.x + bb.max.x) / 2 / TILE) + ',' + Math.floor((bb.min.z + bb.max.z) / 2 / TILE);
@@ -18915,7 +18915,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     }
     if (geos.length) {
       // PERF (Lô A): TILE 350m thay 1 mesh (tới 20000 hộp phủ cả thành phố → cull được main + shadow)
-      const TILE = 350, buckets = new Map(), biMat = new THREE.MeshLambertMaterial({ vertexColors: true });
+      const TILE = 450, buckets = new Map(), biMat = new THREE.MeshLambertMaterial({ vertexColors: true });
       for (const g of geos) {
         g.computeBoundingBox(); const bb = g.boundingBox;
         const k = Math.floor((bb.min.x + bb.max.x) / 2 / TILE) + ',' + Math.floor((bb.min.z + bb.max.z) / 2 / TILE);
