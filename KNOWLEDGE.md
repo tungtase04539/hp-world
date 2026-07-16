@@ -315,6 +315,13 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-16 (cq)** [BẢN QUYỀN + KIỂM ENGULF]: (1) **Engulf pano là false-positive**: detector vertex-proximity <1.4m
+    gắn cờ 43 cam, nhưng chụp 16 cam tệ nhất (14 gần-tường + 2 "trong lòng nhà" 498/351) → TẤT CẢ là cảnh phố/quảng
+    trường MỞ, có tường nhà ở sát (đúng street-view phố dày thật). KHÔNG có defect để fix → lớp pano ~4.18 gần TRẦN thật
+    của phong cách low-poly, KHÔNG có đòn bẩy "diệt engulf" rẻ. (2) **Brand sót**: `js/shopsigns.js` sinh từ OSM name-tag
+    qua `debrand()`/BRAND_MAP; rà pano thấy 8 nhãn hiệu lọt: BRG, CP (Pork), Similac, Bose/JBL/Denon, VAB (VietABank),
+    Bia Hà Nội (Habeco), Cooler City, Bamboo Airways → thêm vào BRAND_MAP, regenerate → 0 sót.
+    **Bài học**: SAU mọi lần sinh biển từ tên-thật OSM, PHẢI re-scan pool bằng list brand rộng (map không bao giờ đủ ngay).
 - **2026-07-16 (cp)** [CHIẾN DỊCH QA + PERF — ChatGPT + 3 agent, fix bug + mượt hơn, 0 giảm quality]: agent-audit xác nhận
     code **phòng thủ rất tốt** (0 crash/NaN nghiêm trọng, 0 floating solid, 0 JS error). Fix: **logic** (daynight hoist
     `_NIGHT_WATER` tránh GC mỗi khung; main.js clamp `teleport` vào WORLD_BOUNDS; traffic.js guard `samplePath` len<1e-6);
