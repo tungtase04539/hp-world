@@ -64,6 +64,15 @@ const BRAND_MAP = [
   [/\b(FPT ?RETAIL|FPT ?SHOP|VIETTEL ?STORE|THẾ GIỚI DI ĐỘNG|CELLPHONES)\b.*/i, 'ĐIỆN THOẠI'],
   [/\bJ&T ?EXPRESS\b.*/i, 'CHUYỂN PHÁT NHANH'],
   [/\b(HIDOO|GENCE)\b.*/i, 'CỬA HÀNG'],
+  // === bổ sung (rà soát pano thực tế 2026-07) ===
+  [/\bBRG\b.*/i, 'SIÊU THỊ'],                              // BRG Group (BRG Shopping...)
+  [/\bCP ?(PORK|FRESH)\b.*/i, 'CỬA HÀNG THỊT'],            // C.P. Vietnam (CP Pork Shop)
+  [/\bSIMILAC\b.*/i, 'MẸ & BÉ'],                            // sữa Similac (Abbott)
+  [/\b(BOSE|JBL|DENON|MARSHALL|HARMAN ?KARDON)\b.*/i, 'THIẾT BỊ ÂM THANH'],
+  [/\bVAB\b.*/i, 'NGÂN HÀNG'],                              // VietABank (viết tắt VAB)
+  [/\bBIA HÀ.*/i, 'BIA HƠI'],                               // Habeco "Bia Hà Nội"
+  [/\bCOOLER ?CITY\b.*/i, 'TRÀ SỮA'],                      // chuỗi trà sữa Cooler City
+  [/\bBAMBOO\b/i, ''],                                      // Bamboo Airways -> strip, giữ "VÉ MÁY BAY"
 ];
 
 function debrand(raw) {
