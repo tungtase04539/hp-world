@@ -19201,43 +19201,8 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     });
   }
 
-  // ---------- LANDMARK PHOTOREAL (Meshy photo→3D từ ảnh Google — KNOWLEDGE §10 cs/ct) ----------
-  //   toạ độ game từ geocode OSM Nominatim (gốc = Nhà hát lớn). rot chỉnh sau khi soi trong game.
-  function placePhoto({ url, name, x, z, size, rot = 0, sink = 0.5, plinthC = 0xcfc5ac }) {
-    registerModel({
-      url, name, x, z, radius: 520, preload: false,
-      place: (m) => {
-        m.updateMatrixWorld(true);
-        let box = new THREE.Box3().setFromObject(m);
-        const sz = box.getSize(new THREE.Vector3());
-        m.scale.setScalar(size / Math.max(sz.x, sz.z));
-        m.rotation.y = rot;
-        m.updateMatrixWorld(true);
-        box.setFromObject(m);
-        const c = box.getCenter(new THREE.Vector3());
-        m.position.x += x - c.x;
-        m.position.z += z - c.z;
-        m.position.y += LAND_H - box.min.y - sink;
-        m.traverse((o) => {
-          if (o.isMesh) {
-            o.castShadow = true; o.receiveShadow = true;
-            const mt = o.material;
-            if (mt) {
-              for (const k of ['map', 'normalMap', 'roughnessMap', 'metalnessMap']) if (mt[k]) mt[k].anisotropy = 8;
-              mt.envMapIntensity = 0.85;
-            }
-          }
-        });
-        scene.add(m);
-        box.setFromObject(m);
-        const fw = (box.max.x - box.min.x) + 2.5, fd = (box.max.z - box.min.z) + 2.5;
-        const plinth = new THREE.Mesh(new THREE.BoxGeometry(fw, 0.8, fd), mat(plinthC));
-        plinth.position.set(x, LAND_H + 0.1, z); plinth.receiveShadow = true; scene.add(plinth);
-      },
-    });
-    addCollider(x, z, Math.max(6, size * 0.4));
-  }
-  // ===== LANDMARK DỰNG BẰNG CODE (procedural theo ảnh thật — sạch, hợp art-style, thay Meshy) =====
+  // ===== LANDMARK DỰNG BẰNG CODE (procedural theo ảnh thật — sạch, hợp art-style, thay Meshy;
+  //       hướng Meshy photo→3D đã bỏ: model noisy/lưng méo — xem KNOWLEDGE §10 ct/cu) =====
   // UBND TP / Hôtel de Ville (18 Hoàng Diệu) — colonial Pháp: thân vàng, mái mansard xám +
   // dormer vòm, đầu hồi giữa có ĐỒNG HỒ, phào trắng, cửa xanh lục sẫm.
   function buildUBND(x, z, rot) {
@@ -19434,7 +19399,9 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     scene.add(grp);
     addCollider(x, z, Math.max(W, D) * 0.42);
   }
-  buildTrienLam(-293, 175, Math.PI);   // mặt tiền quay BẮC ra Nguyễn Đức Cảnh/hồ Tam Bạc (soi ảnh chỉnh sau)
+  // đặt GIỮA 2 dãy phố chéo (probe scene: dãy z~150 bắc + z~177 nam), xoay theo trục phố (~0.23 rad),
+  // mặt tiền quay BẮC ra Nguyễn Đức Cảnh/hồ Tam Bạc
+  buildTrienLam(-293, 164, Math.PI + 0.23);
 
   // ---------- NHÀ HÁT LỚN: GLB chất lượng gốc, đặt & xoay đúng footprint OSM ----------
   const thOpera = orientLong(LM_DIR.opera, LM_FACE.opera);

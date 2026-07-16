@@ -315,6 +315,20 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-17 (cu)** [PIVOT: LANDMARK DỰNG BẰNG CODE — bỏ hướng Meshy]: chủ dự án chốt "Meshy ra model xấu
+    (noisy, lưng méo) vì ảnh thực tế không đủ nét — TỰ XÂY bằng code". GIỮ 4 GLB đã duyệt: **Lê Chân, Nhà hát
+    lớn, Đền Nghè, đền Tam Bạc (dentamky)**; còn lại procedural theo ảnh thật (extension đã có ~450 ảnh tham
+    chiếu). ĐÃ DỰNG LẠI + verify in-game (0 JS error): **Việt Tiệp** (lưới bê tông + huy hiệu vàng + kính/cột),
+    **UBND** (mansard + dormer + ĐỒNG HỒ + phào/quoin, tại đúng LM.ubnd + orientLong — thay bản mái đỏ/portico
+    sai kiểu), **Nhà Kèn** (2 TẦNG MÁI: ngói cam + tum thông gió + chóp — bản cũ 1 mái nón sai), **Rạp Tháng
+    Tám** (art-deco: tháp bậc thang + THÁNG 8 đỏ + băng poster + marquee), **Chợ Sắt** (băng cửa NGANG ribbon
+    + KHUNG THÉP biển trên nóc), **Triển lãm MỚI** (1 Nguyễn Đức Cảnh geocode → (-293,175); colonial + cờ đỏ).
+    **Kỹ thuật**: canvas facade qua makeTex + multi-material BoxGeometry ([+x,-x,+y,-y,+z(facade),-z]);
+    mansard = CylinderGeometry(top,bot,h,4) bake rotateY(π/4) rồi scale (W/2)·√2; bát giác = Cylinder 8 seg.
+    **BẪY đã sửa**: (1) Object.assign(mesh,{position}) crash — position READ-ONLY, sập cả world; (2) mat()
+    cache key nuốt {map} thành '[object Object]' → 2 texture dùng chung material → material có map PHẢI tạo
+    explicit; (3) __hp.teleport(x,z,yaw,pitch,dist) là ORBIT quanh TARGET (x,z) — muốn chụp nhà thì target
+    ngay toạ độ nhà, đừng đặt "vị trí đứng". placePhoto (Meshy loader) đã xoá — dead code.
 - **2026-07-16 (ct)** [SẢN XUẤT MODEL PHOTOREAL — pipeline THÔNG end-to-end]: Chạy thật Meshy (key qua chat,
     balance 2530) → **3 model đẹp**: `ubnd_hotel_de_ville.glb` (10.4MB), `viettiep.glb` (6.8MB),
     `trienlam.glb` (9.4MB) — đều đã meshopt (raw→out, chỉ nén hình học). **CALIBRATION quan trọng**:
