@@ -315,6 +315,17 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-16 (cr)** [PHOTOREAL LANDMARK — prep ảnh + Meshy pipeline]: 18 GLB landmark đã có; các landmark
+    MỚI (Chợ Sắt, Cung Việt Tiệp, Nhà Kèn, Rạp Tháng Tám, Triển lãm) **KHÔNG có ảnh mặt tiền sạch** trên
+    Wikimedia LẪN web search (Brave): Chợ Sắt đã phá 2022 (chỉ còn công trường/flycam), Nhà Kèn chỉ ảnh sự
+    kiện 500px, Việt Tiệp chỉ ảnh báo nghiêng, nhiều query nhầm sang HN/HCM. **Chỉ UBND (Hôtel de Ville)**
+    có ảnh dùng được (bưu thiếp Wikimedia **Public Domain**). Đã prep: crop tách 2 cánh, xoá cột cờ/cây/chữ/
+    tem, tô màu split-tone (mái xám đá, tường kem) — **ChatGPT gpt-5.6 đồng duyệt 5 vòng**. Bộ công cụ ở
+    `tools/meshy_input/` (README + meshy_submit.py + prep + spec chụp cho ảnh tự chụp). **Tham số Meshy chốt
+    cho low-poly game**: `target_polycount 20000, enable_pbr false, should_remesh true, should_texture true`
+    (KHÁC mặc định 300k/PBR ở §5.3 — game low-poly nhẹ hơn). **Bài học**: landmark ít tư liệu → cần ảnh
+    CHÍNH CHỦ chụp (spec `CAPTURE_SPEC.md`); web search cũng không cứu được. Key (Meshy/Brave) đưa qua chat,
+    dùng trong phiên, lưu scratchpad NGOÀI repo — không commit. [[no-brand-names]] vẫn áp dụng cho biển trên model.
 - **2026-07-16 (cq)** [BẢN QUYỀN + KIỂM ENGULF]: (1) **Engulf pano là false-positive**: detector vertex-proximity <1.4m
     gắn cờ 43 cam, nhưng chụp 16 cam tệ nhất (14 gần-tường + 2 "trong lòng nhà" 498/351) → TẤT CẢ là cảnh phố/quảng
     trường MỞ, có tường nhà ở sát (đúng street-view phố dày thật). KHÔNG có defect để fix → lớp pano ~4.18 gần TRẦN thật
