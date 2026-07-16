@@ -761,6 +761,21 @@ export function buildWorld(scene) {
     mesh.receiveShadow = true;
     scene.add(mesh);
   }
+  // PERF (Lô A mở rộng): gộp theo LƯỚI 350m thay 1 mesh phủ cả thành phố → frustum-cull được (đường/vỉa hè).
+  function addMergedTiled(geos, material, name, tile = 350) {
+    if (!geos.length) return;
+    const buckets = new Map();
+    for (const g of geos) {
+      g.computeBoundingBox(); const bb = g.boundingBox;
+      const k = Math.floor((bb.min.x + bb.max.x) / 2 / tile) + ',' + Math.floor((bb.min.z + bb.max.z) / 2 / tile);
+      let l = buckets.get(k); if (!l) buckets.set(k, l = []); l.push(g);
+    }
+    for (const [k, list] of buckets) {
+      const mesh = new THREE.Mesh(mergeGeometries(list), material);
+      mesh.name = name + '_' + k; mesh.receiveShadow = true; scene.add(mesh);
+    }
+    geos.forEach((g) => g.dispose());
+  }
   // ---------- ĐƯỜNG SẮT THẬT (tuyến Hà Nội - Hải Phòng chạy vào ga) ----------
   {
     const ballastGeos = [], railGeos = [];
@@ -798,7 +813,7 @@ export function buildWorld(scene) {
     addMerged(railGeos, mat(0x848a92), 'rails');
   }
 
-  addMerged(asphaltGeos, mat(0x4c5158), 'roads');
+  addMergedTiled(asphaltGeos, mat(0x4c5158), 'roads');
   // AERIAL RIBBONS (Lô 1 — layer 2 CHỈ hiện top-down): dải đường RỘNG cho silhouette vệ tinh khớp real
   // (đại lộ real rộng ~gấp rưỡi base); pano vẫn dùng base road (không nuốt vỉa hè). Draped +0.13m.
   {
@@ -832,14 +847,10 @@ export function buildWorld(scene) {
   // ca-rô đỏ-xám ở bờ sông Tam Bạc/quảng trường, terracotta/con sâu ở vài đoạn. UV đã bake thẳng
   // theo hướng đoạn đường ở layRoad → gộp thẳng theo từng KIỂU, mỗi kiểu một material riêng.
   for (const [type, geos] of Object.entries(sidewalkBuckets)) {
-    if (!geos.length) continue;
-    const merged = mergeGeometries(geos);
-    geos.forEach((g) => g.dispose());
-    const mesh = new THREE.Mesh(merged, sidewalkMaterial(type));
-    mesh.name = 'sidewalk_' + type; mesh.receiveShadow = true; scene.add(mesh);
+    addMergedTiled(geos, sidewalkMaterial(type), 'sidewalk_' + type);   // tile 350m (cull); tên 'sidewalk_TYPE_kx,kz'
   }
-  addMerged(dashGeos, mat(0xe8e4d2), 'dashes');
-  addMerged(pathGeos, mat(0xc9b896), 'paths');
+  addMergedTiled(dashGeos, mat(0xe8e4d2), 'dashes');
+  addMergedTiled(pathGeos, mat(0xc9b896), 'paths');
 
   // ---------- GIÀN VÒM THÉP TRẮNG trang trí (dải công viên trung tâm, gần Trần Bình Trọng) ----------
   // Theo pano thật pano_195 [~555,-234]: dãy vòm bán nguyệt trắng lặp trên lối đi lát.

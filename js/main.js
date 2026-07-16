@@ -98,7 +98,7 @@ const traffic = createTraffic(scene, world);
 // bật đổ bóng cho mọi vật thể đặc (đất nhận bóng, nước & vật trong suốt bỏ qua)
 // PERF (Lô B): mesh PHẲNG sát đất (đường/vỉa hè/vạch/ray/ballast/ribbon) KHÔNG cast (bóng phẳng-trên-phẳng
 // vô hình) → giảm mạnh shadow pass; VẪN receiveShadow (nhận bóng nhà/cây). 0 đổi visual.
-const _noCast = /^(roads|dashes|paths|rails|railballast|aerial_road_ribbon|caro_do_xam|lake_promenade)$|^sidewalk/;
+const _noCast = /^(roads|dashes|paths|rails|railballast|aerial_road_ribbon|caro_do_xam|lake_promenade)(_|$)|^sidewalk/;
 if (renderer.shadowMap.enabled) {
   scene.traverse((o) => {
     if (!o.isMesh || o.name === 'ground' || o.name === 'water') return;
