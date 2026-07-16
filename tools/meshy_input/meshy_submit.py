@@ -39,21 +39,23 @@ payload = {
 }
 if len(uris) == 1:
     payload['image_url'] = uris[0]
+    endpoint = 'image-to-3d'
 else:
     payload['image_urls'] = uris          # multi-view: model đủ mặt
+    endpoint = 'multi-image-to-3d'        # multi-image có ENDPOINT RIÊNG
     print(f'  (multi-image: {len(uris)} góc)')
 if prompt:
     payload['texture_prompt'] = prompt
 
 print(f'[submit] {name} ...')
-res = api('POST', 'https://api.meshy.ai/openapi/v1/image-to-3d', payload)
+res = api('POST', f'https://api.meshy.ai/openapi/v1/{endpoint}', payload)
 task = res.get('result') or res.get('id')
 print('  task:', task)
 
 glb_url = None
 for i in range(80):                              # ~60 phút tối đa
     time.sleep(45)
-    st = api('GET', f'https://api.meshy.ai/openapi/v1/image-to-3d/{task}')
+    st = api('GET', f'https://api.meshy.ai/openapi/v1/{endpoint}/{task}')
     status = st.get('status'); prog = st.get('progress', 0)
     print(f'  [{i}] {status} {prog}%')
     if status == 'SUCCEEDED':
@@ -68,6 +70,6 @@ out = ROOT / 'assets' / f'{name}.glb'
 print('[download]', glb_url)
 urllib.request.urlretrieve(glb_url, raw)
 print('[meshopt]', out)
-subprocess.run(['npx', 'gltf-transform', 'meshopt', str(raw), str(out)], check=True, shell=(os.name=='nt'))
+subprocess.run(['gltf-transform', 'meshopt', str(raw), str(out)], check=True, shell=(os.name == 'nt'))
 raw.unlink(missing_ok=True)
 print('XONG ->', out, '| đặt vào game theo KNOWLEDGE §5.5')
