@@ -19238,7 +19238,59 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     addCollider(x, z, Math.max(6, size * 0.4));
   }
   placePhoto({ url: 'assets/ubnd_hotel_de_ville.glb', name: 'UBND TP (Hôtel de Ville)', x: 173, z: -825, size: 52, rot: 0 });
-  placePhoto({ url: 'assets/viettiep.glb', name: 'Cung Việt Tiệp', x: 1030, z: 1023, size: 78, rot: 0 });
+
+  // ===== LANDMARK DỰNG BẰNG CODE (procedural theo ảnh thật — sạch, hợp art-style, thay Meshy) =====
+  // Cung Văn hoá Lao động Hữu nghị Việt Tiệp (53 Lạch Tray) — khối ngang dài, lưới bê tông, huy hiệu vàng
+  function buildVietTiep(x, z, rot) {
+    const W = 78, Hh = 14, D = 20;
+    const facTex = makeTex(1024, 200, (g, w, h) => {
+      g.fillStyle = '#e9e3d3'; g.fillRect(0, 0, w, h); speckle(g, w, h, 140, 0.05);
+      g.fillStyle = '#f2eee2'; g.fillRect(0, 0, w, h * 0.09);
+      const uy = h * 0.20, uh = h * 0.34, cs = h * 0.08;              // tầng trên: lưới bê tông đặc trưng
+      for (const seg of [[0.03, 0.42], [0.58, 0.97]]) {
+        const x0 = w * seg[0], x1 = w * seg[1];
+        g.fillStyle = '#d8d2c0'; g.fillRect(x0, uy, x1 - x0, uh);
+        g.strokeStyle = '#b6ae96'; g.lineWidth = 1.5;
+        for (let px = x0; px < x1; px += cs) for (let py = uy; py < uy + uh; py += cs) {
+          g.strokeRect(px + 2, py + 2, cs - 4, cs - 4);
+          g.fillStyle = '#cdc6b1'; g.fillRect(px + cs * 0.34, py + cs * 0.34, cs * 0.32, cs * 0.32); g.fillStyle = '#d8d2c0';
+        }
+      }
+      const cx = w * 0.5, cy = h * 0.36, rr = h * 0.13;                // huy hiệu vàng
+      g.fillStyle = '#c9a13a'; g.beginPath(); g.arc(cx, cy, rr, 0, 7); g.fill();
+      g.fillStyle = '#a8862c'; g.beginPath(); g.arc(cx, cy, rr * 0.66, 0, 7); g.fill();
+      g.fillStyle = '#e2c25c'; g.beginPath(); g.arc(cx, cy, rr * 0.36, 0, 7); g.fill();
+      const gy = h * 0.60, gh = h * 0.34, nc = 22;                     // tầng trệt: kính tối + cột kem
+      g.fillStyle = '#33414c'; g.fillRect(0, gy, w, gh);
+      for (let i = 0; i <= nc; i++) { g.fillStyle = '#e4ddca'; g.fillRect(w * i / nc - w * 0.006, gy, w * 0.012, gh); }
+      g.fillStyle = 'rgba(255,255,255,0.05)'; for (let i = 0; i < nc; i++) g.fillRect(w * i / nc + 3, gy + 4, w / nc - 8, gh * 0.4);
+      g.fillStyle = '#7a2b22'; g.fillRect(w * 0.44, gy + gh * 0.12, w * 0.12, gh * 0.88);  // sảnh
+      g.fillStyle = '#8a3a2e'; g.fillRect(w * 0.455, gy + gh * 0.34, w * 0.09, gh * 0.66);
+      g.fillStyle = '#6e6a5c'; g.fillRect(0, h * 0.94, w, h * 0.06);
+    });
+    const sideTex = makeTex(256, 256, (g, w, h) => {
+      g.fillStyle = '#ddd6c4'; g.fillRect(0, 0, w, h); speckle(g, w, h, 70, 0.05);
+      g.fillStyle = '#33414c'; for (let r2 = 0; r2 < 2; r2++) for (let c = 0; c < 4; c++) g.fillRect(w * (0.12 + c * 0.2), h * (0.28 + r2 * 0.34), w * 0.12, h * 0.2);
+      g.fillStyle = '#6e6a5c'; g.fillRect(0, h * 0.94, w, h * 0.06);
+    });
+    // LƯU Ý: KHÔNG dùng mat() cho material có map — mat() cache theo key, map lồng vào key thành
+    // '[object Object]' nên 2 texture khác nhau sẽ DÙNG CHUNG material. Tạo explicit.
+    const facMat = new THREE.MeshLambertMaterial({ map: facTex });
+    const sideMat = new THREE.MeshLambertMaterial({ map: sideTex });
+    const roofMat = mat(0x4a4d50);
+    const grp = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.BoxGeometry(W, Hh, D), [sideMat, sideMat, roofMat, mat(0x555555), facMat, sideMat]);
+    body.position.y = Hh / 2; grp.add(body);
+    const para = new THREE.Mesh(new THREE.BoxGeometry(W + 0.6, 1.0, D + 0.6), mat(0xe4ddca)); para.position.y = Hh + 0.3; grp.add(para);
+    const roofSlab = new THREE.Mesh(new THREE.BoxGeometry(W - 3, 0.4, D - 3), roofMat);
+    roofSlab.position.set(0, Hh + 0.75, 0); grp.add(roofSlab);
+    const canopy = new THREE.Mesh(new THREE.BoxGeometry(W * 0.16, 0.5, 4.5), mat(0xcfc7b2)); canopy.position.set(0, 4.6, D / 2 + 1.8); grp.add(canopy);
+    grp.position.set(x, LAND_H, z); grp.rotation.y = rot;
+    grp.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+    scene.add(grp);
+    addCollider(x, z, Math.max(W, D) * 0.45);
+  }
+  buildVietTiep(1030, 1023, 0);
 
   // ---------- NHÀ HÁT LỚN: GLB chất lượng gốc, đặt & xoay đúng footprint OSM ----------
   const thOpera = orientLong(LM_DIR.opera, LM_FACE.opera);
