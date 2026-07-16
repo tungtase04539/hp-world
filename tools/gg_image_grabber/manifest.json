@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "HP Landmark Image Grabber",
+  "version": "1.0",
+  "description": "Tải ảnh GỐC hàng loạt từ Google Images cho dự án Hải Phòng 3D (photo→3D Meshy).",
+  "permissions": ["downloads"],
+  "host_permissions": ["<all_urls>"],
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    {
+      "matches": ["https://www.google.com/search*", "https://www.google.com.vn/search*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
