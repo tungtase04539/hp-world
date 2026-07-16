@@ -19201,6 +19201,45 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     });
   }
 
+  // ---------- LANDMARK PHOTOREAL (Meshy photo→3D từ ảnh Google — KNOWLEDGE §10 cs/ct) ----------
+  //   toạ độ game từ geocode OSM Nominatim (gốc = Nhà hát lớn). rot chỉnh sau khi soi trong game.
+  function placePhoto({ url, name, x, z, size, rot = 0, sink = 0.5, plinthC = 0xcfc5ac }) {
+    registerModel({
+      url, name, x, z, radius: 520, preload: false,
+      place: (m) => {
+        m.updateMatrixWorld(true);
+        let box = new THREE.Box3().setFromObject(m);
+        const sz = box.getSize(new THREE.Vector3());
+        m.scale.setScalar(size / Math.max(sz.x, sz.z));
+        m.rotation.y = rot;
+        m.updateMatrixWorld(true);
+        box.setFromObject(m);
+        const c = box.getCenter(new THREE.Vector3());
+        m.position.x += x - c.x;
+        m.position.z += z - c.z;
+        m.position.y += LAND_H - box.min.y - sink;
+        m.traverse((o) => {
+          if (o.isMesh) {
+            o.castShadow = true; o.receiveShadow = true;
+            const mt = o.material;
+            if (mt) {
+              for (const k of ['map', 'normalMap', 'roughnessMap', 'metalnessMap']) if (mt[k]) mt[k].anisotropy = 8;
+              mt.envMapIntensity = 0.85;
+            }
+          }
+        });
+        scene.add(m);
+        box.setFromObject(m);
+        const fw = (box.max.x - box.min.x) + 2.5, fd = (box.max.z - box.min.z) + 2.5;
+        const plinth = new THREE.Mesh(new THREE.BoxGeometry(fw, 0.8, fd), mat(plinthC));
+        plinth.position.set(x, LAND_H + 0.1, z); plinth.receiveShadow = true; scene.add(plinth);
+      },
+    });
+    addCollider(x, z, Math.max(6, size * 0.4));
+  }
+  placePhoto({ url: 'assets/ubnd_hotel_de_ville.glb', name: 'UBND TP (Hôtel de Ville)', x: 173, z: -825, size: 52, rot: 0 });
+  placePhoto({ url: 'assets/viettiep.glb', name: 'Cung Việt Tiệp', x: 1030, z: 1023, size: 78, rot: 0 });
+
   // ---------- NHÀ HÁT LỚN: GLB chất lượng gốc, đặt & xoay đúng footprint OSM ----------
   const thOpera = orientLong(LM_DIR.opera, LM_FACE.opera);
   {
