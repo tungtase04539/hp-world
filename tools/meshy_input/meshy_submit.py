@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
-# Gửi ảnh -> Meshy image-to-3d, poll tới SUCCEEDED, tải GLB, chạy gltf-transform meshopt.
-# Dùng: python meshy_submit.py <ảnh trong tools/meshy_input/> "<texture_prompt>"
+# Gửi ảnh -> Meshy image-to-3d (1 ảnh HOẶC multi-image 2-4 ảnh), poll, tải GLB, meshopt.
+# Dùng:  python meshy_submit.py "img1.jpg,img2.jpg,img3.jpg" "<texture_prompt>" [tên_output]
+#   - 1 ảnh  -> image_url  (mặt trước bas-relief; hông/lưng do AI đoán)
+#   - 2-4 ảnh-> image_urls (đủ mặt; PHẢI cùng công trình + CÙNG buổi/nắng, các góc bổ sung nhau)
 # KEY đọc từ env MESHY_API_KEY — KHÔNG hardcode, KHÔNG commit.
 import sys, os, time, json, base64, urllib.request, subprocess, pathlib
 
@@ -10,12 +12,17 @@ if not KEY:
 
 HERE = pathlib.Path(__file__).resolve().parent
 ROOT = HERE.parent.parent                       # hp-world/
-img = sys.argv[1]
+imgs = [s.strip() for s in sys.argv[1].split(',') if s.strip()]
 prompt = sys.argv[2] if len(sys.argv) > 2 else ''
-name = pathlib.Path(img).stem
-img_path = HERE / img
-if not img_path.exists():
-    sys.exit(f'Không thấy ảnh: {img_path}')
+name = sys.argv[3] if len(sys.argv) > 3 else pathlib.Path(imgs[0]).stem
+if not (1 <= len(imgs) <= 4):
+    sys.exit('Cần 1–4 ảnh (Meshy tối đa 4).')
+
+def data_uri(fn):
+    p = HERE / fn
+    if not p.exists():
+        sys.exit(f'Không thấy ảnh: {p}')
+    return 'data:image/jpeg;base64,' + base64.b64encode(p.read_bytes()).decode()
 
 def api(method, url, body=None):
     data = json.dumps(body).encode() if body is not None else None
@@ -24,13 +31,17 @@ def api(method, url, body=None):
     with urllib.request.urlopen(req, timeout=120) as r:
         return json.load(r)
 
-b64 = base64.b64encode(img_path.read_bytes()).decode()
+uris = [data_uri(f) for f in imgs]
 payload = {
-    'image_url': f'data:image/jpeg;base64,{b64}',
     'ai_model': 'latest', 'topology': 'triangle',
     'target_polycount': 20000, 'should_remesh': True,
     'should_texture': True, 'enable_pbr': False,
 }
+if len(uris) == 1:
+    payload['image_url'] = uris[0]
+else:
+    payload['image_urls'] = uris          # multi-view: model đủ mặt
+    print(f'  (multi-image: {len(uris)} góc)')
 if prompt:
     payload['texture_prompt'] = prompt
 

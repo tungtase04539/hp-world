@@ -1,31 +1,44 @@
-# Spec chụp ảnh landmark cho Meshy photo→3D
+# Spec chụp ảnh landmark cho Meshy photo→3D (multi-image 3–4 góc)
 
-Các công trình dưới đây **không có ảnh mặt tiền sạch trên mạng** (Wikimedia + web search đã vét).
-Cách duy nhất để có model photoreal đẹp là **bạn tự chụp** (bạn ở Hải Phòng). Chụp theo spec này
-rồi đưa vào `tools/meshy_input/` — tôi làm sạch + Meshy như đã làm với UBND.
+Mục tiêu: mỗi công trình **3–4 ảnh HIỆN ĐẠI, cùng 1 buổi**, phủ nhiều mặt → Meshy dựng model
+**đủ mọi phía** (không đoán hông/lưng). Ảnh online (Wikimedia/web) vừa **cũ** vừa **rời rạc** →
+KHÔNG ghép multi-image được (Meshy cần ảnh nhất quán). Vì vậy cần **bạn tự chụp**.
 
-## Nguyên tắc chung (rút từ KNOWLEDGE §5.1)
-1. **Góc**: chính diện mặt tiền, HOẶC 3/4 (thấy mặt trước + 1 hông) — 3/4 cho model đủ 2 mặt, tốt hơn.
-2. **Ánh sáng**: BAN NGÀY, trời sáng đều, **KHÔNG ngược sáng**, không hoàng hôn/đèn đêm.
-3. **Độ phân giải**: ≥ 1600px cạnh dài (crop xong còn ≥1200px).
-4. **KHÔNG vật cản** chồng lên dáng công trình: tránh cây, xe, người, cờ, dây điện, biển quảng cáo
-   che mặt tiền. Đứng lùi ra, chọn khung ít vật cản nhất (có thể chụp nhiều kiểu rồi chọn).
-5. **Đứng thẳng**: máy ngang tầm, hạn chế ngước lên (méo phối cảnh keystone). Lùi xa + zoom nhẹ tốt hơn.
-6. Chụp **2-3 kiểu/công trình** (chính diện + 3/4 trái + 3/4 phải) để tôi chọn/ghép.
+## ⚠️ Quy tắc VÀNG cho multi-image
+1. **Cùng 1 buổi, cùng ánh sáng** cho cả 3–4 ảnh của MỘT công trình (đừng trộn sáng/chiều/nhiều hôm).
+2. **Đi vòng quanh** chụp các góc bổ sung nhau, KHÔNG đứng yên zoom.
+3. Cùng máy, cùng phơi sáng; công trình luôn là chủ thể chính, chiếm ~70–80% khung.
+
+## 4 góc nên có (mỗi công trình)
+| # | Góc | Mục đích |
+|---|---|---|
+| 1 | **Chính diện mặt trước** | mặt tiền chuẩn (quan trọng nhất) |
+| 2 | **3/4 trái** (chếch ~40°) | thấy mặt trước + hông trái |
+| 3 | **3/4 phải** (chếch ~40°) | thấy mặt trước + hông phải |
+| 4 | **Mặt sau / hoặc từ trên cao** (nếu tới được) | khép khối, mái (bạn nhắc "từ trên xuống") |
+
+→ Tối thiểu **góc 1+2+3**; có thêm góc 4 càng toàn diện.
+
+## Kỹ thuật (rút từ KNOWLEDGE §5.1)
+- **BAN NGÀY**, trời sáng đều, **không ngược sáng / không hoàng hôn / không đèn đêm**.
+- **≥1600px** cạnh dài mỗi ảnh (crop xong ≥1200px).
+- **Không vật cản** che dáng: tránh cây/xe/người/cờ/dây/biển quảng cáo chồng lên mặt tiền — lùi ra, đợi thoáng.
+- **Máy ngang tầm mắt**, hạn chế ngước (méo keystone); lùi xa + zoom nhẹ thay vì đứng sát ngửa máy.
 
 ## Danh sách ưu tiên
-| Công trình | Vị trí | Ghi chú chụp |
+| Công trình | Vị trí | Lưu ý |
 |---|---|---|
-| **Cung VH Việt Tiệp** | 53 Lạch Tray | Khối hiện đại mặt tiền dài — chụp 3/4 để thấy chiều sâu; tránh bãi xe trước cửa. |
-| **Nhà Kèn** (bát giác) | Vườn hoa Nguyễn Du (Kim Đồng) | Nhà bát giác nhỏ — chụp chính diện 1 cạnh + thấy mái; tránh ngày có sự kiện (che chân). |
-| **Chợ Sắt** | Bờ sông Tam Bạc | Nếu TTTM mới đã xong: chụp mặt tiền; nếu chưa, tạm bỏ (nhà cũ đã phá). |
-| **Rạp/Nhà hát Tháng Tám** | Quang Trung | Mặt tiền rạp — chính diện, tránh biển hiệu phim che. |
-| **Trung tâm Triển lãm** | (nếu muốn) | BAN NGÀY (ảnh mạng chỉ có hoàng hôn + tượng AFTA che). |
+| Cung VH Việt Tiệp | 53 Lạch Tray | khối hiện đại dài — 3/4 để lộ chiều sâu; tránh bãi xe trước cửa |
+| Nhà Kèn (bát giác) | Vườn hoa Nguyễn Du | nhà bát giác — đi vòng chụp 4 cạnh; tránh ngày có sự kiện |
+| Chợ Sắt (TTTM mới) | bờ Tam Bạc | chỉ chụp khi mặt tiền mới đã hoàn thiện |
+| Rạp/Nhà hát Tháng Tám | Quang Trung | tránh poster phim che mặt tiền |
+| UBND TP | 18 Hoàng Diệu | (nếu toà Pháp cũ còn) chụp MỚI 3–4 góc để thay bưu thiếp cũ |
 
-## Sau khi có ảnh
-Đưa file vào `tools/meshy_input/` → báo tôi. Tôi: làm sạch (crop tách khối, xoá vật cản/biển brand,
-nền đồng đều) → ChatGPT đồng duyệt tới khi hết lỗi → Meshy (`meshy_submit.py`) → GLB → đặt vào game.
+## Giao ảnh → tôi lo phần còn lại
+Bỏ ảnh vào `tools/meshy_input/<tên_công_trình>/` (vd `viettiep/1.jpg 2.jpg 3.jpg`) → báo tôi.
+Tôi: làm sạch từng ảnh (crop, xoá vật cản/biển brand, nền đồng đều) → ChatGPT đồng duyệt →
+`meshy_submit.py "viettiep/1.jpg,viettiep/2.jpg,viettiep/3.jpg" "<prompt>" viettiep` → GLB → đặt vào game.
 
-## Đã xong
-- ✅ **UBND / Hôtel de Ville** — từ bưu thiếp Wikimedia (Public Domain), đã prep + ChatGPT duyệt 5 vòng.
-  File: `ubnd_hotel_de_ville.jpg`. Chờ chạy Meshy (cần key).
+## Đã làm mẫu
+- **UBND** (`ubnd_hotel_de_ville.jpg`) — từ **1 bưu thiếp Public Domain (cũ, 1 góc)** → chỉ đủ single-image
+  (bas-relief). Nếu bạn chụp mới 3–4 góc toà UBND hiện tại, tôi thay bằng model đủ mặt.
