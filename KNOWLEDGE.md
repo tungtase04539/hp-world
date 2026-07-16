@@ -315,6 +315,19 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-16 (ct)** [SẢN XUẤT MODEL PHOTOREAL — pipeline THÔNG end-to-end]: Chạy thật Meshy (key qua chat,
+    balance 2530) → **3 model đẹp**: `ubnd_hotel_de_ville.glb` (10.4MB), `viettiep.glb` (6.8MB),
+    `trienlam.glb` (9.4MB) — đều đã meshopt (raw→out, chỉ nén hình học). **CALIBRATION quan trọng**:
+    (1) **crop ảnh mặt tiền SẠCH (bỏ tiền cảnh xe/plaza) → SINGLE-image** cho model ĐẶC, đẹp nhất —
+    hơn hẳn crop-only multi-image (bị nướng xe vào + lưng rỗng). (2) Single-image: front chuẩn, lưng/hông
+    Meshy đùn khối hợp lý → đặt quay mặt ra phố. (3) Multi-image cần ảnh phủ CẢ hướng sau + sạch, khó hơn.
+    **API**: single = `/openapi/v1/image-to-3d`; multi = `/openapi/v1/multi-image-to-3d` (ENDPOINT RIÊNG).
+    meshopt = `gltf-transform meshopt` (cài `@gltf-transform/cli` global; KHÔNG phải `npx gltf-transform`).
+    Params low-poly game: `target_polycount 20000, enable_pbr false`. Soi model: `glbview.html?m=<tên>`
+    (normalize + 4 góc) + `scratchpad/render_glb2.mjs`. Poll+tải: `scratchpad/poll_task.py <task> <ep> <name>`.
+    **CÒN**: (a) tích hợp GLB vào game (registerModel §5.5 — cần TOẠ ĐỘ game từng công trình), (b) landmark
+    khó: Chợ Sắt (cong/đã phá 2022/render — kém), Nhà Kèn (bát giác + cây che + lẫn nhiều nhà). GLB nặng →
+    nhánh assets-storage (§6). **LƯU Ý**: `| head -N` sau lệnh nền GIẾT poller (SIGPIPE) — dùng Bash run_in_background.
 - **2026-07-16 (cs)** [ĐỘT PHÁ NGUỒN ẢNH — extension Google Images]: Wikimedia + Brave API **quá yếu** cho
     landmark Hải Phòng (Brave: nhầm hoa-kèn/Việt-Xô/HCM, chặn hotlink; browser MCP che URL proxy). **Google
     Images MỚI có đủ ảnh hiện đại đa góc** — nhưng tải tự động bị chặn. Giải: **extension Edge tự viết**
