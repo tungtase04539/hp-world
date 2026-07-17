@@ -315,6 +315,13 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-17 (cx)** [TƯỜNG THẾ GIỚI + MINIMAP TÊN ĐƯỜNG/CÔNG TRÌNH]: (1) `clampToPlayArea` (main.js) —
+    tường vô hình tròn PLAY_RADIUS=BUILD_RADIUS−12 áp sau MỌI kiểu di chuyển (bộ/xe/thuyền) trong animate;
+    trượt dọc tường + toast nhắc (chống spam 5s). Verify: teleport 1700 → toast hiện, 0 lỗi. (2) Minimap v2:
+    VIEW_M 260→380 (zoom nhỏ hơn), canvas NỘI BỘ 2x + CSS 210px (chữ nét), TÊN ĐƯỜNG từ STREETS ({n,x,z,d} —
+    8 trục lớn trong bán kính) chữ xám xoay theo d + viền trắng, TÊN CÔNG TRÌNH nâu POI cạnh chấm (tx(lm.name),
+    cắt >22 ký tự). Muốn tên MỌI phố: nâng process_osm giữ name trong ROADS_DT rồi regenerate mapdata.
+    LƯU Ý test: __hp.teleport có lerp/stream chậm — script chụp phải chờ ≥5-6s sau teleport ĐẦU TIÊN.
 - **2026-07-17 (cw)** [MINIMAP KIỂU GOOGLE MAPS]: viết lại `js/minimap.js` — nền phố GG (đất #f2efe9, nước
     #a6d5fa từ heightfield lưới 6m, công viên PARKS, footprint BUILDINGS, đường 2 lớp casing/ruột: trục p/s
     VÀNG #fcd769, phố t/r TRẮNG, rail nét đứt) vẽ MỘT LẦN cho ±(BUILD_RADIUS+100) ở 0.8px/m; mỗi khung chỉ

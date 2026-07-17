@@ -5,7 +5,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { buildWorld, groundHeight, groundHeightNoDeck, landAt, WORLD_BOUNDS, LM, EXTRAS } from './world.js';
+import { buildWorld, groundHeight, groundHeightNoDeck, landAt, WORLD_BOUNDS, LM, EXTRAS, BUILD_RADIUS } from './world.js';
 import { createTraffic } from './traffic.js';
 import { makeHumanoid } from './character.js';
 import { createVehicles } from './vehicles.js';
@@ -359,6 +359,22 @@ function autoQuality() {
   }
 }
 
+// GIAI ĐOẠN TRUNG TÂM: không cho đi quá mép thế giới (ngoài BUILD_RADIUS không có gì —
+// tile/mesh đã bị cắt lúc build). Trượt dọc "tường tròn" + nhắc nhẹ (chống spam 5s).
+const PLAY_RADIUS = BUILD_RADIUS - 12;
+let _edgeToastAt = -9;
+function clampToPlayArea(pos) {
+  const r = Math.hypot(pos.x, pos.z);
+  if (r > PLAY_RADIUS) {
+    const s = PLAY_RADIUS / r;
+    pos.x *= s; pos.z *= s;
+    if (time - _edgeToastAt > 5) {
+      _edgeToastAt = time;
+      ui.toast(tx({ vi: '🚧 Hết ranh giới bản đồ giai đoạn này — quay lại trung tâm nhé!', en: '🚧 Edge of the map for this stage — head back downtown!' }));
+    }
+  }
+}
+
 function animate() {
   requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), 0.05);
@@ -377,6 +393,7 @@ function animate() {
     } else if (!pState.mounted) {
       player.animate(dt, 0, time);   // mở modal khi đang cưỡi → GIỮ tư thế ngồi (không animate lại)
     }
+    clampToPlayArea(pState.pos);     // GIAI ĐOẠN TRUNG TÂM: tường vô hình tại mép thế giới
 
     if (!modal && !cine.active) {
       // 10Hz là đủ cho prompt tương tác (trước: quét mọi ứng viên + dựng chuỗi label 60 lần/s)

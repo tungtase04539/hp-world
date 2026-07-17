@@ -1,15 +1,16 @@
 import { groundHeightNoDeck, BUILD_RADIUS } from './world.js';
-import { ROADS_DT, BUILDINGS, PARKS, RAIL } from './mapdata.js';
+import { ROADS_DT, BUILDINGS, PARKS, RAIL, STREETS } from './mapdata.js';
 import { LANDMARKS } from './landmarks.js';
 import { quests } from './quests.js';
+import { tx } from './i18n.js';
 
 // ============ MINIMAP KIỂU GOOGLE MAPS ============
 // Nền phố (đường trắng/vàng + nhà + nước + công viên) vẽ MỘT LẦN cho dải trung tâm
 // (BUILD_RADIUS), mỗi khung chỉ cắt cửa sổ quanh người chơi → "đi tới đâu hiện tới đấy".
-const W = 210, H = 165;            // kích thước canvas HUD (px)
+const W = 210, H = 165;            // kích thước canvas HUD (px CSS)
 const EXT = BUILD_RADIUS + 100;    // nền phủ ±EXT quanh Nhà hát lớn (m)
 const PPM = 0.8;                   // px trên mét của bản nền (2720px cho 3400m)
-const VIEW_M = 260;                // bề ngang thế giới hiển thị (m) — zoom kiểu đi bộ GG
+const VIEW_M = 380;                // bề ngang thế giới hiển thị (m) — zoom nhỏ hơn theo yêu cầu
 
 let base = null, ctx = null;
 
@@ -33,8 +34,11 @@ function strokeRoads(octx, roads, classes, width, color) {
 
 export function initMinimap() {
   const cnv = document.getElementById('minimap');
-  cnv.width = W; cnv.height = H;
+  // canvas nội bộ 2x + CSS giữ 210×165 → chữ tên đường/công trình NÉT (không vỡ trên màn HiDPI)
+  cnv.width = W * 2; cnv.height = H * 2;
+  cnv.style.width = W + 'px'; cnv.style.height = H + 'px';
   ctx = cnv.getContext('2d');
+  ctx.scale(2, 2);
 
   const S = Math.round(2 * EXT * PPM);
   const off = document.createElement('canvas');
@@ -100,18 +104,45 @@ export function drawMinimap(px, pz, yaw) {
   const [bx, bz] = toBase(px, pz);
   ctx.drawImage(base, bx - sw / 2, bz - sh / 2, sw, sh, 0, 0, W, H);
 
-  // chấm địa danh trong khung nhìn: cam = chưa khám phá, xanh = đã khám phá
   const sc = W / VIEW_M;
+
+  // tên ĐƯỜNG (kiểu GG): chữ xám xoay theo hướng đường, viền trắng cho dễ đọc
+  ctx.font = '7.5px system-ui, sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (const st of STREETS) {
+    const vx = (st.x - px) * sc + W / 2, vy = (st.z - pz) * sc + H / 2;
+    if (vx < 10 || vx > W - 10 || vy < 8 || vy > H - 8) continue;
+    let a = Math.atan2(st.d[1], st.d[0]);
+    if (a > Math.PI / 2) a -= Math.PI;
+    if (a < -Math.PI / 2) a += Math.PI;
+    const nm = st.n.replace(/^(Đường|Phố) /, '');
+    ctx.save();
+    ctx.translate(vx, vy); ctx.rotate(a);
+    ctx.lineWidth = 2.4; ctx.strokeStyle = 'rgba(255,255,255,.9)';
+    ctx.strokeText(nm, 0, 0);
+    ctx.fillStyle = '#8a8175';
+    ctx.fillText(nm, 0, 0);
+    ctx.restore();
+  }
+
+  // chấm + TÊN công trình: cam = chưa khám phá, xanh = đã khám phá (nâu POI kiểu GG)
   for (const lm of LANDMARKS) {
     const vx = (lm.x - px) * sc + W / 2, vy = (lm.z - pz) * sc + H / 2;
     if (vx < -6 || vx > W + 6 || vy < -6 || vy > H + 6) continue;
     ctx.beginPath();
-    ctx.arc(vx, vy, 3.2, 0, Math.PI * 2);
+    ctx.arc(vx, vy, 3, 0, Math.PI * 2);
     ctx.fillStyle = quests.discovered.has(lm.id) ? '#3fbf6f' : '#ff8c2e';
     ctx.fill();
     ctx.strokeStyle = '#fff';
-    ctx.lineWidth = 1.2;
+    ctx.lineWidth = 1.1;
     ctx.stroke();
+    let label = tx(lm.name);
+    if (label.length > 22) label = label.slice(0, 21) + '…';
+    ctx.font = 'bold 7px system-ui, sans-serif';
+    ctx.lineWidth = 2.2; ctx.strokeStyle = 'rgba(255,255,255,.9)';
+    ctx.strokeText(label, vx, vy - 7);
+    ctx.fillStyle = '#8a5a2a';
+    ctx.fillText(label, vx, vy - 7);
   }
 
   // mũi tên người chơi — LUÔN ở giữa (bản đồ trôi theo chân, bắc cố định như GG)
