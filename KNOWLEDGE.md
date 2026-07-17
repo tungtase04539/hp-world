@@ -315,6 +315,16 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-17 (cv)** [GIAI ĐOẠN TRUNG TÂM — cắt thế giới theo bán kính]: chủ dự án chốt giai đoạn này chỉ cần
+    lõi trung tâm → `BUILD_RADIUS = 1600` (world.js, export; 1600 thay 1500 để trọn cụm cảng ~1565m). 2 tầng cắt:
+    (1) `addMergedTiled` BỎ bucket ngoài bán kính lúc build (không merge/upload); (2) `freezeStatic` cắt mesh lẻ
+    hand-built xa bằng bounding-sphere THẾ GIỚI (Đồ Sơn/Cát Bà/Hòn Dấu/Cầu Bính... 564 mesh) TRƯỚC frame đầu.
+    An toàn: mesh khổng lồ phủ tâm (đất/nước) tự giữ vì sphere chạm vòng tâm; InstancedMesh giữ (sphere không gồm
+    instanceMatrix); KHÔNG dispose geometry (có thể dùng chung với mesh gần). Đo: tris tâm 6.26M→5.1M (−19%),
+    lõi + chân trời verify sạch. Mở lại full HP: tăng BUILD_RADIUS. LƯU Ý: quest/địa danh xa (Cát Bà, Đồ Sơn)
+    giai đoạn này sẽ là đất trống — chấp nhận theo chỉ đạo. CÙNG ĐỢT (main.js 97bf4d4): fix bug autoQuality
+    không hạ composer pixelRatio (bloom/MSAA vẫn full → hạ bước vô dụng — nay setPR() đổi cả hai), compileAsync
+    toàn scene sau màn chờ (hết khựng lúc Bắt đầu), powerPreference high-performance, DPR vào 1.5 ramp-up 2.
 - **2026-07-17 (cu)** [PIVOT: LANDMARK DỰNG BẰNG CODE — bỏ hướng Meshy]: chủ dự án chốt "Meshy ra model xấu
     (noisy, lưng méo) vì ảnh thực tế không đủ nét — TỰ XÂY bằng code". GIỮ 4 GLB đã duyệt: **Lê Chân, Nhà hát
     lớn, Đền Nghè, đền Tam Bạc (dentamky)**; còn lại procedural theo ảnh thật (extension đã có ~450 ảnh tham

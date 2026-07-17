@@ -51,6 +51,13 @@ function rectFactor(x, x1, x2, z, z1, z2, m) {
 // facadeMats (đều có opts → không cache) hoặc MeshBasicMaterial riêng (đèn tín hiệu). Material
 // cache chỉ đọc (color cố định), 2 mesh share vô hại (castShadow/frustumCulled không đụng material).
 const _matCache = new Map();
+// ============ GIAI ĐOẠN TRUNG TÂM ============
+// Chỉ giữ thế giới trong bán kính BUILD_RADIUS (m) quanh Nhà hát lớn (gốc 0,0):
+// tile merge ngoài bán kính bị BỎ lúc build, mesh lẻ ngoài bán kính bị CẮT ở freezeStatic.
+// Muốn mở lại full Hải Phòng (Đồ Sơn/Cát Bà/cầu Bính...): tăng số này (vd 99999).
+// 1600 (thay vì 1500 chẵn) để trọn cụm CẢNG (portAnchor ~1565m) không bị cắt nham nhở.
+export const BUILD_RADIUS = 1600;
+
 function mat(color, opts = {}) {
   // PERF: cache CẢ material có opts theo key (màu+opts) — gộp material trùng (giảm 3808→~vài trăm, ít state-change,
   // KHÔNG đổi visual). Material bị mutate per-frame (waterMat/facadeMats) tạo EXPLICIT, không qua mat() → an toàn.
@@ -771,6 +778,12 @@ export function buildWorld(scene) {
       let l = buckets.get(k); if (!l) buckets.set(k, l = []); l.push(g);
     }
     for (const [k, list] of buckets) {
+      // GIAI ĐOẠN TRUNG TÂM: bỏ hẳn tile ngoài BUILD_RADIUS (không merge, không upload GPU)
+      const [tx, tz] = k.split(',').map(Number);
+      if (Math.hypot((tx + 0.5) * tile, (tz + 0.5) * tile) - tile * 0.75 > BUILD_RADIUS) {
+        list.forEach((g) => g.dispose());
+        continue;
+      }
       const mesh = new THREE.Mesh(mergeGeometries(list), material);
       mesh.name = name + '_' + k; mesh.receiveShadow = true; scene.add(mesh);
     }
@@ -21645,6 +21658,28 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
   // TRƯỚC khi tạo NPC/xe/traffic (mấy thứ đó thêm vào sau nên vẫn matrixAutoUpdate mặc định).
   world.freezeStatic = () => {
     scene.updateMatrixWorld(true);
+    // GIAI ĐOẠN TRUNG TÂM: cắt mesh nằm HOÀN TOÀN ngoài BUILD_RADIUS (bounding sphere thế giới).
+    // Chạy TRƯỚC render đầu tiên → geometry xa không bao giờ upload GPU. Mesh khổng lồ phủ tâm
+    // (đất/nước/trời) tự được GIỮ vì sphere chạm vòng tròn tâm. InstancedMesh giữ (an toàn —
+    // boundingSphere không gồm instanceMatrix).
+    {
+      const doomed = [];
+      const _c = new THREE.Vector3();
+      scene.traverse((o) => {
+        if ((!o.isMesh && !o.isPoints && !o.isLine) || o.isInstancedMesh) return;
+        const geo = o.geometry;
+        if (!geo) return;
+        if (!geo.boundingSphere) geo.computeBoundingSphere();
+        const bs = geo.boundingSphere;
+        if (!bs || !isFinite(bs.radius)) return;
+        _c.copy(bs.center).applyMatrix4(o.matrixWorld);
+        const rad = bs.radius * o.matrixWorld.getMaxScaleOnAxis();
+        if (Math.hypot(_c.x, _c.z) - rad > BUILD_RADIUS) doomed.push(o);
+      });
+      // KHÔNG dispose geometry: có thể DÙNG CHUNG với mesh gần (clone) — chỉ remove, GC tự dọn phần không tham chiếu
+      for (const o of doomed) { if (o.parent) o.parent.remove(o); }
+      console.log('[world] giai đoạn trung tâm: cắt', doomed.length, 'mesh ngoài', BUILD_RADIUS, 'm');
+    }
     scene.traverse((o) => {
       if (o === scene || o.userData.dyn) return;
       let p = o.parent;
