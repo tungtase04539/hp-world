@@ -315,6 +315,18 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-17 (db)** [PLAYBOOK MOBILE — gộp tĩnh toàn cục, đòn draw-call]: user "vẫn lag trên mobile" →
+    đo thành phần: **11.759 mesh KHÔNG TÊN** (prop lẻ hand-built các chiến dịch) / 12.393 tổng, 1.806 texture
+    riêng, calls 2985. Bài học chuẩn cộng đồng: mobile chết vì DRAW CALLS + OBJECT COUNT (<150 calls, <2k obj),
+    không phải triangle. Triển khai **MERGE-PASS TOÀN CỤC** (freezeStatic, sau prune): bake material.color vào
+    VERTEX COLOR rồi gộp mọi mesh tĩnh Lambert không-texture theo (ô 450m × castShadow × side) → 6.713 mesh
+    → 89 mesh. KQ: **12.393→5.410 mesh (−56%), calls 2985→1052 (−65%)**, visual y nguyên (Lambert × vertexColor
+    ≡ Lambert × material.color). Skip an toàn: dyn/ancestor-dyn, map, transparent, EMISSIVE (đèn đêm bị daynight
+    mutate), material MẢNG (multi-mat box), non-Lambert (GLB Standard), InstancedMesh, ground/water,
+    **layers.mask≠1 (ribbon aerial layer-2 — nuốt vào là ribbon hiện trong pano!)**. PHẢI gán castShadow/_noCast
+    TRƯỚC merge (main.js từng gán sau theo TÊN roads_*/sidewalk_* — merge nuốt tên) → chuyển vào
+    freezeStatic(shadowOn). LITE thêm: DPR 1.0 thẳng + enableNearView() NGAY từ đầu. CÒN LẠI (chương sau nếu
+    cần): ~5k unnamed multi-mat/textured box → cần texture-atlas; 1.8k canvas texture riêng (biển hiệu).
 - **2026-07-17 (da)** [CHẾ ĐỘ NHẸ — máy yếu/mobile chơi được, KHÔNG thuê server GPU]: chủ dự án hỏi "server
     gánh render cho máy yếu?" → phân tích: cloud-render (pixel streaming) tốn GPU-server ~4-8 người/GPU
     (50-150tr/tháng cho 100 CCU) + input lag 50-150ms → SAI công cụ cho web game miễn phí. Đường đúng:

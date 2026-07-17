@@ -30,8 +30,9 @@ const renderer = new THREE.WebGLRenderer({
   canvas, antialias: !isTouchDevice,              // mobile: tắt MSAA (VRAM + ổn định)
   powerPreference: 'high-performance',            // laptop 2 GPU: ép dGPU (trước hay rơi vào iGPU → lag)
 });
-// KHỞI ĐỘNG ở 1.5 (đỡ khựng lúc vào); máy mạnh được autoQuality NÂNG lên full DPR sau khi đo FPS tốt
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, isTouchDevice ? 1.2 : 1.5));
+// KHỞI ĐỘNG: máy LITE (yếu/mobile) = DPR 1.0 thẳng (playbook mobile); máy thường = 1.5,
+// autoQuality sẽ NÂNG lên full DPR sau khi đo FPS tốt
+renderer.setPixelRatio(LITE ? 1 : Math.min(window.devicePixelRatio, 1.5));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.18;
@@ -82,7 +83,7 @@ window.addEventListener('resize', () => {
 // ============ Thế giới ============
 const world = buildWorld(scene);
 // đóng băng ma trận local của thế giới tĩnh (NPC/xe/traffic tạo SAU nên không bị ảnh hưởng)
-world.freezeStatic();
+world.freezeStatic(renderer.shadowMap.enabled);
 const dayNight = createDayNight(scene, world);
 const petals = createPetals(scene);
 const signs = buildLandmarkSigns(scene, world);
@@ -99,18 +100,8 @@ world.walkPaths.push([
 ]);
 const traffic = createTraffic(scene, world);
 
-// bật đổ bóng cho mọi vật thể đặc (đất nhận bóng, nước & vật trong suốt bỏ qua)
-// PERF (Lô B): mesh PHẲNG sát đất (đường/vỉa hè/vạch/ray/ballast/ribbon) KHÔNG cast (bóng phẳng-trên-phẳng
-// vô hình) → giảm mạnh shadow pass; VẪN receiveShadow (nhận bóng nhà/cây). 0 đổi visual.
-const _noCast = /^(roads|dashes|paths|rails|railballast|aerial_road_ribbon|caro_do_xam|lake_promenade)(_|$)|^sidewalk/;
-if (renderer.shadowMap.enabled) {
-  scene.traverse((o) => {
-    if (!o.isMesh || o.name === 'ground' || o.name === 'water') return;
-    if (o.material && o.material.transparent) return;
-    o.castShadow = !_noCast.test(o.name);
-    o.receiveShadow = true;
-  });
-}
+// (gán castShadow/_noCast đã chuyển vào world.freezeStatic — PHẢI chạy TRƯỚC merge-pass,
+//  vì merge nuốt tên roads_*/sidewalk_* vào mesh gộp mrg*)
 
 // ============ Người chơi ============
 const player = makeHumanoid({ hat: 'cap' });
@@ -409,14 +400,17 @@ function clampToPlayArea(pos) {
   }
 }
 
-// MÁY YẾU (LITE): vào game đã ở bước tiết kiệm — bloom off, PR 1.2, bóng 1024 (mobile vốn không post/bóng)
-if (LITE && !isTouchDevice) {
-  _qStep = 1;
-  if (bloomPass) bloomPass.enabled = false;
-  setPR(Math.min(_DPR, 1.2));
-  const sm = dayNight.sun.shadow;
-  sm.mapSize.set(1024, 1024);
-  if (sm.map) { sm.map.dispose(); sm.map = null; }
+// MÁY YẾU (LITE): vào game đã ở chế độ tiết kiệm sâu — không đợi đo FPS
+if (LITE) {
+  if (!isTouchDevice) {                     // desktop yếu: tắt bloom + bóng 1024 (mobile vốn không post/bóng)
+    _qStep = 1;
+    if (bloomPass) bloomPass.enabled = false;
+    setPR(1);
+    const sm = dayNight.sun.shadow;
+    sm.mapSize.set(1024, 1024);
+    if (sm.map) { sm.map.dispose(); sm.map = null; }
+  }
+  enableNearView();                         // tầm nhìn gần NGAY từ đầu: sương 1300 + ẩn tile xa
 }
 
 function animate() {

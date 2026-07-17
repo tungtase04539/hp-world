@@ -21687,8 +21687,19 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
   // Vật world.js tự animate đã đánh dấu userData.dyn (nước, thiên nga, mây, hải âu, cờ, tàu,
   // hải đăng, hoa nhặt) — cả cây con của chúng đều được chừa. Gọi từ main.js SAU buildWorld,
   // TRƯỚC khi tạo NPC/xe/traffic (mấy thứ đó thêm vào sau nên vẫn matrixAutoUpdate mặc định).
-  world.freezeStatic = () => {
+  world.freezeStatic = (shadowOn) => {
     scene.updateMatrixWorld(true);
+    // Gán bóng TRƯỚC merge (main.js từng làm sau — nhưng merge nuốt tên roads_*/sidewalk_* nên phải làm ở đây):
+    // mesh phẳng sát đất không cast (bóng phẳng-trên-phẳng vô hình), còn lại cast+receive.
+    if (shadowOn) {
+      const _noCast = /^(roads|dashes|paths|rails|railballast|aerial_road_ribbon|caro_do_xam|lake_promenade)(_|$)|^sidewalk/;
+      scene.traverse((o) => {
+        if (!o.isMesh || o.name === 'ground' || o.name === 'water') return;
+        if (o.material && o.material.transparent) return;
+        o.castShadow = !_noCast.test(o.name);
+        o.receiveShadow = true;
+      });
+    }
     // GIAI ĐOẠN TRUNG TÂM: cắt mesh nằm HOÀN TOÀN ngoài BUILD_RADIUS (bounding sphere thế giới).
     // Chạy TRƯỚC render đầu tiên → geometry xa không bao giờ upload GPU. Mesh khổng lồ phủ tâm
     // (đất/nước/trời) tự được GIỮ vì sphere chạm vòng tròn tâm. InstancedMesh giữ (an toàn —
@@ -21710,6 +21721,68 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
       // KHÔNG dispose geometry: có thể DÙNG CHUNG với mesh gần (clone) — chỉ remove, GC tự dọn phần không tham chiếu
       for (const o of doomed) { if (o.parent) o.parent.remove(o); }
       console.log('[world] giai đoạn trung tâm: cắt', doomed.length, 'mesh ngoài', BUILD_RADIUS, 'm');
+    }
+    // ===== GỘP TĨNH TOÀN CỤC (playbook mobile: draw calls + object count là kẻ giết FPS) =====
+    // ~11.7k prop lẻ không-texture (hand-built qua các chiến dịch) → bake màu material vào VERTEX COLOR
+    // rồi gộp theo (ô 450m × castShadow × side) → còn ~vài chục mesh. Skip: dyn, texture map,
+    // material mảng, transparent, emissive (đèn/ cửa sáng đêm — material bị daynight mutate),
+    // không phải Lambert (GLB/player là Standard), InstancedMesh, ground/water.
+    {
+      const T = 450, buckets = new Map(), doomed = [];
+      const _tmpC = new THREE.Vector3();
+      scene.updateMatrixWorld(true);
+      scene.traverse((o) => {
+        if (!o.isMesh || o.isInstancedMesh || o.isSkinnedMesh) return;
+        if (o.layers.mask !== 1) return;               // layer khác (ribbon aerial layer-2) — giữ nguyên
+        if (o.name === 'ground' || o.name === 'water') return;
+        if (o.userData.dyn) return;
+        let pp = o.parent; while (pp) { if (pp.userData && pp.userData.dyn) return; pp = pp.parent; }
+        const m = o.material;
+        if (!m || Array.isArray(m) || !m.isMeshLambertMaterial) return;
+        if (m.map || m.transparent || (m.emissive && (m.emissive.r + m.emissive.g + m.emissive.b) > 0.001)) return;
+        const g = o.geometry;
+        if (!g || !g.attributes.position) return;
+        if (!g.boundingSphere) g.computeBoundingSphere();
+        _tmpC.copy(g.boundingSphere.center).applyMatrix4(o.matrixWorld);
+        const key = Math.floor(_tmpC.x / T) + ',' + Math.floor(_tmpC.z / T) + '|' + (o.castShadow ? 1 : 0) + '|' + (m.side || 0);
+        let l = buckets.get(key); if (!l) buckets.set(key, l = []);
+        l.push(o);
+      });
+      const bakeGeo = (o) => {
+        let g = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone();
+        g.applyMatrix4(o.matrixWorld);
+        const n = g.attributes.position.count;
+        const col = new Float32Array(n * 3);
+        const hasVC = !!g.attributes.color;
+        const mc = o.material.color;
+        for (let i = 0; i < n; i++) {
+          if (hasVC) { col[i*3] = g.attributes.color.getX(i); col[i*3+1] = g.attributes.color.getY(i); col[i*3+2] = g.attributes.color.getZ(i); }
+          else { col[i*3] = mc.r; col[i*3+1] = mc.g; col[i*3+2] = mc.b; }
+        }
+        const out = new THREE.BufferGeometry();
+        out.setAttribute('position', g.attributes.position);
+        if (g.attributes.normal) out.setAttribute('normal', g.attributes.normal);
+        else out.computeVertexNormals();
+        out.setAttribute('color', new THREE.BufferAttribute(col, 3));
+        return out;
+      };
+      let merged = 0, absorbed = 0;
+      for (const [key, list] of buckets) {
+        if (list.length < 2) continue;
+        const geos = list.map(bakeGeo);
+        const g = mergeGeometries(geos);
+        geos.forEach((x) => x.dispose());
+        if (!g) continue;
+        const [txz, cs, side] = key.split('|');
+        const mm = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true, side: +side || 0 }));
+        mm.castShadow = cs === '1'; mm.receiveShadow = true;
+        mm.name = 'mrg' + cs + side + '_' + txz;          // đuôi _x,z khớp regex nearCull → vẫn ẩn xa được
+        scene.add(mm);
+        for (const o of list) doomed.push(o);
+        merged++; absorbed += list.length;
+      }
+      for (const o of doomed) { if (o.parent) o.parent.remove(o); }
+      console.log('[world] gộp tĩnh:', absorbed, 'mesh →', merged, 'mesh gộp');
     }
     scene.traverse((o) => {
       if (o === scene || o.userData.dyn) return;
