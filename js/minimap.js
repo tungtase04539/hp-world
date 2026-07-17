@@ -1,16 +1,34 @@
-import { WORLD_BOUNDS, groundHeightNoDeck } from './world.js';
+import { groundHeightNoDeck, BUILD_RADIUS } from './world.js';
+import { ROADS_DT, BUILDINGS, PARKS, RAIL } from './mapdata.js';
 import { LANDMARKS } from './landmarks.js';
 import { quests } from './quests.js';
 
-// Bản đồ nhỏ: nền vẽ một lần từ địa hình, chấm địa danh + mũi tên người chơi vẽ mỗi khung
-const W = 210, H = 165;
+// ============ MINIMAP KIỂU GOOGLE MAPS ============
+// Nền phố (đường trắng/vàng + nhà + nước + công viên) vẽ MỘT LẦN cho dải trung tâm
+// (BUILD_RADIUS), mỗi khung chỉ cắt cửa sổ quanh người chơi → "đi tới đâu hiện tới đấy".
+const W = 210, H = 165;            // kích thước canvas HUD (px)
+const EXT = BUILD_RADIUS + 100;    // nền phủ ±EXT quanh Nhà hát lớn (m)
+const PPM = 0.8;                   // px trên mét của bản nền (2720px cho 3400m)
+const VIEW_M = 260;                // bề ngang thế giới hiển thị (m) — zoom kiểu đi bộ GG
+
 let base = null, ctx = null;
 
-function toPx(x, z) {
-  return [
-    ((x - WORLD_BOUNDS.minX) / (WORLD_BOUNDS.maxX - WORLD_BOUNDS.minX)) * W,
-    ((z - WORLD_BOUNDS.minZ) / (WORLD_BOUNDS.maxZ - WORLD_BOUNDS.minZ)) * H,
-  ];
+function toBase(x, z) { return [(x + EXT) * PPM, (z + EXT) * PPM]; }
+
+function strokeRoads(octx, roads, classes, width, color) {
+  octx.lineCap = 'round'; octx.lineJoin = 'round';
+  octx.strokeStyle = color; octx.lineWidth = width * PPM;
+  octx.beginPath();
+  for (const r of roads) {
+    if (!classes.includes(r.c)) continue;
+    const p0 = toBase(r.pts[0][0], r.pts[0][1]);
+    octx.moveTo(p0[0], p0[1]);
+    for (let i = 1; i < r.pts.length; i++) {
+      const p = toBase(r.pts[i][0], r.pts[i][1]);
+      octx.lineTo(p[0], p[1]);
+    }
+  }
+  octx.stroke();
 }
 
 export function initMinimap() {
@@ -18,58 +36,97 @@ export function initMinimap() {
   cnv.width = W; cnv.height = H;
   ctx = cnv.getContext('2d');
 
+  const S = Math.round(2 * EXT * PPM);
   const off = document.createElement('canvas');
-  off.width = W; off.height = H;
-  const octx = off.getContext('2d');
-  const img = octx.createImageData(W, H);
-  for (let py = 0; py < H; py++) {
-    for (let px = 0; px < W; px++) {
-      const x = WORLD_BOUNDS.minX + ((px + 0.5) / W) * (WORLD_BOUNDS.maxX - WORLD_BOUNDS.minX);
-      const z = WORLD_BOUNDS.minZ + ((py + 0.5) / H) * (WORLD_BOUNDS.maxZ - WORLD_BOUNDS.minZ);
-      const h = groundHeightNoDeck(x, z);
-      let r, g, b;
-      if (h < -1.5) { r = 26; g = 82; b = 122; }        // biển sâu
-      else if (h < 0.25) { r = 55; g = 124; b = 168; }  // nước nông
-      else if (h < 1.1) { r = 224; g = 204; b = 143; }  // cát
-      else if (h < 7) { r = 106; g = 168; b = 92; }     // đồng bằng
-      else { r = 78, g = 126, b = 74; }                 // đồi núi
-      const i = (py * W + px) * 4;
-      img.data[i] = r; img.data[i + 1] = g; img.data[i + 2] = b; img.data[i + 3] = 235;
+  off.width = S; off.height = S;
+  const o = off.getContext('2d');
+
+  // 1) nền đất be sáng (tông GG)
+  o.fillStyle = '#f2efe9'; o.fillRect(0, 0, S, S);
+
+  // 2) nước từ heightfield (lưới 6m — 1 lần lúc init)
+  o.fillStyle = '#a6d5fa';
+  const step = 6, cell = step * PPM + 0.7;
+  for (let z = -EXT; z < EXT; z += step) {
+    for (let x = -EXT; x < EXT; x += step) {
+      if (groundHeightNoDeck(x + step / 2, z + step / 2) < 0.25) {
+        const [bx, bz] = toBase(x, z);
+        o.fillRect(bx, bz, cell, cell);
+      }
     }
   }
-  octx.putImageData(img, 0, 0);
+
+  // 3) công viên / vườn hoa
+  o.fillStyle = '#c3ecb2';
+  for (const ring of PARKS) {
+    o.beginPath();
+    const p0 = toBase(ring[0][0], ring[0][1]); o.moveTo(p0[0], p0[1]);
+    for (let i = 1; i < ring.length; i++) { const p = toBase(ring[i][0], ring[i][1]); o.lineTo(p[0], p[1]); }
+    o.closePath(); o.fill();
+  }
+
+  // 4) footprint nhà (chỉ trong bán kính)
+  o.fillStyle = '#e8e3da';
+  for (const b of BUILDINGS) {
+    const [fx, fz] = b.p[0];
+    if (fx * fx + fz * fz > EXT * EXT) continue;
+    o.beginPath();
+    const p0 = toBase(b.p[0][0], b.p[0][1]); o.moveTo(p0[0], p0[1]);
+    for (let i = 1; i < b.p.length; i++) { const p = toBase(b.p[i][0], b.p[i][1]); o.lineTo(p[0], p[1]); }
+    o.closePath(); o.fill();
+  }
+
+  // 5) đường sắt (xám, nét đứt)
+  o.setLineDash([6, 4]);
+  strokeRoads(o, RAIL.map((r) => ({ c: 'rl', pts: r.pts })), ['rl'], 2.5, '#b9b3ab');
+  o.setLineDash([]);
+
+  // 6) đường 2 lớp kiểu GG: viền (casing) rồi ruột; trục lớn VÀNG, phố thường TRẮNG
+  strokeRoads(o, ROADS_DT, ['t', 'r'], 8, '#d9d2c9');
+  strokeRoads(o, ROADS_DT, ['p', 's'], 16, '#e8b73e');
+  strokeRoads(o, ROADS_DT, ['t', 'r'], 5.5, '#ffffff');
+  strokeRoads(o, ROADS_DT, ['p', 's'], 12.5, '#fcd769');
+
   base = off;
 }
 
 export function drawMinimap(px, pz, yaw) {
   if (!ctx) return;
-  ctx.clearRect(0, 0, W, H);
-  ctx.drawImage(base, 0, 0);
-  // chấm địa danh: cam = chưa khám phá, xanh = đã khám phá
+  // nền ngoài rìa thế giới (khi người chơi sát mép)
+  ctx.fillStyle = '#eae7e0'; ctx.fillRect(0, 0, W, H);
+
+  // cửa sổ nguồn quanh người chơi (Chrome tự clip nguồn ngoài canvas)
+  const sw = VIEW_M * PPM, sh = VIEW_M * (H / W) * PPM;
+  const [bx, bz] = toBase(px, pz);
+  ctx.drawImage(base, bx - sw / 2, bz - sh / 2, sw, sh, 0, 0, W, H);
+
+  // chấm địa danh trong khung nhìn: cam = chưa khám phá, xanh = đã khám phá
+  const sc = W / VIEW_M;
   for (const lm of LANDMARKS) {
-    const [sx, sy] = toPx(lm.x, lm.z);
+    const vx = (lm.x - px) * sc + W / 2, vy = (lm.z - pz) * sc + H / 2;
+    if (vx < -6 || vx > W + 6 || vy < -6 || vy > H + 6) continue;
     ctx.beginPath();
-    ctx.arc(sx, sy, 2.6, 0, Math.PI * 2);
-    ctx.fillStyle = quests.discovered.has(lm.id) ? '#5fe08a' : '#ffb84d';
+    ctx.arc(vx, vy, 3.2, 0, Math.PI * 2);
+    ctx.fillStyle = quests.discovered.has(lm.id) ? '#3fbf6f' : '#ff8c2e';
     ctx.fill();
-    ctx.strokeStyle = 'rgba(0,0,0,.5)';
-    ctx.lineWidth = 0.8;
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 1.2;
     ctx.stroke();
   }
-  // mũi tên người chơi
-  const [sx, sy] = toPx(px, pz);
+
+  // mũi tên người chơi — LUÔN ở giữa (bản đồ trôi theo chân, bắc cố định như GG)
   ctx.save();
-  ctx.translate(sx, sy);
+  ctx.translate(W / 2, H / 2);
   ctx.rotate(Math.PI - yaw);
   ctx.beginPath();
-  ctx.moveTo(0, -5.5);
-  ctx.lineTo(4, 4.5);
-  ctx.lineTo(-4, 4.5);
+  ctx.moveTo(0, -6);
+  ctx.lineTo(4.4, 5);
+  ctx.lineTo(-4.4, 5);
   ctx.closePath();
-  ctx.fillStyle = '#ff4438';
+  ctx.fillStyle = '#1a73e8';           // xanh GG
   ctx.fill();
   ctx.strokeStyle = '#fff';
-  ctx.lineWidth = 1.2;
+  ctx.lineWidth = 1.4;
   ctx.stroke();
   ctx.restore();
 }

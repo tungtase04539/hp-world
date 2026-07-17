@@ -315,6 +315,12 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-17 (cw)** [MINIMAP KIỂU GOOGLE MAPS]: viết lại `js/minimap.js` — nền phố GG (đất #f2efe9, nước
+    #a6d5fa từ heightfield lưới 6m, công viên PARKS, footprint BUILDINGS, đường 2 lớp casing/ruột: trục p/s
+    VÀNG #fcd769, phố t/r TRẮNG, rail nét đứt) vẽ MỘT LẦN cho ±(BUILD_RADIUS+100) ở 0.8px/m; mỗi khung chỉ
+    `drawImage` cửa sổ VIEW_M=260m quanh người chơi → theo chân như GG, bắc cố định, mũi tên xanh #1a73e8 giữa.
+    Chấm địa danh chỉ vẽ khi lọt khung. Verify: 4 vị trí (Nhà hát/Tam Bạc/cầu HVT) map trôi đúng, nước/công
+    viên/đường chuẩn màu GG, 0 JS error.
 - **2026-07-17 (cv)** [GIAI ĐOẠN TRUNG TÂM — cắt thế giới theo bán kính]: chủ dự án chốt giai đoạn này chỉ cần
     lõi trung tâm → `BUILD_RADIUS = 1600` (world.js, export; 1600 thay 1500 để trọn cụm cảng ~1565m). 2 tầng cắt:
     (1) `addMergedTiled` BỎ bucket ngoài bán kính lúc build (không merge/upload); (2) `freezeStatic` cắt mesh lẻ
