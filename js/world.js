@@ -58,6 +58,24 @@ const _matCache = new Map();
 // 1600 (thay vì 1500 chẵn) để trọn cụm CẢNG (portAnchor ~1565m) không bị cắt nham nhở.
 export const BUILD_RADIUS = 1600;
 
+// CHẾ ĐỘ NHẸ (máy yếu/mobile): build thảm nhà THƯA hơn + main.js seed sẵn bước hạ chất lượng.
+// Máy mạnh giữ nguyên FULL. Ép tay để test/chọn: ?quality=full hoặc ?quality=lite trên URL.
+export const LITE = (() => {
+  try {
+    const q = new URLSearchParams(location.search).get('quality');
+    if (q === 'full') return false;
+    if (q === 'lite') return true;
+    if ('ontouchstart' in window || navigator.maxTouchPoints > 0) return true;   // mobile/tablet
+    if ((navigator.hardwareConcurrency || 8) <= 4) return true;                  // CPU yếu
+    const c = document.createElement('canvas');
+    const gl = c.getContext('webgl');
+    const ext = gl && gl.getExtension('WEBGL_debug_renderer_info');
+    const rs = ext ? String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)) : '';
+    if (/SwiftShader|Intel\(R\)? (HD|UHD|Iris)|Mali-[T4-7]|Adreno [1-5]\d\d/i.test(rs)) return true; // iGPU/GPU cũ
+  } catch (e) { }
+  return false;
+})();
+
 function mat(color, opts = {}) {
   // PERF: cache CẢ material có opts theo key (màu+opts) — gộp material trùng (giảm 3808→~vài trăm, ít state-change,
   // KHÔNG đổi visual). Material bị mutate per-frame (waterMat/facadeMats) tạo EXPLICIT, không qua mat() → an toàn.
@@ -18859,7 +18877,9 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     const geos = []; const lmPtsB = Object.values(LM);
     let bs = 424241; const brnd = () => { bs = (bs * 1103515245 + 12345) & 0x7fffffff; return bs / 0x7fffffff; };
     let nB = 0;
-    const CAPB = 60000;   // thảm nhà ống TOÀN lõi 1600m (20000→60000: phủ thêm nửa nam+đông + lưới 7.5m dày hơn)
+    const CAPB = LITE ? 26000 : 60000;   // thảm nhà ống toàn lõi; LITE: thưa hơn (lưới 11m) cho máy yếu
+    const GRIDI = LITE ? 11 : 7.5;       // bước lưới thảm (m)
+    const ROOFP = LITE ? 60 : 88;        // % nhà có mái chóp
     // (PANO-LOOP V1: 5600 cạn quanh gx≈0 → cả dải đông tới Ga trống; 9500 đủ quét hết lưới, vẫn 1 mesh gộp)
     // KHU PHÂN LÔ LIỀN KỀ MỚI cạnh THPT Lê Hồng Phong (GE ảnh 4: dãy nhà trắng đều) — georef từ ảnh
     {
@@ -18899,8 +18919,8 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     //  - Nhà ỐNG thật: mặt tiền hẹp 4.6-6.8m, SÂU theo chỗ trống (≤12.5m), QUAY MẶT ra đường gần nhất
     //  - Ôm sát ngõ: lùi = nửa_sâu + mép (thay né cứng 16m → hết hành lang trống dọc mọi ngõ)
     //  - BỎ evidence-gate trong lõi (vệ tinh thật: dày ĐỀU); giữ NGUYÊN guard nước/công viên/pano/featured/LM/ray
-    for (let gx = -1600; gx <= 1600 && nB < CAPB; gx += 7.5) {
-      for (let gz = -1600; gz <= 1600 && nB < CAPB; gz += 7.5) {
+    for (let gx = -1600; gx <= 1600 && nB < CAPB; gx += GRIDI) {
+      for (let gz = -1600; gz <= 1600 && nB < CAPB; gz += GRIDI) {
         if (gx * gx + gz * gz > (BUILD_RADIUS - 40) * (BUILD_RADIUS - 40)) continue;
         const x = gx + (brnd() - 0.5) * 4, z = gz + (brnd() - 0.5) * 4;
         if (Math.abs(groundHeightNoDeck(x, z) - LAND_H) > 0.3) continue;
@@ -18929,7 +18949,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
         const _ang = Math.atan2(-bdz, bdx) + (brnd() - 0.5) * 0.08;   // mặt tiền (trục X local) SONG SONG đường gần nhất
         box.rotateY(_ang); box.translate(x, gy + h / 2, z);
         geos.push(box);
-        if ((Math.abs(x * 11 + z * 17) | 0) % 100 < 88) {
+        if ((Math.abs(x * 11 + z * 17) | 0) % 100 < ROOFP) {
           const _rr = _pyrRoof(w, d, 1.8 + (Math.abs(x * 3 + z) % 3) * 0.5, rc, 0.35);
           _rr.rotateY(_ang); _rr.translate(x, gy + h, z); geos.push(_rr);
         }

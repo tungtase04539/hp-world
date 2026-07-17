@@ -315,6 +315,18 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-17 (da)** [CHẾ ĐỘ NHẸ — máy yếu/mobile chơi được, KHÔNG thuê server GPU]: chủ dự án hỏi "server
+    gánh render cho máy yếu?" → phân tích: cloud-render (pixel streaming) tốn GPU-server ~4-8 người/GPU
+    (50-150tr/tháng cho 100 CCU) + input lag 50-150ms → SAI công cụ cho web game miễn phí. Đường đúng:
+    client rẻ. Triển khai: (1) `LITE` (world.js, export) — detect mobile/CPU≤4 lõi/iGPU-GPU cũ qua
+    WEBGL_debug_renderer_info; ép tay `?quality=full|lite`. LITE: thảm nhà lưới 11m + cap 26k + mái 60%
+    (đo: verts block_infill 2911k→1061k, −64%). (2) main.js: LITE desktop seed sẵn bước 1 (bloom off,
+    PR 1.2, bóng 1024). (3) NẤC CHẤT LƯỢNG 3 (`enableNearView`, expose qua __hp): sương 4200→1300 +
+    camera.far 1650 + ẨN tile 450m ngoài 1450m quanh người chơi (nhịp 0.5s ĐỒNG HỒ THẬT — không dùng dt
+    game vì dt clamp 0.05 làm máy càng yếu giờ-game càng chậm). Đo: 86/306 tile ẩn tại spawn. HOSTING:
+    static → Cloudflare/GitHub Pages (miễn phí, nghìn CCU); multiplayer sau này chỉ cần relay ws VPS
+    ~100k/tháng. **BẪY test**: click startBtn TRƯỚC khi listener gắn → started=false → mọi update-loop
+    ngủ (hid=0 giả) — script phải kiểm titleScreen.hidden rồi re-click.
 - **2026-07-17 (cz)** [NGÕ/HẺM OSM — class 'h' + fix Ga + bug chậm bậc hai]: (1) Query roads_dt cũ LỌC MẤT
     highway=service/alley → fetch riêng `osm_alleys.json` (bbox DT; bỏ footway/path — lối công viên nhiều điểm
     ít giá trị) → process_osm mục 3b: class **'h'**, chỉ giữ trong lõi (isCentralRoad), ≥28m → **817 hẻm**.

@@ -5,7 +5,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { buildWorld, groundHeight, groundHeightNoDeck, landAt, WORLD_BOUNDS, LM, EXTRAS, BUILD_RADIUS } from './world.js';
+import { buildWorld, groundHeight, groundHeightNoDeck, landAt, WORLD_BOUNDS, LM, EXTRAS, BUILD_RADIUS, LITE } from './world.js';
 import { createTraffic } from './traffic.js';
 import { makeHumanoid } from './character.js';
 import { createVehicles } from './vehicles.js';
@@ -349,7 +349,7 @@ function autoQuality() {
   if (time - fpsStart > win) {
     const fps = fpsFrames / (time - fpsStart);
     fpsStart = time; fpsFrames = 0; _qChecks++;
-    if (fps < 24 && _qStep < 2) {
+    if (fps < 24 && _qStep < 3) {
       _qStep++;
       if (_qStep === 1) {
         if (bloomPass) bloomPass.enabled = false; setPR(Math.min(_DPR, 1.2));
@@ -357,10 +357,39 @@ function autoQuality() {
         sm.mapSize.set(1024, 1024);
         if (sm.map) { sm.map.dispose(); sm.map = null; }
       }
-      else { dayNight.sun.castShadow = false; renderer.shadowMap.autoUpdate = false; setPR(1); }
+      else if (_qStep === 2) { dayNight.sun.castShadow = false; renderer.shadowMap.autoUpdate = false; setPR(1); }
+      else enableNearView();                          // NẤC 3: co tầm nhìn (sương gần) + ẩn tile xa
     } else if (fps >= 50 && _qStep === 0 && renderer.getPixelRatio() < _DPR) {
       setPR(_DPR);   // máy mạnh: lên full độ phân giải (không mất chất lượng lâu dài)
     }
+  }
+}
+
+// NẤC CHẤT LƯỢNG 3 (máy rất yếu): sương mù co về 1300m + ẨN các tile thế giới ngoài 1450m
+// quanh người chơi (tile 450m đã tách sẵn — chỉ bật/tắt visible, không đổi nội dung).
+let _nearTiles = null, _nearCullLast = 0;
+function enableNearView() {
+  scene.fog.near = 220; scene.fog.far = 1300;
+  camera.far = 1650; camera.updateProjectionMatrix();
+  _nearTiles = [];
+  scene.traverse((o) => {
+    if (!o.isMesh || !/_-?\d+,-?\d+$/.test(o.name)) return;
+    if (!o.geometry.boundingSphere) o.geometry.computeBoundingSphere();
+    const c = o.geometry.boundingSphere.center.clone().applyMatrix4(o.matrixWorld);
+    _nearTiles.push([o, c.x, c.z]);
+  });
+}
+function updateNearCull() {
+  if (!_nearTiles) return;
+  // nhịp theo ĐỒNG HỒ THẬT (không dùng dt game — dt bị clamp 0.05 nên máy càng yếu giờ-game càng
+  // trôi chậm, mà máy yếu chính là nơi cần cull chạy đều)
+  const _now = performance.now();
+  if (_now - _nearCullLast < 500) return;
+  _nearCullLast = _now;
+  const px = pState.pos.x, pz = pState.pos.z, R2 = 1450 * 1450;
+  for (let i = 0; i < _nearTiles.length; i++) {
+    const t3 = _nearTiles[i];
+    t3[0].visible = (t3[1] - px) * (t3[1] - px) + (t3[2] - pz) * (t3[2] - pz) < R2;
   }
 }
 
@@ -378,6 +407,16 @@ function clampToPlayArea(pos) {
       ui.toast(tx({ vi: '🚧 Hết ranh giới bản đồ giai đoạn này — quay lại trung tâm nhé!', en: '🚧 Edge of the map for this stage — head back downtown!' }));
     }
   }
+}
+
+// MÁY YẾU (LITE): vào game đã ở bước tiết kiệm — bloom off, PR 1.2, bóng 1024 (mobile vốn không post/bóng)
+if (LITE && !isTouchDevice) {
+  _qStep = 1;
+  if (bloomPass) bloomPass.enabled = false;
+  setPR(Math.min(_DPR, 1.2));
+  const sm = dayNight.sun.shadow;
+  sm.mapSize.set(1024, 1024);
+  if (sm.map) { sm.map.dispose(); sm.map = null; }
 }
 
 function animate() {
@@ -458,6 +497,7 @@ function animate() {
     audio.tryHorn(time, 1 - Math.min(1, Math.max(0, (dPort - 70) / 180)));
 
     autoQuality();
+    updateNearCull();
     updateAssets(dt, pState.pos); // streaming mô hình xa theo khoảng cách
     clockUITimer += dt;
     if (clockUITimer > 0.5) { clockUITimer = 0; ui.setClock(dayNight.clockString); }
@@ -518,6 +558,7 @@ window.__cine = cine;
 // Hook gỡ lỗi / chụp ảnh tour (không ảnh hưởng gameplay)
 window.__hp = {
   renderer, scene,   // chẩn đoán hiệu năng (draw calls / triangles)
+  enableNearView,    // bật tay chế độ tầm-nhìn-gần (nấc chất lượng 3) — test/máy rất yếu
   cine,
   vehicles, mount, player,   // chẩn đoán/thử nghiệm cưỡi xe
   // Chẩn đoán: mọi thực thể tương tác có đứng đúng chỗ & tiếp cận được không
