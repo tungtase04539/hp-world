@@ -236,6 +236,24 @@ for (const w of dtRoads) {
   ROADS_DT.push({ c, pts, name: w.tags?.name || '' });
 }
 console.log(`roads downtown: ${ROADS_DT.length}`);
+
+// ---------- 3b. NGÕ/HẺM lõi (osm_alleys.json: highway=service/alley/footway/track/path) ----------
+// Class 'h': render mảnh 3m + chia block cho thảm nhà ống (fetch riêng — query roads_dt cũ lọc mất).
+try {
+  const alleyWays = load('osm_alleys.json');
+  let nH = 0;
+  for (const w of alleyWays) {
+    if (!w.tags?.highway || !w.geometry) continue;
+    if (w.tags.highway === 'footway' || w.tags.highway === 'path') continue;  // lối công viên — nhiều điểm, ít giá trị block
+    const pts = rnd(simplify(subdiv(w.geometry, 150), 5));
+    if (pts.length < 2) continue;
+    if (!isCentralRoad(pts)) continue;          // giai đoạn trung tâm: chỉ giữ hẻm trong lõi
+    if (plLen(pts) < 28) continue;              // mẩu vụn (lối rẽ vào 1 nhà) bỏ
+    ROADS_DT.push({ c: 'h', pts, name: '' });
+    nH++;
+  }
+  console.log(`ngõ/hẻm lõi (h): ${nH}`);
+} catch (e) { console.log('(không có osm_alleys.json — bỏ qua hẻm)'); }
 // in vài phố lớn để đặt tuyến xe máy
 const named = {};
 for (const r of ROADS_DT) if (r.name && (r.c === 's' || r.c === 'p' || r.c === 't')) {
@@ -357,7 +375,7 @@ addWay('postoffice', 242226546, null);
 addWay('museum', 1049831208, null);
 addWay('market', 1175766946, null);
 addNode('lechan', 106.67957, 20.85600);
-addNode('station', 106.68752, 20.85850);   // ga Hải Phòng THẬT (lat 20.856→20.8585, dời bắc ~275m — trước lệch nam làm rail yard t3 bị lọc)
+addNode('station', 106.68752, 20.85602);   // ga Hải Phòng THẬT lat 20.856 (hack dời bắc 20.8585 đã bỏ — nearGa 700 đủ giữ rail yard, hack làm TOÀ GA lệch 275m)
 // LM.lake: tính từ polygon hồ thật (phần 6b)
 addNode('baodai', 106.79297, 20.68766);
 EXTRAS.baodai = LM.baodai; delete LM.baodai;

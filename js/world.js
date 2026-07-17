@@ -687,7 +687,7 @@ export function buildWorld(scene) {
   updaters.push((dt, time) => { water.position.y = Math.sin(time * 0.8) * 0.06; });
 
   // ---------- Đường phố THẬT (merge geometry để nhẹ GPU) ----------
-  const ROAD_W = { p: 13, s: 10, t: 8, r: 5.5, w: 3.5 }; // 1:1 — lòng đường thật
+  const ROAD_W = { p: 13, s: 10, t: 8, r: 5.5, w: 3.5, h: 3 }; // 1:1 — lòng đường thật (h = ngõ/hẻm bê tông)
   const asphaltGeos = [], dashGeos = [], pathGeos = [];
   const sidewalkBuckets = {};  // { type: [geo,...] } — vỉa hè theo từng kiểu (đúng pano)
   const m4 = new THREE.Matrix4(), q4 = new THREE.Quaternion(), e4 = new THREE.Euler(), s4 = new THREE.Vector3(1, 1, 1);
@@ -755,7 +755,7 @@ export function buildWorld(scene) {
       sidewalk: hasSW,
       swType: hasSW ? (SIDEWALK_BY_ROAD[ri] || SIDEWALK_DEFAULT) : null,
       dashes: r.c === 'p' || r.c === 's' || r.c === 't',
-      path: r.c === 'w',
+      path: r.c === 'w' || r.c === 'h',   // hẻm: bê tông be (không nhựa đen)
     });
   }
   for (const r of ROADS_REGION) layRoad(r.pts, 12, { dashes: true });
@@ -830,7 +830,7 @@ export function buildWorld(scene) {
   // AERIAL RIBBONS (Lô 1 — layer 2 CHỈ hiện top-down): dải đường RỘNG cho silhouette vệ tinh khớp real
   // (đại lộ real rộng ~gấp rưỡi base); pano vẫn dùng base road (không nuốt vỉa hè). Draped +0.13m.
   {
-    const RIBBON_W = { p: 20, s: 15, t: 11, r: 7 };
+    const RIBBON_W = { p: 20, s: 15, t: 11, r: 7, h: 4 };
     const geos = [];
     for (const r of ROADS_DT) {
       const rw = RIBBON_W[r.c]; if (!rw) continue;   // 'w' foot bỏ
@@ -1529,7 +1529,7 @@ export function buildWorld(scene) {
           if (gy < LAND_H - 0.5 || isWater(gx, gz)) continue;   // né sông/cầu
           // né LÒNG ĐƯỜNG KHÁC tại giao lộ (pháp tuyến phố A rơi vào mặt nhựa phố B)
           { let onRoad = false;
-            for (const r2 of ROADS_DT) { if (r2.c === 'w') continue; const hw2 = ROAD_W[r2.c] / 2 + 0.3;
+            for (const r2 of ROADS_DT) { if (r2.c === 'w' || r2.c === 'h') continue; const hw2 = ROAD_W[r2.c] / 2 + 0.3;
               for (let j = 0; j < r2.pts.length - 1; j++) { const [ax2, az2] = r2.pts[j], [bx2, bz2] = r2.pts[j + 1];
                 if (Math.max(ax2, bx2) < gx - 30 || Math.min(ax2, bx2) > gx + 30 || Math.max(az2, bz2) < gz - 30 || Math.min(az2, bz2) > gz + 30) continue;
                 const ddx = bx2 - ax2, ddz = bz2 - az2, l22 = ddx * ddx + ddz * ddz || 1e-9;
@@ -1580,10 +1580,10 @@ export function buildWorld(scene) {
     // BÀI HỌC PANO-LOOP V1: FOOD là tọa độ PANO (tim đường) → dời cụm quán sang VỈA HÈ:
     // chiếu lên đoạn đường gần nhất rồi đẩy ngang (nửa lòng + 2.6m); từng món vẫn né lòng đường.
     const _fsd = (px, pz, x1, z1, x2, z2) => { const dx = x2 - x1, dz = z2 - z1, l2 = dx * dx + dz * dz; let t = l2 ? ((px - x1) * dx + (pz - z1) * dz) / l2 : 0; t = Math.max(0, Math.min(1, t)); return Math.hypot(px - (x1 + dx * t), pz - (z1 + dz * t)); };
-    const _onRoadF = (px, pz, m) => { for (const r of ROADS_DT) { if (r.c === 'w') continue; const hw = ROAD_W[r.c] / 2 + m; for (let i = 0; i < r.pts.length - 1; i++) if (_fsd(px, pz, r.pts[i][0], r.pts[i][1], r.pts[i + 1][0], r.pts[i + 1][1]) < hw) return true; } return false; };
+    const _onRoadF = (px, pz, m) => { for (const r of ROADS_DT) { if (r.c === 'w' || r.c === 'h') continue; const hw = ROAD_W[r.c] / 2 + m; for (let i = 0; i < r.pts.length - 1; i++) if (_fsd(px, pz, r.pts[i][0], r.pts[i][1], r.pts[i + 1][0], r.pts[i + 1][1]) < hw) return true; } return false; };
     const toSidewalk = (cx, cz) => {
       let bd = 1e9, bx = cx, bz = cz, bn = null;
-      for (const r of ROADS_DT) { if (r.c === 'w') continue; const hw = ROAD_W[r.c] / 2;
+      for (const r of ROADS_DT) { if (r.c === 'w' || r.c === 'h') continue; const hw = ROAD_W[r.c] / 2;
         for (let i = 0; i < r.pts.length - 1; i++) {
           const [x1, z1] = r.pts[i], [x2, z2] = r.pts[i + 1];
           const dx = x2 - x1, dz = z2 - z1, l2 = dx * dx + dz * dz; if (!l2) continue;
@@ -1671,7 +1671,7 @@ export function buildWorld(scene) {
     // BÀI HỌC PANO-LOOP V1: tọa độ pano = TIM ĐƯỜNG (xe Google) → không đặt đồ vật tại đó.
     // Dò điểm trên MẶT LÁT KÈ HỒ: đất chuẩn + cách trục mọi đường lớn >(nửa lòng+2m) + gần mép hồ.
     const _hsd = (px, pz, x1, z1, x2, z2) => { const dx = x2 - x1, dz = z2 - z1, l2 = dx * dx + dz * dz; let t = l2 ? ((px - x1) * dx + (pz - z1) * dz) / l2 : 0; t = Math.max(0, Math.min(1, t)); return Math.hypot(px - (x1 + dx * t), pz - (z1 + dz * t)); };
-    const _onRoadHP = (px, pz) => { for (const r of ROADS_DT) { if (r.c === 'w') continue; const hw = ROAD_W[r.c] / 2 + 2; for (let i = 0; i < r.pts.length - 1; i++) if (_hsd(px, pz, r.pts[i][0], r.pts[i][1], r.pts[i + 1][0], r.pts[i + 1][1]) < hw) return true; } return false; };
+    const _onRoadHP = (px, pz) => { for (const r of ROADS_DT) { if (r.c === 'w' || r.c === 'h') continue; const hw = ROAD_W[r.c] / 2 + 2; for (let i = 0; i < r.pts.length - 1; i++) if (_hsd(px, pz, r.pts[i][0], r.pts[i][1], r.pts[i + 1][0], r.pts[i + 1][1]) < hw) return true; } return false; };
     let x = -718.6, z = 219.3;
     {
       let best = null, bd = 1e9;
@@ -18175,7 +18175,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
           const Ls = Math.hypot(bx - ax, bz - az), st = Math.max(1, Math.ceil(Ls / 2));
           for (let s = 0; s <= st; s++) { ntot++;
             const px = ax + (bx - ax) * s / st, pz = az + (bz - az) * s / st;
-            for (const r of ROADS_DT) { if (r.c === 'w') continue; const hw = ROAD_W[r.c] / 2;
+            for (const r of ROADS_DT) { if (r.c === 'w' || r.c === 'h') continue; const hw = ROAD_W[r.c] / 2;
               let br = false;
               for (let k = 0; k < r.pts.length - 1; k++) if (_hsd(px, pz, r.pts[k][0], r.pts[k][1], r.pts[k + 1][0], r.pts[k + 1][1]) < hw - 0.5) { hit++; br = true; break; }
               if (br) break; } }
@@ -20654,7 +20654,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
   // ---------- HÀNG CÂY CỔ THỤ TRÊN KÈ HỒ TAM BẠC (pano-loop V1: promenade thật rợp cây tán rộng) ----------
   {
     const _tsd = (px, pz, x1, z1, x2, z2) => { const dx = x2 - x1, dz = z2 - z1, l2 = dx * dx + dz * dz; let t = l2 ? ((px - x1) * dx + (pz - z1) * dz) / l2 : 0; t = Math.max(0, Math.min(1, t)); return Math.hypot(px - (x1 + dx * t), pz - (z1 + dz * t)); };
-    const _onRoadT = (px, pz) => { for (const r of ROADS_DT) { if (r.c === 'w') continue; const hw = ROAD_W[r.c] / 2 + 1.2; for (let i = 0; i < r.pts.length - 1; i++) if (_tsd(px, pz, r.pts[i][0], r.pts[i][1], r.pts[i + 1][0], r.pts[i + 1][1]) < hw) return true; } return false; };
+    const _onRoadT = (px, pz) => { for (const r of ROADS_DT) { if (r.c === 'w' || r.c === 'h') continue; const hw = ROAD_W[r.c] / 2 + 1.2; for (let i = 0; i < r.pts.length - 1; i++) if (_tsd(px, pz, r.pts[i][0], r.pts[i][1], r.pts[i + 1][0], r.pts[i + 1][1]) < hw) return true; } return false; };
     let nQ = 0;
     for (let e = 0; e < LAKE_POLY.length; e++) {
       const [ax, az] = LAKE_POLY[e], [bx, bz] = LAKE_POLY[(e + 1) % LAKE_POLY.length];

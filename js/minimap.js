@@ -86,6 +86,8 @@ export function initMinimap() {
   o.setLineDash([]);
 
   // 6) đường 2 lớp kiểu GG: viền (casing) rồi ruột; trục lớn VÀNG, phố thường TRẮNG
+  strokeRoads(o, ROADS_DT, ['h'], 3.2, '#ddd6cb');
+  strokeRoads(o, ROADS_DT, ['h'], 2.0, '#fbfaf6');
   strokeRoads(o, ROADS_DT, ['t', 'r'], 8, '#d9d2c9');
   strokeRoads(o, ROADS_DT, ['p', 's'], 16, '#e8b73e');
   strokeRoads(o, ROADS_DT, ['t', 'r'], 5.5, '#ffffff');

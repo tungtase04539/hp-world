@@ -315,6 +315,18 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-17 (cz)** [NGÕ/HẺM OSM — class 'h' + fix Ga + bug chậm bậc hai]: (1) Query roads_dt cũ LỌC MẤT
+    highway=service/alley → fetch riêng `osm_alleys.json` (bbox DT; bỏ footway/path — lối công viên nhiều điểm
+    ít giá trị) → process_osm mục 3b: class **'h'**, chỉ giữ trong lõi (isCentralRoad), ≥28m → **817 hẻm**.
+    (2) world.js: ROAD_W.h=3 + render bằng vật liệu path (bê tông be 0xc9b896), RIBBON_W.h=4 (aerial),
+    minimap nét trắng mảnh 2px; roadDists coi h là alley → thảm nhà ống TỰ ôm hẻm (block bị cắt như thật).
+    (3) **BUG chậm bậc hai**: các scanner `_onRoadF/_onRoadHP/...` quét MỌI segment ROADS_DT không bucket —
+    thêm hẻm làm build treo ~phút (CDP pause bắt stack tại three.module). Fix: 6 scanner skip 'h' như 'w'.
+    (4) **FIX Ga**: hack addNode station lat 20.8585 (dời bắc 275m cứu rail-yard filter) nằm sẵn trong
+    process_osm nhưng mapdata repo chưa từng regen với nó — regen lần này làm Ga nhảy sai; đã trả về lat thật
+    20.85602 (nearGa 700 đủ giữ yard). Verify: aerial tile3 khớp vệ tinh (block đặc + khe hẻm), DOM load lại
+    nhanh, 0 JS error, 3.6M tris. BÀI HỌC: file osm_*.json có thể là TRANG LỖI XML (rate-limit) — check đầu
+    file trước khi tin; process_osm phải chạy từ tools/ (đường dẫn tương đối).
 - **2026-07-17 (cy)** [THẢM NHÀ ỐNG TOÀN LÕI — sửa cấu trúc "nhà dân chưa chuẩn"]: audit cmp_1..8 chỉ rõ lỗi
     hệ thống #1: thật = thảm liền kề phủ ~90% lòng ô, game cũ = hộp rải ~25% + nửa NAM/ĐÔNG lõi (z>560/x>900)
     TRỐNG hẳn vì vòng lặp infill dừng sớm. Làm lại vòng infill (world.js ~18894): (1) phủ TOÀN lõi tròn

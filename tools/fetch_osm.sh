@@ -16,6 +16,9 @@ q '[out:json][timeout:120];way["waterway"~"^(river|canal)$"](20.55,106.45,21.10,
 # 3. Phố trung tâm (mọi cấp đường trong hộp trung tâm)
 q '[out:json][timeout:120];way["highway"~"^(trunk|primary|secondary|tertiary|residential|living_street|unclassified|pedestrian)$"](20.845,106.652,20.884,106.712);out geom;' osm_roads_dt.json
 
+# 3b. Ngõ/hẻm lõi trung tâm (service/alley/footway — query roads_dt cũ lọc mất; class 'h' trong mapdata)
+q '[out:json][timeout:120];way["highway"~"^(service|footway|path|track)$"](20.845,106.652,20.884,106.712);out geom;' osm_alleys.json
+
 # 4. Trục vùng rộng (ra Đồ Sơn, Đình Vũ, Thủy Nguyên...)
 q '[out:json][timeout:120];way["highway"~"^(trunk|primary|secondary)$"](20.55,106.45,21.10,107.35);out geom;' osm_roads_region.json
 
