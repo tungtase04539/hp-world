@@ -26,8 +26,12 @@ import { initCinematic } from './cinematic.js';
 // ============ Khởi tạo đồ họa ============
 const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 const canvas = document.getElementById('scene');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: !isTouchDevice }); // mobile: tắt MSAA (VRAM + ổn định)
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, isTouchDevice ? 1.2 : 2)); // mobile hạ 1.2 chống crash
+const renderer = new THREE.WebGLRenderer({
+  canvas, antialias: !isTouchDevice,              // mobile: tắt MSAA (VRAM + ổn định)
+  powerPreference: 'high-performance',            // laptop 2 GPU: ép dGPU (trước hay rơi vào iGPU → lag)
+});
+// KHỞI ĐỘNG ở 1.5 (đỡ khựng lúc vào); máy mạnh được autoQuality NÂNG lên full DPR sau khi đo FPS tốt
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, isTouchDevice ? 1.2 : 1.5));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.18;
@@ -328,20 +332,29 @@ let time = 0, clockUITimer = 0, minimapTimer = 1, interactTimer = 1, shadowTimer
 // bóng đổ render theo nhịp riêng (xem cuối animate) — tắt autoUpdate mỗi khung
 if (renderer.shadowMap.enabled) renderer.shadowMap.autoUpdate = false;
 let started = false;
-// AUTO-QUALITY ĐA-BƯỚC + LIÊN TỤC (Lô C): máy MẠNH giữ FULL quality (bước 0); máy yếu hạ DẦN theo tải BỀN
-// (đo FPS mỗi 4s). Bước 1: tắt bloom + pixelRatio 1.5. Bước 2: tắt bóng đổ + pixelRatio 1. Không hồi (chống dao động).
-let fpsFrames = 0, fpsStart = 0, _qStep = 0;
+// AUTO-QUALITY ĐA-BƯỚC + LIÊN TỤC: máy MẠNH được NÂNG lên full DPR sau khi chứng minh FPS;
+// máy yếu hạ DẦN theo tải bền. 3 cửa sổ đầu đo NHANH (2s) để phản ứng sớm ngay sau "Bắt đầu".
+// FIX QUAN TRỌNG: đổi pixelRatio phải đổi CẢ composer (EffectComposer giữ _pixelRatio riêng từ lúc
+// khởi tạo — trước đây chỉ setPixelRatio(renderer) nên bloom/MSAA vẫn render đủ phân giải → hạ bước vô dụng).
+let fpsFrames = 0, fpsStart = 0, _qStep = 0, _qChecks = 0;
 const _DPR = Math.min(window.devicePixelRatio || 1, 2);
+function setPR(v) {
+  renderer.setPixelRatio(v);
+  if (composer) { composer.setPixelRatio(v); composer.setSize(window.innerWidth, window.innerHeight); }
+}
 function autoQuality() {
   if (!fpsStart) { fpsStart = time; fpsFrames = 0; }
   fpsFrames++;
-  if (time - fpsStart > 4) {
+  const win = _qChecks < 3 ? 2 : 4;
+  if (time - fpsStart > win) {
     const fps = fpsFrames / (time - fpsStart);
-    fpsStart = time; fpsFrames = 0;
+    fpsStart = time; fpsFrames = 0; _qChecks++;
     if (fps < 24 && _qStep < 2) {
       _qStep++;
-      if (_qStep === 1) { if (bloomPass) bloomPass.enabled = false; renderer.setPixelRatio(Math.min(_DPR, 1.5)); }
-      else { dayNight.sun.castShadow = false; renderer.shadowMap.autoUpdate = false; renderer.setPixelRatio(1); }
+      if (_qStep === 1) { if (bloomPass) bloomPass.enabled = false; setPR(Math.min(_DPR, 1.2)); }
+      else { dayNight.sun.castShadow = false; renderer.shadowMap.autoUpdate = false; setPR(1); }
+    } else if (fps >= 50 && _qStep === 0 && renderer.getPixelRatio() < _DPR) {
+      setPR(_DPR);   // máy mạnh: lên full độ phân giải (không mất chất lượng lâu dài)
     }
   }
 }
@@ -586,5 +599,14 @@ document.getElementById('startBtn').addEventListener('click', () => {
     if (guide) ui.startDialogue(guide);
   }, 700);
 });
+
+// ẤM MÁY sau màn chờ: compile TOÀN BỘ shader của scene (song song, KHR_parallel_shader_compile)
+// + render bóng 1 lần. Trước đây Three chỉ compile vật thể LỌT KHUNG NHÌN ở frame đầu → bấm
+// "Bắt đầu" camera quét ra toàn cảnh = bão compile shader → khựng vài giây.
+if (renderer.compileAsync) {
+  renderer.compileAsync(scene, camera)
+    .then(() => { if (renderer.shadowMap.enabled) renderer.shadowMap.needsUpdate = true; })
+    .catch(() => {});
+}
 
 animate();
