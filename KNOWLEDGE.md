@@ -315,6 +315,17 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-17 (cy)** [THẢM NHÀ ỐNG TOÀN LÕI — sửa cấu trúc "nhà dân chưa chuẩn"]: audit cmp_1..8 chỉ rõ lỗi
+    hệ thống #1: thật = thảm liền kề phủ ~90% lòng ô, game cũ = hộp rải ~25% + nửa NAM/ĐÔNG lõi (z>560/x>900)
+    TRỐNG hẳn vì vòng lặp infill dừng sớm. Làm lại vòng infill (world.js ~18894): (1) phủ TOÀN lõi tròn
+    BUILD_RADIUS−40; (2) nhà ỐNG mặt tiền 4.6-6.8m × sâu ≤12.5m (sâu co theo chỗ trống: dHalfMax=min(big−8.5,
+    alley−3)); (3) QUAY MẶT ra đường gần nhất (roadDists trả thêm hướng đoạn gần nhất; _ang=atan2(−bdz,bdx));
+    (4) ôm sát ngõ (bỏ né cứng 16m); (5) BỎ evidence-gate trong lõi (thật dày đều); (6) CAPB 20000→60000,
+    2-4 tầng, 88% mái chóp; collider min(0.52·max, alley−2.6, big−8, 6) tránh chặn ngõ. GIỮ NGUYÊN guard
+    nước/công viên/openSpace/panoDenies/nearFeatured/clearedZone/LM/nearPanoCam/ray. Verify: aerial tile3 ≈
+    vệ tinh thật (thảm terracotta kín ô), NAM (200,1000) từ trống → kín, phố tầm mắt dãy nhà 2 bên + lòng
+    đường sạch, tris aerial 3.7M / street 2.7M, 0 JS error. LƯU Ý test: __hp.aerial không tự reset —
+    teleport sau đó vẫn render aerial-cam; muốn chụp ground phải dùng session mới.
 - **2026-07-17 (cx)** [TƯỜNG THẾ GIỚI + MINIMAP TÊN ĐƯỜNG/CÔNG TRÌNH]: (1) `clampToPlayArea` (main.js) —
     tường vô hình tròn PLAY_RADIUS=BUILD_RADIUS−12 áp sau MỌI kiểu di chuyển (bộ/xe/thuyền) trong animate;
     trượt dọc tường + toast nhắc (chống spam 5s). Verify: teleport 1700 → toast hiện, 0 lỗi. (2) Minimap v2:

@@ -18839,11 +18839,19 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     for (const rl of (RAIL || [])) for (let i = 0; i < rl.pts.length - 1; i++) addSeg(rl.pts[i][0], rl.pts[i][1], rl.pts[i + 1][0], rl.pts[i + 1][1], 2);
     const roadDists = (x, z) => {
       const kx = Math.floor(x / BK), kz = Math.floor(z / BK); let big = 1e9, alley = 1e9, rail = 1e9;
+      let bestD = 1e9, bdx = 1, bdz = 0;   // hướng đoạn đường GẦN NHẤT (không tính ray) — để nhà quay mặt ra đường
       for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) {
         const l = segBuck.get((kx + dx) + ',' + (kz + dz)); if (!l) continue;
-        for (const s of l) { const d = _segD(x, z, s[0], s[1], s[2], s[3]); if (s[4] === 2) { if (d < rail) rail = d; } else if (s[4] === 1) { if (d < big) big = d; } else if (d < alley) alley = d; }
+        for (const s of l) {
+          const d = _segD(x, z, s[0], s[1], s[2], s[3]);
+          if (s[4] === 2) { if (d < rail) rail = d; }
+          else {
+            if (s[4] === 1) { if (d < big) big = d; } else if (d < alley) alley = d;
+            if (d < bestD) { bestD = d; bdx = s[2] - s[0]; bdz = s[3] - s[1]; }
+          }
+        }
       }
-      return [big, alley, rail];
+      return [big, alley, rail, bdx, bdz];
     };
     const wallTones = [[0.93, 0.87, 0.70], [0.90, 0.79, 0.62], [0.86, 0.88, 0.84], [0.92, 0.74, 0.62], [0.82, 0.85, 0.89], [0.88, 0.82, 0.68]];
     // Mái sẫm hơn (audit vệ tinh R2): thật đỏ-gạch SÂU + nâu đất, không hồng nhạt. Đỏ chủ đạo + 1 nâu + 1 tôn xám.
@@ -18851,7 +18859,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     const geos = []; const lmPtsB = Object.values(LM);
     let bs = 424241; const brnd = () => { bs = (bs * 1103515245 + 12345) & 0x7fffffff; return bs / 0x7fffffff; };
     let nB = 0;
-    const CAPB = 20000;   // vệ tinh GE: lòng ô kín mái ~100% → lưới dày, nhà gần chạm nhau (15000→20000: mở biên NW/N cần thêm quota rìa)
+    const CAPB = 60000;   // thảm nhà ống TOÀN lõi 1600m (20000→60000: phủ thêm nửa nam+đông + lưới 7.5m dày hơn)
     // (PANO-LOOP V1: 5600 cạn quanh gx≈0 → cả dải đông tới Ga trống; 9500 đủ quét hết lưới, vẫn 1 mesh gộp)
     // KHU PHÂN LÔ LIỀN KỀ MỚI cạnh THPT Lê Hồng Phong (GE ảnh 4: dãy nhà trắng đều) — georef từ ảnh
     {
@@ -18885,30 +18893,32 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
       for (let i = 0; i < n; i++) { const sh = 0.78 + 0.22 * Math.max(0, nr.getY(i) * 0.5 + 0.5); c[i*3]=rgb[0]*sh; c[i*3+1]=rgb[1]*sh; c[i*3+2]=rgb[2]*sh; }
       g.setAttribute('color', new THREE.BufferAttribute(c, 3)); return g;
     };
-    // VÙNG REAL-DÀY nhưng game trống (audit georog): bỏ yêu cầu evidence OSM (vẫn giữ guard đường/nước/openSpace).
-    const _forceDense = (x, z) => (
-      (x > -1200 && x < -650 && z > -1250 && z < -800) ||   // bán đảo Sở GTVT/Bạch Đằng (t7)
-      (x > -1300 && x < -800 && z > -600 && z < -250) ||    // Lê Hồng Phong lấp (t4)
-      (x > -1050 && x < -750 && z > 380 && z < 600)         // Tam Bạc góc dưới-giữa (t1)
-    );
-    for (let gx = -1750; gx <= 900 && nB < CAPB; gx += 8.5) {   // mở biên TÂY -1100→-1750 (phủ rìa tây t4/t7 real dày nhà; guard evidence tự giới hạn)
-      for (let gz = -1320; gz <= 560 && nB < CAPB; gz += 8.5) {  // mở biên BẮC -900→-1320 (phủ bán đảo Sở GTVT/Bạch Đằng t7; guard water/superblock chừa sông Cấm+cảng)
+    // (evidence-gate + _forceDense đã bỏ: thảm phủ ĐỀU toàn lõi theo audit vệ tinh — guard nước/công viên/pano giữ nguyên)
+    // === THẢM NHÀ ỐNG LIỀN KỀ TOÀN LÕI (audit cmp_1..8: thật phủ ~90% lòng ô, bản cũ ~25% rải rác) ===
+    //  - Phủ TOÀN lõi tròn BUILD_RADIUS (vòng cũ dừng z=560/x=900 → nửa NAM + ĐÔNG trống nhà dân)
+    //  - Nhà ỐNG thật: mặt tiền hẹp 4.6-6.8m, SÂU theo chỗ trống (≤12.5m), QUAY MẶT ra đường gần nhất
+    //  - Ôm sát ngõ: lùi = nửa_sâu + mép (thay né cứng 16m → hết hành lang trống dọc mọi ngõ)
+    //  - BỎ evidence-gate trong lõi (vệ tinh thật: dày ĐỀU); giữ NGUYÊN guard nước/công viên/pano/featured/LM/ray
+    for (let gx = -1600; gx <= 1600 && nB < CAPB; gx += 7.5) {
+      for (let gz = -1600; gz <= 1600 && nB < CAPB; gz += 7.5) {
+        if (gx * gx + gz * gz > (BUILD_RADIUS - 40) * (BUILD_RADIUS - 40)) continue;
         const x = gx + (brnd() - 0.5) * 4, z = gz + (brnd() - 0.5) * 4;
         if (Math.abs(groundHeightNoDeck(x, z) - LAND_H) > 0.3) continue;
         if (riverFactor(x, z) > 0.01) continue;
-        const [big, alley, rail] = roadDists(x, z);
-        if (big < 17.5 || alley < 16 || rail < 15) continue;         // trong LÒNG ô, không đè dải nhà mặt phố/ngõ/ray
-        if (big > 130 && alley > 130) continue;                       // quá xa mọi đường = ngoại vi trống
-        if (nearPanoCam(x, z, 5)) continue;                           // KEEP-CLEAR camera pano
-        if (_gridNear(_bldGrid, x, z, 10.5)) continue;                // né nhà OSM thật (13→10.5: nhà infill sát cụm OSM hơn)
-        if (!(_gridNear(_bldGrid, x, z, 95) || _gridNear(_phGrid, x, z, 60) || _forceDense(x, z))) continue; // Ô PHẢI CÓ BẰNG CHỨNG nhà (hoặc vùng real-dày flagged)
+        const [big, alley, rail, bdx, bdz] = roadDists(x, z);
+        if (rail < 15) continue;
+        const dHalfMax = Math.min(big - 8.5, alley - 3.0);   // nửa-sâu tối đa: chừa lòng+vỉa hè (p/s/t) / mép ngõ (r)
+        if (dHalfMax < 3.5) continue;                        // sát đường quá → không nhét được nhà ≥7m sâu
+        if (big > 150 && alley > 150) continue;              // quá xa mọi đường = bãi ngoại vi
+        if (nearPanoCam(x, z, 5)) continue;                  // KEEP-CLEAR camera pano
+        if (_gridNear(_bldGrid, x, z, 7.5)) continue;        // né nhà OSM thật (10.5→7.5: thảm sát cụm OSM)
         if (openSpace(x, z) || panoDenies(x, z)) continue;
-        if (nearFeatured(x, z)) continue;                             // không đè/che công trình đích danh
-        if (clearedZone(x, z)) continue;                              // bãi giải tỏa Hoàng Diệu
+        if (nearFeatured(x, z)) continue;                    // không đè/che công trình đích danh
+        if (clearedZone(x, z)) continue;                     // bãi giải tỏa Hoàng Diệu
         let lmHit = false; for (const [lx, lz] of lmPtsB) { if ((x - lx) ** 2 + (z - lz) ** 2 < 30 * 30) { lmHit = true; break; } }
         if (lmHit) continue;
         if (!cornersDry(x, z, 1, 0, 3.4, 0, 1, 3.4)) continue;
-        const w = 6.2 + brnd() * 2.4, d = 6.2 + brnd() * 2.4, fl = 2 + ((brnd() * 2) | 0), h = fl * 3.2;
+        const w = 4.6 + brnd() * 2.2, d = Math.min(8.5 + brnd() * 4, dHalfMax * 2), fl = 2 + ((brnd() * 3) | 0), h = fl * 3.2;
         const gy = groundHeight(x, z);
         const box = new THREE.BoxGeometry(w, h, d);
         const wc = wallTones[(Math.abs(x * 7 + z * 13) | 0) % wallTones.length];
@@ -18916,14 +18926,15 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
         { const nrm = box.attributes.normal, cn = box.attributes.position.count, c = new Float32Array(cn * 3);
           for (let v = 0; v < cn; v++) { const isR = nrm.getY(v) > 0.6; const t = isR ? rc : wc; const sh = isR ? 0.96 : 0.8 + 0.2 * Math.abs(nrm.getX(v)); c[v * 3] = t[0] * sh; c[v * 3 + 1] = t[1] * sh; c[v * 3 + 2] = t[2] * sh; }
           box.setAttribute('color', new THREE.BufferAttribute(c, 3)); }
-        const _ang = (brnd() * 4 | 0) * Math.PI / 2 + (brnd() - 0.5) * 0.2;
+        const _ang = Math.atan2(-bdz, bdx) + (brnd() - 0.5) * 0.08;   // mặt tiền (trục X local) SONG SONG đường gần nhất
         box.rotateY(_ang); box.translate(x, gy + h / 2, z);
         geos.push(box);
-        if ((Math.abs(x * 11 + z * 17) | 0) % 100 < 72) {
+        if ((Math.abs(x * 11 + z * 17) | 0) % 100 < 88) {
           const _rr = _pyrRoof(w, d, 1.8 + (Math.abs(x * 3 + z) % 3) * 0.5, rc, 0.35);
           _rr.rotateY(_ang); _rr.translate(x, gy + h, z); geos.push(_rr);
         }
-        addCollider(x, z, Math.max(w, d) * 0.52); nB++;
+        addCollider(x, z, Math.max(2.4, Math.min(Math.max(w, d) * 0.52, alley - 2.6, big - 8, 6)));
+        nB++;
       }
     }
     if (geos.length) {
