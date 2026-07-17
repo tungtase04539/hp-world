@@ -351,7 +351,12 @@ function autoQuality() {
     fpsStart = time; fpsFrames = 0; _qChecks++;
     if (fps < 24 && _qStep < 2) {
       _qStep++;
-      if (_qStep === 1) { if (bloomPass) bloomPass.enabled = false; setPR(Math.min(_DPR, 1.2)); }
+      if (_qStep === 1) {
+        if (bloomPass) bloomPass.enabled = false; setPR(Math.min(_DPR, 1.2));
+        const sm = dayNight.sun.shadow;               // bóng 2048→1024: shadow pass nhẹ 4 lần, chưa phải tắt
+        sm.mapSize.set(1024, 1024);
+        if (sm.map) { sm.map.dispose(); sm.map = null; }
+      }
       else { dayNight.sun.castShadow = false; renderer.shadowMap.autoUpdate = false; setPR(1); }
     } else if (fps >= 50 && _qStep === 0 && renderer.getPixelRatio() < _DPR) {
       setPR(_DPR);   // máy mạnh: lên full độ phân giải (không mất chất lượng lâu dài)
@@ -468,7 +473,7 @@ function animate() {
     // (PCFSoft 2048² từng tốn ~745 draw call + ~2M tam giác PHỤ mỗi khung)
     if (renderer.shadowMap.enabled && dayNight.sun.castShadow) {
       shadowTimer += dt;
-      if (shadowTimer > 0.12) { shadowTimer = 0; renderer.shadowMap.needsUpdate = true; }
+      if (shadowTimer > 0.22) { shadowTimer = 0; renderer.shadowMap.needsUpdate = true; }   // 8Hz→4.5Hz: nửa số frame-spike bóng, mắt không thấy khác
     }
   }
 

@@ -9,6 +9,7 @@ import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 //  - báo tiến trình % để hiển thị trên màn chờ
 // ============================================================
 
+if (MeshoptDecoder.useWorkers) MeshoptDecoder.useWorkers(2);   // decode GLB ở WORKER — hết khựng main thread khi stream model
 const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
 const REGISTRY = [];
 let toastFn = null;
