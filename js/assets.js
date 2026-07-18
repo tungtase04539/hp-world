@@ -1,5 +1,7 @@
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+import { IS_MOBILE, LITE } from './device.js';
+export { IS_MOBILE };   // re-export: traffic.js/world.js đang import từ đây
 
 // ============================================================
 // Bộ nạp công trình GLB chất lượng cao — tải thông minh:
@@ -32,19 +34,18 @@ const OVERSIZE = new Set(['assets/baotang.glb', 'assets/quanhoa.glb', 'assets/le
 const assetURL = (url) => IS_LOCAL ? url : ((OVERSIZE.has(url) ? RAWGH : JSDELIVR) + url);
 
 // MOBILE: RAM/VRAM hạn chế → tải tuần tự, bán kính hẹp, texture hạ về ≤1024px (desktop giữ 100% gốc).
-export const IS_MOBILE = /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent)
-  || (navigator.deviceMemory !== undefined && navigator.deviceMemory <= 4);
 
 // Cụm trung tâm (quanh gốc toạ độ) tải NGAY ở màn chờ; công trình xa để streaming.
 const PRELOAD_RADIUS = IS_MOBILE ? 320 : 950;   // m — mobile chỉ preload cụm sát điểm xuất phát
 const PRELOAD_PARALLEL = IS_MOBILE ? 1 : 4;     // mobile: 1 GLB/lúc (tránh peak RAM decode song song)
 const STREAM_PARALLEL = 1;       // trong game: 1 cái/lúc để không giật khung hình khi parse
-const MOBILE_TEX_MAX = 1024;     // px — trần texture trên mobile (màn nhỏ, không nhìn ra khác biệt)
+const MOBILE_TEX_MAX = 512;      // px — trần texture GLB khi LITE/mobile (24 tấm 1024² = 128MB → 32MB;
+                                 // màn điện thoại + cự ly chơi không phân biệt được. Desktop FULL giữ nguyên gốc.)
 
 // Hạ cỡ texture cho mobile NGAY sau khi load (canvas downscale) + giải phóng ảnh gốc khỏi RAM.
 // KHÔNG đụng file gốc — desktop vẫn 100% chất lượng theo yêu cầu chủ dự án.
 export function shrinkTexturesForMobile(root) {
-  if (!IS_MOBILE) return;
+  if (!IS_MOBILE && !LITE) return;   // LITE (desktop yếu) cũng cần: GLB mang map+normal+emissive 4096² ≈ 255MB/model
   const seen = new Set();
   root.traverse((o) => {
     if (!o.isMesh) return;
@@ -55,6 +56,11 @@ export function shrinkTexturesForMobile(root) {
         const t = m[slot];
         if (!t || !t.image || seen.has(t)) continue;
         seen.add(t);
+        // LITE: bỏ hẳn normalMap/roughness/metalness (chi tiết bề mặt gần như vô hình ở cự ly chơi,
+        // nhưng mỗi tấm tốn ngang map) — GIỮ emissiveMap vì đèn/cửa sáng ban đêm cần nó.
+        if ((slot === 'normalMap' || slot === 'roughnessMap' || slot === 'metalnessMap') && (IS_MOBILE || LITE)) {
+          m[slot] = null; m.needsUpdate = true; continue;
+        }
         const img = t.image, w = img.width || 0, h = img.height || 0;
         if (w <= MOBILE_TEX_MAX && h <= MOBILE_TEX_MAX) continue;
         const s = MOBILE_TEX_MAX / Math.max(w, h);

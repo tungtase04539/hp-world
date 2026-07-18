@@ -315,6 +315,37 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-17 (dc)** [ĐỢT TỐI ƯU LỚN — đo bằng CỔNG NGÂN SÁCH `tools/perfbudget.mjs`]: user "vẫn lag" +
+    "tìm repo GitHub áp dụng". Kết luận repo: Claude-Code-Game-Studios = khung QUY TRÌNH (Godot/Unity/UE),
+    KHÔNG có kỹ thuật Three.js — chỉ lấy 1 ý: biến đo perf thành CỔNG NGÂN SÁCH cố định. Dựng
+    `tools/perfbudget.mjs` (chạy: `PW_PATH=<...>/playwright-core/index.mjs node tools/perfbudget.mjs 8179 lite`).
+    **NÓ LẬP TỨC LỘ THỦ PHẠM CHƯA AI ĐO: RAM texture 1.881 MB** (ngân sách 90) — điện thoại 2-4GB RAM thì
+    thrash/crash, đây mới là "lag" thật. Chi tiết + cách sửa:
+    (1) 1.875 texture canvas RIÊNG (mỗi nhà một cái) → vá THẲNG `makeTex`: `TEXQ = LITE?0.5:1`, vẽ ở
+        canvas nhỏ + `ctx.scale` nên bố cục chữ/gạch giữ nguyên → RAM ÷4 (1 đòn phủ hết, không sửa 64 chỗ gọi).
+    (2) Atlas biển hiệu 4096²(85MB/tấm)×3: khoá `IS_MOBILE` → đổi `IS_MOBILE || LITE`.
+    (3) GLB: `shrinkTexturesForMobile` cũng khoá IS_MOBILE → mở cho LITE; MOBILE_TEX_MAX 1024→512;
+        BỎ HẲN normalMap/roughnessMap/metalnessMap khi LITE (giữ emissiveMap cho đèn đêm).
+        KQ: **1.881 → 441 MB**.
+    (4) `js/device.js` MỚI: LITE + IS_MOBILE ở module riêng — world.js và assets.js cùng dùng mà KHÔNG
+        tạo VÒNG LẶP IMPORT (world ↔ assets).
+    (5) `js/instcull.js` MỚI (kỹ thuật InstancedMesh2/agargaro, tự viết — không thêm dependency):
+        THREE.InstancedMesh vẽ MỌI instance mỗi khung (đo: hero_trees = 7,0 TRIỆU tri). Chụp ma trận gốc,
+        mỗi 0.4s NÉN danh sách theo khoảng cách rồi hạ `mesh.count`. `autoRegisterInstances` tự quét
+        (lặp lại vì GLB nạp async), bỏ qua instance ĐỘNG (xe/người tự set ma trận → nén sẽ phá).
+        Tầm: LITE cây 150m/prop 300m; FULL 520/700. KQ: **6.489 → 1.043 instance vẽ (−84%)**.
+    (6) `ornlamp_globes`: 257k tri LUÔN vẽ vì gộp 1 mesh phủ CẢ BẢN ĐỒ (bounding vô nghĩa) → `addMergedTiled`
+        + sphere 10×8→8×5. (7) Ô merge tĩnh LITE 450→220m (ô to = ló góc vẫn vẽ trọn).
+    TỔNG: tri 6,03M→4,81M; texture −77%; 0 lỗi; visual y nguyên (3 góc kiểm).
+    **2 BẪY KIỂM THỬ (tốn ~1h, PHẢI nhớ):**
+      a) `node --check x.js` KHÔNG bắt lỗi cú pháp module → **copy sang .mjs rồi `node --check`** mới đúng.
+         (Suốt buổi báo "SYNTAX OK" trong khi file thật sự hỏng.) Lỗi hiện ra trong browser là
+         "Unexpected end of input" + `__hp` không tồn tại.
+      b) Thay chuỗi có comment `//` cuối dòng: dấu `}` bị NUỐT VÀO COMMENT → mất ngoặc đóng.
+         Comment phải nằm ở DÒNG RIÊNG phía trên.
+      c) (nhắc lại, đã dính lần 2) nhịp định kỳ phải dùng `performance.now()`, KHÔNG dùng `time` giờ-game.
+    CÒN LẠI (đợt sau): model GLB ~300k tri/cái (LOD chỉ cho LITE, FULL giữ 100%); BatchedMesh (r160 CÓ sẵn)
+    cho ~5k hộp multi-material → draw calls; 1.877 texture riêng vẫn nhiều (atlas hoá biển hiệu nhỏ).
 - **2026-07-17 (db)** [PLAYBOOK MOBILE — gộp tĩnh toàn cục, đòn draw-call]: user "vẫn lag trên mobile" →
     đo thành phần: **11.759 mesh KHÔNG TÊN** (prop lẻ hand-built các chiến dịch) / 12.393 tổng, 1.806 texture
     riêng, calls 2985. Bài học chuẩn cộng đồng: mobile chết vì DRAW CALLS + OBJECT COUNT (<150 calls, <2k obj),

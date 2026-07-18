@@ -22,6 +22,7 @@ import { initMinimap, drawMinimap } from './minimap.js';
 import { initMinigame, openMinigame, isMinigameOpen } from './minigame.js';
 import { initAssets, updateAssets } from './assets.js';
 import { initCinematic } from './cinematic.js';
+import { autoRegisterInstances, updateInstanceCull, instanceCullStats } from './instcull.js';
 
 // ============ Khởi tạo đồ họa ============
 const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
@@ -359,6 +360,7 @@ function autoQuality() {
 // NẤC CHẤT LƯỢNG 3 (máy rất yếu): sương mù co về 1300m + ẨN các tile thế giới ngoài 1450m
 // quanh người chơi (tile 450m đã tách sẵn — chỉ bật/tắt visible, không đổi nội dung).
 let _nearTiles = null, _nearCullLast = 0;
+let _instScanAt = -9999;
 function enableNearView() {
   scene.fog.near = 220; scene.fog.far = 1300;
   camera.far = 1650; camera.updateProjectionMatrix();
@@ -492,6 +494,12 @@ function animate() {
 
     autoQuality();
     updateNearCull();
+    // CULLING TỪNG INSTANCE: quét lại định kỳ (cây/model GLB nạp async sau khi world dựng),
+    // rồi nén danh sách theo khoảng cách (nhịp riêng bên trong, 0.4s).
+    // BẪY (KNOWLEDGE da, dính lần 2): nhịp phải theo ĐỒNG HỒ THẬT — `time` là giờ-GAME, dt bị clamp
+    // 0.05 nên máy 2fps thì giờ-game trôi chậm 10× → quét đăng ký mãi không chạy đúng lúc cần nhất.
+    { const _n = performance.now(); if (_n - _instScanAt > 2000) { _instScanAt = _n; autoRegisterInstances(scene); } }
+    updateInstanceCull(pState.pos.x, pState.pos.z);
     updateAssets(dt, pState.pos); // streaming mô hình xa theo khoảng cách
     clockUITimer += dt;
     if (clockUITimer > 0.5) { clockUITimer = 0; ui.setClock(dayNight.clockString); }
@@ -551,8 +559,9 @@ window.__cine = cine;
 
 // Hook gỡ lỗi / chụp ảnh tour (không ảnh hưởng gameplay)
 window.__hp = {
-  renderer, scene,   // chẩn đoán hiệu năng (draw calls / triangles)
+  renderer, scene, camera, THREE,   // chẩn đoán hiệu năng (draw calls / triangles / frustum)
   enableNearView,    // bật tay chế độ tầm-nhìn-gần (nấc chất lượng 3) — test/máy rất yếu
+  instanceCullStats, // chẩn đoán: bao nhiêu instance đang thực sự vẽ
   cine,
   vehicles, mount, player,   // chẩn đoán/thử nghiệm cưỡi xe
   // Chẩn đoán: mọi thực thể tương tác có đứng đúng chỗ & tiếp cận được không

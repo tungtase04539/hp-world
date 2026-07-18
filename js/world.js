@@ -2,7 +2,8 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
-import { registerModel, shrinkTexturesForMobile, IS_MOBILE } from './assets.js';
+import { registerModel, shrinkTexturesForMobile } from './assets.js';
+import { IS_MOBILE, LITE } from './device.js';
 import {
   WORLD_BOUNDS, LM, LM_DIR, LM_FACE, EXTRAS, TREES, PARKS, RAIL, DT_BOX, RIVERS, ROADS_DT, ROADS_REGION, BRIDGES, BUILDINGS,
   groundHeight, groundHeightNoDeck, isWater, landAt, riverFactor,
@@ -58,23 +59,8 @@ const _matCache = new Map();
 // 1600 (thay vì 1500 chẵn) để trọn cụm CẢNG (portAnchor ~1565m) không bị cắt nham nhở.
 export const BUILD_RADIUS = 1600;
 
-// CHẾ ĐỘ NHẸ (máy yếu/mobile): build thảm nhà THƯA hơn + main.js seed sẵn bước hạ chất lượng.
-// Máy mạnh giữ nguyên FULL. Ép tay để test/chọn: ?quality=full hoặc ?quality=lite trên URL.
-export const LITE = (() => {
-  try {
-    const q = new URLSearchParams(location.search).get('quality');
-    if (q === 'full') return false;
-    if (q === 'lite') return true;
-    if ('ontouchstart' in window || navigator.maxTouchPoints > 0) return true;   // mobile/tablet
-    if ((navigator.hardwareConcurrency || 8) <= 4) return true;                  // CPU yếu
-    const c = document.createElement('canvas');
-    const gl = c.getContext('webgl');
-    const ext = gl && gl.getExtension('WEBGL_debug_renderer_info');
-    const rs = ext ? String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)) : '';
-    if (/SwiftShader|Intel\(R\)? (HD|UHD|Iris)|Mali-[T4-7]|Adreno [1-5]\d\d/i.test(rs)) return true; // iGPU/GPU cũ
-  } catch (e) { }
-  return false;
-})();
+// (LITE + IS_MOBILE nay ở js/device.js — re-export để main.js/các module cũ vẫn import từ world.js)
+export { LITE };
 
 function mat(color, opts = {}) {
   // PERF: cache CẢ material có opts theo key (màu+opts) — gộp material trùng (giảm 3808→~vài trăm, ít state-change,
@@ -114,10 +100,17 @@ export const sharedMats = {
 };
 
 // ---------- Texture thủ tục ----------
+// LITE: hạ độ phân giải MỌI texture thủ tục (đo được: 1.875 texture riêng ≈ 1.6GB RAM texture trên
+// desktop-full — điện thoại 2-4GB RAM thì thrash/crash). Vẽ ở tỉ lệ nhỏ rồi scale ngữ cảnh nên nội dung
+// (chữ biển, gạch, cửa sổ) vẫn đúng bố cục, chỉ mềm hơn — trên màn nhỏ gần như không nhận ra.
+const TEXQ = LITE ? 0.5 : 1;          // 0.5 ⇒ RAM texture còn 1/4
 function makeTex(w, h, draw) {
   const c = document.createElement('canvas');
-  c.width = w; c.height = h;
-  draw(c.getContext('2d'), w, h);
+  const cw = Math.max(1, Math.round(w * TEXQ)), ch = Math.max(1, Math.round(h * TEXQ));
+  c.width = cw; c.height = ch;
+  const g = c.getContext('2d');
+  if (TEXQ !== 1) g.scale(TEXQ, TEXQ);   // hàm draw vẫn vẽ theo toạ độ w×h gốc
+  draw(g, w, h);
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   return t;
@@ -1234,14 +1227,14 @@ export function buildWorld(scene) {
       const finial = new THREE.SphereGeometry(0.14, 8, 6); finial.translate(x, gy + 0.7 + H + 0.12, z); ironG.push(finial);
       // 3 cầu đèn: 1 đỉnh + 2 tay ngang
       const topY = gy + 0.7 + H - 0.1;
-      const gl0 = new THREE.SphereGeometry(0.22, 10, 8); gl0.translate(x, topY + 0.5, z); globeG.push(gl0);
+      const gl0 = new THREE.SphereGeometry(0.22, 8, 5); gl0.translate(x, topY + 0.5, z); globeG.push(gl0);
       for (const a of [rotY + Math.PI / 2, rotY - Math.PI / 2]) {
         const ax = Math.sin(a), az = Math.cos(a);
         const arm = new THREE.CylinderGeometry(0.05, 0.05, 0.95, 5); arm.rotateZ(Math.PI / 2);
         const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, a, 0));
         arm.applyMatrix4(new THREE.Matrix4().compose(new THREE.Vector3(x + ax * 0.48, topY + 0.05, z + az * 0.48), q, new THREE.Vector3(1, 1, 1)));
         ironG.push(arm);
-        const gl = new THREE.SphereGeometry(0.2, 10, 8); gl.translate(x + ax * 0.92, topY + 0.02, z + az * 0.92); globeG.push(gl);
+        const gl = new THREE.SphereGeometry(0.2, 8, 5); gl.translate(x + ax * 0.92, topY + 0.02, z + az * 0.92); globeG.push(gl);
       }
     }
     for (let ri = 0; ri < ROADS_DT.length; ri++) {
@@ -1265,7 +1258,8 @@ export function buildWorld(scene) {
         }
       }
     }
-    if (ironG.length) { addMerged(ironG, mat(0x2b3a30), 'ornlamp_iron'); const gm = mergeGeometries(globeG); globeG.forEach((g) => g.dispose()); const mesh = new THREE.Mesh(gm, sharedMats.lampGlow); mesh.name = 'ornlamp_globes'; scene.add(mesh); }
+    // TILED thay 1 mesh phủ cả bản đồ (đo: 257k tam giác quả cầu đèn LUÔN được vẽ vì bounding phủ hết)
+    if (ironG.length) { addMerged(ironG, mat(0x2b3a30), 'ornlamp_iron'); addMergedTiled(globeG, sharedMats.lampGlow, 'ornlamp_globes'); }
   }
 
   // ---------- CỜ ĐỎ SAO VÀNG trên cột dọc các đại lộ trung tâm (thân thuộc + hợp 2/9) ----------
@@ -18551,7 +18545,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     const bg = ['#c62828', '#1c56a0', '#1f7a3c', '#d8862a', '#26262c', '#8e2f80'];
     // MOBILE: atlas 4096² ≈ 85MB VRAM/tấm không nén — thu 1/4 cạnh (1024², chữ vẫn đọc được
     // ở cự ly chơi trên màn nhỏ); desktop giữ nguyên 100%
-    const MS = IS_MOBILE ? 0.25 : 1;
+    const MS = (IS_MOBILE || LITE) ? 0.25 : 1;   // 4096²(85MB/tấm) → 1024²(5MB/tấm) cho MỌI máy yếu
     for (let a = 0; a < Math.ceil(SHOP_SIGNS.length / PER); a++) {
       const items = SHOP_SIGNS.slice(a * PER, (a + 1) * PER);
       const cv = document.createElement('canvas'); cv.width = COLS * CELL_W * MS; cv.height = Math.ceil(ROWS * CELL_H * MS);
@@ -21728,7 +21722,9 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     // material mảng, transparent, emissive (đèn/ cửa sáng đêm — material bị daynight mutate),
     // không phải Lambert (GLB/player là Standard), InstancedMesh, ground/water.
     {
-      const T = 450, buckets = new Map(), doomed = [];
+      // Ô 450m quá thô khi cull (đo: mrg10 ×13 ô = 1.43M tri trong khung dù phần lớn ngoài tầm nhìn).
+      // LITE dùng ô 220m: nhiều mesh hơn một chút nhưng cull theo khung hình chặt hơn hẳn.
+      const T = LITE ? 220 : 450, buckets = new Map(), doomed = [];
       const _tmpC = new THREE.Vector3();
       scene.updateMatrixWorld(true);
       scene.traverse((o) => {
