@@ -43,6 +43,20 @@ for (let i = 0; i < 200; i++) {
 }
 await pg.waitForTimeout(6000);
 
+// TÁCH METRIC (GPT khuyến nghị #1): renderer.info.render.triangles CỘNG CẢ shadow pass →
+// số liệu "tự mâu thuẫn" với phân rã theo mesh. Đo main-only bằng cách tắt bóng rồi render 1 khung.
+const split = await pg.evaluate(async () => {
+  const R = window.__hp.renderer, S = window.__hp.scene, C = window.__hp.camera;
+  const dn = R.shadowMap.enabled;
+  R.render(S, C);
+  const both = R.info.render.triangles, bothCalls = R.info.render.calls;
+  R.shadowMap.enabled = false;
+  R.render(S, C);
+  const main = R.info.render.triangles, mainCalls = R.info.render.calls;
+  R.shadowMap.enabled = dn;
+  return { both, main, shadow: Math.max(0, both - main), bothCalls, mainCalls, shadowCalls: Math.max(0, bothCalls - mainCalls) };
+});
+
 const m = await pg.evaluate(() => {
   const R = window.__hp.renderer, info = R.info;
   // BỘ NHỚ TEXTURE THẬT: duyệt mọi map của mọi material, cộng w*h*4 (RGBA8) *1.33 nếu có mipmap.
@@ -81,9 +95,9 @@ const m = await pg.evaluate(() => {
 });
 
 const rows = [
-  ['draw calls', m.calls, BUDGET.calls],
+  ['draw calls (main)', split.mainCalls, BUDGET.calls],
   ['mesh trong scene', m.meshes, BUDGET.meshes],
-  ['triangles/khung', m.tris, BUDGET.tris],
+  ['triangles (main)', split.main, BUDGET.tris],
   ['RAM texture (MB)', m.texMB, BUDGET.texMB],
   ['shader programs', m.programs, BUDGET.programs],
   ['mesh transparent', m.transparent, BUDGET.transparent],
@@ -96,6 +110,7 @@ for (const [name, val, bud] of rows) {
   console.log(`${ok ? 'OK   ' : 'OVER '} ${name.padEnd(20)} ${String(val).padStart(9)} / ${bud}`);
 }
 console.log(`  (texture riêng: ${m.texCount}, lớn nhất ${m.maxTexMB} MB | geometry đang giữ: ${m.geoMem})`);
+console.log(`  TÁCH: main ${(split.main/1e6).toFixed(2)}M tri / ${split.mainCalls} calls  |  shadow ${(split.shadow/1e6).toFixed(2)}M tri / ${split.shadowCalls} calls`);
 console.log(`  JS error: ${errs.length ? errs.slice(0, 2).join(' ; ') : 'KHÔNG'}`);
 console.log(over ? `\n==> VƯỢT ${over} hạng mục\n` : '\n==> ĐẠT TOÀN BỘ\n');
 

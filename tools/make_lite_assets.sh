@@ -22,7 +22,11 @@ trap 'rm -rf "$TMP"' EXIT
 n=0
 for f in assets/*.glb; do
   b="$(basename "$f")"
-  gltf-transform simplify "$f" "$TMP/a.glb" --ratio 0.35 --error 0.005 >/dev/null 2>&1 || cp "$f" "$TMP/a.glb"
+  # Model NẶNG (>5MB = landmark ~300k tri) siết mạnh: 0.12 (~35k tri) — đo được 5 model chiếm 1.5M
+  # tam giác NGAY tại chỗ đứng. Model nhẹ (cây/xe/prop) giữ 0.5 để không vỡ dáng.
+  SZ=$(stat -c%s "$f" 2>/dev/null || echo 0)
+  if [ "$SZ" -gt 5000000 ]; then RATIO=0.12; ERR=0.01; else RATIO=0.5; ERR=0.005; fi
+  gltf-transform simplify "$f" "$TMP/a.glb" --ratio "$RATIO" --error "$ERR" >/dev/null 2>&1 || cp "$f" "$TMP/a.glb"
   gltf-transform resize "$TMP/a.glb" "$TMP/b.glb" --width 64 --height 64 \
       --slots "{normalTexture,metallicRoughnessTexture,occlusionTexture}" >/dev/null 2>&1 || cp "$TMP/a.glb" "$TMP/b.glb"
   gltf-transform resize "$TMP/b.glb" "$TMP/c.glb" --width 1024 --height 1024 >/dev/null 2>&1 || cp "$TMP/b.glb" "$TMP/c.glb"

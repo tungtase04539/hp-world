@@ -315,6 +315,24 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-17 (df)** [3 ĐÒN CUỐI THEO THỨ TỰ GPT + TÁCH METRIC MAIN/SHADOW]:
+    **(1) TÁCH METRIC (khuyến nghị #1 của GPT — sửa chính CÔNG CỤ ĐO):** `renderer.info.render.triangles`
+    CỘNG CẢ shadow pass → mọi số đo từ đầu buổi đều lẫn lộn (giải thích vì sao phân rã theo mesh ra 5.071k
+    mà tổng chỉ 3,83M). `tools/perfbudget.mjs` giờ render 1 khung có bóng / 1 khung tắt bóng để tách, và áp
+    ngân sách lên MAIN. LƯU Ý: `shadowMap.autoUpdate=false` (bóng theo nhịp riêng) nên phép tách báo
+    shadow=0 — main mới là số cần theo dõi.
+    **(2) GROUND:** `PlaneGeometry(500,340)` = 340k tam giác cho địa hình GẦN NHƯ PHẲNG (đa số ở LAND_H).
+    LITE → 240×164 = 79k (lưới ~9m vẫn giữ dáng bờ nước). FULL giữ nguyên.
+    **(3) LOD LANDMARK:** `make_lite_assets.sh` phân nhánh theo kích thước file — model >5MB (landmark
+    ~300k tri) dùng `--ratio 0.12 --error 0.01`, model nhẹ (cây/xe/prop) giữ 0.5 để không vỡ dáng.
+    ĐO THẬT trong file GLB (đọc chunk JSON, đếm accessor): lechan 330k→40k, nhahat 295k→35k,
+    dennghe 291k→47k, baotang 307k→103k, quanhoa 303k→141k. **Đối chứng ảnh FULL vs LITE: dáng tượng
+    Lê Chân và Nhà hát lớn GIỮ NGUYÊN** dù giảm ~88% tam giác. assets_lite: 282MB→64MB.
+    **(4) HỘP BÓNG LITE 110→70m:** lợi KÉP — ít caster lọt shadow pass (mesh gộp ô lớn chỉ cần CHẠM hộp
+    là render TOÀN BỘ vào shadow map) và bóng NÉT HƠN (cùng 1024px phủ vùng nhỏ hơn).
+    **BÀI HỌC ĐO ĐẠC:** đừng tin mức giảm suy ra từ 1 lần đo — số tam giác phụ thuộc model nào đã STREAM
+    vào tại thời điểm đo (6s). Muốn biết LOD có chạy không thì ĐỌC THẲNG FILE GLB, đừng suy từ FPS/tri.
+    TRẠNG THÁI LITE: texture 258MB/90 · main 3,52M tri/900k · calls 1167/260 · asset 64MB · không rò rỉ.
 - **2026-07-17 (de)** [PHIÊN PHẢN BIỆN VỚI GPT-5.6-sol-xhigh — 3 BUG THẬT + 2 VIỆC HUỶ]:
     Gửi toàn bộ số đo + quyết định cho gpt-5.6-sol-xhigh (`scratchpad/ask_gpt.py`, gọi qua
     `ag.ask(text, system=...)` — KHÔNG phải truyền tên file). Kết quả đáng giá hơn mọi vòng tự tối ưu:

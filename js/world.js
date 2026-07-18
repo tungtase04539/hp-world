@@ -543,7 +543,9 @@ export function buildWorld(scene) {
   const D = WORLD_BOUNDS.maxZ - WORLD_BOUNDS.minZ;
   const CX = (WORLD_BOUNDS.maxX + WORLD_BOUNDS.minX) / 2;
   const CZ = (WORLD_BOUNDS.maxZ + WORLD_BOUNDS.minZ) / 2;
-  const geo = new THREE.PlaneGeometry(W, D, 500, 340);
+  // LITE: địa hình lõi gần như PHẲNG (đa số ở LAND_H, chỉ bờ sông/cầu có độ dốc) — 500×340 = 340k
+  // tam giác là phi lý. 240×164 = 79k vẫn giữ đúng dáng bờ nước ở lưới ~9m. FULL giữ nguyên.
+  const geo = new THREE.PlaneGeometry(W, D, LITE ? 240 : 500, LITE ? 164 : 340);
   geo.rotateX(-Math.PI / 2);
   geo.translate(CX, 0, CZ);
   const pos = geo.attributes.position;
