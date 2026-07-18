@@ -31,7 +31,14 @@ const RAWGH = 'https://raw.githubusercontent.com/tungtase04539/hp-world/assets-s
 // phải dùng raw.githubusercontent (không giới hạn). Còn lại dùng jsDelivr (CDN nhanh).
 // Service Worker cache cả hai nên lần sau vào đều hiện ngay.
 const OVERSIZE = new Set(['assets/baotang.glb', 'assets/quanhoa.glb', 'assets/lechan.glb']);
-const assetURL = (url) => IS_LOCAL ? url : ((OVERSIZE.has(url) ? RAWGH : JSDELIVR) + url);
+// BỘ ASSET NHẸ cho máy yếu/điện thoại: assets/ nặng 282MB (texture 4096² + hình học ~300k tri/model)
+// → assets_lite/ chỉ 67MB (sinh bằng tools/make_lite_assets.sh). Bản GỐC giữ nguyên 100% cho máy mạnh.
+// Lite lỗi/thiếu → onError đặt d.forceFull rồi thử lại bằng bản gốc (không bao giờ mất công trình).
+const assetURL = (url, forceFull) => {
+  const u = (LITE && !forceFull) ? url.replace(/^assets\//, 'assets_lite/') : url;
+  if (IS_LOCAL) return u;
+  return (OVERSIZE.has(u) ? RAWGH : JSDELIVR) + u;   // chỉ bản gốc quá khổ (>20MB) mới cần raw.githubusercontent
+};
 
 // MOBILE: RAM/VRAM hạn chế → tải tuần tự, bán kính hẹp, texture hạ về ≤1024px (desktop giữ 100% gốc).
 
@@ -90,7 +97,7 @@ function start(d) {
   loadingCount++;
   if (toastFn && d.name) toastFn(`⏳ Đang tải ${d.name}…`);
   loader.load(
-    assetURL(d.url),
+    assetURL(d.url, d.forceFull),
     (gltf) => {
       d.state = 'done';
       loadingCount--;
@@ -108,7 +115,12 @@ function start(d) {
     (err) => {
       d.state = 'idle'; // cho phép thử lại khi lại gần lần nữa
       loadingCount--;
-      console.error('asset load', d.url, err);
+      if (LITE && !d.forceFull) {
+        d.forceFull = true;                       // bản lite hỏng/thiếu → lần sau dùng bản GỐC
+        console.warn('[asset] lite lỗi, chuyển bản gốc:', d.url);
+      } else {
+        console.error('asset load', d.url, err);
+      }
       report();
       pump();
     }

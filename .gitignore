@@ -1,4 +1,7 @@
 assets/*.glb
+# Bộ asset nhẹ cho máy yếu — SINH TỰ ĐỘNG (bash tools/make_lite_assets.sh),
+# nặng 67MB nên đẩy sang nhánh assets-storage như assets/ gốc, không commit ở nhánh làm việc.
+assets_lite/*.glb
 glbview.html
 /rb
 node_modules

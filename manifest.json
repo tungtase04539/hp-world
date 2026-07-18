@@ -1,0 +1,21 @@
+{
+  "name": "Hải Phòng 3D — Thành phố Hoa Phượng Đỏ",
+  "short_name": "Hải Phòng 3D",
+  "description": "Khám phá trung tâm Hải Phòng dựng 1:1 từ bản đồ thật: Nhà hát lớn, Quán hoa, tượng Nữ tướng Lê Chân, Đền Nghè, chợ Sắt và hàng trăm con phố.",
+  "lang": "vi",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#1a1a1f",
+  "theme_color": "#c62828",
+  "categories": ["games", "education", "travel"],
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' fill='%23c62828'/%3E%3Ctext x='256' y='368' font-size='320' text-anchor='middle'%3E%F0%9F%8C%BA%3C/text%3E%3C/svg%3E",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

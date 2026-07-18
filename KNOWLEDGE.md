@@ -315,6 +315,32 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-17 (dd)** [BỘ ASSET NHẸ + VÉT CẠN KHÍA CẠNH CHƯA ĐỘNG TỚI]:
+    **A. assets_lite/ (282MB → 67MB, −76%)** — phát hiện: `assets/` 23 model = 282MB người chơi phải TẢI
+    (texture 4096² + ~300k tri/model) → chính là "vào game lag một lúc". `tools/make_lite_assets.sh` (tái lập
+    được): simplify --ratio 0.35 --error 0.005 → normal/metallicRoughness/occlusion về 64px (LITE BỎ HẲN các
+    map này lúc chạy; riêng normalTexture là PNG ~2.9MB/model!) → baseColor/emissive 1024 → meshopt (không
+    lossy, đúng quy tắc). **Bản GỐC không đụng 1 byte**; `assets.js` chỉ đổi đường dẫn khi LITE, lỗi thì
+    `d.forceFull` lùi về bản gốc (không bao giờ mất công trình). `.gitignore` thêm assets_lite/*.glb → đẩy
+    nhánh assets-storage. Đối chứng ảnh FULL vs LITE (Lê Chân + Nhà hát): KHÔNG phân biệt được.
+    KQ ngân sách LITE: tri 4.81M→3.83M, texture 441→274MB, texture lớn nhất 21→5.3MB.
+    **B. KIỂM KÊ 11 KHÍA CẠNH CHƯA TỪNG ĐỘNG** (script kiểm kê nhanh trong git log), đã làm 8:
+      1. **webglcontextlost** — CHÍ MẠNG trên mobile: điện thoại thu hồi GPU khi thiếu RAM/chuyển app;
+         không `preventDefault()` thì context KHÔNG BAO GIỜ phục hồi → màn đen vĩnh viễn. Đã thêm
+         lost/restored + `renderer.resetState()` + bỏ vẽ khi `_ctxLost`. Test: `WEBGL_lose_context`
+         → mất=true, phục hồi=true.
+      2. **Không có WebGL** → trang hướng dẫn VI/EN thay vì màn đen câm.
+      3. **Lưu tiến trình** localStorage `hp3d.progress.v1` (save/load/reset trong quests.js) — trước
+         thoát ra mất sạch 26 địa danh. Test: ghi/đọc đúng.
+      4. **Trần nhịp vẽ 40fps khi LITE** — điện thoại chạy full sẽ nóng → thermal throttle, chơi 5 phút
+         là tụt; khoá trần cho nhiệt ổn định + đỡ tốn pin, mượt ĐỀU hơn.
+      5. **PWA** manifest.json (cài lên màn hình chính, standalone, landscape).
+      6. **og:/meta** chia sẻ MXH. 7. **prefers-reduced-motion** → hoa rơi dịu (nối THẬT vào petals).
+      8. **tools/memleak.mjs** MỚI: teleport vòng quanh lõi nhiều lần, đo geometries/textures/programs/
+         JS heap từng vòng — số phải ổn định. Chưa từng đo trước đây.
+    CÒN LẠI: BatchedMesh (draw calls 1154/260), atlas 1.880 texture canvas lẻ, gamepad.
+    **BẪY MỚI:** viết ` ` qua chuỗi Python làm file mã nguồn NHIỄM BYTE NUL — `node --check` vẫn OK
+    nhưng `file` báo "data" (binary). Đừng nhét cờ vào chuỗi URL; dùng THUỘC TÍNH trên object (`d.forceFull`).
 - **2026-07-17 (dc)** [ĐỢT TỐI ƯU LỚN — đo bằng CỔNG NGÂN SÁCH `tools/perfbudget.mjs`]: user "vẫn lag" +
     "tìm repo GitHub áp dụng". Kết luận repo: Claude-Code-Game-Studios = khung QUY TRÌNH (Godot/Unity/UE),
     KHÔNG có kỹ thuật Three.js — chỉ lấy 1 ý: biến đo perf thành CỔNG NGÂN SÁCH cố định. Dựng

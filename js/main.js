@@ -27,6 +27,16 @@ import { autoRegisterInstances, updateInstanceCull, instanceCullStats } from './
 // ============ Khởi tạo đồ họa ============
 const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 const canvas = document.getElementById('scene');
+// Máy/trình duyệt không có WebGL (máy văn phòng cũ, driver lỗi, chế độ tiết kiệm) — trước đây
+// người chơi chỉ thấy MÀN ĐEN không lời giải thích.
+if (!canvas.getContext('webgl2') && !canvas.getContext('webgl')) {
+  document.body.innerHTML = '<div style="font:16px/1.6 system-ui;padding:32px;max-width:640px;margin:auto;color:#eee;background:#1a1a1f;height:100vh">'
+    + '<h2>😕 Trình duyệt chưa bật WebGL</h2>'
+    + '<p>Hải Phòng 3D cần WebGL để dựng hình. Thử: cập nhật trình duyệt, bật “tăng tốc phần cứng” '
+    + '(Cài đặt → Hệ thống), hoặc mở bằng Chrome/Edge/Safari bản mới.</p>'
+    + '<p style="opacity:.7">Browser does not support WebGL. Please update your browser or enable hardware acceleration.</p></div>';
+  throw new Error('WebGL không khả dụng');
+}
 const renderer = new THREE.WebGLRenderer({
   canvas, antialias: !isTouchDevice,              // mobile: tắt MSAA (VRAM + ổn định)
   powerPreference: 'high-performance',            // laptop 2 GPU: ép dGPU (trước hay rơi vào iGPU → lag)
@@ -73,6 +83,20 @@ if (usePost) {
   composer.addPass(new ShaderPass(GradeShader));                 // grade pass cuối
   composer.renderTarget1.samples = 4; composer.renderTarget2.samples = 4;   // MSAA 4x (EffectComposer bỏ antialias khi post)
 }
+
+// MẤT NGỮ CẢNH WebGL: điện thoại thu hồi GPU khi thiếu RAM / chuyển app / khoá màn hình.
+// Không chặn mặc định → context KHÔNG BAO GIỜ phục hồi, người chơi thấy màn đen vĩnh viễn.
+canvas.addEventListener('webglcontextlost', (e) => {
+  e.preventDefault();                 // BẮT BUỘC: cho phép trình duyệt phục hồi
+  _ctxLost = true;
+  ui.toast(tx({ vi: '⚠️ Card đồ hoạ tạm gián đoạn — đang khôi phục…', en: '⚠️ Graphics interrupted — restoring…' }));
+}, false);
+canvas.addEventListener('webglcontextrestored', () => {
+  _ctxLost = false;
+  renderer.resetState();              // dựng lại trạng thái GL
+  if (composer) composer.setSize(window.innerWidth, window.innerHeight);
+  ui.toast(tx({ vi: '✓ Đã khôi phục đồ hoạ', en: '✓ Graphics restored' }));
+}, false);
 
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
@@ -359,6 +383,15 @@ function autoQuality() {
 
 // NẤC CHẤT LƯỢNG 3 (máy rất yếu): sương mù co về 1300m + ẨN các tile thế giới ngoài 1450m
 // quanh người chơi (tile 450m đã tách sẵn — chỉ bật/tắt visible, không đổi nội dung).
+let _ctxLost = false;
+// GIỚI HẠN NHỊP VẼ: điện thoại chạy hết công suất sẽ NÓNG → CPU/GPU tự hạ xung (thermal throttle),
+// chơi 5 phút là tụt FPS và tốn pin. Khoá trần 40fps ở LITE cho nhiệt ổn định, mượt đều hơn là
+// lúc nhanh lúc chậm. Máy mạnh không giới hạn.
+const FRAME_MIN_MS = LITE ? 1000 / 40 : 0;
+let _lastFrameAt = 0;
+// A11Y: người bật "giảm chuyển động" của hệ điều hành (say chuyển động/tiền đình) → tắt lắc camera,
+// cánh hoa bay chậm lại.
+const REDUCED_MOTION = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 let _nearTiles = null, _nearCullLast = 0;
 let _instScanAt = -9999;
 function enableNearView() {
@@ -417,6 +450,12 @@ if (LITE) {
 
 function animate() {
   requestAnimationFrame(animate);
+  if (_ctxLost) return;                       // GPU đang mất ngữ cảnh: vẽ lúc này chỉ gây lỗi tràn console
+  if (FRAME_MIN_MS) {                         // trần nhịp vẽ (LITE): giữ nhiệt ổn định, đỡ tụt xung + tốn pin
+    const _now = performance.now();
+    if (_now - _lastFrameAt < FRAME_MIN_MS) return;
+    _lastFrameAt = _now;
+  }
   const dt = Math.min(clock.getDelta(), 0.05);
   time += dt;
 
@@ -481,7 +520,8 @@ function animate() {
       pState.pos.x - (LM.lake[0] + LM.opera[0]) / 2,
       pState.pos.z - (LM.lake[1] + LM.opera[1]) / 2);
     const petalStrength = 1 - Math.min(1, Math.max(0, (dCity - 170) / 150));
-    petals.update(dt, time, pState.pos, petalStrength, groundHeight);
+    // A11Y: hệ điều hành bật "giảm chuyển động" → hoa rơi dịu lại (người nhạy cảm tiền đình/say chuyển động)
+    petals.update(dt, time, pState.pos, REDUCED_MOTION ? petalStrength * 0.35 : petalStrength, groundHeight);
 
     // âm thanh môi trường: sóng biển gần mép nước (theo lưới đất/biển thật), còi tàu gần cảng
     const onWater = pState.mounted && !pState.mounted.land;
@@ -551,6 +591,13 @@ ui.initUI();
 })();
 initMinigame(audio);
 quests.bindQuestUI(ui, audio);
+// Nạp tiến trình lần chơi trước (hoa/món ăn/địa danh đã khám phá)
+if (quests.loadProgress()) {
+  setTimeout(() => ui.toast(tx({
+    vi: `📖 Đã khôi phục tiến trình: ${quests.quests.discovered.size} địa danh, ${quests.quests.flowers} hoa`,
+    en: `📖 Progress restored: ${quests.quests.discovered.size} landmarks, ${quests.quests.flowers} flowers`,
+  })), 2500);
+}
 initMinimap();
 setLang('vi');
 
