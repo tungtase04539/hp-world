@@ -5,7 +5,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { buildWorld, groundHeight, groundHeightNoDeck, landAt, WORLD_BOUNDS, LM, EXTRAS, BUILD_RADIUS, LITE } from './world.js';
+import { buildWorld, groundHeight, groundHeightNoDeck, landAt, WORLD_BOUNDS, LM, EXTRAS, BUILD_RADIUS, LITE, texCacheStats } from './world.js';
 import { createTraffic } from './traffic.js';
 import { makeHumanoid } from './character.js';
 import { createVehicles } from './vehicles.js';
@@ -387,7 +387,9 @@ let _ctxLost = false;
 // GIỚI HẠN NHỊP VẼ: điện thoại chạy hết công suất sẽ NÓNG → CPU/GPU tự hạ xung (thermal throttle),
 // chơi 5 phút là tụt FPS và tốn pin. Khoá trần 40fps ở LITE cho nhiệt ổn định, mượt đều hơn là
 // lúc nhanh lúc chậm. Máy mạnh không giới hạn.
-const FRAME_MIN_MS = LITE ? 1000 / 40 : 0;
+// 40fps trên màn 60Hz KHÔNG chia hết nhịp (25ms vs 16.67ms) → khung hình lúc 16 lúc 33ms = GIẬT.
+// Phải chọn ƯỚC của tần số màn: 30fps (mỗi 2 khung) mượt ĐỀU hơn 40fps lởm chởm.
+const FRAME_MIN_MS = LITE ? (1000 / 30) - 2 : 0;   // -2ms dung sai để không lỡ nhịp RAF
 let _lastFrameAt = 0;
 // A11Y: người bật "giảm chuyển động" của hệ điều hành (say chuyển động/tiền đình) → tắt lắc camera,
 // cánh hoa bay chậm lại.
@@ -402,7 +404,9 @@ function enableNearView() {
     if (!o.isMesh || !/_-?\d+,-?\d+$/.test(o.name)) return;
     if (!o.geometry.boundingSphere) o.geometry.computeBoundingSphere();
     const c = o.geometry.boundingSphere.center.clone().applyMatrix4(o.matrixWorld);
-    _nearTiles.push([o, c.x, c.z]);
+    // BÁN KÍNH THẬT của ô: dùng khoảng cách tới MÉP ô, không tới tâm — ô 450m mà đo tới tâm thì
+    // đứng ngay rìa ô cũng bị coi là "xa 225m" → ẩn nhầm phần ngay trước mặt.
+    _nearTiles.push([o, c.x, c.z, o.geometry.boundingSphere.radius]);
   });
 }
 function updateNearCull() {
@@ -412,10 +416,11 @@ function updateNearCull() {
   const _now = performance.now();
   if (_now - _nearCullLast < 500) return;
   _nearCullLast = _now;
-  const px = pState.pos.x, pz = pState.pos.z, R2 = 1450 * 1450;
+  const px = pState.pos.x, pz = pState.pos.z, R = 1450;
   for (let i = 0; i < _nearTiles.length; i++) {
     const t3 = _nearTiles[i];
-    t3[0].visible = (t3[1] - px) * (t3[1] - px) + (t3[2] - pz) * (t3[2] - pz) < R2;
+    const d = Math.hypot(t3[1] - px, t3[2] - pz) - (t3[3] || 0);   // khoảng cách tới MÉP ô
+    t3[0].visible = d < R;
   }
 }
 
@@ -609,6 +614,7 @@ window.__hp = {
   renderer, scene, camera, THREE,   // chẩn đoán hiệu năng (draw calls / triangles / frustum)
   enableNearView,    // bật tay chế độ tầm-nhìn-gần (nấc chất lượng 3) — test/máy rất yếu
   instanceCullStats, // chẩn đoán: bao nhiêu instance đang thực sự vẽ
+  texCacheStats,     // chẩn đoán: texture tạo mới vs dùng lại
   cine,
   vehicles, mount, player,   // chẩn đoán/thử nghiệm cưỡi xe
   // Chẩn đoán: mọi thực thể tương tác có đứng đúng chỗ & tiếp cận được không

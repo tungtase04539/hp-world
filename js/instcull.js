@@ -21,8 +21,12 @@ export function registerInstancedForCull(mesh, radius) {
   const src = new Float32Array(mesh.instanceMatrix.array);   // bản gốc bất biến
   const px = new Float32Array(n), pz = new Float32Array(n);
   for (let i = 0; i < n; i++) { px[i] = src[i * 16 + 12]; pz[i] = src[i * 16 + 14]; }
+  // instanceColor PHẢI nén CÙNG THỨ TỰ với ma trận, nếu không xe/prop sẽ nhận màu của cái khác
+  // (nhiều cụm ở đây dùng setColorAt: xe máy, xe đạp, xe đẩy, dù...).
+  const csrc = mesh.instanceColor ? new Float32Array(mesh.instanceColor.array) : null;
+  const citems = mesh.instanceColor ? mesh.instanceColor.itemSize : 0;
   mesh.frustumCulled = false;         // bounding sphere của cả cụm vô nghĩa sau khi nén
-  tracked.push({ mesh, src, px, pz, n, r2: radius * radius, last: -1 });
+  tracked.push({ mesh, src, csrc, citems, px, pz, n, r2: radius * radius, last: -1 });
 }
 
 // Tự tìm mọi InstancedMesh TĨNH trong scene (khỏi phải sửa 21 chỗ tạo instance).
@@ -46,18 +50,23 @@ export function updateInstanceCull(camX, camZ) {
   if (now - _t < 400) return;
   _t = now;
   for (const t of tracked) {
-    const { mesh, src, px, pz, n, r2 } = t;
+    const { mesh, src, csrc, citems, px, pz, n, r2 } = t;
     const dst = mesh.instanceMatrix.array;
+    const cdst = csrc ? mesh.instanceColor.array : null;
     let k = 0;
     for (let i = 0; i < n; i++) {
       const dx = px[i] - camX, dz = pz[i] - camZ;
       if (dx * dx + dz * dz > r2) continue;
-      if (k !== i) dst.set(src.subarray(i * 16, i * 16 + 16), k * 16);
+      if (k !== i) {
+        dst.set(src.subarray(i * 16, i * 16 + 16), k * 16);
+        if (cdst) cdst.set(csrc.subarray(i * citems, i * citems + citems), k * citems);
+      }
       k++;
     }
     if (k !== t.last) {
       mesh.count = k;
       mesh.instanceMatrix.needsUpdate = true;
+      if (cdst) mesh.instanceColor.needsUpdate = true;
       t.last = k;
     }
   }

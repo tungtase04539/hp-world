@@ -104,7 +104,28 @@ export const sharedMats = {
 // desktop-full — điện thoại 2-4GB RAM thì thrash/crash). Vẽ ở tỉ lệ nhỏ rồi scale ngữ cảnh nên nội dung
 // (chữ biển, gạch, cửa sổ) vẫn đúng bố cục, chỉ mềm hơn — trên màn nhỏ gần như không nhận ra.
 const TEXQ = LITE ? 0.5 : 1;          // 0.5 ⇒ RAM texture còn 1/4
-function makeTex(w, h, draw) {
+// GỘP TEXTURE THEO NỘI DUNG (đo: 1.880 texture riêng — phần lớn TRÙNG nội dung y hệt).
+// AN TOÀN MẶC ĐỊNH: chỉ gộp khi người gọi truyền `key` tường minh, và key phải sinh từ ĐÚNG
+// các giá trị quyết định nội dung (chữ, màu, số hàng/cột).
+// TUYỆT ĐỐI KHÔNG khoá theo draw.toString(): hàm vẽ trong vòng lặp có mã nguồn GIỐNG NHAU nhưng
+// bắt biến ngoài (SHOWROOMS[k], srBg[k]…) → gộp nhầm = mọi biển hiệu cùng một tên. (Đã mắc lỗi này.)
+const _texCache = new Map();
+let _texHit = 0;
+const _texSites = new Map();      // chẩn đoán: chỗ gọi nào sinh nhiều texture nhất (chưa có key)
+function makeTex(w, h, draw, key) {
+  if (key !== undefined) {
+    const ck = w + 'x' + h + '|' + key;
+    const hit = _texCache.get(ck);
+    if (hit) { _texHit++; return hit; }
+    const t = _mkTexRaw(w, h, draw);
+    _texCache.set(ck, t);
+    return t;
+  }
+  const sig = w + 'x' + h + '@' + draw.toString().slice(0, 70).replace(/\s+/g, ' ');
+  _texSites.set(sig, (_texSites.get(sig) || 0) + 1);
+  return _mkTexRaw(w, h, draw);
+}
+function _mkTexRaw(w, h, draw) {
   const c = document.createElement('canvas');
   const cw = Math.max(1, Math.round(w * TEXQ)), ch = Math.max(1, Math.round(h * TEXQ));
   c.width = cw; c.height = ch;
@@ -114,6 +135,12 @@ function makeTex(w, h, draw) {
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   return t;
+}
+export function texCacheStats() {
+  return {
+    cached: _texCache.size, reused: _texHit,
+    topUncached: [..._texSites.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10),
+  };
 }
 function speckle(g, w, h, n, alpha) {
   for (let i = 0; i < n; i++) {
@@ -2138,7 +2165,7 @@ const lmSign = (txt, bg, fg = '#ffffff', px = 50) => new THREE.MeshLambertMateri
     g.fillStyle = bg; g.fillRect(0, 0, w, h);
     g.fillStyle = fg; g.font = `bold ${px}px system-ui, sans-serif`;
     g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, w / 2, h / 2 + 2, w - 26);
-  }),
+  }, 'sign|' + txt + '|' + bg + '|' + fg + '|' + px),
 });
 const lmFacade = (baseCss, winCss, cols, rows) => {           // như facadeTex world.js:1612
   const t = makeTex(256, 256, (g, w, h) => {
@@ -2147,7 +2174,7 @@ const lmFacade = (baseCss, winCss, cols, rows) => {           // như facadeTex 
     for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
       g.fillStyle = winCss; g.fillRect(mx + c * cw + cw * 0.16, my + r * ch + ch * 0.16, cw * 0.68, ch * 0.66);
     }
-  });
+  }, 'fac|' + baseCss + '|' + winCss + '|' + cols + '|' + rows);
   return new THREE.MeshLambertMaterial({ map: t });
 };
 const lmOK = (x, z) => Math.abs(groundHeightNoDeck(x, z) - LAND_H) < 0.4 && !isWater(x, z);
@@ -3065,14 +3092,14 @@ const hbSign = (txt, bg, fg = '#ffffff', px = 46) => new THREE.MeshLambertMateri
     g.fillStyle = bg; g.fillRect(0, 0, w, h);
     g.fillStyle = fg; g.font = `bold ${px}px system-ui, sans-serif`;
     g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, w / 2, h / 2 + 2, w - 26);
-  }), side: THREE.DoubleSide,
+  }, 'sign|' + txt + '|' + bg + '|' + fg + '|' + px), side: THREE.DoubleSide,
 });
 const hbVSign = (txt, bg, fg = '#ffffff') => new THREE.MeshLambertMaterial({ // biển ĐỨNG
   map: makeTex(64, 512, (g, w, h) => {
     g.fillStyle = bg; g.fillRect(0, 0, w, h);
     g.fillStyle = fg; g.font = 'bold 38px system-ui, sans-serif'; g.textAlign = 'center';
     g.save(); g.translate(w / 2, h / 2); g.rotate(Math.PI / 2); g.fillText(txt, 0, 13, h - 30); g.restore();
-  }), side: THREE.DoubleSide,
+  }, 'vsign|' + txt + '|' + bg + '|' + fg), side: THREE.DoubleSide,
 });
 const hbFacade = (baseCss, winCss, cols, rows) => new THREE.MeshLambertMaterial({
   map: makeTex(256, 256, (g, w, h) => {
@@ -3081,7 +3108,7 @@ const hbFacade = (baseCss, winCss, cols, rows) => new THREE.MeshLambertMaterial(
     for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
       g.fillStyle = winCss; g.fillRect(mx + c * cw + cw * 0.16, my + r * ch + ch * 0.16, cw * 0.68, ch * 0.66);
     }
-  }),
+  }, 'fac|' + baseCss + '|' + winCss + '|' + cols + '|' + rows),
 });
 // nhà ống ĐÍCH DANH: thân + kính trệt + biển ngang, mặt tiền local +Z quay ra phố
 const hbShopAt = (x, z, ry, W, D, FL, wallHex, sign, name) => {
@@ -3479,7 +3506,7 @@ const bcSign = (txt, bg, fg = '#ffffff', px = 52) => new THREE.MeshLambertMateri
     g.fillStyle = bg; g.fillRect(0, 0, w, h);
     g.fillStyle = fg; g.font = `bold ${px}px system-ui, sans-serif`;
     g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, w / 2, h / 2 + 2, w - 26);
-  }),
+  }, 'sign|' + txt + '|' + bg + '|' + fg + '|' + px),
 });
 const bcFacade = (baseCss, winCss, cols, rows) => {
   const t = makeTex(256, 256, (g, w, h) => {
@@ -3488,7 +3515,7 @@ const bcFacade = (baseCss, winCss, cols, rows) => {
     for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
       g.fillStyle = winCss; g.fillRect(mx + c * cw + cw * 0.16, my + r * ch + ch * 0.16, cw * 0.68, ch * 0.66);
     }
-  });
+  }, 'fac|' + baseCss + '|' + winCss + '|' + cols + '|' + rows);
   return new THREE.MeshLambertMaterial({ map: t });
 };
 const bcOK = (x, z) => Math.abs(groundHeightNoDeck(x, z) - 2.0) < 0.45 && !isWater(x, z);
@@ -4372,7 +4399,7 @@ const dgSign = (txt, bg, fg = '#ffffff', px = 46) => new THREE.MeshLambertMateri
     g.fillStyle = bg; g.fillRect(0, 0, w, h);
     g.fillStyle = fg; g.font = `bold ${px}px system-ui, sans-serif`;
     g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, w / 2, h / 2 + 2, w - 26);
-  }),
+  }, 'sign|' + txt + '|' + bg + '|' + fg + '|' + px),
 });
 const dgFacade = (baseCss, winCss, cols, rows) => new THREE.MeshLambertMaterial({
   map: makeTex(256, 256, (g, w, h) => {
@@ -4381,7 +4408,7 @@ const dgFacade = (baseCss, winCss, cols, rows) => new THREE.MeshLambertMaterial(
     for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
       g.fillStyle = winCss; g.fillRect(mx + c * cw + cw * 0.16, my + r * ch + ch * 0.16, cw * 0.68, ch * 0.66);
     }
-  }),
+  }, 'fac|' + baseCss + '|' + winCss + '|' + cols + '|' + rows),
 });
 const dgOK = (x, z) => Math.abs(groundHeightNoDeck(x, z) - 2.0) < 0.4 && !isWater(x, z);
 // Nhà phố/shophouse: thân + kính trệt + biển băng mặt tiền + mái; trả group để gắn thêm
@@ -4901,7 +4928,7 @@ const tbSign = (txt, bg, fg = '#ffffff', px = 50) => new THREE.MeshLambertMateri
     g.fillStyle = bg; g.fillRect(0, 0, w, h);
     g.fillStyle = fg; g.font = `bold ${px}px system-ui, sans-serif`;
     g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, w / 2, h / 2 + 2, w - 26);
-  }),
+  }, 'sign|' + txt + '|' + bg + '|' + fg + '|' + px),
 });
 const tbFacade = (baseCss, winCss, cols, rows, archTret = false) => {  // archTret: trệt cửa vòm (phố Pháp)
   const t = makeTex(256, 256, (g, w, h) => {
@@ -6423,7 +6450,7 @@ const dlSign = (txt, bg, fg = '#ffffff', px = 50) => new THREE.MeshLambertMateri
     g.fillStyle = bg; g.fillRect(0, 0, w, h);
     g.fillStyle = fg; g.font = `bold ${px}px system-ui, sans-serif`;
     g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, w / 2, h / 2 + 2, w - 26);
-  }),
+  }, 'sign|' + txt + '|' + bg + '|' + fg + '|' + px),
 });
 const dlFacade = (baseCss, winCss, cols, rows, archTret = false) => {   // archTret: trệt cửa vòm kiểu Pháp
   const t = makeTex(256, 256, (g, w, h) => {
@@ -7245,7 +7272,7 @@ const bsSign = (txt, bg, fg = '#ffffff', px = 50) => new THREE.MeshLambertMateri
     g.fillStyle = bg; g.fillRect(0, 0, w, h);
     g.fillStyle = fg; g.font = `bold ${px}px system-ui, sans-serif`;
     g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, w / 2, h / 2 + 2, w - 26);
-  }),
+  }, 'sign|' + txt + '|' + bg + '|' + fg + '|' + px),
 });
 // lưới cửa sổ; arch=true → hàng DƯỚI cùng thành cửa vòm (nhà Pháp/kho Pháp)
 const bsFacade = (baseCss, winCss, cols, rows, arch = false) => {
@@ -9682,7 +9709,7 @@ const cbFacade = (baseCss, winCss, cols, rows) => new THREE.MeshLambertMaterial(
     for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
       g.fillStyle = winCss; g.fillRect(mx + c * cw + cw * 0.16, my + r * ch + ch * 0.16, cw * 0.68, ch * 0.66);
     }
-  }),
+  }, 'fac|' + baseCss + '|' + winCss + '|' + cols + '|' + rows),
 });
 // tháp dải cửa sổ (mẫu bandTower world.js:1595) nhận ry + material thân
 const cbTower = (x, z, ry, W, D, FL, FH, wallMat, name) => {
@@ -10568,7 +10595,7 @@ const dmFacade = (baseCss, winCss, cols, rows) => new THREE.MeshLambertMaterial(
     for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
       g.fillStyle = winCss; g.fillRect(mx + c * cw + cw * 0.16, my + r * ch + ch * 0.16, cw * 0.68, ch * 0.66);
     }
-  }),
+  }, 'fac|' + baseCss + '|' + winCss + '|' + cols + '|' + rows),
 });
 // pano(px,pz) trên tim đường u=(ux,uz); dời DỌC 'along' + NGANG 'off' về phía sgn(±1) của pháp tuyến trái.
 // Trả tâm nhà + ry (mặt tiền local +Z quay NGƯỢC pháp tuyến, tức về phía đường).
@@ -10808,7 +10835,7 @@ const txSign = (txt, bg, fg = '#ffffff', px = 46) => new THREE.MeshLambertMateri
     g.fillStyle = bg; g.fillRect(0, 0, w, h);
     g.fillStyle = fg; g.font = `bold ${px}px system-ui, sans-serif`;
     g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, w / 2, h / 2 + 2, w - 26);
-  }), side: THREE.DoubleSide,
+  }, 'sign|' + txt + '|' + bg + '|' + fg + '|' + px), side: THREE.DoubleSide,
 });
 // lưới cửa sổ; arch=true → hàng DƯỚI thành cửa vòm (nhà Pháp/arcade)
 const txFacade = (baseCss, winCss, cols, rows, arch = false) => new THREE.MeshLambertMaterial({
@@ -12247,7 +12274,7 @@ const v2Facade = (baseCss, winCss, cols, rows) => new THREE.MeshLambertMaterial(
     for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
       g.fillStyle = winCss; g.fillRect(mx + c * cw + cw * 0.16, my + r * ch + ch * 0.16, cw * 0.68, ch * 0.66);
     }
-  }),
+  }, 'fac|' + baseCss + '|' + winCss + '|' + cols + '|' + rows),
 });
 // nhà hộp mặt tiền texture (local +Z = mặt tiền, quay ra đường theo ry). Tự collider + FEATURED_CLEAR.
 const v2Box = (cx, cz, ry, W, D, FL, FH, wallMat, name) => {
@@ -12769,7 +12796,7 @@ const v6Facade = (baseCss, winCss, cols, rows) => new THREE.MeshLambertMaterial(
     for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
       g.fillStyle = winCss; g.fillRect(mx + c * cw + cw * 0.16, my + r * ch + ch * 0.16, cw * 0.68, ch * 0.66);
     }
-  }),
+  }, 'fac|' + baseCss + '|' + winCss + '|' + cols + '|' + rows),
 });
 // road frame helpers: A=điểm tim của pano gốc, U=hướng dọc phố; N=(-Uz,Ux)
 const v6Pt = (F, s, off) => [F.A[0] + F.U[0] * s + (-F.U[1]) * off, F.A[1] + F.U[1] * s + F.U[0] * off];
@@ -14350,7 +14377,7 @@ const w4Facade = (baseCss, winCss, cols, rows) => new THREE.MeshLambertMaterial(
     for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
       g.fillStyle = winCss; g.fillRect(mx + c * cw + cw * 0.16, my + r * ch + ch * 0.16, cw * 0.68, ch * 0.66);
     }
-  }),
+  }, 'fac|' + baseCss + '|' + winCss + '|' + cols + '|' + rows),
 });
 const w4Done = (g, x, z, colR, clearR) => {
   g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
@@ -14834,7 +14861,7 @@ const w5Facade = (baseCss, winCss, cols, rows) => new THREE.MeshLambertMaterial(
     for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
       g.fillStyle = winCss; g.fillRect(mx + c * cw + cw * 0.16, my + r * ch + ch * 0.16, cw * 0.68, ch * 0.66);
     }
-  }),
+  }, 'fac|' + baseCss + '|' + winCss + '|' + cols + '|' + rows),
 });
 // khối nhà cơ bản: thân + mái bằng, mặt tiền = local +Z. Trả group để đắp thêm.
 const w5Build = (x, z, ry, W, D, FL, FH, wallMat, name) => {
@@ -15149,7 +15176,7 @@ const w1Facade = (baseCss, winCss, cols, rows) => new THREE.MeshLambertMaterial(
     for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
       g.fillStyle = winCss; g.fillRect(mx + c * cw + cw * 0.16, my + r * ch + ch * 0.16, cw * 0.68, ch * 0.66);
     }
-  }),
+  }, 'fac|' + baseCss + '|' + winCss + '|' + cols + '|' + rows),
 });
 // F = {c:[cx,cz], u:[ux,uz], nb:[nx,nz](đơn vị, phía CHÍNH), half}
 const w1Pt = (F, along, off, sgn) => [
@@ -17456,7 +17483,7 @@ const s3Facade = (baseCss, winCss, cols, rows) => new THREE.MeshLambertMaterial(
     for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
       g.fillStyle = winCss; g.fillRect(mx + c * cw + cw * 0.16, my + r * ch + ch * 0.16, cw * 0.68, ch * 0.66);
     }
-  }),
+  }, 'fac|' + baseCss + '|' + winCss + '|' + cols + '|' + rows),
 });
 // khung group đặt tại tim khối (gate s3OK)
 const s3Grp = (x, z, ry, name) => {

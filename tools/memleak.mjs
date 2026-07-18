@@ -64,13 +64,17 @@ console.log('mốc'.padEnd(10), 'geometry'.padStart(9), 'texture'.padStart(8), '
 for (const [name, s] of rows) {
   console.log(name.padEnd(10), String(s.geo).padStart(9), String(s.tex).padStart(8), String(s.prog).padStart(8), String(s.heapMB).padStart(11));
 }
-const a = rows[0][1], b = rows[rows.length - 1][1];
+// So VÒNG ÁP CHÓT với VÒNG CHÓT, KHÔNG so với lúc khởi đầu: vòng 1 là lúc asset stream vào lần đầu
+// (geometry/texture tăng mạnh là ĐÚNG, không phải rò rỉ). Rò rỉ thật = còn tăng ở TRẠNG THÁI ỔN ĐỊNH.
+const a = rows[Math.max(1, rows.length - 2)][1], b = rows[rows.length - 1][1];
 const grow = (k) => b[k] - a[k];
 const verdict = [];
-if (grow('geo') > 400) verdict.push(`geometry +${grow('geo')}`);
-if (grow('tex') > 120) verdict.push(`texture +${grow('tex')}`);
-if (grow('prog') > 25) verdict.push(`program +${grow('prog')}`);
-if (a.heapMB > 0 && grow('heapMB') > 260) verdict.push(`JS heap +${grow('heapMB').toFixed(0)}MB`);
+if (grow('geo') > 60) verdict.push(`geometry +${grow('geo')}/vòng`);
+if (grow('tex') > 20) verdict.push(`texture +${grow('tex')}/vòng`);
+if (grow('prog') > 5) verdict.push(`program +${grow('prog')}/vòng`);
+if (a.heapMB > 0 && grow('heapMB') > 90) verdict.push(`JS heap +${grow('heapMB').toFixed(0)}MB/vòng`);
+console.log(`
+(so trạng thái ổn định: ${rows[Math.max(1, rows.length - 2)][0]} → ${rows[rows.length - 1][0]})`);
 console.log(`\nJS error: ${errs.length ? errs.slice(0, 2).join(' ; ') : 'KHÔNG'}`);
 console.log(verdict.length ? `==> NGHI RÒ RỈ: ${verdict.join(', ')}\n` : '==> KHÔNG THẤY RÒ RỈ (số ổn định qua các vòng)\n');
 

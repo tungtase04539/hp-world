@@ -315,6 +315,33 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-07-17 (de)** [PHIÊN PHẢN BIỆN VỚI GPT-5.6-sol-xhigh — 3 BUG THẬT + 2 VIỆC HUỶ]:
+    Gửi toàn bộ số đo + quyết định cho gpt-5.6-sol-xhigh (`scratchpad/ask_gpt.py`, gọi qua
+    `ag.ask(text, system=...)` — KHÔNG phải truyền tên file). Kết quả đáng giá hơn mọi vòng tự tối ưu:
+    **BUG THẬT (2/3 do chính đợt trước của tôi tạo ra, sẽ lọt vào game nếu không phản biện):**
+     1. `instcull` nén `instanceMatrix` nhưng KHÔNG nén `instanceColor` → xe máy/xe đạp/xe đẩy nhận
+        MÀU CỦA XE KHÁC sau khi cull (nhiều cụm dùng setColorAt). Đã nén song song + needsUpdate.
+     2. Trần **40fps trên màn 60Hz** = 25ms không chia hết 16.67ms → khung lúc 16 lúc 33ms, GIẬT HƠN
+        cả không giới hạn. Phải chọn ƯỚC của tần số màn → 30fps.
+     3. Cache `makeTex` khoá theo `draw.toString()` → SAI NGUYÊN TẮC: hàm vẽ trong vòng lặp có mã nguồn
+        GIỐNG NHAU nhưng bắt biến ngoài (SHOWROOMS[k], srBg[k]) ⇒ mọi biển hiệu chung một tên.
+        Sửa: gộp **CHỌN-THAM-GIA**, khoá sinh từ ĐÚNG tham số nội dung (`'sign|'+txt+'|'+bg+'|'+fg+'|'+px`).
+        20 chỗ đã gắn khoá, kiểm tự động 0 chỗ thiếu tham số.
+    **HUỶ 2 việc đã lên kế hoạch (tiết kiệm nhiều giờ):** (a) BatchedMesh — vô dụng khi mesh còn lại là
+    multi-material/texture riêng, nó chỉ gộp geometry KHÁC NHAU dùng CHUNG material; (b) atlas runtime —
+    atlas KHÔNG giảm texel RAM (4096² = 85MB, ăn gần hết ngân sách 90MB), chỉ giảm state/draw.
+    **KẾT QUẢ TRUNG THỰC:** gộp texture theo nội dung **THẤT BẠI** (1.880→1.858, chỉ 17 lần dùng lại) —
+    giả thuyết "phần lớn trùng nội dung" của tôi SAI, biển hiệu thật sự khác nhau. Giả thuyết "texture GLB
+    không được thu nhỏ" cũng SAI (đã kiểm: chỉ 3 texture ≥1024 và là atlas biển hiệu, cố ý).
+    **CÒN LÀM ĐƯỢC:** cull ô đo tới **MÉP** thay vì tâm (trước: đứng sát rìa ô 450m vẫn bị tính xa 225m
+    → ẩn nhầm cảnh trước mặt). **CÒN LẠI theo thứ tự GPT:** LOD landmark (1.5M tri từ 5 model, decimate
+    10-30k), giảm lưới ground (340k), shadow proxy/castShadow xa, rồi mới tới hình ảnh (color space →
+    baked AO → sky; CSM tối đa 2 cascade, 4 cascade = tự sát).
+    **BẪY MỚI (trả giá 3 lần trong world.js 21k dòng):** KHÔNG dò dấu ngoặc `})` để chèn code — nó nhảy
+    vào hàm khác (`bsRingRail`), vào giữa chuỗi, hoặc cắt sai. PHẢI khớp NGUYÊN VĂN cả khối kèm dòng neo
+    phía sau, và kiểm parse .mjs sau MỖI lô. Làm đúng cách thì 20 chỗ vào chính xác, 0 sự cố.
+    **BẪY:** `tools/memleak.mjs` bản đầu so vòng-đầu với vòng-cuối → DƯƠNG TÍNH GIẢ (vòng 1 là lúc asset
+    stream vào). Phải so 2 vòng CUỐI (trạng thái ổn định). Kết luận thật: KHÔNG rò rỉ.
 - **2026-07-17 (dd)** [BỘ ASSET NHẸ + VÉT CẠN KHÍA CẠNH CHƯA ĐỘNG TỚI]:
     **A. assets_lite/ (282MB → 67MB, −76%)** — phát hiện: `assets/` 23 model = 282MB người chơi phải TẢI
     (texture 4096² + ~300k tri/model) → chính là "vào game lag một lúc". `tools/make_lite_assets.sh` (tái lập
@@ -339,7 +366,7 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
       8. **tools/memleak.mjs** MỚI: teleport vòng quanh lõi nhiều lần, đo geometries/textures/programs/
          JS heap từng vòng — số phải ổn định. Chưa từng đo trước đây.
     CÒN LẠI: BatchedMesh (draw calls 1154/260), atlas 1.880 texture canvas lẻ, gamepad.
-    **BẪY MỚI:** viết ` ` qua chuỗi Python làm file mã nguồn NHIỄM BYTE NUL — `node --check` vẫn OK
+    **BẪY MỚI:** viết `U+0000` qua chuỗi Python làm file mã nguồn NHIỄM BYTE NUL — `node --check` vẫn OK
     nhưng `file` báo "data" (binary). Đừng nhét cờ vào chuỗi URL; dùng THUỘC TÍNH trên object (`d.forceFull`).
 - **2026-07-17 (dc)** [ĐỢT TỐI ƯU LỚN — đo bằng CỔNG NGÂN SÁCH `tools/perfbudget.mjs`]: user "vẫn lag" +
     "tìm repo GitHub áp dụng". Kết luận repo: Claude-Code-Game-Studios = khung QUY TRÌNH (Godot/Unity/UE),
