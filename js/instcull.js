@@ -25,8 +25,10 @@ export function registerInstancedForCull(mesh, radius) {
   // (nhiều cụm ở đây dùng setColorAt: xe máy, xe đạp, xe đẩy, dù...).
   const csrc = mesh.instanceColor ? new Float32Array(mesh.instanceColor.array) : null;
   const citems = mesh.instanceColor ? mesh.instanceColor.itemSize : 0;
-  mesh.frustumCulled = false;         // bounding sphere của cả cụm vô nghĩa sau khi nén
-  tracked.push({ mesh, src, csrc, citems, px, pz, n, r2: radius * radius, last: -1 });
+  // GIỮ frustumCulled: sau mỗi lần nén tính lại boundingSphere theo đúng instance đang vẽ (xem updateInstanceCull).
+  // Trước đây tắt hẳn → ô cây hero 250 m (85-101k tri/cây, world.js loadHeroTrees đã chia ô + tính sphere) vẽ cả khi
+  // ở SAU LƯNG camera. idx[k] = chỉ số gốc của instance ở khe k — phát hiện đổi TẬP hợp kể cả khi số lượng không đổi.
+  tracked.push({ mesh, src, csrc, citems, px, pz, n, r2: radius * radius, last: -1, idx: new Int32Array(n), hidden: false });
 }
 
 // Tự tìm mọi InstancedMesh TĨNH trong scene (khỏi phải sửa 21 chỗ tạo instance).
@@ -50,10 +52,10 @@ export function updateInstanceCull(camX, camZ) {
   if (now - _t < 400) return;
   _t = now;
   for (const t of tracked) {
-    const { mesh, src, csrc, citems, px, pz, n, r2 } = t;
+    const { mesh, src, csrc, citems, px, pz, n, r2, idx } = t;
     const dst = mesh.instanceMatrix.array;
     const cdst = csrc ? mesh.instanceColor.array : null;
-    let k = 0;
+    let k = 0, changed = false;
     for (let i = 0; i < n; i++) {
       const dx = px[i] - camX, dz = pz[i] - camZ;
       if (dx * dx + dz * dz > r2) continue;
@@ -61,13 +63,21 @@ export function updateInstanceCull(camX, camZ) {
         dst.set(src.subarray(i * 16, i * 16 + 16), k * 16);
         if (cdst) cdst.set(csrc.subarray(i * citems, i * citems + citems), k * citems);
       }
+      // tập hợp đổi (1 vào 1 ra cùng nhịp) mà chỉ so SỐ LƯỢNG thì GPU giữ ma trận cũ tới lần đổi count kế tiếp
+      if (idx[k] !== i) { idx[k] = i; changed = true; }
       k++;
     }
-    if (k !== t.last) {
+    if (changed || k !== t.last) {
       mesh.count = k;
       mesh.instanceMatrix.needsUpdate = true;
       if (cdst) mesh.instanceColor.needsUpdate = true;
       t.last = k;
+      // sphere bao đúng k instance đầu (r160 InstancedMesh.computeBoundingSphere duyệt tới count) → frustum
+      // culling thật; cụm rỗng ẩn hẳn (đỡ projectObject) và chỉ hiện lại khi chính ta đã ẩn nó.
+      if (k > 0) {
+        mesh.computeBoundingSphere();
+        if (t.hidden) { t.hidden = false; mesh.visible = true; }
+      } else if (!t.hidden) { t.hidden = true; mesh.visible = false; }
     }
   }
 }

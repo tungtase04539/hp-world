@@ -1,3 +1,4 @@
+import { Box3, Vector3 } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { IS_MOBILE, LITE, TIER } from './device.js';
@@ -12,6 +13,8 @@ export { IS_MOBILE };   // re-export: traffic.js/world.js đang import từ đâ
 //    rải 1 texture/khung → mới đưa về layer 0. Trước đây khung đầu tiên nhìn thấy model phải biên dịch
 //    shader (~45 ms/chương trình) + upload mọi texture 4096² (35-45 ms/tấm) cùng lúc → khựng 100-330 ms.
 //  - CDN jsDelivr ghim SHA (immutable, edge toàn cầu); bản LITE ở assets_lite/ (chỉ tier ≤ 1)
+//  - LOD ĐỊA DANH (tier ≥ 2): sau khi bản gốc hiện, tải ngầm bản assets_lite làm "twin" cùng chỗ; ngoài
+//    LOD_FAR hiện twin, về dưới LOD_NEAR hiện lại bản gốc (nguyên vẹn). Bóng: chỉ mesh trong CAST_RADIUS đổ bóng.
 //  - báo tiến trình % để hiển thị trên màn chờ
 // ============================================================
 
@@ -35,11 +38,11 @@ const OVERSIZE = new Set(['assets/baotang.glb', 'assets/quanhoa.glb', 'assets/le
 // BỘ ASSET NHẸ cho máy yếu/điện thoại (assets_lite/, sinh bằng tools/make_lite_assets.sh, ĐÃ ĐẨY lên
 // assets-storage 2026-09-05 — trước đó chưa bao giờ được đẩy nên mọi máy LITE gặp 404 rồi tải lại bản gốc).
 // LITE giờ = TIER ≤ 1 (device.js) — laptop cảm ứng KHÔNG còn bị đưa vào đây. Lite lỗi → forceFull thử lại NGAY.
-export const assetURL = (url, forceFull) => {
-  const u = (LITE && !forceFull) ? url.replace(/^assets\//, 'assets_lite/') : url;
-  if (IS_LOCAL) return u;
-  return (OVERSIZE.has(u) ? RAWGH : JSDELIVR) + u;   // chỉ bản gốc quá khổ (>20MB) mới cần raw.githubusercontent
-};
+// chỉ bản gốc quá khổ (>20MB) mới cần raw.githubusercontent
+const cdnURL = (u) => (IS_LOCAL ? u : (OVERSIZE.has(u) ? RAWGH : JSDELIVR) + u);
+export const assetURL = (url, forceFull) => cdnURL((LITE && !forceFull) ? url.replace(/^assets\//, 'assets_lite/') : url);
+// Bản lite của CÙNG model (twin LOD xa cho tier ≥ 2): luôn assets_lite/ — OVERSIZE chỉ áp cho tên bản gốc.
+export const assetLiteURL = (url) => cdnURL(url.replace(/^assets\//, 'assets_lite/'));
 
 // Cụm trung tâm (quanh gốc toạ độ) tải NGAY ở màn chờ; công trình xa để streaming.
 const PRELOAD_RADIUS = IS_MOBILE ? 320 : 950;   // m — mobile chỉ preload cụm sát điểm xuất phát
@@ -49,6 +52,16 @@ const FETCH_PARALLEL = IS_MOBILE ? 1 : 4;       // số file TẢI song song tro
 const MOBILE_TEX_MAX = 512;                     // px — trần texture GLB khi tier ≤ 1 (điện thoại/máy yếu)
 const TEX_SLOTS = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap'];
 const HIDE_LAYER = 31;                          // layer camera không vẽ: giấu model trong lúc biên dịch/upload
+// LOD ĐỊA DANH (tier ≥ 2): bản gốc trong LOD_NEAR m, xa hơn LOD_FAR đổi sang twin assets_lite (trễ 30 m chống nhấp
+// nháy khi đứng đúng ranh). Bản gốc KHÔNG đụng 1 byte (quy tắc chủ dự án); đối chứng ảnh FULL vs LITE ở KNOWLEDGE
+// (dd)/(df): không phân biệt được ngay cả ở cự ly gần → ở >250 m càng không. Tier ≤ 1 đã nạp file lite từ đầu.
+const LOD_NEAR = 250, LOD_FAR = 280;
+// Ngoài CAST_RADIUS mesh địa danh không đổ bóng: hộp bóng chỉ ±70/±110 m quanh người chơi (daynight.js) — caster xa
+// hơn chỉ tốn shadow pass (đo: Quán hoa ×5 = 1,5M tam giác mỗi lần cập nhật bóng). Twin lite không bao giờ đổ bóng.
+const CAST_RADIUS = 160;
+const LOD_TICK_MS = 500;
+// Cỡ map roughness/metalness sau khi thu (tier ≤ 1 và twin LOD) — xem trimDetailMaps.
+const DETAIL_MAP_PX = 64;
 
 // ---------- Tải ngầm trong Worker (mạng chạy khi main thread đang bận buildWorld) ----------
 const fetchWorker = (() => {
@@ -109,31 +122,37 @@ export function shrinkTexturesForMobile(root) {
     const mats = Array.isArray(o.material) ? o.material : [o.material];
     for (const m of mats) {
       if (!m) continue;
+      trimDetailMaps(m);
       for (const slot of TEX_SLOTS) {
         const t = m[slot];
-        if (!t) continue;
-        // Bỏ hẳn normal/roughness/metalness (chi tiết bề mặt vô hình ở cự ly chơi trên máy yếu, mỗi tấm tốn
-        // ngang map). Kiểm slot TRƯỚC "seen": roughness và metalness thường DÙNG CHUNG 1 texture — bản cũ
-        // đánh dấu seen ở roughness rồi bỏ qua metalness → giữ nguyên tấm metallicRoughness 1024².
-        if (slot === 'normalMap' || slot === 'roughnessMap' || slot === 'metalnessMap') {
-          m[slot] = null; m.needsUpdate = true; continue;
-        }
-        if (!t.image || seen.has(t)) continue;
+        if (!t || !t.image || seen.has(t)) continue;
         seen.add(t);
-        const img = t.image, w = img.width || 0, h = img.height || 0;
-        if (w <= MOBILE_TEX_MAX && h <= MOBILE_TEX_MAX) continue;
-        const s = MOBILE_TEX_MAX / Math.max(w, h);
-        const cv = document.createElement('canvas');
-        cv.width = Math.max(1, Math.round(w * s)); cv.height = Math.max(1, Math.round(h * s));
-        try {
-          cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
-          t.image = cv;
-          if (img.close) img.close();           // ImageBitmap: giải phóng RAM ngay
-          t.needsUpdate = true;
-        } catch (e) { /* texture lạ → giữ nguyên */ }
+        downscaleTexture(t, MOBILE_TEX_MAX);
       }
     }
   });
+}
+// Map chi tiết bề mặt (vô hình ở cự ly chơi trên máy yếu và ở >250 m với twin LOD): normal → bỏ hẳn; roughness +
+// metalness → THU VỀ 64² thay vì bỏ. Bỏ hẳn là SAI: glTF Meshy không ghi metallicFactor ⇒ GLTFLoader mặc định
+// metalness 1.0, mất map là cả công trình thành KIM LOẠI (đo 2026-09-06: banner đỏ Nhà hát lớn ở LITE xỉn/mất).
+// 64² giữ đúng giá trị trung bình, RAM không đáng kể; 2 slot thường dùng chung 1 texture → lần 2 tự no-op.
+function trimDetailMaps(m) {
+  if (m.normalMap) { m.normalMap = null; m.needsUpdate = true; }
+  for (const k of ['roughnessMap', 'metalnessMap']) if (m[k] && m[k].image) downscaleTexture(m[k], DETAIL_MAP_PX);
+}
+// Thu nhỏ 1 texture bằng canvas (bố cục UV giữ nguyên) rồi giải phóng ảnh gốc khỏi RAM.
+function downscaleTexture(t, maxPx) {
+  const img = t.image, w = img.width || 0, h = img.height || 0;
+  if (w <= maxPx && h <= maxPx) return;
+  const s = maxPx / Math.max(w, h);
+  const cv = document.createElement('canvas');
+  cv.width = Math.max(1, Math.round(w * s)); cv.height = Math.max(1, Math.round(h * s));
+  try {
+    cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+    t.image = cv;
+    if (img.close) img.close();           // ImageBitmap: giải phóng RAM ngay
+    t.needsUpdate = true;
+  } catch (e) { /* texture lạ → giữ nguyên */ }
 }
 
 // GỢI Ý TẢI SỚM: registerModel chỉ chạy ở CUỐI buildWorld (đo: giây ~40 của 53 s dựng) — cụm trung tâm biết
@@ -197,6 +216,8 @@ function onLoaded(d, gltf) {
   loadingCount--;
   try {
     shrinkTexturesForMobile(gltf.scene);
+    // nhận diện root GLB sau place() (bản clone Quán hoa ×5 cũng có — clone() sao chép userData)
+    gltf.scene.userData.lodKey = d.url;
     const before = _scene ? new Set(_scene.children) : null;
     d.place(gltf.scene);
     if (toastFn && d.name) toastFn(`✓ ${d.name} sẵn sàng`);
@@ -205,23 +226,8 @@ function onLoaded(d, gltf) {
       // shader đã biên dịch (compileAsync = KHR_parallel_shader_compile, không chặn) và texture đã upload.
       const roots = _scene.children.filter((o) => !before.has(o));
       if (roots.length) {
-        const texs = new Set();
-        for (const r of roots) {
-          r.traverse((o) => {
-            if (!o.isMesh) return;
-            o.layers.set(HIDE_LAYER);
-            for (const m of (Array.isArray(o.material) ? o.material : [o.material])) {
-              if (!m) continue;
-              for (const s of TEX_SLOTS) if (m[s] && m[s].image) texs.add(m[s]);
-            }
-          });
-        }
-        const item = { roots, textures: [...texs], compiled: false };
-        _reveal.push(item);
-        // compile() duyệt traverseVisible → object phải visible; layer ẩn không ảnh hưởng.
-        Promise.all(roots.map((r) => _renderer.compileAsync(r, _camera, _scene)))
-          .catch(() => { })
-          .then(() => { item.compiled = true; });
+        queueReveal(roots);
+        trackLod(d, roots);
       }
     }
   } catch (e) {
@@ -229,6 +235,27 @@ function onLoaded(d, gltf) {
   }
   report();
   pump();
+}
+
+// Giấu roots ở layer ẩn → compileAsync → pumpAssetUploads upload texture rải khung → layer 0 → onDone().
+function queueReveal(roots, onDone) {
+  const texs = new Set();
+  for (const r of roots) {
+    r.traverse((o) => {
+      if (!o.isMesh) return;
+      o.layers.set(HIDE_LAYER);
+      for (const m of (Array.isArray(o.material) ? o.material : [o.material])) {
+        if (!m) continue;
+        for (const s of TEX_SLOTS) if (m[s] && m[s].image) texs.add(m[s]);
+      }
+    });
+  }
+  const item = { roots, textures: [...texs], compiled: false, onDone };
+  _reveal.push(item);
+  // compile() duyệt traverseVisible → object phải visible; layer ẩn không ảnh hưởng.
+  Promise.all(roots.map((r) => _renderer.compileAsync(r, _camera, _scene)))
+    .catch(() => { })
+    .then(() => { item.compiled = true; });
 }
 
 // Gọi MỖI KHUNG từ main.js: upload đúng 1 texture (2048² ≈ 8-13 ms, 4096² ≈ 35-45 ms) rồi hiện model
@@ -240,9 +267,124 @@ export function pumpAssetUploads() {
   if (t) { try { _renderer.initTexture(t); } catch (e) { } return; }
   for (const r of it.roots) r.traverse((o) => { if (o.isMesh) o.layers.set(0); });
   _reveal.shift();
+  if (it.onDone) it.onDone();
 }
 // autoQuality bỏ qua các cửa sổ đo trong lúc còn tải/hiện model (khựng streaming từng làm máy mạnh bị hạ cấp).
-export function assetsBusy() { return loadingCount > 0 || _reveal.length > 0; }
+export function assetsBusy() { return loadingCount > 0 || _reveal.length > 0 || liteLoading; }
+
+// ---------- LOD địa danh + cull caster bóng ----------
+// d.lod = { state: 'pending' | 'loading' | 'ready' | 'failed' | 'none',
+//           roots: [{ full, lite, cx, cz, d, far, cast }] }   — 1 phần tử/root GLB (Quán hoa: 5)
+const _box = new Box3(), _vec = new Vector3();
+let liteLoading = false;
+
+function trackLod(d, roots) {
+  const fulls = [];
+  for (const r of roots) r.traverse((o) => { if (o.userData.lodKey === d.url) fulls.push(o); });
+  if (!fulls.length) return;
+  d.lod = {
+    state: TIER >= 2 ? 'pending' : 'none',   // tier ≤ 1 đã là file lite: chỉ cull caster
+    roots: fulls.map((full) => {
+      const c = _box.setFromObject(full).getCenter(_vec);
+      return { full, lite: null, cx: c.x, cz: c.z, d: Infinity, far: false, cast: true };
+    }),
+  };
+}
+
+// 1 bản lite/lúc và KHÔNG tranh với bản gốc: chỉ khi không còn model nào đang tải/hiện và preload đã xong hết.
+// Ưu tiên model XA NHẤT: đang vẽ ~300k tam giác chỉ để hiện vài trăm pixel, đổi sang lite lợi ngay.
+function pumpLite() {
+  if (liteLoading || loadingCount > 0 || _reveal.length || REGISTRY.some((d) => d.preload && d.state !== 'done')) return;
+  let best = null, bd = -1;
+  for (const d of REGISTRY) {
+    if (!d.lod || d.lod.state !== 'pending') continue;
+    const dist = Math.min(...d.lod.roots.map((r) => r.d));
+    if (dist > bd) { bd = dist; best = d; }
+  }
+  if (best) startLite(best);
+}
+
+function startLite(d) {
+  const L = d.lod;
+  L.state = 'loading';
+  liteLoading = true;
+  fetchBuffer(assetLiteURL(d.url))
+    .then((buf) => new Promise((res, rej) => loader.parse(buf, '', res, rej)))
+    .then((gltf) => onLiteLoaded(d, gltf))
+    .catch((err) => { L.state = 'failed'; console.warn('[lod] lite lỗi, giữ bản gốc:', d.url, err && err.message); })
+    .finally(() => { liteLoading = false; });
+}
+
+function onLiteLoaded(d, gltf) {
+  const L = d.lod;
+  gltf.scene.userData.lodLite = d.url;
+  const lites = L.roots.map((r, i) => {
+    // cùng parent + cùng transform local = cùng hệ toạ độ với bản gốc (lite sinh từ chính file gốc, chỉ giảm lưới)
+    const lite = i === 0 ? gltf.scene : gltf.scene.clone(true);
+    lite.position.copy(r.full.position);
+    lite.quaternion.copy(r.full.quaternion);
+    lite.scale.copy(r.full.scale);
+    let src = null;
+    r.full.traverse((o) => { if (o.isMesh && !src) src = o; });
+    lite.traverse((o) => {
+      if (!o.isMesh) return;
+      o.castShadow = false;
+      o.receiveShadow = src ? src.receiveShadow : true;
+      const mt = o.material;
+      if (mt) {
+        // map + emissive giữ 1024² của file lite (màn 4K PR 2: mặt tiền 50 m ở 250 m ≈ 500 px, 512² sẽ nhoè thấy
+        // được); normal/roughness/metalness 1024² là chi tiết dưới 1 px ở cự ly đó (đo: 13 file = 50 texture 1024²
+        // = +266 MB ước tính, một nửa là các map này) → trimDetailMaps.
+        trimDetailMaps(mt);
+        for (const k of ['map', 'roughnessMap', 'metalnessMap']) if (mt[k]) mt[k].anisotropy = 8;
+        mt.envMapIntensity = 0.85;
+      }
+    });
+    (r.full.parent || _scene).add(lite);
+    return lite;
+  });
+  // compileAsync duyệt traverseVisible → twin phải visible trong lúc biên dịch/upload (giấu bằng layer);
+  // ẩn ngay khi lộ diện, tick LOD kế tiếp quyết định hiện bản nào.
+  queueReveal(lites, () => {
+    lites.forEach((lite, i) => { lite.visible = false; L.roots[i].lite = lite; });
+    L.state = 'ready';
+  });
+}
+
+function lodTick(p) {
+  for (const d of REGISTRY) {
+    const L = d.lod;
+    if (!L) continue;
+    let near = null;
+    for (const r of L.roots) {
+      r.d = Math.hypot(p.x - r.cx, p.z - r.cz);
+      if (r.lite) {
+        if (r.far ? r.d < LOD_NEAR : r.d > LOD_FAR) r.far = !r.far;
+        r.full.visible = !r.far;
+        r.lite.visible = r.far;
+      }
+      if (r.d < CAST_RADIUS && (!near || r.d < near.d)) near = r;
+    }
+    // chỉ root GẦN NHẤT trong CAST_RADIUS của mỗi model đổ bóng (Quán hoa ×5 → 1 caster thay vì 5)
+    for (const r of L.roots) {
+      const cast = r === near;
+      if (r.cast === cast) continue;
+      r.cast = cast;
+      r.full.traverse((o) => { if (o.isMesh) o.castShadow = cast; });
+    }
+  }
+  pumpLite();
+}
+
+// Chẩn đoán (console: `(await import('./js/assets.js')).assetLodStats()`): trạng thái twin + cự ly + caster từng root.
+export function assetLodStats() {
+  const pairs = [];
+  for (const d of REGISTRY) {
+    if (!d.lod) continue;
+    for (const r of d.lod.roots) pairs.push({ name: d.name, d: Math.round(r.d), far: r.far, cast: r.cast, lite: d.lod.state });
+  }
+  return { pairs, liteLoading };
+}
 
 function report() {
   if (!progressFn) return;
@@ -267,8 +409,11 @@ export function initAssets(toast, onProgress) {
   pump();
 }
 
-let acc = 0;
+let acc = 0, _lodAt = 0;
 export function updateAssets(dt, playerPos) {
+  // LOD + caster theo ĐỒNG HỒ THẬT (bẫy KNOWLEDGE dc: dt game bị clamp 0.05 → máy yếu tick càng chậm)
+  const now = performance.now();
+  if (now - _lodAt >= LOD_TICK_MS) { _lodAt = now; lodTick(playerPos); }
   acc += dt;
   if (acc < 0.4) return;
   acc = 0;

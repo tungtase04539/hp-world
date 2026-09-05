@@ -329,6 +329,57 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-09-06 (dh)** [W3-landmark-lod — nhánh `worktree-wf_97eeaf15-407-3`] [LOD ĐỊA DANH BẰNG TWIN LITE >250 m +
+    CULL CASTER BÓNG + FRUSTUM CULL CÂY HERO]: chỉ sửa `js/assets.js` + `js/instcull.js` (world.js/main.js không đụng).
+    Phát hiện kiểm toán `scene-heavy:landmark-glb-no-far-lod-on-full`, `hero-trees-100k-tris-no-frustum-cull`,
+    `shadow-pass-casters`.
+    **(1) HỢP ĐỒNG LOD (assets.js):** sau khi bản gốc lộ diện (layer 31 → 0) và CHỈ khi `TIER ≥ 2` (tier ≤ 1 đã nạp
+    file lite từ đầu), `lodTick` (0,5 s theo `performance.now()`, gọi từ `updateAssets`) tải ngầm **twin**
+    `assets_lite/<cùng tên>` qua `assetLiteURL()` (jsDelivr; OVERSIZE chỉ áp cho tên bản gốc) — **1 twin/lúc, chỉ khi
+    `loadingCount === 0`, hàng đợi reveal rỗng và mọi model preload đã `done`** (không tranh với preload/streaming), ưu
+    tiên model XA NHẤT. Twin đặt CÙNG parent + copy position/quaternion/scale của root gốc (file lite sinh từ chính
+    file gốc → cùng hệ toạ độ; đối chứng render cùng khung hình: Nhà hát lớn trùng khít), `castShadow=false`,
+    receiveShadow theo bản gốc, anisotropy 8, envMapIntensity 0.85, đi qua đúng pipeline layer-31 + compileAsync +
+    initTexture rồi mới `visible=false`. Mỗi tick: `d = |player − tâm bbox root|`; **bản gốc hiện khi d < 250 m, twin
+    khi d > 280 m** (trễ 30 m chống nhấp nháy). Bản gốc KHÔNG đổi 1 byte (quy tắc chủ dự án); ảnh FULL vs LITE ở
+    (dd)/(df) không phân biệt được ngay cả ở cự ly gần → ở >250 m càng không (kiểm lại: THPT Ngô Quyền ở 277 m hiện
+    twin, ảnh 1600×1000 y hệt bản gốc). Root GLB nhận diện bằng `userData.lodKey = url` gắn TRƯỚC `place()` —
+    `clone(true)` sao chép userData nên 5 quán hoa đều được ghép cặp.
+    **(2) CASTER (cùng tick):** mỗi model chỉ root GẦN NHẤT trong 160 m đổ bóng (`castShadow` từng mesh) → Quán hoa
+    ×5 còn 1 caster; twin không bao giờ đổ bóng. Hộp bóng chỉ ±70/±110 m quanh người chơi (daynight.js) nên bóng
+    của mesh xa hơn vốn không hiện — không đổi hình ảnh.
+    **(3) instcull.js:** BỎ `frustumCulled = false`; sau mỗi lần nén gọi `mesh.computeBoundingSphere()` (r160 duyệt
+    tới `count`) → ô cây hero SAU LƯNG camera bị cull thật; cụm rỗng `visible = false` (cờ `hidden`: chỉ hiện lại
+    cái chính mình đã ẩn). Nén giờ phát hiện đổi TẬP instance (`idx[k]` = chỉ số gốc ở khe k) chứ không chỉ đổi số
+    lượng — BUG CŨ: 1 instance vào + 1 ra cùng nhịp → count không đổi → `needsUpdate` không bật → GPU giữ ma trận cũ.
+    **ĐO** (Chrome headless d3d11 trên Radeon 890M, `?quality=full` = TIER 3, 1600×1000, trưa; main pass = 1 lần
+    `R.render` trực tiếp; shadow pass tách bằng `info.autoReset=false` + `shadowMap.needsUpdate=true` rồi trừ main):
+    main tri spawn 7,59M→4,67M (−38%), hồ 5,47M→3,90M (−29%), bảo tàng 4,99M→3,58M (−28%), 400 m nam Nhà hát
+    9,52M→6,67M (−30%); shadow tri spawn 4,29M→3,08M (−28%, 4 clone Quán hoa), các góc khác ±2% (caster xa vốn
+    ngoài hộp bóng); cây hero trong frustum: hồ 1,92M→0,51M tri (14→3 ô), spawn 2,55M→0,48M, bảo tàng 1,04M→0,09M;
+    draw call không đổi (±10). Chi phí 17 twin (13 file; 5 clone Quán hoa dùng chung geometry/texture): heap JS
+    **+30 MB** (đo SAU `window.gc()` với `--js-flags=--expose-gc`: FULL 593–599 → 623–626 MB, LITE 411–415 →
+    411–415 MB; KHÔNG ép GC thì `usedJSHeapSize` lệch tới ±250 MB giữa 2 run cùng code — rác buildWorld chưa dọn),
+    texture ước tính (w·h·4·1,33) **+128 MB** = 24 tấm 1024² (map + emissive) + 13 tấm 64².
+    File lite thật ra mang 4 texture 1024²/model (normal + metallicRoughness cũng 1024², không phải 64 px như (dd)
+    ghi) → lúc đầu +266 MB; `trimDetailMaps` bỏ normal, thu roughness/metalness về 64². KHÔNG hạ map/emissive xuống
+    512²: ở 250 m trên màn 4K (PR 2) mặt tiền 50 m ≈ 500 px, sẽ nhoè thấy được. Lỗi JS 0 (cả `?quality=lite`),
+    `diag()` chỉ còn dòng boat0 cũ, ảnh spawn/hồ/bảo tàng/400 m trước–sau y hệt; đối chứng cùng khung hình gốc vs
+    twin ở 40–110 m: Nhà hát lớn, 5 Quán hoa, tượng Lê Chân trùng khít vị trí/tỉ lệ/hướng. Thấy thêm: run SAU không
+    còn bị autoQuality hạ bóng 2048→1024 + tắt bloom như run TRƯỚC (ít tam giác hơn → giữ được nhịp).
+    **SỬA KÈM (ngoài phạm vi W3 nhưng trong assets.js): LITE từng `metalnessMap = null`** → glTF Meshy không ghi
+    metallicFactor nên GLTFLoader để metalness = 1.0 ⇒ cả công trình thành KIM LOẠI (ảnh LITE ở spawn: banner đỏ
+    Nhà hát lớn xỉn đen, mặt tiền phẳng lì). Giờ tier ≤ 1 và twin cùng đi qua `trimDetailMaps`: normal bỏ,
+    roughness/metalness thu 64² (giữ giá trị trung bình). (dd) từng kết luận "FULL vs LITE không phân biệt được" —
+    kết luận đó KHÔNG đúng cho vật liệu, chỉ đúng cho lưới.
+    **BẪY MỚI:** (a) twin PHẢI `visible = true` lúc compileAsync (giấu bằng layer 31), chỉ `visible=false` trong
+    onDone của reveal — `visible=false` sớm là shader biên dịch ở khung đầu tiên hiện twin (khựng). (b) Đừng lọc root
+    GLB theo tên: `gltf.scene` tên 'Scene' hoặc rỗng tuỳ file. (c) `place()` đổi position SAU `updateMatrixWorld` →
+    lấy tâm bằng `Box3.setFromObject` (tự cập nhật matrixWorld cây con), không đọc `matrixWorld` thẳng. (d) Đo shadow
+    pass: r160 `renderer.info.reset()` chạy SAU shadow pass trong `render()` → autoReset=true thì info KHÔNG BAO GIỜ
+    chứa shadow; phải `info.autoReset=false` + `info.reset()` tay. (e) `?quality=full` trên máy này vẫn chạy WebGL
+    trên 890M (tier 3 chỉ vì ép tay) — số đo là số CPU-bound, so trước/sau cùng máy mới có nghĩa.
+    Chẩn đoán trong game: `(await import('./js/assets.js')).assetLodStats()` → {pairs:[{name,d,far,cast,lite}]}.
 - **2026-09-05 (dg)** [KIỂM TOÁN TOÀN REPO + ĐỢT 1: PHÂN TIER THEO GPU, HIỆN GLB KHÔNG KHỰNG, ASSETS_LITE LÊN CDN]:
     Kiểm toán 12 lăng kính (147 phát hiện, 16 phản biện đối kháng, số đo GPU thật) — báo cáo đầy đủ là artifact
     "Kiểm toán Hải Phòng 3D" (link trong memory `audit-report-2026-09`). **GỐC CỦA CẢ 2 PHÀN NÀN ("đồ hoạ chưa
