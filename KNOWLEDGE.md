@@ -329,6 +329,39 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-09-06 (W4-visual)** [ĐỢT 2 — BÓNG, NƯỚC, VẬT LIỆU, MÁI NHÀ ỐNG, MÉP SƯƠNG] (nhánh `worktree-wf_97eeaf15-407-4`,
+    6 phát hiện visual-quality của kiểm toán 2026-09; đo ở FULL 1600×1000 trên Radeon 890M headless):
+    **(a) Hộp bóng bám hướng nhìn** (`daynight.js`): tâm hộp = người chơi + hướng nhìn ngang × `LOOK_AHEAD = 0.41·SB`
+    (≈45 m FULL, 29 m TIER 2/LITE); `update(dt, playerPos, camera)` tự lấy `camera.getWorldDirection` (nhìn thẳng
+    xuống thì giữ hướng cũ). `bias −0.0006 → −0.0002`, **`normalBias 0.03`** (hết vệt acne răng cưa trên mặt tiền
+    nhà ống lúc nắng xiên — thấy rõ ở ảnh cũ góc museum), `radius 2` (chỉ có tác dụng khi đổi sang PCFShadowMap).
+    Làm mới bóng (`main.js`): trần đồng hồ như cũ (0.22 s FULL / 0.5 s TIER 2) **+ làm mới sớm khi đi >2 m hoặc quay
+    >0.15 rad** (`dayNight.shadowMoved()`/`markShadow()`), **sàn 0.1 s / 0.25 s** để kéo chuột không bắn shadow pass
+    mỗi khung. A/B cùng phiên: trigger theo chuyển động tốn ≤4% fps (38.9 → 40.4 khi tắt) — trong nhiễu đo.
+    **(b) Nước** (`world.js` waterMat): normal map THỦ TỤC 256² lặp được (value-noise 3 tầng lưới 8/16/32 bọc mép →
+    cao độ → pháp tuyến ×6 → RGB; `CanvasTexture` trực tiếp, KHÔNG qua makeTex vì normal map phải colorSpace tuyến
+    tính), `repeat W/9 × D/9` (ô 9 m), `normalScale 0.35`, offset trôi `(t·0.017, t·0.011) % 1`; `shininess 3 → 75`,
+    `specular 0x20241f → 0x8fa8ba`; màu nền vẫn do daynight ghi mỗi khung. **BẪY (đã dính):** với nắng trưa 70° và
+    camera vệ tinh nhìn thẳng xuống, half-vector chỉ lệch 9.5° → Blinn-Phong (chuẩn hoá `(s/2+1)/π`) làm CẢ HỒ trắng
+    bệch loang lổ = đúng tell #1 audit vệ tinh, dù shininess cao hay thấp (năng lượng đỉnh không đổi). Sửa bằng
+    `onBeforeCompile` chèn sau `#include <lights_phong_fragment>`: `material.specularStrength *= pow(1 − N·V, 3)`
+    (Fresnel theo góc nhìn; three chỉ có Schlick theo V·H ≈ 1 khi nhìn xuống) → aerial tối như cũ, tầm mắt vẫn lấp lánh.
+    Giá: vẫn 1 plane 2 tam giác + 1 lần lấy mẫu.
+    **(c) Vật liệu:** `_mkTexRaw` gán `anisotropy = LITE ? 4 : 8` cho MỌI texture canvas (đếm: 1.932 texture ở 1 →
+    54; renderer max 16); `jitter()` chỉ nhiễu ĐỘ SÁNG (một delta chung r,g,b) — vỉa hè gạch xám hết ô hồng/mint/tím.
+    **(d) Mái block_infill:** `ROOFP 88 (LITE 60) → 30` cho mọi tier; mái bằng = nóc bê tông xám `flatTones`
+    (0x9a9a94..0xb3b0a6) + **lan can `_parapet(w,d,0.55,0.2)`** (BufferGeometry tự dựng: 4 mặt ngoài màu tường + 4 mặt
+    trên bê tông = 16 tam giác = giá 1 mái chóp; PHẢI có attribute `uv` rỗng thì `mergeGeometries` mới nhận chung với
+    Box/Cylinder; winding tự lật theo pháp tuyến) + bể inox 1.3 m ở 35% nhà (12 tam giác). Tam giác block_infill
+    125.084 → 148.492 (+19%, ~4.800 nhà trong R1600; tổng main 7,59 → 7,69 M). Vệ tinh: từ "thảm đỏ" thành xám/trắng
+    điểm đỏ như ảnh thật.
+    **(e) Mép sương:** FULL `Fog 600→4200` thành **700→2600**, `camera.far 6000 → 3200` (TIER ≥ 2; LITE giữ nguyên vì
+    main.js tự đặt 400/2200 hoặc 220/1300). Dải đồng trống ngoài BUILD_RADIUS tan ở góc nhìn cao từ trung tâm; đứng
+    sát mép cảng nhìn ra vẫn thấy đồng (không sương nào che được vật cách 30 m — muốn hết phải tô màu sương cho
+    ground ngoài r=1450, việc của nhánh ground).
+    **BẪY ĐO:** máy chạy nhiều agent/Chrome song song (cổng 8211–8216) → fps cùng build dao động 24–52; chỉ tin A/B
+    TRONG CÙNG PHIÊN (toggle rồi đo lại), không tin 2 phiên khác nhau. Góc chụp `teleport(0,-450)` (museum) và
+    `(91,-440)` nằm TRONG khối nhà ống → ảnh vô dụng, chọn góc khác khi cần soi bảo tàng.
 - **2026-09-05 (dg)** [KIỂM TOÁN TOÀN REPO + ĐỢT 1: PHÂN TIER THEO GPU, HIỆN GLB KHÔNG KHỰNG, ASSETS_LITE LÊN CDN]:
     Kiểm toán 12 lăng kính (147 phát hiện, 16 phản biện đối kháng, số đo GPU thật) — báo cáo đầy đủ là artifact
     "Kiểm toán Hải Phòng 3D" (link trong memory `audit-report-2026-09`). **GỐC CỦA CẢ 2 PHÀN NÀN ("đồ hoạ chưa

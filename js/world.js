@@ -134,6 +134,9 @@ function _mkTexRaw(w, h, draw) {
   draw(g, w, h);
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
+  // Lọc dị hướng cho MỌI texture canvas (kiểm toán 2026-09: 1.761/1.846 texture ở anisotropy 1 → gạch vỉa hè
+  // nhoè ngay 5-20 m trước camera nhìn xiên). GPU tối đa 16; 8 đủ nét, LITE 4 tiết kiệm băng thông.
+  t.anisotropy = LITE ? 4 : 8;
   return t;
 }
 export function texCacheStats() {
@@ -151,7 +154,9 @@ function speckle(g, w, h, n, alpha) {
 // ---------- VỈA HÈ tả thực: mỗi kiểu một texture (theo phân loại pano thật, R1a) ----------
 // UV đã bake ~1 lần texture / 1.6m ở layRoad → texture 4 ô ⇒ ô ~0.4m (đúng gạch vỉa hè thật).
 const _swMatCache = {};
-function jitter(base, d) { const v = (c) => Math.max(0, Math.min(255, c + (Math.random() * 2 - 1) * d)); return `rgb(${v(base[0]) | 0},${v(base[1]) | 0},${v(base[2]) | 0})`; }
+// Nhiễu màu CHỈ theo ĐỘ SÁNG (cùng một delta cho r,g,b) — KHÔNG nhiễu từng kênh: gạch bê tông xám thật chỉ
+// đậm/nhạt khác nhau, nhiễu riêng từng kênh từng biến vỉa hè thành ô hồng/xanh mint/tím pastel (kiểm toán 2026-09).
+function jitter(base, d) { const l = (Math.random() * 2 - 1) * d, v = (c) => Math.max(0, Math.min(255, c + l)); return `rgb(${v(base[0]) | 0},${v(base[1]) | 0},${v(base[2]) | 0})`; }
 function tileGrid(g, W, H, N, rgb, dv, grout) {
   const s = W / N;
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { g.fillStyle = jitter(rgb, dv); g.fillRect(x * s, y * s, s, s); }
@@ -712,11 +717,53 @@ export function buildWorld(scene) {
   }
 
   // ---------- Mặt nước ----------
+  // Normal map nước THỦ TỤC 256² LẶP ĐƯỢC: value-noise 3 tầng (lưới 8/16/32, bọc mép → tile liền) → cao độ →
+  // pháp tuyến (sai phân trung tâm bọc mép) → mã hoá RGB. Ô 9 m. Giá ≈ 0: vẫn 1 plane 2 tam giác, +1 lần lấy
+  // mẫu texture. (Kiểm toán 2026-09: nước phẳng shininess 3 nhìn y hệt mặt đường nhựa.)
+  const waterNormal = (() => {
+    const N = 256, hgt = new Float32Array(N * N);
+    let s = 7;
+    const rnd = () => { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; };
+    for (const [P, amp] of [[8, 1], [16, 0.5], [32, 0.25]]) {
+      const lat = new Float32Array(P * P); for (let i = 0; i < lat.length; i++) lat[i] = rnd();
+      const sc = P / N;
+      for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+        const fx = x * sc, fy = y * sc, x0 = fx | 0, y0 = fy | 0, x1 = (x0 + 1) % P, y1 = (y0 + 1) % P;
+        const tx = fx - x0, ty = fy - y0, sx = tx * tx * (3 - 2 * tx), sy = ty * ty * (3 - 2 * ty);
+        const top = lat[y0 * P + x0] + (lat[y0 * P + x1] - lat[y0 * P + x0]) * sx;
+        const bot = lat[y1 * P + x0] + (lat[y1 * P + x1] - lat[y1 * P + x0]) * sx;
+        hgt[y * N + x] += amp * (top + (bot - top) * sy);
+      }
+    }
+    const cv = document.createElement('canvas'); cv.width = cv.height = N;
+    const g2 = cv.getContext('2d'), img = g2.createImageData(N, N), px = img.data;
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      const dx = hgt[y * N + (x + 1) % N] - hgt[y * N + (x + N - 1) % N];
+      const dy = hgt[((y + 1) % N) * N + x] - hgt[((y + N - 1) % N) * N + x];
+      const nx = -dx * 6, ny = -dy * 6, l = Math.hypot(nx, ny, 1), i = (y * N + x) * 4;
+      px[i] = (nx / l * 0.5 + 0.5) * 255; px[i + 1] = (ny / l * 0.5 + 0.5) * 255; px[i + 2] = (1 / l * 0.5 + 0.5) * 255; px[i + 3] = 255;
+    }
+    g2.putImageData(img, 0, 0);
+    const t = new THREE.CanvasTexture(cv);   // KHÔNG qua makeTex: normal map phải ở colorSpace tuyến tính
+    t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(W / 9, D / 9); t.anisotropy = 4;
+    return t;
+  })();
   const waterMat = new THREE.MeshPhongMaterial({
-    // Nước thật HP (Tam Bạc/Cấm) ĐỤC XÁM-LỤC phù sa, bão hòa THẤP, KHÔNG cyan. Fix mạnh (audit vệ tinh
-    // R1 — tell #1): specular top-down đẩy teal thành cyan → hạ shininess 26→3 + specular tối + màu lục-xám.
-    color: 0x6b7a68, transparent: true, opacity: 0.82, shininess: 3, specular: 0x20241f,
+    // Nước thật HP (Tam Bạc/Cấm) ĐỤC XÁM-LỤC phù sa, bão hòa THẤP, KHÔNG cyan (audit vệ tinh R1 — tell #1:
+    // specular rộng top-down đẩy teal thành cyan). Màu nền do daynight ghi mỗi khung. Đợt 2: normal map lăn tăn
+    // + specular xám-lam HẸP (shininess 75) để nắng để lại VỆT LẤP LÁNH — vẫn không phủ diện rộng như shininess 26 cũ.
+    color: 0x6b7a68, transparent: true, opacity: 0.82, shininess: 75, specular: 0x8fa8ba,
+    normalMap: waterNormal, normalScale: new THREE.Vector2(0.35, 0.35),
   });
+  // FRESNEL theo góc nhìn cho specular: nhìn thẳng xuống (vệ tinh/aerial, N·V≈1) → ~0, nhìn xiên ở tầm mắt → đủ.
+  // Đo: không có nó, ảnh aerial trưa (nắng cao 70°, half-vector lệch 9.5°) làm cả hồ trắng bệch loang lổ = đúng
+  // tell #1 audit vệ tinh. Blinn-Phong của three chỉ có Schlick theo V·H (≈1 khi nhìn xuống) nên phải thêm.
+  // `normal` (đã nhiễu normal map) và vViewPosition đều ở không gian view; isOrthographic: uniform sẵn có.
+  waterMat.onBeforeCompile = (sh) => {
+    sh.fragmentShader = sh.fragmentShader.replace('#include <lights_phong_fragment>',
+      '#include <lights_phong_fragment>\n' +
+      'material.specularStrength *= pow(1.0 - saturate(dot(normal, isOrthographic ? vec3(0.0, 0.0, 1.0) : normalize(vViewPosition))), 3.0);');
+  };
   const water = new THREE.Mesh(new THREE.PlaneGeometry(W, D, 1, 1), waterMat);
   water.rotation.x = -Math.PI / 2;
   water.position.set(CX, 0, CZ);
@@ -724,7 +771,8 @@ export function buildWorld(scene) {
   scene.add(water);
   world.waterMat = waterMat;
   water.userData.dyn = true;
-  updaters.push((dt, time) => { water.position.y = Math.sin(time * 0.8) * 0.06; });
+  // gợn trôi chậm (~0.15 m/s, ô 9 m); offset quấn về [0,1) — RepeatWrapping nên mép quấn liền
+  updaters.push((dt, time) => { water.position.y = Math.sin(time * 0.8) * 0.06; waterNormal.offset.set((time * 0.017) % 1, (time * 0.011) % 1); });
 
   // ---------- Đường phố THẬT (merge geometry để nhẹ GPU) ----------
   const ROAD_W = { p: 13, s: 10, t: 8, r: 5.5, w: 3.5, h: 3 }; // 1:1 — lòng đường thật (h = ngõ/hẻm bê tông)
@@ -18904,7 +18952,12 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     let nB = 0;
     const CAPB = LITE ? 26000 : 60000;   // thảm nhà ống toàn lõi; LITE: thưa hơn (lưới 11m) cho máy yếu
     const GRIDI = LITE ? 11 : 7.5;       // bước lưới thảm (m)
-    const ROOFP = LITE ? 60 : 88;        // % nhà có mái chóp
+    // % nhà mái CHÓP ngói. Kiểm toán 2026-09 (vệ tinh + pano): nhà ống HP đa số MÁI BẰNG lan can + bể nước inox,
+    // ngói chỉ ở nhà cũ/thấp — 88% chóp từng biến vệ tinh thành "thảm đỏ" và silhouette kiểu Địa Trung Hải.
+    const ROOFP = 30;
+    // mái bằng: bê tông xám 0x9a9a94..0xb3b0a6 (theo ảnh vệ tinh thật: xám/trắng chủ đạo, đỏ điểm xuyết)
+    const flatTones = [[0.60, 0.60, 0.58], [0.65, 0.64, 0.61], [0.70, 0.69, 0.65], [0.63, 0.63, 0.60]];
+    const tankTone = [0.74, 0.76, 0.78];   // bể nước inox
     // (PANO-LOOP V1: 5600 cạn quanh gx≈0 → cả dải đông tới Ga trống; 9500 đủ quét hết lưới, vẫn 1 mesh gộp)
     // KHU PHÂN LÔ LIỀN KỀ MỚI cạnh THPT Lê Hồng Phong (GE ảnh 4: dãy nhà trắng đều) — georef từ ảnh
     {
@@ -18938,6 +18991,38 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
       for (let i = 0; i < n; i++) { const sh = 0.78 + 0.22 * Math.max(0, nr.getY(i) * 0.5 + 0.5); c[i*3]=rgb[0]*sh; c[i*3+1]=rgb[1]*sh; c[i*3+2]=rgb[2]*sh; }
       g.setAttribute('color', new THREE.BufferAttribute(c, 3)); return g;
     };
+    // LAN CAN MÁI BẰNG (parapet) cho thảm nhà ống: 4 mặt NGOÀI (màu tường) + 4 mặt TRÊN (bê tông) = 16 tam giác,
+    // bằng giá 1 mái chóp; bỏ mặt trong/đáy (không thấy từ phố lẫn vệ tinh). Có uv rỗng để mergeGeometries
+    // chấp nhận cùng BoxGeometry/CylinderGeometry. Gốc = tâm nóc nhà, y=0 là mặt nóc.
+    const _parapet = (w, d, ph, pt, wallRgb, topRgb) => {
+      const P = [], Nn = [], Cc = [], I = [], hx = w / 2, hz = d / 2;
+      const quad = (a, b, c, e, n, rgb, sh) => {
+        // đảm bảo CCW theo pháp tuyến n (mặt trước) — không phụ thuộc thứ tự đỉnh viết tay
+        const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+        const cx = uy * vz - uz * vy, cy = uz * vx - ux * vz, cz = ux * vy - uy * vx;
+        const vs = (cx * n[0] + cy * n[1] + cz * n[2]) < 0 ? [a, e, c, b] : [a, b, c, e];
+        const i0 = P.length / 3;
+        for (const v of vs) { P.push(v[0], v[1], v[2]); Nn.push(n[0], n[1], n[2]); Cc.push(rgb[0] * sh, rgb[1] * sh, rgb[2] * sh); }
+        I.push(i0, i0 + 1, i0 + 2, i0, i0 + 2, i0 + 3);
+      };
+      for (const sx of [1, -1]) {
+        const ox = sx * hx, ix = sx * (hx - pt);
+        quad([ox, 0, -hz], [ox, 0, hz], [ox, ph, hz], [ox, ph, -hz], [sx, 0, 0], wallRgb, 1.0);
+        quad([ix, ph, -hz], [ox, ph, -hz], [ox, ph, hz], [ix, ph, hz], [0, 1, 0], topRgb, 0.96);
+      }
+      for (const sz of [1, -1]) {
+        const oz = sz * hz, iz = sz * (hz - pt);
+        quad([-hx, 0, oz], [hx, 0, oz], [hx, ph, oz], [-hx, ph, oz], [0, 0, sz], wallRgb, 0.8);
+        quad([-hx, ph, iz], [hx, ph, iz], [hx, ph, oz], [-hx, ph, oz], [0, 1, 0], topRgb, 0.96);
+      }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3));
+      g.setAttribute('normal', new THREE.Float32BufferAttribute(Nn, 3));
+      g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(P.length / 3 * 2), 2));
+      g.setAttribute('color', new THREE.Float32BufferAttribute(Cc, 3));
+      g.setIndex(I);
+      return g;
+    };
     // (evidence-gate + _forceDense đã bỏ: thảm phủ ĐỀU toàn lõi theo audit vệ tinh — guard nước/công viên/pano giữ nguyên)
     // === THẢM NHÀ ỐNG LIỀN KỀ TOÀN LÕI (audit cmp_1..8: thật phủ ~90% lòng ô, bản cũ ~25% rải rác) ===
     //  - Phủ TOÀN lõi tròn BUILD_RADIUS (vòng cũ dừng z=560/x=900 → nửa NAM + ĐÔNG trống nhà dân)
@@ -18967,16 +19052,29 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
         const gy = groundHeight(x, z);
         const box = new THREE.BoxGeometry(w, h, d);
         const wc = wallTones[(Math.abs(x * 7 + z * 13) | 0) % wallTones.length];
-        const rc = roofTones[(Math.abs(x * 3 + z * 5) | 0) % roofTones.length];
+        const hip = (Math.abs(x * 11 + z * 17) | 0) % 100 < ROOFP;
+        // nóc hộp: mái chóp → ngói (chóp che kín nóc, màu chỉ lộ ở mép); mái bằng → bê tông xám
+        const rc = hip ? roofTones[(Math.abs(x * 3 + z * 5) | 0) % roofTones.length] : flatTones[(Math.abs(x * 5 + z * 3) | 0) % flatTones.length];
         { const nrm = box.attributes.normal, cn = box.attributes.position.count, c = new Float32Array(cn * 3);
           for (let v = 0; v < cn; v++) { const isR = nrm.getY(v) > 0.6; const t = isR ? rc : wc; const sh = isR ? 0.96 : 0.8 + 0.2 * Math.abs(nrm.getX(v)); c[v * 3] = t[0] * sh; c[v * 3 + 1] = t[1] * sh; c[v * 3 + 2] = t[2] * sh; }
           box.setAttribute('color', new THREE.BufferAttribute(c, 3)); }
         const _ang = Math.atan2(-bdz, bdx) + (brnd() - 0.5) * 0.08;   // mặt tiền (trục X local) SONG SONG đường gần nhất
         box.rotateY(_ang); box.translate(x, gy + h / 2, z);
         geos.push(box);
-        if ((Math.abs(x * 11 + z * 17) | 0) % 100 < ROOFP) {
+        if (hip) {
           const _rr = _pyrRoof(w, d, 1.8 + (Math.abs(x * 3 + z) % 3) * 0.5, rc, 0.35);
           _rr.rotateY(_ang); _rr.translate(x, gy + h, z); geos.push(_rr);
+        } else {
+          const _pp = _parapet(w, d, 0.55, 0.2, wc, rc);
+          _pp.rotateY(_ang); _pp.translate(x, gy + h, z); geos.push(_pp);
+          if ((Math.abs(x * 13 + z * 7) | 0) % 100 < 35) {   // bể nước inox ở một góc mái (12 tam giác, ~1/3 nhà)
+            const tk = new THREE.BoxGeometry(1.3, 1.0, 1.3);
+            { const nrm = tk.attributes.normal, cn = tk.attributes.position.count, c = new Float32Array(cn * 3);
+              for (let v = 0; v < cn; v++) { const sh = nrm.getY(v) > 0.6 ? 1.0 : 0.78 + 0.16 * Math.abs(nrm.getX(v)); c[v * 3] = tankTone[0] * sh; c[v * 3 + 1] = tankTone[1] * sh; c[v * 3 + 2] = tankTone[2] * sh; }
+              tk.setAttribute('color', new THREE.BufferAttribute(c, 3)); }
+            tk.translate((w / 2 - 1.1) * (brnd() < 0.5 ? 1 : -1), 0.5, (d / 2 - 1.1) * (brnd() < 0.5 ? 1 : -1));
+            tk.rotateY(_ang); tk.translate(x, gy + h, z); geos.push(tk);
+          }
         }
         addCollider(x, z, Math.max(2.4, Math.min(Math.max(w, d) * 0.52, alley - 2.6, big - 8, 6)));
         nB++;

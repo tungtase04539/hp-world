@@ -59,8 +59,9 @@ renderer.shadowMap.enabled = !WEAK_GPU;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 const scene = new THREE.Scene();
-// far 6000: sương mù kết thúc ~4200 nên mọi thứ xa hơn đều chìm trong sương — 16000 chỉ tốn cull/vẽ thừa
-const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 6000);
+// far 3200 (TIER 2/3): sương FULL 700→2600 m (daynight.js) đã che kín, xa hơn chỉ tốn cull/vẽ thừa + depth precision;
+// LITE giữ 6000 rồi tự hạ 2600/1650 lúc khởi động (bên dưới).
+const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, TIER >= 2 ? 3200 : 6000);
 attachRenderer(renderer, camera, scene);   // assets.js: compileAsync + upload texture rải khung cho model GLB
 
 // Môi trường phản chiếu cho vật liệu PBR (mô hình GLB không bị xỉn/tối)
@@ -552,7 +553,7 @@ function animate() {
     traffic.update(dt, time, pState.pos);
     if (window.__hp && window.__hp._aerialCam) { /* chế độ vệ tinh: giữ camera top-down, không cập nhật */ }
     else if (cine.active) cine.update(dt); else updateCamera(dt);   // đạo diễn lo camera khi bật
-    const sky = dayNight.update(dt, pState.pos);
+    const sky = dayNight.update(dt, pState.pos, camera);   // camera: hộp bóng bám hướng nhìn
     // đêm bloom mạnh hơn cho đèn phố & cửa sổ rực rỡ
     if (bloomPass) bloomPass.strength = 0.025 + sky.night * 0.55;   // ban ngày gần tắt bloom
 
@@ -596,9 +597,13 @@ function animate() {
     // (PCFSoft 2048² từng tốn ~745 draw call + ~2M tam giác PHỤ mỗi khung)
     if (renderer.shadowMap.enabled && dayNight.sun.castShadow) {
       shadowTimer += dt;
-      // 8Hz→4.5Hz: nửa số frame-spike bóng, mắt không thấy khác. TIER 2 (iGPU): 2Hz — mỗi lần làm mới bóng
-      // là 1 khung +20 ms trên 890M (đo: p90 59 ms khi 4.5Hz).
-      if (shadowTimer > (TIER === 2 ? 0.5 : 0.22)) { shadowTimer = 0; renderer.shadowMap.needsUpdate = true; }
+      // Trần theo đồng hồ (4.5 Hz FULL / 2 Hz TIER 2 — mỗi lần làm mới bóng là 1 khung +20 ms trên 890M) + làm mới
+      // SỚM khi đã đi >2 m hoặc quay >0.15 rad (hộp bóng bám hướng nhìn, đứng yên thì không tốn gì); sàn 0.1/0.25 s
+      // để kéo chuột xoay camera không bắn shadow pass mỗi khung.
+      const cap = TIER === 2 ? 0.5 : 0.22, floor = TIER === 2 ? 0.25 : 0.1;
+      if (shadowTimer > cap || (shadowTimer > floor && dayNight.shadowMoved())) {
+        shadowTimer = 0; dayNight.markShadow(); renderer.shadowMap.needsUpdate = true;
+      }
     }
   }
 
