@@ -538,18 +538,29 @@ export function buildWorld(scene) {
     }
   };
 
-  // ---------- Mặt đất (từ lưới đất/biển OSM) ----------
+  // ---------- Mặt đất (từ lưới đất/biển OSM) — HỢP ĐỒNG 2 LƯỚI (W2, 2026-09-06) ----------
+  // Trước: MỘT tấm 54,9×31,6 km, ô 110×93 m (LITE 229×193 m) = 340k tam giác mà 99% đỉnh nằm ngoài
+  // BUILD_RADIUS; kênh Tam Bạc 55 m / Hạ Lý 48 m KHÔNG hiện được (2 đỉnh kề nhau đứng 2 bờ → "bắc cầu đất").
+  // Nay:
+  //  (1) 'ground'       — tấm TOÀN THẾ GIỚI, ô SC = 200 m (LITE 400 m), chỉ còn nhiệm vụ chân trời sau sương.
+  //                       Đỉnh nằm HẲN TRONG ô vuông local → y = UNDER (−5, dưới cả đáy biển −4): dìm 1 m như
+  //                       bản đầu KHÔNG đủ — đất 2 m dìm còn 1 m vẫn cao hơn mặt nước 0 và tấm thô nội suy
+  //                       "bắc cầu" qua kênh 55 m, che mất nước của lưới mịn (đã thấy ở hồ Tam Bạc).
+  //                       Đỉnh ĐÚNG TRÊN MÉP ô vuông giữ y = h → ngoài ô không có hào/bậc; ô thô sát mép
+  //                       dốc từ h xuống −5 nằm dưới lưới mịn.
+  //  (2) 'ground_local' — lưới MỊN ±LOCAL_HALF, N×N ô đều (13,3 m FULL / 20 m LITE), y = max(h, cao độ tấm
+  //                       thô tại đó) + 0.03 → LUÔN nằm trên tấm thô (kể cả dải dốc sát mép, nơi nó bám theo
+  //                       dốc thô — dải này cách vùng chơi ≥212 m); bờ kênh/sông trong vùng chơi hiện đúng 1:1.
+  //  SC là BỘI của bước lưới local (200 = 15×13,33; 400 = 20×20) → mép 2 lưới trùng khít từng đỉnh.
+  //  Cả 2 dựng bằng gridGeometry() + vertexHC(x, z) chung → cao độ + màu giống hệt. Dải 5 m hồ Tam Bạc / hồ Sen
+  //  (+0.05) vẫn giữ; trong hộp FINE_BOXES của chúng lưới local dìm 1 m (lưới thô hơn nằm dưới lưới mịn hơn).
   const W = WORLD_BOUNDS.maxX - WORLD_BOUNDS.minX;
   const D = WORLD_BOUNDS.maxZ - WORLD_BOUNDS.minZ;
   const CX = (WORLD_BOUNDS.maxX + WORLD_BOUNDS.minX) / 2;
   const CZ = (WORLD_BOUNDS.maxZ + WORLD_BOUNDS.minZ) / 2;
-  // LITE: địa hình lõi gần như PHẲNG (đa số ở LAND_H, chỉ bờ sông/cầu có độ dốc) — 500×340 = 340k
-  // tam giác là phi lý. 240×164 = 79k vẫn giữ đúng dáng bờ nước ở lưới ~9m. FULL giữ nguyên.
-  const geo = new THREE.PlaneGeometry(W, D, LITE ? 240 : 500, LITE ? 164 : 340);
-  geo.rotateX(-Math.PI / 2);
-  geo.translate(CX, 0, CZ);
-  const pos = geo.attributes.position;
-  const colors = new Float32Array(pos.count * 3);
+  const LOCAL_HALF = BUILD_RADIUS + 400;
+  // hộp [x1, x2, z1, z2] của 2 dải lưới mịn 5 m (hồ Tam Bạc, hồ Sen) — dùng lại ở 2 khối bên dưới
+  const FINE_BOXES = [[-1330, -65, -75, 530], [-215, 205, 690, 1220]];
   const cSand = new THREE.Color(0xeeda9e), cGrass = new THREE.Color(0x83cb6a),
         cGrass2 = new THREE.Color(0x5fae52), cDeep = new THREE.Color(0x6fa393),
         cCity = new THREE.Color(0xcfc7b2), cHill = new THREE.Color(0x4f9a52),
@@ -575,19 +586,10 @@ export function buildWorld(scene) {
   }
   world.inPark = inPark;
   const cPark = new THREE.Color(0x6fbf5a);
-  for (let i = 0; i < pos.count; i++) {
-    const x = pos.getX(i), z = pos.getZ(i);
-    let h = groundHeightNoDeck(x, z);
-    // HÀNH LANG HỒ TAM BẠC: lưới toàn cầu ô ~112m KHÔNG THỂ diễn tả kênh 50-66m (2 đỉnh kề
-    // nhau đứng 2 bờ → nội suy "bắc cầu đất" qua mặt nước). Dìm mọi đỉnh trong hành lang
-    // xuống -3 (tam giác nào phủ kênh cũng chìm); dải lưới MỊN 5m phủ đè bên dưới sẽ vẽ
-    // đúng bờ/kênh/phố (xem khối "DẢI LƯỚI MỊN" ngay sau).
-    if (x > -1210 && x < -195 && z > 45 && z < 410) {
-      if (lakeSD(x, z) < 200) h = -3;   // trong/quanh polygon hồ: dìm — dải lưới MỊN vẽ đè đúng cao độ
-    }
-    // HỒ SEN (cell_nam V1): hồ 85m < ô lưới thô 112m → dìm cả bbox, lưới mịn vẽ đè
-    if (x > -95 && x < 85 && z > 810 && z < 1100) h = -3;
-    pos.setY(i, h);
+  // Cao độ + màu của MỘT đỉnh mặt đất: ghi màu vào colors[i*3..], trả về h (chưa cộng offset).
+  // Dùng chung cho tấm toàn thế giới và lưới local để 2 mặt không lệch màu ở mép.
+  function vertexHC(x, z, colors, i) {
+    const h = groundHeightNoDeck(x, z);
     if (h < -0.6) tmp.copy(cDeep);
     else if (h < 1.1) tmp.copy(cSand);
     else {
@@ -606,22 +608,81 @@ export function buildWorld(scene) {
     colors[i * 3] = tmp.r * noise;
     colors[i * 3 + 1] = tmp.g * noise;
     colors[i * 3 + 2] = tmp.b * noise;
+    return h;
   }
-  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-  geo.computeVertexNormals();
-  const groundMesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ vertexColors: true }));
+  // Lưới đều nx×nz ô, bước step, góc (x0, z0): MỘT BufferGeometry mảng typed (không BoxGeometry từng ô).
+  // yOf(x, z, h) quyết định cao độ đỉnh. Trả về { geo, yAt(x, z) } — yAt = cao độ ĐÚNG NHƯ GPU vẽ
+  // (nội suy tuyến tính trong 2 tam giác của ô, đường chéo (i, j+1)–(i+1, j)), để lưới khác bám theo.
+  function gridGeometry(x0, z0, nx, nz, step, yOf) {
+    const NX = nx + 1, NZ = nz + 1;
+    const p = new Float32Array(NX * NZ * 3), col = new Float32Array(NX * NZ * 3), hs = new Float32Array(NX * NZ);
+    for (let j = 0; j < NZ; j++) {
+      const z = z0 + j * step;
+      for (let i = 0; i < NX; i++) {
+        const x = x0 + i * step, k = j * NX + i;
+        const y = yOf(x, z, vertexHC(x, z, col, k));
+        hs[k] = y; p[k * 3] = x; p[k * 3 + 1] = y; p[k * 3 + 2] = z;
+      }
+    }
+    const idx = new Uint32Array(nx * nz * 6);
+    for (let j = 0, t = 0; j < nz; j++) {
+      for (let i = 0; i < nx; i++) {
+        const a = j * NX + i, b = a + 1, c = a + NX, d = c + 1;
+        idx[t++] = a; idx[t++] = c; idx[t++] = b;
+        idx[t++] = b; idx[t++] = c; idx[t++] = d;
+      }
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setIndex(new THREE.BufferAttribute(idx, 1));
+    geo.setAttribute('position', new THREE.BufferAttribute(p, 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    geo.computeVertexNormals();
+    const yAt = (x, z) => {
+      const fi = Math.min(Math.max((x - x0) / step, 0), nx - 1e-6), fj = Math.min(Math.max((z - z0) / step, 0), nz - 1e-6);
+      const i = Math.floor(fi), j = Math.floor(fj), tx = fi - i, tz = fj - j, a = j * NX + i;
+      const ha = hs[a], hb = hs[a + 1], hc = hs[a + NX], hd = hs[a + NX + 1];
+      return tx + tz <= 1 ? ha + (hb - ha) * tx + (hc - ha) * tz : hd + (hc - hd) * (1 - tx) + (hb - hd) * (1 - tz);
+    };
+    return { geo, yAt };
+  }
+  // (1) tấm toàn thế giới: FULL 275×158 ô 200 m = 87k tam giác (LITE 138×79 ô 400 m = 22k); phủ trọn WORLD_BOUNDS,
+  // gốc lưới chọn sao cho ±LOCAL_HALF rơi đúng lên một đường lưới.
+  const SC = LITE ? 400 : 200, UNDER = -5;
+  const cx0 = -LOCAL_HALF - Math.ceil((-LOCAL_HALF - WORLD_BOUNDS.minX) / SC) * SC;
+  const cz0 = -LOCAL_HALF - Math.ceil((-LOCAL_HALF - WORLD_BOUNDS.minZ) / SC) * SC;
+  const coarse = gridGeometry(cx0, cz0, Math.ceil((WORLD_BOUNDS.maxX - cx0) / SC), Math.ceil((WORLD_BOUNDS.maxZ - cz0) / SC), SC,
+    (x, z, h) => (Math.abs(x) < LOCAL_HALF && Math.abs(z) < LOCAL_HALF ? UNDER : h));
+  // polygonOffset: camera near 0.1 → độ phân giải depth ở 2 km chỉ ~2,4 m; đẩy tấm thô ra xa thêm vài đơn vị
+  // depth để nó LUÔN thua lưới mịn/đường phía trên (ngoài ô local chỉ có nước + trời nên không hại gì).
+  const groundMesh = new THREE.Mesh(coarse.geo, new THREE.MeshLambertMaterial({
+    vertexColors: true, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 4,
+  }));
   groundMesh.name = 'ground';
   groundMesh.receiveShadow = true;
   scene.add(groundMesh);
 
-  // ---------- DẢI LƯỚI MỊN HỒ TAM BẠC (5m) ----------
-  // Phủ hành lang hồ bằng lưới mịn đúng cao độ + màu (lưới toàn cầu trong hành lang đã dìm -3).
-  // +0.05 để nổi trên lưới toàn cầu ở rìa hộp (tránh z-fight nơi 2 mặt trùng cao độ).
+  // (2) lưới local: FULL N=300 → 13,3 m, 180k tam giác (trần 180k của ngân sách W2; 10 m sẽ là 320k > trần);
+  // LITE N=200 → 20 m, 80k (tổng LITE 102k ≈ 79k trước). Kênh 55 m = 4 ô FULL / 2,75 ô LITE, bờ 28 m ≥ 1,4 ô.
   {
-    // HỘP RỘNG HƠN vùng dìm ≥120m mọi phía: đỉnh dìm (-3) nội suy với đỉnh thường tạo VÀNH TRŨNG
-    // lan 1 ô lưới thô (~112m) ra ngoài vùng dìm — không phủ thì lộ "rãnh nước" giả cạnh vườn hoa
-    // Lê Chân (đông) và ven đập Tam Kỳ (tây) — user báo.
-    const X1 = -1330, X2 = -65, Z1 = -75, Z2 = 530, STEP = 5;
+    const N = LITE ? 200 : 300;
+    const local = gridGeometry(-LOCAL_HALF, -LOCAL_HALF, N, N, (2 * LOCAL_HALF) / N, (x, z, h) => {
+      for (const [x1, x2, z1, z2] of FINE_BOXES) if (x > x1 && x < x2 && z > z1 && z < z2) return h - 1;
+      return Math.max(h, coarse.yAt(x, z)) + 0.03;
+    });
+    const groundLocal = new THREE.Mesh(local.geo, new THREE.MeshLambertMaterial({ vertexColors: true }));
+    // tên 'ground_local': freezeStatic bỏ qua theo /^ground/ (không gộp, không castShadow), nearCull không khớp
+    groundLocal.name = 'ground_local';
+    groundLocal.receiveShadow = true;
+    scene.add(groundLocal);
+  }
+
+  // ---------- DẢI LƯỚI MỊN HỒ TAM BẠC (5m) ----------
+  // Phủ hành lang hồ bằng lưới mịn đúng cao độ + màu (lưới local trong hộp FINE_BOXES[0] đã dìm 1 m).
+  // +0.05 để nổi trên lưới local ở rìa hộp (tránh z-fight nơi 2 mặt trùng cao độ).
+  {
+    // HỘP RỘNG HƠN hồ ≥120m mọi phía (giữ từ thời lưới thô 112 m — từng lộ "rãnh nước" giả cạnh vườn hoa
+    // Lê Chân (đông) và ven đập Tam Kỳ (tây) — user báo). Hộp khai báo ở FINE_BOXES để lưới local dìm theo.
+    const [X1, X2, Z1, Z2] = FINE_BOXES[0], STEP = 5;
     const g2 = new THREE.PlaneGeometry(X2 - X1, Z2 - Z1, Math.round((X2 - X1) / STEP), Math.round((Z2 - Z1) / STEP));
     g2.rotateX(-Math.PI / 2);
     g2.translate((X1 + X2) / 2, 0, (Z1 + Z2) / 2);
@@ -681,7 +742,7 @@ export function buildWorld(scene) {
 
   // ---------- DẢI LƯỚI MỊN HỒ SEN (5m) — phủ bbox đã dìm, đúng cao độ + màu ----------
   {
-    const X1 = -215, X2 = 205, Z1 = 690, Z2 = 1220, STEP = 5;
+    const [X1, X2, Z1, Z2] = FINE_BOXES[1], STEP = 5;
     const g2 = new THREE.PlaneGeometry(X2 - X1, Z2 - Z1, Math.round((X2 - X1) / STEP), Math.round((Z2 - Z1) / STEP));
     g2.rotateX(-Math.PI / 2);
     g2.translate((X1 + X2) / 2, 0, (Z1 + Z2) / 2);
@@ -21719,7 +21780,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     if (shadowOn) {
       const _noCast = /^(roads|dashes|paths|rails|railballast|aerial_road_ribbon|caro_do_xam|lake_promenade)(_|$)|^sidewalk/;
       scene.traverse((o) => {
-        if (!o.isMesh || o.name === 'ground' || o.name === 'water') return;
+        if (!o.isMesh || /^ground/.test(o.name) || o.name === 'water') return;
         if (o.material && o.material.transparent) return;
         o.castShadow = !_noCast.test(o.name);
         o.receiveShadow = true;
@@ -21761,7 +21822,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
       scene.traverse((o) => {
         if (!o.isMesh || o.isInstancedMesh || o.isSkinnedMesh) return;
         if (o.layers.mask !== 1) return;               // layer khác (ribbon aerial layer-2) — giữ nguyên
-        if (o.name === 'ground' || o.name === 'water') return;
+        if (/^ground/.test(o.name) || o.name === 'water') return;
         if (o.userData.dyn) return;
         let pp = o.parent; while (pp) { if (pp.userData && pp.userData.dyn) return; pp = pp.parent; }
         const m = o.material;
