@@ -1,4 +1,5 @@
 // Bàn phím + joystick cảm ứng
+import { IS_MOBILE, HAS_TOUCH } from './device.js';
 export const input = {
   forward: 0, right: 0,      // -1..1 (đã gộp bàn phím + joystick)
   run: false,
@@ -82,9 +83,10 @@ export function initInput() {
   btnA.addEventListener('touchstart', (e) => { input.interact = true; e.preventDefault(); }, { passive: false });
   btnJ.addEventListener('touchstart', (e) => { input.jump = true; e.preventDefault(); }, { passive: false });
 
-  // Hiện điều khiển cảm ứng nếu là thiết bị chạm
-  if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
-    input.isTouch = true;
-    document.getElementById('touchControls').classList.remove('hidden');
-  }
+  // Hiện điều khiển cảm ứng khi CON TRỎ CHÍNH là ngón tay (điện thoại/tablet). Laptop có màn cảm ứng nhưng
+  // dùng chuột: chỉ hiện khi có touchstart THẬT (joystick từng che góc màn laptop + prompt E thành ✦).
+  const showTouch = () => { input.isTouch = true; document.getElementById('touchControls').classList.remove('hidden'); };
+  const coarsePrimary = !!(window.matchMedia && matchMedia('(pointer: coarse)').matches && !matchMedia('(pointer: fine)').matches);
+  if (IS_MOBILE || coarsePrimary) showTouch();
+  else if (HAS_TOUCH) window.addEventListener('touchstart', showTouch, { once: true, passive: true });
 }

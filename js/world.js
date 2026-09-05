@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
-import { registerModel, shrinkTexturesForMobile } from './assets.js';
+import { registerModel, shrinkTexturesForMobile, assetURL } from './assets.js';
 import { IS_MOBILE, LITE } from './device.js';
 import {
   WORLD_BOUNDS, LM, LM_DIR, LM_FACE, EXTRAS, TREES, PARKS, RAIL, DT_BOX, RIVERS, ROADS_DT, ROADS_REGION, BRIDGES, BUILDINGS,
@@ -803,6 +803,7 @@ export function buildWorld(scene) {
     if (!geos.length) return;
     const merged = mergeGeometries(geos);
     geos.forEach((g) => g.dispose());
+    geos.length = 0;   // RỖNG mảng đầu vào: closure buildWorld giữ mảng này mãi → 47k BoxGeometry chết = 59% heap, mark-compact ~250 ms
     const mesh = new THREE.Mesh(merged, material);
     mesh.name = name;
     mesh.receiveShadow = true;
@@ -828,6 +829,7 @@ export function buildWorld(scene) {
       mesh.name = name + '_' + k; mesh.receiveShadow = true; scene.add(mesh);
     }
     geos.forEach((g) => g.dispose());
+    geos.length = 0;   // xem addMerged: giải phóng geometry đầu vào khỏi closure (asphaltGeos/dashGeos/sidewalkBuckets)
   }
   // ---------- ĐƯỜNG SẮT THẬT (tuyến Hà Nội - Hải Phòng chạy vào ga) ----------
   {
@@ -20402,7 +20404,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     HERO_FILES.forEach((file, v) => {
       const slots = heroTrees.filter((t) => t.variant === v);
       if (!slots.length) return;
-      loader.load(ASSET_BASE_W + file, (gltf) => {
+      loader.load(assetURL('assets/' + file), (gltf) => {   // qua assetURL: LITE→assets_lite, web→jsDelivr (trước: raw + luôn bản FULL)
         shrinkTexturesForMobile(gltf.scene);
         let mesh = null;
         gltf.scene.traverse((o) => { if (o.isMesh && !mesh) mesh = o; });
@@ -20452,7 +20454,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
   function loadHeroBeds() {
     if (!heroBeds.length) return;
     const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
-    loader.load(ASSET_BASE_W + HERO_BED_FILE, (gltf) => {
+    loader.load(assetURL('assets/' + HERO_BED_FILE), (gltf) => {
       shrinkTexturesForMobile(gltf.scene);
       let mesh = null;
       gltf.scene.traverse((o) => { if (o.isMesh && !mesh) mesh = o; });

@@ -197,6 +197,20 @@ Quy trình đã kiểm chứng (scratchpad `bake.mjs`, dùng `@gltf-transform/co
   3) code chỉ cần `registerModel(url:'assets/xxx.glb')`.
   Chuyển nhánh có file ignore: dùng `git checkout -f`, cẩn thận mất file local (backup ra scratchpad trước).
 - Preload lúc màn hình chờ (`initAssets`), model xa stream theo khoảng cách (`updateAssets`, radius mặc định 900).
+- **(2026-09-05) Tải & hiện GLB không khựng** (`js/assets.js`): (1) `registerModel` với `preload` bấm tải NGAY trong
+  **Worker** (Blob worker, `fetch`→`ArrayBuffer` transfer) — mạng chạy song song với `buildWorld` ~30 s đồng bộ;
+  (2) parse bằng `loader.parse(buf)` (không qua FileLoader stream); (3) model mới đặt vào scene ở **layer 31**
+  (camera không vẽ) → `renderer.compileAsync(root, camera, scene)` (KHR_parallel_shader_compile, không chặn;
+  LƯU Ý `compile()` duyệt `traverseVisible` nên KHÔNG được dùng `visible=false`) → `pumpAssetUploads()` mỗi khung
+  upload đúng 1 texture bằng `renderer.initTexture` → trả về layer 0. Bản clone (Quán hoa ×5) tự được gom vì
+  reveal lấy mọi object mới xuất hiện trong `scene.children` sau `place()`. `assetsBusy()` cho autoQuality bỏ qua
+  cửa sổ đo lúc còn tải. Lite 404 → `forceFull` thử lại NGAY trong `onFail` (không đợi tick 0.4 s).
+- **`assets_lite/*.glb` PHẢI có trên nhánh assets-storage** (đẩy 2026-09-05, commit 8b8e42c, 18 file, bỏ `*_raw`).
+  Trước đó thư mục này CHƯA BAO GIỜ được đẩy → mọi máy LITE 404 ×13 rồi tải lại bản gốc 238 MB. Đổi asset →
+  `git rev-parse --short origin/assets-storage` → cập nhật `ASSETS_SHA` → chạy **`node tools/check_assets.mjs`**
+  (đối chiếu mọi URL trong code với cây git của SHA ghim, cả gốc lẫn lite) TRƯỚC khi push.
+- `sw.js`: URL jsDelivr ghim SHA là bất biến → cache-first (không revalidate); chỉ raw.githubusercontent
+  (theo nhánh) mới stale-while-revalidate. Trước đây mỗi lần vào game lại tải ngầm toàn bộ GLB đã ghim.
 - Người dùng gửi file nặng cho AI: upload lên GitHub Release / nhánh assets-storage rồi đưa URL.
 - **Dữ liệu audit 551 pano**: bản phân tích (JSON + bảng HTML, ~4MB) nằm NGAY nhánh chính
   ở `audit/`; TRỌN BỘ ẢNH pano (4.411 jpg + manifest + README ánh xạ tọa độ) cũng đã ở nhánh
@@ -315,6 +329,55 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-09-05 (dg)** [KIỂM TOÁN TOÀN REPO + ĐỢT 1: PHÂN TIER THEO GPU, HIỆN GLB KHÔNG KHỰNG, ASSETS_LITE LÊN CDN]:
+    Kiểm toán 12 lăng kính (147 phát hiện, 16 phản biện đối kháng, số đo GPU thật) — báo cáo đầy đủ là artifact
+    "Kiểm toán Hải Phòng 3D" (link trong memory `audit-report-2026-09`). **GỐC CỦA CẢ 2 PHÀN NÀN ("đồ hoạ chưa
+    đúng" + "điều khiển giật") nằm ở phân loại thiết bị:** máy chủ dự án (Ryzen AI 9 HX 370, RTX 4060, màn 3840×2400
+    CẢM ỨNG) có `navigator.maxTouchPoints = 10` → `device.js` xếp LITE, `main.js` xếp touch → khoá 30 fps (gate
+    `performance.now()` còn sinh khung 33/50 ms xen kẽ), pixelRatio 1 trên màn 4K, tắt bóng/AA/bloom (gắn với cờ
+    chạm nên `?quality=full` cũng không bật lại được), model assets_lite giảm 88% tam giác + texture ép 512 px
+    (cả chân dung Bác Hồ), sương 1300 m. Đo thật: 22 fps, p99 244 ms, 34/219 khung >50 ms khi xoay camera.
+    **Phát hiện 2:** Chrome/Edge trên laptop 2 GPU chạy WebGL trên **Radeon 890M** (adapter Windows gán);
+    `powerPreference:'high-performance'` KHÔNG đổi được card trên Windows, và `main.js:32` từng gọi
+    `canvas.getContext('webgl2')` để "kiểm tra WebGL" trên chính canvas game → WebGLRenderer nhận lại context cũ,
+    MẤT HẾT attribute (đo: powerPreference 'default', antialias sai). **Phát hiện 3:** khung hình nghẽn CPU của
+    three.js (~17 ms: projectObject + updateMatrixWorld + ~1.200 draw call cho 7.344 object), gameplay chỉ 0,4 ms;
+    FULL trên 890M và RTX bằng nhau → GPU không phải giới hạn. **Phát hiện 4:** khựng 50–938 ms khi GLB stream
+    (parse 56–312 ms + upload 4096² 35–45 ms/tấm + compile shader ~45 ms trong 1 khung); 47.036 BoxGeometry đầu
+    vào merge bị closure `buildWorld` giữ (59% heap) → mark-compact ~250 ms (hiếm). **Phát hiện 5 (accuracy):**
+    trong R1600 chỉ 332 footprint OSM vs 60.000 hộp `block_infill` (chạm CAPB tại x=1.287 → dải đông trống);
+    sông = polyline bề rộng hằng (Cấm 620 m vs OSM 201 m), `reclaimPort()` chôn 18,3 ha lòng Cấm thật, Ga Hải Phòng
+    nằm giữa ray 2–3 quay lưng ra phố (Đợt 2/3). **BỊ BÁC BỎ khi phản biện (đừng làm lại):** "streaming gây GC
+    0,5–1,9 s" và "LITE chậm hơn FULL" = artefact do 67 Chrome chạy song song lúc đo; "mái hip 48% nhà OSM" —
+    thủ phạm silhouette mái chóp là `block_infill` ROOFP 88%, không phải cổng hip-roof.
+    **ĐỢT 1 ĐÃ LÀM:** (1) `js/device.js` viết lại: `HAS_TOUCH` (chỉ UI) tách khỏi **`TIER` 0–3** đọc chuỗi GPU
+    từ canvas TẠM (0 = SwiftShader, 1 = mobile/GPU yếu/≤4 nhân/≤4 GB, 3 = NVIDIA/GeForce/RTX/Radeon RX/Apple M/Arc,
+    2 = còn lại kể cả iGPU hiện đại), `LITE = TIER ≤ 1`, override `?quality=` + `localStorage hp3d.quality`
+    (nút chọn ở màn chờ + hiện tên GPU), `IGPU_ON_BIG_MACHINE` → toast 1 lần hướng dẫn Windows Graphics Settings.
+    (2) `main.js`: kiểm WebGL trên canvas tạm; antialias/shadow/post gắn `TIER ≤ 1`; pixelRatio khởi đầu theo tier
+    (3: 1.5→2, 2: 1.0→1.5 do autoQuality nâng — đo: 890M + bóng + bloom ở 1.25 cho p50 52 ms, ≤1: 1.0); TIER 2
+    bóng 1024 + bloom nửa độ phân giải; **cap fps chỉ khi IS_MOBILE**, chia
+    tick RAF (`FRAME_DIV`) thay vì so `performance.now()`; autoQuality đo bằng đồng hồ thật, ngưỡng theo
+    `REFRESH_HZ/FRAME_DIV` (0,7 hạ / 0,9 nâng), bước hạ 1 KHÔNG tăng PR, bỏ qua khi `assetsBusy()`; **mỗi bước
+    hạ phải chứng minh +20% fps ở cửa sổ 4 s sau, không thì HOÀN TÁC + khoá** (máy nghẽn CPU như 890M: tắt
+    bóng/bloom/hạ PR đều không đổi fps — đo A/B: mặc định p50 40 ms, tắt cả bóng lẫn bloom vẫn p50 37 ms — hạ cấp
+    chỉ mất đẹp; ngưỡng 8% từng bị nhiễu ±10% đánh lừa tụt thẳng xuống nấc 3); camera/yaw mượt `1−exp(−k·dt)`.
+    (3) `assets.js`: worker tải ngầm + layer-31 reveal (xem §6); **worker chỉ khởi động khi luồng chính nhả nhịp**
+    → `main.js` `await workerReady()` (ping/pong, timeout 800 ms) TRƯỚC `buildWorld`; và vì `registerModel` chỉ
+    chạy ở cuối buildWorld (giây ~40/53), thêm `PRELOAD_HINT` (10 URL cụm trung tâm) bấm tải ngay lúc nạp module. (4) `world.js`: `geos.length
+    = 0` sau merge (`addMerged`/`addMergedTiled`); cây hero + luống hoa nạp qua `assetURL()` (LITE→lite, web→jsDelivr).
+    (5) `input.js`: joystick chỉ hiện khi con trỏ chính là ngón tay hoặc có touchstart thật. (6) assets_lite lên
+    assets-storage `8b8e42c`, `ASSETS_SHA` cập nhật, `tools/check_assets.mjs` mới, `sw.js` cache-first cho URL ghim SHA.
+    **VIỆC CHỦ DỰ ÁN TỰ LÀM:** Windows Settings → System → Display → Graphics → thêm Chrome/Edge → High performance
+    → mở lại trình duyệt; sau đó `__hp.gpu` phải báo NVIDIA và tier 3.
+    **CÒN LẠI (Đợt 2/3, theo báo cáo):** ngân sách draw call/object (merge 4.128 mesh texture/emissive theo
+    instance material + ô, atlas biển, ẩn biển/đèn >350 m, tách monolith `mrg10_0,0`), LOD địa danh bằng GLB lite
+    >250 m, bóng 2 cascade + normalBias, nước, sửa Ga/Bảo tàng/Triển lãm/Việt Tiệp, nước polygon OSM; footprint +
+    chiều cao thật (Open Buildings 2.5D / Overture); buildWorld sang worker/cache; loại `audit/` khỏi gh-pages,
+    lọc số điện thoại trong `gen_shopsigns.mjs`, package.json + tools chạy Windows, tách §10 sang CHANGELOG.
+    **BẪY MỚI:** `renderer.compile()` chỉ duyệt `traverseVisible` → muốn biên dịch trước khi hiện phải giấu bằng
+    LAYER, không phải `visible=false`. Mọi phép đo perf từ nay PHẢI ghi `__hp.tier` + `__hp.gpu` (script chụp pano
+    trước đây chạy trên chính máy cảm ứng này nên đã chấm ở LITE mà không biết).
 - **2026-07-17 (df)** [3 ĐÒN CUỐI THEO THỨ TỰ GPT + TÁCH METRIC MAIN/SHADOW]:
     **(1) TÁCH METRIC (khuyến nghị #1 của GPT — sửa chính CÔNG CỤ ĐO):** `renderer.info.render.triangles`
     CỘNG CẢ shadow pass → mọi số đo từ đầu buổi đều lẫn lộn (giải thích vì sao phân rã theo mesh ra 5.071k

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { LITE } from './device.js';
+import { LITE, TIER } from './device.js';
 
 // Chu kỳ ngày đêm — một ngày = 300 giây, bắt đầu lúc ~9h sáng
 export const DAY_LENGTH = 300;
@@ -28,13 +28,14 @@ export function createDayNight(scene, world) {
   sun.shadow.mapSize.set(2048, 2048);
   // LITE: thu hộp bóng 110→70m. Lợi KÉP: (a) ít caster lọt vào shadow pass hơn — mesh gộp ô lớn chỉ
   // cần chạm hộp là render TOÀN BỘ vào shadow map; (b) cùng 1024px phủ vùng nhỏ hơn ⇒ bóng NÉT HƠN.
-  const SB = LITE ? 70 : 110;
+  // TIER 2 (iGPU hiện đại, bóng 1024) cũng dùng hộp 70 m: nửa số caster, bóng nét hơn, GPU nhẹ hơn.
+  const SB = (LITE || TIER === 2) ? 70 : 110;
   sun.shadow.camera.left = -SB;
   sun.shadow.camera.right = SB;
   sun.shadow.camera.top = SB;
   sun.shadow.camera.bottom = -SB;
   sun.shadow.camera.near = 20;
-  sun.shadow.camera.far = LITE ? 400 : 600;
+  sun.shadow.camera.far = (LITE || TIER === 2) ? 400 : 600;
   sun.shadow.bias = -0.0006;
   scene.add(sun);
   scene.add(sun.target);

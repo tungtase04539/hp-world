@@ -17,7 +17,10 @@ self.addEventListener('fetch', (e) => {
   e.respondWith((async () => {
     const cache = await caches.open(CACHE);
     const hit = await cache.match(req);
-    // luôn thử lấy bản mới ngầm để tự cập nhật khi asset đổi
+    // URL jsDelivr ghim COMMIT SHA là BẤT BIẾN → cache-first tuyệt đối, KHÔNG revalidate (trước đây mỗi lần vào
+    // game lại tải ngầm toàn bộ ~240MB GLB dù nội dung không thể đổi — kiểm toán 2026-09-05).
+    if (hit && /cdn\.jsdelivr\.net\/gh\/[^/]+\/[^/@]+@[0-9a-f]{7,40}\//.test(req.url)) return hit;
+    // URL theo nhánh (raw.githubusercontent) có thể đổi → stale-while-revalidate như cũ
     const fetching = fetch(req).then((res) => {
       if (res && (res.ok || res.type === 'opaque')) cache.put(req, res.clone());
       return res;

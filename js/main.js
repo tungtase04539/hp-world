@@ -5,7 +5,8 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { buildWorld, groundHeight, groundHeightNoDeck, landAt, WORLD_BOUNDS, LM, EXTRAS, BUILD_RADIUS, LITE, texCacheStats } from './world.js';
+import { buildWorld, groundHeight, groundHeightNoDeck, landAt, WORLD_BOUNDS, LM, EXTRAS, BUILD_RADIUS, texCacheStats } from './world.js';
+import { IS_MOBILE, HAS_TOUCH, TIER, GPU_NAME, QUALITY_PREF, setQualityPref, IGPU_ON_BIG_MACHINE } from './device.js';
 import { createTraffic } from './traffic.js';
 import { makeHumanoid } from './character.js';
 import { createVehicles } from './vehicles.js';
@@ -20,16 +21,21 @@ import * as audio from './audio.js';
 import * as quests from './quests.js';
 import { initMinimap, drawMinimap } from './minimap.js';
 import { initMinigame, openMinigame, isMinigameOpen } from './minigame.js';
-import { initAssets, updateAssets } from './assets.js';
+import { initAssets, updateAssets, attachRenderer, pumpAssetUploads, assetsBusy, assetFetchLog, workerReady } from './assets.js';
 import { initCinematic } from './cinematic.js';
 import { autoRegisterInstances, updateInstanceCull, instanceCullStats } from './instcull.js';
 
 // ============ Khởi tạo đồ họa ============
-const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+// CẢM ỨNG chỉ quyết định UI (joystick/✦). Chất lượng render quyết định bằng TIER (device.js) — laptop RTX
+// màn cảm ứng từng bị coi là điện thoại: tắt bóng/AA/bloom, khoá 30 fps (kiểm toán 2026-09-05).
+const isTouchDevice = HAS_TOUCH;
+const WEAK_GPU = TIER <= 1;
 const canvas = document.getElementById('scene');
 // Máy/trình duyệt không có WebGL (máy văn phòng cũ, driver lỗi, chế độ tiết kiệm) — trước đây
-// người chơi chỉ thấy MÀN ĐEN không lời giải thích.
-if (!canvas.getContext('webgl2') && !canvas.getContext('webgl')) {
+// người chơi chỉ thấy MÀN ĐEN không lời giải thích. Kiểm trên canvas TẠM: gọi getContext trên canvas game
+// là WebGLRenderer nhận lại context cũ và MẤT HẾT attribute (powerPreference/antialias — đo được).
+const _probe = document.createElement('canvas');
+if (!_probe.getContext('webgl2') && !_probe.getContext('webgl')) {
   document.body.innerHTML = '<div style="font:16px/1.6 system-ui;padding:32px;max-width:640px;margin:auto;color:#eee;background:#1a1a1f;height:100vh">'
     + '<h2>😕 Trình duyệt chưa bật WebGL</h2>'
     + '<p>Hải Phòng 3D cần WebGL để dựng hình. Thử: cập nhật trình duyệt, bật “tăng tốc phần cứng” '
@@ -38,22 +44,24 @@ if (!canvas.getContext('webgl2') && !canvas.getContext('webgl')) {
   throw new Error('WebGL không khả dụng');
 }
 const renderer = new THREE.WebGLRenderer({
-  canvas, antialias: !isTouchDevice,              // mobile: tắt MSAA (VRAM + ổn định)
-  powerPreference: 'high-performance',            // laptop 2 GPU: ép dGPU (trước hay rơi vào iGPU → lag)
+  canvas, antialias: !WEAK_GPU,                   // máy yếu: tắt MSAA (VRAM + ổn định)
+  powerPreference: 'high-performance',            // LƯU Ý: Windows KHÔNG đổi được card bằng cờ này — xem device.js IGPU_ON_BIG_MACHINE
 });
-// KHỞI ĐỘNG: máy LITE (yếu/mobile) = DPR 1.0 thẳng (playbook mobile); máy thường = 1.5,
-// autoQuality sẽ NÂNG lên full DPR sau khi đo FPS tốt
-renderer.setPixelRatio(LITE ? 1 : Math.min(window.devicePixelRatio, 1.5));
+// KHỞI ĐỘNG theo tier: TIER 3 (GPU rời) 1.5 rồi autoQuality nâng dần tới 2; TIER 2 (iGPU) bắt đầu 1.0 và
+// autoQuality nâng tới 1.5 nếu giữ được nhịp (đo 2026-09-05: Radeon 890M + bóng + bloom ở 1.25 = p50 52 ms).
+// Máy yếu ghim 1.0.
+renderer.setPixelRatio(TIER >= 3 ? Math.min(window.devicePixelRatio || 1, 1.5) : 1);
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.18;
-// bóng đổ thời gian thực (tắt trên di động để giữ mượt)
-renderer.shadowMap.enabled = !isTouchDevice;
+// bóng đổ thời gian thực (chỉ tắt trên máy yếu — KHÔNG theo cảm ứng)
+renderer.shadowMap.enabled = !WEAK_GPU;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 const scene = new THREE.Scene();
 // far 6000: sương mù kết thúc ~4200 nên mọi thứ xa hơn đều chìm trong sương — 16000 chỉ tốn cull/vẽ thừa
 const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 6000);
+attachRenderer(renderer, camera, scene);   // assets.js: compileAsync + upload texture rải khung cho model GLB
 
 // Môi trường phản chiếu cho vật liệu PBR (mô hình GLB không bị xỉn/tối)
 {
@@ -62,8 +70,8 @@ const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerH
   pmrem.dispose();
 }
 
-// Hậu kỳ bloom (tắt trên di động để giữ mượt)
-const usePost = !isTouchDevice;
+// Hậu kỳ bloom + grade + MSAA 4x (chỉ tắt trên máy yếu — KHÔNG theo cảm ứng)
+const usePost = !WEAK_GPU;
 let composer = null, bloomPass = null;
 const cine = initCinematic({ renderer, camera });   // chế độ đạo diễn (trailer/cutscene) — off mặc định
 // GRADE: giảm bão hòa + ấm nhẹ (bớt "trời xanh gắt/washed HDR" — dấu hiệu game rõ nhất). ChatGPT + cell_render.
@@ -76,8 +84,8 @@ const GradeShader = {
 if (usePost) {
   composer = new EffectComposer(renderer);
   composer.addPass(new RenderPass(scene, camera));
-  bloomPass = new UnrealBloomPass(
-    new THREE.Vector2(window.innerWidth, window.innerHeight), 0.15, 0.5, 0.9);  // threshold 0.82->0.9: chỉ đèn/emissive bloom
+  bloomPass = new UnrealBloomPass(   // TIER 2 (iGPU): bloom nửa độ phân giải — mắt không phân biệt, GPU nhẹ hơn nhiều
+    new THREE.Vector2(window.innerWidth / (TIER >= 3 ? 1 : 2), window.innerHeight / (TIER >= 3 ? 1 : 2)), 0.15, 0.5, 0.9);  // threshold 0.82->0.9: chỉ đèn/emissive bloom
   composer.addPass(bloomPass);
   composer.addPass(new OutputPass());
   composer.addPass(new ShaderPass(GradeShader));                 // grade pass cuối
@@ -106,10 +114,14 @@ window.addEventListener('resize', () => {
 });
 
 // ============ Thế giới ============
+// Nhường 1 nhịp cho worker tải GLB khởi động TRƯỚC buildWorld (30-45 s đồng bộ): worker chỉ chạy khi luồng
+// chính tạm nhả — không chờ thì mọi fetch chỉ bắt đầu SAU khi dựng xong thế giới (đo 2026-09-05).
+await workerReady();
 const world = buildWorld(scene);
 // đóng băng ma trận local của thế giới tĩnh (NPC/xe/traffic tạo SAU nên không bị ảnh hưởng)
 world.freezeStatic(renderer.shadowMap.enabled);
 const dayNight = createDayNight(scene, world);
+if (TIER === 2) dayNight.sun.shadow.mapSize.set(1024, 1024);   // iGPU: bóng 1024 (shadow pass nhẹ 4×), vẫn BẬT
 const petals = createPetals(scene);
 const signs = buildLandmarkSigns(scene, world);
 const { npcs, update: updateNPCs } = buildNPCs(scene, world);
@@ -176,7 +188,7 @@ function updateCamera(dt) {
   _des.copy(_tgt).add(_off);
   const gy = groundHeight(_des.x, _des.z);
   _des.y = Math.max(_des.y, gy + 1.2, 1.2);
-  camera.position.lerp(_des, Math.min(1, dt * 7));
+  camera.position.lerp(_des, 1 - Math.exp(-7 * dt));   // mượt độc lập fps (hệ số dt·7 từng nhảy bậc khi khung 33↔50 ms)
   camera.lookAt(_tgt);
 }
 camera.position.set(SPAWN.x, 10, SPAWN.z + 14);
@@ -213,7 +225,7 @@ function updatePlayerOnFoot(dt, time) {
     let diff = targetYaw - pState.yaw;
     while (diff > Math.PI) diff -= Math.PI * 2;
     while (diff < -Math.PI) diff += Math.PI * 2;
-    pState.yaw += diff * Math.min(1, dt * 10);
+    pState.yaw += diff * (1 - Math.exp(-10 * dt));
   }
   resolveColliders(pState.pos);
 
@@ -348,49 +360,79 @@ let time = 0, clockUITimer = 0, minimapTimer = 1, interactTimer = 1, shadowTimer
 // bóng đổ render theo nhịp riêng (xem cuối animate) — tắt autoUpdate mỗi khung
 if (renderer.shadowMap.enabled) renderer.shadowMap.autoUpdate = false;
 let started = false;
-// AUTO-QUALITY ĐA-BƯỚC + LIÊN TỤC: máy MẠNH được NÂNG lên full DPR sau khi chứng minh FPS;
-// máy yếu hạ DẦN theo tải bền. 3 cửa sổ đầu đo NHANH (2s) để phản ứng sớm ngay sau "Bắt đầu".
-// FIX QUAN TRỌNG: đổi pixelRatio phải đổi CẢ composer (EffectComposer giữ _pixelRatio riêng từ lúc
-// khởi tạo — trước đây chỉ setPixelRatio(renderer) nên bloom/MSAA vẫn render đủ phân giải → hạ bước vô dụng).
-let fpsFrames = 0, fpsStart = 0, _qStep = 0, _qChecks = 0;
-const _DPR = Math.min(window.devicePixelRatio || 1, 2);
+// AUTO-QUALITY ĐA-BƯỚC + LIÊN TỤC (sửa 2026-09-05 theo kiểm toán):
+//  - đo bằng ĐỒNG HỒ THẬT (giờ-game bị kẹp dt 0.05 → khung 300 ms từng chỉ đếm là 50 ms, fps ảo cao);
+//  - ngưỡng so với NHỊP ĐẠT ĐƯỢC (REFRESH_HZ / FRAME_DIV) thay vì 24/50 cố định — dưới trần 30 fps
+//    của điện thoại, ngưỡng "≥50 mới nâng" khiến việc nâng độ phân giải KHÔNG BAO GIỜ xảy ra;
+//  - bước hạ 1 KHÔNG được TĂNG pixelRatio (bug cũ: máy LITE đang 1.0 bị "hạ" lên 1.2 = +44% pixel);
+//  - bỏ qua cửa sổ đo khi còn đang tải/hiện model (khựng streaming từng làm máy mạnh bị hạ cấp oan).
+// FIX cũ vẫn giữ: đổi pixelRatio phải đổi CẢ composer (EffectComposer giữ _pixelRatio riêng).
+let _fpsN = 0, _fpsT0 = 0, _qStep = 0, _qChecks = 0;
+const _DPR = Math.min(window.devicePixelRatio || 1, TIER >= 3 ? 2 : 1.5);
+let REFRESH_HZ = 60;
+{ // ước lượng tần số màn hình: khoảng cách RAF NHỎ NHẤT trong 90 tick đầu ≈ 1 chu kỳ vsync
+  let n = 0, minGap = 1e9, last = 0;
+  const probe = (ts) => {
+    if (last) minGap = Math.min(minGap, ts - last);
+    last = ts;
+    if (++n < 90) requestAnimationFrame(probe);
+    else REFRESH_HZ = minGap < 7.5 ? 144 : minGap < 9.5 ? 120 : minGap < 12 ? 90 : 60;
+  };
+  requestAnimationFrame(probe);
+}
 function setPR(v) {
   renderer.setPixelRatio(v);
   if (composer) { composer.setPixelRatio(v); composer.setSize(window.innerWidth, window.innerHeight); }
 }
 function autoQuality() {
-  if (!fpsStart) { fpsStart = time; fpsFrames = 0; }
-  fpsFrames++;
-  const win = _qChecks < 3 ? 2 : 4;
-  if (time - fpsStart > win) {
-    const fps = fpsFrames / (time - fpsStart);
-    fpsStart = time; fpsFrames = 0; _qChecks++;
-    if (fps < 24 && _qStep < 3) {
-      _qStep++;
-      if (_qStep === 1) {
-        if (bloomPass) bloomPass.enabled = false; setPR(Math.min(_DPR, 1.2));
-        const sm = dayNight.sun.shadow;               // bóng 2048→1024: shadow pass nhẹ 4 lần, chưa phải tắt
-        sm.mapSize.set(1024, 1024);
-        if (sm.map) { sm.map.dispose(); sm.map = null; }
-      }
-      else if (_qStep === 2) { dayNight.sun.castShadow = false; renderer.shadowMap.autoUpdate = false; setPR(1); }
-      else enableNearView();                          // NẤC 3: co tầm nhìn (sương gần) + ẩn tile xa
-    } else if (fps >= 50 && _qStep === 0 && renderer.getPixelRatio() < _DPR) {
-      setPR(_DPR);   // máy mạnh: lên full độ phân giải (không mất chất lượng lâu dài)
+  const now = performance.now();
+  if (assetsBusy()) { _fpsT0 = 0; return; }   // đang tải/hiện model: không đo
+  if (!_fpsT0) { _fpsT0 = now; _fpsN = 0; return; }
+  _fpsN++;
+  const win = (_qChecks < 3 && !_qPending) ? 2000 : 4000;   // cửa sổ so sánh sau một bước hạ: 4 s (bớt nhiễu)
+  if (now - _fpsT0 < win) return;
+  const fps = _fpsN * 1000 / (now - _fpsT0);
+  _fpsT0 = now; _fpsN = 0; _qChecks++;
+  const target = REFRESH_HZ / FRAME_DIV;
+  // MÁY NGHẼN CPU (đo 2026-09-05 trên Radeon 890M: tắt bóng + bloom + hạ PR đều không đổi fps): hạ cấp chỉ
+  // mất đẹp mà không mượt hơn → mỗi bước hạ phải CHỨNG MINH tăng ≥20% fps ở cửa sổ 4 s sau (nhiễu fps khi
+  // di chuyển ±10%), không thì HOÀN TÁC và khoá không hạ tiếp (trừ khi fps tụt dưới 30% nhịp màn = quá tải thật).
+  if (_qPending && !_qLocked) {
+    if (fps < _qPending.fps * 1.2) { _qPending.undo(); _qStep--; _qLocked = true; }
+    _qPending = null;
+  }
+  if (fps < target * 0.7 && _qStep < 3 && (!_qLocked || fps < target * 0.3)) {
+    _qStep++;
+    const prevPR = renderer.getPixelRatio();
+    if (_qStep === 1) {
+      const bloomWas = bloomPass ? bloomPass.enabled : false;
+      const smWas = dayNight.sun.shadow.mapSize.x;
+      if (bloomPass) bloomPass.enabled = false;
+      setPR(Math.max(1, Math.min(prevPR, 1.2)));   // chỉ HẠ, không bao giờ tăng
+      const sm = dayNight.sun.shadow;               // bóng 2048→1024: shadow pass nhẹ 4 lần, chưa phải tắt
+      sm.mapSize.set(1024, 1024);
+      if (sm.map) { sm.map.dispose(); sm.map = null; }
+      _qPending = { fps, undo: () => { if (bloomPass) bloomPass.enabled = bloomWas; setPR(prevPR); sm.mapSize.set(smWas, smWas); if (sm.map) { sm.map.dispose(); sm.map = null; } } };
     }
+    else if (_qStep === 2) {
+      dayNight.sun.castShadow = false; renderer.shadowMap.autoUpdate = false; setPR(1);
+      _qPending = { fps, undo: () => { dayNight.sun.castShadow = renderer.shadowMap.enabled; renderer.shadowMap.needsUpdate = true; setPR(prevPR); } };
+    }
+    else enableNearView();                          // NẤC 3: co tầm nhìn (sương gần) + ẩn tile xa (không hoàn tác)
+  } else if (fps >= target * 0.9 && _qStep === 0 && renderer.getPixelRatio() < _DPR) {
+    setPR(Math.min(_DPR, renderer.getPixelRatio() + 0.25));   // máy mạnh: nâng từng nấc tới full độ phân giải
   }
 }
+let _qPending = null, _qLocked = false;
 
 // NẤC CHẤT LƯỢNG 3 (máy rất yếu): sương mù co về 1300m + ẨN các tile thế giới ngoài 1450m
 // quanh người chơi (tile 450m đã tách sẵn — chỉ bật/tắt visible, không đổi nội dung).
 let _ctxLost = false;
-// GIỚI HẠN NHỊP VẼ: điện thoại chạy hết công suất sẽ NÓNG → CPU/GPU tự hạ xung (thermal throttle),
-// chơi 5 phút là tụt FPS và tốn pin. Khoá trần 40fps ở LITE cho nhiệt ổn định, mượt đều hơn là
-// lúc nhanh lúc chậm. Máy mạnh không giới hạn.
-// 40fps trên màn 60Hz KHÔNG chia hết nhịp (25ms vs 16.67ms) → khung hình lúc 16 lúc 33ms = GIẬT.
-// Phải chọn ƯỚC của tần số màn: 30fps (mỗi 2 khung) mượt ĐỀU hơn 40fps lởm chởm.
-const FRAME_MIN_MS = LITE ? (1000 / 30) - 2 : 0;   // -2ms dung sai để không lỡ nhịp RAF
-let _lastFrameAt = 0;
+// GIỚI HẠN NHỊP VẼ — CHỈ ĐIỆN THOẠI (nhiệt/pin): chia tick RAF (mỗi 2 vsync = 30 fps trên 60 Hz), KHÔNG so
+// performance.now() như trước (callback trễ >2 ms là lỡ nhịp → khung 33/50 ms xen kẽ = giật). Laptop/desktop
+// mọi tier KHÔNG giới hạn (kiểm toán 2026-09-05: laptop RTX 4060 từng bị khoá 30 fps chỉ vì màn cảm ứng).
+const FRAME_DIV = (IS_MOBILE && TIER <= 1) ? 2 : 1;
+let _tick = 0;
 // A11Y: người bật "giảm chuyển động" của hệ điều hành (say chuyển động/tiền đình) → tắt lắc camera,
 // cánh hoa bay chậm lại.
 const REDUCED_MOTION = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -440,27 +482,21 @@ function clampToPlayArea(pos) {
   }
 }
 
-// MÁY YẾU (LITE): vào game đã ở chế độ tiết kiệm sâu — không đợi đo FPS
-if (LITE) {
-  if (!isTouchDevice) {                     // desktop yếu: tắt bloom + bóng 1024 (mobile vốn không post/bóng)
-    _qStep = 1;
-    if (bloomPass) bloomPass.enabled = false;
-    setPR(1);
-    const sm = dayNight.sun.shadow;
-    sm.mapSize.set(1024, 1024);
-    if (sm.map) { sm.map.dispose(); sm.map = null; }
-  }
-  enableNearView();                         // tầm nhìn gần NGAY từ đầu: sương 1300 + ẩn tile xa
+// MÁY YẾU (TIER ≤ 1): vào chế độ tiết kiệm ngay, không đợi đo FPS. Sương gần (nấc 3) chỉ cho TIER 0 và
+// điện thoại; desktop yếu (TIER 1) dùng mức trung gian để không thành "hộp sương 1,3 km".
+if (TIER <= 1) {
+  _qStep = 1;
+  if (bloomPass) bloomPass.enabled = false;
+  setPR(1);
+  if (TIER === 0 || IS_MOBILE) enableNearView();
+  else { scene.fog.near = 400; scene.fog.far = 2200; camera.far = 2600; camera.updateProjectionMatrix(); }
 }
 
 function animate() {
   requestAnimationFrame(animate);
   if (_ctxLost) return;                       // GPU đang mất ngữ cảnh: vẽ lúc này chỉ gây lỗi tràn console
-  if (FRAME_MIN_MS) {                         // trần nhịp vẽ (LITE): giữ nhiệt ổn định, đỡ tụt xung + tốn pin
-    const _now = performance.now();
-    if (_now - _lastFrameAt < FRAME_MIN_MS) return;
-    _lastFrameAt = _now;
-  }
+  if (FRAME_DIV > 1 && (++_tick % FRAME_DIV)) return;   // điện thoại: đúng mỗi vsync thứ 2, không lỡ nhịp
+  pumpAssetUploads();                         // hiện model GLB đã tải: 1 texture/khung rồi mới lộ diện
   const dt = Math.min(clock.getDelta(), 0.05);
   time += dt;
 
@@ -560,7 +596,9 @@ function animate() {
     // (PCFSoft 2048² từng tốn ~745 draw call + ~2M tam giác PHỤ mỗi khung)
     if (renderer.shadowMap.enabled && dayNight.sun.castShadow) {
       shadowTimer += dt;
-      if (shadowTimer > 0.22) { shadowTimer = 0; renderer.shadowMap.needsUpdate = true; }   // 8Hz→4.5Hz: nửa số frame-spike bóng, mắt không thấy khác
+      // 8Hz→4.5Hz: nửa số frame-spike bóng, mắt không thấy khác. TIER 2 (iGPU): 2Hz — mỗi lần làm mới bóng
+      // là 1 khung +20 ms trên 890M (đo: p90 59 ms khi 4.5Hz).
+      if (shadowTimer > (TIER === 2 ? 0.5 : 0.22)) { shadowTimer = 0; renderer.shadowMap.needsUpdate = true; }
     }
   }
 
@@ -605,6 +643,20 @@ if (quests.loadProgress()) {
 }
 initMinimap();
 setLang('vi');
+// Nút chọn chất lượng + tên GPU trên màn chờ (kiểm toán 2026-09-05: người chơi phải THẤY mình đang ở tier nào).
+{
+  const gpuEl = document.getElementById('gpuName');
+  if (gpuEl) gpuEl.textContent = `${GPU_NAME || 'GPU ?'} · ${['tier 0', 'LITE', 'iGPU', 'FULL'][TIER]}`;
+  document.querySelectorAll('.qualityPick').forEach((b) => {
+    b.classList.toggle('active', b.dataset.q === QUALITY_PREF);
+    b.addEventListener('click', () => {
+      if (b.dataset.q === QUALITY_PREF) return;
+      setQualityPref(b.dataset.q);
+      const u = new URL(location.href); u.searchParams.delete('quality');   // URL không được đè lựa chọn mới
+      location.href = u.toString();
+    });
+  });
+}
 
 // Chế độ đạo diễn (trailer/giới thiệu/cutscene) — dùng qua console: __cine.free(), __cine.demo(), __cine.recordDemo()...
 window.__cine = cine;
@@ -612,6 +664,9 @@ window.__cine = cine;
 // Hook gỡ lỗi / chụp ảnh tour (không ảnh hưởng gameplay)
 window.__hp = {
   renderer, scene, camera, THREE,   // chẩn đoán hiệu năng (draw calls / triangles / frustum)
+  tier: TIER, gpu: GPU_NAME,        // tier chất lượng đang chạy + adapter WebGL (ghi vào mọi phép đo!)
+  assetFetchLog, setPR,             // chẩn đoán: mốc tải GLB trong worker; đổi pixelRatio (cả composer)
+  get bloomPass() { return bloomPass; }, get dayNight() { return dayNight; },   // A/B bóng/bloom lúc đo perf
   enableNearView,    // bật tay chế độ tầm-nhìn-gần (nấc chất lượng 3) — test/máy rất yếu
   instanceCullStats, // chẩn đoán: bao nhiêu instance đang thực sự vẽ
   texCacheStats,     // chẩn đoán: texture tạo mới vs dùng lại
@@ -717,6 +772,18 @@ document.getElementById('startBtn').addEventListener('click', () => {
     const guide = npcs.find((n) => n.data.id === 'guide');
     if (guide) ui.startDialogue(guide);
   }, 700);
+  // Laptop 2 GPU mà WebGL đang chạy trên iGPU (Windows gán, cờ powerPreference vô tác dụng): nhắc 1 lần.
+  if (IGPU_ON_BIG_MACHINE) {
+    try {
+      if (!localStorage.getItem('hp3d.gpuHint')) {
+        localStorage.setItem('hp3d.gpuHint', '1');
+        setTimeout(() => ui.toast(tx({
+          vi: `🎮 Game đang chạy trên ${GPU_NAME.replace(/^ANGLE \(|\)$/g, '').split(',').slice(0, 2).join(',')}. Máy có card rời? Windows: Settings → System → Display → Graphics → thêm trình duyệt → High performance, rồi mở lại.`,
+          en: `🎮 Running on ${GPU_NAME.replace(/^ANGLE \(|\)$/g, '').split(',').slice(0, 2).join(',')}. Got a discrete GPU? Windows: Settings → System → Display → Graphics → add your browser → High performance, then relaunch.`,
+        }), 12000), 4500);
+      }
+    } catch (e) { }
+  }
 });
 
 // ẤM MÁY sau màn chờ: compile TOÀN BỘ shader của scene (song song, KHR_parallel_shader_compile)
