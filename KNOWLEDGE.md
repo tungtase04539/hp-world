@@ -60,7 +60,11 @@ Quan hệ dữ liệu: `tools/fetch_osm.sh` → `osm_*.json` → `tools/process_
 
 ### Dữ liệu xuất trong mapdata.js
 - `WORLD` biên thế giới; `DT_BOX` hộp trung tâm; `MASK` lưới đất/biển bit-pack base64 (cell 40).
-- `RIVERS [{w, pts}]` — rộng 620 (Cấm), 300 (Lạch Tray), 55 (Tam Bạc). Kênh Nam Triệu + hồ push trong terrain.
+- `RIVERS [{w, pts}]` — polyline rộng 620 (Cấm), 300 (Lạch Tray), 55 (Tam Bạc); chỉ dùng NGOÀI thành phố (r ≥ 1750).
+  Kênh Nam Triệu push trong terrain.
+- `WATER [{n, pts}]` — **polygon nước THẬT** (natural=water, từ `osm_water_dt.json`, simplify 1.5 m, bỏ ao < 200 m²,
+  giữ polygon có đỉnh cách gốc < 2350 m): Sông Cấm, Tam Bạc (2 mảnh), Sông Đào Hạ Lý, hồ Tam Bạc/Sen/Tiên Nga, kênh…
+  terrain.js đào nước trong thành phố theo tập này (`waterSD`). 27 polygon / 1260 đỉnh / 21 KB (2026-09).
 - `ROADS_DT [{c, pts}]` — c ∈ p(primary/trunk) s(secondary) t(tertiary) r(residential) w(pedestrian).
 - `ROADS_REGION`, `BUILDINGS [{p, a, l}]` (footprint THẬT không phóng, a=diện tích, l=số tầng×10).
 - `LM {key:[x,z]}` tâm công trình thật; `LM_DIR` **vector đơn vị cạnh dài** footprint;
@@ -83,15 +87,30 @@ với `ang = atan2(Δx, Δz)` của 2 đầu way thật.
 ## 4. Công thức địa hình (terrain.js)
 
 - `landAt(x,z)`: giải mã MASK, nội suy song tuyến → 0..1.
-- `groundHeightNoDeck`: `lerp(-4, 2, smoothstep(0.32,0.68, landAt))` + gợn nhẹ + `hills` +
-  san phẳng (DT_BOX, thị trấn Cát Bà quanh `EXTRAS.catbaTown`, cảng quanh `LM.port`)
-  − đào lòng sông `riverFactor` (thắng san phẳng, đáy −3).
-- `riverFactor(x,z)`: max theo đoạn sông của `1 − smoothstep(w/2, w/2+sh, dist)`; shore `sh` mặc định 28,
-  hồ Tam Bạc 25 (bờ hẹp để không ngập trường/chợ). BÀI HỌC: Tam Bạc từng rộng 160m → ngập Chợ Sắt/Đền Tam Kỳ.
+- `baseHeight(x,z,v)` = `lerp(-4, 2, smoothstep(0.32,0.68, v))` + gợn nhẹ + `hills` +
+  san phẳng (DT_BOX, thị trấn Cát Bà quanh `EXTRAS.catbaTown`, cảng quanh `LM.port`).
+- **NƯỚC 2 MÔ HÌNH theo bán kính r = hypot(x,z) quanh Nhà hát** (từ 2026-09-06, nhánh W5):
+  - **r < R_POLY=1750 (thành phố): POLYGON OSM.** `waterSD(x,z)` = khoảng cách có dấu tới TẬP `WATER`
+    (ÂM = trong nước; hồ Tam Bạc dùng `LAKE_POLY` đủ 20 đỉnh thay bản simplify để `waterSD ≡ lakeSD`).
+    `sd < 0 → h = lerp(-3, 1.7, smoothstep(-2, 0, sd))` (taluy kè 2 m, đáy −3); `sd ≥ 0 → baseHeight(x,z,1)`
+    = ĐẤT (bỏ hẳn MASK bờ biển 40 m — nó từng làm nước thò sau nhà). KHÔNG còn vá tay nào trong thành phố
+    (reclaimPort/PORT_RECLAIM, nắn R3 OLD/NEW_R3_TAIL, HOSEN_POLY vẽ tay, ellipse Quần Ngựa, w38/w48 đã XOÁ).
+  - **r ≥ R_POLY_END=1950 (ngoài): POLYLINE + MASK như cũ.** `riverFactorLine` = max theo đoạn sông của
+    `1 − smoothstep(w/2, w/2+sh, dist)` (sh mặc định 28) → `h = lerp(base, −3, rf)` (thắng san phẳng).
+    Lạch Tray, kênh Nam Triệu, Cát Bà, Đồ Sơn… vẫn ở mô hình này (Lạch Tray gần gốc nhất 2800 m — không dính vùng hoà).
+  - 1750 → 1950: `h = lerp(hLine, hPoly, polyWeight)` — tính ĐỦ 2 mô hình rồi mới hoà (hoà từng phần sẽ cho
+    đáy sông −1.75 giữa dải). `riverFactor` xuất ra world.js cũng hoà: trong thành phố = `sd<0 ? 1 : 1−smoothstep(0,28,sd)`
+    → mọi rào chắn `riverFactor > 0.01` của world.js tự bám nước polygon (cấm xây trong 28 m bờ thật).
+  - Tra cứu `waterSD`: lưới ô 100 m phủ [−2000, 2000]², mỗi ô giữ các cạnh cách ô ≤ 40 m (|sd| chính xác tới 40,
+    xa hơn kẹp ±40) + cờ "tâm ô nằm trong polygon i" (ray-casting đủ lúc nạp); lúc chạy đếm số lần đoạn
+    tâm-ô→điểm cắt cạnh trong ô (chẵn/lẻ, XOR với cờ tâm, HỢP của mọi polygon). Đo: 0.10 µs/lần, `groundHeightNoDeck`
+    0.25 µs (cũ 0.22); đối chiếu brute-force 300k điểm: 0 sai dấu, 0 sai khoảng cách.
+  - `hoSenSD`/`HOSEN_POLY` = polygon OSM "Hồ Sen" lấy từ WATER (bbox nhanh +30 m); `lakeSD`/`LAKE_POLY` giữ nguyên.
 - **Mặt cầu** `deckHeight`: với mỗi cầu `dx=x−b.x, dz=z−b.zc`;
   `along = dx·sin(ang)+dz·cos(ang)`; `across = dx·cos(ang)−dz·sin(ang)`;
   nếu `|across|<10 && |along|<half` → `y = 2 + rise·(1−(along/half)²)` (rise=25 cho HVT/Bính, tĩnh không thật).
-  Đường phố băng sông nhỏ = cầu phẳng 2.05 khi gần tim đường (`nearDTRoad/nearRegionRoad`).
+  Đường phố băng sông nhỏ = cầu phẳng 2.05 khi gần tim đường (`nearDTRoad/nearRegionRoad`) và điểm "ướt"
+  (`h < 1.9` VÀ (trong polygon nước — cờ `polyWet` của lần gọi NoDeck gần nhất — HOẶC `riverFactorLine > 0.03`)).
 - `groundHeight = max(groundHeightNoDeck, deckHeight)`. **Thuyền dùng NoDeck** để chui gầm cầu;
   xe/người dùng bản có deck. `isWater = NoDeck < 0.25`.
 - Đồi (1:1): sống Đồ Sơn `EXTRAS.dsRidge` (cao 62, phạm vi 220→950), đồi Vụng quanh `EXTRAS.baodai`
@@ -237,6 +256,10 @@ node process_osm.mjs     # sinh ../js/mapdata.js + mask_debug.png + log kiểm t
   đã thất bại vì coastline hở ở mép bbox), lọc đa số 3×3.
 - Muốn thêm địa danh mới: tìm id qua Overpass `nwr["name"~"..."]`, thêm id vào fetch_osm.sh mục 6
   và `addWay/addNode` trong process_osm.mjs phần 5.
+- Mục 11 (nước) từ 2026-09-06 lấy cả `rel["natural"="water"]` (sông có đảo là multipolygon, tag nằm trên relation);
+  process_osm §6b2 ghép member outer thành vòng kín. File `osm_water_dt.json` hiện có (tải 2026-07) CHƯA có relation
+  (81 way) — lần fetch sau tự có. Xuất `WATER` phải giữ mọi export khác BYTE-IDENTICAL (sidewalks.js khoá theo
+  index ROADS_DT): `diff` mapdata cũ/mới chỉ được khác đúng dòng `WATER`.
 
 ## 8. Kiểm thử tự động (chạy trước MỌI lần push thay đổi thế giới)
 
@@ -329,6 +352,41 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-09-06 (W5-hydro-polygon-water)** [NƯỚC THẬT TỪ POLYGON OSM trong thành phố — xoá 5 vá tay]:
+    Kiểm toán Đợt 2 (findings osm-pipeline:polygon-water-root-cause, cam-reclaim-overshoot, r3-splice-wrong-channel,
+    west-arm-missing, tien-nga-missing, hosen-hand-polygon, fetch-misses-relations): sông = polyline bề rộng hằng
+    (Cấm 620 m vs OSM 201 m ở Bến Bính) + 5 vá tay trong terrain.js → trong R1600: **31,2 ha nước giả + 39,7 ha thiếu nước**
+    (đo lưới 10 m, point-in-polygon với polygon OSM). **ĐÃ LÀM:** (1) `process_osm.mjs` §6b2 xuất `WATER` (27 polygon
+    natural=water, simplify 1.5 m, bỏ < 200 m², giữ polygon có đỉnh < 2350 m; ghép relation outer nếu có) — mapdata
+    cũ/mới `diff` chỉ khác đúng dòng WATER (ROADS_DT/BUILDINGS… byte-identical, sidewalks.js an toàn); `fetch_osm.sh` §11
+    thêm `rel[natural=water]` (chưa chạy lại — file hiện có 0 relation). (2) `terrain.js`: `waterSD` bucket (xem §4),
+    `groundHeightNoDeck` 2 mô hình theo bán kính (polygon r<1750, polyline r≥1950, hoà giữa), `riverFactor` xuất ra cũng
+    theo polygon trong thành phố; XOÁ reclaimPort/PORT_RECLAIM, splice OLD/NEW_R3_TAIL, HOSEN_POLY vẽ tay (→ polygon OSM
+    "Hồ Sen" từ WATER), ellipse Hồ Quần Ngựa (KHÔNG có polygon OSM tại (628,276) — vị trí đó từ georef vệ tinh sai),
+    các mutation w38/w48/sh10 + `RIVERS.push` hồ/arc; giữ nguyên `LAKE_POLY`, `lakeSD`, `nearestRiverPoint`, `findShore`.
+    **KẾT QUẢ (cùng lưới 10 m, R1600):** nước giả 31,2 → **0,0 ha**, thiếu nước 39,7 → **1,1 ha** (phần còn lại = dải
+    taluy 1,3 m sát mép, h giữa 0,25 và 1,7); bờ Cấm tại x=0: game −1201/−1001 vs OSM −1202/−1000 (cũ −1400/−1230);
+    Cầu Lạc Long (way 160430051) 1/3 giữa có nước 6/17 = OSM (cũ 0/17); `waterbfs` 5/5 bến tới được (seed (500,−1300)
+    vẫn là nước); phiên headless FULL 1600×1000: 0 pageerror, calls/tris spawn 1153/7.59M → 1176/7.58M, `diag()` từ
+    [boat0 mắc cạn h=2.0] → **[]** (Bến Bính giờ dò được bờ thật z≈−994, thuyền spawn (−24,−1019) h=−3 — lỗi "mắc cạn"
+    tồn tại từ lâu tự hết); ảnh aerial Tam Bạc/Hạ Lý/Bến Bính/Tiên Nga/Hồ Sen đúng hình OSM (kênh chữ Y, nhánh tây
+    x≈−1262 dưới cầu Bạch Đằng, kho cảng trong lòng Cấm tự biến mất vì guard isWater). Nhà OSM (BUILDINGS) tâm trong
+    nước: 50 → 42, trong R1750 = **0**, không nhà nào MỚI bị ngập; 8 nhà hết ngập (bờ Cấm x 612..674 / −1163..−1229).
+    **VIỆC CHO NGƯỜI TÍCH HỢP (world.js, ngoài phạm vi nhánh):** (a) khối cell_taysong/bacsong dựng theo KÊNH GIẢ x≈−480..−516
+    (A4 (−495,−629), TXP309 office/kho/cây đa (−577,−703)/(−479,−636)/(−456,−553), F (−504.7,−469.3), bs (−513,−507),
+    "tường rêu" L8357) giờ đứng trên ĐẤT cách kênh thật 100–200 m về tây — cần dời/xoá; (b) quán FOOD (−50,−1081) L1621
+    giờ rơi giữa sông Cấm (sd −40) — guard `isWater` tự bỏ, chỉ nên xoá toạ độ cho sạch; (c) `khoRows` L18999 thành code chết (không còn lô nào khô); (d) block_infill tự sắp lại
+    (PRNG tuần tự) → ảnh museum khác trước, không phải lỗi; (e) cảng: `nearestRiverPoint(1163)` chọn điểm LẠCH TRAY
+    (1197,4472) và quét −1050..−1200 không thấy nước (bờ Cấm thật tại x=1163 ở z≈−1346) → quayZ=4629 — lỗi CŨ có từ
+    trước, không đổi. (f) Lưới ground 110 m chưa diễn tả được kênh 50 m (chờ W2) — nhìn aerial thấy bậc thang bờ, mặt
+    nước vẫn đúng. Cách tìm: quét mọi cặp số `[x, z]` trong world.js, so `isWater` cũ/mới (script scratchpad) — có
+    dương tính giả với cặp (zc, len)/(pz, pz), phải đọc dòng nguồn trước khi tin.
+    **BẪY:** (1) simplify 1.5 m biến hồ Tam Bạc 20 → 11 đỉnh; promenade world.js đặt đồ theo `lakeSD > 0.8` nên
+    waterSD PHẢI dùng chính LAKE_POLY (lệch 1.5 m = ghế chìm 1.6 m). (2) Hoà 2 mô hình phải `lerp(hLine, hPoly)` sau khi
+    tính đủ, KHÔNG hoà từng bước carve (đáy −1.75). (3) Bucket cạnh: cạnh nằm hẳn ngoài lưới phải `continue` — clamp
+    chỉ số sẽ nhét nó vào ô mép. (4) `deckHeight` từng gate bằng `riverFactor > 0.03` → kênh polygon không có cầu phẳng;
+    giờ gate bằng cờ `polyWet` (+ polyline). (5) mapdata regen trên Windows ra LF, file commit CRLF — so byte phải
+    normalize; `git diff` mới là thước đo. (6) `node --check` mapdata/terrain phải qua bản `.mjs` (bẫy cũ, vẫn đúng).
 - **2026-09-05 (dg)** [KIỂM TOÁN TOÀN REPO + ĐỢT 1: PHÂN TIER THEO GPU, HIỆN GLB KHÔNG KHỰNG, ASSETS_LITE LÊN CDN]:
     Kiểm toán 12 lăng kính (147 phát hiện, 16 phản biện đối kháng, số đo GPU thật) — báo cáo đầy đủ là artifact
     "Kiểm toán Hải Phòng 3D" (link trong memory `audit-report-2026-09`). **GỐC CỦA CẢ 2 PHÀN NÀN ("đồ hoạ chưa
