@@ -38,6 +38,10 @@ q '[out:json][timeout:60];way(id:242169921,240463141,1120513525);out geom;' osm_
 #     chùa Dư Hàng 236830096, đền Tam Kỳ 961921403)
 q '[out:json][timeout:60];way(id:1124706318,868234608,240394078,236830096,961921403,242192606);out geom;' osm_lm2_geom.json
 
+# 7c. Đợt địa danh 3: Cung VH Việt Tiệp = way NGOÀI của relation 19780771 (toà ga 241081956 và
+#     Triển lãm 240463140 đã nằm sẵn trong osm_buildings.json — process_osm lấy từ đó)
+q '[out:json][timeout:60];way(id:961958396);out geom;' osm_lm3_geom.json
+
 # 8. Cây thật (node natural=tree) trung tâm
 q '[out:json][timeout:90];node["natural"="tree"](20.845,106.652,20.884,106.712);out;' osm_trees.json
 

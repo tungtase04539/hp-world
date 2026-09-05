@@ -406,18 +406,43 @@ EXTRAS.bridges = [
 LM.bridge_hvt = [EXTRAS.bridges[0].x, EXTRAS.bridges[0].zc + EXTRAS.bridges[0].half + 40];
 LM.bridge_binh = [EXTRAS.bridges[1].x, EXTRAS.bridges[1].zc + EXTRAS.bridges[1].half + 40];
 
-// mặt tiền các tòa chưa có mục tiêu: quay về phố gần nhất
-function nearestRoadPoint(cx, cz) {
+// mặt tiền các tòa chưa có mục tiêu: pháp tuyến của ĐOẠN phố gần nhất (chiếu tâm lên đoạn), phía về phố.
+// KHÔNG lấy đỉnh way gần nhất: sau subdiv(150)+simplify(6) phố thẳng chỉ còn 2 đỉnh = 2 ngã tư
+// → nhà góc phố (bảo tàng, Đền Nghè) từng nhận mặt tiền CHÉO về ngã tư (audit 2026-09).
+// streetName: chỉ xét phố mang tên đó (mọi cấp, kể cả ngõ r); mặc định phố lớn p/s/t.
+function nearestRoadFace(cx, cz, streetName) {
   let best = null, bd = 1e18;
   for (const r of ROADS_DT) {
-    if (r.c === 'r' || r.c === 'w') continue; // mặt tiền quay ra phố lớn, không ngõ nhỏ
-    for (const [px, pz] of r.pts) {
+    if (streetName ? r.name !== streetName : (r.c !== 'p' && r.c !== 's' && r.c !== 't')) continue;
+    for (let i = 0; i < r.pts.length - 1; i++) {
+      const [ax, az] = r.pts[i], [bx, bz] = r.pts[i + 1];
+      const dx = bx - ax, dz = bz - az, L = dx * dx + dz * dz;
+      const t = L ? Math.max(0, Math.min(1, ((cx - ax) * dx + (cz - az) * dz) / L)) : 0;
+      const px = ax + dx * t, pz = az + dz * t;
       const d = (px - cx) ** 2 + (pz - cz) ** 2;
-      if (d < bd) { bd = d; best = [px, pz]; }
+      if (d < bd) { bd = d; best = [px, pz, dx, dz]; }
     }
   }
-  return best;
+  if (!best) throw new Error(`nearestRoadFace: không thấy phố ${streetName || 'p/s/t'} gần (${cx},${cz})`);
+  const [px, pz, dx, dz] = best;
+  const l = Math.hypot(dx, dz) || 1;
+  const s = (-dz * (px - cx) + dx * (pz - cz)) < 0 ? -1 : 1;   // chọn phía pháp tuyến hướng về phố
+  return [s * -dz / l, s * dx / l];
 }
+// Mặt tiền chỉ định tay (nhà góc phố 2 phố cách đều, mặt tiền ở đầu hồi, hoặc phố lớn gần nhất sai phía):
+// giá trị = TÊN PHỐ (pháp tuyến đoạn phố đó) hoặc vector đơn vị [fx,fz]. Mỗi dòng ghi bằng chứng.
+const LM_FACE_OVERRIDE = {
+  museum: 'Phố Điện Biên Phủ',                   // 66 Điện Biên Phủ; ĐBP và Đinh Tiên Hoàng cùng cách 34m → chọn phố địa chỉ (pano_161)
+  rap78: 'Phố Đinh Tiên Hoàng',                  // pano_052 "trước Nhà hát Tháng 8" trên ĐTH; footprint 59×19 dọc đông-tây → mặt tiền ĐẦU HỒI tây
+  cathedral: 'Phố Trần Quang Khải',              // tháp chuông ở ĐẦU NAM gian giữa (pano_255 nhìn tây từ 31 HVT thấy tháp ngang z≈-330)
+  dinhhk: [0, 1],                                // đình quay NAM ra ao đình; phố lớn gần nhất (Hàng Kênh 132m) ở phía đông — sai
+  dennghe: 'Phố Lê Chân',                        // node OSM = cổng đền trên vỉa hè Lê Chân (9m), không phải Mê Linh (35m)
+  station_bldg: 'Phố Lương Khánh Thiện (Phố Ga)', // mặt tiền ga quay ra quảng trường ga / LKT (tây-bắc), ray ở sau lưng
+  viettiep: 'Phố Lạch Tray',                     // 53 Lạch Tray — quảng trường phía trước, Lạch Tray cách 135m (đúng thực địa)
+};
+// Mặt tiền nằm ở ĐẦU HỒI (pháp tuyến ∥ LM_DIR) → world.js dùng orientFace(LM_FACE) thay orientLong.
+// museum: OSM cạnh đơn dài nhất là hông tây 29m nhưng mặt tiền thật là cạnh nam 36m ra Điện Biên Phủ.
+const FACADE_SHORT_SIDE = ['cathedral', 'rap78', 'dinhhk', 'museum'];
 // 3 trường học (way OSM thật, file osm_school_geom.json)
 for (const e of load('osm_school_geom.json')) lmGeom[e.id] = e;
 // đợt địa danh 2: UBND TP, rạp Tháng Tám, đình Hàng Kênh, chùa Dư Hàng, đền Tam Kỳ
@@ -433,13 +458,19 @@ addNode('nhaken', 106.68639, 20.85888);    // Nhà Kèn THẬT trong vườn hoa
 addWay('thptnq', 242169921, null);   // THPT Ngô Quyền (trường Bonnal)
 addWay('thcsnq', 240463141, null);   // THCS Ngô Quyền
 addWay('thcstp', 1120513525, null);  // THCS Trần Phú
+// đợt địa danh 3 (audit 2026-09): toà ga + Trung tâm Triển lãm có sẵn trong osm_buildings.json;
+// Cung Việt Tiệp là relation → way ngoài (osm_lm3_geom.json, fetch_osm.sh mục 7c)
+for (const e of bldWays) if (e.id === 241081956 || e.id === 240463140) lmGeom[e.id] = e;
+for (const e of load('osm_lm3_geom.json')) lmGeom[e.id] = e;
+addWay('station_bldg', 241081956, null);   // toà Ga Hải Phòng (building=train_station, dải 118×21m dọc ray, trục 225°)
+addWay('trienlam', 240463140, LM.lechan);  // TT Triển lãm & Mỹ thuật (1 Nguyễn Đức Cảnh) — mặt dài quay ĐÔNG ra tượng Lê Chân (pano_037)
+addWay('viettiep', 961958396, null);       // Cung VH Lao động Hữu nghị Việt Tiệp (way ngoài relation 19780771)
 
-for (const key of ['cathedral', 'postoffice', 'museum', 'market', 'thptnq', 'thcsnq', 'thcstp', 'ubnd', 'rap78', 'dinhhk', 'chuahang', 'dentamky', 'dennghe', 'nhaken', 'nhnn']) {
+for (const key of ['cathedral', 'postoffice', 'museum', 'market', 'thptnq', 'thcsnq', 'thcstp', 'ubnd', 'rap78', 'dinhhk', 'chuahang', 'dentamky', 'dennghe', 'nhaken', 'nhnn', 'station_bldg', 'viettiep']) {
   const [cx, cz] = LM[key];
-  const rp = nearestRoadPoint(cx, cz);
-  const f = [rp[0] - cx, rp[1] - cz];
-  const l = Math.hypot(...f) || 1;
-  LM_FACE[key] = [Math.round(f[0] / l * 1000) / 1000, Math.round(f[1] / l * 1000) / 1000];
+  const ov = LM_FACE_OVERRIDE[key];
+  const f = Array.isArray(ov) ? ov : nearestRoadFace(cx, cz, ov);
+  LM_FACE[key] = [Math.round(f[0] * 1000) / 1000, Math.round(f[1] * 1000) / 1000];
 }
 // sống đồi Đồ Sơn + rìa bến Bính
 EXTRAS.dsRidge = [...toXZ(106.7770, 20.7160).map(Math.round), ...toXZ(106.7930, 20.6990).map(Math.round)];
@@ -624,6 +655,7 @@ export const LM = ${JSON.stringify(LM)};
 export const LM_DIR = ${JSON.stringify(LM_DIR)};
 export const LM_SIZE = ${JSON.stringify(LM_SIZE)};
 export const LM_FACE = ${JSON.stringify(LM_FACE)};
+export const FACADE_SHORT_SIDE = ${JSON.stringify(FACADE_SHORT_SIDE)};
 export const EXTRAS = ${JSON.stringify(EXTRAS)};
 export const TREES = ${JSON.stringify(TREES)};
 export const RAIL = ${JSON.stringify(RAIL)};
