@@ -36,14 +36,25 @@ export function createDayNight(scene, world) {
   sun.shadow.camera.bottom = -SB;
   sun.shadow.camera.near = 20;
   sun.shadow.camera.far = (LITE || TIER === 2) ? 400 : 600;
-  sun.shadow.bias = -0.0006;
+  // Đợt 2 (W4): bias −0.0006 không normalBias từng để lại VỆT ACNE trên mặt tiền lúc nắng xiên. normalBias đẩy
+  // điểm lấy mẫu theo pháp tuyến (chống acne mặt xiên) nên bias độ sâu chỉ cần rất nhỏ (peter-panning ít hơn).
+  // radius chỉ có tác dụng với PCFShadowMap (PCFSoft bỏ qua) — đặt sẵn để đổi type là có ngay bóng mềm.
+  sun.shadow.bias = -0.0002;
+  sun.shadow.normalBias = 0.03;
+  sun.shadow.radius = 2;
+  // TÂM HỘP BÓNG = người chơi + hướng nhìn × LOOK_AHEAD (mặt xz): hộp 2·SB phủ phần camera THẤY thay vì phí nửa
+  // hộp sau lưng (kiểm toán 2026-09: ở tỉ lệ 1:1 đường chân bóng cứng cắt ngang khung hình). 0.41·SB ≈ 45 m (FULL).
+  const LOOK_AHEAD = SB * 0.41;
   scene.add(sun);
   scene.add(sun.target);
   const moonGlow = new THREE.DirectionalLight(0x8fa8d8, 0);
   moonGlow.position.set(-80, 120, -60);
   scene.add(moonGlow);
 
-  scene.fog = new THREE.Fog(0xd8eefc, 600, 4200);
+  // FULL: 700→2600 m để mép dựng BUILD_RADIUS 1600 m tan trong sương (600→4200 cũ chỉ mờ 24% ở 1600 m → dải
+  // đồng trống sáng lộ ra như bức tường chân trời) mà địa danh trong 1 km vẫn nét. LITE giữ nguyên
+  // (main.js đặt lại 400/2200 hoặc 220/1300 ngay lúc khởi động).
+  scene.fog = new THREE.Fog(0xd8eefc, LITE ? 600 : 700, LITE ? 4200 : 2600);
   scene.background = new THREE.Color(0x6fbdf0);
 
   // Vòm trời gradient (đẹp hơn màu phẳng)
@@ -102,6 +113,11 @@ export function createDayNight(scene, world) {
 
   let dayT = 0.3; // ~9h sáng
   const _sunDir = new THREE.Vector3();
+  const _lookDir = new THREE.Vector3(0, 0, -1), _tmpDir = new THREE.Vector3(), _shCenter = new THREE.Vector3(), _plPos = new THREE.Vector3();
+  // trạng thái lúc làm mới bóng lần cuối (vị trí người chơi + hướng nhìn) — main.js hỏi shadowMoved() để làm
+  // mới sớm khi đã đi >2 m hoặc quay >0.15 rad, thay vì chỉ theo đồng hồ (hộp bám hướng nhìn nên xoay là lệch)
+  const _shPos = new THREE.Vector3(1e9, 0, 1e9), _shDir = new THREE.Vector3();
+  const COS_TURN = Math.cos(0.15);
 
   // buffer tái dùng — sample() chạy mỗi khung, clone Color 3 lần/khung là rác GC vô ích
   const _smp = { sky: new THREE.Color(), fog: new THREE.Color(), sun: new THREE.Color(), sunI: 0, hemiI: 0, night: 0 };
@@ -130,7 +146,12 @@ export function createDayNight(scene, world) {
       const icon = dayT > 0.28 && dayT < 0.78 ? '☀️' : '🌙';
       return `${icon} ${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
     },
-    update(dt, playerPos) {
+    // bóng đã lệch so với lần làm mới cuối? (đi > 2 m hoặc quay > 0.15 rad)
+    shadowMoved() {
+      return _shPos.distanceToSquared(_plPos) > 4 || _shDir.dot(_lookDir) < COS_TURN;
+    },
+    markShadow() { _shPos.copy(_plPos); _shDir.copy(_lookDir); },
+    update(dt, playerPos, camera) {
       dayT = (dayT + dt / DAY_LENGTH) % 1;
       const s = sample(dayT);
       scene.background.copy(s.sky);
@@ -146,8 +167,15 @@ export function createDayNight(scene, world) {
       // quỹ đạo mặt trời quanh người chơi (vector tái dùng — không cấp phát mỗi khung)
       const ang = (dayT - 0.25) * Math.PI * 2;
       _sunDir.set(Math.cos(ang), Math.sin(ang), 0.35).normalize();
-      sun.position.copy(playerPos).addScaledVector(_sunDir, 250);
-      sun.target.position.copy(playerPos);
+      // hộp bóng dời về phía camera nhìn (chỉ thành phần ngang; nhìn thẳng xuống thì giữ hướng cũ)
+      camera.getWorldDirection(_tmpDir);
+      _tmpDir.y = 0;
+      const lh = _tmpDir.length();
+      if (lh > 1e-3) _lookDir.copy(_tmpDir).divideScalar(lh);
+      _plPos.copy(playerPos);
+      _shCenter.copy(playerPos).addScaledVector(_lookDir, LOOK_AHEAD);
+      sun.position.copy(_shCenter).addScaledVector(_sunDir, 250);
+      sun.target.position.copy(_shCenter);
       sunBall.position.copy(playerPos).addScaledVector(_sunDir, 640);
       sunBall.visible = _sunDir.y > -0.06;
       moonBall.position.copy(playerPos).addScaledVector(_sunDir, -640);
