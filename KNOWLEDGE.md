@@ -413,6 +413,40 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     **BẪY ĐO:** máy chạy nhiều agent/Chrome song song (cổng 8211–8216) → fps cùng build dao động 24–52; chỉ tin A/B
     TRONG CÙNG PHIÊN (toggle rồi đo lại), không tin 2 phiên khác nhau. Góc chụp `teleport(0,-450)` (museum) và
     `(91,-440)` nằm TRONG khối nhà ống → ảnh vô dụng, chọn góc khác khi cần soi bảo tàng.
+- **2026-09-06 (W2-ground-grid)** [MẶT ĐẤT 2 LƯỚI: kênh 55 m hiện đúng 1:1, ground 340k→267k tam giác]:
+    Nhánh `worktree-wf_97eeaf15-407-2`, chỉ sửa khối "Mặt đất" `js/world.js` (~540-700) + 2 check tên trong
+    `freezeStatic`. **Vấn đề:** MỘT tấm 54,9×31,6 km ô 110×93 m (LITE 229×193 m) — 99% đỉnh ngoài BUILD_RADIUS,
+    kênh Tam Bạc 55 m / Hạ Lý 48 m không thể hiện (2 đỉnh kề nhau đứng 2 bờ → "bắc cầu đất"); từng phải chữa
+    bằng cách dìm hành lang hồ xuống −3 + dải 5 m phủ đè, và nới sông w38→48. **Hợp đồng 2 lưới mới:**
+    (1) `'ground'` tấm toàn thế giới ô **SC = 200 m** (LITE 400) = 87k tam giác (LITE 22k), chỉ lấp chân trời sau
+    sương; mọi đỉnh nằm HẲN TRONG ô vuông ±LOCAL_HALF (= BUILD_RADIUS+400 = 2000 m) đặt **y = UNDER = −5**
+    (dưới đáy biển −4); đỉnh ĐÚNG TRÊN MÉP giữ y = h. (2) `'ground_local'` lưới N×N ô đều, MỘT BufferGeometry
+    Float32 + Uint32 index, **FULL N=300 → 13,3 m = 180k tam giác** (đúng trần 180k; 10 m như đề bài = 320k
+    vượt trần), **LITE N=200 → 20 m = 80k**; y = **max(h, cao độ tấm thô tại đó) + 0.03**. Cả 2 dựng bằng
+    `gridGeometry(x0, z0, nx, nz, step, yOf)` (trả `{geo, yAt}`; `yAt` nội suy đúng 2 tam giác của ô như GPU)
+    + `vertexHC(x, z, colors, i)` chung → cao độ + màu giống hệt (logic màu công viên/nước/cảng giữ nguyên).
+    Gốc tấm thô chọn `cx0 = −LOCAL_HALF − ceil(...)·SC` để ±2000 rơi đúng lên đường lưới thô, SC là BỘI của bước
+    local (15×13,33 / 20×20) → mép 2 lưới trùng khít từng đỉnh. Dải 5 m hồ Tam Bạc / hồ Sen giữ nguyên; hộp của
+    chúng khai báo ở `FINE_BOXES`, lưới local trong hộp dìm 1 m (quy tắc chung: lưới THÔ hơn nằm dưới lưới MỊN
+    hơn ≥1 m). Bỏ hẳn đoạn dìm hành lang hồ −3 trên tấm thô (không còn cần).
+    **KQ đo (Chrome headless d3d11 trên 890M, 1600×1000, ?quality=full):** ground 340.000 → 86.900 + 180.000 =
+    266.900 tam giác; tổng main pass spawn 7,59M → 7,52M, calls +1, object +1; LITE ground 79k → 21,8k + 80k =
+    101,8k. Build (node, chỉ phần gọi `groundHeightNoDeck`): FULL 171k lần ~31-49 ms → 134k lần ~23-28 ms;
+    LITE 40k → 51k lần 7,8 → 8,7 ms. Thời gian tới `__hp` trong browser dao động 18-48 s giữa các lần chạy CÙNG
+    code → không dùng làm thước đo. `diag()` vẫn chỉ dòng boat0 quen thuộc; 0 pageerror FULL + LITE.
+    **Ảnh vệ tinh `__hp.aerial`:** kênh Hạ Lý (tâm (−800,−750) và (−1050,−950), half 300) trước = các mảng đa giác
+    rời rạc, sau = kênh liền mạch bờ mượt; bờ sông Cấm/Bến Bính hết răng cưa 110 m; hồ Tam Bạc y nguyên.
+    LƯU Ý: toạ độ "Hạ Lý (−1100,−400)" trong đề bài lệch — kênh R3 thật chạy (−650,−705)→(−930,−738)→(−1133,−1125).
+    **BẪY ĐÃ DÍNH (bản đầu, đã sửa):** dìm tấm thô chỉ 1 m trong ô local KHÔNG đủ: đất 2 m dìm còn 1 m vẫn cao
+    hơn mặt nước 0, tấm thô ô 220 m nội suy "bắc cầu" qua hồ Tam Bạc → 2/3 hồ biến thành đất (chụp aerial mới
+    thấy, số tam giác không lộ). Phải dìm xuống DƯỚI đáy biển. Hệ quả thứ 2: đỉnh mép ô local phải giữ y = h
+    (không dìm) nếu không ô thô ngoài mép dốc xuống −5 thành "hào nước" 200 m quanh thành phố. Depth: camera
+    near 0.1 → độ phân giải depth ở d mét ≈ d²/1,68e6 (2 km ≈ 2,4 m!) → thêm `polygonOffset(1, 4)` cho tấm thô
+    để nó luôn thua lưới mịn/đường ở xa. `lake_ground`/`hosen_ground` vẫn bị merge vào `mrg10_*` như trước
+    (skip merge chỉ khớp /^ground/ + water). Kiểm cú pháp world.js: copy sang .mjs rồi `node --check`.
+    **Chưa làm:** `tools/diag.mjs`/`waterbfs.mjs` dùng chromium Linux path nên không chạy trên Windows — thay
+    bằng `__hp.diag()` trong phiên Playwright; dải dốc 1800-2000 m (ngoài vùng chơi ≥212 m) bờ nước vẫn thô
+    như cũ (lưới local bám dốc tấm thô ở đó — chấp nhận, không nhìn thấy từ vùng chơi).
 - **2026-09-05 (dg)** [KIỂM TOÁN TOÀN REPO + ĐỢT 1: PHÂN TIER THEO GPU, HIỆN GLB KHÔNG KHỰNG, ASSETS_LITE LÊN CDN]:
     Kiểm toán 12 lăng kính (147 phát hiện, 16 phản biện đối kháng, số đo GPU thật) — báo cáo đầy đủ là artifact
     "Kiểm toán Hải Phòng 3D" (link trong memory `audit-report-2026-09`). **GỐC CỦA CẢ 2 PHÀN NÀN ("đồ hoạ chưa
