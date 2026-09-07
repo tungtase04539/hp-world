@@ -1,8 +1,8 @@
 // Địa hình từ dữ liệu OpenStreetMap thật (không phụ thuộc three.js — chạy được cả trong node)
-import { WORLD, DT_BOX, MASK, RIVERS, ROADS_DT, ROADS_REGION, LM, LM_DIR, LM_FACE, EXTRAS, TREES, PARKS, RAIL, BUILDINGS } from './mapdata.js';
+import { WORLD, DT_BOX, MASK, RIVERS, ROADS_DT, ROADS_REGION, LM, LM_DIR, LM_FACE, EXTRAS, TREES, PARKS, RAIL, BUILDINGS, WATER } from './mapdata.js';
 
 export const WORLD_BOUNDS = WORLD;
-export { LM, LM_DIR, LM_FACE, EXTRAS, TREES, PARKS, RAIL, DT_BOX, RIVERS, ROADS_DT, ROADS_REGION, BUILDINGS };
+export { LM, LM_DIR, LM_FACE, EXTRAS, TREES, PARKS, RAIL, DT_BOX, RIVERS, ROADS_DT, ROADS_REGION, BUILDINGS, WATER };
 
 const SEA_FLOOR = -4, LAND_H = 2;
 
@@ -82,11 +82,28 @@ function bucketQuery(buckets, x, z) {
 // Kênh Nam Triệu: nối cửa sông Cấm ra biển (luồng tàu thật giữa Đình Vũ - Cát Hải;
 // dữ liệu waterway OSM dừng ở cửa sông nên phải nối thủ công, nếu không thuyền bị "đập" chắn)
 RIVERS.push({ w: 1300, pts: [[7600, 0], [11000, 4100], [15000, 7000], [20600, 9700]] });
-// Hồ Tam Bạc: trục + bề rộng lấy từ polygon nước OSM thật; bờ hẹp sh=14 để nước không lấn
-// ra promenade/phố đi bộ Quang Trung (đối chiếu pano_004; lõi hồ w/2=39m giữ nguyên là nước)
-// để không ngập trường THCS Trần Phú ngay mép nam hồ
-RIVERS.push({ w: EXTRAS.lake.w, sh: 14, pts: EXTRAS.lake.pts });
-// POLYGON HỒ TAM BẠC THẬT (OSM way 236743184 "Hồ Tam Bạc", chiếu hệ game, 20 đỉnh) —
+
+// khoảng cách CÓ DẤU tới 1 polygon: ÂM = trong (nước), DƯƠNG = ngoài (đất)
+function polySD(x, z, poly) {
+  let inside = false, bd = 1e9;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [xi, zi] = poly[i], [xj, zj] = poly[j];
+    if ((zi > z) !== (zj > z) && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) inside = !inside;
+    const d = distToSeg(x, z, xi, zi, xj, zj);
+    if (d < bd) bd = d;
+  }
+  return inside ? -bd : bd;
+}
+function inPoly(x, z, poly) {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [xi, zi] = poly[i], [xj, zj] = poly[j];
+    if ((zi > z) !== (zj > z) && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) inside = !inside;
+  }
+  return inside;
+}
+// POLYGON HỒ TAM BẠC THẬT (OSM way 236743184 "Hồ Tam Bạc", chiếu hệ game, ĐỦ 20 đỉnh — khớp 0,00 m với
+// node OSM; bản trong WATER bị simplify 1.5 m còn 11 đỉnh nên waterSD dùng chính bản này thay thế) —
 // user chốt: hình hồ phải đúng thực địa (2 đầu, bờ cong), KHÔNG xấp xỉ trục+bề rộng.
 // Đầu đông x≈-392..-401 = đập gần tượng Lê Chân (đông đập là đất); đầu tây bo tròn -1186.
 // Đối chiếu: bờ bắc cách polyline Quang Trung ~19m, bờ nam cách Thế Lữ ~13m → vỉa hè luôn khô.
@@ -96,76 +113,95 @@ export const LAKE_POLY = [
   [-1006.2, 346.6], [-392.5, 218.9], [-401.6, 172.8], [-608.7, 215.4], [-769.3, 246.1],
   [-977.2, 287.5], [-1039.5, 299.7], [-1076.1, 302.8], [-1113.8, 302.2], [-1150.8, 299.2],
 ];
-// HỒ SEN (quận Lê Chân, ~85×195m) — cell_nam V1: hồ thật hoàn toàn THIẾU trong terrain
-// (8 pano water sev3). Polygon đã chừa lòng đường + kè >=10m khỏi tim các phố #294/#44/#102.
-export const HOSEN_POLY = [
-  [-55, 865], [5, 852], [14, 950], [34, 988], [43, 1040], [0, 1056], [-40, 1050], [-52, 960],
-];
+// khoảng cách CÓ DẤU tới bờ hồ Tam Bạc: ÂM = trong hồ (nước), DƯƠNG = trên đất (world.js: promenade/kè/cây ven hồ)
+export function lakeSD(x, z) { return polySD(x, z, LAKE_POLY); }
+// HỒ SEN (quận Lê Chân) — polygon OSM thật way 203719090 lấy từ WATER (trước đây vẽ tay 8 đỉnh, bờ đông lệch 14 m);
+// world.js dựng kè theo HOSEN_POLY + hoSenSD, cùng polygon với waterSD nên kè luôn bám đúng mép nước.
+const hoSenWater = WATER.find((w) => w.n === 'Hồ Sen');
+if (!hoSenWater) console.warn('terrain: WATER không có polygon "Hồ Sen" — kè hồ Sen sẽ không dựng');
+export const HOSEN_POLY = hoSenWater ? hoSenWater.pts : [];
+const HOSEN_BB = HOSEN_POLY.reduce((b, [x, z]) => [Math.min(b[0], x), Math.max(b[1], x), Math.min(b[2], z), Math.max(b[3], z)], [1e9, -1e9, 1e9, -1e9]);
 export function hoSenSD(x, z) {
-  if (x < -75 || x > 63 || z < 832 || z > 1076) return 1e6;   // bbox nhanh
-  let inside = false, bd = 1e9;
-  for (let i = 0, j = HOSEN_POLY.length - 1; i < HOSEN_POLY.length; j = i++) {
-    const [xi, zi] = HOSEN_POLY[i], [xj, zj] = HOSEN_POLY[j];
-    if ((zi > z) !== (zj > z) && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) inside = !inside;
-    const d = distToSeg(x, z, xi, zi, xj, zj);
-    if (d < bd) bd = d;
-  }
-  return inside ? -bd : bd;
+  if (x < HOSEN_BB[0] - 30 || x > HOSEN_BB[1] + 30 || z < HOSEN_BB[2] - 30 || z > HOSEN_BB[3] + 30) return 1e6;   // bbox nhanh
+  return polySD(x, z, HOSEN_POLY);
 }
 
-// khoảng cách CÓ DẤU tới bờ hồ: ÂM = trong hồ (nước), DƯƠNG = trên đất
-export function lakeSD(x, z) {
-  let inside = false, bd = 1e9;
-  for (let i = 0, j = LAKE_POLY.length - 1; i < LAKE_POLY.length; j = i++) {
-    const [xi, zi] = LAKE_POLY[i], [xj, zj] = LAKE_POLY[j];
-    if ((zi > z) !== (zj > z) && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) inside = !inside;
-    const d = distToSeg(x, z, xi, zi, xj, zj);
-    if (d < bd) bd = d;
-  }
-  return inside ? -bd : bd;
-}
-
-// Sông Tam Bạc (w=55) đoạn trong phố có KÈ CỨNG — bờ thoải mặc định 28m làm nước loang lên
-// dải phố chợ Đổ/Lý Thường Kiệt (pano_135/200: "mặt nước lấn promenade/mặt phố") và cấm cả
-// dải đất ven sông xây nhà (cornersDry fail) → thu về 10m (taluy sát kè, kênh giữ nguyên w).
-for (const r of RIVERS) if (r.w === 55) r.sh = 10;
-// SÔNG TAM BẠC đoạn phố cổ (x -1092..-506): trục OSM lệch NAM 5-30m — đè tim Phố Tam Bạc
-// (pano_204/208/210/211/473 gh<1.6) và biến dải ven Thế Lữ thành đất xây nhà (cell_taysong V0).
-// Nắn về TRUNG TUYẾN tim Thế Lữ (#243) ↔ tim Phố Tam Bạc (#82), thu w 55→38 (kè cứng đô thị).
-for (const r of RIVERS) {
-  const i = r.pts.findIndex((p) => p[0] === -878 && p[1] === -9);
-  if (i > 0) {
-    r.w = 38;
-    r.pts.splice(i - 1, 2,
-      [-1092, 50], [-1030, 29], [-960, 8], [-900, -8], [-840, -19.5],
-      [-780, -29], [-700, -38], [-620, -47], [-506, -76]);
-  }
-}
-// FIX t4 (cell_struct): sông Tam Bạc arc LIỀN MẠCH — splice ở trên xoá đỉnh nối (-1257,148)
-// làm arc tách khỏi nhánh rộng. Nối lại + làm dày (w38→48) → nước liền, hết "đứt khúc" trên vệ tinh.
-for (const r of RIVERS) {
-  if (r.pts.some((p) => p[0] === -314 && p[1] === -182)) { r.w = 48; r.sh = 14; }
-}
-RIVERS.push({ w: 48, sh: 14, pts: [[-1257, 148], [-1250, 108], [-1238, 72], [-1220, 50], [-1150, 44], [-1092, 50]] });
-// NẮN R3 (kênh Tam Bạc): đuôi cũ chạy XUYÊN tile6 (real 0 nước) → thay bằng trục thật x≈-860..-1133
-// qua cầu Lạc Long, chạm sông Cấm R1 tại [-1133,-1125] (audit nước georef + ChatGPT vet splice an toàn).
+// ---------- NƯỚC POLYGON OSM (trong thành phố) ----------
+// Trong bán kính R_POLY quanh Nhà hát, đất/nước do POLYGON natural=water THẬT (mapdata.WATER) quyết định:
+// waterSD(x,z) = khoảng cách có dấu tới TẬP polygon (ÂM = trong nước). Thay cho polyline bề rộng hằng
+// (Cấm 620 m vs thật 201 m ở Bến Bính; Tam Bạc/Hạ Lý chữ Y; Hồ Tiên Nga không có trục) và mọi vá tay
+// (reclaimPort, nắn R3, ellipse Quần Ngựa, w38/48). Ngoài R_POLY_END vẫn polyline RIVERS + MASK bờ biển
+// (Lạch Tray, kênh Nam Triệu, Cát Bà…); giữa 2 mốc hoà dần 2 mô hình để mép vùng không có bậc.
+// Tra cứu: lưới ô WB m; mỗi ô giữ các cạnh cách ô ≤ WMARGIN (|sd| chính xác tới WMARGIN, xa hơn kẹp) và
+// cờ "tâm ô nằm trong polygon i" (ray-casting đầy đủ 1 lần lúc nạp) → lúc chạy chỉ đếm số lần đoạn
+// tâm-ô→điểm cắt các cạnh trong ô (chẵn/lẻ) — chính xác tuyệt đối, ~0.5 µs/lần.
+export const R_POLY = 1750, R_POLY_END = 1950;
+const WPOLYS = WATER.map((w) => (w.n === 'Hồ Tam Bạc' ? LAKE_POLY : w.pts));
+const WB = 100, WMARGIN = 40;
+const WG = Math.ceil((R_POLY_END + WMARGIN) / WB) * WB;   // nửa cạnh lưới (m), lưới phủ [-WG, WG]²
+const WN = (2 * WG) / WB;
+const NP = WPOLYS.length;
+const wSegs = Array.from({ length: WN * WN }, () => []);   // [ax, az, bx, bz, polygonIdx]
+const wIn = new Uint8Array(WN * WN * NP);                   // tâm ô nằm trong polygon i
+const wInList = Array.from({ length: WN * WN }, () => []);  // các polygon chứa tâm ô
 {
-  const samePt = (a, b) => a[0] === b[0] && a[1] === b[1];
-  const findSeq = (pts, seq) => { outer: for (let i = 0; i <= pts.length - seq.length; i++) { for (let j = 0; j < seq.length; j++) if (!samePt(pts[i + j], seq[j])) continue outer; return i; } return -1; };
-  const OLD_R3_TAIL = [[-506, -61], [-314, -182], [-282, -299], [-313, -459], [-631, -952], [-591, -1055], [-414, -1138]];
-  const NEW_R3_TAIL = [[-506, -61], [-491, -393], [-482, -646], [-650, -705], [-930, -738], [-992, -862], [-1133, -1125]];
-  const cand = RIVERS.filter((r) => findSeq(r.pts, OLD_R3_TAIL) >= 0 || findSeq(r.pts, NEW_R3_TAIL) >= 0);
-  if (cand.length === 1 && findSeq(cand[0].pts, NEW_R3_TAIL) < 0) {
-    const at = findSeq(cand[0].pts, OLD_R3_TAIL);
-    if (at >= 0) cand[0].pts.splice(at, OLD_R3_TAIL.length, ...NEW_R3_TAIL.map((p) => p.slice()));
-  } else if (cand.length !== 1) { console.warn('R3 splice: match count =', cand.length, '(bỏ qua)'); }
+  const ci = (v) => Math.floor((v + WG) / WB);
+  WPOLYS.forEach((poly, pi) => {
+    let x1 = 1e9, x2 = -1e9, z1 = 1e9, z2 = -1e9;
+    for (const [x, z] of poly) { x1 = Math.min(x1, x); x2 = Math.max(x2, x); z1 = Math.min(z1, z); z2 = Math.max(z2, z); }
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      const [ax, az] = poly[j], [bx, bz] = poly[i];
+      const ix1 = ci(Math.min(ax, bx) - WMARGIN), ix2 = ci(Math.max(ax, bx) + WMARGIN);
+      const iz1 = ci(Math.min(az, bz) - WMARGIN), iz2 = ci(Math.max(az, bz) + WMARGIN);
+      if (ix2 < 0 || ix1 >= WN || iz2 < 0 || iz1 >= WN) continue;
+      for (let cz = Math.max(0, iz1); cz <= Math.min(WN - 1, iz2); cz++) {
+        for (let cx = Math.max(0, ix1); cx <= Math.min(WN - 1, ix2); cx++) wSegs[cz * WN + cx].push([ax, az, bx, bz, pi]);
+      }
+    }
+    const ix1 = ci(x1), ix2 = ci(x2), iz1 = ci(z1), iz2 = ci(z2);
+    if (ix2 < 0 || ix1 >= WN || iz2 < 0 || iz1 >= WN) return;
+    for (let cz = Math.max(0, iz1); cz <= Math.min(WN - 1, iz2); cz++) {
+      for (let cx = Math.max(0, ix1); cx <= Math.min(WN - 1, ix2); cx++) {
+        if (inPoly(-WG + (cx + 0.5) * WB, -WG + (cz + 0.5) * WB, poly)) { wIn[(cz * WN + cx) * NP + pi] = 1; wInList[cz * WN + cx].push(pi); }
+      }
+    }
+  });
 }
+const wParity = new Uint8Array(NP);
+export function waterSD(x, z) {
+  const cx = Math.floor((x + WG) / WB), cz = Math.floor((z + WG) / WB);
+  if (cx < 0 || cx >= WN || cz < 0 || cz >= WN) return WMARGIN;
+  const cell = cz * WN + cx, segs = wSegs[cell];
+  const mx = -WG + (cx + 0.5) * WB, mz = -WG + (cz + 0.5) * WB;   // tâm ô
+  const dx = x - mx, dz = z - mz;
+  let bd = WMARGIN, inside = false;
+  for (let k = 0; k < segs.length; k++) {
+    const s = segs[k], ax = s[0], az = s[1], bx = s[2], bz = s[3];
+    const d = distToSeg(x, z, ax, az, bx, bz);
+    if (d < bd) bd = d;
+    // đoạn tâm-ô→điểm cắt cạnh (a,b)? quy ước nửa-mở (>0) để đỉnh chung 2 cạnh chỉ đếm 1 lần
+    const ex = bx - ax, ez = bz - az;
+    if ((ex * (mz - az) - ez * (mx - ax) > 0) === (ex * (z - az) - ez * (x - ax) > 0)) continue;
+    if ((dx * (az - mz) - dz * (ax - mx) > 0) !== (dx * (bz - mz) - dz * (bx - mx) > 0)) wParity[s[4]] ^= 1;
+  }
+  // trong nước ⇔ với polygon nào đó: (tâm ô nằm trong) XOR (số lần cắt lẻ)
+  const inList = wInList[cell];
+  for (let k = 0; k < inList.length; k++) if (!wParity[inList[k]]) inside = true;
+  for (let k = 0; k < segs.length; k++) {
+    const pi = segs[k][4];
+    if (wParity[pi]) { if (!wIn[cell * NP + pi]) inside = true; wParity[pi] = 0; }
+  }
+  return inside ? -bd : bd;
+}
+// trọng số mô hình polygon: 1 trong R_POLY, 0 ngoài R_POLY_END
+function polyWeight(x, z) { return 1 - smoothstep(R_POLY, R_POLY_END, Math.hypot(x, z)); }
+
 const riverIdx = makeBucketIndex(RIVERS.map((r) => ({ pts: r.pts, meta: [r.w, r.sh || 28] })));
 const regionIdx = makeBucketIndex(ROADS_REGION.map((r) => ({ pts: r.pts, meta: 0 })));
 const dtRoadIdx = makeBucketIndex(ROADS_DT.map((r) => ({ pts: r.pts, meta: r.c })));
 
-// hệ số đào lòng sông 0..1 tại điểm
-export function riverFactor(x, z) {
+// hệ số đào lòng sông 0..1 theo POLYLINE (ngoài thành phố)
+function riverFactorLine(x, z) {
   const list = bucketQuery(riverIdx, x, z);
   if (!list) return 0;
   let f = 0;
@@ -175,6 +211,16 @@ export function riverFactor(x, z) {
     if (fi > f) f = fi;
   }
   return f;
+}
+// hệ số "trong/gần sông" 0..1 (world.js dùng làm rào chắn đặt nhà/prop): trong thành phố suy từ polygon
+// (1 trong nước, giảm về 0 ở 28 m ngoài mép như bờ polyline), ngoài thành phố theo polyline như cũ.
+export function riverFactor(x, z) {
+  const wp = polyWeight(x, z);
+  const fl = wp < 1 ? riverFactorLine(x, z) : 0;
+  if (wp <= 0) return fl;
+  const sd = waterSD(x, z);
+  const fp = sd < 0 ? 1 : 1 - smoothstep(0, 28, sd);
+  return wp >= 1 ? fp : lerp(fl, fp, wp);
 }
 export function nearRegionRoad(x, z, r) {
   const list = bucketQuery(regionIdx, x, z);
@@ -197,7 +243,7 @@ export const BRIDGES = EXTRAS.bridges.map((b) => ({
 const PIERS = []; // world.js đăng ký sau khi dò bờ
 export function addPier(p) { PIERS.push(p); }
 
-function deckHeight(x, z, rf) {
+function deckHeight(x, z, wet) {
   let h = -Infinity;
   for (const b of BRIDGES) {
     const dx = x - b.x, dz = z - b.zc;
@@ -214,7 +260,7 @@ function deckHeight(x, z, rf) {
   // đường bộ băng sông = mặt cầu phẳng (mọi cây cầu phố thật: cầu Rào, Lạc Long, An Dương...)
   // NHƯNG trong LÒNG HỒ Tam Bạc: ROADS_REGION vẽ thô đè qua lòng hồ → "dải đất" nổi giữa
   // nước (lộ ở render aerial); chỉ đường DT thật cắt hồ (đập Tam Kỳ) mới được lát mặt.
-  if (rf > 0.03) {
+  if (wet) {
     if (nearDTRoad(x, z, 8) || (lakeSD(x, z) > -2 && nearRegionRoad(x, z, 9))) h = Math.max(h, LAND_H + 0.05);
   }
   return h;
@@ -238,38 +284,9 @@ function hills(x, z, v) {
   return Math.max(0, h);
 }
 
-// KHU CẢNG Hoàng Diệu (tile7/8): sông Cấm R1 (w620, từ OSM) modeled quá RỘNG/nam → ngập dải cảng +
-// bán đảo Sở GTVT (real là ĐẤT tới z≈-1250). KHÔNG dời centerline/giảm w (rủi ro sông xuyên khu khác);
-// dùng OVERRIDE đất cục bộ polygon thuôn, feather bờ 18m, chạy CUỐI groundHeightNoDeck (audit + ChatGPT vet).
-const PORT_RECLAIM = [
-  [-480, -955], [-430, -1120], [-300, -1230], [320, -1230], [450, -1120], [500, -955], [500, -900], [-480, -900],
-];
-function _inPoly(x, z, poly) {
-  let inside = false;
-  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-    const [xi, zi] = poly[i], [xj, zj] = poly[j];
-    if (((zi > z) !== (zj > z)) && x < (xj - xi) * (z - zi) / (zj - zi) + xi) inside = !inside;
-  }
-  return inside;
-}
-function _segDist(x, z, a, b) {
-  const vx = b[0] - a[0], vz = b[1] - a[1], vv = vx * vx + vz * vz;
-  let t = vv ? ((x - a[0]) * vx + (z - a[1]) * vz) / vv : 0; t = Math.max(0, Math.min(1, t));
-  return Math.hypot(x - (a[0] + t * vx), z - (a[1] + t * vz));
-}
-function reclaimPort(h, x, z) {
-  if (x < -490 || x > 510 || z < -1240 || z > -890) return h;   // bbox nhanh
-  if (!_inPoly(x, z, PORT_RECLAIM)) return h;
-  let d = Infinity;
-  for (let i = 0; i < PORT_RECLAIM.length; i++) d = Math.min(d, _segDist(x, z, PORT_RECLAIM[i], PORT_RECLAIM[(i + 1) % PORT_RECLAIM.length]));
-  let t = Math.min(1, d / 18); t = t * t * (3 - 2 * t);          // feather bờ 18m
-  const raised = 0.30 + (LAND_H - 0.30) * t;                     // dryH 0.30 > cutoff isWater 0.25
-  return Math.max(h, raised);
-}
-
 // ---------- Cao độ ----------
-export function groundHeightNoDeck(x, z) {
-  const v = landAt(x, z);
+// cao độ ĐẤT theo độ "đất" v (0 biển .. 1 đất): bờ biển thoải + gợn + đồi + san phẳng phố/Cát Bà/cảng
+function baseHeight(x, z, v) {
   let h = lerp(SEA_FLOOR, LAND_H, smoothstep(0.32, 0.68, v));
   // gợn nhẹ đồng bằng
   h += 0.4 * Math.sin(x * 0.0021) * Math.sin(z * 0.0017) * smoothstep(0.6, 0.9, v);
@@ -279,41 +296,34 @@ export function groundHeightNoDeck(x, z) {
   const CT = EXTRAS.catbaTown;
   h = lerp(h, LAND_H, rectFactor(x, CT[0] - 500, CT[0] + 500, z, CT[1] - 380, CT[1] + 380, 120) * smoothstep(0.35, 0.55, v));
   h = lerp(h, LAND_H, rectFactor(x, LM.port[0] - 600, LM.port[0] + 600, z, LM.port[1] - 300, LM.port[1] + 300, 90) * smoothstep(0.3, 0.5, v));
-  // đào lòng sông (thắng san phẳng)
-  const rf = riverFactor(x, z);
-  if (rf > 0) h = lerp(h, -3, rf);
-  // HỒ TAM BẠC — TẠO HÌNH SẠCH (đè lên mask OSM nham nhở): trong hành lang hồ, lòng hồ là KÊNH
-  // theo POLYGON hồ thật LAKE_POLY (bờ cong đúng thực địa, KHÔNG ngập 2 phố ven hồ);
-  // ngoài mép là ĐẤT PHỐ. Hết "bét nhè"/nước thò sau nhà.
-  // (Giữ NƯỚC đầy hồ theo yêu cầu chủ dự án — thực địa 2026 hồ cạn thi công nhưng không mô phỏng.)
-  if (x > -1200 && x < -205 && z > 55 && z < 400) {
-    const sd = lakeSD(x, z);
-    if (sd < 0) h = lerp(-3, 1.7, smoothstep(-2, 0, sd));   // lòng hồ theo POLYGON thật, taluy kè 2m
-    else if (sd < 60 && h < 1.6) h = LAND_H;                // ngoài mép = đất phố
-    // ĐÔNG ĐẬP Lê Chân: thực tế là ĐẤT (dải vườn hoa + Triển lãm) nhưng mask nước OSM cũ
-    // kéo tới ~x=-240 → lấp thành đất phố (user: "đằng sau nhà triển lãm có hồ đâu")
-    else if (x > -400 && z > 100 && z < 240 && h < 1.6) h = LAND_H;
-  }
-  // HỒ SEN (cell_nam V1): kênh theo polygon thật, taluy kè 2m — ngoài mép giữ đất phố
-  if (x > -75 && x < 63 && z > 832 && z < 1076) {
-    const sd = hoSenSD(x, z);
-    if (sd < 0) h = lerp(-3, 1.7, smoothstep(-2, 0, sd));
-  }
-  // HỒ QUẦN NGỰA (tile3 góc Đông-Nam) — real CÓ hồ lớn nhưng game THIẾU (audit nước georef, t3=2.4).
-  // Ellipse tâm ~(600,228), tràn ra ngoài khung đông; carve nước, nhà tự loại qua isWater. Chỉ hạ (an toàn).
-  // (dời tâm SE + thu bắc: tránh chìm entity ga ở (635,172) — diag bắt được)
-  if (x > 500 && x < 760 && z > 185 && z < 360) {
-    const dx = (x - 628) / 116, dz = (z - 276) / 82, r2 = dx * dx + dz * dz;
-    if (r2 < 1) { const hl = lerp(-3, 1.9, smoothstep(0.45, 1.0, r2)); if (hl < h) h = hl; }
-  }
-  h = reclaimPort(h, x, z);   // ĐẤT cảng: chạy CUỐI (sau mọi carve sông/hồ) để R1 không ngập lại
   return h;
+}
+// cờ nội bộ: lần gọi groundHeightNoDeck gần nhất rơi vào lòng nước polygon (groundHeight/deckHeight
+// dùng ngay sau đó — tránh tính waterSD 2 lần)
+let polyWet = false;
+export function groundHeightNoDeck(x, z) {
+  const wp = polyWeight(x, z);
+  polyWet = false;
+  let hLine = 0;
+  if (wp < 1) {
+    // NGOÀI thành phố: MASK bờ biển + đào lòng sông theo polyline (thắng san phẳng, đáy −3)
+    hLine = baseHeight(x, z, landAt(x, z));
+    const rf = riverFactorLine(x, z);
+    if (rf > 0) hLine = lerp(hLine, -3, rf);
+    if (wp <= 0) return hLine;
+  }
+  // TRONG thành phố: lòng sông/hồ theo polygon OSM thật (taluy kè 2 m: −3 → 1.7 ở mép),
+  // ngoài mép là ĐẤT phố (v=1: bỏ MASK bờ biển thô 40 m — nó từng làm nước thò ra sau nhà)
+  const sd = waterSD(x, z);
+  polyWet = sd < 0;
+  const hPoly = polyWet ? lerp(-3, 1.7, smoothstep(-2, 0, sd)) : baseHeight(x, z, 1);
+  return wp >= 1 ? hPoly : lerp(hLine, hPoly, wp);
 }
 
 export function groundHeight(x, z) {
   const h = groundHeightNoDeck(x, z);
-  const rf = h < 1.9 ? riverFactor(x, z) : 0;
-  const d = deckHeight(x, z, rf);
+  const wet = h < 1.9 && (polyWet || riverFactorLine(x, z) > 0.03);
+  const d = deckHeight(x, z, wet);
   return d > h ? d : h;
 }
 

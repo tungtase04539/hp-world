@@ -530,6 +530,58 @@ console.log(`parks thật: ${PARKS.length}`);
   console.log('hồ Tam Bạc:', JSON.stringify(EXTRAS.lake), 'tâm', LM.lake);
 }
 
+// ---------- 6b2. NƯỚC POLYGON THẬT (natural=water / water=*) quanh trung tâm ----------
+// terrain.js dùng khoảng cách có dấu tới tập polygon này (waterSD) để đào sông/hồ TRONG THÀNH PHỐ
+// (bán kính R_POLY=1750 quanh Nhà hát) thay cho polyline bề rộng hằng (Cấm 620 m vs thật 201 m ở Bến Bính,
+// Tam Bạc/Hạ Lý là chữ Y mà 1 trục không bám được, Hồ Tiên Nga/Hồ Sen không có trục nào).
+// Giữ NGUYÊN polygon (không cắt) nếu có đỉnh nào cách gốc < R_POLY+600; simplify 1.5 m; bỏ ao < 200 m².
+// Relation multipolygon (sông có đảo): ghép các way outer theo đầu-cuối. File 2026-09 CHƯA có relation
+// (fetch cũ chỉ lấy way) — fetch_osm.sh mục 11 đã thêm rel[natural=water] cho lần tải sau.
+const WATER = [];
+{
+  const WR = 1750 + 600;
+  const isWaterTag = (t) => !!t && (t.natural === 'water' || !!t.water);
+  const samePt = (a, b) => Math.abs(a.lat - b.lat) < 1e-7 && Math.abs(a.lon - b.lon) < 1e-7;
+  const rings = [];   // { n, geo:[{lon,lat},...] } vòng kín (điểm cuối = điểm đầu)
+  let nRel = 0;
+  for (const e of load('osm_water_dt.json')) {
+    if (!isWaterTag(e.tags)) continue;
+    const name = e.tags.name || '';
+    if (e.type === 'way') {
+      const g = e.geometry;
+      if (g && g.length >= 4 && samePt(g[0], g[g.length - 1])) rings.push({ n: name, geo: g });
+    } else if (e.type === 'relation' && e.members) {
+      nRel++;
+      const pool = e.members.filter((m) => m.type === 'way' && m.role === 'outer' && m.geometry).map((m) => m.geometry.slice());
+      while (pool.length) {
+        let ring = pool.pop(), grew = true;
+        while (grew && !samePt(ring[0], ring[ring.length - 1])) {
+          grew = false;
+          for (let i = 0; i < pool.length; i++) {
+            const s = pool[i], end = ring[ring.length - 1];
+            if (samePt(s[0], end)) { ring = ring.concat(s.slice(1)); pool.splice(i, 1); grew = true; break; }
+            if (samePt(s[s.length - 1], end)) { ring = ring.concat(s.slice(0, -1).reverse()); pool.splice(i, 1); grew = true; break; }
+          }
+        }
+        if (ring.length >= 4 && samePt(ring[0], ring[ring.length - 1])) rings.push({ n: name, geo: ring });
+        else console.log(`  water relation ${e.id} "${name}": vòng outer hở (${ring.length} điểm) — bỏ`);
+      }
+    }
+  }
+  for (const { n, geo } of rings) {
+    let pts = geo.map((g) => toXZ(g.lon, g.lat));
+    if (!pts.some(([x, z]) => Math.hypot(x, z) < WR)) continue;
+    pts = simplify(pts, 1.5).slice(0, -1);   // giữ vòng kín khi simplify rồi bỏ điểm cuối trùng điểm đầu
+    if (pts.length < 3) continue;
+    let area = 0;
+    for (let i = 0; i < pts.length; i++) { const [x1, z1] = pts[i], [x2, z2] = pts[(i + 1) % pts.length]; area += x1 * z2 - x2 * z1; }
+    if (Math.abs(area) / 2 < 200) continue;
+    WATER.push({ n, pts: pts.map(([x, z]) => [Math.round(x * 10) / 10, Math.round(z * 10) / 10]) });
+  }
+  console.log(`water polygon: ${WATER.length} (relation: ${nRel}), đỉnh ${WATER.reduce((s, w) => s + w.pts.length, 0)}:`,
+    WATER.filter((w) => w.n).map((w) => w.n + '(' + w.pts.length + ')').join(', '));
+}
+
 // ---------- 6c. ĐƯỜNG SẮT THẬT (tuyến chính Hà Nội - Hải Phòng vào ga) ----------
 const RAIL = [];
 for (const w of load('osm_rail.json')) {
@@ -665,6 +717,7 @@ export const INTERSECTIONS = ${JSON.stringify(INTERSECTIONS)};
 export const MEDIANS = ${JSON.stringify(MEDIANS)};
 export const GARDENS = ${JSON.stringify(GARDENS)};
 export const BUILDINGS = ${JSON.stringify(BUILDINGS)};
+export const WATER = ${JSON.stringify(WATER)};
 `;
 fs.writeFileSync(new URL('../js/mapdata.js', import.meta.url), out);   // relative (portable Win/Linux)
 console.log(`mapdata.js: ${(out.length / 1024).toFixed(0)}KB`);
