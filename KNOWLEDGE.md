@@ -63,9 +63,17 @@ Quan hệ dữ liệu: `tools/fetch_osm.sh` → `osm_*.json` → `tools/process_
 - `RIVERS [{w, pts}]` — rộng 620 (Cấm), 300 (Lạch Tray), 55 (Tam Bạc). Kênh Nam Triệu + hồ push trong terrain.
 - `ROADS_DT [{c, pts}]` — c ∈ p(primary/trunk) s(secondary) t(tertiary) r(residential) w(pedestrian).
 - `ROADS_REGION`, `BUILDINGS [{p, a, l}]` (footprint THẬT không phóng, a=diện tích, l=số tầng×10).
-- `LM {key:[x,z]}` tâm công trình thật; `LM_DIR` **vector đơn vị cạnh dài** footprint;
-  `LM_FACE` **hướng mặt tiền** = về **phố lớn (p/s/t) gần nhất** (bỏ ngõ r/w — sửa 2026-07-05e);
-  `LM_SIZE {key:[dài,rộng]}` kích thước thật footprint (mét) để scale GLB;
+- `LM {key:[x,z]}` tâm công trình thật; `LM_DIR` **vector đơn vị cạnh ĐƠN dài nhất** footprint (KHÔNG phải
+  trục dài tổng thể — bảo tàng 36×29 nhận cạnh hông 29m vì cạnh 36m bị notch cắt khúc; chớ đổi sang "trục
+  trội" vì opera/bưu điện/chợ Sắt/THCS TP sẽ đổi theo);
+  `LM_FACE` **hướng mặt tiền** = **pháp tuyến của ĐOẠN phố lớn (p/s/t) gần nhất** (chiếu tâm lên đoạn, phía về
+  phố — sửa 2026-09-06 W6; trước đó lấy ĐỈNH way gần nhất → nhà góc phố quay chéo ra ngã tư vì phố thẳng sau
+  simplify chỉ còn 2 đỉnh = 2 ngã tư). Ngoại lệ ghi trong `LM_FACE_OVERRIDE` (process_osm): giá trị = TÊN PHỐ
+  (pháp tuyến đoạn phố đó, mọi cấp kể cả ngõ r) hoặc vector [fx,fz] — mỗi dòng phải kèm bằng chứng (pano/ảnh).
+  `FACADE_SHORT_SIDE` = key có mặt tiền ở ĐẦU HỒI (pháp tuyến ∥ LM_DIR): world.js `orientLM(key)` dùng
+  `orientFace` thay `orientLong` (nhà thờ, rạp Tháng Tám, đình Hàng Kênh, bảo tàng).
+  Kiểm số: `scratchpad/lmcheck.mjs <mapdata.js> <tools/>` in bảng LM_FACE / hướng world.js / phố gần nhất / cos.
+  `LM_SIZE {key:[dài,rộng]}` kích thước thật footprint (mét) để scale GLB / kích thước khối procedural;
   `STREETS/INTERSECTIONS/MEDIANS` cho nội thất phố;
   `EXTRAS { square, fountain, baodai, bridges[{x,zc,half,ang,rise}], dsRidge, catbaTown, lake }`.
 
@@ -75,6 +83,7 @@ Với `rotation.y = θ`: local X → thế giới `(cosθ, −sinθ)`, local Z �
 ```js
 orientLong(dir, face): θ = atan2(−dir[1], dir[0]); nếu sinθ·face[0]+cosθ·face[1] < 0 thì θ += π
 orientFace(face):      θ = atan2(face[0], face[1])   // nhà thờ: mặt tiền ở ĐẦU HỒI → dùng cái này
+orientLM(key):         FACADE_SHORT_SIDE.includes(key) ? orientFace(LM_FACE[key]) : orientLong(LM_DIR[key], LM_FACE[key])
 localPt(cx,cz,lx,lz,θ) = [cx + lx·cosθ + lz·sinθ,  cz − lx·sinθ + lz·cosθ]  // collider chi tiết phụ
 ```
 Cầu: dựng mọi chi tiết trong nhóm local (z = dọc trục), `group.position=(x,0,zc); group.rotation.y=ang`
@@ -447,6 +456,57 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     **Chưa làm:** `tools/diag.mjs`/`waterbfs.mjs` dùng chromium Linux path nên không chạy trên Windows — thay
     bằng `__hp.diag()` trong phiên Playwright; dải dốc 1800-2000 m (ngoài vùng chơi ≥212 m) bờ nước vẫn thô
     như cũ (lưới local bám dốc tấm thô ở đó — chấp nhận, không nhìn thấy từ vùng chơi).
+- **2026-09-06 (dh) [W6-landmark-placement]** [MẶT TIỀN & VỊ TRÍ ĐỊA DANH THEO OSM — Ga, Triển lãm, Việt Tiệp, Đền Nghè,
+    Bảo tàng, Rạp Tháng Tám, Đình Hàng Kênh, Nhà thờ] (Đợt 2, audit findings `landmarks:*`):
+    **(1) `LM_FACE` = pháp tuyến ĐOẠN phố lớn gần nhất** (`nearestRoadFace` trong process_osm thay `nearestRoadPoint`):
+    quy tắc cũ lấy ĐỈNH way gần nhất, mà phố thẳng sau `subdiv(150)+simplify(6)` chỉ còn 2 đỉnh = 2 ngã tư → nhà góc
+    phố quay chéo ra ngã tư (bảo tàng 229°, Đền Nghè 64°). Thêm `LM_FACE_OVERRIDE` (tên phố hoặc vector, kèm bằng
+    chứng) + `FACADE_SHORT_SIDE` (xuất ra mapdata; world.js `orientLM(key)`). Bảng kiểm `scratchpad/lmcheck.mjs`
+    (cos(mặt tiền world, hướng tới phố) ≥ 0.9 với mọi địa danh trong task; trước: museum 0.01, rap78 −0.01, dinhhk
+    −1.00, dennghe −0.94, cathedral 0.05). Tác dụng phụ đã kiểm: THPT Ngô Quyền lật cổng sang ĐÔNG ra Mê Linh —
+    ĐÚNG (pano_261 "ngay trước cổng chính" trên Mê Linh h270); THCS Trần Phú quay BẮC ra NĐC; THCS Ngô Quyền lật
+    tây→đông (không có phố ở cả 2 phía, chỉ NĐC phía bắc — coi như trung tính); bưu điện/chợ Sắt/UBND/NHNN/chùa
+    Hàng/đền Tam Kỳ: hướng world KHÔNG đổi (chỉ biển landmarks.js dời về đúng trước mặt tiền).
+    **(2) Ga Hải Phòng**: thêm `addWay('station_bldg', 241081956)` (building=train_station, có sẵn trong
+    osm_buildings.json — dải 118×21m trục 225° dọc ray, tâm (578,167), 8m tây-bắc node ga). GLB đặt tại tâm này,
+    `orientLong` + LM_FACE override 'Phố Lương Khánh Thiện (Phố Ga)' → mặt tiền (local +Z: biển GA HẢI PHÒNG +
+    đồng hồ) quay TÂY-BẮC ra quảng trường ga; nhóm ray/tàu/mái sân ga đặt tại node, `rotation.y = thGa` (local X dọc
+    ray, ray ở local −Z = sau lưng, cách tâm toà ~22m ≈ dải ray yard thật 26m). Trước: GLB ở node+25m nam, rot 0
+    (quay nam ra bãi ray), tàu chắn giữa nhà ga và phố.
+    **(3) Triển lãm**: `addWay('trienlam', 240463140, LM.lechan)` (footprint 57×10m trục bắc-nam, tâm (-295,170));
+    `buildTrienLam` lấy W/D từ LM_SIZE, mặt dài quay ĐÔNG ra tượng Lê Chân (pano_037 h270 thấy "mặt tiền dài, biển
+    TRUNG TÂM TRIỂN LÃM" khi nhìn tây). Bỏ 2 bản trùng: hộp 16×9 cạnh tượng (-250,168) và khối PANO-LOOP V2
+    (-302,172) — trước đây CÓ 3 Triển lãm cách nhau <20m. FEATURED_CLEAR trỏ LM.trienlam.
+    **(4) Việt Tiệp**: OSM là RELATION 19780771 (multipolygon) → lấy way ngoài 961958396 qua Overpass
+    (`fetch_osm.sh` mục 7c → `osm_lm3_geom.json`, KHÔNG có trong osm_buildings.json). Footprint 76×75m tâm (1054,1032),
+    mặt tiền quay 246° ra Lạch Tray CÁCH 135m — đúng thực địa (quảng trường + công viên "Cung Hữu nghị Việt Tiệp"
+    phía trước); gợi ý audit "dời tới 45m từ Lạch Tray" là SAI, và vector `[-0.91,-0.41]` của audit sai dấu z.
+    Khối procedural chỉ là khối trước (D=20) đẩy ra mép mặt tiền footprint (`push=(LM_SIZE[1]−D)/2`).
+    **(5) Đền Nghè**: override 'Phố Lê Chân' (ngõ r, node = cổng cách tim đường 9m) → cổng quay BẮC thẳng ra phố.
+    **(6) Bảo tàng**: override 'Phố Điện Biên Phủ' + FACADE_SHORT_SIDE (cạnh ĐƠN dài nhất OSM là hông tây 29m,
+    mặt tiền thật cạnh nam 36m). **Đình Hàng Kênh** override [0,1] (ao đình phía nam) + SHORT_SIDE. **Rạp Tháng
+    Tám**: override 'Phố Đinh Tiên Hoàng' + SHORT_SIDE, dựng lại 19 rộng × 59 sâu theo LM_SIZE, mặt tiền art-deco ở
+    đầu hồi TÂY (pano_052 "trước Nhà hát Tháng 8" trên ĐTH), 2 collider r13 dọc trục. **Nhà thờ**: override
+    'Phố Trần Quang Khải' → tháp chuông ở đầu NAM (pano_255: nhìn tây từ 31 Hoàng Văn Thụ, tháp hiện ngang z≈−330 =
+    đầu nam footprint; bản cũ tháp ở đầu bắc do phép lật −X với LM_FACE đông ⊥ gian giữa = tung đồng xu −0.079).
+    **BẪY:** (a) Overpass hay trả TRANG HTML "server too busy" (kể cả mirror kumi) — parse JSON phải bọc try, thử
+    lại sau vài giây; regex tên có dấu: dùng `Vi.{1,2}t Ti.{1,2}p` nếu bản NFC/NFD lệch. (b) Công trình là RELATION
+    thì `way["building"]` bbox không thấy — phải `nwr[name~..]` rồi lấy member outer. (c) `git config core.autocrlf
+    = true` → mapdata.js sinh ra LF, bản checkout CRLF: so sánh xuất phải bỏ `\r` trước (diff thô báo MỌI dòng khác).
+    (d) `nearestRoadFace` ném lỗi nếu tên phố trong override không có trong ROADS_DT — tên phải khớp CHÍNH XÁC tag
+    OSM (vd 'Phố Lương Khánh Thiện (Phố Ga)'). (e) GLB ga có ĐỒNG HỒ ở CẢ 2 mặt — chỉ mặt có biển GA HẢI PHÒNG là
+    mặt tiền (local +Z); chụp 1 góc có đồng hồ chưa đủ kết luận. (f) KHÔNG đổi `longEdgeDir` sang "trục trội"
+    (tổng chiều dài cạnh theo hướng): opera/bưu điện/chợ Sắt/THCS Trần Phú đổi LM_DIR theo → dùng SHORT_SIDE cho
+    bảo tàng thay vì sửa rule. (g) Quy ước chụp mặt tiền: `teleport(tx,tz,yaw,pitch,d)` đặt camera tại
+    `(tx+sin(yaw)·d, tz+cos(yaw)·d)` nhìn về (tx,tz) → muốn camera ở phía LM_FACE thì `yaw = atan2(fx, fz)`.
+    (h) Bộ dữ liệu `osm_lm3_geom.json` là file gitignore mới: máy khác phải chạy `fetch_osm.sh` mục 7c (hoặc copy
+    file) TRƯỚC khi `node process_osm.mjs`, nếu không `load()` ném ENOENT.
+    Đo (1600×1000, ?quality=full, TIER 3 trên Radeon 890M): main pass spawn calls 1175→1153, tri 7,59M→7,59M,
+    object 7173→7174; `__hp.diag()` chỉ còn dòng boat0 cũ; 0 pageerror. ROADS_DT + mọi export khác ngoài
+    LM/LM_DIR/LM_SIZE/LM_FACE (+FACADE_SHORT_SIDE mới) byte-identical (sidewalks.js index an toàn).
+    CÒN LẠI (ngoài task): UBND 52×17 vs footprint 163×75 và Chợ Sắt 110×80 vs 147×114 chưa ép theo LM_SIZE (UBND là
+    compound có sân — cần tỷ lệ khối chính; chợ Sắt 132×96 từng cố ý chọn ở (e)); THCS Ngô Quyền hướng cổng chưa
+    có bằng chứng pano.
 - **2026-09-05 (dg)** [KIỂM TOÁN TOÀN REPO + ĐỢT 1: PHÂN TIER THEO GPU, HIỆN GLB KHÔNG KHỰNG, ASSETS_LITE LÊN CDN]:
     Kiểm toán 12 lăng kính (147 phát hiện, 16 phản biện đối kháng, số đo GPU thật) — báo cáo đầy đủ là artifact
     "Kiểm toán Hải Phòng 3D" (link trong memory `audit-report-2026-09`). **GỐC CỦA CẢ 2 PHÀN NÀN ("đồ hoạ chưa

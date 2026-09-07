@@ -9,6 +9,7 @@ import {
   groundHeight, groundHeightNoDeck, isWater, landAt, riverFactor,
   nearestRiverPoint, findShore, addPier, LAKE_POLY, lakeSD, HOSEN_POLY, hoSenSD,
 } from './terrain.js';
+import { LM_SIZE, FACADE_SHORT_SIDE } from './mapdata.js';
 import { STREETS, INTERSECTIONS, MEDIANS, GARDENS } from './mapdata.js';
 import { SIDEWALK_BY_ROAD, SIDEWALK_DEFAULT } from './sidewalks.js';
 import { PANO_SIDES } from './panosides.js';
@@ -83,6 +84,12 @@ function orientLong(dir, face) {
 }
 // Quay thẳng local +Z về hướng face (nhà thờ: mặt tiền nằm ở đầu hồi)
 function orientFace(face) { return Math.atan2(face[0], face[1]); }
+// Địa danh theo key mapdata: mặt tiền ở ĐẦU HỒI (FACADE_SHORT_SIDE, process_osm) → quay thẳng về LM_FACE,
+// còn lại trục dài theo LM_DIR + mặt tiền (cạnh dài) về LM_FACE. Tránh "tung đồng xu" của orientLong
+// khi LM_FACE gần vuông góc cạnh dài (bảo tàng, đình Hàng Kênh, rạp Tháng Tám — audit 2026-09).
+function orientLM(key) {
+  return FACADE_SHORT_SIDE.includes(key) ? orientFace(LM_FACE[key]) : orientLong(LM_DIR[key], LM_FACE[key]);
+}
 // Đưa điểm local (lx,lz) của mô hình đã quay th quanh (cx,cz) ra tọa độ thế giới
 function localPt(cx, cz, lx, lz, th) {
   return [cx + lx * Math.cos(th) + lz * Math.sin(th), cz - lx * Math.sin(th) + lz * Math.cos(th)];
@@ -1878,7 +1885,7 @@ export function buildWorld(scene) {
     [-11.8, -256.6, 22],   // tòa Hoàng Long (góc nam ngã ba TQK)
     [237, -292, 26],       // nhà Pháp arcade (Hội LHPN)
     [773.9, -732, 38],     // KS Harbour View (dời theo PLAN corridor4056 V3)
-    [-302, 172, 32],       // TT Triển lãm & Mỹ thuật
+    [LM.trienlam[0], LM.trienlam[1], 36],   // TT Triển lãm & Mỹ thuật (footprint OSM 57×10m, trục bắc-nam)
     [474, 6, 28],          // Sở KH&CN
     [326, -826, 40],       // Cảng vụ (compound + sân)
     [-798, 221, 13],       // FUNZ
@@ -19513,9 +19520,11 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     addCollider(x, z, Math.max(W, D) * 0.45);
   }
 
-  // Cung Văn hoá Lao động Hữu nghị Việt Tiệp (53 Lạch Tray) — khối ngang dài, lưới bê tông, huy hiệu vàng
+  // Cung Văn hoá Lao động Hữu nghị Việt Tiệp (53 Lạch Tray) — khối ngang dài, lưới bê tông, huy hiệu vàng.
+  // (x,z) = tâm footprint OSM (LM.viettiep, way ngoài relation 19780771, 76×75m); chỉ dựng KHỐI TRƯỚC dày D,
+  // ép sát mép mặt tiền footprint (quay ra quảng trường → Lạch Tray), phần hội trường phía sau để trống.
   function buildVietTiep(x, z, rot) {
-    const W = 78, Hh = 14, D = 20;
+    const W = LM_SIZE.viettiep[0], Hh = 14, D = 20;
     const facTex = makeTex(1024, 200, (g, w, h) => {
       g.fillStyle = '#e9e3d3'; g.fillRect(0, 0, w, h); speckle(g, w, h, 140, 0.05);
       g.fillStyle = '#f2eee2'; g.fillRect(0, 0, w, h * 0.09);
@@ -19558,17 +19567,20 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     const roofSlab = new THREE.Mesh(new THREE.BoxGeometry(W - 3, 0.4, D - 3), roofMat);
     roofSlab.position.set(0, Hh + 0.75, 0); grp.add(roofSlab);
     const canopy = new THREE.Mesh(new THREE.BoxGeometry(W * 0.16, 0.5, 4.5), mat(0xcfc7b2)); canopy.position.set(0, 4.6, D / 2 + 1.8); grp.add(canopy);
-    grp.position.set(x, LAND_H, z); grp.rotation.y = rot;
+    // đẩy khối trước từ tâm footprint ra mép mặt tiền (local +Z = hướng mặt tiền)
+    const push = (LM_SIZE.viettiep[1] - D) / 2, px = x + Math.sin(rot) * push, pz = z + Math.cos(rot) * push;
+    grp.position.set(px, LAND_H, pz); grp.rotation.y = rot;
     grp.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
     scene.add(grp);
-    addCollider(x, z, Math.max(W, D) * 0.45);
+    addCollider(px, pz, Math.max(W, D) * 0.45);
   }
-  buildVietTiep(1030, 1023, 0);
+  // trước đây hardcode (1030,1023) quay nam — sai 25m và 66° so với footprint OSM (audit 2026-09)
+  buildVietTiep(LM.viettiep[0], LM.viettiep[1], orientLong(LM_DIR.viettiep, LM_FACE.viettiep));
 
-  // Trung tâm Triển lãm & Mỹ thuật (1 Nguyễn Đức Cảnh, geocode OSM) — colonial kem 2 tầng,
+  // Trung tâm Triển lãm & Mỹ thuật (1 Nguyễn Đức Cảnh, footprint OSM way 240463140) — colonial kem 2 tầng,
   // cửa vòm, pilaster trắng, HÀNG CỜ đỏ trên parapet (theo ảnh thật).
   function buildTrienLam(x, z, rot) {
-    const W = 40, Hh = 9.5, D = 16;
+    const W = LM_SIZE.trienlam[0], Hh = 9.5, D = LM_SIZE.trienlam[1];
     const facTex = makeTex(1024, 240, (g, w, h) => {
       g.fillStyle = '#e8d9a8'; g.fillRect(0, 0, w, h); speckle(g, w, h, 130, 0.04);
       g.fillStyle = '#f4eede'; g.fillRect(0, 0, w, h * 0.06);                    // phào đỉnh
@@ -19627,9 +19639,10 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     scene.add(grp);
     addCollider(x, z, Math.max(W, D) * 0.42);
   }
-  // đặt GIỮA 2 dãy phố chéo (probe scene: dãy z~150 bắc + z~177 nam), xoay theo trục phố (~0.23 rad),
-  // mặt tiền quay BẮC ra Nguyễn Đức Cảnh/hồ Tam Bạc
-  buildTrienLam(-293, 164, Math.PI + 0.23);
+  // footprint OSM 57×10m trục bắc-nam; mặt dài quay ĐÔNG ra quảng trường tượng Lê Chân (pano_037 h270 thấy
+  // "mặt tiền dài, biển TRUNG TÂM TRIỂN LÃM" khi nhìn tây). Bản cũ (-293,164) quay bắc ra Quang Trung là sai;
+  // 2 bản trùng lặp (hộp cạnh tượng + khối PANO-LOOP V2 tại (-302,172)) đã bỏ (audit 2026-09).
+  buildTrienLam(LM.trienlam[0], LM.trienlam[1], orientLong(LM_DIR.trienlam, LM_FACE.trienlam));
 
   // ---------- NHÀ HÁT LỚN: GLB chất lượng gốc, đặt & xoay đúng footprint OSM ----------
   const thOpera = orientLong(LM_DIR.opera, LM_FACE.opera);
@@ -19890,34 +19903,15 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
         scene.add(m);
       },
     });
-    {
-      const eg = new THREE.Group();
-      const body = new THREE.Mesh(new THREE.BoxGeometry(16, 6.5, 9), mat(0xf0ece0));
-      body.position.y = 3.25; eg.add(body);
-      for (let i = -3; i <= 3; i++) { // hàng cột mặt tiền
-        const col = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 5.2, 8), mat(0xfdf8ea));
-        col.position.set(i * 2.2, 2.6, 4.9); eg.add(col);
-      }
-      const cornice = new THREE.Mesh(new THREE.BoxGeometry(16.8, 0.9, 10), mat(0xddd6c2));
-      cornice.position.y = 6.9; eg.add(cornice);
-      const sign = new THREE.Mesh(new THREE.PlaneGeometry(9, 1.1),
-        new THREE.MeshLambertMaterial({ map: signTexture('TRUNG TÂM TRIỂN LÃM', '#2e5f8a', '#ffffff') }));
-      sign.position.set(0, 5.6, 5.06); eg.add(sign);
-      // Nhà triển lãm ĐẰNG SAU tượng: ngược hướng mặt tượng (−faceV), mặt tiền quay về tượng
-      const egx = LM.lechan[0] - 16 * 0.992, egz = LM.lechan[1] - 16 * (-0.126);
-      eg.position.set(egx, LAND_H, egz);
-      eg.rotation.y = thLC;                 // mặt tiền (local +z) quay về tượng
-      scene.add(eg);
-      addCollider(egx, egz, 9);
-    }
   }
 
   // ---------- NHÀ THỜ CHÍNH TÒA: GLB từ ảnh thật (Wikimedia Commons) ----------
   {
-    // trục dài gian giữa theo cạnh dài OSM; tháp chuông (đầu -X mô hình) quay về phố (LM_FACE)
-    // dir gần song song face -> tháp ở đầu hồi; orientLong đã cho tháp quay về phố, KHÔNG cộng π
+    // trục dài gian giữa theo cạnh dài OSM; tháp chuông (đầu -X mô hình) quay về LM_FACE = đầu NAM gian giữa
+    // (override process_osm theo pano_255: nhìn tây từ 31 Hoàng Văn Thụ thấy tháp ngang z≈-330). LM_FACE cũ
+    // trỏ đông ra HVT ⊥ gian giữa → phép lật dưới đây thành "tung đồng xu" (tháp từng ở đầu bắc).
     let thCa = orientLong(LM_DIR.cathedral, null);
-    // đảm bảo đầu -X (mặt tiền) hướng về phố: nếu -X đang quay ngược face thì lật π
+    // đảm bảo đầu -X (mặt tiền) hướng về LM_FACE: nếu -X đang quay ngược face thì lật π
     if ((-Math.cos(thCa)) * LM_FACE.cathedral[0] + Math.sin(thCa) * LM_FACE.cathedral[1] < 0) thCa += Math.PI;
     placeGLB({
       url: 'assets/nhatho.glb', name: 'Nhà thờ chính tòa',
@@ -19944,21 +19938,24 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
   }
 
   // ---------- BẢO TÀNG: GLB từ ảnh thật (tòa nhà vàng kem thật, không phải gạch đỏ) ----------
+  // mặt tiền 36m quay NAM ra Điện Biên Phủ (66 ĐBP); nhà góc phố ĐBP × Đinh Tiên Hoàng cách đều 34m nên
+  // LM_FACE là override trong process_osm, xoay bằng orientLM (từng quay tây ra ĐTH — audit 2026-09)
   placeGLB({
     url: 'assets/baotang.glb', name: 'Bảo tàng Hải Phòng',
     x: LM.museum[0], z: LM.museum[1],
-    rot: orientLong(LM_DIR.museum, LM_FACE.museum), size: 36,
+    rot: orientLM('museum'), size: 36,
   });
   addCollider(LM.museum[0], LM.museum[1], 18);
 
-  // ---------- GA HẢI PHÒNG: GLB từ ảnh thật + đường ray & đoàn tàu phía sau ----------
+  // ---------- GA HẢI PHÒNG: GLB từ ảnh thật + sân ga & đoàn tàu SAU LƯNG ----------
+  // Toà ga theo footprint OSM way 241081956 (LM.station_bldg — dải 118×21m dọc ray, trục 225°); mặt tiền
+  // GLB (local +Z: biển GA HẢI PHÒNG + đồng hồ) quay TÂY-BẮC ra quảng trường ga / Lương Khánh Thiện (LM_FACE).
+  // Bản cũ: GLB tại node+25m nam quay mặt NAM ra bãi ray, tàu nằm giữa nhà ga và phố (audit 2026-09).
   {
-    placeGLB({
-      url: 'assets/ga.glb', name: 'Ga Hải Phòng',
-      x: LM.station[0], z: LM.station[1] + 25, rot: 0, size: 55,
-    });
-    addCollider(LM.station[0], LM.station[1] + 25, 27);
-    // sân ga + đường ray + đoàn tàu (sau lưng nhà ga, phía bắc)
+    const [gx, gz] = LM.station_bldg, thGa = orientLong(LM_DIR.station_bldg, LM_FACE.station_bldg);
+    placeGLB({ url: 'assets/ga.glb', name: 'Ga Hải Phòng', x: gx, z: gz, rot: thGa, size: 55 });
+    addCollider(gx, gz, 27);
+    // sân ga + đường ray + đoàn tàu: local X dọc ray, local -Z = sau lưng nhà ga (ngược LM_FACE)
     const g = new THREE.Group();
     const canopy = new THREE.Mesh(new THREE.BoxGeometry(30, 0.5, 8), mat(0x8a8f96));
     canopy.position.set(0, 6, -10); g.add(canopy);
@@ -19980,9 +19977,12 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
       const car = new THREE.Mesh(new THREE.BoxGeometry(8, 3, 2.5), mat(0x8fb03e));
       car.position.set(-4 + i * 9.5, 1.9, -13.7); g.add(car);
     }
-    g.position.set(LM.station[0], LAND_H, LM.station[1] - 6);
+    // gốc nhóm = node ga OSM (8m sau lưng tâm toà nhà) → ray cách tâm toà ~22m, trùng dải ray yard thật
+    g.position.set(LM.station[0], LAND_H, LM.station[1]);
+    g.rotation.y = thGa;
     scene.add(g);
-    addCollider(LM.station[0], LM.station[1] - 18, 14);
+    const [rcx, rcz] = localPt(LM.station[0], LM.station[1], 0, -12, thGa);
+    addCollider(rcx, rcz, 14);
   }
 
   // ---------- CHỢ SẮT (khối lớn xanh xám + tháp tròn góc như tòa nhà thật) ----------
@@ -20996,25 +20996,10 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
   schoolCompound('thcsnq', 'THCS NGÔ QUYỀN');
   schoolCompound('thcstp', 'THCS TRẦN PHÚ');
 
-  // ---------- PANO-LOOP V2: 2 công trình đích danh từ finding (procedural) ----------
+  // ---------- PANO-LOOP V2: công trình đích danh từ finding (procedural) ----------
+  // (khối "Trung tâm Triển lãm" (-302,172) của V2 đã bỏ — trùng buildTrienLam theo footprint OSM, audit 2026-09)
   {
-    // 1) Trung tâm Triển lãm & Mỹ thuật (1 Nguyễn Đức Cảnh) — vàng kem 2 tầng dài ~40m,
-    //    hành lang vòm; pano_003 thấy ở h90/h180 (đông-nam pano → khối dọc Nguyễn Đức Cảnh)
-    {
-      const cx = -302, cz = 172, W = 40, D = 12, H = 8.6, rot = 0.20;   // trục ~song song NĐC
-      const g = new THREE.Group();
-      const cream = mat(0xead9a8), white = mat(0xf4efe2), roofM = mat(0x8a5a40);
-      const body = new THREE.Mesh(new THREE.BoxGeometry(W, H, D), cream); body.position.y = H / 2; g.add(body);
-      for (let k = 0; k < 9; k++) {                                     // hàng cột vòm mặt bắc
-        const col = new THREE.Mesh(new THREE.BoxGeometry(0.6, 4.4, 0.6), white);
-        col.position.set(-W / 2 + 2.4 + k * (W - 4.8) / 8, 2.2, D / 2 + 1.1); g.add(col);
-      }
-      const porch = new THREE.Mesh(new THREE.BoxGeometry(W - 3, 0.5, 2.6), white); porch.position.set(0, 4.6, D / 2 + 1.0); g.add(porch);
-      const roof = new THREE.Mesh(new THREE.BoxGeometry(W + 1.6, 0.9, D + 1.6), roofM); roof.position.y = H + 0.45; g.add(roof);
-      g.position.set(cx, groundHeight(cx, cz), cz); g.rotation.y = rot; scene.add(g);
-      addCollider(cx, cz, W * 0.5);
-    }
-    // 2) Sở KH&CN (khu Ga, pano_022): 6 tầng kính xanh mặt cong trắng, ~30m, cột cờ
+    // Sở KH&CN (khu Ga, pano_022): 6 tầng kính xanh mặt cong trắng, ~30m, cột cờ
     {
       const cx = 474, cz = 6, W = 30, D = 15, FL = 6, H = FL * 3.4;
       const g = new THREE.Group();
@@ -21091,7 +21076,9 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
   }
 
   // ---------- ĐỢT ĐỊA DANH 2: 5 GLB từ ảnh thật ----------
-  // Đền Nghè — di tích thờ Nữ tướng Lê Chân (node OSM, không có trục dài → xoay theo mặt phố)
+  // Đền Nghè — di tích thờ Nữ tướng Lê Chân (node OSM, không có trục dài → xoay theo mặt phố).
+  // LM_FACE = pháp tuyến Phố Lê Chân (override process_osm): cổng quay BẮC thẳng ra phố Lê Chân (node = cổng, cách
+  // tim đường 9m); trước đây trỏ chéo 64° về ngã tư Lê Chân × Mê Linh (audit 2026-09).
   // lùi 9m khỏi mặt đường theo hướng mặt tiền — node OSM là CỔNG đền nên mô hình chìa ra lòng đường (user báo)
   placeGLB({
     url: 'assets/dennghe.glb', name: 'Đền Nghè',
@@ -21100,11 +21087,12 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
   });
   addCollider(LM.dennghe[0] - LM_FACE.dennghe[0] * 9, LM.dennghe[1] - LM_FACE.dennghe[1] * 9, 11);
 
-  // Đình Hàng Kênh — đình cổ 300 năm, footprint OSM
+  // Đình Hàng Kênh — đình cổ 300 năm, footprint OSM; mặt tiền quay NAM ra ao đình (LM_FACE override [0,1],
+  // FACADE_SHORT_SIDE vì cạnh dài OSM 30m chạy bắc-nam — orientLong từng cho quay TÂY, audit 2026-09)
   placeGLB({
     url: 'assets/dinhhk.glb', name: 'Đình Hàng Kênh',
     x: LM.dinhhk[0], z: LM.dinhhk[1],
-    rot: orientLong(LM_DIR.dinhhk, LM_FACE.dinhhk), size: 30,
+    rot: orientLM('dinhhk'), size: 30,
   });
   addCollider(LM.dinhhk[0], LM.dinhhk[1], 15);
 
@@ -21139,9 +21127,12 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
 
   // Rạp Tháng Tám — DỰNG LẠI theo ảnh thật: art-deco kem, THÁP GIỮA bậc thang + chữ
   //   "THÁNG 8" đỏ dọc, gân sọc dọc trên tường, băng poster màu + marquee "CHIẾU PHIM".
+  //   Footprint OSM 59×19m dọc đông-tây: mặt tiền ở ĐẦU HỒI TÂY ra Đinh Tiên Hoàng (pano_052 "trước Nhà hát
+  //   Tháng 8"), hội trường sâu 59m về đông. Bản cũ 24×30 quay nam, vuông góc footprint (audit 2026-09).
   {
-    const [rx, rz] = LM.rap78;   // 1:1 — footprint thật, hết lấn nhau
-    const th = orientLong(LM_DIR.rap78, LM_FACE.rap78);
+    const [rx, rz] = LM.rap78;   // 1:1 — tâm footprint thật
+    const th = orientLM('rap78');
+    const RW = LM_SIZE.rap78[1], RD = LM_SIZE.rap78[0];   // rộng mặt tiền 19, sâu hội trường 59
     const CRE = '#efe6c8', TRIM = '#f7f1de';
     const facTex = makeTex(512, 300, (g2, w, h) => {
       g2.fillStyle = CRE; g2.fillRect(0, 0, w, h); speckle(g2, w, h, 90, 0.05);
@@ -21175,26 +21166,28 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
       }
     });
     const g = new THREE.Group();
-    const hall = new THREE.Mesh(new THREE.BoxGeometry(22, 10, 30), mat(0xe8dbb8));
-    hall.position.set(0, 5, -6); g.add(hall);
-    // mặt tiền texture art-deco
-    const front = new THREE.Mesh(new THREE.BoxGeometry(24, 12.5, 2.4),
+    // hội trường (local Z = chiều sâu) từ -RD/2 tới mặt sau khối mặt tiền
+    const hall = new THREE.Mesh(new THREE.BoxGeometry(RW - 2, 10, RD - 2.4), mat(0xe8dbb8));
+    hall.position.set(0, 5, -1.2); g.add(hall);
+    // mặt tiền texture art-deco — khối dày 2.4m ở mép +Z
+    const fz = RD / 2 - 1.2;
+    const front = new THREE.Mesh(new THREE.BoxGeometry(RW, 12.5, 2.4),
       [mat(0xefe6c8), mat(0xefe6c8), mat(0xf7f1de), mat(0xefe6c8),
        new THREE.MeshLambertMaterial({ map: facTex }), mat(0xefe6c8)]);
-    front.position.set(0, 6.25, 10.2); g.add(front);
+    front.position.set(0, 6.25, fz); g.add(front);
     // tháp giữa nhô cao hơn mái (khối bậc thang)
     const tw1 = new THREE.Mesh(new THREE.BoxGeometry(7.2, 2.6, 2.6), mat(0xf7f1de));
-    tw1.position.set(0, 13.6, 10.2); g.add(tw1);
+    tw1.position.set(0, 13.6, fz); g.add(tw1);
     const tw2 = new THREE.Mesh(new THREE.BoxGeometry(4.6, 1.6, 2.7), mat(0xefe6c8));
-    tw2.position.set(0, 15.5, 10.2); g.add(tw2);
+    tw2.position.set(0, 15.5, fz); g.add(tw2);
     // marquee đua ra
-    const marquee = new THREE.Mesh(new THREE.BoxGeometry(19, 0.55, 3.6), mat(0x8a2f26));
-    marquee.position.set(0, 4.1, 12.6); g.add(marquee);
+    const marquee = new THREE.Mesh(new THREE.BoxGeometry(RW - 4, 0.55, 3.6), mat(0x8a2f26));
+    marquee.position.set(0, 4.1, fz + 2.4); g.add(marquee);
     g.position.set(rx, LAND_H, rz);
     g.rotation.y = th;
     g.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
     scene.add(g);
-    addCollider(rx, rz, 17);
+    for (const lz of [-RD / 4, RD / 4]) { const [cx, cz] = localPt(rx, rz, 0, lz, th); addCollider(cx, cz, 13); }
   }
 
   // Nhà Kèn — lầu bát giác vườn hoa Nguyễn Du (Pháp 1920s). DỰNG LẠI theo ảnh thật:
