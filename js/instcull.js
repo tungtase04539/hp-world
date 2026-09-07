@@ -59,10 +59,10 @@ export function updateInstanceCull(camX, camZ) {
     for (let i = 0; i < n; i++) {
       const dx = px[i] - camX, dz = pz[i] - camZ;
       if (dx * dx + dz * dz > r2) continue;
-      if (k !== i) {
-        dst.set(src.subarray(i * 16, i * 16 + 16), k * 16);
-        if (cdst) cdst.set(csrc.subarray(i * citems, i * citems + citems), k * citems);
-      }
+      // LUÔN chép (kể cả k === i): slot k có thể đã bị instance khác ghi đè ở nhịp trước (instance i ra khỏi tầm
+      // rồi quay lại đúng vị trí cũ) — bỏ qua khi k === i là giữ ma trận SAI (phản biện Đợt 2, mô phỏng node).
+      dst.set(src.subarray(i * 16, i * 16 + 16), k * 16);
+      if (cdst) cdst.set(csrc.subarray(i * citems, i * citems + citems), k * citems);
       // tập hợp đổi (1 vào 1 ra cùng nhịp) mà chỉ so SỐ LƯỢNG thì GPU giữ ma trận cũ tới lần đổi count kế tiếp
       if (idx[k] !== i) { idx[k] = i; changed = true; }
       k++;

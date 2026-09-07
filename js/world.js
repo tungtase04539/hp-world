@@ -679,9 +679,12 @@ export function buildWorld(scene) {
     const N = LITE ? 200 : 300;
     const local = gridGeometry(-LOCAL_HALF, -LOCAL_HALF, N, N, (2 * LOCAL_HALF) / N, (x, z, h) => {
       for (const [x1, x2, z1, z2] of FINE_BOXES) if (x > x1 && x < x2 && z > z1 && z < z2) return h - 1;
-      return Math.max(h, coarse.yAt(x, z)) + 0.03;
+      // +0.012 (không phải +0.03): nhiều mặt phẳng lát (dm_park_plaza, sân, lot) đặt sẵn ở LAND_H+0.03 → đồng phẳng
+      // với lưới local là z-fight (phản biện Đợt 2). Thấp hơn 1,8 cm + polygonOffset đẩy lưới ra sau trong depth.
+      return Math.max(h, coarse.yAt(x, z)) + 0.012;
     });
-    const groundLocal = new THREE.Mesh(local.geo, new THREE.MeshLambertMaterial({ vertexColors: true }));
+    // polygonOffset nhẹ: lưới local lùi sau trong depth so với các mặt lát +0.03 đặt trên nó (chống z-fight ở xa)
+    const groundLocal = new THREE.Mesh(local.geo, new THREE.MeshLambertMaterial({ vertexColors: true, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 2 }));
     // tên 'ground_local': freezeStatic bỏ qua theo /^ground/ (không gộp, không castShadow), nearCull không khớp
     groundLocal.name = 'ground_local';
     groundLocal.receiveShadow = true;
@@ -21860,6 +21863,124 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
   loadHeroBeds();    // nạp GLB luống hoa ảnh-thật rồi dựng InstancedMesh
   // LƯU Ý: KHÔNG gọi streetTree/bakeTree sau flushTrees() — cây sẽ vô hình + collider ma.
 
+  // ===== TRỢ GIÚP GỘP TĨNH (W1 2026-09-05 — ngân sách CPU/draw call, KNOWLEDGE §10 (dh)) =====
+  const _tmpC = new THREE.Vector3();
+  const isEmissive = (m) => !!(m.emissiveMap || (m.emissive && (m.emissive.r + m.emissive.g + m.emissive.b) > 0.001));
+  // Bỏ qua mesh động (tự nó hoặc tổ tiên mang userData.dyn) và mesh đang ẩn (kể cả ẩn qua tổ tiên):
+  // ẩn mà gộp vào ô là HIỆN ra trái ý người dựng (vd 'lqd_nhatho_xam' cố ý tắt kính trệt).
+  function skipStatic(o) {
+    for (let p = o; p && p !== scene; p = p.parent) { if (p.userData.dyn || !p.visible) return true; }
+    return false;
+  }
+  // Tách geometry (index hoặc không) thành từng ô T×T theo TRỌNG TÂM tam giác, đưa về KHÔNG GIAN THẾ GIỚI,
+  // không index (mergeGeometries đòi mọi geometry cùng kiểu), giữ position/normal/color/uv có sẵn.
+  // Trả về Map('x,z' → BufferGeometry). T = Infinity ⇒ đúng 1 mảnh (dùng để bake mesh lẻ về world).
+  // Ma trận LẬT (det<0): renderer vẽ mesh gốc với frontFace CW, mesh gộp có ma trận đơn vị nên phải ĐẢO
+  // thứ tự đỉnh mỗi tam giác, không thì mặt trước bị cull.
+  const _nrmM = new THREE.Matrix3();
+  function splitGeometryByTile(geometry, matrixWorld, T) {
+    const pos = geometry.attributes.position, nrm = geometry.attributes.normal;
+    const col = geometry.attributes.color, uv = geometry.attributes.uv;
+    const idx = geometry.index ? geometry.index.array : null;
+    const nTri = ((idx ? idx.length : pos.count) / 3) | 0;
+    const e = matrixWorld.elements, nm = _nrmM.getNormalMatrix(matrixWorld).elements;
+    const order = matrixWorld.determinant() < 0 ? [0, 2, 1] : [0, 1, 2];
+    const pa = pos.array, ps = pos.itemSize, invT = 1 / T;
+    // lượt 1: ô của từng tam giác (trọng tâm thế giới) + đếm tam giác mỗi ô
+    const cellOf = new Int32Array(nTri), ids = new Map(), cells = [];
+    for (let t = 0; t < nTri; t++) {
+      let cx = 0, cz = 0;
+      for (let k = 0; k < 3; k++) {
+        const v = (idx ? idx[t * 3 + k] : t * 3 + k) * ps;
+        const x = pa[v], y = pa[v + 1], z = pa[v + 2];
+        cx += e[0] * x + e[4] * y + e[8] * z + e[12];
+        cz += e[2] * x + e[6] * y + e[10] * z + e[14];
+      }
+      const kx = Math.floor(cx / 3 * invT), kz = Math.floor(cz / 3 * invT);
+      const key = kx * 65536 + kz;
+      let id = ids.get(key);
+      if (id === undefined) { id = cells.length; ids.set(key, id); cells.push({ kx, kz, n: 0, w: 0 }); }
+      cellOf[t] = id; cells[id].n++;
+    }
+    // lượt 2: cấp phát mảng từng ô rồi đổ đỉnh đã nhân ma trận vào
+    for (const c of cells) {
+      c.p = new Float32Array(c.n * 9);
+      if (nrm) c.nr = new Float32Array(c.n * 9);
+      if (col) c.c = new Float32Array(c.n * 9);
+      if (uv) c.u = new Float32Array(c.n * 6);
+    }
+    for (let t = 0; t < nTri; t++) {
+      const c = cells[cellOf[t]];
+      let w = c.w;
+      for (let k = 0; k < 3; k++) {
+        const vi = idx ? idx[t * 3 + order[k]] : t * 3 + order[k];
+        const v = vi * ps, x = pa[v], y = pa[v + 1], z = pa[v + 2];
+        c.p[w * 3] = e[0] * x + e[4] * y + e[8] * z + e[12];
+        c.p[w * 3 + 1] = e[1] * x + e[5] * y + e[9] * z + e[13];
+        c.p[w * 3 + 2] = e[2] * x + e[6] * y + e[10] * z + e[14];
+        if (nrm) {
+          const nx = nrm.getX(vi), ny = nrm.getY(vi), nz = nrm.getZ(vi);
+          const ox = nm[0] * nx + nm[3] * ny + nm[6] * nz, oy = nm[1] * nx + nm[4] * ny + nm[7] * nz, oz = nm[2] * nx + nm[5] * ny + nm[8] * nz;
+          const l = Math.sqrt(ox * ox + oy * oy + oz * oz) || 1;
+          c.nr[w * 3] = ox / l; c.nr[w * 3 + 1] = oy / l; c.nr[w * 3 + 2] = oz / l;
+        }
+        if (col) { c.c[w * 3] = col.getX(vi); c.c[w * 3 + 1] = col.getY(vi); c.c[w * 3 + 2] = col.getZ(vi); }
+        if (uv) { c.u[w * 2] = uv.getX(vi); c.u[w * 2 + 1] = uv.getY(vi); }
+        w++;
+      }
+      c.w = w;
+    }
+    const out = new Map();
+    for (const c of cells) {
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.BufferAttribute(c.p, 3));
+      if (nrm) g.setAttribute('normal', new THREE.BufferAttribute(c.nr, 3));
+      if (col) g.setAttribute('color', new THREE.BufferAttribute(c.c, 3));
+      if (uv) g.setAttribute('uv', new THREE.BufferAttribute(c.u, 2));
+      out.set(c.kx + ',' + c.kz, g);
+    }
+    return out;
+  }
+
+  // (c) ẨN XA: mesh lẻ còn lại có texture/emissive nhỏ (biển hiệu canvas riêng, đèn lẻ…) — >350 m chữ đã
+  // không đọc được, ẩn đi để bớt draw call/state change. Danh sách lập trong freezeStatic; main.js gọi
+  // updateFarHide mỗi khung (nhịp 0,5 s ĐỒNG HỒ THẬT bên trong — KNOWLEDGE (da): không dùng giờ-game).
+  const FAR_HIDE = 350, FAR_HIDE_RMAX = 10, FAR_HIDE_RTINY = 0.6;
+  let _farHideAt = -1e9;
+  world.farHideList = [];
+  world.updateFarHide = (px, pz) => {
+    const now = performance.now();
+    if (now - _farHideAt < 500) return;
+    _farHideAt = now;
+    const L = world.farHideList, R2 = FAR_HIDE * FAR_HIDE;
+    for (let i = 0; i < L.length; i++) {
+      const e = L[i], dx = e[1] - px, dz = e[2] - pz;
+      e[0].visible = dx * dx + dz * dz < R2;
+    }
+  };
+
+  // (d) CÂY MA TRẬN: sau freezeStatic, scene.matrixWorldAutoUpdate=false → renderer KHÔNG duyệt ~3.500 object
+  // tĩnh mỗi khung; main.js gọi updateDynMatrices() ngay trước render. HỢP ĐỒNG: vật động phải là con trực
+  // tiếp của scene còn matrixAutoUpdate (mặc định — NPC/xe/GLB/đèn/biển đặt sau freeze) HOẶC mang userData.dyn
+  // (world.js), kể cả khi nằm sâu trong nhóm tĩnh (đèn hải đăng, cờ, vòi phun). Gốc động quét lại MỖI KHUNG
+  // (đọc 2 cờ trên ~3.500 object tĩnh ≈ 0,05 ms, không đi vào cây con động) — KHÔNG cache theo
+  // scene.children.length/2 s: đổi ngôn ngữ (landmarks.js, npcs.js) remove+add sprite trong CÙNG khung nên
+  // số con không đổi, sprite mới sẽ đứng ở gốc toạ độ tới lần quét sau.
+  world.dynRoots = [];
+  const walkDyn = (list) => {
+    for (let i = 0; i < list.length; i++) {
+      const o = list[i];
+      if (o.matrixAutoUpdate || o.userData.dyn) world.dynRoots.push(o);   // cả cây con cập nhật qua updateMatrixWorld(true)
+      else if (o.children.length) walkDyn(o.children);
+    }
+  };
+  world.refreshDynRoots = () => { world.dynRoots.length = 0; walkDyn(scene.children); };
+  world.updateDynMatrices = () => {
+    world.refreshDynRoots();
+    const r = world.dynRoots;
+    for (let i = 0; i < r.length; i++) r[i].updateMatrixWorld(true);
+  };
+
   // ĐÓNG BĂNG ma trận local cho toàn bộ thế giới TĨNH (~6.400 object khỏi recompose mỗi khung).
   // Vật world.js tự animate đã đánh dấu userData.dyn (nước, thiên nga, mây, hải âu, cờ, tàu,
   // hải đăng, hoa nhặt) — cả cây con của chúng đều được chừa. Gọi từ main.js SAU buildWorld,
@@ -21900,68 +22021,113 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
       console.log('[world] giai đoạn trung tâm: cắt', doomed.length, 'mesh ngoài', BUILD_RADIUS, 'm');
     }
     // ===== GỘP TĨNH TOÀN CỤC (playbook mobile: draw calls + object count là kẻ giết FPS) =====
-    // ~11.7k prop lẻ không-texture (hand-built qua các chiến dịch) → bake màu material vào VERTEX COLOR
-    // rồi gộp theo (ô 450m × castShadow × side) → còn ~vài chục mesh. Skip: dyn, texture map,
-    // material mảng, transparent, emissive (đèn/ cửa sáng đêm — material bị daynight mutate),
-    // không phải Lambert (GLB/player là Standard), InstancedMesh, ground/water.
+    // Lượt 1 — Lambert KHÔNG texture/emissive: bake màu material vào VERTEX COLOR rồi gộp theo
+    // (ô T × castShadow × side) → ~vài chục mesh. Lượt 2 (W1) — Lambert CÓ map/emissive: gộp theo
+    // (ô T × INSTANCE material × castShadow × bộ attribute) GIỮ NGUYÊN material (daynight vẫn chỉnh
+    // emissiveIntensity của sharedMats.window/lampGlow/facadeMats), không bake màu, giữ uv.
+    // Mesh bán kính > 0,75·T (đã gộp toàn thành phố từ trước: shophouse_infill 898k tri r=1224 m,
+    // utilwires, street_curbs, cờ, osm_facades…) được TÁCH theo ô trước khi gộp — trước đây chúng dồn hết
+    // vào ô chứa TÂM (mrg10_0,0 = 983k tri, không bao giờ cull được). Skip: dyn/ẩn, material mảng,
+    // transparent, không phải Lambert (GLB/player là Standard), InstancedMesh/SkinnedMesh, morph,
+    // ground/water, layers.mask≠1 (ribbon aerial layer-2 — nuốt vào là ribbon hiện trong pano!).
     {
       // Ô 450m quá thô khi cull (đo: mrg10 ×13 ô = 1.43M tri trong khung dù phần lớn ngoài tầm nhìn).
       // LITE dùng ô 220m: nhiều mesh hơn một chút nhưng cull theo khung hình chặt hơn hẳn.
-      const T = LITE ? 220 : 450, buckets = new Map(), doomed = [];
-      const _tmpC = new THREE.Vector3();
+      const T = LITE ? 220 : 450, RSPLIT = T * 0.75;
       scene.updateMatrixWorld(true);
-      scene.traverse((o) => {
-        if (!o.isMesh || o.isInstancedMesh || o.isSkinnedMesh) return;
-        if (o.layers.mask !== 1) return;               // layer khác (ribbon aerial layer-2) — giữ nguyên
-        if (/^ground/.test(o.name) || o.name === 'water') return;
-        if (o.userData.dyn) return;
-        let pp = o.parent; while (pp) { if (pp.userData && pp.userData.dyn) return; pp = pp.parent; }
-        const m = o.material;
-        if (!m || Array.isArray(m) || !m.isMeshLambertMaterial) return;
-        if (m.map || m.transparent || (m.emissive && (m.emissive.r + m.emissive.g + m.emissive.b) > 0.001)) return;
-        const g = o.geometry;
-        if (!g || !g.attributes.position) return;
-        if (!g.boundingSphere) g.computeBoundingSphere();
-        _tmpC.copy(g.boundingSphere.center).applyMatrix4(o.matrixWorld);
-        const key = Math.floor(_tmpC.x / T) + ',' + Math.floor(_tmpC.z / T) + '|' + (o.castShadow ? 1 : 0) + '|' + (m.side || 0);
-        let l = buckets.get(key); if (!l) buckets.set(key, l = []);
-        l.push(o);
-      });
-      const bakeGeo = (o) => {
-        let g = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone();
-        g.applyMatrix4(o.matrixWorld);
-        const n = g.attributes.position.count;
-        const col = new Float32Array(n * 3);
-        const hasVC = !!g.attributes.color;
-        const mc = o.material.color;
-        for (let i = 0; i < n; i++) {
-          if (hasVC) { col[i*3] = g.attributes.color.getX(i); col[i*3+1] = g.attributes.color.getY(i); col[i*3+2] = g.attributes.color.getZ(i); }
-          else { col[i*3] = mc.r; col[i*3+1] = mc.g; col[i*3+2] = mc.b; }
-        }
-        const out = new THREE.BufferGeometry();
-        out.setAttribute('position', g.attributes.position);
-        if (g.attributes.normal) out.setAttribute('normal', g.attributes.normal);
-        else out.computeVertexNormals();
-        out.setAttribute('color', new THREE.BufferAttribute(col, 3));
-        return out;
+      // Gom ứng viên: entry {o, g} — g = mảnh đã tách về world (mesh lớn) hoặc null (mesh nguyên vẹn)
+      const collect = (pass) => {
+        const buckets = new Map();
+        scene.traverse((o) => {
+          if (!o.isMesh || o.isInstancedMesh || o.isSkinnedMesh) return;
+          if (o.layers.mask !== 1 || /^ground/.test(o.name) || o.name === 'water') return;
+          if (skipStatic(o)) return;
+          const m = o.material, g = o.geometry;
+          if (!m || Array.isArray(m) || !m.isMeshLambertMaterial || m.transparent) return;
+          if ((!!m.map || isEmissive(m)) !== (pass === 2)) return;
+          if (!g || !g.attributes.position || Object.keys(g.morphAttributes).length) return;
+          if (!g.boundingSphere) g.computeBoundingSphere();
+          const tail = '|' + (o.castShadow ? 1 : 0) + '|' + (pass === 1 ? (m.side || 0)
+            : m.uuid + '|' + (g.attributes.normal ? 'n' : '') + (g.attributes.uv ? 'u' : '') + (g.attributes.color ? 'c' : ''));
+          const push = (cell, gg) => { const key = cell + tail; let l = buckets.get(key); if (!l) buckets.set(key, l = []); l.push({ o, g: gg }); };
+          if (g.boundingSphere.radius * o.matrixWorld.getMaxScaleOnAxis() > RSPLIT) {
+            for (const [cell, gg] of splitGeometryByTile(g, o.matrixWorld, T)) push(cell, gg);
+            return;
+          }
+          _tmpC.copy(g.boundingSphere.center).applyMatrix4(o.matrixWorld);
+          push(Math.floor(_tmpC.x / T) + ',' + Math.floor(_tmpC.z / T), null);
+        });
+        return buckets;
       };
-      let merged = 0, absorbed = 0;
-      for (const [key, list] of buckets) {
-        if (list.length < 2) continue;
-        const geos = list.map(bakeGeo);
-        const g = mergeGeometries(geos);
-        geos.forEach((x) => x.dispose());
-        if (!g) continue;
-        const [txz, cs, side] = key.split('|');
-        const mm = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true, side: +side || 0 }));
-        mm.castShadow = cs === '1'; mm.receiveShadow = true;
-        mm.name = 'mrg' + cs + side + '_' + txz;          // đuôi _x,z khớp regex nearCull → vẫn ẩn xa được
-        scene.add(mm);
-        for (const o of list) doomed.push(o);
-        merged++; absorbed += list.length;
-      }
-      for (const o of doomed) { if (o.parent) o.parent.remove(o); }
-      console.log('[world] gộp tĩnh:', absorbed, 'mesh →', merged, 'mesh gộp');
+      const toWorld = ({ o, g }) => g || splitGeometryByTile(o.geometry, o.matrixWorld, Infinity).values().next().value;
+      // Lượt 1: Lambert × vertexColor ≡ Lambert × material.color → bake màu, bỏ uv (bộ attribute đồng nhất)
+      const bakeGeo = (entry) => {
+        const g = toWorld(entry);
+        if (!g.attributes.color) {
+          const n = g.attributes.position.count, mc = entry.o.material.color, col = new Float32Array(n * 3);
+          for (let i = 0; i < n; i++) { col[i * 3] = mc.r; col[i * 3 + 1] = mc.g; col[i * 3 + 2] = mc.b; }
+          g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+        }
+        if (!g.attributes.normal) g.computeVertexNormals();
+        g.deleteAttribute('uv');
+        return g;
+      };
+      const mergePass = (pass) => {
+        const buckets = collect(pass), doomed = new Set();
+        let merged = 0, split = 0;
+        for (const [key, list] of buckets) {
+          if (list.length < 2 && !list[0].g) continue;   // mesh lẻ nguyên vẹn: giữ nguyên
+          const geos = list.map(pass === 1 ? bakeGeo : toWorld);
+          const g = mergeGeometries(geos);
+          geos.forEach((x) => x.dispose());
+          if (!g) continue;
+          const [txz, cs, side] = key.split('|');
+          const mm = new THREE.Mesh(g, pass === 1
+            ? new THREE.MeshLambertMaterial({ vertexColors: true, side: +side || 0 })
+            : list[0].o.material);
+          mm.castShadow = cs === '1'; mm.receiveShadow = true;
+          // đuôi _x,z khớp regex nearCull → vẫn ẩn xa được
+          mm.name = (pass === 1 ? 'mrg' + cs + side : 'mrgm' + cs) + '_' + txz;
+          scene.add(mm);
+          for (const e of list) { if (e.g) split++; doomed.add(e.o); }
+          merged++;
+        }
+        for (const o of doomed) { if (o.parent) o.parent.remove(o); }
+        console.log('[world] gộp tĩnh lượt', pass + ':', doomed.size, 'mesh →', merged, 'mesh gộp (', split, 'mảnh tách ô )');
+      };
+      mergePass(1);
+      mergePass(2);
+    }
+    // (c) danh sách ẩn xa: mesh lẻ còn lại <200 tam giác — tí hon ≤ FAR_HIDE_RTINY bất kể material (bóng đèn tín
+    // hiệu r=0,15 m: >350 m <1 px) HOẶC có map/emissive và (bán kính ≤ FAR_HIDE_RMAX: biển, mặt tiền nhỏ, đèn —
+    // hoặc DẢI BIỂN mỏng ≤0,6 m, cao ≤2,2 m, rộng tới 32 m: >350 m còn ≤2 px). Hộp nhà có texture (cao >2 m)
+    // và mảng phẳng nằm ngang (mái/sân) KHÔNG bao giờ vào danh sách.
+    {
+      const L = world.farHideList; L.length = 0;
+      scene.traverse((o) => {
+        if (!o.isMesh || o.isInstancedMesh || o.isSkinnedMesh || o.layers.mask !== 1) return;
+        if (/^ground/.test(o.name) || o.name === 'water' || skipStatic(o)) return;
+        if (/_-?\d+,-?\d+$/.test(o.name)) return;   // ô tile do nearCull (main.js) chỉnh visible — không chỉnh 2 nơi
+        const m = o.material, g = o.geometry;
+        if (!m || Array.isArray(m) || !g || !g.attributes.position) return;
+        if ((g.index ? g.index.count : g.attributes.position.count) >= 600) return;
+        if (!g.boundingSphere) g.computeBoundingSphere();
+        const sc = o.matrixWorld.getMaxScaleOnAxis(), rad = g.boundingSphere.radius * sc;
+        if (rad > FAR_HIDE_RTINY) {
+          if (!m.map && !isEmissive(m)) return;
+          // Kiểm DÁNG cho MỌI ứng viên (phản biện Đợt 2: guard cũ chỉ chạy khi rad > 10 m nên 316 hộp nhà có texture
+          // bán kính ≤ 10 m bị ẩn ở >350 m): chỉ giấu biển/đèn/mảng mỏng, KHÔNG giấu hộp nhà và mảng phẳng nằm ngang.
+          if (!g.boundingBox) g.computeBoundingBox();
+          const bb = g.boundingBox, h = (bb.max.y - bb.min.y) * sc;
+          const thin = Math.min(bb.max.x - bb.min.x, bb.max.z - bb.min.z) * sc;
+          if (rad > 16) return;                       // quá lớn — giữ
+          if (h <= 0.3 && rad > 3) return;            // mảng phẳng nằm ngang (sân, mái, lot) — giữ
+          if (h > 2.2 && thin > 0.6) return;          // hộp nhà có texture — giữ
+        }
+        _tmpC.copy(g.boundingSphere.center).applyMatrix4(o.matrixWorld);
+        L.push([o, _tmpC.x, _tmpC.z]);
+      });
+      console.log('[world] ẩn xa >' + FAR_HIDE + ' m:', L.length, 'mesh lẻ nhỏ');
     }
     scene.traverse((o) => {
       if (o === scene || o.userData.dyn) return;
@@ -21970,6 +22136,30 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
       o.updateMatrix();
       o.matrixAutoUpdate = false;
     });
+    // LÀM PHẲNG cây tĩnh: mesh lẻ còn lại (biển, đèn, kính…) đưa thẳng lên scene (matrix = matrixWorld đã đóng
+    // băng, scene là gốc đơn vị) rồi cắt nhóm rỗng → projectObject/shadow pass đỡ duyệt ~1.200 Group.
+    // Chỉ đụng cây TĨNH (không dyn, matrixAutoUpdate đã tắt); mesh có tổ tiên ẩn giữ trạng thái ẩn.
+    {
+      const lift = [];
+      scene.traverse((o) => {
+        if (o.parent === scene || !(o.isMesh || o.isSprite || o.isPoints || o.isLine)) return;
+        let hid = false;
+        for (let p = o; p !== scene; p = p.parent) { if (p.userData.dyn || p.matrixAutoUpdate) return; if (!p.visible) hid = true; }
+        lift.push([o, hid]);
+      });
+      for (const [o, hid] of lift) { if (hid) o.visible = false; o.matrix.copy(o.matrixWorld); scene.add(o); }
+      let pruned = 0, empty;
+      do {
+        empty = [];
+        scene.traverse((o) => { if (o !== scene && (o.isGroup || o.type === 'Object3D') && !o.children.length && !o.userData.dyn && !o.matrixAutoUpdate) empty.push(o); });
+        for (const o of empty) o.parent.remove(o);
+        pruned += empty.length;
+      } while (empty.length);
+      console.log('[world] làm phẳng:', lift.length, 'mesh lẻ lên scene, cắt', pruned, 'nhóm rỗng');
+    }
+    // (d) từ đây renderer không duyệt cây ma trận nữa — xem world.updateDynMatrices
+    scene.matrixWorldAutoUpdate = false;
+    world.refreshDynRoots();
   };
 
   return world;

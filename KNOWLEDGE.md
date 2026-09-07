@@ -565,6 +565,82 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     chỉ số sẽ nhét nó vào ô mép. (4) `deckHeight` từng gate bằng `riverFactor > 0.03` → kênh polygon không có cầu phẳng;
     giờ gate bằng cờ `polyWet` (+ polyline). (5) mapdata regen trên Windows ra LF, file commit CRLF — so byte phải
     normalize; `git diff` mới là thước đo. (6) `node --check` mapdata/terrain phải qua bản `.mjs` (bẫy cũ, vẫn đúng).
+- **2026-09-07 (dh)** [W1-merge-budget — NGÂN SÁCH CPU/DRAW CALL CẢNH TĨNH: tách monolith theo ô, gộp lượt 2 theo
+    INSTANCE material, ẩn xa, làm phẳng + đóng băng cây ma trận] (nhánh `worktree-wf_97eeaf15-407-1`; chỉ sửa
+    `world.freezeStatic` + helper ngay trước nó trong `world.js`, và 2 hook trong `main.js animate()`):
+    **VẤN ĐỀ (kiểm toán dg, phát hiện 3):** khung hình nghẽn CPU three.js — `updateMatrixWorld` duyệt 7.177 object
+    + `projectObject` + ~1.150 draw call/khung; merge cũ chỉ gộp Lambert KHÔNG map/emissive nên 4.128 mesh texture/
+    emissive/transparent vẫn lẻ; merge cũ khoá theo TÂM bounding sphere → mọi geometry đã gộp toàn thành phố
+    (shophouse_infill 898k tri r=1224 m, utilwires, street_curbs, cờ…) dồn hết vào ô (0,0) thành `mrg10_0,0` = 983k
+    tri KHÔNG BAO GIỜ cull được (vẽ cả ở hồ/bảo tàng và trong mọi shadow pass).
+    **ĐÃ LÀM (thứ tự trong freezeStatic):**
+    (a) `splitGeometryByTile(geometry, matrixWorld, T)` (helper trước freezeStatic): duyệt tam giác (index/không),
+        bucket theo TRỌNG TÂM ô `floor(cx/T),floor(cz/T)`, trả `Map('x,z' → BufferGeometry)` KHÔNG index, đã ở
+        không gian THẾ GIỚI, giữ position/normal/color/uv có sẵn; `T = Infinity` ⇒ 1 mảnh (bake mesh lẻ về world —
+        thay `toNonIndexed()+applyMatrix4` cũ). Ma trận lật (det<0) → đảo thứ tự đỉnh (renderer vẽ mesh gốc frontFace
+        CW, mesh gộp ma trận đơn vị nên phải bake vào) — hiện KHÔNG mesh tĩnh nào det<0. Mọi mesh bán kính world
+        > 0,75·T (T = 450 FULL / 220 LITE) đều tách trước khi vào bucket — kể cả mesh lớn đứng một mình (trước bị
+        `list.length<2` bỏ qua nên không bao giờ tách). FULL: lượt 1 7.082 mesh → 234 (647 mảnh tách); mrg10_0,0
+        983k → 187k tri.
+    (b) LƯỢT GỘP 2 — Lambert CÓ map/emissive (không transparent): khoá `(ô × material.uuid × castShadow × bộ attribute
+        n/u/c)` → `mergeGeometries` world-space, KHÔNG bake màu, giữ uv, mesh gộp dùng ĐÚNG INSTANCE material cũ (tên
+        `mrgm<cs>_x,z`) → `daynight.js` chỉnh `emissiveIntensity` của `sharedMats.window/lampGlow`, `facadeMats`,
+        `lighthouseLamp` vẫn ăn (three r160: `receiveShadow` là UNIFORM per-object — lib/three.module.js:30406 — nên
+        1 material dùng chung cho mesh gộp lẫn mesh lẻ không đổi program). FULL: 2.274 mesh → 605 (2.095 cửa sổ chung
+        1 material → ~30 mesh theo ô). Skip: dyn/ẩn (mesh ẩn hoặc tổ tiên ẩn — merge cũ NUỐT cả mesh ẩn rồi hiện ra:
+        'lqd_nhatho_xam' cố ý tắt kính trệt), material mảng, InstancedMesh/SkinnedMesh, morph, layers≠1,
+        ground/water. Lượt 1 giữ nguyên ngữ nghĩa cũ (bake vertex color), chỉ đi qua cùng helper.
+    (c) ẨN XA `world.farHideList` + `world.updateFarHide(px,pz)` (main.js gọi cạnh `updateNearCull`, nhịp 0,5 s
+        `performance.now()`): mesh lẻ còn lại <200 tam giác có map/emissive và bán kính ≤ 10 m (biển hiệu canvas
+        riêng, mặt tiền nhỏ, đèn) hoặc DẢI BIỂN (mỏng ≤0,6 m, cao ≤2,2 m, bán kính ≤16 m — `PlaneGeometry(W·0.94,1.5)`
+        texture 512×84 của dãy nhà, >350 m còn ≤2 px) HOẶC bán kính ≤ 0,6 m bất kể material (bóng đèn tín hiệu
+        r=0,15 m) → `visible = dist < 350 m`. Hộp nhà có texture (cao >2 m), mảng phẳng nằm ngang (mái/sân) và mesh
+        tên ô `_x,z` (nearCull đã chỉnh visible) KHÔNG vào danh sách — ẩn nhà là nhà biến mất ở xa. FULL 1.694 mesh
+        trong danh sách; đo A/B (bật lại hết rồi render 1 lần): spawn ẩn 1.262 mesh = −290 call (929 → 639), hồ
+        −146 call, bảo tàng −34.
+    (d) LÀM PHẲNG + ĐÓNG BĂNG CÂY MA TRẬN: mesh lẻ tĩnh còn lại đưa thẳng lên scene (`matrix = matrixWorld`, giữ
+        trạng thái ẩn nếu tổ tiên ẩn) rồi cắt nhóm rỗng lặp tới hết (1.679 mesh lên scene, 1.468 nhóm cắt; Group
+        1.706 → 238); rồi `scene.matrixWorldAutoUpdate = false` → renderer KHÔNG duyệt cây tĩnh nữa.
+        `world.updateDynMatrices()` (main.js gọi NGAY TRƯỚC render, sau mọi update gameplay) quét từ `scene.children`
+        xuống, dừng ở object có `matrixAutoUpdate` hoặc `userData.dyn` (gốc động ~280, giữ trong `world.dynRoots`) rồi
+        `updateMatrixWorld(true)` từng gốc. Quét MỖI KHUNG (đọc 2 cờ trên ~3.500 object tĩnh ≈ 0,05 ms, không đi vào
+        cây con động) — KHÔNG cache theo `scene.children.length`/2 s như bản nháp đầu: đổi ngôn ngữ (landmarks.js,
+        npcs.js) remove+add sprite trong CÙNG khung nên số con không đổi → sprite mới đứng ở gốc toạ độ tới lần quét
+        sau (kiểm chứng `swap_test.mjs`: 33 sprite mới đúng chỗ ngay khung render đầu). Camera parentless → renderer
+        tự cập nhật; `sun.target` là con scene (daynight.js:41) nên là gốc động.
+        **HỢP ĐỒNG TỪ NAY: vật ĐỘNG phải là con TRỰC TIẾP của scene còn `matrixAutoUpdate` (mặc định — NPC/xe/traffic/
+        GLB/đèn/biển đặt sau freeze) HOẶC mang `userData.dyn` (world.js; được phép nằm sâu trong nhóm tĩnh: đèn hải
+        đăng, cờ, vòi phun, thiên nga). Vật tĩnh tạo trong buildWorld mà sau đó tự đổi position/rotation KHÔNG gắn
+        dyn = đứng im vĩnh viễn; module tự quản matrix (`matrixAutoUpdate=false` + `updateMatrix()` tay) cũng KHÔNG
+        được cập nhật matrixWorld.** Kiểm chứng `motion_w1.mjs` (126 gốc/nhóm đổi matrixWorld sau 2,5 s): nước, thiên
+        nga, mây, hải âu, cờ, tàu, đèn hải đăng, hoa nhặt, NPC/xe/người đi bộ, mặt trời/vòm trời; `sun.target` theo
+        người chơi sau teleport; `diag()` chỉ còn dòng boat0 quen thuộc; 0 pageerror cả FULL lẫn LITE.
+    **SỐ ĐO (2026-09-07, 1600×1000, Chrome headless d3d11 trên Radeon 890M; CẢ HAI bản là BẢN SAO scratch chỉ thêm
+    1 dòng `return;` đầu `autoQuality()` — không tắt thì bản chậm bị hạ bóng 1024/tắt bloom NGAY trong lúc đo; pass
+    CHÍNH = 1 lần `R.render` thủ công như perfbudget; CPU = p50 của 40 lần render thủ công; fps = nhịp vòng game 5 s;
+    scratchpad `w1/probe_w1.mjs`):** FULL spawn: calls 1.153 → 617 (−46%), tri 7,59M → 6,83M, object 7.177 → 4.172,
+    mesh hiện 5.430 → 2.634, render p50 44,6 → 12,7 ms (−72%), 25,8 → 54 fps [LƯU Ý phản biện: ms/fps tuyệt đối trên 890M dao động ±2× giữa các phiên (baseline đo lại 17,7–40 ms) — chỉ tin CHÊNH LỆCH đo cùng phiên và số draw call/object]; hồ: 635 → 313 call, 5,48M → 3,83M
+    tri, 34,2 → 8,6 ms (−75%), 27 → 60 fps; bảo tàng: 362 → 300 call, 4,99M → 3,72M, 19,0 → 8,2 ms (−57%), 28,6 →
+    60 fps. LITE (`?quality=lite`, T=220): spawn 1.197 → 813 call, 3,46M → 2,36M tri, 7.344 → 5.131 object, 15,6 →
+    10,9 ms; hồ 651 → 397 call, 10,2 → 8,7 ms; bảo tàng 374 → 378 call (ô 220 m → nhiều mảnh hơn trong khung), 13,5
+    → 8,8 ms. Ảnh so sánh (pixdiff bỏ HUD, px lệch >24): có bóng 0,21/0,68/0,04 % — toàn bộ là dải mép bóng do đồng
+    hồ game trôi vài phút giữa 2 lần chụp + NPC/nước; TẮT bóng 0,02/0,02/0,00 % → hình học y nguyên.
+    **CHƯA ĐẠT tuyệt đối mục tiêu ≤500 call/≤3.500 object ở spawn (617 call/4.172 object):** phần còn lại là 155
+    call mặt tiền/nhà hộp texture canvas RIÊNG từng mesh (không gộp được nếu không atlas — mà ẩn xa thì nhà biến
+    mất), rig NPC/traffic ~119 call (character.js), hero_trees 49 InstancedMesh, 46 material mặt tiền OSM lẻ (~48
+    call, 1k tri), sprite 33; object còn lại phần lớn là mesh ẩn xa (gần như miễn phí: `projectObject` thoát ngay ở
+    `visible=false`, cây ma trận không duyệt). Muốn xuống nữa: atlas 4096² cho ~1.800 texture canvas riêng (cách
+    shopsigns) rồi gộp theo ô — việc riêng, có rủi ro mip-bleed.
+    **KHÔNG LÀM (e) đóng băng con rig:** `updateMatrix()` cho 835 object ≈ 0,06 ms/khung; `sit()` đổi torso (Mesh
+    lá) nên không thể đóng băng mù theo loại; character.js/traffic.js ngoài phạm vi nhánh.
+    **BẪY MỚI:** (1) Đo A/B trên máy này PHẢI tắt autoQuality ở CẢ HAI bản sao đo (1 dòng `return;`, không commit)
+    — `pin()` trạng thái ngay trước khi đo chưa đủ, nó hạ nấc lại trong 700 ms. (2) Ảnh chụp phải `setTime()` ngay
+    trước khi chụp và vẫn lệch mép bóng vài % vì đồng hồ game chạy — so hình học thì chụp thêm bản TẮT bóng.
+    (3) `__hp` không lộ `world` — probe muốn xem farHideList/dynRoots phải suy từ scene (mesh ẩn là con scene).
+    (4) `Sprite.geometry.boundingSphere` = null → probe duyệt scene phải `computeBoundingSphere()` trước.
+    (5) `mergeGeometries` (lib/jsm/utils/BufferGeometryUtils.js): mọi geometry phải CÙNG bộ attribute và cùng kiểu
+    index — vì thế khoá lượt 2 có chữ ký n/u/c và mọi mảnh đều không index. (6) `git archive` cả repo = 1,9 GB
+    (audit/ pano) — bản sao đo chỉ cần index.html js lib css manifest.json sw.js + junction assets/assets_lite.
 - **2026-09-05 (dg)** [KIỂM TOÁN TOÀN REPO + ĐỢT 1: PHÂN TIER THEO GPU, HIỆN GLB KHÔNG KHỰNG, ASSETS_LITE LÊN CDN]:
     Kiểm toán 12 lăng kính (147 phát hiện, 16 phản biện đối kháng, số đo GPU thật) — báo cáo đầy đủ là artifact
     "Kiểm toán Hải Phòng 3D" (link trong memory `audit-report-2026-09`). **GỐC CỦA CẢ 2 PHÀN NÀN ("đồ hoạ chưa

@@ -576,6 +576,7 @@ function animate() {
 
     autoQuality();
     updateNearCull();
+    world.updateFarHide(pState.pos.x, pState.pos.z);   // biển hiệu/đèn lẻ >350 m: ẩn (nhịp 0,5 s bên trong)
     // CULLING TỪNG INSTANCE: quét lại định kỳ (cây/model GLB nạp async sau khi world dựng),
     // rồi nén danh sách theo khoảng cách (nhịp riêng bên trong, 0.4s).
     // BẪY (KNOWLEDGE da, dính lần 2): nhịp phải theo ĐỒNG HỒ THẬT — `time` là giờ-GAME, dt bị clamp
@@ -607,6 +608,9 @@ function animate() {
     }
   }
 
+  // scene.matrixWorldAutoUpdate=false từ freezeStatic: renderer không duyệt cây tĩnh, chỉ cập nhật gốc ĐỘNG
+  // (NPC/xe/GLB/đèn/vật userData.dyn) — PHẢI chạy sau mọi update gameplay, ngay trước render.
+  world.updateDynMatrices();
   if (window.__hp && window.__hp._aerialCam) renderer.render(scene, window.__hp._aerialCam);
   else if (composer) composer.render();
   else renderer.render(scene, camera);
