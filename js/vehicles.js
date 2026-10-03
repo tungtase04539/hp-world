@@ -142,13 +142,25 @@ function makeBoat() {
 // type: 'motorbike' | 'cyclo' | 'boat'
 // groundHeight: có mặt cầu (xe chạy qua cầu được); waterHeight: KHÔNG có mặt cầu (thuyền chui qua gầm cầu)
 // spawns: [{type, x, z, heading}] — do world.js tính từ dữ liệu bản đồ thật (bến, bờ sông...)
+//
+// VẬT LÝ "THẬT MÀ CHƠI ĐƯỢC" (Đợt 3 WP8; trước: xe máy 23 m/s = 83 km/h nội đô, lái kiểu xe tăng — đứng yên vẫn
+// xoay tại chỗ với tốc độ góc cố định):
+//  - tốc độ tối đa: xe máy 16 m/s (~58 km/h — đường lớn HP), xích lô 4,2 m/s (~15 km/h người đạp), thuyền 10 m/s
+//    (~19 hải lý — ca nô nhỏ trên sông Cấm);
+//  - tăng tốc / phanh / trôi tách riêng: ga 3,6 m/s² (xe số 110 cc: 0→50 km/h ~4 s), phanh 8 m/s², nhả ga trôi
+//    chậm dần theo ma sát lăn + gió;
+//  - lái kiểu XE ĐẠP (bicycle model): tốc độ góc = v/L·tan(δ), góc lái δ giảm khi chạy nhanh → không xoay tại chỗ,
+//    vào cua tự nhiên, lùi thì đánh lái ngược; trần tốc độ góc chống "lật" ở tốc độ thấp.
 const TEMPLATES = {
-  motorbike: { maker: makeMotorbike, speed: 23, turn: 2.2, nameKey: 'vMotorbike', land: true },   // ~83 km/h
-  cyclo: { maker: makeCyclo, speed: 8, turn: 2.2, nameKey: 'vCyclo', land: true },
-  boat: { maker: makeBoat, speed: 19, turn: 1.5, nameKey: 'vBoat', land: false },   // ~37 hải lý
+  motorbike: { maker: makeMotorbike, speed: 16, accel: 3.6, brake: 8, rev: 2.5, wb: 1.25, steer: 0.62, yawCap: 2.4, nameKey: 'vMotorbike', land: true },
+  cyclo: { maker: makeCyclo, speed: 4.2, accel: 1.1, brake: 3, rev: 1.2, wb: 1.5, steer: 0.55, yawCap: 1.3, nameKey: 'vCyclo', land: true },
+  boat: { maker: makeBoat, speed: 10, accel: 1.5, brake: 2.2, rev: 2.5, wb: 4.5, steer: 0.55, yawCap: 0.7, nameKey: 'vBoat', land: false },
 };
-export function createVehicles(scene, groundHeight, waterHeight, spawns, resolveCollisions) {
-  const defs = spawns.map((s) => ({ ...TEMPLATES[s.type], type: s.type, x: s.x, z: s.z, heading: s.heading || 0 }));
+export function createVehicles(scene, groundHeight, waterHeight, spawns, resolveCollisions, opts = {}) {
+  const R = opts.playRadius || Infinity;
+  // phương tiện ngoài vùng chơi (thuyền Bến Nghiêng Đồ Sơn cách 20 km) không dựng — không tới được
+  const defs = spawns.filter((s) => Math.hypot(s.x, s.z) <= R - 4)
+    .map((s) => ({ ...TEMPLATES[s.type], type: s.type, x: s.x, z: s.z, heading: s.heading || 0 }));
   const vehicles = defs.map((d) => {
     const built = d.maker();
     built.mesh.position.set(d.x, d.land ? groundHeight(d.x, d.z) : 0.1, d.z);
@@ -161,39 +173,55 @@ export function createVehicles(scene, groundHeight, waterHeight, spawns, resolve
     };
   });
 
+  function blockedAt(v, nx, nz) {
+    if (v.land) { if (groundHeight(nx, nz) < 0.3) return true; }   // xe không xuống nước
+    else if (waterHeight(nx, nz) > -0.6) return true;              // thuyền cần nước đủ sâu (bỏ qua mặt cầu)
+    return nx < WORLD_BOUNDS.minX + 40 || nx > WORLD_BOUNDS.maxX - 40
+      || nz < WORLD_BOUNDS.minZ + 40 || nz > WORLD_BOUNDS.maxZ - 40;
+  }
+
   function update(v, dt, fwdInput, turnInput, time) {
-    // tăng/giảm tốc
-    const target = fwdInput * v.speed * (fwdInput < 0 ? 0.45 : 1);
-    v.vel += (target - v.vel) * Math.min(1, dt * 2.4);
-    if (Math.abs(v.vel) > 0.3) {
-      v.heading -= turnInput * v.turn * dt * Math.sign(v.vel);
-    }
-    const nx = v.pos.x + Math.sin(v.heading) * v.vel * dt;
-    const nz = v.pos.z + Math.cos(v.heading) * v.vel * dt;
-    let blocked = false;
-    if (v.land) {
-      if (groundHeight(nx, nz) < 0.3) blocked = true;   // xe không xuống nước
+    // --- dọc: ga / phanh / lùi / trôi ---
+    if (fwdInput > 0.05) {
+      if (v.vel < -0.05) v.vel = Math.min(0, v.vel + v.brake * dt);
+      else {
+        const vmax = v.speed * fwdInput;
+        if (v.vel < vmax) v.vel = Math.min(vmax, v.vel + v.accel * dt * (1 - 0.55 * v.vel / v.speed));
+        else v.vel = Math.max(vmax, v.vel - (0.8 + 0.02 * v.vel * v.vel) * dt);
+      }
+    } else if (fwdInput < -0.05) {
+      if (v.vel > 0.3) v.vel = Math.max(0, v.vel - v.brake * dt);          // S khi đang tiến = PHANH
+      else v.vel = Math.max(-v.rev * -fwdInput, v.vel - v.accel * 0.6 * dt);   // dừng rồi mới lùi (chậm)
     } else {
-      if (waterHeight(nx, nz) > -0.6) blocked = true;   // thuyền cần nước đủ sâu (bỏ qua mặt cầu)
+      const drag = (v.land ? 0.7 : 0.35) + 0.02 * v.vel * v.vel;           // ma sát lăn + gió (nước: trôi xa hơn)
+      v.vel = Math.sign(v.vel) * Math.max(0, Math.abs(v.vel) - drag * dt);
     }
-    // giới hạn mép bản đồ
-    if (nx < WORLD_BOUNDS.minX + 40 || nx > WORLD_BOUNDS.maxX - 40
-      || nz < WORLD_BOUNDS.minZ + 40 || nz > WORLD_BOUNDS.maxZ - 40) blocked = true;
-    if (!blocked) {
+    // --- ngang: lái kiểu xe đạp ---
+    const steer = turnInput * v.steer / (1 + Math.abs(v.vel) / 9);
+    let yaw = (v.vel / v.wb) * Math.tan(steer);
+    // trần tốc độ góc: hằng số (xe chậm) và theo gia tốc ngang ≤ 14 m/s² (~1,4 g, hơi "game" — xe thật ~0,8 g) → ở
+    // 58 km/h bán kính cua tối thiểu ~18 m: muốn ôm cua góc phố 90° phải giảm ga như ngoài đời.
+    const cap = Math.min(v.yawCap, 14 / Math.max(1, Math.abs(v.vel)));
+    yaw = Math.max(-cap, Math.min(cap, yaw));
+    v.heading -= yaw * dt;
+    // --- tiến theo bước con ≤ 0,4 m (16 m/s × 50 ms = 0,8 m: không xuyên cột/tường mỏng) ---
+    const dist = v.vel * dt, n = Math.max(1, Math.ceil(Math.abs(dist) / 0.4));
+    const sx = Math.sin(v.heading) * dist / n, sz = Math.cos(v.heading) * dist / n;
+    for (let k = 0; k < n; k++) {
+      const nx = v.pos.x + sx, nz = v.pos.z + sz;
+      if (blockedAt(v, nx, nz)) { v.vel = 0; break; }
       v.pos.x = nx; v.pos.z = nz;
-      // không xuyên nhà cửa / đảo đá
+      // không xuyên nhà cửa / cột / NPC / đảo đá
       if (resolveCollisions) {
         const bx = v.pos.x, bz = v.pos.z;
         resolveCollisions(v.pos, v.land ? 0.8 : 1.6);
-        if (Math.hypot(v.pos.x - bx, v.pos.z - bz) > 0.01) v.vel *= 0.4;
+        if (Math.hypot(v.pos.x - bx, v.pos.z - bz) > 0.01) { v.vel *= 0.4; break; }
       }
-    } else {
-      v.vel = 0;
     }
     if (v.land) {
       v.pos.y = groundHeight(v.pos.x, v.pos.z);
-      // NGHIÊNG XE khi rẽ (roll quanh trục tiến): rẽ trái/phải nghiêng theo, đi thẳng thì thẳng.
-      const targetLean = -turnInput * 0.30 * Math.min(1, Math.abs(v.vel) / 7);
+      // NGHIÊNG XE khi rẽ (roll quanh trục tiến) theo gia tốc ngang thật a = v·ω (nghiêng ≈ atan(a/g)), kẹp 0,45 rad.
+      const targetLean = -Math.max(-0.45, Math.min(0.45, Math.atan((v.vel * yaw) / 9.8)));
       v.lean = (v.lean || 0) + (targetLean - (v.lean || 0)) * Math.min(1, dt * 6);
       v.mesh.rotation.set(0, v.heading, 0);
       v.mesh.rotateZ(v.lean);     // roll quanh trục Z LOCAL (= hướng tiến) → nghiêng đúng
