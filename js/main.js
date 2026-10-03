@@ -1,18 +1,15 @@
 import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
-import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
-import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
-import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { installToneMapping, SceneAOPass, FinalPass, AO as AO_CFG, GRADE, timePass } from './post.js';
 import { buildWorld, groundHeight, groundHeightNoDeck, landAt, WORLD_BOUNDS, LM, EXTRAS, BUILD_RADIUS, texCacheStats } from './world.js';
-import { IS_MOBILE, HAS_TOUCH, TIER, GPU_NAME, QUALITY_PREF, setQualityPref, IGPU_ON_BIG_MACHINE } from './device.js';
+import { IS_MOBILE, HAS_TOUCH, TIER, GPU_NAME, QUALITY_PREF, setQualityPref, IGPU_ON_BIG_MACHINE, GFX } from './device.js';
 import { createTraffic } from './traffic.js';
 import { makeHumanoid } from './character.js';
 import { createVehicles } from './vehicles.js';
 import { buildNPCs } from './npcs.js';
 import { buildLandmarkSigns } from './landmarks.js';
-import { createDayNight } from './daynight.js';
+import { createDayNight, attachSkyRenderer } from './daynight.js';
 import { createPetals } from './petals.js';
 import { initInput, input, consumeInteract, consumeJump } from './input.js';
 import { t, tx, setLang } from './i18n.js';
@@ -43,8 +40,11 @@ if (!_probe.getContext('webgl2') && !_probe.getContext('webgl')) {
     + '<p style="opacity:.7">Browser does not support WebGL. Please update your browser or enable hardware acceleration.</p></div>';
   throw new Error('WebGL không khả dụng');
 }
+// Đợt 3 WP5: hậu kỳ (TIER ≥ 2) có MSAA RIÊNG ở RT cảnh (SceneAOPass) → canvas KHÔNG antialias (trước: MSAA canvas
+// + 2 RT composer ×4 = phí 3 lần, kiểm toán §3 #39). TIER ≤ 1 vẫn không MSAA như cũ.
+const usePost = GFX.post;
 const renderer = new THREE.WebGLRenderer({
-  canvas, antialias: !WEAK_GPU,                   // máy yếu: tắt MSAA (VRAM + ổn định)
+  canvas, antialias: false,
   powerPreference: 'high-performance',            // LƯU Ý: Windows KHÔNG đổi được card bằng cờ này — xem device.js IGPU_ON_BIG_MACHINE
 });
 // KHỞI ĐỘNG theo tier: TIER 3 (GPU rời) 1.5 rồi autoQuality nâng dần tới 2; TIER 2 (iGPU) bắt đầu 1.0 và
@@ -52,46 +52,48 @@ const renderer = new THREE.WebGLRenderer({
 // Máy yếu ghim 1.0.
 renderer.setPixelRatio(TIER >= 3 ? Math.min(window.devicePixelRatio || 1, 1.5) : 1);
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.18;
+// TONE MAPPING + GRADE DÙNG CHUNG mọi đường vẽ: CustomToneMapping = AgX r160 + look CDL nhẹ (post.js). PHẢI cài
+// trước khi bất kỳ shader nào biên dịch. Phơi sáng do daynight.js ghi mỗi khung (thích nghi ngày/đêm).
+installToneMapping(renderer);
+renderer.toneMappingExposure = 0.92;
+attachSkyRenderer(renderer);                      // daynight.js: nướng PMREM bầu trời (thay RoomEnvironment cũ)
 // bóng đổ thời gian thực (chỉ tắt trên máy yếu — KHÔNG theo cảm ứng)
 renderer.shadowMap.enabled = !WEAK_GPU;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 const scene = new THREE.Scene();
-// far 3200 (TIER 2/3): sương FULL 700→2600 m (daynight.js) đã che kín, xa hơn chỉ tốn cull/vẽ thừa + depth precision;
-// LITE giữ 6000 rồi tự hạ 2600/1650 lúc khởi động (bên dưới).
-const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, TIER >= 2 ? 3200 : 6000);
+// far 3200 (TIER 2/3): sương exp2 (daynight.js) ở 2600 m đã 99% — xa hơn chỉ tốn cull/vẽ thừa; LITE giữ 6000 rồi tự
+// hạ 2600/1650 lúc khởi động (bên dưới). near 0.3 (cũ 0.1): độ phân giải depth ở 1-2 km tốt gấp 3 (bớt z-fight các lớp
+// mặt đất +0.012/+0.03 ở xa, kiểm toán §3.3) — camera bám người chơi gần nhất 5 m, pano đặt camera cách 0.1 m nhưng
+// nhân vật đã ẩn, không có gì trong 0.3 m.
+const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.3, TIER >= 2 ? 3200 : 6000);
 attachRenderer(renderer, camera, scene);   // assets.js: compileAsync + upload texture rải khung cho model GLB
 
-// Môi trường phản chiếu cho vật liệu PBR (mô hình GLB không bị xỉn/tối)
-{
-  const pmrem = new THREE.PMREMGenerator(renderer);
-  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-  pmrem.dispose();
-}
-
-// Hậu kỳ bloom + grade + MSAA 4x (chỉ tắt trên máy yếu — KHÔNG theo cảm ứng)
-const usePost = !WEAK_GPU;
-let composer = null, bloomPass = null;
+// Hậu kỳ (chỉ tắt trên máy yếu — KHÔNG theo cảm ứng):
+//   SceneAOPass (cảnh → RT MSAA + depth → AO nửa phân giải → ghép) → Bloom (CHỈ bật về đêm) → FinalPass (tone+grade+dither)
+let composer = null, bloomPass = null, scenePass = null, finalPass = null, _bloomOK = true;
 const cine = initCinematic({ renderer, camera });   // chế độ đạo diễn (trailer/cutscene) — off mặc định
-// GRADE: giảm bão hòa + ấm nhẹ (bớt "trời xanh gắt/washed HDR" — dấu hiệu game rõ nhất). ChatGPT + cell_render.
-const GradeShader = {
-  uniforms: { tDiffuse: { value: null }, saturation: { value: 0.88 }, tint: { value: new THREE.Color(1.0, 0.985, 0.945) } },
-  vertexShader: 'varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
-  fragmentShader: 'uniform sampler2D tDiffuse; uniform float saturation; uniform vec3 tint; varying vec2 vUv;' +
-    'void main(){ vec4 c=texture2D(tDiffuse,vUv); float l=dot(c.rgb,vec3(0.2126,0.7152,0.0722)); c.rgb=mix(vec3(l),c.rgb,saturation); c.rgb*=tint; gl_FragColor=c; }',
-};
 if (usePost) {
-  composer = new EffectComposer(renderer);
-  composer.addPass(new RenderPass(scene, camera));
-  bloomPass = new UnrealBloomPass(   // TIER 2 (iGPU): bloom nửa độ phân giải — mắt không phân biệt, GPU nhẹ hơn nhiều
-    new THREE.Vector2(window.innerWidth / (TIER >= 3 ? 1 : 2), window.innerHeight / (TIER >= 3 ? 1 : 2)), 0.15, 0.5, 0.9);  // threshold 0.82->0.9: chỉ đèn/emissive bloom
+  composer = new EffectComposer(renderer);          // RT composer KHÔNG MSAA (MSAA nằm ở RT cảnh)
+  scenePass = new SceneAOPass(scene, camera, { samples: GFX.msaa, ao: GFX.ao, aoSamples: GFX.aoSamples });
+  composer.addPass(scenePass);
+  bloomPass = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.15, 0.5, 0.9);   // threshold 0.9: chỉ đèn/emissive
+  bloomPass.enabled = false;                        // ban ngày tắt hẳn (trước: chạy cả ngày ở cường độ 0.025)
   composer.addPass(bloomPass);
-  composer.addPass(new OutputPass());
-  composer.addPass(new ShaderPass(GradeShader));                 // grade pass cuối
-  composer.renderTarget1.samples = 4; composer.renderTarget2.samples = 4;   // MSAA 4x (EffectComposer bỏ antialias khi post)
+  finalPass = new FinalPass();
+  composer.addPass(finalPass);
 }
+// composer.setSize/setPixelRatio đưa MỌI pass về full-res — TIER 2 phải đặt lại bloom nửa độ phân giải SAU đó
+// (bug cũ: setPR của autoQuality làm mất bloom nửa phân giải, kiểm toán §3 #39).
+function resizePost() {
+  if (!composer) return;
+  composer.setSize(window.innerWidth, window.innerHeight);
+  if (bloomPass && TIER < 3) {
+    const pr = renderer.getPixelRatio();
+    bloomPass.setSize(Math.round(window.innerWidth * pr / 2), Math.round(window.innerHeight * pr / 2));
+  }
+}
+resizePost();
 
 // MẤT NGỮ CẢNH WebGL: điện thoại thu hồi GPU khi thiếu RAM / chuyển app / khoá màn hình.
 // Không chặn mặc định → context KHÔNG BAO GIỜ phục hồi, người chơi thấy màn đen vĩnh viễn.
@@ -103,7 +105,7 @@ canvas.addEventListener('webglcontextlost', (e) => {
 canvas.addEventListener('webglcontextrestored', () => {
   _ctxLost = false;
   renderer.resetState();              // dựng lại trạng thái GL
-  if (composer) composer.setSize(window.innerWidth, window.innerHeight);
+  resizePost();
   ui.toast(tx({ vi: '✓ Đã khôi phục đồ hoạ', en: '✓ Graphics restored' }));
 }, false);
 
@@ -111,7 +113,7 @@ window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
-  if (composer) composer.setSize(window.innerWidth, window.innerHeight);
+  resizePost();
 });
 
 // ============ Thế giới ============
@@ -383,9 +385,16 @@ let REFRESH_HZ = 60;
 }
 function setPR(v) {
   renderer.setPixelRatio(v);
-  if (composer) { composer.setPixelRatio(v); composer.setSize(window.innerWidth, window.innerHeight); }
+  if (composer) { composer.setPixelRatio(v); resizePost(); }
 }
+// Bóng: hệ số giãn nhịp làm mới (autoQuality nấc 2) — thay cho tắt castShadow (đổi program key = biên dịch lại MỌI
+// shader, khựng vài giây, kiểm toán §3 #39). Không bao giờ bật/tắt castShadow lúc chạy.
+let _shadowSlow = 1;
+// QA tất định: trình duyệt tự động hoá (navigator.webdriver — playwright/puppeteer) hoặc ?aq=0 → KHÔNG hạ cấp giữa chừng
+// (máy chạy nhiều agent song song làm fps dao động → AO/bloom/bóng bị tắt ngẫu nhiên giữa các ảnh so sánh).
+const AQ_OFF = navigator.webdriver === true || new URLSearchParams(location.search).get('aq') === '0';
 function autoQuality() {
+  if (AQ_OFF) return;
   const now = performance.now();
   if (assetsBusy()) { _fpsT0 = 0; return; }   // đang tải/hiện model: không đo
   if (!_fpsT0) { _fpsT0 = now; _fpsN = 0; return; }
@@ -394,7 +403,8 @@ function autoQuality() {
   if (now - _fpsT0 < win) return;
   const fps = _fpsN * 1000 / (now - _fpsT0);
   _fpsT0 = now; _fpsN = 0; _qChecks++;
-  const target = REFRESH_HZ / FRAME_DIV;
+  // Mục tiêu TUYỆT ĐỐI tối đa 60 fps: màn 120/144 Hz từng bị coi là "chậm" ở 80 fps rồi hạ cấp oan (§3 #39).
+  const target = Math.min(60, REFRESH_HZ / FRAME_DIV);
   // MÁY NGHẼN CPU (đo 2026-09-05 trên Radeon 890M: tắt bóng + bloom + hạ PR đều không đổi fps): hạ cấp chỉ
   // mất đẹp mà không mượt hơn → mỗi bước hạ phải CHỨNG MINH tăng ≥20% fps ở cửa sổ 4 s sau (nhiễu fps khi
   // di chuyển ±10%), không thì HOÀN TÁC và khoá không hạ tiếp (trừ khi fps tụt dưới 30% nhịp màn = quá tải thật).
@@ -405,19 +415,24 @@ function autoQuality() {
   if (fps < target * 0.7 && _qStep < 3 && (!_qLocked || fps < target * 0.3)) {
     _qStep++;
     const prevPR = renderer.getPixelRatio();
+    const sm = dayNight.sun.shadow;
+    // đổi cỡ map → map = null tới lần vẽ bóng kế tiếp; khung nào vẽ với map null thì shader đọc texture rỗng = TOÀN BỘ
+    // hộp bóng chìm trong bóng (bug cũ, thấy rõ khi autoQuality hạ cấp lúc máy bận) → ép vẽ bóng ngay khung sau.
+    const setMap = (n) => { if (sm.mapSize.x !== n) { sm.mapSize.set(n, n); if (sm.map) { sm.map.dispose(); sm.map = null; } renderer.shadowMap.needsUpdate = true; } };
     if (_qStep === 1) {
-      const bloomWas = bloomPass ? bloomPass.enabled : false;
-      const smWas = dayNight.sun.shadow.mapSize.x;
-      if (bloomPass) bloomPass.enabled = false;
+      // NẤC 1 (GPU): AO + bloom tắt, PR ≤ 1.2, bóng 2048→1024 (shadow pass nhẹ 4 lần)
+      const aoWas = scenePass ? scenePass.aoEnabled : false, smWas = sm.mapSize.x;
+      if (scenePass) scenePass.aoEnabled = false;
+      _bloomOK = false;
       setPR(Math.max(1, Math.min(prevPR, 1.2)));   // chỉ HẠ, không bao giờ tăng
-      const sm = dayNight.sun.shadow;               // bóng 2048→1024: shadow pass nhẹ 4 lần, chưa phải tắt
-      sm.mapSize.set(1024, 1024);
-      if (sm.map) { sm.map.dispose(); sm.map = null; }
-      _qPending = { fps, undo: () => { if (bloomPass) bloomPass.enabled = bloomWas; setPR(prevPR); sm.mapSize.set(smWas, smWas); if (sm.map) { sm.map.dispose(); sm.map = null; } } };
+      setMap(Math.min(smWas, 1024));
+      _qPending = { fps, undo: () => { if (scenePass) scenePass.aoEnabled = aoWas; _bloomOK = true; setPR(prevPR); setMap(smWas); } };
     }
     else if (_qStep === 2) {
-      dayNight.sun.castShadow = false; renderer.shadowMap.autoUpdate = false; setPR(1);
-      _qPending = { fps, undo: () => { dayNight.sun.castShadow = renderer.shadowMap.enabled; renderer.shadowMap.needsUpdate = true; setPR(prevPR); } };
+      // NẤC 2: bóng 512 + làm mới thưa ×2.5, PR 1 — KHÔNG tắt castShadow (biên dịch lại mọi shader)
+      const smWas = sm.mapSize.x;
+      setMap(512); _shadowSlow = 2.5; setPR(1);
+      _qPending = { fps, undo: () => { setMap(smWas); _shadowSlow = 1; setPR(prevPR); renderer.shadowMap.needsUpdate = true; } };
     }
     else enableNearView();                          // NẤC 3: co tầm nhìn (sương gần) + ẩn tile xa (không hoàn tác)
   } else if (fps >= target * 0.9 && _qStep === 0 && renderer.getPixelRatio() < _DPR) {
@@ -440,7 +455,7 @@ const REDUCED_MOTION = window.matchMedia && window.matchMedia('(prefers-reduced-
 let _nearTiles = null, _nearCullLast = 0;
 let _instScanAt = -9999;
 function enableNearView() {
-  scene.fog.near = 220; scene.fog.far = 1300;
+  dayNight.setNearView(true);                 // sương exp2 dày ×1.6 (1300 m ≈ 95%) — CÙNG kiểu sương, không biên dịch lại
   camera.far = 1650; camera.updateProjectionMatrix();
   _nearTiles = [];
   scene.traverse((o) => {
@@ -487,10 +502,10 @@ function clampToPlayArea(pos) {
 // điện thoại; desktop yếu (TIER 1) dùng mức trung gian để không thành "hộp sương 1,3 km".
 if (TIER <= 1) {
   _qStep = 1;
-  if (bloomPass) bloomPass.enabled = false;
+  _bloomOK = false;
   setPR(1);
   if (TIER === 0 || IS_MOBILE) enableNearView();
-  else { scene.fog.near = 400; scene.fog.far = 2200; camera.far = 2600; camera.updateProjectionMatrix(); }
+  else { camera.far = 2600; camera.updateProjectionMatrix(); }   // sương exp2 chung: 2600 m đã 99%
 }
 
 function animate() {
@@ -554,8 +569,15 @@ function animate() {
     if (window.__hp && window.__hp._aerialCam) { /* chế độ vệ tinh: giữ camera top-down, không cập nhật */ }
     else if (cine.active) cine.update(dt); else updateCamera(dt);   // đạo diễn lo camera khi bật
     const sky = dayNight.update(dt, pState.pos, camera);   // camera: hộp bóng bám hướng nhìn
-    // đêm bloom mạnh hơn cho đèn phố & cửa sổ rực rỡ
-    if (bloomPass) bloomPass.strength = 0.025 + sky.night * 0.55;   // ban ngày gần tắt bloom
+    // bloom CHỈ chạy khi trời tối (đèn phố/cửa sổ) — ban ngày tắt hẳn pass (tiết kiệm GPU; vùng sáng ban ngày đã do
+    // tone mapping AgX xử lý, bloom ngày làm mặt tường nắng loé "mơ màng")
+    // ngưỡng bloom tính trên giá trị TRƯỚC phơi sáng (FinalPass nhân sau) → chia theo phơi sáng để "chỉ đèn mới loé"
+    // đúng cả khi mắt thích nghi đêm (phơi sáng ×5)
+    if (bloomPass) {
+      bloomPass.enabled = _bloomOK && sky.night > 0.04;
+      bloomPass.strength = sky.night * 0.6;
+      bloomPass.threshold = 1.06 / renderer.toneMappingExposure;
+    }
 
     // cánh phượng quanh dải trung tâm (tâm ~ giữa hồ Tam Bạc và Nhà hát lớn)
     const dCity = Math.hypot(
@@ -575,14 +597,18 @@ function animate() {
     audio.tryHorn(time, 1 - Math.min(1, Math.max(0, (dPort - 70) / 180)));
 
     autoQuality();
+    // tâm culling: người chơi — hoặc TÂM KHUNG ẢNH ở chế độ vệ tinh (trước: prop/cây quanh ảnh vệ tinh biến mất vì
+    // cull bám người chơi, kiểm toán §3 #22)
+    const _ae = window.__hp && window.__hp._aerialArea;
+    const cullX = _ae ? _ae.cx : pState.pos.x, cullZ = _ae ? _ae.cz : pState.pos.z;
     updateNearCull();
-    world.updateFarHide(pState.pos.x, pState.pos.z);   // biển hiệu/đèn lẻ >350 m: ẩn (nhịp 0,5 s bên trong)
+    world.updateFarHide(cullX, cullZ);   // biển hiệu/đèn lẻ >350 m: ẩn (nhịp 0,5 s bên trong)
     // CULLING TỪNG INSTANCE: quét lại định kỳ (cây/model GLB nạp async sau khi world dựng),
     // rồi nén danh sách theo khoảng cách (nhịp riêng bên trong, 0.4s).
     // BẪY (KNOWLEDGE da, dính lần 2): nhịp phải theo ĐỒNG HỒ THẬT — `time` là giờ-GAME, dt bị clamp
     // 0.05 nên máy 2fps thì giờ-game trôi chậm 10× → quét đăng ký mãi không chạy đúng lúc cần nhất.
     { const _n = performance.now(); if (_n - _instScanAt > 2000) { _instScanAt = _n; autoRegisterInstances(scene); } }
-    updateInstanceCull(pState.pos.x, pState.pos.z);
+    updateInstanceCull(cullX, cullZ);
     updateAssets(dt, pState.pos); // streaming mô hình xa theo khoảng cách
     clockUITimer += dt;
     if (clockUITimer > 0.5) { clockUITimer = 0; ui.setClock(dayNight.clockString); }
@@ -601,7 +627,7 @@ function animate() {
       // Trần theo đồng hồ (4.5 Hz FULL / 2 Hz TIER 2 — mỗi lần làm mới bóng là 1 khung +20 ms trên 890M) + làm mới
       // SỚM khi đã đi >2 m hoặc quay >0.15 rad (hộp bóng bám hướng nhìn, đứng yên thì không tốn gì); sàn 0.1/0.25 s
       // để kéo chuột xoay camera không bắn shadow pass mỗi khung.
-      const cap = TIER === 2 ? 0.5 : 0.22, floor = TIER === 2 ? 0.25 : 0.1;
+      const cap = (TIER === 2 ? 0.5 : 0.22) * _shadowSlow, floor = (TIER === 2 ? 0.25 : 0.1) * _shadowSlow;
       if (shadowTimer > cap || (shadowTimer > floor && dayNight.shadowMoved())) {
         shadowTimer = 0; dayNight.markShadow(); renderer.shadowMap.needsUpdate = true;
       }
@@ -611,10 +637,15 @@ function animate() {
   // scene.matrixWorldAutoUpdate=false từ freezeStatic: renderer không duyệt cây tĩnh, chỉ cập nhật gốc ĐỘNG
   // (NPC/xe/GLB/đèn/vật userData.dyn) — PHẢI chạy sau mọi update gameplay, ngay trước render.
   world.updateDynMatrices();
-  if (window.__hp && window.__hp._aerialCam) renderer.render(scene, window.__hp._aerialCam);
-  else if (composer) composer.render();
-  else renderer.render(scene, camera);
+  // Trước Start: chưa vẽ cho tới khi compileAsync xong (driver biên dịch song song, khung đầu không khựng giây) —
+  // title screen che kín cảnh. Sau Start luôn vẽ. Ảnh vệ tinh giờ CŨNG qua composer (cùng tone/grade/AO).
+  if (!_warm && !started) return;
+  const rcam = (window.__hp && window.__hp._aerialCam) || camera;
+  if (composer) { scenePass.camera = rcam; composer.render(); }
+  else renderer.render(scene, rcam);
+  if (!_firstFrameAt) { _firstFrameAt = performance.now(); }
 }
+let _warm = false, _firstFrameAt = 0;
 
 // Service Worker: cache file nặng (GLB) → lần sau vào hiện đủ NGAY, không tải lại
 if ('serviceWorker' in navigator && location.protocol === 'https:') {
@@ -719,16 +750,40 @@ window.__hp = {
     pState.vy = 0;
     cam.yaw = camYaw; cam.pitch = pitch; cam.dist = dist;
     const cp = Math.cos(pitch);
+    // ĐẶT THẲNG vào điểm hội tụ của updateCamera (đích = chân + 2.2): bản cũ đặt +2 → camera pano (dist 0.1) bắt đầu
+    // thấp hơn đích 0,2 m ⇒ ngửa ~60° rồi lerp dần ~1,5 s; máy bận (dt kẹp 0.05) chưa kịp hội tụ khi harness chụp →
+    // khung pano lệch giữa các lần chụp (đo WP5: hướng nhìn y 0.74→−0.02 trong 1,5 s).
     camera.position.set(
       x + Math.sin(camYaw) * cp * dist,
-      pState.pos.y + Math.sin(pitch) * dist + 2,
+      pState.pos.y + Math.sin(pitch) * dist + 2.2,
       z + Math.cos(camYaw) * cp * dist
     );
+    camera.lookAt(x, pState.pos.y + 2.2, z);
   },
-  setTime(v) { dayNight.t = v; },
-  _aerialCam: null,
+  setTime(v) { dayNight.t = v; },   // 0..1 (0 = nửa đêm); URL ?time=14.5 | 14:30 | 0.6 (&timefreeze=1)
+  // HẬU KỲ (QA/tinh chỉnh): AO_CFG/GRADE sửa trực tiếp; finalPass.setGrade({...}); timeAO() = ms GPU của AO (gl.finish)
+  post: {
+    get composer() { return composer; }, get scenePass() { return scenePass; }, get finalPass() { return finalPass; },
+    AO: AO_CFG, GRADE,
+    // ms GPU của riêng phần AO (AO + mờ + ghép) so với chép thẳng, trên ảnh cảnh hiện tại (gl.finish, n lần)
+    timeAO(n = 60) {
+      if (!scenePass) return null;
+      const sp = scenePass, w = composer.writeBuffer, was = sp.aoEnabled;
+      sp.render(renderer, w);
+      const on = timePass(renderer, () => { sp.aoEnabled = true; sp.post(renderer, w); }, n, w);
+      const off = timePass(renderer, () => { sp.aoEnabled = false; sp.post(renderer, w); }, n, w);
+      const scene = timePass(renderer, () => { sp.aoEnabled = false; sp.render(renderer, w); }, Math.max(5, n >> 3), w);
+      sp.aoEnabled = was;
+      return { aoMs: +(on - off).toFixed(3), aoPassesMs: +on.toFixed(3), copyMs: +off.toFixed(3), sceneMs: +scene.toFixed(2),
+        w: sp.sceneRT.width, h: sp.sceneRT.height };
+    },
+  },
+  get timing() { return { firstFrameMs: _firstFrameAt ? Math.round(_firstFrameAt) : null, warm: _warm }; },
+  _aerialCam: null, _aerialArea: null,
   // Chụp "VỆ TINH": camera TRỰC GIAO nhìn thẳng xuống tâm (cx,cz), phủ ±half mét,
   // Bắc (−z) hướng LÊN, Đông (+x) sang PHẢI — đúng chiều bản đồ. Để so cấu trúc đường/vị trí nhà.
+  // Đợt 3 WP5: tắt sương, hộp bóng trực giao phủ CẢ khung (map 4096 — ảnh vệ tinh thật có bóng nhà rõ), culling
+  // (instcull/far-hide) lấy tâm khung thay vì người chơi, vẽ qua composer (cùng tone/grade/AO như khi chơi).
   aerial(cx, cz, half = 400, alt = 1200) {
     const el = renderer.domElement;
     const asp = (el.width / el.height) || 1;   // khớp tỉ lệ viewport (half = NỬA chiều DỌC)
@@ -738,10 +793,18 @@ window.__hp = {
     c.lookAt(cx, 0, cz);
     c.layers.enable(2);   // AERIAL-ONLY overlay (dải đường/nước rộng): layer 2 CHỈ hiện top-down, pano không thấy
     c.updateProjectionMatrix();
+    c.updateMatrixWorld(true);
     this._aerialCam = c;
+    this._aerialArea = { cx, cz, half, asp };
+    dayNight.setAerial(this._aerialArea);
+    if (renderer.shadowMap.enabled) renderer.shadowMap.needsUpdate = true;
     return { cx, cz, half };
   },
-  aerialOff() { this._aerialCam = null; },
+  aerialOff() {
+    this._aerialCam = null; this._aerialArea = null;
+    dayNight.setAerial(null);
+    if (renderer.shadowMap.enabled) renderer.shadowMap.needsUpdate = true;
+  },
   // liệt kê cụm mesh GLB (material PBR của Meshy) + vị trí thế giới — công cụ audit
   glbs() {
     const out = new Map();
@@ -798,10 +861,19 @@ document.getElementById('startBtn').addEventListener('click', () => {
 // ẤM MÁY sau màn chờ: compile TOÀN BỘ shader của scene (song song, KHR_parallel_shader_compile)
 // + render bóng 1 lần. Trước đây Three chỉ compile vật thể LỌT KHUNG NHÌN ở frame đầu → bấm
 // "Bắt đầu" camera quét ra toàn cảnh = bão compile shader → khựng vài giây.
+// Đợt 3 WP5: compile với ĐÚNG render target của đường vẽ thật (RT cảnh composer → NoToneMapping + linear). Trước đây
+// target = null (màn hình → biến thể tone-mapped/sRGB) nên 29/72 program là biến thể không bao giờ dùng và khung đầu
+// vẫn phải biên dịch lại tất cả (khựng 3,7-4,1 s, kiểm toán §3 #14). animate() không vẽ trước Start cho tới khi xong.
 if (renderer.compileAsync) {
-  renderer.compileAsync(scene, camera)
-    .then(() => { if (renderer.shadowMap.enabled) renderer.shadowMap.needsUpdate = true; })
-    .catch(() => {});
-}
+  const prevRT = renderer.getRenderTarget();
+  if (scenePass) renderer.setRenderTarget(scenePass.sceneRT);
+  let p;
+  try { p = renderer.compileAsync(scene, camera); } catch (e) { p = Promise.resolve(); }
+  renderer.setRenderTarget(prevRT);
+  p.then(() => { if (renderer.shadowMap.enabled) renderer.shadowMap.needsUpdate = true; })
+    .catch(() => {})
+    .finally(() => { _warm = true; });
+  setTimeout(() => { _warm = true; }, 12000);   // lưới an toàn: driver không báo xong vẫn vẽ
+} else _warm = true;
 
 animate();

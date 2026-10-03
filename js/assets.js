@@ -211,10 +211,55 @@ function onFail(d, err) {
   pump();
 }
 
+// ---------- Vật liệu GLB theo ánh sáng ngày/đêm (Đợt 3 WP5) ----------
+// Mọi GLB Meshy có emissiveFactor [1,1,1] (đo bằng đọc JSON GLB, scratchpad WP5/glbmats.cjs):
+//  - 6 file emissive map ĐEN THUẦN (~134 MB VRAM vô ích): bỏ map + emissive = 0 TRƯỚC khi biên dịch (key cố định).
+//  - 4 file emissive map giống albedo (tự sáng → phẳng bẹt dưới nắng, phát sáng như đèn lồng lúc nửa đêm):
+//    emissiveIntensity = 0 ban ngày, tăng dần về đêm (= đèn pha chiếu mặt tiền) — daynight gọi setGlbLighting.
+//  - nhahat: chân dung Bác Hồ là emissive CỐ Ý (KNOWLEDGE §5.6) — KHÔNG ĐỤNG MỘT GIÁ TRỊ NÀO.
+// IBL: scene.environment nay là PMREM của CHÍNH vòm trời (daynight) — tự tối về đêm; GLB còn nhận cả đèn bán cầu
+// (Lambert chỉ có bán cầu) nên envMapIntensity < 1 để ánh sáng nền không bị cộng đôi so với phố xung quanh.
+const _base = (url) => url.replace(/^.*\//, '').replace(/\.glb$/, '');
+const EMIS_BLACK = new Set(['buudien', 'dennghe', 'dentamky', 'dinhhk', 'nhnn', 'lechan']);
+const EMIS_SELFLIT = new Set(['baotang', 'thptnq', 'quanhoa', 'nhatho']);
+const EMIS_KEEP = new Set(['nhahat']);
+export const GLB_ENV_INTENSITY = 0.5;
+const SELF_LIT_NIGHT = 0.42;
+const _selfLit = [];          // material tự sáng (đèn pha đêm)
+let _lastNight = -1;
+function applyGlbMaterialPolicy(root, url) {
+  const key = _base(url);
+  const seen = new Set();
+  root.traverse((o) => {
+    if (!o.isMesh) return;
+    for (const m of (Array.isArray(o.material) ? o.material : [o.material])) {
+      if (!m || seen.has(m) || !m.isMeshStandardMaterial) continue;
+      seen.add(m);
+      m.envMapIntensity = GLB_ENV_INTENSITY;
+      if (EMIS_KEEP.has(key) || !m.emissiveMap) continue;
+      if (EMIS_BLACK.has(key)) {
+        m.emissiveMap.dispose(); m.emissiveMap = null; m.emissive.setRGB(0, 0, 0); m.needsUpdate = true;
+      } else if (EMIS_SELFLIT.has(key)) {
+        m.emissiveIntensity = Math.max(0, _lastNight) * SELF_LIT_NIGHT * _lastK;
+        _selfLit.push(m);
+      }
+    }
+  });
+}
+// daynight.update gọi mỗi khung; chỉ ghi khi đổi > 0,5% (vài chục material)
+// ek = bù phơi sáng (daynight: 1.18/exposure) để độ sáng hiển thị đèn pha không đổi khi mắt thích nghi đêm.
+let _lastK = 1;
+export function setGlbLighting(night, ek = 1) {
+  if (Math.abs(night - _lastNight) < 0.005 && Math.abs(ek - _lastK) < 0.01) return;
+  _lastNight = night; _lastK = ek;
+  for (let i = 0; i < _selfLit.length; i++) _selfLit[i].emissiveIntensity = night * SELF_LIT_NIGHT * ek;
+}
+
 function onLoaded(d, gltf) {
   d.state = 'done';
   loadingCount--;
   try {
+    applyGlbMaterialPolicy(gltf.scene, d.url);   // trước shrink: map đen bỏ luôn, khỏi thu nhỏ vô ích
     shrinkTexturesForMobile(gltf.scene);
     // nhận diện root GLB sau place() (bản clone Quán hoa ×5 cũng có — clone() sao chép userData)
     gltf.scene.userData.lodKey = d.url;
@@ -318,6 +363,7 @@ function startLite(d) {
 function onLiteLoaded(d, gltf) {
   const L = d.lod;
   gltf.scene.userData.lodLite = d.url;
+  applyGlbMaterialPolicy(gltf.scene, d.url);   // cùng chính sách emissive/IBL với bản gốc (clone dùng chung material)
   const lites = L.roots.map((r, i) => {
     // cùng parent + cùng transform local = cùng hệ toạ độ với bản gốc (lite sinh từ chính file gốc, chỉ giảm lưới)
     const lite = i === 0 ? gltf.scene : gltf.scene.clone(true);
@@ -337,7 +383,6 @@ function onLiteLoaded(d, gltf) {
         // = +266 MB ước tính, một nửa là các map này) → trimDetailMaps.
         trimDetailMaps(mt);
         for (const k of ['map', 'roughnessMap', 'metalnessMap']) if (mt[k]) mt[k].anisotropy = 8;
-        mt.envMapIntensity = 0.85;
       }
     });
     (r.full.parent || _scene).add(lite);

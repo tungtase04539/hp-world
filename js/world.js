@@ -819,22 +819,17 @@ export function buildWorld(scene) {
     t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(W / 9, D / 9); t.anisotropy = 4;
     return t;
   })();
-  const waterMat = new THREE.MeshPhongMaterial({
-    // Nước thật HP (Tam Bạc/Cấm) ĐỤC XÁM-LỤC phù sa, bão hòa THẤP, KHÔNG cyan (audit vệ tinh R1 — tell #1:
-    // specular rộng top-down đẩy teal thành cyan). Màu nền do daynight ghi mỗi khung. Đợt 2: normal map lăn tăn
-    // + specular xám-lam HẸP (shininess 75) để nắng để lại VỆT LẤP LÁNH — vẫn không phủ diện rộng như shininess 26 cũ.
-    color: 0x6b7a68, transparent: true, opacity: 0.82, shininess: 75, specular: 0x8fa8ba,
-    normalMap: waterNormal, normalScale: new THREE.Vector2(0.35, 0.35),
+  // Đợt 3 WP5: nước = MeshStandardMaterial ĐỤC (phù sa) — phản chiếu bầu trời bằng IBL PMREM nướng từ vòm trời
+  // (daynight.js), Fresnel/GGX vật lý: nhìn thẳng xuống (vệ tinh) chỉ ~2-4% phản xạ → thấy MÀU NƯỚC xám-lục ô liu như
+  // ảnh vệ tinh thật; nhìn xiên ở tầm mắt → phản chiếu chân trời sáng + vệt nắng lấp lánh qua normal map lăn tăn.
+  // KHÔNG trong suốt nữa (bản cũ opacity 0.82 làm lộ lòng sông/bậc đáy — kiểm toán §3 #38). MỘT nguồn màu: chính
+  // dòng này (daynight KHÔNG ghi đè màu mỗi khung nữa — trời/IBL tự tối về đêm). Hack Fresnel onBeforeCompile của
+  // Phong bị bỏ cùng (Standard đã có Schlick theo N·V).
+  const waterMat = new THREE.MeshStandardMaterial({
+    color: 0x55604c, roughness: 0.12, metalness: 0.0,
+    normalMap: waterNormal, normalScale: new THREE.Vector2(0.15, 0.15),
   });
-  // FRESNEL theo góc nhìn cho specular: nhìn thẳng xuống (vệ tinh/aerial, N·V≈1) → ~0, nhìn xiên ở tầm mắt → đủ.
-  // Đo: không có nó, ảnh aerial trưa (nắng cao 70°, half-vector lệch 9.5°) làm cả hồ trắng bệch loang lổ = đúng
-  // tell #1 audit vệ tinh. Blinn-Phong của three chỉ có Schlick theo V·H (≈1 khi nhìn xuống) nên phải thêm.
-  // `normal` (đã nhiễu normal map) và vViewPosition đều ở không gian view; isOrthographic: uniform sẵn có.
-  waterMat.onBeforeCompile = (sh) => {
-    sh.fragmentShader = sh.fragmentShader.replace('#include <lights_phong_fragment>',
-      '#include <lights_phong_fragment>\n' +
-      'material.specularStrength *= pow(1.0 - saturate(dot(normal, isOrthographic ? vec3(0.0, 0.0, 1.0) : normalize(vViewPosition))), 3.0);');
-  };
+  waterMat.name = 'water';
   const water = new THREE.Mesh(new THREE.PlaneGeometry(W, D, 1, 1), waterMat);
   water.rotation.x = -Math.PI / 2;
   water.position.set(CX, 0, CZ);
