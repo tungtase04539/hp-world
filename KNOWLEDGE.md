@@ -361,6 +361,36 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-09-07 (di)** [ĐỢT 2 TÍCH HỢP — 6 nhánh worktree song song + 6 phản biện đối kháng, gộp trên `dot2-int`]:
+    Quy trình: mỗi nhánh (W1 merge-budget, W2 ground-grid, W3 landmark-lod, W4 visual, W5 hydro-polygon-water,
+    W6 landmark-placement) làm trong worktree riêng, tự đo trước/sau trên GPU thật, có agent phản biện đọc diff +
+    đo lại + thử merge khô; các entry (dh) bên dưới là báo cáo từng nhánh. Thứ tự gộp W3→W4→W2→W6→W5→W1
+    (W1 xung đột 1 hunk ở freezeStatic với regex `/^ground/` của W2 — giữ code W1, áp regex W2 cho cả 3 chỗ).
+    `KNOWLEDGE.md merge=union` (.git/info/attributes) để §10 tự gộp. Regen mapdata sau khi gộp process_osm của
+    W5+W6: 21 export byte-identical với bản đã commit (ROADS_DT không đổi → sidewalks.js an toàn).
+    **SỬA THEO PHẢN BIỆN (đã áp):** (1) W1 far-hide từng giấu cả HỘP NHÀ có texture bán kính ≤ 10 m ở >350 m
+    (316 mesh) — guard dáng giờ chạy cho MỌI ứng viên: giữ nếu rad>16, giữ mảng phẳng nằm ngang (h≤0,3 & rad>3),
+    giữ hộp (h>2,2 & mỏng>0,6); (2) W2 `ground_local` +0.03 đồng phẳng với các mặt lát +0.03 (dm_park_plaza, lot,
+    yard) → z-fight; nay +0.012 + polygonOffset(1,2); (3) W3/instcull: nén bỏ qua khi k===i giữ ma trận SAI nếu slot
+    đã bị instance khác ghi đè — nay luôn chép; (4) W6: biển địa danh (landmarks.js) theo LM_FACE mới bị chôn trong
+    nhà/ra lòng đường → cathedral 42→27, museum 32→22, rap78 26→35, thcsnq 50→58 (kiểm bằng raycast từ trên xuống
+    tại LM+F·d, scratchpad gpu_probe/probe8.mjs quét d=6..80); lượt 2: postoffice 40→24, dinhhk 28→22, ubnd 38→26,
+    biển cảng (offset cố định) (-320,+120)→(-340,+130) vì chỗ cũ bị nhà kho 10 m `mrg10_1,-3` đè — probe9/probe10 quét
+    lưới 10 m ±160 m, lọc raycast chạm đất/vỉa hè + cách tim đường 5–16 m, lấy điểm gần chỗ cũ nhất (vỉa hè gạch xám,
+    7,9 m tới đường 'p'). Kết quả 26/26 biển chạm đất trừ Đồ Sơn: mặt đất thô (ô 200 m) cao 3,1 m > gh 2,x nên cột
+    2,2 m chìm, bảng ở +2,4 vẫn lộ — lệch mặt phẳng thô/gh ngoài vùng lưới mịn, chưa sửa. Số ms tuyệt đối của W1 gắn caveat ±2×.
+    **KẾT QUẢ TÍCH HỢP (Chrome headless d3d11, Radeon 890M, 1600×1000, ?quality=full, máy rảnh):** spawn 700 call /
+    3,94M tam giác / 4.230 object / render CPU p50 6,7 ms (kiểm toán: 1.190 / 7,5M / 7.344 / ~17–20 ms); hồ 264 call
+    / 2,35M / 1,8 ms; bảo tàng 301 / 2,32M / 1,8 ms; 0 lỗi JS; `__hp.diag()` RỖNG (boat0 mắc cạn đã hết nhờ nước
+    polygon); waterbfs 5/5; check_assets ĐỦ. Log build: lượt gộp 1 7.391→234 mesh, lượt 2 2.321→610, ẩn xa 1.306,
+    làm phẳng 1.694 mesh + cắt 1.487 nhóm rỗng.
+    **CÒN LẠI / FOLLOW-UP (ghi nhận từ phản biện, chưa làm):** khối tay dọc kênh Tam Bạc GIẢ x≈-480..-516 (bs*
+    L7455, A4/TXP309 L8329-10924, F w1-07 L15370, "tường rêu") giờ đứng trên cạn cách sông thật 100–200 m; vòng
+    blend 1750–1950 m còn 2,8 ha nước OSM khô (nhánh Hạ Lý bắc/cầu Bạch Đằng); polygon 'Kênh' (1250..1740,60..250)
+    có đường 'r' chạy qua thành mặt cầu 2,05; vòng OSM hip-roof (~18373, 48% nhà thấp) chưa đổi (thảm block_infill
+    đã về mái bằng); 3 trường thptnq/thcsnq/thcstp bị lật mặt tiền theo quy tắc segment (dot ≈ 0, không có pano);
+    cột biển Đồ Sơn chìm 0,9 m trong mặt đất thô (xem trên); sun.shadow.radius vô hiệu với
+    PCFSoft; onBeforeCompile nước bám chuỗi `#include <lights_phong_fragment>` (nâng three phải kiểm).
 - **2026-09-06 (dh)** [W3-landmark-lod — nhánh `worktree-wf_97eeaf15-407-3`] [LOD ĐỊA DANH BẰNG TWIN LITE >250 m +
     CULL CASTER BÓNG + FRUSTUM CULL CÂY HERO]: chỉ sửa `js/assets.js` + `js/instcull.js` (world.js/main.js không đụng).
     Phát hiện kiểm toán `scene-heavy:landmark-glb-no-far-lod-on-full`, `hero-trees-100k-tris-no-frustum-cull`,

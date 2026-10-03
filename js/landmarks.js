@@ -21,12 +21,12 @@ const P = {
   // Khoảng cách biển = nửa cạnh công trình theo LM_FACE + vài m (phản biện Đợt 2: 42/32/26 từng chôn biển trong nhà
   // hoặc đặt ra lòng đường sau khi LM_FACE đổi hướng). Kiểm bằng raycast từ trên xuống tại LM+F·d: phải chạm đất/vỉa hè.
   cathedral: [LM.cathedral[0] + LM_FACE.cathedral[0] * 27, LM.cathedral[1] + LM_FACE.cathedral[1] * 27],
-  postoffice: [LM.postoffice[0] + LM_FACE.postoffice[0] * 40, LM.postoffice[1] + LM_FACE.postoffice[1] * 40],
+  postoffice: [LM.postoffice[0] + LM_FACE.postoffice[0] * 24, LM.postoffice[1] + LM_FACE.postoffice[1] * 24],
   museum: [LM.museum[0] + LM_FACE.museum[0] * 22, LM.museum[1] + LM_FACE.museum[1] * 22],
   station: [LM.station[0] + 42, LM.station[1] + 8],
   bridge: [hvtEnd[0] + 22, hvtEnd[1] + 20],
   binhbridge: [binhEnd[0] + 22, binhEnd[1] + 20],
-  port: [LM.port[0] - 320, LM.port[1] + 120],
+  port: [LM.port[0] - 340, LM.port[1] + 130],   // vỉa hè gạch xám cạnh đường vào cảng; (-320,+120) cũ bị nhà kho 10 m (mrg10_1,-3) đè (quét raycast Đợt 2)
   doson: [LM.doson[0], LM.doson[1]],
   hondau: [LM.hondau[0] + 22, LM.hondau[1] - 22], // đảo nhỏ — lệch về phía đất
   catba: [EXTRAS.catbaTown[0] - 90, EXTRAS.catbaTown[1] + 35],
@@ -34,11 +34,11 @@ const P = {
   thcsnq: [LM.thcsnq[0] + LM_FACE.thcsnq[0] * 58, LM.thcsnq[1] + LM_FACE.thcsnq[1] * 58],
   thcstp: [LM.thcstp[0] + LM_FACE.thcstp[0] * 50, LM.thcstp[1] + LM_FACE.thcstp[1] * 50],
   dennghe: [LM.dennghe[0] + LM_FACE.dennghe[0] * 22, LM.dennghe[1] + LM_FACE.dennghe[1] * 22],
-  dinhhk: [LM.dinhhk[0] + LM_FACE.dinhhk[0] * 28, LM.dinhhk[1] + LM_FACE.dinhhk[1] * 28],
+  dinhhk: [LM.dinhhk[0] + LM_FACE.dinhhk[0] * 22, LM.dinhhk[1] + LM_FACE.dinhhk[1] * 22],
   chuahang: [LM.chuahang[0] + LM_FACE.chuahang[0] * 25, LM.chuahang[1] + LM_FACE.chuahang[1] * 25],
   dentamky: [LM.dentamky[0] + LM_FACE.dentamky[0] * 22, LM.dentamky[1] + LM_FACE.dentamky[1] * 22],
   nhnn: [LM.nhnn[0] + LM_FACE.nhnn[0] * 42, LM.nhnn[1] + LM_FACE.nhnn[1] * 42],
-  ubnd: [LM.ubnd[0] + LM_FACE.ubnd[0] * 38, LM.ubnd[1] + LM_FACE.ubnd[1] * 38],
+  ubnd: [LM.ubnd[0] + LM_FACE.ubnd[0] * 26, LM.ubnd[1] + LM_FACE.ubnd[1] * 26],
   rap78: [LM.rap78[0] + LM_FACE.rap78[0] * 35, LM.rap78[1] + LM_FACE.rap78[1] * 35],
   nhaken: [LM.nhaken[0] + LM_FACE.nhaken[0] * 14, LM.nhaken[1] + LM_FACE.nhaken[1] * 14],
 };
