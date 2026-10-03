@@ -32,6 +32,11 @@ function nearPanoCam(x, z, r = 5) {
   return false;
 }
 import { SHOP_SIGNS } from './shopsigns.js';
+// Mạng đường thật (Đợt 3 WP6): đồ thị nút giao + dải + vỉa hè/bó vỉa + vạch kẻ trong shader
+import { buildRoadNet } from './roadnet.js';
+import { makeRoadMaterial } from './roadtex.js';
+import { ROAD_MARK_EVIDENCE } from './roadmarks.js';
+import { ROAD_W as XS_ROAD_W } from './xsection.js';
 
 // Thế giới dựng từ dữ liệu OpenStreetMap thật của Hải Phòng (tỉ lệ 1:10,
 // trung tâm phóng đại 2.2x). Mọi con phố trung tâm là phố thật.
@@ -845,10 +850,12 @@ export function buildWorld(scene) {
   // gợn trôi chậm (~0.15 m/s, ô 9 m); offset quấn về [0,1) — RepeatWrapping nên mép quấn liền
   updaters.push((dt, time) => { water.position.y = Math.sin(time * 0.8) * 0.06; waterNormal.offset.set((time * 0.017) % 1, (time * 0.011) % 1); });
 
-  // ---------- Đường phố THẬT (merge geometry để nhẹ GPU) ----------
-  const ROAD_W = { p: 13, s: 10, t: 8, r: 5.5, w: 3.5, h: 3 }; // 1:1 — lòng đường thật (h = ngõ/hẻm bê tông)
-  const asphaltGeos = [], dashGeos = [], pathGeos = [];
-  const sidewalkBuckets = {};  // { type: [geo,...] } — vỉa hè theo từng kiểu (đúng pano)
+  // ---------- MẠNG ĐƯỜNG THẬT (Đợt 3 WP6: js/roadnet.js + js/roadtex.js) ----------
+  // Thay hộp 30 m (layRoad) bằng: đồ thị nút giao THẬT (nối lại đỉnh chung bị simplify mất), dải lòng đường (ribbon)
+  // có UV dọc/ngang, đa giác nút giao bó vỉa bo góc, vỉa hè theo xsection.js (p/s/t/r) KHÔNG chạy xuyên ngã tư, mặt đứng
+  // bó vỉa 14 cm, vạch kẻ + zebra + vạch dừng VẼ TRONG SHADER (0 tam giác, không z-fight). 1 material Phong (freezeStatic
+  // không gộp) → mỗi ô 450 m đúng 2 draw call: 'roads_x,z' + 'sidewalk_x,z' (tên giữ regex _noCast + nearCull).
+  const ROAD_W = XS_ROAD_W;   // lòng đường thật theo cấp (xsection.js) — các khối phía sau vẫn dùng tên này
   const m4 = new THREE.Matrix4(), q4 = new THREE.Quaternion(), e4 = new THREE.Euler(), s4 = new THREE.Vector3(1, 1, 1);
   function pushBox(arr, w, h, l, x, y, z, rotY, rotX = 0) {
     const g = new THREE.BoxGeometry(w, h, l);
@@ -858,66 +865,37 @@ export function buildWorld(scene) {
     g.applyMatrix4(m4);
     arr.push(g);
   }
-  function layRoad(pts, wRoad, opts = {}) {
-    for (let i = 0; i < pts.length - 1; i++) {
-      const [x1, z1] = pts[i], [x2, z2] = pts[i + 1];
-      const segLen = Math.hypot(x2 - x1, z2 - z1);
-      if (segLen < 1) continue;
-      const rotY = Math.atan2(x2 - x1, z2 - z1);
-      // chia nhỏ theo địa hình (đoạn dài qua dốc cầu không bị thành tấm nghiêng khổng lồ)
-      const nChunk = Math.max(1, Math.ceil(segLen / 30));
-      for (let c = 0; c < nChunk; c++) {
-        const t1 = c / nChunk, t2 = (c + 1) / nChunk;
-        const cx1 = x1 + (x2 - x1) * t1, cz1 = z1 + (z2 - z1) * t1;
-        const cx2 = x1 + (x2 - x1) * t2, cz2 = z1 + (z2 - z1) * t2;
-        const len = segLen / nChunk;
-        const mx = (cx1 + cx2) / 2, mz = (cz1 + cz2) / 2;
-        // dùng địa hình GỐC (không mặt cầu vòm): qua sông thành cầu phẳng 2.04,
-        // mặt cầu vòm đã có mô hình riêng vẽ đè lên
-        const h1 = Math.max(groundHeightNoDeck(cx1, cz1), LAND_H);
-        const h2 = Math.max(groundHeightNoDeck(cx2, cz2), LAND_H);
-        if (Math.abs(h1 - h2) > 6) continue; // chỗ gãy bất thường -> bỏ mảnh
-        const my = (h1 + h2) / 2 + 0.04;
-        const rotX = Math.atan2(h1 - h2, len);
-        pushBox(opts.path ? pathGeos : asphaltGeos, wRoad, 0.14, len + 1.2, mx, my, mz, rotY, rotX);
-        if (opts.sidewalk) {
-          const px = Math.cos(rotY), pz = -Math.sin(rotY);
-          const sinR = Math.sin(rotY), cosR = Math.cos(rotY), S = 1 / 1.6;   // ô ca-rô ~0.8m
-          for (const side of [-1, 1]) {
-            const off = side * (wRoad / 2 + wRoad * 0.14);
-            const sg = new THREE.BoxGeometry(wRoad * 0.28, 0.24, len + 1.2);
-            e4.set(rotX, rotY, 0); q4.setFromEuler(e4);
-            m4.compose(new THREE.Vector3(mx + off * px, my + 0.02, mz + off * pz), q4, s4);
-            sg.applyMatrix4(m4);
-            // UV ca-rô CHẠY THẲNG theo hướng ĐOẠN ĐƯỜNG (u dọc, v ngang) — hết lệch trục thế giới
-            const sp = sg.attributes.position, suv = new Float32Array(sp.count * 2);
-            for (let k = 0; k < sp.count; k++) {
-              const vx = sp.getX(k), vz = sp.getZ(k);
-              suv[k * 2] = (vx * sinR + vz * cosR) * S;       // dọc đường
-              suv[k * 2 + 1] = (vx * cosR - vz * sinR) * S;   // ngang đường
-            }
-            sg.setAttribute('uv', new THREE.BufferAttribute(suv, 2));
-            const swType = opts.swType || SIDEWALK_DEFAULT;
-            (sidewalkBuckets[swType] = sidewalkBuckets[swType] || []).push(sg);
-          }
-        }
-        if (opts.dashes && c % 2 === 0) {
-          pushBox(dashGeos, 0.35, 0.05, 2.4, mx, my + 0.09, mz, rotY, rotX);
-        }
+  {
+    const net = buildRoadNet(ROADS_DT, {
+      groundHeightNoDeck, groundHeight, isWater, LAND_H, R: BUILD_RADIUS, T: 450, MEDIANS, bridges: BRIDGES,
+      swTypeOf: (ri) => SIDEWALK_BY_ROAD[ri] || SIDEWALK_DEFAULT, MARKS: ROAD_MARK_EVIDENCE,
+    });
+    const rmat = makeRoadMaterial(THREE, { size: LITE ? 256 : 512, anisotropy: LITE ? 4 : 8 });
+    let tris = 0;
+    for (const [key, t] of net.tiles) {
+      for (const kind of ['roads', 'sidewalk']) {
+        const g = t[kind]; if (!g) continue;
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.BufferAttribute(g.position, 3));
+        geo.setAttribute('normal', new THREE.BufferAttribute(g.normal, 3));
+        geo.setAttribute('uv', new THREE.BufferAttribute(g.uv, 2));
+        geo.setAttribute('aSurf', new THREE.BufferAttribute(g.aSurf, 4));
+        geo.setAttribute('aZeb', new THREE.BufferAttribute(g.aZeb, 2));
+        geo.setIndex(new THREE.BufferAttribute(g.index, 1));
+        geo.computeBoundingSphere();
+        const mesh = new THREE.Mesh(geo, rmat);
+        mesh.name = kind + '_' + key;          // 'roads_x,z' / 'sidewalk_x,z'
+        mesh.receiveShadow = true;
+        scene.add(mesh);
+        tris += g.index.length / 3;
       }
     }
+    // API cho hệ khác (cây/prop/giao thông/người chơi): nút giao thật + cột đèn tín hiệu + tra cứu "gần ngã tư" +
+    // surfaceAt(x,z) = độ cao mặt nhựa/vỉa hè so với groundHeight (0 ngoài đường) để chân người/xe không lún vào vỉa hè
+    world.roadNet = { junctions: net.junctions, signals: net.signals, nearJunction: net.nearJunction, surfaceAt: net.surfaceAt, stats: net.stats, material: rmat };
+    console.log('[world] mạng đường:', net.junctions.length, 'nút giao,', net.signals.length, 'cột đèn,', tris, 'tam giác,',
+      net.stats.ms, 'ms dựng +', rmat.userData.genMs.toFixed(0), 'ms texture');
   }
-  for (let ri = 0; ri < ROADS_DT.length; ri++) {
-    const r = ROADS_DT[ri];
-    const hasSW = r.c === 'p' || r.c === 's' || r.c === 't';   // A1: bật vỉa hè phố t (145 pano trước đây trống — cell_curb)
-    layRoad(r.pts, ROAD_W[r.c], {
-      sidewalk: hasSW,
-      swType: hasSW ? (SIDEWALK_BY_ROAD[ri] || SIDEWALK_DEFAULT) : null,
-      dashes: r.c === 'p' || r.c === 's' || r.c === 't',
-      path: r.c === 'w' || r.c === 'h',   // hẻm: bê tông be (không nhựa đen)
-    });
-  }
-  for (const r of ROADS_REGION) layRoad(r.pts, 12, { dashes: true });
   function addMerged(geos, material, name) {
     if (!geos.length) return;
     const merged = mergeGeometries(geos);
@@ -987,44 +965,8 @@ export function buildWorld(scene) {
     addMerged(railGeos, mat(0x848a92), 'rails');
   }
 
-  addMergedTiled(asphaltGeos, mat(0x4c5158), 'roads');
-  // AERIAL RIBBONS (Lô 1 — layer 2 CHỈ hiện top-down): dải đường RỘNG cho silhouette vệ tinh khớp real
-  // (đại lộ real rộng ~gấp rưỡi base); pano vẫn dùng base road (không nuốt vỉa hè). Draped +0.13m.
-  {
-    const RIBBON_W = { p: 20, s: 15, t: 11, r: 7, h: 4 };
-    const geos = [];
-    for (const r of ROADS_DT) {
-      const rw = RIBBON_W[r.c]; if (!rw) continue;   // 'w' foot bỏ
-      for (let i = 0; i < r.pts.length - 1; i++) {
-        const [x1, z1] = r.pts[i], [x2, z2] = r.pts[i + 1];
-        const segLen = Math.hypot(x2 - x1, z2 - z1); if (segLen < 1) continue;
-        const rotY = Math.atan2(x2 - x1, z2 - z1);
-        const mx = (x1 + x2) / 2, mz = (z1 + z2) / 2;
-        const my = Math.max(groundHeightNoDeck(mx, mz), LAND_H) + 0.13;
-        pushBox(geos, rw, 0.05, segLen + rw, mx, my, mz, rotY, 0);   // overlap +rw ở nút giao
-      }
-    }
-    for (const r of ROADS_REGION) {   // trục vùng rộng
-      for (let i = 0; i < r.pts.length - 1; i++) {
-        const [x1, z1] = r.pts[i], [x2, z2] = r.pts[i + 1];
-        const segLen = Math.hypot(x2 - x1, z2 - z1); if (segLen < 1) continue;
-        const rotY = Math.atan2(x2 - x1, z2 - z1);
-        const mx = (x1 + x2) / 2, mz = (z1 + z2) / 2;
-        if (Math.abs(groundHeightNoDeck(mx, mz) - LAND_H) > 0.5) continue;   // chỉ đoạn trên đất phẳng trung tâm
-        const my = LAND_H + 0.13;
-        pushBox(geos, 18, 0.05, segLen + 18, mx, my, mz, rotY, 0);
-      }
-    }
-    if (geos.length) { const m = new THREE.Mesh(mergeGeometries(geos), mat(0x53585f)); geos.forEach((g) => g.dispose()); m.layers.set(2); m.name = 'aerial_road_ribbon'; scene.add(m); }
-  }
-  // VỈA HÈ ĐA DẠNG theo từng nơi (phân loại từ pano Street View — R1a): mặc định xám bê tông,
-  // ca-rô đỏ-xám ở bờ sông Tam Bạc/quảng trường, terracotta/con sâu ở vài đoạn. UV đã bake thẳng
-  // theo hướng đoạn đường ở layRoad → gộp thẳng theo từng KIỂU, mỗi kiểu một material riêng.
-  for (const [type, geos] of Object.entries(sidewalkBuckets)) {
-    addMergedTiled(geos, sidewalkMaterial(type), 'sidewalk_' + type);   // tile 350m (cull); tên 'sidewalk_TYPE_kx,kz'
-  }
-  addMergedTiled(dashGeos, mat(0xe8e4d2), 'dashes');
-  addMergedTiled(pathGeos, mat(0xc9b896), 'paths');
+  // (Đợt 3 WP6: dải "aerial_road_ribbon" layer 2 đã BỎ — lòng đường + vỉa hè thật nay đủ bề rộng ở ảnh vệ tinh;
+  //  vạch kẻ "dashes", ngõ "paths", vỉa hè hộp "sidewalk_TYPE" do roadnet.js thay thế.)
 
   // ---------- GIÀN VÒM THÉP TRẮNG trang trí (dải công viên trung tâm, gần Trần Bình Trọng) ----------
   // Theo pano thật pano_195 [~555,-234]: dãy vòm bán nguyệt trắng lặp trên lối đi lát.
@@ -15583,137 +15525,9 @@ const w1AddSign = (r, txt, bg, fg, y, px = 42, wRatio = 0.9, hh = 1.1) => {
 
 
 
-  // ===== HỆ THỐNG ĐƯỜNG (cell_road): tim đường VÀNG + stop bar (decal MeshBasic, merge 1 draw call) =====
-  {
-function rdYellowCenterline() {
-  const INCLUDE_SECONDARY = false;   // true = vẽ cả 's' (nhiều phố 2 chiều hẹp không có tim vàng -> để false)
-  const DASH = 4.0, GAP = 4.0;       // vạch vàng đứt 4m, hở 4m (giống ĐBP thật)
-  const WIDTH = 0.45;                // RỘNG hơn vạch trắng sẵn có (0.35) -> phủ kín, hết lộ vệt trắng
-  const YELLOW = 0xf2c200;
-  const MED_CLEAR = 9;               // né dải phân cách vật lý (đại lộ đôi): trong 9m không vẽ tim vàng
-
-  // khoảng cách 1 điểm tới 1 đoạn (để né MEDIANS)
-  function segDist(px, pz, x1, z1, x2, z2) {
-    const dx = x2 - x1, dz = z2 - z1, l2 = dx * dx + dz * dz;
-    let t = l2 ? ((px - x1) * dx + (pz - z1) * dz) / l2 : 0;
-    t = Math.max(0, Math.min(1, t));
-    return Math.hypot(px - (x1 + dx * t), pz - (z1 + dz * t));
-  }
-  function nearMedian(px, pz) {
-    for (const line of MEDIANS) {
-      for (let i = 0; i < line.length - 1; i++) {
-        if (segDist(px, pz, line[i][0], line[i][1], line[i + 1][0], line[i + 1][1]) < MED_CLEAR) return true;
-      }
-    }
-    return false;
-  }
-
-  const geos = [];
-  for (const r of ROADS_DT) {
-    if (r.c !== 'p' && !(INCLUDE_SECONDARY && r.c === 's')) continue;
-    for (let i = 0; i < r.pts.length - 1; i++) {
-      const [x1, z1] = r.pts[i], [x2, z2] = r.pts[i + 1];
-      const segLen = Math.hypot(x2 - x1, z2 - z1);
-      if (segLen < DASH) continue;
-      const rotY = Math.atan2(x2 - x1, z2 - z1);     // local +z -> hướng đoạn đường
-      const ux = (x2 - x1) / segLen, uz = (z2 - z1) / segLen;
-      for (let s = GAP; s + DASH < segLen; s += DASH + GAP) {
-        const cs = s + DASH / 2;                     // tâm vạch dọc đoạn
-        const mx = x1 + ux * cs, mz = z1 + uz * cs;
-        if (isWater(mx, mz)) continue;
-        const y = groundHeightNoDeck(mx, mz);
-        if (Math.abs(y - LAND_H) > 1.0) continue;    // chỉ mặt phẳng (né dốc cầu/chỗ gãy)
-        if (nearMedian(mx, mz)) continue;            // né dải phân cách vật lý
-        const g = new THREE.BoxGeometry(WIDTH, 0.05, DASH);   // rộng(x) × cao × dài dọc đường(z)
-        g.rotateY(rotY);
-        g.translate(mx, y + 0.155, mz);
-        geos.push(g);
-      }
-    }
-  }
-  if (geos.length) {
-    const mesh = new THREE.Mesh(mergeGeometries(geos), new THREE.MeshBasicMaterial({ color: YELLOW }));
-    geos.forEach((g) => g.dispose());
-    mesh.name = 'rd_yellow_centerline';
-    scene.add(mesh);
-  }
-}
-
-/* ---------------------------------------------------------------------------
- *  DRAFT B — VẠCH DỪNG (stop bar) tại nút giao lớn  +  (tùy chọn) ZEBRA nâng cấp
- *  Bằng chứng pano: pano_046/152/062 có zebra + đèn tín hiệu; vạch DỪNG ngang là
- *  companion còn THIẾU (game đã có zebra ở dòng 15844-15877, CHƯA có stop bar).
- *
- *  MẶC ĐỊNH AN TOÀN: chỉ vẽ STOP BAR (thuần additive, đặt NGOÀI dải zebra sẵn có
- *  ~0.3m nên KHÔNG z-fight/không đè zebra). Muốn dùng zebra nâng cấp (rộng/sáng
- *  hơn, MeshBasic) thì bật REPLACE_EXISTING_ZEBRA=true VÀ comment khối zebra cũ
- *  (world.js dòng 15844-15877) để tránh vẽ 2 lớp chồng.
- * ------------------------------------------------------------------------- */
-function rdStopBarsAndZebra() {
-  const REPLACE_EXISTING_ZEBRA = false;   // true -> PHẢI tắt khối zebra cũ (15844-15877)
-  const RADIUS = 1200;                     // chỉ nút giao trung tâm (giống zebra cũ dùng 1000)
-  const WHITE = 0xf0eee6;
-
-  const stopGeos = [], zebraGeos = [];
-  for (const [ix, iz] of INTERSECTIONS) {
-    if (ix * ix + iz * iz > RADIUS * RADIUS) continue;
-    if (isWater(ix, iz)) continue;
-    // đoạn đường p/s gần nhất -> hướng + nửa lòng (giống logic zebra cũ)
-    let bd = 1e9, ux = 1, uz = 0, hw = 5;
-    for (const r of ROADS_DT) {
-      if (r.c !== 'p' && r.c !== 's') continue;
-      for (let i = 0; i < r.pts.length - 1; i++) {
-        const [x1, z1] = r.pts[i], [x2, z2] = r.pts[i + 1];
-        const dx = x2 - x1, dz = z2 - z1, l2 = dx * dx + dz * dz; if (!l2) continue;
-        let t = ((ix - x1) * dx + (iz - z1) * dz) / l2; t = Math.max(0, Math.min(1, t));
-        const d = Math.hypot(ix - (x1 + dx * t), iz - (z1 + dz * t));
-        if (d < bd) { bd = d; const L = Math.sqrt(l2); ux = dx / L; uz = dz / L; hw = ROAD_W[r.c] / 2; }
-      }
-    }
-    if (bd > 6) continue;                              // nút không nằm trên p/s
-    const rotY = Math.atan2(ux, uz);                  // local +z -> dọc đường; local +x -> ngang đường
-    const px = -uz, pz = ux;                          // pháp tuyến (ngang đường)
-    for (const dir of [-1, 1]) {                      // 2 nhánh vào nút
-      // STOP BAR: đặt NGOÀI zebra cũ (zebra ở along=hw+3.2) -> along = hw+4.6 (thượng lưu),
-      // chỉ phủ NỬA PHẢI theo chiều xe tới nút (VN đi phải): lệch pháp tuyến +dir*hw/2.
-      const along = hw + 4.6;
-      const bx = ix + ux * dir * along + px * (dir * hw / 2);
-      const bz = iz + uz * dir * along + pz * (dir * hw / 2);
-      const y = groundHeightNoDeck(bx, bz);
-      if (Math.abs(y - LAND_H) > 0.4) continue;
-      const bar = new THREE.BoxGeometry(hw, 0.05, 0.5);  // dài(x)=nửa lòng ngang đường, dày(z)=0.5 dọc đường
-      bar.rotateY(rotY);
-      bar.translate(bx, y + 0.14, bz);
-      stopGeos.push(bar);
-
-      if (REPLACE_EXISTING_ZEBRA) {                   // zebra nâng cấp (rộng 2.6m, sáng MeshBasic)
-        const cx = ix + ux * dir * (hw + 3.2), cz = iz + uz * dir * (hw + 3.2);
-        const yz = groundHeightNoDeck(cx, cz);
-        if (Math.abs(yz - LAND_H) > 0.4) continue;
-        for (let k = -Math.floor(hw - 1); k <= Math.floor(hw - 1); k += 1.15) {
-          const sx = cx + px * k, sz = cz + pz * k;
-          const strip = new THREE.BoxGeometry(0.55, 0.05, 2.6);  // dài dọc đường 2.6m
-          strip.rotateY(rotY);
-          strip.translate(sx, yz + 0.13, sz);
-          zebraGeos.push(strip);
-        }
-      }
-    }
-  }
-  if (stopGeos.length) {
-    const m = new THREE.Mesh(mergeGeometries(stopGeos), new THREE.MeshBasicMaterial({ color: WHITE }));
-    stopGeos.forEach((g) => g.dispose());
-    m.name = 'rd_stopbars'; scene.add(m);
-  }
-  if (zebraGeos.length) {
-    const m = new THREE.Mesh(mergeGeometries(zebraGeos), new THREE.MeshBasicMaterial({ color: WHITE }));
-    zebraGeos.forEach((g) => g.dispose());
-    m.name = 'rd_zebra_v2'; scene.add(m);
-  }
-}
-    rdYellowCenterline();
-    rdStopBarsAndZebra();
-  }
+  // ===== HỆ THỐNG ĐƯỜNG (cell_road) — Đợt 3 WP6: tim vàng/vạch dừng/zebra hộp MeshBasic đã THAY bằng vạch kẻ trong
+  // shader mạng đường (js/roadtex.js): tim vàng đứt/đôi theo cấp + bằng chứng pano (js/roadmarks.js), zebra + vạch dừng
+  // ở nút giao thật (roadnet.js), không còn né MEDIANS bằng vòng lặp O(đoạn×median) ở đây.
 
 
   // ===== HỆ THỐNG CÂY (cell_tree): hàng cau vua trước công sở + phượng allée + cổ thụ xà cừ =====
@@ -16160,181 +15974,8 @@ function buildDensity(ctx) {
   }
 
 
-  // ===== HỆ THỐNG BÓ VỈA (cell_curb, prefix cu*): mặt đứng bê tông mép đường p/s/t =====
-  {
-const CU = {
-  ROAD_W:     { p: 13, s: 10, t: 8 }, // KHỚP ROAD_W world.js — chỉ p/s/t có bó vỉa (bỏ r/w)
-  CURB_W:     0.18,   // bề rộng mặt bó vỉa (m); mép TRONG flush mép nhựa
-  CURB_RISE:  0.14,   // mặt đứng bó vỉa cao hơn MẶT NHỰA (m) — bó vỉa thật ~12-18cm
-  CURB_H:     0.30,   // chiều cao hộp (phần dưới chôn dưới vỉa hè/đất)
-  ROAD_TOP_DY:0.07,   // mặt nhựa = my + 0.07 (asphalt box cao 0.14, tâm tại my)
-  MY_LIFT:    0.04,   // my = (h1+h2)/2 + 0.04  (KHỚP layRoad)
-  CHUNK:      30,     // chia nhỏ đoạn (KHỚP layRoad — bám dốc cầu)
-  NODE_R:     8,      // bán kính CƠ BẢN né nút giao (cộng thêm half lòng đường)
-  MIN_H:      0.6,    // bỏ đoạn cao độ < 0.6 (mép nước / ngập)
-  MAX_DH:     6,      // bỏ đoạn gãy cao độ > 6m (nhịp cầu vòm)
-  LAND_H:     2,      // KHỚP LAND_H world.js
-  COLOR:      0xbdb9ad, // bê tông xám ẤM (đối chiếu pano_050/300/400/500)
-};
-
-// --- Nút giao: coord xuất hiện ở >=2 road KHÁC NHAU, hoặc là đầu/cuối 1 road ---
-// (thu từ TOÀN BỘ ROADS_DT kể cả r/w để bó vỉa p/s/t biết dừng ở ngã r/w cắt vào)
-function cuJunctionNodes(ROADS_DT) {
-  const seen = new Map();                       // key "x,z" -> Set(roadIdx)
-  const key = (x, z) => Math.round(x) + ',' + Math.round(z);
-  ROADS_DT.forEach((r, ri) => {
-    for (const [x, z] of r.pts) {
-      const k = key(x, z);
-      let s = seen.get(k); if (!s) { s = new Set(); seen.set(k, s); }
-      s.add(ri);
-    }
-  });
-  const nodes = [];
-  for (const [k, set] of seen) if (set.size >= 2) { const [x, z] = k.split(',').map(Number); nodes.push([x, z]); }
-  for (const r of ROADS_DT) {                    // đầu/cuối (T-end)
-    const a = r.pts[0], b = r.pts[r.pts.length - 1];
-    nodes.push([a[0], a[1]]); nodes.push([b[0], b[1]]);
-  }
-  return nodes;
-}
-
-// --- Lưới băm không gian cho nút giao (tra cứu nhanh) ---
-function cuNodeGrid(nodes, cell) {
-  const g = new Map();
-  const key = (ix, iz) => ix + ',' + iz;
-  for (const [x, z] of nodes) {
-    const kk = key(Math.floor(x / cell), Math.floor(z / cell));
-    let a = g.get(kk); if (!a) { a = []; g.set(kk, a); }
-    a.push([x, z]);
-  }
-  return { g, cell };
-}
-function cuNearNode(grid, x, z, r) {
-  const { g, cell } = grid;
-  const ix = Math.floor(x / cell), iz = Math.floor(z / cell), r2 = r * r;
-  for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) {
-    const arr = g.get((ix + a) + ',' + (iz + b)); if (!arr) continue;
-    for (const [nx, nz] of arr) if ((nx - x) * (nx - x) + (nz - z) * (nz - z) < r2) return true;
-  }
-  return false;
-}
-
-// --- Lưới lòng đường: mọi ĐOẠN p/s/t (kèm half + roadIdx) băm vào ô 8m ---
-// Dùng để CHẶN bó vỉa lọt vào làn KHÁC (đại lộ đôi, đường song song sát, góc nút).
-function cuLumenGrid(ROADS_DT, C) {
-  const cell = 8, g = new Map();
-  const put = (ix, iz, seg) => { const k = ix + ',' + iz; let a = g.get(k); if (!a) { a = []; g.set(k, a); } if (a[a.length - 1] !== seg) a.push(seg); };
-  ROADS_DT.forEach((r, ri) => {
-    const half = (C.ROAD_W[r.c] || 0) / 2; if (!half) return;
-    for (let i = 0; i < r.pts.length - 1; i++) {
-      const [ax, az] = r.pts[i], [bx, bz] = r.pts[i + 1];
-      const seg = { ax, az, bx, bz, half, ri };
-      const L = Math.hypot(bx - ax, bz - az), n = Math.max(1, Math.ceil(L / 2)); // bước 2m
-      for (let s = 0; s <= n; s++) {
-        const t = s / n, x = ax + (bx - ax) * t, z = az + (bz - az) * t;
-        put(Math.floor(x / cell), Math.floor(z / cell), seg);
-      }
-    }
-  });
-  return { g, cell };
-}
-function cuDistPtSeg(px, pz, ax, az, bx, bz) {
-  const dx = bx - ax, dz = bz - az, L2 = dx * dx + dz * dz;
-  let t = L2 ? ((px - ax) * dx + (pz - az) * dz) / L2 : 0;
-  t = t < 0 ? 0 : t > 1 ? 1 : t;
-  return Math.hypot(px - (ax + dx * t), pz - (az + dz * t));
-}
-// true nếu điểm nằm SÂU > tol trong lòng 1 đường KHÁC (ownRi bỏ qua)
-function cuInForeignLumen(grid, x, z, ownRi, tol) {
-  const { g, cell } = grid, ix = Math.floor(x / cell), iz = Math.floor(z / cell);
-  const done = new Set();
-  for (let a = -2; a <= 2; a++) for (let b = -2; b <= 2; b++) {   // 5x5: phủ bán kính tra ~6.5m
-    const arr = g.get((ix + a) + ',' + (iz + b)); if (!arr) continue;
-    for (const s of arr) {
-      if (s.ri === ownRi || done.has(s)) continue; done.add(s);
-      if (cuDistPtSeg(x, z, s.ax, s.az, s.bx, s.bz) < s.half - tol) return true;
-    }
-  }
-  return false;
-}
-
-// --- Generator THUẦN (không đụng THREE) — trả danh sách hộp bó vỉa để build/kiểm ---
-// Mỗi phần tử: { x,y,z (tâm hộp), rotY,rotX, len,w,h, innerFace (khoảng cách mép
-//   trong tới tim đường — để smoke-run kiểm intrusion), cx,cz (tim đoạn) }
-function cuCurbSegments(deps) {
-  const { ROADS_DT, groundHeightNoDeck, isWater } = deps;
-  const C = deps.CU || CU;
-  const grid = cuNodeGrid(cuJunctionNodes(ROADS_DT), C.NODE_R);
-  const lumen = cuLumenGrid(ROADS_DT, C);
-  const out = [];
-  for (let ri = 0; ri < ROADS_DT.length; ri++) {
-    const r = ROADS_DT[ri];
-    const wRoad = C.ROAD_W[r.c]; if (!wRoad) continue;     // chỉ p/s/t
-    const half = wRoad / 2;
-    for (let i = 0; i < r.pts.length - 1; i++) {
-      const [x1, z1] = r.pts[i], [x2, z2] = r.pts[i + 1];
-      const segLen = Math.hypot(x2 - x1, z2 - z1);
-      if (segLen < 1) continue;
-      const rotY = Math.atan2(x2 - x1, z2 - z1);
-      const nCh = Math.max(1, Math.ceil(segLen / C.CHUNK));
-      for (let c = 0; c < nCh; c++) {
-        const t1 = c / nCh, t2 = (c + 1) / nCh;
-        const cx1 = x1 + (x2 - x1) * t1, cz1 = z1 + (z2 - z1) * t1;
-        const cx2 = x1 + (x2 - x1) * t2, cz2 = z1 + (z2 - z1) * t2;
-        const mx = (cx1 + cx2) / 2, mz = (cz1 + cz2) / 2;
-        const len = segLen / nCh;
-        const g1 = groundHeightNoDeck(cx1, cz1), g2 = groundHeightNoDeck(cx2, cz2);
-        const h1 = Math.max(g1, C.LAND_H), h2 = Math.max(g2, C.LAND_H);
-        if (Math.abs(h1 - h2) > C.MAX_DH) continue;                       // gãy / cầu
-        if (isWater(mx, mz) || isWater(cx1, cz1) || isWater(cx2, cz2)) continue; // nước
-        if (Math.min(g1, g2) < C.MIN_H) continue;                         // mép nước
-        if (cuNearNode(grid, mx, mz, C.NODE_R + half)) continue;          // nút giao
-        const my = (h1 + h2) / 2 + C.MY_LIFT;
-        const rotX = Math.atan2(h1 - h2, len);
-        const px = Math.cos(rotY), pz = -Math.sin(rotY);
-        const centerY = my + C.ROAD_TOP_DY + C.CURB_RISE - C.CURB_H / 2;  // top = mặt nhựa + RISE
-        for (const side of [-1, 1]) {
-          const off = side * (half + C.CURB_W / 2);                       // mép trong tại đúng `half`
-          const cxp = mx + off * px, czp = mz + off * pz;                 // TÂM hộp bó vỉa
-          const iex = mx + side * half * px, iez = mz + side * half * pz; // MÉP TRONG bó vỉa
-          if (isWater(cxp, czp) || isWater(iex, iez)) continue;           // né nước theo TỪNG bên
-          if (cuInForeignLumen(lumen, iex, iez, ri, 0.3)) continue;       // né lọt làn khác
-          out.push({
-            x: cxp, y: centerY, z: czp,
-            rotY, rotX, len, w: C.CURB_W, h: C.CURB_H,
-            innerFace: half, cx: mx, cz: mz,
-          });
-        }
-      }
-    }
-  }
-  return out;
-}
-
-// --- Builder THREE: gộp toàn bộ hộp bó vỉa thành 1 mesh (1 draw call) ---
-function cuBuildCurbs(deps) {
-  const { THREE, scene, mat, mergeGeometries } = deps;
-  const C = deps.CU || CU;
-  const segs = cuCurbSegments(deps);
-  if (!segs.length) return null;
-  const geos = [];
-  const m4 = new THREE.Matrix4(), q4 = new THREE.Quaternion(), e4 = new THREE.Euler(), s4 = new THREE.Vector3(1, 1, 1);
-  for (const s of segs) {
-    const g = new THREE.BoxGeometry(s.w, s.h, s.len + 0.4);   // +0.4 chồng mép tránh hở
-    e4.set(s.rotX, s.rotY, 0); q4.setFromEuler(e4);
-    m4.compose(new THREE.Vector3(s.x, s.y, s.z), q4, s4);
-    g.applyMatrix4(m4);
-    geos.push(g);
-  }
-  const merged = mergeGeometries(geos);
-  geos.forEach((g) => g.dispose());
-  const mesh = new THREE.Mesh(merged, mat(C.COLOR));
-  mesh.name = 'street_curbs'; mesh.receiveShadow = true; scene.add(mesh);
-  return mesh;
-}
-
-  cuBuildCurbs({ THREE, scene, mat, mergeGeometries, groundHeightNoDeck, isWater, ROADS_DT });
-  }
+  // ===== HỆ THỐNG BÓ VỈA (cell_curb) — Đợt 3 WP6: hộp bó vỉa 0,18×0,30 m (đỉnh cao hơn vỉa hè 7 cm, dừng ±8 m quanh
+  // đỉnh chung) đã THAY bằng mặt đứng bó vỉa liền + bo góc cung trong js/roadnet.js (CURB_RISE 0,14 m theo xsection.js).
 
 
   // ===== FIX t8 (cell_struct): CỤM NHÀ KHO CẢNG mở rộng (block_infill dừng ở z=-900) =====
@@ -21322,38 +20963,77 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
       scene.add(plate);
     }
 
-    // 2) Đèn tín hiệu tại giao lộ lớn — 3 bóng, chu kỳ xanh/vàng/đỏ lệch pha
-    const lampHeads = [];
-    for (let i = 0; i < INTERSECTIONS.length; i++) {
-      const [ix, iz] = INTERSECTIONS[i];
-      const cx = ix + 5, cz = iz + 5;
-      if (isWater(cx, cz)) continue;
-      const y = groundHeightNoDeck(cx, cz);
-      if (Math.abs(y - LAND_H) > 1.5) continue;
-      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.13, 4.6, 6), poleM);
-      pole.position.set(cx, y + 2.3, cz); scene.add(pole);
-      const arm = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.12, 0.12), poleM);
-      arm.position.set(cx - 1.1, y + 4.5, cz); scene.add(arm);
-      const headBox = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.35, 0.3), mat(0x24272b));
-      headBox.position.set(cx - 2.1, y + 3.9, cz); scene.add(headBox);
-      const lamps = [];
-      const cols = [0xff2e20, 0xffb300, 0x2ecc40];
-      for (let k = 0; k < 3; k++) {
-        const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 6),
-          new THREE.MeshBasicMaterial({ color: 0x222222 }));
-        lamp.position.set(cx - 2.1, y + 4.3 - k * 0.4, cz + 0.17);
-        scene.add(lamp);
-        lamps.push({ lamp, col: cols[k] });
+    // 2) ĐÈN TÍN HIỆU ở NÚT GIAO THẬT (Đợt 3 WP6): roadnet.js chọn nút ≥3 nhánh phố có ≥2 nhánh p/s (hoặc pano ghi
+    //    "đèn tín hiệu"), cách nhau ≥45 m; mỗi nhánh 1 cột cần vươn ở góc bên PHẢI làn xe tới (đi bên phải), đầu đèn treo
+    //    trên làn + đầu đèn thấp trên cột + hộp đếm ngược. InstancedMesh: 1 draw call cột/đầu + 1 draw call bóng đèn
+    //    (thay 19 nút × 6 mesh + 57 cầu MeshBasic riêng lẻ). Pha: 2 trục vuông góc ngược pha, chu kỳ 30 s lệch theo nút.
+    {
+      const SIG = (world.roadNet && world.roadNet.signals) || [];
+      if (SIG.length) {
+        const parts = [];
+        const colored = (g, hex) => {
+          const c = new THREE.Color(hex), n = g.attributes.position.count, a = new Float32Array(n * 3);
+          for (let i = 0; i < n; i++) { a[i * 3] = c.r; a[i * 3 + 1] = c.g; a[i * 3 + 2] = c.b; }
+          g.setAttribute('color', new THREE.BufferAttribute(a, 3)); return g;
+        };
+        // khung cục bộ: X = về phía tim đường, Y lên, −Z = mặt đèn quay về xe đang tới
+        const ARM = 3.4, H = 5.7;
+        const pole = new THREE.CylinderGeometry(0.085, 0.12, H + 0.3, 8); pole.translate(0, (H + 0.3) / 2, 0); parts.push(colored(pole, 0x7a7f84));
+        const base = new THREE.CylinderGeometry(0.16, 0.18, 0.5, 8); base.translate(0, 0.25, 0); parts.push(colored(base, 0x55595e));
+        const arm = new THREE.CylinderGeometry(0.05, 0.065, ARM, 6); arm.rotateZ(Math.PI / 2); arm.translate(ARM / 2, H, 0); parts.push(colored(arm, 0x7a7f84));
+        const brace = new THREE.CylinderGeometry(0.025, 0.025, 1.6, 4); brace.rotateZ(Math.PI / 2 - 0.42); brace.translate(0.72, H - 0.33, 0); parts.push(colored(brace, 0x7a7f84));
+        const headHi = new THREE.BoxGeometry(0.34, 1.0, 0.24); headHi.translate(ARM - 0.15, H - 0.62, 0); parts.push(colored(headHi, 0x1b1d20));
+        const headLo = new THREE.BoxGeometry(0.34, 1.0, 0.24); headLo.translate(0.26, 2.75, 0); parts.push(colored(headLo, 0x1b1d20));
+        const cnt = new THREE.BoxGeometry(0.5, 0.36, 0.16); cnt.translate(ARM - 0.62, H - 0.32, 0); parts.push(colored(cnt, 0x15171a));
+        const sigGeo = mergeGeometries(parts.map((g) => (g.index ? g.toNonIndexed() : g)));
+        parts.forEach((g) => g.dispose());
+        const poleIM = new THREE.InstancedMesh(sigGeo, new THREE.MeshLambertMaterial({ vertexColors: true }), SIG.length);
+        poleIM.name = 'traffic_signal_poles';
+        const lampGeo = new THREE.CircleGeometry(0.105, 10);   // mặt kính tròn quay −Z
+        lampGeo.rotateY(Math.PI);
+        const lampIM = new THREE.InstancedMesh(lampGeo, new THREE.MeshBasicMaterial({ color: 0xffffff }), SIG.length * 7);
+        lampIM.name = 'traffic_signal_lamps';
+        lampIM.userData.noCull = true;     // instanceColor đổi theo pha → instcull không được nén/ghi đè
+        const M = new THREE.Matrix4(), Ml = new THREE.Matrix4(), lampOff = [];
+        // 3 bóng đầu cao + 3 bóng đầu thấp (đỏ trên, vàng giữa, xanh dưới) + 1 ô đếm ngược
+        for (const [hx, hy] of [[ARM - 0.15, H - 0.62], [0.26, 2.75]]) for (let k = 0; k < 3; k++) lampOff.push([hx, hy + 0.3 - k * 0.3, -0.125, k]);
+        lampOff.push([ARM - 0.62, H - 0.32, -0.085, 3]);
+        const sigInfo = [];
+        SIG.forEach((s, i) => {
+          // cơ sở: X = +nR (về tim đường), Y = lên, Z = −d (về phía nút) → det +1
+          M.makeBasis(new THREE.Vector3(s.nx, 0, s.nz), new THREE.Vector3(0, 1, 0), new THREE.Vector3(-s.dx, 0, -s.dz));
+          // tay vươn cố định 3,4 m: cột ở mép vỉa hè (v = −hw−0,6) → đầu đèn trên làn xe tới với mọi cấp p/s/t/r
+          M.setPosition(s.x, s.y, s.z);
+          poleIM.setMatrixAt(i, M);
+          const ph = ((Math.sin(s.jx * 0.0123 + s.jz * 0.0371) * 43758.5453) % 1 + 1) % 1 * 30;
+          sigInfo.push({ ph: ph + s.phase * 15 });
+          lampOff.forEach(([lx, ly, lz], k) => {
+            Ml.makeTranslation(lx, ly, lz);
+            Ml.premultiply(M);
+            lampIM.setMatrixAt(i * 7 + k, Ml);
+          });
+        });
+        poleIM.instanceMatrix.needsUpdate = true; lampIM.instanceMatrix.needsUpdate = true;
+        const OFF = new THREE.Color(0x141414), RED = new THREE.Color(1.0, 0.12, 0.06), YEL = new THREE.Color(1.0, 0.62, 0.0),
+          GRN = new THREE.Color(0.1, 1.0, 0.45), CNT = new THREE.Color(0.9, 0.15, 0.1);
+        for (let i = 0; i < SIG.length * 7; i++) lampIM.setColorAt(i, OFF);
+        lampIM.instanceColor.setUsage(THREE.DynamicDrawUsage);
+        poleIM.computeBoundingSphere(); lampIM.computeBoundingSphere();
+        scene.add(poleIM); scene.add(lampIM);
+        let lastT = -1;
+        updaters.push((dt, time) => {
+          const tq = Math.floor(time * 4);           // 4 Hz là đủ (đèn đổi theo giây)
+          if (tq === lastT) return; lastT = tq;
+          for (let i = 0; i < SIG.length; i++) {
+            const t = (time + sigInfo[i].ph) % 30;
+            const on = t < 13 ? 2 : t < 16 ? 1 : 0;    // xanh 13 s → vàng 3 s → đỏ 14 s
+            for (let h = 0; h < 2; h++) for (let k = 0; k < 3; k++) lampIM.setColorAt(i * 7 + h * 3 + k, k === on ? (k === 0 ? RED : k === 1 ? YEL : GRN) : OFF);
+            lampIM.setColorAt(i * 7 + 6, on === 0 ? CNT : on === 2 ? GRN : OFF);
+          }
+          lampIM.instanceColor.needsUpdate = true;
+        });
       }
-      lampHeads.push({ lamps, phase: i * 2.3 });
     }
-    updaters.push((dt, time) => {
-      for (const h of lampHeads) {
-        const t = (time + h.phase) % 10;
-        const on = t < 4.5 ? 2 : t < 6 ? 1 : 0; // xanh → vàng → đỏ
-        for (let k = 0; k < 3; k++) h.lamps[k].lamp.material.color.setHex(k === on ? h.lamps[k].col : 0x222222);
-      }
-    });
 
     // 3) Dải phân cách giữa các đại lộ (THĐ, Trần Phú, Điện Biên Phủ) + CÂY XÀ CỪ tán lớn + bụi cây
     // (theo Street View thật: đại lộ trung tâm rợp cây xà cừ/muồng tán tròn to, xanh quanh năm)
@@ -21382,40 +21062,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
       gg.position.set(x, yy, z); gg.rotation.y = x + z * 1.7; bakeTree(gg, x, z);
       addCollider(x, z, 1.0 * s);
     }
-    // 2b) VẠCH QUA ĐƯỜNG zebra tại giao lộ lớn (PANO-LOOP V3: nhiều finding "thiếu vạch qua đường")
-    {
-      const zebraG = [];
-      for (const [ix, iz] of INTERSECTIONS) {
-        if (ix * ix + iz * iz > 1000 * 1000) continue;
-        if (isWater(ix, iz)) continue;
-        // đoạn đường p/s gần nhất → hướng đặt vạch
-        let bd = 1e9, ux = 1, uz = 0, hw = 5;
-        for (const r of ROADS_DT) {
-          if (r.c !== 'p' && r.c !== 's') continue;
-          for (let i = 0; i < r.pts.length - 1; i++) {
-            const [x1, z1] = r.pts[i], [x2, z2] = r.pts[i + 1];
-            const dx = x2 - x1, dz = z2 - z1, l2 = dx * dx + dz * dz; if (!l2) continue;
-            let t = ((ix - x1) * dx + (iz - z1) * dz) / l2; t = Math.max(0, Math.min(1, t));
-            const d = Math.hypot(ix - (x1 + dx * t), iz - (z1 + dz * t));
-            if (d < bd) { bd = d; const L = Math.sqrt(l2); ux = dx / L; uz = dz / L; hw = ROAD_W[r.c] / 2; }
-          }
-        }
-        if (bd > 6) continue;                                   // giao lộ không nằm trên p/s
-        const rotY = Math.atan2(ux, uz);
-        for (const dir of [-1, 1]) {                             // 2 phía giao lộ
-          const cx = ix + ux * dir * (hw + 3.2), cz = iz + uz * dir * (hw + 3.2);
-          const y = groundHeightNoDeck(cx, cz);
-          if (Math.abs(y - LAND_H) > 0.4) continue;
-          for (let k = -Math.floor(hw - 1); k <= Math.floor(hw - 1); k += 1.15) {  // sọc song song trục đường
-            const sx = cx - uz * k, sz = cz + ux * k;
-            const strip = new THREE.BoxGeometry(0.5, 0.03, 2.1);
-            strip.rotateY(rotY); strip.translate(sx, y + 0.12, sz);
-            zebraG.push(strip);
-          }
-        }
-      }
-      if (zebraG.length) addMerged(zebraG, mat(0xe8e6df), 'zebra_crossings');
-    }
+    // (2b zebra hộp tại 19 INTERSECTIONS đã thay bằng zebra trong shader mạng đường ở mọi nút giao thật — Đợt 3 WP6)
 
     // ĐOẠN KHÔNG CÓ DẢI PHÂN CÁCH THẬT (prop-hunt + đối chiếu ảnh pano_153/225/195: mặt đường
     // liền chỉ vạch vàng, bồn cây giữa đường là bịa) — MEDIANS OSM lấy cả tuyến nhưng dải thật

@@ -32,6 +32,7 @@ Trò chơi: thế giới 3D Hải Phòng **tỉ lệ 1:1 mét thật** (từ 202
 | `js/assets.js` | Đăng ký + preload + streaming GLB theo khoảng cách |
 | `js/main.js` | Vòng lặp game, camera, người chơi, bloom, autoQuality, `window.__hp` |
 | `js/landmarks.js` | 15 biển thông tin địa danh (vị trí suy ra từ mapdata) |
+| `js/roadnet.js` / `js/roadtex.js` / `js/roadmarks.js` | Mạng đường (Đợt 3 WP6): đồ thị nút giao + dải + vỉa hè/bó vỉa theo `xsection.js`; 1 material Phong + DataArrayTexture (worker) + vạch kẻ trong shader; bằng chứng vạch kẻ/đèn từ pano (SINH bởi `tools/gen_roadmarks.mjs`) |
 | `js/traffic.js` / `js/vehicles.js` / `js/npc.js` / `js/quests.js`... | Giao thông, xe cưỡi được, NPC, nhiệm vụ |
 | `tools/` | Pipeline dữ liệu + test tự động (xem mục 7, 8) |
 
@@ -265,6 +266,7 @@ node process_osm.mjs     # sinh ../js/mapdata.js + mask_debug.png + log kiểm t
   đã thất bại vì coastline hở ở mép bbox), lọc đa số 3×3.
 - Muốn thêm địa danh mới: tìm id qua Overpass `nwr["name"~"..."]`, thêm id vào fetch_osm.sh mục 6
   và `addWay/addNode` trong process_osm.mjs phần 5.
+- `js/roadmarks.js` SINH bởi `node tools/gen_roadmarks.mjs` (chạy từ GỐC repo; đọc `audit/audit_enriched.json`) — không sửa tay.
 - Mục 11 (nước) từ 2026-09-06 lấy cả `rel["natural"="water"]` (sông có đảo là multipolygon, tag nằm trên relation);
   process_osm §6b2 ghép member outer thành vòng kín. File `osm_water_dt.json` hiện có (tải 2026-07) CHƯA có relation
   (81 way) — lần fetch sau tự có. Xuất `WATER` phải giữ mọi export khác BYTE-IDENTICAL (sidewalks.js khoá theo
@@ -361,6 +363,44 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-10-04 (WP6)** [ĐỢT 3 WP6 ROADS — mạng đường thật: đồ thị nút giao + dải + bó vỉa bo góc + vạch kẻ trong shader]:
+    Thay `layRoad` (hộp 30 m: ~80% tam giác là mặt hộp vô hình, vỉa hè chạy XUYÊN ngã tư, không góc bo), lời gọi
+    `ROADS_REGION` (dựng 12,5k hộp rồi bỏ hết), dải `aerial_road_ribbon` layer 2, `dashes`/`paths`/`sidewalk_TYPE`,
+    cell_road (tim vàng + vạch dừng hộp MeshBasic), cell_curb (hộp bó vỉa), zebra hộp ở 19 INTERSECTIONS và 19 cột đèn
+    tín hiệu lẻ (6 mesh/cột) bằng 3 module mới:
+    (1) `js/roadnet.js` (thuần JS, chạy được trong node): NỐI LẠI ĐỒ THỊ — ROADS_DT simplify TỪNG way nên đỉnh chung của
+    ngã ba bị mất (1.697/2.850 đầu mút lơ lửng): T-snap đầu mút ≤6,5 m vào đoạn của way khác (CHÈN đỉnh, không đổi hình
+    phố đi thẳng — mặt tiền WP1 bám ROADS_DT) + chèn giao điểm X-cross (trừ dưới mặt cầu vòm). Nút: phố p/s/t/r (có vỉa)
+    vs ngõ h/w; 2 nhánh cùng bề rộng gãy ≤50° = nối miter liền; ngõ vào phố = LỐI RẼ cắt ở mép NGOÀI vỉa hè (vỉa hè phố
+    chạy liền qua miệng ngõ như thật); còn lại = nút giao, gom CỤM nút sát nhau (đoạn nối ≤14 m, đường kính ≤26 m); mỗi
+    cặp nhánh kề nhau 1 góc: bo cung R theo cấp thấp hơn (p7 s6 t4,5 r3 m, kẹp theo bề rộng vỉa và setback ≤45% đoạn
+    chạy), thẳng (≈180°) hoặc vòng quanh tâm (>184°). Đa giác nút giao (ear-clip) + vỉa hè góc (zipper bó vỉa↔lưng) +
+    mặt đứng bó vỉa 14 cm + mép lưng; vỉa hè bị cắt nơi lấn lòng/vỉa của phố khác (đường đôi, phố song song sát).
+    Số liệu R1600: 3.580 nút, 1.451 nút giao, 1.332 miter, 595 lối rẽ ngõ, 127 nút có đèn (430 cột — mỗi nhánh phố 1 cột ở
+    góc bên PHẢI làn xe tới), 731 nhánh có zebra; 62 ô 450 m × 2 mesh `roads_x,z`/`sidewalk_x,z` = 142k tam giác (cũ: ~350k
+    tam giác các lớp đường trước gộp). Dựng 320-450 ms (cũ: khối roads 414-620 + cell_road 44-82 + cell_curb 152-277 ms,
+    đo cùng phiên) → bớt ~200-400 ms main thread lúc tải.
+    (2) `js/roadtex.js`: 1 DataArrayTexture 9 lớp 512² (LITE 256²) sinh TRONG WORKER (Blob dựng từ chính mã các hàm; lỗi →
+    sinh đồng bộ; main thread ~5 ms): nhựa sáng màu nắng (đá dăm, loang), bê tông ngõ, 4 kiểu vỉa hè theo SIDEWALK_BY_ROAD,
+    bó vỉa, decal nắp cống/song chắn rác, lớp macro 32 m (nứt, vá, cụm giọt dầu — vệt tròn tối to trông như ổ gà, đã bỏ).
+    MeshPhongMaterial + onBeforeCompile vẽ vạch kẻ THEO (u dọc, v ngang) của dải: tim vàng đôi (p), vàng đứt (s/t), trắng
+    phân làn + vạch mép (p), zebra 3 m + vạch dừng nửa PHẢI ở nút giao, vá đường, vệt bánh xe, rãnh biên — 0 tam giác thêm.
+    (3) `js/roadmarks.js` SINH bởi `tools/gen_roadmarks.mjs` từ audit_enriched.json (111 pano: tim vàng/đôi/trắng, zebra,
+    đèn tín hiệu) → kiểu tim cho đoạn ≤14 m quanh pano, bật zebra/đèn ở nút ≤45 m. Đèn tín hiệu = 2 InstancedMesh
+    (`traffic_signal_poles` cột + cần vươn 3,4 m + 2 đầu đèn + hộp đếm ngược; `traffic_signal_lamps` noCull, instanceColor
+    đổi theo pha 4 Hz, 2 trục vuông góc ngược pha, chu kỳ 30 s).
+    **BẪY/HỢP ĐỒNG MỚI:** (a) mặt vỉa hè nay = `SIDEWALK_TOP` 0,25 m (xsection: ROAD_TOP 0,11 + CURB_RISE 0,14), cũ 0,18 →
+    vật đặt vỉa hè kiểu cũ `gh+0.18` lún 7 cm; vật mới dùng `SIDEWALK_TOP` hoặc `world.roadNet.surfaceAt(x,z)` (độ cao mặt
+    nhựa/vỉa hè so với groundHeight; 0 ngoài đường và trên mặt cầu vòm; ~1,4 µs/lần — dùng được cho chân người chơi/NPC).
+    (b) Mặt nhựa nâng +4 mm/cấp (h 0,11 … p 0,13): 2 dải chồng nhau (đường đôi) → cấp cao thắng, không z-fight; đa giác nút
+    giao lấy cấp cao nhất của cụm. (c) Material đường là Phong CÓ CHỦ Ý: freezeStatic chỉ gộp Lambert (lượt 1 XOÁ uv → mất
+    shader). Mã lớp/vạch (tới ~2,1 triệu) truyền bằng `flat varying ivec2` — nội suy float có thể lệch 1 → nhiễu bit vạch.
+    (d) Hợp đồng đỉnh: position, normal, uv (dải: u dọc m, v ngang m có dấu), aSurf=(lớp, MK|seed<<13, hw, d cách bó vỉa),
+    aZeb=(u đầu, u cuối vùng zebra) — chi tiết ở đầu roadnet.js/roadtex.js. (e) `world.roadNet` = {junctions[{x,z,rad,signal,
+    zebra,arms}], signals, nearJunction(x,z,pad), surfaceAt(x,z), stats, material} cho cây/prop/giao thông/người chơi né
+    miệng ngã tư. (f) SIDEWALK_BY_ROAD vẫn khoá theo index ROADS_DT (`swTypeOf(ri)`) — đừng đổi thứ tự ROADS_DT. (g) Cần
+    WebGL2 (sampler2DArray/textureGrad); r160 còn fallback WebGL1 nhưng khi đó đường không vẽ. (h) Chạy gen_roadmarks từ
+    GỐC repo đang làm (ghi `js/roadmarks.js` theo cwd). Ảnh A/B + số đo: scratchpad `dot3/WP6` (ab_base vs ab_after).
 - **2026-09-07 (di)** [ĐỢT 2 TÍCH HỢP — 6 nhánh worktree song song + 6 phản biện đối kháng, gộp trên `dot2-int`]:
     Quy trình: mỗi nhánh (W1 merge-budget, W2 ground-grid, W3 landmark-lod, W4 visual, W5 hydro-polygon-water,
     W6 landmark-placement) làm trong worktree riêng, tự đo trước/sau trên GPU thật, có agent phản biện đọc diff +
