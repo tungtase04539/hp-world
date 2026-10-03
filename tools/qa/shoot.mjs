@@ -1,0 +1,88 @@
+// tools/qa/shoot.mjs — chụp game headless Chrome (GPU thật d3d11 qua ANGLE) + đo perf + gom lỗi JS.
+// Server tĩnh: python -m http.server <port> (chạy ở gốc repo/worktree). Mỗi agent dùng 1 cổng riêng.
+// usage: node shoot.mjs --port 8177 --out <dir> --views <views.json> [--quality full] [--w 1280 --h 720] [--perf]
+// views.json = [{id, kind:'pano', X, Z, h, pitch?}, {id, kind:'aerial', x, z, half}, {id, kind:'cam', x, z, yaw, pitch, dist}]
+// In ra JSON: {errors, buildMs, tier, gpu, perf:{...}, shots:[...]}
+// PW_PATH = đường dẫn module playwright-core (mặc định: bản cài ở scratchpad phiên 04e77d80, đổi nếu bị dọn)
+const PW = process.env.PW_PATH || 'file:///C:/Users/Admin/AppData/Local/Temp/claude/C--Users-Admin-hp-world/04e77d80-6633-4919-bfa9-5d86fbe6ae69/scratchpad/node_modules/playwright-core/index.mjs';
+const { chromium } = await import(PW);
+import fs from 'fs';
+const A = process.argv.slice(2);
+const arg = (k, d) => { const i = A.indexOf('--' + k); return i >= 0 ? A[i + 1] : d; };
+const PORT = arg('port', '8177');
+const OUT = arg('out', 'shots');
+const VIEWS = JSON.parse(fs.readFileSync(arg('views'), 'utf8'));
+const Q = arg('quality', 'full');
+const W = +arg('w', 1280), H = +arg('h', 720);
+const PERF = A.includes('--perf');
+const HOST = arg('host', '127.0.0.1');
+fs.mkdirSync(OUT, { recursive: true });
+const br = await chromium.launch({
+  executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe',
+  headless: true,
+  args: ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist', '--enable-unsafe-swiftshader=false',
+    '--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows'],
+});
+const pg = await br.newPage({ viewport: { width: W, height: H } });
+const errors = [];
+pg.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
+pg.on('console', (m) => { if (m.type() === 'error') errors.push('console: ' + m.text().slice(0, 300)); });
+const t0 = Date.now();
+await pg.goto(`http://${HOST}:${PORT}/index.html?quality=${Q}`, { waitUntil: 'domcontentloaded', timeout: 120000 });
+let hpAt = 0;
+for (let i = 0; i < 400; i++) {
+  const ok = await pg.evaluate(() => !!(window.__hp && window.__hp.teleport)).catch(() => false);
+  if (ok) { hpAt = Date.now() - t0; break; }
+  await pg.waitForTimeout(500);
+}
+await pg.evaluate(() => { const sb = document.getElementById('startBtn'); if (sb) sb.click(); }).catch(() => {});
+await pg.waitForTimeout(+arg('settle', '15000'));
+const info = await pg.evaluate(() => ({ tier: window.__hp.tier, gpu: window.__hp.gpu }));
+await pg.evaluate(() => {
+  for (const id of ['titleScreen', 'hud', 'dialogue', 'prompt', 'toast', 'banner', 'touchControls', 'gpuWarn']) {
+    const el = document.getElementById(id); if (el) el.style.display = 'none';
+  }
+  document.querySelectorAll('.toast,.gpu-toast,.notice').forEach((e) => (e.style.display = 'none'));
+  window.__hp.scene.traverse((o) => { if (o.isInstancedMesh && !o.frustumCulled && o.count >= 150 && o.count <= 220) o.count = 0; });
+  window.__hp.setTime(0.35);
+  window.__hp.player.group.visible = false;
+});
+const shots = [];
+let first = true;
+for (const v of VIEWS) {
+  const f = `${OUT}/${v.id}.png`;
+  await pg.evaluate((v) => {
+    const hp = window.__hp;
+    hp.setTime(v.time ?? 0.35);
+    if (v.kind === 'aerial') { hp.aerial(v.x, v.z, v.half || 400, v.alt || 1200); }
+    else {
+      hp.aerialOff();
+      if (v.kind === 'pano') hp.teleport(v.X, v.Z, -v.h * Math.PI / 180, v.pitch ?? 0.02, 0.1);
+      else hp.teleport(v.x, v.z, v.yaw ?? 0, v.pitch ?? 0.1, v.dist ?? 8);
+    }
+    hp.player.group.visible = false;
+  }, v);
+  await pg.waitForTimeout(first ? 4000 : +(v.wait || 1500));
+  first = false;
+  let perf = null;
+  if (PERF) {
+    perf = await pg.evaluate(async () => {
+      const r = window.__hp.renderer; const ts = [];
+      let last = performance.now();
+      for (let i = 0; i < 90; i++) { await new Promise((res) => requestAnimationFrame(res)); const n = performance.now(); ts.push(n - last); last = n; }
+      ts.sort((a, b) => a - b);
+      r.info.autoReset = false; r.info.reset();
+      await new Promise((res) => requestAnimationFrame(res));
+      const calls = r.info.render.calls, tris = r.info.render.triangles;
+      r.info.autoReset = true;
+      return { fps: +(1000 / (ts.reduce((a, b) => a + b, 0) / ts.length)).toFixed(1), p50: +ts[45].toFixed(1), p95: +ts[85].toFixed(1), calls, tris };
+    });
+  }
+  await pg.screenshot({ path: f });
+  shots.push({ id: v.id, file: f, perf });
+}
+const mem = await pg.evaluate(() => (performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1e6) : null));
+const res = { errors, hpReadyMs: hpAt, ...info, heapMB: mem, shots };
+fs.writeFileSync(`${OUT}/_result.json`, JSON.stringify(res, null, 1));
+console.log(JSON.stringify({ errors: errors.slice(0, 20), hpReadyMs: hpAt, ...info, heapMB: mem, n: shots.length, perf: shots.filter((s) => s.perf).map((s) => [s.id, s.perf]) }, null, 1));
+await br.close();

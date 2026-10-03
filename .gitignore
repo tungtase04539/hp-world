@@ -10,3 +10,6 @@ water_debug.png
 # OSM data tải từ Overpass (regeneratable: bash tools/fetch_osm.sh) — nặng, không commit
 tools/osm_*.json
 tools/mask_debug.png
+
+# Overture footprint (regeneratable: python tools/fetch_overture.py) — 21 MB
+tools/ov_buildings.csv
