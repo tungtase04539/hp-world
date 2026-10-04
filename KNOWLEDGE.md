@@ -387,6 +387,11 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     (shoot --perf, 5 góc chuẩn): cam_spawn 725→698-711 call / 4,88→4,79M tam giác, cam_high_center 1160→1133 / 7,44→7,33M,
     game_3 1197→1188 / 8,13→8,04M; hpReady 24,6-25,0 s vs 24,4-25,3 s, heap 804-895 vs 772-897 MB, fps — đều trong nhiễu
     headless (khung có lượt cập nhật bóng nhảy +170 call/+1,7M tam giác ở CẢ hai bản; so số nhỏ nhất).
+    Sau phản biện, A/B cùng phiên dot3 ece40e1 (đã gộp WP1/2/4/5) → dot3+WP6, 24 góc chuẩn: draw call/tam giác THẤP hơn ở
+    20/24 góc (vd pano_001_h090 1264→913 / 6,59→4,52M, pano_007 1350→1322, cam_high_center 1094→1048 / 6,38→6,29M,
+    game_3 1212→1203); 2 góc cao hơn là khung có lượt cập nhật bóng. hpReady 9,1-9,5 s vs 9,4-9,9 s; heap SAU GC cưỡng bức
+    (CDP) 432 vs 436 MB (heap thô của shoot.mjs lệch ±200 MB do rác chưa thu — đừng so số thô). Dựng 184-268 ms trong trình
+    duyệt lúc máy bận (node: các bước mới cột đèn/khe đường đôi/dualGap ≈ +10-15 ms).
     (2) `js/roadtex.js`: 1 DataArrayTexture 9 lớp 512² (LITE 256²) sinh TRONG WORKER (Blob dựng từ chính mã các hàm; lỗi →
     sinh đồng bộ; main thread ~2 ms): nhựa xám ẤM sáng màu nắng (đá dăm, loang; pano đo R>G>B ~(142,137,127) — bản lạnh
     g,g+1,g+2 + ánh trời xanh thành mặt đường xanh xám), bê tông ngõ, 4 kiểu vỉa hè theo SIDEWALK_BY_ROAD,
