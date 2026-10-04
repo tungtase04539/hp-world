@@ -387,9 +387,9 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     ở chỗ chưa có footprint thật) — GỠ 844 (đè 536, gần 308) + 9 bản trùng + 133 đồ treo; collider −1.067/2.462, FC
     −945/1.665; 286 claim 'cell'; 844 cellShops (617 có chữ biển). Commit ~340 ms (hình chiếu 77, đối chiếu nhà thật 32,
     áp dụng + vẽ 501 texture + atlas 226). Sau/trước: draw call cam_spawn 503/738, pano_007_h090 1.237/1.590,
-    cam_high_center 842/1.194, game_3 843/1.197; fps pano_007 56,6/39,8, pano_141 58/42, cam_high_center 53,5/45,5 (đã
+    cam_high_center 842/1.194, game_3 843/1.197; fps pano_007 56,6/44, pano_141 58/44,5, pano_021 59,3/46,8, cam_high_center 53,5/49,8 (đã
     chạm vsync ở phần lớn góc); cảnh sau freeze: con cấp gốc 1.686/3.291, mesh 2.332/3.937, material 1.183/2.883;
-    hpReady 20,2/29,7 s (1 mẫu mỗi bên, nhiễu ±5 s); tam giác ±0..+15% (fabric thủ tục CŨ mọc vào chỗ nhà ô bị gỡ — WP2 tắt nó).
+    hpReady 20,2/20,6 s (1 mẫu mỗi bên — khối ô nhanh hơn ~0,6 s nhưng nhiễu ±5 s), heap 741/830 MB; tam giác ±0..+15% (fabric thủ tục CŨ mọc vào chỗ nhà ô bị gỡ — WP2 tắt nó).
     **Texture (mục tiêu <400 canvas):** makeTex trong khối ô LƯỜI: trả texture + canvas RỖNG (qua makeTex gốc + hàm vẽ rỗng
     → đúng TEXQ/anisotropy), commit mới VẼ texture còn được cảnh dùng; texture chỉ nhà bị gỡ dùng KHÔNG BAO GIỜ vẽ (chữ biển
     của chúng lấy bằng ngữ cảnh 2D GIẢ `recorderCtx`). Texture "thường" của vật thể GIỮ được XẾP ATLAS vài trang 2048²
