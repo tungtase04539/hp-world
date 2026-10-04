@@ -18165,6 +18165,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
   }
   world.cellSink = _cells.commit({ foliage: [sharedMats.leafGreen, sharedMats.leafGreen2, sharedMats.leafDark, sharedMats.flower, sharedMats.trunk] });   // gỡ nhà ô trùng nhà thật + claim công trình giữ + xuất cellShops
   world.cellShops = world.cellSink.shops || [];
+  world.cellKept = world.cellSink.kept || [];   // nhà ô GIỮ: {name,kind,cx,cz,h,hull} — WP2 cắt footprint thật theo bao lồi
 
   // (MÁI HIÊN BẠT + BIỂN HIỆU chuyển xuống SAU khối bằng-chứng-nhà: cần houseEvidence/openSpace/panoDenies
   //  để biển hiệu chỉ mọc trước NHÀ THẬT — hết biển "bay" lơ lửng trên mặt hồ/quảng trường/vườn hoa)

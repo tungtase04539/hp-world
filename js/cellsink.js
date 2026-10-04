@@ -670,6 +670,8 @@ function commitSink(sink, THREE, realScene, realFC, colliders, opts) {
     tex: { calls: stats.texCalls, created: stats.texNew, keyHit: stats.texHit, drawn: stats.texDrawn, neverDrawn: stats.texSkipped, drawMs: +stats.texMs.toFixed(1), settleMs: +msTex.toFixed(1), kept: keptTex.size, keptBySize: [...keptTex].reduce((o, t) => { const k = t.name || (t.image ? t.image.width + "x" + t.image.height : "?"); o[k] = (o[k] || 0) + 1; return o; }, {}) }, materialsKept: keptMat.size,
     memo: { hit: stats.memoHit, miss: stats.memoMiss }, atlas, brandHits: stats.brandHits,
     shops,
+    // nhà ô GIỮ LẠI + bao lồi ô khối đặc (để WP2 CẮT footprint thật theo đa giác thay vì bỏ/giữ cả footprint)
+    kept: live ? bl.filter((it) => !it.removed).map((it) => ({ name: it.name, kind: it.kind, cx: +it.cx.toFixed(1), cz: +it.cz.toFixed(1), h: +it.height.toFixed(1), hull: it.H.map(([x, z]) => [+x.toFixed(1), +z.toFixed(1)]) })) : [],
   };
   if (DBG) _report.debug = {
     items: bl.map((it) => ({ n: it.name, k: it.kind, r: it.removed, f: +it.frac.toFixed(2), d: isFinite(it.dReal) ? +it.dReal.toFixed(1) : -1, h: +it.height.toFixed(1), H: it.H.map(([x, z]) => [+x.toFixed(1), +z.toFixed(1)]) })),
