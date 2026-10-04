@@ -650,17 +650,19 @@ export async function buildWorld(scene, prog = () => {}) {
   const cPark = new THREE.Color(LU_ON ? 0x66884a : 0x6fbf5a);
   // Đợt 3 W2-D: hệ mặt đất sử dụng đất (js/landuse.js): material chung cho ground_local + 2 dải hồ (cùng chương trình
   // shader), raster dựng trong worker khi footprint nhà THẬT đã chốt (world.rbData sau khối fabric).
-  const luSys = LU_ON ? makeGroundSystem(THREE, { lite: LITE }) : {
+  // edge: 170 m cuối trước ±LOCAL_HALF hoà về màu đỉnh = màu tấm thô bên ngoài (không đường nối thẳng ở ±2000 m)
+  const luSys = LU_ON ? makeGroundSystem(THREE, { lite: LITE, edge: LOCAL_HALF }) : {
     material: (o = {}) => new THREE.MeshLambertMaterial({ vertexColors: true, polygonOffset: !!o.polygonOffset,
       polygonOffsetFactor: o.polygonOffset ? o.polygonOffset[0] : 0, polygonOffsetUnits: o.polygonOffset ? o.polygonOffset[1] : 0 }),
     start() {}, stats: { off: true },
   };
   world.landuse = luSys;
-  if (LU_ON) {
+  // ?fabric=proc (không có footprint thật, world.rbData không bao giờ có) → không chờ: giữ màu đỉnh (raster không có nhà
+  // sẽ biến cả phố thành "bãi trống")
+  if (LU_ON && FABRIC === 'real') {
     let tries = 0;
     const kick = () => {
       if (world.rbData) { luSys.start(world.rbData, { cellKept: world.cellKept }); return; }
-      // ?fabric=proc (không có footprint thật) → giữ màu đỉnh (raster không có nhà sẽ biến cả phố thành "bãi trống")
       if (++tries < 240) setTimeout(kick, 250);
     };
     setTimeout(kick, 250);

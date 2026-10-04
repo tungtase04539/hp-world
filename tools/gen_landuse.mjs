@@ -1,15 +1,13 @@
 // tools/gen_landuse.mjs — RASTER SỬ DỤNG ĐẤT ±2048 m, 2 m/điểm ảnh (2048²) → js/landuse_data.js (Đợt 3 wave 2 W2-D)
-// Chạy ở gốc repo: node tools/gen_landuse.mjs [--png out.png]   (--png: ảnh xem nhanh, cần python+PIL? KHÔNG: tự ghi PPM)
+// Chạy ở gốc repo: node tools/gen_landuse.mjs [--ppm out.ppm]   (--ppm: ảnh xem nhanh lớp + nhà RB + khoảng cách)
 // Nguồn (đều có sẵn hoặc tải được):
 //   tools/osm_landuse.json  — Overpass (landuse/amenity/leisure/natural/place/...), xem lệnh tải trong fetch_osm.sh mục 12
 //   js/mapdata.js PARKS     — công viên/vườn hoa OSM đã dùng trong game
-//   js/landmark_polys.js    — footprint thật 19 địa danh (nhà) + sân trước (đệm quảng trường)
-//   js/buildings_real.js    — footprint nhà thật RB01 (đúng bộ game vẽ) → lớp NHÀ + KHOẢNG CÁCH tới tường gần nhất
+//   js/landmark_polys.js    — footprint thật các địa danh (nhà) + sân trước (đệm quảng trường)
 //   tools/osm_alleys.json   — lối đi footway/path TRONG công viên → lối lát gạch
-// Ra: 2 mặt phẳng byte nén deflate-raw, base64:
-//   CLS[i] = lớp (0..15, bảng LU_CLASS)          — tô đa giác theo THỨ TỰ ƯU TIÊN (sau đè trước)
-//   DST[i] = min(255, round(d·8)), d = khoảng cách (m) tới điểm ảnh NHÀ gần nhất (EDT chính xác, Felzenszwalb)
-//   cả 2 lọc "Up" (byte − byte hàng trên, mod 256) trước khi nén → mặt phẳng khoảng cách trơn nén ~10×.
+// Ra: MỘT mặt phẳng byte LỚP (CLS[i] = 0..15, bảng C bên dưới; đa giác tô theo THỨ TỰ ƯU TIÊN, sau đè trước), lọc "Up"
+//   (byte − byte hàng trên, mod 256), nén deflate-raw, base64. Footprint nhà THƯỜNG (RB) KHÔNG nướng vào file: js/landuse.js
+//   tô footprint ĐANG SỐNG + tính khoảng cách / mật độ / độ phủ trong worker lúc chạy (nhà bị claim giết lộ đúng lớp đất).
 // Toạ độ: điểm ảnh (i, j) phủ x ∈ [X0 + i·RES, X0 + (i+1)·RES), z tương tự; hàng j tăng theo +z (NAM).
 import fs from 'fs';
 import zlib from 'zlib';
@@ -32,7 +30,7 @@ export const C = {
   PLAZA: 3,    // quảng trường / phố đi bộ / sân trước công trình lớn: đá lát xám
   TEMPLE: 4,   // sân chùa / đền / nhà thờ: gạch đỏ (gạch Bát Tràng)
   CAMPUS: 5,   // sân trường / bệnh viện / cơ quan: bê tông sáng + gạch block
-  PARK: 6,     // bãi đỗ xe: nhựa sẫm
+  PARKING: 6,  // BÃI ĐỖ XE: nhựa sẫm (≠ claim 'park' của WP2 = công viên → GRASS)
   DIRT: 7,     // công trường / đất bỏ hoang / bãi cát: đất nện
   GRASS: 8,    // cỏ công viên / vườn hoa / thảm cỏ
   ROUGH: 9,    // cỏ dại / bụi / ruộng / đất ướt / nghĩa trang
@@ -105,15 +103,17 @@ function assembleRings(ways) {
 // ---------- phân lớp thẻ OSM → (lớp, ưu tiên) ; ưu tiên cao tô SAU ----------
 function classify(t) {
   const lu = t.landuse, am = t.amenity, le = t.leisure, na = t.natural;
+  // đa giác là NHÀ (building=*: chùa/đình, chợ có mái, nhà văn hoá, cây xăng, tượng đài Lê Chân way 1189133591...) → bỏ:
+  // thân nhà do footprint game vẽ; tô lớp sân lên đó làm "thảm" gạch đỏ / sân trường lộ ra khi nhà bị claim giết (phản biện W2-D)
+  if (t.building && t.building !== 'no') return null;
   if (le === 'swimming_pool' || (le === 'pitch' && t.sport === 'swimming')) return [C.POOL, 90];
   if (le === 'track') return [C.TRACK, 85];
   if (le === 'pitch') {
-    if (t.building) return null;   // sân có mái (đã là nhà)
     if (t.sport === 'soccer' || t.surface === 'artificial_turf' || t.surface === 'grass') return [C.TURF, 84];
     return [C.COURT, 84];
   }
   if (le === 'stadium') return [C.TURF, 40];            // sân vận động: cỏ (khán đài là nhà → BLD đè)
-  if (am === 'parking' && t.parking !== 'street_side' && t.parking !== 'underground' && t.parking !== 'multi-storey') return [C.PARK, 70];
+  if (am === 'parking' && t.parking !== 'street_side' && t.parking !== 'underground' && t.parking !== 'multi-storey') return [C.PARKING, 70];
   if (t.place === 'square' || (t.highway === 'pedestrian') || (t['area:highway'] && t['area:highway'] !== 'traffic_island')) return [C.PLAZA, 75];
   if (t.historic === 'monument' || t.historic === 'memorial') return [C.PLAZA, 74];
   if (le === 'playground') return [C.PLAZA, 72];
@@ -199,10 +199,21 @@ for (const k of FORECOURT) {
 // (world.rbData, đã trừ D.dead của claims/quảng trường/công viên) trong worker lúc chạy rồi mới tính khoảng cách → nhà bị
 // giết lộ đúng lớp đất bên dưới (quảng trường/cỏ), không để "vết nhà" sẫm. File nhỏ hơn ~4× (khối nhà nén kém).
 // Không phải mọi LM_POLY là NHÀ: 'square' = quảng trường Nhà hát (đá lát); 3 trường = KHUÔN VIÊN (osm amenity=school);
-// chùa Hàng = cả khuôn viên chùa (sân gạch). Còn lại là thân công trình.
-const LM_AREA = { square: C.PLAZA, thptnq: C.CAMPUS, thcsnq: C.CAMPUS, thcstp: C.CAMPUS, chuahang: C.TEMPLE };
+// chùa Hàng = khuôn viên chùa (viền đá + lõi sân gạch). Còn lại là thân công trình.
+// chùa Hàng: cả khuôn viên 74×61 m tô gạch thành "thảm đỏ" (phản biện) → VIỀN đá lát 6 m + LÕI sân gạch (đa giác thu về tâm).
+const LM_AREA = { square: C.PLAZA, thptnq: C.CAMPUS, thcsnq: C.CAMPUS, thcstp: C.CAMPUS, chuahang: C.PLAZA };
+const LM_CORE = { chuahang: [C.TEMPLE, 6] };
 let nb = 0;
-for (const k of Object.keys(LM_POLY)) nb += fillRings([LM_POLY[k]], LM_AREA[k] ?? C.BLD);
+for (const k of Object.keys(LM_POLY)) {
+  const P = LM_POLY[k];
+  nb += fillRings([P], LM_AREA[k] ?? C.BLD);
+  if (LM_CORE[k]) {
+    const [val, inset] = LM_CORE[k];
+    let cx = 0, cz = 0; for (const [x, z] of P) { cx += x; cz += z; } cx /= P.length; cz /= P.length;
+    const R = Math.max(...P.map(([x, z]) => Math.hypot(x - cx, z - cz))), s = (R - inset) / R;
+    fillRings([P.map(([x, z]) => [cx + (x - cx) * s, cz + (z - cz) * s])], val);
+  }
+}
 stats.lmPx = nb;
 
 // ---------- thống kê ----------
@@ -230,7 +241,7 @@ if (pi > 0) {
   const { luCompose } = await import('../js/landuse.js');
   const D = decodeRB(RB_B64);
   const t1 = Date.now();
-  const rg = luCompose(cls.slice(), { x: D.x, z: D.z, vStart: D.vStart, dead: D.dead, nB: D.nB }, LU_GRID);
+  const { rg } = luCompose(cls.slice(), { x: D.x, z: D.z, vStart: D.vStart, dead: D.dead, nB: D.nB }, LU_GRID);
   console.log('luCompose ms', Date.now() - t1);
   const PAL = [[60, 110, 60], [150, 145, 135], [120, 115, 110], [200, 200, 195], [170, 80, 60], [190, 185, 160], [70, 70, 75], [170, 140, 100],
     [90, 160, 70], [110, 130, 80], [40, 140, 70], [60, 120, 160], [190, 60, 50], [60, 160, 220], [130, 110, 90], [40, 30, 30]];
