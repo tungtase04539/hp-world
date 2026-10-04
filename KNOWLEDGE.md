@@ -475,9 +475,12 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     ở nửa trên khung (`skyfrac.py`, 16 pano chuẩn + 10 pano cây): sai số tuyệt đối trung bình so với ảnh thật 0,20 → 0,10
     (16 pano chuẩn, ảnh phản biện + bản cuối: 0,17 → 0,093)
     (pano_007_h090: thật 0,18 · cũ 0,55 · mới 0,28; pano_071_h180 0,19 · 0,49 · 0,22; pano_019_h090 0,17 · 0,46 · 0,21).
-    Perf std (traffic off): fps 60 cả hai (vsync), draw call ≈ (±25 do bóng), tam giác giảm 0-12% (cam_high_center
-    6,15 → 5,44 M, pano_001_h090 4,44 → 4,18 M); hpReady 4,20 → 4,27 s (nhiễu ±0,1 s); dựng cây cùng phiên buildTrees 120,6 → 123,7 ms (facadeFit 22-43 ms tuỳ tải máy, bù
-    bằng ít thẻ lá hơn), plantStreetTrees 59 → 56 ms; 31 cây non quảng trường. p95 khung (traffic on) ~19-21 ms cả hai.
+    Perf std (traffic off, bản cuối, cùng phiên với base): fps 60 cả hai (vsync), p95 khung 17,7-19,8 ms cả hai, draw
+    call ≈ (±25 do lượt bóng rơi vào khung đo), tam giác giảm 0-12% (cam_high_center 6,15 → 5,44 M, pano_021_h270
+    6,66 → 6,20 M, pano_001_h090 4,44 → 4,10 M); hpReady 3,71/3,84 → 3,91/4,19 s (nhiễu máy chung ±0,3 s). Dựng cây
+    (đo xen kẽ cùng phiên, tách `recsMs/kitMs/atlasMs` trong log `[trees] dựng`): base 67-91 ms → 103-133 ms; phần
+    thêm = biến hình + `facadeFit` 30-52 ms (tuỳ tải máy) + kit gần phức tạp hơn vài ms; plantStreetTrees 55-56 → 56-62 ms;
+    31 cây non quảng trường. p95 khung (traffic on, vòng đầu) ~19-21 ms cả hai.
     **BẪY:** (1) buildTrees cần `nearKits` TRƯỚC khi tính biến hình (base/top/rad đo từ hình học kit) — thứ tự: bản ghi →
     kit → biến hình → ma trận. (2) Kit XA dùng biến thể 0 của loài → PHẢI có sy/lift/cs riêng (`MF`/`SHPF`; nhóm far
     mang `g.S = SHPF`) — dùng chung aShape kit gần = tán nhảy ±2 m ở ranh 180 m; đổi dáng kit thì kiểm lại (rprobe4
