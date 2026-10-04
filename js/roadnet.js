@@ -734,7 +734,8 @@ export function buildRoadNet(ROADS_DT, deps) {
   // mép dải (chia ≤ 4 m) nhìn sang ứng viên phố khác GẦN SONG SONG (|cos| > 0,95) ở đúng phía đó; khe 0,05 < g ≤ 2,5 m
   // (khác cấp ≤ 1,2 m) ở CẢ 2 đầu mẩu → dải NHỰA phủ đúng khe (mép dải này → mép dải kia, không chồng → không z-fight),
   // thấp hơn dải 0,5 mm, UV thế giới, không vạch. (Thử dải phân cách nổi cho g > 1,2 m: trái ảnh pano_327 → bỏ.)
-  // Chỉ way chỉ số NHỎ hơn phát (cặp thấy nhau 2 chiều). stats.gapFill = m².
+  // CẢ 2 way của cặp đều phát (gần nút giao dải 1 bên bị cắt lùi → chỉ bên kia còn mép): phần trùng khít, cùng UV thế
+  // giới/màu, lệch nhau 0,5 mm (way chỉ số lớn thấp hơn) → không thấy z-fight. stats.gapFill = m² (tính cả trùng).
   function gapFill(w, p1a, p1b, p2a, p2b, y1, y2, cands) {
     for (const sg of [-1, 1]) {
       const e1 = sg < 0 ? p1a : p1b, e2 = sg < 0 ? p2a : p2b;
@@ -743,14 +744,15 @@ export function buildRoadNet(ROADS_DT, deps) {
       const sx = (e1[0] - (sg < 0 ? p1b : p1a)[0]), sz = (e1[1] - (sg < 0 ? p1b : p1a)[1]);
       const outS = ox * sx + oz * sz >= 0 ? 1 : -1;
       for (const c of cands) {
-        if (!(c[7] > w.wi0)) continue;
+        const lo = c[7] > w.wi0 ? 0.0005 : 0.001;   // CẢ 2 way cùng phát (vùng nút giao chỉ 1 bên còn dải); trùng khít, cùng màu
         const cdx = c[2] - c[0], cdz = c[3] - c[1], cl = Math.hypot(cdx, cdz); if (cl < 1) continue;
         if (Math.abs((cdx * ux + cdz * uz) / cl) < 0.95) continue;
         const same = c[8] === w.c, gmax = same ? 2.5 : 1.2, ohw = c[4] + 0.2;
         if (segSegDist(e1[0], e1[1], e2[0], e2[1], c[0], c[1], c[2], c[3]) > ohw + gmax + 0.5) continue;
         const n = Math.max(1, Math.ceil(eL / 4));
         const gapAt = (x, z) => {   // → [qx,qz,g] điểm trên mép dải kia | null
-          const t = ((x - c[0]) * cdx + (z - c[1]) * cdz) / (cl * cl); if (t < 0 || t > 1) return null;
+          const t = ((x - c[0]) * cdx + (z - c[1]) * cdz) / (cl * cl), te = 3 / cl;   // ±3 m quá đầu đoạn: phủ tới góc nút giao
+          if (t < -te || t > 1 + te) return null;
           const fx = c[0] + cdx * t, fz = c[1] + cdz * t, dx = fx - x, dz = fz - z, d = Math.hypot(dx, dz);
           const g = d - ohw; if (g <= 0.05 || g > gmax) return null;
           if ((dx * ox + dz * oz) * outS < 0.7 * d) return null;   // ứng viên phải nằm ĐÚNG phía mép này
@@ -764,7 +766,7 @@ export function buildRoadNet(ROADS_DT, deps) {
         for (let i = 1; i <= n; i++) {
           const A = run[i - 1], B = run[i]; if (!A || !B) continue;
           const len = Math.hypot(B[0] - A[0], B[1] - A[1]), area = len * (A[3][2] + B[3][2]) / 2;
-          const yA = A[2] - 0.0005, yB = B[2] - 0.0005;
+          const yA = A[2] - lo, yB = B[2] - lo;
           emit('roads', [[A[0], yA, A[1], A[0], A[1]], [B[0], yB, B[1], B[0], B[1]], [B[3][0], yB, B[3][1], B[3][0], B[3][1]], [A[3][0], yA, A[3][1], A[3][0], A[3][1]]],
             quadTris, [0, 1, 0], [RL.ASPHALT, MK.WUV, 0], null);
           stats.gapFill = (stats.gapFill || 0) + area;
@@ -864,6 +866,19 @@ export function buildRoadNet(ROADS_DT, deps) {
     }
     // ---- vỉa hè 2 bên ----
     const closeQuad = closeQuadOf(cands, hw + sw);
+    // (x,z) trên mép trong vỉa hè, (ux,uz) hướng dải, (ox,oz) pháp tuyến ra ngoài: có làn phố khác GẦN SONG SONG ở phía đó
+    // mà mép lòng của nó cách ≤ 2,5 m (khác cấp ≤ 1,2 m)? — cùng tiêu chí gapFill (đường đôi: khe phủ nhựa, không vỉa hè)
+    const dualGap = (x, z, ux, uz, ox, oz) => {
+      for (const c of cands) {
+        const cdx = c[2] - c[0], cdz = c[3] - c[1], cl = Math.hypot(cdx, cdz); if (cl < 1) continue;
+        if (Math.abs((cdx * ux + cdz * uz) / cl) < 0.95) continue;
+        const t = ((x - c[0]) * cdx + (z - c[1]) * cdz) / (cl * cl); if (t < 0 || t > 1) continue;
+        const fx = c[0] + cdx * t - x, fz = c[1] + cdz * t - z, d = Math.hypot(fx, fz), g = d - c[4] - 0.2;
+        if (g > (c[8] === w.c ? 2.5 : 1.2) || g < -0.5 || fx * ox + fz * oz < 0.7 * d) continue;
+        return true;
+      }
+      return false;
+    };
     if (street && sw > 0) {
       for (const side of [0, 1]) {
         const sg = side ? 1 : -1;
@@ -879,7 +894,11 @@ export function buildRoadNet(ROADS_DT, deps) {
           const bad = (S1, S2) => {
             if (!cands.length) return 0;
             const m1 = off(S1, vmid), m2 = off(S2, vmid), c1 = off(S1, vin), c2 = off(S2, vin);
-            return Math.max(foreign((m1[0] + m2[0]) / 2, (m1[1] + m2[1]) / 2, cands), foreign((c1[0] + c2[0]) / 2, (c1[1] + c2[1]) / 2, cands));
+            const f = Math.max(foreign((m1[0] + m2[0]) / 2, (m1[1] + m2[1]) / 2, cands), foreign((c1[0] + c2[0]) / 2, (c1[1] + c2[1]) / 2, cands));
+            if (f) return f;
+            // mép trong nhìn sang làn đường đôi song song cách ≤ 2,5 m → không vỉa hè trong khe (gapFill phủ nhựa)
+            const [ux, uz] = norm(c2[0] - c1[0], c2[1] - c1[1]), ol = Math.hypot(S1.mx, S1.mz) || 1;
+            return dualGap((c1[0] + c2[0]) / 2, (c1[1] + c2[1]) / 2, ux, uz, sg * S1.mx / ol, sg * S1.mz / ol) ? 2 : 0;
           };
           for (let i = 0; i < S0.length; i++) {
             if (i > 0 && cands.length && closeQuad(S0[i - 1], S0[i])) {
