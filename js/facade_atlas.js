@@ -282,7 +282,7 @@ export const SIGN_Y = [2.95, 3.85];
 const SB_FULL = [0.05, 3.95];
 export const SIGN_EXT = {
   G_SHOP0: SB_FULL, G_SHOP1: SB_FULL, G_SHOP2: SB_FULL, G_SHOP3: SB_FULL, G_SHUT0: SB_FULL, G_SHUT1: SB_FULL,
-  G_GLASS: SB_FULL, G_GATE: SB_FULL, G_OLD: [0.5, 3.5],
+  G_GLASS: SB_FULL, G_GATE: SB_FULL, G_OLD: [0.5, 3.5], G_MOTO: SB_FULL, G_ELEC: SB_FULL, G_HARD: SB_FULL,
 };
 function signBand(x0 = SB_FULL[0], x1 = SB_FULL[1]) {
   rect(x0, SIGN_Y[0], x1, SIGN_Y[1], [236, 236, 236], M_SIGN);
@@ -610,7 +610,7 @@ export function buildFacadeAtlas(size = 2048, opts = {}) {
   });
   cell('S_ADS', W4, UPH, () => {       // quảng cáo vẽ tay trên tường hồi (đặc sản phố VN) — từ CHUNG, không thương hiệu
     WALL(0.5);
-    const t = textMask([{ t: ADS[1], size: 0.34, y: 0.3 }, { t: '0912.345.678', size: 0.3, y: 0.72 }], 512, 128);
+    const t = textMask([{ t: ADS[1], size: 0.34, y: 0.3 }, { t: '0000.345.678', size: 0.3, y: 0.72 }], 512, 128);
     blitText(t, 512, 128, 0.15, 1.2, 3.85, 2.3, [178, 34, 30], M_KEEP);
   });
   cell('S_BACK', W4, UPH, () => {      // mặt sau: cửa sổ nhỏ + cục nóng + ống
@@ -714,7 +714,8 @@ export function buildFacadeAtlas(size = 2048, opts = {}) {
       vgrad(0, y0, 4, y0 + 1, [246, 246, 246], [212, 212, 212], M_SIGN, 4);
       rect(0, y0, 4, y0 + 0.05, [56, 56, 58], M_KEEP); rect(0, y0 + 0.95, 4, y0 + 1, [56, 56, 58], M_KEEP);
       rect(0, y0, 0.05, y0 + 1, [56, 56, 58], M_KEEP); rect(3.95, y0, 4, y0 + 1, [56, 56, 58], M_KEEP);
-      const ph = '0225.3' + String(100 + ((wi * 37) % 900)) + '.' + String(100 + ((wi * 71) % 900));
+      // SĐT GIẢ RÕ RÀNG: đầu '0000.' không phải mã vùng/mạng VN nào → không thể trùng thuê bao thật (từng dùng '0225.3xxx' = định dạng máy bàn HP thật)
+      const ph = '0000.' + String(100 + ((wi * 37) % 900)) + '.' + String(100 + ((wi * 71) % 900));
       const t = textMask([{ t: word, size: 0.52, y: 0.4 }, { t: 'ĐT: ' + ph, size: 0.2, y: 0.84 }], 512, 128);
       blitText(t, 512, 128, 0.12, y0 + 0.08, 3.88, y0 + 0.92, [255, 255, 255], M_TEXT);
     }
@@ -729,7 +730,39 @@ export function buildFacadeAtlas(size = 2048, opts = {}) {
     for (let k = -2; k <= 2; k++) hline(0.28 + k * 0.06, 0.46, 0.78, 0.012, [150, 152, 154], M_KEEP);   // lưới quạt
     disc(0.62, 0.28, 0.045, [210, 210, 206], M_KEEP);
   });
-  const ms = typeof performance !== 'undefined' ? performance.now() - t0 : 0;
+  // =================== THÊM BIẾN THỂ TẦNG TRỆT (sau D_AC → chỉ số ô cũ giữ nguyên) ===================
+  // Phản biện WP2: khi WP1 v1 nối mặt phố liền, cùng 1 nội thất "kệ hàng nhiều màu" lặp cả dãy → thêm 3 kiểu cửa hàng
+  // rất HP: sửa xe máy, điện thoại/điện máy, điện nước/vật liệu. Đều có dải biển (SIGN_EXT).
+  cell('G_MOTO', W4, GH, () => {       // sửa xe máy: nền tối dầu mỡ, lốp treo tường, xe đang sửa, máy nén khí đỏ
+    groundWall(0.45); threshold();
+    interior(0.15, 0.14, 3.85, 2.8, -8);
+    rect(0.15, 0.14, 3.85, 0.5, [70, 66, 60], M_KEEP); for (let k = 0; k < 6; k++) { const x = R(0.3, 3.4); shade(x, 0.14, x + R(0.2, 0.5), 0.45, 0.7); }
+    for (let k = 0; k < 5; k++) { const x = 0.45 + k * 0.42, y = R(1.9, 2.3); disc(x, y, 0.2, [22, 22, 24], M_KEEP); disc(x, y, 0.1, [58, 54, 50], M_KEEP); }   // lốp treo
+    rect(2.6, 1.6, 3.7, 2.5, [92, 86, 78], M_KEEP); for (let k = 0; k < 9; k++) { const x = R(2.65, 3.6), y = R(1.65, 2.4); rect(x, y, x + 0.05, y + R(0.12, 0.25), [170, 170, 172], M_KEEP); }   // bảng đồ nghề
+    disc(1.1, 0.42, 0.26, [26, 26, 28], M_KEEP); disc(2.2, 0.42, 0.26, [26, 26, 28], M_KEEP); disc(1.1, 0.42, 0.1, [150, 150, 150], M_KEEP); disc(2.2, 0.42, 0.1, [150, 150, 150], M_KEEP);
+    rect(1.15, 0.55, 2.15, 0.95, [40, 70, 140], M_KEEP); rect(1.5, 0.95, 1.95, 1.18, [30, 30, 32], M_KEEP); rect(2.0, 0.9, 2.12, 1.3, [60, 60, 62], M_KEEP);   // xe máy
+    rect(3.2, 0.14, 3.75, 0.62, [176, 40, 34], M_KEEP); disc(3.47, 0.75, 0.13, [176, 40, 34], M_KEEP);   // máy nén khí
+    tubeLight(0.4, 2.4, 2.62); shutterBox(0.12, 3.88, 2.8); signBand();
+  });
+  cell('G_ELEC', W4, GH, () => {       // điện thoại/điện máy: nội thất trắng sáng, tủ kính trưng bày, tranh quảng cáo chung
+    groundWall(0.1); threshold();
+    vgrad(0.15, 0.14, 3.85, 2.8, [226, 228, 230], [190, 192, 194], M_KEEP, 3);
+    for (const [x0, x1] of [[0.25, 1.05], [2.95, 3.75]]) { rect(x0, 1.3, x1, 2.45, [R(40, 200), R(80, 160), R(120, 220)], M_KEEP); rect(x0 + 0.08, 1.38, x1 - 0.08, 1.75, [245, 245, 245], M_KEEP); }   // tranh
+    for (let y = 1.5; y < 2.4; y += 0.3) { rect(1.2, y, 2.8, y + 0.03, [250, 250, 250], M_KEEP); for (let x = 1.25; x < 2.75; x += 0.16) rect(x, y + 0.03, x + 0.09, y + 0.2, [30 + R(0, 40), 32, 36], M_KEEP); }   // kệ máy
+    rect(0.3, 0.14, 3.7, 1.0, [150, 156, 162], M_KEEP); glass(0.35, 0.45, 3.65, 0.95, 0, -1); frame(0.3, 0.4, 3.7, 1.0, FR_SILVER, 0.04, 3);   // tủ kính
+    for (let x = 0.5; x < 3.5; x += 0.3) rect(x, 0.5, x + 0.12, 0.62, [24, 26, 30], M_KEEP);
+    tubeLight(0.3, 3.7, 2.68); tubeLight(0.3, 3.7, 2.55); signBand();
+  });
+  cell('G_HARD', W4, GH, () => {       // điện nước/vật liệu: cuộn dây, ống nhựa dựng, xô chậu, bao tải chất cửa
+    groundWall(0.35); threshold();
+    interior(0.15, 0.14, 3.85, 2.8, 2);
+    for (let x = 0.25; x < 1.3; x += 0.09) vline(x, 0.14, R(2.1, 2.6), 0.06, rnd() < 0.6 ? [228, 228, 222] : [120, 128, 134], M_KEEP);   // ống nhựa dựng
+    for (let k = 0; k < 6; k++) { const x = R(1.5, 3.6), y = R(1.6, 2.5), c = [[200, 100, 40], [40, 80, 160], [30, 30, 30], [190, 40, 36]][(rnd() * 4) | 0]; disc(x, y, 0.17, c, M_KEEP); disc(x, y, 0.07, [50, 46, 42], M_KEEP); }   // cuộn dây treo
+    for (let k = 0; k < 5; k++) { const x = R(1.4, 3.4), c = [[60, 110, 170], [200, 60, 50], [70, 140, 80], [220, 180, 60]][(rnd() * 4) | 0]; rect(x, 0.14, x + R(0.3, 0.45), R(0.45, 0.75), c, M_KEEP); }   // xô/chậu
+    rect(0.2, 0.14, 1.3, 0.5, [196, 186, 160], M_KEEP); hline(0.32, 0.2, 1.3, 0.02, [160, 150, 128], M_KEEP);   // bao tải
+    tubeLight(0.3, 3.7, 2.62); shutterBox(0.12, 3.88, 2.8); signBand();
+  });
+  const ms =typeof performance !== 'undefined' ? performance.now() - t0 : 0;
   const data = B ? new Uint8Array(B.buffer) : null;
   B = null; _layoutOnly = false; for (const k in _bases) delete _bases[k];
   return { data, size, mods: MODS.slice(), MOD: { ...MOD }, ms };

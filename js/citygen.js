@@ -17,7 +17,8 @@
 //    chung lộ, 4 mặt mái (ô atlas ở aFac.z), 5 chi tiết (ô atlas ở aFac.z), 6 mặt trước HỘP BIỂN 3D (vẽ y hệt kind 1).
 //    Cờ: +8 nhà LỚN/CAO/độc lập (tường hông + sau cũng có cửa sổ đều), +16 mặt phố DÀI (≥3 bay, ≤5 tầng: dãy nhà ống bị
 //    gộp → mỗi bay 1 nhà: màu/mô-đun riêng), +32 mái dốc (vùng trên đỉnh tường = tường hồi trơn, không phải lan can),
-//    +64·cấp đường trước mặt tiền (0 phố chính p/s/t: cửa hàng; 1 phố r/w: nửa nhà ở; 2 ngõ h: ~85% nhà ở, không biển).
+//    +64·rc (0 phố chính p/s/t: cửa hàng; 1 phố r/w: nửa nhà ở; 2 ngõ h: ~85% nhà ở, không biển; 3 nhà ở hẳn) — dữ liệu
+//    WP1 v1 có công năng trệt từng nhà (INFO: USE_SHOP → rc 0, USE_HOME → rc 3), v0 (info=0) thì theo cấp đường gần nhất.
 //    uv tường: x = bay (0..nb), y = ĐỘ CAO LOCAL (m, tính từ chân nhà). uv mái/chi tiết: đơn vị ô atlas (shader lấy fract).
 //  * Mô-đun TẦNG TRỆT chọn bằng HASH NGUYÊN (uint, ihash/pidx) — groundModule() trong JS ra ĐÚNG từng bit như GPU (đã
 //    kiểm 8192 mẫu trên Radeon 890M/ANGLE) → citygen biết bay nào có dải biển (SIGN_EXT của facade_atlas.js) và dựng hộp
@@ -30,6 +31,7 @@ import * as THREE from 'three';
 import { RB_B64 } from './buildings_real.js';
 import {
   decodeRB, EDGE, STYLE, ROOF, WALL_PALETTE, ROOF_PALETTE, GROUND_H, FLOOR_H, PARAPET_H, heightOf,
+  makeFootprintGrid, refreshPartyEdges, INFO,
 } from './buildings_data.js';
 import { claimAt, claimOverlapFrac } from './claims.js';
 import { buildFacadeAtlas, MOD, ATLAS_N, SIGN_CELLS, SIGN_EXT, SIGN_Y } from './facade_atlas.js';
@@ -82,9 +84,10 @@ const SETS = {
   U4: ['U_VILLA', 'U_VILLA', 'U_SHUT0', 'U_ARCH', 'U_BALU'],
   U5: ['U_SHED'],
   U6: ['U_CIVIC', 'U_CIVIC', 'U_RIB'],
-  G0: ['G_SHOP0', 'G_SHOP1', 'G_SHOP2', 'G_SHOP3', 'G_SHUT0', 'G_SHUT0', 'G_SHUT1', 'G_GLASS', 'G_GATE', 'G_HOME0', 'G_HOME1', 'G_SHOP0', 'G_SHOP2'],
-  G1: ['G_OLD', 'G_OLD', 'G_SHOP0', 'G_SHUT0', 'G_SHUT1', 'G_GATE', 'G_SHOP2', 'G_HOME0'],
-  G2: ['G_SHOP0', 'G_SHUT0', 'G_GATE', 'G_HOME0', 'G_SHOP2', 'G_HOME1'],
+  // (phản biện: mặt phố liền của WP1 v1 lặp 1 kiểu kệ hàng cả dãy → thêm sửa xe/điện thoại/điện nước, bớt lặp SHOP0)
+  G0: ['G_SHOP0', 'G_SHOP1', 'G_SHOP2', 'G_SHOP3', 'G_MOTO', 'G_ELEC', 'G_HARD', 'G_SHUT0', 'G_SHUT0', 'G_SHUT1', 'G_GLASS', 'G_GATE', 'G_HOME0', 'G_HOME1', 'G_SHOP2', 'G_MOTO'],
+  G1: ['G_OLD', 'G_OLD', 'G_SHOP0', 'G_SHUT0', 'G_SHUT1', 'G_GATE', 'G_SHOP2', 'G_HOME0', 'G_HARD', 'G_ELEC'],
+  G2: ['G_SHOP0', 'G_SHUT0', 'G_GATE', 'G_HOME0', 'G_SHOP2', 'G_HOME1', 'G_MOTO', 'G_HARD'],
   G3: ['G_GLASS', 'G_GLASS', 'G_SHOP3'],
   G4: ['G_HOME0', 'G_CIVIC'],
   G5: ['G_WARE'],
@@ -96,7 +99,8 @@ const SETS = {
 };
 // ---- MÔ-ĐUN TẦNG TRỆT theo HASH NGUYÊN — bản JS khớp TỪNG BIT với shader (ihash/pidx/pickGi trong makeMaterial) ----
 // Dùng để biết bay nào là cửa hàng CÓ dải biển (SIGN_EXT) → dựng hộp biển 3D đúng chỗ shader vẽ biển.
-const HOME_THR = [0.08, 0.45, 0.85].map((p) => Math.round(p * 16777216));   // tỉ lệ "nhà ở" theo cấp đường: p/s/t, r/w, ngõ
+// tỉ lệ "nhà ở" theo mã rc: 0 phố chính p/s/t, 1 phố nhỏ r/w, 2 ngõ h, 3 = WP1 v1 ghi công năng trệt NHÀ Ở (INFO USE_HOME: 100%)
+const HOME_THR = [0.08, 0.45, 0.85, 1.0].map((p) => Math.round(p * 16777216));
 function ihash(a, b) {
   let h = Math.imul(a, 0x9E3779B1) ^ Math.imul((b + 0x7F4A7C15) | 0, 0x85EBCA6B);
   h ^= h >>> 15; h = Math.imul(h, 0xC2B2AE35); h ^= h >>> 13;
@@ -106,7 +110,7 @@ const pidx = (h, n) => Math.floor(((h >>> 8) * n) / 16777216);
 function groundModule(s8, bay, wide, rc, st) {
   const gk = wide ? ihash(s8 * 977 + bay, 101) : s8;
   const g1 = ihash(gk, bay * 2 + 1), g2 = ihash(gk, bay * 2 + 2);
-  if ((g2 >>> 8) < HOME_THR[Math.min(2, rc)]) return SETS.GH[pidx(g1, SETS.GH.length)];
+  if ((g2 >>> 8) < HOME_THR[Math.min(3, rc)]) return SETS.GH[pidx(g1, SETS.GH.length)];
   const set = SETS['G' + Math.min(6, st)];
   return st === 5 ? set[0] : set[pidx(g1, set.length)];
 }
@@ -153,7 +157,13 @@ function makeMaterial() {
   const setsGlsl = Object.entries(SETS).map(([k, v]) => glslFloatArr(k, v)).join('\n');
   const n = (k) => SETS[k].length + '.0';
   const ni = (k) => SETS[k].length + 'u';
-  m.onBeforeCompile = (sh) => {
+  m.onBeforeCompile = (sh, renderer) => {
+    // WebGL1 (three r160 còn tự lùi về WebGL1 khi máy không có WebGL2): shader atlas cần GLSL ES 3.0 (uint, textureGrad,
+    // mảng const) → KHÔNG tiêm; nhà vẽ trơn theo màu đỉnh (màu tường/mái), không phát sáng đêm — thà xấu còn hơn hỏng cả phố.
+    if (renderer && renderer.capabilities && renderer.capabilities.isWebGL2 === false) {
+      sh.fragmentShader = sh.fragmentShader.replace('#include <map_fragment>', '').replace('#include <emissivemap_fragment>', 'totalEmissiveRadiance = vec3(0.0);');
+      return;
+    }
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\nattribute vec4 aFac;\nvarying vec4 vFac;\nvarying vec2 vFUv;')
       .replace('#include <uv_vertex>', '#include <uv_vertex>\nvFac = aFac; vFUv = uv;');
@@ -231,7 +241,7 @@ float fabAO = 1.0;
         uint sI = uint(vFac.x + 0.5), bI = uint(max(bay, 0.0));
         uint gk = wide > 0.5 ? ihash(sI * 977u + bI, 101u) : sI;
         uint g1 = ihash(gk, bI * 2u + 1u), g2 = ihash(gk, bI * 2u + 2u);
-        uint thr = rc > 1.5 ? ${HOME_THR[2]}u : (rc > 0.5 ? ${HOME_THR[1]}u : ${HOME_THR[0]}u);
+        uint thr = rc > 2.5 ? ${HOME_THR[3]}u : rc > 1.5 ? ${HOME_THR[2]}u : (rc > 0.5 ? ${HOME_THR[1]}u : ${HOME_THR[0]}u);
         bool home = (g2 >> 8u) < thr;
         m = home ? GH[pidx(g1, ${ni('GH')})] : pickGi(st, g1);
         isG = 1.0; signSeed = h21(vec2(bs * 17.3 + bay * 3.1, 2.9)); litP = home ? 0.45 : 0.25;
@@ -349,13 +359,16 @@ class GBuf {
   }
 }
 
-// cột thép (lăng trụ TAM GIÁC 3 mặt, không nắp — đủ đọc là cột ở ô gần, rẻ hơn hộp 4 mặt) bán kính r, từ yB lên yT
-function steelPost(G, x, z, yB, yT, r, s8) {
-  const c = [0, 1, 2].map((k) => { const a = (k / 3) * Math.PI * 2; return [x + Math.cos(a) * r, z + Math.sin(a) * r]; });
-  for (let k = 0; k < 3; k++) {
-    const A = c[k], B2 = c[(k + 1) % 3], nx = B2[1] - A[1], nz = -(B2[0] - A[0]), l = Math.hypot(nx, nz) || 1;
-    // c[] có diện tích có hướng DƯƠNG trong (x,z) → (dz, −dx) của cạnh A→B hướng RA ngoài; quad [B,A,A',B'] mặt trước hướng ra
-    G.quad([B2[0], yB, B2[1], A[0], yB, A[1], A[0], yT, A[1], B2[0], yT, B2[1]], nx / l, 0, nz / l, [0, 0, 0.05, 0, 0.05, 1, 0, 1], WHITE, s8, 5, MOD.D_SIGNF, 0);
+// cột THÉP GÓC (chữ L, 2 cánh — đúng loại thép V hàn cột mái tôn; 4 tam giác thay vì lăng trụ 3 mặt 6 tam giác): mũi L ở
+// (x,z)+o·r, 2 cánh xoay ±45° quanh hướng VÀO (−o), mặt ngoài nhìn ra phía o (phố) — từ trong mái không ai thấy.
+function steelPost(G, x, z, yB, yT, r, ox, oz, s8) {
+  const tx = x + ox * r, tz = z + oz * r, ix = -ox * Math.SQRT1_2, iz = -oz * Math.SQRT1_2, w = r * 2;
+  for (const sg of [1, -1]) {
+    const ex = tx + (ix - sg * iz) * w, ez = tz + (iz + sg * ix) * w;   // đầu cánh (hướng vào xoay ±45°)
+    let ax = tx, az = tz, bx = ex, bz = ez;
+    if (-(bz - az) * ox + (bx - ax) * oz < 0) { ax = ex; az = ez; bx = tx; bz = tz; }   // pháp tuyến (−dz,dx) của A→B phải hướng ra o
+    const nx = -(bz - az), nz = bx - ax, l = Math.hypot(nx, nz) || 1;
+    G.quad([ax, yB, az, bx, yB, bz, bx, yT, bz, ax, yT, az], nx / l, 0, nz / l, [0, 0, 0.05, 0, 0.05, 1, 0, 1], WHITE, s8, 5, MOD.D_SIGNF, 0);
   }
 }
 
@@ -510,7 +523,16 @@ export function fabricCollide(p, r = 0.45) {
             cands.push([(p.x - cx) ** 2 + (p.z - cz) ** 2, cx - (dz / L) * (r + 0.02), cz + (dx / L) * (r + 0.02)]);
           }
           cands.sort((a1, b1) => a1[0] - b1[0]);
-          for (const c of cands) if (fabricAt(c[1], c[2]) < 0) { ox = c[1]; oz = c[2]; break; }
+          let found = false;
+          for (const c of cands) if (fabricAt(c[1], c[2]) < 0) { ox = c[1]; oz = c[2]; found = true; break; }
+          // lô KÍN (mọi cạnh giáp nhà khác — dữ liệu v1 dày đặc): xoắn ốc tìm điểm trống gần nhất (hiếm, chỉ khi kẹt)
+          for (let rad = 1; !found && rad <= 40; rad += 1) {
+            const na = Math.max(8, Math.round(rad * 2.5));
+            for (let a = 0; a < na; a++) {
+              const ang = (a / na) * Math.PI * 2, x = p.x + Math.cos(ang) * rad, z = p.z + Math.sin(ang) * rad;
+              if (fabricAt(x, z) < 0) { ox = x; oz = z; found = true; break; }
+            }
+          }
         }
         p.x = ox; p.z = oz; moved = any = true;
       }
@@ -541,15 +563,18 @@ export function fabricAt(x, z) {
 
 // ======================================================================================
 // buildRealFabric(scene, ctx) — ctx: { groundHeightNoDeck(x,z), landH, reject(cx,cz) → true = bỏ nhà (vùng mở/hàm
-// zone của world.js), facadeMats (mảng để daynight điều khiển đêm), log }
-// Trả { stats, tiles, collide: fabricCollide, at: fabricAt, frontEdges }.
+// zone của world.js), maxR (bỏ nhà có tâm ngoài bán kính này — world.js truyền BUILD_RADIUS: ngoài vùng chơi không có
+// đường/vỉa → nhà đứng trên cỏ trống), facadeMats (mảng để daynight điều khiển đêm), log }
+// Trả { stats, meshes, detMeshes, collide: fabricCollide, at: fabricAt, hit, frontEdges, material, grid }.
+// grid = makeFootprintGrid(fabricData()) dựng SAU khi chốt D.dead (near/at bỏ nhà dead) — world.js đặt world.rbData /
+// world.rbGrid = D / grid để WP4 cây, WP7 props, WP8 camera dùng CHUNG (không giải mã lại, tôn trọng nhà đã bị gỡ).
 export function buildRealFabric(scene, ctx) {
   const T0 = performance.now();
   const D = fabricData();
   const gh = ctx.groundHeightNoDeck, LAND_H = ctx.landH ?? 2;
   const tDecode = performance.now() - T0;
   // ---------- 1) LOẠI NHÀ dưới vùng giữ chỗ (claims) + zone hàm của world.js ----------
-  const st = { total: D.nB, deadClaim: 0, deadZone: 0, deadWater: 0, deadPano: 0, built: 0, walls: 0, roofs: 0, tris: 0, detTris: 0, balc: 0, awn: 0, signBox: 0, tanks: 0, tums: 0, canopy: 0, ac: 0, promoted: 0 };
+  const st = { total: D.nB, deadPre: 0, deadFar: 0, deadClaim: 0, deadZone: 0, deadWater: 0, deadPano: 0, built: 0, walls: 0, roofs: 0, tris: 0, detTris: 0, balc: 0, awn: 0, signBox: 0, signBay: 0, tanks: 0, tums: 0, canopy: 0, ac: 0, promoted: 0, tWall: 0, tRoof: 0, tPar: 0 };
   const CX = new Float32Array(D.nB), CZ = new Float32Array(D.nB);
   const pts = [];
   // điểm camera pano THẬT (xe Street View chạy trên LÒNG ĐƯỜNG): footprint nào chứa/sát (<0,5 m) điểm này là lệch đăng ký
@@ -576,6 +601,7 @@ export function buildRealFabric(scene, ctx) {
       }
     return false;
   };
+  const maxR2 = ctx.maxR ? ctx.maxR * ctx.maxR : 0;
   for (let b = 0; b < D.nB; b++) {
     const s = D.vStart[b], e = D.vStart[b + 1], n = e - s;
     // tâm diện tích + bbox
@@ -586,7 +612,8 @@ export function buildRealFabric(scene, ctx) {
     }
     if (Math.abs(A) < 1e-6) { cx = D.x[s]; cz = D.z[s]; } else { cx /= 3 * A; cz /= 3 * A; }
     CX[b] = cx; CZ[b] = cz;
-    if (D.dead[b]) continue;
+    if (D.dead[b]) { st.deadPre++; continue; }
+    if (maxR2 && cx * cx + cz * cz > maxR2) { D.dead[b] = 1; st.deadFar++; continue; }
     if (ctx.reject && ctx.reject(cx, cz)) { D.dead[b] = 1; st.deadZone++; continue; }
     if (panoHit(s, n, x0, z0, x1, z1)) { D.dead[b] = 1; st.deadPano++; continue; }
     if (claimAt(cx, cz)) { D.dead[b] = 1; st.deadClaim++; continue; }
@@ -594,6 +621,12 @@ export function buildRealFabric(scene, ctx) {
     if (claimOverlapFrac(pts) > 0.2) { D.dead[b] = 1; st.deadClaim++; continue; }
     if (gh(cx, cz) < LAND_H - 1.2) { D.dead[b] = 1; st.deadWater++; continue; }
   }
+  // TƯỜNG CHUNG sau khi giết nhà (hợp đồng WP1 v1, js/buildings_data.js): cạnh PARTY của nhà SỐNG mà láng giềng che đã
+  // bị giết → hạ thành BACK/SIDE (dựng cả chân tường) — không thì nhà kề nhà bị giết thiếu chân tường = lỗ nhìn xuyên.
+  // Rà quanh MỌI nhà dead (kể cả nhà WP3/ai khác giết trước khi gọi buildRealFabric).
+  const grid = makeFootprintGrid(D);
+  { const killed = []; for (let b = 0; b < D.nB; b++) if (D.dead[b]) killed.push(b);
+    const r = refreshPartyEdges(D, grid, killed); st.partyDemoted = r.demoted; st.partyLowered = r.lowered; }
   buildCollision(D);   // lưới va chạm ngay sau khi chốt D.dead — faceRoad (bên dưới) cần fabricAt
   const tClaims = performance.now() - T0 - tDecode;
   const mat = fabricMaterial();
@@ -614,6 +647,8 @@ export function buildRealFabric(scene, ctx) {
   const X = new Float64Array(256), Z = new Float64Array(256), Y = new Float64Array(256), TD = new Float64Array(256);
   const frontEdges = [];   // [x0,z0,x1,z1,nx,nz,yBase,b] — biển hiệu thật (SHOP_SIGNS) neo vào đây
   const K_ROOF = 4, K_DET = 5;
+  // dữ liệu WP1 v1 mang công năng tầng trệt từng nhà (INFO bit 4-5); v0 toàn 0 → bỏ qua
+  let hasInfo = false; if (D.info) for (let b = 0; b < D.nB && !hasInfo; b++) if (D.info[b]) hasInfo = true;
   const C_CONC = MOD.R_CONC, C_TERR = MOD.R_TERR, C_TON = MOD.R_TON, C_TILE = MOD.R_TILE, C_PLAIN = MOD.D_PLAIN;
 
   for (let b = 0; b < D.nB; b++) {
@@ -681,7 +716,8 @@ export function buildRealFabric(scene, ctx) {
       const bayW = kind === EDGE.FRONT ? 4.2 : 4.0, nb = Math.max(1, Math.round(L / bayW));
       // dãy nhà ống gộp (mỗi bay 1 nhà) — KHÔNG áp cho cạnh được nâng (đó là hông của MỘT nhà)
       const wideF = kind === EDGE.FRONT && rcP < 0 && nb >= 3 && fl <= 5 && (styF === STYLE.TUBE || styF === STYLE.OLD) ? 16 : 0;
-      const rc = rcP >= 0 ? rcP : kind === EDGE.FRONT ? frontClass((ax + bx) / 2, (az + bz) / 2, nx, nz) : 0;
+      let rc = rcP >= 0 ? rcP : kind === EDGE.FRONT ? frontClass((ax + bx) / 2, (az + bz) / 2, nx, nz) : 0;
+      if (hasInfo && kind === EDGE.FRONT && rcP < 0 && !wideF) { const use = (D.info[b] >> INFO.USE_SHIFT) & 3; if (use === INFO.USE_HOME) rc = 3; else if (use === INFO.USE_SHOP) rc = 0; }
       const kb = kind | bigFlag | wideF | pitchFlag | (rc << 6);
       const ta = Y[i], tb = Y[j];
       const a0 = M.v(ax, y0 + ys, az, nx, 0, nz, 0, ys, wcol, s8, kb, styF, fl);
@@ -692,11 +728,11 @@ export function buildRealFabric(scene, ctx) {
         M.v(ax + dx * tt, y0 + H + rise, az + dz * tt, nx, 0, nz, nb * tt, H + rise, wcol, s8, kb, styF, fl);
         M.v(ax, y0 + ta, az, nx, 0, nz, 0, ta, wcol, s8, kb, styF, fl);
         M.t(a0, a0 + 1, a0 + 2); M.t(a0, a0 + 2, a0 + 3); M.t(a0, a0 + 3, a0 + 4);
-        st.tris += 3;
+        st.tris += 3; st.tWall += 3;
       } else {
         M.v(ax, y0 + ta, az, nx, 0, nz, 0, ta, wcol, s8, kb, styF, fl);
         M.t(a0, a0 + 1, a0 + 2); M.t(a0, a0 + 2, a0 + 3);
-        st.tris += 2;
+        st.tris += 2; st.tWall += 2;
       }
       st.walls++;
       if (kind === EDGE.FRONT) {
@@ -704,28 +740,40 @@ export function buildRealFabric(scene, ctx) {
         hasFront = true;
         frontEdges.push([ax, az, bx, bz, nx, nz, y0, b]);
         // ---- HỘP BIỂN HIỆU 3D (ô gần): đúng các bay mà shader vẽ dải biển (groundModule khớp bit với GPU) ----
-        // Mặt trước = kind 6 → shader vẽ Y HỆT mặt phố phía sau (chữ/màu biển/đèn đêm) nhưng lồi ra 0,22 m; 4 mặt
-        // còn lại = khung tôn tối D_SIGNF. Xa hơn DET_R: biển phẳng trong atlas (cùng hình) — không "nhảy" khi đổi LOD.
+        // Mặt trước = kind 6 → shader vẽ Y HỆT mặt phố phía sau (chữ/màu biển/đèn đêm) nhưng lồi ra 0,22 m; 2 mặt đầu
+        // = khung tôn tối D_SIGNF. Xa hơn DET_R: biển phẳng trong atlas (cùng hình) — không "nhảy" khi đổi LOD.
+        // NGÂN SÁCH (dữ liệu WP1 v1 ~29 k biển): các bay LIỀN NHAU cùng có dải biển kín bay (ext tới mép) GỘP thành 1 hộp
+        // (mặt trước 1 quad kéo qua nhiều bay — shader tự chia bay theo uv.x; khe 2,5 cm giữa 2 biển hiện là viền tường);
+        // không mặt TRÊN (ở 3,85 m) và không mặt ĐÁY (dải 0,22 m ở 2,95 m: từ mắt 1,6 m chỉ thấy ≤ 2-3 px, khe hở lộ chính
+        // dải biển cùng màu vẽ trên tường phía sau) → 6 tam giác / hộp gộp (trước: 8 / bay).
         if (DT && cover === 0) {
           const bw = L / nb, ex = dx / L, ez = dz / L, BD = 0.22, yb = y0 + SIGN_Y[0], yt = y0 + SIGN_Y[1], h1 = SIGN_Y[1] - SIGN_Y[0];
           const kbBox = 6 | bigFlag | wideF | pitchFlag | (rc << 6);
-          for (let k = 0; k < nb; k++) {
-            const ext = SIGN_EXT[groundModule(s8, k, wideF > 0, rc, styF)]; if (!ext) continue;
-            const fa = k + ext[0] / 4, fb = k + ext[1] / 4, sA = fa * bw, sB = fb * bw;
+          let runA = -1, runB = -1;
+          const emit = () => {
+            const fa = runA, fb = runB, sA = fa * bw, sB = fb * bw;
             const p0x = ax + ex * sA, p0z = az + ez * sA, p1x = ax + ex * sB, p1z = az + ez * sB;
-            const q0x = p0x + nx * BD, q0z = p0z + nz * BD, q1x = p1x + nx * BD, q1z = p1z + nz * BD;
-            const w4 = (sB - sA) / 4, d4 = BD / 4;
+            const q0x = p0x + nx * BD, q0z = p0z + nz * BD, q1x = p1x + nx * BD, q1z = p1z + nz * BD, d4 = BD / 4;
             DT.quad([q0x, yb, q0z, q1x, yb, q1z, q1x, yt, q1z, q0x, yt, q0z], nx, 0, nz, [fa, SIGN_Y[0], fb, SIGN_Y[0], fb, SIGN_Y[1], fa, SIGN_Y[1]], wcol, s8, kbBox, styF, fl);
-            DT.quad([p0x, yb, p0z, p1x, yb, p1z, q1x, yb, q1z, q0x, yb, q0z], 0, -1, 0, [0, 0, w4, 0, w4, d4, 0, d4], WHITE, s8, K_DET, MOD.D_SIGNF, 0);
             DT.quad([p0x, yb, p0z, q0x, yb, q0z, q0x, yt, q0z, p0x, yt, p0z], -ex, 0, -ez, [0, 0, d4, 0, d4, h1, 0, h1], WHITE, s8, K_DET, MOD.D_SIGNF, 0);
             DT.quad([q1x, yb, q1z, p1x, yb, p1z, p1x, yt, p1z, q1x, yt, q1z], ex, 0, ez, [0, 0, d4, 0, d4, h1, 0, h1], WHITE, s8, K_DET, MOD.D_SIGNF, 0);
-            st.detTris += 8; st.signBox++;   // không mặt TRÊN (dải 0,22 m ở 3,85 m: từ phố không thấy) — ngân sách tam giác
+            st.detTris += 6; st.signBox++;
+            runA = -1;
+          };
+          for (let k = 0; k < nb; k++) {
+            const ext = SIGN_EXT[groundModule(s8, k, wideF > 0, rc, styF)];
+            if (!ext) { if (runA >= 0) emit(); continue; }
+            const fa = k + ext[0] / 4, fb = k + ext[1] / 4;
+            if (runA >= 0 && (runB < k - 0.1 / 4 || ext[0] > 0.1)) emit();   // không liền mép → đóng hộp cũ
+            if (runA < 0) runA = fa;
+            runB = fb; st.signBay++;
           }
+          if (runA >= 0) emit();
         }
         // ---- CỤC NÓNG ĐIỀU HOÀ 3D (ô gần): treo CAO trên tường mỗi tầng trên (đáy +2,58 m, đỉnh +3,12 m — dưới mép
-        //      sàn ban công tầng trên +3,18 m → không cắt ban công/lan can), lồi 0,3 m; ~20% bay nhà ống, 30% KTT ----
+        //      sàn ban công tầng trên +3,18 m → không cắt ban công/lan can), lồi 0,3 m; ~14% bay nhà ống, 21% KTT ----
         if (DT && cover === 0 && fl >= 2 && L >= 2.4 && sty !== STYLE.GLASS && sty !== STYLE.SHED) {
-          const pAC = sty === STYLE.KTT ? 0.3 : (sty === STYLE.TUBE || sty === STYLE.OLD) ? 0.2 : 0.1;
+          const pAC = sty === STYLE.KTT ? 0.21 : (sty === STYLE.TUBE || sty === STYLE.OLD) ? 0.14 : 0.07;   // (v1: ×0,7 — ngân sách)
           const bw = L / nb, ex = dx / L, ez = dz / L, AW = 0.82, AH = 0.54, AD = 0.3;
           for (let k = 1; k < fl; k++) for (let q = 0; q < nb; q++) {
             if (hh(seed * 31 + k, 97 + q) >= pAC) continue;
@@ -755,19 +803,19 @@ export function buildRealFabric(scene, ctx) {
               const ys0 = y0 + heightOf(k) - 0.12, yt = ys0 + 0.15;   // sàn tầng k (tầng trên thứ k)
               const fx0 = sx0 + nx * depth, fz0 = sz0 + nz * depth, fx1 = sx1 + nx * depth, fz1 = sz1 + nz * depth;
               const cP = C_PLAIN;
-              // mặt trên (CCW nhìn từ trên: s1→s0→f0→f1), mặt đáy, lan can trước/sau, 2 đầu
-              DT.quad([sx1, yt, sz1, sx0, yt, sz0, fx0, yt, fz0, fx1, yt, fz1], 0, 1, 0, [0, 0, wl / 4, 0, wl / 4, depth / 4, 0, depth / 4], GREY, s8, K_DET, cP, 0);
+              // mặt đáy, lan can ngoài, 2 đầu. KHÔNG mặt trên: lan can 1,2 m che kín sàn sâu ≤0,95 m với mọi góc nhìn dốc
+              // < ~52° (mắt phố nhìn từ dưới lên càng không thấy); KHÔNG mặt trong lan can (chỉ thấy từ trong nhà) — ngân sách v1
               DT.quad([sx0, ys0, sz0, sx1, ys0, sz1, fx1, ys0, fz1, fx0, ys0, fz0], 0, -1, 0, [0, 0, wl / 4, 0, wl / 4, depth / 4, 0, depth / 4], GREY, s8, K_DET, cP, 0);
               const rh = 1.05;
               DT.quad([fx0, ys0, fz0, fx1, ys0, fz1, fx1, yt + rh, fz1, fx0, yt + rh, fz0], nx, 0, nz, [0, 0, wl / 4, 0, wl / 4, 1, 0, 1], wcol, s8, K_DET, railCell, 0);
-              DT.quad([fx1, ys0, fz1, fx0, ys0, fz0, fx0, yt + rh, fz0, fx1, yt + rh, fz1], -nx, 0, -nz, [0, 0, wl / 4, 0, wl / 4, 1, 0, 1], wcol, s8, K_DET, railCell, 0);
+              // (mặt TRONG lan can bỏ: chỉ thấy được từ phía trong nhà/trên mái — ngân sách tam giác dữ liệu v1)
               const ex = dx / L, ez = dz / L;
               DT.quad([sx0, ys0, sz0, fx0, ys0, fz0, fx0, yt + rh, fz0, sx0, yt + rh, sz0], -ex, 0, -ez, [0, 0, depth / 4, 0, depth / 4, 1, 0, 1], wcol, s8, K_DET, railCell, 0);
               DT.quad([fx1, ys0, fz1, sx1, ys0, sz1, sx1, yt + rh, sz1, fx1, yt + rh, fz1], ex, 0, ez, [0, 0, depth / 4, 0, depth / 4, 1, 0, 1], wcol, s8, K_DET, railCell, 0);
-              st.detTris += 12; st.balc++;
+              st.detTris += 8; st.balc++;
             }
           }
-          if ((sty === STYLE.TUBE || sty === STYLE.OLD || sty === STYLE.KTT) && hh(seed, 41 + i) < 0.4) {   // mái hiên bạt sọc
+          if ((sty === STYLE.TUBE || sty === STYLE.OLD || sty === STYLE.KTT) && hh(seed, 41 + i) < 0.35) {   // mái hiên bạt sọc
             const ac = AWN_LIN[(hh(seed, 43) * AWN_LIN.length) | 0];
             const out = 1.5, yT = y0 + 2.88, yF = y0 + 2.4, inset = 0.15;
             const sx0 = ax + (dx / L) * inset, sz0 = az + (dz / L) * inset, sx1 = bx - (dx / L) * inset, sz1 = bz - (dz / L) * inset;
@@ -793,7 +841,7 @@ export function buildRealFabric(scene, ctx) {
         const ny = (Z[bb] - Z[a]) * (X[c] - X[a]) - (X[bb] - X[a]) * (Z[c] - Z[a]);
         if (ny >= 0) M.t(base + a, base + bb, base + c); else M.t(base + a, base + c, base + bb);
       }
-      st.tris += tri.length / 3;
+      st.tris += tri.length / 3; st.tRoof += tri.length / 3;
       if (rt === ROOF.FLAT_PARAPET) {     // mặt TRONG lan can (nhìn từ trên/xiên thấy gờ mái)
         for (let i = 0; i < n; i++) {
           const j = (i + 1) % n, L = Math.hypot(X[j] - X[i], Z[j] - Z[i]); if (L < 0.3) continue;
@@ -801,7 +849,7 @@ export function buildRealFabric(scene, ctx) {
           const nx = (Z[j] - Z[i]) / L, nz = -(X[j] - X[i]) / L;   // hướng VÀO trong
           const ya = roofY, yt2 = y0 + H + PARAPET_H;
           M.quad([X[j], ya, Z[j], X[i], ya, Z[i], X[i], yt2, Z[i], X[j], yt2, Z[j]], nx, 0, nz, [0, 0, L / 4, 0, L / 4, PARAPET_H / 4, 0, PARAPET_H / 4], wcol, s8, K_DET, C_PLAIN, 0);
-          st.tris += 2;
+          st.tris += 2; st.tPar += 2;
         }
       }
     } else if (rt === ROOF.GABLE_TON || rt === ROOF.SHED_TON) {
@@ -827,7 +875,7 @@ export function buildRealFabric(scene, ctx) {
           const ny = (HZ[bb] - HZ[a]) * (HX[c] - HX[a]) - (HX[bb] - HX[a]) * (HZ[c] - HZ[a]);
           if (ny >= 0) M.t(base + a, base + bb, base + c); else M.t(base + a, base + c, base + bb);
         }
-        st.tris += tri.length / 3;
+        st.tris += tri.length / 3; st.tRoof += tri.length / 3;
       }
     } else if (rt === ROOF.HIP_TILE) {     // mái ngói 4 dốc trên OBB (nhà gần chữ nhật) + đua mái 0,35 m
       const o = 0.35, hwx = hw + o, hl = Lr / 2 + o, inset = Math.min(hl - 0.1, hw * 0.9);
@@ -845,7 +893,7 @@ export function buildRealFabric(scene, ctx) {
         nx /= l; ny /= l; nz /= l; const flip = ny < 0;
         for (const q of pa) M.v(q[0], q[2], q[1], flip ? -nx : nx, flip ? -ny : ny, flip ? -nz : nz, (q[0] * rx + q[1] * rz) / 4, ((q[0] - cxw) * px + (q[1] - czw) * pz) * sec / 4, rcol, s8, K_ROOF, cell, 0);
         for (let k = 1; k < pa.length - 1; k++) { if (flip) M.t(base, base + k + 1, base + k); else M.t(base, base + k, base + k + 1); }
-        st.tris += pa.length - 2;
+        st.tris += pa.length - 2; st.tRoof += pa.length - 2;
       };
       face([[c00[0], c00[1], yE], [c10[0], c10[1], yE], [r1[0], r1[1], yR], [r0[0], r0[1], yR]], C_TILE);
       face([[c11[0], c11[1], yE], [c01[0], c01[1], yE], [r0[0], r0[1], yR], [r1[0], r1[1], yR]], C_TILE);
@@ -889,23 +937,24 @@ export function buildRealFabric(scene, ctx) {
           st.tris += 10; st.tums++;
         }
       }
-      // bồn nước inox (lăng trụ 6 cạnh đứng) — trên nóc tum nếu có (rất phổ biến), không thì 1 góc mái
+      // bồn nước inox (lăng trụ 5 cạnh đứng: 13 tam giác — 6 cạnh 16 tam giác là món trang trí đắt nhất phố với dữ liệu v1;
+      // nhìn từ trên/xiên không phân biệt) — trên nóc tum nếu có (rất phổ biến), không thì 1 góc mái
       if ((sty === STYLE.TUBE || sty === STYLE.OLD || sty === STYLE.KTT) && hh(seed, 61) < 0.7) {
         let a, c, yB;
         if (tum) { a = tum[0]; c = tum[1]; yB = yRoof + tum[4]; }
         else { a = uc + (hh(seed, 63) - 0.5) * Math.max(0, Lu - 2.2); c = vc + (hh(seed, 65) - 0.5) * Math.max(0, Lv - 2.2); yB = yRoof; }
         if (inside(a, c)) {
-          const [tx, tz] = W(a, c), rr = 0.55, th = 1.25, base = M.n;
-          for (let k = 0; k <= 6; k++) {
-            const ang = (k / 6) * Math.PI * 2, cxk = Math.cos(ang), szk = Math.sin(ang);
-            M.v(tx + cxk * rr, yB, tz + szk * rr, cxk, 0, szk, k / 6, 0, WHITE, s8, K_DET, MOD.D_TANK, 0);
-            M.v(tx + cxk * rr, yB + th, tz + szk * rr, cxk, 0, szk, k / 6, 1, WHITE, s8, K_DET, MOD.D_TANK, 0);
+          const [tx, tz] = W(a, c), rr = 0.57, th = 1.25, base = M.n, NS = 5, a0 = hh(seed, 67) * 1.2566;
+          for (let k = 0; k <= NS; k++) {
+            const ang = a0 + (k / NS) * Math.PI * 2, cxk = Math.cos(ang), szk = Math.sin(ang);
+            M.v(tx + cxk * rr, yB, tz + szk * rr, cxk, 0, szk, k / NS, 0, WHITE, s8, K_DET, MOD.D_TANK, 0);
+            M.v(tx + cxk * rr, yB + th, tz + szk * rr, cxk, 0, szk, k / NS, 1, WHITE, s8, K_DET, MOD.D_TANK, 0);
           }
-          for (let k = 0; k < 6; k++) { const i0 = base + k * 2; M.t(i0, i0 + 1, i0 + 3); M.t(i0, i0 + 3, i0 + 2); }
+          for (let k = 0; k < NS; k++) { const i0 = base + k * 2; M.t(i0, i0 + 1, i0 + 3); M.t(i0, i0 + 3, i0 + 2); }
           const cb = M.n;
-          for (let k = 0; k < 6; k++) { const ang = (k / 6) * Math.PI * 2; M.v(tx + Math.cos(ang) * rr, yB + th, tz + Math.sin(ang) * rr, 0, 1, 0, 0.5 + Math.cos(ang) * 0.1, 0.5, WHITE, s8, K_DET, MOD.D_TANK, 0); }
-          for (let k = 1; k < 5; k++) M.t(cb, cb + k + 1, cb + k);
-          st.tris += 16; st.tanks++;
+          for (let k = 0; k < NS; k++) { const ang = a0 + (k / NS) * Math.PI * 2; M.v(tx + Math.cos(ang) * rr, yB + th, tz + Math.sin(ang) * rr, 0, 1, 0, 0.5 + Math.cos(ang) * 0.1, 0.5, WHITE, s8, K_DET, MOD.D_TANK, 0); }
+          for (let k = 1; k < NS - 1; k++) M.t(cb, cb + k + 1, cb + k);
+          st.tris += 13; st.tanks++;
         }
       }
       // mái tôn che sân thượng (vệ tinh HP: mảng tôn đỏ gỉ/xanh phủ phần lớn mái nhà ống)
@@ -938,9 +987,9 @@ export function buildRealFabric(scene, ctx) {
             const fk = alongU ? (backSign > 0 ? [0, 3] : [1, 2]) : (backSign > 0 ? [0, 1] : [2, 3]);
             for (const k of fk) {
               const ddx = ccx - w[k][0], ddz = ccz - w[k][1], dl = Math.hypot(ddx, ddz) || 1;
-              steelPost(DT, w[k][0] + (ddx / dl) * 0.2, w[k][1] + (ddz / dl) * 0.2, yRoof, ys[k] - 0.03, 0.06, s8);
+              steelPost(DT, w[k][0] + (ddx / dl) * 0.2, w[k][1] + (ddz / dl) * 0.2, yRoof, ys[k] - 0.03, 0.06, -ddx / dl, -ddz / dl, s8);
             }
-            st.detTris += 12;
+            st.detTris += 8;
           }
         }
       }
@@ -998,5 +1047,5 @@ export function buildRealFabric(scene, ctx) {
   const tAll = performance.now() - T0;
   Object.assign(st, { tiles: meshes.length, detTiles: detMeshes.length, triMain, triDet, calls, ms: Math.round(tAll), msDecode: Math.round(tDecode), msClaims: Math.round(tClaims), msAtlas: Math.round(tAtlas), msGeo: Math.round(tGeo), atlas: fabricAtlasInfo() });
   if (ctx.log !== false) console.log('[citygen]', JSON.stringify(st));
-  return { stats: st, meshes, detMeshes, collide: fabricCollide, at: fabricAt, hit: fabricHit, frontEdges, material: mat };
+  return { stats: st, meshes, detMeshes, collide: fabricCollide, at: fabricAt, hit: fabricHit, frontEdges, material: mat, grid };
 }

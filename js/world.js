@@ -35,7 +35,7 @@ function nearPanoCam(x, z, r = 5) {
 }
 import { SHOP_SIGNS } from './shopsigns.js';
 // ĐỢT 3 WP2: phố từ footprint THẬT (citygen.js) + sổ vùng giữ chỗ (claims.js) + footprint địa danh (landmark_polys.js)
-import { buildRealFabric } from './citygen.js';
+import { buildRealFabric, fabricData } from './citygen.js';
 import { claimPoly, claimBox, claimCircle } from './claims.js';
 import { LM_POLY } from './landmark_polys.js';
 
@@ -18420,9 +18420,12 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     };
     const fabricReject = (x, z) => clearedZone(x, z) || inSuperblock(x, z) || (x > -300 && x < 120 && z > -1045 && z < -845)
       || lakeSD(x, z) < 16 || hoSenSD(x, z) < 10 || _keHo(x, z);
-    _fab = buildRealFabric(scene, { groundHeightNoDeck, landH: LAND_H, reject: fabricReject, facadeMats });
+    _fab = buildRealFabric(scene, { groundHeightNoDeck, landH: LAND_H, reject: fabricReject, maxR: BUILD_RADIUS, facadeMats });
     _fabCollide = _fab.collide;
     world.fabric = _fab;
+    // DỮ LIỆU FOOTPRINT DÙNG CHUNG (đã đánh D.dead): WP8 footprints.js / WP7 props (ctx.footprints {D, grid}) / WP4 cây
+    // (fpGrid) PHẢI dùng 2 cái này — tự decodeRB sẽ tránh/va vào cả nhà đã bị gỡ (dưới quảng trường, công viên, ngoài R1600).
+    world.rbData = fabricData(); world.rbGrid = _fab.grid;
   }
 
   // ---------- MÁI HIÊN BẠT + BIỂN HIỆU shophouse dọc phố thương mại (rải rộng, rất thân thuộc) ----------
