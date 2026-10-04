@@ -398,7 +398,8 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     tự nhân (`UNLIT_DECL`).
     **(5) Hậu kỳ** (TIER ≥ 2, `GFX.post`): SceneAOPass vẽ cảnh vào RT riêng MSAA 4× + DepthTexture (canvas
     `antialias:false`, RT composer KHÔNG MSAA — trước MSAA ×3 chỗ) → SAO nửa phân giải (pháp tuyến dựng từ depth, xoay
-    Bayer 4×4 + mờ 4×4 theo độ sâu, upsample theo độ sâu, mờ dần 140-320 m, chạy cả camera trực giao) → UnrealBloom CHỈ
+    Bayer 4×4 + mờ 4×4 ×2 lần theo độ sâu MẶT PHẲNG, upsample theo độ sâu, mờ dần 140-320 m, chạy cả camera trực giao,
+    trần bán kính màn hình 56 px phối cảnh / 90 px trực giao — xem (13)) → UnrealBloom CHỈ
     khi night > 0,04 (ngưỡng chia theo exposure) → FinalPass (tone + grade + sRGB + dither). AO = 0,26-0,32 ms GPU ở
     1280×720 trên Radeon 890M → bật cả TIER 2 (8 mẫu; TIER 3 12 mẫu). FinalPass 0,17 ms. Công cụ: `__hp.post.timeAO()`
     (đồng bộ bằng readPixels 1 px — `gl.finish` của Chrome KHÔNG chờ GPU, đo ra 0,01 ms vô nghĩa).
@@ -413,19 +414,43 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     **(8) Nước** (`water.js`, MỘT nguồn màu — daynight KHÔNG ghi màu nước nữa): MeshStandardMaterial ĐỤC (roughness 0,12,
     normal 0,15) phản chiếu IBL trời + Fresnel GGX (nhìn thẳng xuống thấy màu nước, nhìn xiên thấy trời); bản đồ bờ/hồ
     DataTexture 512² (ô 8 m, ±2048 m): R = khoảng cách có dấu tới bờ (waterSD, 128 = mép), G = hồ; sông xám ô liu
-    0x5c625a (ảnh vệ tinh sông Cấm ≈ (93,103,92), game đo (88,94,87)), hồ 0x34443f, dải bùn ven bờ 1-16 m. Dựng 11 ms
-    (lọc thô 32 m rồi 30,8k mẫu mịn sát bờ). onBeforeCompile bám chunk `color_fragment`/`roughnessmap_fragment`.
+    0x5c625a (ảnh vệ tinh sông Cấm ≈ (93,103,92), game đo (88,94,87)), hồ 0x34443f, dải bùn ven bờ 1-16 m (hồ 1-7 m,
+    nhạt hơn). Dựng ~11 ms (lọc thô 32 m rồi 30,8k mẫu mịn sát bờ + lọc cạnh trong — xem (13)). onBeforeCompile bám chunk
+    `color_fragment`/`roughnessmap_fragment`. Mặt nước `receiveShadow = true` (bóng nhà/cầu/cây trên sông).
     **(9) GLB** (đọc JSON + giải ảnh trong GLB): 11 file có emissiveFactor [1,1,1] + emissive map. 6 map ĐEN THUẦN
     (buudien, dennghe, dentamky, dinhhk, nhnn, lechan — trung bình 0) → bỏ map + emissive 0 trước compile (bớt VRAM);
     4 map GIỐNG ALBEDO (baotang, thptnq, quanhoa, nhatho) → emissiveIntensity = night × 0,42 (= đèn pha mặt tiền ban đêm,
     ban ngày 0 — trước tự sáng bẹt dưới nắng); **nhahat KHÔNG ĐỤNG** (chân dung). envMapIntensity 0,5 (GLB còn nhận đèn
-    bán cầu — tránh cộng đôi ánh sáng nền).
+    bán cầu — tránh cộng đôi ánh sáng nền), ghi SAU `place()` cho cả bản gốc lẫn twin lite (xem (13)).
     **(10) Vệ tinh** `__hp.aerial`: sương 0, hộp bóng trực giao phủ CẢ khung (map 4096), phơi sáng ×0,82, instcull/
     far-hide lấy TÂM KHUNG (trước bám người chơi), vẽ qua composer (cùng tone/AO).
     **(11) Ấm máy**: compileAsync với RT cảnh composer đang bind (đúng biến thể NoToneMapping/linear — trước biên dịch
     biến thể màn hình vô dụng); trước Start không vẽ tới khi compile xong (lưới an toàn 12 s); `__hp.timing`
     (compileSync 107-169 ms, khung đầu 1,7 s — vẫn sau màn chờ). Camera near 0,1 → 0,3 (depth xa tốt ×3).
-    **(12) Thời gian**: DAY_LENGTH 300 → 1440 s (24 phút), bắt đầu 09:00; `?time=14.5 | 14:30 | 0.6` + `&timefreeze=1`.
+    **(12) Thời gian**: DAY_LENGTH 300 → 1440 s (24 phút), bắt đầu 09:00; `?time=14.5 | 14:30 | 1 (= 01:00) | 0.6`
+    (< 1 = phần của ngày, ≥ 1 = giờ) + `&timefreeze=1`. Mây trôi theo đồng hồ GAME: đứng yên khi frozen hoặc
+    `navigator.webdriver` (ảnh QA A/B so được điểm ảnh bầu trời).
+    **(13) SAU PHẢN BIỆN (review WP5)** — **BẪY envMapIntensity**: các hàm `place()` của world.js (nhà hát, nhà thờ, Quán
+    hoa ×5, Lê Chân) tự ghi `envMapIntensity = 0.85` khi duyệt model → chính sách ghi TRƯỚC place bị đè: bản gốc 0,85,
+    twin lite 0,5 → sáng/tối nhảy mỗi lần đổi LOD. Nay `applyGlbEnv` chạy SAU `d.place()` (root mới + gltf.scene) và
+    trong onLiteLoaded; đo: 13 bản gốc + 13 twin đều 0,5. **Biến thể program khi GLB lộ diện**: `queueReveal` gọi
+    compileAsync với RT đang gắn = null → biến thể tone-mapped/sRGB của MÀN HÌNH, trong khi composer vẽ vào sceneRT
+    (NoToneMapping + linear) → 5 program vô dụng + khung 92-168 ms trong 7 s đầu. Nay `attachRenderer(renderer, camera,
+    scene, getRT)` (main.js truyền getter sceneRT) và queueReveal gắn RT đó quanh compileAsync: 0 program tone-mapped (cũ
+    5), khung > 80 ms sau Start chỉ còn trong ~1,5 s đầu. Quy tắc chung: MỌI compile/compileAsync phải gắn đúng RT của
+    đường vẽ thật. **Bloom ấm trước**: 7 material của UnrealBloom (highpass, 5 blur, composite, blend) gắn tạm vào quad
+    rồi compileAsync cùng lúc ấm máy → chạng vạng đầu tiên +0 program (cũ +8, khung 45-95 ms). **AO**: trần 90 px làm
+    tường sát camera nhìn xiên có dải tiếp xúc rộng và mép bậc thang; nguyên nhân bậc thang = "mẫu xoay đan xen chu kỳ
+    4 + mờ hộp CÙNG cỡ 4": mỗi pha bị giữ-mẫu 4 texel → bậc 8 px; trọng số độ sâu so với z0 phẳng còn làm lệch trọng số
+    theo pha trên tường xiên. Sửa: maxPx 56 (phối cảnh), mờ hộp chạy 2 LẦN (lần 2 lệch +1 texel bù lệch nửa texel →
+    nhân chập = tam giác 7 texel), trọng số độ sâu so với MẶT PHẲNG cục bộ nội suy theo 1/z (tuyến tính trên màn hình với
+    mặt phẳng phối cảnh; độ dốc lấy phía nhỏ hơn để không vượt mép vật), upsample full-res cũng theo mặt phẳng 1/z. AO
+    vẫn nhân cả ánh nắng trực tiếp (chưa tách ambient). **Nước — cạnh trong**: waterSD đo tới cạnh của MỌI polygon OSM,
+    2 polygon sông kề nhau có cạnh chung giữa lòng → vệt màu bờ giữa sông (game_8). Lọc: khoảng cách tới tâm ô ĐẤT gần
+    nhất (ô 8 m, ô lân cận xếp theo khoảng cách, dừng ở ô đất đầu tiên) − 5,66 m là cận dưới khoảng cách tới bờ thật →
+    nâng độ sâu (1815 ô sửa, dựng vẫn ~11 ms đo bằng node). Hồ: dải bùn hẹp/nhạt (quầng sáng quanh hồ Tam Bạc từ trên cao
+    biến mất), viền sát kè 0,035 → 0,026 (hồ ×0,4). Bóng trên nước: GPU ≈ 0 ms (đo bật/tắt xen kẽ cùng trang: game_3
+    +0,5 ms trên 19,3 ms gồm 1 mẫu lệch, 2 góc tầm thấp âm = nhiễu).
     **ĐO** (Chrome headless d3d11, Radeon 890M, 1280×720, TIER 3, base 6a57acc vs WP5 CÙNG PHIÊN dưới khoá GPU, autoQuality
     khoá): hpReady 19,4 → 16,9 s; heap 903 → 678 MB; cam_spawn 56,9 → 57,5 fps (738 → 726 call, 4,88 M tam giác);
     pano_007_h090 47,8 → 55,7 (1590 → 1578 call, 7,90 M); cam_high_center 49,9 → 55,7 (1173 → 1161, 7,44 M); game_3
@@ -433,6 +458,11 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     Làm mới bóng +0,7..6,2 ms/lần (không đổi). **BẪY ĐO**: số fps WP5 cũ 21-30 (đo lúc 8 Chrome GPU chạy song song) là
     nhiễu — luôn đo dưới `tools/qa/gpulock.mjs`; Bash nền không đặt timeout chết ở 30 phút, giết luôn tiến trình đang
     GIỮ khoá → khoá mồ côi chặn mọi agent (gpulock chỉ cướp khoá sau 20 phút) — đặt timeout tối đa.
+    **ĐO SAU PHẢN BIỆN** (máy đang chạy game của chủ máy → GPU bận, cảnh 20-30 ms thay vì ~10 ms; chỉ so XEN KẼ cùng
+    phiên prev c527b6d / hiện tại ×2): cam_spawn 42,6/45,5 → 41,4/41,8 fps; pano_007 24,4/27,1 → 29,5/30,3;
+    cam_high_center 30,1/31,2 → 35,0/34,2; game_3 35,0/35,6 → 32,4/31,3; hpReady 40,4/38,2 → 35,5/35,3 s; heap 706-713 →
+    728-758 MB — không có hồi quy nhất quán (2 góc nhanh hơn, 2 góc chậm hơn, cỡ nhiễu). AO 0,27 ms (máy rảnh, trước khi
+    thêm lần mờ 2) / 0,38-0,56 ms (máy bận).
     **GHI NHẬN cho WP khác**: độ sáng nửa dưới khung pano: thật trung vị 117, game 68, trong khi highlight game (p98 216)
     còn sáng hơn ảnh thật (198) → tối là do ALBEDO (nhựa đường `mat(0x4c5158)` quá đen so với mặt đường bụi xám sáng
     ~sRGB 110-120 trong pano), KHÔNG được bù bằng phơi sáng.
