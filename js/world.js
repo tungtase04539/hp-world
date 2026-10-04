@@ -3,7 +3,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { makeCellSink } from './cellsink.js';
-import { initClearance, sweepAssemblies, flushClearance } from './clearance.js';   // Đợt 3 W2-A: khoảng trống phố/camera pano
+import { initClearance, sweepAssemblies, flushClearance, onCarriageDisc, nearPano as clrNearPano } from './clearance.js';   // Đợt 3 W2-A: khoảng trống phố/camera pano
 import { registerModel, shrinkTexturesForMobile, assetURL } from './assets.js';
 import { IS_MOBILE, LITE } from './device.js';
 import {
@@ -1836,7 +1836,10 @@ export async function buildWorld(scene, prog = () => {}) {
   // mép lòng (pano_014/018). Mesh gộp (addMerged) tách theo thành phần liên thông + gom cụm chồng nhau (chậu+tán+kiềng);
   // cụm vi phạm → dời lùi (nhà: theo pháp tuyến phố ra sau facadeLine ≤ 8 m; đồ nhỏ: ra khỏi lòng/xa camera ≤ 6 m) hoặc gỡ.
   // Dải phân cách (median) và mặt lát phẳng được giữ nguyên. Báo cáo: world.streetClear.
-  world.streetClear = sweepAssemblies(scene.children.slice(_clrN0), colliders.slice(_clrC0), FEATURED_CLEAR, { keep: (n) => /median|_promenade$|^opera_sq|_dirt$/.test(n) });
+  world.streetClear = sweepAssemblies(scene.children.slice(_clrN0), colliders.slice(_clrC0), FEATURED_CLEAR, {
+    keep: (n) => /median|_promenade$|^opera_sq|_dirt$/.test(n),
+    identity: (n, A) => A.length === 1 && !A[0].o.isMesh && !!n && n !== 'hd_showroom',   // nhóm công trình có tên (KS/cao ốc/công sở) dời không nổi → giữ
+  });
   flushClearance();
 
   await prog('cells');
@@ -18967,6 +18970,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
   // mọi chi tiết dựng trong tọa độ LOCAL (z = dọc trục cầu), cả nhóm quay theo b.ang
   function bridgeGroup(b) {
     const g = new THREE.Group();
+    g.name = 'bridge_group';   // tên cho kiểm toán khoảng trống W2-A (cầu nằm TRÊN tuyến đường là đúng)
     g.position.set(b.x, 0, b.zc);
     g.rotation.y = b.ang;
     scene.add(g);
@@ -19487,6 +19491,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
   const HERO_BED_FILE = 'flowerbed_a.glb';
   const heroBeds = [];   // {x,y,z,diam,yaw}
   function heroBed(x, z, diam) {
+    if (onCarriageDisc(x, z, diam / 2) || clrNearPano(x, z, 3 + diam / 2)) return;   // W2-A: không đặt bồn hoa lên lòng đường / camera pano
     heroBeds.push({ x, y: groundHeight(x, z) + 0.02, z, diam, yaw: (x * 0.7 + z * 1.1) % (Math.PI * 2) });
   }
   function loadHeroBeds() {
@@ -20084,7 +20089,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     //    trên làn + đầu đèn thấp trên cột + hộp đếm ngược. InstancedMesh: 1 draw call cột/đầu + 1 draw call bóng đèn
     //    (thay 19 nút × 6 mesh + 57 cầu MeshBasic riêng lẻ). Pha: 2 trục vuông góc ngược pha, chu kỳ 30 s lệch theo nút.
     {
-      const SIG = (world.roadNet && world.roadNet.signals) || [];
+      const SIG = ((world.roadNet && world.roadNet.signals) || []).filter((s) => !clrNearPano(s.x, s.z, 3.3));   // W2-A: cột không đứng sát camera pano
       if (SIG.length) {
         const parts = [];
         const colored = (g, hex) => {
@@ -20198,7 +20203,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
           const block = new THREE.Mesh(new THREE.BoxGeometry(6.5, 0.3, 1.1), medM);
           block.position.set(mx, y + 0.15, mz);
           block.rotation.y = th;
-          block.receiveShadow = true;
+          block.receiveShadow = true; block.name = 'median_block';   // tên: kiểm toán khoảng trống W2-A coi dải phân cách là đồ ĐÚNG trên lòng
           scene.add(block);
           acc += 10;
           if (acc >= 22) {           // cây xà cừ lớn ~ mỗi 22m
@@ -20208,7 +20213,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
             const bush = new THREE.Mesh(new THREE.SphereGeometry(0.5, 7, 5), bushM);
             bush.position.set(mx, y + 0.65, mz);
             bush.scale.set(1.6, 0.8, 0.7);
-            bush.rotation.y = th;
+            bush.rotation.y = th; bush.name = 'median_bush';
             scene.add(bush);
           }
         }
@@ -20293,6 +20298,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     // ngay khu trung tâm đông người chơi → giờ 8 mesh)
     const rimGeos = [], domeGeos = flowerCols.map(() => []);
     function flowerBed(bx, bz, r, seed) {
+      if (onCarriageDisc(bx, bz, r + 0.3) || clrNearPano(bx, bz, 3 + r)) return;   // W2-A: phố cắt qua vườn (roadnet) / camera pano
       const rim = new THREE.CylinderGeometry(r, r + 0.3, 0.4, 10); rim.translate(bx, LAND_H + 0.2, bz); rimGeos.push(rim);
       const dome = new THREE.SphereGeometry(r * 0.92, 8, 5, 0, Math.PI * 2, 0, Math.PI / 2);
       dome.scale(1, 0.5, 1); dome.translate(bx, LAND_H + 0.38, bz); domeGeos[seed % flowerCols.length].push(dome);
@@ -20425,7 +20431,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
       const barAng = Math.atan2(ux, uz) + Math.PI / 2;
       for (let t = 1.3; t < L; t += 2.6) {
         const cx0 = ax + ux * t + nx * 1.2, cz0 = az + uz * t + nz * 1.2;
-        if (Math.abs(groundHeightNoDeck(cx0, cz0) - LAND_H) > 0.5) continue;
+        if (Math.abs(groundHeightNoDeck(cx0, cz0) - LAND_H) > 0.5 || onCarriageDisc(cx0, cz0, 1.0)) continue;   // W2-A: lan can không chắn lòng đường ven hồ
         const post = new THREE.CylinderGeometry(0.06, 0.07, 1.1, 5); post.translate(cx0, LAND_H + 0.55, cz0); railG.push(post);
         for (const ry of [0.55, 0.95]) { const bar = new THREE.BoxGeometry(0.06, 0.06, 2.7); bar.rotateY(barAng + Math.PI / 2); bar.translate(cx0, LAND_H + ry, cz0); railG.push(bar); }
         acc += 2.6; archAcc += 2.6;

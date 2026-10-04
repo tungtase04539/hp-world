@@ -234,6 +234,34 @@ export function sampleObject(o, opts = {}) {
   });
   return { base, body, y0, y1, x0, x1, z0, z1, massive, nMesh, height: y1 - y0 };
 }
+// Mẫu GỌN từ bao lồi từng mesh đã có (cellsink.extractShape: [{h, y0, y1, massive, area}]): chân = viền BAO LỒI CHUNG của
+// các mesh có đáy sát nền; thân = bao lồi chung các mesh giao tầm 0,3-2,6 m. Rẻ hơn sampleObject nhiều lần (không duyệt
+// lại cây, không lấy mẫu từng mesh) — đủ cho nhà/vật ≤ 20 m (vật trải dài dùng sweepAssemblies theo mảnh).
+export function samplesFromHulls(list) {
+  const gh = _st ? _st.gh : () => 2;
+  const base = [], body = [], seen = new Set();
+  let y0 = 1e9, y1 = -1e9, x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9, massive = 0, n = 0;
+  const tmp = [];
+  for (const q of list) {
+    if (!q.h || !q.h.length) continue;
+    let hx0 = 1e9, hx1 = -1e9, hz0 = 1e9, hz1 = -1e9;
+    for (const [x, z] of q.h) { if (x < hx0) hx0 = x; if (x > hx1) hx1 = x; if (z < hz0) hz0 = z; if (z > hz1) hz1 = z; }
+    const g0 = gh((hx0 + hx1) / 2, (hz0 + hz1) / 2);
+    if (q.y1 - q.y0 < 0.12 && q.y1 < g0 + 0.4) continue;
+    n++;
+    if (q.y0 < y0) y0 = q.y0; if (q.y1 > y1) y1 = q.y1;
+    if (hx0 < x0) x0 = hx0; if (hx1 > x1) x1 = hx1; if (hz0 < z0) z0 = hz0; if (hz1 > z1) z1 = hz1;
+    // chân: viền TỪNG mesh sát nền (hợp các bao — không lấy bao lồi chung: khuôn viên chữ L/ôm góc phố sẽ trùm cả vỉa
+    // hè/lòng ở góc), khử trùng theo ô 0,5 m
+    if (q.y0 <= g0 + CLEAR.BASE_Y) {
+      tmp.length = 0; sampleHull(q.h, tmp);
+      for (let i = 0; i < tmp.length; i += 2) { const k = Math.round(tmp[i] * 2) * 100003 + Math.round(tmp[i + 1] * 2); if (seen.has(k)) continue; seen.add(k); base.push(tmp[i], tmp[i + 1]); }
+    }
+    if (q.y1 > g0 + CLEAR.BODY_Y0 && q.y0 < g0 + CLEAR.BODY_Y1) body.push({ H: q.h, y0: q.y0 - g0, y1: q.y1 - g0 });
+    if (q.massive) massive += q.area || 0;
+  }
+  return { base, body, y0, y1, x0, x1, z0, z1, massive, nMesh: n, height: y1 - y0 };
+}
 // vi phạm khi dời (dx,dz): {n (số mẫu chân trên lòng), pen (lấn hành lang lớn nhất), pano (thiếu bao nhiêu m so với
 // PANO_R), push:[px,pz] vector đẩy đề xuất}. mode 'bldg' xét hành lang facadeLine; 'small' xét lòng đường.
 export function evalShift(S, dx, dz, mode, quick = false) {
@@ -241,22 +269,26 @@ export function evalShift(S, dx, dz, mode, quick = false) {
   // lọc nhanh: hộp vật thể không chạm ô lưới nào có phố và không camera nào trong tầm → sạch
   if (S.x0 !== undefined && !nearAnyRoad(S.x0 + dx, S.z0 + dz, S.x1 + dx, S.z1 + dz)
     && !nearestPano((S.x0 + S.x1) / 2 + dx, (S.z0 + S.z1) / 2 + dz, Math.hypot(S.x1 - S.x0, S.z1 - S.z0) / 2 + CLEAR.PANO_R)) return { n, pen, pano, push, bad: false };
-  const B = S.base;
-  for (let i = 0; i < B.length; i += 2) {
+  const B = S.base, NB = B.length;
+  // kiểm nhanh (dò dời): bắt đầu từ mẫu vi phạm lần trước → phần lớn ứng viên hỏng bị loại sau 1-2 mẫu
+  const i0 = quick && S.lastBad ? S.lastBad : 0;
+  for (let jj = 0; jj < NB; jj += 2) {
+    const i = (i0 + jj) % NB;
     const x = B[i] + dx, z = B[i + 1] + dz;
     if (mode === 'bldg') {
       const c = corridorPen(x, z);
-      if (c && c.pen > 0.02) { if (quick) return { bad: true }; n++; if (c.pen > pen) pen = c.pen; if (c.pen + 0.05 > best) { best = c.pen + 0.05; push = [c.nx * best, c.nz * best]; } continue; }
+      if (c && c.pen > 0.02) { if (quick) { S.lastBad = i; return { bad: true }; } n++; if (c.pen > pen) pen = c.pen; if (c.pen + 0.05 > best) { best = c.pen + 0.05; push = [c.nx * best, c.nz * best]; } continue; }
     }
     if (onCarriage(x, z)) {
-      if (quick) return { bad: true };
+      if (quick) { S.lastBad = i; return { bad: true }; }
       n++;
       const r = nearestRoad(x, z);
       const need = r ? Math.max(0.3, r.hw - r.d + 0.3) : 0.5;
       if (need > best) { best = need; push = r ? [r.nx * need, r.nz * need] : null; }
     }
   }
-  for (const b of S.body) {
+  const anyCam = S.x0 === undefined || !!nearestPano((S.x0 + S.x1) / 2 + dx, (S.z0 + S.z1) / 2 + dz, Math.hypot(S.x1 - S.x0, S.z1 - S.z0) / 2 + CLEAR.PANO_R);
+  if (anyCam) for (const b of S.body) {
     let cx = 0, cz = 0; for (const [x, z] of b.H) { cx += x; cz += z; } cx = cx / b.H.length + dx; cz = cz / b.H.length + dz;
     let rad = 0; for (const [x, z] of b.H) rad = Math.max(rad, Math.hypot(x + dx - cx, z + dz - cz));
     const cam = nearestPano(cx, cz, rad + CLEAR.PANO_R);
@@ -299,9 +331,9 @@ export function solveShift(S, mode, maxShift) {
   // lấy dời NGẮN nhất hết vi phạm (kiểm nhanh: dừng ở vi phạm đầu tiên; mẫu chân thưa ≤ 400 điểm)
   let Sq = S;
   if (S.base.length > 800) { const st = Math.ceil(S.base.length / 800); const b = []; for (let i = 0; i < S.base.length; i += 2 * st) b.push(S.base[i], S.base[i + 1]); Sq = { base: b, body: S.body }; }
-  for (let s = 0.5; s <= maxShift + 1e-6; s += 0.5) {
-    for (let k = 0; k < 24; k++) {
-      const a = k * Math.PI / 12, ddx = Math.cos(a) * s, ddz = Math.sin(a) * s;
+  for (let s = 0.5; s <= maxShift + 1e-6; s += s < 4 ? 0.5 : 1) {
+    for (let k = 0; k < 16; k++) {
+      const a = k * Math.PI / 8, ddx = Math.cos(a) * s, ddz = Math.sin(a) * s;
       if (evalShift(Sq, ddx, ddz, mode, true).bad) continue;
       if (Sq !== S && evalShift(S, ddx, ddz, mode, true).bad) continue;
       return { dx: ddx, dz: ddz, it: -1 };
@@ -442,6 +474,10 @@ export function sweepAssemblies(objs, cols, fc, opts = {}) {
       for (const c of myCols) { c.x += sol.dx; c.z += sol.dz; rep.colMoved++; }
       for (const f of fc) if (inAsm(A, f[0], f[1])) { f[0] += sol.dx; f[1] += sol.dz; rep.fcMoved++; }
       rep.moved.push([name, where, +sol.dx.toFixed(2), +sol.dz.toFixed(2), mode]);
+    } else if (mode === 'bldg' && opts.identity && opts.identity(name, A)) {
+      // công trình có danh tính (khách sạn/cao ốc/công sở dựng theo pano) không dời nổi → GIỮ tại chỗ, báo cáo
+      for (const c of myCols) delete c.__clr;
+      (rep.stuck || (rep.stuck = [])).push([name, where, e0.n, +e0.pen.toFixed(2), +e0.pano.toFixed(2)]);
     } else {
       for (const p of A) dropMesh(p);
       for (const c of myCols) { c.x = 1e7; c.z = 1e7; rep.colOff++; }   // tách khỏi bản đồ (cùng object trong colIdx nếu đã dựng)
@@ -470,13 +506,36 @@ function dropMesh(p) {
     const a = p.o.instanceMatrix.array; for (let k = 0; k < 16; k++) a[p.i * 16 + k] = 0;   // ma trận 0 = instance suy biến
     p.o.instanceMatrix.needsUpdate = true; return;
   }
-  const pos = p.o.geometry.attributes.position, v0 = p.vs[0], X = pos.getX(v0), Y = pos.getY(v0), Z = pos.getZ(v0);
-  for (const i of p.vs) pos.setXYZ(i, X, Y, Z);   // tam giác suy biến (không vẽ, không bóng)
-  pos.needsUpdate = true; _dirty.add(p.o.geometry);
+  // đánh dấu đỉnh chết; flushClearance() dựng lại chỉ số (hoặc nén thuộc tính nếu không chỉ số) bỏ tam giác của chúng
+  const g = p.o.geometry, n = g.attributes.position.count;
+  let dead = _deadV.get(g); if (!dead) _deadV.set(g, (dead = new Uint8Array(n)));
+  for (const i of p.vs) dead[i] = 1;
+  _dirty.add(g);
 }
-// sau sweep: cầu/hộp bao của geometry đã sửa
+const _deadV = new Map();
+// sau sweep: bỏ tam giác của mảnh đã gỡ (dựng lại index / nén thuộc tính) + cầu/hộp bao của geometry đã sửa
 export function flushClearance() {
-  for (const g of _dirty) { g.computeBoundingBox(); g.computeBoundingSphere(); }
+  for (const g of _dirty) {
+    const dead = _deadV.get(g);
+    if (dead) {
+      const idx = g.index;
+      if (idx) {
+        const keep = [];
+        for (let t = 0; t + 2 < idx.count; t += 3) { const a = idx.getX(t), b = idx.getX(t + 1), c = idx.getX(t + 2); if (!dead[a] && !dead[b] && !dead[c]) keep.push(a, b, c); }
+        g.setIndex(keep);   // mảng thường → three tự chọn Uint16/Uint32
+      } else {
+        const n = g.attributes.position.count, live = [];
+        for (let t = 0; t + 2 < n; t += 3) if (!dead[t] && !dead[t + 1] && !dead[t + 2]) live.push(t);
+        for (const k of Object.keys(g.attributes)) {
+          const a = g.attributes[k], s = a.itemSize, src = a.array, dst = new src.constructor(live.length * 3 * s);
+          let w = 0; for (const t of live) for (let q = 0; q < 3 * s; q++) dst[w++] = src[t * s + q];
+          g.setAttribute(k, new a.constructor(dst, s, a.normalized));
+        }
+      }
+      _deadV.delete(g);
+    }
+    g.computeBoundingBox(); g.computeBoundingSphere();
+  }
   _dirty.clear();
 }
 const api = { onCarriage, onCarriageDisc, nearestPano, nearPano, clearDisc, nearestRoad, corridorPen, nudgeDisc, sampleObject, evalShift, solveShift, sweepAssemblies, flushClearance };

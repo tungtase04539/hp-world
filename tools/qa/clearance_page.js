@@ -51,7 +51,7 @@
     const anon = (o) => { const m = o.isMesh ? o : null; if (!m) return '#' + o.type; const q = Array.isArray(m.material) ? m.material[0] : m.material; return '#' + (m.geometry.type || 'G').replace('Geometry', '') + ':' + (q && q.color ? q.color.getHexString() : '-') + ':' + m.geometry.attributes.position.count; };
     const nameOf = (top, m) => (top.name || (top === m ? anon(m) : anon(top) + '>' + (m.name || anon(m)))) + (top.userData && top.userData.__src ? '@L' + top.userData.__src : '');
     const visChain = (o) => { for (let p = o; p && p !== scene; p = p.parent) if (!p.visible) return false; return true; };
-    const EXCL = /^(ground|water|roads_|sidewalk_|lake|tree_pits|props_lamp_pools|props_cables|props_people|props_bikes_far|props_cars_far|props_furniture_far|props_lamp_glow|traffic_signal_lamps|aerial|sky|trees_|hero_trees|rail)|_ground$|ground_/i;
+    const EXCL = /^(bridge_group|ground|water|roads_|sidewalk_|lake|tree_pits|props_lamp_pools|props_cables|props_people|props_bikes_far|props_cars_far|props_furniture_far|props_lamp_glow|traffic_signal_lamps|aerial|sky|trees_|hero_trees|rail)|_ground$|ground_/i;
     const exclName = (o) => { for (let p = o; p && p !== scene; p = p.parent) if (p.name && EXCL.test(p.name)) return true; return false; };
     const kept = new Set((world.cellKept || []).map((k) => k.name));
     const rbGrid = world.rbGrid;
@@ -70,6 +70,8 @@
     let nTri = 0, nMesh = 0;
     // ghi tam giác (toạ độ thế giới) vào mọi camera trong R_CAP
     const pushTri = (ax, ay, az, bx, by, bz, cx, cy, cz, id) => {
+      // tam giác suy biến (mảnh đã bị gỡ bằng cách thu đỉnh về 1 điểm, ma trận instance 0) — không vẽ, bỏ qua
+      if (Math.abs(ax - bx) + Math.abs(ay - by) + Math.abs(az - bz) < 1e-6 && Math.abs(ax - cx) + Math.abs(ay - cy) + Math.abs(az - cz) < 1e-6) return;
       const x0 = Math.min(ax, bx, cx), x1 = Math.max(ax, bx, cx), z0 = Math.min(az, bz, cz), z1 = Math.max(az, bz, cz);
       camsInBox(x0, z0, x1, z1, R_CAP, tmpC);
       if (!tmpC.length) return;
@@ -132,6 +134,7 @@
       if (m.isInstancedMesh) {
         const im = m.instanceMatrix.array, iv = g.attributes.iVar;
         for (let i = 0; i < m.count; i++) {
+          if (!im[i * 16 + 15]) continue;   // ma trận 0 = instance đã gỡ
           mul(m.matrixWorld.elements, im.subarray(i * 16, i * 16 + 16), E);
           bbW(g.boundingBox, E, BB);
           if (!camsInBox(BB.x0, BB.z0, BB.x1, BB.z1, R_CAP, tmpC).length) continue;
@@ -160,12 +163,15 @@
     const depth = new Float32Array(W * H), pid = new Int32Array(W * H);
     const HEADS = [0, 45, 90, 135, 180, 225, 270, 315];
     const out = [];
+    let QX = 0, QZ = 0;   // điểm gần nhất của lần gọi d2tri cuối
     const d2tri = (px, pz, a, b, c, T) => {   // khoảng cách NGANG từ điểm tới hình chiếu XZ tam giác
       const ax = T[a], az = T[a + 2], bx = T[b], bz = T[b + 2], cx = T[c], cz = T[c + 2];
       const s1 = (bx - ax) * (pz - az) - (bz - az) * (px - ax), s2 = (cx - bx) * (pz - bz) - (cz - bz) * (px - bx), s3 = (ax - cx) * (pz - cz) - (az - cz) * (px - cx);
-      if ((s1 >= 0 && s2 >= 0 && s3 >= 0) || (s1 <= 0 && s2 <= 0 && s3 <= 0)) return 0;
-      const sd = (x1, z1, x2, z2) => { const dx = x2 - x1, dz = z2 - z1, l2 = dx * dx + dz * dz; let t = l2 ? ((px - x1) * dx + (pz - z1) * dz) / l2 : 0; t = t < 0 ? 0 : t > 1 ? 1 : t; return Math.hypot(px - x1 - t * dx, pz - z1 - t * dz); };
-      return Math.min(sd(ax, az, bx, bz), sd(bx, bz, cx, cz), sd(cx, cz, ax, az));
+      if ((s1 >= 0 && s2 >= 0 && s3 >= 0) || (s1 <= 0 && s2 <= 0 && s3 <= 0)) { QX = px; QZ = pz; return 0; }
+      let best = 1e9;
+      const sd = (x1, z1, x2, z2) => { const dx = x2 - x1, dz = z2 - z1, l2 = dx * dx + dz * dz; let t = l2 ? ((px - x1) * dx + (pz - z1) * dz) / l2 : 0; t = t < 0 ? 0 : t > 1 ? 1 : t; const qx = x1 + t * dx, qz = z1 + t * dz, d = Math.hypot(px - qx, pz - qz); if (d < best) { best = d; QX = qx; QZ = qz; } };
+      sd(ax, az, bx, bz); sd(bx, bz, cx, cz); sd(cx, cz, ax, az);
+      return best;
     };
     const V = [];   // đỉnh sau cắt mặt phẳng gần: [sx, sy, z]
     const clipNear = (A, B, C, zn) => {
@@ -197,21 +203,37 @@
         if (z < depth[p]) { depth[p] = z; pid[p] = id; }
       }
     };
-    const summ = { cams: cams.length, near: 0, fillCorr: 0, fillAll: 0, bad: 0 };
+    const summ = { cams: cams.length, near: 0, nearAll: 0, fillCorr: 0, fillAll: 0, bad: 0 };
     const surfAt = world.roadNet && world.roadNet.surfaceAt;
     const FILL_C = CFG.fillCorr || 0.2;
+    // điểm chạm lùi SÂU thêm DEEP m theo tia: hợp đồng WP1 cho footprint lấn facadeLine ≤ 0,3 m → 0,6 m để mặt tiền hợp lệ
+    // (và mép đa giác vỉa hè vẽ hơi rộng hơn giải tích) không bị tính là lấn phố
+    const DEEP = CFG.deep || 0.6;
     for (const c of cams) {
       const T = c.tri, O = c.obj, nT = O.length;
       const ex = c.x, ey = c.gh + EYE, ez = c.z;
       // (a) gần
-      const nearBy = new Map();
+      // nearAll = đúng chữ spec (mọi mesh < 3 m); near = đã loại MẶT NHÀ đứng sau facadeLine khi camera nằm trong hành lang
+      // phố (camera trên vỉa hè/phố hẹp do lệch dữ liệu — nhà thật đúng chỗ): nhà chỉ tính khi điểm gần nhất lùi sâu 0,3 m
+      // vẫn trên lòng/vỉa hè đã vẽ (roadNet.surfaceAt > 0) hoặc camera ngoài hành lang. Đồ phố/cây: luôn tính.
+      const nearBy = new Map(), nearAllBy = new Map();
+      const camIn = surfAt ? surfAt(ex, ez) > 0 : false;
       for (let t = 0; t < nT; t++) {
         const o = t * 9, y0 = Math.min(T[o + 1], T[o + 4], T[o + 7]), y1 = Math.max(T[o + 1], T[o + 4], T[o + 7]);
         if (y1 < c.gh + 0.3 || y0 > c.gh + 2.6) continue;
         const d = d2tri(ex, ez, o, o + 3, o + 6, T);
-        if (d < NEAR) { const id = O[t], cur = nearBy.get(id); if (cur === undefined || d < cur) nearBy.set(id, d); }
+        if (d >= NEAR) continue;
+        const id = O[t], k = objs[id].kind;
+        { const cur = nearAllBy.get(id); if (cur === undefined || d < cur) nearAllBy.set(id, d); }
+        const bldg = k === 'fab' || k === 'cellKept' || (k === 'obj' && y1 - y0 > 2.0);
+        if (bldg && camIn && d > 0.05) {
+          const qx = QX + (QX - ex) / d * DEEP, qz = QZ + (QZ - ez) / d * DEEP;
+          if (!(surfAt(qx, qz) > 0)) continue;
+        }
+        const cur = nearBy.get(id); if (cur === undefined || d < cur) nearBy.set(id, d);
       }
       const near = [...nearBy.entries()].sort((a, b) => a[1] - b[1]).slice(0, 4).map(([id, d]) => [objs[id].name, objs[id].kind, +d.toFixed(2)]);
+      const nearAll = [...nearAllBy.entries()].sort((a, b) => a[1] - b[1]).slice(0, 3).map(([id, d]) => [objs[id].name, objs[id].kind, +d.toFixed(2)]);
       // (b) lấp khung
       const fills = [];
       let worst = 0, worstC = 0;
@@ -245,7 +267,7 @@
           // hơn 2,7 m trên nền → vật LẤN phố (mặt tiền đúng chỗ ở facadeLine thì điểm sâu hơn nằm ngoài hành lang)
           const xn = ((p % W) + 0.5) / W * 2 - 1, yn = 1 - (Math.floor(p / W) + 0.5) / H * 2;
           const vx = rx * xn * tanH + ux * yn * tanV + dx, vy = uy * yn * tanV + dy, vz = rz * xn * tanH + uz * yn * tanV + dz;
-          const t2 = depth[p] + 0.3 / Math.hypot(vx, vy, vz);
+          const t2 = depth[p] + DEEP / Math.hypot(vx, vy, vz);
           const hx = ex + vx * depth[p], hy = ey + vy * depth[p], hz = ez + vz * depth[p];
           if (hy > c.gh + 2.7) continue;
           const sA = surfAt ? surfAt(ex + vx * t2, ez + vz * t2) : 0;
@@ -258,8 +280,9 @@
           +fc.toFixed(3), [...perC.entries()].sort((a, b) => b[1] - a[1]).slice(0, 2).map(([id, n]) => [objs[id].name, objs[id].kind, +(n / (W * H)).toFixed(3)])]);
       }
       const badNear = !c.probe && near.length > 0, badFill = !c.probe && worstC > FILL_C;
+      if (!c.probe && nearAll.length) summ.nearAll++;
       if (!c.probe) { if (badNear) summ.near++; if (badFill) summ.fillCorr++; if (worst > FILL_MAX) summ.fillAll++; if (badNear || badFill) summ.bad++; }
-      out.push({ i: c.i, id: c.id, x: c.x, z: c.z, gh: +c.gh.toFixed(2), worst: +worst.toFixed(3), worstC: +worstC.toFixed(3), near, fill: fills, bad: badNear || badFill, probe: !!c.probe });
+      out.push({ i: c.i, id: c.id, x: c.x, z: c.z, gh: +c.gh.toFixed(2), worst: +worst.toFixed(3), worstC: +worstC.toFixed(3), near, nearAll, fill: fills, bad: badNear || badFill, probe: !!c.probe });
       // mặt bằng gỡ lỗi cho cam vi phạm: bao lồi XZ từng vật thể (tam giác trong R_CAP)
       if ((badNear || badFill || c.probe || CFG.plans) && CFG.plan !== false) {
         const per = new Map();
@@ -318,22 +341,34 @@
     }
     const onRoad = [];
     const roadCls = CFG.roadCls || 'A';
-    const isRoadK = (k) => !!k && roadCls.includes(k);
+    // dải phân cách (mesh tên *median*) là đồ ĐÚNG trên lòng → mọi vật trong 3 m quanh nó (cây xà cừ dải phân cách,
+    // collider cây, bụi) không tính "trên lòng đường"
+    const MG = new Map();
+    for (const m of meshesAll) {
+      if (!/median/i.test(m.name || '') && !(m.parent && /median/i.test(m.parent.name || ''))) continue;
+      const e = m.matrixWorld.elements, k = Math.floor(e[12] / 8) * 100003 + Math.floor(e[14] / 8);
+      let a = MG.get(k); if (!a) MG.set(k, (a = [])); a.push(e[12], e[14]);
+    }
+    const nearMedian = (x, z) => { const ci = Math.floor(x / 8), cj = Math.floor(z / 8); for (let i = ci - 1; i <= ci + 1; i++) for (let j = cj - 1; j <= cj + 1; j++) { const a = MG.get(i * 100003 + j); if (!a) continue; for (let q = 0; q < a.length; q += 2) if ((a[q] - x) ** 2 + (a[q + 1] - z) ** 2 < 9) return true; } return false; };
+    const isRoadK0 = (k) => !!k && roadCls.includes(k);
+    let medianSkip = 0;
+    const isRoadAt = (k, x, z) => { if (!isRoadK0(k)) return false; if (nearMedian(x, z)) { medianSkip++; return false; } return true; };
+    const isRoadK = isRoadK0;
     // (c1) collider tròn nhỏ (cây/cột/đèn/thùng/…)
     const carG = new Map();
     for (const pc of (world.props && world.props.parkedCars) || []) { const k = Math.floor(pc.x / 8) * 100003 + Math.floor(pc.z / 8); let a = carG.get(k); if (!a) carG.set(k, (a = [])); a.push(pc); }
     const nearCar = (x, z) => { const ci = Math.floor(x / 8), cj = Math.floor(z / 8); for (let i = ci - 1; i <= ci + 1; i++) for (let j = cj - 1; j <= cj + 1; j++) { const a = carG.get(i * 100003 + j); if (!a) continue; for (const pc of a) if ((pc.x - x) ** 2 + (pc.z - z) ** 2 < 3.5 * 3.5) return true; } return false; };
     for (const c of world.colliders || []) {
       if (c.x > 1e6 || c.r > 3 || nearCar(c.x, c.z)) continue;
-      const k = surfCls(c.x, c.z); if (isRoadK(k)) onRoad.push({ src: 'collider', name: 'r' + c.r.toFixed(2), x: +c.x.toFixed(1), z: +c.z.toFixed(1), cls: k });
+      const k = surfCls(c.x, c.z); if (isRoadAt(k, c.x, c.z)) onRoad.push({ src: 'collider', name: 'r' + c.r.toFixed(2), x: +c.x.toFixed(1), z: +c.z.toFixed(1), cls: k });
     }
     // (c2) cây
-    for (const r of treeRecs) { const k = surfCls(r.x, r.z); if (isRoadK(k)) onRoad.push({ src: 'tree', name: 'sp' + r.sp, x: +r.x.toFixed(1), z: +r.z.toFixed(1), cls: k }); }
+    for (const r of treeRecs) { const k = surfCls(r.x, r.z); if (isRoadAt(k, r.x, r.z)) onRoad.push({ src: 'tree', name: 'sp' + r.sp, x: +r.x.toFixed(1), z: +r.z.toFixed(1), cls: k }); }
     // (c3) props (trừ ô tô: đỗ trong lòng là đúng; người)
     const PL = (window.__hpProps && window.__hpProps.lists) || {};
     for (const key of Object.keys(PL)) {
       if (key === 'cars' || key === 'walkI' || key === 'standI' || key === 'sitI') continue;
-      for (const it of PL[key] || []) { const k = surfCls(it.x, it.z); if (isRoadK(k)) onRoad.push({ src: 'props.' + key, name: key + (it.v !== undefined ? ':' + it.v : ''), x: +it.x.toFixed(1), z: +it.z.toFixed(1), cls: k }); }
+      for (const it of PL[key] || []) { const k = surfCls(it.x, it.z); if (isRoadAt(k, it.x, it.z)) onRoad.push({ src: 'props.' + key, name: key + (it.v !== undefined ? ':' + it.v : ''), x: +it.x.toFixed(1), z: +it.z.toFixed(1), cls: k }); }
     }
     // (c4) mọi vật thể cấp cao nhất khác (cell/streetscape/địa danh thủ tục…): đỉnh CHÂN (≤ mặt đất + 0,45 m), gom theo
     //      ô 2 m × vật thể cấp cao nhất (mesh gộp nhiều bản sao trải cả thành phố → từng cụm chân riêng)
@@ -341,16 +376,17 @@
     const ghAt = (x, z) => { const k = Math.floor(x) * 100003 + Math.floor(z); let v = ghC.get(k); if (v === undefined) { v = groundHeight(Math.floor(x) + 0.5, Math.floor(z) + 0.5); ghC.set(k, v); } return v; };
     const cl = new Map();
     for (const m of meshesAll) {
-      if (exclName(m) || /^(props_|fab_|traffic_)/.test(m.name)) continue;
+      if (exclName(m) || /^(props_|fab_|traffic_)/.test(m.name) || /median/i.test(m.name || "") || /median/i.test(topOf(m).name || "")) continue;
       const g = m.geometry; if (!g.boundingBox) g.computeBoundingBox();
       const top = topOf(m);
       const pos = g.attributes.position;
       if (m.isInstancedMesh) {
         const im = m.instanceMatrix.array;
         for (let i = 0; i < m.count; i++) {
+          if (!im[i * 16 + 15]) continue;
           mul(m.matrixWorld.elements, im.subarray(i * 16, i * 16 + 16), E);
           const x = E[12], z = E[14], k = surfCls(x, z);
-          if (isRoadK(k)) onRoad.push({ src: 'inst', name: (top.name || m.name || '?') + '#' + i, x: +x.toFixed(1), z: +z.toFixed(1), cls: k });
+          if (isRoadAt(k, x, z)) onRoad.push({ src: 'inst', name: (top.name || m.name || '?') + '#' + i, x: +x.toFixed(1), z: +z.toFixed(1), cls: k });
         }
         continue;
       }
@@ -359,7 +395,11 @@
       if (BB.y1 - BB.y0 < 0.3) continue;            // mảng phẳng (nền sân, vạch) không chắn
       const nm = nameOf(top, m);
       const step = Math.max(1, Math.floor(pos.count / 3000));
+      // chỉ đỉnh CÒN được chỉ số tham chiếu (mảnh gỡ bằng dựng lại index vẫn để đỉnh trong buffer)
+      let used = null;
+      if (g.index) { used = new Uint8Array(pos.count); const ix = g.index; for (let q = 0; q < ix.count; q++) used[ix.getX(q)] = 1; }
       for (let vi = 0; vi < pos.count; vi += step) {
+        if (used && !used[vi]) continue;
         const x = pos.getX(vi), y = pos.getY(vi), z = pos.getZ(vi);
         const X = me[0] * x + me[4] * y + me[8] * z + me[12], Y = me[1] * x + me[5] * y + me[9] * z + me[13], Z = me[2] * x + me[6] * y + me[10] * z + me[14];
         if (Y > ghAt(X, Z) + 0.45) continue;
@@ -412,7 +452,7 @@
     sidewalk.sort((a, b) => b.area - a.area);
     const tEnd = performance.now();
     const res = {
-      stats: { ...summ, onRoad: onRoad.length, sidewalk: sidewalk.length, sidewalkBlock: sidewalk.filter((s) => s.block).length, meshes: nMesh, camTris: nTri, roadTris: rtri.length, trees: treeRecs.length,
+      stats: { ...summ, medianSkip, onRoad: onRoad.length, sidewalk: sidewalk.length, sidewalkBlock: sidewalk.filter((s) => s.block).length, meshes: nMesh, camTris: nTri, roadTris: rtri.length, trees: treeRecs.length,
         ms: { collect: Math.round(tCollect - T0), cams: Math.round(tCams - tCollect), rest: Math.round(tEnd - tCams) } },
       cams: out.filter((c) => c.bad || c.probe || c.worst > 0.4 || c.worstC > 0.1 || CFG.allCams),
       worstAll: out.map((c) => +c.worst.toFixed(2)),

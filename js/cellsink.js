@@ -19,7 +19,7 @@ import { RB_B64 } from './buildings_real.js';
 import { claimBox } from './claims.js';
 import { BRAND_MAP, debrand } from './brands.js';
 import { PARKS } from './mapdata.js';
-import { clearanceReady, sampleObject, evalShift, solveShift, sweepAssemblies, flushClearance, CLEAR } from './clearance.js';   // Đợt 3 W2-A
+import { clearanceReady, samplesFromHulls, evalShift, solveShift, sweepAssemblies, flushClearance, CLEAR } from './clearance.js';   // Đợt 3 W2-A
 
 const _q = typeof location !== 'undefined' ? new URLSearchParams(location.search) : new URLSearchParams('');
 // ?cellsink=off → chỉ ghi (không gỡ, không claim) để A/B; =debug → như 'on' + giữ hình chiếu cho overlay QA;
@@ -566,7 +566,7 @@ function commitSink(sink, THREE, realScene, realFC, colliders, opts) {
   const IDENT = new Set(['civic', 'tower', 'heritage', 'bespoke']);
   if (live && clearanceReady()) for (const it of bl) {
     if (it.removed) continue;
-    const S = sampleObject(it.o);
+    const S = samplesFromHulls(it.shape.meshes.filter((q) => !q.leafy && !q.line));
     if (!S.nMesh || !evalShift(S, 0, 0, 'bldg').bad) continue;
     const maxS = it.height >= 15 ? CLEAR.MAX_SHIFT_TOWER : CLEAR.MAX_SHIFT_BLDG;
     const sol = solveShift(S, 'bldg', IDENT.has(it.kind) ? Math.max(maxS, 12) : maxS);
@@ -576,6 +576,7 @@ function commitSink(sink, THREE, realScene, realFC, colliders, opts) {
     else { it.removed = 'clear'; clr.removed.push([it.name, it.kind, where]); }
   }
 
+  clr.t5a = +(performance.now() - tClr0).toFixed(1);
   // 5) biển/mái hiên/điều hoà… treo trên mặt tiền nhà bị gỡ (vật thể RỜI cấp cao nhất) — nhà bị DỜI (5a) thì đồ treo dời theo
   const remCell = new Map(), shCell = new Map();
   for (const it of bl) if (it.removed) for (const k of it.keys) remCell.set(k, it); else if (it.shift) for (const k of it.keys) shCell.set(k, it);
@@ -605,24 +606,31 @@ function commitSink(sink, THREE, realScene, realFC, colliders, opts) {
     const big = [];
     for (const it of items) {
       if (it.bldg || it.removed || it.shift || it.kind === 'sys' || it.kind === 'tree' || !it.shape) continue;
-      if (/median/i.test(it.name) || it.shape.meshes.every((q) => q.leafy || q.green)) continue;
-      const S = sampleObject(it.o);
+      // tán cây rời (khối xanh CAO) bỏ qua; thảm cỏ/bồn xanh THẤP (đảo cỏ giữa nút giao…) vẫn xét
+      if (/median/i.test(it.name) || it.shape.meshes.every((q) => q.leafy || (q.green && q.y1 - q.y0 > 1.0))) continue;
+      const S = samplesFromHulls(it.shape.meshes.filter((q) => !q.leafy && !q.line));
       if (!S.nMesh) continue;
-      if (Math.max(S.x1 - S.x0, S.z1 - S.z0) > 20) { big.push(it); continue; }
-      if (!evalShift(S, 0, 0, 'small').bad) continue;
-      const sol = solveShift(S, 'small', CLEAR.MAX_SHIFT_SMALL);
+      const ext = Math.max(S.x1 - S.x0, S.z1 - S.z0);
+      if (ext > 20) { big.push(it); continue; }
+      // cổng/tường/kiốt dài ≥ 3 m cao ≥ 1,8 m: như nhà (đứng ở ranh đất = sau facadeLine, không trên vỉa hè); vật thấp/nhỏ:
+      // chỉ lòng đường + camera
+      const mode = S.height >= 1.8 && ext >= 3 ? 'bldg' : 'small';
+      if (!evalShift(S, 0, 0, mode).bad) continue;
+      const sol = solveShift(S, mode, mode === 'bldg' ? CLEAR.MAX_SHIFT_BLDG : CLEAR.MAX_SHIFT_SMALL);
       const where = [+((S.x0 + S.x1) / 2).toFixed(1), +((S.z0 + S.z1) / 2).toFixed(1)];
-      if (sol) { it.shift = [sol.dx, sol.dz]; clr.moved.push([it.name || it.o.type, it.kind, where, +sol.dx.toFixed(2), +sol.dz.toFixed(2)]); }
-      else { it.removed = 'clear'; clr.removed.push([it.name || it.o.type, it.kind, where]); }
+      if (sol) { it.shift = [sol.dx, sol.dz]; clr.moved.push([it.name || it.o.type, it.kind + '/' + mode, where, +sol.dx.toFixed(2), +sol.dz.toFixed(2)]); }
+      else { it.removed = 'clear'; clr.removed.push([it.name || it.o.type, it.kind + '/' + mode, where]); }
     }
     // vật trải dài: mảnh = con của nhóm-chứa (ma trận đơn vị) hoặc thành phần liên thông của mesh gộp; collider/FC của khối ô
     // nằm trong mảnh dời/tắt theo (sweepAssemblies)
+    clr.t5c = +(performance.now() - tClr0).toFixed(1);
     const colAll = cols.map((q) => q.c), fcAll = fcs.map((q) => q.e);
     for (const it of big) {
       const o = it.o, e = o.matrixWorld.elements;
       const ident = Math.abs(e[0] - 1) < 1e-6 && Math.abs(e[10] - 1) < 1e-6 && Math.abs(e[12]) < 1e-6 && Math.abs(e[14]) < 1e-6;
       const parts = o.isGroup && ident ? o.children.slice() : [o];
       const r = sweepAssemblies(parts, colAll, fcAll, { keep: (n) => /median/i.test(n) });
+      clr.bigPieces = (clr.bigPieces || 0) + (r.pieces || 0); clr.bigN = (clr.bigN || 0) + 1;
       if (r.moved && r.moved.length) clr.moved.push([it.name || o.type, it.kind + '/parts', r.moved.length]);
       if (r.removed && r.removed.length) clr.removed.push([it.name || o.type, it.kind + '/parts', r.removed.length]);
     }

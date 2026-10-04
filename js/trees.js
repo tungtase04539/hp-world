@@ -35,6 +35,7 @@ import { LM_POLY } from './landmark_polys.js';
 import { claimAt } from './claims.js';
 import { RB_B64 } from './buildings_real.js';
 import { decodeRB, makeFootprintGrid } from './buildings_data.js';
+import { onCarriage } from './clearance.js';   // Đợt 3 W2-A: lòng đường thật (roadNet.surfaceAt, biết khe đường đôi)
 
 export const SP = { XACU: 0, BANG: 1, PHUONG: 2, SAU: 3, BANGLANG: 4, CAU: 5, CATCUT: 6, DA: 7, NON: 8 };
 const SP_N = 9;
@@ -757,7 +758,7 @@ export function plantStreetTrees(ctx) {
     if (nearPano(x, z, PANO_CLEAR)) return rej('pano');
     if (trunkNear(x, z, 4.2)) return rej('spacing');
     if (Math.abs(groundHeightNoDeck(x, z) - LAND) > 0.35 || isWater(x, z)) return rej('ground');
-    if (blockedByRoad(x, z, ri, si)) return rej('road');
+    if (blockedByRoad(x, z, ri, si) || onCarriage(x, z)) return rej('road');   // W2-A: + nhựa khe đường đôi/nút giao (roadNet)
     if (nearNode(x, z, (ROAD_HW[c] ?? 2.75) + 4.5)) return rej('junction');
     if (fp.at(x, z) >= 0) return rej('building');
     if (inLM(x, z, 2.5)) return rej('landmark');
@@ -936,12 +937,13 @@ export function buildTrees(scene, ctx = {}) {
         const t = clamp(((x - s.ax) * dx + (z - s.az) * dz) / L2, 0, 1), qx = s.ax + t * dx, qz = s.az + t * dz, d = Math.hypot(x - qx, z - qz);
         if ('psrt'.includes(s.c) && d >= 0.5) {
           const off = treePitLine(s.c), nx = qx + (x - qx) / d * off, nz = qz + (z - qz) / d * off;
-          if (!roadHit(nx, nz) && (e.parent || fpG.at(nx, nz) < 0) && !nearPano(nx, nz, PANO_CLEAR) && !smallColNear(nx, nz, e.parent ? null : colAt(x, z))) {
+          if (!roadHit(nx, nz) && !onCarriage(nx, nz) && (e.parent || fpG.at(nx, nz) < 0) && !nearPano(nx, nz, PANO_CLEAR) && !smallColNear(nx, nz, e.parent ? null : colAt(x, z))) {
             if (!e.parent) { movedCols = colAt(x, z); for (const c of movedCols) { c.x = nx; c.z = nz; } }
             x = nx; z = nz; y = undefined; fix.moved++;
           } else drop = 'road';
         } else drop = 'road';
       }
+      if (!drop && onCarriage(x, z)) drop = 'road';   // W2-A: gốc trên nhựa khe đường đôi/đa giác nút giao (roadHit chỉ biết dải tim ROADS_DT)
       if (!drop && !e.parent && fpG.at(x, z) >= 0) drop = 'fp';
       if (!drop && nearPano(x, z, PANO_CLEAR)) drop = 'pano';   // cây cell/hồ/OSM/vườn chưa qua lọc camera
       if (!drop && dupNear(x, z, 1.8)) drop = 'dup';

@@ -26,6 +26,7 @@ import { LITE } from './device.js';
 import { RB_B64 } from './buildings_real.js';
 import { decodeRB, makeFootprintGrid } from './buildings_data.js';
 import { claimAt } from './claims.js';
+import { onCarriage, clearDisc } from './clearance.js';   // Đợt 3 W2-A: lòng đường thật (biết khe đường đôi/nút giao) + 3 m quanh camera pano
 
 // =====================================================================================================================
 // 0. TIỆN ÍCH: hash tất định theo toạ độ, màu
@@ -1024,7 +1025,7 @@ export function buildProps(ctx) {
           const x = ax + ux * s + nx * pk, z = az + uz * s + nz * pk;
           stats.cells++;
           if (x * x + z * z > R_MAX * R_MAX) { rej.far++; S.rj[k] = 1; continue; }
-          if (roadIdx.blocked(x, z, ri, si)) { rej.junction++; S.rj[k] = 2; continue; }
+          if (roadIdx.blocked(x, z, ri, si) || onCarriage(x, z)) { rej.junction++; S.rj[k] = 2; continue; }   // W2-A: + nhựa khe đường đôi/nút giao
           if (!flat(x, z)) { rej.notFlat++; S.rj[k] = 3; continue; }
           if (fcGrid.hit(x, z) || avoid(x, z) || clearAt(x, z) || claimAt(x, z, CLAIM_KINDS)) { rej.featured++; S.rj[k] = 4; continue; }
           if (inBuilding(x, z)) { rej.building++; S.rj[k] = 5; continue; }
@@ -1081,6 +1082,7 @@ export function buildProps(ctx) {
             ok = false;
             for (const dd of [1.5, -1.5, 3, -3]) { const x2 = x + S.ux * dd, z2 = z + S.uz * dd; if (!obst.hit(x2, z2, 0.35)) { x = x2; z = z2; ok = true; break; } }
           }
+          if (ok && !clearDisc(x, z, 0.3)) ok = false;   // W2-A: chân cột trên nhựa (khe đường đôi/nút giao) hoặc < 3,3 m camera pano
           const e = ok ? evAt(x, z) : null;
           if (ok && e && e[4] === 0) ok = false;                         // pano nói không có cột điện
           if (ok && !e && r.c === 'p' && hash3(x, z, 14) < 0.5) ok = false; // đại lộ: phần lớn đã hạ ngầm
@@ -1129,6 +1131,7 @@ export function buildProps(ctx) {
               for (const dd of [1.6, -1.6, 3.2, -3.2]) { const x2 = x + S.ux * dd, z2 = z + S.uz * dd; if (!obst.hit(x2, z2, 0.4)) { x = x2; z = z2; moved = true; break; } }
               if (!moved) continue;
             }
+            if (!clearDisc(x, z, 0.3)) continue;          // W2-A: đèn trên nhựa (khe đường đôi/nút giao) hoặc sát camera pano
             const heading = headX(-S.nx, -S.nz);
             if (orn) {
               ornI.push({ x, z, heading: headZ(S.ux, S.uz) });
@@ -1271,7 +1274,7 @@ export function buildProps(ctx) {
       const u = hash3(S.ax + kk, S.az + j, 52);
       const lat = Math.max(curbLine(S.c) + 0.55, lat0 - u * Math.max(0, sw - 1.6));
       const [x, z] = cellPos(S, kk, lat, (u - 0.5) * 1.4);
-      if (inBuilding(x, z) || obst.hit(x, z, 0.55)) continue;
+      if (inBuilding(x, z) || obst.hit(x, z, 0.55) || !clearDisc(x, z, 1.1)) continue;   // W2-A: bộ bàn ghế + khách ~1,1 m
       const rot = hash3(x, z, 53) * 6.28;
       stoolI.push({ x, z, heading: rot });
       S.occ[kk] |= OCC_SHOP;
@@ -1285,14 +1288,14 @@ export function buildProps(ctx) {
         // quay mặt vào bàn
         sitI.push({ x: wx, z: wz, heading: headZ(x - wx, z - wz), yo: -0.03 });
       }
-      if (j === 0 || hash3(x, z, 55) < 0.35) paraI.push({ x: x + S.ux * 0.4, z: z + S.uz * 0.4, heading: rot });
+      if ((j === 0 || hash3(x, z, 55) < 0.35) && clearDisc(x + S.ux * 0.4, z + S.uz * 0.4, 1.3)) paraI.push({ x: x + S.ux * 0.4, z: z + S.uz * 0.4, heading: rot });
     }
     // 1 xe đẩy cạnh cụm quán (40%)
     if (hash3(S.ax, S.az + k, 56) < 0.4) {
       const kk = Math.min(S.n - 1, k + 2);
       if (S.ok[kk] && !(S.occ[kk] & OCC_POLE)) {
         const [x, z] = cellPos(S, kk, parkingLine(S.c));
-        if (!inBuilding(x, z) && !obst.hit(x, z, 0.7)) { cartI.push({ x, z, heading: Math.atan2(S.ux, S.uz) }); S.occ[kk] |= OCC_SHOP; obst.add(x, z, 0.8); ctx.addCollider(x, z, 0.6); }
+        if (!inBuilding(x, z) && !obst.hit(x, z, 0.7) && clearDisc(x, z, 0.9)) { cartI.push({ x, z, heading: Math.atan2(S.ux, S.uz) }); S.occ[kk] |= OCC_SHOP; obst.add(x, z, 0.8); ctx.addCollider(x, z, 0.6); }
       }
     }
   }
@@ -1310,13 +1313,13 @@ export function buildProps(ctx) {
       if (!open && h1 < pFood) { placeFood(S, k, 2 + ((h2 * 4) | 0)); continue; }
       // xe đẩy hàng rong
       const pCart = (cl & 2) ? 0.03 : 0.004;
-      if (!open && h2 < pCart && !obst.hit(x, z, 0.7)) { cartI.push({ x, z, heading: Math.atan2(S.ux, S.uz) + (h3 < 0.5 ? 0 : Math.PI) }); S.occ[k] |= OCC_SHOP; obst.add(x, z, 0.8); ctx.addCollider(x, z, 0.6); if (h3 < 0.7) standI.push({ x: x + S.ux * 0.9, z: z + S.uz * 0.9, heading: Math.atan2(-S.nx, -S.nz) }); continue; }
+      if (!open && h2 < pCart && !obst.hit(x, z, 0.7) && clearDisc(x, z, 0.9)) { cartI.push({ x, z, heading: Math.atan2(S.ux, S.uz) + (h3 < 0.5 ? 0 : Math.PI) }); S.occ[k] |= OCC_SHOP; obst.add(x, z, 0.8); ctx.addCollider(x, z, 0.6); if (h3 < 0.7) standI.push({ x: x + S.ux * 0.9, z: z + S.uz * 0.9, heading: Math.atan2(-S.nx, -S.nz) }); continue; }
       // biển đứng chữ A trước cửa hàng
       const pA = (cl & 8) ? 0.06 : 0.012;
       if (!open && h3 < pA) {
         const lat = facadeLine(S.c) - 0.45;
         const [ax2, az2] = cellPos(S, k, lat, (h1 - 0.5) * 2);
-        if (!inBuilding(ax2, az2) && !obst.hit(ax2, az2, 0.4)) { aframeI.push({ x: ax2, z: az2, heading: Math.atan2(-S.nx, -S.nz) + (h2 - 0.5) * 0.5, cell: (hash3(ax2, az2, 64) * 8) | 0 }); S.occ[k] |= OCC_SHOP; }
+        if (!inBuilding(ax2, az2) && !obst.hit(ax2, az2, 0.4) && clearDisc(ax2, az2, 0.4)) { aframeI.push({ x: ax2, z: az2, heading: Math.atan2(-S.nx, -S.nz) + (h2 - 0.5) * 0.5, cell: (hash3(ax2, az2, 64) * 8) | 0 }); S.occ[k] |= OCC_SHOP; }
         continue;
       }
     }
@@ -1329,6 +1332,7 @@ export function buildProps(ctx) {
       const [x, z] = cellPos(S, k, furnitureLine(S.c) + 0.15);
       const e = S.ev[k], cl = e ? e[6] : 0;
       const hb = hash3(x, z, 71);
+      if (!clearDisc(x, z, 0.5)) continue;   // W2-A: thùng rác/trụ cứu hoả/tủ điện không trên nhựa, ≥ 3,5 m camera pano
       if (hb < ((cl & 4) ? 0.06 : 0.03)) {
         if (obst.hit(x, z, 0.45)) continue;
         binI.push({ x, z, heading: Math.atan2(-S.nx, -S.nz), col: pick([0x2f7d3e, 0x2f7d3e, 0xe07a1f, 0xe8c12c, 0x2b6cb3], hash3(x, z, 72)) });
@@ -1338,7 +1342,7 @@ export function buildProps(ctx) {
         hydI.push({ x, z, heading: 0 }); obst.add(x, z, 0.3); S.occ[k] |= OCC_SHOP;
       } else if (hb > 0.5 && hb < 0.5 + ((cl & 16) ? 0.02 : 0.004)) {
         const [x2, z2] = cellPos(S, k, facadeLine(S.c) - 0.35);
-        if (inBuilding(x2, z2) || obst.hit(x2, z2, 0.5)) continue;
+        if (inBuilding(x2, z2) || obst.hit(x2, z2, 0.5) || !clearDisc(x2, z2, 0.5)) continue;
         cabI.push({ x: x2, z: z2, heading: Math.atan2(-S.nx, -S.nz), col: pick([0xbfc3c4, 0xd6d0bf, 0x9aa69c], hash3(x2, z2, 73)) });
         obst.add(x2, z2, 0.55); ctx.addCollider(x2, z2, 0.45); S.occ[k] |= OCC_SHOP;
       }
@@ -1412,6 +1416,8 @@ export function buildProps(ctx) {
       if (inBuilding(nxp, nzp) || inBuilding(txp, tzp)) { prevA = null; continue; }
       if (obst.hit(x, z, 0.32) || obst.hit(nxp, nzp, 0.22) || obst.hit(txp, tzp, 0.22)) { prevA = null; continue; }
       if (roadIdx.carriageGap(narrow ? x : txp, narrow ? z : tzp) < (narrow ? -0.15 : -0.05)) { prevA = null; continue; }
+      // W2-A: xe (dài ~1,8 m) không chạm nhựa khe đường đôi/nút giao, mép xe ≥ 3 m camera pano
+      if (!clearDisc(x, z, 0.95) || onCarriage(nxp, nzp) || onCarriage(txp, tzp)) { prevA = null; continue; }
       prevA = skew ? null : a;   // sau xe xiên hẳn: xe kế tự do (đã chừa padNext)
       const mu = hash3(x, z, 90);
       const mi = BIKE_ORDER[BIKE_MIX.findIndex((t) => mu < t)];
