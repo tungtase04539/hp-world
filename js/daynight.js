@@ -11,7 +11,7 @@ import { setGlbLighting } from './assets.js';
 //   ban đêm là TRĂNG (hướng trăng, xanh nhạt, có bóng mờ). Bỏ đèn moonGlow riêng (bớt 1 đèn cho mọi fragment).
 // - Sương FogExp2 (chọn 1 lần, không đổi kiểu — đổi Fog↔FogExp2 là biên dịch lại mọi shader): mù ẩm bắt đầu thấy rõ
 //   từ ~150-200 m, GIỐNG NHAU mọi tier; màu = độ chói chân trời theo hướng nhìn → mép phố xa tan liền vào trời.
-// - IBL: PMREM nướng từ CHÍNH vòm trời mỗi ~3 s (2 RT luân phiên, không cấp phát lại) → GLB/nước phản chiếu trời
+// - IBL: PMREM nướng từ CHÍNH vòm trời mỗi ~3 s (MỘT RT cố định, vẽ đè — không đổi texture object) → GLB/nước phản chiếu trời
 //   đúng giờ; đêm tự tối (RoomEnvironment cũ sáng như studio cả lúc nửa đêm).
 // - Bóng: tâm hộp bám người chơi + hướng nhìn như cũ nhưng SNAP theo texel trong không gian đèn (hết "bò" mép bóng).
 //   Chế độ vệ tinh: hộp bóng phủ cả khung ảnh trực giao, map 4096, tắt sương.
@@ -78,6 +78,7 @@ const SKY_VS = /* glsl */`
   void main() {
     vDir = (modelMatrix * vec4(position, 0.0)).xyz;
     gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    gl_Position.z = gl_Position.w;     // đặt ĐÚNG mặt phẳng xa (depth 1) → so depth LessEqual chỉ qua ở pixel trời trống
   }`;
 const SKY_FS = /* glsl */`
   uniform vec3 uSunDir, uMoonDir, uFog, uGround;
@@ -183,14 +184,17 @@ export function createDayNight(scene, world) {
     uTime: { value: 0 }, uCloud: { value: GFX.clouds ? LIGHT.cloud : 0 }, uNight: { value: 0 },
     uHaze: { value: 1 }, uGain: { value: LIGHT.skyViewGain }, uEnv: { value: 0 }, uSat: { value: 1 },
   });
+  // VẼ SAU CÙNG trong nhóm đục, có so depth (z = w ở VS): shader trời (tán xạ + mây fbm) chỉ chạy ở pixel thật sự
+  // thấy trời — bản đầu vẽ TRƯỚC, không so depth ⇒ trả giá shader trời cho MỌI pixel màn hình (phố/nhà che kín vẫn tính).
+  // Vật trong suốt (biển, cánh hoa, sprite…) vẫn vẽ sau nó như cũ. AO coi depth = 1 là trời (post.js) — không đổi.
   const skyMat = new THREE.ShaderMaterial({
     name: 'HPSky', uniforms: mkUniforms(), vertexShader: SKY_VS, fragmentShader: SKY_FS,
-    side: THREE.BackSide, depthWrite: false, depthTest: false, fog: false,
+    side: THREE.BackSide, depthWrite: false, depthTest: true, fog: false,
   });
   const skyGeo = new THREE.SphereGeometry(10, 32, 16);
   const skyDome = new THREE.Mesh(skyGeo, skyMat);
   skyDome.name = 'sky_dome';
-  skyDome.renderOrder = -1e6;            // vẽ ĐẦU TIÊN, không ghi/so depth → mọi thứ vẽ đè lên
+  skyDome.renderOrder = 1e6;             // cuối nhóm đục (sắp theo renderOrder) — xem skyMat
   skyDome.frustumCulled = false;
   // tâm vòm = camera đang vẽ (camera chính, camera vệ tinh, cine) — ma trận cập nhật ngay trước khi vẽ
   skyDome.onBeforeRender = (r, sc, cam) => {
@@ -200,7 +204,10 @@ export function createDayNight(scene, world) {
   };
   scene.add(skyDome);
 
-  // ---- IBL: nướng PMREM từ vòm trời (scene riêng, cube 128, 2 RT luân phiên) ----
+  // ---- IBL: nướng PMREM từ vòm trời (scene riêng, cube 128) vào MỘT RT cố định ----
+  // KHÔNG luân phiên 2 RT: đổi đối tượng texture của scene.environment làm MỌI MeshStandardMaterial (GLB, nước) đi qua
+  // getProgram (materialProperties.envMap !== envMap → needsProgramChange, tính lại cache key) mỗi lần nướng = khựng
+  // CPU định kỳ. Cùng 1 texture → chỉ nội dung đổi, program/uniform giữ nguyên.
   const envMat = new THREE.ShaderMaterial({
     name: 'HPSkyEnv', uniforms: mkUniforms(), vertexShader: SKY_VS, fragmentShader: SKY_FS,
     side: THREE.BackSide, depthWrite: false, depthTest: false, fog: false,
@@ -209,9 +216,8 @@ export function createDayNight(scene, world) {
   envMat.uniforms.uSat.value = 0.45;   // IBL: trời khử bão hoà (khớp đèn bán cầu) — phản chiếu GLB/nước không xanh lét
   const envScene = new THREE.Scene();
   envScene.add(new THREE.Mesh(skyGeo, envMat));
-  let cubeRT = null, cubeCam = null, pmrem = null;
-  const envRTs = [null, null];
-  let envNext = 0, _envAt = -1e9, _envT = -1;
+  let cubeRT = null, cubeCam = null, pmrem = null, envRT = null;
+  let _envAt = -1e9, _envT = -1;
   function bakeEnv() {
     if (!_renderer) return;
     if (!pmrem) {
@@ -220,10 +226,8 @@ export function createDayNight(scene, world) {
       pmrem = new THREE.PMREMGenerator(_renderer);
     }
     cubeCam.update(_renderer, envScene);
-    const rt = pmrem.fromCubemap(cubeRT.texture, envRTs[envNext]);   // 2 lần đầu cấp phát, sau đó tái dùng
-    envRTs[envNext] = rt;
-    scene.environment = rt.texture;
-    envNext ^= 1;
+    envRT = pmrem.fromCubemap(cubeRT.texture, envRT);   // lần đầu cấp phát, sau đó vẽ đè vào chính RT đó
+    scene.environment = envRT.texture;
     _envAt = performance.now(); _envT = dayT;
   }
 
