@@ -24,7 +24,9 @@
 //    kiểm 8192 mẫu trên Radeon 890M/ANGLE) → citygen biết bay nào có dải biển (SIGN_EXT của facade_atlas.js) và dựng hộp
 //    biển 3D đúng chỗ. ĐỪNG đổi phần chọn mô-đun trệt trong shader mà không đổi groundModule() (và ngược lại).
 //  * Ban đêm: material nằm trong world.facadeMats → daynight.js đặt emissiveIntensity = glow·0,95; shader dùng emissive.r
-//    làm hệ số đêm (kính sáng ngẫu nhiên theo ô, cửa hàng + biển hiệu sáng). KHÔNG sửa daynight.js.
+//    làm hệ số đêm (kính sáng ngẫu nhiên theo ô, cửa hàng + biển hiệu sáng). KHÔNG sửa daynight.js. Shader THAY chunk
+//    emissivemap_fragment → phải tự nhân HP_UNLIT_K (post.js WP5: phần tự phát hiển thị theo màn hình, không theo phơi sáng
+//    thích nghi — thiếu là cửa sổ/biển cháy trắng lúc đêm khi phơi sáng ×4).
 //  * Va chạm: lưới ô 16 m trên bbox nhà (nới 2 m) → fabricCollide(p,r) đẩy điểm ra khỏi đa giác (cạnh gần nhất).
 //  * Xác định: mọi ngẫu nhiên = hash(seed nhà) — A/B chụp ảnh so được.
 import * as THREE from 'three';
@@ -304,7 +306,7 @@ float fabAO = 1.0;
   fabGlow += (gW / sum) * lit * warm * (0.18 + tx.rgb * 1.1) + isG * (kW / sum) * lit * (tx.rgb * 0.9 + warm * 0.06);
 }`)
       .replace('#include <color_fragment>', '')
-      .replace('#include <emissivemap_fragment>', 'totalEmissiveRadiance = fabGlow * emissive.r;')
+      .replace('#include <emissivemap_fragment>', 'totalEmissiveRadiance = fabGlow * emissive.r;\n#ifdef HP_UNLIT_K\ntotalEmissiveRadiance *= HP_UNLIT_K;\n#endif')
       .replace('#include <aomap_fragment>', 'reflectedLight.indirectDiffuse *= fabAO; reflectedLight.directDiffuse *= mix(1.0, fabAO, 0.35);');
   };
   m.customProgramCacheKey = () => 'fabric_v1_' + size;

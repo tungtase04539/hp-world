@@ -20539,7 +20539,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
   // keepClear: TRỤC NHÌN spawn → mặt tiền Nhà hát (ảnh đầu tiên người chơi thấy) — hàng cây mép bắc phố road#378 từng
   // che kín chân dung/mặt tiền (cam_spawn)
   const opKeep = (x, z) => _segD(x, z, LM.opera[0], LM.opera[1] + 16, LM.opera[0], LM.opera[1] + 75) < 14;
-  veg.plantStreetTrees({ ROADS_DT, groundHeightNoDeck, isWater, addCollider, colliders, lakeSD, hdTreeBelt, R: BUILD_RADIUS, landH: LAND_H, keepClear: opKeep });
+  veg.plantStreetTrees({ ROADS_DT, groundHeightNoDeck, isWater, addCollider, colliders, lakeSD, hdTreeBelt, R: BUILD_RADIUS, landH: LAND_H, keepClear: opKeep, fpGrid: world.rbGrid });   // rbGrid: footprint đã đánh D.dead (WP2) — proc: undefined → trees tự giải mã
 
   // ---------- CÂY ĐA/SI CỔ THỤ (pano-loop V2: 5 finding "thân bạnh, rễ phụ rủ, tán rất rộng") ----------
   function banyanTree(x, z) {
@@ -21536,7 +21536,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
   };
 
   // DỰNG toàn bộ cây đã xếp hàng (cells + cell_tree + phố + hồ + công viên + vườn hoa) → InstancedMesh theo loài/LOD
-  const trees = veg.buildTrees(scene, { groundHeight, R: BUILD_RADIUS, lakeSD, hdTreeBelt, colliders });
+  const trees = veg.buildTrees(scene, { groundHeight, R: BUILD_RADIUS, lakeSD, hdTreeBelt, colliders, fpGrid: world.rbGrid });
   world.trees = trees;                        // stats()/setSeason(0..1) — __hp.scene… hoặc world.trees.stats()
   world.treeBloomNear = trees.bloomNear;      // cánh phượng rơi quanh cây đang nở gần người chơi (petals.js)
   loadHeroTrees(trees);  // nạp GLB cây phượng ảnh-thật → LOD gần ≤150 m (bất đồng bộ)
