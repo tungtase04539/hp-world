@@ -52,7 +52,7 @@ export function initClearance(ctx) {
   const ghC = new Map();
   const gh0 = ctx.groundHeight || (() => ctx.LAND_H ?? 2);
   const gh = (x, z) => { const k = Math.floor(x) * 100003 + Math.floor(z); let v = ghC.get(k); if (v === undefined) { v = gh0(Math.floor(x) + 0.5, Math.floor(z) + 0.5); ghC.set(k, v); } return v; };
-  _st = { surf: ctx.surfaceAt || null, nearJ: ctx.nearJunction || null, segs, grid, gh, landH: ctx.LAND_H ?? 2 };
+  _st = { surf: ctx.surfaceAt || null, nearJ: ctx.nearJunction || null, water: ctx.isWater || null, segs, grid, gh, landH: ctx.LAND_H ?? 2 };
   return api;
 }
 export const clearanceReady = () => !!_st;
@@ -177,17 +177,30 @@ function hullClosest(H, x, z) {   // điểm gần nhất trên viền bao lồi
   }
   return [bx, bz];
 }
-// mẫu 1 bao lồi XZ: chỉ VIỀN mỗi 0,5 m (đủ: dải đường/ngõ nào cắt qua khối thì cũng cắt viền; lưới trong tốn ×5)
+// mẫu 1 bao lồi XZ: chỉ VIỀN mỗi 0,75 m (đỉnh luôn có) (đủ: dải đường/ngõ nào cắt qua khối thì cũng cắt viền; lưới trong tốn ×5)
 function sampleHull(H, out) {
   for (let i = 0; i < H.length; i++) {
-    const [ax, az] = H[i], [bx, bz] = H[(i + 1) % H.length], L = Math.hypot(bx - ax, bz - az), n = Math.max(1, Math.ceil(L / 0.5));
+    const [ax, az] = H[i], [bx, bz] = H[(i + 1) % H.length], L = Math.hypot(bx - ax, bz - az), n = Math.max(1, Math.ceil(L / 0.75));
     for (let k = 0; k < n; k++) out.push(ax + (bx - ax) * k / n, az + (bz - az) * k / n);
   }
 }
 // có đoạn phố nào trong ô lưới phủ hộp (x0..x1,z0..z1) nới pad? (lọc nhanh vật thể xa mọi phố)
-export function nearAnyRoad(x0, z0, x1, z1, pad = 0) {
+// Có THỂ vi phạm đường không? (lọc nhanh bảo thủ, theo hình tròn bao hộp): 'bldg' — hành lang facadeLine/mép ngõ;
+// 'small' — lòng đường (nửa lòng + 2,8 m phủ cả khe nhựa đường đôi ≤ 2,5 m) hoặc gần nút giao (đa giác góc bo).
+export function nearAnyRoad(x0, z0, x1, z1, mode = 'bldg') {
   if (!_st) return false;
-  for (let i = Math.floor((x0 - pad) / SC); i <= Math.floor((x1 + pad) / SC); i++) for (let j = Math.floor((z0 - pad) / SC); j <= Math.floor((z1 + pad) / SC); j++) if (_st.grid.has(i * 100003 + j)) return true;
+  const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, rad = Math.hypot(x1 - x0, z1 - z0) / 2;
+  const n = Math.ceil((rad + 12) / SC), ci = Math.floor(cx / SC), cj = Math.floor(cz / SC);
+  for (let i = ci - n; i <= ci + n; i++) for (let j = cj - n; j <= cj + n; j++) {
+    const a = _st.grid.get(i * 100003 + j); if (!a) continue;
+    for (const id of a) {
+      const s = _st.segs[id], dx = s.bx - s.ax, dz = s.bz - s.az, l2 = dx * dx + dz * dz || 1;
+      let t = ((cx - s.ax) * dx + (cz - s.az) * dz) / l2; t = t < 0 ? 0 : t > 1 ? 1 : t;
+      const need = mode === 'bldg' ? s.fl + 0.1 : s.hw + (s.street ? 2.8 : 0.4);
+      if (Math.hypot(cx - s.ax - dx * t, cz - s.az - dz * t) - rad <= need) return true;
+    }
+  }
+  if (mode !== 'bldg' && _st.nearJ && _st.nearJ(cx, cz, rad + 2)) return true;
   return false;
 }
 const isSkipMat = (q) => !q || (q.transparent && q.opacity < 0.35) || q.colorWrite === false;
@@ -211,7 +224,7 @@ export function sampleObject(o, opts = {}) {
     let hx0 = 1e9, hx1 = -1e9, hz0 = 1e9, hz1 = -1e9;
     for (const [x, z] of H) { if (x < hx0) hx0 = x; if (x > hx1) hx1 = x; if (z < hz0) hz0 = z; if (z > hz1) hz1 = z; }
     if (opts.maxArea && (hx1 - hx0) * (hz1 - hz0) > opts.maxArea) return;
-    if (my1 - my0 < 0.12 && my1 < gh((hx0 + hx1) / 2, (hz0 + hz1) / 2) + 0.4) return;   // mảng phẳng sát nền (lát/sân/vạch)
+    if (my1 - my0 < 0.12 && my1 < gh((hx0 + hx1) / 2, (hz0 + hz1) / 2) + 0.3) return;   // mảng phẳng sát nền (lát/sân/vạch)
     nMesh++;
     const g0 = gh((hx0 + hx1) / 2, (hz0 + hz1) / 2);
     if (my0 < y0) y0 = my0; if (my1 > y1) y1 = my1;
@@ -247,7 +260,7 @@ export function samplesFromHulls(list) {
     let hx0 = 1e9, hx1 = -1e9, hz0 = 1e9, hz1 = -1e9;
     for (const [x, z] of q.h) { if (x < hx0) hx0 = x; if (x > hx1) hx1 = x; if (z < hz0) hz0 = z; if (z > hz1) hz1 = z; }
     const g0 = gh((hx0 + hx1) / 2, (hz0 + hz1) / 2);
-    if (q.y1 - q.y0 < 0.12 && q.y1 < g0 + 0.4) continue;
+    if (q.y1 - q.y0 < 0.12 && q.y1 < g0 + 0.3) continue;   // mảng phẳng SÁT nền (vạch/tấm nổi ≥ 0,3 m vẫn xét)
     n++;
     if (q.y0 < y0) y0 = q.y0; if (q.y1 > y1) y1 = q.y1;
     if (hx0 < x0) x0 = hx0; if (hx1 > x1) x1 = hx1; if (hz0 < z0) z0 = hz0; if (hz1 > z1) z1 = hz1;
@@ -267,7 +280,7 @@ export function samplesFromHulls(list) {
 export function evalShift(S, dx, dz, mode, quick = false) {
   let n = 0, best = 0, push = null, pen = 0, pano = 0;
   // lọc nhanh: hộp vật thể không chạm ô lưới nào có phố và không camera nào trong tầm → sạch
-  if (S.x0 !== undefined && !nearAnyRoad(S.x0 + dx, S.z0 + dz, S.x1 + dx, S.z1 + dz)
+  if (S.x0 !== undefined && !nearAnyRoad(S.x0 + dx, S.z0 + dz, S.x1 + dx, S.z1 + dz, mode)
     && !nearestPano((S.x0 + S.x1) / 2 + dx, (S.z0 + S.z1) / 2 + dz, Math.hypot(S.x1 - S.x0, S.z1 - S.z0) / 2 + CLEAR.PANO_R)) return { n, pen, pano, push, bad: false };
   const B = S.base, NB = B.length;
   // kiểm nhanh (dò dời): bắt đầu từ mẫu vi phạm lần trước → phần lớn ứng viên hỏng bị loại sau 1-2 mẫu
@@ -279,10 +292,11 @@ export function evalShift(S, dx, dz, mode, quick = false) {
       const c = corridorPen(x, z);
       if (c && c.pen > 0.02) { if (quick) { S.lastBad = i; return { bad: true }; } n++; if (c.pen > pen) pen = c.pen; if (c.pen + 0.05 > best) { best = c.pen + 0.05; push = [c.nx * best, c.nz * best]; } continue; }
     }
+    if ((dx || dz) && _st && _st.water && _st.water(x, z)) { if (quick) { S.lastBad = i; return { bad: true }; } n++; continue; }   // dời không được xuống nước
     if (onCarriage(x, z)) {
       if (quick) { S.lastBad = i; return { bad: true }; }
       n++;
-      const r = nearestRoad(x, z);
+      const r = nearestRoad(x, z, 10);   // tầm 10 m (1 ô lưới ± 1): đủ cho điểm đang nằm TRÊN lòng
       const need = r ? Math.max(0.3, r.hw - r.d + 0.3) : 0.5;
       if (need > best) { best = need; push = r ? [r.nx * need, r.nz * need] : null; }
     }
@@ -309,7 +323,7 @@ export function evalShift(S, dx, dz, mode, quick = false) {
       if (need > best) {
         let vx = cx - cam.x, vz = cz - cam.z; const l = Math.hypot(vx, vz) || 1; vx /= l; vz /= l;
         // camera trong hành lang phố → đẩy theo pháp tuyến phố (ra mặt tiền) thay vì xuyên tâm
-        const r = nearestRoad(cx, cz);
+        const r = nearestRoad(cx, cz, 16);
         if (r && r.d > 0.5 && (r.nx * vx + r.nz * vz) > 0.2) { vx = r.nx; vz = r.nz; }
         best = need + (d === 0 ? rad : 0); push = [vx * best, vz * best];
       }
@@ -331,9 +345,12 @@ export function solveShift(S, mode, maxShift) {
   // lấy dời NGẮN nhất hết vi phạm (kiểm nhanh: dừng ở vi phạm đầu tiên; mẫu chân thưa ≤ 400 điểm)
   let Sq = S;
   if (S.base.length > 800) { const st = Math.ceil(S.base.length / 800); const b = []; for (let i = 0; i < S.base.length; i += 2 * st) b.push(S.base[i], S.base[i + 1]); Sq = { base: b, body: S.body }; }
-  for (let s = 0.5; s <= maxShift + 1e-6; s += s < 4 ? 0.5 : 1) {
-    for (let k = 0; k < 16; k++) {
-      const a = k * Math.PI / 8, ddx = Math.cos(a) * s, ddz = Math.sin(a) * s;
+  // lưới dò thưa (đo: dò 16 hướng × bước 0,5 m chiếm ~2/3 thời gian quét khoảng trống lúc dựng thế giới)
+  const ND = mode === 'bldg' ? 12 : 8;
+  for (const s of [0.5, 1, 1.5, 2, 3, 4, 5, 6, 8, 10, 12, 14]) {
+    if (s > maxShift + 1e-6) break;
+    for (let k = 0; k < ND; k++) {
+      const a = k * 2 * Math.PI / ND, ddx = Math.cos(a) * s, ddz = Math.sin(a) * s;
       if (evalShift(Sq, ddx, ddz, mode, true).bad) continue;
       if (Sq !== S && evalShift(S, ddx, ddz, mode, true).bad) continue;
       return { dx: ddx, dz: ddz, it: -1 };
@@ -386,8 +403,8 @@ export function sweepAssemblies(objs, cols, fc, opts = {}) {
         let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9, y0 = 1e9, y1 = -1e9;
         for (const i of vs) { const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i); if (x < x0) x0 = x; if (x > x1) x1 = x; if (z < z0) z0 = z; if (z > z1) z1 = z; if (y < y0) y0 = y; if (y > y1) y1 = y; }
         const g0 = gh((x0 + x1) / 2, (z0 + z1) / 2);
-        if (y1 - y0 < 0.12 && y1 < g0 + 0.4) continue;                       // lát/vạch phẳng
-        if ((x1 - x0) * (z1 - z0) > 2500) continue;                          // mảng nền rộng
+        if (y1 - y0 < 0.12 && y1 < g0 + 0.3) continue;                       // lát/vạch phẳng
+        if ((x1 - x0) * (z1 - z0) > 2500 && y1 - y0 < 0.25) continue;      // mảng nền rộng (đảo cỏ nổi 0,3 m vẫn xét)
         pieces.push({ kind: 'comp', o, vs, x0, x1, z0, z1, y0, y1, g0, name: nm });
       }
     } else if (o.isInstancedMesh) {
@@ -409,7 +426,7 @@ export function sweepAssemblies(objs, cols, fc, opts = {}) {
       pieces.push({ kind: 'obj', o, S, x0: S.x0, x1: S.x1, z0: S.z0, z1: S.z1, y0: S.y0, y1: S.y1, g0: gh((S.x0 + S.x1) / 2, (S.z0 + S.z1) / 2), name: nm });
     }
   }
-  rep.pieces = pieces.length;
+  rep.pieces = pieces.length; rep.tPieces = +(((typeof performance !== "undefined" ? performance : Date).now()) - t0).toFixed(1);
   // ---- gom cụm: mảnh mesh-gộp/instance chồng nhau trên mặt bằng (dung sai 0,25 m) ----
   const par = pieces.map((_, i) => i);
   const find = (a) => { while (par[a] !== a) { par[a] = par[par[a]]; a = par[a]; } return a; };
@@ -433,7 +450,7 @@ export function sweepAssemblies(objs, cols, fc, opts = {}) {
   });
   const asm = new Map();
   pieces.forEach((p, i) => { const r = find(i); let a = asm.get(r); if (!a) asm.set(r, (a = [])); a.push(p); });
-  rep.assemblies = asm.size;
+  rep.assemblies = asm.size; rep.tLink = +(((typeof performance !== "undefined" ? performance : Date).now()) - t0).toFixed(1);
   // collider / FC: lưới tra nhanh
   const CG = new Map();
   for (const c of cols) { const k = Math.floor(c.x / 8) * 100003 + Math.floor(c.z / 8); let a = CG.get(k); if (!a) CG.set(k, (a = [])); a.push(c); }
@@ -450,23 +467,34 @@ export function sweepAssemblies(objs, cols, fc, opts = {}) {
   // ---- mỗi cụm: mẫu chân/thân → giải dời ----
   for (const A of asm.values()) {
     const S = { base: [], body: [] };
-    let massive = 0, h = 0, x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9;
+    let massive = 0, h = 0, x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9, wallLike = false;
     for (const p of A) {
       x0 = Math.min(x0, p.x0); x1 = Math.max(x1, p.x1); z0 = Math.min(z0, p.z0); z1 = Math.max(z1, p.z1);
-      if (p.kind === 'obj') { for (const v of p.S.base) S.base.push(v); for (const b of p.S.body) S.body.push(b); massive += p.S.massive; h = Math.max(h, p.S.height); continue; }
+      if (p.kind === 'obj') {
+        for (const v of p.S.base) S.base.push(v); for (const b of p.S.body) S.body.push(b); massive += p.S.massive; h = Math.max(h, p.S.height);
+        if (p.S.base.length && p.S.height >= 1.8 && Math.max(p.S.x1 - p.S.x0, p.S.z1 - p.S.z0) >= 3) wallLike = true;
+        continue;
+      }
       const H = p.H || hull2(p.kind === 'comp' ? (() => { const pos = p.o.geometry.attributes.position; const P = []; const st = Math.max(1, Math.floor(p.vs.length / 64)); for (let q = 0; q < p.vs.length; q += st) P.push([pos.getX(p.vs[q]), pos.getZ(p.vs[q])]); P.push([p.x0, p.z0], [p.x1, p.z1]); return P; })() : []);
       p.H = H;
       if (p.y0 <= p.g0 + CLEAR.BASE_Y) sampleHull(H, S.base);
       if (p.y1 > p.g0 + CLEAR.BODY_Y0 && p.y0 < p.g0 + CLEAR.BODY_Y1) S.body.push({ H, y0: p.y0 - p.g0, y1: p.y1 - p.g0 });
       h = Math.max(h, p.y1 - p.g0);
       if (p.y1 - p.y0 >= 2.5) massive += (p.x1 - p.x0) * (p.z1 - p.z0);
+      // tấm tường/cổng/rào cao ≥ 1,8 m dài ≥ 3 m chạm nền → đứng ở ranh đất như nhà (luật hành lang)
+      if (p.y0 <= p.g0 + CLEAR.BASE_Y && p.y1 - p.y0 >= 1.8 && Math.max(p.x1 - p.x0, p.z1 - p.z0) >= 3) wallLike = true;
     }
-    const mode = h >= 1.8 && massive >= 12 ? 'bldg' : 'small';
+    S.x0 = x0; S.x1 = x1; S.z0 = z0; S.z1 = z1;   // hộp cụm → evalShift lọc nhanh cụm xa phố/camera
+    let mode = (h >= 1.8 && massive >= 12) || (wallLike && opts.wallLike) ? 'bldg' : 'small';   // tường/cổng: chỉ khối ô (opts.wallLike)
     const e0 = evalShift(S, 0, 0, mode);
     if (!e0.bad) { rep.kept++; continue; }
     const name = A[0].name || A[0].o.name || '?';
     const where = [+((x0 + x1) / 2).toFixed(1), +((z0 + z1) / 2).toFixed(1)];
-    const sol = solveShift(S, mode, mode === 'bldg' ? (h >= 15 ? CLEAR.MAX_SHIFT_TOWER : CLEAR.MAX_SHIFT_BLDG) : CLEAR.MAX_SHIFT_SMALL);
+    const maxS = mode === 'bldg' ? (h >= 15 ? CLEAR.MAX_SHIFT_TOWER : CLEAR.MAX_SHIFT_BLDG) : CLEAR.MAX_SHIFT_SMALL;
+    let sol = solveShift(S, mode, maxS);
+    const isIdent = mode === 'bldg' && opts.identity && opts.identity(name, A);
+    // công trình danh tính không lùi nổi ra sau facadeLine → ít nhất ra khỏi LÒNG ĐƯỜNG (+ camera); còn chân trên nhựa → gỡ
+    if (!sol && isIdent) { sol = solveShift(S, 'small', maxS); if (sol) mode = 'bldg/partial'; }
     const myCols = colsOf(A);
     for (const c of myCols) c.__clr = 1;
     if (sol) {
@@ -474,7 +502,7 @@ export function sweepAssemblies(objs, cols, fc, opts = {}) {
       for (const c of myCols) { c.x += sol.dx; c.z += sol.dz; rep.colMoved++; }
       for (const f of fc) if (inAsm(A, f[0], f[1])) { f[0] += sol.dx; f[1] += sol.dz; rep.fcMoved++; }
       rep.moved.push([name, where, +sol.dx.toFixed(2), +sol.dz.toFixed(2), mode]);
-    } else if (mode === 'bldg' && opts.identity && opts.identity(name, A)) {
+    } else if (isIdent && !evalShift(S, 0, 0, 'small').n) {
       // công trình có danh tính (khách sạn/cao ốc/công sở dựng theo pano) không dời nổi → GIỮ tại chỗ, báo cáo
       for (const c of myCols) delete c.__clr;
       (rep.stuck || (rep.stuck = [])).push([name, where, e0.n, +e0.pen.toFixed(2), +e0.pano.toFixed(2)]);

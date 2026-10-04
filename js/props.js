@@ -1417,7 +1417,7 @@ export function buildProps(ctx) {
       if (obst.hit(x, z, 0.32) || obst.hit(nxp, nzp, 0.22) || obst.hit(txp, tzp, 0.22)) { prevA = null; continue; }
       if (roadIdx.carriageGap(narrow ? x : txp, narrow ? z : tzp) < (narrow ? -0.15 : -0.05)) { prevA = null; continue; }
       // W2-A: xe (dài ~1,8 m) không chạm nhựa khe đường đôi/nút giao, mép xe ≥ 3 m camera pano
-      if (!clearDisc(x, z, 0.95) || onCarriage(nxp, nzp) || onCarriage(txp, tzp)) { prevA = null; continue; }
+      if (!clearDisc(x, z, 1.15) || onCarriage(nxp, nzp) || onCarriage(txp, tzp)) { prevA = null; continue; }
       prevA = skew ? null : a;   // sau xe xiên hẳn: xe kế tự do (đã chừa padNext)
       const mu = hash3(x, z, 90);
       const mi = BIKE_ORDER[BIKE_MIX.findIndex((t) => mu < t)];

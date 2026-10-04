@@ -53,7 +53,7 @@
     const visChain = (o) => { for (let p = o; p && p !== scene; p = p.parent) if (!p.visible) return false; return true; };
     const EXCL = /^(bridge_group|ground|water|roads_|sidewalk_|lake|tree_pits|props_lamp_pools|props_cables|props_people|props_bikes_far|props_cars_far|props_furniture_far|props_lamp_glow|traffic_signal_lamps|aerial|sky|trees_|hero_trees|rail)|_ground$|ground_/i;
     const exclName = (o) => { for (let p = o; p && p !== scene; p = p.parent) if (p.name && EXCL.test(p.name)) return true; return false; };
-    const kept = new Set((world.cellKept || []).map((k) => k.name));
+    const kept = new Set((world.cellKept || []).map((k) => k.name).filter(Boolean));
     const rbGrid = world.rbGrid;
     const fabAt = (x, z) => {
       if (!rbGrid) return -1;
@@ -440,8 +440,28 @@
         return true;
       };
       let rec = swByTop.get(top);
+      // mesh lớn (thường là mesh GỘP nhiều vật: dãy cột đèn, tường + trụ…) → hộp bao trùm cả khoảng trống giữa chúng; dùng
+      // ô 0,5 m dưới các MẶT NẰM cao ≥ đáy + 1,5 m (mái/đỉnh — như cellsink.rasterUp) thay cho hộp
+      let cells = null;
+      if ((BB.x1 - BB.x0) * (BB.z1 - BB.z0) > 150) {
+        cells = new Set();
+        const pos = g.attributes.position, ix = g.index, n = ix ? ix.count : pos.count;
+        const P = [0, 0, 0, 0, 0, 0, 0, 0, 0];
+        for (let t = 0; t + 2 < n; t += 3) {
+          for (let k = 0; k < 3; k++) { const vi = ix ? ix.getX(t + k) : t + k; const x = pos.getX(vi), y = pos.getY(vi), z = pos.getZ(vi); P[k * 3] = me[0] * x + me[4] * y + me[8] * z + me[12]; P[k * 3 + 1] = me[1] * x + me[5] * y + me[9] * z + me[13]; P[k * 3 + 2] = me[2] * x + me[6] * y + me[10] * z + me[14]; }
+          if (Math.min(P[1], P[4], P[7]) < BB.y0 + 1.5) continue;
+          const ux = P[3] - P[0], uy = P[4] - P[1], uz = P[5] - P[2], vx = P[6] - P[0], vy = P[7] - P[1], vz = P[8] - P[2];
+          const ny = uz * vx - ux * vz, nl = Math.hypot(uy * vz - uz * vy, ny, ux * vy - uy * vx);
+          if (!nl || Math.abs(ny) < 0.5 * nl) continue;
+          const tx0 = Math.min(P[0], P[3], P[6]), tx1 = Math.max(P[0], P[3], P[6]), tz0 = Math.min(P[2], P[5], P[8]), tz1 = Math.max(P[2], P[5], P[8]);
+          for (let x = Math.floor(tx0 * 2) / 2 + 0.25; x < tx1; x += 0.5) for (let z = Math.floor(tz0 * 2) / 2 + 0.25; z < tz1; z += 0.5) {
+            const s1 = (P[3] - P[0]) * (z - P[2]) - (P[5] - P[2]) * (x - P[0]), s2 = (P[6] - P[3]) * (z - P[5]) - (P[8] - P[5]) * (x - P[3]), s3 = (P[0] - P[6]) * (z - P[8]) - (P[2] - P[8]) * (x - P[6]);
+            if ((s1 >= 0 && s2 >= 0 && s3 >= 0) || (s1 <= 0 && s2 <= 0 && s3 <= 0)) cells.add(Math.round((x - 0.25) * 2) * 100003 + Math.round((z - 0.25) * 2));
+          }
+        }
+      }
       for (let x = Math.floor(BB.x0 * 2) / 2 + 0.25; x < BB.x1; x += 0.5) for (let z = Math.floor(BB.z0 * 2) / 2 + 0.25; z < BB.z1; z += 0.5) {
-        if (!inside(x, z)) continue;
+        if (cells ? !cells.has(Math.round((x - 0.25) * 2) * 100003 + Math.round((z - 0.25) * 2)) : !inside(x, z)) continue;
         const k = surfCls(x, z); if (k !== 'S') continue;
         const p = swPen(x, z); if (!p) continue;
         if (!rec) swByTop.set(top, (rec = { name: nameOf(top, m), area: 0, pen: 0, sw: 0, x: 0, z: 0, n: 0 }));
