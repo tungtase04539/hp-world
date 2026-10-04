@@ -581,6 +581,10 @@ export function plant(kind, x, z, o = {}) {
 export function plantLocal(parent, lx, lz, kind, o = {}) { Q.push({ kind, parent, lx, lz, o }); return true; }
 
 // ---- camera 551 pano (js/panoclear.js): không trồng/dời cây trong r m quanh điểm chụp (lưới 8 m, dựng 1 lần) ----
+// PANO_CLEAR 4,5 m: camera pano thật đứng trên LÒNG ĐƯỜNG (xe chụp đi giữa làn) → quanh nó không có gốc cây; trước 3 m
+// thì 68 camera có cây < 4 m, tán bàng/xà cừ che kín nửa trên khung (pano_019/008). Áp cho MỌI cây trừ dải phân cách
+// (o.median). HERO_PANO_CLEAR 12 m: tán GLB phượng xoè 6-7 m — hero 9,7 m trước pano_001_h090 che ~35% khung.
+const PANO_CLEAR = 4.5, HERO_PANO_CLEAR = 12;
 let _PG = null;
 function nearPano(x, z, r) {
   if (!_PG) { _PG = new Map(); for (const [px, pz] of PANO_CAM) { const k = Math.floor(px / 8) * 100003 + Math.floor(pz / 8); let a = _PG.get(k); if (!a) _PG.set(k, (a = [])); a.push(px, pz); } }
@@ -745,12 +749,12 @@ export function plantStreetTrees(ctx) {
   for (const c of (ctx.colliders || [])) { if (c.r > 1.2) continue; const k = Math.floor(c.x / 8) * 100003 + Math.floor(c.z / 8); let a = CG.get(k); if (!a) CG.set(k, (a = [])); a.push(c); }
   const nearProp = (x, z) => { const ci = Math.floor(x / 8), cj = Math.floor(z / 8); for (let i = ci - 1; i <= ci + 1; i++) for (let j = cj - 1; j <= cj + 1; j++) { const a = CG.get(i * 100003 + j); if (!a) continue; for (const c of a) if ((c.x - x) ** 2 + (c.z - z) ** 2 < (c.r + 0.55) ** 2) return true; } return false; };
   const fp = footprints(ctx);
-  const BLOCK = ['landmark', 'civic', 'cell', 'plaza'];
+  const BLOCK = ['landmark', 'civic', 'cell'];   // KHÔNG 'plaza': claim quảng trường chặn NHÀ, không chặn hàng cây bó vỉa quanh nó
   const st = { cand: 0, planted: 0, rej: {} };
   const rej = (k) => { st.rej[k] = (st.rej[k] || 0) + 1; return false; };
   const ok = (x, z, ri, si, c) => {
     if (x * x + z * z > R * R) return rej('radius');
-    if (nearPano(x, z, 3)) return rej('pano');
+    if (nearPano(x, z, PANO_CLEAR)) return rej('pano');
     if (trunkNear(x, z, 4.2)) return rej('spacing');
     if (Math.abs(groundHeightNoDeck(x, z) - LAND) > 0.35 || isWater(x, z)) return rej('ground');
     if (blockedByRoad(x, z, ri, si)) return rej('road');
@@ -792,7 +796,7 @@ export function plantStreetTrees(ctx) {
             plant(SP_NAME[sp], tx, tz, { bloom, pit: c === 'r' ? 0 : 1, wash: hxz(tx, tz, 22) < V.wash ? 1 : 0, sz });
             ctx.addCollider && ctx.addCollider(tx, tz, sp === SP.CAU ? 0.45 : 0.55);
             st.planted++;
-            if (sp === SP.PHUONG && bloom && (c === 'p' || c === 's') && distPolyline(tx, tz, CENTRAL) < 160 && !(ctx.hdTreeBelt && ctx.hdTreeBelt(tx, tz))) heroCand.push(q);
+            if (sp === SP.PHUONG && bloom && (c === 'p' || c === 's') && distPolyline(tx, tz, CENTRAL) < 160 && !(ctx.hdTreeBelt && ctx.hdTreeBelt(tx, tz)) && !nearPano(tx, tz, HERO_PANO_CLEAR)) heroCand.push(q);
           }
           acc += step;
         }
@@ -902,7 +906,11 @@ export function buildTrees(scene, ctx = {}) {
   const ckey = (x, z) => Math.round(x * 100) * 4194304 + Math.round(z * 100);   // khoá số (cm) — |z·100| < 2^21
   for (const c of (ctx.colliders || [])) if (c.r <= 2.2) { const k = ckey(c.x, c.z); let a = CI.get(k); if (!a) CI.set(k, (a = [])); a.push(c); }
   const colAt = (x, z) => CI.get(ckey(x, z)) || [];
-  const fix = { moved: 0, road: 0, fp: 0, dup: 0 };
+  // collider nhỏ (cột/đèn/đạo cụ WP7/gốc cây khác, r ≤ 1,2) — chỗ DỜI tới không được đè lên (như nearProp ở plantStreetTrees)
+  const SG = new Map();
+  for (const c of (ctx.colliders || [])) if (c.r <= 1.2) { const k = Math.floor(c.x / 8) * 100003 + Math.floor(c.z / 8); let a = SG.get(k); if (!a) SG.set(k, (a = [])); a.push(c); }
+  const smallColNear = (x, z, own) => { const ci = Math.floor(x / 8), cj = Math.floor(z / 8); for (let i = ci - 1; i <= ci + 1; i++) for (let j = cj - 1; j <= cj + 1; j++) { const a = SG.get(i * 100003 + j); if (!a) continue; for (const c of a) if ((c.x - x) ** 2 + (c.z - z) ** 2 < (c.r + 0.55) ** 2 && !(own && own.includes(c))) return true; } return false; };   // own: collider của chính cây
+  const fix = { moved: 0, road: 0, fp: 0, dup: 0, pano: 0 };
   const DG = new Map(), dkey = (x, z) => Math.floor(x / 4) * 100003 + Math.floor(z / 4);
   const dupNear = (x, z, r) => { const ci = Math.floor(x / 4), cj = Math.floor(z / 4); for (let i = ci - 1; i <= ci + 1; i++) for (let j = cj - 1; j <= cj + 1; j++) { const a = DG.get(i * 100003 + j); if (!a) continue; for (let q = 0; q < a.length; q += 2) if ((a[q] - x) ** 2 + (a[q + 1] - z) ** 2 < r * r) return true; } return false; };
   // đoạn đường mà điểm lọt vào lòng (cách tim < nửa lòng − 0,3) — null nếu không
@@ -921,24 +929,25 @@ export function buildTrees(scene, ctx = {}) {
     }
     if (x * x + z * z > R * R) continue;
     if (!e.o.median) {
-      let drop = null;
+      let drop = null, movedCols = null;
       const s = roadHit(x, z);
       if (s) {
         const dx = s.bx - s.ax, dz = s.bz - s.az, L2 = dx * dx + dz * dz || 1;
         const t = clamp(((x - s.ax) * dx + (z - s.az) * dz) / L2, 0, 1), qx = s.ax + t * dx, qz = s.az + t * dz, d = Math.hypot(x - qx, z - qz);
         if ('psrt'.includes(s.c) && d >= 0.5) {
           const off = treePitLine(s.c), nx = qx + (x - qx) / d * off, nz = qz + (z - qz) / d * off;
-          if (!roadHit(nx, nz) && (e.parent || fpG.at(nx, nz) < 0) && !nearPano(nx, nz, 3)) {
-            if (!e.parent) for (const c of colAt(x, z)) { c.x = nx; c.z = nz; }
+          if (!roadHit(nx, nz) && (e.parent || fpG.at(nx, nz) < 0) && !nearPano(nx, nz, PANO_CLEAR) && !smallColNear(nx, nz, e.parent ? null : colAt(x, z))) {
+            if (!e.parent) { movedCols = colAt(x, z); for (const c of movedCols) { c.x = nx; c.z = nz; } }
             x = nx; z = nz; y = undefined; fix.moved++;
           } else drop = 'road';
         } else drop = 'road';
       }
       if (!drop && !e.parent && fpG.at(x, z) >= 0) drop = 'fp';
+      if (!drop && nearPano(x, z, PANO_CLEAR)) drop = 'pano';   // cây cell/hồ/OSM/vườn chưa qua lọc camera
       if (!drop && dupNear(x, z, 1.8)) drop = 'dup';
       if (drop) {
         fix[drop]++;
-        if (!e.parent) { const c = colAt(e.x, e.z).pop(); if (c) { c.x = 1e7; c.z = 1e7; } }   // 1 collider / cây bỏ
+        if (!e.parent) { const c = (movedCols || colAt(e.x, e.z)).pop(); if (c) { c.x = 1e7; c.z = 1e7; } }   // 1 collider / cây bỏ (kể cả vừa dời)
         continue;
       }
     }
@@ -966,8 +975,12 @@ export function buildTrees(scene, ctx = {}) {
     const hf = hxz(x, z, 47);
     const full = o.full ?? (sp === SP.CAU || sp === SP.CATCUT || sp === SP.NON ? 1 : sp === SP.DA ? 0.85 + 0.15 * hf
       : V.thin ? 0.42 + 0.3 * hf : sp === SP.BANG ? 0.75 + 0.25 * hf : 0.66 + 0.34 * hf);
+    // hero GLB (luôn nở đỏ) chỉ khi cách camera pano ≥ 12 m — gần hơn: phượng thủ tục, nở theo hash như cây thường
+    // (cây hero vườn hoa từ heroTree truyền bloom:1 chỉ để khớp GLB đỏ)
+    const hero = sp === SP.PHUONG && o.hero !== undefined && o.hero >= 0 && !nearPano(x, z, HERO_PANO_CLEAR) ? o.hero : -1;
+    const bloomF = hero >= 0 ? 1 : o.hero !== undefined && o.hero >= 0 ? (hxz(x, z, 21) < 0.35 ? 1 : 0) : bloom;
     recs.push({ x, y, z, sp, kit, sy, sxz, yaw: o.yaw ?? hxz(x, z, 44) * Math.PI * 2, lx: (hxz(x, z, 45) - 0.5) * 0.07, lz: (hxz(x, z, 46) - 0.5) * 0.07,
-      bloom: sp === SP.PHUONG && o.hero !== undefined ? 1 : bloom, wash, pit: o.pit || 0, hero: o.hero ?? -1, full });
+      bloom: bloomF, wash, pit: o.pit || 0, hero, full });
   }
   const N = recs.length;
   // ---- atlas + vật liệu (1 material cho MỌI cây gần/xa) ----
@@ -1136,7 +1149,8 @@ export function buildTrees(scene, ctx = {}) {
   const prevOBR = scene.onBeforeRender;
   scene.onBeforeRender = function (renderer, sc, cam, rt) {
     prevOBR.call(this, renderer, sc, cam, rt);
-    U.uTime.value = performance.now() * 0.001;
+    // quấn chu kỳ 200π s: mọi tần số gió trong VERT_BEGIN là bội 0,01 rad/s → nối liền, không mất độ chính xác float sau nhiều giờ
+    U.uTime.value = (performance.now() * 0.001) % (200 * Math.PI);
     if (!flagsFixed && scene.matrixWorldAutoUpdate === false) {   // sau freezeStatic (nó đặt cast/receive cho MỌI mesh)
       flagsFixed = true;
       for (const g of groups) { g.mesh.castShadow = g.cast; g.mesh.receiveShadow = true; }
@@ -1215,7 +1229,8 @@ export function buildTrees(scene, ctx = {}) {
   };
   const setSeason = (b) => { U.uBloom.value = b; lastT = -1e9; };
   _built = { setHeroModel, bloomNear, stats, setSeason, uniforms: U, recs };
-  Q.length = 0; _trunkGrid.clear();
+  // lưới gốc dựng lại theo vị trí CUỐI (sau dời/bỏ) → hệ chạy sau buildTrees (đạo cụ WP7…) vẫn tra được trunkNear
+  Q.length = 0; _trunkGrid.clear(); for (const r of recs) addTrunk(r.x, r.z);
   return _built;
 }
 export const treeSystem = () => _built;

@@ -15531,11 +15531,11 @@ function rdStopBarsAndZebra() {
     let t = l2 ? ((px - x1) * dx + (pz - z1) * dz) / l2 : 0; t = Math.max(0, Math.min(1, t));
     return Math.hypot(px - (x1 + dx * t), pz - (z1 + dz * t));
   }
-  // né LÒNG ĐƯỜNG mọi phố (trừ đi bộ 'w'): cách tim > nửa lòng + 0.8 m
+  // né LÒNG ĐƯỜNG mọi phố (trừ đi bộ 'w'): cách tim > nửa lòng + 0.3 m (Đợt 3 WP4: trước +0.8 loại sạch hàng cau ở treePitLine)
   function trOnRoad(x, z) {
     for (const r of ROADS_DT) {
       if (r.c === 'w') continue;
-      const hw = ROAD_W[r.c] / 2 + 0.8;
+      const hw = ROAD_W[r.c] / 2 + 0.3;   // bó vỉa + 0.3: hố cây xsection.treePitLine (+0.45..0.75) phải lọt
       for (let i = 0; i < r.pts.length - 1; i++)
         if (_segD(x, z, r.pts[i][0], r.pts[i][1], r.pts[i + 1][0], r.pts[i + 1][1]) < hw) return true;
     }
@@ -15617,8 +15617,12 @@ function rdStopBarsAndZebra() {
     const nx = -uz, nz = ux;
     for (let d = 24; d < L - 12; d += 15) {
       const cx = A[0] + ux * d, cz = A[1] + uz * d;
+      // bám TIM PHỐ THẬT (đường A→C vẽ tay lệch tim 0,1-1,9 m → hố cây treePitLine tính từ A→C lọt lòng đường 1 bên)
+      const sg = trNearestSeg(cx, cz), sl = sg && sg.d < 12 ? Math.hypot(sg.dx, sg.dz) || 1 : 0;
+      const bx = sl ? sg.cx : cx, bz = sl ? sg.cz : cz, mx = sl ? -sg.dz / sl : nx, mz = sl ? sg.dx / sl : nz;
+      const off = veg.treePitLine(sl ? sg.c : 's');        // xsection (trước hw+3 = sau mặt tiền)
       for (const s of [1, -1]) {
-        const px = cx + nx * s * veg.treePitLine('s'), pz = cz + nz * s * veg.treePitLine('s');   // xsection (trước hw+3 = sau mặt tiền)
+        const px = bx + mx * s * off, pz = bz + mz * s * off;
         const hh = ((px * 3.3 + pz * 1.9) % 1 + 1) % 1;   // hash vị trí
         trPhuong(px, pz, 8.5 + hh * 2.5, hh < 0.32 ? 1 : 0);   // ~32% điểm hoa
       }
@@ -15634,6 +15638,7 @@ function rdStopBarsAndZebra() {
   }
   void localPt; void makeTex;  // giữ tham chiếu scope cho phần tích hợp (draft)
 }
+
 
   // ===== HỆ THỐNG MẬT ĐỘ: người đi bộ + xe bổ sung (cell_dens, prefix de*) =====
   {
