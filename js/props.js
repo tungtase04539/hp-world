@@ -26,7 +26,7 @@ import { LITE } from './device.js';
 import { RB_B64 } from './buildings_real.js';
 import { decodeRB, makeFootprintGrid } from './buildings_data.js';
 import { claimAt } from './claims.js';
-import { onCarriage, clearPt } from './clearance.js';   // Đợt 3 W2-A: lòng đường thật (biết khe đường đôi/nút giao) + 3 m quanh camera pano
+import { onCarriage, clearPt, clearDisc } from './clearance.js';   // Đợt 3 W2-A: lòng đường thật (biết khe đường đôi/nút giao) + 3 m quanh camera pano
 
 // =====================================================================================================================
 // 0. TIỆN ÍCH: hash tất định theo toạ độ, màu
@@ -1082,7 +1082,7 @@ export function buildProps(ctx) {
             ok = false;
             for (const dd of [1.5, -1.5, 3, -3]) { const x2 = x + S.ux * dd, z2 = z + S.uz * dd; if (!obst.hit(x2, z2, 0.35)) { x = x2; z = z2; ok = true; break; } }
           }
-          if (ok && !clearPt(x, z, 0.6)) ok = false;   // W2-A: chân cột trên nhựa (khe đường đôi/nút giao) hoặc < 3,6 m camera pano
+          if (ok && !clearDisc(x, z, 0.3, 3.3)) ok = false;   // W2-A: chân cột trên nhựa (khe đường đôi/nút giao) hoặc < 3,6 m camera pano
           const e = ok ? evAt(x, z) : null;
           if (ok && e && e[4] === 0) ok = false;                         // pano nói không có cột điện
           if (ok && !e && r.c === 'p' && hash3(x, z, 14) < 0.5) ok = false; // đại lộ: phần lớn đã hạ ngầm
@@ -1131,7 +1131,7 @@ export function buildProps(ctx) {
               for (const dd of [1.6, -1.6, 3.2, -3.2]) { const x2 = x + S.ux * dd, z2 = z + S.uz * dd; if (!obst.hit(x2, z2, 0.4)) { x = x2; z = z2; moved = true; break; } }
               if (!moved) continue;
             }
-            if (!clearPt(x, z, 0.6)) continue;          // W2-A: đèn trên nhựa (khe đường đôi/nút giao) hoặc sát camera pano
+            if (!clearDisc(x, z, 0.3, 3.3)) continue;   // W2-A: chân đèn (đĩa 0,3 m — mép nhựa đã vẽ) trên nhựa hoặc sát camera pano
             const heading = headX(-S.nx, -S.nz);
             if (orn) {
               ornI.push({ x, z, heading: headZ(S.ux, S.uz) });

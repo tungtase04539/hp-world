@@ -25,6 +25,11 @@ export const CLEAR = {
   MAX_SHIFT_BLDG: 8,  // đẩy lùi nhà/tường tối đa
   MAX_SHIFT_SMALL: 6, // dời đồ nhỏ tối đa
   MAX_SHIFT_TOWER: 14, // cao ốc ≥ 15 m có danh tính (pano): dời xa hơn thay vì gỡ
+  // TẤM MỎNG (rào tôn/tranh tường/hàng rào dày < 1 m, cao ≥ 1,8 m) của khối ô: luật CHỮ spec — tự nó không được lấp > 40%
+  // khung nhìn (FOV dọc 60°, 16:9, mắt 2,2 m — y hệt tools/qa/clearance_page.js) trong 6 m ở 1 trong 8 hướng (phản biện:
+  // rào tôn pano_109 chỉ bị đẩy tới đúng 3 m, vẫn lấp 60% khung)
+  FILL_D: 6, FILL_MAX: 0.4, EYE: 2.2, THIN: 1.0,
+  STREET_ON_MAX: 0.12, // công trình danh tính kẹt: gỡ chỉ khi ≥ 12% ô khối CHÍNH nằm trên lòng phố p/s/t/r (ngõ h/w không tính)
 };
 
 let _st = null;   // { surf, nearJ, segs, grid, gh, landH }
@@ -49,11 +54,19 @@ export function initClearance(ctx) {
         }
     }
   });
-  const ghC = new Map();
-  const gh0 = ctx.groundHeight || (() => ctx.LAND_H ?? 2);
-  const gh = (x, z) => { const k = Math.floor(x) * 100003 + Math.floor(z); let v = ghC.get(k); if (v === undefined) { v = gh0(Math.floor(x) + 0.5, Math.floor(z) + 0.5); ghC.set(k, v); } return v; };
+  // nền tại ĐÚNG điểm (trước: đệm ô 1 m lấy tâm ô → mép mặt cầu Lạc Long tâm ô rơi xuống nước, cột lan can trên mặt cầu
+  // "không chạm nền" nên không bị xét chân — phản biện: 1 mẩu bs_laclong_rail còn trên nhựa)
+  const gh = ctx.groundHeight || (() => ctx.LAND_H ?? 2);
   _st = { surf: ctx.surfaceAt || null, nearJ: ctx.nearJunction || null, water: ctx.isWater || null, segs, grid, gh, landH: ctx.LAND_H ?? 2 };
+  _released = false;
   return api;
+}
+// NHẢ bộ nhớ đệm (gọi 1 lần sau props/cây, trước freezeStatic — phản biện: lưới đệm lòng đường _cc ≤ 6 MB giữ suốt phiên,
+// heap +6 MB): sau đó tra cứu vẫn đúng nhưng KHÔNG đệm (tính thẳng surfaceAt) — chỉ còn lưới đoạn phố nhỏ.
+let _released = false;
+export function releaseClearance() {
+  _cc.clear(); _deadV.clear(); _deadM.clear(); _dirty.clear();
+  _released = true;
 }
 export const clearanceReady = () => !!_st;
 
@@ -68,15 +81,24 @@ export function onCarriage(x, z) {
   const s = _st.surf(x, z);
   return s > 0.05 && s < 0.2;
 }
-// NHANH (quét vật đã dựng — hàng trăm lần thử dời mỗi vật): có đệm ô
-export function onCarriageFast(x, z) {
-  if (!_st || !_st.surf) return false;
-  const ix = Math.floor(x * 2), iz = Math.floor(z * 2), tk = (ix >> 5) * 100003 + (iz >> 5);
+// NHANH (quét vật đã dựng — hàng trăm lần thử dời mỗi vật): đệm theo LƯỚI ĐỈNH 0,5 m (mỗi đỉnh 1 lần surfaceAt, dùng chung
+// giữa 4 ô); 4 đỉnh ô chứa điểm cùng kết quả → trả luôn, khác nhau (ô MÉP lòng) → tính CHÍNH XÁC tại điểm. Trước: giá trị tâm
+// ô (sai ±0,35 m ở mép) → phản biện thấy bàn/đèn dời "hợp lệ" mà chân vẫn chạm mép nhựa đã vẽ.
+const _lat = (ix, iz) => {
+  const tk = (ix >> 5) * 100003 + (iz >> 5);
   let t = _cc.get(tk); if (!t) { if (_cc.size > 6000) _cc.clear(); _cc.set(tk, (t = new Uint8Array(1024))); }   // trần ~6 MB
   const ci = ((ix & 31) << 5) | (iz & 31);
   let v = t[ci];
-  if (!v) { const s = _st.surf((ix + 0.5) / 2, (iz + 0.5) / 2); v = s > 0.05 && s < 0.2 ? 2 : 1; t[ci] = v; }
-  return v === 2;
+  if (!v) { const s = _st.surf(ix / 2, iz / 2); v = s > 0.05 && s < 0.2 ? 2 : 1; t[ci] = v; }
+  return v;
+};
+export function onCarriageFast(x, z) {
+  if (!_st || !_st.surf) return false;
+  if (_released) return onCarriage(x, z);
+  const ix = Math.floor(x * 2), iz = Math.floor(z * 2);
+  const a = _lat(ix, iz);
+  if (_lat(ix + 1, iz) === a && _lat(ix, iz + 1) === a && _lat(ix + 1, iz + 1) === a) return a === 2;
+  return onCarriage(x, z);
 }
 // đĩa bán kính r chạm lòng đường? (tâm + 8 điểm vành)
 export function onCarriageDisc(x, z, r = 0) {
@@ -96,6 +118,75 @@ export function nearestPano(x, z, r = CLEAR.PANO_R) {
   return best;
 }
 export const nearPano = (x, z, r = CLEAR.PANO_R) => !!nearestPano(x, z, r);
+// mọi camera pano trong bán kính r → [[x,z,d],…]
+export function panosNear(x, z, r) {
+  const ci = Math.floor(x / PC), cj = Math.floor(z / PC), n = Math.ceil(r / PC), out = [];
+  for (let i = ci - n; i <= ci + n; i++) for (let j = cj - n; j <= cj + n; j++) {
+    const a = PG.get(i * 100003 + j); if (!a) continue;
+    for (let q = 0; q < a.length; q += 2) { const d = Math.hypot(a[q] - x, a[q + 1] - z); if (d < r) out.push([a[q], a[q + 1], d]); }
+  }
+  return out;
+}
+// trên LÒNG PHỐ có vỉa (p/s/t/r, kể cả nút giao/khe nhựa trong hành lang phố) — nhựa NGÕ h/w không tính
+export const onStreetCarriage = (x, z) => onCarriage(x, z) && !!corridorPen(x, z, true);
+// tỉ lệ ô 1 m (tâm ô) của các bao lồi KHỐI CHÍNH nằm trên lòng phố có vỉa → {n, tot}
+export function massOnStreet(hulls) {
+  const seen = new Set(); let n = 0, tot = 0;
+  for (const H of hulls) {
+    if (!H || H.length < 3) continue;
+    let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9;
+    for (const [x, z] of H) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (z < z0) z0 = z; if (z > z1) z1 = z; }
+    for (let ix = Math.floor(x0); ix <= Math.floor(x1); ix++) for (let iz = Math.floor(z0); iz <= Math.floor(z1); iz++) {
+      const k = ix * 100003 + iz; if (seen.has(k)) continue;
+      if (!inHull(H, ix + 0.5, iz + 0.5)) continue;
+      seen.add(k); tot++; if (onStreetCarriage(ix + 0.5, iz + 0.5)) n++;
+    }
+  }
+  return { n, tot, frac: tot ? n / tot : 0 };
+}
+// LẤP KHUNG: phần (0..1) khung nhìn 64×36 của 1 camera (mắt nền+2,2 m, FOV dọc 60°, 16:9 — như kiểm toán) bị các LĂNG TRỤ
+// đứng (bao lồi H dời dx,dz; y0..y1 so với nền) che trong FILL_D m, lớn nhất trên 8 hướng 0..315°. Raster 2,5D theo cột.
+const _rows = new Uint8Array(36);
+export function prismFill(body, dx, dz, cx, cz) {
+  const W = 64, Hh = 36, tanV = Math.tan(Math.PI / 6), tanH = tanV * 16 / 9, EYE = CLEAR.EYE, FD = CLEAR.FILL_D;
+  const P = [];
+  for (const b of body) {
+    if (!b.H || b.H.length < 2 || b.y1 === undefined) continue;
+    const Hs = b.H.map(([x, z]) => [x + dx - cx, z + dz - cz]);   // toạ độ so với camera
+    let near = Infinity; for (const [x, z] of Hs) near = Math.min(near, Math.hypot(x, z));
+    if (near > FD + 30) continue;
+    P.push({ H: Hs, y0: b.y0, y1: b.y1, inside: Hs.length >= 3 && inHull(Hs, 0, 0) });
+  }
+  if (!P.length) return 0;
+  let worst = 0;
+  for (let h = 0; h < 8; h++) {
+    const hr = h * Math.PI / 4, fx = Math.sin(hr), fz = -Math.cos(hr), rx = -fz, rz = fx;
+    let cov = 0;
+    for (let i = 0; i < W; i++) {
+      const xn = (i + 0.5) / W * 2 - 1, vx = fx + rx * xn * tanH, vz = fz + rz * xn * tanH;   // tia: p = s·v (s = độ sâu)
+      _rows.fill(0); let any = false;
+      for (const p of P) {
+        // độ sâu vào lăng trụ: nhỏ nhất s ≥ 0,3 cắt cạnh bao (camera trong bao → 0,3)
+        let sIn = p.inside ? 0.3 : Infinity;
+        const H = p.H, n = H.length;
+        if (!p.inside) for (let k = 0; k < n; k++) {
+          const [ax, az] = H[k], [bx, bz] = H[(k + 1) % n], ex = bx - ax, ez = bz - az;
+          const den = vx * ez - vz * ex; if (Math.abs(den) < 1e-9) continue;
+          const s = (ax * ez - az * ex) / den, t = (ax * vz - az * vx) / den;
+          if (t >= 0 && t <= 1 && s >= 0.3 && s < sIn) sIn = s;
+        }
+        if (sIn > FD) continue;
+        for (let j = 0; j < Hh; j++) {
+          const yn = 1 - (j + 0.5) / Hh * 2, y = EYE + yn * tanV * sIn;
+          if (y >= p.y0 && y <= p.y1) { _rows[j] = 1; any = true; }
+        }
+      }
+      if (any) for (let j = 0; j < Hh; j++) cov += _rows[j];
+    }
+    const f = cov / (W * Hh); if (f > worst) worst = f;
+  }
+  return worst;
+}
 // đĩa (x,z,r) sạch: không chạm lòng đường, mép đĩa cách camera pano ≥ PANO_R
 // bản rẻ cho đồ đặt trên ô vỉa hè đã kiểm: chỉ TÂM không trên lòng + mép đĩa ≥ PANO_R camera (1 lần surfaceAt có đệm)
 export function clearPt(x, z, r = 0, panoR = CLEAR.PANO_R) { return !nearPano(x, z, panoR + r) && !onCarriage(x, z); }
@@ -122,15 +213,39 @@ export function nearestRoad(x, z, reach = 30) {
   }
   return best;
 }
+// đoạn phố CÓ VỈA gần nhất (bỏ ngõ h/w) — hướng đẩy khi ngõ "mềm"
+export function nearestStreet(x, z, reach = 30) {
+  if (!_st) return null;
+  let best = null;
+  const n = Math.ceil(reach / SC), ci = Math.floor(x / SC), cj = Math.floor(z / SC);
+  for (let i = ci - n; i <= ci + n; i++) for (let j = cj - n; j <= cj + n; j++) {
+    const a = _st.grid.get(i * 100003 + j); if (!a) continue;
+    for (const id of a) {
+      const s = _st.segs[id]; if (!s.street) continue;
+      const dx = s.bx - s.ax, dz = s.bz - s.az, l2 = dx * dx + dz * dz || 1;
+      let t = ((x - s.ax) * dx + (z - s.az) * dz) / l2; t = t < 0 ? 0 : t > 1 ? 1 : t;
+      const qx = s.ax + dx * t, qz = s.az + dz * t, d = Math.hypot(x - qx, z - qz);
+      if (!best || d < best.d) {
+        let nx = x - qx, nz = z - qz; const l = Math.hypot(nx, nz);
+        if (l > 1e-6) { nx /= l; nz /= l; } else { const L = Math.sqrt(l2); nx = -dz / L; nz = dx / L; }
+        best = { d, nx, nz, c: s.c, hw: s.hw, fl: s.fl, street: true };
+      }
+    }
+  }
+  return best;
+}
 // LẤN HÀNH LANG PHỐ: độ sâu lớn nhất (m) điểm nằm TRONG mặt tiền (phố có vỉa: facadeLine − d − FACADE_TOL; ngõ h/w:
 // nửa lòng − d − ALLEY_TOL) + pháp tuyến đẩy ra; null nếu ngoài mọi hành lang
-export function corridorPen(x, z) {
+// streetsOnly: chỉ phố CÓ VỈA (p/s/t/r) — ngõ h/w là "mềm" với công trình danh tính (phản biện W2-A: ngõ dịch vụ chạy qua
+// khuôn viên/tháp dựng theo pano — beboi_haly, cn_shpplaza, svd_khandai — từng làm gỡ cả công trình)
+export function corridorPen(x, z, streetsOnly = false) {
   if (!_st) return null;
   const ci = Math.floor(x / SC), cj = Math.floor(z / SC);
   const a = _st.grid.get(ci * 100003 + cj); if (!a) return null;
   let best = null;
   for (const id of a) {
-    const s = _st.segs[id], dx = s.bx - s.ax, dz = s.bz - s.az, l2 = dx * dx + dz * dz || 1;
+    const s = _st.segs[id]; if (streetsOnly && !s.street) continue;
+    const dx = s.bx - s.ax, dz = s.bz - s.az, l2 = dx * dx + dz * dz || 1;
     let t = ((x - s.ax) * dx + (z - s.az) * dz) / l2; t = t < 0 ? 0 : t > 1 ? 1 : t;
     const qx = s.ax + dx * t, qz = s.az + dz * t, d = Math.hypot(x - qx, z - qz);
     const pen = s.street ? s.fl - d - CLEAR.FACADE_TOL : s.hw - d - CLEAR.ALLEY_TOL;
@@ -225,8 +340,8 @@ const isSkipMat = (q) => !q || (q.transparent && q.opacity < 0.35) || q.colorWri
 //   opts.meshFilter(m) → false = bỏ mesh; opts.maxArea: mesh có bbox phủ > maxArea m² bị bỏ (nền/mặt sân rộng)
 export function sampleObject(o, opts = {}) {
   const gh = _st ? _st.gh : () => 2;
-  const base = [], body = [];
-  let y0 = 1e9, y1 = -1e9, x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9, massive = 0, nMesh = 0;
+  const base = [], body = [], mass = [];
+  let y0 = 1e9, y1 = -1e9, x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9, massive = 0, nMesh = 0, thick = false;
   const one = (m, me) => {
     const g = m.geometry; if (!g.boundingBox) g.computeBoundingBox();
     const bb = g.boundingBox; if (!isFinite(bb.min.x)) return;
@@ -247,7 +362,8 @@ export function sampleObject(o, opts = {}) {
     if (hx0 < x0) x0 = hx0; if (hx1 > x1) x1 = hx1; if (hz0 < z0) z0 = hz0; if (hz1 > z1) z1 = hz1;
     if (my0 <= g0 + CLEAR.BASE_Y) sampleHull(H, base);
     if (my1 > g0 + CLEAR.BODY_Y0 && my0 < g0 + CLEAR.BODY_Y1) body.push({ H, y0: my0 - g0, y1: my1 - g0 });
-    if (my1 - my0 >= 2.5 && (hx1 - hx0) * (hz1 - hz0) >= 4) massive += (hx1 - hx0) * (hz1 - hz0);
+    if (my1 - my0 >= 2.5 && (hx1 - hx0) * (hz1 - hz0) >= 4) { massive += (hx1 - hx0) * (hz1 - hz0); mass.push(H); }
+    if (my1 - my0 >= 1.8 && my0 <= g0 + CLEAR.BASE_Y && minWidth(H) >= CLEAR.THIN) thick = true;
   };
   o.updateMatrixWorld(true);
   o.traverse((m) => {
@@ -261,7 +377,19 @@ export function sampleObject(o, opts = {}) {
       for (let i = 0; i < m.count; i++) one(m, mulM(m.matrixWorld.elements, im.subarray(i * 16, i * 16 + 16), _e));
     } else one(m, m.matrixWorld.elements);
   });
-  return { base, body, y0, y1, x0, x1, z0, z1, massive, nMesh, height: y1 - y0 };
+  return { base, body, mass, thick, y0, y1, x0, x1, z0, z1, massive, nMesh, height: y1 - y0 };
+}
+// bề rộng nhỏ nhất của bao lồi (calipers xoay theo cạnh) — tấm mỏng < CLEAR.THIN
+function minWidth(H) {
+  if (!H || H.length < 3) return 0;
+  let best = Infinity;
+  for (let i = 0; i < H.length; i++) {
+    const a = H[i], b = H[(i + 1) % H.length], L = Math.hypot(b[0] - a[0], b[1] - a[1]); if (L < 1e-6) continue;
+    const nx = -(b[1] - a[1]) / L, nz = (b[0] - a[0]) / L;
+    let lo = Infinity, hi = -Infinity; for (const p of H) { const v = (p[0] - a[0]) * nx + (p[1] - a[1]) * nz; if (v < lo) lo = v; if (v > hi) hi = v; }
+    if (hi - lo < best) best = hi - lo;
+  }
+  return best;
 }
 // Mẫu GỌN từ bao lồi từng mesh đã có (cellsink.extractShape: [{h, y0, y1, massive, area}]): chân = viền BAO LỒI CHUNG của
 // các mesh có đáy sát nền; thân = bao lồi chung các mesh giao tầm 0,3-2,6 m. Rẻ hơn sampleObject nhiều lần (không duyệt
@@ -293,11 +421,18 @@ export function samplesFromHulls(list) {
 }
 // vi phạm khi dời (dx,dz): {n (số mẫu chân trên lòng), pen (lấn hành lang lớn nhất), pano (thiếu bao nhiêu m so với
 // PANO_R), push:[px,pz] vector đẩy đề xuất}. mode 'bldg' xét hành lang facadeLine; 'small' xét lòng đường.
+// S.softAlley: ngõ h/w không tính (công trình danh tính); S.occ(dx,dz) → true = dời vào lô đã có nhà ô GIỮ khác (chỉ xét khi
+// dời ≠ 0, sau luật đường/camera); S.thin: tấm mỏng — thêm luật lấp khung ≤ FILL_MAX trong FILL_D (prismFill).
 export function evalShift(S, dx, dz, mode, quick = false) {
-  let n = 0, best = 0, push = null, pen = 0, pano = 0;
+  let n = 0, best = 0, push = null, pen = 0, pano = 0, fill = 0;
+  const soft = !!S.softAlley;
+  const rad0 = S.x0 !== undefined ? Math.hypot(S.x1 - S.x0, S.z1 - S.z0) / 2 : 0;
+  const occBad = () => !!(S.occ && (dx || dz) && S.occ(dx, dz));
   // lọc nhanh: hộp vật thể không chạm ô lưới nào có phố và không camera nào trong tầm → sạch
   if (S.x0 !== undefined && !nearAnyRoad(S.x0 + dx, S.z0 + dz, S.x1 + dx, S.z1 + dz, mode)
-    && !nearestPano((S.x0 + S.x1) / 2 + dx, (S.z0 + S.z1) / 2 + dz, Math.hypot(S.x1 - S.x0, S.z1 - S.z0) / 2 + CLEAR.PANO_R)) return { n, pen, pano, push, bad: false };
+    && !nearestPano((S.x0 + S.x1) / 2 + dx, (S.z0 + S.z1) / 2 + dz, rad0 + (S.thin ? CLEAR.FILL_D : CLEAR.PANO_R))) {
+    const ob = occBad(); return { n, pen, pano, push, fill, occ: ob, bad: ob };
+  }
   const B = S.base, NB = B.length;
   // kiểm nhanh (dò dời): bắt đầu từ mẫu vi phạm lần trước → phần lớn ứng viên hỏng bị loại sau 1-2 mẫu
   const i0 = quick && S.lastBad ? S.lastBad : 0;
@@ -306,19 +441,38 @@ export function evalShift(S, dx, dz, mode, quick = false) {
     const x = B[i] + dx, z = B[i + 1] + dz;
     if ((dx || dz) && _st && _st.water && _st.water(x, z)) { if (quick) { S.lastBad = i; return { bad: true }; } n++; continue; }   // dời không được xuống nước
     if (mode === 'bldg') {
-      const c = corridorPen(x, z);
+      const c = corridorPen(x, z, soft);
       if (c && c.pen > 0.02) { if (quick) { S.lastBad = i; return { bad: true }; } n++; if (c.pen > pen) pen = c.pen; if (c.pen + 0.05 > best) { best = c.pen + 0.05; push = [c.nx * best, c.nz * best]; } continue; }
       if (!c) continue;   // ngoài MỌI hành lang → không thể trên lòng (lòng/nút giao/khe nhựa đều nằm trong hành lang) — bỏ tra surfaceAt
-    }
+    } else if (soft && !corridorPen(x, z, true)) continue;   // ngoài hành lang phố có vỉa → nhựa (nếu có) là ngõ h/w: mềm
     if (onCarriageFast(x, z)) {
       if (quick) { S.lastBad = i; return { bad: true }; }
       n++;
-      const r = nearestRoad(x, z, 10);   // tầm 10 m (1 ô lưới ± 1): đủ cho điểm đang nằm TRÊN lòng
+      const r = soft ? nearestStreet(x, z, 10) : nearestRoad(x, z, 10);   // tầm 10 m (1 ô lưới ± 1): đủ cho điểm đang nằm TRÊN lòng
       const need = r ? Math.max(0.3, r.hw - r.d + 0.3) : 0.5;
       if (need > best) { best = need; push = r ? [r.nx * need, r.nz * need] : null; }
     }
   }
-  const anyCam = S.x0 === undefined || !!nearestPano((S.x0 + S.x1) / 2 + dx, (S.z0 + S.z1) / 2 + dz, Math.hypot(S.x1 - S.x0, S.z1 - S.z0) / 2 + CLEAR.PANO_R);
+  // TẤM MỎNG: lấp khung camera trong FILL_D (luật chữ spec, KHÔNG miễn mặt tiền) → đẩy ra xa camera tới FILL_D
+  if (S.thin && S.x0 !== undefined && !(quick && n)) {
+    const mx = (S.x0 + S.x1) / 2 + dx, mz = (S.z0 + S.z1) / 2 + dz;
+    for (const [qx, qz] of panosNear(mx, mz, rad0 + CLEAR.FILL_D)) {
+      let d = Infinity; for (const b of S.body) { const Hs = dx || dz ? b.H.map(([x, z]) => [x + dx, z + dz]) : b.H; d = Math.min(d, hullDist(Hs, qx, qz)); }
+      if (d >= CLEAR.FILL_D) continue;
+      const f = prismFill(S.body, dx, dz, qx, qz);
+      if (f > fill) fill = f;
+      if (f <= CLEAR.FILL_MAX) continue;
+      if (quick) return { bad: true };
+      const need = CLEAR.FILL_D - d + 0.1;
+      if (need > best) {
+        let vx = mx - qx, vz = mz - qz; const l = Math.hypot(vx, vz) || 1; vx /= l; vz /= l;
+        const r = nearestRoad(mx, mz, 16);
+        if (r && r.d > 0.5 && (r.nx * vx + r.nz * vz) > 0.2) { vx = r.nx; vz = r.nz; }
+        best = need; push = [vx * need, vz * need];
+      }
+    }
+  }
+  const anyCam = S.x0 === undefined || !!nearestPano((S.x0 + S.x1) / 2 + dx, (S.z0 + S.z1) / 2 + dz, rad0 + CLEAR.PANO_R);
   if (anyCam) for (const b of S.body) {
     let cx = 0, cz = 0; for (const [x, z] of b.H) { cx += x; cz += z; } cx = cx / b.H.length + dx; cz = cz / b.H.length + dz;
     let rad = 0; for (const [x, z] of b.H) rad = Math.max(rad, Math.hypot(x + dx - cx, z + dz - cz));
@@ -346,7 +500,10 @@ export function evalShift(S, dx, dz, mode, quick = false) {
       }
     }
   }
-  return { n, pen, pano, push, bad: n > 0 || pano > 0 };
+  const bad0 = n > 0 || pano > 0 || fill > CLEAR.FILL_MAX;
+  if (bad0) return { n, pen, pano, push, fill, bad: true };
+  const ob = occBad();
+  return { n, pen, pano, push, fill, occ: ob, bad: ob };
 }
 // tìm (dx,dz) |d| ≤ maxShift để hết vi phạm; null nếu không được. Lặp theo vector đẩy lớn nhất (góc phố → 2 pháp tuyến).
 export function solveShift(S, mode, maxShift) {
@@ -361,7 +518,7 @@ export function solveShift(S, mode, maxShift) {
   // lặp theo vector đẩy có thể dao động (nhà góc phố kẹp giữa 2 hành lang) → dò lưới cực: 24 hướng × bước 0,5 m,
   // lấy dời NGẮN nhất hết vi phạm (kiểm nhanh: dừng ở vi phạm đầu tiên; mẫu chân thưa ≤ 400 điểm)
   let Sq = S;
-  if (S.base.length > 800) { const st = Math.ceil(S.base.length / 800); const b = []; for (let i = 0; i < S.base.length; i += 2 * st) b.push(S.base[i], S.base[i + 1]); Sq = { base: b, body: S.body }; }
+  if (S.base.length > 800) { const st = Math.ceil(S.base.length / 800); const b = []; for (let i = 0; i < S.base.length; i += 2 * st) b.push(S.base[i], S.base[i + 1]); Sq = { ...S, base: b, lastBad: 0 }; }
   // lưới dò thưa (đo: dò 16 hướng × bước 0,5 m chiếm ~2/3 thời gian quét khoảng trống lúc dựng thế giới)
   const ND = mode === 'bldg' ? 12 : 8;
   for (const s of [0.5, 1, 1.5, 2, 3, 4, 5, 6, 8, 10, 12, 14]) {
@@ -484,13 +641,23 @@ export function sweepAssemblies(objs, cols, fc, opts = {}) {
     return out;
   };
   // ---- mỗi cụm: mẫu chân/thân → giải dời ----
+  // collider/FC bị gỡ: đánh dấu (rep.colDead/fcDead) để người gọi NÉN mảng (trước: đỗ ở 1e7 → 266 collider chết + vòng FC
+  // r 38 m của KS đã gỡ vẫn chặn props); collider đã dời/gỡ → rep.colTouched (cellsink bước 6 không xử lý lại)
+  rep.colDead = new Set(); rep.fcDead = new Set(); rep.colTouched = new Set(); rep.fcTouched = new Set();
+  const killCol = (c) => { c.x = 1e7; c.z = 1e7; rep.colDead.add(c); rep.colTouched.add(c); rep.colOff++; };
+  const killFC = (A) => { for (const f of fc) if (!rep.fcDead.has(f) && inAsm(A, f[0], f[1])) { rep.fcDead.add(f); rep.fcTouched.add(f); } };
+  // chỗ đã có NHÀ (opts.occAt(x,z,mode) → true: ô khối nhà ô GIỮ / footprint thật): số mẫu chân rơi vào chỗ có nhà sau khi dời
+  // không được nhiều hơn tại chỗ (+1) → không dời đồ/tường/công trình xuyên vào nhà khác (phản biện: c_lkt_pair)
+  const occCount = (S, dx, dz, mode) => { let k = 0; const B = S.base; for (let i = 0; i < B.length; i += 2) if (opts.occAt(B[i] + dx, B[i + 1] + dz, mode)) k++; return k; };
   for (const A of asm.values()) {
     const S = { base: [], body: [] };
-    let massive = 0, h = 0, x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9, wallLike = false;
+    let massive = 0, h = 0, x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9, wallLike = false, thick = false;
+    const mass = [];
     for (const p of A) {
       x0 = Math.min(x0, p.x0); x1 = Math.max(x1, p.x1); z0 = Math.min(z0, p.z0); z1 = Math.max(z1, p.z1);
       if (p.kind === 'obj') {
         for (const v of p.S.base) S.base.push(v); for (const b of p.S.body) S.body.push(b); massive += p.S.massive; h = Math.max(h, p.S.height);
+        for (const H of p.S.mass) mass.push(H); if (p.S.thick) thick = true;
         if (p.S.base.length && p.S.height >= 1.8 && Math.max(p.S.x1 - p.S.x0, p.S.z1 - p.S.z0) >= 3) wallLike = true;
         continue;
       }
@@ -501,12 +668,16 @@ export function sweepAssemblies(objs, cols, fc, opts = {}) {
       if (p.y0 <= p.g0 + CLEAR.BASE_Y) sampleHull(H, S.base);
       if (p.y1 > p.g0 + CLEAR.BODY_Y0 && p.y0 < p.g0 + CLEAR.BODY_Y1) S.body.push({ H, y0: p.y0 - p.g0, y1: p.y1 - p.g0 });
       h = Math.max(h, p.y1 - p.g0);
-      if (p.y1 - p.y0 >= 2.5) massive += (p.x1 - p.x0) * (p.z1 - p.z0);
+      if (p.y1 - p.y0 >= 2.5) { massive += (p.x1 - p.x0) * (p.z1 - p.z0); mass.push(H); }
       // tấm tường/cổng/rào cao ≥ 1,8 m dài ≥ 3 m chạm nền → đứng ở ranh đất như nhà (luật hành lang)
       if (p.y0 <= p.g0 + CLEAR.BASE_Y && p.y1 - p.y0 >= 1.8 && Math.max(p.x1 - p.x0, p.z1 - p.z0) >= 3) wallLike = true;
+      if (p.y0 <= p.g0 + CLEAR.BASE_Y && p.y1 - p.y0 >= 1.8 && minWidth(H) >= CLEAR.THIN) thick = true;
     }
     S.x0 = x0; S.x1 = x1; S.z0 = z0; S.z1 = z1;   // hộp cụm → evalShift lọc nhanh cụm xa phố/camera
-    S.facadeExempt = h >= 1.8 && massive >= 12;   // chỉ NHÀ khối được miễn luật camera khi mặt tiền đã ở facadeLine
+    // TẤM MỎNG (khối ô: rào tôn, tranh tường, hàng rào/cổng song sắt — mọi phần cao ≥ 1,8 m dày < 1 m): luật lấp khung
+    // chữ spec, KHÔNG miễn mặt tiền (phản biện: pano_109/146 rào tôn đẩy đúng tới 3 m vẫn lấp 55-60% khung)
+    S.thin = !!opts.wallLike && wallLike && !thick;
+    S.facadeExempt = !S.thin && h >= 1.8 && massive >= 12;   // chỉ NHÀ khối được miễn luật camera khi mặt tiền đã ở facadeLine
     let mode = (h >= 1.8 && massive >= 12) || (wallLike && opts.wallLike) ? 'bldg' : 'small';   // tường/cổng: chỉ khối ô (opts.wallLike)
     // nhà DÃY CHUNG CHUNG đặt tay (vd showroom Hoàng Diệu) chồng lên footprint THẬT (lớp phố WP2 đã dựng nhà đó) → bản
     // trùng: gỡ (như luật cellsink 'overlap'); opts.realDup(tên) bật luật, opts.realAt(x,z) = điểm trong nhà thật không SYNTH
@@ -518,53 +689,84 @@ export function sweepAssemblies(objs, cols, fc, opts = {}) {
       }
       if (tot && hit >= 0.3 * tot) {
         for (const p of A) dropMesh(p);
-        for (const c of colsOf(A)) { c.x = 1e7; c.z = 1e7; rep.colOff++; }
+        for (const c of colsOf(A)) killCol(c);
+        killFC(A);
         rep.removed.push([A[0].name, [+((x0 + x1) / 2).toFixed(1), +((z0 + z1) / 2).toFixed(1)], 'realDup', +(hit / tot).toFixed(2)]);
         continue;
       }
     }
+    const name = A[0].name || A[0].o.name || '?';
+    // công trình DANH TÍNH (nhóm có tên dựng theo pano): ngõ h/w "mềm" — chỉ phố có vỉa + camera
+    const isIdent = mode === 'bldg' && !!opts.identity && opts.identity(name, A);
+    if (isIdent) S.softAlley = true;
     const e0 = evalShift(S, 0, 0, mode);
     if (!e0.bad) { rep.kept++; continue; }
-    const name = A[0].name || A[0].o.name || '?';
     const where = [+((x0 + x1) / 2).toFixed(1), +((z0 + z1) / 2).toFixed(1)];
+    // (danh tính phố: không — footprint thật CỦA CHÍNH nó nằm dưới, vd KS Harbour View)
+    if (opts.occAt && !isIdent) { const md = mode, k0 = occCount(S, 0, 0, md); S.occ = (dx, dz) => occCount(S, dx, dz, md) > k0 + 1; }
     const maxS = mode === 'bldg' ? (h >= 15 ? CLEAR.MAX_SHIFT_TOWER : CLEAR.MAX_SHIFT_BLDG) : CLEAR.MAX_SHIFT_SMALL;
     let sol = solveShift(S, mode, maxS);
-    const isIdent = mode === 'bldg' && opts.identity && opts.identity(name, A);
-    // công trình danh tính không lùi nổi ra sau facadeLine → ít nhất ra khỏi LÒNG ĐƯỜNG (+ camera); còn chân trên nhựa → gỡ
+    // công trình danh tính không lùi nổi ra sau facadeLine → ít nhất ra khỏi LÒNG PHỐ (+ camera)
     if (!sol && isIdent) { sol = solveShift(S, 'small', maxS); if (sol) mode = 'bldg/partial'; }
     const myCols = colsOf(A);
     for (const c of myCols) c.__clr = 1;
     if (sol) {
       for (const p of A) moveMesh(p, sol.dx, sol.dz);
-      for (const c of myCols) { c.x += sol.dx; c.z += sol.dz; rep.colMoved++; }
-      for (const f of fc) if (inAsm(A, f[0], f[1])) { f[0] += sol.dx; f[1] += sol.dz; rep.fcMoved++; }
-      rep.moved.push([name, where, +sol.dx.toFixed(2), +sol.dz.toFixed(2), mode]);
-    } else if (isIdent && !evalShift(S, 0, 0, 'small').n) {
-      // công trình có danh tính (khách sạn/cao ốc/công sở dựng theo pano) không dời nổi → GIỮ tại chỗ, báo cáo
-      for (const c of myCols) delete c.__clr;
-      (rep.stuck || (rep.stuck = [])).push([name, where, e0.n, +e0.pen.toFixed(2), +e0.pano.toFixed(2)]);
+      for (const c of myCols) { c.x += sol.dx; c.z += sol.dz; rep.colMoved++; rep.colTouched.add(c); }
+      for (const f of fc) if (inAsm(A, f[0], f[1])) { f[0] += sol.dx; f[1] += sol.dz; rep.fcMoved++; rep.fcTouched.add(f); }
+      rep.moved.push([name, where, +sol.dx.toFixed(2), +sol.dz.toFixed(2), mode + (S.thin ? '/thin' : '')]);
+    } else if (isIdent) {
+      // danh tính không dời nổi: GỠ chỉ khi KHỐI CHÍNH (mesh cao ≥ 2,5 m) nằm trên lòng phố có vỉa ≥ STREET_ON_MAX;
+      // không thì GIỮ tại chỗ (như dot3) + bỏ các mảnh PHỤ (con trực tiếp không phải khối chính) tự vi phạm
+      const ms = massOnStreet(mass);
+      if (ms.frac >= CLEAR.STREET_ON_MAX) {
+        for (const p of A) dropMesh(p);
+        for (const c of myCols) killCol(c);
+        killFC(A);
+        rep.removed.push([name, where, mode + '/street', +ms.frac.toFixed(2)]);
+      } else {
+        for (const c of myCols) delete c.__clr;
+        const nd = A.length === 1 && A[0].kind === 'obj' ? dropBadChildren(A[0].o, rep) : 0;
+        (rep.stuck || (rep.stuck = [])).push([name, where, e0.n, +e0.pen.toFixed(2), +e0.pano.toFixed(2), +ms.frac.toFixed(2), nd]);
+      }
     } else if (A.length > 1 && Math.max(x1 - x0, z1 - z0) > 12) {
       // cụm TRẢI DÀI (dãy lan can/rào: cột + thanh nối thành 1 cụm) không dời nổi → chỉ gỡ MẢNH tự vi phạm (đoạn lan can
-      // cắt qua lòng/nút giao), giữ phần còn lại của dãy
+      // cắt qua lòng/nút giao / đoạn rào tôn lấp khung camera), giữ phần còn lại của dãy
       let nd = 0;
       for (const p of A) {
-        const Sp = { base: [], body: [] };
-        if (p.kind === 'obj') { Sp.base = p.S.base; Sp.body = p.S.body; }
-        else { if (p.y0 <= p.g0 + CLEAR.BASE_Y) sampleHull(p.H, Sp.base); if (p.y1 > p.g0 + CLEAR.BODY_Y0 && p.y0 < p.g0 + CLEAR.BODY_Y1) Sp.body.push({ H: p.H }); }
+        const Sp = { base: [], body: [], thin: S.thin };
+        if (p.kind === 'obj') { Sp.base = p.S.base; Sp.body = p.S.body; Sp.x0 = p.S.x0; Sp.x1 = p.S.x1; Sp.z0 = p.S.z0; Sp.z1 = p.S.z1; }
+        else { if (p.y0 <= p.g0 + CLEAR.BASE_Y) sampleHull(p.H, Sp.base); if (p.y1 > p.g0 + CLEAR.BODY_Y0 && p.y0 < p.g0 + CLEAR.BODY_Y1) Sp.body.push({ H: p.H, y0: p.y0 - p.g0, y1: p.y1 - p.g0 }); Sp.x0 = p.x0; Sp.x1 = p.x1; Sp.z0 = p.z0; Sp.z1 = p.z1; }
         if (!evalShift(Sp, 0, 0, 'small', true).bad) continue;
         dropMesh(p); nd++;
-        for (const c of myCols) if (c.x >= p.x0 - 0.3 && c.x <= p.x1 + 0.3 && c.z >= p.z0 - 0.3 && c.z <= p.z1 + 0.3) { c.x = 1e7; c.z = 1e7; rep.colOff++; }
+        for (const c of myCols) if (c.x >= p.x0 - 0.3 && c.x <= p.x1 + 0.3 && c.z >= p.z0 - 0.3 && c.z <= p.z1 + 0.3) killCol(c);
+        killFC([p]);
       }
       rep.removed.push([name, where, mode + '/pieces', nd, A.length]);
     } else {
       for (const p of A) dropMesh(p);
-      for (const c of myCols) { c.x = 1e7; c.z = 1e7; rep.colOff++; }   // tách khỏi bản đồ (cùng object trong colIdx nếu đã dựng)
-      rep.removed.push([name, where, mode, e0.n, +e0.pen.toFixed(2), +e0.pano.toFixed(2)]);
+      for (const c of myCols) killCol(c);   // tách khỏi bản đồ (người gọi nén mảng theo rep.colDead)
+      killFC(A);
+      rep.removed.push([name, where, mode + (S.thin ? '/thin' : ''), e0.n, +e0.pen.toFixed(2), +e0.pano.toFixed(2), +(e0.fill || 0).toFixed(2)]);
     }
   }
   for (const c of cols) delete c.__clr;
   rep.ms = +(((typeof performance !== 'undefined' ? performance : Date).now()) - t0).toFixed(1);
   return rep;
+}
+// công trình danh tính GIỮ TẠI CHỖ (kẹt): bỏ con TRỰC TIẾP không phải khối chính (cổng/rào/tranh/chòi/cây chậu…) mà tự nó
+// đứng trên lòng phố có vỉa hoặc sát camera < 3 m (ngõ h/w mềm). Khối chính (mesh cao ≥ 2,5 m, ≥ 4 m²) giữ nguyên.
+function dropBadChildren(o, rep) {
+  let nd = 0;
+  for (const ch of o.children.slice()) {
+    const S = sampleObject(ch);
+    if (!S.nMesh || S.massive >= 12) continue;
+    S.softAlley = true;
+    if (!evalShift(S, 0, 0, 'small').bad) continue;
+    o.remove(ch); nd++;
+    (rep.dropped || (rep.dropped = [])).push([o.name, ch.name || ch.type, +((S.x0 + S.x1) / 2).toFixed(1), +((S.z0 + S.z1) / 2).toFixed(1)]);
+  }
+  return nd;
 }
 const _dirty = new Set();
 function moveMesh(p, dx, dz) {

@@ -3,7 +3,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { makeCellSink, realBuildings } from './cellsink.js';
-import { initClearance, sweepAssemblies, flushClearance, onCarriageDisc, nearPano as clrNearPano, nudgeDisc as clrNudge } from './clearance.js';   // Đợt 3 W2-A: khoảng trống phố/camera pano
+import { initClearance, sweepAssemblies, flushClearance, releaseClearance, onCarriageDisc, nearPano as clrNearPano, nudgeDisc as clrNudge } from './clearance.js';   // Đợt 3 W2-A: khoảng trống phố/camera pano
 import { FLAG as RB_FLAG } from './buildings_data.js';
 import { registerModel, shrinkTexturesForMobile, assetURL } from './assets.js';
 import { IS_MOBILE, LITE } from './device.js';
@@ -1837,14 +1837,24 @@ export async function buildWorld(scene, prog = () => {}) {
   // mép lòng (pano_014/018). Mesh gộp (addMerged) tách theo thành phần liên thông + gom cụm chồng nhau (chậu+tán+kiềng);
   // cụm vi phạm → dời lùi (nhà: theo pháp tuyến phố ra sau facadeLine ≤ 8 m; đồ nhỏ: ra khỏi lòng/xa camera ≤ 6 m) hoặc gỡ.
   // Dải phân cách (median) và mặt lát phẳng được giữ nguyên. Báo cáo: world.streetClear.
-  world.streetClear = sweepAssemblies(scene.children.slice(_clrN0), colliders.slice(_clrC0), FEATURED_CLEAR, {
-    keep: (n) => /median|_promenade$|^opera_sq|_dirt$/.test(n),
-    identity: (n, A) => A.length === 1 && !A[0].o.isMesh && !!n && n !== 'hd_showroom',   // nhóm công trình có tên (KS/cao ốc/công sở) dời không nổi → giữ
-    // dãy showroom chung chung chồng ≥ 30% lên footprint THẬT (không SYNTH) = nhà trùng (tường trắng trơn pano_014_h180)
-    realDup: (n) => n === 'hd_showroom',
-    realAt: (() => { const { D, G } = realBuildings(); return (x, z) => { const b = G.at(x, z); return b >= 0 && !(D.flags[b] & RB_FLAG.SYNTH); }; })(),
-  });
-  flushClearance();
+  {
+    const _realAt = (() => { const { D, G } = realBuildings(); return (x, z) => { const b = G.at(x, z); return b >= 0 && !(D.flags[b] & RB_FLAG.SYNTH); }; })();
+    const sc = world.streetClear = sweepAssemblies(scene.children.slice(_clrN0), colliders.slice(_clrC0), FEATURED_CLEAR, {
+      keep: (n) => /median|_promenade$|^opera_sq|_dirt$/.test(n),
+      // nhóm công trình có tên (KS/cao ốc/công sở): ngõ h/w mềm; dời không nổi → giữ (gỡ chỉ khi khối chính trên lòng phố)
+      identity: (n, A) => A.length === 1 && !A[0].o.isMesh && !!n && n !== 'hd_showroom',
+      // dãy showroom chung chung chồng ≥ 30% lên footprint THẬT (không SYNTH) = nhà trùng (tường trắng trơn pano_014_h180)
+      realDup: (n) => n === 'hd_showroom',
+      realAt: _realAt,
+      occAt: _realAt,   // đồ/đài phun/xích lô dời không xuyên vào nhà thật
+    });
+    flushClearance();
+    // nén collider/FEATURED_CLEAR của cụm đã gỡ (trước: đỗ ở 1e7 — rác + vòng FC r 38 m của KS đã gỡ vẫn chặn props)
+    if (sc.colDead && sc.colDead.size) { let w = 0; for (let r = 0; r < colliders.length; r++) if (!sc.colDead.has(colliders[r])) colliders[w++] = colliders[r]; colliders.length = w; }
+    if (sc.fcDead && sc.fcDead.size) { let w = 0; for (let r = 0; r < FEATURED_CLEAR.length; r++) if (!sc.fcDead.has(FEATURED_CLEAR[r])) FEATURED_CLEAR[w++] = FEATURED_CLEAR[r]; FEATURED_CLEAR.length = w; }
+    sc.colDeadN = sc.colDead ? sc.colDead.size : 0; sc.fcDeadN = sc.fcDead ? sc.fcDead.size : 0;
+    delete sc.colDead; delete sc.fcDead; delete sc.colTouched; delete sc.fcTouched;
+  }
 
   await prog('cells');
 
@@ -20040,11 +20050,17 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     }
   }
 
+  // W2-A: điểm (đĩa r, tâm + 4 điểm vành) trong footprint nhà THẬT còn dựng (fabric WP2 đã đánh D.dead theo claims)
+  const clrInFabric = (x, z, r) => {
+    const G = world.rbGrid, D = world.rbData; if (!G) return false;
+    for (const [ox, oz] of [[0, 0], [r, 0], [-r, 0], [0, r], [0, -r]]) { const b = G.at(x + ox, z + oz); if (b >= 0 && !(D && D.dead && D.dead[b])) return true; }
+    return false;
+  };
   // ghế đá ven hồ Tam Bạc + quảng trường
   {
     const woodMat = mat(0x6a4a30);
     function bench(x, z, rotY) {
-      { const nd = clrNudge(x, z, 1.2, 8, (px, pz) => !isWater(px, pz)); if (!nd) return; [x, z] = nd; }   // W2-A: ghế không đặt trên lòng đường
+      { const nd = clrNudge(x, z, 1.2, 8, (px, pz) => !isWater(px, pz) && !clrInFabric(px, pz, 1.1)); if (!nd) return; [x, z] = nd; }   // W2-A: ghế không đặt trên lòng đường / trong nhà thật
       const b = new THREE.Group();
       const seat = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.12, 0.6), woodMat);
       seat.position.y = 0.55; b.add(seat);
@@ -20076,7 +20092,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
       for (const [ix, iz] of INTERSECTIONS) { const d = Math.hypot(ix - st.x, iz - st.z); if (d < abd) { abd = d; ax = ix; az = iz; } }
       if (abd > 220) { ax = st.x; az = st.z; }               // phố không có giao lộ gần → giữ tâm nhãn
       let sx = ax + perp[0] * 4.6 + st.d[0] * 6, sz = az + perp[1] * 4.6 + st.d[1] * 6;
-      { const nd = clrNudge(sx, sz, 0.5, 8); if (!nd) continue; [sx, sz] = nd; }   // W2-A: cột biển không đứng giữa lòng đường (lệch 4,6 m < nửa lòng p)
+      { const nd = clrNudge(sx, sz, 0.5, 8, (px, pz) => !clrInFabric(px, pz, 0.4)); if (!nd) continue; [sx, sz] = nd; }   // W2-A: cột biển không đứng giữa lòng đường (lệch 4,6 m < nửa lòng p) / trong nhà thật
       if (isWater(sx, sz)) continue;
       const y = groundHeightNoDeck(sx, sz);
       if (Math.abs(y - LAND_H) > 1.5) continue;
@@ -20231,7 +20247,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     for (const st of STREETS.slice(0, 6)) {
       const perp = [-st.d[1], st.d[0]];
       let bx = st.x - perp[0] * 5.4 + st.d[0] * 9, bz = st.z - perp[1] * 5.4 + st.d[1] * 9;
-      { const nd = clrNudge(bx, bz, 2.3, 8); if (!nd) continue; [bx, bz] = nd; }   // W2-A: nhà chờ xe buýt ra khỏi lòng đường
+      { const nd = clrNudge(bx, bz, 2.3, 8, (px, pz) => !clrInFabric(px, pz, 2.2)); if (!nd) continue; [bx, bz] = nd; }   // W2-A: nhà chờ xe buýt ra khỏi lòng đường / nhà thật
       if (isWater(bx, bz)) continue;
       const y = groundHeightNoDeck(bx, bz);
       if (Math.abs(y - LAND_H) > 1.2) continue;
@@ -20629,6 +20645,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     ],
   });
 
+  releaseClearance();   // W2-A: nhả bộ đệm khoảng trống (ô lòng đường ≤ 6 MB + độ cao nền) — props/cây đã đặt xong
   loadHeroBeds();    // nạp GLB luống hoa ảnh-thật rồi dựng InstancedMesh
   // LƯU Ý: KHÔNG gọi veg.plant/streetTree sau buildTrees() — cây sẽ không được dựng (chỉ còn collider ma).
 

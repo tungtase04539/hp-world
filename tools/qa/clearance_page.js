@@ -16,6 +16,7 @@
   const CFG = window.__clearCfg || {};
   window.__hpPreFreeze = async (scene, world) => {
     const T0 = performance.now();
+    window.__clrScene = scene; window.__clrWorld = world;   // cho --eval (clearance.mjs) tra cứu sau kiểm toán
     const base = new URL('.', location.href).href;
     const { PANO_CAM } = await import(base + 'js/panoclear.js');
     const { groundHeight } = await import(base + 'js/terrain.js');

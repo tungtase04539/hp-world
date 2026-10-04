@@ -81,12 +81,20 @@ try {
     fs.writeFileSync(PROF + '.top.txt', top.map(([k, us]) => (us / 1000).toFixed(1).padStart(8) + ' ms  ' + k).join('\n'));
     console.log('prof →', PROF + '.top.txt');
   }
+  // --eval <file.js>: thân hàm async (scene, world) chạy trong trang SAU kiểm toán (trang còn giữ trước freeze) → res.eval
+  if (res && arg('eval', '')) {
+    const body = fs.readFileSync(arg('eval'), 'utf8');
+    res.eval = await pg.evaluate(async (b) => { const f = new (Object.getPrototypeOf(async function () {}).constructor)('scene', 'world', b); return f(window.__clrScene, window.__clrWorld); }, body).catch((e) => 'eval error: ' + e.message);
+    console.log('eval:', JSON.stringify(res.eval).slice(0, 4000));
+  }
   if (!res) { console.error('clearance: không có kết quả', errors.slice(0, 10)); process.exitCode = 1; }
   else {
     res.errors = errors; res.wallMs = Date.now() - t0;
     fs.mkdirSync(path.dirname(path.resolve(OUT)), { recursive: true });
     fs.writeFileSync(OUT, JSON.stringify(res, null, 1));
     const bad = res.cams.filter((c) => c.bad);
+    const st = res.stats;
+    console.log(`TIÊU ĐỀ — chữ spec: gần<3m (mọi mesh) ${st.nearAll} cam · lấp>40% trong 6m ${st.fillAll} cam | tinh chỉnh: gần ${st.near} · lấn phố>${cfg.fillCorr} ${st.fillCorr} · cam vi phạm ${st.bad} | trên nhựa ${st.onRoad} · lấn vỉa hè ${st.sidewalk} (chặn kín ${st.sidewalkBlock})`);
     console.log(JSON.stringify({ stats: res.stats, errors: errors.slice(0, 5), wallMs: res.wallMs }));
     console.log('cam vi phạm:', bad.length, bad.slice(0, 40).map((c) => `${c.id}(${c.near.length ? 'gần ' + c.near[0][0] + ' ' + c.near[0][2] + 'm' : ''}${c.worstC > cfg.fillCorr ? ' lấn ' + c.worstC : ''})`).join(' | '));
     console.log('trên lòng đường:', res.onRoad.length, '· lấn vỉa hè:', res.sidewalk.length, '(chặn kín', res.sidewalk.filter((s) => s.block).length + ')');
