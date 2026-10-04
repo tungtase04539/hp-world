@@ -88,8 +88,10 @@ function genLayers(S) {
     const rnd = mulberry(11);
     const mid = fbm(S, [6, 12, 24, 48], [1, 0.8, 0.6, 0.4], rnd), lo = fbm(S, [2, 4], [1, 0.6], rnd);
     for (let i = 0; i < S * S; i++) {
-      const g = 148 + (mid[i] - 0.5) * 24 + (rnd() - 0.5) * 24;   // nhựa cũ bạc màu nắng (pano: ~110-125 sau phơi sáng camera)
-      F[i * 4] = g; F[i * 4 + 1] = g + 1; F[i * 4 + 2] = g + 2;
+      // nhựa cũ bạc màu nắng, xám ẤM (pano đo: R>G>B ~(142,137,127) / (116,113,105)); bản đầu g,g+1,g+2 ngả lạnh + ánh
+      // trời xanh → mặt đường xanh xám (85,90,90) trên ảnh game
+      const g = 152 + (mid[i] - 0.5) * 24 + (rnd() - 0.5) * 24;
+      F[i * 4] = g + 4; F[i * 4 + 1] = g + 1; F[i * 4 + 2] = g - 4;
     }
     const nStone = (S * S / 110) | 0;
     for (let i = 0; i < nStone; i++) {   // đá dăm lộ mặt: sáng (xám/ngà) và hố tối
@@ -370,7 +372,7 @@ const MAIN = /* glsl */`
 
 // makeRoadMaterial(THREE, {size}) → MeshPhongMaterial dùng chung cho mọi ô 'roads_*' / 'sidewalk_*'
 // Màu tạm mỗi lớp (trước khi Worker sinh xong texture ~100 ms — buildWorld còn chạy nhiều giây nên thực tế không thấy)
-const PLACEHOLDER = [[148, 149, 150, 128], [166, 162, 152, 255], [176, 172, 164, 255], [152, 84, 60, 255], [170, 88, 56, 255],
+const PLACEHOLDER = [[156, 153, 148, 128], [166, 162, 152, 255], [176, 172, 164, 255], [152, 84, 60, 255], [170, 88, 56, 255],
   [160, 116, 92, 255], [190, 188, 180, 255], [0, 0, 0, 0], [200, 200, 200, 128]];
 // Sinh texture TRONG WORKER (Blob từ chính mã các hàm ở trên) → không tốn ~100 ms main thread lúc tải; lỗi → sinh đồng bộ.
 function genInWorker(S, done) {
