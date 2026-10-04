@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { GFX } from './device.js';
-import { sunDirection, sunIrradiance, skyIrradiance, skyRadiance, skyGLSL, elevDeg } from './skymodel.js';
+import { sunDirection, sunIrradiance, sunTransmittance, skyIrradiance, skyRadiance, skyK, cloudSun, skyGLSL, elevDeg } from './skymodel.js';
 import { setGlbLighting } from './assets.js';
 
 // ============ NGÀY ĐÊM / BẦU TRỜI / ÁNH SÁNG (Đợt 3 WP5 — viết lại) ============
@@ -82,6 +82,9 @@ const SKY_VS = /* glsl */`
   }`;
 const SKY_FS = /* glsl */`
   uniform vec3 uSunDir, uMoonDir, uFog, uGround;
+  // hằng số theo mặt trời/trăng, JS tính 1 lần/khung (skymodel.js cùng công thức): bớt ALU mỗi pixel trời
+  uniform vec3 uSkyK, uSunT, uSkyUp, uCloudSun;
+  uniform float uSunUp, uMoonUp;
   uniform float uTime, uCloud, uNight, uHaze, uGain, uEnv, uSat;
   varying vec3 vDir;
   ${skyGLSL()}
@@ -99,16 +102,16 @@ const SKY_FS = /* glsl */`
   void main() {
     vec3 v = normalize(vDir);
     vec3 s = uSunDir;
-    vec3 col = skyRadiance(v, s);
-    vec3 Ts = skySunTransmittance(s.y);
-    float sunUp = skySmooth(-1.0, 1.0, skyElev(s.y));
+    vec3 col = skyRadianceK(v, s, uSkyK);
+    vec3 Ts = uSunT;
+    float sunUp = uSunUp;
     float mu = dot(v, s);
     // đĩa mặt trời (r ≈ 0,5°) + chói sát đĩa — đĩa chỉ ở vòm HIỂN THỊ (vào PMREM sẽ thành đốm chói lấp lánh trên GLB)
     if (uEnv < 0.5) col += skySmooth(0.99995, 0.999972, mu) * SKY_E0 * Ts * 38.0 * sunUp;
     col += SKY_E0 * Ts * sunUp * 0.02 * pow(max(mu, 0.0), 400.0);
     // trăng
     float muM = dot(v, uMoonDir);
-    float moonUp = skySmooth(-2.0, 3.0, skyElev(uMoonDir.y));
+    float moonUp = uMoonUp;
     col += uNight * moonUp * vec3(0.62, 0.64, 0.68) * (skySmooth(0.99993, 0.99996, muM) * 1.6 + 0.0035 * pow(max(muM, 0.0), 40.0));
     // sao (mù đô thị: thưa, mờ dần về chân trời)
     if (uEnv < 0.5 && uNight > 0.02 && v.y > 0.0) {
@@ -126,11 +129,11 @@ const SKY_FS = /* glsl */`
       float n = fbm(p);
       float dens = skySmooth(1.0 - uCloud, 1.0 - uCloud + 0.30, n);
       if (dens > 0.002) {
-        float n2 = fbm(p + s.xz * 0.10 + vec2(0.0, 0.0));
+        float n2 = fbm(p + s.xz * 0.10);
         float shade = clamp(0.70 + (n - n2) * 3.2, 0.30, 1.15);               // mặt quay về nắng sáng, đáy tối
-        vec3 sunC = SKY_E0 * exp(-(SKY_TAU_R + SKY_TAU_M) * skyAirMass(s.y) * 0.6) * sunUp;
+        vec3 sunC = uCloudSun;
         float ph = 0.55 + 0.6 * pow(max(mu, 0.0), 8.0);                       // viền bạc phía mặt trời
-        vec3 amb = skyRadiance(vec3(0.0, 1.0, 0.0), s) * 1.5 + skyExtra(v, s) * 2.0;
+        vec3 amb = uSkyUp * 1.5 + skyExtra(v, s) * 2.0;
         vec3 cc = sunC * 0.15 * shade * ph + amb * (0.75 + 0.25 * shade);
         cc = mix(col, cc, exp(-t * 0.07));                                     // mây xa nhạt vào mù
         col = mix(col, cc, dens * skySmooth(0.0, 0.16, v.y));
@@ -181,6 +184,8 @@ export function createDayNight(scene, world) {
   const mkUniforms = () => ({
     uSunDir: { value: new THREE.Vector3(0, 1, 0) }, uMoonDir: { value: new THREE.Vector3(0, -1, 0) },
     uFog: { value: new THREE.Color() }, uGround: { value: new THREE.Color() },
+    uSkyK: { value: new THREE.Vector3() }, uSunT: { value: new THREE.Vector3() }, uSkyUp: { value: new THREE.Vector3() },
+    uCloudSun: { value: new THREE.Vector3() }, uSunUp: { value: 1 }, uMoonUp: { value: 0 },
     uTime: { value: 0 }, uCloud: { value: GFX.clouds ? LIGHT.cloud : 0 }, uNight: { value: 0 },
     uHaze: { value: 1 }, uGain: { value: LIGHT.skyViewGain }, uEnv: { value: 0 }, uSat: { value: 1 },
   });
@@ -243,6 +248,8 @@ export function createDayNight(scene, world) {
   const _right = new THREE.Vector3(), _up2 = new THREE.Vector3(), _Y = new THREE.Vector3(0, 1, 0);
   const COS_TURN = Math.cos(0.15);
   const _fogTarget = new THREE.Color(), _ground = new THREE.Color();
+  const T3 = [0, 0, 0], UP = [0, 1, 0];
+  const _skyK = new THREE.Vector3(), _sunT = new THREE.Vector3(), _skyUp = new THREE.Vector3(), _cloudSun = new THREE.Vector3();
   let _fogInit = false;
   let viewGain = LIGHT.skyViewGain, viewSat = LIGHT.skyViewSat;   // vòm hiển thị (applySky ghi, updateFog dùng)
   const out = { night: 0, sunEl: 0, hours: 0 };
@@ -290,9 +297,16 @@ export function createDayNight(scene, world) {
     viewSat = 1 + (L_.skyViewSat - 1) * dayW;
     skyMat.uniforms.uGain.value = viewGain;
     skyMat.uniforms.uSat.value = viewSat;
+    skyK(sA, T3); _skyK.fromArray(T3);
+    sunTransmittance(sA[1], T3); _sunT.fromArray(T3);
+    skyRadiance(UP, sA, T3); _skyUp.fromArray(T3);
+    cloudSun(sA[1], T3); _cloudSun.fromArray(T3);
+    const sunUp = smooth(-1, 1, el), moonUp = smooth(-2, 3, moonEl);
     for (const m of [skyMat, envMat]) {
       const u = m.uniforms;
       u.uSunDir.value.copy(_sun); u.uMoonDir.value.copy(_moon); u.uNight.value = night;
+      u.uSkyK.value.copy(_skyK); u.uSunT.value.copy(_sunT); u.uSkyUp.value.copy(_skyUp); u.uCloudSun.value.copy(_cloudSun);
+      u.uSunUp.value = sunUp; u.uMoonUp.value = moonUp;
     }
     envMat.uniforms.uGround.value.copy(_ground).multiplyScalar(1 / Math.PI);
     return night;

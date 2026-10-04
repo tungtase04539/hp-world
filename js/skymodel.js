@@ -93,21 +93,34 @@ function skyExtra(v, s, c) {
     + night * (NIGHT_ZEN[c] + CITY[c] * Math.exp(-vy * 7));
 }
 
+// Hệ số CHỈ phụ thuộc mặt trời (không theo hướng nhìn): K = gain·E0·T_tán-xạ·lit. Shader nhận sẵn qua uniform
+// (tính 1 lần/khung ở JS) — khỏi tính airMass/asin/exp của tia nắng cho từng pixel trời.
+// nắng tới ĐIỂM TÁN XẠ (trên cao) thường mạnh hơn nắng tới mặt đất → dùng T^0,55 (bớt tối lúc hoàng hôn)
+export function skyK(s, out = [0, 0, 0]) {
+  const mS = airMass(s[1]);
+  const lit = smooth(-4, 1, elevDeg(s[1]));
+  for (let c = 0; c < 3; c++) out[c] = ATM.skyGain * ATM.E0[c] * Math.exp(-(tauR(c) + tauM(c) + ATM.ozone[c]) * mS * 0.55) * lit;
+  return out;
+}
+const _K = [0, 0, 0];
 // Độ chói vòm trời theo hướng nhìn v (đơn vị), mặt trời s (đơn vị). KHÔNG gồm đĩa mặt trời/trăng, mây, sao
 // (shader cộng) — dùng cho màu sương / đèn bán cầu / chân trời.
 export function skyRadiance(v, s, out = [0, 0, 0]) {
   const mu = v[0] * s[0] + v[1] * s[1] + v[2] * s[2];
   const mV = airMass(Math.max(v[1], 0.0));
-  // nắng tới ĐIỂM TÁN XẠ (trên cao) thường mạnh hơn nắng tới mặt đất → dùng T^0,55 (bớt tối lúc hoàng hôn)
-  const mS = airMass(s[1]);
-  const lit = smooth(-4, 1, elevDeg(s[1]));
+  skyK(s, _K);
   const pr = PR(mu) + ATM.iso, pm = PM(mu);
   for (let c = 0; c < 3; c++) {
     const tr = tauR(c), tm = tauM(c), t = tr + tm;
-    const tsc = Math.exp(-(t + ATM.ozone[c]) * mS * 0.55);
     const ms = ATM.ms * ATM.msTint[c] * (1 - Math.exp(-ATM.msTau * mV));
-    out[c] = ATM.skyGain * ATM.E0[c] * tsc * lit * ((tr * pr + tm * pm) / t * (1 - Math.exp(-t * mV)) + ms + ATM.constB[c]) + skyExtra(v, s, c);
+    out[c] = _K[c] * ((tr * pr + tm * pm) / t * (1 - Math.exp(-t * mV)) + ms + ATM.constB[c]) + skyExtra(v, s, c);
   }
+  return out;
+}
+// Màu nắng chiếu lên MÂY (tầng mây cao hơn mặt đất → khối khí ×0,6), mờ quanh chân trời theo sunUp — uniform shader
+export function cloudSun(sinEl, out = [0, 0, 0]) {
+  const m = airMass(sinEl), up = smooth(-1, 1, elevDeg(sinEl));
+  for (let c = 0; c < 3; c++) out[c] = ATM.E0[c] * Math.exp(-(tauR(c) + tauM(c)) * m * 0.6) * up;
   return out;
 }
 
@@ -162,19 +175,22 @@ vec3 skyExtra(vec3 v, vec3 s) {
   return tw * (hz * (${v3(TW_HZ)} * (0.1 + 0.9 * t2) + ${v3(TW_AWAY)} * (1.0 - t2)) + ${v3(TW_ZEN)} * (1.0 - 0.5 * hz))
     + night * (${v3(NIGHT_ZEN)} + ${v3(CITY)} * exp(-vy * 7.0));
 }
-vec3 skyRadiance(vec3 v, vec3 s) {
+// K = skyK(s) (JS truyền qua uniform cho shader vòm trời; skyRadiance() tự tính khi cần)
+vec3 skyK(vec3 s) {
+  float lit = skySmooth(-4.0, 1.0, skyElev(s.y));
+  return SKY_GAIN * SKY_E0 * exp(-(SKY_TAU_R + SKY_TAU_M + SKY_OZ) * skyAirMass(s.y) * 0.55) * lit;
+}
+vec3 skyRadianceK(vec3 v, vec3 s, vec3 K) {
   float mu = dot(v, s);
   float mV = skyAirMass(max(v.y, 0.0));
-  float mS = skyAirMass(s.y);
-  float lit = skySmooth(-4.0, 1.0, skyElev(s.y));
   float pr = 3.0 / (16.0 * 3.14159265) * (1.0 + mu * mu) + SKY_ISO;
   float d = 1.0 + SKY_G * SKY_G - 2.0 * SKY_G * mu;
   float pm = (1.0 - SKY_G * SKY_G) / (4.0 * 3.14159265 * d * sqrt(d));
   vec3 t = SKY_TAU_R + SKY_TAU_M;
-  vec3 tsc = exp(-(t + SKY_OZ) * mS * 0.55);
   vec3 ms = SKY_MS * (1.0 - exp(-${ATM.msTau.toFixed(3)} * mV));
-  return SKY_GAIN * SKY_E0 * tsc * lit * ((SKY_TAU_R * pr + SKY_TAU_M * pm) / t * (1.0 - exp(-t * mV)) + ms + SKY_CB) + skyExtra(v, s);
+  return K * ((SKY_TAU_R * pr + SKY_TAU_M * pm) / t * (1.0 - exp(-t * mV)) + ms + SKY_CB) + skyExtra(v, s);
 }
+vec3 skyRadiance(vec3 v, vec3 s) { return skyRadianceK(v, s, skyK(s)); }
 vec3 skySunTransmittance(float sinEl) { return exp(-(SKY_TAU_R + SKY_TAU_M + SKY_OZ) * skyAirMass(sinEl)); }
 `;
 }
