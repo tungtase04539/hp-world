@@ -33,8 +33,7 @@ import { ROAD_HW, treePitLine, SIDEWALK_TOP } from './xsection.js';
 export { treePitLine };   // world.js dùng qua veg.treePitLine (khỏi thêm import xsection vào world.js — tránh xung đột gộp)
 import { LM_POLY } from './landmark_polys.js';
 import { claimAt } from './claims.js';
-import { RB_B64 } from './buildings_real.js';
-import { decodeRB, makeFootprintGrid } from './buildings_data.js';
+import { rbGrid } from './rbdata.js';   // footprint thật giải mã 1 lần cho cả trang (W2-F)
 
 export const SP = { XACU: 0, BANG: 1, PHUONG: 2, SAU: 3, BANGLANG: 4, CAU: 5, CATCUT: 6, DA: 7, NON: 8 };
 const SP_N = 9;
@@ -670,7 +669,7 @@ const MARGIN = { p: 1.3, s: 1.2, t: 1.0, r: 0.9, w: 0.5, h: 0.7 };
 let _fp = null;
 function footprints(ctx) {
   if (ctx.fpGrid) return ctx.fpGrid;
-  if (!_fp) _fp = makeFootprintGrid(decodeRB(RB_B64));
+  if (!_fp) _fp = rbGrid();
   return _fp;
 }
 // ---- lưới đoạn đường dùng chung (mọi cấp, kể cả ngõ h): ô 16 m, mỗi đoạn chèn vào mọi ô trong bbox + (nửa lòng + 3 m) ----

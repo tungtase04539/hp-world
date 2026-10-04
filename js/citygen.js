@@ -30,10 +30,10 @@
 //  * Va chạm: lưới ô 16 m trên bbox nhà (nới 2 m) → fabricCollide(p,r) đẩy điểm ra khỏi đa giác (cạnh gần nhất).
 //  * Xác định: mọi ngẫu nhiên = hash(seed nhà) — A/B chụp ảnh so được.
 import * as THREE from 'three';
-import { RB_B64 } from './buildings_real.js';
+import { rbData, rbGrid } from './rbdata.js';
 import {
-  decodeRB, EDGE, STYLE, ROOF, WALL_PALETTE, ROOF_PALETTE, GROUND_H, FLOOR_H, PARAPET_H, heightOf,
-  makeFootprintGrid, refreshPartyEdges, INFO,
+  EDGE, STYLE, ROOF, WALL_PALETTE, ROOF_PALETTE, GROUND_H, FLOOR_H, PARAPET_H, heightOf,
+  refreshPartyEdges, INFO,
 } from './buildings_data.js';
 import { claimAt, claimOverlapFrac } from './claims.js';
 import { buildFacadeAtlas, MOD, ATLAS_N, SIGN_CELLS, SIGN_EXT, SIGN_Y } from './facade_atlas.js';
@@ -56,7 +56,7 @@ const RELEASE_CPU = (() => { try { return new URLSearchParams(location.search).g
 
 // ---------- dữ liệu (giải mã 1 lần, dùng chung: citygen, minimap, cell sink WP3...) ----------
 let _D = null;
-export function fabricData() { if (!_D) _D = decodeRB(RB_B64); return _D; }
+export function fabricData() { if (!_D) _D = rbData(); return _D; }   // = js/rbdata.js (1 lần giải mã cho cả trang)
 
 // ---------- hash xác định ----------
 function hh(a, b) { let h = Math.imul(a | 0, 0x9e3779b1) ^ Math.imul((b | 0) + 0x7f4a7c15, 0x85ebca6b); h = Math.imul(h ^ (h >>> 15), 0xc2b2ae35); h ^= h >>> 13; return (h >>> 0) / 4294967296; }
@@ -635,7 +635,7 @@ export function fabricAt(x, z) {
 // zone của world.js), maxR (bỏ nhà có tâm ngoài bán kính này — world.js truyền BUILD_RADIUS: ngoài vùng chơi không có
 // đường/vỉa → nhà đứng trên cỏ trống), facadeMats (mảng để daynight điều khiển đêm), log }
 // Trả { stats, meshes, detMeshes, collide: fabricCollide, at: fabricAt, hit, frontEdges, material, grid }.
-// grid = makeFootprintGrid(fabricData()) dựng SAU khi chốt D.dead (near/at bỏ nhà dead) — world.js đặt world.rbData /
+// grid = rbGrid() (js/rbdata.js, lưới chung; near/at lọc nhà dead LÚC TRA nên đúng cả sau khi chốt D.dead) — world.js đặt world.rbData /
 // world.rbGrid = D / grid để WP4 cây, WP7 props, WP8 camera dùng CHUNG (không giải mã lại, tôn trọng nhà đã bị gỡ).
 export function buildRealFabric(scene, ctx) {
   const T0 = performance.now();
@@ -693,7 +693,7 @@ export function buildRealFabric(scene, ctx) {
   // TƯỜNG CHUNG sau khi giết nhà (hợp đồng WP1 v1, js/buildings_data.js): cạnh PARTY của nhà SỐNG mà láng giềng che đã
   // bị giết → hạ thành BACK/SIDE (dựng cả chân tường) — không thì nhà kề nhà bị giết thiếu chân tường = lỗ nhìn xuyên.
   // Rà quanh MỌI nhà dead (kể cả nhà WP3/ai khác giết trước khi gọi buildRealFabric).
-  const grid = makeFootprintGrid(D);
+  const grid = rbGrid();   // lưới chung (lọc D.dead lúc tra) — không dựng lại sau khi giết nhà
   { const killed = []; for (let b = 0; b < D.nB; b++) if (D.dead[b]) killed.push(b);
     const r = refreshPartyEdges(D, grid, killed); st.partyDemoted = r.demoted; st.partyLowered = r.lowered; }
   buildCollision(D);   // lưới va chạm ngay sau khi chốt D.dead — faceRoad (bên dưới) cần fabricAt

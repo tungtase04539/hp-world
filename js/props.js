@@ -23,8 +23,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { ROAD_HW, SIDEWALK_W, ROAD_TOP, SIDEWALK_TOP, curbLine, facadeLine, parkingLine, furnitureLine } from './xsection.js';
 import { PROPS_EVIDENCE } from './props_evidence.js';
 import { LITE } from './device.js';
-import { RB_B64 } from './buildings_real.js';
-import { decodeRB, makeFootprintGrid } from './buildings_data.js';
+import { rbData, rbGrid } from './rbdata.js';   // footprint thật giải mã 1 lần cho cả trang (W2-F)
 import { claimAt } from './claims.js';
 
 // =====================================================================================================================
@@ -981,7 +980,7 @@ export function buildProps(ctx) {
   for (const r of ctx.reserved || []) obst.add(r[0], r[1], r[2]);
   // footprint nhà THẬT (RB01): ưu tiên bản WP2 truyền vào (đã đánh D.dead theo claims); không có → tự giải mã (~12 ms)
   let fp = ctx.footprints || null;
-  if (!fp && ctx.useRealFootprints !== false) { const D = decodeRB(RB_B64); fp = { D, grid: makeFootprintGrid(D) }; }
+  if (!fp && ctx.useRealFootprints !== false) fp = { D: rbData(), grid: rbGrid() };
   const inBuilding = fp ? (x, z) => fp.grid.at(x, z) >= 0 : () => false;
   const flat = (x, z) => Math.abs(groundHeightNoDeck(x, z) - LAND_H) < 0.35 && !isWater(x, z);
   const panoNear = ctx.nearPanoCam || (() => false);

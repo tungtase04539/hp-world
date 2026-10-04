@@ -3880,6 +3880,10 @@ const bcPalm = (parent, lx, lz, h = 9) => {   // Đợt 3 WP4: cau vua instanced
   let wi = 0;
   for (const [zc, units] of rows) for (const [xc, W] of units) {
     if (!bcOK(xc, zc)) continue;
+    // W2-F: FABRIC 'real' → kho THẬT do citygen dựng từ footprint (SHED x 90-260 / 640-900); các hộp kho dựng tay
+    // này chỉ còn sống ở chỗ footprint TRỐNG (cell sink gỡ hộp đè nhà thật) = bãi đã giải toả (pano_014/015/016 h000
+    // 10/2024: đất trống + gạch vụn phía bắc Hoàng Diệu) → bỏ hẳn; ?fabric=proc giữ như cũ. Cần cẩu chân đế giữ nguyên.
+    if (FABRIC === 'real') continue;
     const g = new THREE.Group(); g.position.set(xc, groundHeight(xc, zc), zc);
     const D = zc === -936 ? 22 : 20, H = 5.6;
     const body = new THREE.Mesh(new THREE.BoxGeometry(W, H, D), wallM); body.position.y = H / 2; g.add(body);
@@ -15111,6 +15115,7 @@ const w1AddSign = (r, txt, bg, fg, y, px = 42, wRatio = 0.9, hh = 1.1) => {
     for (const [zc, units] of rows) for (const [xc, W] of units) {
       if (!bcOK(xc, zc)) continue;
       if (near(xc, zc, CLV[0], CLV[1], CLV_R)) continue;
+      if (FABRIC === 'real') continue;   // W2-F: như khối B13 — kho thật do citygen dựng, chỗ trống ngoài đời là bãi giải toả
       if (xc > 120 && xc < 420 && zc < -890) continue;
       const g = new THREE.Group();
       g.position.set(xc, groundHeight(xc, zc), zc);
