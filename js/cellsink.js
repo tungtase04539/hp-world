@@ -14,7 +14,7 @@
 //   • Texture canvas của khối ô vẽ LƯỜI (chỉ vẽ cái còn hiện ra sau commit) + xếp atlas cho vật thể giữ lại.
 // Không import three (nhận THREE qua tham số). Chạy 1 lần lúc buildWorld: commit ~300-470 ms trên 890M (máy đang tải),
 // nhưng tiết kiệm hơn thế nhờ ~1.100 canvas không vẽ + ~2.600 mesh ít hơn cho freezeStatic.
-import { decodeRB, makeFootprintGrid } from './buildings_data.js';
+import { decodeRB, makeFootprintGrid, FLAG } from './buildings_data.js';
 import { RB_B64 } from './buildings_real.js';
 import { claimBox } from './claims.js';
 import { BRAND_MAP, debrand } from './brands.js';
@@ -454,7 +454,8 @@ function commitSink(sink, THREE, realScene, realFC, colliders, opts) {
     it.bldg = massive && !veto;
     if (!it.bldg) { it.kind = tag || (nk === 'tree' ? 'tree' : nk === 'open' || nk === 'propn' ? 'open' : 'prop'); return it; }
     it.kind = tag || (nk === 'civic' || nk === 'house' || nk === 'tower' || nk === 'bespoke' ? nk
-      : nk === 'heritage' && mc.S.size >= PR.HERIT_MIN ? 'heritage' : it.height >= PR.TOWER_H ? 'tower' : 'house');
+      : nk === 'heritage' && (mc.S.size >= PR.HERIT_MIN || NAME_KIND[name.toLowerCase()]) ? 'heritage'   // ghi đè tay: bỏ ngưỡng
+      : it.height >= PR.TOWER_H ? 'tower' : 'house');
     return it;
   });
   const tShape = performance.now();
@@ -468,6 +469,10 @@ function commitSink(sink, THREE, realScene, realFC, colliders, opts) {
 
   // 2) đối chiếu nhà thật
   const { D, G } = realBuildings();
+  // nhà SINH (FLAG.SYNTH, RB v1: phỏng đoán lấp chỗ trống) KHÔNG làm bằng chứng gỡ nhà tay — hợp đồng WP1 v1
+  // (buildings_data.js FLAG.SYNTH); nhà sinh dưới nhà tay giữ lại sẽ bị WP2 bỏ qua claim 'cell'.
+  const SYN = FLAG && FLAG.SYNTH ? FLAG.SYNTH : 0;
+  const realB = (b) => b >= 0 && !(D.flags[b] & SYN);
   const bl = items.filter((it) => it.bldg);
   for (const it of bl) {
     const keys = [...it.S]; it.keys = keys;
@@ -478,7 +483,7 @@ function commitSink(sink, THREE, realScene, realFC, colliders, opts) {
     it.cx = sx / n; it.cz = sz / n;
     for (let j = 0; j < n; j += step) {
       tot++; const b = G.at(KX(keys[j]) + 0.5, KZ(keys[j]) + 0.5);
-      if (b >= 0) { hit++; per.set(b, (per.get(b) || 0) + 1); }
+      if (realB(b)) { hit++; per.set(b, (per.get(b) || 0) + 1); }
     }
     it.frac = tot ? hit / tot : 0;
     let bb = -1, bn = 0; for (const [b, c] of per) if (c > bn) { bn = c; bb = b; }
@@ -491,7 +496,7 @@ function commitSink(sink, THREE, realScene, realFC, colliders, opts) {
     let rad = 0; for (const [x, z] of H) rad = Math.max(rad, Math.hypot(x - it.cx, z - it.cz));
     let dmin = Infinity, dB = -1;
     G.near(it.cx, it.cz, rad + PR.NEAR + 1, (b) => {
-      if (dmin <= PR.NEAR) return;   // đủ để quyết định
+      if (dmin <= PR.NEAR || !realB(b)) return;   // đủ để quyết định / bỏ nhà sinh
       const d = polyHullDist(D, G, b, H);
       if (d < dmin) { dmin = d; dB = b; }
     });
