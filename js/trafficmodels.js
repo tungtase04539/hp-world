@@ -52,10 +52,23 @@ const finish = (list) => {
   g.computeBoundingSphere(); return g;
 };
 
-// BÓNG TIẾP ĐẤT: elip tối phẳng sát mặt đường dưới xe/người (thay bóng đổ thật — xem traffic.js: bản đồ bóng chỉ làm mới
-// 4-10 Hz nên bóng thật của xe 10 m/s "giật" từng bước ~2 m; elip đi liền với xe, không tốn lượt bóng).
-function contactShadow(L, rx, rz, hex) {
-  part(L, new THREE.CircleGeometry(1, 14).rotateX(-Math.PI / 2).scale(rx, 1, rz).translate(0, 0.015, 0), hex);
+// BÓNG TIẾP ĐẤT: elip mềm sát mặt đường dưới xe/người (thay bóng đổ thật — xem traffic.js: bản đồ bóng chỉ làm mới
+// 4-10 Hz nên bóng thật của xe 10 m/s "giật" từng bước ~2 m; elip đi liền với xe, không tốn lượt bóng). Hình học RIÊNG
+// (không gộp vào thân xe): traffic.js vẽ bằng 1 InstancedMesh trong suốt dùng CHUNG bộ đệm instance với thân xe.
+// Lõi r ≤ 0,5 đậm đều (alpha a), rìa 0,5 → 1 nhạt dần về 0 (trước: elip Lambert đen đặc → "vũng dầu" cứng dưới xe).
+// Kích thước + alpha khai báo ở geometry.userData.shadow = [rx, rz, a] của từng mô hình.
+export function contactShadowGeometry(rx, rz, a) {
+  const g = mergeGeometries([new THREE.CircleGeometry(0.5, 18), new THREE.RingGeometry(0.5, 1, 18, 2)], false);
+  const P = g.attributes.position, n = P.count, al = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const r = Math.hypot(P.getX(i), P.getY(i));
+    al[i] = r <= 0.501 ? a : a * Math.pow(Math.max(0, (1 - r) / 0.5), 1.3);
+  }
+  g.deleteAttribute('uv'); g.deleteAttribute('normal');
+  g.setAttribute('aSA', new THREE.BufferAttribute(al, 1));
+  g.rotateX(-Math.PI / 2).scale(rx, 1, rz).translate(0, 0.02, 0);
+  g.computeBoundingSphere();
+  return g;
 }
 
 const SKIN = 0xc8976f, PANTS = 0x2e3644, SHOE = 0x2a2420, DARK = 0x232427, METAL = 0x9a9ea3, SEAT = 0x1d1d1f;
@@ -80,7 +93,6 @@ function seatedRider(L, z0, hy, shirtTint, grip, hz = 0.44) {
 // kind: 'single' | 'pillion' (chở 2 người) | 'cargo' (thùng hàng sau yên)
 export function motorbikeGeometry(kind = 'single') {
   const L = [];
-  contactShadow(L, 0.4, 1.08, 0x0c0d0f);
   // bánh + vành (bánh 17" xe số ~0,29 m)
   for (const z of [0.66, -0.6]) {
     part(L, wheel(0.29, 0.09, 0, 0.29, z), 0x1b1c1e);
@@ -110,7 +122,7 @@ export function motorbikeGeometry(kind = 'single') {
     part(L, box(0.62, 0.5, 0.52, 0, 1.13, -0.7), 0xb08a5a, 0);                 // thùng các-tông / thùng xốp
     part(L, box(0.64, 0.04, 0.54, 0, 1.39, -0.7), 0x6a7d8c);                   // dây chằng / nắp
   }
-  return finish(L);
+  const g = finish(L); g.userData.shadow = [0.42, 1.1, 0.5]; return g;
 }
 
 // kind: 'sedan' | 'suv' | 'van' (xe 16 chỗ — rất phổ biến ở HP) — sơn = instanceColor
@@ -120,7 +132,6 @@ export function carGeometry(kind = 'sedan') {
   const len = kind === 'van' ? 5.4 : kind === 'suv' ? 4.7 : 4.45;
   const r = kind === 'van' ? 0.34 : kind === 'suv' ? 0.36 : 0.31;
   const wz = len / 2 - (kind === 'van' ? 0.95 : 0.85);
-  contactShadow(L, W / 2 + 0.14, len / 2 + 0.12, 0x0b0c0e);
   for (const sx of [-1, 1]) for (const z of [wz, -wz]) {
     part(L, wheel(r, 0.22, sx * (W / 2 - 0.13), r, z, 12), 0x161718);
     part(L, wheel(r * 0.55, 0.23, sx * (W / 2 - 0.12), r, z, 8), METAL);
@@ -147,13 +158,12 @@ export function carGeometry(kind = 'sedan') {
   part(L, box(W + 0.02, 0.18, 0.12, 0, 0.42, fz), 0x2b2c2f);                     // cản trước
   part(L, box(W + 0.02, 0.18, 0.12, 0, 0.42, -fz), 0x2b2c2f);                    // cản sau
   part(L, box(0.52, 0.12, 0.02, 0, 0.5, -fz - 0.07), 0xe8e8e2);                  // biển số
-  return finish(L);
+  const g = finish(L); g.userData.shadow = [W / 2 + 0.2, len / 2 + 0.22, 0.58]; return g;
 }
 
 // Người đi bộ dáng thật (~1,65 m). aLimb: 1/2 chân trái/phải (khớp hông y 0,9), 3/4 tay trái/phải (khớp vai y 1,42).
 export function walkerGeometry(kind = 'plain') {
   const L = [];
-  contactShadow(L, 0.27, 0.22, 0x24262a);
   for (const [sx, limb] of [[-0.095, 1], [0.095, 2]]) {
     part(L, box(0.13, 0.84, 0.14, sx, 0.47, 0), 0xffffff, 4, limb);           // chân (quần = aShirt2)
     part(L, box(0.11, 0.07, 0.25, sx, 0.035, 0.03), SHOE, 0, limb);            // giày dép
@@ -168,7 +178,7 @@ export function walkerGeometry(kind = 'plain') {
     part(L, box(0.075, 0.32, 0.08, sx, 0.97, 0.01), SKIN, 0, limb);            // cẳng tay
   }
   if (kind === 'nonla') part(L, new THREE.ConeGeometry(0.25, 0.15, 12).translate(0, 1.73, 0), 0xd9c48c);   // nón lá
-  return finish(L);
+  const g = finish(L); g.userData.shadow = [0.3, 0.26, 0.42]; return g;
 }
 
 // Vật liệu Lambert + nhuộm theo kênh. walk=true: thêm vung tay chân (uniform uTime dùng chung).
@@ -222,6 +232,25 @@ function patch(shader, walk) {
   // đèn xe ban đêm: cộng bức xạ tự phát (đèn pha trắng ấm, đèn hậu đỏ) — chỉ đổi uniform, không đổi chương trình
   shader.fragmentShader = 'uniform float uNight;\nvarying float vLamp;\n' + shader.fragmentShader.replace('#include <emissivemap_fragment>',
     '#include <emissivemap_fragment>\n  if (vLamp > 0.5) totalEmissiveRadiance += (vLamp > 1.5 ? vec3(1.4, 0.06, 0.04) : vec3(2.4, 2.25, 1.9)) * uNight;');
+}
+// Bóng tiếp đất: đen, alpha theo đỉnh (aSA) — không ghi depth, đẩy offset đa giác lên trên mặt đường (khỏi z-fight ở
+// xa), đêm nhạt bớt 45 % (ánh sáng tán xạ đèn đường/ánh trăng, không còn nắng gắt).
+export function trafficShadowMaterial() {
+  const m = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+  m.onBeforeCompile = (sh) => {
+    sh.uniforms.uNight = trafficUniforms.uNight;
+    sh.vertexShader = 'attribute float aSA;
+varying float vSA;
+' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>
+  vSA = aSA;');
+    sh.fragmentShader = 'uniform float uNight;
+varying float vSA;
+' + sh.fragmentShader.replace('#include <color_fragment>',
+      '#include <color_fragment>
+  diffuseColor.a *= vSA * (1.0 - 0.45 * uNight);');
+  };
+  m.customProgramCacheKey = () => 'hp-traffic-shadow';
+  return m;
 }
 export function trafficMaterial(walk = false) {
   const m = new THREE.MeshLambertMaterial({ vertexColors: true });

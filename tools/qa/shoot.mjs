@@ -1,6 +1,8 @@
 // tools/qa/shoot.mjs — chụp game headless Chrome (GPU thật d3d11 qua ANGLE) + đo perf + gom lỗi JS.
 // Server tĩnh: python -m http.server <port> (chạy ở gốc repo/worktree). Mỗi agent dùng 1 cổng riêng.
 // usage: node shoot.mjs --port 8177 --out <dir> --views <views.json> [--quality full] [--w 1280 --h 720] [--perf] [--swiftshader]
+//        [--traffic on|off]  (giao thông WP8 phụ thuộc nhịp khung → ảnh KHÔNG tất định; chấm pano/so A/B ảnh dùng off,
+//        đo perf giữ on = chi phí thật; view có thể ghi "traffic": "on"|"off" riêng)
 // Tự chờ khoá GPU toàn máy (có thể phải đợi agent khác chụp xong). Giữ mỗi lần chụp NGẮN (ít góc) để không chiếm khoá lâu.
 // views.json = [{id, kind:'pano', X, Z, h, pitch?}, {id, kind:'aerial', x, z, half}, {id, kind:'cam', x, z, yaw, pitch, dist}]
 // In ra JSON: {errors, buildMs, tier, gpu, perf:{...}, shots:[...]}
@@ -17,6 +19,7 @@ const Q = arg('quality', 'full');
 const W = +arg('w', 1280), H = +arg('h', 720);
 const PERF = A.includes('--perf');
 const HOST = arg('host', '127.0.0.1');
+const TRAFFIC = arg('traffic', 'on');
 fs.mkdirSync(OUT, { recursive: true });
 // GPU THẬT + KHOÁ TOÀN MÁY (tools/qa/gpulock.mjs): 8 Chrome GPU song song từng làm máy BSOD 0x133 ba lần (2026-10-04)
 // → mọi lần chụp xếp hàng, 1 Chrome GPU tại một thời điểm. --swiftshader = render CPU (rất chậm: >30 s/khung ở 1280×720,
@@ -78,6 +81,7 @@ for (const v of VIEWS) {
     // cần boom chống xuyên tường (main.js, Đợt 3 WP8) là hành vi GAMEPLAY — góc QA giữ đúng toạ độ đã khai báo
     // (so sánh được với baseline), trừ khi view ghi "occlude": true
     if (hp.camOcclusion) hp.camOcclusion(!!v.occlude);
+    if (hp.traffic && hp.traffic.setEnabled) hp.traffic.setEnabled(v._traffic !== 'off');
     if (v.kind === 'aerial') { hp.aerial(v.x, v.z, v.half || 400, v.alt || 1200); }
     else {
       hp.aerialOff();
@@ -85,7 +89,7 @@ for (const v of VIEWS) {
       else hp.teleport(v.x, v.z, v.yaw ?? 0, v.pitch ?? 0.1, v.dist ?? 8);
     }
     hp.player.group.visible = false;
-  }, v);
+  }, { ...v, _traffic: v.traffic || TRAFFIC });
   await pg.waitForTimeout(first ? (USE_GPU ? 4000 : 9000) : +(v.wait || arg('wait', USE_GPU ? '1500' : '3500')));
   first = false;
   let perf = null;
@@ -106,7 +110,7 @@ for (const v of VIEWS) {
   shots.push({ id: v.id, file: f, perf });
 }
 const mem = await pg.evaluate(() => (performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1e6) : null));
-const res = { errors, hpReadyMs: hpAt, startReadyMs: startAt, bootProfile, pinned, ...info, heapMB: mem, gpuMode: USE_GPU ? 'gpu' : 'swiftshader', shots };
+const res = { errors, hpReadyMs: hpAt, startReadyMs: startAt, bootProfile, pinned, traffic: TRAFFIC, ...info, heapMB: mem, gpuMode: USE_GPU ? 'gpu' : 'swiftshader', shots };
 fs.writeFileSync(`${OUT}/_result.json`, JSON.stringify(res, null, 1));
 console.log(JSON.stringify({ errors: errors.slice(0, 20), hpReadyMs: hpAt, startReadyMs: startAt, bootProfile, ...info, heapMB: mem, n: shots.length, perf: shots.filter((s) => s.perf).map((s) => [s.id, s.perf]) }, null, 1));
 await br.close();

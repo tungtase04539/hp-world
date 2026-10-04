@@ -3,7 +3,7 @@ import { ROADS_DT } from './terrain.js';
 import { TIER } from './device.js';
 import { SIDEWALK_W, ROAD_TOP, SIDEWALK_TOP } from './xsection.js';
 import { buildRoadGraph, edgePoint } from './roadgraph.js';
-import { motorbikeGeometry, carGeometry, walkerGeometry, trafficMaterial, trafficUniforms } from './trafficmodels.js';
+import { motorbikeGeometry, carGeometry, walkerGeometry, trafficMaterial, trafficShadowMaterial, contactShadowGeometry, trafficUniforms } from './trafficmodels.js';
 
 // ============================================================
 // THÀNH PHỐ SỐNG (Đợt 3 WP8) — xe máy, ô tô, người đi bộ trên đồ thị PHỐ THẬT (js/roadgraph.js).
@@ -71,7 +71,7 @@ export function createTraffic(scene, world, opts = {}) {
   const nodeIn = nodes.map((n) => Math.hypot(n.x, n.z) <= PLAY_R + 30);
 
   // ---------- Mesh instanced ----------
-  const vehMat = trafficMaterial(false), walkMat = trafficMaterial(true);
+  const vehMat = trafficMaterial(false), walkMat = trafficMaterial(true), shadowMat = trafficShadowMaterial();
   const groups = {};   // kind → {mesh, cap, list:[agents], aShirt, aShirt2}
   // DỮ LIỆU THEO INSTANCE: 1 bộ đệm XEN KẼ (stride 28: ma trận 16 | sơn 3 | áo 3 | áo sau/quần 3 | pha 1 | nhịp bước 1
   // | đệm 1) × 3 BẢN XOAY VÒNG mỗi khung. Lý do (đo 2026-10-04, Radeon 890M, ANGLE d3d11): ghi đè mỗi khung vào CHÍNH
@@ -91,7 +91,7 @@ export function createTraffic(scene, world, opts = {}) {
     }
     mesh.count = 0;
     // KHÔNG đổ bóng vào bản đồ bóng: main.js chỉ làm mới bóng 4,5-10 Hz (mỗi lần +~20 ms trên 890M) → bóng thật của xe
-    // 10 m/s nhảy từng bước ~2 m, tách khỏi xe. Thay bằng elip bóng tiếp đất trong mô hình (trafficmodels.js).
+    // 10 m/s nhảy từng bước ~2 m, tách khỏi xe. Thay bằng elip bóng tiếp đất mềm (smesh bên dưới).
     // Vẫn NHẬN bóng (xe chạy vào bóng cây/nhà tối đi).
     mesh.castShadow = false;
     mesh.receiveShadow = true;
@@ -100,13 +100,21 @@ export function createTraffic(scene, world, opts = {}) {
     // frustum cull theo ĐĨA VẼ (r160: InstancedMesh.boundingSphere tính 1 lần từ ma trận lúc đầu rồi cũ mãi)
     mesh.boundingSphere = new THREE.Sphere(new THREE.Vector3(), DRAW_R + 12);
     mesh.matrixAutoUpdate = false;    // gốc tĩnh ở (0,0,0); chỉ dữ liệu instance đổi
-    const g = { key, mesh, geo, cap, list: [], sets, k: 0, walk };
+    // BÓNG TIẾP ĐẤT mềm (trafficmodels.contactShadowGeometry): mesh trong suốt RIÊNG nhưng DÙNG CHUNG bộ đệm instance
+    // (cùng InterleavedBuffer → 1 lần tải GPU cho cả thân + bóng), cùng count/đĩa cull.
+    const smesh = new THREE.InstancedMesh(contactShadowGeometry(...geo.userData.shadow), shadowMat, cap);
+    smesh.name = 'traffic_' + key + '_shadow';
+    smesh.count = 0; smesh.castShadow = false; smesh.receiveShadow = false;
+    smesh.userData.noCull = true; smesh.raycast = () => {};
+    smesh.boundingSphere = mesh.boundingSphere; smesh.matrixAutoUpdate = false;
+    scene.add(smesh);
+    const g = { key, mesh, smesh, geo, cap, list: [], sets, k: 0, walk };
     bindSet(g, sets[0]);
     scene.add(mesh);
     groups[key] = g;
   }
   function bindSet(g, s) {
-    g.mesh.instanceMatrix = s.mat; g.mesh.instanceColor = s.col;
+    g.mesh.instanceMatrix = s.mat; g.mesh.instanceColor = s.col; g.smesh.instanceMatrix = s.mat;
     g.geo.setAttribute('aShirt', s.sh); g.geo.setAttribute('aShirt2', s.sh2);
     if (g.walk) { g.geo.setAttribute('aPhase', s.ph); g.geo.setAttribute('aWalk', s.wk); }
   }
@@ -121,13 +129,17 @@ export function createTraffic(scene, world, opts = {}) {
   const rightOf = (o) => [-o.tz, o.tx];
   // lệch ngang (dương = bên phải hướng đi) theo loại + cấp phố
   // đường đôi một chiều (roadgraph e.oneway): người đi bộ chỉ ở vỉa hè PHÍA NGOÀI (−e.partner theo chiều a→b)
-  const outerSide = (a, e) => (a.dir === 0 ? 1 : -1) * -e.partner;
-  function latFor(a, e) {
+  // latFor(a, e): lệch cho CẠNH HIỆN TẠI (đi theo a.dir; đường đôi → chốt a.side = vỉa ngoài). Cạnh SẮP TỚI (đoạn bo
+  // cua trong place): truyền side/dir của a.next — không ghi đè a.side (trước: tính vỉa ngoài của cạnh mới bằng a.dir
+  // của cạnh cũ rồi ghi vào a.side).
+  const outerSide = (dir, e) => (dir === 0 ? 1 : -1) * -e.partner;
+  function latFor(a, e, side = 0, dir = -1) {
     const hw = e.hw;
     if (a.type === 'walk') {
-      if (e.oneway) a.side = outerSide(a, e);
+      let sd = side || a.side;
+      if (e.oneway) { sd = outerSide(dir < 0 ? a.dir : dir, e); if (dir < 0) a.side = sd; }
       const sw = SIDEWALK_W[e.c] || 1.2;
-      return a.side * (hw + Math.max(0.6, sw * a.lat01));
+      return sd * (hw + Math.max(0.6, sw * a.lat01));
     }
     if (e.oneway) {   // một chiều: dùng CẢ lòng đường (xe máy dàn khắp, ô tô giữa ±)
       if (a.type === 'car') return Math.max(-(hw - 1.1), Math.min(hw - 1.1, hw * (-0.35 + 0.7 * a.lat01)));
@@ -161,17 +173,24 @@ export function createTraffic(scene, world, opts = {}) {
       const cos = _p.tx * _q.tx + _p.tz * _q.tz;
       let w = 0.15 + (cos + 1) * (cos + 1);                     // ưu tiên đi thẳng
       if (a.type !== 'walk') w *= e2.c === 'p' ? 1.6 : e2.c === 's' ? 1.3 : e2.c === 't' ? 1 : 0.55;
+      else {
+        // người đi bộ giữ MÉP VỈA đang đi: rẽ về phía vỉa của mình (side) không phải băng qua lòng đường; rẽ về phía
+        // kia = băng chéo qua giữa ngã tư (trước: mọi lượt rẽ, người đi bộ cắt chéo lòng đường trong đoạn bo 3,5 m)
+        const turn = -_p.tz * _q.tx + _p.tx * _q.tz;             // > 0: rẽ phải
+        if (turn * a.side < -0.5) w *= 0.12;
+      }
       cands.push([ref, w, cos]); tot += w;
     }
     if (!cands.length) {
       // ngõ cụt: quay đầu — trừ khi đang ở đường đôi một chiều (quay đầu = đi ngược chiều) → cho biến mất, tái sinh chỗ khác
-      if (dirOK(a, e, a.dir ^ 1)) return { e: a.e, dir: a.dir ^ 1, cos: -1 };
+      // người đi bộ quay đầu: đổi bên (side) để vẫn ở CÙNG vỉa hè vật lý, không băng sang vỉa đối diện
+      if (dirOK(a, e, a.dir ^ 1)) return { e: a.e, dir: a.dir ^ 1, cos: -1, side: a.type === 'walk' ? -a.side : 0 };
       a.kill = true; return { e: a.e, dir: a.dir, cos: 1 };
     }
     let r = rnd() * tot;
     for (const c of cands) { r -= c[1]; if (r <= 0) { best = c; break; } }
     if (!best) best = cands[cands.length - 1];
-    return { e: best[0] >> 1, dir: best[0] & 1, cos: best[2] };
+    return { e: best[0] >> 1, dir: best[0] & 1, cos: best[2], side: 0 };
   }
   // vị trí thế giới của tác tử (có bo cua quanh nút)
   const _A = { x: 0, z: 0, tx: 0, tz: 1 }, _B = { x: 0, z: 0, tx: 0, tz: 1 };
@@ -188,7 +207,7 @@ export function createTraffic(scene, world, opts = {}) {
       const u = a.s - e.L;   // âm trước nút
       const en = edges[a.next.e];
       offsetPoint(e, a.dir, a.s, lat, _A);
-      offsetPoint(en, a.next.dir, u, latFor(a, en), _B);
+      offsetPoint(en, a.next.dir, u, latFor(a, en, a.next.side, a.next.dir), _B);
       const w = smooth((u + Rb) / (2 * Rb));
       out.x = _A.x + (_B.x - _A.x) * w; out.z = _A.z + (_B.z - _A.z) * w;
       return out;
@@ -288,10 +307,18 @@ export function createTraffic(scene, world, opts = {}) {
   const HC = 8;
   let hmap = new Map();
   const hk = (x, z) => (Math.floor(x / HC) + 4096) * 8192 + (Math.floor(z / HC) + 4096);
+  // wmap: người đi bộ đang trong vùng bo NGÃ TƯ (≤ rb+2 m từ nút — chỗ họ băng qua lòng đường) → xe nhường. Người
+  // trên vỉa hè dọc phố không vào (khỏi làm xe phanh vô cớ / chặn chỗ mọc xe).
+  let wmap = new Map();
   function rebuildHash() {
-    hmap = new Map();
+    hmap = new Map(); wmap = new Map();
     for (const a of agents) {
-      if (a.type === 'walk') continue;
+      if (a.type === 'walk') {
+        const L = edges[a.e].L;
+        if (!(a.s < (a.prev ? a.prevRb : 0) + 2 || (a.next && a.s > L - a.rb - 2))) continue;
+        const k = hk(a.x, a.z); let l = wmap.get(k); if (!l) wmap.set(k, (l = [])); l.push(a);
+        continue;
+      }
       const k = hk(a.x, a.z); let l = hmap.get(k); if (!l) hmap.set(k, (l = [])); l.push(a);
     }
   }
@@ -326,6 +353,17 @@ export function createTraffic(scene, world, opts = {}) {
         } else if (ahead < len + 1.5) {                     // cắt ngang/ngược chiều sát mũi → nhường
           lim = Math.min(lim, 0.6);
         }
+      }
+    }
+    // người đi bộ đang băng qua ngã tư trong hành lang phía trước → giảm tốc, dừng trước họ (không chạy xuyên người)
+    const wHalf = a.type === 'car' ? 1.1 : 0.55, wStop = a.type === 'car' ? 4.5 : 2.6;
+    for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) {
+      const l = wmap.get(hk(a.x + i * HC, a.z + j * HC)); if (!l) continue;
+      for (const b of l) {
+        const dx = b.x - a.x, dz = b.z - a.z;
+        const ahead = dx * fx + dz * fz; if (ahead <= 0 || ahead > look) continue;
+        if (Math.abs(dx * fz - dz * fx) > wHalf + 0.35) continue;
+        lim = Math.min(lim, Math.max(0, (ahead - wStop) * 0.8));
       }
     }
     if (lim < 0.7) { a.waitT += 0.1; if (a.waitT > 3) { a.waitT = 0; a.ghostT = 1.5; } } else a.waitT = 0;
@@ -413,6 +451,7 @@ export function createTraffic(scene, world, opts = {}) {
       const nx = a.next || chooseNext(a);
       a.prev = { e: a.e, dir: a.dir }; a.prevRb = a.rb; a.prevLat = a.latCur;
       a.s -= e.L; a.e = nx.e; a.dir = nx.dir; a.next = null;
+      if (nx.side) a.side = nx.side;
       const en = edges[a.e];
       a.latCur = latFor(a, en);
       if (a.type !== 'walk') a.vmax = vmaxFor(a, en);
@@ -481,7 +520,7 @@ export function createTraffic(scene, world, opts = {}) {
         arr[o + 26] = a.type === 'walk' && a.v > 0.2 ? a.v * 3.9 : 0;   // nhịp bước ∝ tốc độ (bước ~0,8 m)
         n++;
       }
-      g.mesh.count = n;
+      g.mesh.count = n; g.smesh.count = n;
       if (!n) continue;
       bindSet(g, s);
       s.ib.clearUpdateRanges(); s.ib.addUpdateRange(0, n * STRIDE); s.ib.needsUpdate = true;
@@ -497,7 +536,7 @@ export function createTraffic(scene, world, opts = {}) {
   const setNight = (v) => { trafficUniforms.uNight.value = v; };
   function setEnabled(on) {
     enabled = !!on;
-    for (const k in groups) groups[k].mesh.visible = enabled;
+    for (const k in groups) groups[k].mesh.visible = groups[k].smesh.visible = enabled;
   }
   function update(dt, time, playerPos) {
     if (!enabled) return stats;
@@ -555,32 +594,52 @@ export function createTraffic(scene, world, opts = {}) {
     return stats;
   }
 
-  // KIỂM BẤT BIẾN (tools/diag.mjs): xe đi bên PHẢI ở phố 2 chiều, không ngược chiều đường đôi, người đi bộ không
-  // đứng trong footprint nhà thật, mọi tác tử trong vùng chơi (+biên 60 m của đồ thị).
+  // KIỂM BẤT BIẾN (tools/diag.mjs) trên VỊ TRÍ ĐANG VẼ (a.x,a.z — gồm lách người chơi/ghost), không phải làn gán:
+  //  wrongSide: xe ở phố 2 chiều mà tâm xe lệch < 0,3 m sang phải tim đường (ngoài đoạn bo ngã tư, không đang lách);
+  //  offRoad: tâm xe ra ngoài mép lòng đường > 0,3 m; wrongWay: ngược chiều đường đôi; walkInBuilding: người đi bộ
+  //  trong footprint nhà/địa danh; walkOnRoad: người đi bộ trong lòng đường NGOÀI vùng ngã tư (băng qua ngã tư là được);
+  //  overlap: 2 xe chồng tâm < 0,9 m (xe máy) / 1,8 m (có ô tô) ngoài ghost; outside: ra ngoài vùng chơi.
   function check() {
-    const r = { vehicles: 0, walkers: 0, wrongSide: 0, wrongWay: 0, walkInBuilding: 0, outside: 0, examples: [] };
+    const r = { vehicles: 0, walkers: 0, wrongSide: 0, offRoad: 0, wrongWay: 0, walkInBuilding: 0, walkOnRoad: 0, overlap: 0, outside: 0, examples: [] };
+    const ex = (k, a) => { if (r.examples.length < 8) r.examples.push([k, Math.round(a.x), Math.round(a.z)]); };
+    rebuildHash();
     for (const a of agents) {
       const e = edges[a.e];
       if (Math.hypot(a.x, a.z) > PLAY_R + 70) r.outside++;
+      const inJunction = (a.prev && a.s < a.prevRb + 0.5) || (a.next && a.s > e.L - a.rb - 0.5);
+      edgePoint(e, a.dir, Math.min(e.L, Math.max(0, a.s)), _q);
+      const lat = (a.x - _q.x) * -_q.tz + (a.z - _q.z) * _q.tx;   // dương = bên phải hướng đi
       if (a.type === 'walk') {
         r.walkers++;
-        if (fp && fp.blocked(a.x, a.z)) { r.walkInBuilding++; if (r.examples.length < 6) r.examples.push(['walkInBuilding', Math.round(a.x), Math.round(a.z)]); }
+        if (fp && fp.blocked(a.x, a.z)) { r.walkInBuilding++; ex('walkInBuilding', a); }
+        if (!inJunction && Math.abs(lat) < e.hw - 0.2) { r.walkOnRoad++; ex('walkOnRoad', a); }
         continue;
       }
       r.vehicles++;
-      if (!e.oneway && a.latCur <= 0) { r.wrongSide++; if (r.examples.length < 6) r.examples.push(['wrongSide', Math.round(a.x), Math.round(a.z)]); }
-      if (!dirOK(a, e, a.dir)) r.wrongWay++;
+      if (!dirOK(a, e, a.dir)) { r.wrongWay++; ex('wrongWay', a); }
+      if (inJunction) continue;
+      if (!e.oneway && Math.abs(a.avoid || 0) < 0.3 && lat < 0.3) { r.wrongSide++; ex('wrongSide', a); }
+      if (Math.abs(lat) > e.hw + 0.3) { r.offRoad++; ex('offRoad', a); }
+      if (a.ghostT > 0) continue;
+      for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) {
+        const l = hmap.get(hk(a.x + i * HC, a.z + j * HC)); if (!l) continue;
+        for (const b of l) {
+          if (b === a || b.ghostT > 0 || b.x < a.x || (b.x === a.x && b.z <= a.z)) continue;   // mỗi cặp 1 lần
+          if (Math.hypot(b.x - a.x, b.z - a.z) < (a.type === 'car' || b.type === 'car' ? 1.8 : 0.9)) { r.overlap++; ex('overlap', a); }
+        }
+      }
     }
     return r;
   }
 
   // Người chơi (đi bộ/lái xe) không xuyên qua xe đang chạy: xe máy = 1 vòng 0,55 m, ô tô = 3 vòng dọc thân.
+  const OFF_CAR = [-1.5, 0, 1.5], OFF_BIKE = [0];   // hằng — pushOut chạy mỗi bước con của người chơi (không cấp phát)
   function pushOut(p, r = 0.45) {
     for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) {
       const l = hmap.get(hk(p.x + i * HC, p.z + j * HC)); if (!l) continue;
       for (const b of l) {
         const fx = Math.sin(b.h), fz = Math.cos(b.h);
-        const offs = b.type === 'car' ? [-1.5, 0, 1.5] : [0];
+        const offs = b.type === 'car' ? OFF_CAR : OFF_BIKE;
         const rr = b.type === 'car' ? 0.95 : 0.55;
         for (const o of offs) {
           const cx = b.x + fx * o, cz = b.z + fz * o;

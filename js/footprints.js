@@ -1,14 +1,13 @@
 // footprints.js — CHỈ MỤC FOOTPRINT NHÀ THẬT cho gameplay (Đợt 3 WP8): camera chống xuyên tường, người đi bộ không
 // đi xuyên nhà, chỗ xuống xe/gọi xe không nằm trong nhà. Không dựng hình — chỉ tra cứu 2D + chiều cao.
 //
-// Nguồn: js/buildings_real.js (RB01, js/buildings_data.js) + js/landmark_polys.js (19 địa danh OSM).
-// HỢP ĐỒNG với WP2 (bộ dựng fabric): nếu world.js đặt `world.rbData` (kết quả decodeRB, có cờ dead[] của
-// claims) và/hoặc `world.rbGrid` (makeFootprintGrid của chính dữ liệu đó) thì DÙNG LẠI — không giải mã lần 2 và
-// tôn trọng các footprint đã bị claim gỡ (D.dead). Không có thì tự giải mã (~40-60 ms, 1 lần).
-import { RB_B64 } from './buildings_real.js';
-import { decodeRB, makeFootprintGrid, heightOf, PARAPET_H } from './buildings_data.js';
-import { LM_POLY } from './landmark_polys.js';
-
+// CHỈ dùng dữ liệu của cái ĐANG ĐƯỢC VẼ:
+//  - nhà thật RB01: `world.rbData` (decodeRB, cờ D.dead của claims/vùng cấm đã chốt) + `world.rbGrid` (makeFootprintGrid
+//    dựng SAU khi chốt D.dead → at()/near() bỏ nhà dead) do bộ dựng fabric WP2 đặt (world.js, sau buildRealFabric).
+//    KHÔNG tự giải mã RB_B64: nhánh chưa có WP2 vẽ nhà OSM/thủ tục cũ → footprint RB01 là nhà VÔ HÌNH (camera co lại
+//    trước khoảng trống, chỗ xuống xe bị chặn giữa quảng trường); bản giải mã riêng còn bỏ qua D.dead của WP2 và tốn
+//    thêm ~35 MB heap. Không có world.rbData → chỉ còn địa danh.
+//  - 19 địa danh OSM (js/landmark_polys.js) — GLB địa danh luôn được vẽ.
 const LAND_H = 2;   // nền phố phẳng (world.js LAND_H) — chân nhà thật đặt ở đây
 // Chiều cao THÂN chính của địa danh (m, ước theo ảnh/pano; tháp chuông/vòm nhỏ không tính — chỉ dùng cho camera).
 const LM_H = {
@@ -27,8 +26,9 @@ function pip(pts, x, z) {
 
 export function footprintIndex(world = {}) {
   const t0 = performance.now();
-  const D = world.rbData || decodeRB(RB_B64);
-  const grid = world.rbGrid || makeFootprintGrid(D);
+  const D = world.rbData || null;
+  const grid = D ? (world.rbGrid || makeFootprintGrid(D)) : null;
+  const bAt = grid ? (x, z) => grid.at(x, z) : () => -1;
   const lms = [];
   for (const k in LM_POLY) {
     if (!LM_H[k]) continue;
@@ -44,7 +44,7 @@ export function footprintIndex(world = {}) {
   // Cao độ đỉnh vật cản tại (x,z) (m, toạ độ thế giới) hoặc −1. skipB/skipL: bỏ qua nhà/địa danh chứa điểm xuất phát
   // (nhân vật đứng trong footprint — dữ liệu lệch vài m, hiên nhà — không được làm camera co sát đầu).
   function topAt(x, z, skipB = -1, skipL = null) {
-    const b = grid.at(x, z);
+    const b = bAt(x, z);
     if (b >= 0 && b !== skipB) return LAND_H + heightOf(D.floors[b] || 1) + PARAPET_H;
     const l = lmAt(x, z);
     if (l && l !== skipL) return l.top;
@@ -52,15 +52,16 @@ export function footprintIndex(world = {}) {
   }
   const idx = {
     D, grid, ms: 0,
-    buildingAt: (x, z) => grid.at(x, z),
+    buildingAt: bAt,
+    real: !!D,   // false = chỉ địa danh (chưa có fabric RB01 được vẽ)
     landmarkAt: lmAt,
     topAt,
     // Điểm (x,z) có nằm trong nhà thật/địa danh không (cho chỗ xuống xe, người đi bộ).
-    blocked(x, z) { return grid.at(x, z) >= 0 || !!lmAt(x, z); },
+    blocked(x, z) { return bAt(x, z) >= 0 || !!lmAt(x, z); },
     // CẦN BOOM CAMERA: tia từ tâm nhìn T theo hướng đơn vị (dx,dy,dz) dài maxD — trả độ dài cho phép (≥ minD).
     // Raymarch 2D bước 0,45 m trên lưới footprint (đo: ~80 mẫu × vài nhà/ô ≈ 20-40 µs/khung).
     boom(tx, ty, tz, dx, dy, dz, maxD, minD = 1.2) {
-      const startB = grid.at(tx, tz), startL = lmAt(tx, tz);
+      const startB = bAt(tx, tz), startL = lmAt(tx, tz);
       for (let s = 0.45; s <= maxD; s += 0.45) {
         const x = tx + dx * s, z = tz + dz * s;
         const top = topAt(x, z, startB, startL);
@@ -71,6 +72,6 @@ export function footprintIndex(world = {}) {
     },
   };
   idx.ms = Math.round(performance.now() - t0);
-  console.info('[footprints]', D.nB, 'nhà thật +', lms.length, 'địa danh —', idx.ms, 'ms', world.rbData ? '(dùng lại world.rbData)' : '');
+  console.info('[footprints]', D ? D.nB + ' nhà thật (world.rbData)' : 'không có world.rbData → chỉ', '+', lms.length, 'địa danh —', idx.ms, 'ms');
   return idx;
 }

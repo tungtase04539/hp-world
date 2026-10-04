@@ -208,7 +208,37 @@ const pState = {
 player.group.position.copy(pState.pos);
 if (renderer.shadowMap.enabled) {
   player.group.traverse((o) => { if (o.isMesh && !o.material.transparent) { o.castShadow = true; } });
-  player.blob.visible = false;   // đã có bóng đổ thật — bóng tròn giả làm thành 2 bóng chồng nhau
+}
+// ============ Bóng nhân vật ============
+// Shadow map chỉ làm mới 4,5-10 Hz (vòng lặp chính: trần 0,22 s TIER 3 / 0,5 s TIER 2) → bóng THẬT của người/xe đang
+// chạy trễ ~1,5 m (chạy 7 m/s) … 3,5 m (xe máy 16 m/s) rồi giật theo từng lần làm mới. Cùng lý do traffic.js chỉ dùng
+// bóng tiếp đất. Nên: ĐANG DI CHUYỂN (hoặc vừa dừng < 0,35 s) → tắt castShadow của người + xe đang cưỡi, bóng tròn tiếp
+// đất đậm (luôn dính chân); ĐỨNG YÊN → bật lại bóng thật (lần làm mới kế tiếp ≤ 0,22-0,5 s đã khớp vị trí) và bóng tròn
+// nhạt đi thành bóng tiếp xúc (không thành 2 bóng đậm chồng nhau). Đang cưỡi: bóng tròn của XE lo (blob người treo
+// theo yên, nghiêng theo xe → ẩn).
+const _pCasters = [];
+player.group.traverse((o) => { if (o.isMesh && o.castShadow) _pCasters.push(o); });
+const BLOB_OP = player.blob.material.opacity;
+const _shLast = new THREE.Vector3().copy(pState.pos);
+let _shCast = _pCasters.length > 0, _shStill = 1, _shVeh = null;
+function vehCast(v, on) {
+  if (!v._casters) { v._casters = []; v.mesh.traverse((o) => { if (o.isMesh && o.castShadow) v._casters.push(o); }); }
+  if (v._castOn === on) return;
+  v._castOn = on;
+  for (const m of v._casters) m.castShadow = on;
+}
+function updatePlayerShadow(dt) {
+  const sp = dt > 0 ? Math.hypot(pState.pos.x - _shLast.x, pState.pos.z - _shLast.z) / dt : 0;
+  _shLast.copy(pState.pos);
+  _shStill = sp > 0.6 ? 0 : _shStill + dt;
+  const real = renderer.shadowMap.enabled && dayNight.sun.castShadow;
+  const cast = real && _shStill > 0.35;
+  if (cast !== _shCast) { _shCast = cast; for (const m of _pCasters) m.castShadow = cast; }
+  const v = pState.mounted;
+  if (_shVeh && _shVeh !== v) { vehCast(_shVeh, true); _shVeh = null; }   // xuống xe → xe đứng yên lại đổ bóng thật
+  if (v && v.land) { _shVeh = v; vehCast(v, cast); }
+  player.blob.visible = !v;
+  player.blob.material.opacity = cast ? BLOB_OP * 0.45 : BLOB_OP;
 }
 
 // ============ Camera bám theo nhân vật ============
@@ -348,29 +378,54 @@ function mount(v) {
   consumeJump();
   audio.sfx('mount');
 }
+// Đường từ (x0,z0) tới (x1,z1) không cắt nhà thật/địa danh/tường fabric (chỗ tìm xa không được nằm SAU một bức tường).
+function clearPath(x0, z0, x1, z1) {
+  const L = Math.hypot(x1 - x0, z1 - z0), n = Math.ceil(L / 0.5);
+  for (let i = 1; i < n; i++) {
+    const t = i / n, x = x0 + (x1 - x0) * t, z = z0 + (z1 - z0) * t;
+    if (fp && fp.blocked(x, z)) return false;
+    if (world.isFree && !world.isFree(x, z, 0.15)) return false;
+  }
+  return true;
+}
+// Ứng viên quanh tâm (x,z) hướng h: vòng gần cho sẵn (rings × angles), rồi xoắn ốc 16 hướng ra tới maxR.
+function* spotsAround(x, z, h, rings, angles, maxR) {
+  for (const d of rings) for (const a of angles) yield [x + Math.sin(h + a) * d, z + Math.cos(h + a) * d, d];
+  for (let d = rings[rings.length - 1] + 0.7; d <= maxR + 1e-6; d += 0.7) {
+    for (let k = 0; k < 16; k++) { const a = (k * Math.PI) / 8; yield [x + Math.sin(h + a) * d, z + Math.cos(h + a) * d, d]; }
+  }
+}
 function dismount() {
   const v = pState.mounted;
-  // 2 bên hông trước (như người thật bước xuống), rồi sau/trước; xa dần 1,3 → 2,6 m
-  for (const d of [1.3, 1.9, 2.6]) {
-    for (const a of [Math.PI / 2, -Math.PI / 2, Math.PI, 0]) {
-      const nx = v.pos.x + Math.sin(v.heading + a) * d;
-      const nz = v.pos.z + Math.cos(v.heading + a) * d;
-      if (!freeSpot(nx, nz)) continue;
-      pState.mounted = null;
-      v.mounted = false;
-      v.vel = 0;
-      pState.pos.set(nx, groundHeight(nx, nz), nz);
-      pState.vy = 0;
-      player.sit(false);
-      consumeJump();                                   // Space đã bấm lúc đang lái không được thành cú nhảy
-      audio.sfx('mount');
-      return true;
+  // 1) 2 bên hông trước (như người thật bước xuống), rồi sau/trước 1,3 → 2,6 m; 2) xoắn ốc tới 8 m (thuyền 3,2 m) —
+  // chỗ trống thật (freeSpot) và đường tới đó không xuyên tường; 3) luật cũ dot3: chỉ cần trên cạn + trong vùng chơi;
+  // 4) xe trên cạn: xuống ngay tại chỗ xe. KHÔNG BAO GIỜ từ chối xuống xe trên cạn (trước: kẹt trên xe kẹt = soft-lock).
+  const maxR = v.land ? 8 : 3.2;
+  const SIDE = [Math.PI / 2, -Math.PI / 2, Math.PI, 0];
+  let spot = null;
+  for (const [nx, nz, d] of spotsAround(v.pos.x, v.pos.z, v.heading, [1.3, 1.9, 2.6], SIDE, maxR)) {
+    if (freeSpot(nx, nz) && (d <= 2.6 || clearPath(v.pos.x, v.pos.z, nx, nz))) { spot = [nx, nz]; break; }
+  }
+  if (!spot) {
+    for (const [nx, nz] of spotsAround(v.pos.x, v.pos.z, v.heading, [1.3, 1.9, 2.6], SIDE, maxR)) {
+      if (groundHeight(nx, nz) > 0.32 && inPlayArea(nx, nz)) { spot = [nx, nz]; break; }
     }
   }
-  ui.toast(v.land
-    ? tx({ vi: '🚧 Chỗ này chật quá — dắt xe ra chỗ thoáng rồi xuống nhé!', en: '🚧 Too cramped here — move to an open spot to get off!' })
-    : tx({ vi: '⚓ Hãy cập bến hoặc vào gần bờ rồi mới rời thuyền!', en: '⚓ Reach a pier or shallow shore before leaving the boat!' }));
-  return false;
+  if (!spot && v.land && groundHeight(v.pos.x, v.pos.z) > 0.32) spot = [v.pos.x, v.pos.z];
+  if (!spot) {
+    ui.toast(tx({ vi: '⚓ Hãy cập bến hoặc vào gần bờ rồi mới rời thuyền!', en: '⚓ Reach a pier or shallow shore before leaving the boat!' }));
+    return false;
+  }
+  const [nx, nz] = spot;
+  pState.mounted = null;
+  v.mounted = false;
+  v.vel = 0;
+  pState.pos.set(nx, groundHeight(nx, nz), nz);
+  pState.vy = 0;
+  player.sit(false);
+  consumeJump();                                   // Space đã bấm lúc đang lái không được thành cú nhảy
+  audio.sfx('mount');
+  return true;
 }
 
 // ============ Nút "Gọi xe máy" ============
@@ -381,14 +436,19 @@ function callMoto() {
     ui.toast(tx({ vi: '🏍️ Cần đứng trên bờ mới gọi được xe máy!', en: '🏍️ Stand on land to call a motorbike!' }));
     return;
   }
-  // đặt xe ngay trước mặt (rồi hai bên, sau lưng) ở chỗ trống — không cắm xe vào tường/cột/nhà
-  let bx = pState.pos.x, bz = pState.pos.z;
-  outer: for (const d of [2.4, 1.6]) {
-    for (const a of [0, Math.PI / 2, -Math.PI / 2, Math.PI]) {
-      const x = pState.pos.x + Math.sin(pState.yaw + a) * d, z = pState.pos.z + Math.cos(pState.yaw + a) * d;
-      if (freeSpot(x, z, 0.8)) { bx = x; bz = z; break outer; }
-    }
+  // đặt xe ngay trước mặt (rồi hai bên, sau lưng, rồi xoắn ốc tới 6 m) ở chỗ trống — không cắm xe vào tường/cột/nhà.
+  // Không còn chỗ nào trống → KHÔNG gọi xe (trước: xe mọc ngay chỗ người đứng, kẹt trong collider = soft-lock).
+  let spot = null;
+  const px = pState.pos.x, pz = pState.pos.z;
+  for (const [x, z, d] of spotsAround(px, pz, pState.yaw, [2.4, 1.6], [0, Math.PI / 2, -Math.PI / 2, Math.PI], 6)) {
+    if (freeSpot(x, z, 0.8) && (d <= 2.4 || clearPath(px, pz, x, z))) { spot = [x, z]; break; }
   }
+  if (!spot && freeSpot(px, pz, 0.8)) spot = [px, pz];   // chỗ đứng đủ rộng cho xe → xe hiện ngay dưới chân
+  if (!spot) {
+    ui.toast(tx({ vi: '🏍️ Chỗ này chật quá — ra chỗ thoáng hơn rồi gọi xe nhé!', en: '🏍️ No room for a motorbike here — step into the open and call again!' }));
+    return;
+  }
+  const [bx, bz] = spot;
   if (!personalMoto) {
     personalMoto = spawnVehicle('motorbike', bx, bz, pState.yaw);
   } else {
@@ -624,6 +684,7 @@ function animate() {
       player.animate(dt, 0, time);   // mở modal khi đang cưỡi → GIỮ tư thế ngồi (không animate lại)
     }
     clampToPlayArea(pState.pos);     // GIAI ĐOẠN TRUNG TÂM: tường vô hình tại mép thế giới
+    updatePlayerShadow(dt);
 
     if (!modal && !cine.active) {
       // 10Hz là đủ cho prompt tương tác (trước: quét mọi ứng viên + dựng chuỗi label 60 lần/s)

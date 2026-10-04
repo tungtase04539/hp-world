@@ -124,7 +124,7 @@ export function makeHumanoid(scheme = {}) {
   g.add(blob);
 
   return {
-    group: g, legL, legR, armL, armR, head, torso, blob,   // blob: main.js ẩn khi có bóng đổ thật (tránh 2 bóng)
+    group: g, legL, legR, armL, armR, head, torso, blob,   // blob: main.js updatePlayerShadow (đậm khi di chuyển, nhạt khi đứng yên có bóng thật)
     walkT: 0,
     // speedMs (tuỳ chọn, m/s): nhịp bước theo tốc độ THẬT — 1 chu kỳ 2π = 2 bước, bước 0,8 m (đi) → 1,4 m (chạy);
     // không có speedMs (NPC) giữ công thức cũ. Biên độ vung lớn dần khi chạy.

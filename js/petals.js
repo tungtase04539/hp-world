@@ -20,6 +20,7 @@ export function createPetals(scene) {
   for (const s of sets) s.setUsage(THREE.DynamicDrawUsage);
   let setK = 0;
   mesh.frustumCulled = false;
+  mesh.userData.noCull = true;   // bay theo người chơi — instcull không được chụp/ghi đè ma trận (vị trí chụp lúc đăng ký vô nghĩa)
   scene.add(mesh);
 
   const dummy = new THREE.Object3D();

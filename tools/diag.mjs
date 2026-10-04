@@ -4,8 +4,9 @@
 // Kiểm:
 //  1. __hp.diag(): biển địa danh / NPC / xe / hoa — cao độ hợp lý, TIẾP CẬN được, nằm TRONG vùng chơi;
 //  2. thuyền đậu trên nước đủ sâu (gh < −0.6), xe cạn trên đất;
-//  3. giao thông (js/traffic.js check()): xe chạy bên PHẢI ở phố 2 chiều, không ngược chiều đường đôi, người đi bộ
-//     không đứng trong footprint nhà thật, không tác tử nào ngoài vùng chơi; có xe máy + ô tô + người đi bộ;
+//  3. giao thông (js/traffic.js check(), trên vị trí ĐANG VẼ): xe chạy bên PHẢI ở phố 2 chiều, trong lòng đường, không
+//     chồng nhau, không ngược chiều đường đôi; người đi bộ không trong nhà/địa danh, không giữa lòng đường ngoài ngã tư;
+//     không tác tử nào ngoài vùng chơi; có xe máy + ô tô + người đi bộ;
 //  4. nhiệm vụ: mục tiêu địa danh = số biển trong vùng chơi (allDone đạt được);
 //  5. 0 lỗi JS.
 // Thoát mã 1 nếu có vấn đề (dùng được trong CI/pre-push).
@@ -30,9 +31,14 @@ else {
     if (land && h < 0.3) problems.push(`xe ${type} (${x},${z}) dưới nước h=${h}`);
   }
   const t = r.traffic;
-  if (t.wrongSide) problems.push(`giao thông: ${t.wrongSide}/${t.vehicles} xe đi bên TRÁI phố 2 chiều ${JSON.stringify(t.examples)}`);
+  // check() đo VỊ TRÍ ĐANG VẼ (lách người chơi, bo cua, thoát kẹt…) → cho phép nhiễu nhỏ: > 1 % xe / > 3 % người là lỗi.
+  const tv = Math.max(1, t.vehicles), tw = Math.max(1, t.walkers), ex = JSON.stringify(t.examples);
+  if (t.wrongSide > 0.01 * tv) problems.push(`giao thông: ${t.wrongSide}/${t.vehicles} xe đi bên TRÁI phố 2 chiều ${ex}`);
+  if (t.offRoad > 0.01 * tv) problems.push(`giao thông: ${t.offRoad}/${t.vehicles} xe ra ngoài lòng đường ${ex}`);
+  if (t.overlap > 0.01 * tv) problems.push(`giao thông: ${t.overlap} cặp xe chồng lên nhau ${ex}`);
   if (t.wrongWay) problems.push(`giao thông: ${t.wrongWay} xe ngược chiều đường đôi`);
-  if (t.walkInBuilding) problems.push(`giao thông: ${t.walkInBuilding}/${t.walkers} người đi bộ trong nhà ${JSON.stringify(t.examples)}`);
+  if (t.walkInBuilding > 0.01 * tw) problems.push(`giao thông: ${t.walkInBuilding}/${t.walkers} người đi bộ trong nhà ${ex}`);
+  if (t.walkOnRoad > 0.03 * tw) problems.push(`giao thông: ${t.walkOnRoad}/${t.walkers} người đi bộ giữa lòng đường (ngoài ngã tư) ${ex}`);
   if (t.outside) problems.push(`giao thông: ${t.outside} tác tử ngoài vùng chơi`);
   if (!r.stats.bikes || !r.stats.cars || !r.stats.walkers) problems.push('giao thông: thiếu xe máy/ô tô/người đi bộ ' + JSON.stringify(r.stats));
   console.log('Phương tiện:', r.boats.map((b) => b.join(' ')).join(' | '));
