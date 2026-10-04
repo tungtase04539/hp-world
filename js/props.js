@@ -16,7 +16,7 @@
 //    mảnh dưới 1 px ở xa); ~336k đỉnh đường thẳng — rẻ hơn chia ô (thêm draw call) trên GPU tích hợp.
 //  • Người đi bộ: đứng / ngồi ghế nhựa / đi lại — đi lại hoàn toàn trên GPU (uPropTime), không tốn CPU mỗi khung.
 //
-// API: buildProps(ctx) → { stats, update(cam) } — gọi 1 lần trong buildWorld (SAU khi cây/công trình đã có collider để
+// API: buildProps(ctx) → { stats, update(cam), meshes, cableMeshes, parkedCars, cullStats } — gọi 1 lần trong buildWorld (SAU khi cây/công trình đã có collider để
 //      né), trước freezeStatic. ctx xem chú thích ở buildProps.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -792,6 +792,43 @@ function makeRoadIndex(ROADS_DT, HW, SW) {
   }
   return { blocked, carriageGap, segs };
 }
+// MẶT ĐI ĐƯỢC của bộ dựng đường CŨ (world.js layRoad, dot3 trước WP6 roadnet) — để prop đứng ĐÚNG mặt đang vẽ, không
+// lơ lửng (phản biện WP7: hằng LAND_H+SIDEWALK_TOP = +0,25 m nổi +0,07 trên vỉa p/s/t và +0,24 trên phố r):
+//   lòng nhựa: hộp 0,14 m tâm h+0,04 → đỉnh h+0,11 (= ROAD_TOP) · vạch giữa h+0,155 (bỏ qua, prop không đứng trên vạch)
+//   vỉa hè: CHỈ phố p/s/t, hộp 0,24 m tâm h+0,06 → đỉnh h+0,18, phủ [hw, hw + 0,28·w] (KHÔNG theo SIDEWALK_W — WP1 đã
+//   nới SIDEWALK_W nhưng layRoad vẫn vẽ 0,28·w) · phố r/w/h không vỉa → lưới nền local h+0,012
+//   h = max(groundHeightNoDeck, LAND_H) như layRoad. Mặt cao nhất thắng (vỉa đè lên lòng ở miệng giao lộ = mặt đang vẽ).
+// Khi WP6 (js/roadnet.js) đã gộp: world.js truyền LAND_H + roadNet.surfaceAt thay cho hàm này (xem lời gọi buildProps).
+export function layRoadSurfaceY(ROADS_DT, groundHeightNoDeck, LAND_H) {
+  const W = { p: 13, s: 10, t: 8, r: 5.5, w: 3.5, h: 3 };   // = ROAD_W của world.js (bề rộng hộp lòng layRoad)
+  const CELL = 32, map = new Map(), segs = [];
+  const key = (i, j) => (i + 4096) * 8192 + (j + 4096);
+  for (const r of ROADS_DT) {
+    const w = W[r.c] ?? 5.5, hw = w / 2, sw = (r.c === 'p' || r.c === 's' || r.c === 't') ? w * 0.28 : 0;
+    for (let i = 0; i < r.pts.length - 1; i++) {
+      const [ax, az] = r.pts[i], [bx, bz] = r.pts[i + 1];
+      const id = segs.length; segs.push([ax, az, bx, bz, hw, sw]);
+      const m = hw + sw + 1;
+      for (let a = Math.floor((Math.min(ax, bx) - m) / CELL); a <= Math.floor((Math.max(ax, bx) + m) / CELL); a++)
+        for (let b = Math.floor((Math.min(az, bz) - m) / CELL); b <= Math.floor((Math.max(az, bz) + m) / CELL); b++) {
+          const k = key(a, b); let l = map.get(k); if (!l) map.set(k, (l = [])); l.push(id);
+        }
+    }
+  }
+  return (x, z) => {
+    const h = Math.max(groundHeightNoDeck(x, z), LAND_H);
+    const l = map.get(key(Math.floor(x / CELL), Math.floor(z / CELL)));
+    let top = 0.012;
+    if (l) for (const id of l) {
+      const s = segs[id];
+      const dx = s[2] - s[0], dz = s[3] - s[1], l2 = dx * dx + dz * dz;
+      let t = l2 ? ((x - s[0]) * dx + (z - s[1]) * dz) / l2 : 0; t = t < 0 ? 0 : t > 1 ? 1 : t;
+      const d = Math.hypot(x - (s[0] + dx * t), z - (s[1] + dz * t));
+      if (d <= s[4]) { if (top < 0.11) top = 0.11; } else if (d <= s[4] + s[5]) { top = 0.18; break; }
+    }
+    return h + top;
+  };
+}
 function makeEvidence() {
   const CELL = 60, map = new Map(), key = (i, j) => (i + 4096) * 8192 + (j + 4096);
   for (const r of PROPS_EVIDENCE) { const k = key(Math.floor(r[0] / CELL), Math.floor(r[1] / CELL)); let a = map.get(k); if (!a) map.set(k, (a = [])); a.push(r); }
@@ -834,8 +871,17 @@ function cullRegister(mesh, rMin, rMax, keepBehind = 30) {
   for (const k in mesh.geometry.attributes) { const a = mesh.geometry.attributes[k]; if (a.isInstancedBufferAttribute) attrs.push({ a, size: a.itemSize }); }
   for (const t of attrs) t.src = new Float32Array(t.a.array);
   const px = new Float32Array(n), pz = new Float32Array(n), src = attrs[0].src;
-  for (let i = 0; i < n; i++) { px[i] = src[i * 16 + 12]; pz[i] = src[i * 16 + 14]; }
-  CULL.push({ mesh, attrs, px, pz, n, r0: rMin * rMin, r1: rMax * rMax, kb: keepBehind * keepBehind, last: -1, idx: new Int32Array(n).fill(-1), hidden: false });
+  // bán kính bao của model sau scale lớn nhất (vũng sáng scale 12) + tâm cầu lệch gốc → cầu bao rẻ cho cullUpdate
+  let sMax = 1, yMin = Infinity, yMax = -Infinity;
+  for (let i = 0; i < n; i++) {
+    const o = i * 16; px[i] = src[o + 12]; pz[i] = src[o + 14];
+    const y = src[o + 13]; if (y < yMin) yMin = y; if (y > yMax) yMax = y;
+    const s2 = Math.max(src[o] ** 2 + src[o + 1] ** 2 + src[o + 2] ** 2, src[o + 4] ** 2 + src[o + 5] ** 2 + src[o + 6] ** 2, src[o + 8] ** 2 + src[o + 9] ** 2 + src[o + 10] ** 2);
+    if (s2 > sMax * sMax) sMax = Math.sqrt(s2);
+  }
+  if (!mesh.geometry.boundingSphere) mesh.geometry.computeBoundingSphere();
+  const gs = mesh.geometry.boundingSphere, gR = sMax * (gs.center.length() + gs.radius);
+  CULL.push({ mesh, attrs, px, pz, n, r0: rMin * rMin, r1: rMax * rMax, kb: keepBehind * keepBehind, last: -1, idx: new Int32Array(n).fill(-1), hidden: false, gR, yC: (yMin + yMax) / 2, yH: (yMax - yMin) / 2 });
 }
 const _fw = new THREE.Vector3();
 let _cullAt = -1e9, _cx = 1e9, _cz = 1e9, _fx = 0, _fz = 1;
@@ -851,14 +897,16 @@ function cullUpdate(camera, force = false) {
   _cullAt = now; _cx = cx; _cz = cz; _fx = fx; _fz = fz;
   for (const t of CULL) {
     const { mesh, attrs, px, pz, n, r0, r1, kb, idx } = t;
-    let k = 0, changed = false;
+    let k = 0, lo = -1, hi = 0, x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
     for (let i = 0; i < n; i++) {
       const dx = px[i] - cx, dz = pz[i] - cz, d2 = dx * dx + dz * dz;
       if (d2 > r1 || d2 < r0) continue;
       // sau lưng camera (góc > ~100°) và đủ xa → bỏ (camera xoay nhanh → cập nhật ngay ở khung kế)
       if (!topDown && d2 > kb && dx * fx + dz * fz < -0.18 * Math.sqrt(d2)) continue;
+      const X = px[i], Z = pz[i];
+      if (X < x0) x0 = X; if (X > x1) x1 = X; if (Z < z0) z0 = Z; if (Z > z1) z1 = Z;
       if (idx[k] !== i) {
-        idx[k] = i; changed = true;
+        idx[k] = i; if (lo < 0) lo = k; hi = k + 1;
         // chép thủ công (subarray() cấp phát 1 view/instance/attribute → hàng chục nghìn object rác mỗi lượt)
         for (let a = 0; a < attrs.length; a++) {
           const at = attrs[a], s = at.size, dst = at.a.array, src = at.src;
@@ -867,10 +915,19 @@ function cullUpdate(camera, force = false) {
       }
       k++;
     }
-    if (changed || k !== t.last) {
+    if (lo >= 0 || k !== t.last) {
       mesh.count = k; t.last = k;
-      for (const at of attrs) at.a.needsUpdate = true;
-      if (k > 0) { mesh.computeBoundingSphere(); if (t.hidden) { t.hidden = false; mesh.visible = true; } }
+      // chỉ tải lên GPU đoạn ô [lo, hi) vừa đổi (phản biện: needsUpdate trơn tải lại TOÀN bộ ~1 MB của 15,9k xe xa mỗi
+      // lần cull đổi). Ô ngoài đoạn giữ nguyên dữ liệu đã tải; chỉ giảm count thì không cần tải gì.
+      if (lo >= 0) for (const at of attrs) { at.a.clearUpdateRanges(); at.a.addUpdateRange(lo * at.size, (hi - lo) * at.size); at.a.needsUpdate = true; }
+      if (k > 0) {
+        // cầu bao từ hộp toạ độ instance đã giữ (O(k) phép so sánh) thay computeBoundingSphere (O(k) phép nhân ma trận)
+        if (!mesh.boundingSphere) mesh.boundingSphere = new THREE.Sphere();
+        const bs = mesh.boundingSphere;
+        bs.center.set((x0 + x1) / 2, t.yC, (z0 + z1) / 2);
+        bs.radius = Math.hypot((x1 - x0) / 2, t.yH, (z1 - z0) / 2) + t.gR;
+        if (t.hidden) { t.hidden = false; mesh.visible = true; }
+      }
       else if (!t.hidden) { t.hidden = true; mesh.visible = false; }
     }
   }
@@ -893,6 +950,8 @@ function cullUpdate(camera, force = false) {
 //   nearPanoCam(x,z,r)    — né điểm camera pano
 //   reserved              — [[x,z,r],…] cột đã có (băng rôn) để xe máy né
 //   keepClear             — [[x,z,r],…] giữ trống đồ vỉa hè + ô tô (điểm hồi sinh)
+//   surfaceY(x,z)         — tuỳ chọn: cao độ TUYỆT ĐỐI mặt đang vẽ (vỉa hè/nền/lòng) để chân prop chạm đất; thiếu →
+//                           hằng LAND_H + SIDEWALK_TOP (đúng với vỉa hè WP6 roadnet). dot3 cũ: layRoadSurfaceY(...)
 // }
 export function buildProps(ctx) {
   const T0 = performance.now();
@@ -929,6 +988,11 @@ export function buildProps(ctx) {
   const keepClear = ctx.keepClear || [];
   const clearAt = (x, z) => { for (const c of keepClear) if ((x - c[0]) ** 2 + (z - c[1]) ** 2 < c[2] * c[2]) return true; return false; };
   const yWalk = LAND_H + SIDEWALK_TOP, yRoad = LAND_H + ROAD_TOP;
+  // cao độ chân prop vỉa hè: theo MẶT ĐANG VẼ (ctx.surfaceY) — gán it.y cho từng instance (cột: ngay sau 6.2 vì dây điện
+  // neo theo đỉnh cột; còn lại: lượt cuối trước 6.8). Ô tô giữ yRoad (lòng nhựa); phố r: nghiêng theo mặt phía lề.
+  const surfY = typeof ctx.surfaceY === 'function' ? ctx.surfaceY : null;
+  const yAt = surfY ? (x, z) => surfY(x, z) : () => yWalk;
+  const groundAll = (lists) => { for (const L of lists) for (const it of L) if (typeof it.y !== 'number') it.y = yAt(it.x, it.z); };
 
   // ---------------------------------------------------------------------------------------------------------------
   // 6.1 LẤY MẪU MẶT PHỐ: mỗi (đường, đoạn, bên) → các Ô 3 m dọc vỉa hè, có cờ hợp lệ + mức bằng chứng
@@ -1089,6 +1153,8 @@ export function buildProps(ctx) {
     }
   };
   markObstCells();
+  // chân cột/đèn/tủ/cờ/kính đèn theo mặt đang vẽ (dây điện bên dưới neo vào đỉnh cột → phải gán TRƯỚC 6.3)
+  groundAll([poleI, poleLampI, trafoI, cobraI, ornI, glassI, cabI, flagI]);
   const tPoles = performance.now();
 
   // ---------------------------------------------------------------------------------------------------------------
@@ -1110,7 +1176,7 @@ export function buildProps(ctx) {
   for (const [A, B] of spans) {
     const arr = cableArr;
     const hs = hash3(A.x, A.z, 33);
-    const yA = LAND_H + SIDEWALK_TOP, yB = LAND_H + SIDEWALK_TOP;
+    const yA = A.y, yB = B.y;
     // ngang tuyến (xà nằm ngang, vuông góc tuyến): xà dọc theo local Z của cột = dọc phố → sứ ở ±0.72 dọc phố
     // → 3 dây trung thế đi song song, lệch ngang = trục pháp tuyến
     const nxA = -A.S.nx, nzA = -A.S.nz;
@@ -1132,7 +1198,7 @@ export function buildProps(ctx) {
   // dây vào nhà (2 bên phố) + cuộn rối quanh cột
   for (const P of [...poleI, ...poleLampI, ...trafoI]) {
     const arr = cableArr;
-    const S = P.S, nxA = -S.nx, nzA = -S.nz, y0 = LAND_H + SIDEWALK_TOP;
+    const S = P.S, nxA = -S.nx, nzA = -S.nz, y0 = P.y;
     const nDrop = P.tangle >= 2 ? 4 + ((hash3(P.x, P.z, 41) * 5) | 0) : 1 + ((hash3(P.x, P.z, 41) * 3) | 0);
     const fl = facadeLine(P.c), fl0 = furnitureLine(P.c);
     for (let i = 0; i < nDrop; i++) {
@@ -1167,6 +1233,8 @@ export function buildProps(ctx) {
     const ls = new THREE.LineSegments(g, cableMat);
     ls.name = 'props_cables';
     ls.renderOrder = 2; ls.frustumCulled = false;
+    // không nhận raycast: LineSegments phủ cả thành phố + ngưỡng 1 m mặc định từng chặn MỌI __hp.pick (phản biện WP7)
+    ls.raycast = () => {};
     scene.add(ls); cableMeshes.push(ls);
   }
   const cableVerts = cableN / 3; cableBuf = null;
@@ -1310,27 +1378,38 @@ export function buildProps(ctx) {
   for (const R of bikeRows) {
     const { S } = R;
     if (hash3(R.x, R.z, 83) > keepRow) { for (let q = R.k0; q < R.k1; q++) S.occ[q] &= ~OCC_BIKE; continue; }
-    const narrow = SIDEWALK_W[S.c] < 2.0;
+    // vỉa ≤ 2 m (phố r: 1,5 m nhánh này / 2,0 m sau WP1) → xe xiên 55-70° sát bó vỉa, không vuông góc chạm mặt tiền
+    const narrow = SIDEWALK_W[S.c] <= 2.0;
     const baseAng = narrow ? 0.95 + hash3(R.x, R.z, 84) * 0.25 : 1.22 + hash3(R.x, R.z, 84) * 0.35;   // rad so với trục phố
     const noseIn = hash3(R.x, R.z, 85) < 0.78;                 // phần lớn mũi vào nhà
     const lat = narrow ? curbLine(S.c) + 0.78 : parkingLine(S.c);
     const spacing = 0.66 + hash3(R.x, R.z, 86) * 0.12;
     const t0 = S.off + R.k0 * CELL + 0.35, t1 = S.off + R.k1 * CELL - 0.35;
-    for (let t = t0; t <= t1; t += spacing + (hash3(R.x + t, R.z, 87) < 0.08 ? 0.5 : 0)) {
+    // hàng thật không thẳng tắp nhưng xe KỀ NHAU không xuyên nhau (phản biện: cách 0,66-0,78 m mà lệch ±8° độc lập →
+    // đầu/đuôi xe kề đè lên nhau): lệch so với xe TRƯỚC giới hạn ±0,1 rad; xe đỗ xiên hẳn (±25°) được chừa thêm 0,3 m
+    // trước và sau nó.
+    let prevA = null, padNext = 0;
+    for (let t = t0; t <= t1; t += spacing + padNext + (hash3(R.x + t, R.z, 87) < 0.08 ? 0.5 : 0)) {
+      padNext = 0;
+      const ha = hash3(S.ax + S.ux * t, S.az + S.uz * t, 89);
+      const skew = ha > 0.94 ? 0.42 : ha < 0.06 ? -0.42 : 0;
+      if (skew && prevA !== null) { t += 0.3; padNext = 0.3; if (t > t1) break; }
       const x = S.ax + S.ux * t + S.nx * lat, z = S.az + S.uz * t + S.nz * lat;
       const hb = hash3(x, z, 88);
-      if (hb < 0.06) continue;                                  // khe trống ngẫu nhiên giữa hàng
-      // góc lệch từng xe: phần lớn ±8°, ~12% xe đỗ xiên hẳn (±25°) — hàng thật không thẳng tắp
-      const ha = hash3(x, z, 89);
-      const a = baseAng + (ha - 0.5) * 0.28 + (ha > 0.94 ? 0.42 : ha < 0.06 ? -0.42 : 0);
+      if (hb < 0.06) { prevA = null; continue; }                // khe trống ngẫu nhiên giữa hàng
+      // góc lệch từng xe: phần lớn ±8°, ~12% xe đỗ xiên hẳn (±25°)
+      let a = baseAng + (hash3(x, z, 89) - 0.5) * 0.28;
+      if (prevA !== null && !skew) a = Math.min(prevA + 0.1, Math.max(prevA - 0.1, a));
+      a += skew;
       // hướng mũi: thành phần dọc phố (cos a) + thành phần ra mặt tiền (sin a)·(noseIn?+1:−1)
       const dirAlong = Math.cos(a), dirOut = Math.sin(a) * (noseIn ? 1 : -1);
       const fx = S.ux * dirAlong + S.nx * dirOut, fz = S.uz * dirAlong + S.nz * dirOut;
       // mũi/đuôi không được vào nhà thật hoặc chạm vật cản
       const nxp = x + fx * 0.9, nzp = z + fz * 0.9, txp = x - fx * 0.9, tzp = z - fz * 0.9;
-      if (inBuilding(nxp, nzp) || inBuilding(txp, tzp)) continue;
-      if (obst.hit(x, z, 0.32) || obst.hit(nxp, nzp, 0.22) || obst.hit(txp, tzp, 0.22)) continue;
-      if (roadIdx.carriageGap(narrow ? x : txp, narrow ? z : tzp) < (narrow ? -0.15 : -0.05)) continue;
+      if (inBuilding(nxp, nzp) || inBuilding(txp, tzp)) { prevA = null; continue; }
+      if (obst.hit(x, z, 0.32) || obst.hit(nxp, nzp, 0.22) || obst.hit(txp, tzp, 0.22)) { prevA = null; continue; }
+      if (roadIdx.carriageGap(narrow ? x : txp, narrow ? z : tzp) < (narrow ? -0.15 : -0.05)) { prevA = null; continue; }
+      prevA = skew ? null : a;   // sau xe xiên hẳn: xe kế tự do (đã chừa padNext)
       const mu = hash3(x, z, 90);
       const mi = BIKE_ORDER[BIKE_MIX.findIndex((t) => mu < t)];
       const lean = hash3(x, z, 91) < 0.62 ? -0.11 - hash3(x, z, 92) * 0.05 : 0;   // chân chống nghiêng
@@ -1376,10 +1455,12 @@ export function buildProps(ctx) {
       // (đo: van 5,25 m trước pano_102 — tâm 8,5 m nhưng đầu xe ~6 m, ảnh thật không có xe) → kiểm tra viên nang (tâm
       // + 2 đầu xe) quanh 551 điểm chụp: 6,5 m (van/tải 8 m); pano ghi "ô tô đỗ dày/hai bên" (car 2) thì xe đỗ sát
       // camera là ĐÚNG ảnh thật → chỉ 4/5 m. (Vòng tròn 7,5/9 m quanh TÂM cho mọi pano từng bớt 16% ô tô — quá tay.)
+      // Phản biện: pano "ô tô dày" vẫn để van+taxi đỗ 3-5 m trước camera (pano_024 kín khung, ảnh thật xe ở xa hơn) →
+      // TÂM xe luôn ≥ 6,5 m (van/tải 7,5 m); chỉ 2 đầu xe được tới 4/5 m.
       const ec = evAt(x, z), dense = !!(ec && ec[3] >= 2);
-      const rp = mi >= 4 ? (dense ? 5 : 8) : (dense ? 4 : 6.5), hx = S.ux * len / 2, hz = S.uz * len / 2;
+      const rp = mi >= 4 ? (dense ? 5 : 8) : (dense ? 4 : 6.5), rc = Math.max(rp, mi >= 4 ? 7.5 : 6.5), hx = S.ux * len / 2, hz = S.uz * len / 2;
       let ok = x * x + z * z < R_MAX * R_MAX && flat(x, z) && !avoid(x, z) && !clearAt(x, z) && lakeSD(x, z) > 18
-        && !panoNear(x, z, rp) && !panoNear(x + hx, z + hz, rp) && !panoNear(x - hx, z - hz, rp);
+        && !panoNear(x, z, rc) && !panoNear(x + hx, z + hz, rp) && !panoNear(x - hx, z - hz, rp);
       if (ok) for (const dd of [-len / 2 - 0.5, 0, len / 2 + 0.5]) { if (roadIdx.blocked(x + S.ux * dd, z + S.uz * dd, S.ri, S.si, 4.5, false)) { ok = false; break; } }
       if (ok && obst.hit(x, z, 0.9)) ok = false;
       // phố r: 2 bánh trên vỉa → không đè hàng xe máy / quán / xe đẩy đã đặt trên các ô vỉa hè dọc thân xe
@@ -1405,7 +1486,14 @@ export function buildProps(ctx) {
     const lxDotN = Math.cos(heading) * S.nx - Math.sin(heading) * S.nz;
     const col = mi === 3 ? pick(TAXI_COLS, hash3(x, z, 106)) : mi === 4 ? pick([0xf0f0ec, 0xf0f0ec, 0x2c5aa0, 0xd8d4c8], hash3(x, z, 106))
       : mi === 5 ? pick([0xf2f2ef, 0xf2f2ef, 0xe6e6e2, 0xb9bdc1, 0x9aa0a6, 0x1f3f73], hash3(x, z, 106)) : pick(CAR_COLS, hash3(x, z, 106));
-    carI[mi].push({ x, z, heading, roll: roll ? (lxDotN > 0 ? 0.085 : -0.085) : 0, yo: roll ? 0.065 : 0, col });
+    // phố r: bánh phía lề đứng trên MẶT ĐANG VẼ ở đó (vỉa +0,14 so với lòng → nghiêng lên ~0,09 rad như cũ; dot3 cũ
+    // phố r không vỉa → nền thấp hơn lòng ~0,1 m → nghiêng xuống mép lòng). Vệt bánh ~1,55 m.
+    let rl = 0, yo = 0;
+    if (roll) {
+      const dy = Math.max(-0.12, Math.min(0.16, surfY ? yAt(x + S.nx * 0.78, z + S.nz * 0.78) - yRoad : SIDEWALK_TOP - ROAD_TOP));
+      rl = (lxDotN > 0 ? 1 : -1) * Math.atan2(dy, 1.55); yo = dy * 0.46;
+    }
+    carI[mi].push({ x, z, heading, roll: rl, yo, col, len });
     for (const dd of [-len * 0.28, len * 0.28]) ctx.addCollider(x + S.ux * dd, z + S.uz * dd, 0.85);
     obst.add(x, z, len / 2);
     if (roll) for (let q = C.k0; q <= C.k1; q++) S.occ[q] |= OCC_CAR;   // người đi bộ phố r không xuyên xe
@@ -1451,6 +1539,8 @@ export function buildProps(ctx) {
     const keep = BUDGET.peds / nPedAll;
     for (const arr of [walkI, standI, sitI]) { let w = 0; for (const p of arr) if (hash3(p.x, p.z, 124) < keep) arr[w++] = p; arr.length = w; }
   }
+  // chân mọi đồ vỉa hè còn lại theo mặt đang vẽ (ô tô: yRoad riêng; dây đèn trang trí: y nền riêng)
+  groundAll([...bikeI, stoolI, paraI, cartI, aframeI, binI, hydI, cabI, walkI, standI, sitI]);
   const tPeds = performance.now();
 
   // ---------------------------------------------------------------------------------------------------------------
@@ -1553,7 +1643,7 @@ export function buildProps(ctx) {
   const glowList = [
     ...glassI.filter((g) => g.reach === LAMP_REACH).map((g) => ({ ...g, v: 0 })),
     ...glassI.filter((g) => g.reach !== LAMP_REACH).map((g) => ({ ...g, v: 1 })),
-    ...ornI.map((o) => ({ x: o.x, z: o.z, heading: o.heading, v: 2 })),
+    ...ornI.map((o) => ({ x: o.x, z: o.z, y: o.y, heading: o.heading, v: 2 })),
     ...bulbs.map((b) => ({ ...b, v: 3 })),
   ];
   const bulbGeo = () => mergeParts([finish(new THREE.IcosahedronGeometry(0.07, 0), 0xffffff)]);
@@ -1589,7 +1679,7 @@ export function buildProps(ctx) {
     g.closePath(); g.fill();
     const ft = new THREE.CanvasTexture(cv); ft.colorSpace = THREE.SRGBColorSpace;
     const fg = new THREE.PlaneGeometry(1.2, 0.8); fg.translate(0.62, 0, 0);
-    inst('props_flags', fg, new THREE.MeshLambertMaterial({ map: ft, side: THREE.DoubleSide }), flagI.map((f) => ({ ...f, y: yWalk + 6.1 })), { rMax: FAR_POLE * 0.6, cast: false });
+    inst('props_flags', fg, new THREE.MeshLambertMaterial({ map: ft, side: THREE.DoubleSide }), flagI.map((f) => ({ ...f, y: f.y + 6.1 })), { rMax: FAR_POLE * 0.6, cast: false });
   }
   // NGƯỜI: đứng/đi (biến thể 0) + ngồi (biến thể 1) — 1 draw call
   const NEAR_PED = LITE ? 140 : 240;
@@ -1603,33 +1693,34 @@ export function buildProps(ctx) {
     const a = new Float32Array(list.length * 4); list.forEach((it, i) => a.set(it.walk, i * 4));
     m.geometry.setAttribute('aWalk', new THREE.InstancedBufferAttribute(a, 4));
   } });
-  // vũng sáng đèn đêm (cộng sáng, chỉ hiện khi đêm)
+  // vũng sáng đèn đêm (cộng sáng, chỉ hiện khi đêm). Phản biện: quad đặt ở lòng +0,03 nằm DƯỚI vỉa hè (+0,18/+0,25)
+  // và dưới vạch kẻ → vũng bị bó vỉa cắt thẳng, vạch tối giữa vũng; opacity 0,42 + lõi phẳng → "đĩa sơn" vàng sáng hơn
+  // mặt tiền. Nay: quad ở yWalk+0,02 (trên MỌI mặt lát: lòng, vạch, vỉa dot3/WP6) → một vũng mềm phủ cả lòng + mép vỉa;
+  // falloff ~ (1+(r/0,38)²)^-1,5 (dạng cos³ của đèn chiếu xuống) tắt mượt về 0 ở mép; opacity đỉnh 0,17 (update()).
   let pools = null;
   if (glow && (cobraI.length || poleLampI.length)) {
     const cv = document.createElement('canvas'); cv.width = cv.height = 64;
     const g = cv.getContext('2d'); const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
-    gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.45, 'rgba(255,255,255,0.45)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+    for (let i = 0; i <= 10; i++) { const t = i / 10; const a = Math.pow(1 + (t / 0.38) ** 2, -1.5) * (1 - t * t * t * t); gr.addColorStop(t, `rgba(255,255,255,${a.toFixed(3)})`); }
     g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
     const pt = new THREE.CanvasTexture(cv);
-    const pm = new THREE.MeshBasicMaterial({ map: pt, color: 0xffc27a, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+    const pm = new THREE.MeshBasicMaterial({ map: pt, color: 0xffc78a, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: true });
     const pg = new THREE.PlaneGeometry(1, 1); pg.rotateX(-Math.PI / 2);
-    const list = [];
-    for (const L of cobraI) list.push({ x: L.x + L.rx * (LAMP_REACH + 0.25), z: L.z + L.rz * (LAMP_REACH + 0.25), heading: L.heading, y: yRoad + 0.03, sc: [11, 1, 9] });
-    for (const L of poleLampI) { const rx = -L.S.nx, rz = -L.S.nz; list.push({ x: L.x + rx * (POLE_LAMP_ARM.reach + 0.25), z: L.z + rz * (POLE_LAMP_ARM.reach + 0.25), heading: L.heading, y: yRoad + 0.03, sc: [9, 1, 7.5] }); }
+    const list = [], yP = yWalk + 0.02;
+    for (const L of cobraI) list.push({ x: L.x + L.rx * (LAMP_REACH + 0.25), z: L.z + L.rz * (LAMP_REACH + 0.25), heading: L.heading, y: yP, sc: [12, 1, 10] });
+    for (const L of poleLampI) { const rx = -L.S.nx, rz = -L.S.nz; list.push({ x: L.x + rx * (POLE_LAMP_ARM.reach + 0.25), z: L.z + rz * (POLE_LAMP_ARM.reach + 0.25), heading: L.heading, y: yP, sc: [10, 1, 8.5] }); }
     pools = inst('props_lamp_pools', pg, pm, list, { rMax: 600, cast: false });
-    if (pools) { pools.receiveShadow = false; pools.renderOrder = 1; pools.visible = false; pools.userData.poolMat = pm; }
+    if (pools) { pools.receiveShadow = false; pools.renderOrder = 3; pools.visible = false; pools.userData.poolMat = pm; }
   }
   const tInst = performance.now();
 
   // ---------------------------------------------------------------------------------------------------------------
   // 6.9 CẬP NHẬT MỖI KHUNG: cull theo camera (scene.onBeforeRender), dây điện theo ô, vũng sáng đêm, thời gian người đi
   // ---------------------------------------------------------------------------------------------------------------
-  let castFixed = false;
   const update = (camera) => {
-    if (!castFixed) {   // freezeStatic gán castShadow cho MỌI mesh không trong suốt → trả lại ý định của ta (LOD xa không đổ bóng)
-      castFixed = true;
-      for (const m of meshes) m.castShadow = !!m.userData.propCast;
-    }
+    // freezeStatic gán castShadow cho MỌI mesh không trong suốt → trả lại ý định của ta (LOD xa/kính/cờ không đổ bóng).
+    // Gán MỖI khung (20 phép gán): freezeStatic có thể chạy SAU khung đầu (khởi động bất đồng bộ / làm nóng shader).
+    for (const m of meshes) m.castShadow = m.userData.propCast;
     cullUpdate(camera);
     const gI = glow ? glow.emissiveIntensity / 1.6 : 0;      // daynight: lampGlow = đêm·1,6
     matGlow.emissiveIntensity = gI * 1.9;
@@ -1638,7 +1729,7 @@ export function buildProps(ctx) {
     if (pools) {
       const on = gI > 0.03;
       pools.visible = on && pools.count > 0;
-      pools.userData.poolMat.opacity = Math.min(1, gI) * 0.42;
+      pools.userData.poolMat.opacity = Math.min(1, gI) * 0.17;
     }
   };
   if (ctx.updaters) ctx.updaters.push((dt, time) => { PROP_TIME.value = time; });
@@ -1665,5 +1756,7 @@ export function buildProps(ctx) {
   console.log('[props]', JSON.stringify(stats));
   // móc gỡ lỗi/QA (không dùng trong game): window.__hpProps.sides / .cull()
   if (typeof window !== 'undefined') window.__hpProps = { stats, sides, cull: () => CULL.map((t) => [t.mesh.name, t.mesh.count, t.n]), bikeRows, lists: { stoolI, cartI, aframeI, walkI, standI, sitI, cars: carI.flat(), bikes: bikeI.flat(), cobraI, ornI, poleI, poleLampI, trafoI, binI } };
-  return { stats, update, meshes, cableMeshes, cullStats: () => CULL.map((t) => [t.mesh.name, t.mesh.count, t.n]) };
+  // parkedCars: ô tô đỗ {x,z,heading,len,…} (tâm ở curbLine − 0,95; phố r: curbLine − 0,05) — cho WP8 giao thông né
+  // làn đỗ (xe chạy cách bó vỉa ≥ 1,9 m nơi có xe đỗ) mà không phải đọc lại collider
+  return { stats, update, meshes, cableMeshes, parkedCars: allCars, cullStats: () => CULL.map((t) => [t.mesh.name, t.mesh.count, t.n]) };
 }

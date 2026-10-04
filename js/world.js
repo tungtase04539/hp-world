@@ -32,7 +32,7 @@ function nearPanoCam(x, z, r = 5) {
   return false;
 }
 import { SHOP_SIGNS } from './shopsigns.js';
-import { buildProps } from './props.js';                 // Đợt 3 WP7: đồ đạc phố (xe máy/ô tô/cột điện/đèn/người)
+import { buildProps, layRoadSurfaceY } from './props.js';                 // Đợt 3 WP7: đồ đạc phố (xe máy/ô tô/cột điện/đèn/người)
 import { furnitureLine } from './xsection.js';
 
 // Thế giới dựng từ dữ liệu OpenStreetMap thật của Hải Phòng (tỉ lệ 1:10,
@@ -21219,6 +21219,11 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     avoid: (x, z) => clearedZone(x, z) || inSuperblock(x, z),
     gardens: GARDENS, square: EXTRAS.square,
     footprints: world.realFootprints || null,      // WP2 có thể gắn {D, grid} (đã đánh D.dead) → khỏi giải mã lần 2
+    // chân prop chạm MẶT ĐANG VẼ: WP6 roadnet (vỉa mọi cấp +0,25) nếu đã gộp, không thì mặt layRoad cũ (vỉa p/s/t +0,18,
+    // phố r không vỉa → nền +0,012). Hằng +0,25 cũ làm prop lơ lửng 7-24 cm (phản biện WP7).
+    surfaceY: world.roadNet && world.roadNet.surfaceAt
+      ? (x, z) => Math.max(groundHeightNoDeck(x, z), LAND_H) + Math.max(0.012, world.roadNet.surfaceAt(x, z))
+      : layRoadSurfaceY(ROADS_DT, groundHeightNoDeck, LAND_H),
     stringLights: [[EXTRAS.square[0] - 10, EXTRAS.square[1] + 10], [-430, 195]],
     keepClear: [
       [EXTRAS.square[0] - 5, EXTRAS.square[1] + 23, 18],                     // = SPAWN main.js (khung hình đầu tiên)
