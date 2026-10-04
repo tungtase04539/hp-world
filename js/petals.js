@@ -17,6 +17,11 @@ export function createPetals(scene) {
   });
   const mesh = new THREE.InstancedMesh(geo, mat, COUNT);
   mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  // 3 bộ đệm ma trận XOAY VÒNG (Đợt 3 WP8, đo trên 890M/ANGLE d3d11): ghi đè mỗi khung vào bộ đệm GPU khung trước còn
+  // đang đọc bắt CPU chờ GPU (đồng bộ) → mất vài fps ở khu trung tâm. Ghi bản của khung N−2 thì không phải chờ.
+  const sets = [mesh.instanceMatrix, mesh.instanceMatrix.clone(), mesh.instanceMatrix.clone()];
+  for (const s of sets) s.setUsage(THREE.DynamicDrawUsage);
+  let setK = 0;
   mesh.frustumCulled = false;
   // instcull KHÔNG được quản: nó chụp ma trận lúc đăng ký rồi ghi đè mỗi 0,4 s (+ đặt lại count) → cánh hoa đứng
   // im giữa không trung và tool chụp ảnh không ẩn được (BUG cũ, lộ ra khi cánh hoa có mặt ở chỗ người chơi)
@@ -57,6 +62,7 @@ export function createPetals(scene) {
       if (mat.opacity < 0.02) { mesh.visible = false; return; }
       mesh.visible = true;
       frameNo++;
+      setK = (setK + 1) % sets.length; mesh.instanceMatrix = sets[setK];   // setMatrixAt ghi vào bản này
       for (let i = 0; i < COUNT; i++) {
         const p = parts[i];
         p.y -= p.fall * dt;

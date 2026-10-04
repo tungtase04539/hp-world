@@ -526,7 +526,9 @@ function karstGeo(r, h, seed) {
 }
 
 // ============================================================
-export function buildWorld(scene) {
+// ASYNC (Đợt 3 WP8): `await prog('<bước>')` ở cấp 1 giữa các khu vực lớn = báo tiến trình + nhường luồng chính cho
+// màn chờ (js/boot.js). CHỈ đặt `await` ở cấp 1 của hàm này hoặc trong block trần — trong hàm con là lỗi cú pháp.
+export async function buildWorld(scene, prog = () => {}) {
   const colliders = [];
   const updaters = [];
   const world = {
@@ -586,6 +588,7 @@ export function buildWorld(scene) {
     return [x, z];
   };
 
+  await prog('ground');
   // ---------- Mặt đất (từ lưới đất/biển OSM) — HỢP ĐỒNG 2 LƯỚI (W2, 2026-09-06) ----------
   // Trước: MỘT tấm 54,9×31,6 km, ô 110×93 m (LITE 229×193 m) = 340k tam giác mà 99% đỉnh nằm ngoài
   // BUILD_RADIUS; kênh Tam Bạc 55 m / Hạ Lý 48 m KHÔNG hiện được (2 đỉnh kề nhau đứng 2 bờ → "bắc cầu đất").
@@ -1018,6 +1021,7 @@ export function buildWorld(scene) {
   addMergedTiled(dashGeos, mat(0xe8e4d2), 'dashes');
   addMergedTiled(pathGeos, mat(0xc9b896), 'paths');
 
+  await prog('street');
   // ---------- GIÀN VÒM THÉP TRẮNG trang trí (dải công viên trung tâm, gần Trần Bình Trọng) ----------
   // Theo pano thật pano_195 [~555,-234]: dãy vòm bán nguyệt trắng lặp trên lối đi lát.
   {
@@ -1877,6 +1881,8 @@ export function buildWorld(scene) {
       }
     }
   }
+
+  await prog('cells');
 
   // ---------- CÔNG TRÌNH ĐÍCH DANH LÔ 2 (agent lm_drafts — 12 khối, 19 công trình có tên) ----------
   // KHỐI Ô DỰNG TAY đi qua BỒN CHỨA (js/cellsink.js): che scene/addCollider/FEATURED_CLEAR, hoà giải với nhà THẬT ở cửa ra.
@@ -17316,6 +17322,8 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     if (fenceG.length) addMerged(fenceG, mat(0x35503a), 'civic_fences');
   }
 
+  await prog('fabric');
+
   // ---------- 1.200+ TÒA NHÀ THẬT (footprint OSM đùn khối, gộp 1 mesh) ----------
   // BẢN ĐỒ BẰNG CHỨNG NHÀ: lưới centroid nhà OSM (_bldGrid) + lưới điểm nhà từ pano (housemap.js)
   const _bldGrid = new Map();
@@ -18633,6 +18641,8 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     return m;
   };
 
+  await prog('landmarks');
+
   // Đặt GLB địa danh (từ ảnh thật qua Meshy): scale theo cạnh dài/chiều cao,
   // xoay theo hướng thật, hạ tâm về (x,z), dìm nhẹ chân chống lơ lửng
   function placeGLB({ url, name, x, z, rot = 0, size = 26, bySide = 'max', sink = 0.55, preload = false, radius }) {
@@ -19770,6 +19780,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
       topGeos.forEach((g) => g.dispose()); tm.castShadow = true; scene.add(tm);
     }
   }
+  await prog('nature');
 
   // ---------- CÂY PHƯỢNG "HERO": mô hình Meshy dựng từ ẢNH THẬT (3 dáng) ----------
   // Đợt 3 WP4: hero = LOD GẦN của cây phượng thủ tục cùng vị trí (js/trees.js): GLB (85-101k tam giác, file KHÔNG
@@ -20386,6 +20397,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     const [ftX2, ftZ2] = EXTRAS.fountain;
     bench(ftX2 - 24, ftZ2 + 20, Math.PI); bench(ftX2 + 24, ftZ2 + 20, Math.PI);
   }
+  await prog('furniture');
 
   // ---------- NỘI THẤT ĐƯỜNG PHỐ (từ dữ liệu OSM: STREETS/INTERSECTIONS/MEDIANS) ----------
   {
@@ -20761,6 +20773,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     const deck2 = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.25, 16), mat(0xb03028));
     deck2.position.set(5, LAND_H + 0.9, 852); deck2.rotation.y = 0.35; scene.add(deck2);   // cầu vòm đầu bắc
   }
+  await prog('final');
 
   // ---------- Hoa phượng nhặt (nhiệm vụ) ----------
   const flowerPickups = [];

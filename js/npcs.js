@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { makeHumanoid } from './character.js';
 import { tx, onLangChange } from './i18n.js';
 
-// 6 NPC với hội thoại song ngữ. action: 'minigame' mở trò nấu ăn sau hội thoại
+// NPC với hội thoại song ngữ (chữ có thể chứa {N} {F} — i18n.setVars). action: 'minigame' mở trò nấu ăn sau hội thoại
 export const NPC_DATA = [
   {
     id: 'guide', x: 10, z: 14, face: 0,
@@ -10,8 +10,8 @@ export const NPC_DATA = [
     name: { vi: 'Linh — Hướng dẫn viên', en: 'Linh — Tour guide' },
     lines: [
       { vi: 'Chào mừng bạn đến với Hải Phòng — Thành phố Hoa Phượng Đỏ! Mình là Linh, hướng dẫn viên của bạn. Đây là quảng trường Nhà hát lớn, trái tim của thành phố.', en: 'Welcome to Hai Phong — City of Red Flamboyants! I\'m Linh, your guide. This is the Opera House square, the heart of the city.' },
-      { vi: 'Có 15 địa danh để khám phá — hãy nhìn bản đồ nhỏ góc màn hình nhé! Quanh đây có Quán hoa, tượng đài Lê Chân, hồ Tam Bạc... Phía bắc là sông Cấm với cảng và hai cây cầu lớn.', en: 'There are 15 landmarks to discover — check the minimap in the corner! Nearby are the Flower Kiosks, Le Chan monument and Tam Bac lake... North lies the Cam river with the port and two great bridges.' },
-      { vi: 'Đi xa hơn: theo quốc lộ về phía nam 20 cây số là biển Đồ Sơn, còn muốn ra đảo Cát Bà thì xuống Bến Bính lấy thuyền — thuyền trưởng Hải sẽ chỉ cho bạn. Lấy xe máy đậu cạnh nhà hát mà đi cho nhanh!', en: 'Further out: follow the highway 20km south to Do Son beach, or take a boat from Ben Binh pier to Cat Ba island — Captain Hai will show you. Grab the motorbike parked by the theatre to travel fast!' },
+      { vi: 'Khu trung tâm có {N} địa danh để khám phá — nhìn bản đồ nhỏ góc màn hình nhé! Quanh đây có Quán hoa, tượng đài Lê Chân, đền Nghè... Đi về tây là chợ Sắt và hồ Tam Bạc, phía bắc là sông Cấm với cảng và cầu Hoàng Văn Thụ.', en: 'Downtown has {N} landmarks to discover — check the minimap in the corner! Nearby are the Flower Kiosks, Le Chan monument, Nghe temple... West lie Sat market and Tam Bac lake; north, the Cam river with the port and Hoang Van Thu bridge.' },
+      { vi: 'Thành phố này dựng đúng 1:1 — mỗi mét là một mét thật, nên đi bộ hơi lâu đấy. Bấm nút 🏍️ gọi xe máy, hoặc lấy chiếc đậu cạnh nhà hát. Nhớ đi bên phải, xe cộ ở đây đông lắm!', en: 'This city is built 1:1 — every metre is a real metre, so walking takes a while. Tap 🏍️ to call a motorbike, or take the one parked by the theatre. Keep right — the traffic here is busy!' },
     ],
   },
   {
@@ -31,7 +31,7 @@ export const NPC_DATA = [
     lines: [
       { vi: 'Ơ này du khách! Lên xích lô bác chở đi một vòng dải trung tâm không? Xe đậu ngay kia kìa.', en: 'Hey traveler! Fancy a cyclo ride around the central strip? It\'s parked right over there.' },
       { vi: 'Bác chạy xích lô ba chục năm rồi. Hải Phòng đẹp nhất tháng 5, tháng 6 — mùa phượng nở đỏ trời. Người ta bảo hoa phượng là "lửa" của thành phố này đấy.', en: 'Thirty years on this cyclo. Hai Phong is loveliest in May and June — flamboyant season paints the sky red. They say the flowers are this city\'s "fire".' },
-      { vi: 'Thấy hoa phượng phát sáng quanh phố không? Nhặt đủ mười bông là có quà đấy, hehe!', en: 'See those glowing flowers around town? Collect all ten and something nice happens, hehe!' },
+      { vi: 'Thấy hoa phượng phát sáng dọc phố không? Nhặt đủ {F} bông là có quà đấy, hehe!', en: 'See those glowing flowers along the streets? Collect all {F} and something nice happens, hehe!' },
     ],
   },
   {
@@ -40,8 +40,8 @@ export const NPC_DATA = [
     name: { vi: 'Thuyền trưởng Hải', en: 'Captain Hai' },
     lines: [
       { vi: 'Chào cậu! Con thuyền này sẵn sàng ra khơi rồi. Cậu biết lái không? Cứ lên đi, nhấn E là chạy được!', en: 'Ahoy! This boat is ready to sail. Know how to steer? Hop on — press E and off you go!' },
-      { vi: 'Đây là Bến Bính. Xuôi sông Cấm về phía đông ra cửa biển, rồi giữ hướng đông nam len qua các đảo đá vôi là tới vịnh Lan Hạ — Cát Bà. Cảnh đẹp như tranh vẽ!', en: 'This is Ben Binh pier. Sail the Cam river east to the sea, then keep southeast between the limestone karsts to reach Lan Ha bay at Cat Ba. Like a painting!' },
-      { vi: 'Nhìn bản đồ nhỏ mà đi cho khỏi lạc. Nhớ tránh va vào đá ngầm nhé — biển lặng thế này, chạy chừng một phút là tới.', en: 'Follow the minimap so you don\'t get lost. Mind the rocks — sea\'s calm, about a minute\'s sail.' },
+      { vi: 'Đây là Bến Bính. Chạy dọc sông Cấm mà ngắm cảng Hải Phòng với những cần cẩu, rồi vòng qua dưới cầu Hoàng Văn Thụ. Xa hơn — cửa biển, vịnh Lan Hạ, Cát Bà — để chuyến sau nhé!', en: 'This is Ben Binh pier. Cruise along the Cam river past the port cranes, then swing under Hoang Van Thu bridge. Further out — the estuary, Lan Ha bay, Cat Ba — that\'s for a later trip!' },
+      { vi: 'Sông Cấm nước chảy xiết, tàu lớn ra vào suốt ngày, cậu cứ đi chậm thôi. Nhìn bản đồ nhỏ mà đi cho khỏi lạc!', en: 'The Cam river runs fast and big ships come and go all day — take it easy. Follow the minimap so you don\'t get lost!' },
     ],
   },
   {
@@ -75,7 +75,10 @@ export const NPC_DATA = [
   },
 ];
 
-export function buildNPCs(scene, world) {
+// playRadius: NPC đứng ngoài vùng chơi (ngư dân Đồ Sơn, chị Thu Cát Bà — cách 20-40 km) KHÔNG dựng: không tới được,
+// chỉ tốn ~25 mesh + 1 sprite mỗi người (kiểm toán 2026-10-04 mục 36).
+const NPC_R = 0.7;
+export function buildNPCs(scene, world, playRadius = Infinity) {
   const npcs = [];
   for (const d of NPC_DATA) {
     // vị trí tính từ dữ liệu bản đồ thật (world.npcSpots), fallback về tọa độ tĩnh
@@ -83,6 +86,7 @@ export function buildNPCs(scene, world) {
       d.x = world.npcSpots[d.id][0];
       d.z = world.npcSpots[d.id][1];
     }
+    if (Math.hypot(d.x, d.z) > playRadius - 4) continue;
     const rig = makeHumanoid(d.scheme);
     const y = world.groundHeight(d.x, d.z);
     rig.group.position.set(d.x, y, d.z);
@@ -94,9 +98,7 @@ export function buildNPCs(scene, world) {
     sprite.position.set(d.x, y + 3, d.z);
     scene.add(sprite);
 
-    const npc = { data: d, rig, sprite, baseFace: d.face };
-    npcs.push(npc);
-    world.colliders.push({ x: d.x, z: d.z, r: 0.7 });
+    npcs.push({ data: d, rig, sprite, baseFace: d.face });
   }
 
   onLangChange(() => {
@@ -126,5 +128,15 @@ export function buildNPCs(scene, world) {
     }
   }
 
-  return { npcs, update };
+  // Đẩy điểm p (người/xe bán kính r) ra khỏi NPC. Trước đây collider NPC được push vào world.colliders SAU khi chỉ
+  // mục lưới va chạm đã dựng (world.js tạo colIdx lười ở lần resolveCollisions đầu, giữa buildWorld) → không bao
+  // giờ có hiệu lực, người chơi đi xuyên NPC. ≤ 5 NPC → quét thẳng rẻ hơn mọi chỉ mục.
+  function pushOut(p, r = 0.45) {
+    for (const n of npcs) {
+      const dx = p.x - n.data.x, dz = p.z - n.data.z, d = Math.hypot(dx, dz), min = NPC_R + r;
+      if (d < min && d > 1e-3) { p.x = n.data.x + (dx / d) * min; p.z = n.data.z + (dz / d) * min; }
+    }
+  }
+
+  return { npcs, update, pushOut };
 }

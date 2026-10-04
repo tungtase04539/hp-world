@@ -11,7 +11,9 @@ import { buildNPCs } from './npcs.js';
 import { buildLandmarkSigns } from './landmarks.js';
 import { createDayNight, attachSkyRenderer } from './daynight.js';
 import { createPetals } from './petals.js';
-import { initInput, input, consumeInteract, consumeJump } from './input.js';
+import { initInput, input, consumeInteract, consumeJump, consumeEscape } from './input.js';
+import { createBoot } from './boot.js';
+import { footprintIndex } from './footprints.js';
 import { t, tx, setLang } from './i18n.js';
 import * as ui from './ui.js';
 import * as audio from './audio.js';
@@ -118,28 +120,76 @@ window.addEventListener('resize', () => {
   resizePost();
 });
 
-// ============ Thế giới ============
-// Nhường 1 nhịp cho worker tải GLB khởi động TRƯỚC buildWorld (30-45 s đồng bộ): worker chỉ chạy khi luồng
-// chính tạm nhả — không chờ thì mọi fetch chỉ bắt đầu SAU khi dựng xong thế giới (đo 2026-09-05).
+// ============ Màn chờ + dựng thế giới (Đợt 3 WP8) ============
+// Vùng chơi giai đoạn trung tâm: đĩa BUILD_RADIUS − 12 quanh Nhà hát lớn. Khai báo SỚM: NPC, xe, biển địa danh,
+// giao thông và nhiệm vụ đều lọc theo nó (trước đây 4 địa danh + 2 NPC + 2 thuyền nằm ngoài, không tới được).
+const PLAY_RADIUS = BUILD_RADIUS - 12;
+const inPlayArea = (x, z) => x * x + z * z <= (PLAY_RADIUS - 2) * (PLAY_RADIUS - 2);
+let _qPinned = false;   // __hp.pinQuality(): khoá autoQuality cho QA (xem __hp bên dưới)
+// Service Worker (cache GLB): ĐĂNG KÝ NGAY. Bản cũ gắn listener 'load' SAU khi dựng thế giới — lúc đó 'load' đã
+// bắn từ lâu nên SW KHÔNG BAO GIỜ được đăng ký (kiểm toán 2026-10-04 mục 39).
+if ('serviceWorker' in navigator && location.protocol === 'https:') {
+  const regSW = () => navigator.serviceWorker.register('./sw.js').catch(() => {});
+  if (document.readyState === 'complete') regSW(); else window.addEventListener('load', regSW, { once: true });
+}
+// UI màn chờ gắn TRƯỚC khi dựng (trước: chỉ gắn sau 17-35 s → nút ngôn ngữ/chất lượng chết, không có tiến trình).
+initInput();
+ui.initUI();
+setLang('vi');
+initMinigame(audio);
+quests.bindQuestUI(ui, audio);
+const _hadProgress = quests.loadProgress();
+{ // Nút chọn chất lượng + tên GPU trên màn chờ (kiểm toán 2026-09-05: người chơi phải THẤY mình đang ở tier nào).
+  const gpuEl = document.getElementById('gpuName');
+  if (gpuEl) gpuEl.textContent = `${GPU_NAME || 'GPU ?'} · ${['tier 0', 'LITE', 'iGPU', 'FULL'][TIER]}`;
+  document.querySelectorAll('.qualityPick').forEach((b) => {
+    b.classList.toggle('active', b.dataset.q === QUALITY_PREF);
+    b.addEventListener('click', () => {
+      if (b.dataset.q === QUALITY_PREF) return;
+      setQualityPref(b.dataset.q);
+      const u = new URL(location.href); u.searchParams.delete('quality');   // URL không được đè lựa chọn mới
+      location.href = u.toString();
+    });
+  });
+}
+const boot = createBoot();
+boot.armStart(() => startGame(), () => audio.initAudio());   // AudioContext tạo trong CỬ CHỈ bấm (kể cả bấm sớm)
+// Nhường 1 nhịp cho worker tải GLB khởi động TRƯỚC buildWorld: worker chỉ chạy khi luồng chính tạm nhả — không
+// chờ thì mọi fetch chỉ bắt đầu SAU khi dựng xong thế giới (đo 2026-09-05). Rồi vẽ màn chờ 1 khung trước khối
+// đồng bộ đầu tiên (V8 biên dịch hàm buildWorld 1,5 MB mất vài giây trước dòng lệnh đầu tiên).
 await workerReady();
-const world = buildWorld(scene);
-// đóng băng ma trận local của thế giới tĩnh (NPC/xe/traffic tạo SAU nên không bị ảnh hưởng)
+await boot.step('code', true);
+const world = await buildWorld(scene, boot.step);
+// đóng băng ma trận local của thế giới tĩnh (NPC/xe/traffic tạo SAU nên không bị ảnh hưởng).
+// Nhịp nhường để vẽ chữ "Gộp hình khối tĩnh" có thể cho callback GLB bất đồng bộ (cây phượng hero / luống hoa —
+// world.js gọi loader.load ở cuối buildWorld) chen vào scene TRƯỚC freeze → bị gán bóng/đóng băng khác hẳn bản cũ
+// (vốn luôn đến SAU freeze) và khác nhau giữa các lần chạy. Gỡ tạm mọi gốc mới xuất hiện trong nhịp đó, freeze,
+// rồi gắn lại → đúng ngữ nghĩa cũ, xác định.
+const _preFreeze = new Set(scene.children);
+await boot.step('freeze');
+const _lateRoots = scene.children.filter((o) => !_preFreeze.has(o));
+for (const o of _lateRoots) scene.remove(o);
 world.freezeStatic(renderer.shadowMap.enabled);
+for (const o of _lateRoots) scene.add(o);
+_preFreeze.clear();
+await boot.step('actors');
 const dayNight = createDayNight(scene, world);   // bóng: cỡ map/hộp theo TIER ở device.js GFX (TIER 2 = 1024 / ±70 m)
 const petals = createPetals(scene);
-const signs = buildLandmarkSigns(scene, world);
-const { npcs, update: updateNPCs } = buildNPCs(scene, world);
+// Biển địa danh: chỉ những biển trong vùng chơi được tương tác/khám phá (Đồ Sơn/Hòn Dấu/Cát Bà/cầu Bính nằm
+// ngoài PLAY_RADIUS — trước đây làm nhiệm vụ "Nhà thám hiểm" không bao giờ hoàn thành).
+const signs = buildLandmarkSigns(scene, world).filter((s) => inPlayArea(s.lm.x, s.lm.z));
+const { npcs, update: updateNPCs, pushOut: pushOutNPCs } = buildNPCs(scene, world, PLAY_RADIUS);
+// Va chạm chung cho người & xe: collider thế giới + NPC (collider NPC trước đây push vào world.colliders SAU khi
+// chỉ mục lưới đã dựng → không bao giờ có hiệu lực, npcs.js:99 cũ).
+let _trafficRef = null;   // xe đang chạy cũng là vật cản (gán sau khi tạo giao thông)
+const resolveAll = (p, r = 0.45) => { world.resolveCollisions(p, r); pushOutNPCs(p, r); if (_trafficRef) _trafficRef.pushOut(p, r); };
 const { vehicles, update: updateVehicle, spawn: spawnVehicle } = createVehicles(
-  scene, groundHeight, groundHeightNoDeck, world.vehicleSpawns, world.resolveCollisions);
-// người đi bộ thêm ở bãi biển Đồ Sơn & thị trấn Cát Bà
-if (world.dosonBeach) {
-  world.walkPaths.push([[world.dosonBeach[0] - 30, world.dosonBeach[1] - 20], [world.dosonBeach[0] + 10, world.dosonBeach[1] + 20]]);
-}
-world.walkPaths.push([
-  [EXTRAS.catbaTown[0] - 40, EXTRAS.catbaTown[1] - 8],
-  [EXTRAS.catbaTown[0] + 40, EXTRAS.catbaTown[1] - 2],
-]);
-const traffic = createTraffic(scene, world);
+  scene, groundHeight, groundHeightNoDeck, world.vehicleSpawns, resolveAll, { playRadius: PLAY_RADIUS });
+const fp = footprintIndex(world);   // footprint nhà ĐANG VẼ (world.rbData của WP2; chưa có → chỉ địa danh) → camera, người đi bộ, chỗ xuống xe
+const traffic = createTraffic(scene, world, { playRadius: PLAY_RADIUS, footprints: fp });
+_trafficRef = traffic;
+quests.attachFlowers(world.flowerPickups);
+initMinimap();
 
 // (gán castShadow/_noCast đã chuyển vào world.freezeStatic — PHẢI chạy TRƯỚC merge-pass,
 //  vì merge nuốt tên roads_*/sidewalk_* vào mesh gộp mrg*)
@@ -162,53 +212,119 @@ player.group.position.copy(pState.pos);
 if (renderer.shadowMap.enabled) {
   player.group.traverse((o) => { if (o.isMesh && !o.material.transparent) { o.castShadow = true; } });
 }
+// ============ Bóng nhân vật ============
+// Shadow map chỉ làm mới 4,5-10 Hz (vòng lặp chính: trần 0,22 s TIER 3 / 0,5 s TIER 2) → bóng THẬT của người/xe đang
+// chạy trễ ~1,5 m (chạy 7 m/s) … 3,5 m (xe máy 16 m/s) rồi giật theo từng lần làm mới. Cùng lý do traffic.js chỉ dùng
+// bóng tiếp đất. Nên: ĐANG DI CHUYỂN (hoặc vừa dừng < 0,35 s) → tắt castShadow của người + xe đang cưỡi, bóng tròn tiếp
+// đất đậm (luôn dính chân); ĐỨNG YÊN → bật lại bóng thật (lần làm mới kế tiếp ≤ 0,22-0,5 s đã khớp vị trí) và bóng tròn
+// nhạt đi thành bóng tiếp xúc (không thành 2 bóng đậm chồng nhau). Đang cưỡi: bóng tròn của XE lo (blob người treo
+// theo yên, nghiêng theo xe → ẩn).
+const _pCasters = [];
+player.group.traverse((o) => { if (o.isMesh && o.castShadow) _pCasters.push(o); });
+const BLOB_OP = player.blob.material.opacity;
+const _shLast = new THREE.Vector3().copy(pState.pos);
+let _shCast = _pCasters.length > 0, _shStill = 1, _shVeh = null;
+function vehCast(v, on) {
+  if (!v._casters) { v._casters = []; v.mesh.traverse((o) => { if (o.isMesh && o.castShadow) v._casters.push(o); }); }
+  if (v._castOn === on) return;
+  v._castOn = on;
+  for (const m of v._casters) m.castShadow = on;
+}
+function updatePlayerShadow(dt) {
+  const sp = dt > 0 ? Math.hypot(pState.pos.x - _shLast.x, pState.pos.z - _shLast.z) / dt : 0;
+  _shLast.copy(pState.pos);
+  _shStill = sp > 0.6 ? 0 : _shStill + dt;
+  const real = renderer.shadowMap.enabled && dayNight.sun.castShadow;
+  const cast = real && _shStill > 0.35;
+  if (cast !== _shCast) { _shCast = cast; for (const m of _pCasters) m.castShadow = cast; }
+  const v = pState.mounted;
+  if (_shVeh && _shVeh !== v) { vehCast(_shVeh, true); _shVeh = null; }   // xuống xe → xe đứng yên lại đổ bóng thật
+  if (v && v.land) { _shVeh = v; vehCast(v, cast); }
+  player.blob.visible = !v;
+  player.blob.material.opacity = cast ? BLOB_OP * 0.45 : BLOB_OP;
+}
 
 // ============ Camera bám theo nhân vật ============
-const cam = { yaw: 0, pitch: 0.34, dist: 13 };
-let dragging = false, lastPX = 0, lastPY = 0;
+// Chuột/1 ngón: kéo xoay · lăn chuột/2 ngón (pinch): zoom. Theo dõi TỪNG pointerId (trước: 1 cờ chung → ngón giữ
+// joystick + ngón xoay làm camera giật, 2 ngón nhảy loạn, không có pinch — kiểm toán 2026-10-04 mục 29).
+// Đang lái xe/thuyền: camera tự vòng ra SAU phương tiện khi không kéo trong 1,5 s.
+// CẦN BOOM CHỐNG XUYÊN TƯỜNG: tia từ tâm nhìn tới camera đi qua footprint nhà THẬT (RB01) / địa danh có chiều
+// cao → rút ngắn ngay (không trễ, không lọt vào trong nhà), nhả ra từ từ khi thoáng. Chỉ áp ở tầm chơi (≤ 40 m) —
+// góc "drone" của __hp.teleport (dist 120-160) giữ nguyên để ảnh QA so sánh được.
+const cam = { yaw: 0, pitch: 0.34, dist: 13, cur: 13, lastDrag: -1e9, occlude: true, snap: true };
+const CAM_MIN = 3, CAM_MAX = 36;
+const _ptrs = new Map();   // pointerId → {x, y}
+let _pinch0 = 0;
+const _pinchDist = () => { const [a, b] = [..._ptrs.values()]; return Math.hypot(a.x - b.x, a.y - b.y); };
 canvas.addEventListener('pointerdown', (e) => {
-  dragging = true; lastPX = e.clientX; lastPY = e.clientY;
+  _ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (_ptrs.size === 2) _pinch0 = _pinchDist();
 });
 window.addEventListener('pointermove', (e) => {
-  if (!dragging) return;
-  cam.yaw -= (e.clientX - lastPX) * 0.0052;
-  cam.pitch = Math.min(1.25, Math.max(-0.15, cam.pitch + (e.clientY - lastPY) * 0.004));
-  lastPX = e.clientX; lastPY = e.clientY;
+  const p = _ptrs.get(e.pointerId);
+  if (!p) return;                                   // ngón trên joystick/nút: không phải của camera
+  const dx = e.clientX - p.x, dy = e.clientY - p.y;
+  p.x = e.clientX; p.y = e.clientY;
+  if (_ptrs.size >= 2) {                            // 2 ngón: chỉ zoom
+    const d = _pinchDist();
+    if (_pinch0 > 20 && d > 20) cam.dist = Math.min(CAM_MAX, Math.max(CAM_MIN, cam.dist * _pinch0 / d));
+    _pinch0 = d;
+    return;
+  }
+  cam.yaw -= dx * 0.0052;
+  cam.pitch = Math.min(1.25, Math.max(-0.15, cam.pitch + dy * 0.004));
+  cam.lastDrag = performance.now();
 });
-window.addEventListener('pointerup', () => { dragging = false; });
+const _ptrUp = (e) => { _ptrs.delete(e.pointerId); if (_ptrs.size < 2) _pinch0 = 0; };
+window.addEventListener('pointerup', _ptrUp);
+window.addEventListener('pointercancel', _ptrUp);
 canvas.addEventListener('wheel', (e) => {
-  cam.dist = Math.min(36, Math.max(5, cam.dist + e.deltaY * 0.012));
+  cam.dist = Math.min(CAM_MAX, Math.max(CAM_MIN, cam.dist + e.deltaY * 0.012));
 }, { passive: true });
 
 // vector tạm dùng lại mỗi khung hình (tránh cấp phát → GC giật)
 const UP = new THREE.Vector3(0, 1, 0);
-const _tgt = new THREE.Vector3(), _off = new THREE.Vector3(), _des = new THREE.Vector3();
+const _tgt = new THREE.Vector3(), _tgtS = new THREE.Vector3(), _des = new THREE.Vector3();
 const _fwd = new THREE.Vector3(), _rgt = new THREE.Vector3(), _seat = new THREE.Vector3();
+const wrapPI = (a) => { while (a > Math.PI) a -= Math.PI * 2; while (a < -Math.PI) a += Math.PI * 2; return a; };
 function updateCamera(dt) {
-  if (pState.mounted) _tgt.copy(pState.mounted.pos).setY(pState.mounted.pos.y + 3);
+  const v = pState.mounted;
+  if (v) _tgt.copy(v.pos).setY(v.pos.y + 3);
   else _tgt.copy(pState.pos).setY(pState.pos.y + 2.2);
+  // tự vòng ra sau xe đang chạy (không giành quyền khi người chơi vừa kéo camera)
+  if (v && Math.abs(v.vel) > 1.5 && performance.now() - cam.lastDrag > 1500) {
+    cam.yaw += wrapPI(v.heading + Math.PI - cam.yaw) * (1 - Math.exp(-2.2 * dt));
+  }
+  // bám mục tiêu có trễ nhẹ (thay cho lerp vị trí camera cũ: lerp vị trí làm camera "cắt góc" xuyên tường khi xoay)
+  if (cam.snap) { _tgtS.copy(_tgt); cam.cur = cam.dist; cam.snap = false; }
+  else _tgtS.lerp(_tgt, 1 - Math.exp(-12 * dt));
   const cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch);
-  _off.set(Math.sin(cam.yaw) * cp, sp, Math.cos(cam.yaw) * cp).multiplyScalar(cam.dist);
-  _des.copy(_tgt).add(_off);
+  const ux = Math.sin(cam.yaw) * cp, uz = Math.cos(cam.yaw) * cp;
+  let allow = cam.dist;
+  if (cam.occlude && cam.dist <= 40 && fp) allow = fp.boom(_tgtS.x, _tgtS.y, _tgtS.z, ux, sp, uz, cam.dist);
+  if (allow < cam.cur) cam.cur = allow;                               // co NGAY: không bao giờ lọt vào trong nhà
+  else cam.cur += (allow - cam.cur) * (1 - Math.exp(-2.5 * dt));      // nhả ra từ từ
+  _des.set(_tgtS.x + ux * cam.cur, _tgtS.y + sp * cam.cur, _tgtS.z + uz * cam.cur);
   const gy = groundHeight(_des.x, _des.z);
   _des.y = Math.max(_des.y, gy + 1.2, 1.2);
-  camera.position.lerp(_des, 1 - Math.exp(-7 * dt));   // mượt độc lập fps (hệ số dt·7 từng nhảy bậc khi khung 33↔50 ms)
-  camera.lookAt(_tgt);
+  camera.position.copy(_des);
+  camera.lookAt(_tgtS);
 }
 camera.position.set(SPAWN.x, 10, SPAWN.z + 14);
 updateCamera(1);
 
 // ============ Di chuyển nhân vật ============
-const WALK = 5, RUN = 11, GRAV = 26, JUMP = 7.5;  // 1:1 — m/s thật
+// TỐC ĐỘ "THẬT MÀ CHƠI ĐƯỢC" (Đợt 3; trước: đi 5, chạy 11 = nước rút Olympic, xe máy 23 m/s = 83 km/h nội đô):
+//  - đi 3,0 m/s (~11 km/h — đi nhanh; đi bộ thật 1,4 m/s thì băng vùng chơi Ø3,2 km mất 38 phút)
+//  - chạy 7,0 m/s (~25 km/h — chạy nước rút người thường; giữ Shift/đẩy cần quá 85%)
+//  - xe máy tối đa 16 m/s (~58 km/h, tăng tốc ~3,5 m/s²) — vehicles.js; giao thông 8-12 m/s — traffic.js
+// Nhảy 6,5 m/s với g 26 → đỉnh 0,8 m (vượt ghế đá/bồn hoa, không bay qua mái hiên).
+const WALK = 3.0, RUN = 7.0, GRAV = 26, JUMP = 6.5;
 
 function tryMove(nx, nz) {
   if (nx < WORLD_BOUNDS.minX + 30 || nx > WORLD_BOUNDS.maxX - 30
     || nz < WORLD_BOUNDS.minZ + 30 || nz > WORLD_BOUNDS.maxZ - 30) return false;
   return groundHeight(nx, nz) > 0.32;
-}
-
-function resolveColliders(p) {
-  world.resolveCollisions(p, 0.45);
 }
 
 function updatePlayerOnFoot(dt, time) {
@@ -220,18 +336,18 @@ function updatePlayerOnFoot(dt, time) {
     _fwd.set(-Math.sin(cam.yaw), 0, -Math.cos(cam.yaw));
     _rgt.set(-_fwd.z, 0, _fwd.x);
     const dir = _fwd.multiplyScalar(f).add(_rgt.multiplyScalar(r)).normalize();
-    const nx = pState.pos.x + dir.x * speed * dt;
-    const nz = pState.pos.z + dir.z * speed * dt;
-    if (tryMove(nx, nz)) { pState.pos.x = nx; pState.pos.z = nz; }
-    else if (tryMove(nx, pState.pos.z)) pState.pos.x = nx;
-    else if (tryMove(pState.pos.x, nz)) pState.pos.z = nz;
-    const targetYaw = Math.atan2(dir.x, dir.z);
-    let diff = targetYaw - pState.yaw;
-    while (diff > Math.PI) diff -= Math.PI * 2;
-    while (diff < -Math.PI) diff += Math.PI * 2;
-    pState.yaw += diff * (1 - Math.exp(-10 * dt));
-  }
-  resolveColliders(pState.pos);
+    // bước con ≤ 0,35 m: chạy 7 m/s ở khung 50 ms = 0,35 m — không xuyên tường mỏng (collider/footprint)
+    const n = Math.max(1, Math.ceil((speed * dt) / 0.35)), sdt = dt / n;
+    for (let k = 0; k < n; k++) {
+      const nx = pState.pos.x + dir.x * speed * sdt;
+      const nz = pState.pos.z + dir.z * speed * sdt;
+      if (tryMove(nx, nz)) { pState.pos.x = nx; pState.pos.z = nz; }
+      else if (tryMove(nx, pState.pos.z)) pState.pos.x = nx;
+      else if (tryMove(pState.pos.x, nz)) pState.pos.z = nz;
+      resolveAll(pState.pos, 0.45);
+    }
+    pState.yaw += wrapPI(Math.atan2(dir.x, dir.z) - pState.yaw) * (1 - Math.exp(-10 * dt));
+  } else resolveAll(pState.pos, 0.45);
 
   const gy = groundHeight(pState.pos.x, pState.pos.z);
   if (consumeJump() && pState.onGround) { pState.vy = JUMP; pState.onGround = false; }
@@ -243,51 +359,99 @@ function updatePlayerOnFoot(dt, time) {
   player.group.position.copy(pState.pos);
   player.group.rotation.y = pState.yaw;
   player.group.rotation.x = 0;
-  player.animate(dt, mag * (input.run ? 1 : 0.7), time);
+  player.group.rotation.z = 0;
+  player.animate(dt, mag * (input.run ? 1 : 0.6), time, speed);
 }
 
 // ============ Lên / xuống phương tiện ============
+// Chỗ đặt người/xe phải: trên cạn, trong vùng chơi, không trong nhà thật/địa danh, không dính collider.
+function freeSpot(x, z, r = 0.45) {
+  if (groundHeight(x, z) <= 0.32 || !inPlayArea(x, z)) return false;
+  if (fp && fp.blocked(x, z)) return false;
+  if (world.isFree && !world.isFree(x, z, r)) return false;   // WP2: va chạm đa giác fabric (nếu có)
+  const p = { x, z };
+  resolveAll(p, r);
+  return Math.hypot(p.x - x, p.z - z) < 0.05;
+}
 function mount(v) {
   pState.mounted = v;
   v.mounted = true;
   v.mesh.traverse((o) => { o.frustumCulled = false; });   // xe đang cưỡi không được cull (nhấp nháy khi lái)
   player.sit(true);
+  consumeJump();
   audio.sfx('mount');
+}
+// Đường từ (x0,z0) tới (x1,z1) không cắt nhà thật/địa danh/tường fabric (chỗ tìm xa không được nằm SAU một bức tường).
+function clearPath(x0, z0, x1, z1) {
+  const L = Math.hypot(x1 - x0, z1 - z0), n = Math.ceil(L / 0.5);
+  for (let i = 1; i < n; i++) {
+    const t = i / n, x = x0 + (x1 - x0) * t, z = z0 + (z1 - z0) * t;
+    if (fp && fp.blocked(x, z)) return false;
+    if (world.isFree && !world.isFree(x, z, 0.15)) return false;
+  }
+  return true;
+}
+// Ứng viên quanh tâm (x,z) hướng h: vòng gần cho sẵn (rings × angles), rồi xoắn ốc 16 hướng ra tới maxR.
+function* spotsAround(x, z, h, rings, angles, maxR) {
+  for (const d of rings) for (const a of angles) yield [x + Math.sin(h + a) * d, z + Math.cos(h + a) * d, d];
+  for (let d = rings[rings.length - 1] + 0.7; d <= maxR + 1e-6; d += 0.7) {
+    for (let k = 0; k < 16; k++) { const a = (k * Math.PI) / 8; yield [x + Math.sin(h + a) * d, z + Math.cos(h + a) * d, d]; }
+  }
 }
 function dismount() {
   const v = pState.mounted;
-  const angles = [Math.PI / 2, -Math.PI / 2, Math.PI, 0];
-  for (const a of angles) {
-    const nx = v.pos.x + Math.sin(v.heading + a) * 2.6;
-    const nz = v.pos.z + Math.cos(v.heading + a) * 2.6;
-    if (groundHeight(nx, nz) > 0.32) {
-      pState.mounted = null;
-      v.mounted = false;
-      v.vel = 0;
-      pState.pos.set(nx, groundHeight(nx, nz), nz);
-      pState.vy = 0;
-      player.sit(false);
-      audio.sfx('mount');
-      return true;
+  // 1) 2 bên hông trước (như người thật bước xuống), rồi sau/trước 1,3 → 2,6 m; 2) xoắn ốc tới 8 m (thuyền 3,2 m) —
+  // chỗ trống thật (freeSpot) và đường tới đó không xuyên tường; 3) luật cũ dot3: chỉ cần trên cạn + trong vùng chơi;
+  // 4) xe trên cạn: xuống ngay tại chỗ xe. KHÔNG BAO GIỜ từ chối xuống xe trên cạn (trước: kẹt trên xe kẹt = soft-lock).
+  const maxR = v.land ? 8 : 3.2;
+  const SIDE = [Math.PI / 2, -Math.PI / 2, Math.PI, 0];
+  let spot = null;
+  for (const [nx, nz, d] of spotsAround(v.pos.x, v.pos.z, v.heading, [1.3, 1.9, 2.6], SIDE, maxR)) {
+    if (freeSpot(nx, nz) && (d <= 2.6 || clearPath(v.pos.x, v.pos.z, nx, nz))) { spot = [nx, nz]; break; }
+  }
+  if (!spot) {
+    for (const [nx, nz] of spotsAround(v.pos.x, v.pos.z, v.heading, [1.3, 1.9, 2.6], SIDE, maxR)) {
+      if (groundHeight(nx, nz) > 0.32 && inPlayArea(nx, nz)) { spot = [nx, nz]; break; }
     }
   }
-  ui.toast(tx({ vi: '⚓ Hãy cập bến hoặc vào gần bờ rồi mới rời thuyền!', en: '⚓ Reach a pier or shallow shore before leaving the boat!' }));
-  return false;
+  if (!spot && v.land && groundHeight(v.pos.x, v.pos.z) > 0.32) spot = [v.pos.x, v.pos.z];
+  if (!spot) {
+    ui.toast(tx({ vi: '⚓ Hãy cập bến hoặc vào gần bờ rồi mới rời thuyền!', en: '⚓ Reach a pier or shallow shore before leaving the boat!' }));
+    return false;
+  }
+  const [nx, nz] = spot;
+  pState.mounted = null;
+  v.mounted = false;
+  v.vel = 0;
+  pState.pos.set(nx, groundHeight(nx, nz), nz);
+  pState.vy = 0;
+  player.sit(false);
+  consumeJump();                                   // Space đã bấm lúc đang lái không được thành cú nhảy
+  audio.sfx('mount');
+  return true;
 }
 
 // ============ Nút "Gọi xe máy" ============
 let personalMoto = null;
 function callMoto() {
   if (pState.mounted) { dismount(); return; }   // đang cưỡi → bấm lần nữa để xuống
-  // đặt xe ngay trước mặt nhân vật, trên cạn
-  let bx = pState.pos.x, bz = pState.pos.z;
-  const fx = pState.pos.x + Math.sin(pState.yaw) * 3.2;
-  const fz = pState.pos.z + Math.cos(pState.yaw) * 3.2;
-  if (groundHeight(fx, fz) > 0.35) { bx = fx; bz = fz; }
-  if (groundHeight(bx, bz) < 0.35) {   // đang trên nước/thuyền
+  if (groundHeight(pState.pos.x, pState.pos.z) < 0.35) {   // đang trên nước/thuyền
     ui.toast(tx({ vi: '🏍️ Cần đứng trên bờ mới gọi được xe máy!', en: '🏍️ Stand on land to call a motorbike!' }));
     return;
   }
+  // đặt xe ngay trước mặt (rồi hai bên, sau lưng, rồi xoắn ốc tới 6 m) ở chỗ trống — không cắm xe vào tường/cột/nhà.
+  // Không còn chỗ nào trống → KHÔNG gọi xe (trước: xe mọc ngay chỗ người đứng, kẹt trong collider = soft-lock).
+  let spot = null;
+  const px = pState.pos.x, pz = pState.pos.z;
+  for (const [x, z, d] of spotsAround(px, pz, pState.yaw, [2.4, 1.6], [0, Math.PI / 2, -Math.PI / 2, Math.PI], 6)) {
+    if (freeSpot(x, z, 0.8) && (d <= 2.4 || clearPath(px, pz, x, z))) { spot = [x, z]; break; }
+  }
+  if (!spot && freeSpot(px, pz, 0.8)) spot = [px, pz];   // chỗ đứng đủ rộng cho xe → xe hiện ngay dưới chân
+  if (!spot) {
+    ui.toast(tx({ vi: '🏍️ Chỗ này chật quá — ra chỗ thoáng hơn rồi gọi xe nhé!', en: '🏍️ No room for a motorbike here — step into the open and call again!' }));
+    return;
+  }
+  const [bx, bz] = spot;
   if (!personalMoto) {
     personalMoto = spawnVehicle('motorbike', bx, bz, pState.yaw);
   } else {
@@ -299,7 +463,7 @@ function callMoto() {
   }
   if (personalMoto) {
     mount(personalMoto);
-    ui.toast(tx({ vi: '🏍️ Lên xe! WASD để chạy, bấm lại để xuống.', en: '🏍️ Hop on! WASD to ride, tap again to get off.' }));
+    ui.toast(tx({ vi: '🏍️ Lên xe! WASD để chạy, Space bấm còi, bấm lại để xuống.', en: '🏍️ Hop on! WASD to ride, Space to honk, tap again to get off.' }));
   }
 }
 document.getElementById('btnMoto').addEventListener('click', (e) => { e.currentTarget.blur(); callMoto(); });
@@ -307,7 +471,10 @@ document.getElementById('btnMoto').addEventListener('click', (e) => { e.currentT
 function updateMounted(dt, time) {
   const v = pState.mounted;
   player.sit(true);   // áp lại MỖI khung: mọi animate() lỡ chạy trước đó không làm "đứng trên yên" nữa
+  if (consumeJump() && v.land) audio.sfx('horn');   // Space khi lái = bấm còi (không để dồn thành cú nhảy lúc xuống)
   updateVehicle(v, dt, input.forward, input.right, time);
+  // xe cũng bị giữ trong vùng chơi (trước: chỉ kẹp pState.pos SAU khi xe đã chạy ra ngoài → xe đi tiếp, người trôi theo)
+  if (clampToPlayArea(v.pos)) { v.vel *= 0.6; v.mesh.position.copy(v.pos); }
   _seat.set(0, v.seatY, v.seatZ).applyAxisAngle(UP, v.heading);
   pState.pos.copy(v.pos).add(_seat);
   pState.pos.y -= 0.86;   // hạ nhân vật xuống: HÔNG ngồi trên yên (gốc nhân vật ở CHÂN, hip ~0.9 local)
@@ -345,7 +512,7 @@ function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
 function handleInteract() {
   if (isMinigameOpen()) return;
   if (ui.isDialogueOpen()) { ui.advanceDialogue(); return; }
-  if (ui.isInfoOpen()) { document.getElementById('infoPanel').classList.add('hidden'); return; }
+  if (ui.isInfoOpen() || ui.isHelpOpen()) { ui.closeTopModal(); return; }   // E cũng đóng bảng Hướng dẫn
   const act = nearestInteraction();
   if (!act) return;
   if (act.kind === 'dismount') dismount();
@@ -485,18 +652,18 @@ function updateNearCull() {
 
 // GIAI ĐOẠN TRUNG TÂM: không cho đi quá mép thế giới (ngoài BUILD_RADIUS không có gì —
 // tile/mesh đã bị cắt lúc build). Trượt dọc "tường tròn" + nhắc nhẹ (chống spam 5s).
-const PLAY_RADIUS = BUILD_RADIUS - 12;
+// (PLAY_RADIUS/inPlayArea khai báo ở đầu phần khởi động — NPC/xe/nhiệm vụ lọc theo nó.) Trả true nếu đã kẹp.
 let _edgeToastAt = -9;
 function clampToPlayArea(pos) {
   const r = Math.hypot(pos.x, pos.z);
-  if (r > PLAY_RADIUS) {
-    const s = PLAY_RADIUS / r;
-    pos.x *= s; pos.z *= s;
-    if (time - _edgeToastAt > 5) {
-      _edgeToastAt = time;
-      ui.toast(tx({ vi: '🚧 Hết ranh giới bản đồ giai đoạn này — quay lại trung tâm nhé!', en: '🚧 Edge of the map for this stage — head back downtown!' }));
-    }
+  if (r <= PLAY_RADIUS) return false;
+  const s = PLAY_RADIUS / r;
+  pos.x *= s; pos.z *= s;
+  if (time - _edgeToastAt > 5) {
+    _edgeToastAt = time;
+    ui.toast(tx({ vi: '🚧 Hết ranh giới bản đồ giai đoạn này — quay lại trung tâm nhé!', en: '🚧 Edge of the map for this stage — head back downtown!' }));
   }
+  return true;
 }
 
 // MÁY YẾU (TIER ≤ 1): vào chế độ tiết kiệm ngay, không đợi đo FPS. Sương gần (nấc 3) chỉ cho TIER 0 và
@@ -520,7 +687,9 @@ function animate() {
   if (started) {
     const modal = ui.isAnyModalOpen();
 
-    if (consumeInteract()) handleInteract();
+    if (consumeEscape()) { if (!ui.closeTopModal() && cine.active) cine.stop(); }   // Esc: đóng bảng trên cùng
+    if (consumeInteract() && !cine.active) handleInteract();   // free-cam đạo diễn dùng E để bay lên — không tương tác
+    if (modal || cine.active) consumeJump();   // Space bấm lúc mở bảng/đạo diễn không được "để dành" thành cú nhảy
 
     if (cine.active) {
       // CHẾ ĐỘ ĐẠO DIỄN: không điều khiển nhân vật, camera do cinematic lo
@@ -531,6 +700,7 @@ function animate() {
       player.animate(dt, 0, time);   // mở modal khi đang cưỡi → GIỮ tư thế ngồi (không animate lại)
     }
     clampToPlayArea(pState.pos);     // GIAI ĐOẠN TRUNG TÂM: tường vô hình tại mép thế giới
+    updatePlayerShadow(dt);
 
     if (!modal && !cine.active) {
       // 10Hz là đủ cho prompt tương tác (trước: quét mọi ứng viên + dựng chuỗi label 60 lần/s)
@@ -544,13 +714,14 @@ function animate() {
       ui.setPrompt(null);
     }
 
-    // nhặt hoa phượng
-    for (const p of world.flowerPickups) {
+    // nhặt hoa phượng (lưu theo CHỈ SỐ bông — tải lại không nhặt lại được, đếm không vượt mục tiêu)
+    for (let i = 0; i < world.flowerPickups.length; i++) {
+      const p = world.flowerPickups[i];
       if (!p.visible) continue;
       if (Math.hypot(pState.pos.x - p.position.x, pState.pos.z - p.position.z) < 2.4
           && Math.abs(pState.pos.y - p.position.y) < 3.5) {
         p.visible = false;
-        quests.pickFlower();
+        quests.pickFlower(i);
       }
     }
     // khám phá địa danh khi tới gần
@@ -566,10 +737,11 @@ function animate() {
       if (!v.mounted && !v.land) updateVehicle(v, dt, 0, 0, time);
     }
 
-    traffic.update(dt, time, pState.pos);
+    const tStat = traffic.update(dt, time, pState.pos);
     if (window.__hp && window.__hp._aerialCam) { /* chế độ vệ tinh: giữ camera top-down, không cập nhật */ }
     else if (cine.active) cine.update(dt); else updateCamera(dt);   // đạo diễn lo camera khi bật
     const sky = dayNight.update(dt, pState.pos, camera);   // camera: hộp bóng bám hướng nhìn
+    traffic.setNight(sky.night);   // đèn xe máy/ô tô tự sáng về đêm
     // bloom CHỈ chạy khi trời tối (đèn phố/cửa sổ) — ban ngày tắt hẳn pass (tiết kiệm GPU; vùng sáng ban ngày đã do
     // tone mapping ACES xử lý, bloom ngày làm mặt tường nắng loé "mơ màng").
     // Ngưỡng bloom tính trên giá trị TRƯỚC phơi sáng (FinalPass nhân sau) → chia theo phơi sáng để "chỉ đèn mới loé"
@@ -589,11 +761,17 @@ function animate() {
     const gy = groundHeightNoDeck(pState.pos.x, pState.pos.z);
     const lv = landAt(pState.pos.x, pState.pos.z);
     const seaFactor = onWater || gy < 0.5 ? 1 : 1 - Math.min(1, Math.max(0, (lv - 0.72) / 0.26));
-    audio.updateAudio(dt, { seaFactor });
+    // phố: tiếng xe theo mật độ xe quanh người chơi (traffic.js), chim ban ngày / dế đêm, máy xe mình đang lái
+    const mv = pState.mounted;
+    audio.updateAudio(dt, {
+      seaFactor, night: sky.night, traffic: tStat ? tStat.near : 0, honk: tStat ? tStat.honk : 0,
+      engine: mv && mv.land && mv.type === 'motorbike' ? Math.abs(mv.vel) / mv.speed : -1,
+      green: world.inPark ? (world.inPark(pState.pos.x, pState.pos.z) ? 1 : 0) : 0,
+    });
     const dPort = Math.hypot(pState.pos.x - world.portAnchor[0], pState.pos.z - world.portAnchor[1]);
     audio.tryHorn(time, 1 - Math.min(1, Math.max(0, (dPort - 70) / 180)));
 
-    autoQuality();
+    if (!_qPinned) autoQuality();   // __hp.pinQuality(): QA/đo A/B giữ nguyên nấc chất lượng (máy bận ≠ GPU yếu)
     // tâm culling: người chơi — hoặc TÂM KHUNG ẢNH ở chế độ vệ tinh (trước: prop/cây quanh ảnh vệ tinh biến mất vì
     // cull bám người chơi, kiểm toán §3 #22)
     const _ae = window.__hp && window.__hp._aerialArea;
@@ -646,19 +824,15 @@ function animate() {
 let _warm = false, _firstFrameAt = 0;
 const _T = { compileSyncMs: null, compileDoneAt: null, warmBy: null, firstRenderMs: null };   // __hp.timing (QA khởi động)
 
-// Service Worker: cache file nặng (GLB) → lần sau vào hiện đủ NGAY, không tải lại
-if ('serviceWorker' in navigator && location.protocol === 'https:') {
-  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
-}
-
 // ============ Bắt đầu ============
-initInput();
-ui.initUI();
-// preload cụm trung tâm ngay ở màn chờ + hiển thị tiến trình % dưới nút Bắt đầu
+// (initInput/initUI/setLang/nhiệm vụ/nút chất lượng đã gắn ở đầu phần khởi động — TRƯỚC khi dựng thế giới.)
+// Preload cụm GLB trung tâm: chỉ bắt đầu SAU freezeStatic (place() thêm gốc GLB vào scene — trước freeze sẽ bị gộp/
+// làm phẳng); thanh % hiện dưới nút Bắt đầu khi thanh dựng thế giới đã xong.
 (() => {
   const btn = document.getElementById('startBtn');
   const bar = document.createElement('div');
   bar.id = 'preloadBar';
+  bar.className = 'hidden';
   bar.innerHTML = '<div id="preloadFill"></div><span id="preloadTxt"></span>';
   btn.parentNode.insertBefore(bar, btn.nextSibling);
   const fill = bar.querySelector('#preloadFill');
@@ -667,36 +841,20 @@ ui.initUI();
     if (!total) return;
     const pct = Math.round((done / total) * 100);
     fill.style.width = pct + '%';
-    txt.textContent = pct < 100 ? `Đang tải dải trung tâm… ${pct}%` : '✓ Sẵn sàng — đã tải đủ dải trung tâm';
+    txt.textContent = pct < 100
+      ? tx({ vi: `Đang tải công trình trung tâm… ${pct}%`, en: `Loading downtown landmarks… ${pct}%` })
+      : tx({ vi: '✓ Đã tải đủ công trình trung tâm', en: '✓ Downtown landmarks loaded' });
     bar.classList.toggle('done', pct >= 100);
   });
 })();
-initMinigame(audio);
-quests.bindQuestUI(ui, audio);
-// Nạp tiến trình lần chơi trước (hoa/món ăn/địa danh đã khám phá)
-if (quests.loadProgress()) {
+// Nạp tiến trình lần chơi trước (hoa/món ăn/địa danh đã khám phá) — báo sau khi vào game
+function _progressToast() {
+  if (!_hadProgress) return;
   setTimeout(() => ui.toast(tx({
-    vi: `📖 Đã khôi phục tiến trình: ${quests.quests.discovered.size} địa danh, ${quests.quests.flowers} hoa`,
-    en: `📖 Progress restored: ${quests.quests.discovered.size} landmarks, ${quests.quests.flowers} flowers`,
+    vi: `📖 Đã khôi phục tiến trình: ${quests.discoveredCount()} địa danh, ${quests.quests.flowers} hoa`,
+    en: `📖 Progress restored: ${quests.discoveredCount()} landmarks, ${quests.quests.flowers} flowers`,
   })), 2500);
 }
-initMinimap();
-setLang('vi');
-// Nút chọn chất lượng + tên GPU trên màn chờ (kiểm toán 2026-09-05: người chơi phải THẤY mình đang ở tier nào).
-{
-  const gpuEl = document.getElementById('gpuName');
-  if (gpuEl) gpuEl.textContent = `${GPU_NAME || 'GPU ?'} · ${['tier 0', 'LITE', 'iGPU', 'FULL'][TIER]}`;
-  document.querySelectorAll('.qualityPick').forEach((b) => {
-    b.classList.toggle('active', b.dataset.q === QUALITY_PREF);
-    b.addEventListener('click', () => {
-      if (b.dataset.q === QUALITY_PREF) return;
-      setQualityPref(b.dataset.q);
-      const u = new URL(location.href); u.searchParams.delete('quality');   // URL không được đè lựa chọn mới
-      location.href = u.toString();
-    });
-  });
-}
-
 // Chế độ đạo diễn (trailer/giới thiệu/cutscene) — dùng qua console: __cine.free(), __cine.demo(), __cine.recordDemo()...
 window.__cine = cine;
 
@@ -711,7 +869,14 @@ window.__hp = {
   texCacheStats,     // chẩn đoán: texture tạo mới vs dùng lại
   cine,
   vehicles, mount, player,   // chẩn đoán/thử nghiệm cưỡi xe
-  // Chẩn đoán: mọi thực thể tương tác có đứng đúng chỗ & tiếp cận được không
+  world, pState, traffic, footprints: fp, PLAY_RADIUS,   // Đợt 3 WP8: tool/harness đọc trực tiếp
+  bootProfile: boot.durs,    // ms từng bước khởi động (code/ground/…/freeze/actors/shaders)
+  camOcclusion(on) { if (on !== undefined) cam.occlude = !!on; return cam.occlude; },   // A/B cần boom chống xuyên tường
+  // Khoá autoQuality ở nấc hiện tại (tools/qa/shoot.mjs, perf.mjs gọi ngay sau Bắt đầu). Lý do: headless trên máy
+  // đang chạy nhiều agent → fps tụt dưới 30% nhịp màn → autoQuality nhảy NẤC 3 (sương 220/1300 m, không hoàn tác)
+  // → ảnh vệ tinh chỉ còn màu sương (đo 2026-10-04: mọi game_* của lượt after1/after2 trắng xoá). Trả trạng thái.
+  pinQuality(on = true) { _qPinned = !!on; return { pinned: _qPinned, step: _qStep, pr: renderer.getPixelRatio() }; },
+  // Chẩn đoán: mọi thực thể tương tác có đứng đúng chỗ & tiếp cận được không (+ nằm trong vùng chơi)
   diag() {
     const items = [];
     for (const s of signs) items.push({ kind: 'landmark', id: s.lm.id, x: s.lm.x, z: s.lm.z, reach: 9 });
@@ -727,15 +892,16 @@ window.__hp = {
         const ang = (a / 16) * Math.PI * 2;
         for (const rr of [it.reach * 0.5, it.reach * 0.85, 4, 6, 8].filter((r) => r <= Math.max(8, it.reach))) {
           const p = { x: it.x + Math.cos(ang) * rr, z: it.z + Math.sin(ang) * rr };
-          world.resolveCollisions(p, 0.45);
+          resolveAll(p, 0.45);
           const ph = groundHeight(p.x, p.z);
-          if (Math.hypot(p.x - it.x, p.z - it.z) <= it.reach && ph > 1.2 && ph < 12) { reachable = true; break; }
+          if (Math.hypot(p.x - it.x, p.z - it.z) <= it.reach && ph > 1.2 && ph < 12 && inPlayArea(p.x, p.z)) { reachable = true; break; }
         }
       }
       const problems = [];
       if (it.water) {
         if (h > -0.6) problems.push(`thuyền mắc cạn h=${h.toFixed(1)}`);
       } else if (hd < 1.2 || hd > 14) problems.push(`cao độ lạ h=${hd.toFixed(1)}`);
+      if (!inPlayArea(it.x, it.z)) problems.push(`NGOÀI VÙNG CHƠI r=${Math.hypot(it.x, it.z) | 0}`);
       if (!reachable && !it.water) problems.push('KHÔNG TIẾP CẬN ĐƯỢC');
       if (problems.length) out.push(`${it.kind}/${it.id} (${it.x | 0},${it.z | 0}): ${problems.join(', ')}`);
     }
@@ -747,7 +913,7 @@ window.__hp = {
     z = Math.max(WORLD_BOUNDS.minZ + 31, Math.min(WORLD_BOUNDS.maxZ - 31, z));
     pState.pos.set(x, Math.max(groundHeight(x, z), 0), z);
     pState.vy = 0;
-    cam.yaw = camYaw; cam.pitch = pitch; cam.dist = dist;
+    cam.yaw = camYaw; cam.pitch = pitch; cam.dist = dist; cam.snap = true; cam.lastDrag = performance.now();
     const cp = Math.cos(pitch);
     // ĐẶT THẲNG vào điểm hội tụ của updateCamera (đích = chân + 2.2): bản cũ đặt +2 → camera pano (dist 0.1) bắt đầu
     // thấp hơn đích 0,2 m ⇒ ngửa ~60° rồi lerp dần ~1,5 s; máy bận (dt kẹp 0.05) chưa kịp hội tụ khi harness chụp →
@@ -835,11 +1001,15 @@ window.__hp = {
   },
 };
 
-document.getElementById('startBtn').addEventListener('click', () => {
+// Nút Bắt đầu (boot.armStart): chỉ chạy khi thế giới đã dựng + khung hình đầu đã vẽ; bấm sớm thì vào ngay khi xong.
+function startGame() {
+  if (started) return;
   audio.initAudio();
   document.getElementById('titleScreen').classList.add('hidden');
   document.getElementById('hud').classList.remove('hidden');
   started = true;
+  cam.snap = true;
+  _progressToast();
   setTimeout(() => {
     const guide = npcs.find((n) => n.data.id === 'guide');
     if (guide) ui.startDialogue(guide);
@@ -856,8 +1026,11 @@ document.getElementById('startBtn').addEventListener('click', () => {
       }
     } catch (e) { }
   }
-});
+}
 
+// bước 'shaders' của thanh khởi động bắt đầu TỪ ĐÂY (phần đồng bộ của compileAsync bên dưới tốn vài giây — trước
+// bị tính nhầm vào bước 'actors' sau khi WP5 dời biên dịch lên trước khung đầu)
+boot.step('shaders');
 // ẤM MÁY sau màn chờ: compile TOÀN BỘ shader của scene (song song, KHR_parallel_shader_compile)
 // + render bóng 1 lần. Trước đây Three chỉ compile vật thể LỌT KHUNG NHÌN ở frame đầu → bấm
 // "Bắt đầu" camera quét ra toàn cảnh = bão compile shader → khựng vài giây.
@@ -890,3 +1063,10 @@ if (renderer.compileAsync) {
 } else _warm = true;
 
 animate();
+// Mở nút Bắt đầu sau 2 khung đầu (khung đầu gánh link shader + upload — bấm sớm hơn chỉ thấy đơ). Tab nền: rAF
+// dừng → nút mở khi người chơi quay lại tab (thế giới đã dựng xong, chỉ chờ vẽ).
+requestAnimationFrame(() => requestAnimationFrame(() => {
+  boot.finish();
+  const pb = document.getElementById('preloadBar');
+  if (pb) pb.classList.remove('hidden');
+}));

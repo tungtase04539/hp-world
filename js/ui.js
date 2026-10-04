@@ -67,10 +67,26 @@ export function showInfo(lm) {
 }
 export function isInfoOpen() { return !document.getElementById('infoPanel').classList.contains('hidden'); }
 
+export function isHelpOpen() { return !document.getElementById('helpModal').classList.contains('hidden'); }
+
 export function isAnyModalOpen() {
   return dlg.open || isInfoOpen()
     || !document.getElementById('minigame').classList.contains('hidden')
-    || !document.getElementById('helpModal').classList.contains('hidden');
+    || isHelpOpen();
+}
+
+// Esc (và E với bảng Hướng dẫn/thông tin): đóng bảng trên cùng. Trả true nếu đã đóng thứ gì.
+// Thứ tự = thứ tự chồng z-index trong CSS: Hướng dẫn / thông tin / trò nấu ăn (40) > hội thoại (25).
+export function closeTopModal() {
+  if (isHelpOpen()) { document.getElementById('helpModal').classList.add('hidden'); return true; }
+  if (isInfoOpen()) { document.getElementById('infoPanel').classList.add('hidden'); return true; }
+  if (!document.getElementById('minigame').classList.contains('hidden')) { document.getElementById('mgClose').click(); return true; }
+  if (dlg.open) {   // Esc = bỏ qua phần còn lại của hội thoại (KHÔNG chạy onEnd — không tự mở trò nấu ăn)
+    document.getElementById('dialogue').classList.add('hidden');
+    dlg.npc = null; dlg.onEnd = null;
+    return true;
+  }
+  return false;
 }
 
 export function setClock(str) {
@@ -83,7 +99,9 @@ export function initUI() {
     document.getElementById('infoPanel').classList.add('hidden'));
   document.getElementById('helpClose').addEventListener('click', () =>
     document.getElementById('helpModal').classList.add('hidden'));
-  document.getElementById('btnHelp').addEventListener('click', () => {
+  document.getElementById('btnHelp').addEventListener('click', (e) => {
+    e.currentTarget.blur();   // giữ focus khỏi nút: phím E/Enter/Space sau đó không "bấm lại" nút Hướng dẫn
+    if (isHelpOpen()) { document.getElementById('helpModal').classList.add('hidden'); return; }
     document.getElementById('helpBody').innerHTML = t('helpBody');
     document.getElementById('helpModal').classList.remove('hidden');
     audio.sfx('click');

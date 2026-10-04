@@ -29,14 +29,16 @@
     <div class="title-flower">🌺</div>
     <h1 data-i18n="title">Hải Phòng 3D</h1>
     <h2 data-i18n="subtitle">Thành phố Hoa Phượng Đỏ</h2>
-    <p data-i18n="intro">Nhập vai một du khách trẻ khám phá thành phố Cảng: dạo trung tâm, qua cầu Hoàng Văn Thụ, tắm biển Đồ Sơn và giong thuyền ra Cát Bà!</p>
+    <p data-i18n="intro">Dạo bộ, chạy xe máy giữa trung tâm Hải Phòng dựng 1:1 từ bản đồ thật.</p>
     <div class="controls-hint">
       <div><kbd>W A S D</kbd> / <kbd>← ↑ ↓ →</kbd> <span data-i18n="ctlMove">Di chuyển</span></div>
       <div><kbd>Shift</kbd> <span data-i18n="ctlRun">Chạy</span> &nbsp; <kbd>Space</kbd> <span data-i18n="ctlJump">Nhảy</span></div>
       <div><kbd>E</kbd> <span data-i18n="ctlInteract">Tương tác / Lên & xuống xe</span></div>
       <div>🖱️ <span data-i18n="ctlCam">Kéo chuột xoay camera, lăn để zoom</span></div>
     </div>
-    <button id="startBtn" data-i18n="start">▶ Bắt đầu khám phá</button>
+    <!-- Nút khoá (class loading) tới khi thế giới dựng xong — js/boot.js. Bấm sớm = vào ngay khi xong. -->
+    <button id="startBtn" class="loading" aria-disabled="true">⏳ Đang dựng thành phố…</button>
+    <div id="bootBar"><div id="bootFill"></div><div class="bootShimmer"></div><span id="bootTxt">Đang tải mã…</span></div>
     <div class="lang-row">
       <button class="langPick" data-lang="vi">🇻🇳 Tiếng Việt</button>
       <button class="langPick" data-lang="en">🇬🇧 English</button>

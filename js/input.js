@@ -5,17 +5,24 @@ export const input = {
   run: false,
   jump: false,               // edge-triggered, tiêu thụ bằng consumeJump()
   interact: false,           // edge-triggered, tiêu thụ bằng consumeInteract()
+  escape: false,             // edge-triggered (Esc), tiêu thụ bằng consumeEscape()
   isTouch: false,
 };
 
 const keys = {};
-let joyX = 0, joyY = 0;
+let joyX = 0, joyY = 0, _jumpAt = -1e9;
+// Cú nhảy chỉ "sống" 250 ms: trước đây Space bấm lúc đang lái xe/mở bảng được GIỮ tới khi xuống xe/đóng bảng
+// → nhân vật tự nhảy bất ngờ (kiểm toán 2026-10-04 §3.3). main.js còn chủ động xả cờ khi đang lái/mở modal.
+const JUMP_TTL = 250;
 
 export function consumeInteract() {
   const v = input.interact; input.interact = false; return v;
 }
 export function consumeJump() {
-  const v = input.jump; input.jump = false; return v;
+  const v = input.jump && performance.now() - _jumpAt < JUMP_TTL; input.jump = false; return v;
+}
+export function consumeEscape() {
+  const v = input.escape; input.escape = false; return v;
 }
 
 function recompute() {
@@ -30,12 +37,16 @@ function recompute() {
   input.run = !!(keys['ShiftLeft'] || keys['ShiftRight']) || Math.hypot(joyX, joyY) > 0.85;
 }
 
+// Phím gõ vào ô nhập (nếu sau này có) không được điều khiển nhân vật
+const typing = (e) => { const t = e.target; return t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable); };
+
 export function initInput() {
   window.addEventListener('keydown', (e) => {
-    if (e.repeat) return;
+    if (e.repeat || typing(e)) return;
     keys[e.code] = true;
-    if (e.code === 'Space') { input.jump = true; e.preventDefault(); }
+    if (e.code === 'Space') { input.jump = true; _jumpAt = performance.now(); e.preventDefault(); }
     if (e.code === 'KeyE' || e.code === 'Enter') input.interact = true;
+    if (e.code === 'Escape') input.escape = true;
     if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code)) e.preventDefault();
     recompute();
   });
@@ -81,7 +92,7 @@ export function initInput() {
   const btnA = document.getElementById('btnActionT');
   const btnJ = document.getElementById('btnJumpT');
   btnA.addEventListener('touchstart', (e) => { input.interact = true; e.preventDefault(); }, { passive: false });
-  btnJ.addEventListener('touchstart', (e) => { input.jump = true; e.preventDefault(); }, { passive: false });
+  btnJ.addEventListener('touchstart', (e) => { input.jump = true; _jumpAt = performance.now(); e.preventDefault(); }, { passive: false });
 
   // Hiện điều khiển cảm ứng khi CON TRỎ CHÍNH là ngón tay (điện thoại/tablet). Laptop có màn cảm ứng nhưng
   // dùng chuột: chỉ hiện khi có touchstart THẬT (joystick từng che góc màn laptop + prompt E thành ✦).
