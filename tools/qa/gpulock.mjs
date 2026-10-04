@@ -26,6 +26,14 @@ export async function acquireGpu(who = 'unknown', timeoutMs = 60 * 60 * 1000) {
       return release;
     } catch (e) {
       if (e.code !== 'EEXIST') throw e;
+      // chủ khoá đã chết (bị kill cứng / harness hết giờ) → cướp NGAY, không đợi 20 phút
+      try {
+        const own = fs.readFileSync(path.join(LOCK, 'owner.txt'), 'utf8');
+        const pid = +((own.match(/pid=(\d+)/) || [])[1] || 0);
+        let alive = true;
+        if (pid) { try { process.kill(pid, 0); } catch (err) { alive = err.code === 'EPERM'; } }
+        if (pid && !alive) { fs.rmSync(LOCK, { recursive: true, force: true }); continue; }
+      } catch {}
       try { const st = fs.statSync(LOCK); if (Date.now() - st.mtimeMs > STALE_MS) { fs.rmSync(LOCK, { recursive: true, force: true }); continue; } } catch {}
       if (Date.now() - t0 > timeoutMs) throw new Error('gpulock: hết thời gian chờ khoá GPU');
       await new Promise((r) => setTimeout(r, 3000 + Math.random() * 2000));
