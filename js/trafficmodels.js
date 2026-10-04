@@ -239,15 +239,10 @@ export function trafficShadowMaterial() {
   const m = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
   m.onBeforeCompile = (sh) => {
     sh.uniforms.uNight = trafficUniforms.uNight;
-    sh.vertexShader = 'attribute float aSA;
-varying float vSA;
-' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>
-  vSA = aSA;');
-    sh.fragmentShader = 'uniform float uNight;
-varying float vSA;
-' + sh.fragmentShader.replace('#include <color_fragment>',
-      '#include <color_fragment>
-  diffuseColor.a *= vSA * (1.0 - 0.45 * uNight);');
+    sh.vertexShader = 'attribute float aSA;\nvarying float vSA;\n'
+      + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vSA = aSA;');
+    sh.fragmentShader = 'uniform float uNight;\nvarying float vSA;\n' + sh.fragmentShader.replace('#include <color_fragment>',
+      '#include <color_fragment>\n  diffuseColor.a *= vSA * (1.0 - 0.45 * uNight);');
   };
   m.customProgramCacheKey = () => 'hp-traffic-shadow';
   return m;
