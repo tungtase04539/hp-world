@@ -30,6 +30,7 @@ import { motorbikeGeometry, carGeometry, walkerGeometry, trafficMaterial, walkDe
 const RB = TIER >= 3 ? 340 : TIER === 2 ? 300 : 220;          // bán kính bong bóng xe (m) — xa hơn bị nhà che/còn vài px
 const RW = TIER >= 2 ? 230 : 150;                              // bong bóng người đi bộ
 const SPAWN_MIN = 130;                                         // tái sinh ngoài vành này (khỏi "mọc" trước mặt)
+const SPAWN_NEAR = 12;                                         // rải lại sau teleport: không mọc ĐÈ lên người chơi/camera
 const CAP = TIER >= 3 ? { bike: 520, car: 90, walk: 260 } : TIER === 2 ? { bike: 380, car: 70, walk: 200 } : { bike: 140, car: 26, walk: 70 };
 // mật độ trên mỗi km phố (cả 2 chiều) — pano: 196/551 ảnh tả xe máy "dày/kín", ô tô thưa hơn nhiều
 const DENS = {
@@ -445,7 +446,7 @@ export function createTraffic(scene, world, opts = {}) {
   }
 
   refreshBubble(-5, 72);
-  fill(-5, 72, 0);
+  fill(-5, 72, SPAWN_NEAR);
 
   let enabled = true, msEMA = 0;
   // đèn pha/đèn hậu sáng theo đêm (main.js truyền dayNight.update().night mỗi khung)
@@ -461,11 +462,11 @@ export function createTraffic(scene, world, opts = {}) {
     const px = playerPos.x, pz = playerPos.z;
     trafficUniforms.uTime.value = time;
     if (now - bubAt > 1000 || Math.hypot(px - bubX, pz - bubZ) > 60) {
-      // dịch chuyển xa (teleport) → rải lại toàn bộ trong bóng mới (kể cả sát người chơi)
+      // dịch chuyển xa (teleport) → rải lại toàn bộ trong bóng mới (từ 12 m — ảnh pano QA từng có ô tô đè lên camera)
       const jump = Math.hypot(px - bubX, pz - bubZ) > RB;
       bubAt = now; refreshBubble(px, pz);
       if (jump) for (const a of agents.slice()) removeAgent(a);
-      if (jump) { rebuildHash(); fill(px, pz, 0); }
+      if (jump) { rebuildHash(); fill(px, pz, SPAWN_NEAR); }
     }
     if (now - lastHash > 100) {
       lastHash = now; rebuildHash();
