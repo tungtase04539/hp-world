@@ -921,11 +921,14 @@ function cullUpdate(camera, force = false) {
       // lần cull đổi). Ô ngoài đoạn giữ nguyên dữ liệu đã tải; chỉ giảm count thì không cần tải gì.
       if (lo >= 0) for (const at of attrs) { at.a.clearUpdateRanges(); at.a.addUpdateRange(lo * at.size, (hi - lo) * at.size); at.a.needsUpdate = true; }
       if (k > 0) {
-        // cầu bao từ hộp toạ độ instance đã giữ (O(k) phép so sánh) thay computeBoundingSphere (O(k) phép nhân ma trận)
+        // cầu bao: tâm hộp toạ độ instance đã giữ, bán kính = xa nhất từ tâm (O(k) phép cộng/so sánh, không sqrt
+        // từng instance) + bán kính model×scale — thay computeBoundingSphere (O(k) phép nhân ma trận + hợp cầu)
         if (!mesh.boundingSphere) mesh.boundingSphere = new THREE.Sphere();
-        const bs = mesh.boundingSphere;
-        bs.center.set((x0 + x1) / 2, t.yC, (z0 + z1) / 2);
-        bs.radius = Math.hypot((x1 - x0) / 2, t.yH, (z1 - z0) / 2) + t.gR;
+        const bs = mesh.boundingSphere, mx = (x0 + x1) / 2, mz = (z0 + z1) / 2;
+        let r2 = 0;
+        for (let j = 0; j < k; j++) { const q = idx[j], dx = px[q] - mx, dz = pz[q] - mz, d2 = dx * dx + dz * dz; if (d2 > r2) r2 = d2; }
+        bs.center.set(mx, t.yC, mz);
+        bs.radius = Math.sqrt(r2 + t.yH * t.yH) + t.gR;
         if (t.hidden) { t.hidden = false; mesh.visible = true; }
       }
       else if (!t.hidden) { t.hidden = true; mesh.visible = false; }
@@ -1456,9 +1459,10 @@ export function buildProps(ctx) {
       // + 2 đầu xe) quanh 551 điểm chụp: 6,5 m (van/tải 8 m); pano ghi "ô tô đỗ dày/hai bên" (car 2) thì xe đỗ sát
       // camera là ĐÚNG ảnh thật → chỉ 4/5 m. (Vòng tròn 7,5/9 m quanh TÂM cho mọi pano từng bớt 16% ô tô — quá tay.)
       // Phản biện: pano "ô tô dày" vẫn để van+taxi đỗ 3-5 m trước camera (pano_024 kín khung, ảnh thật xe ở xa hơn) →
-      // pano "dày": TÂM xe ≥ 7 m (van/tải 8 m), 2 đầu xe ≥ 5/6 m (thay 4/5 m chỉ xét viên nang).
+      // pano "dày": TÂM xe ≥ 7,5 m (van/tải 8,5 m), 2 đầu xe ≥ 5,5/6,5 m (thay 4/5 m chỉ xét viên nang; 7 m vẫn để
+      // SUV tâm 7,3 m chiếm 1/4 khung pano_024). Không "dày": đầu xe ≥ 6,5/8 m (tâm tự ≥ ~8 m vì xe song song lề).
       const ec = evAt(x, z), dense = !!(ec && ec[3] >= 2);
-      const rp = mi >= 4 ? (dense ? 6 : 8) : (dense ? 5 : 6.5), rc = mi >= 4 ? 8 : (dense ? 7 : 6.5), hx = S.ux * len / 2, hz = S.uz * len / 2;
+      const rp = mi >= 4 ? (dense ? 6.5 : 8) : (dense ? 5.5 : 6.5), rc = mi >= 4 ? (dense ? 8.5 : 8) : (dense ? 7.5 : 6.5), hx = S.ux * len / 2, hz = S.uz * len / 2;
       let ok = x * x + z * z < R_MAX * R_MAX && flat(x, z) && !avoid(x, z) && !clearAt(x, z) && lakeSD(x, z) > 18
         && !panoNear(x, z, rc) && !panoNear(x + hx, z + hz, rp) && !panoNear(x - hx, z - hz, rp);
       if (ok) for (const dd of [-len / 2 - 0.5, 0, len / 2 + 0.5]) { if (roadIdx.blocked(x + S.ux * dd, z + S.uz * dd, S.ri, S.si, 4.5, false)) { ok = false; break; } }

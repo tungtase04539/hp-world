@@ -381,8 +381,8 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     Ô tô: song song bó vỉa TRONG lòng (curbLine−0,95), chiều xe theo luật đi bên PHẢI; phố r: 2 bánh phía lề đứng trên
     mặt đang vẽ ở đó (vỉa +0,14 so với lòng → lăn ~0,09 rad; dot3 cũ phố r không vỉa → nghiêng XUỐNG ~0,06 rad) và
     không đè hàng xe máy/quán. Giữ trống: TÂM ô tô cách camera pano ≥ 6,5 m (van/tải 8 m), 2 đầu xe ≥ 6,5/8 m
-    (pano ghi "ô tô đỗ dày/hai bên": tâm ≥ 7/8 m, đầu xe ≥ 5/6 m — bản 4/5 m chỉ xét viên nang từng để van + taxi đỗ
-    3-5 m trước pano_024 kín khung hình, phản biện) — van 5,25 m trước pano_102
+    (pano ghi "ô tô đỗ dày/hai bên": tâm ≥ 7,5/8,5 m, đầu xe ≥ 5,5/6,5 m — bản 4/5 m chỉ xét viên nang từng để van +
+    taxi đỗ 3-5 m trước pano_024 kín khung hình, phản biện) — van 5,25 m trước pano_102
     (đầu xe ~6 m) từng che nửa khung hình mà ảnh thật trống; `keepClear` (điểm hồi sinh 18 m, `vehicleSpawns` 4 m,
     `npcSpots` 2,5 m). Cột điện 1 bên/đường (bên theo hash), 31-40 m/cột, né thân cây/trụ có sẵn
     (dịch ±1,5/3 m), pano nói "không cột" → bỏ; 7% trạm biến áp treo (cột kép + 3 máy + tủ hạ thế); nhịp ≤ 52 m nối
