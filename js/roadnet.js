@@ -606,7 +606,10 @@ export function buildRoadNet(ROADS_DT, deps) {
       const x = P[j][0] + (P[j + 1][0] - P[j][0]) * t, z = P[j][1] + (P[j + 1][1] - P[j][1]) * t;
       const nn = nrmOf(j);
       let mx = nn[0], mz = nn[1], k = 1;
-      if (m) { const dot = m[0] * nn[0] + m[1] * nn[1]; if (Math.abs(dot) > 0.3) { mx = m[0]; mz = m[1]; k = 1 / dot; } }
+      // miter m có thể NGƯỢC chiều pháp tuyến dải (nhánh đi ra khỏi nút ngược chiều way): đổi dấu để (mx,mz) luôn cùng
+      // phía nn — vị trí off() không đổi, nhưng hướng mặt đứng bó vỉa/gờ suy từ mx,mz (trước: 91 mặt bó vỉa quay LƯNG về
+      // lòng đường → bị cull, lộ khe hở xanh giữa lòng và vỉa hè, vd pano_457)
+      if (m) { const dot = m[0] * nn[0] + m[1] * nn[1]; if (Math.abs(dot) > 0.3) { const sg = dot < 0 ? -1 : 1; mx = m[0] * sg; mz = m[1] * sg; k = 1 / Math.abs(dot); } }
       out.push({ x, z, mx, mz, k, u, dx: nn[2], dz: nn[3], h: gh(x, z) });
     };
     push(uA, segAt(uA), uA < 0.01 ? cutA : null);
