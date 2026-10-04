@@ -19,7 +19,7 @@ import { RB_B64 } from './buildings_real.js';
 import { claimBox } from './claims.js';
 import { BRAND_MAP, debrand } from './brands.js';
 import { PARKS } from './mapdata.js';
-import { clearanceReady, samplesFromHulls, evalShift, solveShift, sweepAssemblies, flushClearance, massOnStreet, CLEAR } from './clearance.js';   // Đợt 3 W2-A
+import { clearanceReady, samplesFromHulls, evalShift, solveShift, sweepAssemblies, flushClearance, massOnStreet, minWidth, thinMeshOf, trimThinWall, corrCount, CLEAR } from './clearance.js';   // Đợt 3 W2-A
 
 const _q = typeof location !== 'undefined' ? new URLSearchParams(location.search) : new URLSearchParams('');
 // ?cellsink=off → chỉ ghi (không gỡ, không claim) để A/B; =debug → như 'on' + giữ hình chiếu cho overlay QA;
@@ -577,18 +577,37 @@ function commitSink(sink, THREE, realScene, realFC, colliders, opts) {
   const isIdM = (e) => Math.abs(e[0] - 1) < 1e-6 && Math.abs(e[10] - 1) < 1e-6 && Math.abs(e[12]) < 1e-6 && Math.abs(e[14]) < 1e-6;
   const childOf = (o, m) => { let c = m; while (c && c.parent && c.parent !== o) c = c.parent; return c && c.parent === o ? c : null; };
   const bbOf = (hs) => { let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9; for (const h of hs) for (const [x, z] of h) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (z < z0) z0 = z; if (z > z1) z1 = z; } return [x0, z0, x1, z1]; };
-  // lưới chiếm chỗ: ô khối đặc 1 m của mọi nhà ô còn sống (sau khử trùng)
-  const occ = new Map();
-  if (CLR_ON) for (const it of bl) if (!it.removed) for (const k of it.keys) occ.set(k, (occ.get(k) || 0) + 1);
-  const occOver = (it, ox, oz) => { let n = 0; for (const k of it.keys) { const k2 = KEY(KX(k) + ox, KZ(k) + oz); if ((occ.get(k2) || 0) - (it.S.has(k2) ? 1 : 0) > 0) n++; } return n; };
-  const occMove = (it, ox, oz) => {
-    for (const k of it.keys) { const c = occ.get(k) || 0; if (c <= 1) occ.delete(k); else occ.set(k, c - 1); }
-    for (const k of it.keys) { const k2 = KEY(KX(k) + ox, KZ(k) + oz); occ.set(k2, (occ.get(k2) || 0) + 1); }
+  // lưới chiếm chỗ: ô 1 m trong BAO LỒI khối đặc (it.H — cũng là hình claim/cellKept) của mọi nhà ô còn sống (sau khử trùng);
+  // dời nhà không được làm phần chồng bao lồi với nhà giữ khác TĂNG (≤ max(1 ô, chồng sẵn tại chỗ))
+  const hullCells = (it) => {
+    if (it.hc) return it.hc;
+    const out = [], H = it.H; let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9;
+    for (const [x, z] of H) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (z < z0) z0 = z; if (z > z1) z1 = z; }
+    if (H.length >= 3) for (let ix = Math.floor(x0); ix <= Math.floor(x1); ix++) for (let iz = Math.floor(z0); iz <= Math.floor(z1); iz++) if (inConvex(H, ix + 0.5, iz + 0.5)) out.push(KEY(ix, iz));
+    for (const k of it.keys) out.push(k);   // (ô đặc ngoài bao lồi số học: an toàn)
+    return (it.hc = [...new Set(out)]);
   };
+  // THEO TỪNG CẶP (phản biện: tổng giảm mà 1 cặp tăng — s4_mamnon_dth × tb_bvps_trang 22,8 → 52,8 m²)
+  const occ = new Map();   // ô → [nhà…]
+  const occAdd = (k, it) => { const a = occ.get(k); if (a) a.push(it); else occ.set(k, [it]); };
+  const occDel = (k, it) => { const a = occ.get(k); if (!a) return; const i = a.indexOf(it); if (i >= 0) a.splice(i, 1); if (!a.length) occ.delete(k); };
+  if (CLR_ON) for (const it of bl) if (!it.removed) for (const k of hullCells(it)) occAdd(k, it);
+  const occPairs = (it, ox, oz) => {   // → Map(nhà khác → số ô chồng) khi dời (ox,oz)
+    const m = new Map();
+    for (const k of hullCells(it)) { const a = occ.get(KEY(KX(k) + ox, KZ(k) + oz)); if (a) for (const o of a) if (o !== it) m.set(o, (m.get(o) || 0) + 1); }
+    return m;
+  };
+  const occMove = (it, ox, oz) => {
+    const hc = hullCells(it);
+    for (const k of hc) occDel(k, it);
+    for (const k of hc) occAdd(KEY(KX(k) + ox, KZ(k) + oz), it);
+  };
+  // mảnh phụ là TẤM MỎNG (tranh tường, rào): mọi mesh cao ≥ 1,8 m dày < THIN, có mesh dài ≥ 3 m → luật lấp khung
+  const thinOf = (qs) => { let wall = false; for (const q of qs) { if (q.y1 - q.y0 < 1.8 || q.h.length < 3) continue; if (minWidth(q.h) >= CLEAR.THIN) return false; const b = bbOf([q.h]); if (Math.max(b[2] - b[0], b[3] - b[1]) >= 3) wall = true; } return wall; };
   // 1 mảnh phụ (danh sách mesh) vi phạm luật 'small' tại dời (dx,dz)? noCam: chỉ xét chân trên lòng phố
+  const partS = (qs, noCam) => { const Sq = samplesFromHulls(qs); Sq.softAlley = true; if (noCam) Sq.body = []; else Sq.thin = thinOf(qs); return Sq; };
   const partBad = (qs, dx, dz, noCam) => {
-    const Sq = samplesFromHulls(qs); if (!Sq.nMesh) return false;
-    Sq.softAlley = true; if (noCam) Sq.body = [];
+    const Sq = partS(qs, noCam); if (!Sq.nMesh) return false;
     return evalShift(Sq, dx, dz, 'small').bad;
   };
   if (CLR_ON) for (const it of bl) {
@@ -606,8 +625,8 @@ function commitSink(sink, THREE, realScene, realFC, colliders, opts) {
     let dx = 0, dz = 0, stuck = false;
     const e0 = S.nMesh ? evalShift(S, 0, 0, 'bldg') : { bad: false };
     if (e0.bad) {
-      const ov0 = occOver(it, 0, 0);
-      S.occ = (sx, sz) => occOver(it, Math.round(sx), Math.round(sz)) > Math.max(1, ov0);
+      const ov0 = occPairs(it, 0, 0);
+      S.occ = (sx, sz) => { for (const [o, n] of occPairs(it, Math.round(sx), Math.round(sz))) if (n > Math.max(1, ov0.get(o) || 0)) return true; return false; };
       const maxS = it.height >= 15 ? CLEAR.MAX_SHIFT_TOWER : CLEAR.MAX_SHIFT_BLDG;
       const mS = ident ? Math.max(maxS, 12) : maxS;
       let sol = solveShift(S, 'bldg', mS);
@@ -635,8 +654,14 @@ function commitSink(sink, THREE, realScene, realFC, colliders, opts) {
         if (!qq.length || !partBad(qq, dx, dz, false)) continue;
         const bb = bbOf(qs.map((q) => q.h));
         let sol = null;
-        if (!dx && !dz) { const Sc = samplesFromHulls(qq); Sc.softAlley = true; sol = solveShift(Sc, 'small', CLEAR.MAX_SHIFT_SMALL); }
+        if (!dx && !dz) { const Sc = partS(qq, false); Sc.corrCap = corrCount(Sc, 0, 0) + 1; sol = solveShift(Sc, 'small', Sc.thin ? CLEAR.THIN_SHIFT : CLEAR.MAX_SHIFT_SMALL); }
+        let tr = null;
         if (sol) { c.position.x += sol.dx; c.position.z += sol.dz; (it.partMoves || (it.partMoves = [])).push([...bb, sol.dx, sol.dz]); clr.moved.push([it.name + '>' + (c.name || c.type), 'part', where, +sol.dx.toFixed(2), +sol.dz.toFixed(2)]); }
+        else if (!dx && !dz && thinMeshOf(c) && (tr = trimThinWall(c, 'small'))) {
+          // tranh tường/rào mỏng: CẮT đoạn sát camera / trên lòng phố, giữ phần còn lại (pano_548 vẫn thấy tranh tường beboi)
+          (it.partDead || (it.partDead = [])).push(tr.deadAt);
+          clr.trimmed = (clr.trimmed || 0) + 1; clr.dropped.push([it.name, (c.name || c.type) + '/trim', [+((bb[0] + bb[2]) / 2).toFixed(1), +((bb[1] + bb[3]) / 2).toFixed(1)], tr.segs, +tr.cut.toFixed(1)]);
+        }
         else { it.o.remove(c); (it.partDrops || (it.partDrops = [])).push(bb); clr.dropped.push([it.name, c.name || c.type, [+((bb[0] + bb[2]) / 2).toFixed(1), +((bb[1] + bb[3]) / 2).toFixed(1)]]); }
       }
     }
@@ -746,12 +771,17 @@ function commitSink(sink, THREE, realScene, realFC, colliders, opts) {
     clr.t5c = +(performance.now() - tClr0).toFixed(1);
     // chiếm chỗ: ô khối nhà ô GIỮ (mọi cụm); footprint thật chỉ chặn ĐỒ NHỎ ('small') — tường/cổng/rào tôn khuôn viên vốn
     // đứng sát/lẫn mép nhà thật (đo: chặn cả chúng → gỡ thêm ~15 cổng/rào pano-tuned như mamnon_cong, lhp_gate)
-    const occAt = (x, z, mode) => (occ.get(KEY(Math.floor(x), Math.floor(z))) || 0) > 0 || (mode === 'small' && realB(G.at(x, z)));
+    // (ô KHỐI ĐẶC — không phải bao lồi: rào/cổng khuôn viên nằm trong bao lồi của chính khuôn viên — đã tính dời 5a)
+    const occS = new Set();
+    for (const it of bl) if (!it.removed) { const ox = it.shift ? Math.round(it.shift[0]) : 0, oz = it.shift ? Math.round(it.shift[1]) : 0; for (const k of it.keys) occS.add(KEY(KX(k) + ox, KZ(k) + oz)); }
+    const occAt = (x, z, mode) => occS.has(KEY(Math.floor(x), Math.floor(z))) || (mode === 'small' && realB(G.at(x, z)));
     const r = sweep = sweepAssemblies(objs, cols.map((q) => q.c), fcs.map((q) => q.e), { keep: (n) => /median/i.test(n), wallLike: true, occAt });
     flushClearance();
     clr.sweep = { pieces: r.pieces, assemblies: r.assemblies, kept: r.kept, moved: (r.moved || []).length, removed: (r.removed || []).length, stuck: (r.stuck || []).length, tPieces: r.tPieces, tLink: r.tLink, ms: r.ms };
     for (const m of r.moved || []) clr.moved.push(m);
     for (const m of r.removed || []) clr.removed.push(m);
+    // tấm mỏng bị CẮT (trimThinWall) → vật thể = đoạn còn lại đầu tiên (đoạn khác là bản sao cùng material, ngoài sink)
+    if (r.replaced) for (const it of items) { const cl = r.replaced.get(it.o); if (cl && cl.length) { it.o = cl[0]; it.trimmed = cl.length; } }
     // vật thể cấp cao nhất đã rời cảnh (gỡ cả) → đánh dấu để báo cáo/atlas/bước 6 (collider của nó đã bị tách 1e7)
     for (const it of new Set(ownerIt.values())) if (!it.o.parent || (it.o.isGroup && it.o.children.length === 0 && ownerIt.get(it.o) !== it)) it.removed = 'clear';
   }
@@ -760,6 +790,7 @@ function commitSink(sink, THREE, realScene, realFC, colliders, opts) {
   // 6) collider + FC: chủ bị gỡ → bỏ; chủ dời → dời theo; mảnh phụ bị bỏ/dời riêng (5a) → theo mảnh; 5c đã tự xử lý cụm của nó
   const inBB = (b, x, z) => x >= b[0] - 0.3 && x <= b[2] + 0.3 && z >= b[1] - 0.3 && z <= b[3] + 0.3;
   const partFix = (o, x, z) => {
+    if (o.partDead) for (const f of o.partDead) if (f(x, z)) return 'dead';
     if (o.partDrops) for (const b of o.partDrops) if (inBB(b, x, z)) return 'dead';
     if (o.partMoves) for (const b of o.partMoves) if (inBB(b, x, z)) return [b[4], b[5]];
     return null;
@@ -770,7 +801,7 @@ function commitSink(sink, THREE, realScene, realFC, colliders, opts) {
       if (sweep && sweep.colTouched.has(c)) { if (sweep.colDead.has(c)) deadCol.add(c); return; }
       const o = colOwn[i]; if (!o) return;
       if (o.removed) { deadCol.add(c); return; }
-      const pf = (o.partDrops || o.partMoves) ? partFix(o, c.x, c.z) : null;
+      const pf = (o.partDrops || o.partMoves || o.partDead) ? partFix(o, c.x, c.z) : null;
       if (pf === 'dead') { deadCol.add(c); return; }
       const s0 = o.shift ? o.shift : [0, 0], s1 = pf || [0, 0];
       if (s0[0] || s0[1] || s1[0] || s1[1]) shiftCol.push([c, [s0[0] + s1[0], s0[1] + s1[1]]]);
@@ -779,7 +810,7 @@ function commitSink(sink, THREE, realScene, realFC, colliders, opts) {
       if (sweep && sweep.fcTouched.has(e)) { if (sweep.fcDead.has(e)) deadFC.add(e); return; }
       const o = fcOwn[i]; if (!o) return;
       if (o.removed) { deadFC.add(e); return; }
-      const pf = (o.partDrops || o.partMoves) ? partFix(o, e[0], e[1]) : null;
+      const pf = (o.partDrops || o.partMoves || o.partDead) ? partFix(o, e[0], e[1]) : null;
       if (pf === 'dead') { deadFC.add(e); return; }
       const s0 = o.shift ? o.shift : [0, 0], s1 = pf || [0, 0];
       if (s0[0] || s0[1] || s1[0] || s1[1]) shiftFC.push([e, [s0[0] + s1[0], s0[1] + s1[1]]]);

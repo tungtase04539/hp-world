@@ -1853,6 +1853,8 @@ export async function buildWorld(scene, prog = () => {}) {
     if (sc.colDead && sc.colDead.size) { let w = 0; for (let r = 0; r < colliders.length; r++) if (!sc.colDead.has(colliders[r])) colliders[w++] = colliders[r]; colliders.length = w; }
     if (sc.fcDead && sc.fcDead.size) { let w = 0; for (let r = 0; r < FEATURED_CLEAR.length; r++) if (!sc.fcDead.has(FEATURED_CLEAR[r])) FEATURED_CLEAR[w++] = FEATURED_CLEAR[r]; FEATURED_CLEAR.length = w; }
     sc.colDeadN = sc.colDead ? sc.colDead.size : 0; sc.fcDeadN = sc.fcDead ? sc.fcDead.size : 0;
+    for (const [n, P] of sc.claims || []) if (P.length >= 3) claimPoly(P, 'clear', n);   // công trình danh tính đã dời: chỗ cũ ∪ mới
+    sc.claims = (sc.claims || []).map(([n, P]) => [n, P.length]);
     delete sc.colDead; delete sc.fcDead; delete sc.colTouched; delete sc.fcTouched;
   }
 
