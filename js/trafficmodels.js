@@ -52,6 +52,12 @@ const finish = (list) => {
   g.computeBoundingSphere(); return g;
 };
 
+// BÓNG TIẾP ĐẤT: elip tối phẳng sát mặt đường dưới xe/người (thay bóng đổ thật — xem traffic.js: bản đồ bóng chỉ làm mới
+// 4-10 Hz nên bóng thật của xe 10 m/s "giật" từng bước ~2 m; elip đi liền với xe, không tốn lượt bóng).
+function contactShadow(L, rx, rz, hex) {
+  part(L, new THREE.CircleGeometry(1, 14).rotateX(-Math.PI / 2).scale(rx, 1, rz).translate(0, 0.015, 0), hex);
+}
+
 const SKIN = 0xc8976f, PANTS = 0x2e3644, SHOE = 0x2a2420, DARK = 0x232427, METAL = 0x9a9ea3, SEAT = 0x1d1d1f;
 
 // người ngồi trên xe máy: z0 = vị trí hông, hy = độ cao hông, tay tới ghi-đông (hz) nếu grip
@@ -74,6 +80,7 @@ function seatedRider(L, z0, hy, shirtTint, grip, hz = 0.44) {
 // kind: 'single' | 'pillion' (chở 2 người) | 'cargo' (thùng hàng sau yên)
 export function motorbikeGeometry(kind = 'single') {
   const L = [];
+  contactShadow(L, 0.4, 1.08, 0x0c0d0f);
   // bánh + vành (bánh 17" xe số ~0,29 m)
   for (const z of [0.66, -0.6]) {
     part(L, wheel(0.29, 0.09, 0, 0.29, z), 0x1b1c1e);
@@ -113,6 +120,7 @@ export function carGeometry(kind = 'sedan') {
   const len = kind === 'van' ? 5.4 : kind === 'suv' ? 4.7 : 4.45;
   const r = kind === 'van' ? 0.34 : kind === 'suv' ? 0.36 : 0.31;
   const wz = len / 2 - (kind === 'van' ? 0.95 : 0.85);
+  contactShadow(L, W / 2 + 0.14, len / 2 + 0.12, 0x0b0c0e);
   for (const sx of [-1, 1]) for (const z of [wz, -wz]) {
     part(L, wheel(r, 0.22, sx * (W / 2 - 0.13), r, z, 12), 0x161718);
     part(L, wheel(r * 0.55, 0.23, sx * (W / 2 - 0.12), r, z, 8), METAL);
@@ -145,6 +153,7 @@ export function carGeometry(kind = 'sedan') {
 // Người đi bộ dáng thật (~1,65 m). aLimb: 1/2 chân trái/phải (khớp hông y 0,9), 3/4 tay trái/phải (khớp vai y 1,42).
 export function walkerGeometry(kind = 'plain') {
   const L = [];
+  contactShadow(L, 0.27, 0.22, 0x24262a);
   for (const [sx, limb] of [[-0.095, 1], [0.095, 2]]) {
     part(L, box(0.13, 0.84, 0.14, sx, 0.47, 0), 0xffffff, 4, limb);           // chân (quần = aShirt2)
     part(L, box(0.11, 0.07, 0.25, sx, 0.035, 0.03), SHOE, 0, limb);            // giày dép
@@ -218,16 +227,5 @@ export function trafficMaterial(walk = false) {
   const m = new THREE.MeshLambertMaterial({ vertexColors: true });
   m.onBeforeCompile = walk ? (s) => patch(s, true) : (s) => patch(s, false);
   m.customProgramCacheKey = () => (walk ? 'hp-traffic-walk' : 'hp-traffic');
-  return m;
-}
-// Bóng của người đi bộ phải vung tay chân giống thân (MeshDepthMaterial mặc định chỉ thấy dáng đứng)
-export function walkDepthMaterial() {
-  const m = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking });
-  m.onBeforeCompile = (s) => {
-    s.uniforms.uTime = trafficUniforms.uTime;
-    s.vertexShader = 'attribute float aLimb;\nattribute float aPhase;\nattribute float aWalk;\nuniform float uTime;\n'
-      + s.vertexShader.replace('#include <begin_vertex>', WALK_VERT);
-  };
-  m.customProgramCacheKey = () => 'hp-traffic-walk-depth';
   return m;
 }

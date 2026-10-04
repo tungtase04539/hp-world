@@ -1,9 +1,9 @@
 import * as THREE from 'three';
 import { ROADS_DT } from './terrain.js';
-import { TIER, IS_MOBILE } from './device.js';
-import { SIDEWALK_W, ROAD_TOP } from './xsection.js';
+import { TIER } from './device.js';
+import { SIDEWALK_W, ROAD_TOP, SIDEWALK_TOP } from './xsection.js';
 import { buildRoadGraph, edgePoint } from './roadgraph.js';
-import { motorbikeGeometry, carGeometry, walkerGeometry, trafficMaterial, walkDepthMaterial, trafficUniforms } from './trafficmodels.js';
+import { motorbikeGeometry, carGeometry, walkerGeometry, trafficMaterial, trafficUniforms } from './trafficmodels.js';
 
 // ============================================================
 // THÀNH PHỐ SỐNG (Đợt 3 WP8) — xe máy, ô tô, người đi bộ trên đồ thị PHỐ THẬT (js/roadgraph.js).
@@ -22,7 +22,8 @@ import { motorbikeGeometry, carGeometry, walkerGeometry, trafficMaterial, walkDe
 //  - người đi bộ trên vỉa hè 2 bên (xsection: mép bó vỉa + 55% bề rộng vỉa hè), KHÔNG đi vào footprint nhà thật
 //    (footprints.js): gặp nhà thì nép ra mép vỉa, vẫn kẹt thì quay đầu;
 //  - vẽ INSTANCED: 3 kiểu xe máy (1 người / chở 2 / chở hàng) + 3 kiểu ô tô (con / gầm cao / 16 chỗ) + 2 kiểu người
-//    (đầu trần / nón lá) = 8 draw call (+8 bóng) cho cả thành phố; tay chân vung bằng vertex shader.
+//    (đầu trần / nón lá) = 8 draw call cho cả thành phố (không đổ bóng vào bản đồ bóng — elip bóng tiếp đất trong
+//    mô hình); tay chân vung bằng vertex shader; chân người đi bộ trên mặt vỉa hè SIDEWALK_TOP (xsection).
 // HỢP ĐỒNG: InstancedMesh ở đây mang userData.noCull (instcull.js KHÔNG được nén — ma trận đổi mỗi khung) và
 // boundingSphere = đĩa VẼ DRAW_R quanh người chơi (frustum cull đúng; harness tools/qa không ẩn nhầm).
 // ============================================================
@@ -88,9 +89,11 @@ export function createTraffic(scene, world, opts = {}) {
       const at = (size, off) => new THREE.InterleavedBufferAttribute(ib, size, off);
       sets.push({ ib, mat: at(16, 0), col: at(3, 16), sh: at(3, 19), sh2: at(3, 22), ph: at(1, 25), wk: at(1, 26) });
     }
-    if (walk) mesh.customDepthMaterial = walkDepthMaterial();
     mesh.count = 0;
-    mesh.castShadow = !IS_MOBILE || TIER >= 2;
+    // KHÔNG đổ bóng vào bản đồ bóng: main.js chỉ làm mới bóng 4,5-10 Hz (mỗi lần +~20 ms trên 890M) → bóng thật của xe
+    // 10 m/s nhảy từng bước ~2 m, tách khỏi xe. Thay bằng elip bóng tiếp đất trong mô hình (trafficmodels.js).
+    // Vẫn NHẬN bóng (xe chạy vào bóng cây/nhà tối đi).
+    mesh.castShadow = false;
     mesh.receiveShadow = true;
     mesh.userData.noCull = true;      // instcull: KHÔNG nén (ma trận đổi mỗi khung)
     mesh.raycast = () => {};          // instanceMatrix xen kẽ không có .array — và tia chọn (__hp.pick…) không cần xe chạy
@@ -463,7 +466,7 @@ export function createTraffic(scene, world, opts = {}) {
       for (let j = 0; j < L.length; j++) {
         const a = L[j];
         if ((a.x - px) * (a.x - px) + (a.z - pz) * (a.z - pz) > DRAW_R2) continue;
-        if (!(Math.abs(a.x - a.yx) + Math.abs(a.z - a.yz) < 4)) { a.yx = a.x; a.yz = a.z; a.y = groundHeight(a.x, a.z) + (a.type === 'walk' ? 0 : ROAD_TOP); }
+        if (!(Math.abs(a.x - a.yx) + Math.abs(a.z - a.yz) < 4)) { a.yx = a.x; a.yz = a.z; a.y = groundHeight(a.x, a.z) + (a.type === 'walk' ? SIDEWALK_TOP : ROAD_TOP); }
         const ch = Math.cos(a.h), shh = Math.sin(a.h), cl = Math.cos(a.lean || 0), sl = Math.sin(a.lean || 0);
         const o = n * STRIDE;
         // R = Ry(h)·Rz(lean) (cột-trước như Matrix4.elements)
