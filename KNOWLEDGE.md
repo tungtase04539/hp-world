@@ -30,7 +30,12 @@ Trò chơi: thế giới 3D Hải Phòng **tỉ lệ 1:1 mét thật** (từ 202
 | `js/terrain.js` | Cao độ/đất-nước thuần JS (không import three → chạy được trong node để test) |
 | `js/world.js` | Dựng toàn bộ thế giới 3D, collider, spawn, `buildWorld(scene)` |
 | `js/assets.js` | Đăng ký + preload + streaming GLB theo khoảng cách |
-| `js/main.js` | Vòng lặp game, camera, người chơi, bloom, autoQuality, `window.__hp` |
+| `js/main.js` | Vòng lặp game, camera, người chơi, chuỗi hậu kỳ (composer), autoQuality, `window.__hp` |
+| `js/daynight.js` | Ngày/đêm (1440 s/ngày, mặt trời thiên văn), vòm trời shader, đèn mặt trời/trăng + bán cầu, sương FogExp2, PMREM bầu trời (IBL), hộp bóng snap texel, chế độ vệ tinh — Đợt 3 WP5 |
+| `js/skymodel.js` | Mô hình trời tán xạ Rayleigh+Mie + hướng mặt trời (JS thuần, chạy được trong node) — MỘT nguồn cho vòm/đèn/sương |
+| `js/post.js` | Tone mapping + grade DÙNG CHUNG mọi đường vẽ (CustomToneMapping = ACES + grade), SceneAOPass (MSAA + AO theo depth), FinalPass, `HP_UNLIT_K` |
+| `js/water.js` | Vật liệu nước Standard (IBL trời, Fresnel) + bản đồ bờ/hồ — MỘT nguồn màu nước |
+| `js/device.js` | `TIER` + `GFX` (núm chất lượng ánh sáng/hậu kỳ — chỉ theo TIER, không theo cảm ứng) |
 | `js/landmarks.js` | 15 biển thông tin địa danh (vị trí suy ra từ mapdata) |
 | `js/traffic.js` / `js/vehicles.js` / `js/npc.js` / `js/quests.js`... | Giao thông, xe cưỡi được, NPC, nhiệm vụ |
 | `tools/` | Pipeline dữ liệu + test tự động (xem mục 7, 8) |
@@ -187,12 +192,15 @@ registerModel({ url:'assets/xxx.glb', name, x, z, preload:true, place: (m) => {
   scale = kích_thước_mong_muốn / max(size.x,size.z)   // hoặc /size.y với tượng
   m.rotation.y = orientLong(LM_DIR.key, LM_FACE.key)  // xoay TRƯỚC khi đo lại box
   // đo lại box → dịch tâm về (x,z); y += LAND_H − box.min.y − 0.55 (dìm nhẹ chống lơ lửng)
-  // castShadow/receiveShadow; anisotropy=8 cho mọi map; envMapIntensity=0.85
+  // castShadow/receiveShadow; anisotropy=8 cho mọi map; (envMapIntensity=0.85 ở đây bị assets.js GHI ĐÈ = 0,5 SAU place)
   // thêm plinth (bệ) + bậc thềm che chân model
 }});
 ```
 - box.min.y có thể là tán cây/chi tiết thấp — kiểm tra bằng mắt, chỉnh độ dìm.
-- PBR chỉ đẹp khi scene có `scene.environment` = PMREM RoomEnvironment (đã bật trong main.js).
+- PBR chỉ đẹp khi scene có `scene.environment` = PMREM. Từ Đợt 3 (WP5) đó là PMREM nướng từ CHÍNH vòm trời
+  (`daynight.js` bakeEnv, ~3 s/lần, tự tối về đêm) — KHÔNG còn RoomEnvironment; GLB `envMapIntensity` = 0,5
+  (`GLB_ENV_INTENSITY`, ghi bởi `assets.js` applyGlbEnv SAU `place()` cho bản gốc và cho twin lite → 2 bản LOD sáng như
+  nhau) và chính sách emissive ở `assets.js` applyGlbMaterialPolicy (xem §10 Đợt 3 WP5).
 
 ### 5.6 Dập ảnh chuẩn THẲNG vào texture GLB (ảnh nhạy cảm — chân dung Bác Hồ ở Nhà hát lớn)
 Yêu cầu: ảnh nhạy cảm KHÔNG BAO GIỜ để AI sinh/méo — phải là ảnh gốc, dập trực tiếp vào texture.
@@ -438,6 +446,104 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     khi dựng: hạ PARTY không còn láng giềng sống che → BACK/SIDE, edgeCover=0 (không thì nhà kề nhà bị giết thiếu chân
     tường = lỗ nhìn xuyên vào nhà rỗng); không giết gì → 0 cạnh đổi; giết 2.391 nhà → 1.665 cạnh hạ, ~30 ms (tăng dần) /
     ~50 ms (toàn bộ). WP3 cellsink nên BỎ QUA nhà FLAG.SYNTH khi quyết định xoá nhà tay.
+- **2026-10-04 (Đợt 3 WP5 LIGHT)** [TRỜI · ĐÈN · IBL · AO · SƯƠNG · GRADE · BÓNG · NƯỚC · VẬT LIỆU GLB · VỆ TINH · ẤM MÁY]:
+    File: `js/skymodel.js` (mới), `js/post.js` (mới), `js/water.js` (mới), `js/daynight.js` (viết lại), `js/main.js`
+    (renderer/hậu kỳ/autoQuality/vệ tinh/ấm máy), `js/assets.js` (applyGlbMaterialPolicy/setGlbLighting), `js/device.js`
+    (`GFX` — núm chất lượng ánh sáng, CHỈ theo TIER), `js/world.js` (khối nước → water.js).
+    **(1) Trời** = tán xạ đơn Rayleigh+Mie (air mass Kasten–Young, pha đẳng hướng bù tán xạ bội, ozone, chạng vạng/đêm/
+    quầng đèn phố cộng thêm) — JS và GLSL CÙNG công thức trong skymodel.js (sửa một bên phải sửa bên kia; hằng số chỉ
+    theo mặt trời `skyK`/truyền qua/màu nắng lên mây tính ở JS → uniform). Mặt trời THIÊN VĂN (vĩ độ 20,86°, xích vĩ
+    −4,5° đầu tháng 10 như bộ pano, chính ngọ 11:45): mọc ~5:50, trưa cao 64° về phía NAM, lặn ~17:40; dưới −1° nắng = 0.
+    Vòm: đĩa mặt trời + quầng Mie + mây fbm trôi + sao + trăng; có `<tonemapping_fragment>`/`<colorspace_fragment>`.
+    Vòm vẽ SAU CÙNG nhóm đục, `gl_Position.z = w` + depthTest → shader trời chỉ chạy ở pixel trời trống (full-screen
+    1,1-1,4 ms trên 890M). Hiển thị BAN NGÀY ×1,2 + bão hoà 45%: trời HP thật MÙ ẨM — trung vị vùng trời cao ~30-40° của
+    160 pano ngẫu nhiên = sRGB(186,198,211); bản đầu (×0,76, bão hoà 100%) ra (142,175,210) xanh đậm, tối. Chạng vạng/
+    đêm trộn về ×0,76/100% theo độ cao mặt trời (giữ màu hoàng hôn, giờ xanh).
+    **(2) Đèn** — BỘ CỐ ĐỊNH 2 đèn (program key không đổi): HemisphereLight + 1 DirectionalLight có bóng = MẶT TRỜI ban
+    ngày, TRĂNG ban đêm (đổi hướng lúc cường độ ≈ 0; bỏ moonGlow). Trưa: nắng ≈ 3,5 : bán cầu ≈ 0,8 (chiếu sáng trời
+    ×0,55, khử bão hoà còn 25% — bóng râm chỉ hơi lạnh). Lambert/Standard three r160 = albedo/π × chiếu sáng ("tường
+    trắng dưới nắng trưa ≈ 1"). Phơi sáng THÍCH NGHI = 0,92 × sqrt(trưa/hiện tại), trần ×4. Đêm: `moonAmb` + `cityAmb`
+    ấm (đèn phố/cửa hàng; đất ×1, trời ×0,5) — thiếu nó hẻm lúc 21:00 đen kịt sRGB ≈ 15-20.
+    **(3) IBL**: PMREM nướng từ CHÍNH vòm trời (cube 128 TIER ≥ 2, 64 TIER ≤ 1) mỗi 3 s hoặc khi giờ nhảy, 0,5-1,4 ms
+    GPU/lần. BẪY: phải nướng vào MỘT RT cố định — đổi texture object của scene.environment (2 RT luân phiên) làm MỌI
+    MeshStandardMaterial đi qua getProgram (`materialProperties.envMap !== envMap` → needsProgramChange) mỗi lần nướng.
+    **(4) Tone/grade**: `CustomToneMapping` = ACES của three r160 + grade nhẹ (sat 1,03, toe 0,012) cài vào ShaderChunk
+    TRƯỚC khi compile → composer (FinalPass) và đường vẽ thẳng (TIER ≤ 1) ra CÙNG màu; bỏ GradeShader be cũ (sat 0,88 +
+    ám vàng). AgX r160 đã thử: ép trời xanh thành xám chì. Phơi sáng thay đổi theo giờ nên phần TỰ PHÁT SÁNG (emissive,
+    MeshBasic/Line/Points/Sprite) nhân `HP_UNLIT_K = 1,18/exposure` (post.js, vá ShaderChunk/ShaderLib) → đèn/cửa sổ/
+    chân dung nhà hát hiển thị như cũ ở mọi giờ, không cháy trắng ban đêm. ShaderMaterial tự viết có phần tự sáng phải
+    tự nhân (`UNLIT_DECL`).
+    **(5) Hậu kỳ** (TIER ≥ 2, `GFX.post`): SceneAOPass vẽ cảnh vào RT riêng MSAA 4× + DepthTexture (canvas
+    `antialias:false`, RT composer KHÔNG MSAA — trước MSAA ×3 chỗ) → SAO nửa phân giải (pháp tuyến dựng từ depth, xoay
+    Bayer 4×4 + mờ 4×4 ×2 lần theo độ sâu MẶT PHẲNG, upsample theo độ sâu, mờ dần 140-320 m, chạy cả camera trực giao,
+    trần bán kính màn hình 56 px phối cảnh / 90 px trực giao — xem (13)) → UnrealBloom CHỈ
+    khi night > 0,04 (ngưỡng chia theo exposure) → FinalPass (tone + grade + sRGB + dither). AO = 0,26-0,32 ms GPU ở
+    1280×720 trên Radeon 890M → bật cả TIER 2 (8 mẫu; TIER 3 12 mẫu). FinalPass 0,17 ms. Công cụ: `__hp.post.timeAO()`
+    (đồng bộ bằng readPixels 1 px — `gl.finish` của Chrome KHÔNG chờ GPU, đo ra 0,01 ms vô nghĩa).
+    **(6) Sương** FogExp2 density 0,00075 (150 m 1,3%, 800 m 30%, 1600 m 76%), GIỐNG NHAU mọi tier, chọn 1 lần; màu =
+    chân trời hiển thị theo hướng nhìn (mép phố xa tan vào trời). Nấc chất lượng 3/TIER 0 nhân density ×1,6 (KHÔNG đổi
+    kiểu sương = không biên dịch lại). 0,00085 thử trước: góc cao bị "sữa" mất tương phản.
+    **(7) Bóng**: tâm hộp SNAP theo texel trong hệ toạ độ đèn (hết bò mép); `GFX.shadowMap/shadowBox` (TIER 3: 2048/±110 m,
+    TIER ≤ 2: 1024/±70 m). autoQuality KHÔNG BAO GIỜ bật/tắt castShadow nữa: nấc 1 = AO + bloom tắt, PR ≤ 1,2, map ≤ 1024;
+    nấc 2 = map 512 + nhịp làm mới ×2,5, PR 1; mục tiêu fps TUYỆT ĐỐI ≤ 60 (màn 120/144 Hz từng bị hạ cấp oan); đổi mapSize
+    luôn ép `shadowMap.needsUpdate` (bug cũ: khung có map null = cả hộp bóng tối đen). `navigator.webdriver` hoặc `?aq=0`
+    → autoQuality tắt (QA tất định). Chưa làm tầng bóng xa (CSM).
+    **(8) Nước** (`water.js`, MỘT nguồn màu — daynight KHÔNG ghi màu nước nữa): MeshStandardMaterial ĐỤC (roughness 0,12,
+    normal 0,15) phản chiếu IBL trời + Fresnel GGX (nhìn thẳng xuống thấy màu nước, nhìn xiên thấy trời); bản đồ bờ/hồ
+    DataTexture 512² (ô 8 m, ±2048 m): R = khoảng cách có dấu tới bờ (waterSD, 128 = mép), G = hồ; sông xám ô liu
+    0x5c625a (ảnh vệ tinh sông Cấm ≈ (93,103,92), game đo (88,94,87)), hồ 0x34443f, dải bùn ven bờ 1-16 m (hồ 1-7 m,
+    nhạt hơn). Dựng ~11 ms (lọc thô 32 m rồi 30,8k mẫu mịn sát bờ + lọc cạnh trong — xem (13)). onBeforeCompile bám chunk
+    `color_fragment`/`roughnessmap_fragment`. Mặt nước `receiveShadow = true` (bóng nhà/cầu/cây trên sông).
+    **(9) GLB** (đọc JSON + giải ảnh trong GLB): 11 file có emissiveFactor [1,1,1] + emissive map. 6 map ĐEN THUẦN
+    (buudien, dennghe, dentamky, dinhhk, nhnn, lechan — trung bình 0) → bỏ map + emissive 0 trước compile (bớt VRAM);
+    4 map GIỐNG ALBEDO (baotang, thptnq, quanhoa, nhatho) → emissiveIntensity = night × 0,42 (= đèn pha mặt tiền ban đêm,
+    ban ngày 0 — trước tự sáng bẹt dưới nắng); **nhahat KHÔNG ĐỤNG** (chân dung). envMapIntensity 0,5 (GLB còn nhận đèn
+    bán cầu — tránh cộng đôi ánh sáng nền), ghi SAU `place()` cho cả bản gốc lẫn twin lite (xem (13)).
+    **(10) Vệ tinh** `__hp.aerial`: sương 0, hộp bóng trực giao phủ CẢ khung (map 4096), phơi sáng ×0,82, instcull/
+    far-hide lấy TÂM KHUNG (trước bám người chơi), vẽ qua composer (cùng tone/AO).
+    **(11) Ấm máy**: compileAsync với RT cảnh composer đang bind (đúng biến thể NoToneMapping/linear — trước biên dịch
+    biến thể màn hình vô dụng); trước Start không vẽ tới khi compile xong (lưới an toàn 12 s); `__hp.timing`
+    (compileSync 107-169 ms, khung đầu 1,7 s — vẫn sau màn chờ). Camera near 0,1 → 0,3 (depth xa tốt ×3).
+    **(12) Thời gian**: DAY_LENGTH 300 → 1440 s (24 phút), bắt đầu 09:00; `?time=14.5 | 14:30 | 1 (= 01:00) | 0.6`
+    (< 1 = phần của ngày, ≥ 1 = giờ) + `&timefreeze=1`. Mây trôi theo đồng hồ GAME: đứng yên khi frozen hoặc
+    `navigator.webdriver` (ảnh QA A/B so được điểm ảnh bầu trời).
+    **(13) SAU PHẢN BIỆN (review WP5)** — **BẪY envMapIntensity**: các hàm `place()` của world.js (nhà hát, nhà thờ, Quán
+    hoa ×5, Lê Chân) tự ghi `envMapIntensity = 0.85` khi duyệt model → chính sách ghi TRƯỚC place bị đè: bản gốc 0,85,
+    twin lite 0,5 → sáng/tối nhảy mỗi lần đổi LOD. Nay `applyGlbEnv` chạy SAU `d.place()` (root mới + gltf.scene) và
+    trong onLiteLoaded; đo: 13 bản gốc + 13 twin đều 0,5. **Biến thể program khi GLB lộ diện**: `queueReveal` gọi
+    compileAsync với RT đang gắn = null → biến thể tone-mapped/sRGB của MÀN HÌNH, trong khi composer vẽ vào sceneRT
+    (NoToneMapping + linear) → 5 program vô dụng + khung 92-168 ms trong 7 s đầu. Nay `attachRenderer(renderer, camera,
+    scene, getRT)` (main.js truyền getter sceneRT) và queueReveal gắn RT đó quanh compileAsync: 0 program tone-mapped (cũ
+    5), khung > 80 ms sau Start chỉ còn trong ~1,5 s đầu. Quy tắc chung: MỌI compile/compileAsync phải gắn đúng RT của
+    đường vẽ thật. **Bloom ấm trước**: 7 material của UnrealBloom (highpass, 5 blur, composite, blend) gắn tạm vào quad
+    rồi compileAsync cùng lúc ấm máy → chạng vạng đầu tiên +0 program (cũ +8, khung 45-95 ms). **AO**: trần 90 px làm
+    tường sát camera nhìn xiên có dải tiếp xúc rộng và mép bậc thang; nguyên nhân bậc thang = "mẫu xoay đan xen chu kỳ
+    4 + mờ hộp CÙNG cỡ 4": mỗi pha bị giữ-mẫu 4 texel → bậc 8 px; trọng số độ sâu so với z0 phẳng còn làm lệch trọng số
+    theo pha trên tường xiên. Sửa: maxPx 56 (phối cảnh), mờ hộp chạy 2 LẦN (lần 2 lệch +1 texel bù lệch nửa texel →
+    nhân chập = tam giác 7 texel), trọng số độ sâu so với MẶT PHẲNG cục bộ nội suy theo 1/z (tuyến tính trên màn hình với
+    mặt phẳng phối cảnh; độ dốc lấy phía nhỏ hơn để không vượt mép vật), upsample full-res cũng theo mặt phẳng 1/z. AO
+    vẫn nhân cả ánh nắng trực tiếp (chưa tách ambient). **Nước — cạnh trong**: waterSD đo tới cạnh của MỌI polygon OSM,
+    2 polygon sông kề nhau có cạnh chung giữa lòng → vệt màu bờ giữa sông (game_8). Lọc: khoảng cách tới tâm ô ĐẤT gần
+    nhất (ô 8 m, ô lân cận xếp theo khoảng cách, dừng ở ô đất đầu tiên) − 5,66 m là cận dưới khoảng cách tới bờ thật →
+    nâng độ sâu (1815 ô sửa, dựng vẫn ~11 ms đo bằng node). Hồ: dải bùn hẹp/nhạt (quầng sáng quanh hồ Tam Bạc từ trên cao
+    biến mất), viền sát kè 0,035 → 0,026 (hồ ×0,4). Bóng trên nước: GPU ≈ 0 ms (đo bật/tắt xen kẽ cùng trang: game_3
+    +0,5 ms trên 19,3 ms gồm 1 mẫu lệch, 2 góc tầm thấp âm = nhiễu).
+    **ĐO** (Chrome headless d3d11, Radeon 890M, 1280×720, TIER 3, base 6a57acc vs WP5 CÙNG PHIÊN dưới khoá GPU, autoQuality
+    khoá): hpReady 19,4 → 16,9 s; heap 903 → 678 MB; cam_spawn 56,9 → 57,5 fps (738 → 726 call, 4,88 M tam giác);
+    pano_007_h090 47,8 → 55,7 (1590 → 1578 call, 7,90 M); cam_high_center 49,9 → 55,7 (1173 → 1161, 7,44 M); game_3
+    (vệ tinh) 56,9 → 49,2 (map bóng 4096 phủ khung — chỉ chế độ QA). fps chạm trần vsync 60 nên chênh vài fps là nhiễu.
+    Làm mới bóng +0,7..6,2 ms/lần (không đổi). **BẪY ĐO**: số fps WP5 cũ 21-30 (đo lúc 8 Chrome GPU chạy song song) là
+    nhiễu — luôn đo dưới `tools/qa/gpulock.mjs`; Bash nền không đặt timeout chết ở 30 phút, giết luôn tiến trình đang
+    GIỮ khoá → khoá mồ côi chặn mọi agent (gpulock chỉ cướp khoá sau 20 phút) — đặt timeout tối đa.
+    **ĐO SAU PHẢN BIỆN** (máy đang chạy game của chủ máy → GPU bận, cảnh 20-30 ms thay vì ~10 ms; chỉ so XEN KẼ cùng
+    phiên prev c527b6d / hiện tại ×2): cam_spawn 42,6/45,5 → 41,4/41,8 fps; pano_007 24,4/27,1 → 29,5/30,3;
+    cam_high_center 30,1/31,2 → 35,0/34,2; game_3 35,0/35,6 → 32,4/31,3; hpReady 40,4/38,2 → 35,5/35,3 s; heap 706-713 →
+    728-758 MB — không có hồi quy nhất quán (2 góc nhanh hơn, 2 góc chậm hơn, cỡ nhiễu). AO 0,27 ms (máy rảnh, trước khi
+    thêm lần mờ 2) / 0,38-0,56 ms (máy bận).
+    **GHI NHẬN cho WP khác**: độ sáng nửa dưới khung pano: thật trung vị 117, game 68, trong khi highlight game (p98 216)
+    còn sáng hơn ảnh thật (198) → tối là do ALBEDO (nhựa đường `mat(0x4c5158)` quá đen so với mặt đường bụi xám sáng
+    ~sRGB 110-120 trong pano), KHÔNG được bù bằng phơi sáng.
+
 - **2026-09-07 (di)** [ĐỢT 2 TÍCH HỢP — 6 nhánh worktree song song + 6 phản biện đối kháng, gộp trên `dot2-int`]:
     Quy trình: mỗi nhánh (W1 merge-budget, W2 ground-grid, W3 landmark-lod, W4 visual, W5 hydro-polygon-water,
     W6 landmark-placement) làm trong worktree riêng, tự đo trước/sau trên GPU thật, có agent phản biện đọc diff +
