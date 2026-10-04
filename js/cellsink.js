@@ -692,6 +692,8 @@ const LAND_Y = 2;   // = LAND_H world.js (nền phố phẳng)
 // Viền G px NẰM NGOÀI ảnh (ô = w+2G × h+2G, ảnh giữ nguyên độ phân giải, không co lại) — G=8 an toàn tới mip 3
 // (phản biện: G=4 co ảnh vào trong → mờ chữ + biển kề nhau loang sang nhau ở mip xa).
 const AT_PAGE = 2048, AT_G = 8;
+// viền theo cỡ ảnh: ≥128 px → 8 (an toàn tới mip 3); ảnh nhỏ (64/32 px — ở mip 3 đã là đốm 4-8 texel) → 4/2, đỡ phình trang
+const atG = (w, h) => Math.max(2, Math.min(AT_G, Math.floor(Math.min(w, h) / 16)));
 function atlasKept(kept, createdTex, THREE) {
   const plain = (q) => q && !Array.isArray(q) && (q.isMeshLambertMaterial || q.isMeshBasicMaterial) && q.map && createdTex.has(q.map) &&
     !q.transparent && !q.alphaTest && !q.vertexColors && q.color && q.color.getHex() === 0xffffff &&
@@ -716,10 +718,11 @@ function atlasKept(kept, createdTex, THREE) {
   const list = [...texs.keys()].sort((a, b) => b.image.height - a.image.height || b.image.width - a.image.width);
   const pages = []; let pg = null, x = 0, y = 0, rowH = 0;
   for (const t of list) {
-    const w = t.image.width + 2 * AT_G, h = t.image.height + 2 * AT_G;   // ô gồm viền
+    const G = atG(t.image.width, t.image.height);
+    const w = t.image.width + 2 * G, h = t.image.height + 2 * G;   // ô gồm viền
     if (!pg || x + w > AT_PAGE) { x = 0; y += rowH; rowH = 0; }
     if (!pg || y + h > AT_PAGE) { pg = { items: [] }; pages.push(pg); x = 0; y = 0; rowH = 0; }
-    texs.set(t, { pg: pages.length - 1, x, y, w, h }); pg.items.push(t);
+    texs.set(t, { pg: pages.length - 1, x, y, w, h, G }); pg.items.push(t);
     x += w; rowH = Math.max(rowH, h);
   }
   const ref = list[0];
@@ -731,7 +734,7 @@ function atlasKept(kept, createdTex, THREE) {
     for (const t of p.items) {
       const c = texs.get(t);
       g.drawImage(t.image, c.x, c.y, c.w, c.h);                                     // nền ô = ảnh kéo giãn ra viền (chống loang)
-      g.drawImage(t.image, c.x + AT_G, c.y + AT_G, c.w - 2 * AT_G, c.h - 2 * AT_G);  // ảnh thật 1:1 ở giữa (c.w-2G = w gốc)
+      g.drawImage(t.image, c.x + c.G, c.y + c.G, c.w - 2 * c.G, c.h - 2 * c.G);  // ảnh thật 1:1 ở giữa (c.w-2G = w gốc)
     }
     const tx = new THREE.CanvasTexture(cv);
     tx.colorSpace = ref.colorSpace; tx.anisotropy = ref.anisotropy; tx.name = 'cellAtlas' + k;
@@ -752,8 +755,8 @@ function atlasKept(kept, createdTex, THREE) {
     let ng = geoCache.get(gk);
     if (!ng) {
       ng = m.geometry.clone(); const uv = ng.attributes.uv;
-      const u0 = (c.x + AT_G) / AT_PAGE, us = (c.w - 2 * AT_G) / AT_PAGE;
-      const v0 = 1 - (c.y + c.h - AT_G) / P.H, vs = (c.h - 2 * AT_G) / P.H;
+      const u0 = (c.x + c.G) / AT_PAGE, us = (c.w - 2 * c.G) / AT_PAGE;
+      const v0 = 1 - (c.y + c.h - c.G) / P.H, vs = (c.h - 2 * c.G) / P.H;
       for (let i = 0; i < uv.count; i++) uv.setXY(i, u0 + uv.getX(i) * us, v0 + uv.getY(i) * vs);
       uv.needsUpdate = true; geoCache.set(gk, ng);
     }
