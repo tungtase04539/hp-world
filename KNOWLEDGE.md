@@ -735,6 +735,83 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     v1 thêm lô/infill phải đo lại ngân sách ≤1,5 M (núm: xác suất trong citygen, DET_RMAX, DET_R); (e) `sed -i` của Git Bash
     đổi CRLF→LF cả file — sửa file repo bằng python/Edit.
 
+- **2026-10-04 (Đ3-WP1-data)** [ĐỢT 3 WP1 — `tools/process_buildings.mjs` v1: footprint thật → BỨC TƯỜNG PHỐ + THẢM MÁI]
+    (nhánh `worktree-wf_f378e35a-d3b-1`). Generator offline, KHÔNG đổi runtime game (chưa module nào của game import
+    `buildings_real.js`/`xsection.js` — WP2 citygen làm). Chạy: `node tools/process_buildings.mjs [--dump x.json]` ở gốc
+    repo, cần `tools/ov_buildings.csv` + `tools/osm_roads_dt.json` (gitignore, chép từ repo chính) + `audit/audit_enriched.json`;
+    ~45 s (máy bận tới ~100 s); TẤT ĐỊNH (2 lần chạy ra `buildings_real.js` byte y hệt — mọi ngẫu nhiên seed theo id/toạ độ).
+    **Các bước:** (1) đọc CSV, dịch nguồn MS(−1,−1)/GG(−1,−2,5), bỏ nước (tâm hoặc >50% diện tích) + bãi giải toả Hoàng Diệu;
+    (2) khử trùng lặp mọi nguồn (>50% bỏ nhỏ, còn lại cắt nhỏ theo cạnh nhà lớn) + bỏ vỏ OSM >60% chứa nhà khác; (3) cắt phần
+    lấn hành lang phố tới `facadeLine(c)` (ngõ h/phố w chỉ cắt nếu mất ≤35% — hình học ngõ ROADS_DT lệch tới 5 m);
+    (4) KÉO mặt tiền lùi ≤7,2 m ra đúng facadeLine của ROADS_DT (cạnh song song ±25°, ≥2/3 tia tới phố không bị nhà khác che,
+    vùng quét không đè nhà/hành lang/nước/công viên/LM_POLY/camera pano); (5) CHIA LÔ khối mặt phố >9 m thành lô 3,8-6 m
+    vuông góc phố; "khối dính" ML (>400 m² không tên/không class, ngoài cảng, không gọn kiểu cao ốc) → dải trước sâu 14-20 m
+    chia lô + phần sau chia lưới 4,5-7,5×10-16 m; (6) kéo sâu lô tới 13-20 m nếu phía sau trống + vuông hoá lô 4 đỉnh;
+    (7) LẤP KHE mặt phố ≥3,5 m (p/s/t/r) bằng lô SINH 12-18 m sâu khi có BẰNG CHỨNG (≥120 m² NHÀ DÂN thật phía sau trong ±14 m
+    — không tính công trình công cộng/khối lớn >400 m²/cao ốc/nhà trong LM_POLY; hoặc tia quan sát pano audit tả NHÀ ỐNG ≤6 tầng,
+    không chạm LM_POLY trong 80 m, cắt lô ở 3-22 m VÀ lô tựa vào nhà thật ≤8 m); veto: SÂN TRƯỚC (dải lô sâu 25 m chạm
+    LM_POLY+12 m hoặc chồng công trình công cộng >250 m²/khối lớn/cao ốc/nhà >1000 m²), cảng phía BẮC tim Hoàng Diệu,
+    ven nước/công viên (dải vườn hoa), nút giao (facadeLine+3 m phố khác),
+    pano "mặt thoáng" (chữ area/summary có vườn hoa/quảng trường/hồ/sông/nút giao… VÀ 3 ô hướng kề PANO_SIDES tắt);
+    lô NÔNG 3-6 m (khối cơi nới trước nhà lùi) chỉ khi phía sau là nhà dân nhỏ, ≤3 tầng; (8) lõi ô phố trên raster 0,5 m:
+    NỚI nhà thật nông trước (không tốn byte) rồi MỌC nhà sinh 4,5-8×10-18 m tới phủ 77% (giữ ngõ, sân trường/cơ quan đệm
+    10 m, ô phố <18% nhà thật để trống) — CHỈ nơi có BẰNG CHỨNG CỤC BỘ (8b): ≥2 m² nhà thật trong ô vuông ±10 m quanh hạt,
+    tỉ lệ thật/(thật+trống) ±16 m ≥30%, và hạt + thân nhà không thuộc "ĐẤT TRỐNG MỞ" (phép mở hình thái trên lưới thô 2 m:
+    lõi = ô cách mọi thứ không-trống ≥5 m, thành phần lõi ≥300 m², nở lại 6 m); (9) chữ nhật hoá, NỞ chữ nhật ≤1,5 m
+    (thật)/2,5 m (sinh) lấp khe mái, khép khe 3-80 cm giữa nhà kề, cắt chồng lấn; CHỐT cuối: không đỉnh/mẫu biên nào lấn
+    >0,2 m vào facadeLine p/s/t/r (dải đoạn + mũ tròn ở đỉnh gãy polyline và chỗ nối 2 way; đầu cụt không mũ) → cắt nửa
+    mặt phẳng / bỏ; camera pano ≥3 m (sinh) / ≥1 m (thật đã sửa); nhà sinh cách LM_POLY ≥3 m; KIỂM HỢP LỆ trên TOẠ ĐỘ ĐÃ
+    LÀM TRÒN như file (đa giác lưới 0,1 m, chữ nhật đúng tham số RBR1): bỏ đỉnh gai (2 cạnh kề quay ngược >162°), đơn CHẶT
+    (không cạnh cắt, không đỉnh chạm cạnh khác ≤3 cm), tường-ra-ngoài, ≥6 m², bề hẹp ≥1,2 m; sau encode tự decodeRB lại và
+    DỪNG (không ghi file) nếu còn footprint hỏng; (10) ghép 1.887 quan sát pano (tia la bàn, nhà đầu tiên trong 26 m; bỏ nhà "phía xa"; ≥7 tầng chỉ
+    khớp nền ≥250 m²); (11) thuộc tính: tầng OSM >
+    pano > phân bố pano địa phương (80 m) trộn phân bố chung, làm trơn ±2 (trừ cao ốc/khối lớn; "đuôi" 6-8 tầng bốc
+    thăm trên mặt phố p/s/t được GIỮ, không kéo xuống và không kéo láng giềng lên), kiểu phố cũ thời Pháp
+    (28 phố lõi) / cảng SHED / OSM class / chữ pano, màu tường theo chữ màu pano; (12) cạnh PARTY (+edgeCover) / FRONT / BACK / SIDE.
+    **Số đo (Overture gốc → v1 sau phản biện):** 25.192 nhà v0 → 46.128 (thật 33.209 gồm 7.098 lô chia; sinh 12.919 = 4.043
+    lô khe + 8.876 lõi; bản trước phản biện 52.380 với 19.099 sinh); phủ mái ô phố 43% → 65,1% (nhà thật 50,4%; vệ tinh đo
+    ~66% mái/ô phố; bản trước 74,4% là vượt vì bịa nhà trên đất trống); mặt phố có nhà sát vỉa (mẫu facadeLine+1,2 m,
+    trừ nút giao/ven nước/công viên) p/s/t/r 7,6/20,7/29,1/28,7% → 41,5/63,5/63,7/61,8% (bản trước 51,3/68,5/66,4/63,5 —
+    phần chênh là lô bịa trong sân trước công trình/quảng trường/cảng); lùi mặt tiền nhà ống (từ mép lòng)
+    trung vị p 7,6/s 5,2/t 3,9/r 3,5 m → 3,65/3,50/3,00/2,01 (= đúng bề vỉa); sâu lô mặt phố trung vị 8,8 → 11,7 m (p75 15,7;
+    thật 15-25 m — phần sau nhà ống thường là footprint RIÊNG nên đo theo đa giác vẫn hụt); bề mặt tiền trung vị 7,0 → 5,3 m;
+    30.036 cạnh PARTY; 1.893 nhà mang số tầng/màu từ pano; tầng TB 2,89 (1:3,7% 2:31,7% 3:41,7% 4:18,9% 5:2,7% 6:0,9%
+    7+:0,3%; nhà không bằng chứng trần 8 tầng (p/s) / 6); b64 1,55 MB (≤1,8), giải mã ~10-12 ms node / 6-13 ms Chrome.
+    **Màu mái** hiệu chỉnh THEO TỪNG NHÀ trên vệ tinh (trung vị pixel trong 8.885 footprint thật real_1/3/5/6/8, cân trắng
+    gray-world): vệ tinh đỏ 29 / xám 46 / xám-xanh đá 18 / sáng 2%; game cũ 55/20/5/19 → 45/34/9/11 → sau phản biện
+    44/42/9/4 (hạ trọng số bảng màu "sáng" 5/6/9 sang xám 13/15/7; giữ đỏ cao hơn số đo vì mù khí làm tôn đỏ gỉ ngả xám).
+    **ĐỊNH DẠNG RB01 mở rộng CỘNG THÊM (decode cũ vẫn đọc phần đa giác):** u32 reserved@12 = `rectOff` → mục chữ nhật
+    'RBR1' 19 byte/nhà (x0,z0 ×10; ang u16; w,d cm; ek 2 bit/cạnh; cov 4 bit/cạnh bão hoà 15; 6 byte thuộc tính; seed
+    suy từ x0,z0,ang) — 80% số nhà; `decodeRB` trải thành đa giác 4 đỉnh nối SAU nhà đa giác (`D.nPoly`); byte reserved/nhà
+    → `INFO` (bit0-2 cấp phố mặt tiền `ROADC`, bit3 góc phố, bit4-5 công năng trệt home/shop/office/gate);
+    `FLAG.EDIT` 128; `WALL_PALETTE` thêm 24-29; giải mã dùng `Uint8Array.fromBase64` nếu có.
+    **ĐỔI HỢP ĐỒNG `js/xsection.js`:** `SIDEWALK_W` s 2,8→3,5, t 2,24→3,0, r 1,5→2,0 (p 3,64 giữ) theo 404 pano có ghi bề
+    rộng vỉa (`audit_enriched.sidewalk`, gán cấp phố ROADS_DT gần nhất ≤8 m: trung vị p 3,5 · s 3,5 · t 3,0 · r 2,5 · h 3).
+    world.js `layRoad` hiện vẫn vẽ vỉa 0,28·w → TRƯỚC KHI WP6 đọc xsection, nhà dựng theo facadeLine mới sẽ cách mép vỉa cũ
+    0,7-0,8 m (s/t) / 0,5 m (r). Đổi SIDEWALK_W/ROAD_W hay ROADS_DT → CHẠY LẠI generator (mặt tiền bám facadeLine).
+    **Công cụ:** `tools/bgeom.mjs` (clipHalf/clipStrip đa giác lõm, minRect, Grid, cleanPoly, isSimple, rng/hash),
+    `tools/qa/rbview.html` (xem RB không cần world.js: `?pano=X,Z,hướng` / `?cam=` / `?aerial=cx,cz,half`; chạy dưới gpulock).
+    **BẪY:** (a) `clipHalf` với đỉnh chạm đúng đường cắt có thể ghép cặp giao điểm 'out'↔'out' → từng đẻ đa giác răng cưa
+    52 đỉnh diện tích 0 (x −1606) — nay bỏ mảnh không khép + bước 9d; (b) `js/panosides.js` chỉ là bằng chứng ÂM khi chữ
+    pano tả "mặt thoáng" (audit chỉ tả 2-4 nhà/pano: bit tắt ≠ không có nhà); (c) pano "phía xa" từng gán 10-15 tầng cho
+    nhà ống — lọc chữ + cao ốc chỉ khớp nền lớn; (d) làm trơn tầng bỏ qua láng giềng cao ốc/khối lớn (từng sinh nhà "kim"
+    11 tầng); (e) chồng lấn còn ~640 cặp >1 m² chủ yếu là dải 5-10 cm dọc tường chung do lượng tử 0,1 m (vô hại cho tường;
+    renderer nên đặt mái nhà thấp hơn lùi 1-2 cm nếu thấy nhấp nháy); (f) nhà SINH chỉ trong R1640, nhà thật tới R1750.
+    **LƯỢT PHẢN BIỆN (sửa đã áp):** (g) bằng chứng "≥18% nhà thật trong CẢ ô phố" đã bịa trọn các vùng đất trống: dải
+    lưỡi liềm ~1 km bờ bắc sông Cấm, lòng sân vận động, bãi cảng tây bắc, dải giải toả đường sắt ~200 m — nay bằng chứng
+    CỤC BỘ + đất trống mở (8b); (h) công trình lớn/địa danh từng "chứng minh" dãy nhà ống trong chính sân/sườn của nó (Nhà
+    hát lớn, Bảo tàng, THPT Ngô Quyền) — loại khỏi bằng chứng + veto sân trước; (i) tia pano tả Nhà hát (cách 60 m) xuyên
+    quảng trường trống từng "chứng minh" 6 lô giữa quảng trường — chỉ tin tia tả nhà ống, không chạm địa danh, lô tựa nhà
+    thật; (j) `rectOf` dung sai tới ~0,4 m cho cạnh 20 m nhưng b.pts giữ đa giác cắt → file (ghi tham số chữ nhật) lệch
+    hình đã kiểm (lấn vỉa hè/chồng lấn quay lại) — sau MỌI phép cắt dùng `setRectOrPoly` (chữ nhật chỉ khi lệch ≤3 cm, đồng
+    bộ b.pts); (k) kiểm hợp lệ trên số thực rồi làm tròn 0,1 m ở encode từng lọt 7 đa giác tự cắt — kiểm trên toạ độ đã
+    làm tròn + giải mã lại sau encode; (l) kéo mặt tiền: đỉnh chung 2 cạnh mặt tiền nhìn CÙNG 1 phố từng bị CỘNG 2 lần dịch
+    (lấn 4,5 m vào lòng phố s) — chỉ cộng khi 2 đoạn khác nhau lệch >45°, còn lại lấy dịch lớn hơn; sweep không còn bỏ qua
+    hành lang của chính phố được kéo tới. **TƯỜNG CHUNG + D.dead:** edgeCover chỉ ghi SỐ TẦNG nhà che, không ghi nhà nào →
+    người dùng giết nhà (claim/pano/cellsink) PHẢI gọi `refreshPartyEdges(D, grid, killed?)` (js/buildings_data.js) trước
+    khi dựng: hạ PARTY không còn láng giềng sống che → BACK/SIDE, edgeCover=0 (không thì nhà kề nhà bị giết thiếu chân
+    tường = lỗ nhìn xuyên vào nhà rỗng); không giết gì → 0 cạnh đổi; giết 2.391 nhà → 1.665 cạnh hạ, ~30 ms (tăng dần) /
+    ~50 ms (toàn bộ). WP3 cellsink nên BỎ QUA nhà FLAG.SYNTH khi quyết định xoá nhà tay.
 - **2026-09-07 (di)** [ĐỢT 2 TÍCH HỢP — 6 nhánh worktree song song + 6 phản biện đối kháng, gộp trên `dot2-int`]:
     Quy trình: mỗi nhánh (W1 merge-budget, W2 ground-grid, W3 landmark-lod, W4 visual, W5 hydro-polygon-water,
     W6 landmark-placement) làm trong worktree riêng, tự đo trước/sau trên GPU thật, có agent phản biện đọc diff +

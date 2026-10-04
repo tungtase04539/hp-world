@@ -18495,7 +18495,9 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     const MS = (IS_MOBILE || LITE) ? 0.25 : 1;   // 4096²(85MB/tấm) → 1024²(5MB/tấm) cho MỌI máy yếu
     // LUẬT CHỦ DỰ ÁN: KHÔNG tên thương hiệu thật trên biển — catalog pano còn sót vài cái (WP3 làm sạch tận gốc
     // gen_shopsigns.mjs; đây là lưới an toàn lúc dựng): biển khớp danh sách → bỏ (cả 2 nhánh FABRIC).
-    const _BRAND = /\b(HANA|INAX|MB|SSI|DOJI|HABECO|ELISE|CHRISBELLA|KOJI|WINMART|VINMART|VIETTEL|VIETCOMBANK|BIDV|AGRIBANK|TECHCOMBANK|VPBANK|SACOMBANK|PNJ|FPT|PHARMACITY|HIGHLANDS|PETROLIMEX|HONDA|YAMAHA|SAMSUNG)\b|CO\.?OP|THEGIOIDIDONG|THẾ GIỚI DI ĐỘNG|SEVEN\.?ART|MEDIPHARCARE|LONG CHÂU|BẢO MIN|BÁCH HO[AÁ] XANH|ĐIỆN MÁY XANH/i;
+    // (lưới an toàn TẠM cho tới khi WP3 sinh lại js/shopsigns.js theo js/brands.js — nguồn DUY NHẤT; danh sách này phủ đủ
+    //  các tên mà BRAND_MAP của WP3 bắt được trong shopsigns.js hiện tại — quét node 2026-10-04)
+    const _BRAND = /\b(HANA|INAX|MB|SSI|DOJI|HABECO|ELISE|CHRISBELLA|KOJI|WINMART|VINMART|VIETTEL|VIETCOMBANK|BIDV|AGRIBANK|TECHCOMBANK|VPBANK|SACOMBANK|PNJ|FPT|PHARMACITY|HIGHLANDS|PETROLIMEX|HONDA|YAMAHA|SAMSUNG|MAY10|SKF|PASSIO|EVN ?NPC|EVN|GAC MOTOR|HAIPHARCO|BESTORE|DEEP C|NORTHFREIGHT|LIEN A|LIPTON|HOEGAARDEN|TOKY ?LIFE|MILANO|HEAD|HDOO|VIETBANK)\b|CO\.?OP|THEGIOIDIDONG|THẾ GIỚI DI ĐỘNG|SEVEN\.?(ART|UOMO)|MEDIPHARCARE|LONG CHÂU|BẢO MIN|BÁCH HO[AÁ] XANH|ĐIỆN MÁY XANH|NGÂN HÀNG Á CHÂU/i;
     // ĐỢT 3 (FABRIC 'real'): NEO biển vào MẶT TIỀN THẬT gần nhất (≤22 m từ điểm pano+14 m) đúng dải biển hiệu tầng trệt
     // (2,95-3,85 m — đè lên biển vẽ trong atlas), quay theo pháp tuyến cạnh; biển trùng chỗ (530/954 trùng toạ độ) rải dọc
     // mặt tiền, không chồng nhau; không có mặt tiền gần → bỏ (hết biển lơ lửng).

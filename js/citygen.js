@@ -47,7 +47,10 @@ export const FAB_TILE = 450;
 export const DET_TILE = 300;
 const LITE_FAB = TIER <= 1;
 const DET_R = LITE_FAB ? 220 : 380;        // bán kính hiện ban công/mái hiên quanh camera (m)
-const DET_RMAX = 1650;                     // chỉ dựng chi tiết cho nhà có tâm trong r ≤ 1650 m (BUILD_RADIUS 1600 + 50)
+const DET_RMAX = 1650;
+// giải phóng mảng CPU của buffer phố sau upload GPU (dựng lại khi khôi phục ngữ cảnh) — xem cuối buildRealFabric.
+// ?fabfree=0 tắt (đo heap A/B, hoặc khi cần raycast/đọc mảng các mesh fab_* để chẩn đoán).
+const RELEASE_CPU = (() => { try { return new URLSearchParams(location.search).get('fabfree') !== '0'; } catch (e) { return true; } })();                     // chỉ dựng chi tiết cho nhà có tâm trong r ≤ 1650 m (BUILD_RADIUS 1600 + 50)
 
 // ---------- dữ liệu (giải mã 1 lần, dùng chung: citygen, minimap, cell sink WP3...) ----------
 let _D = null;
@@ -634,6 +637,10 @@ export function buildRealFabric(scene, ctx) {
   const tAtlas = performance.now() - T0 - tDecode - tClaims;
 
   // ---------- 2) DỰNG theo ô ----------
+  // gen() = toàn bộ hình học (XÁC ĐỊNH từ D + D.dead đã chốt) → gọi lại được khi khôi phục ngữ cảnh WebGL (bản CPU của
+  // buffer đã bị giải phóng sau upload, xem RELEASE_CPU bên dưới). (thân hàm giữ thụt lề cũ cho diff gọn)
+  const frontEdges = [];   // [x0,z0,x1,z1,nx,nz,yBase,b] — biển hiệu thật (SHOP_SIGNS) neo vào đây
+  const gen = (st, frontEdges) => {
   const tiles = new Map(), dtiles = new Map();
   const tileOf = (cx, cz) => {
     const tx = Math.floor(cx / FAB_TILE), tz = Math.floor(cz / FAB_TILE), k = tx * 4096 + tz;
@@ -645,7 +652,6 @@ export function buildRealFabric(scene, ctx) {
     let t = dtiles.get(k); if (!t) dtiles.set(k, (t = { tx, tz, buf: new GBuf(4096) })); return t.buf;
   };
   const X = new Float64Array(256), Z = new Float64Array(256), Y = new Float64Array(256), TD = new Float64Array(256);
-  const frontEdges = [];   // [x0,z0,x1,z1,nx,nz,yBase,b] — biển hiệu thật (SHOP_SIGNS) neo vào đây
   const K_ROOF = 4, K_DET = 5;
   // dữ liệu WP1 v1 mang công năng tầng trệt từng nhà (INFO bit 4-5); v0 toàn 0 → bỏ qua
   let hasInfo = false; if (D.info) for (let b = 0; b < D.nB && !hasInfo; b++) if (D.info[b]) hasInfo = true;
@@ -1008,28 +1014,51 @@ export function buildRealFabric(scene, ctx) {
     }
     st.built++;
   }
+  return { tiles, dtiles };
+  };
+  const { tiles, dtiles } = gen(st, frontEdges);
   const tGeo = performance.now() - T0 - tDecode - tClaims - tAtlas;
 
   // ---------- 3) MESH theo ô ----------
   const meshes = [], detMeshes = [];
   let calls = 0, triMain = 0, triDet = 0;
-  for (const t of tiles.values()) {
+  for (const [key, t] of tiles) {
     const g = t.buf.geometry();
     if (g) {
-      const m = new THREE.Mesh(g, mat); m.name = `fab_main_${t.tx},${t.tz}`;
+      const m = new THREE.Mesh(g, mat); m.name = `fab_main_${t.tx},${t.tz}`; m.userData.fabKey = key;
       m.castShadow = true; m.receiveShadow = true; m.userData.noMerge = true; m.matrixAutoUpdate = false;
       scene.add(m); meshes.push(m); calls++; triMain += g.index.count / 3;
     }
   }
-  for (const t of dtiles.values()) {
+  for (const [key, t] of dtiles) {
     const gd = t.buf.geometry();
     if (gd) {
-      const m = new THREE.Mesh(gd, mat); m.name = `fab_det_${t.tx}_${t.tz}`;
+      const m = new THREE.Mesh(gd, mat); m.name = `fab_det_${t.tx}_${t.tz}`; m.userData.fabKey = key;
       m.castShadow = true; m.receiveShadow = true; m.userData.noMerge = true; m.matrixAutoUpdate = false;
       m.userData.fabTile = [(t.tx + 0.5) * DET_TILE, (t.tz + 0.5) * DET_TILE];
       m.visible = false;
       scene.add(m); detMeshes.push(m); triDet += gd.index.count / 3;
     }
+  }
+  // GIẢI PHÓNG BẢN CPU của mọi buffer phố SAU KHI upload GPU (onUpload → array = null): ~30 B/đỉnh + chỉ số. Mất/khôi phục
+  // ngữ cảnh WebGL (three dựng lại mọi buffer từ .array) → 'webglcontextrestored' trên canvas #scene: chạy lại gen() (xác
+  // định, ~0,5-1 s) và thay geometry từng ô TRƯỚC khung hình kế. Ô det chưa từng hiện thì chưa upload → còn giữ mảng.
+  // BẪY: sau khi giải phóng, KHÔNG được raycast/computeBounding*/đọc .array các mesh 'fab_*' (bbox/sphere tính sẵn).
+  if (RELEASE_CPU) {
+    const freeArr = function () { this.array = null; };
+    const release = (g) => { for (const k in g.attributes) g.attributes[k].onUpload(freeArr); if (g.index) g.index.onUpload(freeArr); };
+    for (const m of meshes) release(m.geometry);
+    for (const m of detMeshes) release(m.geometry);
+    const cv = typeof document !== 'undefined' && document.getElementById ? document.getElementById('scene') : null;
+    if (cv) cv.addEventListener('webglcontextrestored', () => {
+      const t1 = performance.now();
+      const r = gen({ tris: 0, detTris: 0, tWall: 0, tRoof: 0, tPar: 0, built: 0, walls: 0, roofs: 0 }, []);
+      for (const [list, map] of [[meshes, r.tiles], [detMeshes, r.dtiles]]) for (const m of list) {
+        const t = map.get(m.userData.fabKey), g = t && t.buf.geometry(); if (!g) continue;
+        m.geometry.dispose(); m.geometry = g; release(g);
+      }
+      console.log('[citygen] khôi phục ngữ cảnh WebGL: dựng lại hình học phố ' + Math.round(performance.now() - t1) + ' ms');
+    }, false);
   }
   // LOD chi tiết: hiện ô 'det' khi camera trong DET_R tới MÉP ô (nhịp 0,25 s đồng hồ thật; aerial cao 1200 m → ẩn hết)
   let _detAt = -1e9;
