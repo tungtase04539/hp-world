@@ -78,7 +78,7 @@ export function createTraffic(scene, world, opts = {}) {
   // bộ đệm GPU còn đang vẽ khung trước bắt trình điều khiển ĐỒNG BỘ CPU↔GPU → mất 5-9 fps khi bật giao thông, dù
   // update() chỉ tốn 0,5 ms và giao thông chỉ +0,15 M tam giác ("đóng băng" giao thông = như tắt). Ghi vào bản
   // khung N−2 thì GPU đã đọc xong → hết chờ (thử nghiệm: hồi lại 70-90% số fps mất). 1 lần tải/nhóm/khung thay vì 2-6.
-  const STRIDE = 28, NSET = 3;
+  const STRIDE = 28, NSET = +(new URLSearchParams(location.search).get('tsets')) || 3;   // TẠM: thử số bản
   function makeGroup(key, geo, cap, mat, walk) {
     const mesh = new THREE.InstancedMesh(geo, mat, cap);
     mesh.name = 'traffic_' + key;

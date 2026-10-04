@@ -14,6 +14,11 @@ export function createPetals(scene) {
   });
   const mesh = new THREE.InstancedMesh(geo, mat, COUNT);
   mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  // 3 bộ đệm ma trận XOAY VÒNG (Đợt 3 WP8, đo trên 890M/ANGLE d3d11): ghi đè mỗi khung vào bộ đệm GPU khung trước còn
+  // đang đọc bắt CPU chờ GPU (đồng bộ) → mất vài fps ở khu trung tâm. Ghi bản của khung N−2 thì không phải chờ.
+  const sets = [mesh.instanceMatrix, mesh.instanceMatrix.clone(), mesh.instanceMatrix.clone()];
+  for (const s of sets) s.setUsage(THREE.DynamicDrawUsage);
+  let setK = 0;
   mesh.frustumCulled = false;
   scene.add(mesh);
 
@@ -42,6 +47,7 @@ export function createPetals(scene) {
       mesh.visible = true;
       const cx = playerPos.x, cz = playerPos.z;
       frameNo++;
+      setK = (setK + 1) % sets.length; mesh.instanceMatrix = sets[setK];   // setMatrixAt ghi vào bản này
       for (let i = 0; i < COUNT; i++) {
         const p = parts[i];
         p.y -= p.fall * dt;

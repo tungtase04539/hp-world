@@ -404,11 +404,18 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     dừng + bấm còi (đếm cho audio.js). Áp cả khi đang "thoát kẹt" (bản đầu bỏ qua người chơi ở nhánh đó → xe xuyên người).
     Tốc độ: xe máy 8,5-11 (p) … 4,5-7 (r) m/s, ô tô 9-12 … 4,5-6, người đi bộ 1,1-1,6. Người đi bộ trên vỉa hè
     (xsection: mép đường + 35-75% SIDEWALK_W), không mọc/đi vào footprint nhà thật (gặp nhà → nép mép vỉa, kẹt → quay
-    đầu); đường đôi chỉ vỉa hè phía ngoài. Vẽ INSTANCED: 3 kiểu xe máy (1 người/chở 2/chở hàng) + 3 ô tô (con/gầm
-    cao/16 chỗ) + 2 người đi bộ = 8 draw call (+8 bóng); màu sơn/áo/mũ theo instance (thuộc tính `aTint` chọn kênh),
-    tay chân người đi bộ vung bằng vertex shader, đèn pha/hậu tự sáng theo `uNight` (traffic.setNight). HỢP ĐỒNG:
-    InstancedMesh `traffic_*` mang `userData.noCull` + boundingSphere = bong bóng (instcull không nén). Thuyền du lịch
-    cũ (toạ độ 1:10, nằm trên cạn) và 3 trục vùng đã xoá. `__hp.traffic.check()` = bất biến cho diag.
+    đầu); đường đôi chỉ vỉa hè phía ngoài; chân đặt ở SIDEWALK_TOP. Vẽ INSTANCED: 3 kiểu xe máy (1 người/chở 2/chở
+    hàng) + 3 ô tô (con/gầm cao/16 chỗ) + 2 người đi bộ = 8 draw call; mô hình gộp rồi mergeVertices (≈2× ít đỉnh);
+    màu sơn/áo/mũ theo instance (thuộc tính `aTint` chọn kênh), tay chân người đi bộ vung bằng vertex shader, đèn
+    pha/hậu tự sáng theo `uNight` (traffic.setNight). Chỉ VẼ tác tử trong DRAW_R 260/230/170 m (mô phỏng tới RB).
+    **BẪY HIỆU NĂNG (đo):** ghi đè MỖI KHUNG vào bộ đệm instance GPU còn đang được khung trước đọc → ANGLE/D3D11 đồng
+    bộ CPU↔GPU, mất 5-9 fps dù update() 0,5 ms và chỉ +0,15 M tam giác (thử: "đóng băng" giao thông = như tắt; tắt bóng
+    không đỡ). Sửa: dữ liệu instance XEN KẼ 1 bộ đệm/nhóm (stride 28: ma trận | sơn | áo | áo sau/quần | pha | nhịp)
+    × 3 bản XOAY VÒNG (ghi bản của khung N−2) → 1 lần tải/nhóm/khung, hết chờ. Áp cho MỌI InstancedMesh cập nhật mỗi
+    khung. Giao thông KHÔNG đổ bóng vào shadow map (main.js làm mới bóng 4,5-10 Hz → bóng xe 10 m/s nhảy ~2 m/lần):
+    elip "bóng tiếp đất" tối trong mô hình; vẫn nhận bóng. HỢP ĐỒNG: InstancedMesh `traffic_*` mang `userData.noCull`
+    + boundingSphere = đĩa DRAW_R quanh người chơi (instcull không nén), `raycast` rỗng (instanceMatrix xen kẽ không có
+    `.array`). Thuyền du lịch cũ (toạ độ 1:10, trên cạn) và 3 trục vùng đã xoá. `__hp.traffic.check()` = bất biến diag.
     **Cảm giác chơi (main.js/vehicles.js/input.js/character.js):** đi 3,0 / chạy 7,0 m/s (trước 5/11), nhảy 6,5;
     bước con ≤ 0,35 m; xe máy 16 m/s (~58 km/h, trước 23), xích lô 4,2, thuyền 10; lái kiểu xe đạp ω = v/L·tan δ, δ
     giảm theo tốc độ, trần gia tốc ngang 14 m/s², ga/phanh/lùi/trôi tách riêng, bước con 0,4 m chống xuyên tường.
