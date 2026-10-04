@@ -19430,10 +19430,11 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
   // + mỗi cây thứ 10 quanh vườn hoa.
   const HERO_FILES = ['phuong_a.glb', 'phuong_c.glb', 'phuong_d.glb'];
   const fracH = (v) => { const t = Math.abs(v); return t - Math.floor(t); };
+  // W2-B: hero chỉ thành GLB khi ≤ 230 m quanh Nhà hát (trees.js HERO_SHOW_R) — xa hơn là phượng thủ tục nở theo LỊCH
   function heroTree(x, z) {
     if (hdTreeBelt(x, z)) { shadeTree(x, z); return; }   // Hoàng Diệu: xà cừ cắt trụi, cấm phượng hero
     const s2 = fracH(Math.sin(x * 0.41 + z * 2.31) * 12543.7);
-    veg.plant('phuong', x, z, { hero: s2 < 0.4 ? 0 : s2 < 0.72 ? 1 : 2, bloom: 1 });
+    veg.plant('phuong', x, z, { hero: s2 < 0.4 ? 0 : s2 < 0.72 ? 1 : 2 });
     addCollider(x, z, 0.6);              // chỉ chặn quanh gốc; tán ở trên đầu, đi dưới được
   }
   function loadHeroTrees(trees) {
@@ -20574,7 +20575,8 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
   };
 
   // DỰNG toàn bộ cây đã xếp hàng (cells + cell_tree + phố + hồ + công viên + vườn hoa) → InstancedMesh theo loài/LOD
-  const trees = veg.buildTrees(scene, { groundHeight, R: BUILD_RADIUS, lakeSD, hdTreeBelt, colliders, fpGrid: world.rbGrid });
+  // fpData (W2-B): đỉnh footprint đi cùng rbGrid → tán cây cách mặt tiền ≥ 1,5 m (dời tán ra phía lòng đường)
+  const trees = veg.buildTrees(scene, { groundHeight, R: BUILD_RADIUS, lakeSD, hdTreeBelt, colliders, fpGrid: world.rbGrid, fpData: world.rbData });
   world.trees = trees;                        // stats()/setSeason(0..1) — __hp.scene… hoặc world.trees.stats()
   world.treeBloomNear = trees.bloomNear;      // cánh phượng rơi quanh cây đang nở gần người chơi (petals.js)
   loadHeroTrees(trees);  // nạp GLB cây phượng ảnh-thật → LOD gần ≤150 m (bất đồng bộ)
