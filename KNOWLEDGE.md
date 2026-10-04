@@ -368,6 +368,74 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-10-04 (Đợt 3 WP5 LIGHT)** [TRỜI · ĐÈN · IBL · AO · SƯƠNG · GRADE · BÓNG · NƯỚC · VẬT LIỆU GLB · VỆ TINH · ẤM MÁY]:
+    File: `js/skymodel.js` (mới), `js/post.js` (mới), `js/water.js` (mới), `js/daynight.js` (viết lại), `js/main.js`
+    (renderer/hậu kỳ/autoQuality/vệ tinh/ấm máy), `js/assets.js` (applyGlbMaterialPolicy/setGlbLighting), `js/device.js`
+    (`GFX` — núm chất lượng ánh sáng, CHỈ theo TIER), `js/world.js` (khối nước → water.js).
+    **(1) Trời** = tán xạ đơn Rayleigh+Mie (air mass Kasten–Young, pha đẳng hướng bù tán xạ bội, ozone, chạng vạng/đêm/
+    quầng đèn phố cộng thêm) — JS và GLSL CÙNG công thức trong skymodel.js (sửa một bên phải sửa bên kia; hằng số chỉ
+    theo mặt trời `skyK`/truyền qua/màu nắng lên mây tính ở JS → uniform). Mặt trời THIÊN VĂN (vĩ độ 20,86°, xích vĩ
+    −4,5° đầu tháng 10 như bộ pano, chính ngọ 11:45): mọc ~5:50, trưa cao 64° về phía NAM, lặn ~17:40; dưới −1° nắng = 0.
+    Vòm: đĩa mặt trời + quầng Mie + mây fbm trôi + sao + trăng; có `<tonemapping_fragment>`/`<colorspace_fragment>`.
+    Vòm vẽ SAU CÙNG nhóm đục, `gl_Position.z = w` + depthTest → shader trời chỉ chạy ở pixel trời trống (full-screen
+    1,1-1,4 ms trên 890M). Hiển thị BAN NGÀY ×1,2 + bão hoà 45%: trời HP thật MÙ ẨM — trung vị vùng trời cao ~30-40° của
+    160 pano ngẫu nhiên = sRGB(186,198,211); bản đầu (×0,76, bão hoà 100%) ra (142,175,210) xanh đậm, tối. Chạng vạng/
+    đêm trộn về ×0,76/100% theo độ cao mặt trời (giữ màu hoàng hôn, giờ xanh).
+    **(2) Đèn** — BỘ CỐ ĐỊNH 2 đèn (program key không đổi): HemisphereLight + 1 DirectionalLight có bóng = MẶT TRỜI ban
+    ngày, TRĂNG ban đêm (đổi hướng lúc cường độ ≈ 0; bỏ moonGlow). Trưa: nắng ≈ 3,5 : bán cầu ≈ 0,8 (chiếu sáng trời
+    ×0,55, khử bão hoà còn 25% — bóng râm chỉ hơi lạnh). Lambert/Standard three r160 = albedo/π × chiếu sáng ("tường
+    trắng dưới nắng trưa ≈ 1"). Phơi sáng THÍCH NGHI = 0,92 × sqrt(trưa/hiện tại), trần ×4. Đêm: `moonAmb` + `cityAmb`
+    ấm (đèn phố/cửa hàng; đất ×1, trời ×0,5) — thiếu nó hẻm lúc 21:00 đen kịt sRGB ≈ 15-20.
+    **(3) IBL**: PMREM nướng từ CHÍNH vòm trời (cube 128 TIER ≥ 2, 64 TIER ≤ 1) mỗi 3 s hoặc khi giờ nhảy, 0,5-1,4 ms
+    GPU/lần. BẪY: phải nướng vào MỘT RT cố định — đổi texture object của scene.environment (2 RT luân phiên) làm MỌI
+    MeshStandardMaterial đi qua getProgram (`materialProperties.envMap !== envMap` → needsProgramChange) mỗi lần nướng.
+    **(4) Tone/grade**: `CustomToneMapping` = ACES của three r160 + grade nhẹ (sat 1,03, toe 0,012) cài vào ShaderChunk
+    TRƯỚC khi compile → composer (FinalPass) và đường vẽ thẳng (TIER ≤ 1) ra CÙNG màu; bỏ GradeShader be cũ (sat 0,88 +
+    ám vàng). AgX r160 đã thử: ép trời xanh thành xám chì. Phơi sáng thay đổi theo giờ nên phần TỰ PHÁT SÁNG (emissive,
+    MeshBasic/Line/Points/Sprite) nhân `HP_UNLIT_K = 1,18/exposure` (post.js, vá ShaderChunk/ShaderLib) → đèn/cửa sổ/
+    chân dung nhà hát hiển thị như cũ ở mọi giờ, không cháy trắng ban đêm. ShaderMaterial tự viết có phần tự sáng phải
+    tự nhân (`UNLIT_DECL`).
+    **(5) Hậu kỳ** (TIER ≥ 2, `GFX.post`): SceneAOPass vẽ cảnh vào RT riêng MSAA 4× + DepthTexture (canvas
+    `antialias:false`, RT composer KHÔNG MSAA — trước MSAA ×3 chỗ) → SAO nửa phân giải (pháp tuyến dựng từ depth, xoay
+    Bayer 4×4 + mờ 4×4 theo độ sâu, upsample theo độ sâu, mờ dần 140-320 m, chạy cả camera trực giao) → UnrealBloom CHỈ
+    khi night > 0,04 (ngưỡng chia theo exposure) → FinalPass (tone + grade + sRGB + dither). AO = 0,26-0,32 ms GPU ở
+    1280×720 trên Radeon 890M → bật cả TIER 2 (8 mẫu; TIER 3 12 mẫu). FinalPass 0,17 ms. Công cụ: `__hp.post.timeAO()`
+    (đồng bộ bằng readPixels 1 px — `gl.finish` của Chrome KHÔNG chờ GPU, đo ra 0,01 ms vô nghĩa).
+    **(6) Sương** FogExp2 density 0,00075 (150 m 1,3%, 800 m 30%, 1600 m 76%), GIỐNG NHAU mọi tier, chọn 1 lần; màu =
+    chân trời hiển thị theo hướng nhìn (mép phố xa tan vào trời). Nấc chất lượng 3/TIER 0 nhân density ×1,6 (KHÔNG đổi
+    kiểu sương = không biên dịch lại). 0,00085 thử trước: góc cao bị "sữa" mất tương phản.
+    **(7) Bóng**: tâm hộp SNAP theo texel trong hệ toạ độ đèn (hết bò mép); `GFX.shadowMap/shadowBox` (TIER 3: 2048/±110 m,
+    TIER ≤ 2: 1024/±70 m). autoQuality KHÔNG BAO GIỜ bật/tắt castShadow nữa: nấc 1 = AO + bloom tắt, PR ≤ 1,2, map ≤ 1024;
+    nấc 2 = map 512 + nhịp làm mới ×2,5, PR 1; mục tiêu fps TUYỆT ĐỐI ≤ 60 (màn 120/144 Hz từng bị hạ cấp oan); đổi mapSize
+    luôn ép `shadowMap.needsUpdate` (bug cũ: khung có map null = cả hộp bóng tối đen). `navigator.webdriver` hoặc `?aq=0`
+    → autoQuality tắt (QA tất định). Chưa làm tầng bóng xa (CSM).
+    **(8) Nước** (`water.js`, MỘT nguồn màu — daynight KHÔNG ghi màu nước nữa): MeshStandardMaterial ĐỤC (roughness 0,12,
+    normal 0,15) phản chiếu IBL trời + Fresnel GGX (nhìn thẳng xuống thấy màu nước, nhìn xiên thấy trời); bản đồ bờ/hồ
+    DataTexture 512² (ô 8 m, ±2048 m): R = khoảng cách có dấu tới bờ (waterSD, 128 = mép), G = hồ; sông xám ô liu
+    0x5c625a (ảnh vệ tinh sông Cấm ≈ (93,103,92), game đo (88,94,87)), hồ 0x34443f, dải bùn ven bờ 1-16 m. Dựng 11 ms
+    (lọc thô 32 m rồi 30,8k mẫu mịn sát bờ). onBeforeCompile bám chunk `color_fragment`/`roughnessmap_fragment`.
+    **(9) GLB** (đọc JSON + giải ảnh trong GLB): 11 file có emissiveFactor [1,1,1] + emissive map. 6 map ĐEN THUẦN
+    (buudien, dennghe, dentamky, dinhhk, nhnn, lechan — trung bình 0) → bỏ map + emissive 0 trước compile (bớt VRAM);
+    4 map GIỐNG ALBEDO (baotang, thptnq, quanhoa, nhatho) → emissiveIntensity = night × 0,42 (= đèn pha mặt tiền ban đêm,
+    ban ngày 0 — trước tự sáng bẹt dưới nắng); **nhahat KHÔNG ĐỤNG** (chân dung). envMapIntensity 0,5 (GLB còn nhận đèn
+    bán cầu — tránh cộng đôi ánh sáng nền).
+    **(10) Vệ tinh** `__hp.aerial`: sương 0, hộp bóng trực giao phủ CẢ khung (map 4096), phơi sáng ×0,82, instcull/
+    far-hide lấy TÂM KHUNG (trước bám người chơi), vẽ qua composer (cùng tone/AO).
+    **(11) Ấm máy**: compileAsync với RT cảnh composer đang bind (đúng biến thể NoToneMapping/linear — trước biên dịch
+    biến thể màn hình vô dụng); trước Start không vẽ tới khi compile xong (lưới an toàn 12 s); `__hp.timing`
+    (compileSync 107-169 ms, khung đầu 1,7 s — vẫn sau màn chờ). Camera near 0,1 → 0,3 (depth xa tốt ×3).
+    **(12) Thời gian**: DAY_LENGTH 300 → 1440 s (24 phút), bắt đầu 09:00; `?time=14.5 | 14:30 | 0.6` + `&timefreeze=1`.
+    **ĐO** (Chrome headless d3d11, Radeon 890M, 1280×720, TIER 3, base 6a57acc vs WP5 CÙNG PHIÊN dưới khoá GPU, autoQuality
+    khoá): hpReady 19,4 → 16,9 s; heap 903 → 678 MB; cam_spawn 56,9 → 57,5 fps (738 → 726 call, 4,88 M tam giác);
+    pano_007_h090 47,8 → 55,7 (1590 → 1578 call, 7,90 M); cam_high_center 49,9 → 55,7 (1173 → 1161, 7,44 M); game_3
+    (vệ tinh) 56,9 → 49,2 (map bóng 4096 phủ khung — chỉ chế độ QA). fps chạm trần vsync 60 nên chênh vài fps là nhiễu.
+    Làm mới bóng +0,7..6,2 ms/lần (không đổi). **BẪY ĐO**: số fps WP5 cũ 21-30 (đo lúc 8 Chrome GPU chạy song song) là
+    nhiễu — luôn đo dưới `tools/qa/gpulock.mjs`; Bash nền không đặt timeout chết ở 30 phút, giết luôn tiến trình đang
+    GIỮ khoá → khoá mồ côi chặn mọi agent (gpulock chỉ cướp khoá sau 20 phút) — đặt timeout tối đa.
+    **GHI NHẬN cho WP khác**: độ sáng nửa dưới khung pano: thật trung vị 117, game 68, trong khi highlight game (p98 216)
+    còn sáng hơn ảnh thật (198) → tối là do ALBEDO (nhựa đường `mat(0x4c5158)` quá đen so với mặt đường bụi xám sáng
+    ~sRGB 110-120 trong pano), KHÔNG được bù bằng phơi sáng.
+
 - **2026-09-07 (di)** [ĐỢT 2 TÍCH HỢP — 6 nhánh worktree song song + 6 phản biện đối kháng, gộp trên `dot2-int`]:
     Quy trình: mỗi nhánh (W1 merge-budget, W2 ground-grid, W3 landmark-lod, W4 visual, W5 hydro-polygon-water,
     W6 landmark-placement) làm trong worktree riêng, tự đo trước/sau trên GPU thật, có agent phản biện đọc diff +

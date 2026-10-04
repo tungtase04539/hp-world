@@ -44,9 +44,11 @@ function parseTimeParam() {
 // NÚM ÁNH SÁNG (một chỗ; daynight đọc lại MỖI khung → QA chỉnh sống qua __hp.dayNight.LIGHT, không cần nạp lại trang).
 // Đơn vị: tuyến tính trước tone mapping, "tường trắng dưới nắng trưa ≈ 1" (skymodel.js).
 export const LIGHT = {
-  // Sương exp2: 150 m 1,6%, 400 m 11%, 800 m 37%, 1200 m 65%, 1600 m 84% (mép BUILD_RADIUS tan), 2600 m 99%.
-  fogDensity: 0.00085,
-  fogNearView: 1.6,          // nấc chất lượng 3 (ẩn ô > 1450 m): 1300 m ≈ 95%
+  // Sương exp2: 150 m 1,3%, 400 m 8,6%, 800 m 30%, 1200 m 55%, 1600 m 76% (mép BUILD_RADIUS chìm), 2600 m 98%.
+  // (0,00085 thử trước: góc cao 160 m nhìn xa bị "sữa" mất tương phản cả nửa khung — bản cũ tuyến tính 700→2600 m
+  // chỉ 47% ở 1600 m.) Màu sương = chân trời hiển thị nên mép phố xa tan vào trời, không thành vạch.
+  fogDensity: 0.00075,
+  fogNearView: 1.6,          // nấc chất lượng 3 (ẩn ô > 1450 m): 1300 m ≈ 91%
   // Phơi sáng: thích nghi mắt theo độ rọi ngang so với trưa, gain = (trưa/hiện tại)^0,5, TRẦN ×4 (bản đầu ×10 làm
   // chạng vạng/đêm sáng như ngày âm u dưới bầu trời tối — sai thứ tự sáng: trời phải sáng hơn phố lúc chạng vạng).
   exposure: 0.92, maxGain: 4.0,

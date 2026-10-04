@@ -454,7 +454,7 @@ const REDUCED_MOTION = window.matchMedia && window.matchMedia('(prefers-reduced-
 let _nearTiles = null, _nearCullLast = 0;
 let _instScanAt = -9999;
 function enableNearView() {
-  dayNight.setNearView(true);                 // sương exp2 dày ×1.6 (1300 m ≈ 95%) — CÙNG kiểu sương, không biên dịch lại
+  dayNight.setNearView(true);                 // sương exp2 dày ×1.6 (1300 m ≈ 91%) — CÙNG kiểu sương, không biên dịch lại
   camera.far = 1650; camera.updateProjectionMatrix();
   _nearTiles = [];
   scene.traverse((o) => {
