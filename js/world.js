@@ -10,6 +10,7 @@ import {
   nearestRiverPoint, findShore, addPier, LAKE_POLY, lakeSD, HOSEN_POLY, hoSenSD,
 } from './terrain.js';
 import { LM_SIZE, FACADE_SHORT_SIDE } from './mapdata.js';
+import { makeWaterMaterial } from './water.js';
 import { STREETS, INTERSECTIONS, MEDIANS, GARDENS } from './mapdata.js';
 import { SIDEWALK_BY_ROAD, SIDEWALK_DEFAULT } from './sidewalks.js';
 import { PANO_SIDES } from './panosides.js';
@@ -788,48 +789,8 @@ export function buildWorld(scene) {
   }
 
   // ---------- Mặt nước ----------
-  // Normal map nước THỦ TỤC 256² LẶP ĐƯỢC: value-noise 3 tầng (lưới 8/16/32, bọc mép → tile liền) → cao độ →
-  // pháp tuyến (sai phân trung tâm bọc mép) → mã hoá RGB. Ô 9 m. Giá ≈ 0: vẫn 1 plane 2 tam giác, +1 lần lấy
-  // mẫu texture. (Kiểm toán 2026-09: nước phẳng shininess 3 nhìn y hệt mặt đường nhựa.)
-  const waterNormal = (() => {
-    const N = 256, hgt = new Float32Array(N * N);
-    let s = 7;
-    const rnd = () => { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; };
-    for (const [P, amp] of [[8, 1], [16, 0.5], [32, 0.25]]) {
-      const lat = new Float32Array(P * P); for (let i = 0; i < lat.length; i++) lat[i] = rnd();
-      const sc = P / N;
-      for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
-        const fx = x * sc, fy = y * sc, x0 = fx | 0, y0 = fy | 0, x1 = (x0 + 1) % P, y1 = (y0 + 1) % P;
-        const tx = fx - x0, ty = fy - y0, sx = tx * tx * (3 - 2 * tx), sy = ty * ty * (3 - 2 * ty);
-        const top = lat[y0 * P + x0] + (lat[y0 * P + x1] - lat[y0 * P + x0]) * sx;
-        const bot = lat[y1 * P + x0] + (lat[y1 * P + x1] - lat[y1 * P + x0]) * sx;
-        hgt[y * N + x] += amp * (top + (bot - top) * sy);
-      }
-    }
-    const cv = document.createElement('canvas'); cv.width = cv.height = N;
-    const g2 = cv.getContext('2d'), img = g2.createImageData(N, N), px = img.data;
-    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
-      const dx = hgt[y * N + (x + 1) % N] - hgt[y * N + (x + N - 1) % N];
-      const dy = hgt[((y + 1) % N) * N + x] - hgt[((y + N - 1) % N) * N + x];
-      const nx = -dx * 6, ny = -dy * 6, l = Math.hypot(nx, ny, 1), i = (y * N + x) * 4;
-      px[i] = (nx / l * 0.5 + 0.5) * 255; px[i + 1] = (ny / l * 0.5 + 0.5) * 255; px[i + 2] = (1 / l * 0.5 + 0.5) * 255; px[i + 3] = 255;
-    }
-    g2.putImageData(img, 0, 0);
-    const t = new THREE.CanvasTexture(cv);   // KHÔNG qua makeTex: normal map phải ở colorSpace tuyến tính
-    t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(W / 9, D / 9); t.anisotropy = 4;
-    return t;
-  })();
-  // Đợt 3 WP5: nước = MeshStandardMaterial ĐỤC (phù sa) — phản chiếu bầu trời bằng IBL PMREM nướng từ vòm trời
-  // (daynight.js), Fresnel/GGX vật lý: nhìn thẳng xuống (vệ tinh) chỉ ~2-4% phản xạ → thấy MÀU NƯỚC xám-lục ô liu như
-  // ảnh vệ tinh thật; nhìn xiên ở tầm mắt → phản chiếu chân trời sáng + vệt nắng lấp lánh qua normal map lăn tăn.
-  // KHÔNG trong suốt nữa (bản cũ opacity 0.82 làm lộ lòng sông/bậc đáy — kiểm toán §3 #38). MỘT nguồn màu: chính
-  // dòng này (daynight KHÔNG ghi đè màu mỗi khung nữa — trời/IBL tự tối về đêm). Hack Fresnel onBeforeCompile của
-  // Phong bị bỏ cùng (Standard đã có Schlick theo N·V).
-  const waterMat = new THREE.MeshStandardMaterial({
-    color: 0x55604c, roughness: 0.12, metalness: 0.0,
-    normalMap: waterNormal, normalScale: new THREE.Vector2(0.15, 0.15),
-  });
-  waterMat.name = 'water';
+  // Đợt 3 WP5: vật liệu + normal map + bản đồ bờ/hồ ở js/water.js (MỘT nguồn màu nước). Vẫn 1 plane 2 tam giác.
+  const { mat: waterMat, normal: waterNormal } = makeWaterMaterial(W, D);
   const water = new THREE.Mesh(new THREE.PlaneGeometry(W, D, 1, 1), waterMat);
   water.rotation.x = -Math.PI / 2;
   water.position.set(CX, 0, CZ);

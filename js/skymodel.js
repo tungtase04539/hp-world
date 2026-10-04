@@ -76,17 +76,20 @@ const PR = (mu) => 3 / (16 * Math.PI) * (1 + mu * mu);
 function PM(mu) { const g = ATM.g, d = 1 + g * g - 2 * g * mu; return (1 - g * g) / (4 * Math.PI * d * Math.sqrt(d)); }
 
 // Chạng vạng + đêm (cộng thêm, theo kênh) — cùng công thức với GLSL skyExtra()
-const TW_HZ = [0.150, 0.065, 0.026], TW_ZEN = [0.014, 0.024, 0.060];
-const NIGHT_ZEN = [0.0030, 0.0042, 0.0080], CITY = [0.0150, 0.0100, 0.0055];   // nền đêm + quầng đèn phố (mù ẩm hắt sáng cam)
+// chạng vạng: TW_HZ = dải cam phía mặt trời, TW_AWAY = "vành đai Venus" hồng-tím phía đối diện (bản đầu chỉ có dải
+// cam ×0,25 → chân trời phía Đông nâu đục), TW_ZEN = thiên đỉnh xanh giờ xanh.
+const TW_HZ = [0.150, 0.065, 0.026], TW_AWAY = [0.030, 0.027, 0.042], TW_ZEN = [0.016, 0.030, 0.080];
+const NIGHT_ZEN = [0.0032, 0.0048, 0.0105], CITY = [0.0150, 0.0100, 0.0055];   // nền đêm + quầng đèn phố (mù ẩm hắt sáng cam)
 function skyExtra(v, s, c) {
   const el = elevDeg(s[1]);
-  const tw = smooth(-10, -1.5, el) * (1 - smooth(-1.5, 5, el));          // "giờ xanh" quanh lúc mặt trời lặn/mọc
+  const tw = smooth(-12, -2, el) * (1 - smooth(-1.5, 5, el));            // "giờ xanh" quanh lúc mặt trời lặn/mọc
   const vy = Math.max(v[1], 0);
   const hz = Math.exp(-vy * 5);
   const hl = Math.hypot(s[0], s[2]) || 1, vl = Math.hypot(v[0], v[2]) || 1;
   const toward = Math.max(0, (v[0] * s[0] + v[2] * s[2]) / (hl * vl));
   const night = 1 - smooth(-12, -3, el);
-  return tw * (TW_HZ[c] * hz * (0.25 + 0.75 * toward * toward) + TW_ZEN[c] * (1 - 0.5 * hz))
+  const t2 = toward * toward;
+  return tw * (hz * (TW_HZ[c] * (0.1 + 0.9 * t2) + TW_AWAY[c] * (1 - t2)) + TW_ZEN[c] * (1 - 0.5 * hz))
     + night * (NIGHT_ZEN[c] + CITY[c] * Math.exp(-vy * 7));
 }
 
@@ -150,12 +153,13 @@ float skyAirMass(float sinEl) {
 }
 vec3 skyExtra(vec3 v, vec3 s) {
   float el = skyElev(s.y);
-  float tw = skySmooth(-10.0, -1.5, el) * (1.0 - skySmooth(-1.5, 5.0, el));
+  float tw = skySmooth(-12.0, -2.0, el) * (1.0 - skySmooth(-1.5, 5.0, el));
   float vy = max(v.y, 0.0);
   float hz = exp(-vy * 5.0);
   float toward = max(0.0, dot(normalize(v.xz + 1e-5), normalize(s.xz + 1e-5)));
   float night = 1.0 - skySmooth(-12.0, -3.0, el);
-  return tw * (${v3(TW_HZ)} * hz * (0.25 + 0.75 * toward * toward) + ${v3(TW_ZEN)} * (1.0 - 0.5 * hz))
+  float t2 = toward * toward;
+  return tw * (hz * (${v3(TW_HZ)} * (0.1 + 0.9 * t2) + ${v3(TW_AWAY)} * (1.0 - t2)) + ${v3(TW_ZEN)} * (1.0 - 0.5 * hz))
     + night * (${v3(NIGHT_ZEN)} + ${v3(CITY)} * exp(-vy * 7.0));
 }
 vec3 skyRadiance(vec3 v, vec3 s) {

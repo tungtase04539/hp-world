@@ -41,24 +41,29 @@ function parseTimeParam() {
   } catch (e) { return { t: null, freeze: false }; }
 }
 
-// Sương: exp2 — 150 m 1,6%, 400 m 11%, 800 m 37%, 1200 m 65%, 1600 m 84% (mép BUILD_RADIUS tan), 2600 m 99%.
-const FOG_DENSITY = 0.00085;
-const FOG_NEAR_VIEW = 1.6;           // nấc chất lượng 3 (ẩn ô > 1450 m): 1300 m ≈ 95%
-// Phơi sáng: thích nghi mắt nhẹ theo độ rọi ngang (trưa = 1) — chiều/tối mở thêm, đêm tối đa ×NIGHT.
-const EXPOSURE = 0.92, EXPOSURE_MAX_GAIN = 10.0;
-// Ảnh VỆ TINH: máy ảnh vệ tinh phơi sáng thấp hơn mắt người (ảnh Google Earth tối & tương phản hơn) — chỉ áp ở aerial().
-const AERIAL_EXPOSURE = 0.82;
-// Thang của mô hình trời (skymodel.js) → 3 nơi dùng:
-//  - vòm HIỂN THỊ ×0,76 (khớp màu pano thật qua tone mapping: thiên đỉnh ≈ sRGB(90,140,210), chân trời ≈ (196,210,228));
-//  - đèn bán cầu/IBL ×0,55 và KHỬ BÃO HOÀ còn 25% (bầu trời thật + mây + tường quanh phố dội lại → bóng râm chỉ hơi
-//    lạnh, không xanh lét; tỉ lệ nắng : bán cầu lúc trưa ≈ 3,5 : 0,8 theo SPEC);
-//  - màu sương = chân trời hiển thị khử bão hoà 35% (mù ẩm HP xám trắng).
-const SKY_VIEW_GAIN = 0.76;
-const HEMI_SCALE = 0.55, HEMI_SAT = 0.25, HAZE_DESAT = 0.35;
-const GROUND_ALBEDO = [0.17, 0.155, 0.135];   // mặt phố (nhựa/gạch/mái) — màu ánh dội cho hemi.groundColor
-const MOON_E = [0.090, 0.110, 0.160];        // trăng (đèn chủ ban đêm — có bóng mờ)
-const MOON_AMB = [0.040, 0.052, 0.085];      // bầu trời đêm có trăng + ánh đèn phố dội (hemi) — đêm vẫn đọc được phố
-const CLOUD_COVER = 0.40;
+// NÚM ÁNH SÁNG (một chỗ; daynight đọc lại MỖI khung → QA chỉnh sống qua __hp.dayNight.LIGHT, không cần nạp lại trang).
+// Đơn vị: tuyến tính trước tone mapping, "tường trắng dưới nắng trưa ≈ 1" (skymodel.js).
+export const LIGHT = {
+  // Sương exp2: 150 m 1,6%, 400 m 11%, 800 m 37%, 1200 m 65%, 1600 m 84% (mép BUILD_RADIUS tan), 2600 m 99%.
+  fogDensity: 0.00085,
+  fogNearView: 1.6,          // nấc chất lượng 3 (ẩn ô > 1450 m): 1300 m ≈ 95%
+  // Phơi sáng: thích nghi mắt theo độ rọi ngang so với trưa, gain = (trưa/hiện tại)^0,5, TRẦN ×4 (bản đầu ×10 làm
+  // chạng vạng/đêm sáng như ngày âm u dưới bầu trời tối — sai thứ tự sáng: trời phải sáng hơn phố lúc chạng vạng).
+  exposure: 0.92, maxGain: 4.0,
+  aerialExposure: 0.82,      // ảnh VỆ TINH: máy ảnh vệ tinh phơi sáng thấp hơn mắt người (Google Earth tối & tương phản hơn)
+  // Thang của mô hình trời (skymodel.js) → 3 nơi dùng:
+  //  - vòm HIỂN THỊ ×0,76 (khớp màu pano thật qua tone mapping: thiên đỉnh ≈ sRGB(90,140,210), chân trời ≈ (196,210,228));
+  //  - đèn bán cầu/IBL ×0,55 và KHỬ BÃO HOÀ còn 25% (bầu trời thật + mây + tường quanh phố dội lại → bóng râm chỉ hơi
+  //    lạnh, không xanh lét; tỉ lệ nắng : bán cầu lúc trưa ≈ 3,5 : 0,8 theo SPEC);
+  //  - màu sương = chân trời hiển thị khử bão hoà 35% (mù ẩm HP xám trắng).
+  skyViewGain: 0.76, hemiScale: 0.55, hemiSat: 0.25, hazeDesat: 0.35,
+  groundAlbedo: [0.17, 0.155, 0.135],   // mặt phố (nhựa/gạch/mái) — màu ánh dội cho hemi.groundColor
+  // ĐÊM: trăng (đèn chủ, có bóng mờ) + "nền đêm" (trời có trăng + đèn phố dội lên mù ẩm) cộng vào bán cầu. Chỉ bật
+  // khi mặt trời đã xuống dưới moonFade[0]° và đầy đủ ở moonFade[1]° — giờ xanh (0..−8°) do CHÍNH bầu trời chiếu sáng,
+  // trăng cộng sớm sẽ sáng hơn trời chạng vạng (bug bản đầu: phố trắng dưới trời nâu sẫm lúc 18:15).
+  moonE: [0.060, 0.075, 0.112], moonAmb: [0.014, 0.018, 0.030], moonFade: [-5, -13],
+  cloud: 0.40,
+};
 
 const SKY_VS = /* glsl */`
   varying vec3 vDir;
@@ -160,15 +165,15 @@ export function createDayNight(scene, world) {
   scene.add(sun.target);
 
   // ---- sương + nền ----
-  scene.fog = new THREE.FogExp2(0xc4d2de, FOG_DENSITY);
+  scene.fog = new THREE.FogExp2(0xc4d2de, LIGHT.fogDensity);
   scene.background = new THREE.Color(0xc4d2de);   // dự phòng (vòm trời phủ kín)
 
   // ---- vòm trời ----
   const mkUniforms = () => ({
     uSunDir: { value: new THREE.Vector3(0, 1, 0) }, uMoonDir: { value: new THREE.Vector3(0, -1, 0) },
     uFog: { value: new THREE.Color() }, uGround: { value: new THREE.Color() },
-    uTime: { value: 0 }, uCloud: { value: GFX.clouds ? CLOUD_COVER : 0 }, uNight: { value: 0 },
-    uHaze: { value: 1 }, uGain: { value: SKY_VIEW_GAIN }, uEnv: { value: 0 }, uSat: { value: 1 },
+    uTime: { value: 0 }, uCloud: { value: GFX.clouds ? LIGHT.cloud : 0 }, uNight: { value: 0 },
+    uHaze: { value: 1 }, uGain: { value: LIGHT.skyViewGain }, uEnv: { value: 0 }, uSat: { value: 1 },
   });
   const skyMat = new THREE.ShaderMaterial({
     name: 'HPSky', uniforms: mkUniforms(), vertexShader: SKY_VS, fragmentShader: SKY_FS,
@@ -192,7 +197,7 @@ export function createDayNight(scene, world) {
     name: 'HPSkyEnv', uniforms: mkUniforms(), vertexShader: SKY_VS, fragmentShader: SKY_FS,
     side: THREE.BackSide, depthWrite: false, depthTest: false, fog: false,
   });
-  envMat.uniforms.uEnv.value = 1; envMat.uniforms.uGain.value = HEMI_SCALE; envMat.uniforms.uHaze.value = 0;
+  envMat.uniforms.uEnv.value = 1; envMat.uniforms.uGain.value = LIGHT.hemiScale; envMat.uniforms.uHaze.value = 0;
   envMat.uniforms.uSat.value = 0.45;   // IBL: trời khử bão hoà (khớp đèn bán cầu) — phản chiếu GLB/nước không xanh lét
   const envScene = new THREE.Scene();
   envScene.add(new THREE.Mesh(skyGeo, envMat));
@@ -228,7 +233,7 @@ export function createDayNight(scene, world) {
   const _fogTarget = new THREE.Color(), _ground = new THREE.Color();
   let _fogInit = false;
   const out = { night: 0, sunEl: 0, hours: 0 };
-  const NOON_ADAPT = (() => { sunDirection(12, sA); sunIrradiance(sA[1], E); skyIrradiance(sA, Esky); return lum(Esky) * HEMI_SCALE + lum(E) * sA[1]; })();
+  const NOON_ADAPT = (() => { sunDirection(12, sA); sunIrradiance(sA[1], E); skyIrradiance(sA, Esky); return lum(Esky) * LIGHT.hemiScale + lum(E) * sA[1]; })();
   function lum(c) { return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; }
 
   // tính toàn bộ đèn/trời cho giờ hiện tại (không phụ thuộc camera)
@@ -246,25 +251,27 @@ export function createDayNight(scene, world) {
     // trăng: gần đối diện mặt trời (trăng tròn), lệch Nam một chút cho đẹp bóng
     _moon.set(-sA[0], -sA[1], -sA[2] + 0.25).normalize();
     const moonEl = Math.asin(_moon.y) * 180 / Math.PI;
-    const moonW = smooth(-1, -7, el) * smooth(-2, 6, moonEl);
+    const L_ = LIGHT, mA = smooth(L_.moonFade[0], L_.moonFade[1], el);   // trọng số "đêm thật" (sau giờ xanh)
+    const moonW = mA * smooth(-2, 6, moonEl);
     // đèn chủ: mặt trời khi còn trên chân trời, trăng sau đó (đổi hướng lúc cường độ ≈ 0 → không giật)
     if (el > -1.5) { _key.copy(_sun); sun.color.setRGB(E[0], E[1], E[2]); }
-    else { _key.copy(_moon); sun.color.setRGB(MOON_E[0] * moonW, MOON_E[1] * moonW, MOON_E[2] * moonW); }
+    else { _key.copy(_moon); sun.color.setRGB(L_.moonE[0] * moonW, L_.moonE[1] * moonW, L_.moonE[2] * moonW); }
     const kmax = Math.max(sun.color.r, sun.color.g, sun.color.b, 1e-6);
     sun.intensity = kmax; sun.color.multiplyScalar(1 / kmax);
     // bán cầu: trời = chiếu sáng bầu trời (+ trăng/đèn phố đêm); đất = phố dội (nắng ngang + trời) × albedo
-    const mA = smooth(-1, -8, el);
     const ls = lum(Esky);
-    for (let c = 0; c < 3; c++) Esky[c] = (ls + HEMI_SAT * (Esky[c] - ls)) * HEMI_SCALE;
-    hemi.color.setRGB(Esky[0] + MOON_AMB[0] * mA, Esky[1] + MOON_AMB[1] * mA, Esky[2] + MOON_AMB[2] * mA);
+    for (let c = 0; c < 3; c++) Esky[c] = (ls + L_.hemiSat * (Esky[c] - ls)) * L_.hemiScale;
+    const MA = L_.moonAmb, GA = L_.groundAlbedo;
+    hemi.color.setRGB(Esky[0] + MA[0] * mA, Esky[1] + MA[1] * mA, Esky[2] + MA[2] * mA);
     const sh = Math.max(sA[1], 0);
-    _ground.setRGB(GROUND_ALBEDO[0] * (E[0] * sh + Esky[0]), GROUND_ALBEDO[1] * (E[1] * sh + Esky[1]), GROUND_ALBEDO[2] * (E[2] * sh + Esky[2]));
-    hemi.groundColor.setRGB(_ground.r + MOON_AMB[0] * 0.5 * mA, _ground.g + MOON_AMB[1] * 0.5 * mA, _ground.b + MOON_AMB[2] * 0.5 * mA);
+    _ground.setRGB(GA[0] * (E[0] * sh + Esky[0]), GA[1] * (E[1] * sh + Esky[1]), GA[2] * (E[2] * sh + Esky[2]));
+    hemi.groundColor.setRGB(_ground.r + MA[0] * 0.5 * mA, _ground.g + MA[1] * 0.5 * mA, _ground.b + MA[2] * 0.5 * mA);
     hemi.intensity = 1;
-    // phơi sáng: thích nghi theo độ rọi ngang (trưa = 1)
-    const adapt = lum(Esky) + lum(E) * sh + 0.03 * mA;
-    if (_renderer) _renderer.toneMappingExposure = EXPOSURE * (aerial ? AERIAL_EXPOSURE : 1)
-      * Math.min(EXPOSURE_MAX_GAIN, Math.max(1, Math.pow(NOON_ADAPT / Math.max(adapt, 1e-4), 0.5)));
+    // phơi sáng: thích nghi theo độ rọi ngang (trưa = 1), trần ×maxGain
+    const adapt = lum(Esky) + lum(E) * sh + lum(MA) * mA;
+    if (_renderer) _renderer.toneMappingExposure = L_.exposure * (aerial ? L_.aerialExposure : 1)
+      * Math.min(L_.maxGain, Math.max(1, Math.sqrt(NOON_ADAPT / Math.max(adapt, 1e-4))));
+    skyMat.uniforms.uGain.value = L_.skyViewGain;
     for (const m of [skyMat, envMat]) {
       const u = m.uniforms;
       u.uSunDir.value.copy(_sun); u.uMoonDir.value.copy(_moon); u.uNight.value = night;
@@ -272,6 +279,8 @@ export function createDayNight(scene, world) {
     envMat.uniforms.uGround.value.copy(_ground).multiplyScalar(1 / Math.PI);
     return night;
   }
+
+  const fogDensity = () => (aerial ? 0 : LIGHT.fogDensity * (nearView ? LIGHT.fogNearView : 1));
 
   function fitShadow(playerPos) {
     let SBx = SB;
@@ -300,12 +309,13 @@ export function createDayNight(scene, world) {
     hzDir[0] = _lookDir.x * 0.9986; hzDir[1] = 0.052; hzDir[2] = _lookDir.z * 0.9986;
     skyRadiance(hzDir, sA, L);
     const lh = lum(L);
-    _fogTarget.setRGB((lh + (1 - HAZE_DESAT) * (L[0] - lh)) * SKY_VIEW_GAIN, (lh + (1 - HAZE_DESAT) * (L[1] - lh)) * SKY_VIEW_GAIN,
-      (lh + (1 - HAZE_DESAT) * (L[2] - lh)) * SKY_VIEW_GAIN);
+    const k = 1 - LIGHT.hazeDesat, g = LIGHT.skyViewGain;
+    _fogTarget.setRGB((lh + k * (L[0] - lh)) * g, (lh + k * (L[1] - lh)) * g, (lh + k * (L[2] - lh)) * g);
     if (!_fogInit || dt <= 0) { scene.fog.color.copy(_fogTarget); _fogInit = true; }
     else scene.fog.color.lerp(_fogTarget, 1 - Math.exp(-dt * 3));
     skyMat.uniforms.uFog.value.copy(scene.fog.color);
     scene.background.copy(scene.fog.color);
+    scene.fog.density = fogDensity();
   }
 
   applySky();
@@ -343,11 +353,12 @@ export function createDayNight(scene, world) {
         if (sm.mapSize.x !== GFX.shadowMap) { sm.mapSize.set(GFX.shadowMap, GFX.shadowMap); if (sm.map) { sm.map.dispose(); sm.map = null; } }
       }
       SH.updateProjectionMatrix();
-      scene.fog.density = aerial ? 0 : FOG_DENSITY * (nearView ? FOG_NEAR_VIEW : 1);
+      scene.fog.density = fogDensity();
       _shPos.set(1e9, 0, 1e9);   // ép làm mới bóng
     },
     // nấc chất lượng 3 / máy rất yếu: sương dày hơn để giấu ô thế giới bị ẩn ngoài 1450 m (CÙNG kiểu sương)
-    setNearView(on) { nearView = !!on; if (!aerial) scene.fog.density = FOG_DENSITY * (nearView ? FOG_NEAR_VIEW : 1); },
+    setNearView(on) { nearView = !!on; scene.fog.density = fogDensity(); },
+    LIGHT,
     bakeEnv,
     update(dt, playerPos, camera) {
       if (!frozen) dayT = (dayT + dt / DAY_LENGTH) % 1;
@@ -368,27 +379,25 @@ export function createDayNight(scene, world) {
       // IBL: nướng lại mỗi 3 s đồng hồ thật hoặc khi giờ nhảy (setTime / tua nhanh)
       if (now - _envAt > 3000 || Math.abs(dayT - _envT) > 0.004) bakeEnv();
 
-      // đèn đường, cửa sổ, hải đăng sáng về đêm. Phơi sáng đêm nay MỞ tới ×5 (thích nghi mắt) → chia lại cho phơi
-      // sáng để độ sáng HIỂN THỊ của đèn giữ như cũ (emissive × exposure ≈ hằng số, mốc cũ exposure 1.18) — không thì
-      // cửa sổ vàng ấm cháy thành trắng. Bloom threshold cũng theo phơi sáng (main.js).
+      // đèn đường, cửa sổ, hải đăng sáng về đêm. Phần TỰ PHÁT SÁNG hiển thị theo màn hình (post.js HP_UNLIT_K bù phơi
+      // sáng thích nghi) → giá trị dưới đây giữ nguyên thang cũ (mốc phơi sáng 1,18) ở mọi giờ.
       const glow = night;
-      const ek = 1.18 / (_renderer ? _renderer.toneMappingExposure : 1.18);
       const { sharedMats } = world;
       if (sharedMats) {
-        sharedMats.lampGlow.emissiveIntensity = glow * 1.6 * ek;
-        sharedMats.window.emissiveIntensity = glow * 1.1 * ek;
+        sharedMats.lampGlow.emissiveIntensity = glow * 1.6;
+        sharedMats.window.emissiveIntensity = glow * 1.1;
       }
       if (world.facadeMats) {
-        for (const m of world.facadeMats) m.emissiveIntensity = glow * 0.95 * ek;
+        for (const m of world.facadeMats) m.emissiveIntensity = glow * 0.95;
       }
       if (world.lighthouseLamp) {
-        world.lighthouseLamp.emissiveIntensity = (0.2 + glow * (1.2 + Math.sin(now * 0.004) * 0.8)) * ek;
+        world.lighthouseLamp.emissiveIntensity = 0.2 + glow * (1.2 + Math.sin(now * 0.004) * 0.8);
       }
       if (world.lighthouseBeam) {
         world.lighthouseBeam.mat.opacity = glow * 0.28;
       }
       // GLB địa danh: emissive tự phát sáng chỉ về đêm, IBL theo ngày (assets.js)
-      setGlbLighting(night, ek);
+      setGlbLighting(night);
       // Nước: màu do world.js quyết (MỘT nguồn); trời/IBL tự tối về đêm nên không ghi đè màu mỗi khung nữa.
       return out;
     },

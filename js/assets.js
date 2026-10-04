@@ -240,19 +240,18 @@ function applyGlbMaterialPolicy(root, url) {
       if (EMIS_BLACK.has(key)) {
         m.emissiveMap.dispose(); m.emissiveMap = null; m.emissive.setRGB(0, 0, 0); m.needsUpdate = true;
       } else if (EMIS_SELFLIT.has(key)) {
-        m.emissiveIntensity = Math.max(0, _lastNight) * SELF_LIT_NIGHT * _lastK;
+        m.emissiveIntensity = Math.max(0, _lastNight) * SELF_LIT_NIGHT;
         _selfLit.push(m);
       }
     }
   });
 }
-// daynight.update gọi mỗi khung; chỉ ghi khi đổi > 0,5% (vài chục material)
-// ek = bù phơi sáng (daynight: 1.18/exposure) để độ sáng hiển thị đèn pha không đổi khi mắt thích nghi đêm.
-let _lastK = 1;
-export function setGlbLighting(night, ek = 1) {
-  if (Math.abs(night - _lastNight) < 0.005 && Math.abs(ek - _lastK) < 0.01) return;
-  _lastNight = night; _lastK = ek;
-  for (let i = 0; i < _selfLit.length; i++) _selfLit[i].emissiveIntensity = night * SELF_LIT_NIGHT * ek;
+// daynight.update gọi mỗi khung; chỉ ghi khi đổi > 0,5% (vài chục material). Hiển thị không phụ thuộc phơi sáng thích
+// nghi (post.js HP_UNLIT_K bù cho mọi emissive).
+export function setGlbLighting(night) {
+  if (Math.abs(night - _lastNight) < 0.005) return;
+  _lastNight = night;
+  for (let i = 0; i < _selfLit.length; i++) _selfLit[i].emissiveIntensity = night * SELF_LIT_NIGHT;
 }
 
 function onLoaded(d, gltf) {

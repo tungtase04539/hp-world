@@ -52,8 +52,8 @@ const renderer = new THREE.WebGLRenderer({
 // Máy yếu ghim 1.0.
 renderer.setPixelRatio(TIER >= 3 ? Math.min(window.devicePixelRatio || 1, 1.5) : 1);
 renderer.setSize(window.innerWidth, window.innerHeight);
-// TONE MAPPING + GRADE DÙNG CHUNG mọi đường vẽ: CustomToneMapping = AgX r160 + look CDL nhẹ (post.js). PHẢI cài
-// trước khi bất kỳ shader nào biên dịch. Phơi sáng do daynight.js ghi mỗi khung (thích nghi ngày/đêm).
+// TONE MAPPING + GRADE DÙNG CHUNG mọi đường vẽ: CustomToneMapping = ACES của three r160 + grade nhẹ (post.js GRADE).
+// PHẢI cài trước khi bất kỳ shader nào biên dịch. Phơi sáng do daynight.js ghi mỗi khung (thích nghi ngày/đêm).
 installToneMapping(renderer);
 renderer.toneMappingExposure = 0.92;
 attachSkyRenderer(renderer);                      // daynight.js: nướng PMREM bầu trời (thay RoomEnvironment cũ)
@@ -570,9 +570,9 @@ function animate() {
     else if (cine.active) cine.update(dt); else updateCamera(dt);   // đạo diễn lo camera khi bật
     const sky = dayNight.update(dt, pState.pos, camera);   // camera: hộp bóng bám hướng nhìn
     // bloom CHỈ chạy khi trời tối (đèn phố/cửa sổ) — ban ngày tắt hẳn pass (tiết kiệm GPU; vùng sáng ban ngày đã do
-    // tone mapping AgX xử lý, bloom ngày làm mặt tường nắng loé "mơ màng")
-    // ngưỡng bloom tính trên giá trị TRƯỚC phơi sáng (FinalPass nhân sau) → chia theo phơi sáng để "chỉ đèn mới loé"
-    // đúng cả khi mắt thích nghi đêm (phơi sáng ×5)
+    // tone mapping ACES xử lý, bloom ngày làm mặt tường nắng loé "mơ màng").
+    // Ngưỡng bloom tính trên giá trị TRƯỚC phơi sáng (FinalPass nhân sau) → chia theo phơi sáng để "chỉ đèn mới loé"
+    // đúng cả khi mắt thích nghi đêm (phơi sáng tới ×4, daynight LIGHT.maxGain)
     if (bloomPass) {
       bloomPass.enabled = _bloomOK && sky.night > 0.04;
       bloomPass.strength = sky.night * 0.6;

@@ -41,10 +41,46 @@ function gradeGLSL(G) {
 
 const _STUB = 'vec3 CustomToneMapping( vec3 color ) { return color; }';
 let _origChunk = null;
+
+// ---------- 1b) Vật TỰ SÁNG / KHÔNG CHIẾU SÁNG hiển thị THEO MÀN HÌNH (không theo phơi sáng thích nghi) ----------
+// Phơi sáng nay thích nghi ngày/đêm (daynight: tới ×4 lúc đêm). Nếu nhân cả ánh sáng tự phát thì đèn đường, cửa sổ, biển
+// hiệu MeshBasic, nhãn sprite… cháy trắng lúc đêm (đo: chân dung nhà hát loé kín mặt tiền). Pipeline cũ phơi sáng CỐ ĐỊNH
+// 1,18 → mọi vật tự sáng hiển thị = giá trị × 1,18. Giữ ĐÚNG hiển thị đó ở mọi giờ: nhân phần tự phát với
+// HP_UNLIT_K = 1,18 / toneMappingExposure (FinalPass/tone mapping nhân lại phơi sáng → còn × 1,18 như cũ).
+//  - material CÓ chiếu sáng (Lambert/Phong/Standard/Toon): chỉ totalEmissiveRadiance (chunk emissivemap_fragment);
+//  - material KHÔNG chiếu sáng (MeshBasic/LineBasic, LineDashed, Points, Sprite): toàn bộ màu ra.
+// KHÔNG đổi giá trị material nào (chân dung nhà hát giữ nguyên emissive — chỉ cách HIỂN THỊ không đổi theo giờ).
+// Uniform `toneMappingExposure` do renderer tự đặt cho MỌI program có khai báo (WebGLRenderer.setProgram, refreshMaterial)
+// kể cả khi vẽ vào RT composer (NoToneMapping) → tự khai báo khi không có TONE_MAPPING.
+// ShaderMaterial / onBeforeCompile tự viết ánh sáng tự phát: nhân với HP_UNLIT_K (có sẵn sau <emissivemap_pars_fragment>)
+// hoặc tự khai báo như UNLIT_DECL.
+export const UNLIT_REF_EXPOSURE = 1.18;
+export const UNLIT_DECL = `
+#ifndef TONE_MAPPING
+uniform float toneMappingExposure;
+#endif
+#define HP_UNLIT_K ( ${UNLIT_REF_EXPOSURE.toFixed(3)} / max( toneMappingExposure, 1e-3 ) )
+`;
+function installUnlitDisplayReferred() {
+  const C = THREE.ShaderChunk;
+  if (C.emissivemap_pars_fragment.indexOf('HP_UNLIT_K') >= 0) return;
+  C.emissivemap_pars_fragment = UNLIT_DECL + C.emissivemap_pars_fragment;
+  C.emissivemap_fragment = C.emissivemap_fragment + '\ntotalEmissiveRadiance *= HP_UNLIT_K;\n';
+  for (const id of ['basic', 'dashed', 'points', 'sprite']) {
+    const L = THREE.ShaderLib[id];
+    if (!L || L.fragmentShader.indexOf('#include <opaque_fragment>') < 0 || L.fragmentShader.indexOf('#include <common>') < 0) {
+      console.warn('[post] ShaderLib.' + id + ' khác r160 — bỏ qua hiển thị-theo-màn-hình'); continue;
+    }
+    L.fragmentShader = L.fragmentShader.replace('#include <common>', '#include <common>' + UNLIT_DECL)
+      .replace('#include <opaque_fragment>', 'outgoingLight *= HP_UNLIT_K;\n\t#include <opaque_fragment>');
+  }
+}
+
 // Gọi 1 lần ở đầu main.js (TRƯỚC khi tạo bất kỳ material/compile nào). Đổi GRADE sau đó chỉ có tác dụng với FinalPass
 // (setGrade) — các shader vẽ thẳng đã biên dịch giữ hằng số cũ (đường vẽ thẳng chỉ là TIER ≤ 1/ảnh chụp vệ tinh).
 export function installToneMapping(renderer) {
   if (_origChunk === null) _origChunk = THREE.ShaderChunk.tonemapping_pars_fragment;
+  installUnlitDisplayReferred();
   if (_origChunk.indexOf(_STUB) < 0) { console.warn('[post] không tìm thấy stub CustomToneMapping (đổi bản three?)'); return; }
   THREE.ShaderChunk.tonemapping_pars_fragment = _origChunk.replace(_STUB, gradeGLSL(GRADE));
   renderer.toneMapping = THREE.CustomToneMapping;
@@ -88,7 +124,7 @@ export class FinalPass extends Pass {
     renderer.setRenderTarget(this.renderToScreen ? null : writeBuffer);
     this.fsQuad.render(renderer);
   }
-  // tinh chỉnh grade lúc chạy (chỉ đường composer) — công cụ QA: __hp.post.setGrade({power:[..], sat:..})
+  // tinh chỉnh grade lúc chạy (chỉ đường composer) — công cụ QA: __hp.post.finalPass.setGrade({sat:1.05, toe:0.01})
   setGrade(g) {
     Object.assign(GRADE, g);
     THREE.ShaderChunk.tonemapping_pars_fragment = _origChunk.replace(_STUB, gradeGLSL(GRADE));
@@ -99,7 +135,16 @@ export class FinalPass extends Pass {
 }
 
 // ---------- 2) + 3) Scene + AO ----------
-const AO_FS = /* glsl */`
+// Lấy mẫu KHÔNG đạo hàm trong vòng lặp (HLSL/ANGLE cảnh báo X3595 "gradient instruction used in a loop" và có thể
+// không unroll) — RT không mipmap nên LOD 0 = giống hệt texture2D.
+const TEX0 = /* glsl */`
+#if __VERSION__ >= 300
+#define HP_TEX0(t, uv) textureLod(t, uv, 0.0)
+#else
+#define HP_TEX0(t, uv) texture2D(t, uv)
+#endif
+`;
+const AO_FS = /* glsl */`${TEX0}
   uniform sampler2D tDepth;
   uniform vec2 uFullTexel;
   uniform mat4 uProjInv;
@@ -114,7 +159,7 @@ const AO_FS = /* glsl */`
     vec4 v = uProjInv * vec4(uv * 2.0 - 1.0, d * 2.0 - 1.0, 1.0);
     return v.xyz / v.w;
   }
-  vec3 posAt(vec2 uv) { return viewPos(uv, texture2D(tDepth, uv).x); }
+  vec3 posAt(vec2 uv) { return viewPos(uv, HP_TEX0(tDepth, uv).x); }
   void main() {
     float d = texture2D(tDepth, vUv).x;
     if (d >= 0.99999) { gl_FragColor = vec4(1.0, 1e4, 0.0, 1.0); return; }
@@ -149,7 +194,7 @@ const AO_FS = /* glsl */`
     gl_FragColor = vec4(ao, z, 0.0, 1.0);
   }`;
 
-const BLUR_FS = /* glsl */`
+const BLUR_FS = /* glsl */`${TEX0}
   uniform sampler2D tAO;
   uniform vec2 uTexel;
   varying vec2 vUv;
@@ -158,7 +203,7 @@ const BLUR_FS = /* glsl */`
     float z0 = c.y, s = 0.0, w = 0.0;
     float tol = z0 * 0.035 + 0.15;
     for (int y = -2; y < 2; y++) for (int x = -2; x < 2; x++) {
-      vec2 t = texture2D(tAO, vUv + vec2(float(x), float(y)) * uTexel).xy;
+      vec2 t = HP_TEX0(tAO, vUv + vec2(float(x), float(y)) * uTexel).xy;
       float k = max(0.0, 1.0 - abs(t.y - z0) / tol);
       s += t.x * k; w += k;
     }
