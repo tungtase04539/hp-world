@@ -1,17 +1,15 @@
 import * as THREE from 'three';
+import { humanoidGeometry, SK } from './models_kit.js';
 
-function mat(color, opts = {}) { return new THREE.MeshLambertMaterial({ color, ...opts }); }
+// NHÂN VẬT CHƠI / NPC (Đợt 3 wave 2, W2-C): người kit (js/models_kit.js — tỉ lệ 7,5 đầu, cao 1,70 m, chi là ống elip
+// bo tròn, mặt/tóc/nón lá thật) dựng thành MỘT SkinnedMesh 11 xương (hông, thân, đầu, vai/khuỷu, hông/gối) → 1 draw
+// call + 1 bóng tròn mỗi nhân vật (trước: ~25 mesh capsule + ~25 Lambert riêng/người, dáng chibi).
+// API giữ nguyên: { group, legL, legR, armL, armR, head, torso, blob, walkT, animate(dt, speedRatio, time, speedMs), sit(on) }
+// — legL/armL/... là Bone (Object3D) nên mã cũ gán .rotation vẫn chạy. Quy ước: nhìn +Z; xoay X DƯƠNG đưa chi về SAU.
+let _mat = null;
+const mat = () => (_mat || (_mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.82, metalness: 0, envMapIntensity: 0.7, name: 'hp_humanoid' })));
+const v = (a, b) => new THREE.Vector3(a[0] - (b ? b[0] : 0), a[1] - (b ? b[1] : 0), a[2] - (b ? b[2] : 0));
 
-// Chi (tay/chân) capsule bo tròn — gốc xoay ở khớp trên
-function limb(r, len, material) {
-  const g = new THREE.Group();
-  const geo = new THREE.CapsuleGeometry(r, len, 4, 10);
-  geo.translate(0, -len / 2, 0);
-  g.add(new THREE.Mesh(geo, material));
-  return g;
-}
-
-// Nhân vật bo tròn, TỈ LỆ NGƯỜI THẬT ~1,72 m (Đợt 3: đầu nhỏ lại, bỏ mắt long lanh/má hồng chibi)
 export function makeHumanoid(scheme = {}) {
   const s = {
     shirt: 0xff7a4d, shorts: 0x2e5a8f, skin: 0xf0c090,
@@ -19,146 +17,97 @@ export function makeHumanoid(scheme = {}) {
     hat: null, // 'nonla' | 'cap' | null
     ...scheme,
   };
+  if (s.skin === 0xf0c090) s.skin = 0xe2b48c;   // da người Việt (bảng cũ hồng-cam kiểu hoạt hình)
+  const geo = humanoidGeometry(s);
+  // ---- xương (vị trí nghỉ = khớp SK; con đặt tương đối với cha) ----
+  const W = {
+    hips: [0, 0.93, 0], torso: [0, SK.waistY, 0], head: [0, SK.neckY, -0.005],
+    armL: [SK.shX, SK.shY, SK.shZ], armR: [-SK.shX, SK.shY, SK.shZ], foreL: [SK.elX, SK.elY, SK.elZ], foreR: [-SK.elX, SK.elY, SK.elZ],
+    legL: [SK.hipX, SK.hipY, 0], legR: [-SK.hipX, SK.hipY, 0], shinL: [SK.knX, SK.knY, SK.knZ], shinR: [-SK.knX, SK.knY, SK.knZ],
+  };
+  const parent = { torso: 'hips', head: 'torso', armL: 'torso', armR: 'torso', foreL: 'armL', foreR: 'armR', legL: 'hips', legR: 'hips', shinL: 'legL', shinR: 'legR' };
+  const order = ['hips', 'torso', 'head', 'armL', 'armR', 'foreL', 'foreR', 'legL', 'legR', 'shinL', 'shinR'];   // = chỉ số xương trong models_kit
+  const B = {};
+  for (const k of order) {
+    const b = new THREE.Bone(); b.name = k;
+    b.position.copy(v(W[k], parent[k] ? W[parent[k]] : null));
+    if (parent[k]) B[parent[k]].add(b);
+    B[k] = b;
+  }
+  const mesh = new THREE.SkinnedMesh(geo, mat());
+  mesh.name = 'humanoid';
+  mesh.add(B.hips);
+  mesh.bind(new THREE.Skeleton(order.map((k) => B[k])));
+  // cầu bao rộng (chi xoay vẫn nằm trong) — frustum cull đúng, không tính lại từ xương
+  mesh.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0.9, 0), 1.25);
   const g = new THREE.Group();
-  const skinM = mat(s.skin), shirtM = mat(s.shirt), shortsM = mat(s.shorts);
-
-  // ---- Chân + giày ----
-  const legL = limb(0.095, 0.6, shortsM);
-  const legR = limb(0.095, 0.6, shortsM);
-  legL.position.set(-0.13, 0.88, 0);
-  legR.position.set(0.13, 0.88, 0);
-  for (const leg of [legL, legR]) {
-    const shoe = new THREE.Mesh(new THREE.SphereGeometry(0.11, 10, 8), mat(0x42342a));
-    shoe.scale.set(1, 0.62, 1.5);
-    shoe.position.set(0, -0.66, 0.05);
-    leg.add(shoe);
-  }
-  g.add(legL, legR);
-
-  // ---- Hông ----
-  const hips = new THREE.Mesh(new THREE.CapsuleGeometry(0.17, 0.08, 4, 12), shortsM);
-  hips.scale.set(1.05, 1, 0.82);
-  hips.position.y = 0.95;
-  g.add(hips);
-
-  // ---- Thân áo ----
-  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.185, 0.34, 4, 12), shirtM);
-  torso.scale.set(1.12, 1, 0.76);
-  torso.position.y = 1.24;
-  g.add(torso);
-
-  // ---- Cổ ----
-  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.06, 0.09, 8), skinM);
-  neck.position.y = 1.465;
-  g.add(neck);
-
-  // ---- Tay + bàn tay ----
-  const armL = limb(0.06, 0.44, shirtM);
-  const armR = limb(0.06, 0.44, shirtM);
-  armL.position.set(-0.265, 1.42, 0);
-  armR.position.set(0.265, 1.42, 0);
-  armL.rotation.z = 0.08;
-  armR.rotation.z = -0.08;
-  for (const arm of [armL, armR]) {
-    const hand = new THREE.Mesh(new THREE.SphereGeometry(0.062, 8, 7), skinM);
-    hand.position.y = -0.52;
-    arm.add(hand);
-  }
-  g.add(armL, armR);
-
-  // ---- Đầu: TỈ LỆ NGƯỜI THẬT (Đợt 3: đầu ~1/7,5 chiều cao, bỏ mắt long lanh + má hồng kiểu chibi) ----
-  const head = new THREE.Group();
-  const skull = new THREE.Mesh(new THREE.SphereGeometry(0.118, 14, 12), skinM);
-  skull.scale.set(0.92, 1.1, 1.0);
-  skull.position.y = 0.12;
-  head.add(skull);
-  const hair = new THREE.Mesh(new THREE.SphereGeometry(0.124, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.62), mat(s.hair));
-  hair.scale.set(0.95, 1.05, 1.02);
-  hair.position.set(0, 0.135, -0.012);
-  head.add(hair);
-  for (const ex of [-0.04, 0.04]) {
-    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.012, 6, 5), mat(0x2a241e));
-    eye.position.set(ex, 0.13, 0.108);
-    head.add(eye);
-  }
-  const nose = new THREE.Mesh(new THREE.BoxGeometry(0.022, 0.035, 0.03), skinM);
-  nose.position.set(0, 0.1, 0.115);
-  head.add(nose);
-  // ---- Mũ ----
-  if (s.hat === 'cap') {
-    const dome = new THREE.Mesh(new THREE.SphereGeometry(0.128, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), mat(s.cap));
-    dome.scale.set(0.97, 0.85, 1.03);
-    dome.position.y = 0.16;
-    head.add(dome);
-    const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.11, 0.016, 10, 1, false, -Math.PI / 2, Math.PI), mat(s.cap));
-    brim.scale.set(1, 1, 1.5);
-    brim.position.set(0, 0.17, 0.07);
-    head.add(brim);
-  } else if (s.hat === 'nonla') {
-    const nonla = new THREE.Mesh(new THREE.ConeGeometry(0.25, 0.15, 14), mat(0xd9c48c, { flatShading: true }));
-    nonla.position.y = 0.27;
-    head.add(nonla);
-  }
-  head.position.y = 1.47;
-  g.add(head);
-
-  // ---- Ba lô ----
-  if (s.backpack) {
-    const bp = new THREE.Mesh(new THREE.CapsuleGeometry(0.15, 0.2, 4, 10), mat(s.backpack));
-    bp.scale.set(1.1, 1, 0.62);
-    bp.position.set(0, 1.22, -0.24);
-    g.add(bp);
-    const pocket = new THREE.Mesh(new THREE.SphereGeometry(0.08, 8, 6), mat(s.backpack));
-    pocket.scale.set(1, 1.1, 0.6);
-    pocket.position.set(0, 1.12, -0.34);
-    g.add(pocket);
-  }
+  g.add(mesh);
 
   // ---- Bóng đổ giả ----
   const blob = new THREE.Mesh(
-    new THREE.CircleGeometry(0.5, 14),
+    new THREE.CircleGeometry(0.42, 14),
     new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.26, depthWrite: false })
   );
   blob.rotation.x = -Math.PI / 2;
   blob.position.y = 0.03;
   g.add(blob);
 
-  return {
-    group: g, legL, legR, armL, armR, head, torso, blob,   // blob: main.js updatePlayerShadow (đậm khi di chuyển, nhạt khi đứng yên có bóng thật)
+  const rig = {
+    group: g, mesh, legL: B.legL, legR: B.legR, armL: B.armL, armR: B.armR, head: B.head, torso: B.torso, blob,   // blob: main.js updatePlayerShadow
+    shinL: B.shinL, shinR: B.shinR, foreL: B.foreL, foreR: B.foreR, hips: B.hips,
+    tris: (geo.index ? geo.index.count : geo.attributes.position.count) / 3,
     walkT: 0,
-    // speedMs (tuỳ chọn, m/s): nhịp bước theo tốc độ THẬT — 1 chu kỳ 2π = 2 bước, bước 0,8 m (đi) → 1,4 m (chạy);
-    // không có speedMs (NPC) giữ công thức cũ. Biên độ vung lớn dần khi chạy.
+    // dáng đi (cùng công thức với vertex shader đám đông — models_kit kitPose): hông ±0,42·a, gối gập khi chân
+    // đang đưa ra trước, tay đánh ngược chân, khuỷu gập nhẹ; hạ hông theo cos góc đùi để chân trụ không nhấc khỏi đất
+    pose(ph, a) {
+      const sn = Math.sin(ph), cs = Math.cos(ph);
+      B.legL.rotation.set(-0.42 * a * sn, 0, 0); B.legR.rotation.set(0.42 * a * sn, 0, 0);
+      B.shinL.rotation.x = a * (0.06 + 0.62 * Math.pow(Math.max(0, cs), 1.5));
+      B.shinR.rotation.x = a * (0.06 + 0.62 * Math.pow(Math.max(0, -cs), 1.5));
+      B.armL.rotation.set(0.34 * a * sn, 0, 0.06); B.armR.rotation.set(-0.34 * a * sn, 0, -0.06);
+      B.foreL.rotation.x = -(0.16 + 0.32 * a * Math.max(0, -sn)); B.foreR.rotation.x = -(0.16 + 0.32 * a * Math.max(0, sn));
+      B.torso.rotation.set(0.04 * a, 0.05 * a * sn, 0);
+      B.hips.position.y = 0.93 - 0.81 * (1 - Math.cos(0.42 * a * sn));
+    },
+    // speedMs (tuỳ chọn, m/s): nhịp bước theo tốc độ THẬT — 1 chu kỳ 2π = 2 bước, bước 0,7 m (đi) → 1,3 m (chạy);
+    // không có speedMs (NPC) giữ công thức cũ. Biên độ lớn dần khi chạy.
     animate(dt, speedRatio, time, speedMs) {
       if (speedRatio > 0.05) {
         if (speedMs > 0.05) {
-          const stepLen = 0.8 + Math.min(1, Math.max(0, (speedMs - 2) / 5)) * 0.6;
+          const stepLen = 0.7 + Math.min(1, Math.max(0, (speedMs - 1.5) / 5)) * 0.6;
           this.walkT += dt * (speedMs / stepLen) * Math.PI;
         } else this.walkT += dt * (6 + speedRatio * 7);
-        const sw = Math.sin(this.walkT) * 0.62 * speedRatio;
-        this.legL.rotation.x = sw;
-        this.legR.rotation.x = -sw;
-        this.armL.rotation.x = -sw * 0.75;
-        this.armR.rotation.x = sw * 0.75;
-        this.head.rotation.x = Math.sin(this.walkT * 2) * 0.03;
+        this.pose(this.walkT, Math.min(1.25, 0.55 + speedRatio * 0.6));
+        B.head.rotation.x = Math.sin(this.walkT * 2) * 0.02;
       } else {
+        // đứng: thở nhẹ + dồn trọng tâm (không cứng đơ)
         const k = 0.12;
-        this.legL.rotation.x *= 1 - k;
-        this.legR.rotation.x *= 1 - k;
-        this.armL.rotation.x = Math.sin(time * 1.6) * 0.06;
-        this.armR.rotation.x = -Math.sin(time * 1.6) * 0.06;
-        this.head.rotation.x = Math.sin(time * 1.1) * 0.02;
+        for (const b of [B.legL, B.legR, B.shinL, B.shinR, B.torso]) { b.rotation.x *= 1 - k; b.rotation.y *= 1 - k; }
+        B.hips.position.y += (0.93 - B.hips.position.y) * k;
+        B.armL.rotation.set(Math.sin(time * 1.6) * 0.04, 0, 0.07); B.armR.rotation.set(-Math.sin(time * 1.6) * 0.04, 0, -0.07);
+        B.foreL.rotation.x = -0.14; B.foreR.rotation.x = -0.14;
+        B.head.rotation.x = Math.sin(time * 1.1) * 0.02;
+        B.head.rotation.y = Math.sin(time * 0.37) * 0.12;
       }
     },
     sit(on) {
-      // Tư thế ngồi xe máy tự nhiên: đùi đưa ra TRƯỚC (chân đặt sàn xe), hơi dạng;
-      // hai tay vươn ra trước-xuống nắm ghi-đông; thân hơi chồm.
-      const a = on ? 1.0 : 0;
-      this.legL.rotation.x = a; this.legR.rotation.x = a;
-      this.legL.rotation.z = on ? 0.14 : 0; this.legR.rotation.z = on ? -0.14 : 0;
-      this.armL.rotation.x = on ? 0.78 : 0; this.armR.rotation.x = on ? 0.78 : 0;
-      this.armL.rotation.z = on ? 0.18 : 0.08; this.armR.rotation.z = on ? -0.18 : -0.08;
-      this.torso.rotation.x = on ? 0.16 : 0;   // chồm nhẹ ra trước
-      this.head.rotation.x = 0;
+      // ngồi xe máy: đùi đưa ra TRƯỚC gần ngang (hơi dạng), cẳng chân thả xuống sàn/gác chân, thân chồm nhẹ,
+      // 2 tay vươn tới ghi-đông (khuỷu hơi gập). (Bản cũ xoay đùi +1 rad = chân ra SAU.)
+      if (on) {
+        B.hips.position.y = 0.93;
+        B.legL.rotation.set(-1.32, 0, 0.12); B.legR.rotation.set(-1.32, 0, -0.12);
+        B.shinL.rotation.x = 1.38; B.shinR.rotation.x = 1.38;
+        B.torso.rotation.set(0.16, 0, 0);
+        B.armL.rotation.set(-0.95, 0, 0.16); B.armR.rotation.set(-0.95, 0, -0.16);
+        B.foreL.rotation.x = -0.45; B.foreR.rotation.x = -0.45;
+        B.head.rotation.set(-0.1, 0, 0);
+      } else {
+        for (const b of [B.legL, B.legR, B.shinL, B.shinR, B.torso, B.armL, B.armR, B.foreL, B.foreR, B.head]) b.rotation.set(0, 0, 0);
+        B.armL.rotation.z = 0.07; B.armR.rotation.z = -0.07;
+        B.hips.position.y = 0.93;
+      }
     },
   };
+  rig.sit(false);
+  return rig;
 }
