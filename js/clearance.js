@@ -304,11 +304,12 @@ export function evalShift(S, dx, dz, mode, quick = false) {
   for (let jj = 0; jj < NB; jj += 2) {
     const i = (i0 + jj) % NB;
     const x = B[i] + dx, z = B[i + 1] + dz;
+    if ((dx || dz) && _st && _st.water && _st.water(x, z)) { if (quick) { S.lastBad = i; return { bad: true }; } n++; continue; }   // dời không được xuống nước
     if (mode === 'bldg') {
       const c = corridorPen(x, z);
       if (c && c.pen > 0.02) { if (quick) { S.lastBad = i; return { bad: true }; } n++; if (c.pen > pen) pen = c.pen; if (c.pen + 0.05 > best) { best = c.pen + 0.05; push = [c.nx * best, c.nz * best]; } continue; }
+      if (!c) continue;   // ngoài MỌI hành lang → không thể trên lòng (lòng/nút giao/khe nhựa đều nằm trong hành lang) — bỏ tra surfaceAt
     }
-    if ((dx || dz) && _st && _st.water && _st.water(x, z)) { if (quick) { S.lastBad = i; return { bad: true }; } n++; continue; }   // dời không được xuống nước
     if (onCarriageFast(x, z)) {
       if (quick) { S.lastBad = i; return { bad: true }; }
       n++;
@@ -493,7 +494,9 @@ export function sweepAssemblies(objs, cols, fc, opts = {}) {
         if (p.S.base.length && p.S.height >= 1.8 && Math.max(p.S.x1 - p.S.x0, p.S.z1 - p.S.z0) >= 3) wallLike = true;
         continue;
       }
-      const H = p.H || hull2(p.kind === 'comp' ? (() => { const pos = p.o.geometry.attributes.position; const P = []; const st = Math.max(1, Math.floor(p.vs.length / 64)); for (let q = 0; q < p.vs.length; q += st) P.push([pos.getX(p.vs[q]), pos.getZ(p.vs[q])]); P.push([p.x0, p.z0], [p.x1, p.z1]); return P; })() : []);
+      // mảnh nhỏ (< 1,5 m): hộp trục là đủ (hàng nghìn cột/thanh/chậu — bao lồi từng mảnh từng tốn ~40 ms)
+      const small = Math.max(p.x1 - p.x0, p.z1 - p.z0) < 1.5;
+      const H = p.H || (small ? [[p.x0, p.z0], [p.x1, p.z0], [p.x1, p.z1], [p.x0, p.z1]] : hull2(p.kind === 'comp' ? (() => { const pos = p.o.geometry.attributes.position; const P = []; const st = Math.max(1, Math.floor(p.vs.length / 64)); for (let q = 0; q < p.vs.length; q += st) P.push([pos.getX(p.vs[q]), pos.getZ(p.vs[q])]); P.push([p.x0, p.z0], [p.x1, p.z1]); return P; })() : []));
       p.H = H;
       if (p.y0 <= p.g0 + CLEAR.BASE_Y) sampleHull(H, S.base);
       if (p.y1 > p.g0 + CLEAR.BODY_Y0 && p.y0 < p.g0 + CLEAR.BODY_Y1) S.body.push({ H, y0: p.y0 - p.g0, y1: p.y1 - p.g0 });
