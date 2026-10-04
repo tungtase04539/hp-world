@@ -59,10 +59,24 @@ export const clearanceReady = () => !!_st;
 
 // ---------- tra cứu ----------
 // trên LÒNG (nhựa/bê tông ngõ, khe đường đôi, nút giao) — theo world.roadNet.surfaceAt (0 ngoài, ~0,11-0,13 lòng, 0,25 vỉa)
+// Bộ nhớ đệm ô 0,5 m (lười, theo mảnh 16 m): props/cây/quét gọi hàng trăm nghìn lần quanh cùng các vỉa hè — đo hồ sơ CPU:
+// surfaceAt chiếm ~0,3 s lúc dựng nếu gọi thẳng. Sai số ≤ 0,35 m (tâm ô) — các luật đều có lề ≥ 0,3 m.
+const _cc = new Map();
+// CHÍNH XÁC (props/cây/đặt tay): gọi thẳng surfaceAt
 export function onCarriage(x, z) {
   if (!_st || !_st.surf) return false;
   const s = _st.surf(x, z);
   return s > 0.05 && s < 0.2;
+}
+// NHANH (quét vật đã dựng — hàng trăm lần thử dời mỗi vật): có đệm ô
+export function onCarriageFast(x, z) {
+  if (!_st || !_st.surf) return false;
+  const ix = Math.floor(x * 2), iz = Math.floor(z * 2), tk = (ix >> 5) * 100003 + (iz >> 5);
+  let t = _cc.get(tk); if (!t) { if (_cc.size > 6000) _cc.clear(); _cc.set(tk, (t = new Uint8Array(1024))); }   // trần ~6 MB
+  const ci = ((ix & 31) << 5) | (iz & 31);
+  let v = t[ci];
+  if (!v) { const s = _st.surf((ix + 0.5) / 2, (iz + 0.5) / 2); v = s > 0.05 && s < 0.2 ? 2 : 1; t[ci] = v; }
+  return v === 2;
 }
 // đĩa bán kính r chạm lòng đường? (tâm + 8 điểm vành)
 export function onCarriageDisc(x, z, r = 0) {
@@ -83,6 +97,8 @@ export function nearestPano(x, z, r = CLEAR.PANO_R) {
 }
 export const nearPano = (x, z, r = CLEAR.PANO_R) => !!nearestPano(x, z, r);
 // đĩa (x,z,r) sạch: không chạm lòng đường, mép đĩa cách camera pano ≥ PANO_R
+// bản rẻ cho đồ đặt trên ô vỉa hè đã kiểm: chỉ TÂM không trên lòng + mép đĩa ≥ PANO_R camera (1 lần surfaceAt có đệm)
+export function clearPt(x, z, r = 0, panoR = CLEAR.PANO_R) { return !nearPano(x, z, panoR + r) && !onCarriage(x, z); }
 export function clearDisc(x, z, r = 0, panoR = CLEAR.PANO_R) {
   return !onCarriageDisc(x, z, r) && !nearPano(x, z, panoR + r);
 }
@@ -293,7 +309,7 @@ export function evalShift(S, dx, dz, mode, quick = false) {
       if (c && c.pen > 0.02) { if (quick) { S.lastBad = i; return { bad: true }; } n++; if (c.pen > pen) pen = c.pen; if (c.pen + 0.05 > best) { best = c.pen + 0.05; push = [c.nx * best, c.nz * best]; } continue; }
     }
     if ((dx || dz) && _st && _st.water && _st.water(x, z)) { if (quick) { S.lastBad = i; return { bad: true }; } n++; continue; }   // dời không được xuống nước
-    if (onCarriage(x, z)) {
+    if (onCarriageFast(x, z)) {
       if (quick) { S.lastBad = i; return { bad: true }; }
       n++;
       const r = nearestRoad(x, z, 10);   // tầm 10 m (1 ô lưới ± 1): đủ cho điểm đang nằm TRÊN lòng
@@ -309,7 +325,7 @@ export function evalShift(S, dx, dz, mode, quick = false) {
     if (!cam) continue;
     const Hs = dx || dz ? b.H.map(([x, z]) => [x + dx, z + dz]) : b.H;
     const d = hullDist(Hs, cam.x, cam.z);
-    if (d < CLEAR.PANO_R && mode === 'bldg' && d > 0.05) {
+    if (d < CLEAR.PANO_R && mode === 'bldg' && S.facadeExempt && d > 0.05) {
       // NHÀ: camera (đứng trong hành lang phố) gần MẶT TIỀN đã lùi đúng facadeLine = lệch dữ liệu camera/đường (camera
       // trên vỉa hè phố hẹp) — không đẩy nhà lùi thêm; chỉ tính khi điểm gần nhất (lùi sâu 0,3 m) còn trong hành lang
       if (corridorPen(cam.x, cam.z) || onCarriage(cam.x, cam.z)) {
@@ -485,6 +501,7 @@ export function sweepAssemblies(objs, cols, fc, opts = {}) {
       if (p.y0 <= p.g0 + CLEAR.BASE_Y && p.y1 - p.y0 >= 1.8 && Math.max(p.x1 - p.x0, p.z1 - p.z0) >= 3) wallLike = true;
     }
     S.x0 = x0; S.x1 = x1; S.z0 = z0; S.z1 = z1;   // hộp cụm → evalShift lọc nhanh cụm xa phố/camera
+    S.facadeExempt = h >= 1.8 && massive >= 12;   // chỉ NHÀ khối được miễn luật camera khi mặt tiền đã ở facadeLine
     let mode = (h >= 1.8 && massive >= 12) || (wallLike && opts.wallLike) ? 'bldg' : 'small';   // tường/cổng: chỉ khối ô (opts.wallLike)
     const e0 = evalShift(S, 0, 0, mode);
     if (!e0.bad) { rep.kept++; continue; }
@@ -506,6 +523,19 @@ export function sweepAssemblies(objs, cols, fc, opts = {}) {
       // công trình có danh tính (khách sạn/cao ốc/công sở dựng theo pano) không dời nổi → GIỮ tại chỗ, báo cáo
       for (const c of myCols) delete c.__clr;
       (rep.stuck || (rep.stuck = [])).push([name, where, e0.n, +e0.pen.toFixed(2), +e0.pano.toFixed(2)]);
+    } else if (A.length > 1 && Math.max(x1 - x0, z1 - z0) > 12) {
+      // cụm TRẢI DÀI (dãy lan can/rào: cột + thanh nối thành 1 cụm) không dời nổi → chỉ gỡ MẢNH tự vi phạm (đoạn lan can
+      // cắt qua lòng/nút giao), giữ phần còn lại của dãy
+      let nd = 0;
+      for (const p of A) {
+        const Sp = { base: [], body: [] };
+        if (p.kind === 'obj') { Sp.base = p.S.base; Sp.body = p.S.body; }
+        else { if (p.y0 <= p.g0 + CLEAR.BASE_Y) sampleHull(p.H, Sp.base); if (p.y1 > p.g0 + CLEAR.BODY_Y0 && p.y0 < p.g0 + CLEAR.BODY_Y1) Sp.body.push({ H: p.H }); }
+        if (!evalShift(Sp, 0, 0, 'small', true).bad) continue;
+        dropMesh(p); nd++;
+        for (const c of myCols) if (c.x >= p.x0 - 0.3 && c.x <= p.x1 + 0.3 && c.z >= p.z0 - 0.3 && c.z <= p.z1 + 0.3) { c.x = 1e7; c.z = 1e7; rep.colOff++; }
+      }
+      rep.removed.push([name, where, mode + '/pieces', nd, A.length]);
     } else {
       for (const p of A) dropMesh(p);
       for (const c of myCols) { c.x = 1e7; c.z = 1e7; rep.colOff++; }   // tách khỏi bản đồ (cùng object trong colIdx nếu đã dựng)

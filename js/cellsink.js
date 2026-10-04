@@ -566,7 +566,7 @@ function commitSink(sink, THREE, realScene, realFC, colliders, opts) {
   const IDENT = new Set(['civic', 'tower', 'heritage', 'bespoke']);
   if (live && clearanceReady()) for (const it of bl) {
     if (it.removed) continue;
-    const S = samplesFromHulls(it.shape.meshes.filter((q) => !q.leafy && !q.line));
+    const S = samplesFromHulls(it.shape.meshes.filter((q) => !q.leafy && !q.line)); S.facadeExempt = true;
     if (!S.nMesh || !evalShift(S, 0, 0, 'bldg').bad) continue;
     const maxS = it.height >= 15 ? CLEAR.MAX_SHIFT_TOWER : CLEAR.MAX_SHIFT_BLDG;
     const ident = IDENT.has(it.kind), mS = ident ? Math.max(maxS, 12) : maxS;
@@ -606,12 +606,16 @@ function commitSink(sink, THREE, realScene, realFC, colliders, opts) {
   //     sạp của 1 quầy là 3 mesh cấp cao nhất riêng — dời/gỡ riêng từng cái từng để tán ô lơ lửng); nhóm-chứa toạ độ thế
   //     giới trải > 20 m (dãy lều + rào dọc kè…) tách theo con; mesh gộp tách theo thành phần liên thông. Luật: lòng đường
   //     + camera; tấm tường/cổng cao ≥ 1,8 m dài ≥ 3 m (opts.wallLike) và khối ≥ 12 m² theo hành lang như nhà.
-  //     Dải phân cách (median) là đồ ĐÚNG trên lòng → giữ; tán cây rời (khối xanh lơ lửng > 1,2 m) bỏ qua.
+  //     Dải phân cách (median) là đồ ĐÚNG trên lòng → giữ; vật chỉ gồm material lá dùng chung (foliage) bỏ qua.
   if (live && clearanceReady()) {
     const objs = [], ownerIt = new Map();
+    // CHỈ material lá dùng chung (sharedMats.leaf*) là tán cây; mọi khối xanh khác (hàng rào cây, lan can sơn xanh, bồn cỏ,
+    // tán ô dù chợ hình nón xanh — extractShape gắn cờ leafy/green cho chúng) vẫn xét, kể cả vật loại 'tree' theo tên
+    // (hedge…): cây THẬT của khối ô đã chuyển sang trees.js (plantLocal), trong cảnh chỉ còn bụi/hàng rào/tán rời
+    const canopy = (q) => { const mt = Array.isArray(q.m.material) ? q.m.material : [q.m.material]; return mt.some((m) => foliage.has(m)); };
     for (const it of items) {
-      if (it.bldg || it.removed || it.shift || it.kind === 'sys' || it.kind === 'tree' || !it.shape) continue;
-      if (/median/i.test(it.name) || it.shape.meshes.every((q) => q.leafy || (q.green && q.y0 > LAND_Y + 1.2))) continue;
+      if (it.bldg || it.removed || it.shift || it.kind === 'sys' || !it.shape) continue;
+      if (/median/i.test(it.name) || it.shape.meshes.every(canopy)) continue;
       const o = it.o, e = o.matrixWorld.elements;
       let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9;
       for (const [x, z] of it.hull) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (z < z0) z0 = z; if (z > z1) z1 = z; }

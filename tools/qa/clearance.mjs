@@ -54,12 +54,27 @@ try {
     await route.fulfill({ response: r, body, headers: { ...r.headers(), 'content-type': 'application/javascript', 'cache-control': 'no-store' } });
   });
   await pg.addInitScript({ content: 'window.__clearCfg = ' + JSON.stringify(cfg) + ';\n' + pageJs });
+  // --prof <file>: hồ sơ CPU (CDP) từ lúc tải tới khi kiểm toán xong → <file>.cpuprofile (tự cộng self-time theo hàm)
+  const PROF = arg('prof', '');
+  let cdp = null;
+  if (PROF) { cdp = await pg.context().newCDPSession(pg); await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', { interval: 200 }); await cdp.send('Profiler.start'); }
   await pg.goto(`http://${HOST}:${PORT}/index.html?quality=full&fabfree=0`, { waitUntil: 'domcontentloaded', timeout: 120000 });
   let res = null;
   for (let i = 0; i < 900 && !res; i++) {
     await pg.waitForTimeout(1000);
     res = await pg.evaluate(() => window.__clearResult || null).catch(() => null);
     if (errors.some((e) => /pageerror/.test(e))) break;
+  }
+  if (cdp) {
+    const { profile } = await cdp.send('Profiler.stop');
+    fs.writeFileSync(PROF + '.cpuprofile', JSON.stringify(profile));
+    const dt = profile.timeDeltas || [], self = new Map(), byId = new Map(profile.nodes.map((n) => [n.id, n]));
+    for (let i = 0; i < (profile.samples || []).length; i++) { const id = profile.samples[i]; self.set(id, (self.get(id) || 0) + (dt[i] || 0)); }
+    const agg = new Map();
+    for (const [id, us] of self) { const n = byId.get(id); const cf = n.callFrame; const k = (cf.functionName || '(anon)') + ' ' + (cf.url || '').split('/').pop() + ':' + (cf.lineNumber + 1); agg.set(k, (agg.get(k) || 0) + us); }
+    const top = [...agg.entries()].sort((a, b) => b[1] - a[1]).slice(0, 40);
+    fs.writeFileSync(PROF + '.top.txt', top.map(([k, us]) => (us / 1000).toFixed(1).padStart(8) + ' ms  ' + k).join('\n'));
+    console.log('prof →', PROF + '.top.txt');
   }
   if (!res) { console.error('clearance: không có kết quả', errors.slice(0, 10)); process.exitCode = 1; }
   else {
