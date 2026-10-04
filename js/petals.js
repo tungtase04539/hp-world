@@ -5,6 +5,8 @@ import * as THREE from 'three';
 // (giữa hồ Tam Bạc và Nhà hát) → lúc spawn không có, ở dưới gốc phượng thật cũng không. Nay: main.js truyền
 // `bloomNear(x,z,r)` (js/trees.js — cây phượng nở gần nhất, theo uniform mùa hoa) → tâm = gốc cây đó, cánh rơi
 // trong bán kính tán, cường độ giảm dần khi người chơi ra xa cây (18 → 45 m).
+// Đợt 3 W2-B: hoa theo LỊCH trong game (trees.js bloomShare: rộ tháng 5-7, ~17% cây còn hoa muộn ngoài mùa) — bloomNear
+// chỉ trả cây đang nở + độ rộ `s` → cánh rơi dày/thưa theo mùa.
 const COUNT = 170;
 const RANGE = 6.5, TOP = 9;
 
@@ -54,7 +56,8 @@ export function createPetals(scene) {
             cx = b.x; cz = b.z; cy = b.y ?? groundHeight(cx, cz); topY = Math.max(5, Math.min(13, b.h * 0.85));
             for (const p of parts) { p.y = topY * (0.3 + rnd() * 0.7); p.gy = groundHeight(cx + p.x, cz + p.z); }
           }
-          targetS = (1 - Math.min(1, Math.max(0, (b.d - 18) / 27))) * strength;
+          // W2-B: × độ rộ của cây theo LỊCH (b.s 0..1 — cuối mùa lác đác vài chùm → cánh rơi thưa)
+          targetS = (1 - Math.min(1, Math.max(0, (b.d - 18) / 27))) * strength * (b.s ?? 1);
         } else targetS = 0;
       }
       const target = targetS > 0.02 ? 0.95 * targetS : 0;

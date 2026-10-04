@@ -11,18 +11,24 @@
 //   • InstancedMesh: kit GẦN (≤ NEAR_R) đổ bóng lốm đốm (customDepthMaterial alpha-test), kit XA ít thẻ (≤ FAR_R),
 //     cây phượng HERO GLB (Meshy, file KHÔNG đổi) chỉ hiện trong HERO_R — xa hơn là phượng thủ tục cùng chỗ.
 //     LOD tự quản (không qua instcull: userData.noCull) — nén tập instance theo khoảng cách camera mỗi ~0,25 s.
-//   • Gió: lắc tán bằng onBeforeCompile (rẻ). Mùa hoa: uniform uBloom (mặc định hè: ~35% phượng + bằng lăng nở).
+//   • Gió: lắc tán bằng onBeforeCompile (rẻ). Mùa hoa theo LỊCH trong game (W2-B: bloomShare — mặc định 4/10 ~17%
+//     phượng còn hoa muộn; rộ tháng 5-7; ?date= / world.trees.setDate).
+//   • W2-B: KÍCH THƯỚC THẬT theo loài (SPX: cao / mép dưới tán / bán kính) → biến hình TỪNG CÂY trong shader (aShape:
+//     nâng tán, co tán ngang, ép nửa tán phía tường / nghiêng nhẹ) trên kit chung; tán cách mặt tiền ≥ 1,5 m (facadeFit:
+//     TÁN LỆCH, thân thẳng); tán thoáng (chùm đầu cành); cắt cụt / tỉa trơ theo pano; hero GLB chỉ quanh Nhà hát, ngoài
+//     khung pano thật (heroSpotOk), ≤ 3 cây GLB cùng lúc; kit XA có sy/nâng/co tán riêng (khớp ranh LOD).
 //
 // Hợp đồng dùng (world.js):
 //   plant(kind, x, z, o)          — xếp hàng 1 cây (toạ độ thế giới). kind: 'xacu'|'bang'|'phuong'|'sau'|'banglang'|
 //                                   'cau'|'catcut'|'da'|'non' hoặc 'shade' (cây bóng mát: loài theo pano/vùng) |
-//                                   'street' (mọi loài theo pano/vùng) | 'park'. o: {h, r, bloom, wash, pit, hero, yaw,
-//                                   variant, sz, full, median} (xem plant()).
+//                                   'street' (mọi loài theo pano/vùng) | 'park'. o: {h, r, wash, pit, hero, yaw,
+//                                   variant, sz, full, median} (xem plant(); o.bloom BỎ từ W2-B — hoa theo lịch).
 //                                   KHÔNG tự thêm collider (người gọi giữ addCollider như cũ); buildTrees dời/bỏ cây
 //                                   lọt lòng đường / nhà thật / trùng gốc và dời/tách collider ở đúng (x,z) đó.
 //   plantLocal(parent, lx, lz, kind, o) — cây trong Group (toạ độ local của parent, giải ở buildTrees; parent bị gỡ
 //                                   khỏi scene trước đó → cây bị bỏ).
 //   plantStreetTrees(ctx)          — trồng THEO DỮ LIỆU dọc phố p/s/t (+ r nơi pano nói có cây) tại xsection.treePitLine.
+//   plantPlazaYoung(ctx)           — hàng cây non chống cọc trên quảng trường lát đá (claim ctx.claim | hộp ctx.box) — W2-B.
 //   buildTrees(scene, ctx)         — dựng atlas + kit + InstancedMesh, móc scene.onBeforeRender (LOD + gió). Trả handle.
 // Mọi vị trí/hash TẤT ĐỊNH (không Math.random) để A/B ảnh so được.
 import * as THREE from 'three';
@@ -31,9 +37,10 @@ import { PANO_VEG, PANO_VEG_STRIDE } from './treemap.js';
 import { PANO_CAM } from './panoclear.js';
 import { ROAD_HW, treePitLine, SIDEWALK_TOP } from './xsection.js';
 export { treePitLine };   // world.js dùng qua veg.treePitLine (khỏi thêm import xsection vào world.js — tránh xung đột gộp)
-import { LM_POLY } from './landmark_polys.js';
-import { claimAt } from './claims.js';
-import { rbGrid } from './rbdata.js';   // footprint thật giải mã 1 lần cho cả trang (W2-F)
+import { LM_POLY, LM_CENTROID } from './landmark_polys.js';
+import { claimAt, claimsAll } from './claims.js';
+import { rbData, rbGrid } from './rbdata.js';   // footprint thật giải mã 1 lần cho cả trang (W2-F)
+import { heightOf, PARAPET_H } from './buildings_data.js';
 
 export const SP = { XACU: 0, BANG: 1, PHUONG: 2, SAU: 3, BANGLANG: 4, CAU: 5, CATCUT: 6, DA: 7, NON: 8 };
 const SP_N = 9;
@@ -275,13 +282,17 @@ function buildAtlasCanvas() {
 //    color (AO × màu vỏ), aKind (0 gỗ, 1 gỗ-gốc-vôi, 2 lá, 3 hoa), aSway (độ lắc theo gió).
 // =====================================================================================================
 class Geo {
-  constructor() { this.p = []; this.n = []; this.uv = []; this.c = []; this.k = []; this.s = []; this.i = []; this.nv = 0; }
+  // crown: đỉnh đang thêm thuộc TÁN (cành + lá + hoa + rễ phụ) hay THÂN — shader W2-B co tán theo chiều ngang chỉ với
+  // đỉnh tán (aHt + 2), thân giữ nguyên bề dày
+  constructor() { this.p = []; this.n = []; this.uv = []; this.c = []; this.k = []; this.s = []; this.i = []; this.cr = []; this.nv = 0; this.crown = false; }
   v(x, y, z, nx, ny, nz, u, v, cr, cg, cb, kind, sway) {
-    this.p.push(x, y, z); this.n.push(nx, ny, nz); this.uv.push(u, v); this.c.push(cr, cg, cb); this.k.push(kind); this.s.push(sway);
+    this.p.push(x, y, z); this.n.push(nx, ny, nz); this.uv.push(u, v); this.c.push(cr, cg, cb); this.k.push(kind); this.s.push(sway); this.cr.push(this.crown ? 1 : 0);
     return this.nv++;
   }
   t(a, b, c) { this.i.push(a, b, c); }
-  build() {
+  // fork: cao chạc cành chính (kit) — aHt = 0 dưới gốc quét vôi (≤ WASH_TOP) → 1 ở chạc trở lên: phần THÂN giữa 2 mức
+  // được kéo giãn khi nâng tán (aShape.x), gốc vôi giữ nguyên ~1,2 m; +2 cho đỉnh thuộc tán (xem crown)
+  build(fork = Infinity) {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(this.p, 3));
     g.setAttribute('normal', new THREE.Float32BufferAttribute(this.n, 3));
@@ -289,11 +300,16 @@ class Geo {
     g.setAttribute('color', new THREE.Float32BufferAttribute(this.c, 3));
     g.setAttribute('aKind', new THREE.Float32BufferAttribute(this.k, 1));
     g.setAttribute('aSway', new THREE.Float32BufferAttribute(this.s, 1));
+    const ht = new Float32Array(this.nv), span = Math.max(0.5, fork - WASH_TOP);
+    // đỉnh TÁN = 3 (nâng/dời TRỌN khối, kể cả thẻ lá thấp hơn chạc); đỉnh THÂN = dốc 0..1 theo cao
+    for (let i = 0; i < this.nv; i++) ht[i] = !Number.isFinite(fork) ? 0 : this.cr[i] ? 3 : clamp((this.p[i * 3 + 1] - WASH_TOP) / span, 0, 1);
+    g.setAttribute('aHt', new THREE.Float32BufferAttribute(ht, 1));
     g.setIndex(this.nv > 65535 ? new THREE.Uint32BufferAttribute(this.i, 1) : new THREE.Uint16BufferAttribute(this.i, 1));
     g.computeBoundingBox(); g.computeBoundingSphere();
     return g;
   }
 }
+const WASH_TOP = 1.3;    // trên mức gốc quét vôi (WASH_H 1,25) — đoạn thân kéo giãn khi nâng tán bắt đầu từ đây
 const _T = new THREE.Vector3(), _N = new THREE.Vector3(), _B = new THREE.Vector3(), _P = new THREE.Vector3(), _U = new THREE.Vector3(0, 1, 0), _X = new THREE.Vector3(1, 0, 0);
 // ống côn theo polyline pts=[[x,y,z,r],...]; uv quấn hết bề ngang ô, v trải theo chiều dài; col(y)→[r,g,b]; sway(x,y,z)
 function tube(G, pts, sides, rect, kind, col, sway, cap) {
@@ -350,20 +366,23 @@ const norm3 = (x, y, z) => { const l = Math.hypot(x, y, z) || 1; return [x / l, 
 
 // Bảng KIT (kích thước danh nghĩa — instance co giãn theo chiều cao/bán kính tán thực).
 // form: round (xà cừ/sấu/bằng lăng/đa/non) | umbrella (phượng) | tier (bàng) | pollard (cắt cụt) | palm (cau vua)
+// W2-B (tán THOÁNG): bớt ~30% thẻ lá, thẻ nhỏ hơn ~10%, ¾ số thẻ dồn thành CHÙM ở đầu cành (khe trời giữa các chùm như
+// ảnh pano 10/2024) thay vì phủ đều vỏ ellipsoid; thêm cành phụ (sub) để chùm rải khắp tán. cardsFar = số thẻ kit XA
+// (giữ như cũ — từ trên cao/vệ tinh tán vẫn thành khối).
 const KIT_DEFS = [
-  { sp: SP.XACU, form: 'round', H: 14, trunkH: 4.8, r0: 0.4, r1: 0.27, lean: 0.015, limbs: 5, limbAng: [0.28, 0.6], limbLen: 5.2, sub: 2, cy: 9.9, rx: 4.6, ry: 4.1, cards: 108, cardS: [1.7, 2.6], cells: [CELL.XACU_A, CELL.XACU_B], bark: [0.95, 0.93, 0.9], up: 0.15 },
-  { sp: SP.XACU, form: 'round', H: 12.5, trunkH: 3.9, r0: 0.44, r1: 0.3, lean: 0.035, limbs: 5, limbAng: [0.55, 0.95], limbLen: 5.8, sub: 2, cy: 8.7, rx: 5.7, ry: 3.4, cards: 112, cardS: [1.7, 2.6], cells: [CELL.XACU_A, CELL.XACU_B], bark: [0.93, 0.9, 0.86], up: 0.3 },
-  { sp: SP.BANG, form: 'tier', H: 10.5, r0: 0.3, tiers: [[3.6, 5.2], [5.6, 4.9], [7.5, 3.9], [9.1, 2.3]], branches: 5, cards: 132, cardS: [2.0, 2.9], cells: [CELL.BANG_A, CELL.BANG_B], bark: [0.8, 0.76, 0.72] },
-  { sp: SP.BANG, form: 'tier', H: 11, r0: 0.34, tiers: [[3.2, 6.2], [5.5, 5.7], [7.8, 4.3], [9.6, 2.2]], branches: 6, cards: 140, cardS: [2.1, 3.0], cells: [CELL.BANG_A, CELL.BANG_B], bark: [0.8, 0.76, 0.72] },
-  { sp: SP.PHUONG, form: 'umbrella', H: 9.8, trunkH: 3.0, r0: 0.38, r1: 0.29, lean: 0.03, limbs: 5, limbAng: [0.85, 1.15], limbLen: 5.3, sub: 3, cy: 7.4, rx: 5.9, ry: 2.3, cards: 96, cardS: [1.9, 2.8], cells: [CELL.PH_A, CELL.PH_B], flowerCell: CELL.PH_FLOWER, flowers: 44, bark: [1.0, 0.98, 0.96], up: 0.65 },
-  { sp: SP.PHUONG, form: 'umbrella', H: 10.6, trunkH: 3.7, r0: 0.4, r1: 0.3, lean: 0.1, limbs: 4, limbAng: [0.65, 1.05], limbLen: 5.6, sub: 3, cy: 8.2, rx: 5.3, ry: 2.7, cards: 92, cardS: [1.9, 2.8], cells: [CELL.PH_A, CELL.PH_B], flowerCell: CELL.PH_FLOWER, flowers: 40, bark: [1.0, 0.98, 0.96], up: 0.6 },
-  { sp: SP.SAU, form: 'round', H: 12, trunkH: 3.6, r0: 0.36, r1: 0.25, lean: 0.02, limbs: 5, limbAng: [0.4, 0.8], limbLen: 4.4, sub: 2, cy: 8.2, rx: 4.7, ry: 3.9, cards: 112, cardS: [1.6, 2.5], cells: [CELL.SAU], bark: [0.86, 0.82, 0.78], up: 0.2 },
-  { sp: SP.BANGLANG, form: 'round', H: 9, trunkH: 2.9, r0: 0.26, r1: 0.18, lean: 0.02, limbs: 4, limbAng: [0.35, 0.75], limbLen: 3.2, sub: 2, cy: 6.3, rx: 3.5, ry: 3.0, cards: 80, cardS: [1.4, 2.1], cells: [CELL.BL_LEAF], flowerCell: CELL.BL_FLOWER, flowers: 30, bark: [1.0, 0.96, 0.92], up: 0.2 },
+  { sp: SP.XACU, form: 'round', H: 14, trunkH: 4.8, r0: 0.4, r1: 0.27, lean: 0.015, limbs: 5, limbAng: [0.28, 0.6], limbLen: 5.2, sub: 3, cy: 9.9, rx: 4.6, ry: 4.1, cards: 76, cardsFar: 21, cardS: [1.5, 2.35], cells: [CELL.XACU_A, CELL.XACU_B], bark: [0.95, 0.93, 0.9], up: 0.15 },
+  { sp: SP.XACU, form: 'round', H: 12.5, trunkH: 3.9, r0: 0.44, r1: 0.3, lean: 0.035, limbs: 5, limbAng: [0.55, 0.95], limbLen: 5.8, sub: 3, cy: 8.7, rx: 5.7, ry: 3.4, cards: 78, cardsFar: 21, cardS: [1.5, 2.35], cells: [CELL.XACU_A, CELL.XACU_B], bark: [0.93, 0.9, 0.86], up: 0.3 },
+  { sp: SP.BANG, form: 'tier', H: 10.5, r0: 0.3, tiers: [[3.6, 5.2], [5.6, 4.9], [7.5, 3.9], [9.1, 2.3]], branches: 5, cards: 94, cardsFar: 28, cardS: [1.8, 2.6], cells: [CELL.BANG_A, CELL.BANG_B], bark: [0.8, 0.76, 0.72] },
+  { sp: SP.BANG, form: 'tier', H: 11, r0: 0.34, tiers: [[3.2, 6.2], [5.5, 5.7], [7.8, 4.3], [9.6, 2.2]], branches: 6, cards: 98, cardsFar: 29, cardS: [1.9, 2.7], cells: [CELL.BANG_A, CELL.BANG_B], bark: [0.8, 0.76, 0.72] },
+  { sp: SP.PHUONG, form: 'umbrella', H: 9.8, trunkH: 3.0, r0: 0.38, r1: 0.29, lean: 0.03, limbs: 5, limbAng: [0.85, 1.15], limbLen: 5.3, sub: 3, cy: 7.4, rx: 5.9, ry: 2.3, cards: 68, cardsFar: 18, cardS: [1.7, 2.5], cells: [CELL.PH_A, CELL.PH_B], flowerCell: CELL.PH_FLOWER, flowers: 40, bark: [1.0, 0.98, 0.96], up: 0.65 },
+  { sp: SP.PHUONG, form: 'umbrella', H: 10.6, trunkH: 3.7, r0: 0.4, r1: 0.3, lean: 0.1, limbs: 4, limbAng: [0.65, 1.05], limbLen: 5.6, sub: 4, cy: 8.2, rx: 5.3, ry: 2.7, cards: 66, cardsFar: 18, cardS: [1.7, 2.5], cells: [CELL.PH_A, CELL.PH_B], flowerCell: CELL.PH_FLOWER, flowers: 36, bark: [1.0, 0.98, 0.96], up: 0.6 },
+  { sp: SP.SAU, form: 'round', H: 12, trunkH: 3.6, r0: 0.36, r1: 0.25, lean: 0.02, limbs: 5, limbAng: [0.4, 0.8], limbLen: 4.4, sub: 3, cy: 8.2, rx: 4.7, ry: 3.9, cards: 78, cardsFar: 21, cardS: [1.45, 2.25], cells: [CELL.SAU], bark: [0.86, 0.82, 0.78], up: 0.2 },
+  { sp: SP.BANGLANG, form: 'round', H: 9, trunkH: 2.9, r0: 0.26, r1: 0.18, lean: 0.02, limbs: 4, limbAng: [0.35, 0.75], limbLen: 3.2, sub: 2, cy: 6.3, rx: 3.5, ry: 3.0, cards: 58, cardsFar: 15, cardS: [1.3, 1.9], cells: [CELL.BL_LEAF], flowerCell: CELL.BL_FLOWER, flowers: 28, bark: [1.0, 0.96, 0.92], up: 0.2 },
   { sp: SP.CAU, form: 'palm', H: 13.5, trunkH: 11.2, r0: 0.3, r1: 0.22, shaft: 1.7, fronds: 15, frondL: 4.6, frondW: 1.5 },
-  { sp: SP.CATCUT, form: 'pollard', H: 7, trunkH: 4.0, r0: 0.44, r1: 0.34, lean: 0.03, stubs: 4, stubLen: [1.1, 2.3], shoots: 3, cardS: [0.8, 1.3], cells: [CELL.SHOOT], bark: [0.9, 0.87, 0.83] },
-  { sp: SP.CATCUT, form: 'pollard', H: 8, trunkH: 4.5, r0: 0.4, r1: 0.31, lean: 0.06, stubs: 5, stubLen: [1.4, 2.7], shoots: 8, cardS: [0.9, 1.6], cells: [CELL.SHOOT, CELL.SHOOT, CELL.XACU_A], bark: [0.9, 0.87, 0.83] },
-  { sp: SP.DA, form: 'round', H: 15, trunkH: 3.6, r0: 1.0, r1: 0.62, lean: 0, limbs: 7, limbAng: [0.85, 1.25], limbLen: 7.6, sub: 2, cy: 10.2, rx: 9.0, ry: 4.6, cards: 170, cardS: [2.3, 3.3], cells: [CELL.DA], bark: [0.82, 0.8, 0.76], up: 0.35, stems: 4, roots: 18 },
-  { sp: SP.NON, form: 'round', H: 4.6, trunkH: 2.2, r0: 0.075, r1: 0.05, lean: 0.01, limbs: 4, limbAng: [0.4, 0.7], limbLen: 1.1, sub: 0, cy: 3.4, rx: 1.3, ry: 1.15, cards: 22, cardS: [0.8, 1.2], cells: [CELL.XACU_A, CELL.SAU], bark: [0.9, 0.86, 0.8], up: 0.2, stakes: true },
+  { sp: SP.CATCUT, form: 'pollard', H: 7, trunkH: 4.0, r0: 0.37, r1: 0.29, lean: 0.03, stubs: 4, stubLen: [1.1, 2.3], shoots: 3, cardS: [0.8, 1.3], cells: [CELL.SHOOT], bark: [0.9, 0.87, 0.83] },
+  { sp: SP.CATCUT, form: 'pollard', H: 8, trunkH: 4.5, r0: 0.34, r1: 0.27, lean: 0.06, stubs: 5, stubLen: [1.4, 2.7], shoots: 8, cardS: [0.9, 1.6], cells: [CELL.SHOOT, CELL.SHOOT, CELL.XACU_A], bark: [0.9, 0.87, 0.83] },
+  { sp: SP.DA, form: 'round', H: 15, trunkH: 3.6, r0: 1.0, r1: 0.62, lean: 0, limbs: 7, limbAng: [0.85, 1.25], limbLen: 7.6, sub: 3, cy: 10.2, rx: 9.0, ry: 4.6, cards: 130, cardsFar: 32, cardS: [2.1, 3.0], cells: [CELL.DA], bark: [0.82, 0.8, 0.76], up: 0.35, stems: 4, roots: 18 },
+  { sp: SP.NON, form: 'round', H: 4.6, trunkH: 2.2, r0: 0.075, r1: 0.05, lean: 0.01, limbs: 4, limbAng: [0.4, 0.7], limbLen: 1.1, sub: 0, cy: 3.4, rx: 1.3, ry: 1.15, cards: 18, cardsFar: 14, cardS: [0.8, 1.2], cells: [CELL.XACU_A, CELL.SAU], bark: [0.9, 0.86, 0.8], up: 0.2, stakes: true },
 ];
 const SP_KITS = Array.from({ length: SP_N }, () => []);
 KIT_DEFS.forEach((d, i) => SP_KITS[d.sp].push(i));
@@ -382,6 +401,7 @@ function genKit(d, far, seed) {
   const sidesT = far ? 5 : (d.r0 > 0.6 ? 10 : 8), sidesL = far ? 4 : 6, sidesS = 4;
   // ---- thân: đoạn gốc quét vôi (kind 1) + thân trên (kind 0) ----
   const trunk = (r0, r1, top, ox = 0, oz = 0) => {
+    G.crown = false;
     const at = (y) => [ox + lx * Math.max(0, y), oz + lz * Math.max(0, y)];
     const [a0x, a0z] = at(-0.4), [a1x, a1z] = at(0.15), [a2x, a2z] = at(WASH_H);
     tube(G, [[a0x, -0.4, a0z, r0 * 1.32], [a1x, 0.15, a1z, r0 * 1.12], [a2x, WASH_H, a2z, r0]], sidesT, rectWash, 1, woodAO, woodSway);
@@ -393,6 +413,7 @@ function genKit(d, far, seed) {
   };
   // ---- cành cong (ngóc dần lên), trả về điểm đầu/giữa/cuối ----
   const limb = (sx, sy, sz, az, th, len, rA, rB, sides, bendUp, segs = 3) => {
+    G.crown = true;
     const pts = []; let x = sx, y = sy, z = sz, t = th;
     for (let s = 0; s <= segs; s++) {
       pts.push([x, y, z, lerp(rA, rB, s / segs)]);
@@ -405,10 +426,13 @@ function genKit(d, far, seed) {
   const leafCell = (cells) => cellRect(cells[(r() * cells.length) | 0], 3);
   // thẻ lá quanh tâm tán ellipsoid c=(cx,cy,cz),(rx,ry); tips = điểm hút (đầu cành)
   const crownCards = (cx, cy, cz, rx, ry, tips, n, sMin, sMax, cells, upBias, kind = 2, topOnly = false) => {
+    G.crown = true;
+    // W2-B: kit gần ¾ số thẻ thành CHÙM chặt quanh đầu cành (trước 58%, toả rộng hơn) → giữa các chùm lộ trời/cành
+    const tipF = far ? 0.58 : 0.76, tipS = far ? 1.0 : 0.72;
     for (let i = 0; i < n; i++) {
       let px, py, pz;
-      if (!topOnly && tips.length && i < n * 0.58) {
-        const tp = tips[i % tips.length], sp = 1.0 + 0.4 * (rx / 5);
+      if (!topOnly && tips.length && i < n * tipF) {
+        const tp = tips[i % tips.length], sp = (1.0 + 0.4 * (rx / 5)) * tipS;
         px = tp[0] + (r() + r() - 1) * sp; py = tp[1] + (r() + r() - 1) * sp * 0.6 + 0.3; pz = tp[2] + (r() + r() - 1) * sp;
       } else {
         const u = r() * 2 - 1, a = r() * Math.PI * 2, s = Math.sqrt(1 - u * u);
@@ -450,25 +474,30 @@ function genKit(d, far, seed) {
         }
       }
     }
-    if (d.roots && !far) for (let q = 0; q < d.roots; q++) {      // rễ phụ buông (đa/si)
+    if (d.roots && !far) for (let q = 0; q < d.roots; q++) {      // rễ phụ buông (đa/si) — KHÔNG thuộc tán: chân rễ chạm đất
+      G.crown = false;
       const a = r() * 6.28, rr = 2 + r() * (d.rx - 3), x = cx + Math.cos(a) * rr, z = cz + Math.sin(a) * rr, yt = d.cy - d.ry * (0.55 + r() * 0.3);
       tube(G, [[x, yt, z, 0.05 + r() * 0.05], [x + (r() - 0.5) * 0.3, yt * 0.5, z + (r() - 0.5) * 0.3, 0.05 + r() * 0.06], [x, -0.2, z, 0.06 + r() * 0.08]], 4, rectBark, 0, woodAO, woodSway);
     }
     if (d.stakes && !far) for (let q = 0; q < 3; q++) {            // cọc chống (cây non)
+      G.crown = false;
       const a = q / 3 * 6.28 + 0.5;
       tube(G, [[Math.cos(a) * 0.62, -0.3, Math.sin(a) * 0.62, 0.035], [Math.cos(a) * 0.1, 1.55, Math.sin(a) * 0.1, 0.03]], 4, rectBark, 0, () => [1.55, 1.38, 1.1], () => 0);
     }
-    // kit XA: ~19% số thẻ, thẻ ×1,9 (nhìn từ trên cao/vệ tinh tán vẫn thành khối liền, không lấm tấm)
-    const n = Math.round(far ? Math.max(14, d.cards * 0.19) : d.cards * CARD_Q);
+    // kit XA: ~19% số thẻ cũ (cardsFar), thẻ ×1,9 (nhìn từ trên cao/vệ tinh tán vẫn thành khối liền, không lấm tấm)
+    const n = Math.round(far ? Math.max(14, d.cardsFar || d.cards * 0.19) : d.cards * CARD_Q);
     const sMul = far ? 1.9 : 1;
     // kit XA: thẻ ngửa lên nhiều hơn (nhìn từ trên/xa tán vẫn kín — ảnh vệ tinh), gần: theo loài
     crownCards(cx, d.cy, cz, d.rx, d.ry, tips, n, d.cardS[0] * sMul, d.cardS[1] * sMul, d.cells, (d.up || 0.2) + (far ? 0.55 : 0));
-    if (d.flowers) crownCards(cx, d.cy, cz, d.rx * 0.97, d.ry, [], far ? 6 : Math.round(d.flowers * CARD_Q), (far ? 2.4 : 1.2), (far ? 3.2 : 2.0), d.cells, 0.55, 3, true);
+    // hoa: kit XA trên mặt vòm (nhìn từ cao); kit GẦN thành chùm ở ĐẦU CÀNH khắp tán (W2-B — trước chỉ mặt trên vòm nên
+    // đứng dưới đường nhìn lên gần như không thấy hoa, tháng 6 trông như tháng 10)
+    if (d.flowers) crownCards(cx, d.cy, cz, d.rx * 0.97, d.ry, far ? [] : tips, far ? 8 : Math.round(d.flowers * 1.8 * CARD_Q), (far ? 2.4 : 1.4), (far ? 3.2 : 2.3), d.cells, 0.55, 3, far);
   } else if (d.form === 'tier') {
     // BÀNG: thân thẳng tới ngọn, các TẦNG cành gần nằm ngang, lá dồn đầu cành thành tầng phẳng (dáng chùa)
     trunk(d.r0, d.r0 * 0.3, H * 0.94);
+    G.crown = true;
     let wsum = 0; for (const [, R] of d.tiers) wsum += R * R;
-    const nCards = far ? Math.max(22, d.cards * 0.21) : d.cards * CARD_Q, sMul = far ? 1.8 : 1;
+    const nCards = far ? Math.max(22, d.cardsFar || d.cards * 0.21) : d.cards * CARD_Q, sMul = far ? 1.8 : 1;
     d.tiers.forEach(([ty, R], ti) => {
       const nb = far ? 4 : d.branches + (ti === d.tiers.length - 1 ? -2 : 0), az0 = r() * 6.28, tips = [];
       for (let b = 0; b < nb; b++) {
@@ -479,7 +508,8 @@ function genKit(d, far, seed) {
       const n = Math.round(nCards * R * R / wsum);
       for (let i = 0; i < n; i++) {
         let px, py, pz;
-        if (i < n * 0.7) { const tp = tips[i % tips.length]; px = tp[0] + (r() + r() - 1) * 1.3; py = tp[1] + 0.1 + r() * 0.6; pz = tp[2] + (r() + r() - 1) * 1.3; }
+        // W2-B: chùm lá bàng chặt hơn quanh đầu cành (80%, toả 1,0 m) → tầng lá thành các "đĩa" rời, lộ trời giữa tầng
+        if (i < n * (far ? 0.7 : 0.8)) { const tp = tips[i % tips.length], sp = far ? 1.3 : 1.0; px = tp[0] + (r() + r() - 1) * sp; py = tp[1] + 0.1 + r() * 0.6; pz = tp[2] + (r() + r() - 1) * sp; }
         else { const a = r() * 6.28, rr = Math.sqrt(0.08 + r() * 0.92) * R; px = lx * ty + Math.cos(a) * rr; py = ty + 0.2 + r() * 0.55; pz = lz * ty + Math.sin(a) * rr; }
         const rr = Math.hypot(px - lx * ty, pz - lz * ty) / R;
         const [nx, ny, nz] = norm3((r() - 0.5) * (far ? 1.6 : 0.9), far ? 1.0 : 1.7, (r() - 0.5) * (far ? 1.6 : 0.9));
@@ -508,8 +538,8 @@ function genKit(d, far, seed) {
     const nC = far ? 8 : Math.round((d.shoots * nS + 3) * CARD_Q + 2);
     for (let i = 0; i < nC; i++) {
       let px, py, pz;
-      if (i < nC - 3 || far) { const tp = tips[i % tips.length]; px = tp[0] + (r() - 0.5) * 1.1; py = tp[1] + 0.25 + r() * 0.6; pz = tp[2] + (r() - 0.5) * 1.1; }
-      else { const a = r() * 6.28, y = d.trunkH * (0.45 + r() * 0.4); px = lx * y + Math.cos(a) * (d.r0 + 0.25); py = y; pz = lz * y + Math.sin(a) * (d.r0 + 0.25); }
+      if (i < nC - 3 || far) { G.crown = true; const tp = tips[i % tips.length]; px = tp[0] + (r() - 0.5) * 1.1; py = tp[1] + 0.25 + r() * 0.6; pz = tp[2] + (r() - 0.5) * 1.1; }
+      else { G.crown = false; const a = r() * 6.28, y = d.trunkH * (0.45 + r() * 0.4); px = lx * y + Math.cos(a) * (d.r0 + 0.25); py = y; pz = lz * y + Math.sin(a) * (d.r0 + 0.25); }   // chồi bám thân: không co theo tán
       const [nx, ny, nz] = norm3((r() - 0.5) * 2, 0.6 + r(), (r() - 0.5) * 2);
       const nl = norm3(px * 0.4, 1, pz * 0.4);
       card(G, px, py, pz, nx, ny, nz, lerp(d.cardS[0], d.cardS[1], r()) * (far ? 1.6 : 1), leafCell(d.cells), r() * 6.283, 2, clamp(0.75 + r() * 0.3, 0.6, 1.05), nl, clamp(0.4 + 0.6 * py / d.H, 0.3, 1));
@@ -549,8 +579,16 @@ function genKit(d, far, seed) {
       }
     }
   }
-  const geo = G.build();
-  return { geo, def: d, R: kitR(d), tris: G.i.length / 3 };
+  const fork = d.form === 'palm' ? Infinity : d.form === 'tier' ? d.tiers[0][0] - 0.3 : d.form === 'pollard' ? d.trunkH - 0.7 : tH;
+  const geo = G.build(fork);
+  // số đo kit (đơn vị kit) cho phép biến hình từng cây (buildTrees): base = mép dưới TÁN (phân vị 8% cao độ đỉnh thẻ lá),
+  // top = ngọn, fork = chạc
+  // rad = bán kính tán THẤY ĐƯỢC (phân vị 85% khoảng cách ngang đỉnh lá tới trục thân)
+  const ly = [], lr = []; let top = 0;
+  for (let i = 0; i < G.nv; i++) { const y = G.p[i * 3 + 1]; if (y > top) top = y; if (G.k[i] >= 2 && G.k[i] < 3) { ly.push(y); lr.push(Math.hypot(G.p[i * 3], G.p[i * 3 + 2])); } }
+  ly.sort((a, b) => a - b); lr.sort((a, b) => a - b);
+  const base = ly.length ? ly[Math.floor(ly.length * 0.08)] : tH, rad = lr.length ? lr[Math.floor(lr.length * 0.85)] : kitR(d);
+  return { geo, def: d, R: kitR(d), tris: G.i.length / 3, base, top, fork, rad };
 }
 
 // =====================================================================================================
@@ -568,7 +606,7 @@ export function trunkNear(x, z, r) {
   }
   return false;
 }
-// kind: tên loài | 'shade' | 'street' | 'park'. o: {h (cao m), r (bán kính tán m), bloom (0/1), wash (0/1), pit (0 không,
+// kind: tên loài | 'shade' | 'street' | 'park'. o: {h (cao m), r (bán kính tán m), bloom (BỎ từ W2-B: hoa theo LỊCH), wash (0/1), pit (0 không,
 // 1 ô vuông), hero (biến thể GLB 0..2), yaw, variant (chỉ số kit trong loài), sz (hệ số cỡ theo cấp phố), full (độ kín tán 0..1),
 // median (1 = cây dải phân cách, miễn kiểm lòng đường)}
 export function plant(kind, x, z, o = {}) {
@@ -582,14 +620,51 @@ export function plantLocal(parent, lx, lz, kind, o = {}) { Q.push({ kind, parent
 // ---- camera 551 pano (js/panoclear.js): không trồng/dời cây trong r m quanh điểm chụp (lưới 8 m, dựng 1 lần) ----
 // PANO_CLEAR 4,5 m: camera pano thật đứng trên LÒNG ĐƯỜNG (xe chụp đi giữa làn) → quanh nó không có gốc cây; trước 3 m
 // thì 68 camera có cây < 4 m, tán bàng/xà cừ che kín nửa trên khung (pano_019/008). Áp cho MỌI cây trừ dải phân cách
-// (o.median). HERO_PANO_CLEAR 12 m: tán GLB phượng xoè 6-7 m — hero 9,7 m trước pano_001_h090 che ~35% khung.
-const PANO_CLEAR = 4.5, HERO_PANO_CLEAR = 12;
+// (o.median).
+const PANO_CLEAR = 4.5;
+// HERO GLB (W2-B): chỉ là "tủ kính" quanh Nhà hát (≤ HERO_SHOW_R) — "thành phố hoa phượng đỏ" — và mỗi lúc chỉ vẽ
+// HERO_MAX cây GLB gần camera nhất trong HERO_R (trước: 57 hero cả dải trung tâm, ≤ 8 cùng lúc → 1,19 M tam giác)
+const OPERA = LM_CENTROID.opera, HERO_SHOW_R = 120, HERO_MAX = 3;
 let _PG = null;
 function nearPano(x, z, r) {
   if (!_PG) { _PG = new Map(); for (const [px, pz] of PANO_CAM) { const k = Math.floor(px / 8) * 100003 + Math.floor(pz / 8); let a = _PG.get(k); if (!a) _PG.set(k, (a = [])); a.push(px, pz); } }
   const ci = Math.floor(x / 8), cj = Math.floor(z / 8);
   for (let i = ci - 1; i <= ci + 1; i++) for (let j = cj - 1; j <= cj + 1; j++) { const a = _PG.get(i * 100003 + j); if (!a) continue; for (let q = 0; q < a.length; q += 2) if ((a[q] - x) ** 2 + (a[q + 1] - z) ** 2 < r * r) return true; }
   return false;
+}
+// ---- CHỖ ĐẶT HERO GLB (tủ kính phượng đỏ quanh Nhà hát, luôn nở) — không được chắn khung pano thật. Review W2-B:
+// pano_055_h000 (std) có 3 vòm đỏ 25-49 m GIỮA khung che lối vào Nhà hát (pano thật 10/2024: xanh, cây tỉa/cây non).
+// Pano thật chụp 8 hướng (h000..h315) ⇒ "nón ±45° của hướng chụp" = mọi hướng ⇒ luật: (1) cách MỌI camera pano
+// ≥ HERO_PANO_MIN (vòm 6-7 m ở ≥ 45 m chỉ ~1/6 khung, không còn "chiếm giữa khung"; 50 m thì vùng ≤ 120 m quanh
+// Nhà hát gần như chỉ còn dải z < −70 — pano dày đặc); (2) ngoài NÊM NHÌN tới đa giác Nhà hát (+ bán kính tán) từ mọi camera
+// pano ≤ HERO_VIEW_R quanh Nhà hát + camera spawn (0, 72) — không che mặt Nhà hát từ chỗ có ảnh thật (pano xa hơn:
+// Nhà hát nhỏ, nêm từ mọi phía phủ kín cả vùng). Thay HERO_PANO_CLEAR 12 m cũ (nearPano chỉ dò ±1 ô 8 m — r 12 m sót).
+const HERO_PANO_MIN = 45, HERO_CROWN_R = 7, HERO_VIEW_R = 160;
+let _HV = null;
+function heroSpotOk(x, z) {
+  if (!_HV) {
+    const OP = LM_POLY.opera; _HV = [];
+    const views = PANO_CAM.map(([px, pz]) => [px, pz, true]).filter(([px, pz]) => Math.hypot(px - OPERA[0], pz - OPERA[1]) < HERO_VIEW_R);
+    views.push([0, 72, false]);
+    for (const [px, pz, pano] of views) {
+      const dir = Math.atan2(OPERA[0] - px, OPERA[1] - pz);
+      let a0 = 1e9, a1 = -1e9, dn = 1e9;
+      for (const [vx, vz] of OP) {
+        let a = Math.atan2(vx - px, vz - pz) - dir; a = Math.atan2(Math.sin(a), Math.cos(a));
+        a0 = Math.min(a0, a); a1 = Math.max(a1, a); dn = Math.min(dn, Math.hypot(vx - px, vz - pz));
+      }
+      _HV.push({ x: px, z: pz, pano, dir, a0, a1, dn });
+    }
+  }
+  for (const [px, pz] of PANO_CAM) if ((px - x) ** 2 + (pz - z) ** 2 < HERO_PANO_MIN * HERO_PANO_MIN) return false;
+  for (const v of _HV) {
+    const dx = x - v.x, dz = z - v.z, d = Math.hypot(dx, dz);
+    if (d > v.dn + HERO_CROWN_R || d < 1) continue;            // sau lưng mặt Nhà hát gần nhất → không che
+    let a = Math.atan2(dx, dz) - v.dir; a = Math.atan2(Math.sin(a), Math.cos(a));
+    const hw = Math.atan2(HERO_CROWN_R, d);
+    if (a + hw > v.a0 && a - hw < v.a1) return false;
+  }
+  return true;
 }
 // ---- tra pano gần nhất (≤ 60 m) ----
 const VG = new Map(), VCELL = 60;
@@ -620,11 +695,13 @@ function distPolyline(x, z, P) {
 let _ctx = {};     // hàm vùng (lakeSD, hdTreeBelt) — đặt ở plantStreetTrees/buildTrees
 // trọng số loài [xacu, bang, phuong, sau, banglang, cau, -, da]; + tỉ lệ cắt cụt / cây non / mật độ / quét vôi
 function vegAt(x, z) {
-  let w, pollard, young = 0.04, dens = 2, wash = 0.55, pano = false, cauRaw = 0, near = false, thin = 0;
-  if (_ctx.hdTreeBelt && _ctx.hdTreeBelt(x, z)) { w = [1, 0.3, 0, 0.1, 0, 0, 0, 0]; pollard = 0.6; }
-  else if (_ctx.lakeSD && _ctx.lakeSD(x, z) < 45) { w = [0.42, 0.3, 0.12, 0.1, 0.04, 0, 0, 0.02]; pollard = 0.18; }
-  else if (distPolyline(x, z, CENTRAL) < 110) { w = [0.3, 0.14, 0.42, 0.05, 0.05, 0.04, 0, 0]; pollard = 0.15; }
-  else { w = [0.36, 0.26, 0.2, 0.09, 0.05, 0.02, 0, 0]; pollard = 0.12; }
+  let w, pollard, young = 0.04, dens = 2, wash = 0.55, pano = false, cauRaw = 0, near = false, thin = 0, polLvl = 0, zoneCut;
+  // zoneCut (W2-B): tỉ lệ cây TỈA TRƠ (thân cao, tán nhỏ thưa) nơi không có pano ≤ 60 m — dải trung tâm/ven hồ/Hoàng
+  // Diệu bị tỉa nặng sau bão Yagi (pano_001/007/055: "cắt tỉa trơ cành", "tán thưa")
+  if (_ctx.hdTreeBelt && _ctx.hdTreeBelt(x, z)) { w = [1, 0.3, 0, 0.1, 0, 0, 0, 0]; pollard = 0.6; zoneCut = 0.55; }
+  else if (_ctx.lakeSD && _ctx.lakeSD(x, z) < 45) { w = [0.42, 0.3, 0.12, 0.1, 0.04, 0, 0, 0.02]; pollard = 0.18; zoneCut = 0.5; }
+  else if (distPolyline(x, z, CENTRAL) < 110) { w = [0.3, 0.14, 0.42, 0.05, 0.05, 0.04, 0, 0]; pollard = 0.15; zoneCut = 0.5; }
+  else { w = [0.36, 0.26, 0.2, 0.09, 0.05, 0.02, 0, 0]; pollard = 0.12; zoneCut = 0.15; }
   const pi = panoVeg(x, z);
   if (pi >= 0) {
     const V = PANO_VEG, o = pi + 2;
@@ -632,13 +709,15 @@ function vegAt(x, z) {
     const sp = wp.reduce((a, b) => a + b, 0), sz = w.reduce((a, b) => a + b, 0);
     near = true; cauRaw = V[o + 5];
     if (sp > 0) { w = w.map((v, i) => 0.3 * v / sz + 0.7 * wp[i] / sp); pano = true; }
-    pollard = V[o + 7] ? 0.06 + V[o + 7] / 10 * 0.85 : pollard * 0.6;
+    // W2-B: "một số/vài cây" (3) → 18%, (5) → 40%, "hàng cây/nhiều cây cắt" (7) → 62% (trước 31/49/66%)
+    pollard = V[o + 7] ? -0.15 + V[o + 7] * 0.11 : pollard * 0.6;
+    polLvl = V[o + 7];
     young = V[o + 8] ? V[o + 8] / 10 * 0.6 : 0.03;
     dens = V[o + 9];
     if (V[o + 10]) wash = 0.9;
     thin = V[o + 12] || (V[o + 7] >= 5 ? 1 : 0);   // tán thưa / trụi lá — hoặc vùng cắt cụt nặng (cây còn lại cũng xơ xác)
   }
-  return { w, pollard, young, dens, wash, pano, cauRaw, near, thin };
+  return { w, pollard, young, dens, wash, pano, cauRaw, near, thin, polLvl, zoneCut };
 }
 function pickW(w, h) {
   let s = 0; for (const v of w) s += v;
@@ -666,11 +745,21 @@ function resolveSpecies(x, z, mode) {
 // 4) TRỒNG THEO DỮ LIỆU dọc phố (thay vòng 46 m cũ + cây xà cừ 2 bên đại lộ cap 170)
 // =====================================================================================================
 const MARGIN = { p: 1.3, s: 1.2, t: 1.0, r: 0.9, w: 0.5, h: 0.7 };
-let _fp = null;
+let _fp = null, _fpD = null;
 function footprints(ctx) {
   if (ctx.fpGrid) return ctx.fpGrid;
-  if (!_fp) _fp = rbGrid();
+  if (!_fp) { _fpD = rbData(); _fp = rbGrid(); }   // W2-F: giải mã 1 lần dùng chung (rbdata.js)
   return _fp;
+}
+// dữ liệu đỉnh footprint đi cùng lưới (ctx.fpData = world.rbData, D.dead đã đánh) — cần cho khoảng cách tới mặt tiền
+let _fpWarn = false;
+function footprintData(ctx) {
+  if (ctx.fpGrid) {
+    if (!ctx.fpData && !_fpWarn) { _fpWarn = true; console.warn('[trees] fpGrid không kèm fpData → TẮT khoảng cách mặt tiền (facadeFit)'); }
+    return ctx.fpData || null;
+  }
+  footprints(ctx);
+  return _fpD;
 }
 // ---- lưới đoạn đường dùng chung (mọi cấp, kể cả ngõ h): ô 16 m, mỗi đoạn chèn vào mọi ô trong bbox + (nửa lòng + 3 m) ----
 let _ri = null;
@@ -790,12 +879,12 @@ export function plantStreetTrees(ctx) {
           if (c === 'r' && (!V.near || V.dens < 2 || hxz(tx, tz, 12) < 0.3)) { acc += step; rej('r-nodata'); continue; }
           if (ok(tx, tz, ri, i, c)) {
             const { sp } = resolveSpecies(tx, tz, 'street');
-            const bloom = (sp === SP.PHUONG || sp === SP.BANGLANG) && hxz(tx, tz, 21) < 0.35 ? 1 : 0;
-            const q = Q.length;
-            plant(SP_NAME[sp], tx, tz, { bloom, pit: c === 'r' ? 0 : 1, wash: hxz(tx, tz, 22) < V.wash ? 1 : 0, sz });
+            const q = Q.length;   // (hoa: theo LỊCH ở buildTrees — hạng hash so với tỉ lệ nở của ngày)
+            plant(SP_NAME[sp], tx, tz, { pit: c === 'r' ? 0 : 1, wash: hxz(tx, tz, 22) < V.wash ? 1 : 0, sz });
             ctx.addCollider && ctx.addCollider(tx, tz, sp === SP.CAU ? 0.45 : 0.55);
             st.planted++;
-            if (sp === SP.PHUONG && bloom && (c === 'p' || c === 's') && distPolyline(tx, tz, CENTRAL) < 160 && !(ctx.hdTreeBelt && ctx.hdTreeBelt(tx, tz)) && !nearPano(tx, tz, HERO_PANO_CLEAR)) heroCand.push(q);
+            // hero GLB: chỉ "tủ kính" quanh Nhà hát (W2-B — trước cả dải trung tâm ≤ 160 m)
+            if (sp === SP.PHUONG && (c === 'p' || c === 's') && Math.hypot(tx - OPERA[0], tz - OPERA[1]) < HERO_SHOW_R && !(ctx.hdTreeBelt && ctx.hdTreeBelt(tx, tz)) && heroSpotOk(tx, tz)) heroCand.push(q);
           }
           acc += step;
         }
@@ -805,25 +894,91 @@ export function plantStreetTrees(ctx) {
   }
   // HERO (GLB phượng Meshy) cho dải trung tâm: chọn đều theo hash (KHÔNG "N cây đầu tiên theo thứ tự ROADS_DT")
   heroCand.sort((a, b) => hxz(Q[a].x, Q[a].z, 31) - hxz(Q[b].x, Q[b].z, 31));
-  const nHero = Math.min(heroCand.length, ctx.heroMax ?? 46);
+  const nHero = Math.min(heroCand.length, ctx.heroMax ?? 8);
   for (let h = 0; h < nHero; h++) { const e = Q[heroCand[h]]; e.o.hero = hxz(e.x, e.z, 33) < 0.4 ? 0 : hxz(e.x, e.z, 33) < 0.72 ? 1 : 2; }
   st.heroes = nHero; st.ms = +(performance.now() - t0).toFixed(1);
   console.log('[trees] trồng dọc phố:', JSON.stringify(st));
   return st;
 }
 
+// ---- CÂY NON CHỐNG CỌC TRÊN QUẢNG TRƯỜNG LÁT ĐÁ (W2-B) — pano_541 "hàng cây non mới trồng có cọc chống gỗ hình chóp trải
+// khắp quảng trường", pano_055/056 (cây chống kiềng cọc), pano_249 ("cây mới trồng có khung chống 3 chân"): quảng trường
+// Nhà hát phía nam (Trần Phú) trồng lại sau bão Yagi. Lưới hàng song song trục hộp claim `box` {cx,cz,ux,uz,hu,hw} nhịp
+// `step` m, giữ ~72% theo hash; né lòng đường (+1,5 m), nhà thật, địa danh (LM_POLY + 3 m, kể cả quảng trường Nhà hát),
+// collider (chậu bonsai/đài phun/cột đèn), gốc khác < 5 m, camera pano 4,5 m, ctx.keepClear (trục nhìn spawn → Nhà hát).
+// ctx.claim = tên claim hộp (vd 'road9_tay') → hộp lấy THẲNG từ claims (W2-D/E sửa claim thì hàng cây đi theo);
+// ctx.box = hộp cho sẵn (dự phòng / trang QA)
+export function plantPlazaYoung(ctx) {
+  const { ROADS_DT, groundHeightNoDeck, isWater } = ctx;
+  let box = ctx.box;
+  if (ctx.claim) {
+    const c = claimsAll().find((q) => q.name === ctx.claim && q.type === 'box');
+    // claims.js: local X → (cosθ, −sinθ), local Z → (sinθ, cosθ) = (−uz, ux) — đúng trục w của hộp dưới đây
+    if (c) box = { cx: c.cx, cz: c.cz, ux: Math.cos(c.rot), uz: -Math.sin(c.rot), hu: c.hx, hw: c.hz };
+    else console.warn('[trees] plantPlazaYoung: không thấy claim', ctx.claim);
+  }
+  if (!box) return 0;
+  const LAND = ctx.landH ?? 2, step = ctx.step || 8.5, RI = roadIndex(ROADS_DT, ctx.R || 1600), fp = footprints(ctx);
+  const inLMpad = (x, z, pad) => {
+    for (const P of Object.values(LM_POLY)) {
+      let c = false;
+      for (let i = 0, j = P.length - 1; i < P.length; j = i++) { const [xi, zi] = P[i], [xj, zj] = P[j]; if ((zi > z) !== (zj > z) && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) c = !c; }
+      if (c) return true;
+      for (let i = 0, j = P.length - 1; i < P.length; j = i++) if (RI.segD(x, z, { ax: P[j][0], az: P[j][1], bx: P[i][0], bz: P[i][1] }) < pad) return true;
+    }
+    return false;
+  };
+  const cols = (ctx.colliders || []).filter((c) => Math.abs(c.x - box.cx) < box.hu + box.hw + 20 && Math.abs(c.z - box.cz) < box.hu + box.hw + 20);
+  const wx = -box.uz, wz = box.ux;
+  let n = 0;
+  for (let a = -box.hu + step / 2; a < box.hu; a += step) for (let b = -box.hw + step / 2; b < box.hw; b += step) {
+    const x = box.cx + box.ux * a + wx * b, z = box.cz + box.uz * a + wz * b;
+    if (hxz(x, z, 71) > 0.72) continue;
+    if (Math.abs(groundHeightNoDeck(x, z) - LAND) > 0.35 || isWater(x, z)) continue;
+    if (RI.nearRoad(x, z, 1.5) || fp.at(x, z) >= 0 || inLMpad(x, z, 3)) continue;
+    if (nearPano(x, z, PANO_CLEAR) || trunkNear(x, z, 5) || (ctx.keepClear && ctx.keepClear(x, z))) continue;
+    if (cols.some((c) => (c.x - x) ** 2 + (c.z - z) ** 2 < (c.r + 1.0) ** 2)) continue;
+    plant('non', x, z, { pit: 0, wash: 0 });
+    ctx.addCollider && ctx.addCollider(x, z, 0.3);
+    n++;
+  }
+  console.log('[trees] cây non quảng trường:', n);
+  return n;
+}
+
 // =====================================================================================================
 // 5) DỰNG: atlas + kit + InstancedMesh + LOD/gió (móc scene.onBeforeRender)
 // =====================================================================================================
-const U = { uTime: { value: 0 }, uBloom: { value: 1 }, uWind: { value: 1 }, uAtlasPx: { value: ATLAS_S * 4 } };
-const VERT_DECL = 'attribute float aKind;\nattribute float aSway;\nattribute vec4 aInst;\nuniform float uTime;\nuniform float uBloom;\nuniform float uWind;\n';
+// uBloom = (tỉ lệ phượng đang nở, tỉ lệ bằng lăng đang nở) theo LỊCH trong game (bloomShare) — cây nở khi hạng hoa
+// riêng (aInst.x, hash 0..1; bằng lăng +2; −1 = luôn nở: cây đôi của hero GLB) < tỉ lệ; càng sâu dưới ngưỡng càng nhiều chùm hoa
+const U = { uTime: { value: 0 }, uBloom: { value: new THREE.Vector2(1, 1) }, uWind: { value: 1 }, uAtlasPx: { value: ATLAS_S * 4 } };
+const VERT_DECL = 'attribute float aKind;\nattribute float aSway;\nattribute float aHt;\nattribute vec4 aInst;\nattribute vec4 aShape;\nuniform float uTime;\nuniform vec2 uBloom;\nuniform float uWind;\n';
 const VERT_BEGIN = `vec3 transformed = vec3( position );
 #ifdef USE_INSTANCING
-  // hoa: cây không nở / trái mùa → thu thẻ hoa về 1 điểm (tam giác suy biến, không raster)
-  if ( aKind > 2.5 && aInst.x * uBloom < 0.5 ) transformed = vec3( 0.0, -3.0, 0.0 );
+  // W2-B BIẾN HÌNH TỪNG CÂY (aShape, đơn vị kit): x = NÂNG tán (thân từ gốc vôi → chạc giãn ra, tán dời lên nguyên khối),
+  // |y| = co/giãn tán NGANG quanh trục thân (chỉ đỉnh tán: aHt ≥ 2). zw theo DẤU của y:
+  //   y > 0 → zw = NGHIÊNG tự nhiên nhẹ (dời tán ≤ ~6°, thân thẳng từ trên gốc vôi tới chạc)
+  //   y < 0 → TÁN LỆCH (né mặt tiền): zw = hướng ra lòng đường × tỉ lệ ÉP s — nửa tán phía TƯỜNG co về trục thân
+  //           (×(1−s) theo pháp tuyến tường), nửa phía đường giữ nguyên; THÂN THẲNG ĐỨNG (cây sát nhà bị tỉa phía nhà)
+  float hpCr = step( 1.5, aHt ), hpH = aHt - 2.0 * hpCr, hpSq = step( aShape.y, 0.0 );
+  transformed.xz *= mix( 1.0, abs( aShape.y ), hpCr );
+  float hpSL = length( aShape.zw );
+  vec2 hpN = aShape.zw / max( hpSL, 1e-5 );
+  transformed.xz += hpN * ( max( - dot( transformed.xz, hpN ), 0.0 ) * hpSL * hpSq * hpCr );
+  transformed.xz += aShape.zw * ( hpH * ( 1.0 - hpSq ) );
+  transformed.y += aShape.x * hpH;
+  // hoa theo MÙA: cây chưa tới lượt nở / trái mùa → thu thẻ hoa về 1 điểm (tam giác suy biến, không raster); cây đang
+  // nở giữ phần thẻ hoa ∝ độ sâu dưới ngưỡng (đầu/cuối mùa lác đác vài chùm, giữa mùa đỏ rực)
+  if ( aKind > 2.5 ) {
+    float hpR = aInst.x, hpS = uBloom.x;
+    if ( hpR > 1.5 ) { hpR -= 2.0; hpS = uBloom.y; }
+    if ( hpR < -0.5 && hpS <= 0.05 ) hpR = 1.0;     // cây đôi hero (luôn nở) — trừ khi tắt hẳn mùa hoa (setSeason(0))
+    if ( fract( aKind ) * 2.5 >= clamp( ( hpS - hpR ) * 8.0, 0.0, 1.0 ) ) transformed = vec3( 0.0, -3.0, 0.0 );
+  }
   // ĐỘ KÍN TÁN từng cây (aInst.w 0..1): thẻ lá/hoa có số ngẫu nhiên riêng (phần lẻ aKind × 2,5) lớn hơn → bỏ
   // ⇒ cùng 1 kit mà cây thưa/cây dày khác nhau, lộ trời + cành như ảnh thật (pano 10/2024 sau bão Yagi)
-  if ( aKind > 1.5 && fract( aKind ) * 2.5 > aInst.w ) transformed = vec3( 0.0, -3.0, 0.0 );
+  // (thẻ HOA không theo độ kín tán — độ rộ do lịch quyết; cây tỉa trơ vẫn nở trên phần cành còn lại)
+  if ( aKind > 1.5 && aKind < 2.5 && fract( aKind ) * 2.5 > aInst.w ) transformed = vec3( 0.0, -3.0, 0.0 );
   float hpSw = aSway * uWind, hpPh = aInst.z;
   transformed.x += hpSw * ( 0.2 * sin( uTime * 0.83 + hpPh ) + 0.07 * sin( uTime * 2.1 + hpPh * 2.3 ) );
   transformed.z += hpSw * ( 0.16 * cos( uTime * 0.67 + hpPh * 1.3 ) );
@@ -881,8 +1036,146 @@ function patchShader(sh, depth) {
   sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uAtlasPx;\n' + (A2C ? '#define HP_SHARP\n' : '') + (depth ? '' : '#define HP_COLOR\n')).replace('#include <map_fragment>', FRAG_MAP);
 }
 
+// =====================================================================================================
+// 4b) LỊCH TRONG GAME → MÙA HOA (W2-B). Phượng HP: nụ cuối tháng 4, rực tháng 5-6, tàn dần tháng 7, lác đác tháng 8.
+//     Bằng lăng: tím rộ tháng 6. Ngoài mùa vẫn ~17% phượng còn vài chùm hoa muộn ("thành phố hoa phượng đỏ" — pano
+//     10/2024 gần như toàn xanh). Ngày mặc định 4/10 = ngày của mô hình mặt trời (daynight.js "đầu tháng 10") và của
+//     ảnh pano. Ghi đè: ?date=2026-05-25 | ?date=05-25 | ?month=6 (giữa tháng). Ngày tự sang khi đồng hồ game qua 0h.
+// =====================================================================================================
+const DEFAULT_DOY = 277;      // 4/10
+const MDAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+const doyOf = (m, d) => { let s = 0; for (let i = 0; i < m - 1; i++) s += MDAYS[i]; return s + d; };
+const mdOf = (doy) => { let m = 0, d = ((Math.round(doy) - 1) % 365 + 365) % 365 + 1; while (d > MDAYS[m]) { d -= MDAYS[m]; m++; } return [m + 1, d]; };
+const sstep = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+// tỉ lệ cây ĐANG NỞ theo ngày trong năm: [phượng, bằng lăng]
+export function bloomShare(doy) {
+  const ph = 0.17 + 0.63 * sstep(118, 142, doy) * (1 - sstep(186, 224, doy));
+  const bl = 0.12 + 0.66 * sstep(130, 154, doy) * (1 - sstep(190, 218, doy));
+  return [ph, bl];
+}
+function parseDateParam() {
+  try {
+    const q = new URLSearchParams(location.search), v = q.get('date'), mo = q.get('month');
+    if (v) { const p = v.split('-').map(Number), m = p.length >= 3 ? p[1] : p[0], d = p.length >= 3 ? p[2] : p[1]; if (m >= 1 && m <= 12) return doyOf(m, clamp(d || 15, 1, MDAYS[m - 1])); }
+    if (mo) { const m = Math.round(+mo); if (m >= 1 && m <= 12) return doyOf(m, 15); }
+  } catch (e) { /* node / không có location */ }
+  return DEFAULT_DOY;
+}
+
+// ---- KÍCH THƯỚC THẬT theo loài (m): cây đường phố trung tâm HP, hiệu chỉnh theo pano 10/2024 (pano_001/036/055/085/
+// 007): [cao min, cao max, mép tán dưới min, max, bán kính tán min, max]. Mép dưới tán = chiều cao THÂN TRỐNG đã tỉa
+// chừa lối đi + xe tải (cây lớn 5-7,5 m, phượng 4,2-5,6 m, bàng tầng dưới 3,8-5 m); trước W2-B cây phố t/r co ĐỀU
+// cả cây nên tán phượng xuống 2,6-3 m, che kín mặt tiền + nửa khung pano (pano_071/085/141).
+const SPX = [
+  [12, 21, 5.0, 7.5, 3.8, 6.8],      // xà cừ
+  [9, 13.5, 3.8, 5.0, 3.4, 5.4],     // bàng
+  [8, 12, 4.2, 5.6, 3.6, 5.8],       // phượng
+  [12, 19, 5.0, 7.0, 3.4, 5.4],      // sấu
+  [7, 10.5, 3.2, 4.2, 2.4, 3.6],     // bằng lăng
+  [10, 16, 0, 0, 0, 0],              // cau vua (chỉ co theo cao)
+  [6, 9.5, 3.6, 5.2, 1.6, 2.8],      // cắt cụt (mép tán = chạc cụt + chồi)
+  [13, 18, 4.0, 5.5, 7.0, 10.0],     // đa/si
+  [4.0, 6.5, 2.2, 3.0, 1.1, 1.9],    // cây non chống cọc (pano_541: 5-7 m, tán từ ~2,5 m)
+];
+const FACADE_CLEAR = 1.5;   // tán cách mặt tiền ≥ 1,5 m (ép nửa tán phía tường — tán lệch ra lòng đường, không đủ thì thu nhỏ)
+const SQ_MAX = 0.72;        // ép tối đa nửa tán phía tường còn 28% bán kính
+// nghiêng TỰ NHIÊN tối đa (độ) của thân trên đoạn gốc vôi → chạc (cây đứng tự do; cây sát nhà/cây non/cắt cụt: 0)
+const LEAN_NAT_DEG = 5.5;
+// facadeFit: 16 điểm mép tán (dây cung/2 ≤ 0,2R ≤ 1,36 m < 1,45 m → cạnh tường cắt qua mép tán luôn bị bắt), bảng cos/sin dựng 1 lần
+const FIT_N = 16, FIT_C = new Float64Array(FIT_N), FIT_S = new Float64Array(FIT_N);
+for (let q = 0; q < FIT_N; q++) { FIT_C[q] = Math.cos(q * 2 * Math.PI / FIT_N); FIT_S[q] = Math.sin(q * 2 * Math.PI / FIT_N); }
+// LM_POLY làm "tường" cao (địa danh) — bbox để lọc nhanh. BỎ các đa giác KHUÔN VIÊN/quảng trường (tường rào/hè trống,
+// tán cây vươn qua rào là đúng thật): square, trường học, chùa Hàng, Việt Tiệp
+const LM_OPEN = new Set(['square', 'thptnq', 'thcsnq', 'thcstp', 'chuahang', 'viettiep']);
+const LMW = Object.entries(LM_POLY).filter(([k]) => !LM_OPEN.has(k)).map(([, P]) => { let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9; for (const [x, z] of P) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); } return { P, x0, z0, x1, z1 }; });
+// tán (tâm gốc x,z, mép dưới B m, bán kính R m) vướng mặt tiền nào cao hơn mép tán? → {sq (0..SQ_MAX tỉ lệ ép nửa tán
+// phía tường), nx, nz (pháp tuyến tường → lòng đường), R (m), d (m, gốc → tường gần nhất)}.
+// Chỉ tường cao ≥ mép tán − 0,3 m (tán xoè trên mái nhà 1 tầng là bình thường). Gốc nằm TRONG nhà/địa danh → bỏ qua.
+function facadeFit(x, z, B, R, fp, D, CB) {
+  const out = { sq: 0, nx: 0, nz: 0, R, d: 1e9 };
+  if (!fp || !D) return out;
+  const S = R + FACADE_CLEAR + 0.5, E = [];
+  let best = 1e9, nx = 0, nz = 0;
+  const edge = (ax, az, bx, bz) => {
+    const dx = bx - ax, dz = bz - az, L2 = dx * dx + dz * dz || 1;
+    let t = ((x - ax) * dx + (z - az) * dz) / L2; t = t < 0 ? 0 : t > 1 ? 1 : t;
+    const qx = ax + t * dx, qz = az + t * dz, d = Math.hypot(x - qx, z - qz);
+    if (d > S) return;
+    E.push(ax, az, bx, bz, d);
+    if (d < best && d > 1e-3) { best = d; nx = (x - qx) / d; nz = (z - qz) / d; }
+  };
+  let inside = false;
+  fp.near(x, z, S, (b) => {
+    if (inside) return;
+    if (heightOf(D.floors[b]) + PARAPET_H < B - 0.3) return;
+    if (fp.inside(b, x, z)) { inside = true; return; }
+    for (let v = D.vStart[b], e = D.vStart[b + 1], w = e - 1; v < e; w = v++) edge(D.x[w], D.z[w], D.x[v], D.z[v]);
+  });
+  // nhà ô dựng tay GIỮ LẠI (cell sink, claim 'cell' hộp nhỏ < 1500 m² = 1 công trình, không phải khuôn viên): tường
+  // cao không rõ → coi là cao; gốc trong hộp → bỏ qua hộp (cây trong sân)
+  if (CB && !inside) {
+    const a = CB.get(Math.floor(x / 32) * 100003 + Math.floor(z / 32));
+    if (a) for (const c of a) {
+      if (x < c.x0 - S || x > c.x1 + S || z < c.z0 - S || z > c.z1 + S) continue;
+      const dx = x - c.cx, dz = z - c.cz, lx = dx * c.cs - dz * c.sn, lz = dx * c.sn + dz * c.cs;
+      if (Math.abs(lx) <= c.hx && Math.abs(lz) <= c.hz) continue;
+      const P = c.P;
+      for (let i = 0, j = 3; i < 4; j = i++) edge(P[j][0], P[j][1], P[i][0], P[i][1]);
+    }
+  }
+  for (const L of LMW) {
+    if (inside || x < L.x0 - S || x > L.x1 + S || z < L.z0 - S || z > L.z1 + S) continue;
+    const P = L.P; let c = false;
+    for (let i = 0, j = P.length - 1; i < P.length; j = i++) { const [xi, zi] = P[i], [xj, zj] = P[j]; if ((zi > z) !== (zj > z) && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) c = !c; }
+    if (c) { inside = true; break; }
+    for (let i = 0, j = P.length - 1; i < P.length; j = i++) edge(P[j][0], P[j][1], P[i][0], P[i][1]);
+  }
+  out.d = best;
+  if (inside || best >= R + FACADE_CLEAR) return out;
+  // TÁN LỆCH (review W2-B: dời tán ≤ 1,6 m trên đoạn thân gốc vôi→chạc 1,4-3,3 m = thân gãy 20-55°, pano thật thân gần
+  // thẳng đứng): THÂN GIỮ THẲNG, nửa tán phía tường bị ÉP về trục thân theo pháp tuyến mặt tiền gần nhất — (1−s)·R ≤
+  // khoảng trống (best − 1,5 m), s ≤ SQ_MAX (cây sát nhà ở HP bị tỉa phẳng phía nhà, tán vươn ra lòng đường). Không đủ
+  // (thân quá sát tường) → thu R. Rồi kiểm MỌI tường trong tầm (góc phố/nhà thứ 2) với hình tán đã ép → thu dần R.
+  const room = best - FACADE_CLEAR, Rmin = Math.max(1.2, R * 0.42), tx = -nz, tz = nx;
+  let Rf = R, s = 1 - room / R;
+  if (s > SQ_MAX) { s = SQ_MAX; Rf = Math.max(Rmin, Math.min(R, room / (1 - SQ_MAX))); }
+  if (s < 0) s = 0;
+  // hình tán ép: điểm (a theo pháp tuyến n — dương = phía đường, b theo tiếp tuyến); a < 0 bị nhân (1−s); FIT_N điểm mép
+  const clearOK = (Rc, sc) => {
+    const k = 1 - sc;
+    for (let q = 0; q < FIT_N; q++) {
+      const ca = FIT_C[q], a = ca < 0 ? ca * k : ca, b = FIT_S[q];
+      const px = x + (nx * a + tx * b) * Rc, pz = z + (nz * a + tz * b) * Rc;
+      for (let e = 0; e < E.length; e += 5) {
+        if (E[e + 4] - Rc >= FACADE_CLEAR) continue;     // cạnh xa hơn R + 1,5 m tính từ gốc: không điểm mép nào chạm
+        const ax = E[e], az = E[e + 1], dx = E[e + 2] - ax, dz = E[e + 3] - az, L2 = dx * dx + dz * dz || 1;
+        let t = ((px - ax) * dx + (pz - az) * dz) / L2; t = t < 0 ? 0 : t > 1 ? 1 : t;
+        if ((px - ax - t * dx) ** 2 + (pz - az - t * dz) ** 2 < (FACADE_CLEAR - 0.05) ** 2) return false;
+      }
+    }
+    // cạnh tường nằm GỌN trong tán (nhà nhỏ/ki-ốt): điểm gần thân nhất của cạnh lọt trong hình tán
+    for (let e = 0; e < E.length; e += 5) {
+      if (E[e + 4] >= Rc) continue;
+      const ax = E[e], az = E[e + 1], dx = E[e + 2] - ax, dz = E[e + 3] - az, L2 = dx * dx + dz * dz || 1;
+      let t = ((x - ax) * dx + (z - az) * dz) / L2; t = t < 0 ? 0 : t > 1 ? 1 : t;
+      const qx = ax + t * dx - x, qz = az + t * dz - z;
+      let a = qx * nx + qz * nz; const b = qx * tx + qz * tz;
+      if (a < 0) a /= Math.max(k, 0.05);
+      if (a * a + b * b < Rc * Rc) return false;
+    }
+    return true;
+  };
+  for (let it = 0; it < 12 && !clearOK(Rf, s); it++) {
+    if (Rf <= Rmin + 1e-3) break;
+    Rf = Math.max(Rmin, Rf * 0.88);
+    s = Math.min(SQ_MAX, Math.max(0, 1 - room / Rf));
+  }
+  out.sq = s; out.nx = nx; out.nz = nz; out.R = Rf;
+  return out;
+}
+
 let _built = null;
-// ctx: { groundHeight, R, lakeSD, hdTreeBelt, colliders?, fpGrid? }
+// ctx: { groundHeight, R, lakeSD, hdTreeBelt, colliders?, fpGrid?, fpData? }
 export function buildTrees(scene, ctx = {}) {
   const t0 = performance.now();
   if (ctx.lakeSD || ctx.hdTreeBelt) _ctx = Object.assign({}, _ctx, ctx);
@@ -957,31 +1250,40 @@ export function buildTrees(scene, ctx = {}) {
     if (e.kind === 'shade' || e.kind === 'street' || e.kind === 'park') ({ sp, V } = resolveSpecies(x, z, e.kind));
     else sp = KIND_OF[e.kind] ?? SP.XACU;
     if (!V) V = vegAt(x, z);
-    const o = e.o, kits = SP_KITS[sp];
-    const kit = kits[o.variant !== undefined ? o.variant % kits.length : (hxz(x, z, 41) * kits.length) | 0], d = KIT_DEFS[kit];
-    // cỡ: h (cao mục tiêu) / r (bán kính tán) từ helper cũ; mặc định ngẫu nhiên ±
-    const hs = 0.8 + hxz(x, z, 42) * 0.45;
-    let sy = (o.h ? o.h / d.H : hs * (sp === SP.DA ? 1 : sp === SP.CAU ? 0.95 : 0.92)) * (o.sz || 1);
-    // trần cỡ theo loài: helper cũ truyền h của "cây to" nhưng pano/vùng có thể biến nó thành cây non/cắt cụt/cau
-    // (cây non 4,6 m × 2,2 = thân 0,3 m + cọc chống 4 m — đã gặp ở pano_141)
-    const SC = sp === SP.NON ? [0.7, 1.15] : sp === SP.CATCUT ? [0.75, 1.4] : sp === SP.CAU ? [0.45, 1.3] : [0.45, 2.0];
-    sy = clamp(sy, SC[0], SC[1]);
-    let sxz = o.r ? o.r / kitR(d) : sy * (0.9 + hxz(x, z, 43) * 0.22);
-    sxz = clamp(sxz, sy * 0.7, sy * 1.45);
-    const bloom = o.bloom !== undefined ? (o.bloom ? 1 : 0) : ((sp === SP.PHUONG || sp === SP.BANGLANG) && hxz(x, z, 21) < 0.35 ? 1 : 0);
+    const o = e.o;
+    // hero GLB (showcase, luôn nở đỏ) chỉ trong HERO_SHOW_R quanh Nhà hát + không chắn khung pano (heroSpotOk) — còn lại: phượng thủ
+    // tục nở theo LỊCH như mọi cây (W2-B: trước 57 hero rải cả dải trung tâm + vườn hoa → "vòm đỏ" khắp nơi tháng 10)
+    const heroOk = sp === SP.PHUONG && o.hero !== undefined && o.hero >= 0 && Math.hypot(x - OPERA[0], z - OPERA[1]) < HERO_SHOW_R && heroSpotOk(x, z);
+    // CẮT CỤT / TỈA TRƠ theo bằng chứng pano (bão Yagi 9/2024 → pano 10/2024): loài đặt đích danh bởi helper cũ
+    // (phượng allée, xà cừ vườn hoa…) cũng bị cắt khi pano ≤ 60 m nói "cắt cụt/trụi" — trước chỉ cây 'shade/street/park'
+    if (!heroOk && V.near && V.polLvl > 0 && sp !== SP.CAU && sp !== SP.DA && sp !== SP.NON && sp !== SP.CATCUT && hxz(x, z, 5) < V.pollard * 0.85) sp = SP.CATCUT;
+    const kits = SP_KITS[sp];
+    const kit = kits[o.variant !== undefined ? o.variant % kits.length : (hxz(x, z, 41) * kits.length) | 0];
+    // ---- KÍCH THƯỚC THẬT (m): cao H, mép dưới tán B, bán kính tán R — phân bố lệch về cây nhỏ/vừa (u^1,25) cho đa dạng;
+    // cấp phố (o.sz) thu cao + tán nhưng KHÔNG hạ mép tán dưới mức tỉa tối thiểu của loài; h/r của helper cũ nặng 50%
+    const T = SPX[sp], u = hxz(x, z, 42), s = u ** 1.25, szf = o.sz || 1;
+    let H = lerp(T[0], T[1], s) * szf;
+    let B = Math.max(lerp(T[2], T[3], clamp(0.55 * s + 0.45 * hxz(x, z, 48), 0, 1)) * (0.92 + 0.08 * szf), T[2] * 0.95);
+    let Rr = lerp(T[4], T[5], clamp(0.65 * s + 0.35 * hxz(x, z, 49), 0, 1)) * (0.75 + 0.25 * szf);
+    if (o.h) H = clamp(lerp(H, o.h, 0.5), T[0] * 0.8, T[1] * 1.12);
+    if (o.r) Rr = clamp(lerp(Rr, o.r, 0.5), T[4] * 0.8, T[5] * 1.1);
+    // TỈA TRƠ (cut-back): thân cao, tán nhỏ thưa — dạng phổ biến nhất trên pano 10/2024 (pano_007/055/036)
+    const cutP = sp === SP.CAU || sp === SP.DA || sp === SP.NON || sp === SP.CATCUT || heroOk ? 0
+      : V.polLvl > 0 ? 0.1 + V.polLvl * 0.065 : V.thin ? 0.7 : V.near ? 0.1 : V.zoneCut;
+    const cut = hxz(x, z, 57) < cutP ? 1 : 0;
+    if (cut) { Rr *= 0.55 + 0.2 * hxz(x, z, 58); B += 0.5; }
+    if (sp !== SP.CAU) B = Math.min(B, H - (sp === SP.CATCUT || sp === SP.NON ? 1.6 : 2.6));   // độ sâu tán tối thiểu
     const wash = o.wash !== undefined ? (o.wash ? 1 : 0) : (sp === SP.CAU || sp === SP.DA ? 0 : hxz(x, z, 22) < V.wash ? 1 : 0);
-    // độ kín tán (shader bỏ bớt thẻ lá): đa số 0,66-1; nơi pano tả "tán thưa/trụi lá/cắt trụi" 0,42-0,72
+    // độ kín tán (shader bỏ bớt thẻ lá) — W2-B thưa hơn: thường 0,62-0,95; pano "tán thưa/trụi" & tỉa trơ 0,38-0,62
     const hf = hxz(x, z, 47);
-    const full = o.full ?? (sp === SP.CAU || sp === SP.CATCUT || sp === SP.NON ? 1 : sp === SP.DA ? 0.85 + 0.15 * hf
-      : V.thin ? 0.42 + 0.3 * hf : sp === SP.BANG ? 0.75 + 0.25 * hf : 0.66 + 0.34 * hf);
-    // hero GLB (luôn nở đỏ) chỉ khi cách camera pano ≥ 12 m — gần hơn: phượng thủ tục, nở theo hash như cây thường
-    // (cây hero vườn hoa từ heroTree truyền bloom:1 chỉ để khớp GLB đỏ)
-    const hero = sp === SP.PHUONG && o.hero !== undefined && o.hero >= 0 && !nearPano(x, z, HERO_PANO_CLEAR) ? o.hero : -1;
-    const bloomF = hero >= 0 ? 1 : o.hero !== undefined && o.hero >= 0 ? (hxz(x, z, 21) < 0.35 ? 1 : 0) : bloom;
-    recs.push({ x, y, z, sp, kit, sy, sxz, yaw: o.yaw ?? hxz(x, z, 44) * Math.PI * 2, lx: (hxz(x, z, 45) - 0.5) * 0.07, lz: (hxz(x, z, 46) - 0.5) * 0.07,
-      bloom: bloomF, wash, pit: o.pit || 0, hero, full });
+    const full = o.full ?? (sp === SP.CAU || sp === SP.CATCUT || sp === SP.NON ? 1 : sp === SP.DA ? 0.82 + 0.15 * hf
+      : V.thin || cut ? 0.34 + 0.22 * hf : sp === SP.BANG ? 0.66 + 0.26 * hf : 0.58 + 0.34 * hf);
+    // HẠNG HOA (0..1): cây nở khi hạng < tỉ lệ nở của ngày (uBloom); bằng lăng +2; −1 = luôn nở (cây đôi của hero GLB)
+    const rank = heroOk ? -1 : sp === SP.BANGLANG ? 2 + hxz(x, z, 21) : sp === SP.PHUONG ? hxz(x, z, 21) : 3;
+    recs.push({ x, y, z, sp, kit, sy: 1, sxz: 1, yaw: o.yaw ?? hxz(x, z, 44) * Math.PI * 2, lx: (hxz(x, z, 45) - 0.5) * 0.07, lz: (hxz(x, z, 46) - 0.5) * 0.07,
+      rank, wash, pit: o.pit || 0, hero: heroOk ? o.hero : -1, full, H, B, Rr, cut, lift: 0, cs: 1, ox: 0, oz: 0 });
   }
-  const N = recs.length;
+  const N = recs.length, recsMs = performance.now() - t0;
   // ---- atlas + vật liệu (1 material cho MỌI cây gần/xa) ----
   const tA = performance.now();
   const atlas = new THREE.CanvasTexture(buildAtlasCanvas());
@@ -1001,19 +1303,95 @@ export function buildTrees(scene, ctx = {}) {
   depthMat.customProgramCacheKey = () => 'hpveg1d';
   depthMat.extensions = { derivatives: true };
   // ---- kit (chỉ loại đang dùng) ----
+  const tK = performance.now();
   const usedK = new Set(recs.map((r) => r.kit)), usedS = new Set(recs.map((r) => r.sp));
   const nearKits = [], farKits = [];
   KIT_DEFS.forEach((d, i) => { nearKits[i] = usedK.has(i) ? genKit(d, false, 1000 + i * 17) : null; });
   // kit XA mỗi loài lấy dáng biến thể 0
   for (let s = 0; s < SP_N; s++) farKits[s] = usedS.has(s) ? genKit(KIT_DEFS[SP_KITS[s][0]], true, 5000 + s * 13) : null;
+  const kitMs = performance.now() - tK;
+  // ---- KÍCH THƯỚC THẬT → biến hình kit (W2-B). Mỗi cây: tán né mặt tiền (facadeFit) rồi quy về đơn vị kit:
+  //   sy = (H − B)/(top − base) (co dọc theo ĐỘ SÂU TÁN), lift = B/sy − base (nâng tán: thân trống dài ra, gốc vôi giữ),
+  //   sxz = bề dày thân ∝ sy, cs = R/(rad·sxz) (co tán ngang quanh trục); sát tường: ép nửa tán phía tường (sq, hướng
+  //   snx/snz → zx/zz kit), đứng tự do: nghiêng nhẹ (ox,oz ≤ 5,5°). Cùng số đo cho kit XA (syF/liftF/csF).
+  const fpD = ctx.facade === false ? null : footprintData(ctx);   // facade:false = trang QA kit (tools/qa/trees.html)
+  const fit = { squeezed: 0, shrunk: 0, maxSq: 0, ms: 0 };
+  const tF = performance.now();
+  // hộp claim 'cell' nhỏ (nhà ô dựng tay giữ lại) → lưới 32 m cho facadeFit
+  const CB = new Map();
+  for (const c of claimsAll()) {
+    if (c.kind !== 'cell' || c.type !== 'box' || c.hx * c.hz * 4 > 1500) continue;
+    const cs = Math.cos(c.rot), sn = Math.sin(c.rot), P = [];
+    // local X → (cosθ, −sinθ), local Z → (sinθ, cosθ) (claims.js)
+    for (const [a, b] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) P.push([c.cx + a * c.hx * cs + b * c.hz * sn, c.cz - a * c.hx * sn + b * c.hz * cs]);
+    const e = { cx: c.cx, cz: c.cz, hx: c.hx, hz: c.hz, cs, sn, P, x0: c.bb[0], z0: c.bb[1], x1: c.bb[2], z1: c.bb[3] };
+    for (let i = Math.floor((e.x0 - 12) / 32); i <= Math.floor((e.x1 + 12) / 32); i++) for (let j = Math.floor((e.z0 - 12) / 32); j <= Math.floor((e.z1 + 12) / 32); j++) {
+      const k = i * 100003 + j; let a = CB.get(k); if (!a) CB.set(k, (a = [])); a.push(e);
+    }
+  }
+  const LEAN_T = Math.tan(LEAN_NAT_DEG * Math.PI / 180);
+  for (const r of recs) {
+    const k = nearKits[r.kit], kf = farKits[r.sp], cau = r.sp === SP.CAU;
+    r.sq = 0; r.snx = 0; r.snz = 0; r.zx = 0; r.zz = 0;
+    if (cau) {
+      r.sy = clamp(r.H / k.top, 0.45, 1.3); r.sxz = r.sy * (0.92 + hxz(r.x, r.z, 43) * 0.12);
+      r.syF = clamp(r.H / kf.top, 0.45, 1.3); r.liftF = 0; r.csF = 1;
+      continue;
+    }
+    let R = r.Rr;
+    if (fpD) {
+      const f = facadeFit(r.x, r.z, r.B, R, fpG, fpD, CB);
+      if (f.sq > 0.005) { r.sq = f.sq; r.snx = f.nx; r.snz = f.nz; fit.squeezed++; fit.maxSq = Math.max(fit.maxSq, f.sq); }
+      if (f.R < R - 0.05) fit.shrunk++;
+      R = f.R; r.fd = f.d;
+    }
+    r.sy = clamp((r.H - r.B) / Math.max(0.5, k.top - k.base), 0.4, 2.4);
+    r.lift = clamp(r.B / r.sy - k.base, -(k.fork - WASH_TOP) * 0.6, 14);
+    // bề dày thân theo CHIỀU CAO cây so với kit (không theo độ sâu tán — cây cắt cụt tán nông từng ra thân 1 m)
+    r.sxz = clamp((r.H / k.def.H) ** 0.8 * (0.88 + hxz(r.x, r.z, 43) * 0.22), 0.45, 1.5);
+    r.cs = clamp(R / (k.rad * r.sxz), 0.35, 1.9);
+    // kit XA (variant 0 của loài, > NEAR_R): sy/nâng/co tán RIÊNG theo số đo kit xa → mép dưới/ngọn/bán kính tán khớp
+    // kit gần ở ranh LOD (trước: dùng aShape của kit gần → mép tán nhảy −1..+1,7 m khi đổi LOD). Khớp mép/ngọn THỰC của
+    // kit gần (kể cả khi kẹp sy/nâng — cắt cụt biến thể 1 không hạ tán dưới chạc được), không phải B/H mong muốn
+    const Bn = (k.base + r.lift) * r.sy, Tn = (k.top + r.lift) * r.sy;
+    // (kit xa xà cừ/cắt cụt: tán NÔNG hơn kit gần → cần hạ tán sâu dưới chạc; ở > 180 m thân bị nén 90% không thấy được;
+    // vẫn chạm sàn → chọn sy khớp TÂM tán, chia đều sai số mép dưới/ngọn)
+    const lminF = -(kf.fork - WASH_TOP) * 0.9;
+    r.syF = clamp((Tn - Bn) / Math.max(0.5, kf.top - kf.base), 0.4, 2.4);
+    r.liftF = Bn / r.syF - kf.base;
+    if (r.liftF < lminF) { r.liftF = lminF; r.syF = clamp((Bn + Tn) / 2 / Math.max(0.5, (kf.base + kf.top) / 2 + lminF), 0.4, 2.4); }
+    r.liftF = Math.min(r.liftF, 14);
+    r.csF = clamp(R / (kf.rad * r.sxz), 0.35, 1.9);
+    // nghiêng TỰ NHIÊN (cây phố HP ít khi thẳng tuyệt đối — pano_007/085) chỉ cây ĐỨNG TỰ DO (không tường trong tầm),
+    // không cây non chống cọc / cắt cụt; dời tán ≤ tan(5,5°) × đoạn thân gốc vôi → chạc (shader dồn nghiêng vào đoạn
+    // này) — review W2-B: 0,15-0,8 m trên đoạn 1,4-3,3 m từng ra thân gãy 9-17°, cộng dời né tường tới 55°
+    let ox = 0, oz = 0;
+    if (!r.sq && r.sp !== SP.NON && r.sp !== SP.CATCUT && (r.fd === undefined || r.fd > R + FACADE_CLEAR + 1) && Number.isFinite(k.fork)) {
+      const seg = Math.max(0, (Math.min(k.fork, kf.fork) + Math.min(r.lift, r.liftF) - WASH_TOP) * Math.min(r.sy, r.syF));
+      const a = hxz(r.x, r.z, 59) * 6.283, m = Math.min((0.15 + 0.65 * hxz(r.x, r.z, 60)) * Math.min(1, r.B / 5), LEAN_T * seg);
+      ox = Math.cos(a) * m; oz = Math.sin(a) * m;
+    }
+    // thế giới → kit (nghịch đảo xoay yaw; nghiêng lx/lz nhỏ bỏ qua): dời tán chia sxz; hướng ép tán chỉ xoay
+    const c = Math.cos(r.yaw), s = Math.sin(r.yaw);
+    r.ox = (ox * c - oz * s) / r.sxz; r.oz = (ox * s + oz * c) / r.sxz;
+    if (r.sq) { r.zx = (r.snx * c - r.snz * s) * r.sq; r.zz = (r.snx * s + r.snz * c) * r.sq; } else { r.zx = r.ox; r.zz = r.oz; }
+    r.Rf = R; r.wox = ox; r.woz = oz;
+  }
+  fit.ms = +(performance.now() - tF).toFixed(1); fit.maxSq = +fit.maxSq.toFixed(2);
   // ---- ma trận + màu + thuộc tính từng cây ----
-  const M = new Float32Array(N * 16), COL = new Float32Array(N * 3), INST = new Float32Array(N * 4);
+  // M/SHP: kit GẦN; MF/SHPF: kit XA (sy + nâng/co tán riêng theo số đo kit xa). SHP.y < 0 = cờ TÁN LỆCH (xem VERT_BEGIN)
+  const M = new Float32Array(N * 16), COL = new Float32Array(N * 3), INST = new Float32Array(N * 4), SHP = new Float32Array(N * 4);
+  const MF = new Float32Array(N * 16), SHPF = new Float32Array(N * 4);
   const px = new Float32Array(N), pz = new Float32Array(N);
   const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _e = new THREE.Euler(), _s = new THREE.Vector3(), _p = new THREE.Vector3();
   const SP_TINT = [[1, 1, 1], [1.04, 1.03, 0.95], [1.0, 1.03, 0.95], [1, 1, 1], [1, 1, 1], [1, 1, 1], [1, 1, 1], [0.95, 0.97, 0.95], [1.03, 1.03, 1]];
   const setM = (i, r) => {
     _e.set(r.lx, r.yaw, r.lz); _q.setFromEuler(_e); _s.set(r.sxz, r.sy, r.sxz); _p.set(r.x, r.y, r.z);
     _m.compose(_p, _q, _s); _m.toArray(M, i * 16);
+    _s.set(r.sxz, r.syF, r.sxz); _m.compose(_p, _q, _s); _m.toArray(MF, i * 16);
+    const sg = r.sq > 0 ? -1 : 1;
+    SHP[i * 4] = r.lift; SHP[i * 4 + 1] = sg * r.cs; SHP[i * 4 + 2] = r.zx; SHP[i * 4 + 3] = r.zz;
+    SHPF[i * 4] = r.liftF; SHPF[i * 4 + 1] = sg * r.csF; SHPF[i * 4 + 2] = r.zx; SHPF[i * 4 + 3] = r.zz;
   };
   recs.forEach((r, i) => {
     setM(i, r);
@@ -1022,14 +1400,16 @@ export function buildTrees(scene, ctx = {}) {
     let cr = tt[0] * b * (1 + (hxz(r.x, r.z, 52) - 0.5) * 0.14), cg = tt[1] * b, cb = tt[2] * b * (1 + (hxz(r.x, r.z, 53) - 0.5) * 0.2);
     if (r.sp === SP.BANG && hxz(r.x, r.z, 54) < 0.18) { cr *= 1.25; cg *= 1.05; cb *= 0.7; }   // bàng ngả vàng
     COL[i * 3] = cr; COL[i * 3 + 1] = cg; COL[i * 3 + 2] = cb;
-    INST[i * 4] = r.bloom; INST[i * 4 + 1] = r.wash; INST[i * 4 + 2] = hxz(r.x, r.z, 55) * 6.283; INST[i * 4 + 3] = r.full;
+    INST[i * 4] = r.rank; INST[i * 4 + 1] = r.wash; INST[i * 4 + 2] = hxz(r.x, r.z, 55) * 6.283; INST[i * 4 + 3] = r.full;
   });
   // ---- nhóm InstancedMesh ----
   const groups = [];
-  const mkGroup = (kitObj, cap, name, cast) => {
+  const mkGroup = (kitObj, cap, name, cast, S) => {
     const geo = kitObj.geo.clone();
     const aInst = new THREE.InstancedBufferAttribute(new Float32Array(cap * 4), 4); aInst.setUsage(THREE.DynamicDrawUsage);
     geo.setAttribute('aInst', aInst);
+    const aShape = new THREE.InstancedBufferAttribute(new Float32Array(cap * 4), 4); aShape.setUsage(THREE.DynamicDrawUsage);
+    geo.setAttribute('aShape', aShape);
     const mesh = new THREE.InstancedMesh(geo, mat, cap);
     mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3); mesh.instanceColor.setUsage(THREE.DynamicDrawUsage);
@@ -1039,13 +1419,13 @@ export function buildTrees(scene, ctx = {}) {
     mesh.userData.noMerge = true;
     mesh.boundingSphere = new THREE.Sphere(new THREE.Vector3(), -1);
     scene.add(mesh);
-    const g = { mesh, cap, idx: new Int32Array(cap).fill(-1), k: 0, dirty: false, aInst, cast, tris: kitObj.tris };
+    const g = { mesh, cap, idx: new Int32Array(cap).fill(-1), k: 0, dirty: false, aInst, aShape, S, cast, tris: kitObj.tris };
     groups.push(g); return g;
   };
   const nearCount = new Array(KIT_DEFS.length).fill(0), farCount = new Array(SP_N).fill(0);
   for (const r of recs) { nearCount[r.kit]++; farCount[r.sp]++; }
-  const nearG = KIT_DEFS.map((d, i) => (nearCount[i] ? mkGroup(nearKits[i], nearCount[i], 'trees_' + SP_NAME[d.sp] + i, true) : null));
-  const farG = Array.from({ length: SP_N }, (_, s) => (farCount[s] ? mkGroup(farKits[s], farCount[s], 'trees_far_' + SP_NAME[s], false) : null));
+  const nearG = KIT_DEFS.map((d, i) => (nearCount[i] ? mkGroup(nearKits[i], nearCount[i], 'trees_' + SP_NAME[d.sp] + i, true, SHP) : null));
+  const farG = Array.from({ length: SP_N }, (_, s) => (farCount[s] ? mkGroup(farKits[s], farCount[s], 'trees_far_' + SP_NAME[s], false, SHPF) : null));
   const kitOf = new Uint8Array(N), spOf = new Uint8Array(N), heroOf = new Int8Array(N);
   recs.forEach((r, i) => { kitOf[i] = r.kit; spOf[i] = r.sp; heroOf[i] = r.hero; });
   // ---- ô gốc cây (bó vỉa bê tông + đất) dọc vỉa hè: 1 InstancedMesh, chỉ hiện trong tầm gần ----
@@ -1064,7 +1444,7 @@ export function buildTrees(scene, ctx = {}) {
     const cc = [0.74, 0.72, 0.68];
     box(-o, o, -o, -o + w, -0.05, top, cc); box(-o, o, o - w, o, -0.05, top, cc); box(-o, -o + w, -o + w, o - w, -0.05, top, cc); box(o - w, o, -o + w, o - w, -0.05, top, cc);
     { const base = G.nv, s = o - w, c = [0.3, 0.24, 0.19]; for (const [x, z] of [[-s, -s], [s, -s], [s, s], [-s, s]]) G.v(x, soil, z, 0, 1, 0, 0, 0, c[0], c[1], c[2], 0, 0); G.t(base, base + 2, base + 1); G.t(base, base + 3, base + 2); }
-    const pg = G.build(); pg.deleteAttribute('uv'); pg.deleteAttribute('aKind'); pg.deleteAttribute('aSway');
+    const pg = G.build(); pg.deleteAttribute('uv'); pg.deleteAttribute('aKind'); pg.deleteAttribute('aSway'); pg.deleteAttribute('aHt');
     const pmesh = new THREE.InstancedMesh(pg, new THREE.MeshLambertMaterial({ vertexColors: true }), pitIdx.length);
     pmesh.count = 0; pmesh.name = 'tree_pits'; pmesh.castShadow = false; pmesh.receiveShadow = true;
     pmesh.userData.noCull = true; pmesh.userData.noMerge = true; pmesh.boundingSphere = new THREE.Sphere(new THREE.Vector3(), -1);
@@ -1086,7 +1466,7 @@ export function buildTrees(scene, ctx = {}) {
     if (g.idx[k] !== i) {
       g.idx[k] = i; g.dirty = true;
       g.mesh.instanceMatrix.array.set(src16.subarray(i * 16, i * 16 + 16), k * 16);
-      if (!g.pit && !g.hero) { g.mesh.instanceColor.array.set(COL.subarray(i * 3, i * 3 + 3), k * 3); g.aInst.array.set(INST.subarray(i * 4, i * 4 + 4), k * 4); }
+      if (!g.pit && !g.hero) { g.mesh.instanceColor.array.set(COL.subarray(i * 3, i * 3 + 3), k * 3); g.aInst.array.set(INST.subarray(i * 4, i * 4 + 4), k * 4); g.aShape.array.set(g.S.subarray(i * 4, i * 4 + 4), k * 4); }
     }
     g.k++;
   };
@@ -1094,7 +1474,7 @@ export function buildTrees(scene, ctx = {}) {
     if (g.k !== g.mesh.count) g.dirty = true;
     if (g.dirty) {
       g.mesh.count = g.k; g.mesh.instanceMatrix.needsUpdate = true;
-      if (!g.pit && !g.hero) { g.mesh.instanceColor.needsUpdate = true; g.aInst.needsUpdate = true; }
+      if (!g.pit && !g.hero) { g.mesh.instanceColor.needsUpdate = true; g.aInst.needsUpdate = true; g.aShape.needsUpdate = true; }
       // cầu bao từ tâm instance + bán kính tán tối đa (rẻ hơn computeBoundingSphere duyệt ma trận)
       const bs = g.mesh.boundingSphere; bs.makeEmpty();
       if (g.k) {
@@ -1109,6 +1489,10 @@ export function buildTrees(scene, ctx = {}) {
   };
   let lastX = 1e9, lastZ = 1e9, lastT = -1e9, lastYaw = 1e9, lastCone = 0;
   const heroNear = [];                          // ứng viên hero trong tầm (lọc frustum mỗi khung)
+  // W2-B: chỉ HERO_MAX cây GLB GẦN NHẤT trong HERO_R (cây đang là hero được ưu tiên 8 m — chống nhấp nháy khi 2 cây
+  // cách gần bằng nhau); còn lại vẽ phượng thủ tục cùng chỗ (cây đôi, luôn nở như GLB)
+  const heroIdx = []; recs.forEach((r, i) => { if (r.hero >= 0) heroIdx.push(i); });
+  const heroPick = new Uint8Array(N), _hc = [];
   // NÓN NHÌN cho kit XA: chỉ giữ cây xa trong góc ngang ±(nửa FOV ngang + 31°) quanh hướng nhìn (cây xa không đổ bóng
   // nên sau lưng camera là vô ích; trước: ~5k cây xa vẽ cả vòng 360° ≈ 0,6 M tam giác mỗi khung). cone = cos(giới hạn),
   // < −1 = tắt (camera trực giao / nhìn dốc xuống — mặt đất sau lưng lọt khung). Gán lại khi hướng đổi > 10°.
@@ -1118,13 +1502,21 @@ export function buildTrees(scene, ctx = {}) {
     if (pitG) pitG.k = 0;
     heroNear.length = 0;
     const n2 = NEAR_R * NEAR_R, n2h = (NEAR_R + 12) ** 2, f2 = FAR_R * FAR_R, h2 = HERO_R * HERO_R, h2h = (HERO_R + 10) ** 2, p2 = Math.min(NEAR_R, 90) ** 2;
-    const bloomOn = U.uBloom.value >= 0.5;
+    _hc.length = 0;
+    if (U.uBloom.value.x > 0.05) for (const i of heroIdx) {      // mùa hoa tắt hẳn (setSeason(0)) → không hero
+      heroPick[i] = 0;
+      if (!heroReady[heroOf[i]]) continue;
+      const d2 = (px[i] - cx) ** 2 + (pz[i] - cz) ** 2, cur = state[i] === 3;
+      if (d2 < (cur ? h2h : h2)) _hc.push({ i, d: Math.sqrt(d2) - (cur ? 8 : 0) });
+    }
+    else for (const i of heroIdx) heroPick[i] = 0;
+    if (_hc.length > HERO_MAX) _hc.sort((a, b) => a.d - b.d);
+    for (let k = 0; k < Math.min(HERO_MAX, _hc.length); k++) heroPick[_hc[k].i] = 1;
     for (let i = 0; i < N; i++) {
       const dx = px[i] - cx, dz = pz[i] - cz, d2 = dx * dx + dz * dz, prev = state[i];
-      const hv = heroOf[i];
-      if (hv >= 0 && heroReady[hv] && bloomOn && d2 < (prev === 3 ? h2h : h2)) { state[i] = 3; heroNear.push(i); }
+      if (heroPick[i]) { state[i] = 3; heroNear.push(i); }
       else if (d2 < (prev === 1 || prev === 3 ? n2h : n2)) { state[i] = 1; write(nearG[kitOf[i]], i, M); }
-      else if (d2 < f2 && (coneCos < -1 || dx * coneFx + dz * coneFz >= coneCos * Math.sqrt(d2))) { state[i] = 2; write(farG[spOf[i]], i, M); }
+      else if (d2 < f2 && (coneCos < -1 || dx * coneFx + dz * coneFz >= coneCos * Math.sqrt(d2))) { state[i] = 2; write(farG[spOf[i]], i, MF); }
       else state[i] = 0;
       if (pitG && pitOf[i] && d2 < p2) write(pitG, i, PM);
     }
@@ -1172,7 +1564,7 @@ export function buildTrees(scene, ctx = {}) {
     }
     let dYaw = Math.abs(yaw - lastYaw); if (dYaw > Math.PI) dYaw = 2 * Math.PI - dYaw;
     if (now - lastT > 250 || (cx - lastX) ** 2 + (cz - lastZ) ** 2 > 64 || (cone > -1) !== (lastCone > -1) || (cone > -1 && dYaw > 0.17)) {
-      lastT = now; lastX = cx; lastZ = cz; lastYaw = yaw; lastCone = cone; coneCos = cone; assign(cx, cz);
+      lastT = now; lastX = cx; lastZ = cz; lastYaw = yaw; lastCone = cone; coneCos = cone; assign(cx, cz); calendarTick();
     }
     heroCull(cam);
   };
@@ -1186,41 +1578,46 @@ export function buildTrees(scene, ctx = {}) {
     scene.add(mesh);
     heroG[v] = { mesh, cap: L.length, idx: new Int32Array(L.length).fill(-1), k: 0, dirty: false, hero: true };
     const HB = [8.6, 10.8, 8.8];
-    const d = KIT_DEFS[SP_KITS[SP.PHUONG][0]];
     for (const i of L) {
-      const r = recs[i];
-      // cao hero như cũ (HERO_BASE_H × 0.82..1.32), cây thủ tục thay thế cùng cao + cùng độ xoè tán (aspect GLB)
+      const r = recs[i], k = nearKits[r.kit], kf = farKits[r.sp];
+      // cao hero như cũ (HERO_BASE_H × 0.82..1.32), cây thủ tục thay thế (cây ĐÔI) cùng cao + cùng độ xoè tán (aspect
+      // GLB), không nâng/dời tán (GLB không biến hình được)
       const h = HB[v] * (0.82 + hxz(r.x, r.z, 61) * 0.5);
       _e.set(0, r.yaw, 0); _q.setFromEuler(_e); _s.setScalar(h); _p.set(r.x, r.y, r.z);
       _m.compose(_p, _q, _s).multiply(B); _m.toArray(HM, i * 16);
       heroBox[i * 2] = Math.max(h * aspect * 0.6, h * 0.6); heroBox[i * 2 + 1] = h;
-      r.sy = h / d.H; r.sxz = clamp((h * aspect * 0.5) / kitR(KIT_DEFS[r.kit]), r.sy * 0.7, r.sy * 1.45);
+      r.sy = h / k.top; r.sxz = r.sy * 0.95; r.lift = 0; r.ox = r.oz = 0; r.sq = 0; r.zx = r.zz = 0;
+      r.cs = clamp((h * aspect * 0.5) / (k.rad * r.sxz), 0.5, 1.6);
+      r.syF = h / kf.top; r.liftF = 0; r.csF = clamp((h * aspect * 0.5) / (kf.rad * r.sxz), 0.5, 1.6);
       setM(i, r);
       for (const g of [nearG[kitOf[i]], farG[spOf[i]]]) if (g) g.idx.fill(-1);   // ép ghi lại hàng ma trận
     }
     heroReady[v] = true; lastT = -1e9;
   };
   // ---- tra cây phượng ĐANG NỞ gần nhất (cánh hoa rơi — petals.js) ----
+  // (W2-B: theo LỊCH — cây nở khi hạng < tỉ lệ ngày; độ rộ = như shader (tỉ lệ − hạng)·8 → cánh rơi thưa/dày theo)
   const BG = new Map();
-  recs.forEach((r, i) => { if (r.sp === SP.PHUONG && r.bloom) { const k = Math.floor(r.x / 32) * 100003 + Math.floor(r.z / 32); let a = BG.get(k); if (!a) BG.set(k, (a = [])); a.push(i); } });
-  const _bn = { x: 0, z: 0, d: 0, h: 0 };
+  recs.forEach((r, i) => { if (r.sp === SP.PHUONG && r.rank < 0.85) { const k = Math.floor(r.x / 32) * 100003 + Math.floor(r.z / 32); let a = BG.get(k); if (!a) BG.set(k, (a = [])); a.push(i); } });
+  const _bn = { x: 0, z: 0, d: 0, h: 0, y: 0, s: 0 };
   const bloomNear = (x, z, rMax = 45) => {
-    if (U.uBloom.value < 0.5) return null;
+    const share = U.uBloom.value.x;
     let best = -1, bd = rMax * rMax; const ci = Math.floor(x / 32), cj = Math.floor(z / 32), rc = Math.ceil(rMax / 32);
     for (let i = ci - rc; i <= ci + rc; i++) for (let j = cj - rc; j <= cj + rc; j++) {
       const a = BG.get(i * 100003 + j); if (!a) continue;
-      for (const t of a) { const d = (px[t] - x) ** 2 + (pz[t] - z) ** 2; if (d < bd) { bd = d; best = t; } }
+      for (const t of a) { if ((share - recs[t].rank) * 8 < 0.2 || (recs[t].rank < 0 && share <= 0.05)) continue; const d = (px[t] - x) ** 2 + (pz[t] - z) ** 2; if (d < bd) { bd = d; best = t; } }
     }
     if (best < 0) return null;
-    _bn.x = px[best]; _bn.z = pz[best]; _bn.d = Math.sqrt(bd); _bn.h = recs[best].sy * 9.8; _bn.y = recs[best].y;
+    const r = recs[best];
+    _bn.x = px[best]; _bn.z = pz[best]; _bn.d = Math.sqrt(bd); _bn.y = r.y; _bn.s = clamp((share - r.rank) * 8, 0, 1);
+    _bn.h = heroOf[best] >= 0 && heroBox[best * 2 + 1] ? heroBox[best * 2 + 1] : (nearKits[r.kit].top + r.lift) * r.sy;
     return _bn;
   };
   const bySp = {}; for (const r of recs) bySp[SP_NAME[r.sp]] = (bySp[SP_NAME[r.sp]] || 0) + 1;
   const info = {
-    trees: N, fix, bySpecies: bySp, heroes: heroList.map((l) => l.length), pits: pitIdx.length,
+    trees: N, fix, fit, cut: recs.reduce((a, r) => a + r.cut, 0), bySpecies: bySp, heroes: heroList.map((l) => l.length), pits: pitIdx.length,
     kitTris: nearKits.map((k, i) => k && [SP_NAME[KIT_DEFS[i].sp] + i, k.tris]).filter(Boolean),
     farTris: farKits.map((k, s) => k && [SP_NAME[s], k.tris]).filter(Boolean),
-    atlasMs: +atlasMs.toFixed(1), buildMs: +(performance.now() - t0).toFixed(1), drawGroups: groups.length + (pitG ? 1 : 0),
+    atlasMs: +atlasMs.toFixed(1), recsMs: +recsMs.toFixed(1), kitMs: +kitMs.toFixed(1), buildMs: +(performance.now() - t0).toFixed(1), drawGroups: groups.length + (pitG ? 1 : 0),
   };
   console.log('[trees] dựng:', JSON.stringify(info));
   const stats = () => {
@@ -1230,8 +1627,25 @@ export function buildTrees(scene, ctx = {}) {
     if (pitG && pitG.mesh.count) { calls++; tris += pitG.mesh.count * pitG.tris; }
     return Object.assign({}, info, { near, far, hero, visTris: Math.round(tris), calls });
   };
-  const setSeason = (b) => { U.uBloom.value = b; lastT = -1e9; };
-  _built = { setHeroModel, bloomNear, stats, setSeason, uniforms: U, recs };
+  // LỊCH: setDate(tháng, ngày) → tỉ lệ nở theo bloomShare; setSeason(s) = ghi đè tỉ lệ (0..1, cả 2 loài; null = về lịch)
+  let doy = parseDateParam(), seasonOverride = null;
+  const applySeason = () => {
+    const [a, b] = seasonOverride != null ? [seasonOverride, seasonOverride] : bloomShare(doy);
+    U.uBloom.value.set(a, b); lastT = -1e9;
+  };
+  applySeason();
+  const setSeason = (b) => { seasonOverride = b == null ? null : clamp(+b, 0, 1); applySeason(); };
+  const setDate = (m, d = 15) => { doy = doyOf(clamp(Math.round(m), 1, 12), clamp(Math.round(d), 1, 31)); seasonOverride = null; applySeason(); };
+  const getDate = () => { const [m, d] = mdOf(doy); return { month: m, day: d, doy, share: [+U.uBloom.value.x.toFixed(3), +U.uBloom.value.y.toFixed(3)] }; };
+  // ngày tự sang khi đồng hồ game qua 0h (đọc dayNight của main.js qua __hp — không có thì đứng ở ngày mặc định)
+  let lastDayT = -1;
+  const calendarTick = () => {
+    const dn = globalThis.__hp && globalThis.__hp.dayNight; if (!dn) return;
+    const t = dn.t;
+    if (lastDayT > 0.85 && t < 0.15) { doy = doy % 365 + 1; if (seasonOverride == null) applySeason(); }
+    lastDayT = t;
+  };
+  _built = { setHeroModel, bloomNear, stats, setSeason, setDate, getDate, uniforms: U, recs };
   // lưới gốc dựng lại theo vị trí CUỐI (sau dời/bỏ) → hệ chạy sau buildTrees (đạo cụ WP7…) vẫn tra được trunkNear
   Q.length = 0; _trunkGrid.clear(); for (const r of recs) addTrunk(r.x, r.z);
   return _built;

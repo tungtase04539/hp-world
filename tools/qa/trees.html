@@ -6,7 +6,7 @@
 </head><body><div id="info"></div>
 <script type="module">
 // tools/qa/trees.html — xem KIT cây của js/trees.js tách khỏi game (atlas lá, dáng, LOD, bóng lốm đốm).
-// ?row=all|<loài> &dist=<m> &h=<cao camera> &fov=<độ> &yaw=<rad> &bloom=0|1 &far=1 (đặt cây cách 250 m để thấy kit XA)
+// ?row=all|<loài> &dist=<m> &h=<cao camera> &fov=<độ> &yaw=<rad> &date=6-1 | 2026-06-01 (lịch hoa, mặc định 4/10) &far=1 (đặt cây cách 250 m để thấy kit XA)
 // &atlas=1 (hiện atlas lá thay vì cảnh). Phục vụ tools/qa/shoot-tree (playwright) — window.__ready khi vẽ xong.
 import * as THREE from 'three';
 import * as veg from '../../js/trees.js';
@@ -33,9 +33,10 @@ let n = 0;
 kinds.forEach((k, i) => {
   if (row !== 'all' && row !== k) return;
   const x = (n++) * (k === 'da' ? 22 : 14) - (row === 'all' ? 84 : 0) + (k === 'da' ? 5 : 0);
-  veg.plant(k, x, z0, { variant: vari[i], bloom: Q.get('bloom') === '0' ? 0 : 1, wash: i % 2, pit: 1, yaw: 0.3 + i, h: undefined });
+  veg.plant(k, x, z0, { variant: vari[i], wash: i % 2, pit: 1, yaw: 0.3 + i, h: undefined, median: 1 });   // median: bỏ kiểm nhà/camera pano (trang QA đặt cây ở gốc toạ độ = Nhà hát)
 });
-const sys = veg.buildTrees(scene, { groundHeight: () => 0, R: 5000 });
+const sys = veg.buildTrees(scene, { groundHeight: () => 0, R: 5000, facade: false });
+if (Q.get("date")) { const p = Q.get("date").split("-").map(Number); sys.setDate(...(p.length >= 3 ? p.slice(1) : p)); }   // YYYY-MM-DD hoặc M-D
 scene.matrixWorldAutoUpdate = false; scene.updateMatrixWorld(true);
 const cam = new THREE.PerspectiveCamera(+(Q.get('fov') || 60), W / H, 0.1, 6000);
 const dist = +(Q.get('dist') || 30), ch = +(Q.get('h') || 1.7), yaw = +(Q.get('yaw') || 0);
