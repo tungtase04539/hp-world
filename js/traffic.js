@@ -275,7 +275,9 @@ export function createTraffic(scene, world, opts = {}) {
       const u = a.s - e.L;   // âm trước nút
       const en = edges[a.next.e];
       offsetPoint(e, a.dir, a.s, lat, _A);
-      offsetPoint(en, a.next.dir, u, latFor(a, en, a.next.side, a.next.dir), _B);
+      // + a.pk: sau nút pk vẫn mang sang cạnh mới (prevLat = latCur+pk, lat mới = latFor+pk) — thiếu nó ở đây thì đúng
+      // lúc qua nút vị trí nhảy ngang 0,5·pk trong 1 khung (phản biện W2-F)
+      offsetPoint(en, a.next.dir, u, latFor(a, en, a.next.side, a.next.dir) + a.pk, _B);
       const w = smooth((u + Rb) / (2 * Rb));
       out.x = _A.x + (_B.x - _A.x) * w; out.z = _A.z + (_B.z - _A.z) * w;
       return out;

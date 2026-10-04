@@ -17585,8 +17585,10 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
         geos.push(pg);
       });
       if (geos.length) {
-        // W2-F: hộp đèn biển SÁNG về đêm (emissiveMap = chính texture; daynight đặt emissiveIntensity = đêm × LIGHT.signGlow)
-        const sm = new THREE.MeshLambertMaterial({ map: tex, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: 0, side: THREE.DoubleSide });
+        // W2-F: hộp đèn biển SÁNG về đêm (emissiveMap = chính texture; daynight đặt emissiveIntensity = đêm × LIGHT.signGlow).
+        // Biển NEO mặt tiền (_anchor): mặt trước quay ra phố, lưng áp hộp biển 3D cách 0,05 m → FrontSide (không có mặt lưng
+        // sáng chữ ngược về đêm); biển cũ treo theo pano (không neo) giữ DoubleSide như trước.
+        const sm = new THREE.MeshLambertMaterial({ map: tex, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: 0, side: _anchor ? THREE.FrontSide : THREE.DoubleSide });
         (world.signMats || (world.signMats = [])).push(sm);
         const m = new THREE.Mesh(mergeGeometries(geos), sm);
         geos.forEach((gg) => gg.dispose());

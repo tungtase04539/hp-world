@@ -1,4 +1,4 @@
-import { Box3, Vector3, RGBAFormat, UnsignedByteType, NearestFilter, LinearFilter } from 'three';
+import { Box3, Vector3, RGBAFormat, UnsignedByteType, NearestFilter, LinearFilter, REVISION } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { IS_MOBILE, LITE, TIER } from './device.js';
@@ -341,9 +341,12 @@ function queueReveal(roots, onDone) {
 // Chỉ ảnh flipY=false RGBA8 (mọi texture GLTF); còn lại / WebGL1 → initTexture nguyên khối như cũ.
 const STRIP_BYTES = 6 * 1024 * 1024;
 let _strip = null;
+// beginSplit chặn state.texSubImage2D (nội bộ riêng của three r160) trong lúc initTexture — bản three khác: dùng đường
+// tải nguyên khối cũ cho chắc (phản biện W2-F), kiểm lại chi tiết initTexture/texSubImage2D trước khi nới REVISION.
+const SPLIT_OK_REV = REVISION === '160';
 function canSplit(t) {
   const im = t.image;
-  return !!(_renderer && _renderer.capabilities.isWebGL2 && im && typeof ImageBitmap !== 'undefined' && im instanceof ImageBitmap
+  return !!(SPLIT_OK_REV && _renderer && _renderer.capabilities.isWebGL2 && im && typeof ImageBitmap !== 'undefined' && im instanceof ImageBitmap
     && im.width <= _renderer.capabilities.maxTextureSize && im.height <= _renderer.capabilities.maxTextureSize
     && !t.flipY && t.format === RGBAFormat && t.type === UnsignedByteType && !t.isCompressedTexture && !(t.mipmaps && t.mipmaps.length));
 }

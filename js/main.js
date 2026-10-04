@@ -800,8 +800,8 @@ function animate() {
     if (renderer.shadowMap.enabled && dayNight.sun.castShadow) {
       shadowTimer += dt;
       // Trần theo đồng hồ (4.5 Hz FULL / 2 Hz TIER 2 — mỗi lần làm mới bóng là 1 khung +20 ms trên 890M) + làm mới
-      // SỚM khi đã đi >2 m hoặc quay >0.15 rad (hộp bóng bám hướng nhìn, đứng yên thì không tốn gì); sàn 0.1/0.25 s
-      // để kéo chuột xoay camera không bắn shadow pass mỗi khung.
+      // SỚM khi đã đi >6 m hoặc quay >0.3 rad (W2-F; trước 2 m/0.15 rad = 6,6 lần/s khi chạy xe — hộp bóng bám hướng
+      // nhìn, đứng yên thì không tốn gì); sàn 0.1/0.25 s để kéo chuột xoay camera không bắn shadow pass mỗi khung.
       const cap = (TIER === 2 ? 0.5 : 0.22) * _shadowSlow, floor = (TIER === 2 ? 0.25 : 0.1) * _shadowSlow;
       if (shadowTimer > cap || (shadowTimer > floor && dayNight.shadowMoved())) {
         shadowTimer = 0; dayNight.markShadow(); renderer.shadowMap.needsUpdate = true;

@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GFX } from './device.js';
 import { sunDirection, sunIrradiance, sunTransmittance, skyIrradiance, skyRadiance, skyK, cloudSun, skyGLSL, elevDeg } from './skymodel.js';
 import { setGlbLighting } from './assets.js';
+import { SIDEWALK_TOP } from './xsection.js';
 
 // ============ NGÀY ĐÊM / BẦU TRỜI / ÁNH SÁNG (Đợt 3 WP5 — viết lại) ============
 // - Mặt trời theo THIÊN VĂN (vĩ độ HP, đầu tháng 10): mọc ~5:50 phía Đông, trưa cao 64° về phía Nam, lặn ~17:40.
@@ -204,11 +205,17 @@ function buildLampPools(scene, world) {
     }
     heads.push(h);
   }
+  // ĐỘ CAO QUAD (sau phản biện W2-F): KHÔNG lấy surf() trần — surf chỉ biết lòng/vỉa của roadnet, ngoài mạng đường trả
+  // 0 ⇒ quad ở g+0,047 nằm DƯỚI mặt lát nổi (caro ven hồ g+0,24…0,255, caro Tam Bạc g+0,20, đá quảng trường Nhà hát
+  // g+0,045…0,06) → depth test che mất 68/114 vũng. Sàn = SIDEWALK_TOP (0,25 — mặt lát cao nhất đo được quanh 113/114 đầu
+  // đèn) + 0,035, giống vũng props (yWalk+0,02): một vũng phủ cả lòng nhựa + vỉa + lát caro. Đã đo phương án raycast
+  // xuống mặt tĩnh mỗi đầu đèn (4 tia × 114): 5,8 s (lưới đất 180k tri + ô gộp mrg10/fab_main ~330k tri/tia), bỏ đất
+  // vẫn 0,67 s — quá đắt cho lúc khởi động, không dùng.
   const list = [];
   for (const h of heads) {
     const x = h.x / h.n, z = h.z / h.n, g = gh(x, z), hh = h.y - g;
     if (hh < 2.2 || hh > 16 || g < 0.5) continue;             // đèn treo thấp/cột cờ/vật trên nước — bỏ
-    list.push({ x, z, y: g + Math.max(0.012, surf(x, z)) + 0.035, s: Math.max(8, Math.min(15, hh * 2.6)) });
+    list.push({ x, z, y: g + Math.max(SIDEWALK_TOP, surf(x, z)) + 0.035, s: Math.max(8, Math.min(15, hh * 2.6)) });
   }
   if (!list.length) return null;
   const cv = document.createElement('canvas'); cv.width = cv.height = 64;
