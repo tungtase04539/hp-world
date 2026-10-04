@@ -491,6 +491,10 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     vẽ trơn theo màu đỉnh, không phát sáng đêm) thay vì hỏng cả phố. (f) **THƯƠNG HIỆU**: lưới `_BRAND` (world.js) bổ sung đủ
     các tên mà `BRAND_MAP` của WP3 (`js/brands.js` — nguồn DUY NHẤT sau khi gộp) bắt được trong `shopsigns.js` hiện tại (quét
     node: 0 tên lọt, 0 bỏ nhầm, bỏ 26/954 biển); sau khi WP3 sinh lại shopsigns.js lưới này chỉ còn là dự phòng.
+    (g) **GỘP VỚI WP5/WP4** (rebase lên dot3 9c46ef4): post.js WP5 thêm `totalEmissiveRadiance *= HP_UNLIT_K` vào chunk
+    emissivemap_fragment (tự phát hiển thị theo màn hình, phơi sáng thích nghi tới ×4 lúc đêm) — shader phố THAY chunk đó nên
+    phải tự nhân (`#ifdef HP_UNLIT_K`), không thì cửa sổ/biển cháy trắng ban đêm. `veg.plantStreetTrees` + `veg.buildTrees`
+    nhận `fpGrid: world.rbGrid` (cây không né nhà đã bị gỡ, không giải mã RB lần 2; proc: undefined → trees tự giải mã).
     **ĐO** (Chrome headless d3d11, Radeon 890M, ?quality=full TIER 3, 1280×720, máy dùng chung với 7 agent — fps ±; A/B CÙNG
     PHIÊN proc → real, fog cố định 2600, 2 phiên): hpReadyMs 19,7-23,2 → 8,7-9,5 s (baseline dot3 18,9); cam_spawn 738 call/
     4,88 M tri → 709-712/3,92 M; pano_007_h090 1.577-1.706/7,9-9,1 M → 1.353-1.355/6,59 M (fps 42-44 → 50-51); cam_high_center
