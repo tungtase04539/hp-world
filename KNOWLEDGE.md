@@ -408,15 +408,18 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 - **2026-10-04 (W2-B trees)** [ĐỢT 3 WAVE 2 — CÂY THẬT HƠN: tán cao + thoáng, né mặt tiền, cắt cụt theo pano, MÙA HOA theo lịch, hero chỉ quanh Nhà hát]
     (nhánh worktree W2-B, trên dot3 ea5f57f). File: `js/trees.js` (chính), `js/petals.js`, `js/world.js` (3 chỗ cây:
     `buildTrees` thêm `fpData: world.rbData`; `heroTree` bỏ ép nở; gọi `veg.plantPlazaYoung` sau `plantStreetTrees`),
-    `tools/qa/trees.html` (`facade:false`, `median:1`, `?date=`).
+    `tools/qa/trees.html` (`facade:false`, `median:1`, `?date=`). Vòng sửa sau phản biện (cùng ngày): thân NGHIÊNG → TÁN
+    LỆCH, hero ra khỏi khung pano, kit XA khớp dáng — mô tả dưới đã là bản cuối.
     **VẤN ĐỀ (pano 10/2024 vs game):** tán cây phố bắt đầu 2,6-3 m (kit co ĐỀU cả cây theo cấp phố → phượng phố t/r còn
     thân 2 m) + quá dày → che kín mặt tiền và nửa trên khung pano (pano_071/085/141/007); 48% số cây có tán CẮM VÀO tường
     nhà thật; phượng vườn hoa đỏ rực thành "vòm đỏ" (25/45 nở quanh pano_001) trong khi ảnh tháng 10 xanh + cắt trụi.
     **BIẾN HÌNH TỪNG CÂY TRONG SHADER (không thêm kit):** mỗi kit có thuộc tính đỉnh `aHt` — thân: dốc 0..1 từ trên gốc
     quét vôi (1,3 m) tới CHẠC (fork của kit); tán (cành/lá/hoa, cờ `Geo.crown`): 3 — và mỗi instance `aShape` = (lift
-    nâng tán [đơn vị kit], cs co tán ngang quanh trục, ox/oz dời tán). VERT_BEGIN (cả depth material → bóng khớp):
-    `xz *= mix(1, cs, tán)`, `xz += off·h` (thân NGHIÊNG THẲNG từ trên gốc vôi — h^1,5 từng ra thân cong 'quả chuối', pano_092), `y += lift·h` (đoạn thân trống giãn,
-    gốc vôi ~1,2 m GIỮ NGUYÊN). Rễ phụ đa, cọc chống, chồi bám thân = THÂN (chân phải chạm đất / không co theo tán).
+    nâng tán [đơn vị kit], ±cs co tán ngang quanh trục, zw). DẤU của y là CỜ: y > 0 → zw = dời tán (nghiêng tự nhiên nhẹ,
+    thân thẳng từ trên gốc vôi tới chạc); y < 0 → TÁN LỆCH: zw = hướng ra lòng đường × tỉ lệ ép s, đỉnh tán có
+    d = −dot(xz, n) > 0 (nửa phía TƯỜNG) bị kéo về trục: `xz += n·d·s` → nửa đó còn (1−s); thân giữ THẲNG ĐỨNG.
+    VERT_BEGIN (cả depth material → bóng khớp): `xz *= mix(1, |cs|, tán)`, ép/dời như trên, `y += lift·h` (đoạn thân
+    trống giãn, gốc vôi ~1,2 m GIỮ NGUYÊN). Rễ phụ đa, cọc chống, chồi bám thân = THÂN (chân phải chạm đất / không co theo tán).
     Kit đo `base` (phân vị 8% cao đỉnh lá), `top`, `fork`, `rad` (phân vị 85% bán kính lá) → buildTrees quy kích thước
     THẬT (m) về kit: `sy=(H−B)/(top−base)`, `lift=B/sy−base`, `sxz=(H/H_kit)^0,8` (bề dày thân theo CHIỀU CAO — theo độ sâu tán từng ra cây cắt cụt thân 1 m), `cs=R/(rad·sxz)`.
     **KÍCH THƯỚC THẬT (bảng `SPX`, m: cao / mép dưới tán / bán kính tán):** xà cừ 12-21 / 5-7,5 / 3,8-6,8; bàng 9-13,5 /
@@ -425,9 +428,18 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     cao + tán nhưng KHÔNG hạ mép tán dưới mức tỉa tối thiểu; h/r của helper cũ nặng 50%.
     **NÉ MẶT TIỀN ≥ 1,5 m (`facadeFit`):** cạnh footprint thật (world.rbData + lưới rbGrid) + LM_POLY (bỏ khuôn
     viên/quảng trường: square, 3 trường, chùa Hàng, Việt Tiệp) + hộp claim 'cell' < 1500 m² (nhà ô dựng tay giữ lại), chỉ tường cao ≥ mép tán − 0,3 m (tán xoè trên mái nhà
-    1 tầng là đúng); gốc nằm trong nhà → bỏ qua. Dời tâm tán theo pháp tuyến tường gần nhất ra lòng đường ≤ min(0,35R;
-    1,6 m) (≤ ~18° với chạc 5 m), vẫn thiếu → thu bán kính (sàn max(1,2; 0,42R)). Không có tường trong tầm → nghiêng TỰ NHIÊN 0,15-0,8 m hướng
-    ngẫu nhiên. ~22-43 ms cho 8,9k cây (tuỳ tải máy).
+    1 tầng là đúng); gốc nằm trong nhà → bỏ qua. **TÁN LỆCH, THÂN THẲNG:** ép nửa tán phía tường gần nhất theo pháp
+    tuyến: (1−s)·R ≤ khoảng trống (d_tường − 1,5 m), s ≤ `SQ_MAX` 0,72; thân quá sát tường → thu R (sàn max(1,2; 0,42R));
+    rồi kiểm MỌI tường trong tầm với hình tán đã ép (16 điểm mép + điểm gần thân nhất của từng cạnh — ki-ốt lọt gọn
+    trong tán) → thu dần R ×0,88. Cây sát nhà HP thật đúng dạng này (tỉa phẳng phía nhà, tán vươn ra lòng đường).
+    BẢN ĐẦU (bỏ): dời tâm tán ≤ min(0,35R; 1,6 m) — shader dồn độ dời vào đoạn thân gốc vôi → chạc chỉ 1,4-3,3 m
+    ⇒ thân GÃY 20-55° (p50 25°) trên gốc vôi thẳng đứng, hàng cây như bão quật (pano_089/071/092/190/001); muốn
+    nghiêng phải tính GÓC theo đoạn thân đó, không theo chiều cao cây. Nghiêng TỰ NHIÊN chỉ cây ĐỨNG TỰ DO (không
+    tường trong tầm R + 2,5 m), không cây non chống cọc / cắt cụt: ≤ tan(`LEAN_NAT_DEG` 5,5°) × đoạn thân. 4,6k cây
+    bị ép (đa số chạm s = 0,72 — hố cây cách mặt tiền 2-4 m), 2,6k thu R; ~34 ms cho 8,9k cây.
+    **KIT XA** (biến thể 0 của loài) có sy/nâng/co tán RIÊNG (ma trận `MF` + `SHPF`, nhóm far ghi từ đó): khớp mép
+    dưới/ngọn THỰC của kit gần (kể cả khi kit gần bị kẹp); kit xa xà cừ/cắt cụt tán nông hơn → cho nén thân 90%
+    (không thấy ở > 180 m), vẫn chạm sàn thì chọn sy khớp TÂM tán ⇒ lệch ranh LOD p5-p95 ±0,2 m (trước −1,0..+1,7 m).
     **THOÁNG:** kit gần bớt ~30% thẻ lá + nhỏ hơn ~10%, 76% thẻ thành CHÙM chặt quanh đầu cành (thêm cành phụ), bàng 80%;
     kit XA giữ số thẻ cũ (`cardsFar`) — từ trên cao tán vẫn thành khối. Độ kín tán: thường 0,58-0,92, tỉa trơ/"tán thưa"
     0,34-0,56. **TỈA TRƠ (cut-back)** = trạng thái mới: tán ×0,55-0,75, mép +0,5 m — theo pano (cắt cụt mức P>0 → 30-55%
@@ -441,26 +453,37 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     0,25 s). API: `world.trees.setDate(m,d)`, `getDate()`, `setSeason(s|null)` (ghi đè tỉ lệ cả 2 loài; null = về
     lịch). `o.bloom` của plant() BỎ. Thẻ HOA kit gần nay thành chùm ở ĐẦU CÀNH khắp tán (×1,8 số thẻ) và không theo
     độ kín tán — trước chỉ nằm trên mặt vòm nên đứng dưới phố tháng 6 trông như tháng 10. Cánh phượng (petals.js) × độ rộ của cây gần nhất (`bloomNear(...).s`).
-    **HERO GLB:** chỉ ≤ 120 m quanh Nhà hát (`HERO_SHOW_R`; phố ≤ 8 + vườn hoa) và mỗi lúc chỉ `HERO_MAX` = 3 cây GLB
-    gần camera nhất trong 150 m (cây đang hero được ưu tiên 8 m — chống nhấp nháy); còn lại là cây đôi thủ tục luôn nở.
+    **HERO GLB:** chỉ ≤ 120 m quanh Nhà hát (`HERO_SHOW_R`; phố ≤ 8 + vườn hoa) VÀ `heroSpotOk`: cách MỌI camera pano
+    ≥ 45 m (pano thật chụp 8 hướng ⇒ "nón ±45°" = mọi hướng; vòm đỏ 6-7 m ở 18-35 m từng chiếm giữa pano_055_h000 che
+    lối vào Nhà hát) + ngoài NÊM NHÌN tới đa giác Nhà hát (+ tán 7 m) từ mọi pano ≤ 160 m quanh Nhà hát + camera spawn
+    (0, 72) (pano xa hơn: nêm từ mọi phía phủ kín cả vùng — vô dụng). Còn 3 hero, đều phía BẮC Nhà hát (cách pano gần
+    nhất 51-80 m). Mỗi lúc chỉ `HERO_MAX` = 3 cây GLB gần camera nhất trong 150 m (cây đang hero được ưu tiên 8 m —
+    chống nhấp nháy); còn lại là cây đôi thủ tục luôn nở — trừ `setSeason(0)` (shader + bloomNear tắt cả cây đôi).
+    Lưu ý `nearPano(x,z,r)` chỉ dò ±1 ô 8 m → r > 8 m có thể sót (heroSpotOk duyệt thẳng PANO_CAM).
     **QUẢNG TRƯỜNG NHÀ HÁT PHÍA NAM (`plantPlazaYoung`):** hàng cây NON chống cọc (pano_541/055/249) trong hộp claim
-    'road9_tay', nhịp 8,5 m, ~72% ô; né lòng đường, nhà/địa danh (+3 m), collider, trục nhìn spawn → Nhà hát + vòng spawn 20 m.
-    **SỐ ĐO (cùng phiên, base = dot3 ea5f57f, Chrome headless d3d11 Radeon 890M, TIER 3, ghim chất lượng):** tán cắm vào
-    tường nhà thật 3.982/8.368 cây → 15 (+ hộp nhà ô dựng tay giữ lại 275 → 10); tán cách tường < 1,5 m 4.409 → 505 (chủ yếu cây chạm sàn
-    thu nhỏ); mép dưới tán p10 2,78 → 4,06 m, trung vị 4,04 → 4,99 m, số cây có tán thấp hơn 3,5 m 2.523 → 77 (trừ cau +
-    cây non); hero GLB 56 → 9 (≤ 3 vẽ cùng lúc; tam giác CÂY thấy được: nhìn cao giữa phố 1,21 M → 0,49 M, spawn 0,75 → 0,59 M,
+    'road9_tay' (tra THẲNG từ claimsAll() theo tên — `ctx.claim`), nhịp 8,5 m, ~72% ô; né lòng đường, nhà/địa danh (+3 m), collider, trục nhìn spawn → Nhà hát + vòng spawn 20 m.
+    **SỐ ĐO (cùng phiên, base = dot3 ea5f57f, Chrome headless d3d11 Radeon 890M, TIER 3, ghim chất lượng):** LÁ TRONG NHÀ
+    (đỉnh lá THẬT của kit qua đúng biến hình shader trên CPU, thử với footprint cao hơn đỉnh — probe phản biện rprobe3/4):
+    base 3.645/6.316 cây có lá trong nhà (3.016 sâu > 1 m) → bản đầu (dời tán) 219 (25) → bản cuối (tán lệch) 51 (12).
+    GÓC NGHIÊNG thân (atan(dời / đoạn gốc vôi → chạc)): bản đầu p50 17°, p90 33°, max 55° (4.535 cây > 15°) → bản cuối
+    chỉ 2.548 cây đứng tự do p50 3,0°, p90 4,5°, max 4,8°, cây sát nhà 0°. (Mô hình "vòng tròn tán" cũ báo 3.982 → 15
+    — lạc quan, đừng dùng.) Mép dưới tán p10 2,78 → 4,06 m, trung vị 4,04 → 4,99 m, số cây có tán thấp hơn 3,5 m 2.523 → 77 (trừ cau +
+    cây non); hero GLB 56 → 3 (≤ 3 vẽ cùng lúc; tam giác CÂY thấy được: nhìn cao giữa phố 1,21 M → 0,49 M, spawn 0,75 → 0,58 M,
     pano_001 0,81 → 0,46 M; draw call cây 22-25 → 20-22); phượng nở quanh
     pano_001 (150 m) 22/41 → 6/40 (4/10) — tháng 6 (`setDate(6,1)`) 0,80; tỉ lệ cây cắt cụt + tỉa trơ trong 40 m quanh
     pano theo mức bằng chứng: P7 0,50 + 0,18, P5 0,32 + 0,15, P3 0,22 + 0,19, không nhắc 0,10 + 0,10. Tỉ lệ ĐIỂM ẢNH CÂY
     ở nửa trên khung (`skyfrac.py`, 16 pano chuẩn + 10 pano cây): sai số tuyệt đối trung bình so với ảnh thật 0,20 → 0,10
+    (16 pano chuẩn, ảnh phản biện + bản cuối: 0,17 → 0,093)
     (pano_007_h090: thật 0,18 · cũ 0,55 · mới 0,28; pano_071_h180 0,19 · 0,49 · 0,22; pano_019_h090 0,17 · 0,46 · 0,21).
     Perf std (traffic off): fps 60 cả hai (vsync), draw call ≈ (±25 do bóng), tam giác giảm 0-12% (cam_high_center
     6,15 → 5,44 M, pano_001_h090 4,44 → 4,18 M); hpReady 4,20 → 4,27 s (nhiễu ±0,1 s); dựng cây cùng phiên buildTrees 120,6 → 123,7 ms (facadeFit 22-43 ms tuỳ tải máy, bù
     bằng ít thẻ lá hơn), plantStreetTrees 59 → 56 ms; 31 cây non quảng trường. p95 khung (traffic on) ~19-21 ms cả hai.
     **BẪY:** (1) buildTrees cần `nearKits` TRƯỚC khi tính biến hình (base/top/rad đo từ hình học kit) — thứ tự: bản ghi →
-    kit → biến hình → ma trận. (2) Kit XA dùng biến thể 0 của loài nhưng nhận aShape tính theo kit gần của cây — lệch
-    nhỏ chấp nhận được; đổi dáng kit thì kiểm ranh 180 m. (3) aShape là thuộc tính instance thứ 2 → `write()`/`finish()`
-    phải chép/đánh dấu cùng aInst (thiếu = cây nhận hình của cây khác sau mỗi lần gán LOD). (4) `facadeFit` chỉ thấy footprint
+    kit → biến hình → ma trận. (2) Kit XA dùng biến thể 0 của loài → PHẢI có sy/lift/cs riêng (`MF`/`SHPF`; nhóm far
+    mang `g.S = SHPF`) — dùng chung aShape kit gần = tán nhảy ±2 m ở ranh 180 m; đổi dáng kit thì kiểm lại (rprobe4
+    `lodMismatch`). (3) aShape là thuộc tính instance thứ 2 → `write()`/`finish()` phải chép/đánh dấu cùng aInst
+    (thiếu = cây nhận hình của cây khác sau mỗi lần gán LOD); DẤU aShape.y là cờ tán lệch — đừng ghi cs âm vì lý do
+    khác; hero twin đặt sq = 0. Probe CPU mô phỏng shader phải áp cả phép ép (`r.sq`, `r.zx/zz`) — rprobe3 cũ không có. (4) `facadeFit` chỉ thấy footprint
     thật, LM_POLY và hộp claim 'cell' NHỎ (< 1500 m²); khuôn viên lớn của cell sink và GLB địa danh ngoài LM_POLY thì không. (5) trang QA trees.html đặt cây quanh gốc toạ độ
     (= Nhà hát): phải `median:1` + `facade:false`, không thì cây bị bỏ/dời như cây thật.
 - **2026-10-04 (wp8)** [ĐỢT 3 WP8 GAME — khởi động, giao thông phố thật, cảm giác chơi, nhiệm vụ, âm thanh, tool Windows]:

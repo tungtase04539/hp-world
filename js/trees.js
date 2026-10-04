@@ -1081,6 +1081,9 @@ const FACADE_CLEAR = 1.5;   // tán cách mặt tiền ≥ 1,5 m (ép nửa tán
 const SQ_MAX = 0.72;        // ép tối đa nửa tán phía tường còn 28% bán kính
 // nghiêng TỰ NHIÊN tối đa (độ) của thân trên đoạn gốc vôi → chạc (cây đứng tự do; cây sát nhà/cây non/cắt cụt: 0)
 const LEAN_NAT_DEG = 5.5;
+// facadeFit: 16 điểm mép tán (dây cung/2 ≤ 0,2R ≤ 1,36 m < 1,45 m → cạnh tường cắt qua mép tán luôn bị bắt), bảng cos/sin dựng 1 lần
+const FIT_N = 16, FIT_C = new Float64Array(FIT_N), FIT_S = new Float64Array(FIT_N);
+for (let q = 0; q < FIT_N; q++) { FIT_C[q] = Math.cos(q * 2 * Math.PI / FIT_N); FIT_S[q] = Math.sin(q * 2 * Math.PI / FIT_N); }
 // LM_POLY làm "tường" cao (địa danh) — bbox để lọc nhanh. BỎ các đa giác KHUÔN VIÊN/quảng trường (tường rào/hè trống,
 // tán cây vươn qua rào là đúng thật): square, trường học, chùa Hàng, Việt Tiệp
 const LM_OPEN = new Set(['square', 'thptnq', 'thcsnq', 'thcstp', 'chuahang', 'viettiep']);
@@ -1098,7 +1101,7 @@ function facadeFit(x, z, B, R, fp, D, CB) {
     let t = ((x - ax) * dx + (z - az) * dz) / L2; t = t < 0 ? 0 : t > 1 ? 1 : t;
     const qx = ax + t * dx, qz = az + t * dz, d = Math.hypot(x - qx, z - qz);
     if (d > S) return;
-    E.push(ax, az, bx, bz);
+    E.push(ax, az, bx, bz, d);
     if (d < best && d > 1e-3) { best = d; nx = (x - qx) / d; nz = (z - qz) / d; }
   };
   let inside = false;
@@ -1137,20 +1140,22 @@ function facadeFit(x, z, B, R, fp, D, CB) {
   let Rf = R, s = 1 - room / R;
   if (s > SQ_MAX) { s = SQ_MAX; Rf = Math.max(Rmin, Math.min(R, room / (1 - SQ_MAX))); }
   if (s < 0) s = 0;
-  // hình tán ép: điểm (a theo pháp tuyến n — dương = phía đường, b theo tiếp tuyến); a < 0 bị nhân (1−s)
+  // hình tán ép: điểm (a theo pháp tuyến n — dương = phía đường, b theo tiếp tuyến); a < 0 bị nhân (1−s); FIT_N điểm mép
   const clearOK = (Rc, sc) => {
     const k = 1 - sc;
-    for (let q = 0; q < 24; q++) {
-      const ang = q * 0.2618, ca = Math.cos(ang), a = ca < 0 ? ca * k : ca, b = Math.sin(ang);
+    for (let q = 0; q < FIT_N; q++) {
+      const ca = FIT_C[q], a = ca < 0 ? ca * k : ca, b = FIT_S[q];
       const px = x + (nx * a + tx * b) * Rc, pz = z + (nz * a + tz * b) * Rc;
-      for (let e = 0; e < E.length; e += 4) {
+      for (let e = 0; e < E.length; e += 5) {
+        if (E[e + 4] - Rc >= FACADE_CLEAR) continue;     // cạnh xa hơn R + 1,5 m tính từ gốc: không điểm mép nào chạm
         const ax = E[e], az = E[e + 1], dx = E[e + 2] - ax, dz = E[e + 3] - az, L2 = dx * dx + dz * dz || 1;
         let t = ((px - ax) * dx + (pz - az) * dz) / L2; t = t < 0 ? 0 : t > 1 ? 1 : t;
         if ((px - ax - t * dx) ** 2 + (pz - az - t * dz) ** 2 < (FACADE_CLEAR - 0.05) ** 2) return false;
       }
     }
     // cạnh tường nằm GỌN trong tán (nhà nhỏ/ki-ốt): điểm gần thân nhất của cạnh lọt trong hình tán
-    for (let e = 0; e < E.length; e += 4) {
+    for (let e = 0; e < E.length; e += 5) {
+      if (E[e + 4] >= Rc) continue;
       const ax = E[e], az = E[e + 1], dx = E[e + 2] - ax, dz = E[e + 3] - az, L2 = dx * dx + dz * dz || 1;
       let t = ((x - ax) * dx + (z - az) * dz) / L2; t = t < 0 ? 0 : t > 1 ? 1 : t;
       const qx = ax + t * dx - x, qz = az + t * dz - z;
@@ -1278,7 +1283,7 @@ export function buildTrees(scene, ctx = {}) {
     recs.push({ x, y, z, sp, kit, sy: 1, sxz: 1, yaw: o.yaw ?? hxz(x, z, 44) * Math.PI * 2, lx: (hxz(x, z, 45) - 0.5) * 0.07, lz: (hxz(x, z, 46) - 0.5) * 0.07,
       rank, wash, pit: o.pit || 0, hero: heroOk ? o.hero : -1, full, H, B, Rr, cut, lift: 0, cs: 1, ox: 0, oz: 0 });
   }
-  const N = recs.length;
+  const N = recs.length, recsMs = performance.now() - t0;
   // ---- atlas + vật liệu (1 material cho MỌI cây gần/xa) ----
   const tA = performance.now();
   const atlas = new THREE.CanvasTexture(buildAtlasCanvas());
@@ -1294,11 +1299,13 @@ export function buildTrees(scene, ctx = {}) {
   depthMat.onBeforeCompile = (sh) => patchShader(sh, true);
   depthMat.customProgramCacheKey = () => 'hpveg1d';
   // ---- kit (chỉ loại đang dùng) ----
+  const tK = performance.now();
   const usedK = new Set(recs.map((r) => r.kit)), usedS = new Set(recs.map((r) => r.sp));
   const nearKits = [], farKits = [];
   KIT_DEFS.forEach((d, i) => { nearKits[i] = usedK.has(i) ? genKit(d, false, 1000 + i * 17) : null; });
   // kit XA mỗi loài lấy dáng biến thể 0
   for (let s = 0; s < SP_N; s++) farKits[s] = usedS.has(s) ? genKit(KIT_DEFS[SP_KITS[s][0]], true, 5000 + s * 13) : null;
+  const kitMs = performance.now() - tK;
   // ---- KÍCH THƯỚC THẬT → biến hình kit (W2-B). Mỗi cây: tán né mặt tiền (facadeFit) rồi quy về đơn vị kit:
   //   sy = (H − B)/(top − base) (co dọc theo ĐỘ SÂU TÁN), lift = B/sy − base (nâng tán: thân trống dài ra, gốc vôi giữ),
   //   sxz = bề dày thân ∝ sy, cs = R/(rad·sxz) (co tán ngang quanh trục); sát tường: ép nửa tán phía tường (sq, hướng
@@ -1606,7 +1613,7 @@ export function buildTrees(scene, ctx = {}) {
     trees: N, fix, fit, cut: recs.reduce((a, r) => a + r.cut, 0), bySpecies: bySp, heroes: heroList.map((l) => l.length), pits: pitIdx.length,
     kitTris: nearKits.map((k, i) => k && [SP_NAME[KIT_DEFS[i].sp] + i, k.tris]).filter(Boolean),
     farTris: farKits.map((k, s) => k && [SP_NAME[s], k.tris]).filter(Boolean),
-    atlasMs: +atlasMs.toFixed(1), buildMs: +(performance.now() - t0).toFixed(1), drawGroups: groups.length + (pitG ? 1 : 0),
+    atlasMs: +atlasMs.toFixed(1), recsMs: +recsMs.toFixed(1), kitMs: +kitMs.toFixed(1), buildMs: +(performance.now() - t0).toFixed(1), drawGroups: groups.length + (pitG ? 1 : 0),
   };
   console.log('[trees] dựng:', JSON.stringify(info));
   const stats = () => {
