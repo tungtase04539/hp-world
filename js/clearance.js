@@ -640,7 +640,12 @@ export function sweepAssemblies(objs, cols, fc, opts = {}) {
   // collider / FC: lưới tra nhanh
   const CG = new Map();
   for (const c of cols) { const k = Math.floor(c.x / 8) * 100003 + Math.floor(c.z / 8); let a = CG.get(k); if (!a) CG.set(k, (a = [])); a.push(c); }
-  const inAsm = (A, x, z) => A.some((p) => x >= p.x0 - 0.3 && x <= p.x1 + 0.3 && z >= p.z0 - 0.3 && z <= p.z1 + 0.3);
+  // (hộp cả cụm lọc trước — cụm lan can 400 mảnh × ~2.000 vòng FC từng là vòng lặp nặng nhất sau dời/gỡ)
+  const inAsm = (A, x, z) => {
+    let b = A.__bb; if (!b) { b = A.__bb = [1e9, 1e9, -1e9, -1e9]; for (const p of A) { if (p.x0 < b[0]) b[0] = p.x0; if (p.z0 < b[1]) b[1] = p.z0; if (p.x1 > b[2]) b[2] = p.x1; if (p.z1 > b[3]) b[3] = p.z1; } }
+    if (x < b[0] - 0.3 || x > b[2] + 0.3 || z < b[1] - 0.3 || z > b[3] + 0.3) return false;
+    return A.some((p) => x >= p.x0 - 0.3 && x <= p.x1 + 0.3 && z >= p.z0 - 0.3 && z <= p.z1 + 0.3);
+  };
   const colsOf = (A) => {
     const out = []; let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9;
     for (const p of A) { x0 = Math.min(x0, p.x0); x1 = Math.max(x1, p.x1); z0 = Math.min(z0, p.z0); z1 = Math.max(z1, p.z1); }

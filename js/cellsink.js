@@ -19,6 +19,7 @@ import { RB_B64 } from './buildings_real.js';
 import { claimBox } from './claims.js';
 import { BRAND_MAP, debrand } from './brands.js';
 import { PARKS } from './mapdata.js';
+import { LM_POLY } from './landmark_polys.js';
 import { clearanceReady, samplesFromHulls, evalShift, solveShift, sweepAssemblies, flushClearance, massOnStreet, minWidth, thinMeshOf, trimThinWall, corrCount, nearAnyRoad, nearestPano, CLEAR } from './clearance.js';   // Đợt 3 W2-A
 
 const _q = typeof location !== 'undefined' ? new URLSearchParams(location.search) : new URLSearchParams('');
@@ -592,6 +593,26 @@ function commitSink(sink, THREE, realScene, realFC, colliders, opts) {
   const occAdd = (k, it) => { const a = occ.get(k); if (a === undefined) occ.set(k, it); else if (Array.isArray(a)) a.push(it); else occ.set(k, [a, it]); };
   const occDel = (k, it) => { const a = occ.get(k); if (a === undefined) return; if (a === it) { occ.delete(k); return; } if (!Array.isArray(a)) return; const i = a.indexOf(it); if (i >= 0) a.splice(i, 1); if (!a.length) occ.delete(k); else if (a.length === 1) occ.set(k, a[0]); };
   if (CLR_ON) for (const it of bl) if (!it.removed) for (const k of hullCells(it)) occAdd(k, it);
+  // đa giác ĐỊA DANH thật (LM_POLY) cũng là "chủ" chiếm chỗ: nhà ô KHÔNG chạm địa danh tại chỗ thì không được dời vào nó;
+  // nhà ĐÃ chồng sẵn (v6_ndc_tower13 × thptnq 182 m² từ dot3) thì không chặn — chặn làm nó kẹt giữa hành lang phố
+  // (pano_427 lấn phố 0,64). Chỉ raster phần đa giác gần nhà ô còn sống.
+  if (CLR_ON) {
+    const bbs = bl.filter((it) => !it.removed).map((it) => bbOf([it.H]));
+    for (const [key, P] of Object.entries(LM_POLY || {})) {
+      const b = bbOf([P]), lm = { lm: key, H: P }, done = new Set();
+      // chỉ phần đa giác trong hộp (nới 14 m = dời tối đa) của nhà ô chạm nó — không raster cả khuôn viên chợ/UBND
+      for (const q of bbs) {
+        const x0 = Math.max(b[0], q[0] - 14), x1 = Math.min(b[2], q[2] + 14), z0 = Math.max(b[1], q[1] - 14), z1 = Math.min(b[3], q[3] + 14);
+        if (x0 > x1 || z0 > z1) continue;
+        for (let ix = Math.floor(x0); ix <= Math.floor(x1); ix++) for (let iz = Math.floor(z0); iz <= Math.floor(z1); iz++) {
+          const k = KEY(ix, iz); if (done.has(k)) continue; done.add(k);
+          const x = ix + 0.5, z = iz + 0.5; let c = false;
+          for (let i = 0, j = P.length - 1; i < P.length; j = i++) { const [xi, zi] = P[i], [xj, zj] = P[j]; if ((zi > z) !== (zj > z) && x < (xj - xi) * (z - zi) / (zj - zi) + xi) c = !c; }
+          if (c) occAdd(k, lm);
+        }
+      }
+    }
+  }
   const tOcc = performance.now(); let tMain = 0, tPart = 0;
   const occPairs = (it, ox, oz) => {   // → Map(nhà khác → số ô chồng) khi dời (ox,oz)
     const m = new Map();
@@ -633,8 +654,8 @@ function commitSink(sink, THREE, realScene, realFC, colliders, opts) {
         const ox = Math.round(sx), oz = Math.round(sz); cnt.clear();
         for (const k of hc) {
           const a = occ.get(KEY(KX(k) + ox, KZ(k) + oz)); if (a === undefined) continue;
-          if (Array.isArray(a)) { for (const o of a) { if (o === it) continue; const n = (cnt.get(o) || 0) + 1; cnt.set(o, n); if (n > Math.max(1, ov0.get(o) || 0)) return true; } }
-          else if (a !== it) { const n = (cnt.get(a) || 0) + 1; cnt.set(a, n); if (n > Math.max(1, ov0.get(a) || 0)) return true; }
+          if (Array.isArray(a)) { for (const o of a) { if (o === it || (o.lm && ov0.get(o))) continue; const n = (cnt.get(o) || 0) + 1; cnt.set(o, n); if (n > Math.max(1, ov0.get(o) || 0)) return true; } }
+          else if (a !== it && !(a.lm && ov0.get(a))) { const n = (cnt.get(a) || 0) + 1; cnt.set(a, n); if (n > Math.max(1, ov0.get(a) || 0)) return true; }
         }
         return false;
       };
