@@ -448,6 +448,8 @@ export function createTraffic(scene, world, opts = {}) {
   fill(-5, 72, 0);
 
   let enabled = true, msEMA = 0;
+  // đèn pha/đèn hậu sáng theo đêm (main.js truyền dayNight.update().night mỗi khung)
+  const setNight = (v) => { trafficUniforms.uNight.value = v; };
   function setEnabled(on) {
     enabled = !!on;
     for (const k in groups) groups[k].mesh.visible = enabled;
@@ -546,7 +548,7 @@ export function createTraffic(scene, world, opts = {}) {
 
   console.info('[traffic] đồ thị:', nodes.length, 'nút,', edges.length, 'cạnh,', G.ms, 'ms — bóng', RB, 'm, trần', JSON.stringify(CAP));
   return {
-    update, graph: G, pushOut, setEnabled, check,
+    update, graph: G, pushOut, setEnabled, setNight, check,
     stats: () => ({ ...stats, groups: Object.fromEntries(Object.entries(groups).map(([k, g]) => [k, g.list.length])) }),
   };
 }

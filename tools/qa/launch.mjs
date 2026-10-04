@@ -1,7 +1,7 @@
 // tools/qa/launch.mjs — khởi động game trong Chrome headless HỆ THỐNG (GPU thật qua ANGLE d3d11) cho các tool kiểm thử
 // (diag/tour/perf/mobile). Cùng quy ước với tools/qa/shoot.mjs: server tĩnh `python -m http.server <port>` ở gốc
 // repo/worktree, playwright-core nạp từ PW_PATH (mặc định: bản cài ở scratchpad phiên 04e77d80 — đổi nếu bị dọn).
-// Dùng: const g = await openGame({ port, quality, viewport, mobile }); … await g.close();
+// Dùng: const g = await openGame({ port, quality, viewport, mobile, pin }); … await g.close();   (pin: khoá autoQuality, mặc định bật)
 //   g.pg (Page) · g.errors (lỗi JS) · g.hpReadyMs (window.__hp có) · g.startReadyMs (nút Bắt đầu mở, js/boot.js)
 import os from 'os';
 import path from 'path';
@@ -15,7 +15,7 @@ export function args(argv = process.argv.slice(2)) {
 export const defaultOut = (name) => path.join(os.tmpdir(), 'hp-qa', name);
 
 export async function openGame({ port = 8177, host = '127.0.0.1', quality = 'full', viewport = { width: 1280, height: 720 },
-  mobile = false, start = true, extra = '' } = {}) {
+  mobile = false, start = true, extra = '', pin = true } = {}) {
   const { chromium } = await import(PW);
   const br = await chromium.launch({
     executablePath: CHROME, headless: true,
@@ -46,6 +46,8 @@ export async function openGame({ port = 8177, host = '127.0.0.1', quality = 'ful
       await pg.waitForTimeout(250);
     }
   }
+  // khoá autoQuality (như shoot.mjs): máy bận làm fps headless tụt → nấc 3 sương gần → ảnh/số đo không so được
+  if (pin && hpReadyMs) await pg.evaluate(() => window.__hp.pinQuality && window.__hp.pinQuality(true)).catch(() => {});
   const info = hpReadyMs ? await pg.evaluate(() => ({ tier: window.__hp.tier, gpu: window.__hp.gpu })).catch(() => ({})) : {};
   return {
     br, ctx, pg, errors, t0, hpReadyMs, startReadyMs, ...info,

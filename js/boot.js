@@ -68,7 +68,7 @@ export function createBoot() {
   function render(frac) {
     const pct = Math.max(1, Math.min(99, Math.round(frac * 100)));
     if (fill) fill.style.width = pct + '%';
-    const label = cur ? tx(STEPS[cur]) : '';
+    const label = tx(cur ? STEPS[cur] : { vi: 'Đang tải mã', en: 'Loading code' });
     if (txt) txt.textContent = `${label}… ${pct}%`;
     if (btn && !ready) {
       btn.textContent = pendingStart

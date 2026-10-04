@@ -1,7 +1,7 @@
 // trafficmodels.js — MÔ HÌNH XE/NGƯỜI cho giao thông INSTANCED (Đợt 3 WP8). Mỗi biến thể = 1 BufferGeometry
 // gộp từ khối cơ bản, màu cố định ở vertex color + thuộc tính `aTint` chọn kênh nhuộm theo instance:
 //   0 giữ màu đỉnh · 1 sơn xe = instanceColor · 2 áo người lái = aShirt · 3 mũ bảo hiểm = bảng màu băm từ aShirt
-//   4 áo người ngồi sau / quần người đi bộ = aShirt2
+//   4 áo người ngồi sau / quần người đi bộ = aShirt2 · 5 đèn pha · 6 đèn hậu (giữ màu đỉnh; đêm tự sáng theo uNight)
 // → mọi xe máy cùng kiểu chung 1 draw call nhưng mỗi chiếc màu sơn/áo/mũ khác nhau (ảnh pano HP: xe số, xe ga đủ
 // màu, mũ bảo hiểm trắng/đen/đỏ/xanh, rất nhiều xe chở 2 người, xe chở hàng thùng sau).
 // Người đi bộ: dáng người thật (~1,65 m, đầu 1/7,5 thân — KHÔNG chibi), tay chân vung bằng VERTEX SHADER
@@ -79,14 +79,14 @@ export function motorbikeGeometry(kind = 'single') {
   part(L, box(0.42, 0.62, 0.13, 0, 0.7, 0.42, -0.22), 0xffffff, 1);            // ốp chân trước (sơn)
   part(L, box(0.14, 0.06, 0.42, 0, 0.6, 0.68), 0xffffff, 1);                   // chắn bùn trước
   part(L, box(0.22, 0.17, 0.2, 0, 1.03, 0.5), 0xffffff, 1);                    // đầu đèn
-  part(L, box(0.15, 0.09, 0.03, 0, 1.0, 0.6), 0xf3f0dc);                       // đèn pha
+  part(L, box(0.15, 0.09, 0.03, 0, 1.0, 0.6), 0xf3f0dc, 5);                    // đèn pha
   part(L, box(0.64, 0.05, 0.05, 0, 1.08, 0.44), DARK);                         // ghi-đông
   for (const sx of [-0.25, 0.25]) {
     part(L, box(0.02, 0.2, 0.02, sx, 1.18, 0.42), DARK);                       // cần gương
     part(L, box(0.1, 0.06, 0.02, sx * 1.06, 1.29, 0.42), DARK);                // gương
   }
   part(L, new THREE.CylinderGeometry(0.045, 0.05, 0.55, 6).rotateX(Math.PI / 2).translate(0.17, 0.33, -0.42), METAL);   // ống xả
-  part(L, box(0.17, 0.06, 0.04, 0, 0.77, -0.73), 0xa01818);                    // đèn hậu
+  part(L, box(0.17, 0.06, 0.04, 0, 0.77, -0.73), 0xa01818, 6);                 // đèn hậu
   part(L, box(0.17, 0.11, 0.01, 0, 0.6, -0.8), 0xe8e8e2);                      // biển số
   seatedRider(L, -0.12, 0.92, 2, true);
   if (kind === 'pillion') seatedRider(L, -0.5, 0.96, 4, false);
@@ -126,8 +126,8 @@ export function carGeometry(kind = 'sedan') {
   }
   const fz = len / 2;
   for (const sx of [-1, 1]) {
-    part(L, box(0.32, 0.12, 0.04, sx * (W / 2 - 0.28), 0.82, fz + 0.01), 0xf1efe2);   // đèn pha
-    part(L, box(0.3, 0.12, 0.04, sx * (W / 2 - 0.26), 0.86, -fz - 0.01), 0xa31616);  // đèn hậu
+    part(L, box(0.32, 0.12, 0.04, sx * (W / 2 - 0.28), 0.82, fz + 0.01), 0xf1efe2, 5);   // đèn pha
+    part(L, box(0.3, 0.12, 0.04, sx * (W / 2 - 0.26), 0.86, -fz - 0.01), 0xa31616, 6);  // đèn hậu
   }
   part(L, box(W + 0.02, 0.18, 0.12, 0, 0.42, fz), 0x2b2c2f);                     // cản trước
   part(L, box(W + 0.02, 0.18, 0.12, 0, 0.42, -fz), 0x2b2c2f);                    // cản sau
@@ -156,17 +156,21 @@ export function walkerGeometry(kind = 'plain') {
 }
 
 // Vật liệu Lambert + nhuộm theo kênh. walk=true: thêm vung tay chân (uniform uTime dùng chung).
-export const trafficUniforms = { uTime: { value: 0 } };
+// uNight 0..1 (traffic.setNight ← daynight): đèn pha/đèn hậu tự phát sáng (bloom đêm làm loé) — phố đêm VN là
+// một dòng đèn xe máy; ban ngày chỉ là màu đỉnh.
+export const trafficUniforms = { uTime: { value: 0 }, uNight: { value: 0 } };
 const TINT_VERT = /* glsl */`
   vColor = vec3(1.0);
   #ifdef USE_COLOR
     vColor *= color;
   #endif
   vec3 tintC = vec3(1.0);
+  vLamp = aTint > 5.5 ? 2.0 : aTint > 4.5 ? 1.0 : 0.0;
   #ifdef USE_INSTANCING_COLOR
     if (aTint > 0.5 && aTint < 1.5) tintC = instanceColor.xyz;
   #endif
   if (aTint > 1.5 && aTint < 2.5) tintC = aShirt;
+  else if (aTint > 4.5) tintC = vec3(1.0);
   else if (aTint > 3.5) tintC = aShirt2;
   else if (aTint > 2.5) {
     // mũ bảo hiểm: băm (áo người lái, áo/quần phụ) → 144 tổ hợp; tỉ lệ theo pano: trắng/kem, đen, xám, rồi màu
@@ -194,10 +198,14 @@ const WALK_VERT = /* glsl */`
 `;
 function patch(shader, walk) {
   shader.uniforms.uTime = trafficUniforms.uTime;
+  shader.uniforms.uNight = trafficUniforms.uNight;
   shader.vertexShader = 'attribute float aTint;\nattribute float aLimb;\nattribute vec3 aShirt;\nattribute vec3 aShirt2;\n'
-    + 'attribute float aPhase;\nattribute float aWalk;\nuniform float uTime;\n' + shader.vertexShader;
+    + 'attribute float aPhase;\nattribute float aWalk;\nuniform float uTime;\nvarying float vLamp;\n' + shader.vertexShader;
   if (shader.vertexShader.includes('#include <color_vertex>')) shader.vertexShader = shader.vertexShader.replace('#include <color_vertex>', TINT_VERT);
   if (walk) shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', WALK_VERT);
+  // đèn xe ban đêm: cộng bức xạ tự phát (đèn pha trắng ấm, đèn hậu đỏ) — chỉ đổi uniform, không đổi chương trình
+  shader.fragmentShader = 'uniform float uNight;\nvarying float vLamp;\n' + shader.fragmentShader.replace('#include <emissivemap_fragment>',
+    '#include <emissivemap_fragment>\n  if (vLamp > 0.5) totalEmissiveRadiance += (vLamp > 1.5 ? vec3(1.4, 0.06, 0.04) : vec3(2.4, 2.25, 1.9)) * uNight;');
 }
 export function trafficMaterial(walk = false) {
   const m = new THREE.MeshLambertMaterial({ vertexColors: true });

@@ -121,6 +121,7 @@ window.addEventListener('resize', () => {
 // giao thông và nhiệm vụ đều lọc theo nó (trước đây 4 địa danh + 2 NPC + 2 thuyền nằm ngoài, không tới được).
 const PLAY_RADIUS = BUILD_RADIUS - 12;
 const inPlayArea = (x, z) => x * x + z * z <= (PLAY_RADIUS - 2) * (PLAY_RADIUS - 2);
+let _qPinned = false;   // __hp.pinQuality(): khoá autoQuality cho QA (xem __hp bên dưới)
 // Service Worker (cache GLB): ĐĂNG KÝ NGAY. Bản cũ gắn listener 'load' SAU khi dựng thế giới — lúc đó 'load' đã
 // bắn từ lâu nên SW KHÔNG BAO GIỜ được đăng ký (kiểm toán 2026-10-04 mục 39).
 if ('serviceWorker' in navigator && location.protocol === 'https:') {
@@ -155,10 +156,18 @@ boot.armStart(() => startGame(), () => audio.initAudio());   // AudioContext t�
 await workerReady();
 await boot.step('code', true);
 const world = await buildWorld(scene, boot.step);
-// đóng băng ma trận local của thế giới tĩnh (NPC/xe/traffic tạo SAU nên không bị ảnh hưởng). KHÔNG await giữa
-// buildWorld và freezeStatic: cây hero/luống hoa GLB (callback bất đồng bộ) phải đến SAU freeze như trước.
+// đóng băng ma trận local của thế giới tĩnh (NPC/xe/traffic tạo SAU nên không bị ảnh hưởng).
+// Nhịp nhường để vẽ chữ "Gộp hình khối tĩnh" có thể cho callback GLB bất đồng bộ (cây phượng hero / luống hoa —
+// world.js gọi loader.load ở cuối buildWorld) chen vào scene TRƯỚC freeze → bị gán bóng/đóng băng khác hẳn bản cũ
+// (vốn luôn đến SAU freeze) và khác nhau giữa các lần chạy. Gỡ tạm mọi gốc mới xuất hiện trong nhịp đó, freeze,
+// rồi gắn lại → đúng ngữ nghĩa cũ, xác định.
+const _preFreeze = new Set(scene.children);
 await boot.step('freeze');
+const _lateRoots = scene.children.filter((o) => !_preFreeze.has(o));
+for (const o of _lateRoots) scene.remove(o);
 world.freezeStatic(renderer.shadowMap.enabled);
+for (const o of _lateRoots) scene.add(o);
+_preFreeze.clear();
 await boot.step('actors');
 const dayNight = createDayNight(scene, world);
 if (TIER === 2) dayNight.sun.shadow.mapSize.set(1024, 1024);   // iGPU: bóng 1024 (shadow pass nhẹ 4×), vẫn BẬT
@@ -655,6 +664,7 @@ function animate() {
     if (window.__hp && window.__hp._aerialCam) { /* chế độ vệ tinh: giữ camera top-down, không cập nhật */ }
     else if (cine.active) cine.update(dt); else updateCamera(dt);   // đạo diễn lo camera khi bật
     const sky = dayNight.update(dt, pState.pos, camera);   // camera: hộp bóng bám hướng nhìn
+    traffic.setNight(sky.night);   // đèn xe máy/ô tô tự sáng về đêm
     // đêm bloom mạnh hơn cho đèn phố & cửa sổ rực rỡ
     if (bloomPass) bloomPass.strength = 0.025 + sky.night * 0.55;   // ban ngày gần tắt bloom
 
@@ -681,7 +691,7 @@ function animate() {
     const dPort = Math.hypot(pState.pos.x - world.portAnchor[0], pState.pos.z - world.portAnchor[1]);
     audio.tryHorn(time, 1 - Math.min(1, Math.max(0, (dPort - 70) / 180)));
 
-    autoQuality();
+    if (!_qPinned) autoQuality();   // __hp.pinQuality(): QA/đo A/B giữ nguyên nấc chất lượng (máy bận ≠ GPU yếu)
     updateNearCull();
     world.updateFarHide(pState.pos.x, pState.pos.z);   // biển hiệu/đèn lẻ >350 m: ẩn (nhịp 0,5 s bên trong)
     // CULLING TỪNG INSTANCE: quét lại định kỳ (cây/model GLB nạp async sau khi world dựng),
@@ -771,6 +781,10 @@ window.__hp = {
   world, pState, traffic, footprints: fp, PLAY_RADIUS,   // Đợt 3 WP8: tool/harness đọc trực tiếp
   bootProfile: boot.durs,    // ms từng bước khởi động (code/ground/…/freeze/actors/shaders)
   camOcclusion(on) { if (on !== undefined) cam.occlude = !!on; return cam.occlude; },   // A/B cần boom chống xuyên tường
+  // Khoá autoQuality ở nấc hiện tại (tools/qa/shoot.mjs, perf.mjs gọi ngay sau Bắt đầu). Lý do: headless trên máy
+  // đang chạy nhiều agent → fps tụt dưới 30% nhịp màn → autoQuality nhảy NẤC 3 (sương 220/1300 m, không hoàn tác)
+  // → ảnh vệ tinh chỉ còn màu sương (đo 2026-10-04: mọi game_* của lượt after1/after2 trắng xoá). Trả trạng thái.
+  pinQuality(on = true) { _qPinned = !!on; return { pinned: _qPinned, step: _qStep, pr: renderer.getPixelRatio() }; },
   // Chẩn đoán: mọi thực thể tương tác có đứng đúng chỗ & tiếp cận được không (+ nằm trong vùng chơi)
   diag() {
     const items = [];

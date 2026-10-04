@@ -45,6 +45,11 @@ for (let i = 0; i < 240; i++) {
   await pg.waitForTimeout(250);
 }
 const bootProfile = await pg.evaluate(() => window.__hp && window.__hp.bootProfile).catch(() => null);
+// Khoá autoQuality (mặc định; --nopin để tắt): máy chạy nhiều agent làm fps headless tụt → autoQuality nhảy nấc 3
+// (sương gần, không hoàn tác) → ảnh vệ tinh trắng xoá + số đo không so được giữa các lượt. Bản game chưa có
+// __hp.pinQuality thì bỏ qua (null).
+const pinned = A.includes('--nopin') ? null
+  : await pg.evaluate(() => (window.__hp && window.__hp.pinQuality ? window.__hp.pinQuality(true) : null)).catch(() => null);
 await pg.waitForTimeout(+arg('settle', '15000'));
 const info = await pg.evaluate(() => ({ tier: window.__hp.tier, gpu: window.__hp.gpu }));
 await pg.evaluate(() => {
@@ -94,7 +99,7 @@ for (const v of VIEWS) {
   shots.push({ id: v.id, file: f, perf });
 }
 const mem = await pg.evaluate(() => (performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1e6) : null));
-const res = { errors, hpReadyMs: hpAt, startReadyMs: startAt, bootProfile, ...info, heapMB: mem, shots };
+const res = { errors, hpReadyMs: hpAt, startReadyMs: startAt, bootProfile, pinned, ...info, heapMB: mem, shots };
 fs.writeFileSync(`${OUT}/_result.json`, JSON.stringify(res, null, 1));
 console.log(JSON.stringify({ errors: errors.slice(0, 20), hpReadyMs: hpAt, startReadyMs: startAt, bootProfile, ...info, heapMB: mem, n: shots.length, perf: shots.filter((s) => s.perf).map((s) => [s.id, s.perf]) }, null, 1));
 await br.close();
