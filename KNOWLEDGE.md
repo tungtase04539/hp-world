@@ -378,8 +378,9 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     cặp nhánh kề nhau 1 góc: bo cung R theo cấp thấp hơn (p7 s6 t4,5 r3 m, kẹp theo bề rộng vỉa và setback ≤45% đoạn
     chạy), thẳng (≈180°) hoặc vòng quanh tâm (>184°). Đa giác nút giao (ear-clip) + vỉa hè góc (zipper bó vỉa↔lưng) +
     mặt đứng bó vỉa 14 cm + mép lưng; vỉa hè bị cắt nơi lấn lòng/vỉa của phố khác (đường đôi, phố song song sát).
-    Số liệu R1600: 3.574 nút, 1.447 nút giao, 1.332 miter, 595 lối rẽ ngõ, 126 nút có đèn (426 cột — mỗi nhánh phố 1 cột ở
-    góc bên PHẢI làn xe tới), 715 nhánh có zebra; 63 ô 450 m × 2 mesh `roads_x,z`/`sidewalk_x,z` = 147k tam giác (cũ: ~350k
+    Số liệu R1600: 3.574 nút, 1.447 nút giao, 1.332 miter, 595 lối rẽ ngõ, 126 nút có đèn (391 cột — mỗi nhánh phố 1 cột ở
+    góc bên PHẢI làn xe tới, CHỈ trên vỉa hè đã phát, xem (l)), 715 nhánh có zebra; 63 ô 450 m × 2 mesh
+    `roads_x,z`/`sidewalk_x,z` = 146k tam giác (69,4k lòng + 76,7k vỉa hè; với SIDEWALK_W dot3: 69,5k + 78,3k) (cũ: ~350k
     tam giác các lớp đường trước gộp). Dựng 173-181 ms trong trình duyệt (node ~230 ms; cũ: khối roads 414-620 + cell_road
     44-82 + cell_curb 152-277 ms) → bớt ~400-700 ms main thread lúc tải. Draw call cùng phiên (1 khung, base→mới):
     pano_062_h090 864→843, pano_007_h090 1592→1577; tam giác 3,56M→3,49M / 7,90M→7,83M. A/B xen kẽ 2 lượt cùng phiên
@@ -400,15 +401,22 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     vuông góc lệch 15 s nên xanh/vàng trục này nằm gọn trong đỏ trục kia).
     **BẪY/HỢP ĐỒNG MỚI:** (a) mặt vỉa hè nay = `SIDEWALK_TOP` 0,25 m (xsection: ROAD_TOP 0,11 + CURB_RISE 0,14), cũ 0,18 →
     vật đặt vỉa hè kiểu cũ `gh+0.18` lún 7 cm; vật mới dùng `SIDEWALK_TOP` hoặc `world.roadNet.surfaceAt(x,z)` (độ cao mặt
-    nhựa/vỉa hè so với groundHeight; 0 ngoài đường và trên mặt cầu vòm; ~1,4 µs/lần — dùng được cho chân người chơi/NPC).
+    nhựa/vỉa hè so với groundHeight; 0 ngoài đường và trên mặt cầu vòm; ~0,5 µs/lần đo node 200k điểm sau khi tách
+    makeQueries (số 1,4 µs cũ là bản closure) — dùng được cho chân người chơi/NPC; KHÔNG biết dải nhựa phủ khe đường đôi (m):
+    trong khe trả 0,25 (vỉa) thay vì ~0,12).
     (b) Mặt nhựa nâng +4 mm/cấp (h 0,11 … p 0,13): 2 dải chồng nhau (đường đôi) → cấp cao thắng, không z-fight; đa giác nút
     giao lấy cấp cao nhất của cụm. (c) Material đường là Phong CÓ CHỦ Ý: freezeStatic chỉ gộp Lambert (lượt 1 XOÁ uv → mất
     shader). Mã lớp/vạch (tới ~2,1 triệu) truyền bằng `flat varying ivec2` — nội suy float có thể lệch 1 → nhiễu bit vạch.
     (d) Hợp đồng đỉnh: position, normal, uv (dải: u dọc m, v ngang m có dấu), aSurf=(lớp, MK|seed<<13, hw, d cách bó vỉa),
     aZeb=(u đầu, u cuối vùng zebra) — chi tiết ở đầu roadnet.js/roadtex.js. (e) `world.roadNet` = {junctions[{x,z,rad,signal,
     zebra,arms}], signals, nearJunction(x,z,pad), surfaceAt(x,z), stats, material} cho cây/prop/giao thông/người chơi né
-    miệng ngã tư. (f) SIDEWALK_BY_ROAD vẫn khoá theo index ROADS_DT (`swTypeOf(ri)`) — đừng đổi thứ tự ROADS_DT. (g) Cần
-    WebGL2 (sampler2DArray/textureGrad); r160 còn fallback WebGL1 nhưng khi đó đường không vẽ. (h) Chạy gen_roadmarks từ
+    miệng ngã tư. (f) SIDEWALK_BY_ROAD vẫn khoá theo index ROADS_DT (`swTypeOf(ri)`) — đừng đổi thứ tự ROADS_DT. (g) Shader
+    chính cần WebGL2 (sampler2DArray, flat ivec, textureGrad). r160 vẫn fallback WebGL1 → `onBeforeCompile(sh, renderer)`
+    (renderer = tham số THỨ 2) thấy `renderer.capabilities.isWebGL2 === false` → nhánh GLSL ES 1.0 `gl1Patch`: màu phẳng theo
+    lớp mặt aSurf.x (bảng PLACEHOLDER), không vạch; `material.userData.webgl1 = true`. Kiểm: init script trả null cho
+    getContext('webgl2') (scratchpad dot3/WP6/shoot_gl1.mjs --gl1): đường/vỉa hè vẽ đủ. Cùng phép thử, dot3 (cả có/không WP6)
+    còn 2 lỗi shader 'GL_OES_standard_derivatives disabled' của shader atlas `hpTex/uAtlasPx` (dFdx không bật
+    `extensions.derivatives`) — KHÔNG thuộc WP6, nhánh sở hữu shader đó cần sửa nếu muốn WebGL1 sạch. (h) Chạy gen_roadmarks từ
     GỐC repo đang làm (ghi `js/roadmarks.js` theo cwd). (i) BẪY miter ngược chiều: mặt cắt đầu dải dùng vector miter m của
     nút; nếu m NGƯỢC chiều pháp tuyến dải (dot<0) phải đổi dấu m (k=1/|dot|) — vị trí off() như nhau nhưng mặt đứng bó vỉa
     lấy hướng từ (mx,mz) → 91 mặt bó vỉa từng quay LƯNG về lòng đường, bị cull, lộ khe xanh giữa lòng và vỉa hè (pano_457).
@@ -419,7 +427,22 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     (j) Đoạn đường trong 10 m quanh trục cầu VÒM (BRIDGES rise>3) bị cắt CÓ CHỦ Ý kể cả trên bờ (dốc dẫn cầu Bính x≈75,
     z −950..−900 nằm trên mặt cầu, groundHeight 7-9 m). (k) Kiểm hình học không cần GPU: scratchpad `dot3/WP6/probe`
     (facecheck.mjs hướng mặt bó vỉa, holecheck.mjs lỗ lòng đường theo tim ROADS_DT, rn_test.mjs+rn_draw.py vẽ mặt bằng PNG).
-    Ảnh A/B + số đo: scratchpad `dot3/WP6` (fin_base vs fin_std, a4_jx*, a4_v5_m.jpg).
+    (l) CỘT ĐÈN TÍN HIỆU kiểm theo TAM GIÁC MẶT TRÊN ĐÃ PHÁT (placeSignals sau khi phát xong mọi hình học): vị trí hình học
+    (mép bó vỉa +0,6 m, a.s+1,2 m) từng rơi vào lòng phố khác/đa giác nút/khe đất giữa đường đôi/vỉa hè bị foreign() cắt
+    (phản biện: 32/426 cột trên nhựa/đất). Nay: tâm + vòng r 0,25 m phải đều trên tam giác vỉa hè, không điểm nào trên tam giác
+    lòng; lùi 1 m/bước tới a.s+8; không được → bỏ cột nhánh đó (35 nhánh); y = mặt vỉa hè nội suy. Lọc nhanh bằng bitmap ô
+    4 m + ô thô 32 m (tam giác lớn khỏi duyệt từng ô: 731k → ~40k lượt) ≈ 4-10 ms. Kiểm: review/sigcheck.mjs → 391/391 trên vỉa.
+    (m) ĐƯỜNG ĐÔI OSM (2 way song song, khe giữa 2 mép lòng 0,05-2,5 m; khác cấp ≤1,2 m): KHÔNG vỉa hè trong khe (bad() →
+    dualGap) + `gapFill` phủ NHỰA đúng khe (mép dải này → mép dải kia, mẩu ≤4 m, ±3 m quá đầu đoạn để tới góc nút; CẢ 2 way
+    cùng phát, lệch 0,5 mm, trùng khít cùng màu) — ảnh thật pano_327 (Hồ Sen) là 1 mặt đường liền + zebra suốt; thử dải
+    phân cách nổi cho khe >1,2 m: trái ảnh → bỏ. Khe đất còn lại (~227 m² trong 1 km, Bính/(450,600)/(475,-450)) là nhập
+    làn hội tụ không song song. (n) freezeStatic bật castShadow cho mọi mesh không khớp _noCast → `traffic_signal_lamps` tự
+    tắt castShadow ở khung đầu trong updater (không sửa dòng regex dùng chung). (o) Vật ĐẶT THEO ROADS_DT kiểu cũ (đèn gang
+    trang trí `wRoad/2+1`, cột điện, cây WP4) nay có thể đứng giữa lòng đường ở đường đôi/miệng nút (pano_327: đèn gang
+    giữa đường vì khe giữa 2 chiều xe giờ là nhựa) → lọc bằng `world.roadNet.surfaceAt(x,z)` (0<s<0,2 = lòng) +
+    `nearJunction(x,z,1)` ở nhánh sở hữu khối đó.
+    Ảnh A/B + số đo: scratchpad `dot3/WP6` (fin_base vs fin_std, a4_jx*, a4_v5_m.jpg; sau phản biện: a5_mrg_m1-3.jpg
+    real|dot3|dot3+WP6, a5_gl1_m.jpg WebGL1, ab5/ A/B std).
 - **2026-09-07 (di)** [ĐỢT 2 TÍCH HỢP — 6 nhánh worktree song song + 6 phản biện đối kháng, gộp trên `dot2-int`]:
     Quy trình: mỗi nhánh (W1 merge-budget, W2 ground-grid, W3 landmark-lod, W4 visual, W5 hydro-polygon-water,
     W6 landmark-placement) làm trong worktree riêng, tự đo trước/sau trên GPU thật, có agent phản biện đọc diff +
