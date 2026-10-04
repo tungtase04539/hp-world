@@ -12,7 +12,8 @@
 //    mặt nạ sơn `aPaint` (phần thân nhận instanceColor; mũ bảo hiểm/thùng sau/hộp công tơ là PHỤ KIỆN bật/tắt theo
 //    hash vị trí trong vertex shader). LOD 2 mức + culling theo khoảng cách & nửa không gian phía trước camera
 //    (bộ cull riêng — instcull.js không nén được attribute tuỳ biến).
-//  • Dây điện = LineSegments theo ô 400 m, alpha giảm theo khoảng cách (dây thật mảnh dưới 1 px ở xa).
+//  • Dây điện = 1 LineSegments cho cả thành phố, alpha giảm theo khoảng cách + bỏ (discard) xa > uFar (dây thật
+//    mảnh dưới 1 px ở xa); ~336k đỉnh đường thẳng — rẻ hơn chia ô (thêm draw call) trên GPU tích hợp.
 //  • Người đi bộ: đứng / ngồi ghế nhựa / đi lại — đi lại hoàn toàn trên GPU (uPropTime), không tốn CPU mỗi khung.
 //
 // API: buildProps(ctx) → { stats, update(cam) } — gọi 1 lần trong buildWorld (SAU khi cây/công trình đã có collider để
@@ -105,7 +106,8 @@ function prof(pts, w, x0 = 0) {
   return g;
 }
 // GỘP NHIỀU MODEL vào 1 hình (aVar = chỉ số model); InstancedMesh chọn model theo iVar từng instance — vertex shader
-// thu đỉnh của model khác về 0 (tam giác suy biến). 4 xe máy / 5 ô tô / 6 loại cột-đèn → MỖI NHÓM 1 draw call.
+// thu đỉnh của model khác về 0 (tam giác suy biến). Cột-đèn (6), đồ lặt vặt (6), kính đèn (4), người (2) → MỖI NHÓM
+// 1 draw call. Xe máy/ô tô KHÔNG gộp (nhiều instance × đỉnh suy biến của 3-5 model khác — xem 6.8).
 function variants(models) {
   models.forEach((g, i) => g.attributes.aVar.array.fill(i));
   const m = mergeGeometries(models, false);
@@ -305,7 +307,7 @@ function bikeCommon(parts, { hbY, hbZ, mirrorY }) {
     parts.push(finish(box(0.12, 0.075, 0.025, s * 0.29, mirrorY + 0.02, hbZ + 0.045, 0, s * 0.25, 0), C.black)); // mặt gương
   }
 }
-// (a) XE GA NHỎ (kiểu Vision/Lead): sàn để chân, yếm trước, đuôi tròn — ~480 tam giác
+// (a) XE GA NHỎ phổ thông (bánh 14"): sàn để chân, yếm trước, đuôi tròn — ~480 tam giác
 function modelScooter() {
   const P = [];
   bikeWheel(P, 0.63, 0.25, 0.09); bikeWheel(P, -0.6, 0.25, 0.1);
@@ -327,7 +329,7 @@ function modelScooter() {
   P.push(finish(new THREE.SphereGeometry(0.135, 7, 4, 0, Math.PI * 2, 0, Math.PI * 0.62).translate(0.3, 1.13, 0.5), 0xffffff, 5));
   return mergeParts(P);
 }
-// (b) XE SỐ (kiểu Wave/Sirius): bánh to mảnh, khung lộ, máy lộ — ~520 tam giác
+// (b) XE SỐ phổ thông (underbone): bánh to mảnh, khung lộ, máy lộ — ~520 tam giác
 function modelUnderbone() {
   const P = [];
   bikeWheel(P, 0.64, 0.3, 0.075); bikeWheel(P, -0.62, 0.3, 0.085);
@@ -351,7 +353,7 @@ function modelUnderbone() {
   P.push(finish(new THREE.SphereGeometry(0.135, 7, 4, 0, Math.PI * 2, 0, Math.PI * 0.62).translate(0.3, 1.11, 0.48), 0xffffff, 5));
   return mergeParts(P);
 }
-// (c) XE GA LỚN (kiểu SH/Air Blade): bánh 16", thân dài, sàn phẳng; phụ kiện cổng 2: thùng sau — ~560 tam giác
+// (c) XE GA LỚN: bánh 16", thân dài, sàn phẳng; phụ kiện cổng 2: thùng sau — ~560 tam giác
 function modelBigScooter() {
   const P = [];
   bikeWheel(P, 0.68, 0.29, 0.1); bikeWheel(P, -0.64, 0.28, 0.11);
@@ -374,7 +376,7 @@ function modelBigScooter() {
   P.push(finish(new THREE.SphereGeometry(0.135, 7, 4, 0, Math.PI * 2, 0, Math.PI * 0.62).translate(-0.31, 1.17, 0.52), 0xffffff, 5));
   return mergeParts(P);
 }
-// (d) XE CUB/DREAM: rổ trước, yên dài, ốp chân lớn — ~500 tam giác
+// (d) XE CUB đời cũ: rổ trước, yên dài, ốp chân lớn — ~500 tam giác
 function modelCub() {
   const P = [];
   bikeWheel(P, 0.64, 0.3, 0.08); bikeWheel(P, -0.62, 0.3, 0.085);
@@ -474,7 +476,7 @@ function modelHatch(taxi = false) {
   if (taxi) P.push(finish(box(0.52, 0.16, 0.2, 0, 1.56, -0.35), [C.white, C.white, 0xf3d24a, C.white, 0x2a5aa8, 0x2a5aa8]));
   return mergeParts(P);
 }
-// XE TẢI NHỎ thùng bạt (Carry/K200…) 4.8×1.7×2.2 — thùng bạt màu bảng A — ~300 tam giác
+// XE TẢI NHỎ thùng bạt (tải 1 tấn) 4.8×1.7×2.2 — thùng bạt màu bảng A — ~300 tam giác
 function modelTruck() {
   const P = [];
   carWheels(P, 1.55, -1.25, 0.72, 0.3, 0.2);
@@ -1090,7 +1092,7 @@ export function buildProps(ctx) {
   const tPoles = performance.now();
 
   // ---------------------------------------------------------------------------------------------------------------
-  // 6.3 DÂY ĐIỆN: mỗi nhịp 6-30 sợi võng ngẫu nhiên + dây vào nhà 2 bên + cuộn rối gần cột; LineSegments theo ô 400 m
+  // 6.3 DÂY ĐIỆN: mỗi nhịp 6-30 sợi võng ngẫu nhiên + dây vào nhà 2 bên + cuộn rối gần cột; 1 LineSegments
   // ---------------------------------------------------------------------------------------------------------------
   // bộ đệm đỉnh tăng dần (Float32Array) — mảng JS 1 triệu số từng tốn ~80 ms + GC
   let cableBuf = new Float32Array(1 << 18), cableN = 0;
@@ -1370,9 +1372,14 @@ export function buildProps(ctx) {
       const sc = s + len / 2;
       if (sc > S.L - len / 2 - 1) break;
       const x = S.ax + S.ux * sc + S.nx * lat, z = S.az + S.uz * sc + S.nz * lat;
-      // camera pano nằm giữa lòng đường: ô tô đỗ ≤ 6 m (van/tải 8 m) che gần nửa khung hình mà ảnh thật ở đó trống
-      // (đo: van 2,1 m ngay trước pano_102) → giữ trống quanh 551 điểm chụp (7,5/9 m từng bớt 16% ô tô — quá tay)
-      let ok = x * x + z * z < R_MAX * R_MAX && flat(x, z) && !panoNear(x, z, mi >= 4 ? 8 : 6) && !avoid(x, z) && !clearAt(x, z) && lakeSD(x, z) > 18;
+      // camera pano nằm giữa lòng đường: ô tô đỗ có ĐẦU XE sát camera che gần nửa khung hình mà ảnh thật ở đó trống
+      // (đo: van 5,25 m trước pano_102 — tâm 8,5 m nhưng đầu xe ~6 m, ảnh thật không có xe) → kiểm tra viên nang (tâm
+      // + 2 đầu xe) quanh 551 điểm chụp: 6,5 m (van/tải 8 m); pano ghi "ô tô đỗ dày/hai bên" (car 2) thì xe đỗ sát
+      // camera là ĐÚNG ảnh thật → chỉ 4/5 m. (Vòng tròn 7,5/9 m quanh TÂM cho mọi pano từng bớt 16% ô tô — quá tay.)
+      const ec = evAt(x, z), dense = !!(ec && ec[3] >= 2);
+      const rp = mi >= 4 ? (dense ? 5 : 8) : (dense ? 4 : 6.5), hx = S.ux * len / 2, hz = S.uz * len / 2;
+      let ok = x * x + z * z < R_MAX * R_MAX && flat(x, z) && !avoid(x, z) && !clearAt(x, z) && lakeSD(x, z) > 18
+        && !panoNear(x, z, rp) && !panoNear(x + hx, z + hz, rp) && !panoNear(x - hx, z - hz, rp);
       if (ok) for (const dd of [-len / 2 - 0.5, 0, len / 2 + 0.5]) { if (roadIdx.blocked(x + S.ux * dd, z + S.uz * dd, S.ri, S.si, 4.5, false)) { ok = false; break; } }
       if (ok && obst.hit(x, z, 0.9)) ok = false;
       // phố r: 2 bánh trên vỉa → không đè hàng xe máy / quán / xe đẩy đã đặt trên các ô vỉa hè dọc thân xe
