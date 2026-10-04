@@ -589,7 +589,7 @@ export function createTraffic(scene, world, opts = {}) {
       arr[o + 27] = a.opt || 0;
       g.n++;
       // bóng tiếp đất: elip (rx, rz) của mô hình gần, theo hướng xe (không nghiêng theo lean)
-      const shp = a.grp.sh, rx = shp[0] * sx, rz = shp[1] * sz, q = ns * SH_STRIDE;
+      const shp = a.grp.sh, ks = a.type === 'walk' ? (a.sc || 1) : 1, rx = shp[0] * ks, rz = shp[1] * ks, q = ns * SH_STRIDE;   // elip của mô hình GẦN theo kiểu (đã đúng kích thước — không nhân scale LOD xa)
       sa[q] = ch * rx; sa[q + 1] = 0; sa[q + 2] = -shh * rx; sa[q + 3] = 0;
       sa[q + 4] = 0; sa[q + 5] = 1; sa[q + 6] = 0; sa[q + 7] = 0;
       sa[q + 8] = shh * rz; sa[q + 9] = 0; sa[q + 10] = ch * rz; sa[q + 11] = 0;
