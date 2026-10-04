@@ -305,7 +305,63 @@ onmessage = async (e) => {
 }
 
 // ======================= shader =======================
+// ---------- BẢNG THAM SỐ LỚP 2..14 (trừ 7 DIRT: đi chung nhánh URB) → mảng const GLSL ----------
+// Bản đầu: mỗi lớp 1 nhánh if riêng trong luClass → fxc (ANGLE D3D11) biên dịch tổng mọi nhánh: +30-60 ms compileAsync
+// và +~90 ms khung đầu (đo: luClass chỉ nhánh URB = ngang dot3). Nay MỘT công thức chung đọc bảng theo chỉ số lớp:
+//   A = ca·(ka.x + pa·d0 + ka.yz·d1.rg) · F ;  F = tông · ố · nứt · sọc
+//   tông = mix(t.x, t.y, tw·M + t.z) ; ố = mix(s.x, 1, d1.b) ; nứt = mix(1, min(crk, s.y), s.z) ; sọc = 1 + s.w·(sọc 5 m − ½)
+//   B = mix(A·tb, cb·(kb.x + pb·d0 + kb.yz·d1.rg)·F, kb.w)        (kb.w = 0: B là A NHUỘM màu tb; 1: mặt riêng)
+//   kết quả = mix(A, B, smoothstep(mk.x, mk.y, mw·M + md·mdet) · mk.z)
+// d0 = (bê tông tấm, đá lát 0,5 m, gạch đỏ, đất nện); d1.rg = (cỏ, nhựa/sỏi); M = mặt nạ lớn không lặp; mdet = 23 m.
+// Màu sRGB 0-255 ở đây, đổi sang tuyến tính khi sinh GLSL.
+const LU_PARAMS = {
+  2: { // CÔNG NGHIỆP / CẢNG: bê tông tấm lớn bạc + ố dầu + mảng gỉ
+    ca: [136, 134, 129], pa: [0.7, 0, 0, 0], ka: [0.55, 0, 0], tw: [1, 0, 0, 0], t: [0.85, 1.08, 0], s: [0.62, 1.1, 1, 0],
+    tb: [1.1, 0.92, 0.78], mw: [0, 0, 0, 0.8], md: [0, 0, 0, 0.2], mk: [0.6, 0.8, 0.5] },
+  3: { // QUẢNG TRƯỜNG: đá lát xám sáng
+    ca: [160, 158, 152], pa: [0, 0.6, 0, 0], ka: [0.62, 0, 0], tw: [0, 1, 0, 0], t: [0.9, 1.04, 0], s: [0.88, 1, 0, 0] },
+  4: { // SÂN CHÙA/ĐỀN: gạch Bát Tràng CŨ — khử bão hoà, sẫm, loang mốc (bản đầu: thảm đỏ cam rực 150,84,62) + ~1/5 mảng
+       // đá lát xám (vá/lối đi). Chùa Hàng: viền đá do gen_landuse tô (PLAZA), lõi gạch.
+    ca: [128, 94, 78], pa: [0, 0, 0.6, 0], ka: [0.62, 0, 0], tw: [0, 0.6, 0, -0.45], t: [0.8, 1.06, 0.3], s: [0.86, 1, 0, 0],
+    cb: [150, 147, 140], pb: [0, 0.6, 0, 0], kb: [0.62, 0, 0, 1], mw: [0, 0, 1, 0], md: [0.12, 0, 0, 0], mk: [0.66, 0.68, 1] },
+  5: { // SÂN TRƯỜNG / CƠ QUAN: bê tông sáng + mảng gạch block
+    ca: [148, 145, 138], pa: [0.7, 0, 0, 0], ka: [0.6, 0, 0], tw: [0, 1, 0, 0], t: [0.88, 1.06, 0], s: [0.85, 1.1, 1, 0],
+    cb: [152, 148, 140], pb: [0, 0.6, 0, 0], kb: [0.62, 0, 0, 1], mw: [0, 0, 0.8, 0], md: [0, 0, 0.2, 0], mk: [0.45, 0.6, 1] },
+  6: { // BÃI ĐỖ XE: nhựa sẫm + ố dầu
+    ca: [96, 96, 98], ka: [0.65, 0, 0.6], tw: [1, 0, 0, 0], t: [0.9, 1.08, 0], s: [0.7, 1.1, 1, 0] },
+  8: { // CỎ công viên: xanh ngả vàng + mảng mòn đất
+    ca: [92, 118, 58], ka: [0.6, 0.8, 0], tw: [0, 1, 0, 0], t: [0.82, 1.12, 0], s: [1, 1, 0, 0],
+    cb: [132, 118, 90], pb: [0, 0, 0, 0.7], kb: [0.6, 0, 0, 1], mw: [0.85, 0, 0, 0], md: [0.25, 0, 0, 0], mk: [0.64, 0.8, 0.75] },
+  9: { // CỎ DẠI / BỤI / RUỘNG
+    ca: [86, 100, 56], ka: [0.55, 0.9, 0], tw: [0, 1, 0, 0], t: [0.75, 1.15, 0], s: [1, 1, 0, 0],
+    cb: [128, 112, 86], pb: [0, 0, 0, 0.7], kb: [0.6, 0, 0, 1], mw: [0.85, 0, 0, 0], md: [0.25, 0, 0, 0], mk: [0.55, 0.75, 0.6] },
+  10: { // SÂN BÓNG CỎ NHÂN TẠO: sọc cắt 5 m
+    ca: [63, 120, 65], ka: [0.85, 0.3, 0], s: [1, 1, 0, 0.16] },
+  11: { // SÂN TENNIS / BÓNG RỔ: sơn acrylic xanh lá
+    ca: [66, 116, 92], ka: [0.9, 0, 0.2], tw: [0, 1, 0, 0], t: [0.92, 1.03, 0] },
+  12: { // ĐƯỜNG CHẠY cao su đỏ
+    ca: [168, 74, 58], ka: [0.88, 0, 0.24] },
+  13: { // BỂ BƠI: gạch men xanh
+    ca: [70, 160, 196], pa: [0, 0.45, 0, 0], ka: [0.7, 0, 0] },
+  14: { // CHỢ: bê tông bẩn ẩm
+    ca: [128, 122, 112], pa: [0.7, 0, 0, 0], ka: [0.55, 0, 0], tw: [1, 0, 0, 0], t: [0.85, 1.05, 0], s: [0.6, 1.2, 1, 0] },
+};
+const LU_DEF = { ca: [0, 0, 0], pa: [0, 0, 0, 0], ka: [1, 0, 0], cb: [0, 0, 0], pb: [0, 0, 0, 0], kb: [1, 0, 0, 0], tb: [1, 1, 1],
+  tw: [0, 0, 0, 0], t: [1, 1, 0], s: [1, 1, 0, 0], mw: [0, 0, 0, 0], md: [0, 0, 0, 0], mk: [0, 1, 0] };
+function luTableGLSL() {
+  const lin = (c) => c.map((v) => Math.pow(v / 255, 2.2));
+  const f = (v) => { const s = (+v.toFixed(5)).toString(); return /[.e]/.test(s) ? s : s + '.0'; };
+  const rows = Array.from({ length: 16 }, (_, i) => ({ ...LU_DEF, ...(LU_PARAMS[i] || {}) }));
+  const arr = (name, key, conv) => {
+    const n = rows[0][key].length, ty = 'vec' + n;
+    return `const ${ty} ${name}[16] = ${ty}[16](` + rows.map((r) => `${ty}(${(conv ? conv(r[key]) : r[key]).map(f).join(', ')})`).join(', ') + ');';
+  };
+  return [arr('LU_CA', 'ca', lin), arr('LU_PA', 'pa'), arr('LU_KA', 'ka'), arr('LU_CB', 'cb', lin), arr('LU_PB', 'pb'), arr('LU_KB', 'kb'),
+    arr('LU_TB', 'tb'), arr('LU_TW', 'tw'), arr('LU_T', 't'), arr('LU_S', 's'), arr('LU_MW', 'mw'), arr('LU_MD', 'md'), arr('LU_MK', 'mk')].join('\n');
+}
+
 const PARS = /* glsl */`
+${luTableGLSL()}
 uniform highp sampler2D tLuMap;      // highp: giải mã byte lớp/mật độ (lowp trên GPU di động làm lệch floor(r·255))
 uniform highp sampler2DArray tLuDet;
 uniform highp sampler2D tLuCov;
@@ -323,7 +379,8 @@ float luH(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); 
 vec3 luClass(float c, float dist, float dens, float cov, vec2 w, vec4 d0, vec4 d1, vec4 M, vec4 md, vec3 vcol) {
   float stain = d1.b, crk = d1.a / 0.74;
   if (c < 0.5) return vcol;
-  if (c < 1.5 || c > 14.5) {
+  float isDirt = 1.0 - step(0.5, abs(c - 7.0));   // ĐẤT NỆN / CÔNG TRƯỜNG: bãi trống trừ khi đã kín nhà (OSM cũ)
+  if (c < 1.5 || c > 14.5 || isDirt > 0.5) {
     // NỀN PHỐ (+ trong nhà): bê tông tấm xám; sát tường (≤1,5 m) ố ẩm + rêu; sân ≥3 m đôi chỗ lát gạch block.
     // BÃI TRỐNG (đất nện + mảng cỏ dại + mảng bê tông sót) CHỈ ở nơi THƯA nhà (mật độ ±40 m < ~25 %) và xa tường;
     // KHÔNG nhà trong ~200 m (cov ≈ 0: vành ngoài BUILD_RADIUS, lỗ thiếu dữ liệu) → "phố xa": màu đỉnh khử bão hoà + loang.
@@ -335,14 +392,15 @@ vec3 luClass(float c, float dist, float dens, float cov, vec2 w, vec4 d0, vec4 d
     float yard = smoothstep(2.5, 5.0, dist);
     vec3 tiles = luS2L(vec3(146.0, 142.0, 135.0)) * (0.62 + 0.6 * d0.g) * mix(0.9, 1.04, M.g);
     conc = mix(conc, tiles, yard * smoothstep(0.672, 0.684, M.b * 0.8 + md.r * 0.25));   // mép mảng lát SẮC (ranh đổ/lát thật)
-    float far = (1.0 - smoothstep(0.05, 0.4, cov + (M.r - 0.5) * 0.2)) * smoothstep(4.0, 12.0, dist);
-    float vac = smoothstep(6.0, 14.0, dist + (M.r - 0.5) * 8.0) * (1.0 - smoothstep(0.12, 0.35, dens + (M.a - 0.5) * 0.15));
+    float far = (1.0 - smoothstep(0.05, 0.4, cov + (M.r - 0.5) * 0.2)) * smoothstep(4.0, 12.0, dist) * (1.0 - isDirt);
+    float vac = mix(smoothstep(6.0, 14.0, dist + (M.r - 0.5) * 8.0) * (1.0 - smoothstep(0.12, 0.35, dens + (M.a - 0.5) * 0.15)),
+                    1.0 - smoothstep(0.18, 0.4, dens + (M.r - 0.5) * 0.15), isDirt);   // công trường OSM cũ nay kín nhà → sân bê tông
     if (vac < 0.01 && far < 0.01) return conc;
-    vec3 dirt = luS2L(vec3(140.0, 124.0, 100.0)) * (0.6 + 0.7 * d0.a) * mix(0.85, 1.1, M.b);
+    vec3 dirt = luS2L(vec3(140.0, 124.0, 100.0)) * (0.6 + 0.7 * d0.a) * mix(0.85, 1.1, M.b) * (1.0 + 0.1 * isDirt);
     vec3 weed = luS2L(vec3(100.0, 108.0, 66.0)) * (0.6 + 0.8 * d1.r) * mix(0.85, 1.1, M.g);
     // mảng cỏ dại: nhiễu LỚN không lặp quyết định CHỖ, hạt mịn (md 23 m + lá cỏ 4 m) làm mép RÁCH; dải chuyển hẹp (mép
     // mềm 20-50 m nhìn từ cao như vết mờ/sương)
-    float wv = smoothstep(0.47, 0.55, M.a * 0.9 + (md.g - 0.5) * 0.16 + (d1.r - 0.5) * 0.2 + smoothstep(14.0, 30.0, dist) * 0.08);
+    float wv = smoothstep(0.47, 0.55, M.a * 0.9 + (md.g - 0.5) * 0.16 + (d1.r - 0.5) * 0.2 + smoothstep(14.0, 30.0, dist) * 0.08 - 0.1 * isDirt);
     vec3 lot = mix(dirt, weed, wv);
     lot = mix(lot, conc * 0.95, smoothstep(0.63, 0.67, M.b * 0.75 + M.r * 0.35 + (d0.a - 0.5) * 0.1));   // mảng bê tông/sân cũ còn sót
     // PHỐ XA: trung bình ≈ màu đỉnh khử bão hoà (tấm thô ngoài ±LOCAL_HALF cùng màu đỉnh → hoà mép không lộ).
@@ -358,62 +416,14 @@ vec3 luClass(float c, float dist, float dens, float cov, vec2 w, vec4 d0, vec4 d
     fg = mix(fg, fg * vec3(0.9, 1.0, 0.78), smoothstep(0.64, 0.7, M.a + (d1.r - 0.5) * 0.15) * 0.4);   // cỏ thưa loang qua nhiều ô
     return mix(mix(conc, lot, vac), fg, far);
   }
-  if (c < 2.5) {   // CÔNG NGHIỆP / CẢNG: bê tông tấm lớn bạc + ố dầu + gỉ
-    vec3 b = luS2L(vec3(136.0, 134.0, 129.0)) * (0.55 + 0.7 * d0.r) * mix(0.85, 1.08, M.r) * mix(0.62, 1.0, stain) * min(crk, 1.1);
-    return mix(b, b * vec3(1.1, 0.92, 0.78), smoothstep(0.6, 0.8, M.a * 0.8 + md.a * 0.2) * 0.5);
-  }
-  if (c < 3.5) {   // QUẢNG TRƯỜNG: đá lát xám sáng
-    return luS2L(vec3(160.0, 158.0, 152.0)) * (0.62 + 0.6 * d0.g) * mix(0.9, 1.04, M.g) * mix(0.88, 1.0, stain);
-  }
-  if (c < 4.5) {   // SÂN CHÙA/ĐỀN: gạch Bát Tràng CŨ — khử bão hoà, sẫm, mốc/rêu (bản đầu: thảm đỏ cam rực 150,84,62);
-    //               ~1/5 mảng lát đá xám (vá/lối đi). Chùa Hàng: viền đá do gen_landuse tô (PLAZA), lõi gạch.
-    vec3 br = luS2L(vec3(128.0, 94.0, 78.0)) * (0.62 + 0.6 * d0.b) * mix(0.84, 1.05, M.g) * mix(0.86, 1.0, stain);
-    br = mix(br, br * vec3(0.82, 0.86, 0.86), smoothstep(0.45, 0.75, M.a * 0.6 + md.a * 0.4) * 0.6);
-    br = mix(br, br * vec3(0.84, 0.93, 0.76), smoothstep(0.58, 0.78, M.r) * 0.45);
-    vec3 st = luS2L(vec3(150.0, 147.0, 140.0)) * (0.62 + 0.6 * d0.g) * mix(0.86, 1.04, M.g) * mix(0.85, 1.0, stain);
-    return mix(br, st, smoothstep(0.6, 0.62, M.b + (md.r - 0.5) * 0.12));
-  }
-  if (c < 5.5) {   // SÂN TRƯỜNG / CƠ QUAN: bê tông sáng + gạch block
-    vec3 a = luS2L(vec3(148.0, 145.0, 138.0)) * (0.6 + 0.7 * d0.r) * mix(0.88, 1.06, M.g) * mix(0.85, 1.0, stain) * min(crk, 1.1);
-    vec3 t = luS2L(vec3(152.0, 148.0, 140.0)) * (0.62 + 0.6 * d0.g);
-    return mix(a, t, smoothstep(0.45, 0.6, M.b * 0.8 + md.b * 0.2));
-  }
-  if (c < 6.5) {   // BÃI ĐỖ XE: nhựa sẫm + ố dầu
-    return luS2L(vec3(96.0, 96.0, 98.0)) * (0.65 + 0.6 * d1.g) * mix(0.9, 1.08, M.r) * mix(0.7, 1.0, stain) * min(crk, 1.1);
-  }
-  if (c < 7.5) {   // ĐẤT NỆN / CÔNG TRƯỜNG — công trường OSM cũ nay đã kín nhà (mật độ cao) → sân bê tông như nền phố
-    vec3 b = luS2L(vec3(152.0, 130.0, 102.0)) * (0.6 + 0.7 * d0.a) * mix(0.82, 1.1, M.b);
-    vec3 wd = luS2L(vec3(102.0, 110.0, 66.0)) * (0.6 + 0.8 * d1.r);
-    b = mix(b, wd, smoothstep(0.6, 0.76, M.a * 0.9 + md.g * 0.1) * 0.7);
-    vec3 cc = luS2L(vec3(134.0, 132.0, 127.0)) * (0.55 + 0.75 * d0.r) * mix(0.8, 1.08, M.g) * mix(0.72, 1.0, stain) * mix(0.7, 1.0, smoothstep(0.2, 1.6, dist));
-    return mix(b, cc, smoothstep(0.18, 0.4, dens + (M.r - 0.5) * 0.15));
-  }
-  if (c < 8.5) {   // CỎ công viên: xanh ngả vàng, mảng mòn đất
-    vec3 g = luS2L(vec3(92.0, 118.0, 58.0)) * (0.6 + 0.8 * d1.r) * mix(0.82, 1.12, M.g) * mix(vec3(1.0), vec3(1.08, 1.02, 0.85), M.b);
-    vec3 worn = luS2L(vec3(132.0, 118.0, 90.0)) * (0.6 + 0.7 * d0.a);
-    return mix(g, worn, smoothstep(0.64, 0.8, M.r * 0.85 + md.r * 0.25) * 0.75);
-  }
-  if (c < 9.5) {   // CỎ DẠI / BỤI / RUỘNG
-    vec3 g = luS2L(vec3(86.0, 100.0, 56.0)) * (0.55 + 0.9 * d1.r) * mix(0.75, 1.15, M.g * 0.8 + md.g * 0.2);
-    vec3 b = luS2L(vec3(128.0, 112.0, 86.0)) * (0.6 + 0.7 * d0.a);
-    return mix(g, b, smoothstep(0.55, 0.75, M.r * 0.85 + md.r * 0.25) * 0.6);
-  }
-  if (c < 10.5) {  // SÂN BÓNG CỎ NHÂN TẠO: sọc cắt 5 m
-    float st = step(0.5, fract((w.x + w.y) * 0.1));
-    return luS2L(vec3(64.0, 122.0, 66.0)) * mix(0.9, 1.06, st) * (0.85 + 0.3 * d1.r);
-  }
-  if (c < 11.5) {  // SÂN TENNIS / BÓNG RỔ: sơn acrylic xanh lá
-    return luS2L(vec3(66.0, 116.0, 92.0)) * (0.9 + 0.2 * d1.g) * mix(0.92, 1.03, M.g);
-  }
-  if (c < 12.5) {  // ĐƯỜNG CHẠY cao su đỏ
-    return luS2L(vec3(168.0, 74.0, 58.0)) * (0.88 + 0.24 * d1.g);
-  }
-  if (c < 13.5) {  // BỂ BƠI: gạch men xanh
-    return luS2L(vec3(70.0, 160.0, 196.0)) * (0.7 + 0.45 * d0.g);
-  }
-  // CHỢ: bê tông bẩn ẩm
-  vec3 b = luS2L(vec3(128.0, 122.0, 112.0)) * (0.55 + 0.7 * d0.r) * mix(0.6, 1.0, stain) * min(crk, 1.2);
-  return b * mix(0.85, 1.05, M.r);
+  // lớp 2..14 (trừ 7): MỘT công thức chung đọc bảng LU_* (xem LU_PARAMS ở trên)
+  int i = int(c + 0.5);
+  vec4 S = LU_S[i]; vec3 T = LU_T[i], KA = LU_KA[i], MK = LU_MK[i]; vec4 KB = LU_KB[i];
+  float F = mix(T.x, T.y, dot(LU_TW[i], M) + T.z) * mix(S.x, 1.0, stain) * mix(1.0, min(crk, S.y), S.z)
+          * (1.0 + S.w * (step(0.5, fract((w.x + w.y) * 0.1)) - 0.5));
+  vec3 A = LU_CA[i] * (KA.x + dot(LU_PA[i], d0) + dot(KA.yz, d1.rg)) * F;
+  vec3 B = mix(A * LU_TB[i], LU_CB[i] * (KB.x + dot(LU_PB[i], d0) + dot(KB.yz, d1.rg)) * F, KB.w);
+  return mix(A, B, smoothstep(MK.x, MK.y, dot(LU_MW[i], M) + dot(LU_MD[i], md)) * MK.z);
 }
 `;
 const MAIN = /* glsl */`
@@ -518,7 +528,7 @@ export function makeGroundSystem(THREE, opt = {}) {
     uLuEdge: { value: opt.edge || 1e6 },
     uLuGrid: { value: new THREE.Vector4(LU_GRID.x0, LU_GRID.z0, LU_GRID.res, n) },
   };
-  const key = 'landuse-v4' + (opt.lite ? '-lite' : '');
+  const key = 'landuse-v5' + (opt.lite ? '-lite' : '');
   function material(mo = {}) {
     const m = new THREE.MeshLambertMaterial({ vertexColors: true });
     if (opt.lite) m.defines = { LU_LITE: '' };
