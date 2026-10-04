@@ -290,6 +290,10 @@ node tools/perf.mjs --port 8177 [--quality lite]   # fps/p50/p95, draw call+tam 
 node tools/mobile.mjs --port 8177 --out <dir>  # viewport điện thoại dọc/ngang + cảm ứng giả lập (TIER 1)
 node tools/qa/shoot.mjs --port 8177 --out <dir> --views tools/qa/views_std.json --perf   # ảnh so pano/vệ tinh
 ```
+- **KHOÁ GPU TOÀN MÁY** (`tools/qa/gpulock.mjs`): mọi tool trên (launch.mjs `openGame` giữ khoá tới `g.close()`,
+  shoot.mjs giữ tới khi xong) xếp hàng — chỉ 1 Chrome GPU trên cả máy (8 Chrome GPU song song từng làm máy BSOD
+  0x133 ba lần, 2026-10-04). Script tự viết mở Chrome: bọc `node tools/qa/gpulock.mjs run -- node x.mjs` (tiến trình
+  con nhận `HPWORLD_GPU_LOCK=1` → acquireGpu tái nhập, không tự chờ chính mình) hoặc `acquireGpu()` trong code.
 - Mọi tool trên gọi `__hp.pinQuality(true)` ngay sau khi vào game: máy chạy nhiều agent làm fps headless tụt →
   autoQuality nhảy nấc 3 (sương gần, không hoàn tác) → ảnh trắng xoá, số đo không so được. Số headless dao động
   tới ±2× giữa các phiên: chỉ so A/B CÙNG phiên (vd. serve bản `dot3` ở cổng khác rồi chụp nối tiếp).
@@ -375,6 +379,63 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-10-04 (wp8)** [ĐỢT 3 WP8 GAME — khởi động, giao thông phố thật, cảm giác chơi, nhiệm vụ, âm thanh, tool Windows]:
+    **Khởi động (js/boot.js + main.js + 9 dòng world.js):** UI màn chờ (ngôn ngữ, chất lượng, nhiệm vụ, input) gắn
+    TRƯỚC khi dựng; `buildWorld` thành `async buildWorld(scene, prog)` với `await prog('<bước>')` ở cấp 1 giữa các khu
+    (ground/street/cells/fabric/landmarks/nature/furniture/final) — CHỈ đặt `await` ở cấp 1 hoặc block trần của
+    buildWorld (trong hàm con là lỗi cú pháp; WP khác sửa world.js giữ nguyên các dòng này). Thanh tiến trình theo
+    trọng số đo ở lần khởi động trước (localStorage `hp3d.bootProfile.v1`, `__hp.bootProfile`); vệt sáng chạy bằng CSS
+    `transform` (compositor) nên vẫn chuyển động khi luồng chính bận khối đồng bộ dài. Nút Bắt đầu khoá (class
+    `loading`) tới khi xong + 2 khung đầu đã vẽ; bấm sớm được ghi nhận (AudioContext tạo trong cử chỉ) và tự vào khi
+    xong. Nhường luồng = rAF→MessageChannel (tab ẩn: chỉ MessageChannel — setTimeout bị bóp). BẪY: nhịp nhường trước
+    freeze cho callback GLB (cây hero/luống hoa) chen vào scene TRƯỚC freezeStatic → main.js gỡ tạm các gốc mới xuất
+    hiện, freeze, gắn lại (giữ ngữ nghĩa cũ "GLB đến sau freeze"). Service Worker đăng ký NGAY (trước: gắn vào 'load'
+    sau khi dựng → không bao giờ đăng ký). Thanh preload GLB chỉ hiện sau khi dựng xong.
+    **Giao thông (js/roadgraph.js + js/traffic.js + js/trafficmodels.js, viết lại):** đồ thị nút–cạnh từ ROADS_DT
+    p/s/t/r trong đĩa vùng chơi (+60 m): gom đỉnh 1,5 m, chèn nút chữ T (đầu mút cách thân phố khác ≤ 6 m) và ngã tư
+    chéo; ~675 cạnh, 1 thành phần chính. Đường đôi (2 way song song cùng cấp cách 8-26 m về một bên ở ≥ 2/3 mẫu) →
+    một chiều, chiều = bạn nằm bên TRÁI. Xe đi BÊN PHẢI: vector phải của hướng t=(tx,tz) là (−tz, tx) (+z = NAM).
+    "Bong bóng" quanh người chơi (r 340/300/220 m theo TIER): số xe = km phố trong bóng × mật độ theo cấp, xe ra
+    khỏi bóng tái sinh ở vành ≥ 130 m; qua nút chọn cạnh tiếp (ưu tiên thẳng/đường lớn, không quay đầu trừ ngõ cụt,
+    không ra ngoài vùng chơi, không ngược chiều), bo cua = nội suy smoothstep 2 quỹ đạo lệch-làn quanh nút (≤ 6 m),
+    giảm tốc theo góc rẽ; bám đuôi bằng lưới băm 10 Hz + thoát kẹt 1,5 s. NGƯỜI CHƠI trên đường (avoidPlayer, 10 Hz):
+    xe LÁCH sang bên tới khoảng hở tâm xe máy 2,0 / ô tô 2,7 / người đi bộ 1,0 m (giới hạn trong lòng đường — xe máy
+    được lấn tạm làn ngược, ô tô không — hoặc trong vỉa hè), lệch trượt 1,8/1,2/0,9 m/s; không lách đủ thì giảm tốc,
+    dừng + bấm còi (đếm cho audio.js). Áp cả khi đang "thoát kẹt" (bản đầu bỏ qua người chơi ở nhánh đó → xe xuyên người).
+    Tốc độ: xe máy 8,5-11 (p) … 4,5-7 (r) m/s, ô tô 9-12 … 4,5-6, người đi bộ 1,1-1,6. Người đi bộ trên vỉa hè
+    (xsection: mép đường + 35-75% SIDEWALK_W), không mọc/đi vào footprint nhà thật (gặp nhà → nép mép vỉa, kẹt → quay
+    đầu); đường đôi chỉ vỉa hè phía ngoài. Vẽ INSTANCED: 3 kiểu xe máy (1 người/chở 2/chở hàng) + 3 ô tô (con/gầm
+    cao/16 chỗ) + 2 người đi bộ = 8 draw call (+8 bóng); màu sơn/áo/mũ theo instance (thuộc tính `aTint` chọn kênh),
+    tay chân người đi bộ vung bằng vertex shader, đèn pha/hậu tự sáng theo `uNight` (traffic.setNight). HỢP ĐỒNG:
+    InstancedMesh `traffic_*` mang `userData.noCull` + boundingSphere = bong bóng (instcull không nén). Thuyền du lịch
+    cũ (toạ độ 1:10, nằm trên cạn) và 3 trục vùng đã xoá. `__hp.traffic.check()` = bất biến cho diag.
+    **Cảm giác chơi (main.js/vehicles.js/input.js/character.js):** đi 3,0 / chạy 7,0 m/s (trước 5/11), nhảy 6,5;
+    bước con ≤ 0,35 m; xe máy 16 m/s (~58 km/h, trước 23), xích lô 4,2, thuyền 10; lái kiểu xe đạp ω = v/L·tan δ, δ
+    giảm theo tốc độ, trần gia tốc ngang 14 m/s², ga/phanh/lùi/trôi tách riêng, bước con 0,4 m chống xuyên tường.
+    CẦN BOOM CAMERA chống xuyên nhà: js/footprints.js raymarch 2D 0,45 m trên makeFootprintGrid(decodeRB(RB_B64)) +
+    heightOf + LM_POLY (cao thân địa danh), co NGAY, nhả 2,5/s; bỏ qua nhà chứa tâm nhìn; chỉ khi dist ≤ 40 m.
+    `__hp.camOcclusion(false)` cho harness (góc QA khớp baseline). HỢP ĐỒNG WP2: nếu world.js đặt `world.rbData`
+    (+`world.rbGrid`) thì footprints.js DÙNG LẠI (tôn trọng D.dead của claims), `world.isFree(x,z,r)` được freeSpot()
+    gọi nếu có. Camera tự vòng ra sau xe đang chạy khi không kéo 1,5 s; pointer theo pointerId + pinch zoom (3-36 m);
+    Esc đóng bảng trên cùng (ui.closeTopModal; hội thoại: bỏ qua, không chạy onEnd); E cũng đóng Hướng dẫn; free-cam
+    đạo diễn không còn kích hoạt tương tác; Space chỉ "sống" 250 ms + bị xả khi đang lái/mở bảng (đang lái = bấm còi);
+    xe bị kẹp trong vùng chơi; xuống xe/gọi xe chỉ đặt ở chỗ trống (đất, trong vùng chơi, ngoài nhà thật/địa danh,
+    không dính collider). Bóng tròn giả của nhân vật ẩn khi có bóng đổ thật. Nhân vật tỉ lệ người thật (đầu nhỏ, bỏ
+    mắt long lanh/má hồng), nhịp bước theo tốc độ thật.
+    **Nhiệm vụ/NPC/chữ:** PLAY_RADIUS khai báo sớm; biển địa danh, NPC (ngư dân Đồ Sơn, chị Thu Cát Bà), xe/thuyền
+    ngoài vùng chơi không dựng/không tính → mục tiêu "Nhà thám hiểm" = 22 địa danh trong vùng (trước 26, tối đa 22 →
+    allDone không bao giờ bắn). Hoa lưu theo CHỈ SỐ bông (`flowerIdx`, bản lưu cũ chỉ có số đếm → coi N bông đầu là
+    đã nhặt); NPC chặn người/xe bằng pushOut (collider cũ push vào world.colliders SAU khi chỉ mục đã dựng → vô hiệu).
+    Chữ i18n/NPC viết lại cho giai đoạn 1:1 trung tâm (bỏ "1:10", "phóng đại 2,2", "15 địa danh", "nhanh gấp 7 lần");
+    số liệu qua biến `{N}` `{F}` (i18n.setVars). diag() báo thêm "NGOÀI VÙNG CHƠI".
+    **Âm thanh (audio.js):** nền phố procedural — ù xe (nhiễu nâu) + rì máy (nhiễu dải 600-900 Hz) theo mật độ xe quanh
+    người chơi (traffic stats.near), còi "bíp bíp" khi xe bị chắn + lác đác ban ngày, chim ban ngày (công viên nhiều
+    hơn), dế đêm, máy xe mình lái + gió; nhạc nền nhỏ lại 0,16→0,075. Node cố định, chỉ đổi gain/tần số.
+    **Tool (Windows):** tools/qa/launch.mjs (Chrome hệ thống + playwright-core, khoá autoQuality, GIỮ KHOÁ GPU toàn máy
+    tới g.close() — bản đầu không khoá; gpulock.mjs tái nhập qua env HPWORLD_GPU_LOCK=1 cho con của `run --`); diag/tour/perf/mobile
+    viết lại (toạ độ suy từ LM/PANO_CAM, tour chọn điểm đứng bằng raycast); shoot.mjs chờ nút Bắt đầu mở + pinQuality
+    (BẪY: không khoá thì máy bận → autoQuality nấc 3 sương gần → ảnh vệ tinh trắng xoá — đã thấy ở baseline cùng phiên).
+    **Đo (Radeon 890M, TIER 3, CÙNG PHIÊN với bản dot3 ở cổng khác, máy đang tải ~97% CPU bởi agent khác):** __NUMBERS__
 - **2026-09-07 (di)** [ĐỢT 2 TÍCH HỢP — 6 nhánh worktree song song + 6 phản biện đối kháng, gộp trên `dot2-int`]:
     Quy trình: mỗi nhánh (W1 merge-budget, W2 ground-grid, W3 landmark-lod, W4 visual, W5 hydro-polygon-water,
     W6 landmark-placement) làm trong worktree riêng, tự đo trước/sau trên GPU thật, có agent phản biện đọc diff +
