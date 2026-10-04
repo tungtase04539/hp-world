@@ -21131,8 +21131,6 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
             if (tx * tx + tz * tz > 850 * 850) continue;
             if (Math.abs(groundHeightNoDeck(tx, tz) - LAND_H) > 0.3) continue;
             if (Object.values(LM).some(([lx, lz]) => (tx - lx) ** 2 + (tz - lz) ** 2 < 22 * 22)) continue;
-            // mạng đường thật (WP6): không trồng trên lòng đường phố khác / trong miệng nút giao
-            if (world.roadNet) { const sf = world.roadNet.surfaceAt(tx, tz); if ((sf > 0 && sf < 0.2) || world.roadNet.nearJunction(tx, tz, 1)) continue; }
             const p = { x: tx, z: tz }; world.resolveCollisions(p, 0.6);
             if (Math.hypot(p.x - tx, p.z - tz) > 0.3) continue;
             shadeTree(tx, tz); nShade++;
