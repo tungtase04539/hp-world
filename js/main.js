@@ -182,7 +182,7 @@ let _trafficRef = null;   // xe đang chạy cũng là vật cản (gán sau khi
 const resolveAll = (p, r = 0.45) => { world.resolveCollisions(p, r); pushOutNPCs(p, r); if (_trafficRef) _trafficRef.pushOut(p, r); };
 const { vehicles, update: updateVehicle, spawn: spawnVehicle } = createVehicles(
   scene, groundHeight, groundHeightNoDeck, world.vehicleSpawns, resolveAll, { playRadius: PLAY_RADIUS });
-const fp = footprintIndex(world);   // footprint nhà THẬT (RB01) → camera chống xuyên tường + người đi bộ
+const fp = footprintIndex(world);   // footprint nhà ĐANG VẼ (world.rbData của WP2; chưa có → chỉ địa danh) → camera, người đi bộ, chỗ xuống xe
 const traffic = createTraffic(scene, world, { playRadius: PLAY_RADIUS, footprints: fp });
 _trafficRef = traffic;
 quests.attachFlowers(world.flowerPickups);
