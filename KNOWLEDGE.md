@@ -480,7 +480,9 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     ~1.500 xe đỗ, xe máy gần 80 m) +0,5..+2,8 M tam giác, p95 +1,5-4 ms → mới thêm LOD 3 mức. Heap sau GC ép (CDP
     HeapProfiler.collectGarbage) 388 → 389-390 MB; geometries 497 → 456; programs 66 → 68. Khởi động: hpReady/Start
     trong nhiễu (4,24 s / 5,83 s ↔ 4,11-4,28 / 5,8-6,2 s); dựng mọi mô hình kit ~40 ms. 0 lỗi JS full + lite;
-    diag 0; traffic.check() 0 sai bên/ra ngoài/chồng.
+    diag 0; traffic.check() 0 sai bên/ra ngoài/chồng. RIÊNG người + xe (giao thông + xe/người props + nhân vật chơi;
+    đo = chênh khi ẩn chúng, gồm cả lượt bóng): base 43-48 draw call / 0,36-0,39 M tam giác → 16-26 / 0,32-0,35 M
+    (cam_spawn, pano_007, pano_130, phố Điện Biên Phủ; số base CHƯA tính NPC — mỗi NPC cũ ~25 mesh) — ngân sách ≤ 40 đạt.
 
 - **2026-10-04 (wp8)** [ĐỢT 3 WP8 GAME — khởi động, giao thông phố thật, cảm giác chơi, nhiệm vụ, âm thanh, tool Windows]:
     **Khởi động (js/boot.js + main.js + 9 dòng world.js):** UI màn chờ (ngôn ngữ, chất lượng, nhiệm vụ, input) gắn
