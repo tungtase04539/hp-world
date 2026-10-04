@@ -23,8 +23,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { ROAD_HW, SIDEWALK_W, ROAD_TOP, SIDEWALK_TOP, curbLine, facadeLine, parkingLine, furnitureLine } from './xsection.js';
 import { PROPS_EVIDENCE } from './props_evidence.js';
 import { LITE } from './device.js';
-import { RB_B64 } from './buildings_real.js';
-import { decodeRB, makeFootprintGrid } from './buildings_data.js';
+import { rbData, rbGrid } from './rbdata.js';   // footprint thật giải mã 1 lần cho cả trang (W2-F)
 import { claimAt } from './claims.js';
 
 // =====================================================================================================================
@@ -981,7 +980,7 @@ export function buildProps(ctx) {
   for (const r of ctx.reserved || []) obst.add(r[0], r[1], r[2]);
   // footprint nhà THẬT (RB01): ưu tiên bản WP2 truyền vào (đã đánh D.dead theo claims); không có → tự giải mã (~12 ms)
   let fp = ctx.footprints || null;
-  if (!fp && ctx.useRealFootprints !== false) { const D = decodeRB(RB_B64); fp = { D, grid: makeFootprintGrid(D) }; }
+  if (!fp && ctx.useRealFootprints !== false) fp = { D: rbData(), grid: rbGrid() };
   const inBuilding = fp ? (x, z) => fp.grid.at(x, z) >= 0 : () => false;
   const flat = (x, z) => Math.abs(groundHeightNoDeck(x, z) - LAND_H) < 0.35 && !isWater(x, z);
   const panoNear = ctx.nearPanoCam || (() => false);
@@ -1703,7 +1702,7 @@ export function buildProps(ctx) {
   // falloff ~ (1+(r/0,55)²)^-1,5 (dạng cos³ của đèn chiếu xuống) tắt mượt về 0 ở mép; opacity đỉnh 0,2 (update()) —
   // năng lượng ~43% bản cũ (0,38/0,17 = 23%: vũng tầm trung ở night_022 gần như biến mất).
   let pools = null;
-  if (glow && (cobraI.length || poleLampI.length)) {
+  if (glow && (cobraI.length || poleLampI.length || ornI.length)) {
     const cv = document.createElement('canvas'); cv.width = cv.height = 64;
     const g = cv.getContext('2d'); const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
     for (let i = 0; i <= 10; i++) { const t = i / 10; const a = Math.pow(1 + (t / 0.55) ** 2, -1.5) * (1 - t * t * t * t); gr.addColorStop(t, `rgba(255,255,255,${a.toFixed(3)})`); }
@@ -1714,6 +1713,9 @@ export function buildProps(ctx) {
     const list = [], yP = yWalk + 0.02;
     for (const L of cobraI) list.push({ x: L.x + L.rx * (LAMP_REACH + 0.25), z: L.z + L.rz * (LAMP_REACH + 0.25), heading: L.heading, y: yP, sc: [12, 1, 10] });
     for (const L of poleLampI) { const rx = -L.S.nx, rz = -L.S.nz; list.push({ x: L.x + rx * (POLE_LAMP_ARM.reach + 0.25), z: L.z + rz * (POLE_LAMP_ARM.reach + 0.25), heading: L.heading, y: yP, sc: [10, 1, 8.5] }); }
+    // W2-F: đèn gang 3 bóng (vườn hoa/hồ/quảng trường) cũng có vũng — trước chỉ cobra/đèn cột → lòng đường dải vườn hoa
+    // Quang Trung / Trần Hưng Đạo 21:00 đen kịt (sRGB ≈ 37) dù đèn sáng. Đèn toả đều quanh cột (cầu ở ~4 m) → vũng tròn.
+    for (const L of ornI) list.push({ x: L.x, z: L.z, heading: L.heading, y: yP, sc: [11, 1, 11] });
     pools = inst('props_lamp_pools', pg, pm, list, { rMax: 600, cast: false });
     if (pools) { pools.receiveShadow = false; pools.renderOrder = 3; pools.visible = false; pools.userData.poolMat = pm; }
   }

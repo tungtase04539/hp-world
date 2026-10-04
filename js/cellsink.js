@@ -14,8 +14,8 @@
 //   • Texture canvas của khối ô vẽ LƯỜI (chỉ vẽ cái còn hiện ra sau commit) + xếp atlas cho vật thể giữ lại.
 // Không import three (nhận THREE qua tham số). Chạy 1 lần lúc buildWorld: commit ~300-470 ms trên 890M (máy đang tải),
 // nhưng tiết kiệm hơn thế nhờ ~1.100 canvas không vẽ + ~2.600 mesh ít hơn cho freezeStatic.
-import { decodeRB, makeFootprintGrid, FLAG } from './buildings_data.js';
-import { RB_B64 } from './buildings_real.js';
+import { FLAG } from './buildings_data.js';
+import { rbData, rbGrid } from './rbdata.js';
 import { claimBox } from './claims.js';
 import { BRAND_MAP, debrand } from './brands.js';
 import { PARKS } from './mapdata.js';
@@ -62,7 +62,7 @@ function inPark(x, z) {
 // ---------- footprint nhà thật dùng chung (giải mã 1 lần cho cả trang — WP2/WP8 dùng lại, đừng giải mã lần 2) ----------
 let _RB = null;
 export function realBuildings() {
-  if (!_RB) { const D = decodeRB(RB_B64); _RB = { D, G: makeFootprintGrid(D) }; }
+  if (!_RB) _RB = { D: rbData(), G: rbGrid() };   // = js/rbdata.js (citygen/trees/props/minimap dùng chung)
   return _RB;
 }
 

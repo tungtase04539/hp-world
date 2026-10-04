@@ -6,7 +6,7 @@ import { makeCellSink } from './cellsink.js';
 import { registerModel, shrinkTexturesForMobile, assetURL } from './assets.js';
 import { IS_MOBILE, LITE } from './device.js';
 import {
-  WORLD_BOUNDS, LM, LM_DIR, LM_FACE, EXTRAS, TREES, PARKS, RAIL, DT_BOX, RIVERS, ROADS_DT, ROADS_REGION, BRIDGES, BUILDINGS,
+  WORLD_BOUNDS, LM, LM_DIR, LM_FACE, EXTRAS, TREES, PARKS, RAIL, DT_BOX, ROADS_DT, BRIDGES, BUILDINGS,
   groundHeight, groundHeightNoDeck, isWater, landAt, riverFactor,
   nearestRiverPoint, findShore, addPier, LAKE_POLY, lakeSD, HOSEN_POLY, hoSenSD,
 } from './terrain.js';
@@ -900,28 +900,6 @@ export async function buildWorld(scene, prog = () => {}) {
     mesh.name = name;
     mesh.receiveShadow = true;
     scene.add(mesh);
-  }
-  // PERF (Lô A mở rộng): gộp theo LƯỚI 350m thay 1 mesh phủ cả thành phố → frustum-cull được (đường/vỉa hè).
-  function addMergedTiled(geos, material, name, tile = 450) {
-    if (!geos.length) return;
-    const buckets = new Map();
-    for (const g of geos) {
-      g.computeBoundingBox(); const bb = g.boundingBox;
-      const k = Math.floor((bb.min.x + bb.max.x) / 2 / tile) + ',' + Math.floor((bb.min.z + bb.max.z) / 2 / tile);
-      let l = buckets.get(k); if (!l) buckets.set(k, l = []); l.push(g);
-    }
-    for (const [k, list] of buckets) {
-      // GIAI ĐOẠN TRUNG TÂM: bỏ hẳn tile ngoài BUILD_RADIUS (không merge, không upload GPU)
-      const [tx, tz] = k.split(',').map(Number);
-      if (Math.hypot((tx + 0.5) * tile, (tz + 0.5) * tile) - tile * 0.75 > BUILD_RADIUS) {
-        list.forEach((g) => g.dispose());
-        continue;
-      }
-      const mesh = new THREE.Mesh(mergeGeometries(list), material);
-      mesh.name = name + '_' + k; mesh.receiveShadow = true; scene.add(mesh);
-    }
-    geos.forEach((g) => g.dispose());
-    geos.length = 0;   // xem addMerged: giải phóng geometry đầu vào khỏi closure (asphaltGeos/dashGeos/sidewalkBuckets)
   }
   // ---------- ĐƯỜNG SẮT THẬT (tuyến Hà Nội - Hải Phòng chạy vào ga) ----------
   {
@@ -3880,6 +3858,10 @@ const bcPalm = (parent, lx, lz, h = 9) => {   // Đợt 3 WP4: cau vua instanced
   let wi = 0;
   for (const [zc, units] of rows) for (const [xc, W] of units) {
     if (!bcOK(xc, zc)) continue;
+    // W2-F: FABRIC 'real' → kho THẬT do citygen dựng từ footprint (SHED x 90-260 / 640-900); các hộp kho dựng tay
+    // này chỉ còn sống ở chỗ footprint TRỐNG (cell sink gỡ hộp đè nhà thật) = bãi đã giải toả (pano_014/015/016 h000
+    // 10/2024: đất trống + gạch vụn phía bắc Hoàng Diệu) → bỏ hẳn; ?fabric=proc giữ như cũ. Cần cẩu chân đế giữ nguyên.
+    if (FABRIC === 'real') continue;
     const g = new THREE.Group(); g.position.set(xc, groundHeight(xc, zc), zc);
     const D = zc === -936 ? 22 : 20, H = 5.6;
     const body = new THREE.Mesh(new THREE.BoxGeometry(W, H, D), wallM); body.position.y = H / 2; g.add(body);
@@ -15111,6 +15093,7 @@ const w1AddSign = (r, txt, bg, fg, y, px = 42, wRatio = 0.9, hh = 1.1) => {
     for (const [zc, units] of rows) for (const [xc, W] of units) {
       if (!bcOK(xc, zc)) continue;
       if (near(xc, zc, CLV[0], CLV[1], CLV_R)) continue;
+      if (FABRIC === 'real') continue;   // W2-F: như khối B13 — kho thật do citygen dựng, chỗ trống ngoài đời là bãi giải toả
       if (xc > 120 && xc < 420 && zc < -890) continue;
       const g = new THREE.Group();
       g.position.set(xc, groundHeight(xc, zc), zc);
@@ -17245,15 +17228,6 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
       fmesh.name = 'osm_facades'; scene.add(fmesh);
     }
   }
-  function nearRealBuilding(x, z) {
-    const kx = Math.round(x / 22), kz = Math.round(z / 22);
-    for (let dx = -1; dx <= 1; dx++) {
-      for (let dz = -1; dz <= 1; dz++) {
-        if (world.buildingCells.has(`${kx + dx},${kz + dz}`)) return true;
-      }
-    }
-    return false;
-  }
 
   // ---------- Nhà phố tự mọc dọc các phố thật (chỉ nơi CHƯA có footprint thật) ----------
   const roofMats = [mat(0xc24a30, { flatShading: true }), mat(0x96603c, { flatShading: true }),
@@ -17611,7 +17585,12 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
         geos.push(pg);
       });
       if (geos.length) {
-        const m = new THREE.Mesh(mergeGeometries(geos), new THREE.MeshLambertMaterial({ map: tex, side: THREE.DoubleSide }));
+        // W2-F: hộp đèn biển SÁNG về đêm (emissiveMap = chính texture; daynight đặt emissiveIntensity = đêm × LIGHT.signGlow).
+        // Biển NEO mặt tiền (_anchor): mặt trước quay ra phố, lưng áp hộp biển 3D cách 0,05 m → FrontSide (không có mặt lưng
+        // sáng chữ ngược về đêm); biển cũ treo theo pano (không neo) giữ DoubleSide như trước.
+        const sm = new THREE.MeshLambertMaterial({ map: tex, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: 0, side: _anchor ? THREE.FrontSide : THREE.DoubleSide });
+        (world.signMats || (world.signMats = [])).push(sm);
+        const m = new THREE.Mesh(mergeGeometries(geos), sm);
         geos.forEach((gg) => gg.dispose());
         m.name = 'real_shop_signs_' + a; scene.add(m);
       }
@@ -18274,13 +18253,6 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     tower(360, 60, 14, 46, 0xc8b89a);
     tower(255, 140, 13, 38, 0xa8c0b8);
   }
-
-  const grandMat = (base, trim, opts) => {
-    const { map, emissiveMap } = grandFacadeTextures(base, trim, opts);
-    const m = new THREE.MeshLambertMaterial({ map, emissiveMap, emissive: 0xffcc77, emissiveIntensity: 0 });
-    facadeMats.push(m);
-    return m;
-  };
 
   await prog('landmarks');
 

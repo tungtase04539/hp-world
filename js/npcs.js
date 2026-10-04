@@ -1,4 +1,3 @@
-import * as THREE from 'three';
 import { makeHumanoid } from './character.js';
 import { tx, onLangChange } from './i18n.js';
 

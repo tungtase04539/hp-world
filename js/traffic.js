@@ -70,6 +70,74 @@ export function createTraffic(scene, world, opts = {}) {
   const { nodes, edges } = G;
   const nodeIn = nodes.map((n) => Math.hypot(n.x, n.z) <= PLAY_R + 30);
 
+  // ---------- Ô TÔ ĐỖ mép đường (js/props.js → world.props.parkedCars, tâm ở curbLine − 0,95; phố r curbLine − 0,05) ----------
+  // Đợt 3 wave 2 (W2-F): xe chạy từng xuyên qua xe đỗ (xe máy tới hw − 0,55, ô tô hw − 1,1 ⇒ trùng dải đỗ hw − 0,05…hw − 1,85).
+  // Mỗi xe đỗ chiếu lên cạnh đồ thị có tim gần nhất: đoạn [u0,u1] (quãng theo chiều a→b, ±2,5 m quá đầu/đuôi xe để kịp lách)
+  // + phía σ (+1 = bên phải chiều a→b) + MÉP TRONG (|lệch tâm| − nửa rộng 0,9). Tác tử đi qua đoạn đó ở phía đó: |lat| ≤
+  // mép trong − nửa rộng xe chạy − 0,3 (trượt ngang mượt a.pk, xem parkShift). Gộp các đoạn chồng nhau (giữ mép trong nhỏ nhất).
+  const PARK_HALF = { bike: 0.45, car: 0.95 };
+  const parkStats = { cars: 0, mapped: 0, edges: 0, spans: 0 };
+  (function indexParked(list) {
+    if (!list || !list.length) return;
+    const CELL = 24, sh = new Map(), key = (i, j) => (i + 4096) * 8192 + (j + 4096);
+    edges.forEach((e, ei) => {
+      for (let k = 0; k < e.xs.length - 1; k++) {
+        const x0 = Math.min(e.xs[k], e.xs[k + 1]) - 8, x1 = Math.max(e.xs[k], e.xs[k + 1]) + 8;
+        const z0 = Math.min(e.zs[k], e.zs[k + 1]) - 8, z1 = Math.max(e.zs[k], e.zs[k + 1]) + 8;
+        for (let i = Math.floor(x0 / CELL); i <= Math.floor(x1 / CELL); i++) for (let j = Math.floor(z0 / CELL); j <= Math.floor(z1 / CELL); j++) {
+          const kk = key(i, j); let a = sh.get(kk); if (!a) sh.set(kk, (a = [])); a.push(ei, k);
+        }
+      }
+    });
+    const per = new Map();
+    for (const c of list) {
+      parkStats.cars++;
+      const a = sh.get(key(Math.floor(c.x / CELL), Math.floor(c.z / CELL))); if (!a) continue;
+      let best = null, bd = 1e9;
+      for (let q = 0; q < a.length; q += 2) {
+        const e = edges[a[q]], k = a[q + 1];
+        const ax = e.xs[k], az = e.zs[k], dx = e.xs[k + 1] - ax, dz = e.zs[k + 1] - az, L = Math.hypot(dx, dz) || 1e-6;
+        const t = Math.max(0, Math.min(1, ((c.x - ax) * dx + (c.z - az) * dz) / (L * L)));
+        const px = ax + dx * t, pz = az + dz * t;
+        const lat = (c.x - px) * (-dz / L) + (c.z - pz) * (dx / L);   // dương = phải chiều a→b
+        const d = Math.abs(lat);
+        if (d > e.hw + 1.2 || d < e.hw - 2.6) continue;                  // tâm xe đỗ phải nằm ở dải sát bó vỉa
+        if (Math.hypot(c.x - px, c.z - pz) - d > 0.5) continue;          // chiếu rơi ra ngoài đầu đoạn
+        const sc = Math.abs(d - (e.hw - 0.6));                            // tim gần mép bó vỉa của CHÍNH cạnh này nhất
+        if (sc < bd) { bd = sc; best = { ei: a[q], u: e.cum[k] + t * L, sg: lat > 0 ? 1 : -1, inner: d - 0.9 }; }
+      }
+      if (!best) continue;
+      parkStats.mapped++;
+      const half = (c.len || 4.4) / 2 + 2.5;
+      let arr = per.get(best.ei); if (!arr) per.set(best.ei, (arr = []));
+      arr.push([best.sg, best.u - half, best.u + half, best.inner]);
+    }
+    for (const [ei, arr] of per) {
+      arr.sort((p, q) => p[0] - q[0] || p[1] - q[1]);
+      const m = [];
+      for (const s of arr) {
+        const l = m[m.length - 1];
+        if (l && l[0] === s[0] && s[1] <= l[2]) { l[2] = Math.max(l[2], s[2]); l[3] = Math.min(l[3], s[3]); } else m.push(s.slice());
+      }
+      edges[ei].park = m; parkStats.edges++; parkStats.spans += m.length;
+    }
+  })(world.props && world.props.parkedCars);
+  // độ lệch ngang mục tiêu (hệ tác tử: dương = phải hướng đi) để không đè xe đỗ trong cửa sổ [s, s+look] phía trước
+  function parkShift(a, e, lat) {
+    if (!e.park || a.type === 'walk' || Math.abs(lat) < 0.05) return 0;
+    const sgA = (a.dir ? -1 : 1) * (lat > 0 ? 1 : -1);                 // phía (theo a→b) mà tác tử đang lệch về
+    const look = Math.max(5, a.v * 1.4);                               // bắt đầu lách ~1,4 s trước (trượt ngang ≤ 1,6 m/s)
+    const u0 = a.dir ? e.L - a.s - look : a.s, u1 = a.dir ? e.L - a.s : a.s + look;
+    let inner = 1e9;
+    for (const p of e.park) if (p[0] === sgA && p[1] < u1 && p[2] > u0 && p[3] < inner) inner = p[3];
+    if (inner > 1e8) return 0;
+    let cap = inner - PARK_HALF[a.type] - 0.3;
+    if (!e.oneway) cap = Math.max(cap, 0.35);                          // phố 2 chiều: không bị đẩy qua tim đường
+    else cap = Math.max(cap, 0);
+    const al = Math.abs(lat);
+    return al > cap ? (lat > 0 ? cap - al : al - cap) : 0;
+  }
+
   // ---------- Mesh instanced ----------
   const vehMat = trafficMaterial(false), walkMat = trafficMaterial(true), shadowMat = trafficShadowMaterial();
   const groups = {};   // kind → {mesh, cap, list:[agents], aShirt, aShirt2}
@@ -201,13 +269,15 @@ export function createTraffic(scene, world, opts = {}) {
   }
   function place(a, out) {
     const e = edges[a.e];
-    const lat = a.latCur;
+    const lat = a.latCur + a.pk;                                       // pk: lách xe đỗ (parkShift)
     const Rb = a.rb;
     if (a.next && a.s > e.L - Rb) {
       const u = a.s - e.L;   // âm trước nút
       const en = edges[a.next.e];
       offsetPoint(e, a.dir, a.s, lat, _A);
-      offsetPoint(en, a.next.dir, u, latFor(a, en, a.next.side, a.next.dir), _B);
+      // + a.pk: sau nút pk vẫn mang sang cạnh mới (prevLat = latCur+pk, lat mới = latFor+pk) — thiếu nó ở đây thì đúng
+      // lúc qua nút vị trí nhảy ngang 0,5·pk trong 1 khung (phản biện W2-F)
+      offsetPoint(en, a.next.dir, u, latFor(a, en, a.next.side, a.next.dir) + a.pk, _B);
       const w = smooth((u + Rb) / (2 * Rb));
       out.x = _A.x + (_B.x - _A.x) * w; out.z = _A.z + (_B.z - _A.z) * w;
       return out;
@@ -270,7 +340,7 @@ export function createTraffic(scene, world, opts = {}) {
       if (rnd() * 90 > (dens[e.c] || 0)) continue;              // trọng số mật độ theo cấp phố
       a.e = ei; a.dir = rnd() < 0.5 ? 0 : 1; a.s = rnd() * e.L;
       if (!dirOK(a, e, a.dir)) a.dir ^= 1;
-      a.prev = null; a.next = null; a.rb = 6; a.prevRb = 0;
+      a.prev = null; a.next = null; a.rb = 6; a.prevRb = 0; a.pk = 0;
       a.lat01 = rnd(); a.drive01 = rnd();
       if (a.type === 'walk') { a.side = rnd() < 0.5 ? 1 : -1; a.lat01 = 0.35 + rnd() * 0.4; a.walkV = 1.1 + rnd() * 0.5; }
       a.latCur = latFor(a, e);
@@ -281,7 +351,7 @@ export function createTraffic(scene, world, opts = {}) {
       if (!hashFree(_p.x, _p.z, a.type === 'car' ? 6 : a.type === 'bike' ? 2.5 : 1)) continue;
       a.vmax = vmaxFor(a, e); a.v = a.vmax * 0.8; a.lim = a.vmax;
       a.x = _p.x; a.z = _p.z; a.h = Math.atan2(_p.tx, _p.tz); a.hInit = true; a.lean = 0;
-      a.blockedT = 0; a.checkAt = 0; a.ghostT = 0; a.waitT = 0; a.avoid = 0; a.avT = 0;
+      a.blockedT = 0; a.checkAt = 0; a.ghostT = 0; a.waitT = 0; a.avoid = 0; a.avT = 0; a.pk = 0;
       return true;
     }
     return false;
@@ -289,7 +359,7 @@ export function createTraffic(scene, world, opts = {}) {
   function newAgent(type) {
     const grp = groupFor(type);
     if (grp.list.length >= grp.cap) return null;
-    const a = { type, grp };
+    const a = { type, grp, pk: 0 };   // pk: độ lệch ngang lách xe đỗ (place() cộng vào latCur)
     a.paint = new THREE.Color(type === 'car' ? pick(CAR_PAINT) : pick(BIKE_PAINT));
     a.shirt = new THREE.Color(pick(SHIRT));
     a.shirt2 = new THREE.Color(type === 'walk' ? pick(PANTS) : pick(SHIRT));
@@ -463,7 +533,7 @@ export function createTraffic(scene, world, opts = {}) {
     }
     if (a.s >= e.L) {
       const nx = a.next || chooseNext(a);
-      a.prev = { e: a.e, dir: a.dir }; a.prevRb = a.rb; a.prevLat = a.latCur;
+      a.prev = { e: a.e, dir: a.dir }; a.prevRb = a.rb; a.prevLat = a.latCur + a.pk;
       a.s -= e.L; a.e = nx.e; a.dir = nx.dir; a.next = null;
       if (nx.side) a.side = nx.side;
       const en = edges[a.e];
@@ -482,6 +552,15 @@ export function createTraffic(scene, world, opts = {}) {
         offsetPoint(ee, a.dir, a.s + 2, inner, _q);
         if (!fp.blocked(_q.x, _q.z) && Math.abs(a.latCur - inner) > 0.1) a.latCur = inner;
         else { a.dir ^= 1; a.s = Math.max(0, ee.L - a.s); a.side = -a.side; a.latCur = latFor(a, ee); a.next = null; a.prev = null; }
+      }
+    }
+    // né XE ĐỖ (W2-F): trượt ngang mượt về độ lệch mục tiêu của parkShift (chỉ cạnh có xe đỗ — đa số cạnh bỏ qua ngay)
+    if (a.type !== 'walk') {
+      const tgt = parkShift(a, edges[a.e], a.latCur);
+      if (tgt || a.pk) {
+        const k = (a.type === 'car' ? 1.1 : 1.6) * dt;
+        a.pk += Math.max(-k, Math.min(k, tgt - a.pk));
+        if (!tgt && Math.abs(a.pk) < 1e-3) a.pk = 0;
       }
     }
     place(a, _p);
@@ -614,7 +693,7 @@ export function createTraffic(scene, world, opts = {}) {
   //  trong footprint nhà/địa danh; walkOnRoad: người đi bộ trong lòng đường NGOÀI vùng ngã tư (băng qua ngã tư là được);
   //  overlap: 2 xe chồng tâm < 0,9 m (xe máy) / 1,8 m (có ô tô) ngoài ghost; outside: ra ngoài vùng chơi.
   function check() {
-    const r = { vehicles: 0, walkers: 0, wrongSide: 0, offRoad: 0, wrongWay: 0, walkInBuilding: 0, walkOnRoad: 0, overlap: 0, outside: 0, examples: [] };
+    const r = { vehicles: 0, walkers: 0, wrongSide: 0, offRoad: 0, wrongWay: 0, walkInBuilding: 0, walkOnRoad: 0, overlap: 0, outside: 0, parkHit: 0, examples: [] };
     const ex = (k, a) => { if (r.examples.length < 8) r.examples.push([k, Math.round(a.x), Math.round(a.z)]); };
     rebuildHash();
     for (const a of agents) {
@@ -634,6 +713,7 @@ export function createTraffic(scene, world, opts = {}) {
       if (inJunction) continue;
       if (!e.oneway && Math.abs(a.avoid || 0) < 0.3 && lat < 0.3) { r.wrongSide++; ex('wrongSide', a); }
       if (Math.abs(lat) > e.hw + 0.3) { r.offRoad++; ex('offRoad', a); }
+      if (parkedHit(a)) { r.parkHit++; ex('parkHit', a); }
       if (a.ghostT > 0) continue;
       for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) {
         const l = hmap.get(hk(a.x + i * HC, a.z + j * HC)); if (!l) continue;
@@ -644,6 +724,23 @@ export function createTraffic(scene, world, opts = {}) {
       }
     }
     return r;
+  }
+
+  // parkHit (check): thân xe đang chạy (hình chữ nhật xấp xỉ) chồng lên ô tô đỗ (props.parkedCars) — sau W2-F phải ≈ 0
+  let _pkGrid = null;
+  function parkedHit(a) {
+    const list = world.props && world.props.parkedCars; if (!list || !list.length) return false;
+    if (!_pkGrid) { _pkGrid = new Map(); for (const c of list) { const k = hk(c.x, c.z); let l = _pkGrid.get(k); if (!l) _pkGrid.set(k, (l = [])); l.push(c); } }
+    const hw = PARK_HALF[a.type] - 0.1, hl = a.type === 'car' ? 2.0 : 0.8;
+    for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) {
+      const l = _pkGrid.get(hk(a.x + i * HC, a.z + j * HC)); if (!l) continue;
+      for (const c of l) {
+        const dx = a.x - c.x, dz = a.z - c.z, sh = Math.sin(c.heading || 0), ch = Math.cos(c.heading || 0);
+        const along = dx * sh + dz * ch, across = dx * ch - dz * sh;
+        if (Math.abs(across) < 0.85 + hw && Math.abs(along) < (c.len || 4.4) / 2 + hl) return true;
+      }
+    }
+    return false;
   }
 
   // Người chơi (đi bộ/lái xe) không xuyên qua xe đang chạy: xe máy = 1 vòng 0,55 m, ô tô = 3 vòng dọc thân.
@@ -666,7 +763,7 @@ export function createTraffic(scene, world, opts = {}) {
 
   console.info('[traffic] đồ thị:', nodes.length, 'nút,', edges.length, 'cạnh,', G.ms, 'ms — bóng', RB, 'm, trần', JSON.stringify(CAP));
   return {
-    update, graph: G, pushOut, setEnabled, setNight, check, agents,   // agents: chỉ để chẩn đoán (tool/test), không sửa từ ngoài
+    update, graph: G, pushOut, setEnabled, setNight, check, agents, parkStats,   // agents: chỉ để chẩn đoán (tool/test), không sửa từ ngoài
     stats: () => ({ ...stats, groups: Object.fromEntries(Object.entries(groups).map(([k, g]) => [k, g.list.length])) }),
   };
 }

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { installToneMapping, SceneAOPass, FinalPass, AO as AO_CFG, GRADE, timePass } from './post.js';
-import { buildWorld, groundHeight, groundHeightNoDeck, landAt, WORLD_BOUNDS, LM, EXTRAS, BUILD_RADIUS, texCacheStats } from './world.js';
+import { buildWorld, groundHeight, groundHeightNoDeck, landAt, WORLD_BOUNDS, EXTRAS, BUILD_RADIUS, texCacheStats } from './world.js';
 import { IS_MOBILE, HAS_TOUCH, TIER, GPU_NAME, QUALITY_PREF, setQualityPref, IGPU_ON_BIG_MACHINE, GFX } from './device.js';
 import { createTraffic } from './traffic.js';
 import { makeHumanoid } from './character.js';
@@ -680,7 +680,7 @@ function animate() {
   requestAnimationFrame(animate);
   if (_ctxLost) return;                       // GPU đang mất ngữ cảnh: vẽ lúc này chỉ gây lỗi tràn console
   if (FRAME_DIV > 1 && (++_tick % FRAME_DIV)) return;   // điện thoại: đúng mỗi vsync thứ 2, không lỡ nhịp
-  pumpAssetUploads();                         // hiện model GLB đã tải: 1 texture/khung rồi mới lộ diện
+  pumpAssetUploads(started ? 0 : 32);         // hiện model GLB đã tải: 1 texture/khung (chưa Bắt đầu: ngân sách 32 ms/khung — W2-F)
   const dt = Math.min(clock.getDelta(), 0.05);
   time += dt;
 
@@ -800,8 +800,8 @@ function animate() {
     if (renderer.shadowMap.enabled && dayNight.sun.castShadow) {
       shadowTimer += dt;
       // Trần theo đồng hồ (4.5 Hz FULL / 2 Hz TIER 2 — mỗi lần làm mới bóng là 1 khung +20 ms trên 890M) + làm mới
-      // SỚM khi đã đi >2 m hoặc quay >0.15 rad (hộp bóng bám hướng nhìn, đứng yên thì không tốn gì); sàn 0.1/0.25 s
-      // để kéo chuột xoay camera không bắn shadow pass mỗi khung.
+      // SỚM khi đã đi >6 m hoặc quay >0.3 rad (W2-F; trước 2 m/0.15 rad = 6,6 lần/s khi chạy xe — hộp bóng bám hướng
+      // nhìn, đứng yên thì không tốn gì); sàn 0.1/0.25 s để kéo chuột xoay camera không bắn shadow pass mỗi khung.
       const cap = (TIER === 2 ? 0.5 : 0.22) * _shadowSlow, floor = (TIER === 2 ? 0.25 : 0.1) * _shadowSlow;
       if (shadowTimer > cap || (shadowTimer > floor && dayNight.shadowMoved())) {
         shadowTimer = 0; dayNight.markShadow(); renderer.shadowMap.needsUpdate = true;

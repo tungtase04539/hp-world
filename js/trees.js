@@ -33,8 +33,7 @@ import { ROAD_HW, treePitLine, SIDEWALK_TOP } from './xsection.js';
 export { treePitLine };   // world.js dùng qua veg.treePitLine (khỏi thêm import xsection vào world.js — tránh xung đột gộp)
 import { LM_POLY } from './landmark_polys.js';
 import { claimAt } from './claims.js';
-import { RB_B64 } from './buildings_real.js';
-import { decodeRB, makeFootprintGrid } from './buildings_data.js';
+import { rbGrid } from './rbdata.js';   // footprint thật giải mã 1 lần cho cả trang (W2-F)
 
 export const SP = { XACU: 0, BANG: 1, PHUONG: 2, SAU: 3, BANGLANG: 4, CAU: 5, CATCUT: 6, DA: 7, NON: 8 };
 const SP_N = 9;
@@ -670,7 +669,7 @@ const MARGIN = { p: 1.3, s: 1.2, t: 1.0, r: 0.9, w: 0.5, h: 0.7 };
 let _fp = null;
 function footprints(ctx) {
   if (ctx.fpGrid) return ctx.fpGrid;
-  if (!_fp) _fp = makeFootprintGrid(decodeRB(RB_B64));
+  if (!_fp) _fp = rbGrid();
   return _fp;
 }
 // ---- lưới đoạn đường dùng chung (mọi cấp, kể cả ngõ h): ô 16 m, mỗi đoạn chèn vào mọi ô trong bbox + (nửa lòng + 3 m) ----
@@ -994,9 +993,13 @@ export function buildTrees(scene, ctx = {}) {
   const mat = new THREE.MeshLambertMaterial({ map: atlas, vertexColors: true, alphaTest: A2C ? 0.04 : 0.5, side: THREE.DoubleSide, alphaToCoverage: A2C });
   mat.onBeforeCompile = (sh) => patchShader(sh, false);
   mat.customProgramCacheKey = () => 'hpveg1';
+  // WebGL1 (r160 tự lùi khi không có WebGL2): dFdx/fwidth trong FRAG_MAP cần GL_OES_standard_derivatives — three chỉ
+  // chèn #extension khi material.extensions.derivatives (WebGL2 bỏ qua cờ này). Thiếu → 2 lỗi biên dịch, mất hết cây.
+  mat.extensions = { derivatives: true };
   const depthMat = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map: atlas, alphaTest: 0.5, side: THREE.DoubleSide });
   depthMat.onBeforeCompile = (sh) => patchShader(sh, true);
   depthMat.customProgramCacheKey = () => 'hpveg1d';
+  depthMat.extensions = { derivatives: true };
   // ---- kit (chỉ loại đang dùng) ----
   const usedK = new Set(recs.map((r) => r.kit)), usedS = new Set(recs.map((r) => r.sp));
   const nearKits = [], farKits = [];

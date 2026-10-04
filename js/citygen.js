@@ -30,10 +30,10 @@
 //  * Va chạm: lưới ô 16 m trên bbox nhà (nới 2 m) → fabricCollide(p,r) đẩy điểm ra khỏi đa giác (cạnh gần nhất).
 //  * Xác định: mọi ngẫu nhiên = hash(seed nhà) — A/B chụp ảnh so được.
 import * as THREE from 'three';
-import { RB_B64 } from './buildings_real.js';
+import { rbData, rbGrid } from './rbdata.js';
 import {
-  decodeRB, EDGE, STYLE, ROOF, WALL_PALETTE, ROOF_PALETTE, GROUND_H, FLOOR_H, PARAPET_H, heightOf,
-  makeFootprintGrid, refreshPartyEdges, INFO,
+  EDGE, STYLE, ROOF, WALL_PALETTE, ROOF_PALETTE, GROUND_H, FLOOR_H, PARAPET_H, heightOf,
+  refreshPartyEdges, INFO,
 } from './buildings_data.js';
 import { claimAt, claimOverlapFrac } from './claims.js';
 import { buildFacadeAtlas, MOD, ATLAS_N, SIGN_CELLS, SIGN_EXT, SIGN_Y } from './facade_atlas.js';
@@ -56,7 +56,7 @@ const RELEASE_CPU = (() => { try { return new URLSearchParams(location.search).g
 
 // ---------- dữ liệu (giải mã 1 lần, dùng chung: citygen, minimap, cell sink WP3...) ----------
 let _D = null;
-export function fabricData() { if (!_D) _D = decodeRB(RB_B64); return _D; }
+export function fabricData() { if (!_D) _D = rbData(); return _D; }   // = js/rbdata.js (1 lần giải mã cho cả trang)
 
 // ---------- hash xác định ----------
 function hh(a, b) { let h = Math.imul(a | 0, 0x9e3779b1) ^ Math.imul((b | 0) + 0x7f4a7c15, 0x85ebca6b); h = Math.imul(h ^ (h >>> 15), 0xc2b2ae35); h ^= h >>> 13; return (h >>> 0) / 4294967296; }
@@ -80,6 +80,22 @@ function glslFloatArr(name, names) {
   const v = names.map((n) => { if (!(n in MOD)) throw new Error('citygen: thiếu mô-đun atlas ' + n); return MOD[n].toFixed(1); });
   return `const float ${name}[${v.length}] = float[${v.length}](${v.join(',')});`;
 }
+// WebGL1 (GLSL ES 1.0 không có mảng const khởi tạo): mảng → HÀM chuỗi if; mã thân shader viết NAME[i] được đổi
+// thành NAME(i) bằng gl1Idx() (chỉ số không chứa '[' lồng nhau).
+function glslFloatFn(name, names) {
+  const v = names.map((n) => { if (!(n in MOD)) throw new Error('citygen: thiếu mô-đun atlas ' + n); return MOD[n].toFixed(1); });
+  let s = `float ${name}(int i){`;
+  for (let k = 0; k < v.length - 1; k++) s += `if(i==${k})return ${v[k]};`;
+  return s + `return ${v[v.length - 1]};}`;
+}
+function glslVec3Fn(name, hexes) {
+  const v = hexes.map((h) => { const c = new THREE.Color().setHex(h); return `vec3(${c.r.toFixed(4)},${c.g.toFixed(4)},${c.b.toFixed(4)})`; });
+  let s = `vec3 ${name}(int i){`;
+  for (let k = 0; k < v.length - 1; k++) s += `if(i==${k})return ${v[k]};`;
+  return s + `return ${v[v.length - 1]};}`;
+}
+const GL1_ARR = /\b(U[0-6]|G[0-6]|GH|SD|BK|PT|SIGNC|WALLP)\[([^[\]]*)\]/g;
+const gl1Idx = (src) => src.replace(GL1_ARR, '$1($2)');
 // Bộ mô-đun theo KIỂU (STYLE): TUBE 0, OLD 1, KTT 2, GLASS 3, VILLA 4, SHED 5, CIVIC 6. Lặp tên = tăng trọng số.
 const SETS = {
   U0: ['U_SLIDE0', 'U_SLIDE0', 'U_SLIDE1', 'U_BALC0', 'U_BALC1', 'U_BALC0', 'U_CAGE', 'U_TILE', 'U_AC', 'U_AC', 'U_LOG'],
@@ -118,6 +134,26 @@ function groundModule(s8, bay, wide, rc, st) {
   if ((g2 >>> 8) < HOME_THR[Math.min(3, rc)]) return SETS.GH[pidx(g1, SETS.GH.length)];
   const set = SETS['G' + Math.min(6, st)];
   return st === 5 ? set[0] : set[pidx(g1, set.length)];
+}
+// WebGL1 (GLSL ES 1.0 không có uint/phép bit): BẢNG TRA tính sẵn bằng CHÍNH ihash JS — texel (s8 0..255, bay 0..127 +
+// 128·wide) = g1>>>8 (24 bit ở RGB) + hạng "nhà ở" ở A (c = ngưỡng HOME_THR nhỏ nhất mà g2>>>8 lọt dưới; nhà ở ⇔
+// min(3,rc) ≥ c) → mô-đun trệt của nhánh GL1 khớp groundModule() (trừ bay ≥ 128 quấn vòng — mặt tiền > 500 m — và
+// sai số làm tròn float ~1e-6 ở pidx). 256² RGBA8 = 256 KB, ~3 ms, CHỈ dựng khi renderer là WebGL1.
+let _gmodTex = null;
+function gmodTexture() {
+  if (_gmodTex) return _gmodTex;
+  const S = 256, d = new Uint8Array(S * S * 4);
+  for (let w = 0; w < 2; w++) for (let bay = 0; bay < 128; bay++) for (let s8 = 0; s8 < 256; s8++) {
+    const gk = w ? ihash(s8 * 977 + bay, 101) : s8;
+    const g1 = ihash(gk, bay * 2 + 1) >>> 8, g2 = ihash(gk, bay * 2 + 2) >>> 8;
+    const o = ((bay + 128 * w) * S + s8) * 4;
+    d[o] = g1 >>> 16; d[o + 1] = (g1 >>> 8) & 255; d[o + 2] = g1 & 255;
+    d[o + 3] = g2 < HOME_THR[0] ? 0 : g2 < HOME_THR[1] ? 1 : g2 < HOME_THR[2] ? 2 : 3;
+  }
+  const t = new THREE.DataTexture(d, S, S, THREE.RGBAFormat, THREE.UnsignedByteType);
+  t.minFilter = t.magFilter = THREE.NearestFilter; t.generateMipmaps = false; t.colorSpace = THREE.NoColorSpace;
+  t.name = 'fabric_gmod_gl1'; t.needsUpdate = true;
+  return (_gmodTex = t);
 }
 // Atlas vẽ trong WORKER (facade_atlas_worker.js): luồng chính chỉ đăng ký thứ tự ô (MOD → shader) + cấp phát texture
 // đúng kích thước tô xám tường trơn; ảnh thật về sau ~0,1-0,2 s (thường TRƯỚC khung hình đầu vì buildWorld còn chạy
@@ -162,38 +198,61 @@ function makeMaterial() {
   const setsGlsl = Object.entries(SETS).map(([k, v]) => glslFloatArr(k, v)).join('\n');
   const n = (k) => SETS[k].length + '.0';
   const ni = (k) => SETS[k].length + 'u';
+  const setsGlsl1 = Object.entries(SETS).map(([k, v]) => glslFloatFn(k, v)).join('\n');
+  // HASH NGUYÊN (uint) cho mô-đun TẦNG TRỆT: JS (groundModule) tính RA ĐÚNG Y HỆT → biết bay nào có biển để dựng hộp biển
+  // 3D (hash float GPU/JS lệch nhau do float32/FMA; số nguyên thì không).
+  const GL2_GROUND = `uint ihash(uint a, uint b){ uint h = (a * 0x9E3779B1u) ^ ((b + 0x7F4A7C15u) * 0x85EBCA6Bu); h ^= h >> 15u; h *= 0xC2B2AE35u; h ^= h >> 13u; return h; }
+int pidx(uint h, uint n){ return int(((h >> 8u) * n) >> 24u); }
+float pickGi(int st, uint h){
+  if (st == 1) return G1[pidx(h, ${ni('G1')})]; if (st == 2) return G2[pidx(h, ${ni('G2')})]; if (st == 3) return G3[pidx(h, ${ni('G3')})];
+  if (st == 4) return G4[pidx(h, ${ni('G4')})]; if (st == 5) return G5[0]; if (st == 6) return G6[pidx(h, ${ni('G6')})];
+  return G0[pidx(h, ${ni('G0')})];
+}`;
+  const GL2_GROUND_MAIN = `        uint sI = uint(vFac.x + 0.5), bI = uint(max(bay, 0.0));
+        uint gk = wide > 0.5 ? ihash(sI * 977u + bI, 101u) : sI;
+        uint g1 = ihash(gk, bI * 2u + 1u), g2 = ihash(gk, bI * 2u + 2u);
+        uint thr = rc > 2.5 ? ${HOME_THR[3]}u : rc > 1.5 ? ${HOME_THR[2]}u : (rc > 0.5 ? ${HOME_THR[1]}u : ${HOME_THR[0]}u);
+        bool home = (g2 >> 8u) < thr;
+        m = home ? GH[pidx(g1, ${ni('GH')})] : pickGi(st, g1);`;
+  // GL1: u1 = (g1>>>8)/2^24 từ bảng tra (RGB 24 bit, NEAREST), pidx(g1,n) = int(u1·n)
+  const GL1_GROUND = `uniform sampler2D uGMod;
+float pickGi(int st, float u){
+  if (st == 1) return G1[int(u * ${n('G1')})]; if (st == 2) return G2[int(u * ${n('G2')})]; if (st == 3) return G3[int(u * ${n('G3')})];
+  if (st == 4) return G4[int(u * ${n('G4')})]; if (st == 5) return G5[0]; if (st == 6) return G6[int(u * ${n('G6')})];
+  return G0[int(u * ${n('G0')})];
+}`;
+  const GL1_GROUND_MAIN = `        vec4 gm = texture2D(uGMod, (vec2(vFac.x, mod(max(bay, 0.0), 128.0) + 128.0 * wide) + 0.5) / 256.0);
+        vec3 gb = floor(gm.rgb * 255.0 + 0.5);
+        float u1 = (gb.r * 65536.0 + gb.g * 256.0 + gb.b) / 16777216.0;
+        float rcI = rc > 2.5 ? 3.0 : rc > 1.5 ? 2.0 : (rc > 0.5 ? 1.0 : 0.0);
+        bool home = rcI >= floor(gm.a * 255.0 + 0.5);
+        m = home ? GH[int(u1 * ${n('GH')})] : pickGi(st, u1);`;
+  // WebGL1 (three r160 tự lùi về WebGL1 khi máy không có WebGL2 — vd GPU/driver bị chặn WebGL2): GLSL ES 1.0 không có
+  // uint/phép bit, textureGrad, mảng const. Nhánh GL1 cùng thuật toán: mảng → hàm if (gl1Idx), hash nguyên → bảng tra
+  // gmodTexture(), textureGrad → texture2DGradEXT (GL_EXT_shader_texture_lod; thiếu thì texture2D — viền mô-đun hơi lộ),
+  // dFdx → GL_OES_standard_derivatives. Hai cờ dưới chỉ có tác dụng ở WebGL1 (three bỏ qua ở WebGL2, không đổi khoá program).
+  m.extensions = { derivatives: true, shaderTextureLOD: true };
   m.onBeforeCompile = (sh, renderer) => {
-    // WebGL1 (three r160 còn tự lùi về WebGL1 khi máy không có WebGL2): shader atlas cần GLSL ES 3.0 (uint, textureGrad,
-    // mảng const) → KHÔNG tiêm; nhà vẽ trơn theo màu đỉnh (màu tường/mái), không phát sáng đêm — thà xấu còn hơn hỏng cả phố.
-    if (renderer && renderer.capabilities && renderer.capabilities.isWebGL2 === false) {
-      sh.fragmentShader = sh.fragmentShader.replace('#include <map_fragment>', '').replace('#include <emissivemap_fragment>', 'totalEmissiveRadiance = vec3(0.0);');
-      return;
-    }
+    const gl1 = !!(renderer && renderer.capabilities && renderer.capabilities.isWebGL2 === false);
+    const X = gl1 ? gl1Idx : (s) => s;
+    if (gl1) { sh.uniforms.uGMod = { value: gmodTexture() }; m.userData.webgl1 = true; }
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\nattribute vec4 aFac;\nvarying vec4 vFac;\nvarying vec2 vFUv;')
       .replace('#include <uv_vertex>', '#include <uv_vertex>\nvFac = aFac; vFUv = uv;');
     sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', `#include <common>
+      .replace('#include <common>', X(`#include <common>
 varying vec4 vFac; varying vec2 vFUv;
-${setsGlsl}
-${glslVec3Arr('SIGNC', SIGN_HEX)}
-${glslVec3Arr('WALLP', WALL_PALETTE)}
+${gl1 ? setsGlsl1 : setsGlsl}
+${gl1 ? glslVec3Fn('SIGNC', SIGN_HEX) : glslVec3Arr('SIGNC', SIGN_HEX)}
+${gl1 ? glslVec3Fn('WALLP', WALL_PALETTE) : glslVec3Arr('WALLP', WALL_PALETTE)}
 float h21(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
 float pickU(int st, float r){
   if (st == 1) return U1[int(r * ${n('U1')})]; if (st == 2) return U2[int(r * ${n('U2')})]; if (st == 3) return U3[int(r * ${n('U3')})];
   if (st == 4) return U4[int(r * ${n('U4')})]; if (st == 5) return U5[0]; if (st == 6) return U6[int(r * ${n('U6')})];
   return U0[int(r * ${n('U0')})];
 }
-// HASH NGUYÊN (uint) cho mô-đun TẦNG TRỆT: JS (groundModule) tính RA ĐÚNG Y HỆT → biết bay nào có biển để dựng hộp biển
-// 3D (hash float GPU/JS lệch nhau do float32/FMA; số nguyên thì không).
-uint ihash(uint a, uint b){ uint h = (a * 0x9E3779B1u) ^ ((b + 0x7F4A7C15u) * 0x85EBCA6Bu); h ^= h >> 15u; h *= 0xC2B2AE35u; h ^= h >> 13u; return h; }
-int pidx(uint h, uint n){ return int(((h >> 8u) * n) >> 24u); }
-float pickGi(int st, uint h){
-  if (st == 1) return G1[pidx(h, ${ni('G1')})]; if (st == 2) return G2[pidx(h, ${ni('G2')})]; if (st == 3) return G3[pidx(h, ${ni('G3')})];
-  if (st == 4) return G4[pidx(h, ${ni('G4')})]; if (st == 5) return G5[0]; if (st == 6) return G6[pidx(h, ${ni('G6')})];
-  return G0[pidx(h, ${ni('G0')})];
-}
-float hat(float a, float c, float w){ return max(0.0, 1.0 - abs(a - c) / w); }`)
+${gl1 ? GL1_GROUND : GL2_GROUND}
+float hat(float a, float c, float w){ return max(0.0, 1.0 - abs(a - c) / w); }`))
       .replace('#include <map_pars_fragment>', `#include <map_pars_fragment>
 vec4 fabSample(float m, vec2 f, vec2 gx, vec2 gy){
   float N = ${N}.0, pad = ${pad};
@@ -203,9 +262,13 @@ vec4 fabSample(float m, vec2 f, vec2 gx, vec2 gy){
   gx *= sc; gy *= sc;
   float lg = max(length(gx), length(gy)), mg = ${maxG};
   if (lg > mg) { gx *= mg / lg; gy *= mg / lg; }
-  return textureGrad(map, auv, gx, gy);
+${gl1 ? `#ifdef GL_EXT_shader_texture_lod
+  return texture2DGradEXT(map, auv, gx, gy);
+#else
+  return texture2D(map, auv);
+#endif` : '  return textureGrad(map, auv, gx, gy);'}
 }`)
-      .replace('#include <map_fragment>', `
+      .replace('#include <map_fragment>', X(`
 vec3 fabGlow = vec3(0.0);
 float fabAO = 1.0;
 {
@@ -243,12 +306,7 @@ float fabAO = 1.0;
       else m = ((st == 1 || st == 4) && h21(vec2(bs * 7.1, 3.3)) < 0.5) ? ${MOD.P_BALU}.0 : ${MOD.P_PLAIN}.0;
     } else if (kind == 1) {
       if (fl < 0.5) {
-        uint sI = uint(vFac.x + 0.5), bI = uint(max(bay, 0.0));
-        uint gk = wide > 0.5 ? ihash(sI * 977u + bI, 101u) : sI;
-        uint g1 = ihash(gk, bI * 2u + 1u), g2 = ihash(gk, bI * 2u + 2u);
-        uint thr = rc > 2.5 ? ${HOME_THR[3]}u : rc > 1.5 ? ${HOME_THR[2]}u : (rc > 0.5 ? ${HOME_THR[1]}u : ${HOME_THR[0]}u);
-        bool home = (g2 >> 8u) < thr;
-        m = home ? GH[pidx(g1, ${ni('GH')})] : pickGi(st, g1);
+${gl1 ? GL1_GROUND_MAIN : GL2_GROUND_MAIN}
         isG = 1.0; signSeed = h21(vec2(bs * 17.3 + bay * 3.1, 2.9)); litP = home ? 0.45 : 0.25;
       }
       else {
@@ -294,7 +352,10 @@ float fabAO = 1.0;
     vec3 sc = (sW2 * t2.rgb * signCol * 1.15 + tW2 * textCol + kW2 * t2.rgb) / max(sW2 + tW2 + kW2, 1e-3);
     float ss = sW + tW;
     tx.rgb = mix(tx.rgb, sc, ss); sW = 0.0; tW = 0.0; kW += ss;
-    fabGlow += sc * 0.45 * ss;
+    // ĐÊM: biển tự sáng nhưng TRẦN độ chói (W2-F): nền trắng/vàng nhạt × 0,45 từng loá qua bloom, chữ không đọc được;
+    // nay độ chói phát sáng ≤ 0,45 × 0,24 — nền đậm (đỏ/xanh/lục, chói < 0,24) giữ nguyên, nền sáng giảm tới ~4×.
+    float sLum = dot(sc, vec3(0.2126, 0.7152, 0.0722));
+    fabGlow += sc * (0.45 * ss) * min(1.0, 0.24 / max(sLum, 1e-3));
   }
   float sum = max(wW + gW + kW + sW + tW, 1e-3);
   vec3 col = (wW * tx.rgb * tint * 1.25 + (gW + kW) * tx.rgb + sW * tx.rgb * signCol * 1.15 + tW * textCol) / sum;
@@ -303,8 +364,10 @@ float fabAO = 1.0;
   // ánh đèn nhân với chính texture (rèm/nội thất/hàng hoá vẫn đọc được, không thành ô trắng loá)
   float lit = step(litP, h21(vec2(seed * 31.7 + cellKey, 4.1)));
   vec3 warm = vec3(1.0, 0.76, 0.46);
-  fabGlow += (gW / sum) * lit * warm * (0.18 + tx.rgb * 1.1) + isG * (kW / sum) * lit * (tx.rgb * 0.9 + warm * 0.06);
-}`)
+  // nhà ở VN: ~nửa số phòng sáng đèn tuýp/LED TRẮNG LẠNH, nửa đèn vàng ấm (W2-F; trước: mọi cửa sổ cùng màu cam)
+  vec3 roomC = h21(vec2(seed * 13.3 + cellKey, 7.7)) < 0.5 ? vec3(0.80, 0.88, 1.0) : warm;
+  fabGlow += (gW / sum) * lit * roomC * (0.18 + tx.rgb * 1.1) + isG * (kW / sum) * lit * (tx.rgb * 0.9 + warm * 0.06);
+}`))
       .replace('#include <color_fragment>', '')
       .replace('#include <emissivemap_fragment>', 'totalEmissiveRadiance = fabGlow * emissive.r;\n#ifdef HP_UNLIT_K\ntotalEmissiveRadiance *= HP_UNLIT_K;\n#endif')
       .replace('#include <aomap_fragment>', 'reflectedLight.indirectDiffuse *= fabAO; reflectedLight.directDiffuse *= mix(1.0, fabAO, 0.35);');
@@ -577,7 +640,7 @@ export function fabricAt(x, z) {
 // zone của world.js), maxR (bỏ nhà có tâm ngoài bán kính này — world.js truyền BUILD_RADIUS: ngoài vùng chơi không có
 // đường/vỉa → nhà đứng trên cỏ trống), facadeMats (mảng để daynight điều khiển đêm), log }
 // Trả { stats, meshes, detMeshes, collide: fabricCollide, at: fabricAt, hit, frontEdges, material, grid }.
-// grid = makeFootprintGrid(fabricData()) dựng SAU khi chốt D.dead (near/at bỏ nhà dead) — world.js đặt world.rbData /
+// grid = rbGrid() (js/rbdata.js, lưới chung; near/at lọc nhà dead LÚC TRA nên đúng cả sau khi chốt D.dead) — world.js đặt world.rbData /
 // world.rbGrid = D / grid để WP4 cây, WP7 props, WP8 camera dùng CHUNG (không giải mã lại, tôn trọng nhà đã bị gỡ).
 export function buildRealFabric(scene, ctx) {
   const T0 = performance.now();
@@ -635,7 +698,7 @@ export function buildRealFabric(scene, ctx) {
   // TƯỜNG CHUNG sau khi giết nhà (hợp đồng WP1 v1, js/buildings_data.js): cạnh PARTY của nhà SỐNG mà láng giềng che đã
   // bị giết → hạ thành BACK/SIDE (dựng cả chân tường) — không thì nhà kề nhà bị giết thiếu chân tường = lỗ nhìn xuyên.
   // Rà quanh MỌI nhà dead (kể cả nhà WP3/ai khác giết trước khi gọi buildRealFabric).
-  const grid = makeFootprintGrid(D);
+  const grid = rbGrid();   // lưới chung (lọc D.dead lúc tra) — không dựng lại sau khi giết nhà
   { const killed = []; for (let b = 0; b < D.nB; b++) if (D.dead[b]) killed.push(b);
     const r = refreshPartyEdges(D, grid, killed); st.partyDemoted = r.demoted; st.partyLowered = r.lowered; }
   buildCollision(D);   // lưới va chạm ngay sau khi chốt D.dead — faceRoad (bên dưới) cần fabricAt
