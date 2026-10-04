@@ -10,6 +10,7 @@
 // Không có texture (WebGL1, chưa xong worker, trình duyệt thiếu DecompressionStream) → màu đỉnh như cũ (uLuOn = 0).
 // HỢP ĐỒNG LỚP: chỉ số trong LU_META.classes (tools/gen_landuse.mjs) = các hằng C_* trong GLSL dưới đây.
 import { LU_META, LU_CLS } from './landuse_data.js';
+import { claimsAll } from './claims.js';
 
 export const LU = LU_META.classes;
 export const LU_GRID = { n: LU_META.n, res: LU_META.res, x0: LU_META.x0, z0: LU_META.z0 };
@@ -20,8 +21,34 @@ export function luUnfilter(a, n) { for (let i = n; i < a.length; i++) a[i] = (a[
 
 // cls (Uint8Array n² ĐÃ bỏ lọc) + footprint sống → Uint8Array RG (n²·2). Sửa cls tại chỗ (tô BLD).
 // fp = { x, z: Float32Array (m), vStart: Uint32Array, dead: Uint8Array|null, nB }
-export function luCompose(cls, fp, grid) {
-  const { n, res, x0, z0 } = grid, BLD = 15, POOL = 13;
+// extra = { plaza: [[[x,z],...],...], park: [...], bld: [...] } — đa giác chạy lúc chạy: claim 'plaza'/'park' (vùng mở mà
+// WP2 đã giết nhà thật: quảng trường, hành lang, kè, công viên) đổi nền phố URB → đá lát / cỏ; 'bld' (bao lồi nhà ô tay
+// GIỮ — world.cellKept) tính là NHÀ cho khoảng cách/mật độ.
+export function luCompose(cls, fp, grid, extra = null) {
+  const { n, res, x0, z0 } = grid, BLD = 15, POOL = 13, URB = 1;
+  const fillPoly = (P, val, onlyFrom) => {
+    let zmin = 1e9, zmax = -1e9;
+    for (const p of P) { if (p[1] < zmin) zmin = p[1]; if (p[1] > zmax) zmax = p[1]; }
+    const j0 = Math.max(0, Math.ceil((zmin - z0) / res - 0.5)), j1 = Math.min(n - 1, Math.floor((zmax - z0) / res - 0.5));
+    const xs = [];
+    for (let j = j0; j <= j1; j++) {
+      const zc = z0 + (j + 0.5) * res; xs.length = 0;
+      for (let a = 0, b = P.length - 1; a < P.length; b = a++) {
+        const za = P[a][1], zb = P[b][1];
+        if ((za > zc) !== (zb > zc)) xs.push(P[a][0] + (zc - za) * (P[b][0] - P[a][0]) / (zb - za));
+      }
+      xs.sort((p, q) => p - q);
+      for (let q = 0; q + 1 < xs.length; q += 2) {
+        const i0 = Math.max(0, Math.ceil((xs[q] - x0) / res - 0.5)), i1 = Math.min(n - 1, Math.floor((xs[q + 1] - x0) / res - 0.5));
+        for (let i = i0; i <= i1; i++) { const o = j * n + i; if (onlyFrom < 0 || cls[o] === onlyFrom) cls[o] = val; }
+      }
+    }
+  };
+  if (extra) {
+    for (const P of extra.park || []) fillPoly(P, 8, URB);
+    for (const P of extra.plaza || []) fillPoly(P, 3, URB);
+    for (const P of extra.bld || []) fillPoly(P, BLD, -1);
+  }
   // (1) tô footprint sống (even-odd, tâm điểm ảnh) — nhà nằm trên bể bơi OSM (bể có mái) không đè
   if (fp && fp.nB) {
     const xs = new Float64Array(64);
@@ -149,20 +176,24 @@ export function luGenDetail(S) {
   const put = (layer, ch, F) => { const off = layer * P + ch; for (let i = 0; i < S * S; i++) { const v = F[i] * 255; data[off + i * 4] = v < 0 ? 0 : v > 255 ? 255 : v + 0.5; } };
 
   // ---- lớp 0 ----
-  { // R: bê tông tấm 2 m (4 m/ô = 2×2 tấm)
-    const n1 = fbm([8, 16, 32, 64], [1, 0.7, 0.5, 0.35]), n2 = fbm([4], [1]);
+  { // R: bê tông đổ tại chỗ (4 m/ô): mạch cắt CHỈ ở mép ô, mờ + đứt quãng (lưới đều 2 m trông như gạch lát — ảnh thử
+    //    cam_yard2), mảng vá chữ nhật lệch tông, rỗ, nứt
+    const n1 = fbm([8, 16, 32, 64], [1, 0.7, 0.5, 0.35]), n2 = fbm([4], [1]), nj = fbm([16], [1]);
     const F = new Float32Array(S * S);
-    for (let i = 0; i < S * S; i++) F[i] = 0.62 + (n1[i] - 0.5) * 0.32 + (rnd() - 0.5) * 0.07;
-    const slab = S / 2;
-    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {   // tông mỗi tấm hơi khác + mạch
-      const tx = Math.floor(x / slab), ty = Math.floor(y / slab), h = Math.sin(tx * 12.99 + ty * 78.23 + 3.1) * 43758.5; const tone = (h - Math.floor(h) - 0.5) * 0.1;
-      const ex = Math.min(x % slab, slab - (x % slab)), ey = Math.min(y % slab, slab - (y % slab)), e = Math.min(ex, ey);
-      const o = y * S + x;
-      F[o] += tone + (n2[o] - 0.5) * 0.08;
-      if (e < 1.5 * px) F[o] *= 0.45; else if (e < 3 * px) F[o] *= 0.85;
+    for (let i = 0; i < S * S; i++) F[i] = 0.62 + (n1[i] - 0.5) * 0.3 + (n2[i] - 0.5) * 0.1 + (rnd() - 0.5) * 0.07;
+    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+      const e = Math.min(x, y, S - 1 - x, S - 1 - y), o = y * S + x;
+      if (e < 1.2 * px && nj[o] > 0.42) F[o] *= 0.62 + 0.25 * (1 - (nj[o] - 0.42) / 0.58);
     }
-    for (let i = 0; i < (S * S / 300 | 0); i++) dot(F, rnd() * S, rnd() * S, (0.5 + rnd() * 1.2) * px, (v, k) => v - 0.18 * k);   // rỗ
-    for (let i = 0; i < 7; i++) crack(F, rnd() * S, rnd() * S, (60 + rnd() * 180) * px | 0, 0.8 * px, 0.45);
+    for (let i = 0; i < 5; i++) {   // mảng vá / đổ lại
+      const w = (60 + rnd() * 140) * px, h = (40 + rnd() * 110) * px, x0 = rnd() * S, y0 = rnd() * S, k = 1 + (rnd() - 0.45) * 0.16;
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const o = wrap(Math.round(y0 + y)) * S + wrap(Math.round(x0 + x)), edge = Math.min(x, y, w - 1 - x, h - 1 - y) < 1.2 * px;
+        F[o] *= edge ? 0.8 : k;
+      }
+    }
+    for (let i = 0; i < (S * S / 300 | 0); i++) dot(F, rnd() * S, rnd() * S, (0.5 + rnd() * 1.2) * px, (v, k) => v - 0.16 * k);   // rỗ
+    for (let i = 0; i < 9; i++) crack(F, rnd() * S, rnd() * S, (60 + rnd() * 200) * px | 0, 0.75 * px, 0.4);
     put(0, 0, F);
   }
   { // G: gạch đá lát 0,5 m (8×8 viên / 4 m), tông từng viên + vân + mạch
@@ -215,12 +246,13 @@ export function luGenDetail(S) {
     for (let i = 0; i < (S * S / 90 | 0); i++) { const add = rnd() < 0.6 ? 0.25 : -0.25; dot(F, rnd() * S, rnd() * S, (0.5 + rnd() * 1.1) * px, (v, k) => v + add * Math.min(1, k * 2)); }
     put(1, 1, F);
   }
-  { // B: vết ố / loang (1 = sạch, nhỏ hơn = ố): cụm dầu, mảng ẩm
-    const F = new Float32Array(S * S).fill(1);
-    for (let i = 0; i < 26; i++) {
-      const cx = rnd() * S, cy = rnd() * S, nn = 3 + (rnd() * 6 | 0), sp = (8 + rnd() * 30) * px, dk = 0.12 + rnd() * 0.22;
-      for (let j = 0; j < nn; j++) dot(F, cx + (rnd() - 0.5) * sp, cy + (rnd() - 0.5) * sp, (4 + rnd() * 18) * px, (v, k) => v * (1 - dk * Math.min(1, k * 1.5)));
+  { // B: vết ố / loang (1 = sạch, nhỏ hơn = ố): cụm dầu, mảng ẩm — mép RÁCH theo nhiễu (bản đầu: chấm tròn đậm = "chấm bi")
+    const F = new Float32Array(S * S).fill(0), nz = fbm([16, 32, 64], [1, 0.7, 0.5]);
+    for (let i = 0; i < 22; i++) {
+      const cx = rnd() * S, cy = rnd() * S, nn = 3 + (rnd() * 6 | 0), sp = (10 + rnd() * 40) * px, dk = 0.1 + rnd() * 0.16;
+      for (let j = 0; j < nn; j++) dot(F, cx + (rnd() - 0.5) * sp, cy + (rnd() - 0.5) * sp, (6 + rnd() * 22) * px, (v, k) => Math.max(v, dk * Math.min(1, k * 1.3)));
     }
+    for (let i = 0; i < S * S; i++) F[i] = 1 - F[i] * Math.min(1, Math.max(0, (nz[i] - 0.3) * 2.5));
     put(1, 2, F);
   }
   { // A: vết nứt + rác vụn (1 = sạch)
@@ -250,7 +282,7 @@ onmessage = async (e) => {
     const ab = await new Response(new Blob([u8]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer();
     const t0 = performance.now();
     const cls = luUnfilter(new Uint8Array(ab), m.grid.n);
-    const rg = luCompose(cls, m.fp, m.grid);
+    const rg = luCompose(cls, m.fp, m.grid, m.extra);
     postMessage({ kind: 'map', data: rg, ms: performance.now() - t0 }, [rg.buffer]);
   } catch (err) { postMessage({ kind: 'error', msg: String(err && err.message || err) }); }
 };`;
@@ -274,14 +306,14 @@ vec3 luClass(float c, float dist, float dens, vec2 w, vec4 d0, vec4 d1, vec4 m, 
     // NỀN PHỐ (+ trong nhà): bê tông tấm xám; sát tường (≤1,5 m) ố ẩm + rêu; sân ≥3 m đôi chỗ lát gạch block.
     // BÃI TRỐNG (đất nện + mảng cỏ dại + mảng bê tông sót) CHỈ ở nơi THƯA nhà (mật độ ±40 m < ~25 %) và xa tường —
     // khoảng trống giữa phố dày ngoài đời là sân lát / bãi xe, không phải đất hoang (ảnh vệ tinh: xám tối).
-    vec3 conc = luS2L(vec3(146.0, 143.0, 137.0)) * (0.55 + 0.75 * d0.r) * mix(0.8, 1.08, m.g) * mix(0.72, 1.0, stain) * min(crk, 1.15);
+    vec3 conc = luS2L(vec3(134.0, 132.0, 127.0)) * (0.55 + 0.75 * d0.r) * mix(0.8, 1.08, m.g) * mix(0.72, 1.0, stain) * min(crk, 1.15);
     conc *= mix(vec3(1.0), vec3(1.04, 1.0, 0.93), smoothstep(0.5, 0.8, md.b));   // mảng bụi đất ngả vàng
     float grime = 1.0 - smoothstep(0.2, 1.6, dist);
     conc *= mix(1.0, 0.7, grime);
     conc = mix(conc, conc * vec3(0.9, 0.95, 0.85), grime * md.a);               // rêu chân tường
     float yard = smoothstep(2.5, 5.0, dist);
-    vec3 tiles = luS2L(vec3(156.0, 152.0, 144.0)) * (0.62 + 0.6 * d0.g) * mix(0.9, 1.04, m.g);
-    conc = mix(conc, tiles, yard * smoothstep(0.62, 0.7, m.b * 0.7 + md.r * 0.45));
+    vec3 tiles = luS2L(vec3(146.0, 142.0, 135.0)) * (0.62 + 0.6 * d0.g) * mix(0.9, 1.04, m.g);
+    conc = mix(conc, tiles, yard * smoothstep(0.672, 0.684, m.b * 0.7 + md.r * 0.45));   // mép mảng lát SẮC (ranh đổ/lát thật)
     float vac = smoothstep(6.0, 14.0, dist + (md.r - 0.5) * 8.0) * (1.0 - smoothstep(0.12, 0.35, dens + (m.a - 0.5) * 0.15));
     if (vac < 0.01) return conc;
     vec3 dirt = luS2L(vec3(146.0, 126.0, 100.0)) * (0.6 + 0.7 * d0.a) * mix(0.85, 1.1, m.b);
@@ -292,28 +324,30 @@ vec3 luClass(float c, float dist, float dens, vec2 w, vec4 d0, vec4 d1, vec4 m, 
     return mix(conc, lot, vac);
   }
   if (c < 2.5) {   // CÔNG NGHIỆP / CẢNG: bê tông tấm lớn bạc + ố dầu + gỉ
-    vec3 b = luS2L(vec3(146.0, 144.0, 138.0)) * (0.55 + 0.7 * d0.r) * mix(0.85, 1.08, m.r) * mix(0.62, 1.0, stain) * min(crk, 1.1);
+    vec3 b = luS2L(vec3(136.0, 134.0, 129.0)) * (0.55 + 0.7 * d0.r) * mix(0.85, 1.08, m.r) * mix(0.62, 1.0, stain) * min(crk, 1.1);
     return mix(b, b * vec3(1.1, 0.92, 0.78), smoothstep(0.6, 0.8, md.a) * 0.5);
   }
   if (c < 3.5) {   // QUẢNG TRƯỜNG: đá lát xám sáng
-    return luS2L(vec3(170.0, 168.0, 162.0)) * (0.62 + 0.6 * d0.g) * mix(0.9, 1.04, m.g) * mix(0.88, 1.0, stain);
+    return luS2L(vec3(160.0, 158.0, 152.0)) * (0.62 + 0.6 * d0.g) * mix(0.9, 1.04, m.g) * mix(0.88, 1.0, stain);
   }
   if (c < 4.5) {   // SÂN CHÙA/ĐỀN: gạch đỏ Bát Tràng + rêu
     vec3 b = luS2L(vec3(150.0, 84.0, 62.0)) * (0.6 + 0.65 * d0.b) * mix(0.85, 1.05, m.g);
     return mix(b, b * vec3(0.8, 0.88, 0.75), smoothstep(0.55, 0.8, md.a) * 0.6);
   }
   if (c < 5.5) {   // SÂN TRƯỜNG / CƠ QUAN: bê tông sáng + gạch block
-    vec3 a = luS2L(vec3(160.0, 157.0, 148.0)) * (0.6 + 0.7 * d0.r) * mix(0.88, 1.06, m.g) * mix(0.85, 1.0, stain) * min(crk, 1.1);
-    vec3 t = luS2L(vec3(165.0, 160.0, 150.0)) * (0.62 + 0.6 * d0.g);
+    vec3 a = luS2L(vec3(148.0, 145.0, 138.0)) * (0.6 + 0.7 * d0.r) * mix(0.88, 1.06, m.g) * mix(0.85, 1.0, stain) * min(crk, 1.1);
+    vec3 t = luS2L(vec3(152.0, 148.0, 140.0)) * (0.62 + 0.6 * d0.g);
     return mix(a, t, smoothstep(0.45, 0.6, md.b));
   }
   if (c < 6.5) {   // BÃI ĐỖ XE: nhựa sẫm + ố dầu
     return luS2L(vec3(96.0, 96.0, 98.0)) * (0.65 + 0.6 * d1.g) * mix(0.9, 1.08, m.r) * mix(0.7, 1.0, stain) * min(crk, 1.1);
   }
-  if (c < 7.5) {   // ĐẤT NỆN / CÔNG TRƯỜNG
+  if (c < 7.5) {   // ĐẤT NỆN / CÔNG TRƯỜNG — công trường OSM cũ nay đã kín nhà (mật độ cao) → sân bê tông như nền phố
     vec3 b = luS2L(vec3(152.0, 130.0, 102.0)) * (0.6 + 0.7 * d0.a) * mix(0.82, 1.1, m.b);
     vec3 wd = luS2L(vec3(102.0, 110.0, 66.0)) * (0.6 + 0.8 * d1.r);
-    return mix(b, wd, smoothstep(0.62, 0.78, md.g * 0.8 + m.a * 0.3) * 0.7);
+    b = mix(b, wd, smoothstep(0.62, 0.78, md.g * 0.8 + m.a * 0.3) * 0.7);
+    vec3 cc = luS2L(vec3(134.0, 132.0, 127.0)) * (0.55 + 0.75 * d0.r) * mix(0.8, 1.08, m.g) * mix(0.72, 1.0, stain) * mix(0.7, 1.0, smoothstep(0.2, 1.6, dist));
+    return mix(b, cc, smoothstep(0.18, 0.4, dens + (md.r - 0.5) * 0.15));
   }
   if (c < 8.5) {   // CỎ công viên: xanh ngả vàng, mảng mòn đất
     vec3 g = luS2L(vec3(92.0, 118.0, 58.0)) * (0.6 + 0.8 * d1.r) * mix(0.82, 1.12, m.g) * mix(vec3(1.0), vec3(1.08, 1.02, 0.85), md.b);
@@ -407,9 +441,12 @@ export function makeGroundSystem(THREE, opt = {}) {
   mapTex.wrapS = mapTex.wrapT = THREE.ClampToEdgeWrapping; mapTex.colorSpace = THREE.NoColorSpace; mapTex.unpackAlignment = 2;
   mapTex.needsUpdate = true;
   // chi tiết: placeholder xám giữa (0,5) cùng kích thước → worker thay
-  const det = new Uint8Array(S * S * 4 * 3).fill(128);
-  for (let i = 0; i < S * S; i++) { det[S * S * 4 + i * 4 + 2] = 255; det[S * S * 4 + i * 4 + 3] = 189; }   // ố = sạch, nứt = sạch
-  const detTex = new THREE.DataArrayTexture(det, S, S, 3);
+  const detPlaceholder = () => {
+    const det = new Uint8Array(S * S * 4 * 3).fill(128);
+    for (let i = 0; i < S * S; i++) { det[S * S * 4 + i * 4 + 2] = 255; det[S * S * 4 + i * 4 + 3] = 189; }   // ố = sạch, nứt = sạch
+    return det;
+  };
+  const detTex = new THREE.DataArrayTexture(detPlaceholder(), S, S, 3);
   detTex.format = THREE.RGBAFormat; detTex.type = THREE.UnsignedByteType; detTex.colorSpace = THREE.NoColorSpace;
   detTex.wrapS = detTex.wrapT = THREE.RepeatWrapping;
   detTex.magFilter = THREE.LinearFilter; detTex.minFilter = THREE.LinearMipmapLinearFilter; detTex.generateMipmaps = true;
@@ -450,15 +487,50 @@ export function makeGroundSystem(THREE, opt = {}) {
   let tDet = performance.now(), tMap = 0;
   if (canWork) { try { pending++; getWorker().postMessage({ kind: 'detail', S }); } catch (e) { stats.error = String(e); } }
   else stats.error = 'no Worker/DecompressionStream';
-  let started = false;
-  function start(fp) {
-    if (started || !canWork) return; started = true;
+  // GIẢI PHÓNG bản CPU của 2 texture sau khi upload (−11 MB heap: 8 MB raster + 3 MB chi tiết; đo gc() ép 391 → 379 MB).
+  // Mất/khôi phục ngữ cảnh WebGL: three upload lại mọi texture từ image.data ở lần dùng kế → 'webglcontextrestored'
+  // (chạy SAU listener của three, TRƯỚC khung kế) đặt lại placeholder + tắt uLuOn rồi cho worker dựng lại (~0,3 s).
+  // ?lufree=0 giữ bản CPU (công cụ đọc raster: mapTex.image.data).
+  const RELEASE = opt.release !== false && !(typeof location !== 'undefined' && /[?&]lufree=0/.test(location.search));
+  if (RELEASE) {
+    const free = (t) => { t.image.data = null; };
+    mapTex.onUpdate = free; detTex.onUpdate = free;
+    const cv = typeof document !== 'undefined' && document.getElementById ? document.getElementById('scene') : null;
+    if (cv) cv.addEventListener('webglcontextrestored', () => {
+      uniforms.uLuOn.value = 0;
+      mapTex.image.data = new Uint8Array(n * n * 2); mapTex.needsUpdate = true;
+      detTex.image.data = detPlaceholder(); detTex.needsUpdate = true;
+      if (canWork) { tDet = performance.now(); pending++; getWorker().postMessage({ kind: 'detail', S }); }
+      if (started) { started = false; start(lastFp); }   // lastExtra giữ nguyên
+    }, false);
+  }
+  let started = false, lastFp = null;
+  // claim → đa giác (tròn 24 cạnh, hộp xoay theo quy ước world.js)
+  const claimPolys = (kind) => {
+    const out = [];
+    for (const c of claimsAll()) {
+      if (c.kind !== kind) continue;
+      if (c.type === 'poly') out.push(c.pts.map((p) => [p[0], p[1]]));
+      else if (c.type === 'circle') { const P = []; for (let k = 0; k < 24; k++) { const a = k / 24 * Math.PI * 2; P.push([c.cx + Math.cos(a) * c.r, c.cz + Math.sin(a) * c.r]); } out.push(P); }
+      else { const cs = Math.cos(c.rot), sn = Math.sin(c.rot), P = [];
+        for (const [u, v] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) P.push([c.cx + u * c.hx * cs + v * c.hz * sn, c.cz - u * c.hx * sn + v * c.hz * cs]);
+        out.push(P); }
+    }
+    return out;
+  };
+  let lastExtra = null;
+  function start(fp, ex = {}) {
+    if (started || !canWork) return; started = true; lastFp = fp;
     tMap = performance.now();
+    if (!lastExtra) {
+      lastExtra = { plaza: claimPolys('plaza'), park: claimPolys('park'), bld: (ex.cellKept || []).filter((k) => k.hull && k.hull.length >= 3).map((k) => k.hull) };
+      stats.extra = { plaza: lastExtra.plaza.length, park: lastExtra.park.length, bld: lastExtra.bld.length };
+    }
     // sao chép (không chuyển quyền): D vẫn được các hệ khác dùng
     const f = fp ? { x: fp.x.slice(), z: fp.z.slice(), vStart: fp.vStart.slice(), dead: fp.dead ? fp.dead.slice() : null, nB: fp.nB } : null;
     try {
       pending++;
-      getWorker().postMessage({ kind: 'map', b64: LU_CLS, grid: LU_GRID, fp: f }, f ? [f.x.buffer, f.z.buffer, f.vStart.buffer] : []);
+      getWorker().postMessage({ kind: 'map', b64: LU_CLS, grid: LU_GRID, fp: f, extra: lastExtra }, f ? [f.x.buffer, f.z.buffer, f.vStart.buffer] : []);
     } catch (e) { stats.error = String(e); }
   }
   return { material, start, uniforms, stats, mapTex, detTex };

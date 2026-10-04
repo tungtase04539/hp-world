@@ -621,10 +621,12 @@ export async function buildWorld(scene, prog = () => {}) {
   // Đợt 3 W2-D: bảng màu đỉnh hạ về tông ảnh vệ tinh (trước: be 0xcfc7b2 sáng gần gấp đôi bê tông/đất thật, cỏ
   // 0x83cb6a xanh nõn chuối). Trong ±2048 m shader landuse.js thay màu đỉnh bằng lớp sử dụng đất; màu đỉnh còn dùng cho
   // bờ nước/cát, tấm thô ngoài ô local, WebGL1 và vài trăm ms đầu trước khi worker dựng xong raster.
-  const cSand = new THREE.Color(0xc9b98e), cGrass = new THREE.Color(0x7c9a55),
-        cGrass2 = new THREE.Color(0x5f8146), cDeep = new THREE.Color(0x6f8f83),
-        cCity = new THREE.Color(0x98928a), cHill = new THREE.Color(0x4f7e48),
-        cPort = new THREE.Color(0x96948f), cRock = new THREE.Color(0x8a917c);
+  // ?landuse=0 → mặt đất CŨ (màu đỉnh be + Lambert thường) để A/B ảnh/hiệu năng cùng bản build.
+  const LU_ON = typeof location === 'undefined' || !/[?&]landuse=0/.test(location.search);
+  const cSand = new THREE.Color(LU_ON ? 0xc9b98e : 0xeeda9e), cGrass = new THREE.Color(LU_ON ? 0x7c9a55 : 0x83cb6a),
+        cGrass2 = new THREE.Color(LU_ON ? 0x5f8146 : 0x5fae52), cDeep = new THREE.Color(LU_ON ? 0x6f8f83 : 0x6fa393),
+        cCity = new THREE.Color(LU_ON ? 0x98928a : 0xcfc7b2), cHill = new THREE.Color(LU_ON ? 0x4f7e48 : 0x4f9a52),
+        cPort = new THREE.Color(LU_ON ? 0x96948f : 0xa9a9a4), cRock = new THREE.Color(LU_ON ? 0x8a917c : 0x93a086);
   const tmp = new THREE.Color();
   // công viên/thảm cỏ thật từ OSM: tô xanh nền đất
   const parkPolys = PARKS.map((pts) => {
@@ -645,15 +647,19 @@ export async function buildWorld(scene, prog = () => {}) {
     return false;
   }
   world.inPark = inPark;
-  const cPark = new THREE.Color(0x66884a);
+  const cPark = new THREE.Color(LU_ON ? 0x66884a : 0x6fbf5a);
   // Đợt 3 W2-D: hệ mặt đất sử dụng đất (js/landuse.js): material chung cho ground_local + 2 dải hồ (cùng chương trình
   // shader), raster dựng trong worker khi footprint nhà THẬT đã chốt (world.rbData sau khối fabric).
-  const luSys = makeGroundSystem(THREE, { lite: LITE });
+  const luSys = LU_ON ? makeGroundSystem(THREE, { lite: LITE }) : {
+    material: (o = {}) => new THREE.MeshLambertMaterial({ vertexColors: true, polygonOffset: !!o.polygonOffset,
+      polygonOffsetFactor: o.polygonOffset ? o.polygonOffset[0] : 0, polygonOffsetUnits: o.polygonOffset ? o.polygonOffset[1] : 0 }),
+    start() {}, stats: { off: true },
+  };
   world.landuse = luSys;
-  {
+  if (LU_ON) {
     let tries = 0;
     const kick = () => {
-      if (world.rbData) { luSys.start(world.rbData); return; }
+      if (world.rbData) { luSys.start(world.rbData, { cellKept: world.cellKept }); return; }
       // ?fabric=proc (không có footprint thật) → giữ màu đỉnh (raster không có nhà sẽ biến cả phố thành "bãi trống")
       if (++tries < 240) setTimeout(kick, 250);
     };
