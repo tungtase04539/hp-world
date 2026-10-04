@@ -249,7 +249,7 @@ export function createTraffic(scene, world, opts = {}) {
       if (!hashFree(_p.x, _p.z, a.type === 'car' ? 6 : a.type === 'bike' ? 2.5 : 1)) continue;
       a.vmax = vmaxFor(a, e); a.v = a.vmax * 0.8; a.lim = a.vmax;
       a.x = _p.x; a.z = _p.z; a.h = Math.atan2(_p.tx, _p.tz); a.hInit = true; a.lean = 0;
-      a.blockedT = 0; a.checkAt = 0; a.ghostT = 0; a.waitT = 0;
+      a.blockedT = 0; a.checkAt = 0; a.ghostT = 0; a.waitT = 0; a.avoid = 0; a.avT = 0;
       return true;
     }
     return false;
@@ -316,11 +316,42 @@ export function createTraffic(scene, world, opts = {}) {
       }
     }
     if (lim < 0.7) { a.waitT += 0.1; if (a.waitT > 3) { a.waitT = 0; a.ghostT = 1.5; } } else a.waitT = 0;
-    // người chơi trên đường
+    return lim;
+  }
+  // NGƯỜI CHƠI (đi bộ hoặc đang lái) đứng trên đường đi của tác tử: LÁCH sang bên cho đủ khoảng hở (như xe máy VN
+  // lách người qua đường), lách không đủ (lòng đường/vỉa hè hẹp) thì giảm tốc, dừng hẳn + bấm còi. Trả trần tốc độ.
+  // a.avT = độ lệch ngang mục tiêu (m, dương = bên phải hướng đi) — stepAgent trượt a.avoid về đó với tốc độ giới hạn.
+  // Áp cho cả tác tử đang "thoát kẹt" (ghostT) — trước đây nhánh đó bỏ qua người chơi, xe chạy xuyên qua người.
+  const CLEAR = { bike: 2.0, car: 2.7, walk: 1.0 };      // khoảng cách tâm–người chơi khi lách qua (m)
+  const STOPW = { bike: 1.35, car: 2.1, walk: 0.6 };     // hở ngang nhỏ hơn mức này mà vẫn tới gần → dừng
+  function avoidPlayer(a, px, pz) {
+    const fx = Math.sin(a.h), fz = Math.cos(a.h);
     const dx = px - a.x, dz = pz - a.z, ahead = dx * fx + dz * fz;
-    if (ahead > 0 && ahead < look + 4 && Math.abs(dx * fz - dz * fx) < halfW + 0.6) {
-      lim = Math.min(lim, Math.max(0, (ahead - 3) * 0.8));
-      if (lim < 0.5) { a.blockedT += 0.1; if (a.blockedT > 1.2 && rnd() < 0.08) honk++; }
+    const look = a.type === 'car' ? 11 : a.type === 'bike' ? 6.5 : 2.5;
+    // lệch ngang của người chơi so với QUỸ ĐẠO GỐC (chưa lách): bên phải hướng đi = (−fz, fx)
+    const plBase = -dx * fz + dz * fx + (a.avoid || 0);
+    const clr = CLEAR[a.type];
+    let avT = 0;
+    if (ahead > -2 && ahead < look + (a.type === 'walk' ? 3 : 14) && Math.abs(plBase) < clr) {
+      avT = plBase > 0 ? plBase - clr : plBase + clr;
+      // giới hạn trong mặt cắt phố: xe trong lòng đường (xe máy được lấn tạm sang làn ngược), người trên vỉa hè
+      const e = edges[a.e], hw = e.hw;
+      let lo, hi;
+      if (a.type === 'walk') {
+        const sw = SIDEWALK_W[e.c] || 1.2, i0 = hw + 0.25, i1 = hw + Math.max(0.6, sw - 0.25);
+        lo = a.side > 0 ? i0 : -i1; hi = a.side > 0 ? i1 : -i0;
+      } else {
+        const m = a.type === 'car' ? 1.1 : 0.5;
+        lo = -(hw - m); hi = hw - m;
+        if (a.type === 'car' && !e.oneway) lo = Math.min(lo + hw * 0.6, a.latCur);   // ô tô không lấn hẳn làn ngược
+      }
+      avT = Math.max(lo - a.latCur, Math.min(hi - a.latCur, avT));
+    }
+    a.avT = avT;
+    let lim = 1e9;
+    if (ahead > 0 && ahead < look + 4 && Math.abs(plBase - avT) < STOPW[a.type]) {
+      lim = Math.max(0, (ahead - (a.type === 'walk' ? 0.9 : 3)) * 0.8);
+      if (a.type !== 'walk' && lim < 0.5) { a.blockedT += 0.1; if (a.blockedT > 1.2 && rnd() < 0.08) honk++; }
     } else a.blockedT = 0;
     return lim;
   }
@@ -351,7 +382,7 @@ export function createTraffic(scene, world, opts = {}) {
   function stepAgent(a, dt, px, pz) {
     const e = edges[a.e];
     // tốc độ mục tiêu: bám đuôi + giảm tốc vào cua
-    let target = a.type === 'walk' ? a.walkV : a.lim;
+    let target = a.lim;
     if (a.type !== 'walk' && a.next && e.L - a.s < 18) {
       const sharp = (1 - a.next.cos) * 0.5;                // 0 thẳng … 1 quay đầu
       target = Math.min(target, a.vmax * (1 - 0.6 * sharp) + 1);
@@ -388,6 +419,13 @@ export function createTraffic(scene, world, opts = {}) {
       }
     }
     place(a, _p);
+    // lách người chơi (avoidPlayer): lệch ngang trượt mượt về a.avT, cộng theo vector phải của hướng xe hiện tại
+    if (a.avT || a.avoid) {
+      const k = (a.type === 'car' ? 1.2 : a.type === 'bike' ? 1.8 : 0.9) * dt;
+      a.avoid += Math.max(-k, Math.min(k, (a.avT || 0) - a.avoid));
+      if (Math.abs(a.avoid) < 1e-3 && !a.avT) a.avoid = 0;
+      _p.x += -Math.cos(a.h) * a.avoid; _p.z += Math.sin(a.h) * a.avoid;
+    }
     const dx = _p.x - a.x, dz = _p.z - a.z, d = Math.hypot(dx, dz);
     if (d > 1e-3) {
       const hNew = Math.atan2(dx, dz);
@@ -470,7 +508,7 @@ export function createTraffic(scene, world, opts = {}) {
     }
     if (now - lastHash > 100) {
       lastHash = now; rebuildHash();
-      for (const a of agents) if (a.type !== 'walk') a.lim = followLimit(a, px, pz);
+      for (const a of agents) a.lim = Math.min(a.type === 'walk' ? a.walkV : followLimit(a, px, pz), avoidPlayer(a, px, pz));
     }
     // tái sinh xe ra khỏi bóng + bù thiếu (rải đều theo thời gian: ≤ 12 tác tử/khung)
     let budget = 12;
