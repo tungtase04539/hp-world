@@ -47,10 +47,10 @@ export const FAB_TILE = 450;
 export const DET_TILE = 300;
 const LITE_FAB = TIER <= 1;
 const DET_R = LITE_FAB ? 220 : 380;        // bán kính hiện ban công/mái hiên quanh camera (m)
-const DET_RMAX = 1650;
+const DET_RMAX = 1650;                     // chỉ dựng chi tiết cho nhà có tâm trong r ≤ 1650 m (nhà ngoài ctx.maxR đã bị bỏ)
 // giải phóng mảng CPU của buffer phố sau upload GPU (dựng lại khi khôi phục ngữ cảnh) — xem cuối buildRealFabric.
 // ?fabfree=0 tắt (đo heap A/B, hoặc khi cần raycast/đọc mảng các mesh fab_* để chẩn đoán).
-const RELEASE_CPU = (() => { try { return new URLSearchParams(location.search).get('fabfree') !== '0'; } catch (e) { return true; } })();                     // chỉ dựng chi tiết cho nhà có tâm trong r ≤ 1650 m (BUILD_RADIUS 1600 + 50)
+const RELEASE_CPU = (() => { try { return new URLSearchParams(location.search).get('fabfree') !== '0'; } catch (e) { return true; } })();
 
 // ---------- dữ liệu (giải mã 1 lần, dùng chung: citygen, minimap, cell sink WP3...) ----------
 let _D = null;
@@ -526,16 +526,7 @@ export function fabricCollide(p, r = 0.45) {
             cands.push([(p.x - cx) ** 2 + (p.z - cz) ** 2, cx - (dz / L) * (r + 0.02), cz + (dx / L) * (r + 0.02)]);
           }
           cands.sort((a1, b1) => a1[0] - b1[0]);
-          let found = false;
-          for (const c of cands) if (fabricAt(c[1], c[2]) < 0) { ox = c[1]; oz = c[2]; found = true; break; }
-          // lô KÍN (mọi cạnh giáp nhà khác — dữ liệu v1 dày đặc): xoắn ốc tìm điểm trống gần nhất (hiếm, chỉ khi kẹt)
-          for (let rad = 1; !found && rad <= 40; rad += 1) {
-            const na = Math.max(8, Math.round(rad * 2.5));
-            for (let a = 0; a < na; a++) {
-              const ang = (a / na) * Math.PI * 2, x = p.x + Math.cos(ang) * rad, z = p.z + Math.sin(ang) * rad;
-              if (fabricAt(x, z) < 0) { ox = x; oz = z; found = true; break; }
-            }
-          }
+          for (const c of cands) if (fabricAt(c[1], c[2]) < 0) { ox = c[1]; oz = c[2]; break; }
         }
         p.x = ox; p.z = oz; moved = any = true;
       }
@@ -545,6 +536,21 @@ export function fabricCollide(p, r = 0.45) {
       }
     }
     if (!any) break;
+  }
+  // KẸT (dữ liệu v1 dày đặc): lô KÍN mọi cạnh giáp nhà khác, hoặc KHE/hõm đa giác lõm hẹp hơn 2r (đẩy khỏi tường này lại
+  // lọt vào tường kia) → sau 2 lượt vẫn trong nhà. Xoắn ốc (bước 0,5 m tới 8 m rồi 1 m, ≤ 60 m: khối kho cảng liền nhau) tìm điểm ngoài mọi nhà và cách tường ~r.
+  // Hiếm (đo: ~0,6% tâm nhà v1 thử), chỉ chạy khi kẹt.
+  if (moved && fabricAt(p.x, p.z) >= 0) {
+    const rr = r * 0.95, clear = (x, z) => fabricAt(x, z) < 0 && fabricAt(x + rr, z) < 0 && fabricAt(x - rr, z) < 0 && fabricAt(x, z + rr) < 0 && fabricAt(x, z - rr) < 0;
+    for (let rad = 0.5; rad <= 60; rad += rad < 8 ? 0.5 : 1) {
+      const na = Math.max(8, Math.round(rad * 8)), a0 = rad * 1.7;
+      let hit = false;
+      for (let a = 0; a < na; a++) {
+        const ang = a0 + (a / na) * Math.PI * 2, x = p.x + Math.cos(ang) * rad, z = p.z + Math.sin(ang) * rad;
+        if (clear(x, z)) { p.x = x; p.z = z; hit = true; break; }
+      }
+      if (hit) break;
+    }
   }
   return moved;
 }
@@ -1043,12 +1049,13 @@ export function buildRealFabric(scene, ctx) {
   // GIẢI PHÓNG BẢN CPU của mọi buffer phố SAU KHI upload GPU (onUpload → array = null): ~30 B/đỉnh + chỉ số. Mất/khôi phục
   // ngữ cảnh WebGL (three dựng lại mọi buffer từ .array) → 'webglcontextrestored' trên canvas #scene: chạy lại gen() (xác
   // định, ~0,5-1 s) và thay geometry từng ô TRƯỚC khung hình kế. Ô det chưa từng hiện thì chưa upload → còn giữ mảng.
-  // BẪY: sau khi giải phóng, KHÔNG được raycast/computeBounding*/đọc .array các mesh 'fab_*' (bbox/sphere tính sẵn).
+  // BẪY: sau khi giải phóng, KHÔNG được computeBounding*/đọc .array các mesh 'fab_*' (bbox/sphere tính sẵn; raycast = no-op).
   if (RELEASE_CPU) {
     const freeArr = function () { this.array = null; };
     const release = (g) => { for (const k in g.attributes) g.attributes[k].onUpload(freeArr); if (g.index) g.index.onUpload(freeArr); };
-    for (const m of meshes) release(m.geometry);
-    for (const m of detMeshes) release(m.geometry);
+    const noRay = () => {};   // raycast (vd __hp.pick) đọc .array → bỏ qua mesh phố thay vì ném lỗi
+    for (const m of meshes) { release(m.geometry); m.raycast = noRay; }
+    for (const m of detMeshes) { release(m.geometry); m.raycast = noRay; }
     const cv = typeof document !== 'undefined' && document.getElementById ? document.getElementById('scene') : null;
     if (cv) cv.addEventListener('webglcontextrestored', () => {
       const t1 = performance.now();
