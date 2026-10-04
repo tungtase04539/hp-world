@@ -12,6 +12,7 @@ import {
 } from './terrain.js';
 import { LM_SIZE, FACADE_SHORT_SIDE } from './mapdata.js';
 import { makeWaterMaterial } from './water.js';
+import { makeGroundSystem } from './landuse.js';   // Đợt 3 W2-D: mặt đất theo sử dụng đất (raster + shader)
 import { STREETS, INTERSECTIONS, MEDIANS, GARDENS } from './mapdata.js';
 import { SIDEWALK_BY_ROAD, SIDEWALK_DEFAULT } from './sidewalks.js';
 import { PANO_SIDES } from './panosides.js';
@@ -617,10 +618,15 @@ export async function buildWorld(scene, prog = () => {}) {
   const LOCAL_HALF = BUILD_RADIUS + 400;
   // hộp [x1, x2, z1, z2] của 2 dải lưới mịn 5 m (hồ Tam Bạc, hồ Sen) — dùng lại ở 2 khối bên dưới
   const FINE_BOXES = [[-1330, -65, -75, 530], [-215, 205, 690, 1220]];
-  const cSand = new THREE.Color(0xeeda9e), cGrass = new THREE.Color(0x83cb6a),
-        cGrass2 = new THREE.Color(0x5fae52), cDeep = new THREE.Color(0x6fa393),
-        cCity = new THREE.Color(0xcfc7b2), cHill = new THREE.Color(0x4f9a52),
-        cPort = new THREE.Color(0xa9a9a4), cRock = new THREE.Color(0x93a086);
+  // Đợt 3 W2-D: bảng màu đỉnh hạ về tông ảnh vệ tinh (trước: be 0xcfc7b2 sáng gần gấp đôi bê tông/đất thật, cỏ
+  // 0x83cb6a xanh nõn chuối). Trong ±2048 m shader landuse.js thay màu đỉnh bằng lớp sử dụng đất; màu đỉnh còn dùng cho
+  // bờ nước/cát, tấm thô ngoài ô local, WebGL1 và vài trăm ms đầu trước khi worker dựng xong raster.
+  // ?landuse=0 → mặt đất CŨ (màu đỉnh be + Lambert thường) để A/B ảnh/hiệu năng cùng bản build.
+  const LU_ON = typeof location === 'undefined' || !/[?&]landuse=0/.test(location.search);
+  const cSand = new THREE.Color(LU_ON ? 0xc9b98e : 0xeeda9e), cGrass = new THREE.Color(LU_ON ? 0x7c9a55 : 0x83cb6a),
+        cGrass2 = new THREE.Color(LU_ON ? 0x5f8146 : 0x5fae52), cDeep = new THREE.Color(LU_ON ? 0x6f8f83 : 0x6fa393),
+        cCity = new THREE.Color(LU_ON ? 0x98928a : 0xcfc7b2), cHill = new THREE.Color(LU_ON ? 0x4f7e48 : 0x4f9a52),
+        cPort = new THREE.Color(LU_ON ? 0x96948f : 0xa9a9a4), cRock = new THREE.Color(LU_ON ? 0x8a917c : 0x93a086);
   const tmp = new THREE.Color();
   // công viên/thảm cỏ thật từ OSM: tô xanh nền đất
   const parkPolys = PARKS.map((pts) => {
@@ -641,7 +647,26 @@ export async function buildWorld(scene, prog = () => {}) {
     return false;
   }
   world.inPark = inPark;
-  const cPark = new THREE.Color(0x6fbf5a);
+  const cPark = new THREE.Color(LU_ON ? 0x66884a : 0x6fbf5a);
+  // Đợt 3 W2-D: hệ mặt đất sử dụng đất (js/landuse.js): material chung cho ground_local + 2 dải hồ (cùng chương trình
+  // shader), raster dựng trong worker khi footprint nhà THẬT đã chốt (world.rbData sau khối fabric).
+  // edge: 170 m cuối trước ±LOCAL_HALF hoà về màu đỉnh = màu tấm thô bên ngoài (không đường nối thẳng ở ±2000 m)
+  const luSys = LU_ON ? makeGroundSystem(THREE, { lite: LITE, edge: LOCAL_HALF }) : {
+    material: (o = {}) => new THREE.MeshLambertMaterial({ vertexColors: true, polygonOffset: !!o.polygonOffset,
+      polygonOffsetFactor: o.polygonOffset ? o.polygonOffset[0] : 0, polygonOffsetUnits: o.polygonOffset ? o.polygonOffset[1] : 0 }),
+    start() {}, stats: { off: true },
+  };
+  world.landuse = luSys;
+  // ?fabric=proc (không có footprint thật, world.rbData không bao giờ có) → không chờ: giữ màu đỉnh (raster không có nhà
+  // sẽ biến cả phố thành "bãi trống")
+  if (LU_ON && FABRIC === 'real') {
+    let tries = 0;
+    const kick = () => {
+      if (world.rbData) { luSys.start(world.rbData, { cellKept: world.cellKept }); return; }
+      if (++tries < 240) setTimeout(kick, 250);
+    };
+    setTimeout(kick, 250);
+  }
   // Cao độ + màu của MỘT đỉnh mặt đất: ghi màu vào colors[i*3..], trả về h (chưa cộng offset).
   // Dùng chung cho tấm toàn thế giới và lưới local để 2 mặt không lệch màu ở mép.
   function vertexHC(x, z, colors, i) {
@@ -728,7 +753,7 @@ export async function buildWorld(scene, prog = () => {}) {
       return Math.max(h, coarse.yAt(x, z)) + 0.012;
     });
     // polygonOffset nhẹ: lưới local lùi sau trong depth so với các mặt lát +0.03 đặt trên nó (chống z-fight ở xa)
-    const groundLocal = new THREE.Mesh(local.geo, new THREE.MeshLambertMaterial({ vertexColors: true, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 2 }));
+    const groundLocal = new THREE.Mesh(local.geo, luSys.material({ polygonOffset: [1, 2] }));
     // tên 'ground_local': freezeStatic bỏ qua theo /^ground/ (không gộp, không castShadow), nearCull không khớp
     groundLocal.name = 'ground_local';
     groundLocal.receiveShadow = true;
@@ -793,8 +818,8 @@ export async function buildWorld(scene, prog = () => {}) {
     }
     g2.setAttribute('color', new THREE.BufferAttribute(col2, 3));
     g2.computeVertexNormals();
-    const lakeGround = new THREE.Mesh(g2, new THREE.MeshLambertMaterial({ vertexColors: true }));
-    lakeGround.name = 'lake_ground';
+    const lakeGround = new THREE.Mesh(g2, luSys.material());
+    lakeGround.name = 'ground_lake';   // W2-D: tên ^ground → freezeStatic KHÔNG gộp (gộp lượt 1 thay material → mất shader landuse), không cast bóng
     lakeGround.receiveShadow = true;
     scene.add(lakeGround);
   }
@@ -807,8 +832,7 @@ export async function buildWorld(scene, prog = () => {}) {
     g2.translate((X1 + X2) / 2, 0, (Z1 + Z2) / 2);
     const p2 = g2.attributes.position;
     const col2 = new Float32Array(p2.count * 3);
-    const cSand2 = new THREE.Color(0xeeda9e), cDeep2 = new THREE.Color(0x6fa393),
-          cG1 = new THREE.Color(0x83cb6a), cG2 = new THREE.Color(0x5fae52), cCity2 = new THREE.Color(0xcfc7b2);
+    const cSand2 = cSand, cDeep2 = cDeep, cG1 = cGrass, cG2 = cGrass2, cCity2 = cCity;
     const tmp2 = new THREE.Color();
     for (let i = 0; i < p2.count; i++) {
       const x = p2.getX(i), z = p2.getZ(i);
@@ -827,8 +851,8 @@ export async function buildWorld(scene, prog = () => {}) {
     }
     g2.setAttribute('color', new THREE.BufferAttribute(col2, 3));
     g2.computeVertexNormals();
-    const m2 = new THREE.Mesh(g2, new THREE.MeshLambertMaterial({ vertexColors: true }));
-    m2.name = 'hosen_ground'; m2.receiveShadow = true; scene.add(m2);
+    const m2 = new THREE.Mesh(g2, luSys.material());
+    m2.name = 'ground_hosen'; m2.receiveShadow = true; scene.add(m2);   // W2-D: ^ground như trên
   }
 
   // ---------- Mặt nước ----------

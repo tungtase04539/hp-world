@@ -1,0 +1,16 @@
+A 8414 tier 3 heap 386 err 0 None lu None
+    cam_spawn      {'calls': 375, 'tris': 3897544, 'forcedMs': 5.37}
+    pano_007_h090  {'calls': 546, 'tris': 5585332, 'forcedMs': 6.36}
+    cam_yard2      {'calls': 298, 'tris': 3196276, 'forcedMs': 4.62}
+    cam_edge       {'calls': 69, 'tris': 559492, 'forcedMs': 2.17}
+    game_3         {'calls': 376, 'tris': 6405995, 'forcedMs': 6.55}
+    ag_edge        {'calls': 51, 'tris': 439831, 'forcedMs': 1.42}
+    ag_chuahang    {'calls': 71, 'tris': 1169964, 'forcedMs': 2.44}
+B 8404 tier 3 heap 379 err 0 None lu {'mapWorkerMs': 137.80000000447035, 'mapMs': 1282.2999999970198, 'ready': True}
+    cam_spawn      {'calls': 375, 'tris': 3927922, 'onMs': 5.47, 'offMs': 5.44, 'shaderMs': 0.03}
+    pano_007_h090  {'calls': 549, 'tris': 5628776, 'onMs': 6.59, 'offMs': 6.52, 'shaderMs': 0.07}
+    cam_yard2      {'calls': 298, 'tris': 3201620, 'onMs': 4.97, 'offMs': 4.69, 'shaderMs': 0.28}
+    cam_edge       {'calls': 69, 'tris': 559492, 'onMs': 2.43, 'offMs': 2.22, 'shaderMs': 0.21}
+    game_3         {'calls': 376, 'tris': 6427175, 'onMs': 6.98, 'offMs': 6.88, 'shaderMs': 0.1}
+    ag_edge        {'calls': 51, 'tris': 439831, 'onMs': 1.53, 'offMs': 1.24, 'shaderMs': 0.29}
+    ag_chuahang    {'calls': 70, 'tris': 1153024, 'onMs': 2.73, 'offMs': 2.49, 'shaderMs': 0.24}
