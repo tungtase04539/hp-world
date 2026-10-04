@@ -428,19 +428,28 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     ảnh game_8 cũng không khớp real_8 — đáng soát lại georef/khung tile 8.)
     **(4) ĐÊM 21:00** (đo sRGB trên ảnh): (a) VŨNG SÁNG cho đèn DỰNG TAY (đèn hồ Tam Bạc/ven hồ, đèn ô cells — chỉ có cầu
     `sharedMats.lampGlow`, mặt đường quanh đen sRGB ≈ 37): `daynight.buildLampPools` quét 1 lần sau freezeStatic mọi đỉnh mesh
-    dùng lampGlow (đã gộp ô → toạ độ thế giới), gom ô 1,5 m liền kề = 1 đầu đèn (cao 2,2-16 m), quad cộng sáng nằm trên mặt
-    lát (cùng kiểu props: falloff cos³, MeshBasic additive có sương), cỡ 2,6×cao (8-15 m), 1 InstancedMesh `night_lamp_pools`
-    (noCull, renderOrder 3) — opacity = đêm × `LIGHT.poolOpacity` 0,2; đèn gang 3 bóng của props (ornI) nay cũng có vũng 11 m
-    (trước chỉ cobra/đèn cột → dải vườn hoa tối). (b) BIỂN: shader phố trần độ chói tự sáng của dải biển `≤ 0,45·0,24`
+    dùng lampGlow (đã gộp ô → toạ độ thế giới), gom ô 1,5 m liền kề = 1 đầu đèn (cao 2,2-16 m), quad cộng sáng (cùng kiểu
+    props: falloff cos³, MeshBasic additive có sương), cỡ 2,6×cao (8-15 m), 1 InstancedMesh `night_lamp_pools` (114 vũng;
+    noCull, renderOrder 3) — opacity = đêm × `LIGHT.poolOpacity` 0,2; đèn gang 3 bóng của props (ornI) nay cũng có vũng 11 m
+    (trước chỉ cobra/đèn cột → dải vườn hoa tối). **ĐỘ CAO QUAD = g + max(SIDEWALK_TOP 0,25, roadNet.surfaceAt) + 0,035**
+    (phản biện: bản đầu dùng `surfaceAt` trần — nó chỉ biết lòng/vỉa của roadnet, ngoài mạng đường trả 0 ⇒ quad g+0,047 nằm
+    DƯỚI mặt lát nổi → depth test che 68/114 vũng: caro ven hồ g+0,24…0,255, caro Tam Bạc g+0,20, đá quảng trường Nhà hát
+    g+0,045…0,06). Đo mặt lát bằng raycast 4 tia/đầu đèn: sau sửa 111/114 quad trên mặt lát tại chỗ, 2 trên mặt cầu (g có
+    deck), 1 dưới 1 khối 0,77 m đứng trên lòng đường (513,−256 — vũng vẫn hiện trên nhựa/vỉa quanh khối). Raycast lúc chạy
+    để đặt quad đã đo và BỎ: 5,8 s (lưới đất `ground_local` 180k tri + ô gộp mrg10/fab_main ≈ 330k tri mỗi tia), bỏ lưới
+    đất vẫn 0,67 s. Ảnh trước/sau: scratchpad W2-F nfix_lake.jpg (đèn đôi ven hồ cạnh camera: base = bản đầu không vũng →
+    nay có), nfix_2.jpg (pano_007: dải lát đỏ ven hồ có vũng), nfix_3.jpg. (b) BIỂN: shader phố trần độ chói tự sáng của dải biển `≤ 0,45·0,24`
     (nền đậm giữ nguyên, nền trắng/vàng nhạt giảm tới ~4× — trước loá bloom, chữ không đọc được); biển CHỮ THẬT neo mặt tiền
     (`real_shop_signs_*`) thành hộp đèn: emissiveMap = texture, `world.signMats`, daynight đặt emissiveIntensity = đêm ×
-    `LIGHT.signGlow` 0,35. (c) Cửa sổ sáng: ~½ đèn tuýp/LED trắng lạnh (0,80,0,88,1), ½ vàng ấm (trước mọi cửa sổ cam).
+    `LIGHT.signGlow` 0,35; biển neo mặt tiền `FrontSide` (lưng áp hộp biển 3D — DoubleSide làm mặt lưng sáng chữ ngược),
+    biển không neo (fabric proc) giữ DoubleSide như cũ. (c) Cửa sổ sáng: ~½ đèn tuýp/LED trắng lạnh (0,80,0,88,1), ½ vàng ấm (trước mọi cửa sổ cam).
     (d) `cityAmb` (đèn phố dội) chia mặt ngửa/úp `cityAmbUp/Down` 0,7/0,8 (WP5: 0,5/1,0) → tường giữ 0,75, lòng đường +40%
     (sRGB 37 → 40 giữa 2 vũng; dưới đèn 90-120). Ảnh: scratchpad W2-F nb*/na*/nbm.jpg.
     **(5) GIAO THÔNG NÉ XE ĐỖ**: mỗi ô tô đỗ (`world.props.parkedCars`) chiếu lên cạnh đồ thị có mép bó vỉa gần nhất →
     đoạn [u ± (dài/2 + 2,5 m)] + phía + mép trong; tác tử đi qua đoạn đó lệch ngang ≤ mép trong − nửa rộng (xe máy 0,45 / ô
     tô 0,95) − 0,3 (phố 2 chiều không đẩy quá tim 0,35), trượt ngang mượt `a.pk` (1,6/1,1 m/s, nhìn trước max(5, 1,4·v) m);
-    `place()` cộng pk vào latCur, prevLat mang pk qua nút. `check().parkHit` (thân xe chạy chồng xe đỗ) + `traffic.parkStats`.
+    `place()` cộng pk vào latCur, prevLat mang pk qua nút, và đoạn hoà TRƯỚC nút cũng cộng pk vào `latFor(next)` (thiếu thì
+    đúng lúc qua nút xe nhảy ngang 0,5·pk trong 1 khung — phản biện). `check().parkHit` (thân xe chạy chồng xe đỗ) + `traffic.parkStats`.
     Đo 8 điểm × 3 s (~5k mẫu xe): 7,4% → 0%; wrongSide/offRoad/overlap không đổi (0-1).
     **(6) DỌN CODE CHẾT** do wave 1 để lại: `addMergedTiled` (hết người gọi sau WP6), `grandMat`, `nearRealBuilding`, import
     `ROADS_REGION`/`RIVERS` (world.js), `LM` (main.js), `THREE` (npcs.js). Helper chết TỪ TRƯỚC wave 1 trong khối cells
@@ -456,7 +465,8 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     + tham số + version đúng, không đẩy điểm ảnh) rồi mỗi khung đẩy 1 DẢI ~6 MB hàng ảnh bằng `texSubImage2D(…,0,y,w,h,…,
     ImageBitmap)` + `UNPACK_SKIP_ROWS` (WebGL2 cho chọn hình chữ nhật con của TexImageSource; BẮT BUỘC trả SKIP_ROWS về 0), dải
     cuối `generateMipmap`; model vẫn ở layer ẩn tới khi đủ dải; trước Bắt đầu bơm theo NGÂN SÁCH 32 ms/khung (màn chờ che cảnh);
-    texture lớn không tách được cách nhau ≥ 2 khung. (b) `daynight.shadowMoved` 2 m/0,15 rad → 6 m/0,3 rad (bóng tĩnh lấy mẫu
+    texture lớn không tách được cách nhau ≥ 2 khung; chặn `state.texSubImage2D` là nội bộ three r160 → `canSplit` chỉ bật khi
+    `THREE.REVISION === '160'` (nâng three: kiểm lại initTexture rồi mới nới). (b) `daynight.shadowMoved` 2 m/0,15 rad → 6 m/0,3 rad (bóng tĩnh lấy mẫu
     bằng ma trận lần vẽ trước nên đúng chỗ khi hộp ±70-110 m lệch vài mét; caster động đã tắt bóng thật khi di chuyển).
     **ĐO A/B CÙNG PHIÊN** (dot3 ea5f57f bản sao `git archive` có assets hard-link, cổng 8416 → W2-F, liền nhau, khoá GPU,
     ANGLE Radeon 890M d3d11, TIER 3): xe máy NGAY sau Bắt đầu: khung > 33 ms 17 → 11, > 50 ms 4 → 2, tối đa 108,5 → 57 ms,
@@ -464,7 +474,9 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     > 50 ms 0 → 0, p95 20,3 → 20,2. hpReady 4,23 / 4,21 s, Start mở 6,18 / 6,24 s, heap thô 361 / 363 MB (không đổi). 24 góc
     std (`--traffic off --perf`): fps TB 60,1 / 60,0 (chạm vsync), draw call TB 400 / 395, 0 lỗi JS. Ảnh ngày khác base chỉ
     ở lá cây/bóng lá (gió theo đồng hồ thật). diag full 0 vấn đề (parkHit 0), lite chỉ 404 `assets_lite` (môi trường),
-    waterbfs 5/5, WebGL1 0 lỗi.
+    waterbfs 5/5, WebGL1 0 lỗi. Sau phản biện (vũng đèn trên mặt lát, pk qua nút, biển FrontSide, chặn REVISION) chạy lại:
+    24 góc std 0 lỗi, fps TB 60,2 (vsync), draw call TB 398, tam giác như cũ, ảnh ngày chỉ khác lá/bóng lá; WebGL1 7 góc 0
+    lỗi; diag full 0 vấn đề (parkHit 0); lite chỉ 404 `assets_lite`; waterbfs 5/5.
     **BẪY**: (a) `node --check js/x.js` trong repo này coi .js là CommonJS và KHÔNG báo lỗi cú pháp module (đã lọt 1 lỗi) →
     chép sang .mjs rồi check; (b) đừng pipe `shoot.mjs | head` — head đóng ống, node chết giữa chừng (không có _result.json);
     (c) `heredoc` + python ghi `'\\n'` vào chuỗi JS có thể thành xuống dòng thật — sửa bằng Edit/kiểm .mjs.
