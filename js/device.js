@@ -68,6 +68,24 @@ export const TIER = (() => {
 })();
 export const LITE = TIER <= 1;
 
+// NÚM CHẤT LƯỢNG ÁNH SÁNG (Đợt 3 WP5) — NGUỒN DUY NHẤT, chỉ theo TIER (không bao giờ theo cảm ứng).
+//  post: chuỗi hậu kỳ (scene RT MSAA + AO + bloom + tone/grade) — TIER ≥ 2; TIER ≤ 1 vẽ thẳng ra màn hình nhưng
+//        CÙNG tone mapping/grade (CustomToneMapping) nên màu khớp mọi đường vẽ.
+//  ao: AO theo độ sâu nửa độ phân giải. Đo trên Radeon 890M (KNOWLEDGE §10 Đợt 3 WP5): 0,25-0,32 ms GPU ở 1280×720 → bật
+//      cả TIER 2 (ngưỡng SPEC ≤ 2,5 ms); aoSamples ít hơn ở TIER 2.
+//  shadowMap/shadowBox: bản đồ bóng và nửa cạnh hộp bóng (m). envSize: cạnh cubemap bầu trời nướng PMREM.
+//  clouds: lớp mây thủ tục trên vòm trời (rất rẻ — chỉ tắt ở TIER 0 phần mềm).
+export const GFX = {
+  post: TIER >= 2,
+  msaa: TIER >= 2 ? 4 : 0,
+  ao: TIER >= 2,
+  aoSamples: TIER >= 3 ? 12 : 8,
+  shadowMap: TIER >= 3 ? 2048 : 1024,
+  shadowBox: TIER >= 3 ? 110 : 70,
+  envSize: TIER >= 2 ? 128 : 64,
+  clouds: TIER >= 1,
+};
+
 // Chrome/Edge trên laptop 2 GPU bám adapter mà Windows gán (thường iGPU); WebGL powerPreference KHÔNG đổi
 // được card trên Windows (đo 2026-09-05: RTX 4060 nằm không, WebGL chạy Radeon 890M). Khi thấy iGPU trên
 // máy nhiều nhân → gợi ý người chơi chỉnh Windows Graphics Settings (main.js hiện toast 1 lần).

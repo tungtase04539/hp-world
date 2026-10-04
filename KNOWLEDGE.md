@@ -30,12 +30,23 @@ Trò chơi: thế giới 3D Hải Phòng **tỉ lệ 1:1 mét thật** (từ 202
 | `js/terrain.js` | Cao độ/đất-nước thuần JS (không import three → chạy được trong node để test) |
 | `js/world.js` | Dựng toàn bộ thế giới 3D, collider, spawn, `async buildWorld(scene, prog)` (Đợt 3: `await prog('<bước>')` ở cấp 1 = báo tiến trình + nhường luồng) |
 | `js/boot.js` | Màn chờ: thanh dựng thế giới theo bước (trọng số = lần khởi động trước, localStorage `hp3d.bootProfile.v1`), nút Bắt đầu khoá tới khi sẵn sàng |
+| `js/world.js` | Dựng toàn bộ thế giới 3D, collider, spawn, `buildWorld(scene)` |
+| `js/citygen.js` | ĐỢT 3: dựng PHỐ NHÀ THẬT từ footprint RB01 (`buildings_real.js`) — 1 quad/cạnh tường + shader atlas, mái/tum/bồn/tôn, ban công/mái hiên/hộp biển/điều hoà 3D (ô gần), va chạm đa giác (`fabricCollide/At/Hit`), `fabricData()` dùng chung (world.js đặt `world.rbData`/`world.rbGrid` cho cây/props/camera). Cờ `FABRIC` (world.js, `?fabric=proc` = phố giả cũ) |
+| `js/facade_atlas.js` (+ `facade_atlas_worker.js`) | Atlas mặt tiền/mái/chi tiết/biển hiệu VN vẽ thủ tục bằng rasterizer phần mềm (8×8 ô, alpha = mặt nạ), vẽ trong Worker |
 | `js/assets.js` | Đăng ký + preload + streaming GLB theo khoảng cách |
-| `js/main.js` | Vòng lặp game, camera, người chơi, bloom, autoQuality, `window.__hp` |
+| `js/main.js` | Vòng lặp game, camera, người chơi, chuỗi hậu kỳ (composer), autoQuality, `window.__hp` |
+| `js/daynight.js` | Ngày/đêm (1440 s/ngày, mặt trời thiên văn), vòm trời shader, đèn mặt trời/trăng + bán cầu, sương FogExp2, PMREM bầu trời (IBL), hộp bóng snap texel, chế độ vệ tinh — Đợt 3 WP5 |
+| `js/skymodel.js` | Mô hình trời tán xạ Rayleigh+Mie + hướng mặt trời (JS thuần, chạy được trong node) — MỘT nguồn cho vòm/đèn/sương |
+| `js/post.js` | Tone mapping + grade DÙNG CHUNG mọi đường vẽ (CustomToneMapping = ACES + grade), SceneAOPass (MSAA + AO theo depth), FinalPass, `HP_UNLIT_K` |
+| `js/water.js` | Vật liệu nước Standard (IBL trời, Fresnel) + bản đồ bờ/hồ — MỘT nguồn màu nước |
+| `js/device.js` | `TIER` + `GFX` (núm chất lượng ánh sáng/hậu kỳ — chỉ theo TIER, không theo cảm ứng) |
 | `js/landmarks.js` | 15 biển thông tin địa danh (vị trí suy ra từ mapdata) |
 | `js/traffic.js` / `js/vehicles.js` / `js/npcs.js` / `js/quests.js`... | Giao thông, xe cưỡi được, NPC, nhiệm vụ |
 | `js/roadgraph.js` / `js/trafficmodels.js` | Đồ thị phố thật (nút giao, đường đôi một chiều — thuần JS, chạy được trong node) / mô hình xe máy·ô tô·người đi bộ INSTANCED + shader nhuộm |
 | `js/footprints.js` | Tra cứu footprint nhà thật ĐANG VẼ (world.rbData/rbGrid của WP2, không có thì chỉ địa danh LM_POLY) cho gameplay: camera chống xuyên tường, chỗ xuống xe, người đi bộ |
+| `js/trees.js` | HỆ CÂY instanced (Đợt 3 WP4): `plant/plantLocal` (mọi helper cây chỉ xếp hàng), `plantStreetTrees` (trồng theo dữ liệu dọc phố), `buildTrees` (atlas lá + kit 9 loài + LOD gần/xa/hero GLB) — xem §10 (WP4-trees) |
+| `js/treemap.js` | **SINH TỰ ĐỘNG** bởi `tools/gen_treemap.mjs` từ `audit/audit_enriched.json` (thảm cây 551 pano) — KHÔNG sửa tay |
+| `js/traffic.js` / `js/vehicles.js` / `js/npc.js` / `js/quests.js`... | Giao thông, xe cưỡi được, NPC, nhiệm vụ |
 | `tools/` | Pipeline dữ liệu + test tự động (xem mục 7, 8) |
 
 Quan hệ dữ liệu: `tools/fetch_osm.sh` → `osm_*.json` → `tools/process_osm.mjs` → `js/mapdata.js`
@@ -190,12 +201,15 @@ registerModel({ url:'assets/xxx.glb', name, x, z, preload:true, place: (m) => {
   scale = kích_thước_mong_muốn / max(size.x,size.z)   // hoặc /size.y với tượng
   m.rotation.y = orientLong(LM_DIR.key, LM_FACE.key)  // xoay TRƯỚC khi đo lại box
   // đo lại box → dịch tâm về (x,z); y += LAND_H − box.min.y − 0.55 (dìm nhẹ chống lơ lửng)
-  // castShadow/receiveShadow; anisotropy=8 cho mọi map; envMapIntensity=0.85
+  // castShadow/receiveShadow; anisotropy=8 cho mọi map; (envMapIntensity=0.85 ở đây bị assets.js GHI ĐÈ = 0,5 SAU place)
   // thêm plinth (bệ) + bậc thềm che chân model
 }});
 ```
 - box.min.y có thể là tán cây/chi tiết thấp — kiểm tra bằng mắt, chỉnh độ dìm.
-- PBR chỉ đẹp khi scene có `scene.environment` = PMREM RoomEnvironment (đã bật trong main.js).
+- PBR chỉ đẹp khi scene có `scene.environment` = PMREM. Từ Đợt 3 (WP5) đó là PMREM nướng từ CHÍNH vòm trời
+  (`daynight.js` bakeEnv, ~3 s/lần, tự tối về đêm) — KHÔNG còn RoomEnvironment; GLB `envMapIntensity` = 0,5
+  (`GLB_ENV_INTENSITY`, ghi bởi `assets.js` applyGlbEnv SAU `place()` cho bản gốc và cho twin lite → 2 bản LOD sáng như
+  nhau) và chính sách emissive ở `assets.js` applyGlbMaterialPolicy (xem §10 Đợt 3 WP5).
 
 ### 5.6 Dập ảnh chuẩn THẲNG vào texture GLB (ảnh nhạy cảm — chân dung Bác Hồ ở Nhà hát lớn)
 Yêu cầu: ảnh nhạy cảm KHÔNG BAO GIỜ để AI sinh/méo — phải là ảnh gốc, dập trực tiếp vào texture.
@@ -486,6 +500,151 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     (không GPU): map 'three' → lib/three.module.js bằng module.register + shim window/location/localStorage + đồng hồ
     performance.now giả — đo va chạm xe–người (72 điểm × 50 s): bản đầu 557 lượt < 0,8 m / 190 xuyên < 0,45 m → 483 /
     164 (−13 %); ~9 % người đi bộ ở trong lòng đường tại một thời điểm = đang băng qua phố ngang (vỉa hè đứt ở ngã tư).
+- **2026-10-04 (dot3-WP2 FABRIC)** [PHỐ NHÀ THẬT TỪ FOOTPRINT — `js/citygen.js` + `js/facade_atlas.js` (+ `_worker.js`)]:
+    **(1) CỜ `FABRIC`** (world.js cạnh BUILD_RADIUS): mặc định `'real'`; `?fabric=proc` = bộ sinh nhà GIẢ cũ để A/B. Các khối
+    `if (FABRIC === 'proc') {` thay `{` ở: vòng OSM BUILDINGS, mái hiên/biển generic (InstancedMesh cap 300), `house()` rows,
+    `shophouse_infill`, `block_infill` (+ dãy LHP), `port_kho`, `_buildAnchor` (Sở GTVT/Cảng vụ/BV QT), 3 `tower()` giả. CHƯA
+    gate (thuộc khối cells — WP3): `port_kho_100+` (fix t8) và `port_kho_0..`. Hàm `house()`/`facadeMats` giữ (grandMat dùng).
+    Mọi chỗ đọc `_bldGrid`/`houseEvidence`/`nearRealBuilding` nay chỉ còn trong nhánh proc (FABRIC 'real' không nạp chúng).
+    **(2) VÙNG GIỮ CHỖ trước khi dựng** (world.js, ngay sau `cornersDry`, TRƯỚC mái hiên/biển/cây): `LM_POLY` (+3 m, đệm miter)
+    kind 'landmark' ('square' → 'plaza'); vòng tròn khối GLB lệch/to hơn footprint (opera 28, bưu điện lùi 9 m r27, bảo tàng
+    21, nhà thờ 25, ga 30, THPT NQ 44, đền Nghè, đình HK, chùa Hàng, NHNN 34, đền Tam Kỳ, Nhà Kèn, Chợ Sắt +12,+4 r60); hộp CVH
+    Thanh Niên; `PARKS` (đa giác OSM — KHÔNG dùng `GARDENS`: đó là bbox TRỤC THẲNG của chính các park, dải vườn hoa chạy chéo
+    nên bbox nuốt ~110 nhà thật hai bên phố); tập con THẬT SỰ MỞ của `openSpace` (quảng trường Nhà hát r62, hành lang Nhà hát→
+    Quán hoa, QT Lê Chân, QT Triển lãm, chợ Cột Đèn, bãi Cầu Đất, road#9 2 hộp, CV ĐBP tây, 2 promenade Tam Bạc, CV Bạch Đằng,
+    Bến Bính, hành lang ray Mê Linh). Zone dạng HÀM thử tại TÂM: `clearedZone`, `inSuperblock`, hộp nút cầu HVT, `lakeSD<16`,
+    `hoSenSD<10`, kè hồ 25 m. Các zone openSpace kiểu "khuôn viên công sở / bệnh viện / ngã tư bảo tàng / kè sông 42 m / cầu Lạc
+    Long" CỐ Ý BỎ: chúng chặn nhà GIẢ, còn footprint thật ở đó là nhà thật. Nhà bị `D.dead[b]=1` khi tâm trong claim HOẶC
+    `claimOverlapFrac>0.2` (mọi kind — claim 'cell' của WP3 tự có hiệu lực, miễn đăng ký TRƯỚC khối này) HOẶC chứa/sát (<0,5 m)
+    điểm camera pano (lệch đăng ký/đè đường). v0: 289 do claim + 119 do zone + 9 do pano. `claims.js` thêm lọc nhanh BBOX
+    trong `claimOverlapFrac` (kết quả y hệt; cần khi WP3 rải ~1.200 claim 'cell').
+    **(3) ATLAS** (`facade_atlas.js`): rasterizer PHẦN MỀM ghi thẳng Uint8ClampedArray (không canvas: premultiply hỏng RGB ở
+    mặt nạ 0, getImageData 2048² 30-40 ms; Clamped để cộng sáng/bóng không quấn 255→0). 8×8 ô, mỗi ô 1 MÔ-ĐUN = 1 bay 4 m × 1
+    tầng (tầng trệt 3,9 / trên 3,3 / lan can 0,9 m) hoặc 4×4 m mái/chi tiết; 63 ô: 20 tầng trên (nhôm kính+hoa sắt, ban công
+    Juliet, chuồng cọp, ốp gạch, điều hoà, lô gia, cửa chớp Pháp, vòm, con tiện, KTT, vách kính, băng cửa, biệt thự, công sở,
+    tôn kho), 16 tầng trệt (tạp hoá kệ hàng, shop quần áo, quán ăn ghế nhựa, nhà thuốc, cửa cuốn ×2, kính, cửa xếp, nhà ở ×2,
+    phố cũ cửa gỗ vòm, kho, công sở + 3 thêm sau phản biện, đặt SAU D_AC: SỬA XE MÁY `G_MOTO`, ĐIỆN THOẠI `G_ELEC`, ĐIỆN NƯỚC
+    `G_HARD` — mặt phố liền của WP1 v1 từng lặp 1 kiểu kệ hàng cả dãy), 7 tường hông/sau/chung (vữa, xi măng thô, ố, cửa sổ nhỏ, mảng gạch, QUẢNG CÁO VẼ TAY từ
+    chung "HÚT BỂ PHỐT"), 2 lan can mái, 4 mái (bê tông, GẠCH LÁ NEM ĐỎ giữ màu, tôn sóng, ngói), 8 chi tiết, 5 ô × 4 dải BIỂN
+    HIỆU (20 từ CHUNG: CÀ PHÊ, TẠP HOÁ, PHỞ BÒ... + SĐT giả RÕ RÀNG '0000.xxx.xxx' — đầu 0000 không phải mã vùng/mạng
+    nào; từng dùng '0225.3xxx.xxx' = đúng định dạng máy bàn HP thật, có thể trùng thuê bao — KHÔNG thương hiệu), mặt trước CỤC NÓNG ĐIỀU HOÀ `D_AC` (đặt SAU
+    các ô SIGN: SIGN0.. phải liên tiếp). KÊNH ALPHA = MẶT NẠ: 255 tường (nhân màu nhà), 191 kính (sáng đêm), 128 giữ màu, 64 nền
+    biển (nhân màu biển), 0 chữ biển (màu tương phản). THỨ TỰ CÓ CHỦ Ý: biên tường↔giữ (khung/song sắt — nhiều nhất) khi mipmap
+    trộn chỉ đi qua vùng "kính", không qua biển/chữ. Nhiễu xác định (hash + value noise, không Math.random). VẼ TRONG WORKER
+    (`facade_atlas_worker.js`, module worker, chữ bằng OffscreenCanvas): luồng chính chỉ `buildFacadeAtlas(size,{layoutOnly:true})`
+    lấy chỉ số ô cho shader + DataTexture ĐÚNG KÍCH THƯỚC tô xám chờ; ảnh về thì `tex.image.data = data; needsUpdate` (BẪY: three
+    r160 dùng texStorage2D BẤT BIẾN — không được đổi kích thước texture sau lần upload đầu). Worker lỗi → vẽ đồng bộ. 2048²
+    (TIER≥2) / 1024² (TIER≤1); node 83-88 ms, worker 190-210 ms (onmessage chỉ chạy khi buildWorld nhả luồng chính — log
+    "worker 7-8 s" là thời điểm nhận, không phải thời gian vẽ; vẫn về TRƯỚC khung hình đầu).
+    **(4) BUILDER** (`buildRealFabric(scene, ctx)`): MỖI CẠNH = 1 QUAD (cạnh cắt nóc hồi = 3 tam giác), uv = (bay, ĐỘ CAO LOCAL m);
+    shader (Lambert + onBeforeCompile, `textureGrad` + đệm 3 px/ô + TRẦN MIP ~log2(ô)−3,5 chống loang ô kề) chọn mô-đun THEO
+    FRAGMENT: tầng từ độ cao, bay = floor(uv.x), bộ mô-đun theo STYLE; tầng trên 80% "mô-đun chính" của nhà; mặt phố ≥3 bay
+    (dãy nhà ống gộp) → MỖI BAY 1 nhà (màu WALL_PALETTE + mô-đun riêng); dải biển 2,95-3,85 m phủ chữ từ 20 dải SIGN theo hash.
+    aFac u8×4 = (seed, kind|cờ, style hoặc ô atlas, số tầng); cờ +8 nhà LỚN/CAO/độc lập (≥5 tầng, ≥600 m² từ 3 tầng, KTT/kính/
+    biệt thự/công sở → hông + sau cũng có cửa sổ đều, ~12% bay trơn), +16 mặt phố dài, +32 mái dốc, +64·CẤP ĐƯỜNG trước mặt tiền
+    (`frontClass`: p/s/t → 8% bay là nhà ở, r/w 45%, ngõ h 85% — phố nhỏ/ngõ thôi "toàn cửa hàng"). Nhà ≥9 tầng mà dữ liệu ghi
+    nhà ống/phố cũ → mô-đun KTT hoặc kính (tháp 20 tầng mang mô-đun nhà ống trông giả). MÔ-ĐUN TẦNG TRỆT chọn bằng HASH
+    NGUYÊN uint (`ihash/pidx`): `groundModule()` JS ra ĐÚNG TỪNG BIT như GPU (kiểm 8192 mẫu, Radeon 890M/ANGLE) → citygen biết bay
+    nào có dải biển (`SIGN_EXT`) và dựng HỘP BIỂN 3D lồi 0,22 m đúng chỗ (mặt trước = kind 6, shader vẽ y hệt mặt phố sau nó →
+    không "nhảy" khi ẩn ô chi tiết). BẪY: hash FLOAT trong GLSL ≠ JS (float32/FMA) — muốn JS biết GPU chọn gì thì dùng số nguyên.
+    CẠNH NÂNG (`faceRoad`): cạnh SIDE/BACK ≥3 m nhìn thẳng ra lòng đường trong 26 m mà không nhà nào che → vẽ như MẶT PHỐ (v0
+    gắn FRONT chỉ khi đường cách ≤ ~6,5 m sau mặt tiền chuẩn → nhà lùi 10-20 m quay TƯỜNG TRƠN ra phố, vd pano_085/092; v0: 10,6k
+    cạnh được nâng; không áp "mỗi bay 1 nhà" cho cạnh nâng). Ban đêm: material đẩy vào `world.facadeMats` → daynight đặt
+    emissiveIntensity, shader lấy `emissive.r` làm hệ số đêm (KHÔNG sửa daynight.js); kính sáng ngẫu nhiên theo ô + cửa hàng
+    trệt + biển, ánh đèn NHÂN với texture. AO giả: chân tường tối dần 0-1,7 m.
+    Mái: FLAT_PARAPET = đa giác (earcut/quạt) + mặt TRONG lan can; FLAT +0,25; GABLE/SHED tôn theo trục DÀI OBB (cắt đa giác bằng
+    Sutherland-Hodgman theo đường nóc, tường lên tới mặt mái + đỉnh hồi); HIP ngói chỉ cho nhà ~chữ nhật (diện tích/OBB ≥0,85,
+    ≤6 đỉnh) trên OBB đua 0,35 m. Sàn mái bằng: lá nem đỏ 45% nhà <300 m² (15% nhà lớn), còn lại bê tông SẪM nhuộm màu mái;
+    `roofVar` = mỗi mái 1 độ sáng 0,78-1,14 theo hạt giống (vệ tinh là MẢNG LOANG; ô bê tông 4 m có vết đậm lặp lại → nhìn từ
+    trên thành "lưới caro" — vết loang trong ô phải MỀM). Đồ trên mái bằng (nhà <900 m²): tum thang 45% (≥3 tầng, phía SAU mặt
+    phố, mặt cửa D_DOOR), bồn inox lăng trụ 5 cạnh 70% (13 tam giác; trên tum nếu có), MÁI TÔN che sân thượng 70% nhà <300 m² / 40% lớn hơn, phủ
+    55-95% chiều dài, ~70% đỏ gỉ/nâu đỏ (mảng đỏ chủ đạo của vệ tinh HP) + 2 cột THÉP GÓC chữ L phía phố (2 cánh, mặt ngoài hướng phố, ô det), máy nước nóng 10% nghiêng NAM.
+    Vệt gỉ trên ô tôn CHỈ làm tối (tô màu nâu M_KEEP → thành vạch trắng hồng trên tôn xanh).
+    Chi tiết mặt phố (ô 'det'): ban công (TUBE 62%, OLD 50%...: mặt đáy + lan can NGOÀI + 2 đầu = 8 tam giác — KHÔNG mặt
+    trên: lan can 1,2 m che kín sàn sâu ≤0,95 m với mọi góc nhìn dốc <~52°; KHÔNG mặt trong lan can), mái hiên bạt sọc 35%
+    (2,88→2,4 m, ra 1,5 m), HỘP BIỂN 3D (các bay LIỀN NHAU cùng có dải biển kín bay GỘP 1 hộp: mặt trước 1 quad kéo qua nhiều
+    bay — shader tự chia bay theo uv.x — + 2 đầu = 6 tam giác/hộp; không mặt trên/đáy), CỤC NÓNG ĐIỀU HOÀ 3D (0,82×0,54×0,3 m
+    treo +2,58..3,12 m mỗi tầng trên — dưới mép sàn ban công tầng trên +3,18 m nên không cắt ban công; 14% bay nhà ống, 21% KTT).
+    Chi tiết chỉ dựng cho nhà có tâm r ≤ 1650 m. CÔNG NĂNG TẦNG TRỆT: dữ liệu v1 có `INFO` từng nhà → USE_SHOP ép rc 0 (cửa
+    hàng), USE_HOME ép rc 3 (mã MỚI: 100% mô-đun nhà ở — HOME_THR[3]=1,0 cả JS lẫn GLSL); v0 (info=0) vẫn theo `frontClass`;
+    không áp cho mặt phố gộp nhiều bay (mỗi bay 1 nhà) và cạnh nâng faceRoad.
+    Ô: CHÍNH 450 m `fab_main_<tx>,<tz>` (đuôi _x,z cho nearCull) — ĐO cùng phiên 300/450/600 m: 450 giảm MỘT NỬA draw call của
+    phố (pano_007 58→26, cam_spawn 38→21, kể cả lượt bóng), tam giác vẽ chỉ +0,01-0,05 M; 600 không lợi thêm. CHI TIẾT 300 m
+    `fab_det_<tx>_<tz>` (CỐ Ý không khớp regex _x,z: hiện trong 380 m (LITE: không có) do `scene.onBeforeRender` nối chuỗi
+    bật/tắt, nhịp 0,25 s). Mọi mesh `userData.noMerge=true` + freezeStatic `collect` bỏ qua (aFac không sống qua merge/split).
+    v0 (25.192 footprint): dựng 24.775 nhà; 57 ô chính (≤57 draw call cả thành phố) 0,74 M tam giác + 107-110 ô chi tiết
+    0,75 M tam giác (chỉ phần trong 380 m được vẽ); dựng 510-640 ms (giải mã 5, claims 60-70, hình học 340-450 ms).
+    **v1 (46.128 footprint, dot3 9cb2cc1) sau phản biện:** dựng 40.572 nhà (bỏ 4.934 ngoài R1600 + 488 claim + 133 zone + 1
+    pano); 51 ô chính 0,883 M + 105 ô chi tiết 0,590 M = **1,474 M tam giác** (≤1,5 M; trước khi cắt: 1,03 M + 0,91 M = 1,95 M);
+    dựng 630 ms máy rảnh / 1,7 s máy bận (giải mã 7, claims+tường chung+lưới 100-300, hình học 445-1.180). Cơ cấu chính:
+    tường 348 k, mái 125 k, mặt trong lan can mái 148 k, bồn 13 k×13, tum 4,8 k×10, mái tôn 10 k×4; chi tiết: ban công 26 k×8,
+    hộp biển 22,7 k hộp (28,9 k bay)×6, điều hoà 13 k×8, mái hiên 9,5 k×6, cột 10 k×8. ĐẾM KHÔNG CẦN GPU: dựng citygen trong
+    node (loader map 'three'→lib/three.module.js, giả navigator/location/localStorage; device.js nạp trước khi xoá document để
+    atlas vẽ đồng bộ không chữ) — ra đúng số tam giác (trừ claims vì không chạy world.js), ~1-2 s.
+    **(5) VA CHẠM ĐA GIÁC**: lưới 16 m trên bbox nhà (+2 m), dựng NGAY sau khi chốt D.dead; `fabricCollide(p,r)` 2 lượt: trong
+    nhà → ra cạnh gần nhất KHÔNG dẫn sang nhà kề (tường chung), ngoài mà gần < r → đẩy theo điểm gần nhất. Gắn cuối
+    `world.resolveCollisions` (nên mọi oracle đặt cây/hoa/diag tự thấy nhà thật). Mới: `world.isFree(x,z,r)`,
+    `world.findFree(x,z,r,maxD)` (xoắn ốc 1 m, đất khô), `world.fabric = {stats, meshes, detMeshes, collide, at, hit, frontEdges,
+    material, grid}`; `citygen.fabricData()` = RB01 giải mã DÙNG CHUNG (D.dead = nhà đã bỏ — camera/minimap/cell sink phải bỏ qua).
+    KẸT: lô KÍN (mọi cạnh giáp nhà khác) hoặc khe/hõm đa giác lõm hẹp hơn 2r (đẩy khỏi tường này lọt vào tường kia) → sau 2
+    lượt vẫn trong nhà (v1: 9/1.401 tâm nhà thử) → xoắn ốc 0,5 m (tới 8 m) rồi 1 m (≤60 m — khối kho cảng liền nhau) tìm điểm
+    ngoài mọi nhà và cách tường ~r. v1: 0/13.541 tâm nhà + 0/200.000 điểm ngẫu nhiên còn kẹt; 2,6 µs/lần (node, gồm kiểm),
+    tệ nhất 3,4 ms (chỉ khi kẹt).
+    **(6) RÀ LẠI vị trí**: biển địa danh (landmarks.js) chỉ DỜI khi trong/cách footprint <1,3 m: nhà thờ ~7 m, đền Nghè 8 m, đình
+    HK 3 m, NHNN 8 m; npcSpots/vehicleSpawns (trừ thuyền) dời khi chạm nhà; cyclo (−220,174) hết nằm trong nhà (đa giác 46×46
+    dưới claim QT Lê Chân). `__hp.diag()` RỖNG cả real lẫn proc; 0/551 camera pano trong nhà; 400/400 điểm thử trong nhà bị
+    đẩy ra. BIỂN THẬT `SHOP_SIGNS`: NEO vào mặt tiền thật gần nhất ≤22 m đúng dải biển 3,4 m (0,27 m trước tường — trước hộp
+    biển 3D), quay theo pháp tuyến cạnh, biển trùng toạ độ rải dọc mặt tiền không chồng; không có mặt tiền → bỏ. LƯỚI AN TOÀN
+    THƯƠNG HIỆU `_BRAND` (world.js, cả 2 nhánh): catalog pano còn HANA/INAX/MB/"BẢO MIN…" → bỏ biển đó (WP3 làm sạch tận gốc
+    gen_shopsigns). Minimap vẽ footprint thật còn sống (1 path, 1 lần).
+    **(7) SAU PHẢN BIỆN (rebase lên dot3 9cb2cc1 = có WP1 v1):** (a) **CẮT NGOÀI VÙNG CHƠI**: `ctx.maxR` (world.js truyền
+    `BUILD_RADIUS`) → nhà có TÂM ngoài R1600 `D.dead` (`deadFar`): ngoài đó không có đường/vỉa, phố thật từng mọc ~150 m nhà
+    trên cỏ trống (freezeStatic chỉ cắt ô NẰM TRỌN ngoài vòng tròn); dead nên va chạm/mặt tiền/minimap/ô det đều bỏ. (b) **TƯỜNG
+    CHUNG SAU KHI GIẾT NHÀ** (hợp đồng v1): ngay sau vòng loại nhà, `makeFootprintGrid(D)` + `refreshPartyEdges(D, grid,
+    mọi-nhà-dead)` — PARTY không còn láng giềng sống che → BACK/SIDE, cover 0 (không thì lỗ nhìn xuyên vào nhà rỗng); v1: 94
+    cạnh hạ. Nhà do WP3/ai khác giết TRƯỚC (D.dead sẵn) cũng được rà. (c) **DỮ LIỆU DÙNG CHUNG**: world.js đặt `world.rbData =
+    fabricData()` (D.dead đã chốt) và `world.rbGrid = _fab.grid` (grid trên) ngay sau `world.fabric` — WP8 `footprints.js`
+    dùng nếu có; tích hợp PHẢI truyền `{D: world.rbData, grid: world.rbGrid}` làm `ctx.footprints` của WP7 và `fpGrid` của WP4
+    (tự decodeRB = tránh/va vào cả nhà đã bị gỡ dưới quảng trường/công viên/ngoài R1600, và giải mã lại 3 lần). (d) **GIẢI PHÓNG
+    BẢN CPU** (`RELEASE_CPU`, `?fabfree=0` tắt): `attr.onUpload(() => array = null)` cho mọi attribute + index của mesh phố;
+    `webglcontextrestored` trên canvas `#scene` → chạy lại `gen()` (toàn bộ hình học, xác định từ D + D.dead) và thay geometry
+    từng ô theo `userData.fabKey` TRƯỚC khung hình kế (đo: 414 ms, 0 lỗi, ô chính được upload lại); mesh phố `raycast` = no-op.
+    BẪY: (1) `performance.memory.usedJSHeapSize` CÓ tính ArrayBuffer — mảng hình học phố ~94 MB (v1 1,47 M tam giác, 30 B/đỉnh +
+    chỉ số); (2) ô CHỈ upload khi lần đầu được VẼ (trong frustum/bóng) → lúc spawn mới giải phóng ~30/156 ô (−21 MB: heap sau GC
+    482 → 461 MB), phần còn lại giải phóng dần khi người chơi nhìn tới; (3) sau giải phóng KHÔNG gọi computeBounding*/đọc .array
+    mesh 'fab_*'. HEAP ĐO ĐÚNG: Chrome `--js-flags=--expose-gc` + `gc()` 2 lần trước khi đọc — số "thô" (730-966 MB các lần
+    trước) chủ yếu là rác chưa dọn: sau GC real 461 MB / proc 660 MB (cùng máy, v1). (e) **WebGL1**: shader atlas cần GLSL ES 3.0
+    (uint, textureGrad, mảng const) → `onBeforeCompile(sh, renderer)` thấy `!renderer.capabilities.isWebGL2` thì KHÔNG tiêm (nhà
+    vẽ trơn theo màu đỉnh, không phát sáng đêm) thay vì hỏng cả phố. (f) **THƯƠNG HIỆU**: lưới `_BRAND` (world.js) bổ sung đủ
+    các tên mà `BRAND_MAP` của WP3 (`js/brands.js` — nguồn DUY NHẤT sau khi gộp) bắt được trong `shopsigns.js` hiện tại (quét
+    node: 0 tên lọt, 0 bỏ nhầm, bỏ 26/954 biển); sau khi WP3 sinh lại shopsigns.js lưới này chỉ còn là dự phòng.
+    (g) **GỘP VỚI WP5/WP4** (rebase lên dot3 9c46ef4): post.js WP5 thêm `totalEmissiveRadiance *= HP_UNLIT_K` vào chunk
+    emissivemap_fragment (tự phát hiển thị theo màn hình, phơi sáng thích nghi tới ×4 lúc đêm) — shader phố THAY chunk đó nên
+    phải tự nhân (`#ifdef HP_UNLIT_K`), không thì cửa sổ/biển cháy trắng ban đêm. `veg.plantStreetTrees` + `veg.buildTrees`
+    nhận `fpGrid: world.rbGrid` (cây không né nhà đã bị gỡ, không giải mã RB lần 2; proc: undefined → trees tự giải mã).
+    **ĐO** (Chrome headless d3d11, Radeon 890M, ?quality=full TIER 3, 1280×720, máy dùng chung với 7 agent — fps ±; A/B CÙNG
+    PHIÊN proc → real, fog cố định 2600, 2 phiên): hpReadyMs 19,7-23,2 → 8,7-9,5 s (baseline dot3 18,9); cam_spawn 738 call/
+    4,88 M tri → 709-712/3,92 M; pano_007_h090 1.577-1.706/7,9-9,1 M → 1.353-1.355/6,59 M (fps 42-44 → 50-51); cam_high_center
+    1.160/7,44 M → 1.089-1.091/6,46 M (fps 46-49 → 51-57); game_3 1.197/8,13 M → 1.172/7,17 M; pano_102_h090 1.079/4,57 M →
+    856-993/3,5-4,3 M. 12 góc std so baseline: calls −4…−21%, tris −13…−26% (game_3 dao động 1,17k-1,66k call giữa các lượt do
+    hệ khác — đo trực tiếp: phố thật chỉ chiếm 8 call/0,14 M tri ở góc aerial này). Heap 730-950 MB cả hai nhánh (dao động theo
+    GC; hình học ô chi tiết giữ bản CPU ~50 MB vì mất ngữ cảnh WebGL cần upload lại). LITE (TIER 1): không lỗi mới (8 lỗi 404
+    `assets_lite/*.glb` do worktree không có assets_lite — có cả ở proc), hpReady 6,8-7,4 s.
+    **ĐO LẠI sau phản biện** (dữ liệu v1 + WP4 cây + WP5 ánh sáng, dot3 9c46ef4; A/B CÙNG PHIÊN proc → real): hpReadyMs 17,0 →
+    9,4 s; cam_spawn 742 call/4,89 M tri → 714/4,01 M (57 fps cả hai); pano_007_h090 1.585/7,09 M → 1.350/5,90 M (51 → 58 fps);
+    cam_high_center 1.487/10,31 M → 1.094/6,29 M (55 → 57); game_3 1.234/7,14 M → 1.212/6,30 M (54 → 55); pano_102_h090
+    1.093/4,46 M → 859/3,68 M. 24 góc std so baseline_std (dot3 TRƯỚC WP4/5, khác phiên): calls −38…+27% (game_6 +27%, aerial —
+    hệ khác), tris −56…+7%, fps tối thiểu 39 → 49. Heap SAU GC: real 436-461 MB / proc 638-660 MB. Cổng: 0 lỗi JS (full), diag
+    [], 400/400 điểm trong nhà bị đẩy ra & 0 còn kẹt, 0 biển địa danh/0 camera pano trong nhà, mất/khôi phục ngữ cảnh 0 lỗi,
+    waterbfs 5/5; LITE chỉ 404 `assets_lite/*.glb` (môi trường).
+    **BẪY/BÀI HỌC**: (a) helper GLSL dùng sampler `map` phải chèn SAU `#include <map_pars_fragment>`, không sau `<common>`;
+    (b) đo trong máy dùng chung: autoQuality nấc 3 (near view, fog 220/1300, không hoàn tác) có thể bật giữa chừng → ảnh
+    aerial mù sương — script chụp nên ghi `scene.fog.far` mỗi shot hoặc ép fog; (c) v0 footprint lùi khỏi phố + mặt phố không
+    liên tục: phố thật vẫn "thưa" tới khi WP1 (frontage snap, lô, infill) về; renderer chỉ bù phần "tường trơn quay ra phố"
+    (faceRoad); (d) tam giác ô chi tiết tăng theo số MẶT PHỐ (hộp biển 8, điều hoà 8, ban công 12, cột 6 tam giác/cái): khi WP1
+    v1 thêm lô/infill phải đo lại ngân sách ≤1,5 M (núm: xác suất trong citygen, DET_RMAX, DET_R) — ĐÃ đo lại, xem "v1" ở (4);
+    (e) `sed -i` của Git Bash đổi CRLF→LF cả file — sửa file repo bằng python/Edit.
+
 - **2026-10-04 (Đ3-WP1-data)** [ĐỢT 3 WP1 — `tools/process_buildings.mjs` v1: footprint thật → BỨC TƯỜNG PHỐ + THẢM MÁI]
     (nhánh `worktree-wf_f378e35a-d3b-1`). Generator offline, KHÔNG đổi runtime game (chưa module nào của game import
     `buildings_real.js`/`xsection.js` — WP2 citygen làm). Chạy: `node tools/process_buildings.mjs [--dump x.json]` ở gốc
@@ -563,6 +722,196 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     khi dựng: hạ PARTY không còn láng giềng sống che → BACK/SIDE, edgeCover=0 (không thì nhà kề nhà bị giết thiếu chân
     tường = lỗ nhìn xuyên vào nhà rỗng); không giết gì → 0 cạnh đổi; giết 2.391 nhà → 1.665 cạnh hạ, ~30 ms (tăng dần) /
     ~50 ms (toàn bộ). WP3 cellsink nên BỎ QUA nhà FLAG.SYNTH khi quyết định xoá nhà tay.
+- **2026-10-04 (Đợt 3 WP5 LIGHT)** [TRỜI · ĐÈN · IBL · AO · SƯƠNG · GRADE · BÓNG · NƯỚC · VẬT LIỆU GLB · VỆ TINH · ẤM MÁY]:
+    File: `js/skymodel.js` (mới), `js/post.js` (mới), `js/water.js` (mới), `js/daynight.js` (viết lại), `js/main.js`
+    (renderer/hậu kỳ/autoQuality/vệ tinh/ấm máy), `js/assets.js` (applyGlbMaterialPolicy/setGlbLighting), `js/device.js`
+    (`GFX` — núm chất lượng ánh sáng, CHỈ theo TIER), `js/world.js` (khối nước → water.js).
+    **(1) Trời** = tán xạ đơn Rayleigh+Mie (air mass Kasten–Young, pha đẳng hướng bù tán xạ bội, ozone, chạng vạng/đêm/
+    quầng đèn phố cộng thêm) — JS và GLSL CÙNG công thức trong skymodel.js (sửa một bên phải sửa bên kia; hằng số chỉ
+    theo mặt trời `skyK`/truyền qua/màu nắng lên mây tính ở JS → uniform). Mặt trời THIÊN VĂN (vĩ độ 20,86°, xích vĩ
+    −4,5° đầu tháng 10 như bộ pano, chính ngọ 11:45): mọc ~5:50, trưa cao 64° về phía NAM, lặn ~17:40; dưới −1° nắng = 0.
+    Vòm: đĩa mặt trời + quầng Mie + mây fbm trôi + sao + trăng; có `<tonemapping_fragment>`/`<colorspace_fragment>`.
+    Vòm vẽ SAU CÙNG nhóm đục, `gl_Position.z = w` + depthTest → shader trời chỉ chạy ở pixel trời trống (full-screen
+    1,1-1,4 ms trên 890M). Hiển thị BAN NGÀY ×1,2 + bão hoà 45%: trời HP thật MÙ ẨM — trung vị vùng trời cao ~30-40° của
+    160 pano ngẫu nhiên = sRGB(186,198,211); bản đầu (×0,76, bão hoà 100%) ra (142,175,210) xanh đậm, tối. Chạng vạng/
+    đêm trộn về ×0,76/100% theo độ cao mặt trời (giữ màu hoàng hôn, giờ xanh).
+    **(2) Đèn** — BỘ CỐ ĐỊNH 2 đèn (program key không đổi): HemisphereLight + 1 DirectionalLight có bóng = MẶT TRỜI ban
+    ngày, TRĂNG ban đêm (đổi hướng lúc cường độ ≈ 0; bỏ moonGlow). Trưa: nắng ≈ 3,5 : bán cầu ≈ 0,8 (chiếu sáng trời
+    ×0,55, khử bão hoà còn 25% — bóng râm chỉ hơi lạnh). Lambert/Standard three r160 = albedo/π × chiếu sáng ("tường
+    trắng dưới nắng trưa ≈ 1"). Phơi sáng THÍCH NGHI = 0,92 × sqrt(trưa/hiện tại), trần ×4. Đêm: `moonAmb` + `cityAmb`
+    ấm (đèn phố/cửa hàng; đất ×1, trời ×0,5) — thiếu nó hẻm lúc 21:00 đen kịt sRGB ≈ 15-20.
+    **(3) IBL**: PMREM nướng từ CHÍNH vòm trời (cube 128 TIER ≥ 2, 64 TIER ≤ 1) mỗi 3 s hoặc khi giờ nhảy, 0,5-1,4 ms
+    GPU/lần. BẪY: phải nướng vào MỘT RT cố định — đổi texture object của scene.environment (2 RT luân phiên) làm MỌI
+    MeshStandardMaterial đi qua getProgram (`materialProperties.envMap !== envMap` → needsProgramChange) mỗi lần nướng.
+    **(4) Tone/grade**: `CustomToneMapping` = ACES của three r160 + grade nhẹ (sat 1,03, toe 0,012) cài vào ShaderChunk
+    TRƯỚC khi compile → composer (FinalPass) và đường vẽ thẳng (TIER ≤ 1) ra CÙNG màu; bỏ GradeShader be cũ (sat 0,88 +
+    ám vàng). AgX r160 đã thử: ép trời xanh thành xám chì. Phơi sáng thay đổi theo giờ nên phần TỰ PHÁT SÁNG (emissive,
+    MeshBasic/Line/Points/Sprite) nhân `HP_UNLIT_K = 1,18/exposure` (post.js, vá ShaderChunk/ShaderLib) → đèn/cửa sổ/
+    chân dung nhà hát hiển thị như cũ ở mọi giờ, không cháy trắng ban đêm. ShaderMaterial tự viết có phần tự sáng phải
+    tự nhân (`UNLIT_DECL`).
+    **(5) Hậu kỳ** (TIER ≥ 2, `GFX.post`): SceneAOPass vẽ cảnh vào RT riêng MSAA 4× + DepthTexture (canvas
+    `antialias:false`, RT composer KHÔNG MSAA — trước MSAA ×3 chỗ) → SAO nửa phân giải (pháp tuyến dựng từ depth, xoay
+    Bayer 4×4 + mờ 4×4 ×2 lần theo độ sâu MẶT PHẲNG, upsample theo độ sâu, mờ dần 140-320 m, chạy cả camera trực giao,
+    trần bán kính màn hình 56 px phối cảnh / 90 px trực giao — xem (13)) → UnrealBloom CHỈ
+    khi night > 0,04 (ngưỡng chia theo exposure) → FinalPass (tone + grade + sRGB + dither). AO = 0,26-0,32 ms GPU ở
+    1280×720 trên Radeon 890M → bật cả TIER 2 (8 mẫu; TIER 3 12 mẫu). FinalPass 0,17 ms. Công cụ: `__hp.post.timeAO()`
+    (đồng bộ bằng readPixels 1 px — `gl.finish` của Chrome KHÔNG chờ GPU, đo ra 0,01 ms vô nghĩa).
+    **(6) Sương** FogExp2 density 0,00075 (150 m 1,3%, 800 m 30%, 1600 m 76%), GIỐNG NHAU mọi tier, chọn 1 lần; màu =
+    chân trời hiển thị theo hướng nhìn (mép phố xa tan vào trời). Nấc chất lượng 3/TIER 0 nhân density ×1,6 (KHÔNG đổi
+    kiểu sương = không biên dịch lại). 0,00085 thử trước: góc cao bị "sữa" mất tương phản.
+    **(7) Bóng**: tâm hộp SNAP theo texel trong hệ toạ độ đèn (hết bò mép); `GFX.shadowMap/shadowBox` (TIER 3: 2048/±110 m,
+    TIER ≤ 2: 1024/±70 m). autoQuality KHÔNG BAO GIỜ bật/tắt castShadow nữa: nấc 1 = AO + bloom tắt, PR ≤ 1,2, map ≤ 1024;
+    nấc 2 = map 512 + nhịp làm mới ×2,5, PR 1; mục tiêu fps TUYỆT ĐỐI ≤ 60 (màn 120/144 Hz từng bị hạ cấp oan); đổi mapSize
+    luôn ép `shadowMap.needsUpdate` (bug cũ: khung có map null = cả hộp bóng tối đen). `navigator.webdriver` hoặc `?aq=0`
+    → autoQuality tắt (QA tất định). Chưa làm tầng bóng xa (CSM).
+    **(8) Nước** (`water.js`, MỘT nguồn màu — daynight KHÔNG ghi màu nước nữa): MeshStandardMaterial ĐỤC (roughness 0,12,
+    normal 0,15) phản chiếu IBL trời + Fresnel GGX (nhìn thẳng xuống thấy màu nước, nhìn xiên thấy trời); bản đồ bờ/hồ
+    DataTexture 512² (ô 8 m, ±2048 m): R = khoảng cách có dấu tới bờ (waterSD, 128 = mép), G = hồ; sông xám ô liu
+    0x5c625a (ảnh vệ tinh sông Cấm ≈ (93,103,92), game đo (88,94,87)), hồ 0x34443f, dải bùn ven bờ 1-16 m (hồ 1-7 m,
+    nhạt hơn). Dựng ~11 ms (lọc thô 32 m rồi 30,8k mẫu mịn sát bờ + lọc cạnh trong — xem (13)). onBeforeCompile bám chunk
+    `color_fragment`/`roughnessmap_fragment`. Mặt nước `receiveShadow = true` (bóng nhà/cầu/cây trên sông).
+    **(9) GLB** (đọc JSON + giải ảnh trong GLB): 11 file có emissiveFactor [1,1,1] + emissive map. 6 map ĐEN THUẦN
+    (buudien, dennghe, dentamky, dinhhk, nhnn, lechan — trung bình 0) → bỏ map + emissive 0 trước compile (bớt VRAM);
+    4 map GIỐNG ALBEDO (baotang, thptnq, quanhoa, nhatho) → emissiveIntensity = night × 0,42 (= đèn pha mặt tiền ban đêm,
+    ban ngày 0 — trước tự sáng bẹt dưới nắng); **nhahat KHÔNG ĐỤNG** (chân dung). envMapIntensity 0,5 (GLB còn nhận đèn
+    bán cầu — tránh cộng đôi ánh sáng nền), ghi SAU `place()` cho cả bản gốc lẫn twin lite (xem (13)).
+    **(10) Vệ tinh** `__hp.aerial`: sương 0, hộp bóng trực giao phủ CẢ khung (map 4096), phơi sáng ×0,82, instcull/
+    far-hide lấy TÂM KHUNG (trước bám người chơi), vẽ qua composer (cùng tone/AO).
+    **(11) Ấm máy**: compileAsync với RT cảnh composer đang bind (đúng biến thể NoToneMapping/linear — trước biên dịch
+    biến thể màn hình vô dụng); trước Start không vẽ tới khi compile xong (lưới an toàn 12 s); `__hp.timing`
+    (compileSync 107-169 ms, khung đầu 1,7 s — vẫn sau màn chờ). Camera near 0,1 → 0,3 (depth xa tốt ×3).
+    **(12) Thời gian**: DAY_LENGTH 300 → 1440 s (24 phút), bắt đầu 09:00; `?time=14.5 | 14:30 | 1 (= 01:00) | 0.6`
+    (< 1 = phần của ngày, ≥ 1 = giờ) + `&timefreeze=1`. Mây trôi theo đồng hồ GAME: đứng yên khi frozen hoặc
+    `navigator.webdriver` (ảnh QA A/B so được điểm ảnh bầu trời).
+    **(13) SAU PHẢN BIỆN (review WP5)** — **BẪY envMapIntensity**: các hàm `place()` của world.js (nhà hát, nhà thờ, Quán
+    hoa ×5, Lê Chân) tự ghi `envMapIntensity = 0.85` khi duyệt model → chính sách ghi TRƯỚC place bị đè: bản gốc 0,85,
+    twin lite 0,5 → sáng/tối nhảy mỗi lần đổi LOD. Nay `applyGlbEnv` chạy SAU `d.place()` (root mới + gltf.scene) và
+    trong onLiteLoaded; đo: 13 bản gốc + 13 twin đều 0,5. **Biến thể program khi GLB lộ diện**: `queueReveal` gọi
+    compileAsync với RT đang gắn = null → biến thể tone-mapped/sRGB của MÀN HÌNH, trong khi composer vẽ vào sceneRT
+    (NoToneMapping + linear) → 5 program vô dụng + khung 92-168 ms trong 7 s đầu. Nay `attachRenderer(renderer, camera,
+    scene, getRT)` (main.js truyền getter sceneRT) và queueReveal gắn RT đó quanh compileAsync: 0 program tone-mapped (cũ
+    5), khung > 80 ms sau Start chỉ còn trong ~1,5 s đầu. Quy tắc chung: MỌI compile/compileAsync phải gắn đúng RT của
+    đường vẽ thật. **Bloom ấm trước**: 7 material của UnrealBloom (highpass, 5 blur, composite, blend) gắn tạm vào quad
+    rồi compileAsync cùng lúc ấm máy → chạng vạng đầu tiên +0 program (cũ +8, khung 45-95 ms). **AO**: trần 90 px làm
+    tường sát camera nhìn xiên có dải tiếp xúc rộng và mép bậc thang; nguyên nhân bậc thang = "mẫu xoay đan xen chu kỳ
+    4 + mờ hộp CÙNG cỡ 4": mỗi pha bị giữ-mẫu 4 texel → bậc 8 px; trọng số độ sâu so với z0 phẳng còn làm lệch trọng số
+    theo pha trên tường xiên. Sửa: maxPx 56 (phối cảnh), mờ hộp chạy 2 LẦN (lần 2 lệch +1 texel bù lệch nửa texel →
+    nhân chập = tam giác 7 texel), trọng số độ sâu so với MẶT PHẲNG cục bộ nội suy theo 1/z (tuyến tính trên màn hình với
+    mặt phẳng phối cảnh; độ dốc lấy phía nhỏ hơn để không vượt mép vật), upsample full-res cũng theo mặt phẳng 1/z. AO
+    vẫn nhân cả ánh nắng trực tiếp (chưa tách ambient). **Nước — cạnh trong**: waterSD đo tới cạnh của MỌI polygon OSM,
+    2 polygon sông kề nhau có cạnh chung giữa lòng → vệt màu bờ giữa sông (game_8). Lọc: khoảng cách tới tâm ô ĐẤT gần
+    nhất (ô 8 m, ô lân cận xếp theo khoảng cách, dừng ở ô đất đầu tiên) − 5,66 m là cận dưới khoảng cách tới bờ thật →
+    nâng độ sâu (1815 ô sửa, dựng vẫn ~11 ms đo bằng node). Hồ: dải bùn hẹp/nhạt (quầng sáng quanh hồ Tam Bạc từ trên cao
+    biến mất), viền sát kè 0,035 → 0,026 (hồ ×0,4). Bóng trên nước: GPU ≈ 0 ms (đo bật/tắt xen kẽ cùng trang: game_3
+    +0,5 ms trên 19,3 ms gồm 1 mẫu lệch, 2 góc tầm thấp âm = nhiễu).
+    **ĐO** (Chrome headless d3d11, Radeon 890M, 1280×720, TIER 3, base 6a57acc vs WP5 CÙNG PHIÊN dưới khoá GPU, autoQuality
+    khoá): hpReady 19,4 → 16,9 s; heap 903 → 678 MB; cam_spawn 56,9 → 57,5 fps (738 → 726 call, 4,88 M tam giác);
+    pano_007_h090 47,8 → 55,7 (1590 → 1578 call, 7,90 M); cam_high_center 49,9 → 55,7 (1173 → 1161, 7,44 M); game_3
+    (vệ tinh) 56,9 → 49,2 (map bóng 4096 phủ khung — chỉ chế độ QA). fps chạm trần vsync 60 nên chênh vài fps là nhiễu.
+    Làm mới bóng +0,7..6,2 ms/lần (không đổi). **BẪY ĐO**: số fps WP5 cũ 21-30 (đo lúc 8 Chrome GPU chạy song song) là
+    nhiễu — luôn đo dưới `tools/qa/gpulock.mjs`; Bash nền không đặt timeout chết ở 30 phút, giết luôn tiến trình đang
+    GIỮ khoá → khoá mồ côi chặn mọi agent (gpulock chỉ cướp khoá sau 20 phút) — đặt timeout tối đa.
+    **ĐO SAU PHẢN BIỆN** (máy đang chạy game của chủ máy → GPU bận, cảnh 20-30 ms thay vì ~10 ms; chỉ so XEN KẼ cùng
+    phiên prev c527b6d / hiện tại ×2): cam_spawn 42,6/45,5 → 41,4/41,8 fps; pano_007 24,4/27,1 → 29,5/30,3;
+    cam_high_center 30,1/31,2 → 35,0/34,2; game_3 35,0/35,6 → 32,4/31,3; hpReady 40,4/38,2 → 35,5/35,3 s; heap 706-713 →
+    728-758 MB — không có hồi quy nhất quán (2 góc nhanh hơn, 2 góc chậm hơn, cỡ nhiễu). AO 0,27 ms (máy rảnh, trước khi
+    thêm lần mờ 2) / 0,38-0,56 ms (máy bận).
+    **GHI NHẬN cho WP khác**: độ sáng nửa dưới khung pano: thật trung vị 117, game 68, trong khi highlight game (p98 216)
+    còn sáng hơn ảnh thật (198) → tối là do ALBEDO (nhựa đường `mat(0x4c5158)` quá đen so với mặt đường bụi xám sáng
+    ~sRGB 110-120 trong pano), KHÔNG được bù bằng phơi sáng.
+
+- **2026-10-04 (WP4-trees)** [ĐỢT 3 WP4 — CÂY ĐƯỜNG PHỐ THẬT: 9 loài instanced, trồng theo dữ liệu 551 pano, LOD gần/xa/hero]
+    (Sau phản biện đối kháng: hàng cau công sở + phượng allée sống lại, bỏ 'plaza' khỏi danh sách cấm trồng, cây cách camera
+    pano 4,5 m / hero 12 m, cây dời né collider nhỏ, uTime quấn chu kỳ, trunkNear dùng được sau build — chi tiết trong từng mục.)
+    (nhánh `worktree-wf_f378e35a-d3b-4`). File: MỚI `js/trees.js` (cả hệ cây), MỚI `js/treemap.js` (SINH TỰ ĐỘNG bởi
+    `node tools/gen_treemap.mjs` từ trường `vegetation` của `audit/audit_enriched.json` — ĐỪNG SỬA TAY; chạy lại ra
+    byte-giống), MỚI `tools/qa/trees.html` (xem kit cây tách game: `?row=all|xacu|bang|…&dist=&far=1&atlas=1&bloom=0`),
+    `js/petals.js`, `js/main.js` (1 chỗ: `petals.update` ~560), `js/world.js` (import `veg`; THÂN ~30 helper cây cells
+    bcTree/bcPalm/twTreeAt/bsTree/bsPalm/tsTree/tsYoung/tsWillow/txTreeAt/txPalm/lnTree/w1-w4Tree/w4Pollard/w4Palm/cnBanyan/
+    cnPalm/v3Willow/garden6 tree…; khối `cell_tree`; vùng cây cũ phượng hero/bakeTree/phuongTree/palm/shadeTree/streetTree/
+    banyan/hồ/OSM-công viên; cây dải phân cách; bỏ "xà cừ 2 bên đại lộ" cap 170; vườn hoa; chỗ `flushTrees`).
+    **TRƯỚC:** 5 đường ống cây (bake icosahedron 80 tam giác xanh lè + ~12 helper cầu lá trong cells + cell_tree + 76
+    phượng GLB Meshy 85-101k tam giác LUÔN bật, castShadow=false) → ~1.200 cây, quota theo thứ tự ROADS_DT (lõi hết
+    quota, phố khác trống), cây ở hw+3,4 = SAU mặt tiền phố s/t.
+    **HỢP ĐỒNG (`js/trees.js`):** `veg.plant(kind,x,z,o)` / `veg.plantLocal(group,lx,lz,kind,o)` CHỈ xếp hàng (không tự
+    thêm collider — helper giữ `addCollider` như cũ). kind = 'xacu'|'bang'|'phuong'|'sau'|'banglang'|'cau'|'catcut'|'da'|
+    'non' hoặc 'shade' (bóng mát: loài theo pano/vùng, không phượng/cau) | 'street' (mọi loài) | 'park'. o = {h, r (tán),
+    bloom, wash (gốc quét vôi), pit (ô gốc bê tông), hero (0..2 = biến thể GLB), yaw, variant, sz, full (độ kín tán),
+    median (cây dải phân cách — miễn kiểm lòng đường)}. `veg.plantStreetTrees(ctx)` trồng theo dữ liệu (thay vòng 46 m);
+    `veg.buildTrees(scene, ctx)` dựng TẤT CẢ ở chỗ `flushTrees` cũ rồi XOÁ hàng đợi → **KHÔNG gọi plant sau buildTrees**
+    (cây không được dựng, chỉ còn collider ma). `world.trees` = {stats(), setSeason(0..1), setHeroModel, bloomNear,
+    uniforms, recs}; `world.treeBloomNear(x,z,r)` cho petals. Ngoài game: `import('/js/trees.js').then(m=>m.treeSystem())`.
+    **KIT + ATLAS:** atlas lá vẽ thủ tục 4×4 ô (canvas 2048² TIER≥2 / 1024² TIER≤1, ~17 ms) — lá kép xà cừ/sấu, lá bàng
+    chùm hoa thị (ít lá vàng/đỏ), lá lông chim 2 lần + chùm hoa phượng, lá + chuỳ hoa tím bằng lăng, chồi non, đa, vỏ,
+    gốc quét vôi, thân + tàu cau. Lưu PREMULTIPLIED (`premultiplyAlpha=true`, `NoColorSpace`) rồi shader chia alpha +
+    tự giải sRGB → mép lá lọc mipmap không viền đen; bù alpha theo mức mip (lá xa không "tan"). 13 kit gần (thân + cành
+    côn cong, 22-170 thẻ lá; 290-1.600 tam giác) + 9 kit XA (thẻ to ×1,8-1,9 ngửa lên, tối 12% vì không tự đổ bóng; 70-212 tam giác). Dáng: xà cừ tán
+    cao rộng, bàng TẦNG ngang, phượng tán DÙ, sấu, bằng lăng, cau vua (thân xám vòng đốt + bẹ xanh + 15 tàu cong), CẮT
+    CỤT (cành cụt mặt cắt sáng + chồi non — 96 pano sau bão Yagi), đa/si (rễ phụ), cây non chống 3 cọc. 1 material
+    Lambert DUY NHẤT cho mọi cây (onBeforeCompile, key 'hpveg1'): `aInst`=(bloom, wash, phase, độ kín tán) per-instance,
+    `aKind` (gỗ/gỗ-vôi/lá/hoa + số ngẫu nhiên riêng từng thẻ ở phần lẻ → cây thưa bỏ bớt thẻ — 1 kit ra nhiều độ kín),
+    gió (uTime), mùa hoa (uBloom: thẻ hoa thu về điểm suy biến khi tắt), lá trong mờ (ánh sáng xuyên lá từ hemi + nắng
+    ngược), thẻ lá nghiêng hẳn về camera mờ dần (không thành vạch sẫm). TIER≥2 (có MSAA): alpha-to-coverage + làm sắc
+    alpha; TIER≤1: alphaTest 0,5. `customDepthMaterial` alpha-test → bóng lá lốm đốm.
+    **LOD (tự quản, `userData.noCull` — instcull KHÔNG đụng):** mỗi 250 ms (hoặc camera đi > 8 m / quay > 10°) nén lại
+    tập instance theo khoảng cách CAMERA: gần ≤ 180 m (TIER≤1 110) kit gần đổ bóng; ≤ 1.000 m (TIER≤1 520) kit xa không
+    đổ bóng, chỉ trong NÓN NHÌN ±(nửa FOV ngang + 31°) (camera trực giao/nhìn dốc xuống → tắt nón); hero GLB ≤ 150 m;
+    ô gốc ≤ 90 m. Trễ 10-12 m chống nhấp nháy ranh. boundingSphere tính tay từ tâm instance + bán kính tán (finish()).
+    **HERO phượng GLB (file KHÔNG đổi):** là LOD GẦN của phượng thủ tục CÙNG chỗ (cùng cao, cùng độ xoè tán theo tỉ lệ
+    bbox GLB), frustum-cull TỪNG cây mỗi khung (luôn giữ trong 30 m — bóng đổ vào khung), castShadow BẬT. Vị trí: 46 cây
+    chọn ĐỀU theo hash trong ứng viên phượng nở dọc p/s ≤ 160 m dải trung tâm (37) + mỗi cây thứ 10 quanh vườn hoa (20) = 57.
+    Lite thiếu/hỏng → thử NGAY bản gốc (như assets.js; cả luống hoa hero). Hero luôn nở (GLB đỏ) nên chỉ hiện khi uBloom ≥ 0,5.
+    Hero CHỈ khi cách camera pano ≥ 12 m (`HERO_PANO_CLEAR` — tán GLB xoè 6-7 m: hero 9,7 m trước pano_001_h090 từng che
+    ~35% khung); cây hero vườn hoa (heroTree) gần hơn → phượng thủ tục, nở theo hash 35% (không ép nở).
+    **TRỒNG THEO DỮ LIỆU (`plantStreetTrees`):** 2 bên mọi phố p/s/t tại `xsection.treePitLine(c)` (bó vỉa + 0,75 m),
+    nhịp 9,0/9,4 m × (0,88-1,18) lệch pha từng bên; phố r chỉ nơi pano ≤ 60 m nói có cây (mật độ ≥ 2) + 70% hash; mật
+    độ pano: 0 = bỏ, 1 thưa ×2,3, 3 rợp ×0,9. Loại: lòng đường/đoạn khác (lưới đoạn 16 m dùng chung `veg.roadIndex`),
+    nút giao (đỉnh chung ≥ 2 đường + đầu mút, r = nửa lòng + 4,5), footprint nhà THẬT (buildings_real), LM_POLY + 2,5 m,
+    claims landmark/civic/cell (KHÔNG 'plaza': claim quảng trường/phố đi bộ của WP2 chặn NHÀ, hàng cây bó vỉa quanh nó
+    là đúng thật — đo: 327 cây/226 hố cây nằm trong các claim plaza của WP2), camera pano `PANO_CLEAR` 4,5 m, collider nhỏ
+    (cột/đèn), cách gốc khác < 4,2 m, `ctx.keepClear`
+    (world.js: TRỤC NHÌN spawn → mặt tiền Nhà hát, rộng ±14 m — hàng cây mép bắc phố road#378 từng che kín Nhà hát ở
+    cam_spawn). Loài: trọng số vùng (Hoàng Diệu `hdTreeBelt` xà cừ cắt trụi 60%; ven hồ lakeSD<45; dải trung tâm
+    (polyline hồ→Nhà hát→THĐ/QT→Tố Hữu, < 110 m) phượng 42%; còn lại xà cừ 36/bàng 26/phượng 20/sấu 9/bằng lăng 5) trộn
+    30/70 với loài pano gần nhất; tỉ lệ cắt cụt/cây non/gốc vôi/tán thưa theo pano. Cau dọc phố chỉ khi pano nói rõ
+    "hàng cau" (≥7), đa chỉ trồng đích danh. Hoa: ~35% phượng + bằng lăng nở (mùa hè mặc định).
+    **DỌN CÂY CŨ (`buildTrees`):** toạ độ helper cells có từ thời đường/nhà vẽ tay — đo: 118 cây TRONG LÒNG ĐƯỜNG (hàng
+    cách tim 's' 4,5 m, cau giữa tim…), 125 trong footprint nhà thật, 60 cặp gốc < 3 m. Nay: trong lòng p/s/t/r, cách tim
+    ≥ 0,5 m → DỜI ra treePitLine cùng phía (chỗ mới phải sạch: ngoài lòng đường/nhà thật/4,5 m camera pano); giữa
+    tim/ngõ h/phố đi bộ w/nhà thật/< 4,5 m camera pano/trùng gốc (< 1,8 m) → BỎ; collider gốc ở
+    đúng (x,z) cũ được dời theo hoặc tách (x=z=1e7 — cùng object nằm trong `colIdx` nên không phải xây lại chỉ mục).
+    Kết quả: dời 58, bỏ 40 (lòng đường) + 115 (nhà thật) + 16 (trùng gốc); còn trên lòng đường chỉ cây dải phân cách.
+    cell_tree: cau trước công sở + phượng allée sang treePitLine (trước hw+2,6/hw+3 = sau mặt tiền). BẪY đã dính: guard
+    `trOnRoad` của khối có lề nửa lòng + 0,8 m > treePitLine (+0,45..0,75) → loại SẠCH hàng cau (2/35) + nửa allée mà
+    không báo gì; nay lề + 0,3 m, allée bám tim phố THẬT (trNearestSeg — đường A→C vẽ tay lệch tim 0,1-1,9 m). Đặt cây
+    theo xsection thì MỌI guard lòng đường phía trước phải có lề < treePitLine − nửa lòng.
+    **SỐ ĐO (Chrome headless d3d11, Radeon 890M, autoQuality ghim, 1280×720):** 8.639 cây trong R1600 (xà cừ 2.720,
+    bàng 1.640, phượng 1.378 — 499 nở, cắt cụt 1.290, cau 545, sấu 442, cây non 372, bằng lăng 247, đa 5; 57 hero; 6.700 ô gốc), 22-25 draw call cây (13 kit gần + 9 xa +
+    ô gốc + 3 hero), tam giác cây THẤY ĐƯỢC 0,67-1,19 M (spawn 0,74 M; nhìn cao giữa phố 1,19 M khi 8 hero trong 150 m; trước: riêng hero GLB 2,5 M ở spawn).
+    Camera pano có cây < 4,5 m: 1/551 (cây dải phân cách; trước phản biện 68 < 4 m); hero < 8 m: 0 (trước 9). Hàng cau 5 công sở: 6/7/7/7/7
+    (UBND: hàng nằm trên phố r cách công trình ~51 m). Phượng allée Bảo tàng: 52 phượng (trước phản biện 33). Cùng phiên
+    bật/tắt toàn bộ cây (cả lượt bóng; trung vị 3 lượt — đo của phản biện): p50 +0,3..+0,8 ms, +1,1 ms khi hero GLB trong
+    khung, 0 ở aerial → chi phí nhỏ nhưng KHÔNG bằng 0. Gán lại LOD cưỡng bức 0,35-0,42 ms (≤ 4 lần/s + mỗi 10° quay). Khởi động (cùng phiên, 2 lượt/bên):
+    buildWorld 14,69 → 14,21 s (−0,48 s), hpReady 19,5 → 18,4 s, heap ~như cũ; phần cây: plantStreetTrees ~82 ms (gồm
+    giải RB_B64 ~13 ms), cả khối cây world.js ~110 ms, buildTrees ~65-85 ms (atlas 17 ms). Tổng scene (std, so baseline
+    dot3): spawn 755 call/4,88 M (738/4,88 M), pano_007 1.595/7,10 M (1.590/7,90 M), cam_high_center 1.187/7,03 M
+    (1.194/7,45 M). So số call/tam giác giữa 2 lượt chụp: worktree chưa có `__hp.pinQuality` → autoQuality tự bật/tắt
+    bloom (±13 call) và bóng (±300 call, ±3 M tam giác) theo tải máy — đừng đọc chênh đó là do cây. 0 lỗi JS (full); lite chỉ còn 404 assets_lite/ do checkout local không có file lite (check_assets ĐỦ).
+    **BẪY:** (1) `flagsFixed`: freezeStatic ghi đè castShadow/receiveShadow MỌI mesh → trees.js đặt lại cờ ở khung đầu
+    sau freeze (kit xa/ô gốc không đổ bóng). (2) QA `shoot.mjs` ẩn InstancedMesh `!frustumCulled && count 150..220` =
+    petals (170) — đừng tạo InstancedMesh khác khớp điều kiện đó. (3) Hero material (Standard của GLB) biên dịch lần đầu
+    khi cây hero đầu tiên vào 150 m (khựng 1 lần, như trước). (4) Tích hợp WP2: truyền lưới footprint DÙNG CHUNG (đã
+    đánh dấu `D.dead` bởi claims) qua `ctx.fpGrid` cho CẢ `plantStreetTrees` lẫn `buildTrees` — thiếu thì trees.js tự giải
+    RB_B64 (không có dead → cây trong khuôn viên được giữ nhưng nằm trên footprint "chết" vẫn bị coi là trong nhà).
+    (4b) Tích hợp WP7: `buildProps` chạy NGAY TRƯỚC `veg.buildTrees` (sau mọi `veg.plant`); buildTrees dời ~53 cây cũ ra hố
+    cây và chỉ dời tới chỗ không đè collider nhỏ (r ≤ 1,2: đèn/cột/đạo cụ) → đạo cụ đặt trước vẫn được tôn trọng.
+    (5) InstancedMesh tự LOD có thuộc tính instance riêng (`aInst`) → phải `noCull`; instcull chỉ nén matrix + color.
+    (5b) A2C giả định TIER≥2 có MSAA (composer RT samples 4) — đổi post/AA thì xem lại hằng `A2C` trong trees.js.
+    (5c) `uTime` quấn `% 200π` s: mọi tần số gió là bội 0,01 rad/s → nối liền, float không mất chính xác sau nhiều giờ —
+    thêm tần số mới phải giữ là bội 0,01. (5d) Sau `buildTrees` lưới gốc được dựng lại theo vị trí CUỐI → `veg.trunkNear`
+    dùng được cho hệ chạy sau (đạo cụ WP7), nhưng `veg.plant` sau đó vẫn KHÔNG dựng.
+    (6) Còn cây cũ CHƯA chuyển (ngoài vùng WP4): cau 'rockery' giữa vòng xuyến (world.js ~1860, vùng WP7), cau sân Nhà
+    khách Hải quân (~9865, WP3), bách tán chóp thông (~8383), cây quanh hải đăng (~20180, ngoài R).
 - **2026-09-07 (di)** [ĐỢT 2 TÍCH HỢP — 6 nhánh worktree song song + 6 phản biện đối kháng, gộp trên `dot2-int`]:
     Quy trình: mỗi nhánh (W1 merge-budget, W2 ground-grid, W3 landmark-lod, W4 visual, W5 hydro-polygon-water,
     W6 landmark-placement) làm trong worktree riêng, tự đo trước/sau trên GPU thật, có agent phản biện đọc diff +
