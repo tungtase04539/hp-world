@@ -505,6 +505,21 @@ export function sweepAssemblies(objs, cols, fc, opts = {}) {
     S.x0 = x0; S.x1 = x1; S.z0 = z0; S.z1 = z1;   // hộp cụm → evalShift lọc nhanh cụm xa phố/camera
     S.facadeExempt = h >= 1.8 && massive >= 12;   // chỉ NHÀ khối được miễn luật camera khi mặt tiền đã ở facadeLine
     let mode = (h >= 1.8 && massive >= 12) || (wallLike && opts.wallLike) ? 'bldg' : 'small';   // tường/cổng: chỉ khối ô (opts.wallLike)
+    // nhà DÃY CHUNG CHUNG đặt tay (vd showroom Hoàng Diệu) chồng lên footprint THẬT (lớp phố WP2 đã dựng nhà đó) → bản
+    // trùng: gỡ (như luật cellsink 'overlap'); opts.realDup(tên) bật luật, opts.realAt(x,z) = điểm trong nhà thật không SYNTH
+    if (opts.realDup && opts.realAt && A.length === 1 && A[0].kind === 'obj' && opts.realDup(A[0].name)) {
+      let hit = 0, tot = 0;
+      for (let x = x0 + 0.5; x < x1; x += 1) for (let z = z0 + 0.5; z < z1; z += 1) {
+        if (!A[0].S.body.some((b) => b.H.length >= 3 && inHull(b.H, x, z))) continue;
+        tot++; if (opts.realAt(x, z)) hit++;
+      }
+      if (tot && hit >= 0.3 * tot) {
+        for (const p of A) dropMesh(p);
+        for (const c of colsOf(A)) { c.x = 1e7; c.z = 1e7; rep.colOff++; }
+        rep.removed.push([A[0].name, [+((x0 + x1) / 2).toFixed(1), +((z0 + z1) / 2).toFixed(1)], 'realDup', +(hit / tot).toFixed(2)]);
+        continue;
+      }
+    }
     const e0 = evalShift(S, 0, 0, mode);
     if (!e0.bad) { rep.kept++; continue; }
     const name = A[0].name || A[0].o.name || '?';

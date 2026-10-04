@@ -2,8 +2,9 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
-import { makeCellSink } from './cellsink.js';
+import { makeCellSink, realBuildings } from './cellsink.js';
 import { initClearance, sweepAssemblies, flushClearance, onCarriageDisc, nearPano as clrNearPano, nudgeDisc as clrNudge } from './clearance.js';   // Đợt 3 W2-A: khoảng trống phố/camera pano
+import { FLAG as RB_FLAG } from './buildings_data.js';
 import { registerModel, shrinkTexturesForMobile, assetURL } from './assets.js';
 import { IS_MOBILE, LITE } from './device.js';
 import {
@@ -1839,6 +1840,9 @@ export async function buildWorld(scene, prog = () => {}) {
   world.streetClear = sweepAssemblies(scene.children.slice(_clrN0), colliders.slice(_clrC0), FEATURED_CLEAR, {
     keep: (n) => /median|_promenade$|^opera_sq|_dirt$/.test(n),
     identity: (n, A) => A.length === 1 && !A[0].o.isMesh && !!n && n !== 'hd_showroom',   // nhóm công trình có tên (KS/cao ốc/công sở) dời không nổi → giữ
+    // dãy showroom chung chung chồng ≥ 30% lên footprint THẬT (không SYNTH) = nhà trùng (tường trắng trơn pano_014_h180)
+    realDup: (n) => n === 'hd_showroom',
+    realAt: (() => { const { D, G } = realBuildings(); return (x, z) => { const b = G.at(x, z); return b >= 0 && !(D.flags[b] & RB_FLAG.SYNTH); }; })(),
   });
   flushClearance();
 
