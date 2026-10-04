@@ -503,6 +503,13 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     hệ khác — đo trực tiếp: phố thật chỉ chiếm 8 call/0,14 M tri ở góc aerial này). Heap 730-950 MB cả hai nhánh (dao động theo
     GC; hình học ô chi tiết giữ bản CPU ~50 MB vì mất ngữ cảnh WebGL cần upload lại). LITE (TIER 1): không lỗi mới (8 lỗi 404
     `assets_lite/*.glb` do worktree không có assets_lite — có cả ở proc), hpReady 6,8-7,4 s.
+    **ĐO LẠI sau phản biện** (dữ liệu v1 + WP4 cây + WP5 ánh sáng, dot3 9c46ef4; A/B CÙNG PHIÊN proc → real): hpReadyMs 17,0 →
+    9,4 s; cam_spawn 742 call/4,89 M tri → 714/4,01 M (57 fps cả hai); pano_007_h090 1.585/7,09 M → 1.350/5,90 M (51 → 58 fps);
+    cam_high_center 1.487/10,31 M → 1.094/6,29 M (55 → 57); game_3 1.234/7,14 M → 1.212/6,30 M (54 → 55); pano_102_h090
+    1.093/4,46 M → 859/3,68 M. 24 góc std so baseline_std (dot3 TRƯỚC WP4/5, khác phiên): calls −38…+27% (game_6 +27%, aerial —
+    hệ khác), tris −56…+7%, fps tối thiểu 39 → 49. Heap SAU GC: real 436-461 MB / proc 638-660 MB. Cổng: 0 lỗi JS (full), diag
+    [], 400/400 điểm trong nhà bị đẩy ra & 0 còn kẹt, 0 biển địa danh/0 camera pano trong nhà, mất/khôi phục ngữ cảnh 0 lỗi,
+    waterbfs 5/5; LITE chỉ 404 `assets_lite/*.glb` (môi trường).
     **BẪY/BÀI HỌC**: (a) helper GLSL dùng sampler `map` phải chèn SAU `#include <map_pars_fragment>`, không sau `<common>`;
     (b) đo trong máy dùng chung: autoQuality nấc 3 (near view, fog 220/1300, không hoàn tác) có thể bật giữa chừng → ảnh
     aerial mù sương — script chụp nên ghi `scene.fog.far` mỗi shot hoặc ép fog; (c) v0 footprint lùi khỏi phố + mặt phố không
