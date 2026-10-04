@@ -355,18 +355,32 @@ export function createTraffic(scene, world, opts = {}) {
         }
       }
     }
-    // người đi bộ đang băng qua ngã tư trong hành lang phía trước → giảm tốc, dừng trước họ (không chạy xuyên người)
+    lim = Math.min(lim, walkerLimit(a));
+    if (lim < 0.7) { a.waitT += 0.1; if (a.waitT > 3) { a.waitT = 0; a.ghostT = 1.5; } } else a.waitT = 0;
+    return lim;
+  }
+  // XE NHƯỜNG NGƯỜI ĐI BỘ (gọi trong followLimit, TRƯỚC bộ đếm chờ: chờ người > 3 s vẫn được "thoát kẹt" như chờ xe —
+  // đo mô phỏng node 72 điểm × 50 s: tách riêng khỏi ghost KHÔNG giảm va chạm, giữ chung cho xe khỏi đứng mãi).
+  function walkerLimit(a) {
+    // người đi bộ đang băng qua ngã tư trong hành lang phía trước → giảm tốc, dừng trước họ (không chạy xuyên người).
+    // Tầm nhìn = quãng phanh (v²/2·4 m/s²) + chỗ dừng + 2 m (xe máy 11 m/s ≈ 20 m); xét cả vị trí người đó 1,2 s nữa
+    // (đang bước VÀO hành lang). Lưới băm 8 m, quét ±2 ô → tầm 14 m luôn nằm trong vùng quét.
+    let lim = 1e9;
+    const fx = Math.sin(a.h), fz = Math.cos(a.h);
     const wHalf = a.type === 'car' ? 1.1 : 0.55, wStop = a.type === 'car' ? 4.5 : 2.6;
-    for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) {
+    const wLook = Math.min(14, wStop + 2 + a.v * a.v / 8);
+    for (let i = -2; i <= 2; i++) for (let j = -2; j <= 2; j++) {
       const l = wmap.get(hk(a.x + i * HC, a.z + j * HC)); if (!l) continue;
       for (const b of l) {
-        const dx = b.x - a.x, dz = b.z - a.z;
-        const ahead = dx * fx + dz * fz; if (ahead <= 0 || ahead > look) continue;
-        if (Math.abs(dx * fz - dz * fx) > wHalf + 0.35) continue;
+        const bx = b.x - a.x, bz = b.z - a.z;
+        const ahead = bx * fx + bz * fz; if (ahead <= 0 || ahead > wLook) continue;
+        const bv = (b.v || 0) * 1.2, ex = bx + Math.sin(b.h) * bv, ez = bz + Math.cos(b.h) * bv;
+        const s0 = bx * fz - bz * fx, s1 = ex * fz - ez * fx;   // lệch ngang bây giờ / 1,2 s nữa
+        const w = wHalf + 0.45;
+        if ((s0 > w && s1 > w) || (s0 < -w && s1 < -w)) continue;   // cả 2 thời điểm cùng ở ngoài một bên
         lim = Math.min(lim, Math.max(0, (ahead - wStop) * 0.8));
       }
     }
-    if (lim < 0.7) { a.waitT += 0.1; if (a.waitT > 3) { a.waitT = 0; a.ghostT = 1.5; } } else a.waitT = 0;
     return lim;
   }
   // NGƯỜI CHƠI (đi bộ hoặc đang lái) đứng trên đường đi của tác tử: LÁCH sang bên cho đủ khoảng hở (như xe máy VN
@@ -652,7 +666,7 @@ export function createTraffic(scene, world, opts = {}) {
 
   console.info('[traffic] đồ thị:', nodes.length, 'nút,', edges.length, 'cạnh,', G.ms, 'ms — bóng', RB, 'm, trần', JSON.stringify(CAP));
   return {
-    update, graph: G, pushOut, setEnabled, setNight, check,
+    update, graph: G, pushOut, setEnabled, setNight, check, agents,   // agents: chỉ để chẩn đoán (tool/test), không sửa từ ngoài
     stats: () => ({ ...stats, groups: Object.fromEntries(Object.entries(groups).map(([k, g]) => [k, g.list.length])) }),
   };
 }
