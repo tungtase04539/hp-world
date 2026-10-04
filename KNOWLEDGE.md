@@ -382,7 +382,10 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     góc bên PHẢI làn xe tới), 715 nhánh có zebra; 63 ô 450 m × 2 mesh `roads_x,z`/`sidewalk_x,z` = 147k tam giác (cũ: ~350k
     tam giác các lớp đường trước gộp). Dựng 173-181 ms trong trình duyệt (node ~230 ms; cũ: khối roads 414-620 + cell_road
     44-82 + cell_curb 152-277 ms) → bớt ~400-700 ms main thread lúc tải. Draw call cùng phiên (1 khung, base→mới):
-    pano_062_h090 864→843, pano_007_h090 1592→1577; tam giác 3,56M→3,49M / 7,90M→7,83M.
+    pano_062_h090 864→843, pano_007_h090 1592→1577; tam giác 3,56M→3,49M / 7,90M→7,83M. A/B xen kẽ 2 lượt cùng phiên
+    (shoot --perf, 5 góc chuẩn): cam_spawn 725→698-711 call / 4,88→4,79M tam giác, cam_high_center 1160→1133 / 7,44→7,33M,
+    game_3 1197→1188 / 8,13→8,04M; hpReady 24,6-25,0 s vs 24,4-25,3 s, heap 804-895 vs 772-897 MB, fps — đều trong nhiễu
+    headless (khung có lượt cập nhật bóng nhảy +170 call/+1,7M tam giác ở CẢ hai bản; so số nhỏ nhất).
     (2) `js/roadtex.js`: 1 DataArrayTexture 9 lớp 512² (LITE 256²) sinh TRONG WORKER (Blob dựng từ chính mã các hàm; lỗi →
     sinh đồng bộ; main thread ~2 ms): nhựa xám ẤM sáng màu nắng (đá dăm, loang; pano đo R>G>B ~(142,137,127) — bản lạnh
     g,g+1,g+2 + ánh trời xanh thành mặt đường xanh xám), bê tông ngõ, 4 kiểu vỉa hè theo SIDEWALK_BY_ROAD,
