@@ -414,7 +414,7 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     Tốc độ: xe máy 8,5-11 (p) … 4,5-7 (r) m/s, ô tô 9-12 … 4,5-6, người đi bộ 1,1-1,6. Người đi bộ trên vỉa hè
     (xsection: mép đường + 35-75% SIDEWALK_W), không mọc/đi vào footprint nhà thật (gặp nhà → nép mép vỉa, kẹt → quay
     đầu); đường đôi chỉ vỉa hè phía ngoài; chân đặt ở SIDEWALK_TOP. Vẽ INSTANCED: 3 kiểu xe máy (1 người/chở 2/chở
-    hàng) + 3 ô tô (con/gầm cao/16 chỗ) + 2 người đi bộ = 8 draw call; mô hình gộp rồi mergeVertices (≈2× ít đỉnh);
+    hàng) + 3 ô tô (con/gầm cao/16 chỗ) + 2 người đi bộ = 8 draw call thân (+8 bóng tiếp đất); mô hình gộp rồi mergeVertices;
     màu sơn/áo/mũ theo instance (thuộc tính `aTint` chọn kênh), tay chân người đi bộ vung bằng vertex shader, đèn
     pha/hậu tự sáng theo `uNight` (traffic.setNight). Chỉ VẼ tác tử trong DRAW_R 260/230/170 m (mô phỏng tới RB).
     **BẪY HIỆU NĂNG (đo):** ghi đè MỖI KHUNG vào bộ đệm instance GPU còn đang được khung trước đọc → ANGLE/D3D11 đồng
@@ -466,15 +466,26 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     tới g.close() — bản đầu không khoá; gpulock.mjs tái nhập có kiểm pid + khoá con cho hậu duệ của `run --`); diag/tour/perf/mobile
     viết lại (toạ độ suy từ LM/PANO_CAM, tour chọn điểm đứng bằng raycast); shoot.mjs chờ nút Bắt đầu mở + pinQuality
     (BẪY: không khoá thì máy bận → autoQuality nấc 3 sương gần → ảnh vệ tinh trắng xoá — đã thấy ở baseline cùng phiên).
-    **Đo (Radeon 890M, TIER 3, CÙNG PHIÊN + CÙNG 1 khoá GPU với bản dot3 c82a9ee ở cổng khác; shoot.mjs views_std):**
-    hpReady 20,5 → 20,0 s, nút Bắt đầu mở 21,3 → 20,2 s (khối đồng bộ dài nhất vẫn là `fabric` 12,6 s của world.js —
-    giờ có thanh tiến trình + vệt sáng chạy thay vì màn hình đơ); heap 663 → 713 MB (lượt trước 677 → 684: nhiễu GC +
-    RB01 giải mã cho footprints.js). fps: pano_007 45,8→48,8 · pano_021 46→52,2 · pano_089 35,4→42,4 · pano_071
-    40,6→47,5 · pano_014 50,4→54,4 · cam_spawn 57,9→57,0 · cam_high_center 47,6→47,1 · game_3 57,6→56,1; draw call
-    −5..−25 % ở góc phố (giao thông cũ = mỗi xe nhiều mesh). BẪY ĐO: calls/tris của shoot.mjs là MẪU 1 KHUNG — khung đó
-    có/không lượt làm mới bóng (4,5 Hz) làm số nhảy ±2-3 M tam giác → so fps (90 khung), đừng so tris 1 khung.
-    Giao thông: update() 0,5-0,9 ms/khung (TIER 3, ~300 tác tử), 0,4-0,5 ms (lite). 0 lỗi JS full + lite, diag 0
-    vấn đề, bất biến giao thông 0/265 xe sai làn, 0 ngược chiều, 0/66 người đi bộ trong nhà.
+    **Đo (Radeon 890M, TIER 3, shoot.mjs views_std 24 góc, base = `git archive dot3` 9cb2cc1 CÓ assets/ + assets_lite/
+    hard-link — log server 0 lần 404; after = WP8 đã merge cùng dot3 đó; 2 cặp CÙNG 1 khoá GPU, thứ tự base→after rồi
+    after→base):** fps TB 16 góc pano 53,1 / 53,8 → 56,1 / 56,4; góc phố nặng pano_007 44,3/45,0 → 53,9/53,5 · pano_021
+    48,9/49,8 → 56,5/54,8 · pano_071 42,8/45,5 → 50,3/54,3 · pano_014 48,3/52,0 → 55,7/58,1 · pano_141 52,2/48,2 →
+    55,1/55,6; góc nhẹ (≥ 57 fps) như cũ. Draw call TB pano 1015/1026 → 869/858 (−15 %; góc phố −20..−25 %: giao thông
+    cũ mỗi xe nhiều mesh + thuyền cũ → 16 draw instanced). Tam giác bằng nhau (pano_007 5,75 → 5,84 M) — chênh tris
+    ở lượt đo đầu (−2..−3 M) là do base THIẾU assets_lite (xem BẪY A/B ở §8), KHÔNG phải "lấy mẫu khung bóng" như đã
+    ghi trước; nhưng lợi fps ở góc phố vẫn còn khi cả 2 bên có lite và lặp lại khi đảo thứ tự → đến từ −300..−350
+    draw call. (Lượt A/B của phản biện trên máy tải nặng: fps lệch trong nhiễu; số trên đo lúc máy chỉ có agent khác
+    chụp xen kẽ.) CHI PHÍ GIAO THÔNG cùng phiên (bật/tắt, `--traffic off`): TB pano 56,1 vs 56,9 fps (0-2 fps ở hầu hết
+    góc; cam_spawn/cam_high_center 3-5 fps ở 1 lượt, lượt kia ≈ 0); probe bật/tắt luân phiên: −0..3 fps; update()
+    0,6-0,75 ms/khung TIER 3 (~265 xe + 66 người), 0,49 ms lite (145 + 37) — tăng theo tải CPU của máy (phản biện đo
+    máy tải nặng: −3..−7 fps, 0,9 ms). Khởi động KHÔNG đổi (hpReady 20,2/19,6 → 20,4/20,6 s, nhiễu ±1 s; khối `fabric`
+    12,5 s đồng bộ của world.js vẫn dài nhất — thanh tiến trình chỉ làm nó hiện rõ). Heap sau gc() ép: 684 → 680 MB
+    (bản đầu 664 → 702: footprints.js tự giải mã RB01 + import buildings_real.js — đã bỏ). 0 lỗi JS full (24 góc ×2)
+    + lite (tier 1); diag 0 vấn đề cả full lẫn lite, check() trên vị trí vẽ: 0 sai bên / 0 ra ngoài lòng đường /
+    0 chồng / 0 người đi bộ giữa lòng đường ngoài ngã tư (265 xe, 66 người). Mô phỏng giao thông chạy được trong node
+    (không GPU): map 'three' → lib/three.module.js bằng module.register + shim window/location/localStorage + đồng hồ
+    performance.now giả — đo va chạm xe–người (72 điểm × 50 s): bản đầu 557 lượt < 0,8 m / 190 xuyên < 0,45 m → 483 /
+    164 (−13 %); ~9 % người đi bộ ở trong lòng đường tại một thời điểm = đang băng qua phố ngang (vỉa hè đứt ở ngã tư).
 - **2026-10-04 (Đ3-WP1-data)** [ĐỢT 3 WP1 — `tools/process_buildings.mjs` v1: footprint thật → BỨC TƯỜNG PHỐ + THẢM MÁI]
     (nhánh `worktree-wf_f378e35a-d3b-1`). Generator offline, KHÔNG đổi runtime game (chưa module nào của game import
     `buildings_real.js`/`xsection.js` — WP2 citygen làm). Chạy: `node tools/process_buildings.mjs [--dump x.json]` ở gốc
