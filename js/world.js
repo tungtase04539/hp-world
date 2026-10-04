@@ -19430,7 +19430,8 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
   // + mỗi cây thứ 10 quanh vườn hoa.
   const HERO_FILES = ['phuong_a.glb', 'phuong_c.glb', 'phuong_d.glb'];
   const fracH = (v) => { const t = Math.abs(v); return t - Math.floor(t); };
-  // W2-B: hero chỉ thành GLB khi ≤ 230 m quanh Nhà hát (trees.js HERO_SHOW_R) — xa hơn là phượng thủ tục nở theo LỊCH
+  // W2-B: hero chỉ thành GLB khi ≤ 120 m quanh Nhà hát (trees.js HERO_SHOW_R, ≤ 3 GLB vẽ cùng lúc) — xa hơn là phượng
+  // thủ tục nở theo LỊCH
   function heroTree(x, z) {
     if (hdTreeBelt(x, z)) { shadeTree(x, z); return; }   // Hoàng Diệu: xà cừ cắt trụi, cấm phượng hero
     const s2 = fracH(Math.sin(x * 0.41 + z * 2.31) * 12543.7);

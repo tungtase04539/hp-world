@@ -11,18 +11,23 @@
 //   • InstancedMesh: kit GẦN (≤ NEAR_R) đổ bóng lốm đốm (customDepthMaterial alpha-test), kit XA ít thẻ (≤ FAR_R),
 //     cây phượng HERO GLB (Meshy, file KHÔNG đổi) chỉ hiện trong HERO_R — xa hơn là phượng thủ tục cùng chỗ.
 //     LOD tự quản (không qua instcull: userData.noCull) — nén tập instance theo khoảng cách camera mỗi ~0,25 s.
-//   • Gió: lắc tán bằng onBeforeCompile (rẻ). Mùa hoa: uniform uBloom (mặc định hè: ~35% phượng + bằng lăng nở).
+//   • Gió: lắc tán bằng onBeforeCompile (rẻ). Mùa hoa theo LỊCH trong game (W2-B: bloomShare — mặc định 4/10 ~17%
+//     phượng còn hoa muộn; rộ tháng 5-7; ?date= / world.trees.setDate).
+//   • W2-B: KÍCH THƯỚC THẬT theo loài (SPX: cao / mép dưới tán / bán kính) → biến hình TỪNG CÂY trong shader (aShape:
+//     nâng tán, co tán ngang, dời tán) trên kit chung; tán cách mặt tiền ≥ 1,5 m (facadeFit); tán thoáng (chùm đầu cành);
+//     cắt cụt / tỉa trơ theo pano; hero GLB chỉ quanh Nhà hát, ≤ 3 cây GLB cùng lúc.
 //
 // Hợp đồng dùng (world.js):
 //   plant(kind, x, z, o)          — xếp hàng 1 cây (toạ độ thế giới). kind: 'xacu'|'bang'|'phuong'|'sau'|'banglang'|
 //                                   'cau'|'catcut'|'da'|'non' hoặc 'shade' (cây bóng mát: loài theo pano/vùng) |
-//                                   'street' (mọi loài theo pano/vùng) | 'park'. o: {h, r, bloom, wash, pit, hero, yaw,
-//                                   variant, sz, full, median} (xem plant()).
+//                                   'street' (mọi loài theo pano/vùng) | 'park'. o: {h, r, wash, pit, hero, yaw,
+//                                   variant, sz, full, median} (xem plant(); o.bloom BỎ từ W2-B — hoa theo lịch).
 //                                   KHÔNG tự thêm collider (người gọi giữ addCollider như cũ); buildTrees dời/bỏ cây
 //                                   lọt lòng đường / nhà thật / trùng gốc và dời/tách collider ở đúng (x,z) đó.
 //   plantLocal(parent, lx, lz, kind, o) — cây trong Group (toạ độ local của parent, giải ở buildTrees; parent bị gỡ
 //                                   khỏi scene trước đó → cây bị bỏ).
 //   plantStreetTrees(ctx)          — trồng THEO DỮ LIỆU dọc phố p/s/t (+ r nơi pano nói có cây) tại xsection.treePitLine.
+//   plantPlazaYoung(ctx)           — hàng cây non chống cọc trên quảng trường lát đá (hộp ctx.box) — W2-B.
 //   buildTrees(scene, ctx)         — dựng atlas + kit + InstancedMesh, móc scene.onBeforeRender (LOD + gió). Trả handle.
 // Mọi vị trí/hash TẤT ĐỊNH (không Math.random) để A/B ảnh so được.
 import * as THREE from 'three';
