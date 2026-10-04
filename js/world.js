@@ -20927,6 +20927,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     gardens: GARDENS, square: EXTRAS.square,
     footprints: world.realFootprints || null,      // WP2 có thể gắn {D, grid} (đã đánh D.dead) → khỏi giải mã lần 2
     stringLights: [[EXTRAS.square[0] - 10, EXTRAS.square[1] + 10], [-430, 195]],
+    keepClear: [[EXTRAS.square[0] - 5, EXTRAS.square[1] + 23, 18]],   // = SPAWN main.js (khung hình đầu tiên)
   });
 
   // ---------- DẢI VƯỜN HOA TRUNG TÂM (chuỗi vườn hoa đặc trưng Hải Phòng) ----------

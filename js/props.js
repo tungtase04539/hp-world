@@ -491,6 +491,26 @@ function modelTruck() {
   P.push(finish(box(0.5, 0.14, 0.02, 0, 0.5, -2.46), C.plate));
   return mergeParts(P);
 }
+// XE VAN / MINIBUS 16 chỗ 5.2×1.88×2.1 (rất phổ biến: xe hợp đồng, xe khách nhỏ, xe công ty) — ~560 tam giác
+function modelVan() {
+  const P = [];
+  carWheels(P, 1.72, -1.55, 0.82, 0.33, 0.22);
+  // thân dưới (tới gờ kính), hốc bánh khoét
+  P.push(finish(prof([[2.58, 0.38], [2.63, 0.92], [2.42, 1.14], [-2.56, 1.16], [-2.6, 0.42], [-1.95, 0.36], [-1.9, 0.72], [-1.2, 0.72], [-1.14, 0.36], [1.36, 0.36], [1.42, 0.72], [2.04, 0.72], [2.1, 0.36]], 1.86), 0xffffff, 1));
+  // dải kính (kính lái dốc + cửa sổ hông liền)
+  P.push(finish(prof([[2.42, 1.14], [1.72, 1.98], [-2.5, 2.0], [-2.56, 1.16]], 1.8), C.glass));
+  P.push(finish(box(1.84, 0.12, 4.32, 0, 2.04, -0.36), 0xffffff, 1));                                   // nóc
+  for (const s of [-1, 1]) {
+    P.push(finish(beam([s * 0.9, 1.14, 2.38], [s * 0.9, 1.99, 1.74], 0.07, 0.07), 0xffffff, 1));          // trụ A
+    for (const z of [0.95, -0.7]) P.push(finish(box(0.06, 0.86, 0.14, s * 0.91, 1.57, z), 0xffffff, 1)); // trụ B/C
+    P.push(finish(box(0.06, 0.86, 0.22, s * 0.91, 1.57, -2.44), 0xffffff, 1));                          // trụ sau
+    P.push(finish(box(0.08, 0.14, 0.2, s * 1.0, 1.32, 2.2), C.black));                                   // gương
+    P.push(finish(box(0.02, 0.05, 1.6, s * 0.94, 1.0, -0.2), C.dark));                                   // ray cửa lùa
+  }
+  P.push(finish(box(0.9, 0.22, 0.03, 0, 0.68, 2.64), C.dark));                                           // ca-lăng
+  carLights(P, 2.62, -2.61, 0.84, 0.98, 0.66);
+  return mergeParts(P);
+}
 // LOD xa ô tô: thân + ca-bin (mặt bên kính, nóc sơn) — 24 tam giác
 function modelCarFar() {
   const P = [];
@@ -870,6 +890,7 @@ function cullUpdate(camera, force = false) {
 //   footprints            — tuỳ chọn {D, grid} (buildings_data.decodeRB + makeFootprintGrid, đã đánh D.dead) để né nhà THẬT
 //   nearPanoCam(x,z,r)    — né điểm camera pano
 //   reserved              — [[x,z,r],…] cột đã có (băng rôn) để xe máy né
+//   keepClear             — [[x,z,r],…] giữ trống đồ vỉa hè + ô tô (điểm hồi sinh)
 // }
 export function buildProps(ctx) {
   const T0 = performance.now();
@@ -902,6 +923,9 @@ export function buildProps(ctx) {
   const panoNear = ctx.nearPanoCam || (() => false);
   const openSpace = ctx.openSpace || (() => false);
   const avoid = ctx.avoid || (() => false);
+  // vùng giữ trống cho đồ vỉa hè + ô tô (điểm hồi sinh người chơi: khung hình đầu tiên không bị xe đỗ che) — [[x,z,r],…]
+  const keepClear = ctx.keepClear || [];
+  const clearAt = (x, z) => { for (const c of keepClear) if ((x - c[0]) ** 2 + (z - c[1]) ** 2 < c[2] * c[2]) return true; return false; };
   const yWalk = LAND_H + SIDEWALK_TOP, yRoad = LAND_H + ROAD_TOP;
 
   // ---------------------------------------------------------------------------------------------------------------
@@ -933,7 +957,7 @@ export function buildProps(ctx) {
           if (x * x + z * z > R_MAX * R_MAX) { rej.far++; S.rj[k] = 1; continue; }
           if (roadIdx.blocked(x, z, ri, si)) { rej.junction++; S.rj[k] = 2; continue; }
           if (!flat(x, z)) { rej.notFlat++; S.rj[k] = 3; continue; }
-          if (fcGrid.hit(x, z) || avoid(x, z) || claimAt(x, z, CLAIM_KINDS)) { rej.featured++; S.rj[k] = 4; continue; }
+          if (fcGrid.hit(x, z) || avoid(x, z) || clearAt(x, z) || claimAt(x, z, CLAIM_KINDS)) { rej.featured++; S.rj[k] = 4; continue; }
           if (inBuilding(x, z)) { rej.building++; S.rj[k] = 5; continue; }
           if (lakeSD(x, z) < 14) { rej.lake++; S.rj[k] = 6; continue; }   // kè hồ Tam Bạc có đồ riêng (lan can/ghế/đèn đôi)
           S.ok[k] = 1; stats.valid++;
@@ -1317,10 +1341,10 @@ export function buildProps(ctx) {
   // ---------------------------------------------------------------------------------------------------------------
   // 6.6 Ô TÔ ĐỖ: song song mép đường TRONG LÒNG (curbLine − 0,95 m); phố r: 2 bánh trên vỉa (nghiêng nhẹ)
   // ---------------------------------------------------------------------------------------------------------------
-  const carI = [[], [], [], [], []];   // sedan, suv, hatch, taxi, truck
+  const carI = [[], [], [], [], [], []];   // sedan, suv, hatch, taxi, truck, van
   const CAR_COLS = [0xeeeeec, 0xeeeeec, 0xe4e4e1, 0x16171a, 0x16171a, 0xb4b8bc, 0x8e9398, 0x6c7176, 0x9a1d1d, 0x24406e, 0x6b5a48, 0xcfc4ae];
   const TAXI_COLS = [0xf4f4f0, 0x2f8f4e, 0x3aa35a, 0xe9e9e4, 0x2c5aa0];   // trắng · xanh lá · xanh dương-trắng (taxi HP)
-  const CAR_LEN = [4.5, 4.6, 3.9, 3.9, 4.8];
+  const CAR_LEN = [4.5, 4.6, 3.9, 3.9, 4.8, 5.25];
   // lượt 1: gom ỨNG VIÊN (mọi kiểm tra) · lượt 2: lấy mẫu ĐỀU theo hash nếu vượt ngân sách (không "N đường đầu ăn hết")
   const carCand = [];
   for (const S of sides) {
@@ -1337,13 +1361,16 @@ export function buildProps(ctx) {
       const x0 = S.ax + S.ux * s, z0 = S.az + S.uz * s;
       const hc = hash3(x0, z0, 102);
       const mu = hash3(x0, z0, 103);
-      const mi = mu < 0.36 ? 0 : mu < 0.6 ? 1 : mu < 0.82 ? 2 : mu < 0.9 ? 3 : 4;
+      // sedan 32% · SUV 22% · hatch 18% · van/minibus 11% · taxi 8% · tải nhỏ 9%
+      const mi = mu < 0.32 ? 0 : mu < 0.54 ? 1 : mu < 0.72 ? 2 : mu < 0.83 ? 5 : mu < 0.91 ? 3 : 4;
       const len = CAR_LEN[mi];
       if (hc > fill) { s += len + 2 + hash3(x0, z0, 104) * 9; continue; }
       const sc = s + len / 2;
       if (sc > S.L - len / 2 - 1) break;
       const x = S.ax + S.ux * sc + S.nx * lat, z = S.az + S.uz * sc + S.nz * lat;
-      let ok = x * x + z * z < R_MAX * R_MAX && flat(x, z) && !panoNear(x, z, 3.5) && !avoid(x, z) && lakeSD(x, z) > 18;
+      // camera pano nằm giữa lòng đường: ô tô đỗ ≤ 7,5 m (van/tải 9 m) che gần nửa khung hình mà ảnh thật ở đó trống
+      // (đo: van 2,1 m ngay trước pano_102) → giữ trống quanh 551 điểm chụp; còn lại vẫn đỗ theo bằng chứng
+      let ok = x * x + z * z < R_MAX * R_MAX && flat(x, z) && !panoNear(x, z, mi >= 4 ? 9 : 7.5) && !avoid(x, z) && !clearAt(x, z) && lakeSD(x, z) > 18;
       if (ok) for (const dd of [-len / 2 - 0.5, 0, len / 2 + 0.5]) { if (roadIdx.blocked(x + S.ux * dd, z + S.uz * dd, S.ri, S.si, 4.5, false)) { ok = false; break; } }
       if (ok && obst.hit(x, z, 0.9)) ok = false;
       // phố r: 2 bánh trên vỉa → không đè hàng xe máy / quán / xe đẩy đã đặt trên các ô vỉa hè dọc thân xe
@@ -1367,7 +1394,8 @@ export function buildProps(ctx) {
     const heading = headZ(S.ux * dirSign, S.uz * dirSign) + (hash3(x, z, 105) - 0.5) * 0.04;
     // nâng phía vỉa hè: local +X = (cosθ, −sinθ); nếu nó chỉ ra vỉa (n) → quay dương quanh trục dọc
     const lxDotN = Math.cos(heading) * S.nx - Math.sin(heading) * S.nz;
-    const col = mi === 3 ? pick(TAXI_COLS, hash3(x, z, 106)) : mi === 4 ? pick([0xf0f0ec, 0xf0f0ec, 0x2c5aa0, 0xd8d4c8], hash3(x, z, 106)) : pick(CAR_COLS, hash3(x, z, 106));
+    const col = mi === 3 ? pick(TAXI_COLS, hash3(x, z, 106)) : mi === 4 ? pick([0xf0f0ec, 0xf0f0ec, 0x2c5aa0, 0xd8d4c8], hash3(x, z, 106))
+      : mi === 5 ? pick([0xf2f2ef, 0xf2f2ef, 0xe6e6e2, 0xb9bdc1, 0x9aa0a6, 0x1f3f73], hash3(x, z, 106)) : pick(CAR_COLS, hash3(x, z, 106));
     carI[mi].push({ x, z, heading, roll: roll ? (lxDotN > 0 ? 0.085 : -0.085) : 0, yo: roll ? 0.065 : 0, col });
     for (const dd of [-len * 0.28, len * 0.28]) ctx.addCollider(x + S.ux * dd, z + S.uz * dd, 0.85);
     obst.add(x, z, len / 2);
@@ -1477,10 +1505,10 @@ export function buildProps(ctx) {
   inst('props_bikes_far', modelBikeFar(), matBike, allBikes.map((b) => ({ ...b, v: 0 })), { rMin: NEAR_BIKE, rMax: FAR_BIKE, cast: false, color: bikeColor });
   // ô tô: 5 model gần + LOD xa
   const NEAR_CAR = LITE ? 90 : 130, FAR_CAR = LITE ? 420 : 750;
-  const carModels = [modelSedan(), modelSUV(), modelHatch(false), modelHatch(true), modelTruck()];
+  const carModels = [modelSedan(), modelSUV(), modelHatch(false), modelHatch(true), modelTruck(), modelVan()];
   const carTris = carModels.map(triCount);
   const allCars = carI.flat();
-  ['sedan', 'suv', 'hatch', 'taxi', 'truck'].forEach((nm, i) => inst('props_car_' + nm, carModels[i], matCar, carI[i], { y: yRoad, rMax: NEAR_CAR, color: (it) => it.col }));
+  ['sedan', 'suv', 'hatch', 'taxi', 'truck', 'van'].forEach((nm, i) => inst('props_car_' + nm, carModels[i], matCar, carI[i], { y: yRoad, rMax: NEAR_CAR, color: (it) => it.col }));
   inst('props_cars_far', modelCarFar(), matCar, allCars.map((c) => ({ ...c, v: 0 })), { y: yRoad, rMin: NEAR_CAR, rMax: FAR_CAR, cast: false, color: (it) => it.col });
   // CỘT & ĐÈN (gần: 6 biến thể / xa: 5 biến thể)
   const NEAR_POLE = LITE ? 140 : 200, FAR_POLE = LITE ? 600 : 1100;
@@ -1623,7 +1651,7 @@ export function buildProps(ctx) {
     stools: stoolI.length, parasols: paraI.length, carts: cartI.length, aframes: aframeI.length, bins: binI.length, hydrants: hydI.length, cabinets: cabI.length,
     walkers: walkI.length, standing: standI.length, sitting: sitI.length,
     instancedMeshes: drawGroups, trisAllInstances: Math.round(tris),
-    modelTris: { scooter: bikeTris[0][1], underbone: bikeTris[1][1], big: bikeTris[2][1], cub: bikeTris[3][1], sedan: carTris[0], suv: carTris[1], hatch: carTris[2], truck: carTris[4], ped: pedTris },
+    modelTris: { scooter: bikeTris[0][1], underbone: bikeTris[1][1], big: bikeTris[2][1], cub: bikeTris[3][1], sedan: carTris[0], suv: carTris[1], hatch: carTris[2], truck: carTris[4], van: carTris[5], ped: pedTris },
   });
   console.log('[props]', JSON.stringify(stats));
   // móc gỡ lỗi/QA (không dùng trong game): window.__hpProps.sides / .cull()
