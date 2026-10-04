@@ -34,6 +34,10 @@ function nearPanoCam(x, z, r = 5) {
   return false;
 }
 import { SHOP_SIGNS } from './shopsigns.js';
+// ĐỢT 3 WP2: phố từ footprint THẬT (citygen.js) + sổ vùng giữ chỗ (claims.js) + footprint địa danh (landmark_polys.js)
+import { buildRealFabric, fabricData } from './citygen.js';
+import { claimPoly, claimBox, claimCircle } from './claims.js';
+import { LM_POLY } from './landmark_polys.js';
 
 // Thế giới dựng từ dữ liệu OpenStreetMap thật của Hải Phòng (tỉ lệ 1:10,
 // trung tâm phóng đại 2.2x). Mọi con phố trung tâm là phố thật.
@@ -61,6 +65,11 @@ const _matCache = new Map();
 // Muốn mở lại full Hải Phòng (Đồ Sơn/Cát Bà/cầu Bính...): tăng số này (vd 99999).
 // 1600 (thay vì 1500 chẵn) để trọn cụm CẢNG (portAnchor ~1565m) không bị cắt nham nhở.
 export const BUILD_RADIUS = 1600;
+// ĐỢT 3: nguồn nhà dân. 'real' (mặc định) = footprint thật Overture/OSM dựng bởi citygen.js; '?fabric=proc' = bộ sinh
+// nhà giả cũ (OSM BUILDINGS đùn khối + house() + shophouse_infill + block_infill + kho cảng/anchor/tower) để A/B.
+export const FABRIC = (() => {
+  try { return new URLSearchParams(location.search).get('fabric') === 'proc' ? 'proc' : 'real'; } catch (e) { return 'real'; }
+})();
 
 // (LITE + IS_MOBILE nay ở js/device.js — re-export để main.js/các module cũ vẫn import từ world.js)
 export { LITE };
@@ -530,6 +539,9 @@ export function buildWorld(scene) {
     colliders.push(c);
     if (colIdx) { const k = colKey(x, z); let l = colIdx.get(k); if (!l) colIdx.set(k, l = []); l.push(c); }
   }
+  // VA CHẠM ĐA GIÁC nhà thật (FABRIC 'real'): citygen.fabricCollide gắn vào đây SAU khi dựng phố — đẩy điểm ra khỏi
+  // footprint theo cạnh gần nhất (không còn "tường vô hình hình tròn" 86 m²/nhà, không đi xuyên góc nhà).
+  let _fabCollide = null;
   world.resolveCollisions = (p, pr = 0.45) => {
     if (!colIdx) {
       colIdx = new Map();
@@ -550,6 +562,25 @@ export function buildWorld(scene) {
         }
       }
     }
+    if (_fabCollide) _fabCollide(p, pr);
+  };
+  // Ô trống cho vật bán kính r? (không dính collider tròn lẫn nhà thật). Dùng cho mọi code ĐẶT VẬT sau khi dựng phố.
+  world.isFree = (x, z, r = 0.45) => {
+    const p = { x, z }; world.resolveCollisions(p, r);
+    return Math.abs(p.x - x) + Math.abs(p.z - z) < 0.02;
+  };
+  // Điểm trống + đất khô gần (x,z) nhất (xoắn ốc 1 m, tối đa maxD) — dời biển/NPC/xe spawn ra khỏi nhà thật.
+  world.findFree = (x, z, r = 0.6, maxD = 30) => {
+    const ok = (px, pz) => Math.abs(groundHeightNoDeck(px, pz) - LAND_H) < 0.4 && world.isFree(px, pz, r);
+    if (ok(x, z)) return [x, z];
+    for (let d = 1; d <= maxD; d += 1) {
+      const n = Math.max(8, Math.round(d * 4));
+      for (let k = 0; k < n; k++) {
+        const a = (k / n) * Math.PI * 2, px = x + Math.cos(a) * d, pz = z + Math.sin(a) * d;
+        if (ok(px, pz)) return [px, pz];
+      }
+    }
+    return [x, z];
   };
 
   // ---------- Mặt đất (từ lưới đất/biển OSM) — HỢP ĐỒNG 2 LƯỚI (W2, 2026-09-06) ----------
@@ -17910,7 +17941,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
   // BẰNG CHỨNG để được đặt nhà: pano thấy nhà trong 20m; hoặc vùng KHÔNG pano nào (45m) thì cần nhà OSM trong 50m
   const houseEvidence = (x, z) => _gridNear(_phGrid, x, z, 20) || (!_gridNear(_psGrid, x, z, 45) && _gridNear(_bldGrid, x, z, 50));
   world.buildingCells = new Set();
-  {
+  if (FABRIC === 'proc') {   // ĐỢT 3: chỉ bộ sinh nhà GIẢ cũ (?fabric=proc) — OSM BUILDINGS
     const bldGeos = [];
     // chừa chỗ quanh địa danh; trường học là KHUÔN VIÊN rộng nên chừa rộng hơn
     const lmSkip = Object.entries(LM).map(([k, [x, z]]) =>
@@ -18321,9 +18352,85 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     return true;
   }
 
+  // ---------- ĐỢT 3 WP2: PHỐ TỪ FOOTPRINT THẬT (js/citygen.js) ----------
+  // Chạy SAU openSpace/onOtherRoad/panoDenies/cornersDry (TDZ) và SAU khối cells (WP3 đăng ký claim 'cell' ở đó),
+  // TRƯỚC mái hiên/biển hiệu/cây (chúng cần nhà thật + va chạm đa giác). Nhà thật bị bỏ (D.dead) khi tâm nằm trong
+  // vùng giữ chỗ HOẶC >20% diện tích chồng vùng giữ chỗ (claims.js) HOẶC tâm thuộc zone-hàm (fabricReject).
+  let _fab = null;
+  if (FABRIC === 'real') {
+    // (1) footprint OSM địa danh (+3 m đệm) — tâm của mọi khối GLB/procedural hiện có đều nằm trong các đa giác này
+    const expandPoly = (P, d) => {
+      let s = 0; for (let i = 0; i < P.length; i++) { const a = P[i], b = P[(i + 1) % P.length]; s += a[0] * b[1] - b[0] * a[1]; }
+      const sg = s < 0 ? 1 : -1, out = [];
+      for (let i = 0; i < P.length; i++) {
+        const a = P[(i + P.length - 1) % P.length], b = P[i], c = P[(i + 1) % P.length];
+        const n1 = [-(b[1] - a[1]), b[0] - a[0]], n2 = [-(c[1] - b[1]), c[0] - b[0]];
+        const l1 = Math.hypot(n1[0], n1[1]) || 1, l2 = Math.hypot(n2[0], n2[1]) || 1;
+        let nx = n1[0] / l1 + n2[0] / l2, nz = n1[1] / l1 + n2[1] / l2; const ln = Math.hypot(nx, nz) || 1; nx /= ln; nz /= ln;
+        const cosh = Math.max(0.5, (n1[0] * nx + n1[1] * nz) / l1);
+        out.push([b[0] + sg * nx * d / cosh, b[1] + sg * nz * d / cosh]);
+      }
+      return out;
+    };
+    for (const [k, P] of Object.entries(LM_POLY)) claimPoly(expandPoly(P, 3), k === 'square' ? 'plaza' : 'landmark', k);
+    // (2) khối GLB/procedural lệch hoặc to hơn footprint OSM (cỡ GLB = size trong placeGLB, xem bên dưới)
+    const fc = (x, z, r, name) => claimCircle(x, z, r, 'landmark', name);
+    fc(LM.opera[0], LM.opera[1], 28, 'opera_glb');
+    fc(LM.postoffice[0] - LM_FACE.postoffice[0] * 9, LM.postoffice[1] - LM_FACE.postoffice[1] * 9, 27, 'postoffice_glb');
+    fc(LM.museum[0], LM.museum[1], 21, 'museum_glb');
+    fc(LM.cathedral[0], LM.cathedral[1], 25, 'cathedral_glb');
+    fc(LM.station_bldg[0], LM.station_bldg[1], 30, 'ga_glb');
+    fc(LM.thptnq[0], LM.thptnq[1], 44, 'thptnq_glb');
+    fc(LM.dennghe[0] - LM_FACE.dennghe[0] * 9, LM.dennghe[1] - LM_FACE.dennghe[1] * 9, 14, 'dennghe_glb');
+    fc(LM.dinhhk[0], LM.dinhhk[1], 17, 'dinhhk_glb');
+    fc(LM.chuahang[0], LM.chuahang[1], 15, 'chuahang_glb');
+    fc(LM.nhnn[0], LM.nhnn[1], 34, 'nhnn_glb');
+    fc(LM.dentamky[0], LM.dentamky[1], 13, 'dentamky_glb');
+    fc(LM.nhaken[0], LM.nhaken[1], 12, 'nhaken');
+    fc(LM.market[0] + 12, LM.market[1] + 4, 60, 'chosat');
+    claimBox(947, 800, 30, 27, 0, 'civic', 'cvh_thanhnien');
+    // (3) không gian mở thật (tập con openSpace: công viên, vườn hoa, quảng trường, kè, hành lang ray)
+    // (GARDENS = bbox TRỤC THẲNG của chính các đa giác PARKS — dải vườn hoa trung tâm chạy CHÉO nên bbox nuốt cả
+    //  ~110 nhà thật hai bên phố → chỉ dùng đa giác PARKS)
+    for (const ring of PARKS) claimPoly(ring, 'park', 'osm_park');
+    claimCircle(_sqX, _sqZ, 62, 'plaza', 'qt_nhahat');
+    { const ax = 5, az = 15, bx = -45, bz = 125, L = Math.hypot(bx - ax, bz - az);     // hành lang Nhà hát → Quán hoa → cột cờ
+      claimBox((ax + bx) / 2, (az + bz) / 2, L / 2, 55, Math.atan2(-(bz - az) / L, (bx - ax) / L), 'plaza', 'hl_quanhoa');
+      claimCircle(ax, az, 55, 'plaza', 'hl_quanhoa_a'); claimCircle(bx, bz, 55, 'plaza', 'hl_quanhoa_b'); }
+    if (LM.lechan) claimCircle(LM.lechan[0], LM.lechan[1], 55, 'plaza', 'qt_lechan');
+    claimCircle(-187.8, 201.6, 50, 'plaza', 'qt_trienlam');
+    claimCircle(-427, 943, 28, 'plaza', 'cho_cotden');
+    claimCircle(90, -757, 40, 'plaza', 'bai_caudat');
+    { const ux = 0.2989, uz = 0.9543, wx = -0.9543, wz = 0.2989, rot = Math.atan2(-uz, ux);   // road#9: quảng trường + vườn hoa
+      claimBox(41 + ux * 43.5 + wx * 47.5, 59 + uz * 43.5 + wz * 47.5, 51.5, 47.5, rot, 'plaza', 'road9_tay');
+      claimBox(41 + ux * 43.5 - wx * 22.5, 59 + uz * 43.5 - wz * 22.5, 51.5, 22.5, rot, 'park', 'road9_dong'); }
+    claimPoly([[-282, -468], [-215, -468], [-236, -588], [-306, -570]], 'park', 'cv_dbp_tay');
+    claimPoly([[-252, -286], [-249, -388], [-266, -430], [-286, -427], [-270, -386], [-272, -286]], 'plaza', 'prom_tambac_e');
+    claimPoly([[-359, -210], [-331, -378], [-345, -462], [-320, -462], [-318, -378], [-346, -210]], 'plaza', 'prom_tambac_w');
+    claimBox(-580, -508.5, 68, 31.5, 0, 'park', 'cv_bachdang');
+    claimBox(-262.5, -529, 47.5, 61, 0, 'plaza', 'ben_binh');
+    claimBox(-160, 591, 100, 5, 0, 'plaza', 'rail_melinh');
+    // zone dạng HÀM (thử tại tâm footprint): bãi giải toả Hoàng Diệu, siêu khối Hải quân, nút cầu HVT, ven hồ/kè
+    const _keHo = (x, z) => {
+      for (const [ax, az, bx, bz, x0, x1] of [[-211, 116, -1052, 285, -1e9, 1e9], [-1007, 367, -20, 162, -1050, -260]]) {
+        if (x < x0 || x > x1) continue;
+        if (_segD(x, z, ax, az, bx, bz) < 25 && ((bx - ax) * (z - az) - (bz - az) * (x - ax)) < 0) return true;
+      }
+      return false;
+    };
+    const fabricReject = (x, z) => clearedZone(x, z) || inSuperblock(x, z) || (x > -300 && x < 120 && z > -1045 && z < -845)
+      || lakeSD(x, z) < 16 || hoSenSD(x, z) < 10 || _keHo(x, z);
+    _fab = buildRealFabric(scene, { groundHeightNoDeck, landH: LAND_H, reject: fabricReject, maxR: BUILD_RADIUS, facadeMats });
+    _fabCollide = _fab.collide;
+    world.fabric = _fab;
+    // DỮ LIỆU FOOTPRINT DÙNG CHUNG (đã đánh D.dead): WP8 footprints.js / WP7 props (ctx.footprints {D, grid}) / WP4 cây
+    // (fpGrid) PHẢI dùng 2 cái này — tự decodeRB sẽ tránh/va vào cả nhà đã bị gỡ (dưới quảng trường, công viên, ngoài R1600).
+    world.rbData = fabricData(); world.rbGrid = _fab.grid;
+  }
+
   // ---------- MÁI HIÊN BẠT + BIỂN HIỆU shophouse dọc phố thương mại (rải rộng, rất thân thuộc) ----------
   // CHỈ đặt nơi có BẰNG CHỨNG NHÀ (pano/OSM) và KHÔNG phải không gian mở (hồ/quảng trường/vườn hoa)
-  {
+  if (FABRIC === 'proc') {   // ĐỢT 3: chỉ bộ sinh nhà GIẢ cũ (?fabric=proc) — awnings
     // mái hiên: canopy nghiêng + diềm; protrusion hướng +Z (ra phía đường)
     const awnG = [];
     { const cano = new THREE.BoxGeometry(3.0, 0.08, 1.7); cano.rotateX(-0.22); cano.translate(0, 3.15, 0.85); awnG.push(cano);
@@ -18386,6 +18493,45 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     // MOBILE: atlas 4096² ≈ 85MB VRAM/tấm không nén — thu 1/4 cạnh (1024², chữ vẫn đọc được
     // ở cự ly chơi trên màn nhỏ); desktop giữ nguyên 100%
     const MS = (IS_MOBILE || LITE) ? 0.25 : 1;   // 4096²(85MB/tấm) → 1024²(5MB/tấm) cho MỌI máy yếu
+    // LUẬT CHỦ DỰ ÁN: KHÔNG tên thương hiệu thật trên biển — catalog pano còn sót vài cái (WP3 làm sạch tận gốc
+    // gen_shopsigns.mjs; đây là lưới an toàn lúc dựng): biển khớp danh sách → bỏ (cả 2 nhánh FABRIC).
+    // (lưới an toàn TẠM cho tới khi WP3 sinh lại js/shopsigns.js theo js/brands.js — nguồn DUY NHẤT; danh sách này phủ đủ
+    //  các tên mà BRAND_MAP của WP3 bắt được trong shopsigns.js hiện tại — quét node 2026-10-04)
+    const _BRAND = /\b(HANA|INAX|MB|SSI|DOJI|HABECO|ELISE|CHRISBELLA|KOJI|WINMART|VINMART|VIETTEL|VIETCOMBANK|BIDV|AGRIBANK|TECHCOMBANK|VPBANK|SACOMBANK|PNJ|FPT|PHARMACITY|HIGHLANDS|PETROLIMEX|HONDA|YAMAHA|SAMSUNG|MAY10|SKF|PASSIO|EVN ?NPC|EVN|GAC MOTOR|HAIPHARCO|BESTORE|DEEP C|NORTHFREIGHT|LIEN A|LIPTON|HOEGAARDEN|TOKY ?LIFE|MILANO|HEAD|HDOO|VIETBANK)\b|CO\.?OP|THEGIOIDIDONG|THẾ GIỚI DI ĐỘNG|SEVEN\.?(ART|UOMO)|MEDIPHARCARE|LONG CHÂU|BẢO MIN|BÁCH HO[AÁ] XANH|ĐIỆN MÁY XANH|NGÂN HÀNG Á CHÂU/i;
+    // ĐỢT 3 (FABRIC 'real'): NEO biển vào MẶT TIỀN THẬT gần nhất (≤22 m từ điểm pano+14 m) đúng dải biển hiệu tầng trệt
+    // (2,95-3,85 m — đè lên biển vẽ trong atlas), quay theo pháp tuyến cạnh; biển trùng chỗ (530/954 trùng toạ độ) rải dọc
+    // mặt tiền, không chồng nhau; không có mặt tiền gần → bỏ (hết biển lơ lửng).
+    let _anchor = null;
+    if (_fab) {
+      const FE = _fab.frontEdges, G = new Map(), gk = (i, j) => i * 100003 + j, CS = 16;
+      FE.forEach((e, k) => {
+        for (let i = Math.floor(Math.min(e[0], e[2]) / CS); i <= Math.floor(Math.max(e[0], e[2]) / CS); i++)
+          for (let j = Math.floor(Math.min(e[1], e[3]) / CS); j <= Math.floor(Math.max(e[1], e[3]) / CS); j++) { const kk = gk(i, j); let l = G.get(kk); if (!l) G.set(kk, l = []); l.push(k); }
+      });
+      const occ = new Map();
+      _anchor = SHOP_SIGNS.map(([x, z]) => {
+        const cand = [], seen = new Set();
+        for (let i = Math.floor((x - 22) / CS); i <= Math.floor((x + 22) / CS); i++) for (let j = Math.floor((z - 22) / CS); j <= Math.floor((z + 22) / CS); j++) {
+          const l = G.get(gk(i, j)); if (!l) continue;
+          for (const k of l) { if (seen.has(k)) continue; seen.add(k); const e = FE[k], dx = e[2] - e[0], dz = e[3] - e[1], L2 = dx * dx + dz * dz;
+            let t = ((x - e[0]) * dx + (z - e[1]) * dz) / L2; t = Math.max(0, Math.min(1, t));
+            const d = Math.hypot(x - e[0] - dx * t, z - e[1] - dz * t); if (d < 22) cand.push([d, k, t * Math.sqrt(L2)]); }
+        }
+        cand.sort((p, q) => p[0] - q[0]);
+        for (let c = 0; c < Math.min(4, cand.length); c++) {
+          const [, k, s0] = cand[c], e = FE[k], L = Math.hypot(e[2] - e[0], e[3] - e[1]); if (L < 2.6) continue;
+          const w = Math.min(4.2, L - 0.3); let list = occ.get(k); if (!list) occ.set(k, list = []);
+          for (let o = 0; o < 8; o++) {
+            const s = s0 + (o % 2 ? 1 : -1) * Math.ceil(o / 2) * (w + 0.2), lo = Math.max(0.15, Math.min(L - 0.15 - w, s - w / 2));
+            if (list.some(([a0, a1]) => lo < a1 + 0.2 && lo + w > a0 - 0.2)) continue;
+            list.push([lo, lo + w]);
+            const m = (lo + w / 2) / L, px = e[0] + (e[2] - e[0]) * m + e[4] * 0.27, pz = e[1] + (e[3] - e[1]) * m + e[5] * 0.27;   // 0,27 m: trước mặt hộp biển 3D (0,22)
+            return [px, e[6] + 3.4, pz, Math.atan2(e[4], e[5]), w];
+          }
+        }
+        return null;
+      });
+    }
     for (let a = 0; a < Math.ceil(SHOP_SIGNS.length / PER); a++) {
       const items = SHOP_SIGNS.slice(a * PER, (a + 1) * PER);
       const cv = document.createElement('canvas'); cv.width = COLS * CELL_W * MS; cv.height = Math.ceil(ROWS * CELL_H * MS);
@@ -18398,7 +18544,16 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
       });
       const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
       const geos = [];
-      items.forEach(([x, z, ry], k) => {
+      items.forEach(([x, z, ry, name], k) => {
+        if (_BRAND.test(name)) return;
+        if (_anchor) {
+          const an = _anchor[a * PER + k]; if (!an) return;
+          const pg = new THREE.PlaneGeometry(an[4], 0.85);
+          const u0 = (k % COLS) / COLS, v1 = 1 - ((k / COLS) | 0) / ROWS, v0 = v1 - 1 / ROWS, uv = pg.attributes.uv;
+          for (let i = 0; i < uv.count; i++) uv.setXY(i, u0 + uv.getX(i) / COLS, v0 + uv.getY(i) * (v1 - v0));
+          pg.rotateY(an[3]); pg.translate(an[0], an[1], an[2]); geos.push(pg);
+          return;
+        }
         const gy = groundHeightNoDeck(x, z);
         if (Math.abs(gy - LAND_H) > 0.5 || isWater(x, z)) return;
         if (clearedZone(x, z)) return;   // bãi giải tỏa Hoàng Diệu: hết nhà thì hết biển
@@ -18421,7 +18576,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     }
   }
 
-  {
+  if (FABRIC === 'proc') {   // ĐỢT 3: chỉ bộ sinh nhà GIẢ cũ (?fabric=proc) — house rows
     const placed = [];
     const lmPts = Object.values(LM);
     let count = 0;
@@ -18482,7 +18637,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
   // ---------- DÃY SHOPHOUSE LIỀN MẠCH dọc PHỐ CHÍNH 'p'/'s' lõi trung tâm ----------
   // Lấp mặt phố cho hết trống: nhà ống/cửa hàng 3-5 tầng sát nhau tạo "tường phố" (đối chiếu pano).
   // Chỉ mọc nơi CHƯA có footprint OSM; né nước/địa danh/nhà thật. Gộp 1 mesh (vertex-color + vân tầng).
-  {
+  if (FABRIC === 'proc') {   // ĐỢT 3: chỉ bộ sinh nhà GIẢ cũ (?fabric=proc) — shophouse_infill
     const shopGeos = [];
     // màu TỪNG CĂN đa dạng (bạc hà/kem/cam gạch/hồng/xám xanh/vàng/trắng/nâu) — hết "đơn điệu khối xám"
     const bayCols = [[0.62, 0.82, 0.74], [0.94, 0.88, 0.68], [0.88, 0.55, 0.34], [0.86, 0.58, 0.64],
@@ -18679,7 +18834,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
   // ---------- LẤP LÒNG Ô PHỐ theo 2 bản đồ (OSM + footprint): ô phố thật DÀY ĐẶC nhà, game đang rỗng ruột ----------
   // Nhà ống nhỏ 2-3 tầng phủ kín lòng ô (block interior), chừa: mọi loại đường, công viên/vườn hoa/quảng trường/kè,
   // hành lang đường sắt, nhà OSM thật, và chỉ nơi Ô CÓ BẰNG CHỨNG nhà (footprint OSM <60m hoặc điểm nhà pano <40m).
-  {
+  if (FABRIC === 'proc') {   // ĐỢT 3: chỉ bộ sinh nhà GIẢ cũ (?fabric=proc) — block_infill
     const BK = 48; const segBuck = new Map();
     const addSeg = (ax, az, bx, bz, big) => {
       for (let gx = Math.floor((Math.min(ax, bx) - BK) / BK); gx <= Math.floor((Math.max(ax, bx) + BK) / BK); gx++)
@@ -18859,7 +19014,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
 
   // KHO CẢNG Hoàng Diệu (tile8) — dải kho dài mái tôn XÁM song song sông Cấm, TRÊN đất vừa reclaim
   // (real_8: dải kho CN lớn dọc bờ; đất reclaim để trống = void → lấp kho cho đúng silhouette cảng vệ tinh).
-  {
+  if (FABRIC === 'proc') {   // ĐỢT 3: chỉ bộ sinh nhà GIẢ cũ (?fabric=proc) — port_kho
     const khoGeos = [];
     const khoRows = [
       { z: -1000, x1: -400, x2: 480, d: 34 },
@@ -19022,7 +19177,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
   }
 
   // ===== anchor: 3 CÔNG TRÌNH LỚN thiếu (Sở GTVT t7, Cảng vụ t8, BV Quốc tế t1) — vệ tinh top-down =====
-  {
+  if (FABRIC === 'proc') {   // ĐỢT 3: chỉ bộ sinh nhà GIẢ cũ (?fabric=proc) — anchors
     const _anchorLand = (x, z) => !isWater(x, z) && Math.abs(groundHeightNoDeck(x, z) - LAND_H) < 0.4;
     const _anchorVCol = (g, wallHex, roofHex) => {
       const wc = new THREE.Color(wallHex), rc = new THREE.Color(roofHex);
@@ -19072,9 +19227,11 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     }
     addCollider(x, z, w * 0.75);
   }
-  tower(310, -40, 16, 64, 0x9fb8c8);
-  tower(360, 60, 14, 46, 0xc8b89a);
-  tower(255, 140, 13, 38, 0xa8c0b8);
+  if (FABRIC === 'proc') {   // tháp giả khu Lê Hồng Phong — footprint thật đã có nhà cao thật
+    tower(310, -40, 16, 64, 0x9fb8c8);
+    tower(360, 60, 14, 46, 0xc8b89a);
+    tower(255, 140, 13, 38, 0xa8c0b8);
+  }
 
   const grandMat = (base, trim, opts) => {
     const { map, emissiveMap } = grandFacadeTextures(base, trim, opts);
@@ -20382,7 +20539,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
   // keepClear: TRỤC NHÌN spawn → mặt tiền Nhà hát (ảnh đầu tiên người chơi thấy) — hàng cây mép bắc phố road#378 từng
   // che kín chân dung/mặt tiền (cam_spawn)
   const opKeep = (x, z) => _segD(x, z, LM.opera[0], LM.opera[1] + 16, LM.opera[0], LM.opera[1] + 75) < 14;
-  veg.plantStreetTrees({ ROADS_DT, groundHeightNoDeck, isWater, addCollider, colliders, lakeSD, hdTreeBelt, R: BUILD_RADIUS, landH: LAND_H, keepClear: opKeep });
+  veg.plantStreetTrees({ ROADS_DT, groundHeightNoDeck, isWater, addCollider, colliders, lakeSD, hdTreeBelt, R: BUILD_RADIUS, landH: LAND_H, keepClear: opKeep, fpGrid: world.rbGrid });   // rbGrid: footprint đã đánh D.dead (WP2) — proc: undefined → trees tự giải mã
 
   // ---------- CÂY ĐA/SI CỔ THỤ (pano-loop V2: 5 finding "thân bạnh, rễ phụ rủ, tán rất rộng") ----------
   function banyanTree(x, z) {
@@ -21353,6 +21510,11 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
   world.npcSpots.coba = [LM.lake[0] - 20, LM.lake[1] + 62];
   world.npcSpots.xichlo = [LM.quanhoa[0] - 26, LM.quanhoa[1] + 18];
   world.npcSpots.florist = [LM.quanhoa[0] + 6, LM.quanhoa[1] - 1];
+  // ĐỢT 3: các điểm trên từng nằm giữa phố giả — với nhà thật (va chạm đa giác) dời tới chỗ trống + đất khô gần nhất
+  if (_fab) {
+    for (const k in world.npcSpots) { const [x, z] = world.npcSpots[k]; if (_fab.hit(x, z, 0.8)) world.npcSpots[k] = world.findFree(x, z, 0.8, 25); }
+    for (const v of world.vehicleSpawns) { if (v.type === 'boat' || !_fab.hit(v.x, v.z, 1.4)) continue; const [x, z] = world.findFree(v.x, v.z, 1.4, 25); v.x = x; v.z = z; }
+  }
 
   // ---------- Nhãn chữ nổi ----------
   world.makeTextSprite = function makeTextSprite(text, opts = {}) {
@@ -21374,7 +21536,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
   };
 
   // DỰNG toàn bộ cây đã xếp hàng (cells + cell_tree + phố + hồ + công viên + vườn hoa) → InstancedMesh theo loài/LOD
-  const trees = veg.buildTrees(scene, { groundHeight, R: BUILD_RADIUS, lakeSD, hdTreeBelt, colliders });
+  const trees = veg.buildTrees(scene, { groundHeight, R: BUILD_RADIUS, lakeSD, hdTreeBelt, colliders, fpGrid: world.rbGrid });
   world.trees = trees;                        // stats()/setSeason(0..1) — __hp.scene… hoặc world.trees.stats()
   world.treeBloomNear = trees.bloomNear;      // cánh phượng rơi quanh cây đang nở gần người chơi (petals.js)
   loadHeroTrees(trees);  // nạp GLB cây phượng ảnh-thật → LOD gần ≤150 m (bất đồng bộ)
@@ -21559,6 +21721,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
         scene.traverse((o) => {
           if (!o.isMesh || o.isInstancedMesh || o.isSkinnedMesh) return;
           if (o.layers.mask !== 1 || /^ground/.test(o.name) || o.name === 'water') return;
+          if (o.userData.noMerge) return;   // đã tự chia ô + thuộc tính riêng (citygen fab_*: aFac mất khi gộp/tách)
           if (skipStatic(o)) return;
           const m = o.material, g = o.geometry;
           if (!m || Array.isArray(m) || !m.isMeshLambertMaterial || m.transparent) return;

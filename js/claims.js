@@ -52,9 +52,14 @@ export function claimAt(x, z, kinds = null) {
 export function claimOverlapFrac(pts, kinds = null) {
   let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9;
   for (const [x, z] of pts) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
+  // lọc nhanh: phải có claim (đúng kind) mà BBOX giao bbox đa giác — không thì khỏi lấy mẫu (kết quả y hệt, chỉ nhanh hơn;
+  // quan trọng khi WP3 thêm ~1.200 claim 'cell' rải khắp phố)
   let any = false;
   for (let i = Math.floor(x0 / CELL); i <= Math.floor(x1 / CELL) && !any; i++)
-    for (let j = Math.floor(z0 / CELL); j <= Math.floor(z1 / CELL); j++) if (grid.has(key(i, j))) { any = true; break; }
+    for (let j = Math.floor(z0 / CELL); j <= Math.floor(z1 / CELL) && !any; j++) {
+      const a = grid.get(key(i, j)); if (!a) continue;
+      for (const c of a) if ((!kinds || kinds.includes(c.kind)) && c.bb[0] <= x1 && c.bb[2] >= x0 && c.bb[1] <= z1 && c.bb[3] >= z0) { any = true; break; }
+    }
   if (!any) return 0;
   const step = Math.max(1, Math.sqrt(((x1 - x0) * (z1 - z0)) / 400));
   let n = 0, hit = 0;
