@@ -5,8 +5,8 @@ import { Pass, FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
 //
 // 1) TONE MAPPING + GRADE = 1 hàm GLSL `CustomToneMapping` (ACES của three r160 + grade nhẹ) ghi đè vào
 //    ShaderChunk.tonemapping_pars_fragment TRƯỚC khi bất kỳ shader nào biên dịch. Mọi đường vẽ dùng CÙNG hàm:
-//    - composer (TIER ≥ 2): FinalPass gọi CustomToneMapping;
-//    - vẽ thẳng ra màn hình (TIER ≤ 1, ảnh vệ tinh không qua composer): renderer.toneMapping = CustomToneMapping →
+//    - composer (TIER ≥ 2, kể cả ảnh vệ tinh __hp.aerial): FinalPass gọi CustomToneMapping;
+//    - vẽ thẳng ra màn hình (TIER ≤ 1): renderer.toneMapping = CustomToneMapping →
 //      mọi material/vòm trời qua <tonemapping_fragment>.
 //    Bỏ Grade pass cũ (sat 0,88 + ám vàng sau ACES = "be bạc màu") — kiểm toán §3 #21.
 //    (Tên vẫn là CustomToneMapping vì r160 chỉ có stub này để ghi đè; nền là ACES của chính three — xem GRADE.)
@@ -150,7 +150,7 @@ const AO_FS = /* glsl */`${TEX0}
   uniform mat4 uProjInv;
   uniform vec2 uProjScale;      // (P[0][0], P[1][1]) · 0.5 → bán kính m → uv
   uniform float uIsOrtho;
-  uniform float uRadius, uBias, uBiasZ, uIntensity;
+  uniform float uRadius, uBias, uBiasZ, uIntensity, uMaxPx;
   varying vec2 vUv;
   // Bayer 4×4 (16 mức) không cần phép bit (GLSL ES 1.0)
   float bayer2(vec2 a) { a = floor(a); return fract(dot(a, vec2(0.5, a.y * 0.75))); }
@@ -174,7 +174,7 @@ const AO_FS = /* glsl */`${TEX0}
     vec2 rUV = uRadius * uProjScale / (uIsOrtho > 0.5 ? 1.0 : max(z, 0.1));
     float rPx = rUV.y / uFullTexel.y;
     if (rPx < 1.5) { gl_FragColor = vec4(1.0, z, 0.0, 1.0); return; }
-    rUV *= min(1.0, 90.0 / rPx);                       // trần bán kính màn hình (cache)
+    rUV *= min(1.0, uMaxPx / rPx);                     // trần bán kính màn hình (cache + dải tiếp xúc tường gần)
     // xoay mẫu theo Bayer 4×4 (theo pixel nửa phân giải) — mờ hộp 4×4 phía sau khử nhiễu ĐÚNG chu kỳ
     float rot = bayer4(gl_FragCoord.xy) * 6.2831853;
     float bias = uBias * (1.0 + z * uBiasZ);
@@ -202,9 +202,15 @@ const BLUR_FS = /* glsl */`${TEX0}
     vec2 c = texture2D(tAO, vUv).xy;
     float z0 = c.y, s = 0.0, w = 0.0;
     float tol = z0 * 0.035 + 0.15;
+    // so độ sâu với MẶT PHẲNG cục bộ (độ dốc 1 phía nhỏ hơn — không lấy qua mép vật), không với z0 phẳng: tường gần nhìn
+    // xiên có độ sâu đổi > tol mỗi texel → trước đây mờ bị loại gần hết → lộ nhiễu Bayer 4×4 thành mép răng cưa.
+    float zr = HP_TEX0(tAO, vUv + vec2(uTexel.x, 0.0)).y, zl = HP_TEX0(tAO, vUv - vec2(uTexel.x, 0.0)).y;
+    float zt = HP_TEX0(tAO, vUv + vec2(0.0, uTexel.y)).y, zb = HP_TEX0(tAO, vUv - vec2(0.0, uTexel.y)).y;
+    float gx = abs(zr - z0) < abs(z0 - zl) ? zr - z0 : z0 - zl;
+    float gy = abs(zt - z0) < abs(z0 - zb) ? zt - z0 : z0 - zb;
     for (int y = -2; y < 2; y++) for (int x = -2; x < 2; x++) {
       vec2 t = HP_TEX0(tAO, vUv + vec2(float(x), float(y)) * uTexel).xy;
-      float k = max(0.0, 1.0 - abs(t.y - z0) / tol);
+      float k = max(0.0, 1.0 - abs(t.y - (z0 + gx * float(x) + gy * float(y))) / tol);
       s += t.x * k; w += k;
     }
     gl_FragColor = vec4(w > 0.0 ? s / w : c.x, z0, 0.0, 1.0);
@@ -212,24 +218,31 @@ const BLUR_FS = /* glsl */`${TEX0}
 
 const COMP_FS = /* glsl */`
   uniform sampler2D tColor, tAO, tDepth;
-  uniform vec2 uHalfTexel;
+  uniform vec2 uHalfTexel, uFullTexel;
   uniform mat4 uProjInv;
   uniform float uStrength, uFadeStart, uFadeEnd, uDebug;
   varying vec2 vUv;
+  float zAt(vec2 uv) { vec4 v = uProjInv * vec4(uv * 2.0 - 1.0, texture2D(tDepth, uv).x * 2.0 - 1.0, 1.0); return -v.z / v.w; }
   void main() {
     vec4 col = texture2D(tColor, vUv);
     float d = texture2D(tDepth, vUv).x;
     if (d >= 0.99999) { gl_FragColor = col; return; }
     vec4 vp = uProjInv * vec4(vUv * 2.0 - 1.0, d * 2.0 - 1.0, 1.0);
     float z = -vp.z / vp.w;
-    // upsample theo độ sâu: 4 texel nửa phân giải gần nhất, trọng số song tuyến × giống độ sâu
+    // upsample theo độ sâu: 4 texel nửa phân giải gần nhất, trọng số song tuyến × giống độ sâu. Độ sâu kỳ vọng của
+    // từng texel = mặt phẳng cục bộ (độ dốc 1 phía nhỏ hơn, theo pixel full-res) — tường nhìn xiên không thành khối 2×2.
+    float zr = zAt(vUv + vec2(uFullTexel.x, 0.0)), zl = zAt(vUv - vec2(uFullTexel.x, 0.0));
+    float zt = zAt(vUv + vec2(0.0, uFullTexel.y)), zb = zAt(vUv - vec2(0.0, uFullTexel.y));
+    vec2 g = vec2(abs(zr - z) < abs(z - zl) ? zr - z : z - zl, abs(zt - z) < abs(z - zb) ? zt - z : z - zb);
     vec2 hp = vUv / uHalfTexel - 0.5;
     vec2 f = fract(hp), base = (floor(hp) + 0.5) * uHalfTexel;
     vec2 a00 = texture2D(tAO, base).xy, a10 = texture2D(tAO, base + vec2(uHalfTexel.x, 0.0)).xy;
     vec2 a01 = texture2D(tAO, base + vec2(0.0, uHalfTexel.y)).xy, a11 = texture2D(tAO, base + uHalfTexel).xy;
+    vec2 o00 = (base - vUv) / uFullTexel, oH = uHalfTexel / uFullTexel;   // vị trí texel so với pixel (px full-res)
+    vec4 ze = z + vec4(dot(g, o00), dot(g, o00 + vec2(oH.x, 0.0)), dot(g, o00 + vec2(0.0, oH.y)), dot(g, o00 + oH));
     float tol = z * 0.03 + 0.1;
     vec4 w = vec4((1.0 - f.x) * (1.0 - f.y), f.x * (1.0 - f.y), (1.0 - f.x) * f.y, f.x * f.y);
-    w *= vec4(1.0) / (vec4(abs(a00.y - z), abs(a10.y - z), abs(a01.y - z), abs(a11.y - z)) / tol + 0.05);
+    w *= vec4(1.0) / (abs(vec4(a00.y, a10.y, a01.y, a11.y) - ze) / tol + 0.05);
     float ao = dot(w, vec4(a00.x, a10.x, a01.x, a11.x)) / max(dot(w, vec4(1.0)), 1e-5);
     float fade = 1.0 - smoothstep(uFadeStart, uFadeEnd, z);
     ao = mix(1.0, ao, uStrength * fade);
@@ -247,8 +260,10 @@ function rt(w, h, opts) {
 
 // Cấu hình AO theo loại camera (đo/chỉnh bằng mắt ở KNOWLEDGE §10 Đợt 3 WP5)
 export const AO = {
-  persp: { radius: 1.8, bias: 0.03, biasZ: 0.02, intensity: 1.0, strength: 0.72, fadeStart: 140, fadeEnd: 320 },
-  ortho: { radius: 7.0, bias: 0.15, biasZ: 0.0, intensity: 1.0, strength: 0.7, fadeStart: 1e6, fadeEnd: 2e6 },
+  // maxPx: trần bán kính trên màn hình (px full-res). 90 cũ: tường sát camera có dải tối tiếp xúc rộng bất thường
+  // (review WP5, pano_014_h180) — 56 giữ dải ~0,5 m ở 4-5 m, không đổi gì ở xa (rPx < 56 khi z > ~8 m).
+  persp: { radius: 1.8, bias: 0.03, biasZ: 0.02, intensity: 1.0, strength: 0.72, fadeStart: 140, fadeEnd: 320, maxPx: 56 },
+  ortho: { radius: 7.0, bias: 0.15, biasZ: 0.0, intensity: 1.0, strength: 0.7, fadeStart: 1e6, fadeEnd: 2e6, maxPx: 90 },
 };
 
 export class SceneAOPass extends Pass {
@@ -265,12 +280,12 @@ export class SceneAOPass extends Pass {
     this._pi = new THREE.Matrix4();
     this.aoMat = sm(AO_FS, {
       tDepth: { value: this.sceneRT.depthTexture }, uFullTexel: { value: new THREE.Vector2() }, uProjInv: { value: this._pi },
-      uProjScale: { value: new THREE.Vector2() }, uIsOrtho: { value: 0 }, uRadius: { value: 1 }, uBias: { value: 0 }, uBiasZ: { value: 0 }, uIntensity: { value: 1 },
+      uProjScale: { value: new THREE.Vector2() }, uIsOrtho: { value: 0 }, uRadius: { value: 1 }, uBias: { value: 0 }, uBiasZ: { value: 0 }, uIntensity: { value: 1 }, uMaxPx: { value: 56 },
     }, { AO_SAMPLES: aoSamples });
     this.blurMat = sm(BLUR_FS, { tAO: { value: this.aoRT.texture }, uTexel: { value: new THREE.Vector2() } });
     this.compMat = sm(COMP_FS, {
       tColor: { value: this.sceneRT.texture }, tAO: { value: this.blurRT.texture }, tDepth: { value: this.sceneRT.depthTexture },
-      uHalfTexel: { value: new THREE.Vector2() }, uProjInv: { value: this._pi }, uStrength: { value: 1 }, uFadeStart: { value: 1 }, uFadeEnd: { value: 2 }, uDebug: { value: 0 },
+      uHalfTexel: { value: new THREE.Vector2() }, uFullTexel: { value: new THREE.Vector2() }, uProjInv: { value: this._pi }, uStrength: { value: 1 }, uFadeStart: { value: 1 }, uFadeEnd: { value: 2 }, uDebug: { value: 0 },
     });
     this.copyMat = sm(COPY_FS, { tColor: { value: this.sceneRT.texture } });
     this.quad = new FullScreenQuad(this.copyMat);
@@ -283,6 +298,7 @@ export class SceneAOPass extends Pass {
     this.aoMat.uniforms.uFullTexel.value.set(1 / w, 1 / h);
     this.blurMat.uniforms.uTexel.value.set(1 / hw, 1 / hh);
     this.compMat.uniforms.uHalfTexel.value.set(1 / hw, 1 / hh);
+    this.compMat.uniforms.uFullTexel.value.set(1 / w, 1 / h);
   }
   render(renderer, writeBuffer) {
     renderer.setRenderTarget(this.sceneRT);
@@ -303,6 +319,7 @@ export class SceneAOPass extends Pass {
     u.uProjScale.value.set(e[0] * 0.5, e[5] * 0.5);
     u.uIsOrtho.value = ortho ? 1 : 0;
     u.uRadius.value = P.radius; u.uBias.value = P.bias; u.uBiasZ.value = P.biasZ; u.uIntensity.value = P.intensity;
+    u.uMaxPx.value = P.maxPx;
     const c = this.compMat.uniforms;
     c.uStrength.value = P.strength; c.uFadeStart.value = P.fadeStart; c.uFadeEnd.value = P.fadeEnd;
     this.quad.material = this.aoMat; renderer.setRenderTarget(this.aoRT); this.quad.render(renderer);

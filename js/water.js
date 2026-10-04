@@ -78,6 +78,26 @@ export function makeShoreTexture() {
       data[(tz * N + tx) * 4] = v;
     }
   }
+  // CẠNH TRONG: waterSD đo tới cạnh GẦN NHẤT của MỌI polygon nước — 2 polygon OSM kề nhau (sông cắt đoạn) có cạnh chung
+  // giữa lòng sông → vệt màu bờ chạy giữa sông nhìn từ trên cao (review WP5, game_8). Bờ THẬT thì phải có ô đất gần:
+  // khoảng cách tới tâm ô đất gần nhất − nửa đường chéo ô (5,66 m) là CẬN DƯỚI của khoảng cách tới bờ thật → nâng độ
+  // sâu lên ít nhất bằng nó (bờ thật: không đổi; cạnh trong không có đất trong 4 ô = 32 m → ≥ 26 m, hết tô bờ).
+  const LR = 4, HALFDIAG = SHORE_STEP * Math.SQRT1_2, CAP = 26 * ENC;
+  let fixed = 0;
+  for (let tz = 0; tz < N; tz++) for (let tx = 0; tx < N; tx++) {
+    const v = data[(tz * N + tx) * 4];
+    if (v <= 128 || v - 128 >= CAP) continue;     // đất, hoặc đã đủ xa bờ để không tô
+    let best = (LR + 1) * SHORE_STEP;
+    for (let j = -LR; j <= LR; j++) {
+      const z2 = tz + j; if (z2 < 0 || z2 >= N) continue;
+      for (let i = -LR; i <= LR; i++) {
+        const x2 = tx + i; if (x2 < 0 || x2 >= N) continue;
+        if (data[(z2 * N + x2) * 4] < 128) { const dd = Math.hypot(i, j) * SHORE_STEP; if (dd < best) best = dd; }
+      }
+    }
+    const lo = Math.round(128 + (best - HALFDIAG) * ENC);
+    if (lo > v) { data[(tz * N + tx) * 4] = Math.min(255, lo); fixed++; }
+  }
   for (const poly of LAKE_POLYS) {
     let x1 = 1e9, x2 = -1e9, z1 = 1e9, z2 = -1e9;
     for (const [x, z] of poly) { x1 = Math.min(x1, x); x2 = Math.max(x2, x); z1 = Math.min(z1, z); z2 = Math.max(z2, z); }
@@ -93,6 +113,7 @@ export function makeShoreTexture() {
   tex.needsUpdate = true;
   tex.userData.buildMs = +(performance.now() - t0).toFixed(1);
   tex.userData.fineSamples = fine;
+  tex.userData.innerEdgeFixed = fixed;
   return tex;
 }
 
@@ -119,10 +140,12 @@ export function makeWaterMaterial(W, D) {
 	float hpIn = step( 0.0, hpSuv.x ) * step( hpSuv.x, 1.0 ) * step( 0.0, hpSuv.y ) * step( hpSuv.y, 1.0 );
 	vec4 hpSh = texture2D( tShore, clamp( hpSuv, 0.0, 1.0 ) );
 	float hpDepth = ( hpSh.r * 255.0 - 128.0 ) / ${ENC.toFixed(4)};          // m tính từ mép bờ, + = vào lòng nước
-	float hpShoreW = hpIn * ( 1.0 - smoothstep( 1.0, 16.0, hpDepth ) ) * step( -4.0, hpDepth );
-	diffuseColor.rgb = mix( diffuseColor.rgb, uLakeCol, hpIn * hpSh.g );
-	diffuseColor.rgb = mix( diffuseColor.rgb, uShoreCol, hpShoreW * 0.75 );
-	diffuseColor.rgb += vec3( 0.035, 0.034, 0.03 ) * hpIn * ( 1.0 - smoothstep( 0.6, 2.2, hpDepth ) ) * step( -1.0, hpDepth );`)
+	float hpLake = hpIn * hpSh.g;
+	// hồ (kè đá, nước tĩnh): dải bùn hẹp + nhạt hơn sông — dải 16 m × 0,75 cũ thành quầng sáng quanh hồ nhìn từ trên cao
+	float hpShoreW = hpIn * ( 1.0 - smoothstep( 1.0, mix( 16.0, 7.0, hpLake ), hpDepth ) ) * step( -4.0, hpDepth );
+	diffuseColor.rgb = mix( diffuseColor.rgb, uLakeCol, hpLake );
+	diffuseColor.rgb = mix( diffuseColor.rgb, uShoreCol, hpShoreW * mix( 0.75, 0.3, hpLake ) );
+	diffuseColor.rgb += vec3( 0.026, 0.025, 0.022 ) * mix( 1.0, 0.4, hpLake ) * hpIn * ( 1.0 - smoothstep( 0.6, 2.2, hpDepth ) ) * step( -1.0, hpDepth );`)
       .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
 	roughnessFactor = mix( roughnessFactor, 0.32, hpShoreW * 0.8 );`);
   };

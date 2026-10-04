@@ -795,6 +795,7 @@ export function buildWorld(scene) {
   water.rotation.x = -Math.PI / 2;
   water.position.set(CX, 0, CZ);
   water.name = 'water';
+  water.receiveShadow = true;   // bóng nhà/cây/cầu trên mặt sông (freezeStatic chừa 'water' nên gán ở đây; không cast)
   scene.add(water);
   world.waterMat = waterMat;
   water.userData.dyn = true;

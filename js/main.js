@@ -67,7 +67,9 @@ const scene = new THREE.Scene();
 // mặt đất +0.012/+0.03 ở xa, kiểm toán §3.3) — camera bám người chơi gần nhất 5 m, pano đặt camera cách 0.1 m nhưng
 // nhân vật đã ẩn, không có gì trong 0.3 m.
 const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.3, TIER >= 2 ? 3200 : 6000);
-attachRenderer(renderer, camera, scene);   // assets.js: compileAsync + upload texture rải khung cho model GLB
+// assets.js: compileAsync + upload texture rải khung cho model GLB; getter = RT cảnh của composer (biến thể program
+// đúng đường vẽ thật; null khi vẽ thẳng ra màn hình). scenePass gán ngay bên dưới, getter chỉ gọi lúc GLB lộ diện.
+attachRenderer(renderer, camera, scene, () => (scenePass ? scenePass.sceneRT : null));
 
 // Hậu kỳ (chỉ tắt trên máy yếu — KHÔNG theo cảm ứng):
 //   SceneAOPass (cảnh → RT MSAA + depth → AO nửa phân giải → ghép) → Bloom (CHỈ bật về đêm) → FinalPass (tone+grade+dither)
@@ -872,8 +874,19 @@ if (renderer.compileAsync) {
   let p;
   const _c0 = performance.now();
   try { p = renderer.compileAsync(scene, camera); } catch (e) { p = Promise.resolve(); }
+  // Bloom CHỈ bật về đêm → ~8 program của nó từng biên dịch đúng lúc chạng vạng đầu tiên (khung 45-95 ms, review WP5).
+  // Biên dịch sẵn song song (không chặn): mỗi material của bloom gắn tạm vào 1 quad. Bloom vẽ vào RT riêng → cùng
+  // biến thể (NoToneMapping + linear) với RT đang gắn ở đây.
+  let pb = null;
+  if (bloomPass && scenePass) {
+    const tmp = new THREE.Scene(), g = new THREE.PlaneGeometry(1, 1);
+    const bm = [bloomPass.materialHighPassFilter, ...(bloomPass.separableBlurMaterials || []), bloomPass.compositeMaterial, bloomPass.blendMaterial];
+    for (const m of bm) if (m) { const q = new THREE.Mesh(g, m); q.frustumCulled = false; tmp.add(q); }
+    try { pb = renderer.compileAsync(tmp, camera).catch(() => {}).finally(() => g.dispose()); } catch (e) { g.dispose(); }
+  }
   _T.compileSyncMs = Math.round(performance.now() - _c0);
   renderer.setRenderTarget(prevRT);
+  if (pb) p = Promise.all([p, pb]);
   p.then(() => { if (renderer.shadowMap.enabled) renderer.shadowMap.needsUpdate = true; })
     .catch(() => {})
     .finally(() => { if (!_warm) _T.warmBy = 'compile'; _warm = true; _T.compileDoneAt = Math.round(performance.now()); });

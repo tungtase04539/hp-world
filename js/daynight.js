@@ -17,7 +17,7 @@ import { setGlbLighting } from './assets.js';
 //   Chế độ vệ tinh: hộp bóng phủ cả khung ảnh trực giao, map 4096, tắt sương.
 
 export const DAY_LENGTH = 1440;      // giây thật / 1 ngày game (24 phút — SPEC: 300 s cũ quá nhanh, 40% là đêm)
-const START_HOUR = 9;                // mặc định 09:00; QA: ?time=14.5 | 14:30 | 0.6 (≤1 = phần của ngày), ?timefreeze=1
+const START_HOUR = 9;                // mặc định 09:00; QA: ?time=14.5 | 14:30 | 1 (= 01:00) | 0.6 (<1 = phần của ngày), ?timefreeze=1
 
 // Uniform DÙNG CHUNG cho shader của module khác (mặt tiền/cây...): `shader.uniforms.uNight = NIGHT_U` trong
 // onBeforeCompile — daynight ghi .value mỗi khung, không cần đăng ký material.
@@ -35,7 +35,8 @@ function parseTimeParam() {
     let t = null;
     if (v) {
       if (v.includes(':')) { const [h, m] = v.split(':').map(Number); t = (h + (m || 0) / 60) / 24; }
-      else { const n = parseFloat(v); if (isFinite(n)) t = n <= 1 ? n : n / 24; }
+      // < 1 = phần của ngày (0.6); ≥ 1 = giờ (1 = 01:00, 14.5 = 14:30). Trước đây "1" bị hiểu là phần 1 = nửa đêm.
+      else { const n = parseFloat(v); if (isFinite(n)) t = n < 1 ? n : n / 24; }
     }
     return { t: t == null ? null : ((t % 1) + 1) % 1, freeze: q.get('timefreeze') === '1' };
   } catch (e) { return { t: null, freeze: false }; }
@@ -244,6 +245,8 @@ export function createDayNight(scene, world) {
   const tp = parseTimeParam();
   let dayT = tp.t != null ? tp.t : START_HOUR / 24;
   let frozen = tp.freeze;
+  let _cloudT = 0;
+  const CLOUD_STILL = typeof navigator !== 'undefined' && navigator.webdriver === true;
   let aerial = null, nearView = false;
   const sA = [0, 1, 0], E = [0, 0, 0], Esky = [0, 0, 0], L = [0, 0, 0], hzDir = [0, 0, 0];
   const _sun = new THREE.Vector3(), _moon = new THREE.Vector3(), _key = new THREE.Vector3();
@@ -400,7 +403,10 @@ export function createDayNight(scene, world) {
       if (!frozen) dayT = (dayT + dt / DAY_LENGTH) % 1;
       const night = applySky();
       const now = performance.now();
-      skyMat.uniforms.uTime.value = envMat.uniforms.uTime.value = now * 0.001;
+      // mây trôi theo đồng hồ GAME (đứng yên khi ?timefreeze / frozen, và khi trình duyệt tự động hoá — ảnh QA A/B
+      // so được điểm ảnh bầu trời; trước đây = performance.now() nên mây khác nhau giữa 2 lần chụp)
+      if (!frozen && !CLOUD_STILL) _cloudT += dt;
+      skyMat.uniforms.uTime.value = envMat.uniforms.uTime.value = _cloudT;
 
       // hướng nhìn ngang (hộp bóng + màu sương theo phương nhìn)
       camera.getWorldDirection(_tmpDir);

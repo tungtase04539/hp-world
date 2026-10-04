@@ -71,7 +71,7 @@ export const LITE = TIER <= 1;
 // NÚM CHẤT LƯỢNG ÁNH SÁNG (Đợt 3 WP5) — NGUỒN DUY NHẤT, chỉ theo TIER (không bao giờ theo cảm ứng).
 //  post: chuỗi hậu kỳ (scene RT MSAA + AO + bloom + tone/grade) — TIER ≥ 2; TIER ≤ 1 vẽ thẳng ra màn hình nhưng
 //        CÙNG tone mapping/grade (CustomToneMapping) nên màu khớp mọi đường vẽ.
-//  ao: AO theo độ sâu nửa độ phân giải. Đo trên Radeon 890M (KNOWLEDGE §10 Đợt 3 WP5): ≈1 ms GPU ở 1280×720 → bật
+//  ao: AO theo độ sâu nửa độ phân giải. Đo trên Radeon 890M (KNOWLEDGE §10 Đợt 3 WP5): 0,25-0,32 ms GPU ở 1280×720 → bật
 //      cả TIER 2 (ngưỡng SPEC ≤ 2,5 ms); aoSamples ít hơn ở TIER 2.
 //  shadowMap/shadowBox: bản đồ bóng và nửa cạnh hộp bóng (m). envSize: cạnh cubemap bầu trời nướng PMREM.
 //  clouds: lớp mây thủ tục trên vòm trời (rất rẻ — chỉ tắt ở TIER 0 phần mềm).
