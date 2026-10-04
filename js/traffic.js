@@ -556,11 +556,16 @@ export function createTraffic(scene, world, opts = {}) {
     a.x = _p.x; a.z = _p.z;
   }
 
-  const DRAW_R2 = DRAW_R * DRAW_R, NB2 = NEAR_BIKE * NEAR_BIKE, NC2 = NEAR_CAR * NEAR_CAR;
+  const DRAW_R2 = DRAW_R * DRAW_R, LOD_HYST = 5;
   const gBikeFar = groups.bike_far, gCarFar = groups.car_far;
   // Ghi instance: mỗi tác tử trong bán kính vẽ → nhóm GẦN của kiểu nó hoặc nhóm XA (LOD) theo khoảng cách; mỗi nhóm
   // ghi vào bản đệm khung N−2 của nó (xem STRIDE/NSET) — 1 lần tải/nhóm/khung. Bóng tiếp đất: 1 bộ đệm chung.
-  function writeInstances(px, pz) {
+  // LOD gần/xa theo khoảng cách tới CAMERA (cx, cz), KHÔNG tới người chơi: camera LITE lùi tới CAM_MAX 36 m > NEAR_BIKE
+  // 32 m, camera đạo diễn __cine bay xa người chơi → bản XA (người que trên nêm) từng hiện cách ống kính 2-6 m (phản biện).
+  // Trễ LOD_HYST 5 m (xa → gần khi < ngưỡng − 5 m) — không nhấp nháy ở ngưỡng. Cắt DRAW_R + mô phỏng vẫn quanh người chơi.
+  // Người đi bộ: pha bước tích phân trên CPU (a.wph) + biên độ êm theo tốc độ (a.wamp) — trước: biên độ nhảy 0↔1 ở
+  // 0,2 m/s và pha = uKitTime·nhịp nhảy khi nhịp đổi.
+  function writeInstances(px, pz, cx, cz, dt) {
     for (const k in groups) { const g = groups[k]; g.k = (g.k + 1) % NSET; g.n = 0; g.arr = g.sets[g.k].ib.array; }
     shK = (shK + 1) % NSET;
     const ss = shSets[shK], sa = ss.ib.array;
@@ -571,9 +576,18 @@ export function createTraffic(scene, world, opts = {}) {
       if (d2 > DRAW_R2) continue;
       if (!(Math.abs(a.x - a.yx) + Math.abs(a.z - a.yz) < 4)) { a.yx = a.x; a.yz = a.z; a.y = groundHeight(a.x, a.z) + (a.type === 'walk' ? SIDEWALK_TOP : ROAD_TOP); }
       let g = a.grp, sx = 1, sy = 1, sz = 1;
-      if (a.type === 'bike' && d2 > NB2) g = gBikeFar;
-      else if (a.type === 'car' && d2 > NC2) { g = gCarFar; const f = CAR_FAR_SCALE[a.kind]; sx = f[2]; sy = f[1]; sz = f[0]; }
-      else if (a.type === 'walk') sx = sy = sz = a.sc || 1;
+      if (a.type !== 'walk') {
+        const lim = (a.type === 'bike' ? NEAR_BIKE : NEAR_CAR) - (a.far ? LOD_HYST : 0);
+        a.far = (a.x - cx) * (a.x - cx) + (a.z - cz) * (a.z - cz) > lim * lim;
+      }
+      if (a.type === 'bike' && a.far) g = gBikeFar;
+      else if (a.type === 'car' && a.far) { g = gCarFar; const f = CAR_FAR_SCALE[a.kind]; sx = f[2]; sy = f[1]; sz = f[0]; }
+      else if (a.type === 'walk') {
+        sx = sy = sz = a.sc || 1;
+        a.wph = ((a.wph ?? a.phase ?? 0) + dt * (a.v > 0.05 ? a.v * 4.5 / sx : 0)) % 6.2832;   // nhịp bước (rad/s) ∝ tốc độ / chiều dài chân
+        const wt = Math.min(1, Math.max(0, (a.v - 0.05) / 0.55));
+        a.wamp = (a.wamp ?? wt) + (wt - (a.wamp ?? wt)) * Math.min(1, dt * 5);
+      }
       const arr = g.arr, o = g.n * STRIDE;
       const ch = Math.cos(a.h), shh = Math.sin(a.h), cl = Math.cos(a.lean || 0), sl = Math.sin(a.lean || 0);
       // R = Ry(h)·Rz(lean)·S (cột-trước như Matrix4.elements)
@@ -584,8 +598,8 @@ export function createTraffic(scene, world, opts = {}) {
       arr[o + 16] = a.paint.r; arr[o + 17] = a.paint.g; arr[o + 18] = a.paint.b;
       arr[o + 19] = a.shirt.r; arr[o + 20] = a.shirt.g; arr[o + 21] = a.shirt.b;
       arr[o + 22] = a.shirt2.r; arr[o + 23] = a.shirt2.g; arr[o + 24] = a.shirt2.b;
-      arr[o + 25] = a.phase || 0;
-      arr[o + 26] = a.type === 'walk' && a.v > 0.2 ? a.v * 4.5 / (a.sc || 1) : 0;   // nhịp bước (rad/s) ∝ tốc độ / chiều dài chân
+      arr[o + 25] = a.type === 'walk' ? a.wph : 0;    // pha bước (rad)
+      arr[o + 26] = a.type === 'walk' ? a.wamp : 0;   // biên độ bước 0..1
       arr[o + 27] = a.opt || 0;
       g.n++;
       // bóng tiếp đất: elip (rx, rz) của mô hình gần, theo hướng xe (không nghiêng theo lean)
@@ -624,7 +638,8 @@ export function createTraffic(scene, world, opts = {}) {
     for (const k in groups) groups[k].mesh.visible = enabled;
     shMesh.visible = enabled;
   }
-  function update(dt, time, playerPos) {
+  // camPos (tuỳ chọn, main.js: camera.position): tâm chọn LOD gần/xa; thiếu → dùng người chơi
+  function update(dt, time, playerPos, camPos) {
     if (!enabled) return stats;
     frameNo++;
     const now = performance.now();
@@ -662,7 +677,7 @@ export function createTraffic(scene, world, opts = {}) {
       const st = Math.min(a.acc, 0.2); a.acc = 0;
       stepAgent(a, st, px, pz);
     }
-    writeInstances(px, pz);
+    writeInstances(px, pz, camPos ? camPos.x : px, camPos ? camPos.z : pz, dt);
     // thống kê cho âm thanh: mức xe gần (0..1) + số còi phát sinh
     let near = 0;
     let nb = 0, nc = 0, nw = 0;

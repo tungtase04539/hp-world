@@ -73,8 +73,8 @@ const only = Q.get('only');   // một mô hình ở gốc toạ độ: car:<ki�
 if (only) {
   const [k, t] = only.split(':'), oh = +(Q.get('oh') || 0);
   const bits = (Q.get('opt') || '').split(',').filter(Boolean).map(Number);
-  const mat = k === 'ped' ? KIT.kitMaterial({ name: 'ped', std, shirts: true, walk: 'cpu' }) : KIT.kitMaterial({ name: 'veh', std, shirts: true });
-  const geo = k === 'car' ? (lo ? KIT.carFarGeometry() : KIT.carGeometry(t)) : k === 'bike' ? KIT.motorbikeGeometry(t, { rider: 'none', lo }) : k === 'ride' ? KIT.motorbikeGeometry(t, { rider: 'ride', lo }) : k === 'bikefar' ? KIT.motorbikeFarGeometry() : KIT.pedestrianGeometry();
+  const mat = k === 'ped' || k === 'pedfar' ? KIT.kitMaterial({ name: 'ped', std, shirts: true, walk: 'cpu' }) : KIT.kitMaterial({ name: 'veh', std, shirts: true });
+  const geo = k === 'car' ? (lo ? KIT.carFarGeometry() : KIT.carGeometry(t)) : k === 'bike' ? KIT.motorbikeGeometry(t, { rider: 'none', lo }) : k === 'ride' ? KIT.motorbikeGeometry(t, { rider: 'ride', lo }) : k === 'bikefar' ? KIT.motorbikeFarGeometry() : k === 'pedfar' ? KIT.pedestrianFarGeometry() : KIT.pedestrianGeometry();
   place(geo, mat, [{ x: 0, z: 0, h: oh, paint: +(Q.get('paint') || 0xb4b7ba), shirt: 0xd96b2b, shirt2: 0x9cc7e6, opt: KIT.optWord(bits, +(Q.get('seed') || 5)), walk: +(Q.get('walk') || 0), phase: +(Q.get('ph') || 0) }], only);
 }
 const matV = KIT.kitMaterial({ name: 'veh', std, shirts: true });

@@ -46,7 +46,7 @@ export const PAL = {
   hair: [0x141210, 0x1d1714, 0x2a1e17, 0x3b2a1e],
   helm: [0xf0efea, 0xf0efea, 0x18181a, 0x18181a, 0x9a1c1c, 0x1f3e86, 0xe2b81c, 0x8a8f96, 0xd27aa0, 0x2d7a46],
   bot: [0x1f2a3e, 0x1c1c1f, 0x343b48, 0x5c5246, 0x2c3e5e, 0x6a6e74, 0x4a3c30, 0x8a96a6],
-  mask: [0x9cc7e6, 0x9cc7e6, 0x1c1c1e, 0xf2f2f0, 0xe7a2b8],   // xanh y tế phổ biến nhất; đen 20% (đen + tóc đen = mặt tối như trùm đầu)
+  mask: [0x9cc7e6, 0x9cc7e6, 0x8db8d6, 0x1c1c1e, 0xf2f2f0, 0xe7a2b8],   // xanh y tế phổ biến nhất; đen 1/6 (đen + tóc đen = mặt tối như trùm đầu)
   shoe: [0x1c1c1e, 0xe8e6e0, 0x5a4434, 0x2a2a30],
   bag: [0x1c1c1e, 0x6a4a32, 0xb53a3a, 0x2c4f8a, 0xd8cdb8, 0x3a3a40],
   cargo: [0xb08a5a, 0xd9d6cc, 0x2f6aa8, 0x3c7a4a, 0x9a3a2a, 0x6a6f74],   // thùng các-tông / xốp / bạt xanh / bạt lục
@@ -299,6 +299,18 @@ export function riderJoints({ seat, grip, foot, lean = 0.12, headUp = 0.1, hands
   return J;
 }
 
+// cằm/hàm hẹp + mặt hơi phẳng phía trước, đầu sau tròn (đầu + khẩu trang ôm theo cùng dáng mặt)
+function faceShape(g, k0 = 1) {
+  const p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) {
+    let x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+    if (y < 0) { const k = -y / (0.113 * k0); x *= 1 - 0.3 * k; z = z > 0 ? z * (1 - 0.12 * k) : z * (1 - 0.25 * k); }
+    if (z > 0.06 * k0) z = 0.06 * k0 + (z - 0.06 * k0) * 0.7;
+    p.setXYZ(i, x, y, z);
+  }
+  g.computeVertexNormals();
+  return g;
+}
 // Dựng người từ khung khớp J. o: { who:'A'|'B', lo (ít đa giác: người lái/xa), limbs (gán id chi), helmet:
 //  'gate'|'on'|false, nonla/cap/bag/hair/mask: giá trị cổng (0 = không có), skirt }
 export function person(K, J, o = {}) {
@@ -320,24 +332,21 @@ export function person(K, J, o = {}) {
   if (o.skirt) K.add(tube([pr(1.0, 0.15, 0.1), pr(0.78, 0.2, 0.15), pr(0.56, 0.23, 0.17)], nb, { capA: false, capB: false, ref: fw }), { ch: C.bot, gate: o.skirt, limb: L(0), ...cloth });
   // --- cổ + đầu (đầu: elip 0,078×0,112×0,095, cằm hẹp, mũi nhô) — chi 10
   K.add(seg(J.neck, add3(J.neck, nrm3(sub3(J.head, J.neck)), 0.1), 0.047, 0.044, n, { capA: false, capB: false, ref: fw }), { ch: C.skin, limb: L(10), ...skin });
-  const hd = ell([0, 0, 0], 0.079, 0.113, 0.097, RD ? 6 : o.lo ? 7 : 8, RD ? 5 : o.lo ? 5 : 6);
-  { // cằm/hàm hẹp + mặt hơi phẳng phía trước, đầu sau tròn
-    const p = hd.attributes.position;
-    for (let i = 0; i < p.count; i++) {
-      let x = p.getX(i), y = p.getY(i), z = p.getZ(i);
-      if (y < 0) { const k = -y / 0.113; x *= 1 - 0.3 * k; z = z > 0 ? z * (1 - 0.12 * k) : z * (1 - 0.25 * k); }
-      if (z > 0.06) z = 0.06 + (z - 0.06) * 0.7;
-      p.setXYZ(i, x, y, z);
-    }
-    hd.computeVertexNormals();
-  }
+  const hd = faceShape(ell([0, 0, 0], 0.079, 0.113, 0.097, RD ? 6 : o.lo ? 7 : 8, RD ? 5 : o.lo ? 5 : 6));
   // khung đầu: x = trái, y = trục cổ→đầu, z = mặt (hệ phải: z = x × y)
   const hdUp = nrm3(sub3(J.head, J.neck));
   const hx = nrm3(cross3(hdUp, J.fwd)), hz = cross3(hx, hdUp);
   const hm = new THREE.Matrix4().makeBasis(v3(hx), v3(hdUp), v3(hz));
   const place = (g) => { g.applyMatrix4(hm); g.translate(J.head[0], J.head[1], J.head[2]); return g; };
   K.add(place(hd), { ch: C.skin, limb: L(10), ...skin });
-  if (!o.lo) K.add(place(box(0.026, 0.045, 0.03, 0, -0.005, 0.098, -0.25)), { ch: C.skin, limb: L(10), ...skin });   // mũi
+  if (!o.lo) {
+    K.add(place(box(0.026, 0.045, 0.03, 0, -0.005, 0.098, -0.25)), { ch: C.skin, limb: L(10), ...skin });   // mũi
+    // lông mày (màu tóc) + hốc mắt tối: mặt không còn "ma-nơ-canh trơn" (phản biện) — 4 hộp mỏng nhô 3-4 mm khỏi mặt
+    for (const sx of [1, -1]) {
+      K.add(place(box(0.03, 0.009, 0.01, sx * 0.031, 0.03, 0.077, 0, sx * 0.35, sx * -0.12)), { ch: C.hair, limb: L(10), r: 0.8 });
+      K.add(place(box(0.02, 0.011, 0.01, sx * 0.03, 0.009, 0.079, 0, sx * 0.3, 0)), { c: 0x2a1d17, limb: L(10), r: 0.5 });
+    }
+  }
   // tóc ngắn: chỏm trên-sau đầu, chân tóc phía trán kéo lên (không trùm mặt)
   if (o.helmet !== 'on') {
     const hr = ell([0, 0.012, -0.01], 0.085, 0.118, 0.103, o.lo ? 7 : 9, 5, 0, Math.PI * 0.62);
@@ -355,7 +364,13 @@ export function person(K, J, o = {}) {
     K.add(place(box(0.15, 0.012, 0.05, 0, 0.03, 0.118, 0.32)), { ch: C.helm, gate: hg, limb: L(10), r: 0.65, shade: 0.75 });   // lưỡi trai mũ (nhám: mặt phẳng bóng phản chiếu trời thành vệt trắng)
   }
   // khẩu trang (cổng)
-  if (o.mask) K.add(place(box(0.11, 0.06, 0.03, 0, -0.045, 0.082)), { ch: CH.MASK, gate: o.mask, limb: L(10), r: 0.9 });
+  // khẩu trang (cổng): VỎ cong ôm nửa dưới mặt (mảnh cầu trước mặt, cùng dáng cằm của đầu, nở 7 %) — bản hộp phẳng
+  // đen trông như râu đen ở < 4 m (phản biện)
+  if (o.mask) {
+    const mk = new THREE.SphereGeometry(1, RD ? 6 : 8, 2, Math.PI / 2 - 1.4, 2.8, 1.8, 0.8);   // dưới mũi → cằm, ±80° quanh mặt
+    mk.scale(0.079 * 1.07, 0.113 * 1.07, 0.097 * 1.07);
+    K.add(place(faceShape(mk, 1.07)), { ch: CH.MASK, gate: o.mask, limb: L(10), r: 0.9 });
+  }
   // nón lá (cổng): nón chóp rộng 0,48 m cao 0,17, mặt hơi lõm, màu lá cọ
   if (o.nonla) K.add(place(tube([{ p: [0, 0.055, 0], rx: 0.235, rz: 0.235 }, { p: [0, 0.09, 0], rx: 0.17, rz: 0.17 }, { p: [0, 0.16, 0], rx: 0.06, rz: 0.06 }, { p: [0, 0.205, 0], rx: 0.004, rz: 0.004 }], o.lo ? 10 : 14, { ref: [1, 0, 0], capA: true, capB: false, fixed: true })), { c: 0xd8c48c, gate: o.nonla, limb: L(10), r: 0.85 });
   // mũ lưỡi trai (cổng)
@@ -366,7 +381,9 @@ export function person(K, J, o = {}) {
   // --- tay: cánh tay (tay áo) + cẳng tay (da / tay áo dài) + bàn tay
   for (const [sd, sx, la, lf] of [['L', 1, 5, 7], ['R', -1, 6, 8]]) {
     const sh = J['sh' + sd], el = J['el' + sd], wr = J['wr' + sd];
-    K.add(tube([{ p: add3(sh, [sx * -0.01, 0.025, 0]), rx: 0.052, rz: 0.05 }, { p: el, rx: 0.039, rz: 0.04 }], n, { bulgeA: 0.03, bulgeB: 0.01 }), { ch: C.top, limb: L(la), ...cloth });
+    // nắp trên cánh tay CHÌM dưới vai áo (trước: nhô 25 mm + vòm 30 mm trên khớp vai → như cầu vai): bắt đầu thấp hơn
+    // khớp 22 mm, lệch vào trong 24 mm, vòm 15 mm — mép ngoài vẫn nở hơn ngực (cơ delta)
+    K.add(tube([{ p: add3(sh, [sx * -0.024, -0.022, 0]), rx: 0.05, rz: 0.05 }, { p: el, rx: 0.039, rz: 0.04 }], n, { bulgeA: 0.015, bulgeB: 0.01 }), { ch: C.top, limb: L(la), ...cloth });
     const hdir = nrm3(sub3(wr, el));
     if (RD) { K.add(tube([{ p: el, rx: 0.037, rz: 0.038 }, { p: add3(wr, hdir, 0.05), rx: 0.027, rz: 0.032 }], 5, { bulgeA: 0.01, bulgeB: 0.02 }), { ch: C.fore, ...skin }); continue; }
     K.add(tube([{ p: el, rx: 0.037, rz: 0.038 }, { p: add3(el, nrm3(sub3(wr, el)), 0.11), rx: 0.036, rz: 0.035 }, { p: wr, rx: 0.026, rz: 0.03 }], n, { bulgeA: 0.01, bulgeB: 0 }), { ch: C.fore, limb: L(lf), ...skin });
@@ -547,6 +564,10 @@ export function motorbikeFarGeometry({ rider = true } = {}) {
   for (const z of [0.63, -0.6]) for (const s of [-1, 1]) K.add(disc(s * 0.05, 0.28, z, 0.28, s, 7), { c: BK.tyre, r: 0.9 });
   K.add(slab([[0.85, 0.45], [0.6, 1.02], [0.45, 1.02], [0.35, 0.55], [-0.1, 0.42], [-0.95, 0.62], [-0.95, 0.78], [-0.2, 0.84], [0.1, 0.6], [0.4, 0.4]], 0.34, 0, 0), { ch: CH.PAINT, r: 0.4 });
   K.add(box(0.64, 0.04, 0.04, 0, 1.06, 0.42), { c: BK.black });
+  // đèn pha/hậu (kênh HEAD/TAIL → sáng đêm; xe đỗ tắt nhờ bit PARKED): 2 tấm mặt trước/sau = 4 tam giác — thiếu chúng
+  // thì mọi xe máy ngoài NEAR_BIKE tối om về đêm (phản biện W2-C)
+  K.add(quad([-0.1, 0.9, 0.67], [0.1, 0.9, 0.67], [0.1, 1.0, 0.67], [-0.1, 1.0, 0.67]), { c: BK.lens, ch: CH.HEAD, r: 0.1 });
+  K.add(quad([0.08, 0.66, -0.965], [-0.08, 0.66, -0.965], [-0.08, 0.74, -0.965], [0.08, 0.74, -0.965]), { c: BK.red, ch: CH.TAIL, r: 0.2 });
   if (!rider) { K.add(box(0.28, 0.08, 0.7, 0, 0.84, -0.45), { c: BK.seat, r: 0.6 }); const g = K.build(); g.userData.shadow = [0.42, 1.12, 0.5]; return g; }
   K.add(tube([{ p: [0, 0.86, -0.22], rx: 0.15, rz: 0.1 }, { p: [0, 1.15, -0.12], rx: 0.17, rz: 0.11 }, { p: [0, 1.38, -0.05], rx: 0.16, rz: 0.09 }], 6), { ch: CH.TOP, r: 0.9 });
   K.add(ell([0, 1.53, 0.0], 0.11, 0.13, 0.12, 5, 3), { ch: CH.HELM, r: 0.4 });
@@ -846,7 +867,9 @@ export function pedestrianFarGeometry() {
   K.add(tube([{ p: [0, SK.headY + 0.06, 0], rx: 0.235, rz: 0.235 }, { p: [0, SK.headY + 0.215, 0], rx: 0.005, rz: 0.005 }], 8, { capA: true, capB: false, ref: [1, 0, 0], fixed: true }), { c: 0xd8c48c, gate: OPT.NONLA + 1, limb: 10, r: 0.85 });
   K.add(ell([0, SK.headY + 0.035, 0.0], 0.092, 0.1, 0.106, 6, 2, 0, Math.PI * 0.5), { ch: CH.BAG, gate: OPT.CAP + 1, limb: 10, r: 0.85 });
   for (const [sd, sx, lt, la] of [['L', 1, 1, 5], ['R', -1, 2, 6]]) {
-    K.add(tube([{ p: J['hip' + sd], rx: 0.075, rz: 0.08 }, { p: J['kn' + sd], rx: 0.055, rz: 0.06 }, { p: [sx * SK.anX, 0.03, 0.02], rx: 0.045, rz: 0.07 }], 4, { capA: false }), { ch: CH.LOWLEG, limb: lt, r: 0.9 });
+    // đùi (chi 1/2) + cẳng (chi 3/4) RIÊNG: dáng NGỒI gập gối (trước 1 ống → cả chân chĩa lên trước 19° khi ngồi)
+    K.add(tube([{ p: J['hip' + sd], rx: 0.075, rz: 0.08 }, { p: J['kn' + sd], rx: 0.055, rz: 0.06 }], 4, { capA: false, capB: false }), { ch: CH.BOT, limb: lt, r: 0.9 });
+    K.add(tube([{ p: J['kn' + sd], rx: 0.055, rz: 0.06 }, { p: [sx * SK.anX, 0.03, 0.02], rx: 0.045, rz: 0.07 }], 4, { capA: false }), { ch: CH.LOWLEG, limb: lt + 2, r: 0.9 });
     K.add(tube([{ p: J['sh' + sd], rx: 0.048, rz: 0.048 }, { p: J['el' + sd], rx: 0.038, rz: 0.038 }, { p: [sx * SK.wrX, SK.wrY - 0.08, SK.wrZ], rx: 0.03, rz: 0.03 }], 4, { capA: false }), { ch: CH.FOREARM, limb: la, r: 0.9 });
   }
   const g = K.build(); g.userData.shadow = [0.3, 0.26, 0.42]; return g;
@@ -876,7 +899,7 @@ export function contactShadowGeometry(rx = 1, rz = 1, a = 1) {
 // 6. VẬT LIỆU KIT: MeshStandard (TIER ≥ 2: sơn bóng + kính phản chiếu IBL trời của daynight) hoặc Lambert (LITE),
 //    vertex colour × kênh, cổng, dáng đi/ngồi, đèn xe tự sáng theo uNight. Mọi InstancedMesh dùng kit chung chương trình.
 //    Thuộc tính instance: instanceColor (sơn / áo người đi bộ), aShirt/aShirt2 (áo người A/B), aOpt (bit + hạt giống);
-//    dáng đi: 'cpu' (giao thông: aPhase + aWalk = nhịp rad/s; CPU dời vị trí) | 'path' (props: aPath = [L, tốc độ,
+//    dáng đi: 'cpu' (giao thông: aPhase = pha bước rad, aWalk = biên độ 0..1 — CPU tích phân pha, dời vị trí) | 'path' (props: aPath = [L, tốc độ,
 //    pha, nghỉ] — đi qua-lại trên GPU, 0 CPU/khung).
 // ---------------------------------------------------------------------------------------------------------------------
 export const KIT_U = { uKitTime: { value: 0 }, uNight: { value: 0 } };
@@ -1000,8 +1023,8 @@ function walkCode(depth) {
     float ph = 0.0, amp = 0.0, sit = kitBit(${OPT.SIT}.0);
     vec3 kp = vec3(position), kn = ${depth ? 'vec3(0.0, 1.0, 0.0)' : 'objectNormal'};
   #ifdef KIT_WALK_CPU
-    amp = aWalk > 0.01 ? 1.0 : 0.0;
-    ph = uKitTime * aWalk + aPhase;
+    amp = clamp(aWalk, 0.0, 1.0);   // CPU (traffic.js) ghi pha đã tích phân + biên độ êm theo tốc độ
+    ph = aPhase;
     kitPose(kp, kn, ph, amp, sit);
   #else
     float Lw = aPath.x, spd = aPath.y, ph0 = aPath.z, pau = aPath.w, s = 0.0, dirv = 1.0;
@@ -1036,11 +1059,14 @@ function patchVS(vs, depth) {
 }
 const GL_FRAG_HEAD = 'uniform float uNight;\nvarying vec2 vKitRM;\nvarying float vKitLamp;\n';
 // đèn: 1 pha (trắng ấm), 2 hậu (đỏ), 3 hộp đèn taxi (vàng ấm), 4 xi-nhan (hổ phách, tắt)
+// Pha/hậu cộng SAU chunk emissivemap = theo CẢNH (như trafficmodels dot3): phơi sáng đêm ×4 + bloom ngưỡng 0,9 làm
+// đèn xe loé — "chữ ký" phố đêm VN. Bản đầu W2-C cộng TRƯỚC chunk (× HP_UNLIT_K ≈ 0,3 lúc đêm) → pha 2,6 còn 0,77 <
+// ngưỡng bloom: xe máy ngược chiều chỉ còn vệt mờ (phản biện). Hộp đèn taxi = biển hiệu → giữ theo MÀN HÌNH (× K).
+const GL_LAMP_SIGN = /* glsl */`
+  if (vKitLamp > 2.5 && vKitLamp < 3.5) totalEmissiveRadiance += vec3(1.7, 1.5, 0.7) * uNight;
+`;
 const GL_LAMP = /* glsl */`
-  if (vKitLamp > 0.5) {
-    vec3 le = vKitLamp < 1.5 ? vec3(2.6, 2.4, 2.0) : vKitLamp < 2.5 ? vec3(1.6, 0.05, 0.03) : vKitLamp < 3.5 ? vec3(1.7, 1.5, 0.7) : vec3(0.0);
-    totalEmissiveRadiance += le * uNight;
-  }
+  if (vKitLamp > 0.5 && vKitLamp < 2.5) totalEmissiveRadiance += (vKitLamp < 1.5 ? vec3(2.6, 2.4, 2.0) : vec3(1.6, 0.05, 0.03)) * uNight;
 `;
 const _mats = new Map();
 // opts: { walk: 'none'|'cpu'|'path', shirts: bool, std: bool, name } — cùng tham số → CÙNG vật liệu (cache)
@@ -1063,11 +1089,11 @@ export function kitMaterial({ walk = 'none', shirts = false, std = true, name = 
       fs = fs.replace('#include <roughnessmap_fragment>', 'float roughnessFactor = max(0.04, vKitRM.x);')
         .replace('#include <metalnessmap_fragment>', 'float metalnessFactor = vKitRM.y;');
     }
-    // đèn xe cộng TRƯỚC chunk emissivemap (post.js nhân HP_UNLIT_K ở cuối chunk → hiển thị theo màn hình, không loá ×4 đêm)
-    fs = fs.replace('#include <emissivemap_fragment>', GL_LAMP + '\n#include <emissivemap_fragment>');
+    // hộp đèn taxi TRƯỚC chunk emissivemap (post.js nhân HP_UNLIT_K cuối chunk → theo màn hình); pha/hậu SAU (theo cảnh, loé)
+    fs = fs.replace('#include <emissivemap_fragment>', GL_LAMP_SIGN + '\n#include <emissivemap_fragment>\n' + GL_LAMP);
     sh.fragmentShader = fs;
   };
-  m.customProgramCacheKey = () => 'hp_kit_v1|' + key;
+  m.customProgramCacheKey = () => 'hp_kit_v2|' + key;
   // bóng đổ (props: xe đỗ/người — giao thông không đổ bóng): cùng cổng + dáng
   const d = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking });
   d.defines = { ...m.defines };

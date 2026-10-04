@@ -1,13 +1,44 @@
 import * as THREE from 'three';
 import { humanoidGeometry, SK } from './models_kit.js';
+import { TIER } from './device.js';
 
 // NHÂN VẬT CHƠI / NPC (Đợt 3 wave 2, W2-C): người kit (js/models_kit.js — tỉ lệ 7,5 đầu, cao 1,70 m, chi là ống elip
 // bo tròn, mặt/tóc/nón lá thật) dựng thành MỘT SkinnedMesh 11 xương (hông, thân, đầu, vai/khuỷu, hông/gối) → 1 draw
 // call + 1 bóng tròn mỗi nhân vật (trước: ~25 mesh capsule + ~25 Lambert riêng/người, dáng chibi).
 // API giữ nguyên: { group, legL, legR, armL, armR, head, torso, blob, walkT, animate(dt, speedRatio, time, speedMs), sit(on) }
 // — legL/armL/... là Bone (Object3D) nên mã cũ gán .rotation vẫn chạy. Quy ước: nhìn +Z; xoay X DƯƠNG đưa chi về SAU.
-let _mat = null;
-const mat = () => (_mat || (_mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.82, metalness: 0, envMapIntensity: 0.7, name: 'hp_humanoid' })));
+// WEBGL1: chunk skinning của three r160 dùng textureSize()/texelFetch() (chỉ GLSL ES 3.0) → trên WebGL1 cả program màu
+// lẫn program bóng KHÔNG biên dịch, người chơi/NPC biến mất (phản biện W2-C). Thay chunk bằng bản texture2D với cỡ
+// texture xương CỐ ĐỊNH: mọi nhân vật đúng 11 xương → Skeleton.computeBoneTexture() = 8×8 (11·4 texel, làm tròn bội 4).
+// texture2D chạy cả WebGL2 (three #define texture2D texture) → 1 đường code cho mọi máy. Bóng: customDepthMaterial cùng vá.
+const NBONE = 11, BONE_TEX = Math.max(4, Math.ceil(Math.sqrt(NBONE * 4) / 4) * 4);
+const SKIN_PARS = /* glsl */`
+#ifdef USE_SKINNING
+  uniform mat4 bindMatrix;
+  uniform mat4 bindMatrixInverse;
+  uniform highp sampler2D boneTexture;
+  mat4 getBoneMatrix( const in float i ) {
+    float j = i * 4.0, d = 1.0 / ${BONE_TEX}.0;
+    float x = mod( j, ${BONE_TEX}.0 ), y = d * ( floor( j / ${BONE_TEX}.0 ) + 0.5 );
+    vec4 v1 = texture2D( boneTexture, vec2( d * ( x + 0.5 ), y ) );
+    vec4 v2 = texture2D( boneTexture, vec2( d * ( x + 1.5 ), y ) );
+    vec4 v3 = texture2D( boneTexture, vec2( d * ( x + 2.5 ), y ) );
+    vec4 v4 = texture2D( boneTexture, vec2( d * ( x + 3.5 ), y ) );
+    return mat4( v1, v2, v3, v4 );
+  }
+#endif
+`;
+const skinGL1 = (m, key) => {
+  m.onBeforeCompile = (sh) => { sh.vertexShader = sh.vertexShader.replace('#include <skinning_pars_vertex>', SKIN_PARS); };
+  m.customProgramCacheKey = () => 'hp_hum_skin_v1|' + key;
+  return m;
+};
+let _mat = null, _depth = null;
+// LITE (TIER ≤ 1): Lambert như kit người/xe (rẻ hơn, cùng kiểu ánh sáng); TIER ≥ 2: Standard (IBL trời daynight)
+const mat = () => (_mat || (_mat = skinGL1(TIER >= 2
+  ? new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.82, metalness: 0, envMapIntensity: 0.7, name: 'hp_humanoid' })
+  : new THREE.MeshLambertMaterial({ vertexColors: true, name: 'hp_humanoid' }), TIER >= 2 ? 'std' : 'lam')));
+const depthMat = () => (_depth || (_depth = skinGL1(new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking }), 'depth')));
 const v = (a, b) => new THREE.Vector3(a[0] - (b ? b[0] : 0), a[1] - (b ? b[1] : 0), a[2] - (b ? b[2] : 0));
 
 export function makeHumanoid(scheme = {}) {
@@ -26,7 +57,7 @@ export function makeHumanoid(scheme = {}) {
     legL: [SK.hipX, SK.hipY, 0], legR: [-SK.hipX, SK.hipY, 0], shinL: [SK.knX, SK.knY, SK.knZ], shinR: [-SK.knX, SK.knY, SK.knZ],
   };
   const parent = { torso: 'hips', head: 'torso', armL: 'torso', armR: 'torso', foreL: 'armL', foreR: 'armR', legL: 'hips', legR: 'hips', shinL: 'legL', shinR: 'legR' };
-  const order = ['hips', 'torso', 'head', 'armL', 'armR', 'foreL', 'foreR', 'legL', 'legR', 'shinL', 'shinR'];   // = chỉ số xương trong models_kit
+  const order = ['hips', 'torso', 'head', 'armL', 'armR', 'foreL', 'foreR', 'legL', 'legR', 'shinL', 'shinR'];   // = chỉ số xương trong models_kit (NBONE)
   const B = {};
   for (const k of order) {
     const b = new THREE.Bone(); b.name = k;
@@ -36,6 +67,7 @@ export function makeHumanoid(scheme = {}) {
   }
   const mesh = new THREE.SkinnedMesh(geo, mat());
   mesh.name = 'humanoid';
+  mesh.customDepthMaterial = depthMat();
   mesh.add(B.hips);
   mesh.bind(new THREE.Skeleton(order.map((k) => B[k])));
   // cầu bao rộng (chi xoay vẫn nằm trong) — frustum cull đúng, không tính lại từ xương
@@ -98,8 +130,11 @@ export function makeHumanoid(scheme = {}) {
         B.legL.rotation.set(-1.32, 0, 0.12); B.legR.rotation.set(-1.32, 0, -0.12);
         B.shinL.rotation.x = 1.38; B.shinR.rotation.x = 1.38;
         B.torso.rotation.set(0.16, 0, 0);
-        B.armL.rotation.set(-0.95, 0, 0.16); B.armR.rotation.set(-0.95, 0, -0.16);
-        B.foreL.rotation.x = -0.45; B.foreR.rotation.x = -0.45;
+        // tay: giải IK số (đo trong game, hệ nhân vật) tới tay nắm xe Cub GLB ≈ (±0,37, 1,27, 0,27) — khuỷu dạng ra
+        // ngoài-xuống, cẳng tay hướng lên trước. Bản cũ (−0,95/−0,45) cẳng tay nằm ngang như tấm ván, bàn tay thấp hơn
+        // 14 cm và vượt quá tay nắm 26 cm (phản biện W2-C)
+        B.armL.rotation.set(-0.2, 0.3, 0.5); B.armR.rotation.set(-0.2, -0.3, -0.5);
+        B.foreL.rotation.x = -1.8; B.foreR.rotation.x = -1.8;
         B.head.rotation.set(-0.1, 0, 0);
       } else {
         for (const b of [B.legL, B.legR, B.shinL, B.shinR, B.torso, B.armL, B.armR, B.foreL, B.foreR, B.head]) b.rotation.set(0, 0, 0);

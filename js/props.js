@@ -1311,9 +1311,12 @@ export function buildProps(ctx) {
     const g = shared('car_' + nm, () => carGeometry(nm)); carTris[nm] = triCount(g);
     inst('props_car_' + nm, g, matVeh, carKit[nm], { y: yRoad, rMax: NEAR_CAR, color: (it) => it.col, extra: kitOpt(carOpt) });
     const f = CAR_FAR_SCALE[nm];
-    for (const c of carKit[nm]) farCars.push({ ...c, sc: [f[2], f[1], f[0]] });
+    // hw: nửa bề ngang THẬT của mô hình (kể cả gương) — cho giao thông né xe đỗ (xe 16 chỗ 1,18 m, SUV ~1,1 m; không phải 0,9 m)
+    const hw = +Math.max(g.boundingBox.max.x, -g.boundingBox.min.x).toFixed(3);
+    for (const c of carKit[nm]) { c.hw = hw; farCars.push({ ...c, sc: [f[2], f[1], f[0]] }); }
+    if (nm === 'hatch') for (const c of carI[3]) c.hw = hw;   // taxi: bản sao {...c, taxi} ở trên, gốc trong carI[3]
   }
-  const allCars = carI.flat();
+  const allCars = carI.flat();   // = parkedCars (mỗi phần tử có hw)
   inst('props_cars_mid', shared('car_far', carFarGeometry), matVeh, farCars, { y: yRoad, rMin: NEAR_CAR, rMax: MID_CAR, cast: false, color: (it) => it.col, extra: kitOpt(parkedFar) });
   inst('props_cars_far', shared('car_far2', carFar2Geometry), matVeh, farCars, { y: yRoad, rMin: MID_CAR, rMax: FAR_CAR, cast: false, color: (it) => it.col, extra: kitOpt(parkedFar) });
   // CỘT & ĐÈN (gần: 6 biến thể / xa: 5 biến thể)
@@ -1481,7 +1484,7 @@ export function buildProps(ctx) {
   console.log('[props]', JSON.stringify(stats));
   // móc gỡ lỗi/QA (không dùng trong game): window.__hpProps.sides / .cull()
   if (typeof window !== 'undefined') window.__hpProps = { stats, sides, cull: () => CULL.map((t) => [t.mesh.name, t.mesh.count, t.n]), bikeRows, lists: { stoolI, cartI, aframeI, walkI, standI, sitI, cars: carI.flat(), bikes: bikeI.flat(), cobraI, ornI, poleI, poleLampI, trafoI, binI } };
-  // parkedCars: ô tô đỗ {x,z,heading,len,…} (tâm ở curbLine − 0,95; phố r: curbLine − 0,05) — cho WP8 giao thông né
+  // parkedCars: ô tô đỗ {x,z,heading,len,hw,…} (tâm ở curbLine − 0,95; phố r: curbLine − 0,05) — cho WP8 giao thông né
   // làn đỗ (xe chạy cách bó vỉa ≥ 1,9 m nơi có xe đỗ) mà không phải đọc lại collider
   return { stats, update, meshes, cableMeshes, parkedCars: allCars, cullStats: () => CULL.map((t) => [t.mesh.name, t.mesh.count, t.n]) };
 }
