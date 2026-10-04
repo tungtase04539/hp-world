@@ -390,7 +390,8 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     xong. Nhường luồng = rAF→MessageChannel (tab ẩn: chỉ MessageChannel — setTimeout bị bóp). BẪY: nhịp nhường trước
     freeze cho callback GLB (cây hero/luống hoa) chen vào scene TRƯỚC freezeStatic → main.js gỡ tạm các gốc mới xuất
     hiện, freeze, gắn lại (giữ ngữ nghĩa cũ "GLB đến sau freeze"). Service Worker đăng ký NGAY (trước: gắn vào 'load'
-    sau khi dựng → không bao giờ đăng ký). Thanh preload GLB chỉ hiện sau khi dựng xong.
+    sau khi dựng → không bao giờ đăng ký). Thanh preload GLB chỉ hiện sau khi dựng xong. Dựng ném lỗi (window
+    'error'/'unhandledrejection' trước khi sẵn sàng) → thanh báo "Lỗi khi dựng thế giới — hãy tải lại trang".
     **Giao thông (js/roadgraph.js + js/traffic.js + js/trafficmodels.js, viết lại):** đồ thị nút–cạnh từ ROADS_DT
     p/s/t/r trong đĩa vùng chơi (+60 m): gom đỉnh 1,5 m, chèn nút chữ T (đầu mút cách thân phố khác ≤ 6 m) và ngã tư
     chéo; ~675 cạnh, 1 thành phần chính. Đường đôi (2 way song song cùng cấp cách 8-26 m về một bên ở ≥ 2/3 mẫu) →
@@ -412,7 +413,7 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     bộ CPU↔GPU, mất 5-9 fps dù update() 0,5 ms và chỉ +0,15 M tam giác (thử: "đóng băng" giao thông = như tắt; tắt bóng
     không đỡ). Sửa: dữ liệu instance XEN KẼ 1 bộ đệm/nhóm (stride 28: ma trận | sơn | áo | áo sau/quần | pha | nhịp)
     × 3 bản XOAY VÒNG (ghi bản của khung N−2) → 1 lần tải/nhóm/khung, hết chờ. Áp cho MỌI InstancedMesh cập nhật mỗi
-    khung. Giao thông KHÔNG đổ bóng vào shadow map (main.js làm mới bóng 4,5-10 Hz → bóng xe 10 m/s nhảy ~2 m/lần):
+    khung (petals.js đã áp: 3 instanceMatrix xoay vòng). Giao thông KHÔNG đổ bóng vào shadow map (main.js làm mới bóng 4,5-10 Hz → bóng xe 10 m/s nhảy ~2 m/lần):
     elip "bóng tiếp đất" tối trong mô hình; vẫn nhận bóng. HỢP ĐỒNG: InstancedMesh `traffic_*` mang `userData.noCull`
     + boundingSphere = đĩa DRAW_R quanh người chơi (instcull không nén), `raycast` rỗng (instanceMatrix xen kẽ không có
     `.array`). Thuyền du lịch cũ (toạ độ 1:10, trên cạn) và 3 trục vùng đã xoá. `__hp.traffic.check()` = bất biến diag.
@@ -442,7 +443,15 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     tới g.close() — bản đầu không khoá; gpulock.mjs tái nhập qua env HPWORLD_GPU_LOCK=1 cho con của `run --`); diag/tour/perf/mobile
     viết lại (toạ độ suy từ LM/PANO_CAM, tour chọn điểm đứng bằng raycast); shoot.mjs chờ nút Bắt đầu mở + pinQuality
     (BẪY: không khoá thì máy bận → autoQuality nấc 3 sương gần → ảnh vệ tinh trắng xoá — đã thấy ở baseline cùng phiên).
-    **Đo (Radeon 890M, TIER 3, CÙNG PHIÊN với bản dot3 ở cổng khác, máy đang tải ~97% CPU bởi agent khác):** __NUMBERS__
+    **Đo (Radeon 890M, TIER 3, CÙNG PHIÊN + CÙNG 1 khoá GPU với bản dot3 c82a9ee ở cổng khác; shoot.mjs views_std):**
+    hpReady 20,5 → 20,0 s, nút Bắt đầu mở 21,3 → 20,2 s (khối đồng bộ dài nhất vẫn là `fabric` 12,6 s của world.js —
+    giờ có thanh tiến trình + vệt sáng chạy thay vì màn hình đơ); heap 663 → 713 MB (lượt trước 677 → 684: nhiễu GC +
+    RB01 giải mã cho footprints.js). fps: pano_007 45,8→48,8 · pano_021 46→52,2 · pano_089 35,4→42,4 · pano_071
+    40,6→47,5 · pano_014 50,4→54,4 · cam_spawn 57,9→57,0 · cam_high_center 47,6→47,1 · game_3 57,6→56,1; draw call
+    −5..−25 % ở góc phố (giao thông cũ = mỗi xe nhiều mesh). BẪY ĐO: calls/tris của shoot.mjs là MẪU 1 KHUNG — khung đó
+    có/không lượt làm mới bóng (4,5 Hz) làm số nhảy ±2-3 M tam giác → so fps (90 khung), đừng so tris 1 khung.
+    Giao thông: update() 0,5-0,9 ms/khung (TIER 3, ~300 tác tử), 0,4-0,5 ms (lite). 0 lỗi JS full + lite, diag 0
+    vấn đề, bất biến giao thông 0/265 xe sai làn, 0 ngược chiều, 0/66 người đi bộ trong nhà.
 - **2026-09-07 (di)** [ĐỢT 2 TÍCH HỢP — 6 nhánh worktree song song + 6 phản biện đối kháng, gộp trên `dot2-int`]:
     Quy trình: mỗi nhánh (W1 merge-budget, W2 ground-grid, W3 landmark-lod, W4 visual, W5 hydro-polygon-water,
     W6 landmark-placement) làm trong worktree riêng, tự đo trước/sau trên GPU thật, có agent phản biện đọc diff +
