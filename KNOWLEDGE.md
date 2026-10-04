@@ -70,8 +70,10 @@ Quan hệ dữ liệu: `tools/fetch_osm.sh` → `osm_*.json` → `tools/process_
 
 ### Tỉ lệ hiển thị 1:1 (mét thật)
 - Đường lòng: p=13, s=10, t=8, r=5.5, w=3.5 (region 12). Nhà dân footprint THẬT, 3.3m/tầng.
-- Địa danh GLB scale theo `LM_SIZE[key]` (cạnh dài thật OSM): opera 49, bưu điện 49, nhà thờ 45, ga 55,
-  bảo tàng 36, NHNN 63, chợ Sắt 132×96, THPT NQ 80... Cầu HVT nhịp vòm 200m, trụ Bính 101m, cần cẩu 50m.
+- Địa danh GLB: TỪ ĐỢT 3 W2-E khớp footprint OSM `LM_POLY` bằng bảng `LM_FIT` (world.js: xoay + scale DỊ HƯỚNG sx/sz + sy theo
+  chiều cao thật, đo bằng tools/qa/lmfit.py — xem §10 "Đ3-W2-E"); phần GLB không phủ (cánh ga, khuôn viên trường/chùa/UBND, Việt
+  Tiệp) là khối thủ tục từ đa giác. (Cũ: scale ĐỀU theo `LM_SIZE` — nhà hát 49, ga 55, THPT 80 → sai hướng/tỉ lệ.)
+  Cầu HVT nhịp vòm 200m, trụ Bính 101m, cần cẩu 50m.
 - Tốc độ THẬT (m/s): đi 5, chạy 11, xe máy 23 (~83 km/h), thuyền 19. Camera far 16000, fog 600-4200.
 - Nhân vật ~1.7m. Đồ nội thất phố (ghế/đèn/biển/thùng rác) giữ TẦM NGƯỜI (~0.5-3m), KHÔNG scale theo 1:1.
 
@@ -404,6 +406,57 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 - Vercel (tùy chọn): import repo, không cần build command (site tĩnh).
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
+
+- **2026-10-04 (Đ3-W2-E LANDMARKS)** [ĐỊA DANH KHỚP FOOTPRINT THẬT — GLB transform dị hướng + khuôn viên thủ tục theo LM_POLY]:
+    **(1) KHỚP GLB (world.js, khối ngay sau `await prog('landmarks')`):** bảng `LM_FIT {key: th, sx, sy, sz, dx, dz}` → `placeGLB({fit,
+    key})` đặt `scale.set(sx,sy,sz)` + `rotation.y = th` + TÂM BBOX model tại `LM_CENTROID + (dx,dz)` (file GLB KHÔNG đổi; twin lite
+    assets.js chép nguyên `scale` vector nên LOD khớp). sx/sz = m mỗi đơn vị model theo local X/Z, dị hướng có giới hạn; sy CHỌN theo
+    chiều cao thật trong pano (không theo scale ngang — ga scale đều 118 m thì cao 80 m). Số đo bằng **`tools/qa/lmfit.py`**: ảnh chiếu
+    bằng của GLB GỐC (`tools/qa/glbsheet.html?m=<glb>&occ=0.12` — bỏ 12% chiều cao dưới: tấm đế/bậc Meshy; chụp hàng loạt
+    `OCC=0.12 node tools/qa/glbsheets.mjs <port> <dir>/sheets nhahat,ga,…`) → lưới θ (±vài độ quanh hướng mặt tiền ĐÃ KIỂM bằng pano),
+    sx, sz, dời tâm, cực đại `IoU − lam·(phần ngoài đa giác nở buf) − lamR·(phần trong hành lang phố: cách tim < facadeLine − 0,5 m)`
+    (`node tools/qa/lmfit_prep.mjs <dir>` ghi lmpoly.json + segs.json). Kết quả (IoU raster tam giác GLB thật trong game, `tools/qa/
+    lmprobe.mjs --metrics`, trước → sau): nhà hát 0,42 → 0,74 (mặt tiền 29 m ra quảng trường × sâu 49 m; GLB Meshy bè ngang 2,3:1, ép
+    dị hướng 2,4 — tỉ lệ mặt tiền ~1,5:1 khớp pano_054/250), nhà thờ 0,62 → 0,83 (gần đều: "rộng hơn 8 m" của kiểm toán cũ là bbox
+    gồm 2 hàng cây bách), bưu điện 0,52 → 0,60 (đè lòng đường 8 → 0 m²), bảo tàng 0,64 → 0,70, NHNN 0,71 → 0,81 (lòng đường 134 → 0 m²:
+    góc tây LM_POLY lấn 3,2 m qua bó vỉa phố 't' → phạt hành lang), đình HK 0,40 → 0,52, đền Tam Kỳ 0,69 → 0,95.
+    **(2) KIT KHỐI THỦ TỤC** (cùng khối): `lmOBB` (OBB diện tích nhỏ nhất, u = trục dài), `lmEdge(P,a,b)` (hệ toạ độ theo cạnh, v hướng
+    vào trong), `lmFitRect` (co hình chữ nhật tới khi 4 góc + 4 trung điểm nằm trong đa giác co m mét), `lmBlock` (tường 1 quad/cạnh,
+    texture 1 GIAN × 1 TẦNG lặp 2 chiều — `LM_STYLE` colonial/yellow/arcade/cream/soviet/temple/market/hoard, emissive mờ đêm qua
+    facadeMats — + mái hông `lmHipRoof` ngói/đá đen/xanh/ngói đền, hoặc mái bằng earcut), `lmPolyBlock` (đùn đa giác). Material chung
+    theo phong cách → freezeStatic lượt 2 gộp theo ô. Dùng cho: GA (GLB 60 m ở SẢNH giữa — đa giác nhô 2 phía, 12,2 m về đông tâm OBB —
+    + 2 cánh vòm 2 tầng mái ngói + khối sau sảnh; IoU 0,31 → 0,90, cột cờ 37 → 23 m), THPT NGÔ QUYỀN (GLB = cổng "NGÔ QUYỀN" + dãy
+    cạnh cổng, tỉ lệ thật 10 m/đơn vị trên mặt ĐÔNG Mê Linh — pano_261 h270 gần y hệt ảnh thật; bản cũ phóng 80 m cao 46 m che camera;
+    dãy 3 tầng vàng cửa chớp xanh lùi sau tường rào dọc Nguyễn Đức Cảnh + nhà 2 tầng kính góc đông-bắc theo pano_037/427, dãy 2 tầng
+    3 phía, sân có cây), CHÙA HÀNG (gác 3 mái ~14 m ở mặt tây + chính điện 2 tầng mái chồng diêm + hậu cung + 2 dãy nhà tổ, sân cây),
+    UBND (khuôn viên 163 × 75 m: vườn trước 20 m có đài phun, 2 thảm cỏ, hàng cau + cờ, rào sắt chân xây; dãy chính = khối mansard
+    đồng hồ cũ `buildUBND` + 2 dãy thuộc địa mái đá; cánh tây + dãy sau bao sân trong; Trung tâm Hội nghị 5 tầng kem mái xanh đầu đông
+    — pano_020 h270/h315), VIỆT TIỆP (thân cung đùn theo đa giác 16 đỉnh 12 m + khán phòng 21 m + khối mặt tiền huy hiệu áp đúng CẠNH
+    mặt tiền 53,5 m — IoU 0,19 → 0,97), 2 THCS (dải nhà ven CHU VI: mỗi cạnh ≥14 m một dải sâu 11 m — chạy đúng đa giác lõm/chữ L).
+    Rạp Tháng Tám/Triển lãm: tâm OBB footprint (LM tâm-đỉnh lệch 6 m) → IoU 0,99. **CHỢ SẮT = CÔNG TRƯỜNG** (pano_116/214/013/212
+    10/2024: chợ cũ đã phá, rào tôn xám, cẩu tháp, máy khoan cọc): rào tôn theo đa giác + khung bê tông 3 sàn + 2 cẩu tháp + 3 máy khoan
+    + container lán trại + băng rôn "CHỢ SẮT · ĐANG XÂY DỰNG" (biển/nhiệm vụ địa danh giữ nguyên). Đường chạy oval "civic8" (169,-832)
+    nằm TRONG khuôn viên UBND (đọc nhầm ảnh vệ tinh) đã bỏ.
+    **(3) VA CHẠM ĐA GIÁC + DỮ LIỆU CHUNG:** `lmSolid(ring,key)`; `world.resolveCollisions` được BỌC thêm `lmPush` (đẩy ra cạnh gần
+    nhất, lọc bbox) → `isFree/findFree`, oracle đặt cây/hoa/biển phía sau, người chơi đều thấy địa danh; bỏ các vòng tròn cũ (nhà
+    hát r15, ga r27, bưu điện r22, NHNN r28, Triển lãm r24 = tường vô hình 19 m…). `world.lmMasses [{key, ring, h}]` (khối + GLB của
+    khuôn viên), `world.landmarkHit(x,z,r)`, `world.lmFit`. `js/footprints.js` (cần camera/xuống xe/người đi bộ) lấy `lmMasses` cho
+    địa danh có khối → SÂN TRONG/VƯỜN TRƯỚC không còn là vật cản; địa danh chỉ-GLB vẫn dùng cả LM_POLY. `js/landmarks.js`: biển dời ra
+    nếu trong nhà thật HOẶC trong khối địa danh. Claims (khối WP2): bỏ vòng tròn bù GLB lệch/to (nhà hát r28, ga r30, THPT r44, NHNN r34,
+    chợ Sắt r60…) vì GLB nay nằm trong LM_POLY (+3 m) — chỉ giữ đền Nghè, Nhà Kèn (không có đa giác).
+    **(4) VẬT LẠ:** cây trong footprint nhà thờ (garden6 (-114,-345), (-118,-378)), cây xà cừ (-210,275) trong cổng THPT bỏ; cây chu vi
+    vườn hoa né `world.landmarkHit`; tháp kính 13 tầng `v6_ndc_tower13` (ô v6, đặt nhầm phía NAM Nguyễn Đức Cảnh = giữa sân trường —
+    pano_427 h090/pano_002 h180: tháp ở bờ BẮC) gỡ bằng `lmRemoveCell` (mesh + collider trong bao lồi, `cellKept[].removedByLM`); khối
+    địa danh NHƯỜNG chỗ nhà ô GIỮ chạm vào (`lmCellClash`, vd công sở Pháp arcade pano_482 bên Mê Linh).
+    **Đo (lmprobe, 19 địa danh):** 0 m² GLB/khối trên lòng đường (trước: THPT 104, NHNN 134, bưu điện 8), 0 biển/xe/NPC trong khối,
+    `__hp.diag()` [], 0 lỗi JS; còn 1 cây (nguồn chưa rõ, (-287,200)) ở mũi bắc Triển lãm. PERF: xem số A/B cùng phiên bên dưới.
+    **BẪY:** (a) bbox GLB ≠ thân nhà (cây/tấm đế/cánh lệch Meshy) — khớp theo ẢNH CHIẾU BẰNG, không theo bbox; (b) IoU thuần đẩy GLB
+    ra lòng đường khi LM_POLY OSM lấn phố game (NHNN, bưu điện) — luôn phạt hành lang facadeLine; (c) θ phải bị CHẶN cả trong bước tinh
+    chỉnh (bản đầu trôi −9,5° → mặt tiền bưu điện lệch phố); (d) texture 1 ô theo tầng: tường cao không chia hết storeyH thì dải phào
+    ở đỉnh ô bị cắt (rào tôn: cao đúng 1 ô); (e) đoạn code chạy TRƯỚC khối địa danh không gọi được `_lmIn`/`lmSolid` (const/TDZ) — ở
+    cells/garden6 sửa bằng toạ độ/chặn tại chỗ; (f) Git Bash: chuỗi chứa chữ "eval" trong lệnh bị chặn cách ly worktree.
+    **Chưa làm/đề xuất:** bưu điện — pano_220 h045/pano_362 h315 cho thấy THÁP ĐỒNG HỒ ở GÓC TÂY-NAM (vát góc ra ngã tư), GLB đặt
+    mặt tiền SSE theo pano_362 (đúng một nửa); ga/UBND/THPT dùng texture canvas riêng (không qua shader atlas citygen); 1 cây Triển lãm.
 
 - **2026-10-04 (wp8)** [ĐỢT 3 WP8 GAME — khởi động, giao thông phố thật, cảm giác chơi, nhiệm vụ, âm thanh, tool Windows]:
     **Khởi động (js/boot.js + main.js + 9 dòng world.js):** UI màn chờ (ngôn ngữ, chất lượng, nhiệm vụ, input) gắn

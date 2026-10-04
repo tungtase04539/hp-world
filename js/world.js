@@ -18585,7 +18585,9 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
   const LM_FIT = {
     opera: { th: 0.0023, sx: 15.75, sy: 24, sz: 37.63, dx: 0, dz: 4 },          // mặt tiền 29 m ra quảng trường (nam), sâu 49 m
     cathedral: { th: 1.5275, sx: 23.89, sy: 24, sz: 27.99, dx: 0, dz: 0 },
-    postoffice: { th: 0.3508, sx: 26.83, sy: 23, sz: 26.83, dx: 4, dz: -7 },   // phạt phần lòi ra ngoài + vỉa hè/lòng phố (mặt tiền SSE)
+    // bưu điện: tháp đồng hồ (mặt +Z GLB) quay ra GÓC TÂY-NAM vát tròn (phân giác 2 phố) — pano_220 h045 thấy tháp chính diện,
+    // pano_362 h315 thấy tháp bên trái + cánh vòm gạch đỏ (= mặt +X GLB) chạy dọc phố chéo đông-nam
+    postoffice: { th: -0.6638, sx: 24.78, sy: 23, sz: 29.04, dx: 5.5, dz: -2.5 },   // lmfit (lamR 4) rồi dời 2 m về TB khỏi phố chéo ĐN
     museum: { th: -0.0063, sx: 19.61, sy: 16, sz: 26.92, dx: 0, dz: 1 },
     nhnn: { th: -1.1118, sx: 30.3, sy: 23, sz: 32.13, dx: 1, dz: 0 },   // góc tây footprint OSM lấn 3 m qua bó vỉa → phạt hành lang phố
     dinhhk: { th: 0.0436, sx: 14.84, sy: 16, sz: 22.06, dx: 3, dz: 4 },
