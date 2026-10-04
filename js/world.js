@@ -20917,19 +20917,6 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     // 6) Dây đèn đêm dải trung tâm → js/props.js (ctx.stringLights; 2 InstancedMesh thay ~150 mesh lẻ)
   }
 
-  // ---------- ĐỒ ĐẠC PHỐ (Đợt 3 WP7, js/props.js) ----------
-  // Chạy SAU cây + công trình + nhà thật (né collider nhỏ r≤1 m, claims/FEATURED_CLEAR, footprint thật) và TRƯỚC
-  // freezeStatic. Mọi offset ngang theo js/xsection.js; mật độ theo js/props_evidence.js (551 pano). Xem KNOWLEDGE §10.
-  world.props = buildProps({
-    scene, LAND_H, ROADS_DT, groundHeightNoDeck, isWater, lakeSD, sharedMats, updaters, addCollider, colliders,
-    featuredClear: FEATURED_CLEAR, reserved: propReserved, openSpace, nearPanoCam,
-    avoid: (x, z) => clearedZone(x, z) || inSuperblock(x, z),
-    gardens: GARDENS, square: EXTRAS.square,
-    footprints: world.realFootprints || null,      // WP2 có thể gắn {D, grid} (đã đánh D.dead) → khỏi giải mã lần 2
-    stringLights: [[EXTRAS.square[0] - 10, EXTRAS.square[1] + 10], [-430, 195]],
-    keepClear: [[EXTRAS.square[0] - 5, EXTRAS.square[1] + 23, 18]],   // = SPAWN main.js (khung hình đầu tiên)
-  });
-
   // ---------- DẢI VƯỜN HOA TRUNG TÂM (chuỗi vườn hoa đặc trưng Hải Phòng) ----------
   // An Biên → Ng.Văn Trỗi → Ng.Bỉnh Khiêm → Nguyễn Du(Nhà Kèn) → Kim Đồng → Tố Hữu
   {
@@ -21221,6 +21208,24 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     sp.scale.set(16, 4, 1);
     return sp;
   };
+
+  // ---------- ĐỒ ĐẠC PHỐ (Đợt 3 WP7, js/props.js) ----------
+  // Chạy SAU mọi cây (kể cả dải vườn hoa) + công trình + nhà thật + điểm xe/NPC mặc định (né collider nhỏ r≤1 m,
+  // claims/FEATURED_CLEAR, footprint thật, keepClear) và NGAY TRƯỚC flushTrees/freezeStatic (InstancedMesh của props
+  // không qua bake/merge). Mọi offset ngang theo js/xsection.js; mật độ theo js/props_evidence.js (551 pano). KNOWLEDGE §10.
+  world.props = buildProps({
+    scene, LAND_H, ROADS_DT, groundHeightNoDeck, isWater, lakeSD, sharedMats, updaters, addCollider, colliders,
+    featuredClear: FEATURED_CLEAR, reserved: propReserved, openSpace, nearPanoCam,
+    avoid: (x, z) => clearedZone(x, z) || inSuperblock(x, z),
+    gardens: GARDENS, square: EXTRAS.square,
+    footprints: world.realFootprints || null,      // WP2 có thể gắn {D, grid} (đã đánh D.dead) → khỏi giải mã lần 2
+    stringLights: [[EXTRAS.square[0] - 10, EXTRAS.square[1] + 10], [-430, 195]],
+    keepClear: [
+      [EXTRAS.square[0] - 5, EXTRAS.square[1] + 23, 18],                     // = SPAWN main.js (khung hình đầu tiên)
+      ...world.vehicleSpawns.map((v) => [v.x, v.z, 4]),                        // xe máy/xích lô mặc định
+      ...Object.values(world.npcSpots).map((p) => [p[0], p[1], 2.5]),          // NPC đứng cố định
+    ],
+  });
 
   flushTrees();      // GỘP toàn bộ cây procedural đã bake → vài mesh tĩnh (giảm ~8700 draw call)
   loadHeroTrees();   // nạp GLB cây phượng ảnh-thật rồi dựng InstancedMesh (bất đồng bộ)
