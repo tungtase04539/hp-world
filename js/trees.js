@@ -635,11 +635,11 @@ function nearPano(x, z, r) {
 // ---- CHỖ ĐẶT HERO GLB (tủ kính phượng đỏ quanh Nhà hát, luôn nở) — không được chắn khung pano thật. Review W2-B:
 // pano_055_h000 (std) có 3 vòm đỏ 25-49 m GIỮA khung che lối vào Nhà hát (pano thật 10/2024: xanh, cây tỉa/cây non).
 // Pano thật chụp 8 hướng (h000..h315) ⇒ "nón ±45° của hướng chụp" = mọi hướng ⇒ luật: (1) cách MỌI camera pano
-// ≥ HERO_PANO_MIN (vòm 6-7 m ở ≥ 35 m chỉ ~1/5 khung, không còn "chiếm giữa khung"; 50 m thì cả vùng ≤ 120 m quanh
-// Nhà hát chỉ còn khối phía bắc — pano dày đặc); (2) ngoài NÊM NHÌN tới đa giác Nhà hát (+ bán kính tán) từ mọi camera
+// ≥ HERO_PANO_MIN (vòm 6-7 m ở ≥ 45 m chỉ ~1/6 khung, không còn "chiếm giữa khung"; 50 m thì vùng ≤ 120 m quanh
+// Nhà hát gần như chỉ còn dải z < −70 — pano dày đặc); (2) ngoài NÊM NHÌN tới đa giác Nhà hát (+ bán kính tán) từ mọi camera
 // pano ≤ HERO_VIEW_R quanh Nhà hát + camera spawn (0, 72) — không che mặt Nhà hát từ chỗ có ảnh thật (pano xa hơn:
 // Nhà hát nhỏ, nêm từ mọi phía phủ kín cả vùng). Thay HERO_PANO_CLEAR 12 m cũ (nearPano chỉ dò ±1 ô 8 m — r 12 m sót).
-const HERO_PANO_MIN = 35, HERO_CROWN_R = 7, HERO_VIEW_R = 160;
+const HERO_PANO_MIN = 45, HERO_CROWN_R = 7, HERO_VIEW_R = 160;
 let _HV = null;
 function heroSpotOk(x, z) {
   if (!_HV) {
@@ -1343,8 +1343,13 @@ export function buildTrees(scene, ctx = {}) {
     // kit gần ở ranh LOD (trước: dùng aShape của kit gần → mép tán nhảy −1..+1,7 m khi đổi LOD). Khớp mép/ngọn THỰC của
     // kit gần (kể cả khi kẹp sy/nâng — cắt cụt biến thể 1 không hạ tán dưới chạc được), không phải B/H mong muốn
     const Bn = (k.base + r.lift) * r.sy, Tn = (k.top + r.lift) * r.sy;
+    // (kit xa xà cừ/cắt cụt: tán NÔNG hơn kit gần → cần hạ tán sâu dưới chạc; ở > 180 m thân bị nén 90% không thấy được;
+    // vẫn chạm sàn → chọn sy khớp TÂM tán, chia đều sai số mép dưới/ngọn)
+    const lminF = -(kf.fork - WASH_TOP) * 0.9;
     r.syF = clamp((Tn - Bn) / Math.max(0.5, kf.top - kf.base), 0.4, 2.4);
-    r.liftF = clamp(Bn / r.syF - kf.base, -(kf.fork - WASH_TOP) * 0.6, 14);
+    r.liftF = Bn / r.syF - kf.base;
+    if (r.liftF < lminF) { r.liftF = lminF; r.syF = clamp((Bn + Tn) / 2 / Math.max(0.5, (kf.base + kf.top) / 2 + lminF), 0.4, 2.4); }
+    r.liftF = Math.min(r.liftF, 14);
     r.csF = clamp(R / (kf.rad * r.sxz), 0.35, 1.9);
     // nghiêng TỰ NHIÊN (cây phố HP ít khi thẳng tuyệt đối — pano_007/085) chỉ cây ĐỨNG TỰ DO (không tường trong tầm),
     // không cây non chống cọc / cắt cụt; dời tán ≤ tan(5,5°) × đoạn thân gốc vôi → chạc (shader dồn nghiêng vào đoạn
