@@ -361,6 +361,61 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-10-04 (d3-wp7)** [ĐỢT 3 WP7 PROPS — đồ đạc phố: xe máy, ô tô, cột điện + búi dây, đèn, đồ lặt vặt, người]:
+    MỚI `js/props.js` (`buildProps(ctx)` → `{stats, update, meshes, cableMeshes, cullStats}`, gắn `world.props`) +
+    `js/props_evidence.js` (SINH bởi `tools/gen_props_evidence.mjs` từ `audit/audit_enriched.json`, ĐỪNG SỬA TAY:
+    mỗi pano `[X,Z,bike 0-3,car 0-2,pole 0-2,lamp bits,clutter bits]`). world.js: XOÁ các khối cũ rải theo THỨ TỰ
+    ROADS_DT với trần cứng (đèn gang 3 cầu trên MỌI phố p/s ≤ 800 m, cột cờ rời, cột điện + `utilwires` trụ 153k tam
+    giác, xe đẩy/thùng rác ≤70/120, `parked_scooters` ≤620 (90% nằm trên 7 đường đầu), FOOD, ô tô ĐỖ TRÊN VỈA HÈ ≤520,
+    `cell_dens` (620 người khựng giữa bước + 360 xe máy + 120 ô tô hộp), ~150 mesh bóng đèn dây quảng trường) → 1 lời
+    gọi `buildProps` NGAY TRƯỚC `flushTrees()` (sau mọi cây/công trình/điểm xe-NPC để né). Cột băng rôn nay đứng ở
+    `furnitureLine` và đẩy vào `propReserved` để xe máy/cột né.
+    **Cách đặt:** mỗi (đường p/s/t/r, đoạn, bên) → ô 3 m dọc `parkingLine` (xsection.js); ô bị loại có lý do
+    (`__hpProps.sides[i].rj`: 1 xa >1600 m · 2 miệng giao lộ/lòng đường khác · 3 dốc/nước · 4 FEATURED_CLEAR (lõi 60%
+    bán kính)/avoid/keepClear/claims `landmark civic cell plaza park water` · 5 trong footprint THẬT RB01 · 6 kè hồ).
+    Mật độ = pano gần nhất ≤ 60 m (`props_evidence`), không có pano → theo bán kính lõi. MỌI quyết định = `hash3(x,z,
+    seed)` theo toạ độ (độc lập thứ tự, không LCG chạy dọc vòng lặp); ngân sách (xe máy 16k/LITE 5k, ô tô 3,6k/1,4k,
+    người 1,1k/450) lấy mẫu ĐỀU theo hash. Xe máy: hàng 1-9 ô (4-37 xe) góc 70-90° với phố (vỉa hẹp 55-69°), 78%
+    mũi vào nhà, chân chống nghiêng, khe ngẫu nhiên. Ô tô: song song bó vỉa TRONG lòng (curbLine−0,95), chiều xe theo
+    luật đi bên PHẢI; phố r: 2 bánh trên vỉa (lăn 0,085 rad) và không đè hàng xe máy/quán. Giữ trống: tâm + 2 đầu
+    ô tô cách camera pano ≥ 6,5 m (van/tải 8 m; pano ghi "ô tô đỗ dày/hai bên" chỉ 4/5 m) — van 5,25 m trước pano_102
+    (đầu xe ~6 m) từng che nửa khung hình mà ảnh thật trống; `keepClear` (điểm hồi sinh 18 m, `vehicleSpawns` 4 m,
+    `npcSpots` 2,5 m). Cột điện 1 bên/đường (bên theo hash), 31-40 m/cột, né thân cây/trụ có sẵn
+    (dịch ±1,5/3 m), pano nói "không cột" → bỏ; 7% trạm biến áp treo (cột kép + 3 máy + tủ hạ thế); nhịp ≤ 52 m nối
+    3 dây trung thế + 4-30 sợi hạ thế/viễn thông võng ngẫu nhiên theo mức rối, dây vào nhà 2 bên phố, vòng cáp thõng
+    quanh cột. Đèn cao áp cần vươn (thép, 33-36 m) 2 bên phố p, 1 bên (đối diện cột điện) s/t; phố t/r: 50% cột điện
+    mang cần đèn. Đèn gang 3 cầu CHỈ ở quảng trường Nhà hát (95 m), quanh vườn hoa (+22 m), ven hồ (<34 m), hoặc pano
+    nói "đèn cổ điển". Cờ đỏ sao vàng treo trên cột đèn đại lộ p (thay cột cờ rời giữa vỉa hè).
+    **Mô hình** (local +Z = mũi xe, bánh chạm y=0; vertex colour + mặt nạ sơn `aPaint`): 4 xe máy ~480-540 tam giác
+    (ga nhỏ, xe số, ga lớn có thùng sau, cub có rổ — gương/yên/ống xả/biển số/mũ treo gương là phụ kiện bật theo hash),
+    LOD xa 90 tam giác; 6 ô tô 440-590 (sedan, SUV, hatch, taxi có hộp đèn, tải nhỏ thùng bạt, van/minibus 16 chỗ),
+    LOD xa 24; cột điện/cột đèn/trạm biến áp/đèn gang/cột dây đèn; bàn + 4 ghế nhựa, ô dù, xe đẩy, thùng rác 240 L,
+    trụ cứu hoả, tủ điện, biển chữ A (atlas chữ CHUNG: CÀ PHÊ, PHỞ BÒ, SỬA XE… — không thương hiệu); người 312 tam giác
+    (đứng/đi/ngồi ghế nhựa, nón lá 16%).
+    **Dựng hình:** 20 InstancedMesh + 1 LineSegments cho cả thành phố. Gộp BIẾN THỂ: nhiều model trong 1 geometry
+    (`aVar`), instance chọn model bằng `iVar` (InstancedBufferAttribute) → vertex shader thu đỉnh model khác về 0
+    (tam giác suy biến) — dùng cho cột/đèn (6), đồ lặt vặt (6), kính đèn (4), người (2). XE MÁY THÌ KHÔNG gộp (đo:
+    +0,27 M tam giác suy biến ở cam_spawn) → 1 InstancedMesh/model. `customProgramCacheKey` chung → mọi vật liệu props
+    dùng chung 1 program. Bóng đổ: `customDepthMaterial` có cùng cổng phụ kiện + dáng đi (không thì bóng mũ "đã tắt"
+    vẫn hiện, bóng người đi đứng yên). Người đi lại HOÀN TOÀN trên GPU (`uPropTime`, `aWalk`=[L, tốc độ, pha, nghỉ]):
+    đi qua-lại đoạn 8-26 m, chân/tay đánh quanh hông/vai, quay đầu ở 2 mút — 0 CPU/khung.
+    **Cull riêng** (bẫy: instcull.js chỉ nén `instanceMatrix/instanceColor` → props đặt `userData.noCull` và tự nén MỌI
+    attribute instanced): vành khuyên [rMin,rMax] quanh CAMERA (gần/xa LOD: xe máy 80/420 m, ô tô 130/750, cột 200/1100,
+    đồ lặt vặt 260, người 240; LITE nhỏ hơn) + bỏ instance SAU LƯNG (>25-40 m, góc >100°; aerial/chúc xuống thì
+    không), nhịp 0,3 s hoặc ngay khi camera xoay >25°/dời >20 m. Móc vào `scene.onBeforeRender` (chỉ lượt render
+    camera chính, không gọi trong pass bóng). Bẫy freezeStatic: nó gán `castShadow` cho MỌI mesh không trong suốt →
+    `update()` khung đầu trả lại ý định (LOD xa/kính đèn/cờ không đổ bóng). Dây điện: 1 LineSegments (~336k đỉnh),
+    shader alpha ∝ 34/khoảng cách và `discard` > uFar (520 m, LITE 280; camera trực giao aerial 4000) — dây 1-2 cm
+    thật dưới 1 px ở xa, không thành vệt đen. Đêm: kính đèn của props chép `sharedMats.lampGlow.emissiveIntensity`
+    (daynight điều khiển) ×1,9; vũng sáng cộng (additive) dưới đèn chỉ bật khi đêm.
+    **Số đo** (TIER 3, Radeon 890M): xe máy 15,86k (1.859 hàng), ô tô ~1,7k (ứng viên đã qua mọi kiểm tra; ngân sách 3,6k chưa chạm), cột điện 1.222 + 111 trạm biến áp, 949 nhịp / 21,4k sợi dây (336k đỉnh), đèn cao áp 981 + 365 cần đèn trên cột điện + 184 đèn gang, 105 cờ, 773 bộ bàn ghế + 648 người ngồi, 448 ô dù, 216 xe đẩy, 295 biển chữ A, 585 thùng rác, 136 trụ cứu hoả, 161 tủ điện, 392 người đi + 87 người đứng; `buildProps` 290-450 ms luồng chính (lấy mẫu ô 100-170 ms) — thay các khối cũ ~1,1 s+ (đèn gang 139, cột điện 135, xe máy 201, FOOD 434 ms… theo PROJECT_MAP); LITE: xe máy 5,3k, ô tô 1,4k, người ~480. Khớp bằng chứng (pano ≤ 1500 m, đo bằng probe): pano "xe máy dày" có
+    ≥ 6 xe trong 25 m 86% (pano "không xe máy" 20%); "có cột điện" có cột trong 30 m 92-93% ("không cột" 23%); "ghế
+    nhựa" có bộ bàn ghế trong 30 m 73% (không: 17%). A/B CÙNG PHIÊN (`tools/qa/shoot.mjs --perf`, base = dot3 phục vụ song song): cam_spawn 738→729 call, 4,88→4,92 M tam giác (fps 58→56-57, nhiễu); pano_007_h090 1577-1717→1527 call, 7,90-9,05→7,81 M; cam_high_center 1173→1014 call, 7,44→7,37 M; game_3 (aerial) 1197→1046-1062 call, 8,13→8,46 M (ô tô/xe máy LOD xa thấy từ trên); hpReady 19,6/22,4 s (base) ↔ 19,4-21,7 s (nhiễu ±3 s do 8 agent dùng chung máy). Bật/tắt riêng props tại cùng góc nhìn (probe trong scratch): +0,4-0,5 M tam giác, +17-18 call (gồm pass bóng), thời gian khung chênh trong nhiễu.
+    **QA:** `window.__hpProps` = {stats, sides (ô + lý do loại + bằng chứng), lists (toạ độ từng loại), cull()}.
+    **Giao diện cho WP khác:** WP2 có thể gắn `world.realFootprints = {D, grid}` (đã đánh `D.dead`) TRƯỚC lời gọi →
+    props né đúng nhà thật đang hiển thị (không có → tự `decodeRB(RB_B64)` ~12 ms). WP3 đăng ký claim `cell`/`civic`…
+    → ô vỉa hè trong claim bị bỏ. WP8 (traffic/NPC): ô tô đỗ thêm collider tròn r 0,85 ×2/xe, cột/đèn/thùng/xe đẩy có
+    collider (`world.colliders` — thêm TRƯỚC khi chỉ mục collider được dựng, an toàn).
 - **2026-09-07 (di)** [ĐỢT 2 TÍCH HỢP — 6 nhánh worktree song song + 6 phản biện đối kháng, gộp trên `dot2-int`]:
     Quy trình: mỗi nhánh (W1 merge-budget, W2 ground-grid, W3 landmark-lod, W4 visual, W5 hydro-polygon-water,
     W6 landmark-placement) làm trong worktree riêng, tự đo trước/sau trên GPU thật, có agent phản biện đọc diff +
