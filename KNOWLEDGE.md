@@ -286,6 +286,9 @@ node process_osm.mjs     # sinh ../js/mapdata.js + mask_debug.png + log kiểm t
 - Muốn thêm địa danh mới: tìm id qua Overpass `nwr["name"~"..."]`, thêm id vào fetch_osm.sh mục 6
   và `addWay/addNode` trong process_osm.mjs phần 5.
 - `js/roadmarks.js` SINH bởi `node tools/gen_roadmarks.mjs` (chạy từ GỐC repo; đọc `audit/audit_enriched.json`) — không sửa tay.
+- `js/landuse_data.js` (raster sử dụng đất mặt đất, Đợt 3 W2-D) SINH bởi `node tools/gen_landuse.mjs [--ppm xem.ppm]` (chạy từ
+  GỐC repo; đọc `tools/osm_landuse.json` = fetch_osm.sh mục 12, + PARKS/LM_POLY/osm_alleys) — không sửa tay. Chạy lại khi
+  LM_POLY/PARKS đổi hoặc tải lại OSM; footprint nhà KHÔNG nướng vào file (js/landuse.js tô footprint sống lúc chạy).
 - Mục 11 (nước) từ 2026-09-06 lấy cả `rel["natural"="water"]` (sông có đảo là multipolygon, tag nằm trên relation);
   process_osm §6b2 ghép member outer thành vòng kín. File `osm_water_dt.json` hiện có (tải 2026-07) CHƯA có relation
   (81 way) — lần fetch sau tự có. Xuất `WATER` phải giữ mọi export khác BYTE-IDENTICAL (sidewalks.js khoá theo
@@ -404,6 +407,52 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 - Vercel (tùy chọn): import repo, không cần build command (site tĩnh).
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
+
+- **2026-10-04 (w2-d GROUND)** [MẶT ĐẤT THEO SỬ DỤNG ĐẤT — hết "khoảng đất be trống": `js/landuse.js` (mới),
+    `js/landuse_data.js` (SINH), `tools/gen_landuse.mjs` (mới), khối "Mặt đất" world.js, `tools/fetch_osm.sh` mục 12]:
+    **Vấn đề:** ground_local tô MỘT màu đỉnh be 0xcfc7b2 (lerp 80 % trên cả DT_BOX) ô 13,3 m → mọi khe nhà/sân/bãi trống/quanh
+    địa danh là mảng be sáng gần gấp đôi bê tông thật (ảnh vệ tinh: sân bê tông ~(98,93,100), đất ~(144,125,118), cỏ ~(95,105,82)).
+    **Dữ liệu:** Overpass (fetch_osm.sh §12, bbox 20.836-20.879 × 106.659-106.705) → `tools/osm_landuse.json` (511 phần tử,
+    gitignored) → `node tools/gen_landuse.mjs [--ppm xem.ppm]` → raster LỚP 2048² × 2 m (±2048 m quanh gốc), lọc "Up" + deflate-raw
+    + base64 = 58 KB. 16 lớp (chỉ số = hợp đồng với GLSL `C_*` trong landuse.js): 0 NAT (giữ màu đỉnh) · 1 URB nền phố · 2 IND
+    công nghiệp/cảng · 3 PLAZA đá lát · 4 TEMPLE gạch đỏ · 5 CAMPUS sân trường/bệnh viện/cơ quan · 6 PARK bãi xe nhựa · 7 DIRT
+    công trường · 8 GRASS · 9 ROUGH cỏ dại/ruộng/bụi · 10 TURF sân bóng · 11 COURT sân tennis · 12 TRACK · 13 POOL · 14 MARKET ·
+    15 BLD. Tô theo ƯU TIÊN (thấp → cao, cùng ưu tiên: đa giác lớn trước); PARKS game = cỏ; lối footway/path nằm ≥ 60 % trong cỏ
+    = lối lát 2,4 m (131 lối); đệm 10 m quanh LM_POLY công trình dân sự = PLAZA. BẪY: LM_POLY KHÔNG phải toàn nhà — 'square' là
+    quảng trường Nhà hát (PLAZA), 3 trường là KHUÔN VIÊN (CAMPUS), chùa Hàng là cả khuôn chùa (TEMPLE); còn lại BLD. BẪY OSM
+    lỗi thời: landuse=construction "Công viên Tam Bạc/Hạ Lý/Nam Bính…" đã xong (vệ tinh 2026: sân lát) → tên "Công viên|Quảng
+    trường" = PLAZA; công trường đã kín nhà (mật độ cao) shader cho thành bê tông.
+    **Lúc chạy (WORKER Blob, 0 ms luồng chính):** khi `world.rbData` có (khối ground hẹn giờ 250 ms dò, vì fabric dựng SAU
+    ground) → worker giải nén → claims `plaza`/`park` (WP2: quảng trường, hành lang Nhà hát–Quán hoa, kè Tam Bạc, công viên —
+    nơi nhà thật đã bị GIẾT) đổi URB → PLAZA/GRASS → bao lồi nhà ô GIỮ (world.cellKept, 290) + footprint RB SỐNG (bỏ D.dead) →
+    BLD → khoảng cách tới tường (chamfer 3×3 hai lượt) + MẬT ĐỘ nhà ±40 m (ảnh tích phân) → texture RG8 2048² NEAREST: R = lớp
+    | mật độ<<4, G = khoảng cách ×8 (trần 31,9 m). 130-225 ms trong worker, sẵn sàng ~0,8-1,9 s sau khi dựng xong. KHÔNG nướng
+    footprint vào file: (a) nhà bị claims giết sẽ để lại "vết nhà" sẫm giữa quảng trường, (b) file 970 KB → 58 KB.
+    Texture chi tiết (DataArrayTexture 3 lớp 512², LITE 256², sinh trong worker ~100 ms, tileable, giá trị là MẪU không phải
+    màu): bê tông đổ (mạch cắt mờ đứt quãng ở mép ô 4 m — lưới đều 2 m trông như gạch lát), đá lát 0,5 m, gạch đỏ 0,25×0,125,
+    đất nện | cỏ, nhựa/sỏi, vết ố mép rách (bản đầu chấm tròn = "chấm bi"), nứt/rác | 4 nhiễu vĩ mô.
+    **Shader** (onBeforeCompile MeshLambertMaterial vertexColors, chung chương trình `landuse-v3`): 4 mẫu raster quanh điểm +
+    nội suy song tuyến CÓ NHIỄU rồi làm sắc → biên lớp tự nhiên (không bậc thang 2 m); khoảng cách/mật độ nội suy thật. URB:
+    sát tường ≤ 1,5 m bê tông ố + rêu, sân ≥ 3 m đôi chỗ lát gạch block (mép mảng SẮC), BÃI TRỐNG (đất nện + mảng cỏ dại theo
+    nhiễu 96 m mép mềm + mảng bê tông sót) CHỈ khi xa tường VÀ mật độ ±40 m < ~25 % (khe giữa phố dày ngoài đời là sân lát/bãi xe;
+    bản đầu không có mật độ → sân nhà thờ/quảng trường Triển lãm thành bãi hoang). Chỉ áp ở chỗ khô (y > 1,25..1,75) → bờ cát/đáy
+    nước giữ màu đỉnh. LITE (TIER ≤ 1, define LU_LITE): 1 mẫu raster gần nhất + 2 mẫu chi tiết. WebGL1: không vá (màu đỉnh).
+    **world.js:** bảng màu đỉnh hạ tông (cCity 0x98928a, cỏ 0x7c9a55, cát 0xc9b98e…) cho tấm thô/fallback; `?landuse=0` = mặt
+    đất CŨ (be + Lambert thường) để A/B cùng bản build. 2 dải hồ ĐỔI TÊN `lake_ground`/`hosen_ground` → `ground_lake`/`ground_hosen`.
+    BẪY freezeStatic: lượt gộp 1 nuốt MỌI mesh Lambert không map (khoá theo ô×castShadow×side, KHÔNG theo material) rồi thay
+    material → shader riêng biến mất; mesh mang shader riêng phải tên `^ground` (bỏ qua gộp/far-hide/gán bóng) hoặc
+    `userData.noMerge`. Hệ quả: 2 dải không còn cast bóng (phẳng, vô hình) và không gộp ô (+8..43k tam giác/khung, < 1 %).
+    BẪY heap: bản CPU 2 texture (8 + 3 MB) GIẢI PHÓNG sau upload (`texture.onUpdate` → image.data = null); 'webglcontextrestored'
+    (chạy sau listener của three, trước khung kế) đặt lại placeholder, tắt uLuOn, cho worker dựng lại. `?lufree=0` giữ bản CPU
+    (công cụ đọc `__hp.world.landuse.mapTex.image.data`). Lớp cao độ KHÔNG đổi (ground_local +0.012 polygonOffset, dải hồ +0.05).
+    **Đo (Radeon 890M TIER 3, base = `git archive dot3` ea5f57f có GLB hard-link ở cổng 8414, xen kẽ base→mới ×2, khoá GPU):**
+    fps 60 (vsync) mọi góc cả 2 bên; draw call bằng nhau (cam_spawn 375, pano_007 549/546, cam_high_center 427/426, game_3 376);
+    render main pass ép đồng bộ (20× render + readPixels) A/B CÙNG bản (`?landuse=0`↔bật): +0,0..0,3 ms/khung; heap sau gc() ép
+    386 → 379 MB (trước khi giải phóng texture: +12 MB); hpReady 5,0 → 4,5 s, nút Bắt đầu 7,3 → 7,3 s, bước 'ground' 601-654 →
+    548-579 ms (nhiễu máy). Ảnh vệ tinh (trung vị điểm ảnh "đất sáng" bão hoà < 0,2): real_5 (120,112,118) · cũ (168,162,141) →
+    mới (127,118,106); real_6 (115,107,115) · cũ (175,166,147) → mới (128,119,107). diag full 0 vấn đề/0 lỗi JS; lite chỉ 404
+    assets_lite (môi trường, y hệt dot3); waterbfs 5/5. Còn lại (ngoài làn): thảm cỏ dải vườn hoa (`lawnM`, xanh nõn) vẫn quá rực
+    so với vệ tinh; vùng ngoài phố (r > ~1,6 km) là bãi đất + cỏ dại vì không có nhà; dữ liệu nhà thiếu ở vài khu vẫn để lộ sân lớn.
 
 - **2026-10-04 (wp8)** [ĐỢT 3 WP8 GAME — khởi động, giao thông phố thật, cảm giác chơi, nhiệm vụ, âm thanh, tool Windows]:
     **Khởi động (js/boot.js + main.js + 9 dòng world.js):** UI màn chờ (ngôn ngữ, chất lượng, nhiệm vụ, input) gắn
