@@ -123,8 +123,7 @@ await workerReady();
 const world = buildWorld(scene);
 // đóng băng ma trận local của thế giới tĩnh (NPC/xe/traffic tạo SAU nên không bị ảnh hưởng)
 world.freezeStatic(renderer.shadowMap.enabled);
-const dayNight = createDayNight(scene, world);
-if (TIER === 2) dayNight.sun.shadow.mapSize.set(1024, 1024);   // iGPU: bóng 1024 (shadow pass nhẹ 4×), vẫn BẬT
+const dayNight = createDayNight(scene, world);   // bóng: cỡ map/hộp theo TIER ở device.js GFX (TIER 2 = 1024 / ±70 m)
 const petals = createPetals(scene);
 const signs = buildLandmarkSigns(scene, world);
 const { npcs, update: updateNPCs } = buildNPCs(scene, world);
@@ -763,11 +762,12 @@ window.__hp = {
     camera.lookAt(x, pState.pos.y + 2.2, z);
   },
   setTime(v) { dayNight.t = v; },   // 0..1 (0 = nửa đêm); URL ?time=14.5 | 14:30 | 0.6 (&timefreeze=1)
-  // HẬU KỲ (QA/tinh chỉnh): AO_CFG/GRADE sửa trực tiếp; finalPass.setGrade({...}); timeAO() = ms GPU của AO (gl.finish)
+  // HẬU KỲ (QA/tinh chỉnh): AO_CFG/GRADE sửa trực tiếp; finalPass.setGrade({...}); timeAO() = ms GPU của AO
   post: {
     get composer() { return composer; }, get scenePass() { return scenePass; }, get finalPass() { return finalPass; },
     AO: AO_CFG, GRADE,
-    // ms GPU của riêng phần AO (AO + mờ + ghép) so với chép thẳng, trên ảnh cảnh hiện tại (gl.finish, n lần)
+    // ms GPU của riêng phần AO (AO + mờ + ghép) so với chép thẳng, trên ảnh cảnh hiện tại (n lần; đồng bộ bằng
+    // readPixels 1 px — gl.finish của Chrome không chờ GPU)
     timeAO(n = 60) {
       if (!scenePass) return null;
       const sp = scenePass, w = composer.writeBuffer, was = sp.aoEnabled;

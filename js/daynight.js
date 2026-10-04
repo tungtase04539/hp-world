@@ -52,16 +52,24 @@ export const LIGHT = {
   exposure: 0.92, maxGain: 4.0,
   aerialExposure: 0.82,      // ảnh VỆ TINH: máy ảnh vệ tinh phơi sáng thấp hơn mắt người (Google Earth tối & tương phản hơn)
   // Thang của mô hình trời (skymodel.js) → 3 nơi dùng:
-  //  - vòm HIỂN THỊ ×0,76 (khớp màu pano thật qua tone mapping: thiên đỉnh ≈ sRGB(90,140,210), chân trời ≈ (196,210,228));
+  //  - vòm HIỂN THỊ: BAN NGÀY ×1,3 và bão hoà 40% — trời HP thật MÙ ẨM, xanh nhạt gần trắng: đo 160 ảnh pano ngẫu
+  //    nhiên, vùng trời ở độ cao ~30-40° có trung vị sRGB(186,198,211) (p25 174,187,201 / p75 201,209,221); bản đầu
+  //    (×0,76, bão hoà 100%) ra ≈(140,170,205) xanh đậm & tối hơn ảnh thật. Chạng vạng/đêm (mặt trời < 3°) trở về
+  //    ×0,76 + bão hoà 100% để giữ màu hoàng hôn/giờ xanh (trộn theo độ cao mặt trời skyDayEl). Số liệu: WP5/num/scan.mjs.
   //  - đèn bán cầu/IBL ×0,55 và KHỬ BÃO HOÀ còn 25% (bầu trời thật + mây + tường quanh phố dội lại → bóng râm chỉ hơi
   //    lạnh, không xanh lét; tỉ lệ nắng : bán cầu lúc trưa ≈ 3,5 : 0,8 theo SPEC);
   //  - màu sương = chân trời hiển thị khử bão hoà 35% (mù ẩm HP xám trắng).
-  skyViewGain: 0.76, hemiScale: 0.55, hemiSat: 0.25, hazeDesat: 0.35,
+  skyViewGain: 1.3, skyViewSat: 0.4, skyViewGainLow: 0.76, skyDayEl: [3, 15],
+  hemiScale: 0.55, hemiSat: 0.25, hazeDesat: 0.35,
   groundAlbedo: [0.17, 0.155, 0.135],   // mặt phố (nhựa/gạch/mái) — màu ánh dội cho hemi.groundColor
   // ĐÊM: trăng (đèn chủ, có bóng mờ) + "nền đêm" (trời có trăng + đèn phố dội lên mù ẩm) cộng vào bán cầu. Chỉ bật
   // khi mặt trời đã xuống dưới moonFade[0]° và đầy đủ ở moonFade[1]° — giờ xanh (0..−8°) do CHÍNH bầu trời chiếu sáng,
   // trăng cộng sớm sẽ sáng hơn trời chạng vạng (bug bản đầu: phố trắng dưới trời nâu sẫm lúc 18:15).
   moonE: [0.060, 0.075, 0.112], moonAmb: [0.014, 0.018, 0.030], moonFade: [-5, -13],
+  // ĐÈN PHỐ (ấm, theo `night` — bật từ chạng vạng): bộ đèn cố định nên ánh đèn đường/biển hiệu/cửa hàng hắt lên
+  // mặt phố & tường là phần cộng vào bán cầu (đất ×1, trời ×0,6). Thiếu nó hẻm nhỏ lúc 21:00 đen kịt (sRGB ≈ 15) —
+  // phố HP thật về đêm sáng đèn, mắt vẫn đọc được mặt tiền.
+  cityAmb: [0.034, 0.027, 0.018],
   cloud: 0.40,
 };
 
@@ -232,6 +240,7 @@ export function createDayNight(scene, world) {
   const COS_TURN = Math.cos(0.15);
   const _fogTarget = new THREE.Color(), _ground = new THREE.Color();
   let _fogInit = false;
+  let viewGain = LIGHT.skyViewGain, viewSat = LIGHT.skyViewSat;   // vòm hiển thị (applySky ghi, updateFog dùng)
   const out = { night: 0, sunEl: 0, hours: 0 };
   const NOON_ADAPT = (() => { sunDirection(12, sA); sunIrradiance(sA[1], E); skyIrradiance(sA, Esky); return lum(Esky) * LIGHT.hemiScale + lum(E) * sA[1]; })();
   function lum(c) { return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; }
@@ -261,17 +270,22 @@ export function createDayNight(scene, world) {
     // bán cầu: trời = chiếu sáng bầu trời (+ trăng/đèn phố đêm); đất = phố dội (nắng ngang + trời) × albedo
     const ls = lum(Esky);
     for (let c = 0; c < 3; c++) Esky[c] = (ls + L_.hemiSat * (Esky[c] - ls)) * L_.hemiScale;
-    const MA = L_.moonAmb, GA = L_.groundAlbedo;
-    hemi.color.setRGB(Esky[0] + MA[0] * mA, Esky[1] + MA[1] * mA, Esky[2] + MA[2] * mA);
+    const MA = L_.moonAmb, GA = L_.groundAlbedo, CA = L_.cityAmb;
+    hemi.color.setRGB(Esky[0] + MA[0] * mA + CA[0] * 0.6 * night, Esky[1] + MA[1] * mA + CA[1] * 0.6 * night, Esky[2] + MA[2] * mA + CA[2] * 0.6 * night);
     const sh = Math.max(sA[1], 0);
     _ground.setRGB(GA[0] * (E[0] * sh + Esky[0]), GA[1] * (E[1] * sh + Esky[1]), GA[2] * (E[2] * sh + Esky[2]));
-    hemi.groundColor.setRGB(_ground.r + MA[0] * 0.5 * mA, _ground.g + MA[1] * 0.5 * mA, _ground.b + MA[2] * 0.5 * mA);
+    hemi.groundColor.setRGB(_ground.r + MA[0] * 0.5 * mA + CA[0] * night, _ground.g + MA[1] * 0.5 * mA + CA[1] * night, _ground.b + MA[2] * 0.5 * mA + CA[2] * night);
     hemi.intensity = 1;
     // phơi sáng: thích nghi theo độ rọi ngang (trưa = 1), trần ×maxGain
     const adapt = lum(Esky) + lum(E) * sh + lum(MA) * mA;
     if (_renderer) _renderer.toneMappingExposure = L_.exposure * (aerial ? L_.aerialExposure : 1)
       * Math.min(L_.maxGain, Math.max(1, Math.sqrt(NOON_ADAPT / Math.max(adapt, 1e-4))));
-    skyMat.uniforms.uGain.value = L_.skyViewGain;
+    // vòm hiển thị: ngày mù ẩm (sáng + nhạt), chạng vạng/đêm giữ màu đậm (xem LIGHT.skyViewGain)
+    const dayW = smooth(L_.skyDayEl[0], L_.skyDayEl[1], el);
+    viewGain = L_.skyViewGainLow + (L_.skyViewGain - L_.skyViewGainLow) * dayW;
+    viewSat = 1 + (L_.skyViewSat - 1) * dayW;
+    skyMat.uniforms.uGain.value = viewGain;
+    skyMat.uniforms.uSat.value = viewSat;
     for (const m of [skyMat, envMat]) {
       const u = m.uniforms;
       u.uSunDir.value.copy(_sun); u.uMoonDir.value.copy(_moon); u.uNight.value = night;
@@ -304,12 +318,12 @@ export function createDayNight(scene, world) {
     sun.target.position.copy(_shCenter);
   }
 
-  // MÀU SƯƠNG = độ chói chân trời (cao 3°) theo hướng nhìn, ×gain hiển thị — trùng dải mù của vòm trời
+  // MÀU SƯƠNG = độ chói chân trời (cao 3°) theo hướng nhìn, ×gain + bão hoà hiển thị — trùng dải mù của vòm trời
   function updateFog(dt) {
     hzDir[0] = _lookDir.x * 0.9986; hzDir[1] = 0.052; hzDir[2] = _lookDir.z * 0.9986;
     skyRadiance(hzDir, sA, L);
     const lh = lum(L);
-    const k = 1 - LIGHT.hazeDesat, g = LIGHT.skyViewGain;
+    const k = viewSat * (1 - LIGHT.hazeDesat), g = viewGain;
     _fogTarget.setRGB((lh + k * (L[0] - lh)) * g, (lh + k * (L[1] - lh)) * g, (lh + k * (L[2] - lh)) * g);
     if (!_fogInit || dt <= 0) { scene.fog.color.copy(_fogTarget); _fogInit = true; }
     else scene.fog.color.lerp(_fogTarget, 1 - Math.exp(-dt * 3));
