@@ -955,37 +955,84 @@ export function buildRoadNet(ROADS_DT, deps) {
       index: B.vc > 65535 ? B.idx.slice(0, B.ic) : Uint16Array.from(B.idx.subarray(0, B.ic)),
     } : null;
   }
-  // tra cứu nút giao cho hệ khác (cây/prop/biển tránh miệng ngã tư): lưới 50 m
+  // tra cứu nút giao cho hệ khác (cây/prop/biển tránh miệng ngã tư) + mặt đi được. Dữ liệu tra cứu được ĐÓNG GÓI gọn
+  // (typed array) rồi dựng hàm ở makeQueries() NGOÀI phạm vi này: closure trả về trong buildRoadNet giữ sống CẢ ngữ cảnh
+  // (ways/nodes/arms/lưới… ~43 MB heap, đo node --expose-gc) — nay chỉ giữ ~1-2 MB.
   const pub = junctions.map((J) => ({ x: J.x, z: J.z, rad: J.rad, signal: !!J.signal, zebra: !!J.zebra, arms: J.arms.map((a) => ({ c: a.c, dx: a.d[0], dz: a.d[1], ox: a.O[0], oz: a.O[1], setback: a.s ?? 0, hw: a.hw, sw: a.sw })) }));
-  const jgrid = new Map();
-  junctions.forEach((J, i) => { const kk = Math.floor(J.x / 50) + ',' + Math.floor(J.z / 50); let l = jgrid.get(kk); if (!l) jgrid.set(kk, l = []); l.push(i); });
+  let nSeg = 0; for (const w of ways) nSeg += w.pts.length - 1;
+  const segs = new Float32Array(nSeg * 7);
+  { let k = 0;
+    for (const w of ways) {
+      const hw = hwOf(w.c), top = ROAD_TOP + 0.004 * RANK[w.c], outer = STREET[w.c] ? hw + swOf(w.c) : -1;
+      for (let i = 0; i < w.pts.length - 1; i++, k += 7) {
+        segs[k] = w.pts[i][0]; segs[k + 1] = w.pts[i][1]; segs[k + 2] = w.pts[i + 1][0]; segs[k + 3] = w.pts[i + 1][1];
+        segs[k + 4] = hw; segs[k + 5] = top; segs[k + 6] = outer;
+      }
+    } }
+  const jd = new Float32Array(junctions.length * 4), jpoly = junctions.map((J) => (J.poly ? Float32Array.from(J.poly.flat()) : null));
+  junctions.forEach((J, i) => { jd[i * 4] = J.x; jd[i * 4 + 1] = J.z; jd[i * 4 + 2] = J.rad; jd[i * 4 + 3] = J.yTop ?? -1; });
+  const q = makeQueries(segs, jd, jpoly, pub, ARCH.map((b) => ({ x: b.x, zc: b.zc, sin: b.sin, cos: b.cos, half: b.half })));
+  stats.ms = Math.round((typeof performance !== 'undefined' ? performance : Date).now() - t0);
+  return { tiles, signals, stats, nearJunction: q.nearJunction, surfaceAt: q.surfaceAt, junctions: pub };
+}
+
+// Hàm tra cứu dựng từ dữ liệu GỌN (xem cuối buildRoadNet). segs = [ax,az,bx,bz,hw,mặt nhựa,mép ngoài vỉa hè|-1]×n,
+// jd = [x,z,rad,yTop]×n, jpoly = đa giác nút giao (x,z phẳng) | null.
+function makeQueries(segs, jd, jpoly, pub, ARCH) {
+  const C = 16, grid = new Map(), nSeg = segs.length / 7;
+  for (let s = 0; s < nSeg; s++) {
+    const ax = segs[s * 7], az = segs[s * 7 + 1], bx = segs[s * 7 + 2], bz = segs[s * 7 + 3];
+    const L = Math.hypot(bx - ax, bz - az), n = Math.max(1, Math.ceil(L / (C * 0.5)));
+    let last = null;
+    for (let i = 0; i <= n; i++) {
+      const k = Math.floor((ax + (bx - ax) * i / n) / C) * 100003 + Math.floor((az + (bz - az) * i / n) / C);
+      if (k === last) continue; last = k;
+      let l = grid.get(k); if (!l) grid.set(k, l = []);
+      if (l[l.length - 1] !== s) l.push(s);
+    }
+  }
+  const jgrid = new Map(), nJ = jd.length / 4;
+  for (let i = 0; i < nJ; i++) { const k = Math.floor(jd[i * 4] / 50) * 100003 + Math.floor(jd[i * 4 + 1] / 50); let l = jgrid.get(k); if (!l) jgrid.set(k, l = []); l.push(i); }
   const nearJ = (x, z, pad, cb) => {
     const ix = Math.floor(x / 50), iz = Math.floor(z / 50);
     for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) {
-      const l = jgrid.get((ix + a) + ',' + (iz + b)); if (!l) continue;
-      for (const i of l) { const J = junctions[i]; if ((J.x - x) ** 2 + (J.z - z) ** 2 < (J.rad + pad) ** 2 && cb(i, J)) return i; }
+      const l = jgrid.get((ix + a) * 100003 + iz + b); if (!l) continue;
+      for (const i of l) { const r = jd[i * 4 + 2] + pad; if ((jd[i * 4] - x) ** 2 + (jd[i * 4 + 1] - z) ** 2 < r * r && cb(i)) return i; }
     }
     return -1;
   };
   const nearJunction = (x, z, pad = 0) => { const i = nearJ(x, z, pad, () => true); return i < 0 ? null : pub[i]; };
+  const pip = (P, x, z) => {
+    let c = false; const n = P.length / 2;
+    for (let i = 0, j = n - 1; i < n; j = i++) {
+      const xi = P[i * 2], zi = P[i * 2 + 1], xj = P[j * 2], zj = P[j * 2 + 1];
+      if ((zi > z) !== (zj > z) && x < (xj - xi) * (z - zi) / (zj - zi) + xi) c = !c;
+    }
+    return c;
+  };
+  const onArch = (x, z) => {
+    for (const b of ARCH) { const dx = x - b.x, dz = z - b.zc; if (Math.abs(dx * b.cos - dz * b.sin) < 10 && Math.abs(dx * b.sin + dz * b.cos) < b.half) return true; }
+    return false;
+  };
   // MẶT ĐI ĐƯỢC: độ cao mặt nhựa / mặt vỉa hè so với groundHeight tại (x,z) — cho chân người chơi/NPC/prop
   // (groundHeight là NỀN LAND_H; lòng đường nổi +0,11..0,13 m, vỉa hè +0,25 m theo xsection.js). Trả 0 ngoài mạng đường
   // và trên mặt cầu vòm (mô hình cầu riêng). Lòng thắng vỉa hè; trong đa giác nút giao = lòng (kể cả vùng góc bo).
-  const sgrid = buildSegGrid(ways, 16);
-  const pip = (P, x, z) => { let c = false; for (let i = 0, j = P.length - 1; i < P.length; j = i++) { if ((P[i][1] > z) !== (P[j][1] > z) && x < (P[j][0] - P[i][0]) * (z - P[i][1]) / (P[j][1] - P[i][1]) + P[i][0]) c = !c; } return c; };
   const surfaceAt = (x, z) => {
     if (ARCH.length && onArch(x, z)) return 0;
     let road = -1, side = false;
-    sgrid.near(x, z, (wi, i) => {
-      const w = ways[wi], [ax, az] = w.pts[i], [bx, bz] = w.pts[i + 1], d = segDist(x, z, ax, az, bx, bz), hw = hwOf(w.c);
-      if (d <= hw) road = Math.max(road, ROAD_TOP + 0.004 * RANK[w.c]);
-      else if (STREET[w.c] && d <= hw + swOf(w.c)) side = true;
-    });
+    const ix = Math.floor(x / C), iz = Math.floor(z / C);
+    for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) {
+      const l = grid.get((ix + a) * 100003 + iz + b); if (!l) continue;
+      for (const s of l) {
+        const o = s * 7, d = segDist(x, z, segs[o], segs[o + 1], segs[o + 2], segs[o + 3]);
+        if (d <= segs[o + 4]) road = Math.max(road, segs[o + 5]);
+        else if (d <= segs[o + 6]) side = true;
+      }
+    }
     let jy = -1;
-    nearJ(x, z, 0, (i, J) => { if (J.poly && pip(J.poly, x, z)) { jy = J.yTop; return true; } return false; });
+    nearJ(x, z, 0, (i) => { if (jpoly[i] && pip(jpoly[i], x, z)) { jy = jd[i * 4 + 3]; return true; } return false; });
     if (jy >= 0) return Math.max(jy, road);
     return road >= 0 ? road : side ? SIDEWALK_TOP : 0;
   };
-  stats.ms = Math.round((typeof performance !== 'undefined' ? performance : Date).now() - t0);
-  return { tiles, signals, stats, nearJunction, surfaceAt, junctions: pub };
+  return { nearJunction, surfaceAt };
 }
