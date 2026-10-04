@@ -1456,9 +1456,9 @@ export function buildProps(ctx) {
       // + 2 đầu xe) quanh 551 điểm chụp: 6,5 m (van/tải 8 m); pano ghi "ô tô đỗ dày/hai bên" (car 2) thì xe đỗ sát
       // camera là ĐÚNG ảnh thật → chỉ 4/5 m. (Vòng tròn 7,5/9 m quanh TÂM cho mọi pano từng bớt 16% ô tô — quá tay.)
       // Phản biện: pano "ô tô dày" vẫn để van+taxi đỗ 3-5 m trước camera (pano_024 kín khung, ảnh thật xe ở xa hơn) →
-      // TÂM xe luôn ≥ 6,5 m (van/tải 7,5 m); chỉ 2 đầu xe được tới 4/5 m.
+      // pano "dày": TÂM xe ≥ 7 m (van/tải 8 m), 2 đầu xe ≥ 5/6 m (thay 4/5 m chỉ xét viên nang).
       const ec = evAt(x, z), dense = !!(ec && ec[3] >= 2);
-      const rp = mi >= 4 ? (dense ? 5 : 8) : (dense ? 4 : 6.5), rc = Math.max(rp, mi >= 4 ? 7.5 : 6.5), hx = S.ux * len / 2, hz = S.uz * len / 2;
+      const rp = mi >= 4 ? (dense ? 6 : 8) : (dense ? 5 : 6.5), rc = mi >= 4 ? 8 : (dense ? 7 : 6.5), hx = S.ux * len / 2, hz = S.uz * len / 2;
       let ok = x * x + z * z < R_MAX * R_MAX && flat(x, z) && !avoid(x, z) && !clearAt(x, z) && lakeSD(x, z) > 18
         && !panoNear(x, z, rc) && !panoNear(x + hx, z + hz, rp) && !panoNear(x - hx, z - hz, rp);
       if (ok) for (const dd of [-len / 2 - 0.5, 0, len / 2 + 0.5]) { if (roadIdx.blocked(x + S.ux * dd, z + S.uz * dd, S.ri, S.si, 4.5, false)) { ok = false; break; } }
@@ -1696,12 +1696,13 @@ export function buildProps(ctx) {
   // vũng sáng đèn đêm (cộng sáng, chỉ hiện khi đêm). Phản biện: quad đặt ở lòng +0,03 nằm DƯỚI vỉa hè (+0,18/+0,25)
   // và dưới vạch kẻ → vũng bị bó vỉa cắt thẳng, vạch tối giữa vũng; opacity 0,42 + lõi phẳng → "đĩa sơn" vàng sáng hơn
   // mặt tiền. Nay: quad ở yWalk+0,02 (trên MỌI mặt lát: lòng, vạch, vỉa dot3/WP6) → một vũng mềm phủ cả lòng + mép vỉa;
-  // falloff ~ (1+(r/0,38)²)^-1,5 (dạng cos³ của đèn chiếu xuống) tắt mượt về 0 ở mép; opacity đỉnh 0,17 (update()).
+  // falloff ~ (1+(r/0,55)²)^-1,5 (dạng cos³ của đèn chiếu xuống) tắt mượt về 0 ở mép; opacity đỉnh 0,2 (update()) —
+  // năng lượng ~43% bản cũ (0,38/0,17 = 23%: vũng tầm trung ở night_022 gần như biến mất).
   let pools = null;
   if (glow && (cobraI.length || poleLampI.length)) {
     const cv = document.createElement('canvas'); cv.width = cv.height = 64;
     const g = cv.getContext('2d'); const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
-    for (let i = 0; i <= 10; i++) { const t = i / 10; const a = Math.pow(1 + (t / 0.38) ** 2, -1.5) * (1 - t * t * t * t); gr.addColorStop(t, `rgba(255,255,255,${a.toFixed(3)})`); }
+    for (let i = 0; i <= 10; i++) { const t = i / 10; const a = Math.pow(1 + (t / 0.55) ** 2, -1.5) * (1 - t * t * t * t); gr.addColorStop(t, `rgba(255,255,255,${a.toFixed(3)})`); }
     g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
     const pt = new THREE.CanvasTexture(cv);
     const pm = new THREE.MeshBasicMaterial({ map: pt, color: 0xffc78a, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: true });
@@ -1729,7 +1730,7 @@ export function buildProps(ctx) {
     if (pools) {
       const on = gI > 0.03;
       pools.visible = on && pools.count > 0;
-      pools.userData.poolMat.opacity = Math.min(1, gI) * 0.17;
+      pools.userData.poolMat.opacity = Math.min(1, gI) * 0.2;
     }
   };
   if (ctx.updaters) ctx.updaters.push((dt, time) => { PROP_TIME.value = time; });
