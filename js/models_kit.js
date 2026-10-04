@@ -352,7 +352,7 @@ export function person(K, J, o = {}) {
   if (o.helmet) {
     const hg = o.helmet === 'gate' ? o.helmetGate : 0;
     K.add(place(ell([0, 0.025, -0.006], 0.106, 0.112, 0.124, RD ? 8 : o.lo ? 8 : 10, RD ? 3 : 4, 0, Math.PI * 0.55)), { ch: C.helm, gate: hg, limb: L(10), r: 0.3 });
-    K.add(place(box(0.15, 0.012, 0.05, 0, 0.03, 0.118, 0.32)), { ch: C.helm, gate: hg, limb: L(10), r: 0.3, shade: 0.8 });
+    K.add(place(box(0.15, 0.012, 0.05, 0, 0.03, 0.118, 0.32)), { ch: C.helm, gate: hg, limb: L(10), r: 0.65, shade: 0.75 });   // lưỡi trai mũ (nhám: mặt phẳng bóng phản chiếu trời thành vệt trắng)
   }
   // khẩu trang (cổng)
   if (o.mask) K.add(place(box(0.11, 0.06, 0.03, 0, -0.045, 0.082)), { ch: CH.MASK, gate: o.mask, limb: L(10), r: 0.9 });
@@ -360,7 +360,7 @@ export function person(K, J, o = {}) {
   if (o.nonla) K.add(place(tube([{ p: [0, 0.055, 0], rx: 0.235, rz: 0.235 }, { p: [0, 0.09, 0], rx: 0.17, rz: 0.17 }, { p: [0, 0.16, 0], rx: 0.06, rz: 0.06 }, { p: [0, 0.205, 0], rx: 0.004, rz: 0.004 }], o.lo ? 10 : 14, { ref: [1, 0, 0], capA: true, capB: false, fixed: true })), { c: 0xd8c48c, gate: o.nonla, limb: L(10), r: 0.85 });
   // mũ lưỡi trai (cổng)
   if (o.cap) {
-    K.add(place(ell([0, 0.035, -0.004], 0.09, 0.1, 0.106, 8, 3, 0, Math.PI * 0.5)), { ch: CH.BAG, gate: o.cap, limb: L(10), r: 0.85 });
+    K.add(place(ell([0, 0.026, -0.006], 0.093, 0.125, 0.11, 8, 3, 0, Math.PI * 0.5)), { ch: CH.BAG, gate: o.cap, limb: L(10), r: 0.85 });   // chỏm mũ trùm hết tóc
     K.add(place(box(0.13, 0.01, 0.08, 0, 0.04, 0.115, 0.08)), { ch: CH.BAG, gate: o.cap, limb: L(10), r: 0.85, shade: 0.85 });
   }
   // --- tay: cánh tay (tay áo) + cẳng tay (da / tay áo dài) + bàn tay
@@ -567,7 +567,7 @@ export function motorbikeFarGeometry({ rider = true } = {}) {
 //    đèn pha/hậu (kênh đèn → sáng về đêm) + cản, lưới tản nhiệt, biển số, gương. 6 kiểu (+ taxi = cổng TAXI trên
 //    sedan/hatch: hộp đèn TAXI chữ chung chung, không thương hiệu).
 // ---------------------------------------------------------------------------------------------------------------------
-const CK = { tyre: 0x151517, alloy: 0xb2b6bb, dark: 0x1e1f22, trim: 0x232427, glass: 0x0b0e12, lens: 0xdfe6ea, red: 0x9c1010, plate: 0xecebe2, chrome: 0xc9ccd0 };
+const CK = { tyre: 0x151517, alloy: 0xb2b6bb, dark: 0x1e1f22, trim: 0x232427, glass: 0x0b0e12, lens: 0xb9c3ca, red: 0x9c1010, plate: 0xecebe2, chrome: 0xc9ccd0 };
 export const CAR_TYPES = ['sedan', 'hatch', 'suv', 'mpv', 'van', 'truck'];
 // thông số thật (m): dài, rộng, bán kính bánh, trục trước/sau (z), gầm, mũi [đáy, đỉnh], nắp ca-pô ở chân kính,
 // vai xe, đuôi [đáy, đỉnh], nhà kính: z chân kính trước/đỉnh, đỉnh kính sau/chân, nóc, vai kính
@@ -712,13 +712,13 @@ function carFace(K, T, { lo = false, wN, wT, yF, yR, hF = 0.14, hR = 0.15, grill
   const zF = T.L / 2, zR = -T.L / 2;
   for (const s of [-1, 1]) {
     // đèn pha: khối thuôn ôm từ mặt trước sang hông (2 mảnh: mặt trước + phần vát góc)
-    K.add(box(0.3, hF, 0.06, s * (wN - 0.2), yF, zF - 0.01, -0.12, s * 0.12, 0), { c: CK.lens, ch: CH.HEAD, r: 0.08 });
-    K.add(box(0.04, hF * 0.85, 0.22, s * (wN - 0.035), yF, zF - 0.14, -0.1, 0, 0), { c: CK.lens, ch: CH.HEAD, r: 0.08 });
+    K.add(box(0.3, hF, 0.06, s * (wN - 0.2), yF, zF - 0.01, -0.12, s * 0.12, 0), { c: CK.lens, ch: CH.HEAD, r: 0.2 });
+    K.add(box(0.04, hF * 0.85, 0.22, s * (wN - 0.035), yF, zF - 0.14, -0.1, 0, 0), { c: CK.lens, ch: CH.HEAD, r: 0.2 });
     if (!lo) K.add(box(0.07, 0.035, 0.05, s * (wN - 0.08), yF - hF * 0.5 - 0.03, zF - 0.02), { c: 0xd08a28, ch: CH.AMBER, r: 0.2 });
     // đèn hậu
     K.add(box(0.32, hR, 0.06, s * (wT - 0.18), yR, zR + 0.01, 0, -s * 0.1, 0), { c: CK.red, ch: CH.TAIL, r: 0.15 });
     K.add(box(0.04, hR * 0.9, 0.16, s * (wT - 0.025), yR, zR + 0.1), { c: CK.red, ch: CH.TAIL, r: 0.15 });
-    if (tallRear) K.add(box(0.12, 0.34, 0.05, s * (wT - 0.08), yR + 0.3, zR + 0.01), { c: CK.red, ch: CH.TAIL, r: 0.15 });
+    if (tallRear) K.add(box(0.12, 0.3, 0.05, s * (wT - 0.08), yR - 0.02, zR + 0.012), { c: CK.red, ch: CH.TAIL, r: 0.15 });   // đèn hậu dựng đứng (xe 16 chỗ)
   }
   // lưới tản nhiệt + nẹp
   K.add(box((wN - 0.36) * 2, grilleH, 0.05, 0, yF - 0.01, zF + 0.0), { c: 0x141518, r: 0.55 });
@@ -741,7 +741,7 @@ export function carGeometry(type = 'sedan', { lo = false } = {}) {
   for (const z of [T.zf, T.zr]) for (const s of [-1, 1]) carWheel(K, s * wx, z, R, tw, s, { lo });
   // mặt trước/sau — nửa rộng mặt cắt mũi/đuôi đúng như thân loft (w·(1−0,085) − 0,05)
   const wTip = hw * 0.915 - 0.05;
-  carFace(K, T, { lo, wN: wTip, wT: wTip, yF: T.nose[1] - 0.1, yR: T.tail[1] - 0.12, hF: type === 'van' ? 0.18 : 0.14, hR: 0.14, tallRear: type === 'van' || type === 'mpv' || type === 'suv' });
+  carFace(K, T, { lo, wN: wTip, wT: wTip, yF: T.nose[1] - 0.1, yR: T.tail[1] - 0.12, hF: type === 'van' ? 0.18 : 0.14, hR: 0.14, tallRear: type === 'van' });
   // gương chiếu hậu (sơn, mặt kính tối)
   for (const s of [-1, 1]) {
     const zM = T.gh.zA - 0.12, yM = T.belt + 0.1;
