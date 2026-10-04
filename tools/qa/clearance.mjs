@@ -18,7 +18,7 @@ const HOST = arg('host', '127.0.0.1');
 const GPU = A.includes('--gpu');
 const here = path.dirname(fileURLToPath(import.meta.url));
 const ids = JSON.parse(fs.readFileSync(path.join(here, '../pano_loop/list_full_551.json'), 'utf8')).map((e) => e.id);
-const cfg = { ids, hold: true, allCams: A.includes('--all'), roadCls: arg('road', 'A'), near: +arg('near', '3'), fillD: +arg('filld', '6'), fillMax: +arg('fillmax', '0.4'), fillCorr: +arg('fillcorr', '0.2'), probe: arg('probe', '') ? JSON.parse(fs.readFileSync(arg('probe'), 'utf8')) : [] };
+const cfg = { ids, hold: !A.includes('--nohold'), allCams: A.includes('--all'), roadCls: arg('road', 'A'), near: +arg('near', '3'), fillD: +arg('filld', '6'), fillMax: +arg('fillmax', '0.4'), fillCorr: +arg('fillcorr', '0.2'), probe: arg('probe', '') ? JSON.parse(fs.readFileSync(arg('probe'), 'utf8')) : [] };
 const pageJs = fs.readFileSync(path.join(here, 'clearance_page.js'), 'utf8');
 const { acquireGpu } = await import('./gpulock.mjs');
 const release = await acquireGpu('clearance ' + OUT);
@@ -32,7 +32,7 @@ const t0 = Date.now();
 try {
   const pg = await br.newPage({ viewport: { width: 640, height: 360 } });
   const errors = [];
-  pg.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
+  pg.on('pageerror', (e) => { errors.push('pageerror: ' + e.message); if (A.includes('--stack')) console.log('STACK', e.stack); });
   pg.on('console', (m) => { const t = m.text(); if (m.type() === 'error') errors.push('console: ' + t.slice(0, 300)); if (/^\[(clear|cellsink|clearance)\]/.test(t)) console.log(t.slice(0, 400)); });
   await pg.route('**/js/main.js', async (route) => {
     const r = await route.fetch(); let body = await r.text();
@@ -64,6 +64,11 @@ try {
     await pg.waitForTimeout(1000);
     res = await pg.evaluate(() => window.__clearResult || null).catch(() => null);
     if (errors.some((e) => /pageerror/.test(e))) break;
+  }
+  // --nohold: để trang chạy tiếp qua freezeStatic/khởi động (bắt lỗi SAU kiểm toán — vd hỏng geometry khi gộp)
+  if (A.includes('--nohold')) for (let i = 0; i < 40; i++) {
+    await pg.waitForTimeout(1000);
+    if (await pg.evaluate(() => !!(window.__hp && window.__hp.teleport)).catch(() => false)) { console.log('nohold: __hp sẵn sàng'); break; }
   }
   if (cdp) {
     const { profile } = await cdp.send('Profiler.stop');

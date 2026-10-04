@@ -403,6 +403,8 @@ export function sweepAssemblies(objs, cols, fc, opts = {}) {
   const gh = _st.gh;
   const pieces = [];
   const rep = { pieces: 0, assemblies: 0, moved: [], removed: [], kept: 0, colMoved: 0, colOff: 0, fcMoved: 0 };
+  // geometry DÙNG CHUNG giữa nhiều mesh (vd 1 hình đã translate dùng cho 2 material) → không sửa đỉnh (sẽ dời/xoá cả mesh kia)
+  const geoUse = new Map(); for (const o of objs) if (o && o.isMesh && o.geometry) geoUse.set(o.geometry, (geoUse.get(o.geometry) || 0) + 1);
   for (const o of objs) {
     if (!o || !o.parent) continue;
     const nm = o.name || '';
@@ -410,7 +412,7 @@ export function sweepAssemblies(objs, cols, fc, opts = {}) {
     o.updateMatrixWorld(true);
     const me = o.matrixWorld.elements;
     const ident = Math.abs(me[0] - 1) < 1e-6 && Math.abs(me[5] - 1) < 1e-6 && Math.abs(me[10] - 1) < 1e-6 && Math.abs(me[12]) < 1e-6 && Math.abs(me[14]) < 1e-6 && Math.abs(me[13]) < 1e-6;
-    if (o.isMesh && !o.isInstancedMesh && ident && o.children.length === 0) {
+    if (o.isMesh && !o.isInstancedMesh && ident && o.children.length === 0 && geoUse.get(o.geometry) === 1) {
       // mesh gộp (toạ độ thế giới nướng sẵn) → từng thành phần liên thông
       const mt = Array.isArray(o.material) ? o.material : [o.material];
       if (mt.every(isSkipMat)) continue;
@@ -567,30 +569,35 @@ function dropMesh(p) {
   // đánh dấu đỉnh chết; flushClearance() dựng lại chỉ số (hoặc nén thuộc tính nếu không chỉ số) bỏ tam giác của chúng
   const g = p.o.geometry, n = g.attributes.position.count;
   let dead = _deadV.get(g); if (!dead) _deadV.set(g, (dead = new Uint8Array(n)));
+  let ms = _deadM.get(g); if (!ms) _deadM.set(g, (ms = new Set())); ms.add(p.o);
   for (const i of p.vs) dead[i] = 1;
   _dirty.add(g);
 }
-const _deadV = new Map();
+const _deadV = new Map(), _deadM = new Map();   // geometry → đỉnh chết / các mesh dùng nó
 // sau sweep: bỏ tam giác của mảnh đã gỡ (dựng lại index / nén thuộc tính) + cầu/hộp bao của geometry đã sửa
 export function flushClearance() {
   for (const g of _dirty) {
-    const dead = _deadV.get(g);
+    const dead = _deadV.get(g); let empty = false;
     if (dead) {
       const idx = g.index;
       if (idx) {
         const keep = [];
         for (let t = 0; t + 2 < idx.count; t += 3) { const a = idx.getX(t), b = idx.getX(t + 1), c = idx.getX(t + 2); if (!dead[a] && !dead[b] && !dead[c]) keep.push(a, b, c); }
         g.setIndex(keep);   // mảng thường → three tự chọn Uint16/Uint32
+        if (!keep.length) empty = true;
       } else {
         const n = g.attributes.position.count, live = [];
         for (let t = 0; t + 2 < n; t += 3) if (!dead[t] && !dead[t + 1] && !dead[t + 2]) live.push(t);
+        if (!live.length) empty = true;
         for (const k of Object.keys(g.attributes)) {
           const a = g.attributes[k], s = a.itemSize, src = a.array, dst = new src.constructor(live.length * 3 * s);
           let w = 0; for (const t of live) for (let q = 0; q < 3 * s; q++) dst[w++] = src[t * s + q];
           g.setAttribute(k, new a.constructor(dst, s, a.normalized));
         }
       }
-      _deadV.delete(g);
+      // gỡ HẾT mảnh → bỏ hẳn mesh (geometry rỗng làm hỏng splitGeometryByTile/mergeGeometries ở freezeStatic)
+      if (empty) for (const m of _deadM.get(g) || []) if (m.parent) m.parent.remove(m);
+      _deadV.delete(g); _deadM.delete(g);
     }
     g.computeBoundingBox(); g.computeBoundingSphere();
   }
