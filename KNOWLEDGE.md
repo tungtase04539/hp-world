@@ -29,6 +29,8 @@ Trò chơi: thế giới 3D Hải Phòng **tỉ lệ 1:1 mét thật** (từ 202
 | `js/mapdata.js` | **SINH TỰ ĐỘNG** bởi `tools/process_osm.mjs` — KHÔNG sửa tay |
 | `js/terrain.js` | Cao độ/đất-nước thuần JS (không import three → chạy được trong node để test) |
 | `js/world.js` | Dựng toàn bộ thế giới 3D, collider, spawn, `buildWorld(scene)` |
+| `js/cellsink.js` | "Bồn chứa" khối ô dựng tay (world.js "cells"): che scene/addCollider/FEATURED_CLEAR/makeTex, ở cửa ra gỡ nhà ô trùng footprint THẬT, claim kind `'cell'` cho công trình giữ, xuất `world.cellShops`; `realBuildings()` = giải mã RB01 dùng chung |
+| `js/brands.js` | Danh sách chặn tên THƯƠNG HIỆU thật (nguồn duy nhất cho `gen_shopsigns.mjs` + lưới an toàn vẽ biển trong cellsink) |
 | `js/assets.js` | Đăng ký + preload + streaming GLB theo khoảng cách |
 | `js/main.js` | Vòng lặp game, camera, người chơi, bloom, autoQuality, `window.__hp` |
 | `js/landmarks.js` | 15 biển thông tin địa danh (vị trí suy ra từ mapdata) |

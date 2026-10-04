@@ -9090,7 +9090,7 @@ const tsShop = (bx, bz, ry, W, FL, wallMat, txt, sbg, sfg, opt = {}) => {
     ['PHỤC VỤ HIẾU HỶ', -717.7, 71.8, -2.852, 6, 3, '#cfb96a', '#57503f', '#c1201a', '#ffe9b0', {}],
     ['KIM THANH', -730.5, 56.8, 0.289, 5.5, 3, '#e0b53a', '#6b5a33', '#c1201a', '#ffffff', { arch: 0xf5d76a }],
     // pano_492
-    ['PROSIMEX — HAIPHONG BRANCH — BỘ THƯƠNG MẠI', -754.0, 83.2, -2.852, 9, 3, '#efe6cf', '#5f6d74', '#c1201a', '#ffffff', { px: 24 }],
+    ['CÔNG TY THƯƠNG MẠI — CHI NHÁNH HẢI PHÒNG', -754.0, 83.2, -2.852, 9, 3, '#efe6cf', '#5f6d74', '#c1201a', '#ffffff', { px: 24 }],
     ['LỢI — TINH • SÀNH SỨ GIA DỤNG', -764.1, 66.8, 0.289, 6, 4, '#efe0b0', '#5f6d74', '#1c56a0', '#ffffff', {}],
     ['ONLINE', -772.7, 69.3, 0.289, 5, 4, '#9e3b30', '#e8d8c2', '#22252a', '#ffd54a', {}],
     ['BÌNH THỦY — TẤM XỐP CÁCH NHIỆT • KIM TRANG', -775.2, 88.9, -2.852, 6.5, 3, '#e8c85a', '#5f6d74', '#1c56a0', '#ffffff', { awn: tsStripe('#2a5fa8', '#f4efe4'), px: 26 }],

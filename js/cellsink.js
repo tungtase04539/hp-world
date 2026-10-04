@@ -10,7 +10,9 @@
 //   • Cặp nhà TRÙNG nhau (nhiều đợt agent vẽ cùng 1 toà) → giữ 1.
 //   • Cây, đồ phố, tường/rào, mặt sân, và các HỆ THỐNG nhúng (cell_road rd_*, cell_tree tr_*, cell_dens de_*,
 //     cell_curb street_curbs, cloverleaf) → không đụng.
-// Không import three (nhận THREE qua tham số). Chạy 1 lần lúc buildWorld (đo ~40-90 ms trên 890M).
+//   • Texture canvas của khối ô vẽ LƯỜI (chỉ vẽ cái còn hiện ra sau commit) + xếp atlas cho vật thể giữ lại.
+// Không import three (nhận THREE qua tham số). Chạy 1 lần lúc buildWorld: commit ~300-470 ms trên 890M (máy đang tải),
+// nhưng tiết kiệm hơn thế nhờ ~1.100 canvas không vẽ + ~2.600 mesh ít hơn cho freezeStatic.
 import { decodeRB, makeFootprintGrid } from './buildings_data.js';
 import { RB_B64 } from './buildings_real.js';
 import { claimBox } from './claims.js';
@@ -52,9 +54,30 @@ function guardText(t, stats) {
   return d;
 }
 
+// ngữ cảnh 2D GIẢ chỉ ghi lại trạng thái (không raster): đủ cho các hàm vẽ biển/mặt tiền của khối ô (fillStyle/font/
+// fillRect/fillText/path/gradient/save/restore...) — dùng để lấy chữ biển + màu nền mà KHÔNG tạo pixel.
+function recorderCtx(W, H) {
+  const noop = () => {};
+  const grad = { addColorStop: noop };
+  const st = { canvas: { width: W, height: H }, fillStyle: '#000000', strokeStyle: '#000000', font: '10px sans-serif',
+    globalAlpha: 1, lineWidth: 1, textAlign: 'start', textBaseline: 'alphabetic', globalCompositeOperation: 'source-over' };
+  return new Proxy(st, {
+    get(o, p) {
+      if (p in o) return o[p];
+      if (p === 'createLinearGradient' || p === 'createRadialGradient' || p === 'createConicGradient' || p === 'createPattern') return () => grad;
+      if (p === 'measureText') return (s) => ({ width: String(s).length * 8 });
+      if (p === 'getImageData' || p === 'createImageData') return (x, y, w, h) => ({ data: new Uint8ClampedArray(Math.max(4, (w | 0) * (h | 0) * 4)), width: w, height: h });
+      if (p === 'getTransform') return () => ({ a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 });
+      return noop;
+    },
+    set(o, p, v) { o[p] = v; return true; },
+    deleteProperty(o, p) { delete o[p]; return true; },
+  });
+}
+
 export function makeCellSink(THREE, realScene, realAddCollider, realFC, colliders, outerMakeTex) {
   const recs = [], cols = [], fcs = [];
-  const stats = { texCalls: 0, texNew: 0, memoHit: 0, memoMiss: 0, brandHits: [] };
+  const stats = { t0: performance.now(), texCalls: 0, texNew: 0, texHit: 0, texDrawn: 0, texSkipped: 0, texMs: 0, memoHit: 0, memoMiss: 0, brandHits: [] };
   const createdTex = new Set();
   let seq = 0;
   const DUMP = CELLSINK_MODE === 'dump';
@@ -82,30 +105,58 @@ export function makeCellSink(THREE, realScene, realAddCollider, realFC, collider
       return Reflect.get(t, p, t);
     },
   });
-  // makeTex: bắt chữ biển (fillText) + màu nền (fillRect phủ kín) để xuất cellShops; chặn thương hiệu lúc vẽ
+  // makeTex LƯỜI: khối ô tạo ~1.560 canvas biển/mặt tiền nhưng ~70% thuộc nhà sẽ bị gỡ ở commit → chỉ tạo texture +
+  // canvas TRỐNG (qua makeTex gốc với hàm vẽ rỗng: đúng TEXQ/colorSpace/anisotropy, ngữ cảnh đã scale), giữ hàm vẽ;
+  // commit() mới VẼ những texture còn được cảnh dùng (materialize), texture chỉ nhà-bị-gỡ dùng thì KHÔNG BAO GIỜ vẽ
+  // (chữ biển của chúng vẫn lấy được bằng ngữ cảnh GHI CHÉP giả — recorderCtx). Đo: vẽ canvas = ~38% thời gian khối ô.
+  // key: cache RIÊNG của sink (không đẩy vào cache toàn cục world.js → code ngoài khối không thể nhận texture chưa vẽ).
+  let committed = false;         // sau commit: makeTex vẽ NGAY (không còn ai materialize)
+  const lazy = new Map();        // texture → { w, h, draw }
+  const keyed = new Map();       // 'WxH|key' → texture
   const makeTex = outerMakeTex && ((w, h, draw, key) => {
     stats.texCalls++;
-    let texts = null, base = null;
-    const wrapped = (g, W, H) => {
-      const ft = g.fillText, st = g.strokeText, fr = g.fillRect;
-      g.fillText = function (t, ...a) { const s = guardText(t, stats); (texts || (texts = [])).push(String(s)); return ft.call(this, s, ...a); };
-      g.strokeText = function (t, ...a) { return st.call(this, guardText(t, stats), ...a); };
-      g.fillRect = function (x, y, ww, hh) { if (base === null && x <= 0 && y <= 0 && ww >= W && hh >= H) base = String(this.fillStyle); return fr.call(this, x, y, ww, hh); };
-      try { draw(g, W, H); } finally { delete g.fillText; delete g.strokeText; delete g.fillRect; }
-    };
-    wrapped.toString = () => draw.toString();   // giữ chẩn đoán texCacheStats().topUncached theo chỗ gọi gốc
-    const t = outerMakeTex(w, h, wrapped, key);
-    if (!createdTex.has(t)) {
-      createdTex.add(t); stats.texNew++;
-      if (texts) t.userData.signTexts = texts;
-      if (base) t.userData.base = base;
-    }
+    let ck;
+    if (key !== undefined) { ck = w + 'x' + h + '|' + key; const hit = keyed.get(ck); if (hit) { stats.texHit++; return hit; } }
+    const noop = () => {};
+    noop.toString = () => draw.toString();   // giữ chẩn đoán texCacheStats().topUncached theo chỗ gọi gốc
+    const t = outerMakeTex(w, h, noop);
+    lazy.set(t, { w, h, draw });
+    createdTex.add(t); stats.texNew++;
+    if (ck) keyed.set(ck, t);
+    if (committed) materialize(t);
     return t;
   });
+  // chạy hàm vẽ gốc trên ngữ cảnh g: chặn thương hiệu (fillText/strokeText) + ghi chữ biển & màu nền phủ kín
+  const runDraw = (t, L, g) => {
+    let texts = null, base = null;
+    const ft = g.fillText, st = g.strokeText, fr = g.fillRect, W = L.w, H = L.h;
+    g.fillText = function (s0, ...a) { const s = guardText(s0, stats); (texts || (texts = [])).push(String(s)); return ft.call(this, s, ...a); };
+    g.strokeText = function (s0, ...a) { return st.call(this, guardText(s0, stats), ...a); };
+    g.fillRect = function (x, y, ww, hh) { if (base === null && x <= 0 && y <= 0 && ww >= W && hh >= H) base = String(this.fillStyle); return fr.call(this, x, y, ww, hh); };
+    try { L.draw(g, W, H); } finally { delete g.fillText; delete g.strokeText; delete g.fillRect; }
+    if (texts) t.userData.signTexts = texts;
+    if (base) t.userData.base = base;
+  };
+  // vẽ thật 1 texture lười (canvas của nó đã có ngữ cảnh scale TEXQ từ makeTex gốc)
+  const materialize = (t) => {
+    const L = lazy.get(t); if (!L) return;
+    lazy.delete(t);
+    const tq = performance.now();
+    runDraw(t, L, t.image.getContext('2d'));
+    t.needsUpdate = true;
+    stats.texDrawn++; stats.texMs += performance.now() - tq;
+  };
+  // chỉ lấy chữ biển/màu nền (không raster) — cho texture không bao giờ vẽ của nhà bị gỡ (xuất cellShops)
+  const recordTexts = (t) => {
+    const L = lazy.get(t); if (!L || L.rec) return;
+    L.rec = true;
+    try { runDraw(t, L, recorderCtx(L.w, L.h)); } catch (e) { /* hàm vẽ lạ → bỏ qua chữ */ }
+  };
   // memo(name, fn): helper biển/mặt tiền thuần (tham số nguyên thuỷ → material) chỉ tạo 1 material/texture cho mỗi bộ
   // tham số (trước: mỗi lần gọi 1 canvas + 1 material → 1.693 texture). Tham số object/hàm → không cache (an toàn).
+  const memoCaches = [];
   const memo = (name, fn) => {
-    const cache = new Map();
+    const cache = new Map(); memoCaches.push(cache);
     return (...args) => {
       for (const a of args) if (a !== null && (typeof a === 'object' || typeof a === 'function')) return fn(...args);
       const k = JSON.stringify(args);
@@ -114,7 +165,25 @@ export function makeCellSink(THREE, realScene, realAddCollider, realFC, collider
       return v;
     };
   };
-  const sink = { scene, addCollider, fc, makeTex, memo, recs, cols, fcs, stats, createdTex };
+  // cuối commit: vẽ MỌI texture lười còn có thể hiện ra; chỉ bỏ những texture mà MỌI tham chiếu nằm trong vật thể bị gỡ
+  // (so theo Source: texture.clone() dùng chung canvas — vd cbWallMat). deadObjs = vật thể vừa gỡ khỏi cảnh.
+  const settleTextures = (deadObjs) => {
+    if (!lazy.size) return;
+    const deadSrc = new Set(), liveSrc = new Set();
+    const scan = (root, into) => root.traverse((m) => {
+      const ms = m.material; if (!ms) return;
+      for (const q of (Array.isArray(ms) ? ms : [ms])) if (q) for (const k in q) { const v = q[k]; if (v && v.isTexture) into.add(v.source); }
+    });
+    for (const o of deadObjs) scan(o, deadSrc);
+    if (deadSrc.size) scan(realScene, liveSrc);
+    for (const t of [...lazy.keys()]) {
+      if (deadSrc.has(t.source) && !liveSrc.has(t.source)) { stats.texSkipped++; continue; }
+      materialize(t);
+    }
+  };
+  const sink = { scene, addCollider, fc, makeTex, memo, recs, cols, fcs, stats, createdTex, lazy, settleTextures, recordTexts };
+  // nhả tham chiếu tới vật thể/texture đã gỡ (closure trong khối ô có thể giữ ngữ cảnh sink sống suốt phiên)
+  sink.release = () => { committed = true; recs.length = 0; cols.length = 0; fcs.length = 0; lazy.clear(); keyed.clear(); createdTex.clear(); for (const c of memoCaches) c.clear(); };
   sink.commit = (opts = {}) => commitSink(sink, THREE, realScene, realFC, colliders, opts);
   return sink;
 }
@@ -256,11 +325,14 @@ const TREE_RE = /tree|palm|trunk|leaf|canopy|banyan|xacu|foliage|hedge|bougain|c
 const OPEN_RE = /garden|park|pergola|plaza|fountain|nan\b|rail|wall|fence|rao|tuong|pillar|lancan|kerb|curb|caro|promenade|lamppost|globe|stall|kiosk|umbrella|tarp|scaffold|dirt|sanbong|walk|ke_|_ke\b/;
 // token (đã bỏ số đuôi) → công trình danh tính. Khớp ĐÚNG token; tiền tố dài khớp startsWith.
 const CIVIC_EXACT = new Set(['ubnd', 'ub', 'nvh', 'cdc', 'hcdc', 'bv', 'bvps', 'cho', 'den', 'dinh', 'chua', 'yte', 'svd',
-  'bidv', 'msb', 'acb', 'vib', 'scb', 'baoviet', 'gate', 'cong', 'tt', 'thuvien', 'school', 'truong']);
+  'bidv', 'msb', 'acb', 'vib', 'scb', 'vab', 'vcb', 'baoviet', 'gate', 'cong', 'tt', 'thuvien', 'school', 'truong', 'cdkt']);
 const CIVIC_PREFIX = ['congso', 'conso', 'coquan', 'truso', 'chicucthue', 'sotuphap', 'thanhdoan', 'danguy', 'banchqs',
   'vanhoa', 'nhahoi', 'hoitruong', 'congvu', 'dienluc', 'tramyte', 'ytehongbang', 'benhvien', 'truongcong', 'mamnon', 'thpt',
   'thcs', 'nhatho', 'chocon', 'market', 'bazaar', 'khachsan', 'nhakhach', 'haiquan', 'hanghai', 'cangvu', 'beboi',
-  'khandai', 'newschool', 'skyline', 'legend'];
+  'khandai', 'newschool', 'skyline', 'legend',
+  'congthu', 'dinhphap', 'congty'];   // công thự / dinh thự Pháp (công sở thời Pháp) + khuôn viên công ty có cổng-cờ
+// cao ốc văn phòng/kính có tên (5-7 tầng, thấp hơn TOWER_H) — dáng riêng nhìn từ pano → giữ như tháp
+const TOWER_PREFIX = ['caooc', 'toakinh'];
 const CIVIC_INCL = ['hotel', 'bank', 'school', 'tower', 'hospital'];
 // ghi đè tay theo tên đầy đủ (đối chiếu pano: công trình đứng riêng có danh tính / nhà nhầm token)
 const NAME_KIND = {
@@ -268,8 +340,12 @@ const NAME_KIND = {
   x46_gate: 'civic', tambac_phothuyen: 'house', cb_lam_block: 'house',
   tt_vanhoa: 'civic', samnec: 'house', pico_bachdang: 'house',
   tb_tapthe_cho: 'house', w4_maytinh_hanghai: 'house',   // 'cho'/'hanghai' ở đây là tên phố/tiệm, không phải chợ/cơ quan
+  tb_goldstar: 'civic', tb_goldstar_thap: 'civic',       // bệnh viện quốc tế (pano_537-540)
+  v2_haithanh_bld: 'civic',                               // khối VP 5T sau cổng 3 cột cờ (cùng khuôn viên v2_cong_haithanh)
+  w5_phonglan_bld: 'tower',                               // cao ốc kính 6T có tên (pano_048)
 };
-function tokens(name) { return name.toLowerCase().split(/[_\s\-.,·—]+/).map((t) => t.replace(/\d+$/, '')).filter(Boolean); }
+// token bỏ số nhà đuôi (kể cả '17a', '246b'): 'w5_cdc17a' → ['w', 'cdc']
+function tokens(name) { return name.toLowerCase().split(/[_\s\-.,·—]+/).map((t) => t.replace(/\d+[a-z]?$/, '')).filter(Boolean); }
 export function nameKind(name) {
   const n = (name || '').toLowerCase();
   if (!n) return '';
@@ -281,6 +357,7 @@ export function nameKind(name) {
     for (const p of CIVIC_PREFIX) if (t.startsWith(p)) return 'civic';
     for (const p of CIVIC_INCL) if (t.includes(p)) return 'civic';
   }
+  for (const t of tokens(n)) for (const p of TOWER_PREFIX) if (t.startsWith(p)) return 'tower';
   if (OPEN_RE.test(n)) return 'open';
   return '';
 }
@@ -317,13 +394,15 @@ function commitSink(sink, THREE, realScene, realFC, colliders, opts) {
     it.S = mc.S; it.height = mc.top - mc.base; it.base = mc.base;
     it.bldg = mc.S.size >= PR.MIN_CELLS && it.height >= PR.MIN_H && nk !== 'tree' && nk !== 'open' && tag !== 'prop' && tag !== 'tree';
     if (!it.bldg) { it.kind = tag || (nk === 'tree' ? 'tree' : nk === 'open' ? 'open' : 'prop'); return it; }
-    it.kind = tag || (nk === 'civic' ? 'civic' : nk === 'house' ? 'house' : it.height >= PR.TOWER_H ? 'tower' : 'house');
+    it.kind = tag || (nk === 'civic' || nk === 'house' || nk === 'tower' ? nk : it.height >= PR.TOWER_H ? 'tower' : 'house');
     return it;
   });
   const tShape = performance.now();
 
   if (MODE === 'dump') {
+    sink.settleTextures([]);
     _report = dumpReport(items, cols, fcs, stats, performance.now() - t0);
+    sink.release();
     return _report;
   }
 
@@ -449,17 +528,22 @@ function commitSink(sink, THREE, realScene, realFC, colliders, opts) {
   // 7) áp dụng: gỡ khỏi cảnh, nén mảng collider (colIdx còn null tới lần resolveCollisions đầu) + FEATURED_CLEAR
   const shops = [];
   let nRem = 0;
+  const dead = new Set();
   if (live) {
     // gỡ HÀNG LOẠT: nén scene.children 1 lượt (remove() từng cái = indexOf+splice O(n²) trên ~3.300 con)
-    const dead = new Set(); for (const it of items) if (it.removed && it.o.parent === realScene) dead.add(it.o);
+    for (const it of items) if (it.removed && it.o.parent === realScene) dead.add(it.o);
     const ch = realScene.children; let w = 0;
     for (let r = 0; r < ch.length; r++) { const o = ch[r]; if (dead.has(o)) { o.parent = null; o.dispatchEvent({ type: 'removed' }); } else ch[w++] = o; }
     ch.length = w; nRem = dead.size;
     if (deadCol.size) { let w = 0; for (let r = 0; r < colliders.length; r++) if (!deadCol.has(colliders[r])) colliders[w++] = colliders[r]; colliders.length = w; }
     if (deadFC.size) { let w = 0; for (let r = 0; r < realFC.length; r++) if (!deadFC.has(realFC[r])) realFC[w++] = realFC[r]; realFC.length = w; }
-    // xuất thuộc tính nhà bị gỡ (trừ bản trùng — bản thắng vẫn đứng đó)
-    for (const it of bl) if (it.removed === 'overlap' || it.removed === 'near') shops.push(shopAttrs(it));
   }
+  // 7a) vẽ texture lười còn hiện ra (texture CHỈ nhà bị gỡ dùng → không bao giờ vẽ)
+  const tTex0 = performance.now();
+  sink.settleTextures(dead);
+  const msTex = performance.now() - tTex0;
+  // xuất thuộc tính nhà bị gỡ (trừ bản trùng — bản thắng vẫn đứng đó); chữ biển texture chưa vẽ lấy qua ngữ cảnh ghi chép
+  if (live) for (const it of bl) if (it.removed === 'overlap' || it.removed === 'near') shops.push(shopAttrs(it, sink.recordTexts));
 
   // 7b) ATLAS biển/mặt tiền của vật thể GIỮ LẠI: mỗi canvas "thường" (không lặp/lệch UV) → 1 ô trong vài trang 2048²,
   //     material dùng chung theo (loại, mặt, trang) → freezeStatic lượt 2 gộp theo material → ít draw call + ít upload.
@@ -491,7 +575,7 @@ function commitSink(sink, THREE, realScene, realFC, colliders, opts) {
     if (!m.material) return; for (const q of (Array.isArray(m.material) ? m.material : [m.material])) { keptMat.add(q); if (q.map && (sink.createdTex.has(q.map) || q.name === 'cellAtlas')) keptTex.add(q.map); }
   });
   _report = {
-    mode: MODE, ms: +(performance.now() - t0).toFixed(1), msShape: +(tShape - t0).toFixed(1), msReal: +(tReal - tShape).toFixed(1), msApply: +(tApply - tReal).toFixed(1),
+    mode: MODE, blockMs: +(t0 - stats.t0).toFixed(1), ms: +(performance.now() - t0).toFixed(1), msShape: +(tShape - t0).toFixed(1), msReal: +(tReal - tShape).toFixed(1), msApply: +(tApply - tReal).toFixed(1),
     objects: items.length, buildings: bl.length,
     kinds: { civic: cnt((it) => it.bldg && it.kind === 'civic'), tower: cnt((it) => it.bldg && it.kind === 'tower'), house: cnt((it) => it.bldg && it.kind === 'house'),
       tree: cnt((it) => it.kind === 'tree'), open: cnt((it) => it.kind === 'open'), prop: cnt((it) => it.kind === 'prop'), sys: cnt((it) => it.kind === 'sys') },
@@ -499,7 +583,7 @@ function commitSink(sink, THREE, realScene, realFC, colliders, opts) {
     keptBuildings: bl.filter((it) => !it.removed).length,
     colliders: { cells: cols.length, removed: deadCol.size }, featuredClear: { cells: fcs.length, removed: deadFC.size },
     claims: nClaims, dups, bySection: bySec,
-    tex: { calls: stats.texCalls, created: stats.texNew, kept: keptTex.size, keptBySize: [...keptTex].reduce((o, t) => { const k = t.name || (t.image ? t.image.width + "x" + t.image.height : "?"); o[k] = (o[k] || 0) + 1; return o; }, {}) }, materialsKept: keptMat.size,
+    tex: { calls: stats.texCalls, created: stats.texNew, keyHit: stats.texHit, drawn: stats.texDrawn, neverDrawn: stats.texSkipped, drawMs: +stats.texMs.toFixed(1), settleMs: +msTex.toFixed(1), kept: keptTex.size, keptBySize: [...keptTex].reduce((o, t) => { const k = t.name || (t.image ? t.image.width + "x" + t.image.height : "?"); o[k] = (o[k] || 0) + 1; return o; }, {}) }, materialsKept: keptMat.size,
     memo: { hit: stats.memoHit, miss: stats.memoMiss }, atlas, brandHits: stats.brandHits,
     shops,
   };
@@ -508,6 +592,7 @@ function commitSink(sink, THREE, realScene, realFC, colliders, opts) {
     claims: claimsDbg,
     attached: items.filter((it) => it.removed === 'attached').map((it) => [it.name || it.o.type, it.host, +it.shape.y0.toFixed(1), it.shape.meshes.length]),
   };
+  sink.release();
   if (typeof console !== 'undefined') console.log(`[cellsink] ${MODE}: ${bl.length} nhà ô → giữ ${_report.keptBuildings}, gỡ ${nRem} (đè ${_report.removed.overlap}, gần ${_report.removed.near}, trùng ${_report.removed.dup}, đồ treo ${propsRemoved}); collider −${deadCol.size}, FC −${deadFC.size}; claim ${nClaims}; ${_report.ms} ms`);
   return _report;
 }
@@ -617,22 +702,27 @@ function claimRects(it) {
   return out.length ? out : [r];
 }
 // thuộc tính nhà ô bị gỡ → world.cellShops (để WP2/lớp mặt tiền tô lại footprint thật: chữ biển, màu, tầng, kiểu)
-function shopAttrs(it) {
+function shopAttrs(it, recordTexts) {
   const signs = new Set(); let wall = null, wallA = 0, roof = null;
   it.o.traverse((m) => {
     if (!m.material) return;
     for (const q of (Array.isArray(m.material) ? m.material : [m.material])) {
+      if (q && q.map && recordTexts) recordTexts(q.map);
       if (q.map && q.map.userData && q.map.userData.signTexts) for (const t of q.map.userData.signTexts) if (t && t.trim()) signs.add(t.trim());
     }
   });
-  for (const q of it.shape.meshes) {
-    if (!q.massive) continue;
+  const colOf = (q) => {
     const mm = Array.isArray(q.m.material) ? q.m.material[0] : q.m.material;
-    if (q.area > wallA && mm) {
-      wallA = q.area;
-      wall = mm.map && mm.map.userData && mm.map.userData.base ? mm.map.userData.base
-        : (mm.color && !mm.vertexColors ? '#' + mm.color.getHexString() : null);
-    }
+    if (!mm) return null;
+    return mm.map && mm.map.userData && mm.map.userData.base ? mm.map.userData.base
+      : (mm.color && !mm.vertexColors ? '#' + mm.color.getHexString() : null);
+  };
+  for (const q of it.shape.meshes) if (q.massive && q.area > wallA) { const c = colOf(q); if (c) { wallA = q.area; wall = c; } }
+  // mái = mặt phủ cao nhất (≥25% diện tích thân, không phải tán cây/kính mờ)
+  let roofY = -1e9;
+  for (const q of it.shape.meshes) {
+    if (q.leafy || q.line || q.inst || q.area < 0.25 * wallA || q.y1 <= roofY) continue;
+    const c = colOf(q); if (c) { roofY = q.y1; roof = c; }
   }
   const r = minRect(it.H);
   const ry = it.o.rotation ? it.o.rotation.y : 0;

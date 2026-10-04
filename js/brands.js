@@ -25,7 +25,7 @@ export const BRAND_MAP = [
   [/\b(EVN ?NPC|EVNNPC|EVN)\b.*/i, 'ĐIỆN LỰC'],
   [/\b(PETROLIMEX|PV ?OIL)\b.*/i, 'CÂY XĂNG'],
   // cà phê / trà / F&B
-  [/\b(HIGHLANDS|THE COFFEE HOUSE|AHA ?COFFEE|AHA CAFE|TRUNG NGUY[ÊE]N|PHÚC LONG|KATINAT|STARBUCKS|COFFEE ?BEAN|CỘNG CÀ PHÊ)\b.*/i, 'CÀ PHÊ'],
+  [/\b(HIGHLANDS|THE COFFEE HOUSE|AHA ?COFFEE|AHA CAFE|TRUNG NGUY[ÊE]N|PHÚC LONG|KATINAT|STARBUCKS|COFFEE ?BEAN|CỘNG CÀ PHÊ|MILANO)\b.*/i, 'CÀ PHÊ'],   // Milano = chuỗi nhượng quyền cà phê
   [/\b(MIXUE|TOCOTOCO|GONG ?CHA|MR ?GOOD ?TEA|CHATIME|DING ?TEA|LIPTON|PHÚC LONG)\b.*/i, 'TRÀ SỮA'],
   [/\b(KFC|LOTTERIA|JOLLIBEE|DON ?CHICKEN|TEXAS ?CHICKEN|POPEYES|MCDONALD'?S)\b.*/i, 'GÀ RÁN'],
   [/\bBOSSAM\b.*/i, 'QUÁN NƯỚNG'], [/\bPIZZA ?(HUT|COMPANY)?\b.*/i, 'PIZZA'],
@@ -43,7 +43,8 @@ export const BRAND_MAP = [
   [/\b(OMRON|MEDIPHARCARE|MEDIPHAR)\b.*/i, 'THIẾT BỊ Y TẾ'],
   [/\bSKF\b.*/i, 'VÒNG BI'],
   // xe / lốp / dầu
-  [/\bHONDA ?(HEAD)?\b.*/i, 'XE MÁY'], [/\b(YAMAHA|SUZUKI|PIAGGIO|VESPA|SYM)\b.*/i, 'XE MÁY'],
+  [/\bHONDA ?(HEAD)?\b.*/i, 'XE MÁY'], [/^HEAD$/i, 'XE MÁY'],   // 'HEAD' trơn = đại lý Honda HEAD
+  [/\b(YAMAHA|SUZUKI|PIAGGIO|VESPA|SYM)\b.*/i, 'XE MÁY'],
   [/\b(YADEA|DK ?BIKE|PEGA|VINFAST|ASAMA)\b.*/i, 'XE ĐIỆN'],
   [/\b(GAC ?MOTOR|TOYOTA|HYUNDAI|MAZDA|FORD|MITSUBISHI|THACO)\b.*/i, 'Ô TÔ'],
   [/\b(MICHELIN|CONTINENTAL|GOODYEAR|BRIDGESTONE|CASUMINA|DUNLOP)\b.*/i, 'LỐP XE'],
@@ -83,7 +84,7 @@ export const BRAND_MAP = [
   [/\bDELTA ?GROUP\b.*/i, 'NHÀ THẦU XÂY DỰNG'],
   [/\bSUMMO\b.*/i, 'CÔNG TRÌNH'],
   [/\b(VINCOM|VINHOMES|VINGROUP|PULLMAN|MELIA|SHERATON|HILTON|MARRIOTT|NOVOTEL|MƯỜNG ?THANH|AVANI)\b.*/i, 'KHÁCH SẠN'],
-  [/\b(HIDOO|GENCE)\b.*/i, 'CỬA HÀNG'],
+  [/\b(HIDOO|HDOO|GENCE)\b.*/i, 'CỬA HÀNG'],
   [/\bBRG\b.*/i, 'SIÊU THỊ'],
   [/\bCP ?(PORK|FRESH)\b.*/i, 'CỬA HÀNG THỊT'],
   [/\b(BOSE|JBL|DENON|MARSHALL|HARMAN ?KARDON)\b.*/i, 'THIẾT BỊ ÂM THANH'],
