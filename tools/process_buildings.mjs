@@ -1,9 +1,11 @@
 // process_buildings.mjs v1 — footprint THẬT (Overture: OSM + Google Open Buildings + Microsoft ML) → js/buildings_real.js
 // (định dạng RB01 + mục chữ nhật RBR1, xem js/buildings_data.js).
-// Chạy (gốc repo): node tools/process_buildings.mjs [--dump <file.json>]   (~45 s máy rảnh, tới ~100 s khi máy bận;
-// tất định: chạy lại ra byte y hệt)
+// Chạy (gốc repo): node tools/process_buildings.mjs [--dump <file.json>]   (~35-45 s máy rảnh, tới ~100 s khi máy bận;
+// tất định: chạy lại ra byte y hệt; tự giải mã lại kết quả và DỪNG không ghi file nếu có footprint hỏng)
 // Cần tools/ov_buildings.csv (python tools/fetch_overture.py) — gitignore, KHÔNG commit; tools/osm_roads_dt.json (tên phố
-// cho vùng phố cũ; thiếu thì bỏ qua). Gỡ lỗi: DEBUG_PT=x,z (lý do kéo mặt tiền của nhà quanh điểm), DEBUG_BLK=1.
+// cho vùng phố cũ; thiếu thì bỏ qua). Gỡ lỗi: DEBUG_PT=x,z (lý do kéo mặt tiền + bằng chứng lô khe quanh điểm),
+// DEBUG_BLK=1; --dump ghi thêm *_gap.json (lý do từng lô khe), *_intdbg.json (bằng chứng hạt lõi ô), *_inv.json (bị bỏ ở 9d).
+// Ngưỡng bằng chứng lõi ô (env): INT_NEAR_R/INT_NEAR_MIN, INT_R/INT_FRAC, OPEN_R/OPEN_A (xem bước 8b).
 //
 // Mục tiêu: đùn footprint lên phải RA ĐƯỢC "bức tường phố" thật (nhà ống liền mạch sát vỉa hè, mỗi lô 4-6 m một
 // màu/tầng) và "thảm mái" vệ tinh (đo: ô phố ~66% mái, Overture gốc 42%). Các bước (thống kê in cuối + RB_META.stats):
@@ -14,10 +16,15 @@
 //   5. CHIA LÔ khối mặt phố > 9 m thành lô 3,8-6 m vuông góc phố; "khối dính" ML (> 400 m², dãy nhà bị máy gộp) cắt
 //      dải trước sâu 14-20 m thành lô + phần sau chia lưới 4,5-7,5 × 10-16 m
 //   6. KÉO SÂU + VUÔNG HOÁ lô mặt phố (ML nông 8-11 m → 13-20 m nếu phía sau trống; lô 4 đỉnh → chữ nhật)
-//   7. LẤP KHE mặt phố ≥ 3,5 m bằng lô SINH (bằng chứng: nhà thật phía sau hoặc tia quan sát pano; trừ ven nước/công viên)
+//   7. LẤP KHE mặt phố ≥ 3,5 m bằng lô SINH. Bằng chứng: NHÀ DÂN thật phía sau (không tính công trình công cộng/khối lớn/
+//      cao ốc/nhà trong địa danh) hoặc tia quan sát pano NHÀ ỐNG (không tia tả công trình/cao ốc, không tia chạm địa danh)
+//      tựa vào nhà thật ≤ 8 m. Veto: ven nước/công viên, SÂN TRƯỚC (dải 25 m chạm địa danh + 12 m / công trình lớn), cảng
+//      phía bắc Hoàng Diệu, pano "mặt thoáng"
 //   8. LÕI Ô PHỐ trên lưới chiếm chỗ 0,5 m: NỚI nhà thật nông (không tốn byte) rồi MỌC nhà sinh 4,5-8 × 10-18 m tới COV_TARGET
+//      — chỉ nơi có BẰNG CHỨNG CỤC BỘ (nhà thật trong ±10 m, tỉ lệ nhà thật ±16 m ≥ 30%, không thuộc "đất trống mở")
 //   9. chữ nhật hoá (mã RBR1 19 byte/nhà), nở lấp khe mái, khép khe 3-80 cm giữa nhà kề, cắt chồng lấn còn sót,
-//      kiểm hợp lệ cuối (đa giác đơn, tường-ra-ngoài, ≥ 6 m², bề hẹp ≥ 1,2 m)
+//      CHỐT cuối: hành lang phố p/s/t/r (cả mũ khúc cua/chỗ nối way), camera pano (sinh 3 m / thật 1 m), địa danh (sinh
+//      3 m); kiểm hợp lệ trên TOẠ ĐỘ ĐÃ LÀM TRÒN như file (đơn chặt, tường-ra-ngoài, ≥ 6 m², bề hẹp ≥ 1,2 m)
 //  10. mặt tiền cuối + ghép quan sát pano (tầng/màu/kiểu: tia la bàn từ pano, nhà đầu tiên trong 26 m)
 //  11. thuộc tính: kiểu (phố cũ thời Pháp, cảng, OSM class, chữ pano), tầng (OSM > pano > phân bố pano địa phương,
 //      làm trơn ±2), mái + màu mái (hiệu chỉnh theo vệ tinh), màu tường (chữ màu pano → WALL_PALETTE), INFO (cấp phố,
@@ -31,10 +38,10 @@ import { ROAD_HW, facadeLine } from '../js/xsection.js';
 import { LM_POLY } from '../js/landmark_polys.js';
 import { PANO_CAM } from '../js/panoclear.js';
 import { PANO_SIDES } from '../js/panosides.js';
-import { encodeRB, rectOf, EDGE, STYLE, ROOF, FLAG, INFO, ROADC } from '../js/buildings_data.js';
+import { encodeRB, decodeRB, rectOf, EDGE, STYLE, ROOF, FLAG, INFO, ROADC } from '../js/buildings_data.js';
 import {
   signedArea, absArea, outward, centroid, bbox, pointInPoly, segDist, cleanPoly, isSimple, clipHalf, clipStrip,
-  minRect, Grid, overlapArea, hash32, rng, pickW,
+  minRect, Grid, overlapArea, hash32, rng, pickW, polyEdgeDist,
 } from './bgeom.mjs';
 
 const T0 = Date.now();
@@ -83,6 +90,53 @@ const LM_POLYS = Object.entries(LM_POLY).map(([k, p]) => ({ k, p, bb: bbox(p) })
 const inPolyList = (L, x, z, pad = 0) => L.some((o) => x >= o.bb[0] - pad && x <= o.bb[2] + pad && z >= o.bb[1] - pad && z <= o.bb[3] + pad &&
   (pointInPoly(o.p, x, z) || (pad > 0 && polyNear(o.p, x, z, pad))));
 function polyNear(P, x, z, d) { for (let i = 0; i < P.length; i++) { const a = P[i], b = P[(i + 1) % P.length]; if (segDist(x, z, a[0], a[1], b[0], b[1]) < d) return true; } return false; }
+// giao 2 đoạn (kể cả chạm) — cho polyDist
+function segCross(a, b, c, d) {
+  const cr = (o, p, q) => (p[0] - o[0]) * (q[1] - o[1]) - (p[1] - o[1]) * (q[0] - o[0]);
+  const d1 = cr(c, d, a), d2 = cr(c, d, b), d3 = cr(a, b, c), d4 = cr(a, b, d);
+  return ((d1 > 0) !== (d2 > 0)) && ((d3 > 0) !== (d4 > 0));
+}
+// khoảng cách 2 đa giác (0 nếu chồng/cắt nhau)
+function polyDist(P, Q) {
+  for (const [x, z] of P) if (pointInPoly(Q, x, z)) return 0;
+  for (const [x, z] of Q) if (pointInPoly(P, x, z)) return 0;
+  for (let i = 0; i < P.length; i++) for (let j = 0; j < Q.length; j++) if (segCross(P[i], P[(i + 1) % P.length], Q[j], Q[(j + 1) % Q.length])) return 0;
+  let d = Infinity;
+  for (const [x, z] of P) d = Math.min(d, polyEdgeDist(Q, x, z));
+  for (const [x, z] of Q) d = Math.min(d, polyEdgeDist(P, x, z));
+  return d;
+}
+// Đa giác đơn THEO NGHĨA CHẶT (renderer/tam giác hoá cần): isSimple (cạnh không kề không cắt nhau) + không "gai" (2 cạnh
+// kề quay ngược nhau, góc < ~18°: isSimple không thấy vì chỉ xét cạnh không kề) + không đỉnh nào chạm (≤ 3 cm) cạnh
+// không kề (vòng gập 8-10 cm sau làm tròn 0,1 m — review: 7 đa giác hỏng sau encode)
+function strictSimple(P) {
+  const n = P.length; if (n < 3 || !isSimple(P)) return false;
+  for (let i = 0; i < n; i++) {
+    const a = P[(i + n - 1) % n], b = P[i], c = P[(i + 1) % n];
+    const ux = b[0] - a[0], uz = b[1] - a[1], vx = c[0] - b[0], vz = c[1] - b[1], lu = Math.hypot(ux, uz), lv = Math.hypot(vx, vz);
+    if (lu < 1e-6 || lv < 1e-6) return false;
+    if ((ux * vx + uz * vz) / (lu * lv) < -0.95) return false;
+    for (let j = 0; j < n; j++) {
+      if (j === i || (j + 1) % n === i) continue;
+      const p = P[j], q = P[(j + 1) % n];
+      if (segDist(b[0], b[1], p[0], p[1], q[0], q[1]) < 0.03) return false;
+    }
+  }
+  return true;
+}
+// bỏ đỉnh "gai" (2 cạnh kề quay ngược nhau > 162°) lặp tới khi hết; trả đa giác mới
+function despike(P) {
+  let Q = P.slice(), changed = true;
+  while (changed && Q.length > 3) {
+    changed = false;
+    for (let i = 0; i < Q.length && Q.length > 3; i++) {
+      const a = Q[(i + Q.length - 1) % Q.length], b = Q[i], c = Q[(i + 1) % Q.length];
+      const ux = b[0] - a[0], uz = b[1] - a[1], vx = c[0] - b[0], vz = c[1] - b[1], lu = Math.hypot(ux, uz), lv = Math.hypot(vx, vz);
+      if (lu < 1e-6 || lv < 1e-6 || (ux * vx + uz * vz) / (lu * lv) < -0.95) { Q.splice(i, 1); i--; changed = true; }
+    }
+  }
+  return Q;
+}
 // Bãi giải toả Hoàng Diệu (thực địa 10/2024: nhà cũ đã phá — world.js clearedZone): bỏ cả nhà thật lẫn nhà sinh
 const HD_A = [315, -809.5], HD_U = [0.9795, -0.2012], HD_N = [-0.2012, -0.9795];
 function clearedZone(x, z) {
@@ -277,6 +331,7 @@ const CIVIC_CLS = new Set(['school', 'university', 'hospital', 'kindergarten', '
 const CIVIC_SUB = new Set(['civic', 'education', 'medical', 'religious', 'entertainment', 'transportation', 'industrial', 'commercial']);
 // Cảng/kho (phía bắc Hoàng Diệu tới sông Cấm; ven Bạch Đằng phía sông): khối lớn ở đây là KHO THẬT, không phải dãy nhà dính
 const portZone = (x, z) => (z < -840 && x > 100 && x < 1300) || (z < -480 && x < -380 && waterSD(x, z) < 140);
+const portGapZone = (x, z) => z < -840 && x > 100 && x < 1300 && (x - HD_A[0]) * HD_N[0] + (z - HD_A[1]) * HD_N[1] > 0;
 function classify(b) {
   const mr = minRect(b.pts); b.mr = mr;
   b.civic = CIVIC_CLS.has(b.cls) || CIVIC_SUB.has(b.sub) || /trường|bệnh viện|uỷ ban|ubnd|chùa|đền|đình|nhà thờ|công ty|cung văn hoá|cung văn hóa|chợ|ga /i.test(b.name);
@@ -359,8 +414,9 @@ function sweepFree(Q, self, opts = {}) {
     for (let i = 0; i < Q.length && !edge; i++) { const a = Q[i], c = Q[(i + 1) % Q.length]; if (segDist(x, z, a[0], a[1], c[0], c[1]) < 0.12) edge = true; }
     if (edge) continue;
     for (const j of nb) if (pointInPoly(B[j].pts, x, z)) return false;
-    if (opts.corr && inCorridor(x, z, 0.05, opts.corrSkip)) return false;
-    if (opts.zones && (waterSD(x, z) < 0.5 || inPolyList(PARK_POLYS, x, z) || inPolyList(LM_POLYS, x, z) || nearCam(x, z, 2.5) || nearRail(x, z))) return false;
+    if (opts.corr && inCorridor(x, z, 0.05)) return false;
+    // vùng cấm: địa danh + 3 m (CẢ đa giác, không chỉ tâm), camera pano 3 m (hợp đồng SPEC §WP1.4)
+    if (opts.zones && (waterSD(x, z) < 0.5 || inPolyList(PARK_POLYS, x, z) || inPolyList(LM_POLYS, x, z, 3) || nearCam(x, z, 3) || nearRail(x, z))) return false;
   }
   return true;
 }
@@ -382,15 +438,21 @@ function snapFront(bi) {
   if (!fronts.length) { if (dbg) dbg('no front'); return; }
   b.hadFront = 1;
   // vector dời mỗi đỉnh: tới facadeLine của đoạn (đỉnh thuộc 2 cạnh mặt phố khác phố → giao 2 đường)
-  const vec = new Map();
+  const vec = new Map(), vsrc = new Map();
   for (const f of fronts) {
     if (f.d <= 0.08) continue;
     for (const vi of [f.k, (f.k + 1) % n]) {
       const [x, z] = P[vi]; const [, v] = segLocal(f.s, x, z); const dd = f.sg * v - f.s.fl;
       if (dd <= 0) continue;
       const mv = [-f.sg * f.s.nx * dd, -f.sg * f.s.nz * dd];
-      if (vec.has(vi)) { const o = vec.get(vi); vec.set(vi, [o[0] + mv[0], o[1] + mv[1]]); }   // góc phố: cộng 2 dịch vuông góc ≈ giao 2 đường
-      else vec.set(vi, mv);
+      if (vec.has(vi)) {
+        // góc phố (2 mặt tiền nhìn ra 2 đoạn KHÁC NHAU lệch > 45°): cộng 2 dịch ≈ giao 2 đường. Cùng đoạn / 2 đoạn gần
+        // song song (2 cạnh mặt tiền liền nhau của 1 nhà nhìn ra 1 phố): GIỮ dịch lớn hơn — cộng sẽ dời đỉnh 2 lần, quá
+        // facadeLine vào lòng phố (review: mảnh khối ML ở (−687,826) lấn 4,5 m vào phố s)
+        const o = vec.get(vi), os = vsrc.get(vi);
+        if (os !== f.s && Math.abs(os.ux * f.s.ux + os.uz * f.s.uz) < 0.7) vec.set(vi, [o[0] + mv[0], o[1] + mv[1]]);
+        else if (Math.hypot(mv[0], mv[1]) > Math.hypot(o[0], o[1])) { vec.set(vi, mv); vsrc.set(vi, f.s); }
+      } else { vec.set(vi, mv); vsrc.set(vi, f.s); }
     }
   }
   if (!vec.size) return;
@@ -406,7 +468,9 @@ function snapFront(bi) {
       if (!idx.has(i0) && !idx.has(i1)) continue;
       const quad = [P[i0], P[i1], Q[i1], Q[i0]];
       if (absArea(quad) < 0.05) continue;
-      if (!sweepFree(outward(quad), bi, { corr: true, corrSkip: (s) => s === f.s, zones: true })) return null;
+      // hành lang của CHÍNH phố được kéo tới cũng kiểm (mẫu lõm 0,12 m nên mặt tiền đúng facadeLine vẫn qua; vượt quá thì
+      // bị chặn — trước đây bỏ qua phố này nên đỉnh dời quá đà lọt vào lòng phố)
+      if (!sweepFree(outward(quad), bi, { corr: true, zones: true })) return null;
     }
     return Q;
   };
@@ -523,7 +587,8 @@ for (const b of B) {
   if (parts.length < 2) continue;
   b.dead = 'cells';
   for (const q of parts) {
-    newB.push({ id: b.id + '#c' + newB.length, src: b.src, cls: '', sub: '', name: '', nfl: 0, hgt: 0, pts: q, area: absArea(q), cell: 1, parent: b.id, civic: false, big: false });
+    newB.push({ id: b.id + '#c' + newB.length, src: b.src, cls: '', sub: '', name: '', nfl: 0, hgt: 0, pts: q, area: absArea(q), cell: 1, parent: b.id,
+      snapped: b.snapped, clipped: b.clipped, civic: false, big: false });
     nCells++;
   }
 }
@@ -549,6 +614,11 @@ function frontFrame(f) {
 }
 // hình chữ nhật [ua,ub]×[d0,d1] theo khung F, thứ tự tường-ra-ngoài
 const frameRect = (F, ua, ub, d0, d1) => outward([F.world(ua, d0), F.world(ub, d0), F.world(ub, d1), F.world(ua, d1)]);
+// 4 đỉnh của chữ nhật RBR1 (y hệt decodeRB) + gán chữ nhật/đa giác cho nhà sau một phép CẮT: chữ nhật chỉ khi Q đúng là
+// chữ nhật (lệch ≤ 3 cm) và b.pts luôn = hình sẽ được ghi (trước đây rectOf dung sai tới ~0,4 m cho cạnh 20 m nhưng b.pts
+// giữ đa giác cắt → file lệch so với hình đã kiểm: chồng lấn/lấn vỉa hè quay lại sau encode)
+const rectPts = (r) => { const ca = Math.cos(r.ang), sa = Math.sin(r.ang); return [[r.x0, r.z0], [r.x0 + r.w * ca, r.z0 + r.w * sa], [r.x0 + r.w * ca + r.d * sa, r.z0 + r.w * sa - r.d * ca], [r.x0 + r.d * sa, r.z0 - r.d * ca]]; };
+function setRectOrPoly(b, Q) { const r = rectOf(Q, 0.5, 0.03, 0.03); if (r) { b.rect = r; b.pts = rectPts(r); } else { b.rect = null; b.pts = Q; } b.area = absArea(b.pts); }
 let nDeep = 0, deepGain = 0, nSquare = 0;
 for (let bi = 0; bi < B.length; bi++) {
   const b = B[bi]; if (b.civic || b.big || b.rear) continue;
@@ -613,6 +683,8 @@ lap(`kéo sâu: ${nDeep} lô (+${Math.round(deepGain)} m²), vuông hoá ${nSqua
 // ======================================================================================================
 let nGapLots = 0;
 const GAPDBG = [];   // gỡ lỗi (--dump): [x, z, lý do]
+const INVDBG = [];   // gỡ lỗi (--dump): footprint bị bỏ ở 9d [id, nguồn, sinh?, đa giác đã làm tròn]
+const INTDBG = [];   // gỡ lỗi (--dump): hạt nhà sinh lõi ô [x, z, ô nhà thật ±INT_NEAR_R, tỉ lệ thật ±INT_R]
 function buildingAt(x, z) { let h = -1; grid.query([x, z, x, z], (j) => { if (h < 0 && !B[j].dead && pointInPoly(B[j].pts, x, z)) h = j; }); return h; }
 function occupiedAt(x, z) { return buildingAt(x, z) >= 0; }
 function sideSamples(s, sg) {
@@ -654,24 +726,52 @@ function frontageStats(tag) {
   return o;
 }
 console.log('  mặt phố có nhà (trước lấp khe) %:', JSON.stringify(frontageStats('before_infill')));
-// ô phố phía sau (±14 m dọc phố, sâu 2-32 m) có ≥ 120 m² nhà THẬT (không phải 1 ki-ốt lẻ trong vườn/quảng trường)
+// ô phố phía sau (±14 m dọc phố, sâu 2-32 m) có ≥ 120 m² NHÀ DÂN thật (không phải 1 ki-ốt lẻ trong vườn/quảng trường).
+// Công trình công cộng / khối lớn (> 400 m²) / cao ốc / nhà trong đa giác địa danh KHÔNG là bằng chứng: khoảng trống
+// trước chúng là sân/khuôn viên/quảng trường thật (review: Nhà hát lớn, Bảo tàng từng "chứng minh" dãy nhà ống trong sân)
+const inLMc = (o) => (o.inLM ??= inPolyList(LM_POLYS, ...centroid(o.pts)) ? 1 : 0);
 function builtEvidence(x, z, ux, uz, nx, nz) {
   let A = 0;
   const cx = x + nx * 17, cz = z + nz * 17;
   grid.query([cx - 22, cz - 22, cx + 22, cz + 22], (j) => {
-    const o = B[j]; if (o.dead || o.synth) return;
+    const o = B[j]; if (o.dead || o.synth || o.civic || o.big || o.tallObs || o.area > 400 || inLMc(o)) return;
     const [bx, bz] = centroid(o.pts); const a = (bx - x) * ux + (bz - z) * uz, d = (bx - x) * nx + (bz - z) * nz;
     if (Math.abs(a) <= 14 && d >= 2 && d <= 32) A += Math.min(o.area, 400);
   });
   return A >= 120;
 }
+// SÂN TRƯỚC / KHUÔN VIÊN: dải lô sâu 25 m phía sau mặt phố chạm (a) đa giác địa danh + 12 m hoặc (b) công trình công
+// cộng > 250 m² / khối lớn / cao ốc / nhà > 1000 m² → khe đó là sân trước, bãi xe, lối vào của công trình (Bảo tàng HP,
+// Nhà hát lớn, trường THPT Ngô Quyền, bưu điện…) — không bịa nhà ống vào
+function forecourt(Q) {
+  const bb = bbox(Q);
+  for (const o of LM_POLYS) {
+    if (o.bb[0] > bb[2] + 12 || o.bb[2] < bb[0] - 12 || o.bb[1] > bb[3] + 12 || o.bb[3] < bb[1] - 12) continue;
+    if (polyDist(Q, o.p) < 12) return true;
+  }
+  let hit = false;
+  grid.query(bb, (j) => {
+    if (hit) return; const o = B[j]; if (o.dead || o.synth) return;
+    if (!((o.civic && o.area > 250) || o.big || o.tallObs || o.area > 1000)) return;
+    if (overlapArea(Q, o.pts, 0.5) > 2) hit = true;
+  });
+  return hit;
+}
 // mặt ven công viên/vườn hoa: công viên trong 16 m phía sau facadeLine → để thoáng (dải vườn hoa HP, quảng trường)
 function parkfront(x, z, nx, nz) { for (const d of [2, 6, 10, 16]) if (inPolyList(PARK_POLYS, x + nx * d, z + nz * d)) return true; return false; }
 // quan sát pano (audit) ỦNG HỘ lô: tia từ pano theo hướng quan sát cắt hình chữ nhật lô ở cự ly 3-22 m
 const AUD0 = JSON.parse(fs.readFileSync(new URL('../audit/audit_enriched.json', import.meta.url), 'utf8'));
+// Chỉ quan sát NHÀ ỐNG/NHÀ DÂN (≤ 6 tầng, chữ không tả công trình công cộng/cao ốc) và tia không chạm đa giác địa danh
+// trong 80 m: review — pano_055/056 ven quảng trường Nhà hát Lớn tả "Nhà hát Pháp cổ" hướng 315 (cách ~60 m), tia đó
+// xuyên quảng trường trống và từng "chứng minh" 6 lô nhà ống giữa quảng trường.
+const OBS_CIVIC_RX = /nhà hát|văn hóa|văn hoá|công sở|cơ quan|bảo tàng|nhà thờ|chùa|đền|đình|trường|bưu điện|ủy ban|uỷ ban|ga |chợ|cao tầng|cao ốc|tòa nhà|toà nhà|khách sạn|ngân hàng|trung tâm|bệnh viện|tượng đài|công viên|quảng trường/;
 const RAYS = [];
 for (const p of AUD0) if (typeof p.X === 'number') for (const o of p.buildings || []) {
-  const h = ((+o.heading || 0) * Math.PI) / 180; RAYS.push([p.X, p.Z, Math.sin(h), -Math.cos(h)]);
+  if ((+o.floors || 0) > 6 || OBS_CIVIC_RX.test(String(o.style || '').toLowerCase())) { stat('obs_ray_skip_civic'); continue; }
+  const h = ((+o.heading || 0) * Math.PI) / 180, dx = Math.sin(h), dz = -Math.cos(h);
+  let lm = false; for (let d = 2; d <= 80 && !lm; d += 1) if (inPolyList(LM_POLYS, p.X + dx * d, p.Z + dz * d)) lm = true;
+  if (lm) { stat('obs_ray_skip_lm'); continue; }
+  RAYS.push([p.X, p.Z, dx, dz]);
 }
 const rayGrid = new Grid(40); RAYS.forEach((r, i) => rayGrid.insert(i, [r[0], r[1], r[0], r[1]]));
 // Pano "MẶT THOÁNG": chữ tả khu vực (area/summary) có vườn hoa/quảng trường/hồ/sông/nút giao… VÀ hướng tới nhà
@@ -701,7 +801,15 @@ function panoOpenVeto(Q) {
   });
   return v;
 }
+// nhà THẬT (không sinh) trong d m quanh đa giác Q — lô chỉ có bằng chứng tia pano phải nối tiếp/tựa vào dãy nhà thật
+// (review: lô giữa quảng trường Nhà hát Lớn chỉ có tia pano, nhà thật gần nhất ở bên kia phố)
+function realNear(Q, dmax) {
+  const bb = bbox(Q); let hit = false;
+  grid.query([bb[0] - dmax, bb[1] - dmax, bb[2] + dmax, bb[3] + dmax], (j) => { if (!hit && !B[j].dead && !B[j].synth && polyDist(Q, B[j].pts) < dmax) hit = true; });
+  return hit;
+}
 function obsSupport(Q) {
+  if (!realNear(Q, 8)) return false;
   const [cx, cz] = centroid(Q); let ok = false;
   rayGrid.query([cx - 30, cz - 30, cx + 30, cz + 30], (i) => {
     if (ok) return; const [px, pz, dx, dz] = RAYS[i];
@@ -724,12 +832,17 @@ function fillGap(s, sg, t0, t1) {
     const D = 12 + R() * 6;
     const mx = s.ax + s.ux * (ta + tb) / 2 + nx * s.fl, mz = s.az + s.uz * (ta + tb) / 2 + nz * s.fl;
     if (waterfront(mx, mz, nx, nz)) { stat('gap_veto_water'); GAPDBG.push([mx, mz, 'water']); continue; }
-    if (parkfront(mx, mz, nx, nz)) { stat('gap_veto_park'); GAPDBG.push([mx, mz, 'water']); continue; }
+    if (parkfront(mx, mz, nx, nz)) { stat('gap_veto_park'); GAPDBG.push([mx, mz, 'park']); continue; }
+    // cảng/kho phía BẮC Hoàng Diệu (bờ sông Cấm): mặt đường trước kho là bãi/cổng/tường rào, không phải dãy nhà ống
+    // (review: lô sinh trước kho cảng x 1132-1244). Chỉ phía bắc tim Hoàng Diệu — phía nam là phố dân thật.
+    if (portGapZone(mx, mz)) { stat('gap_veto_port'); GAPDBG.push([mx, mz, 'port']); continue; }
+    if (forecourt(frameRect(F, uBase + ta, uBase + tb, 0, 25))) { stat('gap_veto_forecourt'); GAPDBG.push([mx, mz, 'forecourt']); continue; }
     if (panoOpenVeto(frameRect(F, uBase + ta, uBase + tb, 0, 12))) { stat('gap_veto_pano'); GAPDBG.push([mx, mz, 'noev']); continue; }
+    if (DBG && Math.hypot(mx - DBG[0], mz - DBG[1]) < 8) console.log('   [dbg gap]', mx.toFixed(1), mz.toFixed(1), s.c, 'ev', builtEvidence(mx, mz, s.ux, s.uz, nx, nz), 'obs', obsSupport(frameRect(F, uBase + ta, uBase + tb, 0, 12)));
     if (!builtEvidence(mx, mz, s.ux, s.uz, nx, nz) && !obsSupport(frameRect(F, uBase + ta, uBase + tb, 0, 12))) { stat('gap_veto_noev'); GAPDBG.push([mx, mz, 'noev']); continue; }
     const rect = (d) => frameRect(F, uBase + ta, uBase + tb, 0, d);
     let lo = 0, hi = D;
-    const okD = (d) => { const Q = rect(d); if (!sweepFree(Q, -1, { corr: true, corrSkip: (o) => o === s, zones: true })) return false;
+    const okD = (d) => { const Q = rect(d); if (!sweepFree(Q, -1, { corr: true, zones: true })) return false;
       const [cx, cz] = centroid(Q); return !synBlocked(cx, cz); };
     if (okD(D)) lo = D; else { for (let it = 0; it < 6; it++) { const m = (lo + hi) / 2; if (okD(m)) lo = m; else hi = m; } }
     // lô NÔNG 3-6 m: nhà thật lùi 3-6 m sau vỉa mà không kéo ra được (lệch góc > 25°, vướng tia…) → khối "cơi nới"
@@ -882,6 +995,7 @@ let nInterior = 0;
   };
   // Ô trong hình chữ nhật cục bộ [a0,a1]×[b0,b1] quanh (cx,cz) (trục a = (ux,uz), b = (−uz,ux)) đều trống; viền `gap`
   // quanh nó không được là đường/vùng cấm (nhà khác OK → nhà mới được áp tường chung vào nhà cũ như phố thật)
+  let openTest = null;   // 8b: hàm (x,z) → đất trống mở (lõi nhà sinh không được mọc vào), gán sau khi tính OPEN
   const boxFree = (cx, cz, ux, uz, a0, a1, b0, b1, gap) => {
     const vx = -uz, vz = ux;
     let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
@@ -895,7 +1009,7 @@ let nInterior = 0;
       const a = x * ux + z * uz, b = x * vx + z * vz;
       if (a < a0 - gap || a > a1 + gap || b < b0 - gap || b > b1 + gap) continue;
       const v = OCC[j * RN + i];
-      if (v === 0) continue;
+      if (v === 0) { if (openTest && a >= a0 && a <= a1 && b >= b0 && b <= b1 && openTest(x + cx, z + cz)) return false; continue; }
       if (a >= a0 && a <= a1 && b >= b0 && b <= b1) return false;   // lõi: phải trống hẳn
       if (v === 2 || v === 3) return false;                            // viền: không sát đường/vùng cấm
     }
@@ -956,12 +1070,89 @@ let nInterior = 0;
   }
   ST.grown = nGrow; ST.grown_m2 = Math.round(growA);
   lap(`nới nhà thật lõi ô: ${nGrow} (+${Math.round(growA)} m²) → phủ ${coverage('after_grow')}%`);
+  // 8b. BẰNG CHỨNG CỤC BỘ cho nhà sinh lõi ô (review: dải đất giải toả đường sắt ~200 m không có footprint nào từng bị rải
+  //     nhà sinh vì luật cũ chỉ xét CẢ ô phố ≥ 18% nhà thật): hạt phải (a) có nhà THẬT trong ô vuông ±INT_NEAR_R m và
+  //     (b) tỉ lệ nhà thật / (thật + trống) trong ô vuông ±INT_R m quanh hạt ≥ INT_FRAC — khoảng trống lớn không có nhà thật
+  //     xung quanh là bãi/sân/công trường thật, không phải nhà ML bỏ sót. Đo trên raster TRƯỚC khi mọc nhà sinh (ảnh tích
+  //     phân lưới thô 2 m) → không phụ thuộc thứ tự mọc.
+  const CS = 4, CN = Math.ceil(RN / CS), CW = CN + 1;
+  const IR = new Int32Array(CW * CW), IFR = new Int32Array(CW * CW);
+  {
+    const cr = new Int32Array(CN * CN), cf = new Int32Array(CN * CN);
+    for (let j = 0; j < RN; j++) { const rc = ((j / CS) | 0) * CN; for (let i = 0; i < RN; i++) { const v = OCC[j * RN + i]; if (v === 1) cr[rc + ((i / CS) | 0)]++; else if (v === 0) cf[rc + ((i / CS) | 0)]++; } }
+    for (let j = 0; j < CN; j++) for (let i = 0; i < CN; i++) {
+      const o = (j + 1) * CW + i + 1;
+      IR[o] = cr[j * CN + i] + IR[o - CW] + IR[o - 1] - IR[o - CW - 1];
+      IFR[o] = cf[j * CN + i] + IFR[o - CW] + IFR[o - 1] - IFR[o - CW - 1];
+    }
+  }
+  const boxSum = (I, x, z, r) => {
+    const c = RS * CS, i0 = Math.max(0, Math.floor((x - r + RH) / c)), i1 = Math.min(CN - 1, Math.floor((x + r + RH) / c));
+    const j0 = Math.max(0, Math.floor((z - r + RH) / c)), j1 = Math.min(CN - 1, Math.floor((z + r + RH) / c));
+    return I[(j1 + 1) * CW + i1 + 1] - I[j0 * CW + i1 + 1] - I[(j1 + 1) * CW + i0] + I[j0 * CW + i0];
+  };
+  const INT_NEAR_R = +(process.env.INT_NEAR_R ?? 10), INT_NEAR_MIN = +(process.env.INT_NEAR_MIN ?? 8);   // ≥ 8 ô 0,5 m = 2 m² nhà thật
+  const INT_R = +(process.env.INT_R ?? 16), INT_FRAC = +(process.env.INT_FRAC ?? 0.3);
+  // (c) ĐẤT TRỐNG MỞ (phép "mở" hình thái trên lưới thô 2 m): lõi = ô trống cách mọi thứ không-trống (nhà, đường, vùng cấm)
+  //     ≥ OPEN_R m (vừa 1 đĩa Ø 2·OPEN_R); thành phần lõi liên thông ≥ OPEN_A m² (≈ bãi trống > ~27×27 m) là đất trống
+  //     thật → mọi ô trong OPEN_R + 1 m quanh lõi đó (cả mép, sát dãy nhà thật) cấm mọc nhà sinh. Một nhà/cụm nhà ML bỏ
+  //     sót (≤ 20×20 m) không tạo lõi đủ lớn. (Review: mép dải giải toả đường sắt vẫn mọc 1 hàng nhà sau luật (a)(b).)
+  const OPEN_R = +(process.env.OPEN_R ?? 5), OPEN_A = +(process.env.OPEN_A ?? 300);
+  const OPEN = new Uint8Array(CN * CN);
+  {
+    const cs = RS * CS, INF = 1e9, dt = new Float32Array(CN * CN);
+    for (let j = 0; j < CN; j++) for (let i = 0; i < CN; i++) {
+      const o = (j + 1) * CW + i + 1, f = IFR[o] - IFR[o - CW] - IFR[o - 1] + IFR[o - CW - 1];   // ô 0,5 m trống trong ô thô
+      dt[j * CN + i] = f >= CS * CS - 2 ? INF : 0;
+    }
+    const chamfer = (d) => {
+      const a = cs, b = cs * Math.SQRT2;
+      for (let j = 0; j < CN; j++) for (let i = 0; i < CN; i++) {
+        const o = j * CN + i; let v = d[o]; if (v === 0) continue;
+        if (i > 0) v = Math.min(v, d[o - 1] + a);
+        if (j > 0) { v = Math.min(v, d[o - CN] + a); if (i > 0) v = Math.min(v, d[o - CN - 1] + b); if (i < CN - 1) v = Math.min(v, d[o - CN + 1] + b); }
+        d[o] = v;
+      }
+      for (let j = CN - 1; j >= 0; j--) for (let i = CN - 1; i >= 0; i--) {
+        const o = j * CN + i; let v = d[o]; if (v === 0) continue;
+        if (i < CN - 1) v = Math.min(v, d[o + 1] + a);
+        if (j < CN - 1) { v = Math.min(v, d[o + CN] + a); if (i < CN - 1) v = Math.min(v, d[o + CN + 1] + b); if (i > 0) v = Math.min(v, d[o + CN - 1] + b); }
+        d[o] = v;
+      }
+    };
+    chamfer(dt);
+    // thành phần lõi (8 hướng) → lõi lớn
+    const lab = new Int32Array(CN * CN).fill(-1), stack = new Int32Array(CN * CN), d2 = new Float32Array(CN * CN).fill(INF);
+    let nComp = 0, nBig = 0;
+    for (let o0 = 0; o0 < CN * CN; o0++) {
+      if (lab[o0] !== -1 || dt[o0] < OPEN_R) continue;
+      let sp = 0, n = 0; stack[sp++] = o0; lab[o0] = nComp; const mem = [];
+      while (sp) {
+        const o = stack[--sp]; n++; mem.push(o); const i = o % CN, j = (o - i) / CN;
+        for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
+          const ii = i + di, jj = j + dj; if (ii < 0 || jj < 0 || ii >= CN || jj >= CN) continue;
+          const q = jj * CN + ii; if (lab[q] === -1 && dt[q] >= OPEN_R) { lab[q] = nComp; stack[sp++] = q; }
+        }
+      }
+      if (n * cs * cs >= OPEN_A) { nBig++; for (const o of mem) d2[o] = 0; }
+      nComp++;
+    }
+    chamfer(d2);
+    let nOpen = 0; for (let o = 0; o < CN * CN; o++) if (d2[o] <= OPEN_R + 1) { OPEN[o] = 1; nOpen++; }
+    ST.open_land_m2 = Math.round(nOpen * cs * cs); ST.open_cores = nBig;
+  }
+  const isOpen = (x, z) => { const c = RS * CS, i = Math.floor((x + RH) / c), j = Math.floor((z + RH) / c); return i >= 0 && j >= 0 && i < CN && j < CN && OPEN[j * CN + i] === 1; };
+  openTest = isOpen;
   for (const o of cand) {
     if (OCC[o] !== 0) continue;
     const bl = blocks[LAB[o]];
     if (blkCov(bl) >= COV_TARGET) continue;
     const i = o % RN, j = (o - i) / RN;
     const cx = -RH + (i + 0.5) * RS, cz = -RH + (j + 0.5) * RS;
+    const nearR = boxSum(IR, cx, cz, INT_NEAR_R), rr = boxSum(IR, cx, cz, INT_R), ff = boxSum(IFR, cx, cz, INT_R), fr = rr / Math.max(1, rr + ff);
+    if (nearR < INT_NEAR_MIN) { stat('interior_veto_near'); continue; }
+    if (fr < INT_FRAC) { stat('interior_veto_frac'); continue; }
+    if (isOpen(cx, cz)) { stat('interior_veto_open'); continue; }
     const s = nearestSeg(cx, cz); if (!s) continue;
     const r2 = rng(o + 7);
     const par = r2() < 0.2;
@@ -990,6 +1181,7 @@ let nInterior = 0;
     fillPoly(P, 4, 0.3);
     const add = Math.round(nb.area / (RS * RS)); bl.nSyn += add; bl.nFree -= add;
     nInterior++;
+    if (DUMP) INTDBG.push([+cx.toFixed(1), +cz.toFixed(1), nearR, +fr.toFixed(3)]);
   }
 }
 ST.interior = nInterior;
@@ -1128,7 +1320,7 @@ let nClose = 0;
       if (!mine) continue;
       const g = best.g;
       const quad = outward([a, c, [c[0] + nx * g, c[1] + nz * g], [a[0] + nx * g, a[1] + nz * g]]);
-      if (!sweepFree(quad, bi, { corr: true, ignore: new Set([best.j]) })) continue;
+      if (!sweepFree(quad, bi, { corr: true, zones: true, ignore: new Set([best.j]) })) continue;
       // khe mỏng (< 24 cm) lọt lưới lấy mẫu của sweepFree → dò thêm dọc đường giữa khe
       let third = false;
       for (let t = 0.1; t < L - 0.05 && !third; t += 0.25) {
@@ -1174,7 +1366,7 @@ lap(`chữ nhật: ${nRect}/${B.length}`);
         }
       }
       if (best && (best.A > 0.6 * sf.area || !sf.synth)) {
-        sf.pts = best.Q; sf.area = best.A; sf.rect = rectOf(best.Q) || null; sf.ovcut = 1; nFix++;
+        setRectOrPoly(sf, best.Q); sf.ovcut = 1; nFix++;
         grid.update(si, (sf.bb = bbox(sf.pts)));
       } else if (sf.synth) { sf.dead = 'overlap'; nDrop++; grid.remove(si); }
     });
@@ -1189,22 +1381,143 @@ lap(`chữ nhật: ${nRect}/${B.length}`);
 //     Hỏng thì làm sạch đỉnh (cleanPoly) rồi kiểm lại; vẫn hỏng → bỏ (thống kê drop_invalid). Renderer (WP2) và lưới
 //     va chạm giả định mọi footprint hợp lệ — 1 đa giác răng cưa diện tích 0 từng lọt ra từ clipHalf.
 // ======================================================================================================
+// 9d-0. CHỐT HÀNH LANG PHỐ lần cuối: không nhà nào (thật hay sinh) được lấn > 0,3 m vào lòng + vỉa hè (facadeLine) của
+//     phố p/s/t/r — tính cả "mũ tròn" ở đỉnh gãy GIỮA polyline (góc ngoài chỗ phố bẻ hướng; corridorClip bước 3 chỉ xét
+//     dải t∈[0,1] nên sót footprint gốc ở khúc cua, vd GG (−70,581)) và ở chỗ nối 2 way. Đầu CỤT thật / đầu chạm ngang
+//     phố khác không có mũ (game không vẽ vỉa vòng qua đầu phố; phố kia tự có hành lang). Lấn > 0,2 m (chừa 0,1 m làm tròn) → cắt nửa mặt phẳng tại facadeLine (tiếp tuyến mũ ở khúc
+//     cua); còn lấn / mất > 50% → bỏ.
+// đầu polyline NỐI TIẾP một phố khác (đầu mút trùng ≤ 1 m: OSM tách way tại nút) cũng là khúc gãy → có mũ
+const ENDCAP = ROADS_DT.map((r, ri) => [0, r.pts.length - 1].map((e) => ROADS_DT.some((o, rj) => rj !== ri &&
+  [o.pts[0], o.pts[o.pts.length - 1]].some((q) => Math.hypot(q[0] - r.pts[e][0], q[1] - r.pts[e][1]) < 1))));
+function capDist(s, x, z) {
+  const t = (x - s.ax) * s.ux + (z - s.az) * s.uz;
+  if (t >= 0 && t <= s.L) return Math.abs((x - s.ax) * s.nx + (z - s.az) * s.nz);
+  const nPts = ROADS_DT[s.ri].pts.length;
+  if (t < 0) return s.k > 0 || ENDCAP[s.ri][0] ? Math.hypot(x - s.ax, z - s.az) : Infinity;
+  return s.k + 2 < nPts || ENDCAP[s.ri][1] ? Math.hypot(x - s.bx, z - s.bz) : Infinity;
+}
+function streetIntrusion(P) {
+  const bb = bbox(P); let worst = null;
+  const S = [];
+  for (let k = 0; k < P.length; k++) {
+    const a = P[k], c = P[(k + 1) % P.length], n = Math.max(1, Math.ceil(Math.hypot(c[0] - a[0], c[1] - a[1]) / 0.5));
+    for (let m = 0; m < n; m++) S.push([a[0] + ((c[0] - a[0]) * m) / n, a[1] + ((c[1] - a[1]) * m) / n]);
+  }
+  segGrid.query([bb[0] - 1, bb[1] - 1, bb[2] + 1, bb[3] + 1], (i) => {
+    const s = SEGS[i]; if (!'pstr'.includes(s.c)) return;
+    for (const [x, z] of S) { const pen = s.fl - capDist(s, x, z); if (pen > 0.2 && (!worst || pen > worst.pen)) worst = { s, x, z, pen }; }   // 0,2: chừa 0,1 m cho làm tròn
+    // phố đâm xuyên giữa nhà (không mẫu biên nào gần): kiểm điểm giữa đoạn
+    if (!worst && pointInPoly(P, (s.ax + s.bx) / 2, (s.az + s.bz) / 2)) worst = { s, x: (s.ax + s.bx) / 2, z: (s.az + s.bz) / 2, pen: s.fl };
+  });
+  return worst;
+}
+function streetGuard(b) {
+  const A0 = b.area;
+  for (let pass = 0; pass < 4; pass++) {
+    const w = streetIntrusion(b.pts); if (!w) return true;
+    const s = w.s, P = b.pts, [cx, cz] = centroid(P);
+    const t = (w.x - s.ax) * s.ux + (w.z - s.az) * s.uz;
+    let nx, nz, qx, qz;
+    if (t >= 0 && t <= s.L) { const sg = (cx - s.ax) * s.nx + (cz - s.az) * s.nz >= 0 ? 1 : -1; nx = sg * s.nx; nz = sg * s.nz; qx = s.ax; qz = s.az; }
+    else {
+      [qx, qz] = t < 0 ? [s.ax, s.az] : [s.bx, s.bz];
+      let dx = w.x - qx, dz = w.z - qz, L = Math.hypot(dx, dz);
+      if (L < 0.3) { dx = cx - qx; dz = cz - qz; L = Math.hypot(dx, dz) || 1; }
+      nx = dx / L; nz = dz / L;
+    }
+    const parts = clipHalf(P, nx, nz, nx * qx + nz * qz + s.fl).map((q) => outward(cleanPoly(q))).filter((q) => q.length >= 3);
+    parts.sort((p, q) => absArea(q) - absArea(p));
+    if (!parts.length || absArea(parts[0]) < Math.max(8, 0.5 * A0)) return false;
+    setRectOrPoly(b, parts[0]); b.guard = 1;
+  }
+  return !streetIntrusion(b.pts);
+}
+// Camera pano: nhà SINH cách ≥ 3 m (SPEC), nhà thật ≥ 1 m (nới/kéo/nở không được trùm lên camera; nhà thật GỐC chứa
+// camera mà cắt mất > 50% thì giữ nguyên — WP2 deadPano xử lý). Cắt nửa mặt phẳng vuông góc hướng camera → nhà.
+function nearestOnPoly(P, x, z) {
+  let best = null, bd = Infinity;
+  for (let i = 0; i < P.length; i++) {
+    const a = P[i], c = P[(i + 1) % P.length], dx = c[0] - a[0], dz = c[1] - a[1], L2 = dx * dx + dz * dz || 1;
+    const t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (z - a[1]) * dz) / L2)), qx = a[0] + dx * t, qz = a[1] + dz * t, d = Math.hypot(qx - x, qz - z);
+    if (d < bd) { bd = d; best = [qx, qz]; }
+  }
+  return best;
+}
+function camGuard(b) {
+  const need = (b.synth ? 3 : 1) + 0.1, P0 = b.pts, A0 = b.area, R0 = b.rect;   // +0,1 m cho làm tròn toạ độ
+  for (let pass = 0; pass < 3; pass++) {
+    const P = b.pts, bb = bbox(P); let hit = null;
+    camGrid.query([bb[0] - need, bb[1] - need, bb[2] + need, bb[3] + need], (i) => {
+      const [x, z] = PANO_CAM[i], inside = pointInPoly(P, x, z), d = inside ? -1 : polyEdgeDist(P, x, z);
+      if (d < need - 0.05 && (!hit || d < hit.d)) hit = { x, z, d, inside };
+    });
+    if (!hit) return true;
+    let [tx, tz] = hit.inside ? centroid(P) : nearestOnPoly(P, hit.x, hit.z);
+    let L = Math.hypot(tx - hit.x, tz - hit.z);
+    if (L < 0.05) { [tx, tz] = centroid(P); L = Math.hypot(tx - hit.x, tz - hit.z) || 1; }
+    const nx = (tx - hit.x) / L, nz = (tz - hit.z) / L;
+    const parts = clipHalf(P, nx, nz, nx * hit.x + nz * hit.z + need).map((q) => outward(cleanPoly(q))).filter((q) => q.length >= 3);
+    parts.sort((p, q) => absArea(q) - absArea(p));
+    if (!parts.length || absArea(parts[0]) < Math.max(8, 0.5 * A0)) {
+      if (b.synth) return false;
+      b.pts = P0; b.area = A0; b.rect = R0; return true;
+    }
+    setRectOrPoly(b, parts[0]); b.guard = 1;
+  }
+  return true;
+}
+{
+  let nG = 0, nGD = 0, nC = 0, nCD = 0;
+  for (const b of B) {
+    const was = b.guard;
+    if (!streetGuard(b)) { b.dead = 'street'; nGD++; continue; }
+    if (b.guard && !was) nG++;
+    const P1 = b.pts;
+    if (!camGuard(b)) { b.dead = 'cam'; nCD++; continue; }
+    if (b.pts !== P1) nC++;
+    // nhà SINH cách địa danh ≥ 3 m (lưới mẫu 0,4 m / raster 0,5 m ở các bước trước để lọt vài nhà 2,9 m) → bỏ
+    if (b.synth) {
+      const bb = bbox(b.pts);
+      if (LM_POLYS.some((o) => !(o.bb[0] > bb[2] + 3.1 || o.bb[2] < bb[0] - 3.1 || o.bb[1] > bb[3] + 3.1 || o.bb[3] < bb[1] - 3.1) && polyDist(b.pts, o.p) < 3.1)) { b.dead = 'lm'; stat('lm_guard_drop'); continue; }
+    }
+  }
+  B = B.filter((b) => !b.dead);
+  grid = rebuildGrid();
+  ST.street_guard_clip = nG; ST.street_guard_drop = nGD; ST.cam_guard_clip = nC; ST.cam_guard_drop = nCD;
+  lap(`chốt hành lang phố: cắt ${nG}, bỏ ${nGD}; camera pano: cắt ${nC}, bỏ ${nCD}`);
+}
+// 9d. KIỂM HỢP LỆ trên TOẠ ĐỘ ĐÃ LÀM TRÒN như file (đa giác: lưới 0,1 m; chữ nhật: x0/z0 0,1 m, góc u16, w/d cm — y hệt
+//     encodeRB/decodeRB): làm tròn → bỏ đỉnh gai (2 cạnh kề quay ngược > 162°) → cleanPoly → đơn CHẶT (strictSimple),
+//     tường-ra-ngoài, ≥ 6 m², bề hẹp nhất ≥ 1,2 m; hỏng → bỏ (drop_invalid). Kiểm trên số thực rồi làm tròn ở encode từng
+//     để lọt 7 đa giác tự cắt (gai 1,7 m, vòng gập 8-10 cm). Các bước 10-12 (mặt tiền, tường chung) chạy trên toạ độ này.
 {
   let nInv = 0;
+  const q10 = (v) => Math.round(v * 10) / 10, TAU = 2 * Math.PI;
   for (const b of B) {
-    if (b.rect) {   // chữ nhật dựng từ (x0,z0,ang,w,d): luôn đơn + tường-ra-ngoài; chỉ loại mảnh vụn/lát mỏng (vách 0,5 m)
-      if (Math.min(b.rect.w, b.rect.d) < 1.2 || b.rect.w * b.rect.d < 6) { b.dead = 'invalid'; nInv++; }
+    if (b.rect) {
+      const r = b.rect;
+      let a = r.ang % TAU; if (a < 0) a += TAU;
+      const ang = ((Math.round((a / TAU) * 65536) & 0xffff) * TAU) / 65536;
+      const x0 = q10(r.x0), z0 = q10(r.z0), w = Math.round(r.w * 100) / 100, d = Math.round(r.d * 100) / 100;
+      if (Math.min(w, d) < 1.2 || w * d < 6) { b.dead = 'invalid'; nInv++; stat('inv_rect'); continue; }   // mảnh vụn / lát mỏng (vách 0,5 m)
+      const ca = Math.cos(ang), sa = Math.sin(ang);
+      b.rect = { x0, z0, ang, w, d };
+      b.pts = [[x0, z0], [x0 + w * ca, z0 + w * sa], [x0 + w * ca + d * sa, z0 + w * sa - d * ca], [x0 + d * sa, z0 - d * ca]];
+      b.area = w * d;
       continue;
     }
-    let P = b.pts;
-    if (P.length < 3 || !isSimple(P) || signedArea(P) >= 0) P = outward(cleanPoly(P));
+    const P = outward(cleanPoly(despike(cleanPoly(b.pts.map(([x, z]) => [q10(x), q10(z)]), 0.05, 0.02)), 0.05, 0.02));
     const mr = P.length >= 3 ? minRect(P) : null;
-    if (P.length < 3 || !isSimple(P) || absArea(P) < 6 || !mr || mr.d < 1.2) { b.dead = 'invalid'; nInv++; continue; }
-    if (P !== b.pts) { b.pts = P; b.area = absArea(P); }
+    if (P.length < 3 || !strictSimple(P) || signedArea(P) >= 0 || absArea(P) < 6 || !mr || mr.d < 1.2) {
+      stat(P.length < 3 ? 'inv_few' : !strictSimple(P) ? (isSimple(P) ? 'inv_spike_touch' : 'inv_cross') : absArea(P) < 6 ? 'inv_small' : 'inv_thin' + (b.synth ? '_syn' : b.parent ? '_piece' : '_raw'));
+      b.dead = 'invalid'; nInv++; if (DUMP) INVDBG.push([b.id, b.src, b.synth ? 1 : 0, P]); continue;
+    }
+    b.pts = P; b.area = absArea(P);
   }
   B = B.filter((b) => !b.dead);
   grid = rebuildGrid();
   ST.drop_invalid = nInv;
+  lap(`kiểm hợp lệ (toạ độ làm tròn): bỏ ${nInv}`);
 }
 // độ phủ THẬT cuối cùng (raster không nới — số nới 0,3 m ở bước 8 chỉ để đặt nhà an toàn, phóng đại độ phủ)
 function exactCoverage(onlyReal) {
@@ -1356,11 +1669,12 @@ const ROOF_BY_STYLE = {
 // real_1/3/5/6/8, cân trắng gray-world): vệ tinh đỏ/nâu đỏ 29% · xám bê tông 46% · xám xanh đá (tôn xanh/bê tông
 // bóng râm) 18% · sáng/trắng 2%. Bộ trọng số cũ cho đỏ 55% · sáng 19% · xám 20% → quá đỏ-cam và quá nhiều mái trắng.
 // Giữ đỏ cao hơn số đo (~42%: mù khí làm đỏ gỉ trên ảnh ngả xám), mái bằng chủ yếu xám, tôn dốc đỏ gỉ + xám + xanh đá.
+// Lượt review: lớp "sáng" (bảng màu 5/6/9: v ≥ 0,6, s < 0,14) còn 11% vs vệ tinh 2% → hạ trọng số 5/6 sang xám 13/15/7.
 const ROOFC = {
-  [ROOF.FLAT_PARAPET]: [[13, 14], [15, 14], [7, 10], [5, 8], [6, 3], [9, 1], [0, 5], [3, 5], [10, 6], [2, 1], [14, 2], [1, 1], [11, 3], [4, 2], [12, 4]],
-  [ROOF.FLAT]: [[5, 3], [6, 1], [13, 4], [15, 3], [9, 1], [7, 3]],
-  [ROOF.GABLE_TON]: [[0, 12], [3, 11], [10, 9], [1, 2], [14, 2], [11, 3], [4, 4], [12, 7], [13, 9], [7, 7], [15, 7], [5, 5], [6, 1], [8, 2]],
-  [ROOF.SHED_TON]: [[0, 12], [3, 11], [10, 9], [1, 2], [14, 2], [11, 3], [4, 4], [12, 7], [13, 9], [7, 7], [15, 7], [5, 5], [6, 1], [8, 2]],
+  [ROOF.FLAT_PARAPET]: [[13, 18], [15, 15], [7, 12], [5, 2], [6, 1], [9, 1], [0, 5], [3, 5], [10, 6], [2, 1], [14, 2], [1, 1], [11, 3], [4, 2], [12, 4]],
+  [ROOF.FLAT]: [[5, 1], [13, 6], [15, 4], [9, 1], [7, 3]],
+  [ROOF.GABLE_TON]: [[0, 12], [3, 11], [10, 9], [1, 2], [14, 2], [11, 3], [4, 4], [12, 7], [13, 12], [7, 7], [15, 7], [5, 2], [6, 1], [8, 2]],
+  [ROOF.SHED_TON]: [[0, 12], [3, 11], [10, 9], [1, 2], [14, 2], [11, 3], [4, 4], [12, 7], [13, 12], [7, 7], [15, 7], [5, 2], [6, 1], [8, 2]],
   [ROOF.HIP_TILE]: [[2, 5], [1, 6], [0, 5], [10, 6], [3, 5], [14, 4]],
 };
 // mái lớn (> 800 m²: trường, chợ, kho, khách sạn) — ảnh vệ tinh: chủ yếu bê tông xám / tôn bạc, ít đỏ
@@ -1522,7 +1836,8 @@ const out = [];
 for (const b of B) {
   const flags = (b.src === 'OSM' ? FLAG.OSM : b.src === 'GG' ? FLAG.GOOGLE : b.src === 'MS' ? FLAG.MS : 0) | (b.synth ? FLAG.SYNTH : 0) |
     (b.lot ? FLAG.LOT : 0) | (b.area > 800 ? FLAG.BIG : 0) | (b.pano ? FLAG.PANO : 0) |
-    (!b.synth && (b.clipped || b.snapped || b.lot || b.deep || b.cut || b.squared || b.grown || b.grown2 || b.notch || b.closed || b.ovcut) ? FLAG.EDIT : 0);
+    // EDIT: mọi mảnh tách từ footprint gốc (b.parent: lô, khối sau, ô lưới khối dính) cũng là hình học đã sửa
+    (!b.synth && (b.parent || b.clipped || b.snapped || b.lot || b.deep || b.cut || b.squared || b.grown || b.grown2 || b.notch || b.closed || b.ovcut || b.guard) ? FLAG.EDIT : 0);
   out.push({ pts: b.pts, rect: b.rect || null, edge: b.edge, cover: b.cover, floors: b.floors, style: b.style, wall: b.wall,
     roofType: b.roofType, roofColor: b.roofColor, flags, info: b.info, seed: hash32(b.id + 's') & 0xffff });
 }
@@ -1532,9 +1847,19 @@ const order2 = out.map((o, i) => [key(o), B[i].id, i]).sort((p, q) => p[0] - q[0
 const outS = order2.map((i) => out[i]);
 const bytes = encodeRB(outS);
 const b64 = Buffer.from(bytes).toString('base64');
+// KIỂM SAU ENCODE: giải mã lại đúng byte sẽ ghi → mọi nhà phải đơn chặt, tường-ra-ngoài, ≥ 5,9 m²; hỏng thì DỪNG, không ghi file
+{
+  const D = decodeRB(bytes), bad = [];
+  for (let b = 0; b < D.nB; b++) {
+    const P = []; for (let v = D.vStart[b]; v < D.vStart[b + 1]; v++) P.push([D.x[v], D.z[v]]);
+    if (!strictSimple(P) || signedArea(P) >= 0 || absArea(P) < 5.9) bad.push([b, b < D.nPoly ? 'poly' : 'rect', JSON.stringify(P.map(([x, z]) => [+x.toFixed(2), +z.toFixed(2)]))]);
+  }
+  if (bad.length) { console.error('LỖI: ' + bad.length + ' footprint hỏng sau encode/decode:'); for (const r of bad.slice(0, 20)) console.error('  ', ...r); process.exit(1); }
+  ST.decode_check = 'ok ' + D.nB;
+}
 // thống kê
 const cnt = (f) => { const m = {}; for (const o of outS) { const k = f(o); m[k] = (m[k] || 0) + 1; } return m; };
-ST.count = outS.length;
+ST.count = outS.length; ST.rects = outS.filter((o) => o.rect).length;   // số cuối (sau các bước bỏ/cắt 9c-9d)
 ST.by_src = cnt((o) => (o.flags & FLAG.SYNTH ? (o.flags & FLAG.LOT ? 'syn_gap' : 'syn_interior') : (o.flags & FLAG.OSM ? 'osm' : o.flags & FLAG.GOOGLE ? 'google' : 'ms') + (o.flags & FLAG.LOT ? '_lot' : '')));
 ST.by_style = cnt((o) => Object.keys(STYLE).find((k) => STYLE[k] === o.style));
 ST.by_floors = cnt((o) => (o.floors >= 7 ? '7+' : o.floors));
@@ -1552,7 +1877,9 @@ fs.writeFileSync(new URL('../js/buildings_real.js', import.meta.url),
 if (DUMP) fs.writeFileSync(DUMP.replace(/\.json$/, '_gap.json'), JSON.stringify(GAPDBG));
 if (DUMP) fs.writeFileSync(DUMP.replace(/\.json$/, '_front.json'), JSON.stringify(FRONTDBG));
 if (DUMP) fs.writeFileSync(DUMP.replace(/\.json$/, '_panoveto.json'), JSON.stringify(PANOVETO));
+if (DUMP) fs.writeFileSync(DUMP.replace(/\.json$/, '_intdbg.json'), JSON.stringify(INTDBG));
+if (DUMP) fs.writeFileSync(DUMP.replace(/\.json$/, '_inv.json'), JSON.stringify(INVDBG));
 if (DUMP) fs.writeFileSync(DUMP, JSON.stringify(outS.map((o) => ({ p: o.pts.map(([x, z]) => [+x.toFixed(2), +z.toFixed(2)]), f: o.flags, rc: o.roofColor, rt: o.roofType,
   e: o.edge, fl: o.floors, st: o.style, w: o.wall, i: o.info }))));
 console.log(JSON.stringify(ST));
-console.log('nhà', outS.length, 'chữ nhật', nRect, 'bytes', bytes.length, 'b64', b64.length, ((Date.now() - T0) / 1000).toFixed(1) + 's');
+console.log('nhà', outS.length, 'chữ nhật', outS.filter((o) => o.rect).length, 'bytes', bytes.length, 'b64', b64.length, ((Date.now() - T0) / 1000).toFixed(1) + 's');

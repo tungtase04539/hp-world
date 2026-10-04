@@ -9,6 +9,7 @@
 //                                              (= diện tích có dấu Σ(x_i·z_{i+1} − x_{i+1}·z_i) < 0, xem isOutwardOrder)
 //   u8 edge[nV]                              — loại CẠNH i (đỉnh i → i+1): EDGE.*
 //   u8 edgeCover[nV]                         — số tầng nhà bên cạnh che cạnh này (0 = lộ hoàn toàn) → chỉ dựng phần trên
+//                                              (giết nhà qua D.dead → GỌI refreshPartyEdges(D) trước khi dựng, xem cuối file)
 //   u8 floors[nB] | u8 style[nB] | u8 wall[nB] (chỉ số WALL_PALETTE) | u8 roof[nB] (4 bit thấp = ROOF.*, 4 bit cao = ROOF_PALETTE)
 //   u8 flags[nB] (FLAG.*) | u8 info[nB] (INFO.*: cấp phố mặt tiền + góc phố + công năng tầng trệt; trước v1 = 0) | u16 seed[nB]
 //
@@ -40,8 +41,13 @@ export const STYLE = {
 };
 export const ROOF = { FLAT_PARAPET: 0, FLAT: 1, GABLE_TON: 2, HIP_TILE: 3, SHED_TON: 4 };
 export const FLAG = { SYNTH: 1, OSM: 2, GOOGLE: 4, MS: 8, PANO: 16, BIG: 32, LOT: 64, EDIT: 128 };
-// FLAG.EDIT (v1): hình học nhà THẬT đã bị generator sửa so với nguồn (cắt hành lang phố / kéo mặt tiền / chia lô /
-// kéo sâu / vuông hoá / nới / khép khe / cắt chồng lấn). Nhà SINH (FLAG.SYNTH) không mang cờ này.
+// FLAG.EDIT (v1): hình học nhà THẬT đã bị generator sửa so với nguồn (cắt hành lang phố / kéo mặt tiền / chia lô, khối
+// sau, ô lưới khối dính / kéo sâu / vuông hoá / nới / khép khe / cắt chồng lấn / chốt hành lang-camera). Nhà SINH
+// (FLAG.SYNTH) không mang cờ này. Hợp đồng hình học (generator tự kiểm sau encode): mọi nhà là đa giác ĐƠN chặt (không
+// cạnh cắt nhau, không gai, không đỉnh chạm cạnh khác), tường-ra-ngoài, ≥ 6 m², bề hẹp ≥ 1,2 m; không đỉnh nào lấn
+// > 0,3 m vào facadeLine phố p/s/t/r; nhà SINH cách địa danh (LM_POLY) và camera pano ≥ 3 m.
+// Người dùng có cell/nhà tay riêng (WP3 cellsink) nên BỎ QUA nhà FLAG.SYNTH khi quyết định xoá nhà tay (nhà sinh là phỏng
+// đoán lấp chỗ trống, nhà tay mang danh tính/ảnh pano thật).
 // INFO (byte thứ 6 mỗi nhà, v1): bit 0-2 = cấp phố mà mặt tiền chính nhìn ra (chỉ số ROADC: 0 không có, 1 p … 6 h),
 // bit 3 = góc phố (mặt tiền nhìn ra ≥ 2 phố), bit 4-5 = công năng tầng trệt (USE_*), bit 6-7 dự trữ = 0.
 export const ROADC = ['', 'p', 's', 't', 'r', 'w', 'h'];
@@ -268,4 +274,79 @@ export function makeFootprintGrid(D, cell = 24) {
     },
     inside,
   };
+}
+
+// ---------- Tường chung sau khi GIẾT nhà (D.dead) ----------
+// EDGE.PARTY + edgeCover chỉ ghi SỐ TẦNG nhà láng giềng che cạnh, KHÔNG ghi láng giềng nào. Người dùng (WP2 claim địa
+// danh/pano/vùng cấm, WP3 cell sink…) đặt D.dead[b] = 1 cho một số nhà → nhà còn sống kề nhà bị giết sẽ dựng thiếu chân
+// tường (chỉ dựng phần trên heightOf(edgeCover)) = lỗ nhìn xuyên vào nhà rỗng. BẮT BUỘC gọi hàm này SAU khi đặt xong
+// D.dead và TRƯỚC khi dựng mesh/va chạm: rà mọi cạnh PARTY của nhà còn sống — còn láng giềng SỐNG có cạnh song song
+// ngược chiều sát (≤ 0,3 m) phủ ≥ L − 0,65 m → edgeCover = min(cũ, số tầng THẤP NHẤT của các láng giềng sống đó); không →
+// hạ thành BACK (nếu quay lưng với mặt tiền) hoặc SIDE, edgeCover = 0 (dựng cả chân tường). Cùng ngưỡng với bước 12 của
+// tools/process_buildings.mjs → gọi trên dữ liệu chưa giết nhà nào thì không đổi gì (kiểm: demoted = 0).
+// grid: makeFootprintGrid(D) (tạo mới nếu bỏ trống). killed (tuỳ chọn): mảng chỉ số nhà vừa bị giết → chỉ rà nhà quanh
+// chúng (nhanh, gọi lại được nhiều lần); bỏ trống = rà toàn bộ. Trả {checked, demoted, lowered}.
+export function refreshPartyEdges(D, grid = null, killed = null) {
+  const G = grid || makeFootprintGrid(D);
+  let todo;
+  if (killed) {
+    const set = new Set();
+    for (const k of killed) {
+      const x0 = G.bb[k * 4], z0 = G.bb[k * 4 + 1], x1 = G.bb[k * 4 + 2], z1 = G.bb[k * 4 + 3];
+      G.near((x0 + x1) / 2, (z0 + z1) / 2, Math.max(x1 - x0, z1 - z0) / 2 + 1.5, (b) => set.add(b));
+    }
+    todo = set;
+  } else { todo = []; for (let b = 0; b < D.nB; b++) todo.push(b); }
+  let checked = 0, demoted = 0, lowered = 0;
+  const iv = [];
+  for (const b of todo) {
+    if (D.dead[b]) continue;
+    const s = D.vStart[b], e = D.vStart[b + 1], n = e - s;
+    let any = false; for (let v = s; v < e; v++) if (D.edge[v] === EDGE.PARTY) { any = true; break; }
+    if (!any) continue;
+    // pháp tuyến ngoài của cạnh mặt tiền DÀI NHẤT (để phân BACK/SIDE khi hạ cạnh)
+    let fnx = 0, fnz = 0, fL = 0;
+    for (let k = 0; k < n; k++) {
+      const v = s + k, w = k + 1 < n ? v + 1 : s; if (D.edge[v] !== EDGE.FRONT) continue;
+      const L = Math.hypot(D.x[w] - D.x[v], D.z[w] - D.z[v]); if (L > fL) { fL = L; [fnx, fnz] = edgeNormal(D.x[v], D.z[v], D.x[w], D.z[w]); }
+    }
+    const x0 = G.bb[b * 4], z0 = G.bb[b * 4 + 1], x1 = G.bb[b * 4 + 2], z1 = G.bb[b * 4 + 3];
+    const nbs = [];
+    G.near((x0 + x1) / 2, (z0 + z1) / 2, Math.max(x1 - x0, z1 - z0) / 2 + 1, (j) => { if (j !== b) nbs.push(j); });   // near() bỏ nhà dead
+    for (let k = 0; k < n; k++) {
+      const v = s + k; if (D.edge[v] !== EDGE.PARTY) continue;
+      checked++;
+      const w = k + 1 < n ? v + 1 : s, ax = D.x[v], az = D.z[v], L = Math.hypot(D.x[w] - ax, D.z[w] - az);
+      if (L < 0.05) continue;
+      const ex = (D.x[w] - ax) / L, ez = (D.z[w] - az) / L, nx = -ez, nz = ex;
+      iv.length = 0; let minF = Infinity;
+      for (const j of nbs) {
+        const sj = D.vStart[j], ej = D.vStart[j + 1], m = ej - sj;
+        for (let q = 0; q < m; q++) {
+          const p0 = sj + q, p1 = q + 1 < m ? p0 + 1 : sj;
+          const px = D.x[p0], pz = D.z[p0], qx = D.x[p1], qz = D.z[p1], Lq = Math.hypot(qx - px, qz - pz); if (Lq < 0.3) continue;
+          if (((qx - px) * ex + (qz - pz) * ez) / Lq > -0.985) continue;   // song song NGƯỢC chiều
+          const dp = (px - ax) * nx + (pz - az) * nz, dq = (qx - ax) * nx + (qz - az) * nz;
+          if (dp < -0.3 || dq < -0.3 || dp > 0.2 || dq > 0.2) continue;
+          let t0 = (px - ax) * ex + (pz - az) * ez, t1 = (qx - ax) * ex + (qz - az) * ez; if (t0 > t1) { const t = t0; t0 = t1; t1 = t; }
+          t0 = Math.max(0, t0); t1 = Math.min(L, t1);
+          if (t1 - t0 > 0.3) { iv.push([t0, t1]); if (D.floors[j] < minF) minF = D.floors[j]; }
+        }
+      }
+      let cov = 0;
+      if (iv.length) {
+        iv.sort((p, q) => p[0] - q[0]); let c0 = iv[0][0], c1 = iv[0][1];
+        for (let i = 1; i < iv.length; i++) { if (iv[i][0] > c1) { cov += c1 - c0; c0 = iv[i][0]; c1 = iv[i][1]; } else if (iv[i][1] > c1) c1 = iv[i][1]; }
+        cov += c1 - c0;
+      }
+      if (iv.length && L - cov <= 0.65) {
+        const c = Math.min(b >= D.nPoly ? 15 : 255, minF);   // mục chữ nhật bão hoà 15 tầng như lúc mã hoá
+        if (c < D.edgeCover[v]) { D.edgeCover[v] = c; lowered++; }   // chỉ HẠ (an toàn: tường thừa nằm khuất trong nhà kề), không nâng
+      } else {
+        D.edge[v] = fL > 0 && -(nx * fnx + nz * fnz) > 0.7 ? EDGE.BACK : EDGE.SIDE;
+        D.edgeCover[v] = 0; demoted++;
+      }
+    }
+  }
+  return { checked, demoted, lowered };
 }
