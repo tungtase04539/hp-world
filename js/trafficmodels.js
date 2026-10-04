@@ -8,7 +8,7 @@
 // (aLimb + aPhase/aWalk theo instance) → đám đông đi lại thật mà CPU không phải cập nhật xương.
 // Trục mô hình: tiến = +Z, lên = +Y, bề ngang = X; gốc ở mặt đường dưới tâm xe.
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 
 const _c = new THREE.Color();
 // Thêm 1 khối: geo (đã đặt vị trí), màu hex (sRGB), kênh nhuộm, chi (người đi bộ) → non-indexed + attribute đủ bộ
@@ -43,7 +43,14 @@ const wheel = (r, w, x, y, z, seg = 10) => {
   g.rotateZ(Math.PI / 2);
   return g.translate(x, y, z);
 };
-const finish = (list) => { const g = mergeGeometries(list, false); list.forEach((x) => x.dispose()); g.computeBoundingSphere(); return g; };
+// Gộp + ĐÁNH CHỈ SỐ lại (mergeVertices): khối rời ở trên phải non-indexed để gộp chung (Icosahedron vốn non-indexed),
+// nhưng vẽ instanced thì số đỉnh × số xe × 2 lượt (màu + bóng) mới là chi phí — đỉnh trùng (cùng vị trí/pháp tuyến/màu/
+// kênh) gộp lại ≈ 2× ít lần chạy vertex shader + tận dụng cache sau biến đổi.
+const finish = (list) => {
+  const m = mergeGeometries(list, false); list.forEach((x) => x.dispose());
+  const g = mergeVertices(m, 1e-4); if (g !== m) m.dispose();
+  g.computeBoundingSphere(); return g;
+};
 
 const SKIN = 0xc8976f, PANTS = 0x2e3644, SHOE = 0x2a2420, DARK = 0x232427, METAL = 0x9a9ea3, SEAT = 0x1d1d1f;
 

@@ -125,6 +125,15 @@ export function createBoot() {
       render(doneW / total);
     });
   }
+  // Lỗi trong lúc dựng (module main.js ném ở top-level await → window 'error'): báo NGAY trên thanh thay vì để
+  // "Đang dựng…" quay mãi. Lỗi thoáng qua mà khởi động vẫn xong thì finish() ẩn thanh như thường.
+  const onFail = () => {
+    if (ready) return;
+    if (txt) txt.textContent = tx({ vi: '⚠️ Lỗi khi dựng thế giới — hãy tải lại trang', en: '⚠️ World build failed — please reload' });
+    if (fill) { fill.style.width = '100%'; fill.style.background = '#7a2b2b'; }
+  };
+  window.addEventListener('error', onFail);
+  window.addEventListener('unhandledrejection', onFail);
   render(0.01);
   return { step, finish, armStart, get ready() { return ready; }, durs, t0 };
 }

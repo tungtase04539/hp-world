@@ -24,11 +24,14 @@ import { motorbikeGeometry, carGeometry, walkerGeometry, trafficMaterial, walkDe
 //  - vẽ INSTANCED: 3 kiểu xe máy (1 người / chở 2 / chở hàng) + 3 kiểu ô tô (con / gầm cao / 16 chỗ) + 2 kiểu người
 //    (đầu trần / nón lá) = 8 draw call (+8 bóng) cho cả thành phố; tay chân vung bằng vertex shader.
 // HỢP ĐỒNG: InstancedMesh ở đây mang userData.noCull (instcull.js KHÔNG được nén — ma trận đổi mỗi khung) và
-// boundingSphere = bong bóng (frustum cull đúng; harness tools/qa không ẩn nhầm).
+// boundingSphere = đĩa VẼ DRAW_R quanh người chơi (frustum cull đúng; harness tools/qa không ẩn nhầm).
 // ============================================================
 
 const RB = TIER >= 3 ? 340 : TIER === 2 ? 300 : 220;          // bán kính bong bóng xe (m) — xa hơn bị nhà che/còn vài px
 const RW = TIER >= 2 ? 230 : 150;                              // bong bóng người đi bộ
+// bán kính VẼ (quanh người chơi): xa hơn vẫn mô phỏng (dòng xe liền mạch khi tới gần) nhưng không vẽ — ở 260 m xe máy
+// còn ~3 px và phần lớn bị nhà che; vẽ hết bong bóng 340 m tốn gấp ~1,7× vertex (cả lượt bóng) mà không thấy gì thêm.
+const DRAW_R = TIER >= 3 ? 260 : TIER === 2 ? 230 : 170;
 const SPAWN_MIN = 130;                                         // tái sinh ngoài vành này (khỏi "mọc" trước mặt)
 const SPAWN_NEAR = 12;                                         // rải lại sau teleport: không mọc ĐÈ lên người chơi/camera
 const CAP = TIER >= 3 ? { bike: 520, car: 90, walk: 260 } : TIER === 2 ? { bike: 380, car: 70, walk: 200 } : { bike: 140, car: 26, walk: 70 };
@@ -90,7 +93,7 @@ export function createTraffic(scene, world, opts = {}) {
     mesh.receiveShadow = true;
     mesh.userData.noCull = true;      // instcull: KHÔNG nén (ma trận đổi mỗi khung)
     // frustum cull theo BONG BÓNG (r160: InstancedMesh.boundingSphere tính 1 lần từ ma trận lúc đầu rồi cũ mãi)
-    mesh.boundingSphere = new THREE.Sphere(new THREE.Vector3(), RB + 20);
+    mesh.boundingSphere = new THREE.Sphere(new THREE.Vector3(), DRAW_R + 12);
     mesh.matrixAutoUpdate = false;    // gốc tĩnh ở (0,0,0); chỉ instanceMatrix đổi
     scene.add(mesh);
     groups[key] = { key, mesh, cap, list: [], sh, sh2, ph, wk, walk };
@@ -443,13 +446,16 @@ export function createTraffic(scene, world, opts = {}) {
     a.x = _p.x; a.z = _p.z;
   }
 
-  function writeInstances() {
+  const DRAW_R2 = DRAW_R * DRAW_R;
+  function writeInstances(px, pz) {
     for (const k in groups) {
       const g = groups[k], arr = g.mesh.instanceMatrix.array, carr = g.mesh.instanceColor.array;
       const sh = g.sh.array, sh2 = g.sh2.array;
       const L = g.list;
-      for (let i = 0; i < L.length; i++) {
-        const a = L[i];
+      let i = 0;   // ô instance đang ghi (chỉ tác tử trong bán kính vẽ)
+      for (let j = 0; j < L.length; j++) {
+        const a = L[j];
+        if ((a.x - px) * (a.x - px) + (a.z - pz) * (a.z - pz) > DRAW_R2) { a.slot = -1; continue; }   // ô cũ có thể bị xe khác ghi đè
         if (!(Math.abs(a.x - a.yx) + Math.abs(a.z - a.yz) < 4)) { a.yx = a.x; a.yz = a.z; a.y = groundHeight(a.x, a.z) + (a.type === 'walk' ? 0 : ROAD_TOP); }
         const y = a.y;
         const ch = Math.cos(a.h), shh = Math.sin(a.h), cl = Math.cos(a.lean || 0), sl = Math.sin(a.lean || 0);
@@ -468,8 +474,9 @@ export function createTraffic(scene, world, opts = {}) {
           if (g.walk) g.ph.array[i] = a.phase;
         }
         if (g.walk) g.wk.array[i] = a.v > 0.2 ? a.v * 3.9 : 0;   // nhịp bước ∝ tốc độ (bước ~0,8 m)
+        i++;
       }
-      const n = L.length;
+      const n = i;
       g.mesh.count = n;
       if (!n) continue;
       const im = g.mesh.instanceMatrix; im.clearUpdateRanges(); im.addUpdateRange(0, n * 16); im.needsUpdate = true;
@@ -479,7 +486,7 @@ export function createTraffic(scene, world, opts = {}) {
         g.colorDirty = false;
       }
       if (g.walk) { g.wk.clearUpdateRanges(); g.wk.addUpdateRange(0, n); g.wk.needsUpdate = true; }
-      g.mesh.boundingSphere.center.set(bubX, 2, bubZ);
+      g.mesh.boundingSphere.center.set(px, 2, pz);
     }
   }
 
@@ -531,7 +538,7 @@ export function createTraffic(scene, world, opts = {}) {
       const st = Math.min(a.acc, 0.2); a.acc = 0;
       stepAgent(a, st, px, pz);
     }
-    writeInstances();
+    writeInstances(px, pz);
     // thống kê cho âm thanh: mức xe gần (0..1) + số còi phát sinh
     let near = 0;
     let nb = 0, nc = 0, nw = 0;
