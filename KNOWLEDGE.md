@@ -500,6 +500,15 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     (không GPU): map 'three' → lib/three.module.js bằng module.register + shim window/location/localStorage + đồng hồ
     performance.now giả — đo va chạm xe–người (72 điểm × 50 s): bản đầu 557 lượt < 0,8 m / 190 xuyên < 0,45 m → 483 /
     164 (−13 %); ~9 % người đi bộ ở trong lòng đường tại một thời điểm = đang băng qua phố ngang (vỉa hè đứt ở ngã tư).
+    **Sau merge dot3 ece40e1 (WP2 fabric thật + WP4 + WP5; base = export ece40e1 có lite, 2 cặp đảo thứ tự):** fps TB
+    pano 56,2/57,3 → 58,3/58,4 (pano_089 46,1/50,0 → 56,9/58,2 · pano_071 51,7/51,4 → 57,2/56,0 · pano_141 53,0/53,5 →
+    58,9/56,4), draw call TB pano 877/913 → 735/741 (−19 %), tris bằng nhau; giao thông bật/tắt ≈ 0 fps. footprints.js
+    nhận world.rbData (46 128 nhà, D.dead của WP2): cần boom co 20 → 8,6 m trước nhà THẬT đang vẽ; gọi xe/xuống xe ở
+    chỗ reviewer từng kẹt chạy bình thường (xuống ở chỗ world.isFree). **KHỞI ĐỘNG −4,7 s:** hpReady 9,7-9,9 → 5,0 s, nút
+    Bắt đầu mở 12,1-12,3 → 6,9-7,7 s. **BẪY CANVAS 2D (đo):** minimap.js vẽ ~40k footprint thành MỘT path rồi fill() 1
+    lần = 5,2 s đồng bộ (rasterizer Skia sắp cạnh cả path; CPU hay GPU canvas như nhau); fill theo lô 64 đa giác = 74 ms,
+    ảnh y hệt (cùng màu đặc) → bước 'actors' 5,2 s → 0,36-0,45 s. Bước 'shaders' giờ bắt đầu trước khối biên dịch trước
+    của WP5 (trước tính nhầm vào 'actors'). Heap sau gc() 467 → 464 MB. diag full + lite 0 vấn đề / 0 lỗi JS.
 - **2026-10-04 (dot3-WP2 FABRIC)** [PHỐ NHÀ THẬT TỪ FOOTPRINT — `js/citygen.js` + `js/facade_atlas.js` (+ `_worker.js`)]:
     **(1) CỜ `FABRIC`** (world.js cạnh BUILD_RADIUS): mặc định `'real'`; `?fabric=proc` = bộ sinh nhà GIẢ cũ để A/B. Các khối
     `if (FABRIC === 'proc') {` thay `{` ở: vòng OSM BUILDINGS, mái hiên/biển generic (InstancedMesh cap 300), `house()` rows,
