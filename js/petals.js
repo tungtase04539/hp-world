@@ -1,13 +1,16 @@
 import * as THREE from 'three';
 
-// Cánh phượng đỏ 3D bay trong gió quanh dải trung tâm (instanced để nhẹ)
-// RANGE/HEIGHT thu lại (42/20 → 30/15): cánh hoa từng bay như "confetti giữa trời trống"
-// cách xa mọi tán cây; giờ quẩn quanh tầm tán phượng
+// Cánh phượng đỏ 3D rơi trong gió DƯỚI TÁN CÂY PHƯỢNG ĐANG NỞ gần người chơi (instanced để nhẹ).
+// Đợt 3 WP4: trước đây đám cánh hoa bám người chơi nhưng chỉ bật quanh một điểm cố định tính từ thời bản đồ 1:10
+// (giữa hồ Tam Bạc và Nhà hát) → lúc spawn không có, ở dưới gốc phượng thật cũng không. Nay: main.js truyền
+// `bloomNear(x,z,r)` (js/trees.js — cây phượng nở gần nhất, theo uniform mùa hoa) → tâm = gốc cây đó, cánh rơi
+// trong bán kính tán, cường độ giảm dần khi người chơi ra xa cây (18 → 45 m).
 const COUNT = 170;
-const RANGE = 30, HEIGHT = 15;
+const RANGE = 6.5, TOP = 9;
 
 export function createPetals(scene) {
-  const geo = new THREE.PlaneGeometry(0.4, 0.24);
+  // cánh hoa thật ~5-7 cm; 18×11 cm để còn thấy được trong khung hình (trước 40×24 cm — như tờ giấy A4 bay)
+  const geo = new THREE.PlaneGeometry(0.18, 0.11);
   const mat = new THREE.MeshLambertMaterial({
     color: 0xff5238, side: THREE.DoubleSide, transparent: true, opacity: 0,
     emissive: 0xaa2210, emissiveIntensity: 0.55,
@@ -15,54 +18,60 @@ export function createPetals(scene) {
   const mesh = new THREE.InstancedMesh(geo, mat, COUNT);
   mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   mesh.frustumCulled = false;
+  // instcull KHÔNG được quản: nó chụp ma trận lúc đăng ký rồi ghi đè mỗi 0,4 s (+ đặt lại count) → cánh hoa đứng
+  // im giữa không trung và tool chụp ảnh không ẩn được (BUG cũ, lộ ra khi cánh hoa có mặt ở chỗ người chơi)
+  mesh.userData.noCull = true;
   scene.add(mesh);
 
   const dummy = new THREE.Object3D();
+  // vị trí cánh hoa TƯƠNG ĐỐI tâm cây (tất định — không Math.random để ảnh A/B so được)
+  let seed = 7919;
+  const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
   const parts = [];
   for (let i = 0; i < COUNT; i++) {
     parts.push({
-      x: (Math.random() - 0.5) * RANGE * 2,
-      y: Math.random() * HEIGHT,
-      z: (Math.random() - 0.5) * RANGE * 2,
-      fall: 1.1 + Math.random() * 1.3,
-      phase: Math.random() * Math.PI * 2,
-      sway: 0.6 + Math.random() * 1.1,
-      spin: 2 + Math.random() * 3,
+      x: (rnd() - 0.5) * RANGE * 2, y: rnd() * TOP, z: (rnd() - 0.5) * RANGE * 2,
+      fall: 0.7 + rnd() * 0.9, phase: rnd() * Math.PI * 2, sway: 0.6 + rnd() * 1.1, spin: 2 + rnd() * 3,
       gy: 2,   // cao độ đất cache — cập nhật so le (groundHeight từng bị gọi 200 lần/khung)
     });
   }
-  let frameNo = 0;
+  let frameNo = 0, cx = 0, cz = 0, cy = 2, topY = TOP, targetS = 0, findT = -1e9;
 
   return {
-    // strength 0..1: chỉ rơi dày ở khu trung tâm
-    update(dt, time, playerPos, strength, groundHeight) {
-      const target = strength > 0.02 ? 0.95 * strength : 0;
+    // strength 0..1 (giảm khi người dùng bật "giảm chuyển động"); bloomNear: (x,z,r) → {x,z,d,h,y} | null
+    update(dt, time, playerPos, strength, groundHeight, bloomNear) {
+      const now = performance.now();
+      if (now - findT > 500) {            // tìm lại cây nở gần nhất 2 lần/giây (đồng hồ thật)
+        findT = now;
+        const b = bloomNear ? bloomNear(playerPos.x, playerPos.z, 45) : null;
+        if (b) {
+          if (Math.hypot(b.x - cx, b.z - cz) > 1) {   // đổi cây → rải lại cánh trên tán mới
+            cx = b.x; cz = b.z; cy = b.y ?? groundHeight(cx, cz); topY = Math.max(5, Math.min(13, b.h * 0.85));
+            for (const p of parts) { p.y = topY * (0.3 + rnd() * 0.7); p.gy = groundHeight(cx + p.x, cz + p.z); }
+          }
+          targetS = (1 - Math.min(1, Math.max(0, (b.d - 18) / 27))) * strength;
+        } else targetS = 0;
+      }
+      const target = targetS > 0.02 ? 0.95 * targetS : 0;
       mat.opacity += (target - mat.opacity) * Math.min(1, dt * 1.5);
       if (mat.opacity < 0.02) { mesh.visible = false; return; }
       mesh.visible = true;
-      const cx = playerPos.x, cz = playerPos.z;
       frameNo++;
       for (let i = 0; i < COUNT; i++) {
         const p = parts[i];
         p.y -= p.fall * dt;
-        p.x += Math.sin(time * p.sway + p.phase) * dt * 1.6 + dt * 0.7;
-        p.z += Math.cos(time * p.sway * 0.8 + p.phase) * dt * 1.2;
-        // cao độ đất: cập nhật SO LE mỗi cánh 1 lần/20 khung (đủ chính xác cho điểm chạm đất)
+        p.x += Math.sin(time * p.sway + p.phase) * dt * 1.2 + dt * 0.5;
+        p.z += Math.cos(time * p.sway * 0.8 + p.phase) * dt * 0.9;
         if ((i + frameNo) % 20 === 0) p.gy = groundHeight(cx + p.x, cz + p.z);
-        if (p.y < Math.max(p.gy, 0) + 0.15) {
-          p.x = (Math.random() - 0.5) * RANGE * 2;
-          p.z = (Math.random() - 0.5) * RANGE * 2;
-          p.y = HEIGHT * (0.7 + Math.random() * 0.3);
+        if (cy + p.y < Math.max(p.gy, 0) + 0.15) {
+          p.x = (rnd() - 0.5) * RANGE * 2; p.z = (rnd() - 0.5) * RANGE * 2;
+          p.y = topY * (0.75 + rnd() * 0.25);
           p.gy = groundHeight(cx + p.x, cz + p.z);
         }
-        if (Math.abs(p.x) > RANGE) p.x = -Math.sign(p.x) * RANGE * 0.95;
-        if (Math.abs(p.z) > RANGE) p.z = -Math.sign(p.z) * RANGE * 0.95;
-        dummy.position.set(cx + p.x, p.y, cz + p.z);
-        dummy.rotation.set(
-          time * p.spin + p.phase,
-          p.phase + time * 0.8,
-          Math.sin(time * p.sway + p.phase) * 0.8
-        );
+        if (Math.abs(p.x) > RANGE * 1.6) p.x = -Math.sign(p.x) * RANGE * 0.9;
+        if (Math.abs(p.z) > RANGE * 1.6) p.z = -Math.sign(p.z) * RANGE * 0.9;
+        dummy.position.set(cx + p.x, cy + p.y, cz + p.z);
+        dummy.rotation.set(time * p.spin + p.phase, p.phase + time * 0.8, Math.sin(time * p.sway + p.phase) * 0.8);
         dummy.updateMatrix();
         mesh.setMatrixAt(i, dummy.matrix);
       }

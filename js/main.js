@@ -580,13 +580,9 @@ function animate() {
       bloomPass.threshold = 1.06 / renderer.toneMappingExposure;
     }
 
-    // cánh phượng quanh dải trung tâm (tâm ~ giữa hồ Tam Bạc và Nhà hát lớn)
-    const dCity = Math.hypot(
-      pState.pos.x - (LM.lake[0] + LM.opera[0]) / 2,
-      pState.pos.z - (LM.lake[1] + LM.opera[1]) / 2);
-    const petalStrength = 1 - Math.min(1, Math.max(0, (dCity - 170) / 150));
-    // A11Y: hệ điều hành bật "giảm chuyển động" → hoa rơi dịu lại (người nhạy cảm tiền đình/say chuyển động)
-    petals.update(dt, time, pState.pos, REDUCED_MOTION ? petalStrength * 0.35 : petalStrength, groundHeight);
+    // cánh phượng rơi dưới tán cây phượng ĐANG NỞ gần nhất (js/trees.js qua world.treeBloomNear — Đợt 3 WP4;
+    // trước: tâm cố định lệch từ thời bản đồ 1:10 nên lúc spawn không có). A11Y: "giảm chuyển động" → dịu lại
+    petals.update(dt, time, pState.pos, REDUCED_MOTION ? 0.35 : 1, groundHeight, world.treeBloomNear);
 
     // âm thanh môi trường: sóng biển gần mép nước (theo lưới đất/biển thật), còi tàu gần cảng
     const onWater = pState.mounted && !pState.mounted.land;
