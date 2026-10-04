@@ -291,9 +291,10 @@ const MAIN = /* glsl */`
           float inP = step(pu0, u) * step(u, pu1) * step(pv0, av) * step(av, pv1);
           float edge = inP * (1.0 - step(0.06, min(min(u - pu0, pu1 - u), min(av - pv0, pv1 - av))));
           // vá nhựa mới (sẫm, 70%) hoặc rãnh cáp vá bê tông (sáng hơn, ngả be — 1/4 số miếng)
-          vec3 tone = h1 < 0.05 ? vec3(1.07, 1.05, 0.99) : vec3(0.7 + 0.14 * h2);
+          // (tone 0,78-0,92: bản 0,70 ra mảng đen chữ nhật quá gắt so với pano — vá thật chỉ sẫm hơn nền vừa phải)
+          vec3 tone = h1 < 0.05 ? vec3(1.07, 1.05, 0.99) : vec3(0.78 + 0.14 * h2);
           col = mix(col, col * tone, inP);
-          col *= 1.0 - 0.2 * edge;
+          col *= 1.0 - 0.14 * edge;
         }
         // vệt bánh xe (bóng hơn, sẫm nhẹ) + rãnh biên bám bụi
         float lane = hw * 0.5;

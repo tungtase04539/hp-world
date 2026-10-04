@@ -409,6 +409,10 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     GỐC repo đang làm (ghi `js/roadmarks.js` theo cwd). (i) BẪY miter ngược chiều: mặt cắt đầu dải dùng vector miter m của
     nút; nếu m NGƯỢC chiều pháp tuyến dải (dot<0) phải đổi dấu m (k=1/|dot|) — vị trí off() như nhau nhưng mặt đứng bó vỉa
     lấy hướng từ (mx,mz) → 91 mặt bó vỉa từng quay LƯNG về lòng đường, bị cull, lộ khe xanh giữa lòng và vỉa hè (pano_457).
+    (i2) BẪY closure giữ sống ngữ cảnh: hàm trả về được tạo TRONG buildRoadNet (surfaceAt/nearJunction) giữ sống CẢ phạm
+    vi dựng (ways/nodes/arms/lưới/tiles ≈ 41 MB heap, đo node --expose-gc) — nay dựng ở makeQueries() từ typed array gọn
+    (≈5 MB). Module tạo closure lâu dài trong hàm dựng lớn → tách factory riêng. (i3) LITE (TIER ≤1): define RN_LITE bỏ
+    mẫu nhựa tầng 2 + mẫu mòn sơn (2 lần đọc texture/điểm ảnh), texture 256²; customProgramCacheKey 'roadnet-v2-lite'.
     (j) Đoạn đường trong 10 m quanh trục cầu VÒM (BRIDGES rise>3) bị cắt CÓ CHỦ Ý kể cả trên bờ (dốc dẫn cầu Bính x≈75,
     z −950..−900 nằm trên mặt cầu, groundHeight 7-9 m). (k) Kiểm hình học không cần GPU: scratchpad `dot3/WP6/probe`
     (facecheck.mjs hướng mặt bó vỉa, holecheck.mjs lỗ lòng đường theo tim ROADS_DT, rn_test.mjs+rn_draw.py vẽ mặt bằng PNG).
