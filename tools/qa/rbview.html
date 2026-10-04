@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>RB viewer</title><link rel="icon" href="data:,">
+<!-- rbview.html — xem nhanh dữ liệu nhà js/buildings_real.js (RB01+RBR1) KHÔNG cần world.js: tường đùn theo tầng
+     (mặt phố/hông/sau/tường chung tô khác nhau, cửa sổ theo tầng), mái theo ROOF_PALETTE, đường theo ROADS_DT + xsection.
+     Dùng để kiểm generator (tools/process_buildings.mjs) ở tầm mắt pano và từ trên cao. Chạy từ gốc repo:
+       python -m http.server 8301  →  http://127.0.0.1:8301/tools/qa/rbview.html?pano=-599.3,194.2,90
+     Tham số: pano=X,Z,headingLaBàn | cam=x,y,z,lx,ly,lz | aerial=cx,cz,half (trực giao, bắc lên trên) | t=giờ (0..1)
+     Không phải renderer của game (WP2 làm citygen.js) — chỉ để soát hình khối/độ phủ/bức tường phố. -->
+<style>body{margin:0;overflow:hidden;background:#000}#info{position:fixed;left:6px;top:6px;color:#fff;font:12px monospace;background:rgba(0,0,0,.45);padding:4px 6px}</style>
+<script type="importmap">{"imports":{"three":"../../lib/three.module.js"}}</script>
+</head><body><div id="info">…</div>
+<script type="module">
+import * as THREE from 'three';
+import { RB_B64, RB_META } from '../../js/buildings_real.js';
+import { decodeRB, EDGE, ROOF, WALL_PALETTE, ROOF_PALETTE, heightOf, GROUND_H, FLOOR_H, PARAPET_H } from '../../js/buildings_data.js';
+import { ROADS_DT, WATER, PARKS } from '../../js/mapdata.js';
+import { ROAD_HW, SIDEWALK_W, ROAD_TOP, SIDEWALK_TOP } from '../../js/xsection.js';
+const P = new URLSearchParams(location.search);
+const t0 = performance.now();
+const D = decodeRB(RB_B64);
+const tDec = performance.now() - t0;
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setSize(innerWidth, innerHeight); renderer.setPixelRatio(1);
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.1;
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xc4d5e4);
+const aerial = P.get('aerial');
+if (!aerial) scene.fog = new THREE.Fog(0xc9d5df, 180, 1400);
+scene.add(new THREE.HemisphereLight(0xd6e6f7, 0x8f8676, 0.95));
+const sun = new THREE.DirectionalLight(0xfff0dc, 2.3); sun.castShadow = true;
+sun.shadow.mapSize.set(4096, 4096);
+sun.shadow.bias = -0.0003; sun.shadow.normalBias = 0.04; scene.add(sun); scene.add(sun.target);
+const col = (hex) => new THREE.Color(hex).convertSRGBToLinear();
+
+// ---------- nhà ----------
+const wpos = [], wnor = [], wuv = [], wcol = [], winf = [], widx = [];
+const rpos = [], rcol = [], ridx = [];
+let tris = 0, nB = 0;
+const cx0 = +(P.get('cx') ?? 0), cz0 = +(P.get('cz') ?? 0), R = +(P.get('r') ?? 1e9);
+for (let b = 0; b < D.nB; b++) {
+  const s = D.vStart[b], e = D.vStart[b + 1], n = e - s;
+  if (Math.hypot(D.x[s] - cx0, D.z[s] - cz0) > R) continue;
+  nB++;
+  const fl = D.floors[b], H = heightOf(fl);
+  const wc = col(WALL_PALETTE[D.wall[b]] ?? 0xdddddd), rt = D.roof[b] & 15, rc = col(ROOF_PALETTE[D.roof[b] >> 4]);
+  const use = (D.info[b] >> 4) & 3;
+  for (let i = 0; i < n; i++) {
+    const a = s + i, c = s + ((i + 1) % n);
+    const ax = D.x[a], az = D.z[a], bx = D.x[c], bz = D.z[c], L = Math.hypot(bx - ax, bz - az);
+    if (L < 0.05) continue;
+    const kind = D.edge[a];
+    const y0 = kind === EDGE.PARTY ? Math.min(H, heightOf(D.edgeCover[a])) : 0;
+    if (kind === EDGE.PARTY && D.edgeCover[a] >= fl) continue;
+    const nx = -(bz - az) / L, nz = (bx - ax) / L;
+    const top = H + (rt === ROOF.FLAT_PARAPET ? PARAPET_H : 0);
+    const k = wpos.length / 3;
+    wpos.push(ax, y0, az, bx, y0, bz, bx, top, bz, ax, top, az);
+    for (let q = 0; q < 4; q++) { wnor.push(nx, 0, nz); wcol.push(wc.r, wc.g, wc.b); winf.push(kind, fl, use, D.seed[b] / 65535); }
+    wuv.push(0, y0, L, y0, L, top, 0, top);
+    widx.push(k, k + 1, k + 2, k, k + 2, k + 3); tris += 2;
+  }
+  // mái (phẳng ở H; mái dốc vẽ phẳng cùng màu — đủ để soát vệ tinh)
+  const pts = []; for (let v = s; v < e; v++) pts.push(new THREE.Vector2(D.x[v], D.z[v]));
+  let T; try { T = THREE.ShapeUtils.triangulateShape(pts, []); } catch { T = []; }
+  const k = rpos.length / 3;
+  const ry = H + (rt === ROOF.GABLE_TON || rt === ROOF.HIP_TILE || rt === ROOF.SHED_TON ? 0.6 : 0.02);
+  for (let v = s; v < e; v++) { rpos.push(D.x[v], ry, D.z[v]); rcol.push(rc.r, rc.g, rc.b); }
+  for (const t of T) ridx.push(k + t[0], k + t[2], k + t[1]);
+  tris += T.length;
+}
+const wg = new THREE.BufferGeometry();
+wg.setAttribute('position', new THREE.Float32BufferAttribute(wpos, 3));
+wg.setAttribute('normal', new THREE.Float32BufferAttribute(wnor, 3));
+wg.setAttribute('uv', new THREE.Float32BufferAttribute(wuv, 2));
+wg.setAttribute('color', new THREE.Float32BufferAttribute(wcol, 3));
+wg.setAttribute('aInf', new THREE.Float32BufferAttribute(winf, 4));
+wg.setIndex(widx);
+const wm = new THREE.MeshLambertMaterial({ vertexColors: true });
+// shader đơn giản: tầng trệt mặt phố (cửa cuốn/kính cửa hàng), cửa sổ mỗi tầng theo nhịp ~3,6 m, mặt hông ít cửa
+wm.onBeforeCompile = (sh) => {
+  sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec4 aInf; varying vec4 vInf; varying vec2 vW;')
+    .replace('#include <uv_vertex>', '#include <uv_vertex>\nvInf = aInf; vW = uv;');
+  sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
+varying vec4 vInf; varying vec2 vW;
+float h1(float n){ return fract(sin(n)*43758.5453); }`)
+    .replace('#include <color_fragment>', `#include <color_fragment>
+{
+  float kind = vInf.x, fl = vInf.y, use = vInf.z, sd = vInf.w;
+  float y = vW.y, u = vW.x;
+  float GH = ${GROUND_H.toFixed(2)}, FH = ${FLOOR_H.toFixed(2)};
+  float top = GH + (fl - 1.0) * FH;
+  float floorI = y < GH ? 0.0 : 1.0 + floor((y - GH) / FH);
+  float fy = y < GH ? y / GH : fract((y - GH) / FH);
+  vec3 c = diffuseColor.rgb;
+  if (y > top) { c *= 0.92; }                                   // lan can mái
+  else if (kind < 0.5 || kind > 1.5 && kind < 2.5) {             // hông / sau: ít cửa, vệt ố
+    float bay = floor(u / 3.0);
+    if (h1(bay * 7.1 + floorI * 3.3 + sd * 91.0) > 0.78 && fy > 0.35 && fy < 0.75 && fract(u / 3.0) > 0.35 && fract(u / 3.0) < 0.65 && floorI > 0.5) c = vec3(0.12, 0.13, 0.15);
+    c *= 0.9 + 0.1 * h1(floor(y * 0.7) + sd * 13.0);
+  } else if (kind > 0.5 && kind < 1.5) {                         // mặt phố
+    if (floorI < 0.5) {
+      if (use > 0.5 && use < 1.5) { c = (fy < 0.78) ? vec3(0.16, 0.15, 0.14) + 0.25 * vec3(h1(sd * 11.0), h1(sd * 17.0), h1(sd * 23.0)) * step(0.5, fy) : vec3(0.75, 0.15 + 0.5 * h1(sd * 5.0), 0.15); }  // cửa hàng + biển
+      else c = (fy < 0.72 && fract(u / 4.0) > 0.15 && fract(u / 4.0) < 0.85) ? vec3(0.42, 0.44, 0.46) : c;   // cửa cuốn / cổng
+    } else {
+      float bayW = 3.6; float fu = fract(u / bayW);
+      bool win = fu > 0.18 && fu < 0.82 && fy > 0.25 && fy < 0.85;
+      if (win) c = mix(vec3(0.09, 0.11, 0.13), vec3(0.35, 0.42, 0.48), step(0.6, h1(floor(u / bayW) + floorI * 5.0 + sd * 31.0)));
+      if (fy < 0.08) c *= 0.75;                                // gờ sàn / ban công
+    }
+  }
+  diffuseColor.rgb = c;
+}`);
+};
+const wmesh = new THREE.Mesh(wg, wm); wmesh.castShadow = wmesh.receiveShadow = true; scene.add(wmesh);
+const rg = new THREE.BufferGeometry();
+rg.setAttribute('position', new THREE.Float32BufferAttribute(rpos, 3));
+rg.setAttribute('color', new THREE.Float32BufferAttribute(rcol, 3));
+rg.setIndex(ridx); rg.computeVertexNormals();
+const rmesh = new THREE.Mesh(rg, new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }));
+rmesh.castShadow = rmesh.receiveShadow = true; scene.add(rmesh);
+
+// ---------- đất, nước, công viên, đường ----------
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(6000, 6000), new THREE.MeshLambertMaterial({ color: 0x9a948a }));
+ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
+function polyMesh(pts, y, color) {
+  const sh = new THREE.Shape(pts.map(([x, z]) => new THREE.Vector2(x, -z)));
+  const g = new THREE.ShapeGeometry(sh); g.rotateX(-Math.PI / 2); g.translate(0, y, 0);
+  const m = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color })); m.receiveShadow = true; scene.add(m);
+}
+for (const w of WATER) if (w.pts.some(([x, z]) => Math.hypot(x, z) < 2600)) polyMesh(w.pts, 0.03, 0x4f6a78);
+for (const p of PARKS) polyMesh(p, 0.04, 0x7f9a62);
+function ribbon(widthOf, y, color) {
+  const pos = [], idx = [];
+  for (const r of ROADS_DT) {
+    const hw = widthOf(r.c); if (!hw) continue;
+    for (let i = 0; i + 1 < r.pts.length; i++) {
+      const [ax, az] = r.pts[i], [bx, bz] = r.pts[i + 1]; const L = Math.hypot(bx - ax, bz - az) || 1;
+      const nx = -(bz - az) / L, nz = (bx - ax) / L, b0 = pos.length / 3;
+      pos.push(ax + nx * hw, y, az + nz * hw, bx + nx * hw, y, bz + nz * hw, bx - nx * hw, y, bz - nz * hw, ax - nx * hw, y, az - nz * hw);
+      idx.push(b0, b0 + 2, b0 + 1, b0, b0 + 3, b0 + 2);
+      const c0 = pos.length / 3; pos.push(bx, y, bz);
+      for (let k = 0; k <= 10; k++) { const a = (k / 10) * Math.PI * 2; pos.push(bx + Math.cos(a) * hw, y, bz + Math.sin(a) * hw); }
+      for (let k = 0; k < 10; k++) idx.push(c0, c0 + 2 + k, c0 + 1 + k);
+    }
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals();
+  const m = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color, side: THREE.DoubleSide })); m.receiveShadow = true; scene.add(m);
+}
+ribbon((c) => (ROAD_HW[c] ?? 2.75) + (SIDEWALK_W[c] ?? 1.5), SIDEWALK_TOP, 0xb3ada3);
+ribbon((c) => ROAD_HW[c] ?? 2.75, SIDEWALK_TOP + 0.01, 0x6b6c6e);   // (xem nhanh: vẽ đè lên dải hè)
+
+// ---------- camera ----------
+let camera;
+if (aerial) {
+  const [cx, cz, half] = aerial.split(',').map(Number); const asp = innerWidth / innerHeight;
+  camera = new THREE.OrthographicCamera(-half * asp, half * asp, half, -half, 1, 3000);
+  camera.position.set(cx, 1500, cz); camera.up.set(0, 0, -1); camera.lookAt(cx, 0, cz);
+  sun.position.set(cx + 300, 900, cz + 200); sun.target.position.set(cx, 0, cz);
+  Object.assign(sun.shadow.camera, { left: -half * asp * 1.4, right: half * asp * 1.4, top: half * 1.4, bottom: -half * 1.4, near: 10, far: 2500 });
+} else {
+  camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 3000);
+  if (P.has('pano')) { const [x, z, h] = P.get('pano').split(',').map(Number); const a = (h * Math.PI) / 180;
+    camera.position.set(x, 2.6, z); camera.lookAt(x + Math.sin(a) * 10, 2.8, z - Math.cos(a) * 10); }
+  else { const c = (P.get('cam') || '-150,120,350,-150,0,150').split(',').map(Number); camera.position.set(c[0], c[1], c[2]); camera.lookAt(c[3], c[4], c[5]); }
+  const tx = camera.position.x, tz = camera.position.z;
+  sun.position.set(tx + 160, 260, tz + 110); sun.target.position.set(tx, 0, tz);
+  Object.assign(sun.shadow.camera, { left: -260, right: 260, top: 260, bottom: -260, near: 1, far: 900 });
+}
+sun.shadow.camera.updateProjectionMatrix();
+renderer.render(scene, camera);
+window.__rbReady = true;
+document.getElementById('info').textContent = `RB ${RB_META.generator} · ${D.nB} nhà (${D.nPoly} đa giác + ${D.nB - D.nPoly} chữ nhật) · giải mã ${tDec.toFixed(1)} ms · vẽ ${nB} nhà, ${(tris / 1e6).toFixed(2)}M tam giác`;
+window.__rbInfo = { nB: D.nB, nPoly: D.nPoly, decodeMs: tDec, tris };
+if (!P.has('static')) (function loop() { renderer.render(scene, camera); requestAnimationFrame(loop); })();
+</script></body></html>
