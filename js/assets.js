@@ -330,14 +330,31 @@ function queueReveal(roots, onDone) {
 
 // Gọi MỖI KHUNG từ main.js: upload đúng 1 texture (2048² ≈ 8-13 ms, 4096² ≈ 35-45 ms) rồi hiện model
 // ở khung kế tiếp. Không còn khung 100-330 ms khi công trình đầu tiên lọt vào tầm nhìn.
-export function pumpAssetUploads() {
-  const it = _reveal[0];
-  if (!it || !it.compiled) return;
-  const t = it.textures.shift();
-  if (t) { try { _renderer.initTexture(t); } catch (e) { } return; }
-  for (const r of it.roots) r.traverse((o) => { if (o.isMesh) o.layers.set(0); });
-  _reveal.shift();
-  if (it.onDone) it.onDone();
+// W2-F (đo lộ trình 60 s xe máy Quang Trung NGAY sau Bắt đầu, 890M): 10-13 khung 34-74 ms trong 2 s đầu đều là upload
+// texture GLB (texSubImage2D 4096²). Nay: budgetMs > 0 (main.js truyền khi CHƯA Bắt đầu — màn chờ che cảnh, vệt tiến
+// trình chạy bằng CSS compositor) → upload LIÊN TIẾP tới hết ngân sách/khung để hàng đợi cạn trước khi vào game; sau
+// Bắt đầu: texture LỚN (≥ 2048²) cách nhau ≥ 2 khung (không 2 khung nặng liền nhau — giật cảm nhận rõ hơn 1 khung lẻ).
+let _bigGap = 0;
+export function pumpAssetUploads(budgetMs = 0) {
+  const t0 = budgetMs > 0 ? performance.now() : 0;
+  if (_bigGap > 0) _bigGap--;
+  for (;;) {
+    const it = _reveal[0];
+    if (!it || !it.compiled) return;
+    const t = it.textures[0];
+    if (t) {
+      const im = t.image, big = im && (im.width || 0) * (im.height || 0) >= 2048 * 2048;
+      if (!budgetMs && big && _bigGap > 0) return;
+      it.textures.shift();
+      try { _renderer.initTexture(t); } catch (e) { }
+      if (big) _bigGap = 2;
+    } else {
+      for (const r of it.roots) r.traverse((o) => { if (o.isMesh) o.layers.set(0); });
+      _reveal.shift();
+      if (it.onDone) it.onDone();
+    }
+    if (!budgetMs || performance.now() - t0 > budgetMs) return;
+  }
 }
 // autoQuality bỏ qua các cửa sổ đo trong lúc còn tải/hiện model (khựng streaming từng làm máy mạnh bị hạ cấp).
 export function assetsBusy() { return loadingCount > 0 || _reveal.length > 0 || liteLoading; }

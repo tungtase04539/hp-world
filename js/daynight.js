@@ -324,7 +324,11 @@ export function createDayNight(scene, world) {
   const _lookDir = new THREE.Vector3(0, 0, -1), _tmpDir = new THREE.Vector3(), _shCenter = new THREE.Vector3(), _plPos = new THREE.Vector3();
   const _shPos = new THREE.Vector3(1e9, 0, 1e9), _shDir = new THREE.Vector3();
   const _right = new THREE.Vector3(), _up2 = new THREE.Vector3(), _Y = new THREE.Vector3(0, 1, 0);
-  const COS_TURN = Math.cos(0.15);
+  // Làm mới bóng SỚM (trước trần đồng hồ của main.js) khi đã đi > SH_MOVE m hoặc quay > SH_TURN rad. W2-F: 2 m / 0,15 rad
+  // → 6 m / 0,3 rad: bóng TĨNH lấy mẫu bằng ma trận của lần vẽ trước nên vẫn đúng chỗ khi hộp bóng (±70-110 m, nhìn trước
+  // 29-45 m) lệch vài mét; caster động (người chơi/xe đang chạy) đã tắt bóng thật khi di chuyển (WP8). Đo lộ trình xe máy
+  // 14 m/s: 6,6 → ~4,5 lần vẽ bóng/s (trần đồng hồ), mỗi lần ~1,3 ms CPU + lượt vẽ bóng GPU.
+  const SH_MOVE2 = 36, COS_TURN = Math.cos(0.3);
   const _fogTarget = new THREE.Color(), _ground = new THREE.Color();
   const T3 = [0, 0, 0], UP = [0, 1, 0];
   const _skyK = new THREE.Vector3(), _sunT = new THREE.Vector3(), _skyUp = new THREE.Vector3(), _cloudSun = new THREE.Vector3();
@@ -448,9 +452,9 @@ export function createDayNight(scene, world) {
       const icon = out.sunEl > -3 ? '☀️' : '🌙';
       return `${icon} ${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
     },
-    // bóng đã lệch so với lần làm mới cuối? (đi > 2 m hoặc quay > 0.15 rad)
+    // bóng đã lệch so với lần làm mới cuối? (đi > 6 m hoặc quay > 0.3 rad — SH_MOVE2/COS_TURN)
     shadowMoved() {
-      return _shPos.distanceToSquared(_plPos) > 4 || _shDir.dot(_lookDir) < COS_TURN;
+      return _shPos.distanceToSquared(_plPos) > SH_MOVE2 || _shDir.dot(_lookDir) < COS_TURN;
     },
     markShadow() { _shPos.copy(_plPos); _shDir.copy(_lookDir); },
     // CHẾ ĐỘ VỆ TINH: a = {cx, cz, half, asp} → hộp bóng phủ khung ảnh (map 4096), tắt sương; null → trả lại.

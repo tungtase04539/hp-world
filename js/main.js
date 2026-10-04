@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { installToneMapping, SceneAOPass, FinalPass, AO as AO_CFG, GRADE, timePass } from './post.js';
-import { buildWorld, groundHeight, groundHeightNoDeck, landAt, WORLD_BOUNDS, LM, EXTRAS, BUILD_RADIUS, texCacheStats } from './world.js';
+import { buildWorld, groundHeight, groundHeightNoDeck, landAt, WORLD_BOUNDS, EXTRAS, BUILD_RADIUS, texCacheStats } from './world.js';
 import { IS_MOBILE, HAS_TOUCH, TIER, GPU_NAME, QUALITY_PREF, setQualityPref, IGPU_ON_BIG_MACHINE, GFX } from './device.js';
 import { createTraffic } from './traffic.js';
 import { makeHumanoid } from './character.js';
@@ -680,7 +680,7 @@ function animate() {
   requestAnimationFrame(animate);
   if (_ctxLost) return;                       // GPU đang mất ngữ cảnh: vẽ lúc này chỉ gây lỗi tràn console
   if (FRAME_DIV > 1 && (++_tick % FRAME_DIV)) return;   // điện thoại: đúng mỗi vsync thứ 2, không lỡ nhịp
-  pumpAssetUploads();                         // hiện model GLB đã tải: 1 texture/khung rồi mới lộ diện
+  pumpAssetUploads(started ? 0 : 32);         // hiện model GLB đã tải: 1 texture/khung (chưa Bắt đầu: ngân sách 32 ms/khung — W2-F)
   const dt = Math.min(clock.getDelta(), 0.05);
   time += dt;
 
