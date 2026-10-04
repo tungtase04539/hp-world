@@ -689,8 +689,9 @@ const LAND_Y = 2;   // = LAND_H world.js (nền phố phẳng)
 // không trong suốt/alphaTest/vertexColors/màu nhuộm (color trắng), không emissive/map phụ, onBeforeCompile mặc định,
 // và UV của geometry nằm trong [0,1]. Ô atlas = kích thước canvas gốc (ảnh lùi vào G px mỗi bên, viền kéo giãn chống
 // loang mip). Mỗi mesh nhận geometry CLONE (UV đổi sang ô atlas) + material atlas dùng chung.
-// Viền G px NẰM NGOÀI ảnh (ô = w+2G × h+2G, ảnh giữ nguyên độ phân giải, không co lại) — G=8 an toàn tới mip 3
-// (phản biện: G=4 co ảnh vào trong → mờ chữ + biển kề nhau loang sang nhau ở mip xa).
+// Viền G px NẰM NGOÀI ảnh theo trục ngắn (<512: ô = n+2G, ảnh 1:1 không co) — G=8 an toàn tới mip 3 (phản biện: G=4 co
+// ảnh vào trong → mờ chữ + biển kề nhau loang ở mip xa). Trục ≥512 giữ ô = cỡ gốc, ảnh co 2G (≤3%): nếu nới thì ảnh rộng
+// 1024 thành 1040 → 1 ảnh/kệ 2048, trang 7 → 9.
 const AT_PAGE = 2048, AT_G = 8;
 // viền theo cỡ ảnh: ≥128 px → 8 (an toàn tới mip 3); ảnh nhỏ (64/32 px — ở mip 3 đã là đốm 4-8 texel) → 4/2, đỡ phình trang
 const atG = (w, h) => Math.max(2, Math.min(AT_G, Math.floor(Math.min(w, h) / 16)));
@@ -719,7 +720,8 @@ function atlasKept(kept, createdTex, THREE) {
   const pages = []; let pg = null, x = 0, y = 0, rowH = 0;
   for (const t of list) {
     const G = atG(t.image.width, t.image.height);
-    const w = t.image.width + 2 * G, h = t.image.height + 2 * G;   // ô gồm viền
+    const ax = (n) => (n >= 512 ? n : n + 2 * G);
+    const w = ax(t.image.width), h = ax(t.image.height);   // ô gồm viền
     if (!pg || x + w > AT_PAGE) { x = 0; y += rowH; rowH = 0; }
     if (!pg || y + h > AT_PAGE) { pg = { items: [] }; pages.push(pg); x = 0; y = 0; rowH = 0; }
     texs.set(t, { pg: pages.length - 1, x, y, w, h, G }); pg.items.push(t);
@@ -762,7 +764,8 @@ function atlasKept(kept, createdTex, THREE) {
     }
     m.geometry = ng; m.material = am;
   }
-  return { pages: pages.length, textures: list.length, meshes: meshes.length, materials: mats.size, pageH: pages.map((p) => p.H) };
+  const sizes = {}; for (const t of list) { const k = t.image.width + 'x' + t.image.height; sizes[k] = (sizes[k] || 0) + 1; }
+  return { pages: pages.length, textures: list.length, meshes: meshes.length, materials: mats.size, pageH: pages.map((p) => p.H), sizes };
 }
 
 // khoảng cách footprint thật b ↔ bao lồi H (0 nếu giao)
