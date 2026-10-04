@@ -2590,7 +2590,7 @@ const lmTower = (x, z, ry, W, D, FL, FH, wallMat, name) => {
   const ROW = [
     // [tên biển, bx, bz, W, FL, màu tường, nền biển, chữ]
     ['THỜI TRANG NAM', -575.2, 291.1, 5, 2, 0x2a6db5, '#1c56a0', '#ffffff'],
-    ["NOAH'S", -567.9, 289.6, 10, 2, 0xf4f2ec, '#22252a', '#ffffff'],
+    ['THỜI TRANG NỮ', -567.9, 289.6, 10, 2, 0xf4f2ec, '#22252a', '#ffffff'],
     ['NHÀ THUỐC 116', -559.5, 287.9, 7, 4, 0x1553a0, '#1050c8', '#ffffff'],
     ['NHÀ THUỐC 69', -553.2, 286.6, 6, 3, 0x8f959b, '#c1201a', '#ffffff'],
     ['ĐÔNG MẬN — TRÁI CÂY NHẬP KHẨU', -547.3, 285.3, 6, 4, 0xe8c85a, '#d97706', '#ffffff'],
@@ -4935,7 +4935,7 @@ const dgRail = (ax, az, bx, bz, h, kind, colHex) => {
     const left = new THREE.Mesh(new THREE.BoxGeometry(6.2, 9.9, D), mat(0x232428)); left.position.set(-3.3, 4.95, 0); g.add(left);
     const right = new THREE.Mesh(new THREE.BoxGeometry(6.2, 9.3, D), dgFacade('#efe9d8', '#5c6a72', 2, 3)); right.position.set(3.3, 4.65, 0); g.add(right);
     const s1 = new THREE.Mesh(new THREE.PlaneGeometry(5.6, 1.1), dgSign('ĐỒ DA', '#17181b', '#d8d3c0', 60)); s1.position.set(-3.3, 5.6, D / 2 + 0.08); g.add(s1);
-    const s2 = new THREE.Mesh(new THREE.PlaneGeometry(5.8, 1.0), dgSign('TAGONE FLORAL', '#f4f1e8', '#4a4438', 44)); s2.position.set(3.3, 4.4, D / 2 + 0.08); g.add(s2);
+    const s2 = new THREE.Mesh(new THREE.PlaneGeometry(5.8, 1.0), dgSign('HOA TƯƠI', '#f4f1e8', '#4a4438', 44)); s2.position.set(3.3, 4.4, D / 2 + 0.08); g.add(s2);
     const glass = new THREE.Mesh(new THREE.BoxGeometry(11.6, 2.4, 0.12), sharedMats.window); glass.position.set(0, 1.5, D / 2 + 0.04); g.add(glass);
     const roof = new THREE.Mesh(new THREE.BoxGeometry(W + 0.8, 0.6, D + 0.8), mat(0xb8b2a2)); roof.position.y = 10.1; g.add(roof);
     g.traverse((o) => { if (o.isMesh) o.castShadow = true; }); g.name = 'lkt_gence_tagone'; scene.add(g);
@@ -5192,7 +5192,7 @@ const tbHut = (x, z, ry, wallHex, roofHex) => {
   if (tbOK(-88, -641)) {
     const ry = Math.atan2(-0.358, -0.934);         // ≈ -2.776
     const g = tbBlockM(-88, -641, ry, 24, 16.5, 14, tbFacade('#3a3f45', '#20242a', 10, 5), 'tb_goldstar');
-    const s = new THREE.Mesh(new THREE.PlaneGeometry(16, 2.0), tbSign('GOLD STAR HOSPITAL', '#17181a', '#d43b3b', 46));
+    const s = new THREE.Mesh(new THREE.PlaneGeometry(16, 2.0), tbSign('BỆNH VIỆN QUỐC TẾ', '#17181a', '#d43b3b', 46));
     s.position.set(0, 12.6, 7.2); g.add(s);
     const s2 = new THREE.Mesh(new THREE.PlaneGeometry(6, 1.1), tbSign('NHÀ THUỐC', '#7a1f1f', '#ffe9c9', 46));
     s2.position.set(-7, 2.6, 7.2); g.add(s2);
@@ -9850,7 +9850,7 @@ const cbTower = (x, z, ry, W, D, FL, FH, wallMat, name) => {
   }
   const roof = new THREE.Mesh(new THREE.BoxGeometry(W + 1, 0.7, D + 1), mat(0xb8b2a2)); roof.position.y = H + 0.35; g.add(roof);
   g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
-  g.name = name; scene.add(g);
+  g.name = name; g.userData.kind = 'tower'; scene.add(g);   // cao ốc có tên (VP/kính/KS) → giữ + claim như lmTower
   addCollider(x, z, Math.max(W, D) * 0.52);
   FEATURED_CLEAR.push([x, z, Math.max(W, D) / 2 + 9]);
   return g;
@@ -10329,7 +10329,7 @@ const cnTower = (x, z, ry, W, D, FL, FH, wallMat, name) => {
     band.position.y = f * FH + FH * 0.62; g.add(band);
   }
   cnRoof(g, W, D, 0xb0aa9a, H + 0.35);
-  g.name = name; return g;
+  g.name = name; g.userData.kind = 'tower'; return g;   // cao ốc có tên → giữ + claim (vd cn_shpplaza 41 m)
 };
 // cây đa/si cổ thụ: thân + rễ phụ buông + tán lớn
 const cnBanyan = (x, z, scl = 1) => {
@@ -12431,7 +12431,7 @@ const v2Tower = (x, z, ry, W, D, FL, FH, wallMat, name) => {
   for (let f = 0; f < FL; f++) { const band = new THREE.Mesh(new THREE.BoxGeometry(W + 0.14, 1.5, D + 0.14), sharedMats.window); band.position.y = f * FH + FH * 0.62; g.add(band); }
   const roof = new THREE.Mesh(new THREE.BoxGeometry(W + 1, 0.7, D + 1), mat(0xb8b2a2)); roof.position.y = H + 0.35; g.add(roof);
   g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
-  g.name = name; scene.add(g);
+  g.name = name; g.userData.kind = 'tower'; scene.add(g);   // cao ốc có tên → giữ + claim (vd v2_curtainwall156 51 m)
   addCollider(x, z, Math.max(W, D) * 0.52); FEATURED_CLEAR.push([x, z, Math.max(W, D) / 2 + 9]);
   return g;
 };
@@ -17940,7 +17940,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     const s = new THREE.Mesh(new THREE.PlaneGeometry(Math.min(W * 0.8, 7), 1.4), s4Sign(signTxt, signBg || '#c1201a'));
     s.position.set(0, 4.4, D / 2 + 0.12); g.add(s);
   }
-  g.traverse((o) => { if (o.isMesh) o.castShadow = true; }); g.name = name; scene.add(g);
+  g.traverse((o) => { if (o.isMesh) o.castShadow = true; }); g.name = name; g.userData.kind = 'tower'; scene.add(g);   // cao ốc có tên → giữ + claim
   addCollider(x, z, Math.max(W, D) * 0.52);
   FEATURED_CLEAR.push([x, z, Math.max(W, D) / 2 + 10]);
   return g;

@@ -10,12 +10,13 @@ export const BRAND_MAP = [
   [/\b(VIETCOMBANK|VIETINBANK|AGRIBANK|BIDV|VPBANK|MSB|SHB|ACB|TECHCOMBANK|VIB|SCB|SEABANK|TPBANK|OCB|SACOMBANK|PVCOMBANK|ABBANK|VIETABANK|SAIGONBANK|EXIMBANK|HD ?BANK|PG ?BANK|BAOVIET ?BANK|NAM ?A ?BANK|LPBANK|VIETBANK|MB ?BANK|MBBANK|KIENLONGBANK|BAC ?A ?BANK|OCEANBANK|GPBANK|NCB|VIET ?CAPITAL ?BANK|MARITIME ?BANK)\b.*/i, 'NGÂN HÀNG'],
   [/^MB$/i, 'NGÂN HÀNG'],
   [/\bNGÂN HÀNG (Á CHÂU|NGOẠI THƯƠNG|CÔNG THƯƠNG|ĐẦU TƯ|NÔNG NGHIỆP|QUÂN ĐỘI|HÀNG HẢI|TIÊN PHONG|QUỐC TẾ|SÀI GÒN|VIỆT Á|BƯU ĐIỆN|AN BÌNH|PHƯƠNG ĐÔNG|KỸ THƯƠNG|XĂNG DẦU)\b.*/i, 'NGÂN HÀNG'],
-  [/\b(BẢO VIỆT|BAO ?VIET|BẢO MINH|BAO ?MINH|BẢO M\.{2,}|BẢO MIN\b|GENERALI|PRUDENTIAL|MANULIFE|DAI-?ICHI|AIA|PJICO|PVI)\b.*/i, 'BẢO HIỂM'],
+  [/\b(BẢO VIỆT|BAO ?VIET|BẢO MINH|BAO ?MINH|BẢO MIN|GENERALI|PRUDENTIAL|MANULIFE|DAI-?ICHI|PJICO|PVI)\b.*/i, 'BẢO HIỂM'],
+  [/\bBẢO M(\.{2,}|…).*/i, 'BẢO HIỂM'],   // bản cắt 'BẢO M...' (bản cũ trong nhóm trên có \b sau '...' → không bao giờ khớp)
   [/\bTỔNG CÔNG TY\s*(\.\.\.|…)?\s*BẢO MIN.*/i, 'BẢO HIỂM'],
   [/\b(SSI|VNDIRECT|HSC|VPS)\b.*/i, 'CHỨNG KHOÁN'],
   // tiện lợi / siêu thị
   [/\b(CIRCLE ?K|GS25|MINISTOP|B'?S ?MART|FAMILY ?MART|7-?ELEVEN)\b.*/i, 'CỬA HÀNG TIỆN LỢI'],
-  [/\b(WINMART|WIN ?MART|VINMART|BRG ?MART|CO\.?OP ?MART|CO\.?OP ?FOOD|CO\.?OP|COOPMART|BÁCH HÓA XANH|BÁCH HOÁ XANH|BIG ?C|LOTTE ?MART|AEON|GO!)\S*.*/i, 'SIÊU THỊ'],
+  [/\b(WINMART|WIN ?MART|VINMART|BRG ?MART|CO\.?OP ?MART|CO\.?OP ?FOOD|CO\.?OP|COOPMART|BÁCH HÓA XANH|BÁCH HOÁ XANH|BIG ?C|LOTTE ?MART|AEON)\S*.*/i, 'SIÊU THỊ'],
   // viễn thông / chuyển phát
   [/\bVIETTEL ?POST\b.*/i, 'CHUYỂN PHÁT NHANH'],
   [/\b(VIETTEL|VINAPHONE|MOBIFONE|VNPT|FPT ?TELECOM)\b.*/i, 'VIỄN THÔNG'],
@@ -35,9 +36,9 @@ export const BRAND_MAP = [
   [/\bCOOLER ?CITY\b.*/i, 'TRÀ SỮA'], [/\bBESTORE\b.*/i, 'ĂN VẶT'],
   // điện thoại / điện máy / điện lạnh
   [/\b(THE ?GIOI ?DI ?DONG|THEGIOIDIDONG|THẾ GIỚI DI ĐỘNG|FPT ?RETAIL|FPT ?SHOP|VIETTEL ?STORE|CELLPHONES|DI ĐỘNG VIỆT|HOÀNG HÀ MOBILE)\b.*/i, 'ĐIỆN THOẠI'],
-  [/\b(OPPO|SAMSUNG|SAMCENTER|IPHONE|APPLE|XIAOMI|VIVO|NOKIA|REALME|HUAWEI|HD ?MOBILE|SHB ?MOBILE)\b.*/i, 'ĐIỆN THOẠI'],
-  [/\b(PICO|SAMNEC|MEDIA ?MART|ĐIỆN MÁY XANH|NGUYỄN KIM|SONY|PANASONIC|TOSHIBA|BEKO|HITACHI|TCL|LG|SHARP|ELECTROLUX)\b.*/i, 'ĐIỆN MÁY'],
-  [/\b(CHIGO|GREE|DAIKIN|AQUA|HIKAWA|CASPER|FUNIKI)\b.*/i, 'ĐIỀU HÒA'],
+  [/\b(OPPO|SAMSUNG|SAMCENTER|IPHONE|XIAOMI|VIVO|NOKIA|REALME|HUAWEI|HD ?MOBILE|SHB ?MOBILE)\b.*/i, 'ĐIỆN THOẠI'],
+  [/\b(PICO|SAMNEC|MEDIA ?MART|ĐIỆN MÁY XANH|NGUYỄN KIM|SONY|PANASONIC|TOSHIBA|BEKO|HITACHI|TCL|SHARP|ELECTROLUX)\b.*/i, 'ĐIỆN MÁY'],
+  [/\b(CHIGO|GREE|DAIKIN|HIKAWA|CASPER|FUNIKI)\b.*/i, 'ĐIỀU HÒA'],
   [/\b(BOSCH|TAKARA|SPELIER|MALLOCA|HAFELE|CANZY)\b.*/i, 'THIẾT BỊ NHÀ BẾP'],
   [/\b(INAX|TOTO|VIGLACERA|CAESAR|AMERICAN ?STANDARD)\b.*/i, 'THIẾT BỊ VỆ SINH'],
   [/\b(OMRON|MEDIPHARCARE|MEDIPHAR)\b.*/i, 'THIẾT BỊ Y TẾ'],
@@ -48,14 +49,14 @@ export const BRAND_MAP = [
   [/\b(YADEA|DK ?BIKE|PEGA|VINFAST|ASAMA)\b.*/i, 'XE ĐIỆN'],
   [/\b(GAC ?MOTOR|TOYOTA|HYUNDAI|MAZDA|FORD|MITSUBISHI|THACO)\b.*/i, 'Ô TÔ'],
   [/\b(MICHELIN|CONTINENTAL|GOODYEAR|BRIDGESTONE|CASUMINA|DUNLOP)\b.*/i, 'LỐP XE'],
-  [/\b(CASTROL|SHELL)\b.*/i, 'DẦU NHỚT'],
+  [/\bCASTROL\b.*/i, 'DẦU NHỚT'],
   // thời trang / giày / trang sức
-  [/\b(ZARA|H&M|MANGO|LEVI'?S|IVY ?MODA|CANIFA|ELISE|CHRISBELLA|TOKYO ?LIFE|TOKY ?LIFE|SUNFLY|SIXDO|JK ?JEANS?|QIAODAN|WHITE ?DAISY|MOCHI|4TEEN|MADE IN VIETNAM|HOANG ?PHUC|ARISTINO|KAPPA|VIET ?TIEN|VTEC|FORMAT|AFANI|VICTORIA'?S? ?SECRET|VICTORIA|MAY ?10|SEVEN\.?\s?(AM|UOMO|ART)?|NEM ?FASHION|NINOMAXX|ROUTINE|YODY|OWEN|NIKE|ADIDAS|PUMA|UNIQLO)\b.*/i, 'THỜI TRANG'],
+  [/\b(ZARA|H&M|MANGO|LEVI'?S|IVY ?MODA|CANIFA|ELISE|CHRISBELLA|TOKYO ?LIFE|TOKY ?LIFE|SUNFLY|SIXDO|JK ?JEANS?|QIAODAN|WHITE ?DAISY|MOCHI|4TEEN|MADE IN VIETNAM|HOANG ?PHUC|ARISTINO|KAPPA|VIET ?TIEN|VTEC|AFANI|VICTORIA'?S? ?SECRET|VICTORIA|MAY ?10|SEVEN\.?\s?(AM|UOMO|ART)?|NEM ?FASHION|NINOMAXX|ROUTINE|YODY|OWEN|NIKE|ADIDAS|PUMA|UNIQLO)\b.*/i, 'THỜI TRANG'],
   [/\bTRIUMPH\b.*/i, 'ĐỒ LÓT'],
   [/\bBITI'?S?\b.*/i, 'GIÀY DÉP'],
   [/\bDOJI\b.*/i, 'TRANG SỨC'], [/\bPNJ\b.*/i, 'TIỆM VÀNG'], [/\bSJC\b.*/i, 'VÀNG BẠC'],
   // nhà thuốc / mỹ phẩm / mẹ&bé / y tế
-  [/\b(PHARMACITY|LONG ?CHÂU|LONG ?CHAU|AN ?KHANG|GUARDIAN|MEDICARE|HAIPHARCO|TRAPHACO|ECO ?PHARMA)\b.*/i, 'NHÀ THUỐC'],
+  [/\b(PHARMACITY|LONG ?CHÂU|LONG ?CHAU|MEDICARE|HAIPHARCO|TRAPHACO|ECO ?PHARMA)\b.*/i, 'NHÀ THUỐC'],
   [/\b(MEDELA|SIMILAC|CON ?CƯNG|KIDS ?PLAZA|BIBO ?MART)\b.*/i, 'MẸ & BÉ'], [/\b(TENAMYD|HASAKI|THE ?FACE ?SHOP|INNISFREE|KOJI|HANA)\b.*/i, 'MỸ PHẨM'],
   // chăn ga / nội thất / sơn / nhựa / nhôm
   [/\b(EVERON|HANVICO|LIEN ?A|KYMDAN)\b.*/i, 'CHĂN GA GỐI ĐỆM'],
@@ -64,7 +65,7 @@ export const BRAND_MAP = [
   [/ĐIỆN MÁY XANH/i, 'ĐIỆN MÁY'],
   [/\b(NORTHFREIGHT|HATRACO)\b.*/i, 'CÔNG TY VẬN TẢI'],
   [/\b(CROCS|ECKO( UNLTD)?)\b.*/i, 'GIÀY DÉP'],
-  [/\b(STARPOST|VNPOST|EMS)\b.*/i, 'CHUYỂN PHÁT NHANH'],
+  [/\b(STARPOST|VNPOST)\b.*/i, 'CHUYỂN PHÁT NHANH'],
   [/\bPOS\.VN\b.*/i, 'CỬA HÀNG'],
   [/\bDEEP ?C\b.*/i, 'VĂN PHÒNG'],
   [/\bPASSIO\b/i, ''],                                       // "PASSIO FITNESS & YOGA" → "FITNESS & YOGA"
@@ -73,7 +74,7 @@ export const BRAND_MAP = [
   [/\b(NHỰA ?)?TIỀN PHONG\b.*/i, 'ỐNG NHỰA'],
   [/\bXINGFA\b/i, ''],  // strip: giữ phần "NHÔM KÍNH ..." còn lại
   // giáo dục / tóc / cầm đồ / karaoke / đồ chơi / vận tải / tập đoàn
-  [/\b(APOLLO|SCOTS ?ENGLISH|ILA|VUS|OCEAN ?EDU|LANGMASTER|WALL ?STREET ?ENGLISH)\b.*/i, 'ANH NGỮ'],
+  [/\b(APOLLO|SCOTS ?ENGLISH|VUS|OCEAN ?EDU|LANGMASTER|WALL ?STREET ?ENGLISH)\b.*/i, 'ANH NGỮ'],
   [/\b30 ?SHINE\b.*/i, 'TÓC NAM'],
   [/\bF88\b.*/i, 'CẦM ĐỒ'], [/\b(FERROLI|ARISTON)\b.*/i, 'MÁY NƯỚC NÓNG'],
   [/\bVINAKTV\b.*/i, 'KARAOKE'],
@@ -91,6 +92,22 @@ export const BRAND_MAP = [
   [/\bVAB\b.*/i, 'NGÂN HÀNG'],
   [/\bBIA HÀ.*/i, 'BIA HƠI'],                                // "Bia Hà Nội" (Habeco), kể cả bản cắt "BIA HÀ..."
   [/\bBAMBOO\b/i, ''],
+  // tên riêng cơ sở thật còn sót (phản biện WP3): bệnh viện quốc tế NTP, shop thời trang, tiệm hoa
+  [/\bGOLD ?STAR\b.*HOSPITAL.*/i, 'BỆNH VIỆN QUỐC TẾ'], [/\bGOLD ?STAR\b.*/i, 'CỬA HÀNG'],
+  [/\bNOAH'?S\b.*/i, 'THỜI TRANG'], [/\bTAGONE\b.*/i, 'HOA TƯƠI'],
+  // TỪ THƯỜNG trùng tên hãng (shell, apple, aqua, guardian, format, go!) + viết tắt ngắn (LG, AIA, ILA, EMS) + AN KHANG:
+  // chỉ khớp khi là TỪ ĐẦU biển (hoặc ngay sau 'NHÀ THUỐC') — 'NHÀ HÀNG AN KHANG', "LET'S GO!", 'SEA SHELL' giữ nguyên
+  // (lưới an toàn lúc vẽ thay CẢ biển → token rộng = bẫy).
+  [/^\s*GO!(?=$|[\s\-–—,.:])/i, 'SIÊU THỊ'],
+  [/^\s*AIA(?=$|[\s\-–—,.!:])/i, 'BẢO HIỂM'],
+  [/^\s*LG(?=$|[\s\-–—,.!:])/i, 'ĐIỆN MÁY'],
+  [/^\s*AQUA(?=$|[\s\-–—,.!:])/i, 'ĐIỀU HÒA'],
+  [/^\s*SHELL(?=$|[\s\-–—,.!:])/i, 'DẦU NHỚT'],
+  [/^\s*APPLE(?=$|[\s\-–—,.!:])/i, 'ĐIỆN THOẠI'],
+  [/^\s*FORMAT(?=$|[\s\-–—,.!:])/i, 'THỜI TRANG'],
+  [/(^\s*|NHÀ THUỐC\s+)(AN ?KHANG|GUARDIAN)(?=$|[\s\-–—,.!:])/i, 'NHÀ THUỐC'],
+  [/^\s*ILA(?=$|[\s\-–—,.!:])/i, 'ANH NGỮ'],
+  [/^\s*EMS(?=$|[\s\-–—,.!:])/i, 'CHUYỂN PHÁT NHANH'],
 ];
 
 // Thay thương hiệu trong 1 chuỗi biển (giữ nguyên chuỗi nếu không khớp). Trả '' chỉ khi đầu vào rỗng.

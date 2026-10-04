@@ -18,6 +18,7 @@ import { decodeRB, makeFootprintGrid } from './buildings_data.js';
 import { RB_B64 } from './buildings_real.js';
 import { claimBox } from './claims.js';
 import { BRAND_MAP, debrand } from './brands.js';
+import { PARKS } from './mapdata.js';
 
 const _q = typeof location !== 'undefined' ? new URLSearchParams(location.search) : new URLSearchParams('');
 // ?cellsink=off → chỉ ghi (không gỡ, không claim) để A/B; =debug → như 'on' + giữ hình chiếu cho overlay QA;
@@ -35,7 +36,28 @@ export const CELLSINK_PARAMS = {
   DUP_MIN: 0.5,     // trùng lặp: giao ≥50% diện tích nhà nhỏ hơn
   DUP_MAX: 0.25,    //            và ≥25% nhà lớn hơn
   DUP_HR: 2,        //            và tỉ lệ chiều cao ≤2 (tháp trên khối đế KHÔNG phải trùng)
+  PARK_FRAC: 0.3,   // nhà dãy sinh tự động không có nhà thật gần, ≥30% khối đặc trong polygon công viên OSM → gỡ
 };
+
+// polygon công viên/vườn hoa OSM (mapdata PARKS) + bbox lọc nhanh
+let _parks = null;
+function inPark(x, z) {
+  if (!_parks) _parks = (PARKS || []).map((pts) => {
+    let x1 = 1e9, x2 = -1e9, z1 = 1e9, z2 = -1e9;
+    for (const [px, pz] of pts) { if (px < x1) x1 = px; if (px > x2) x2 = px; if (pz < z1) z1 = pz; if (pz > z2) z2 = pz; }
+    return { pts, x1, x2, z1, z2 };
+  });
+  for (const p of _parks) {
+    if (x < p.x1 || x > p.x2 || z < p.z1 || z > p.z2) continue;
+    let ins = false; const P = p.pts;
+    for (let i = 0, j = P.length - 1; i < P.length; j = i++) {
+      const [xi, zi] = P[i], [xj, zj] = P[j];
+      if ((zi > z) !== (zj > z) && x < (xj - xi) * (z - zi) / (zj - zi) + xi) ins = !ins;
+    }
+    if (ins) return true;
+  }
+  return false;
+}
 
 // ---------- footprint nhà thật dùng chung (giải mã 1 lần cho cả trang — WP2/WP8 dùng lại, đừng giải mã lần 2) ----------
 let _RB = null;
@@ -325,7 +347,14 @@ function rasterUp(m, yMin, S) {
 // ---------- phân loại theo tên ----------
 const SYS_RE = /^(rd_|tr_hptrees|de_|street_curbs|cloverleaf)/;
 const TREE_RE = /tree|palm|trunk|leaf|canopy|banyan|xacu|foliage|hedge|bougain|cay_|_cay\b|stake/;
-const OPEN_RE = /garden|park|pergola|plaza|fountain|nan\b|rail|wall|fence|rao|tuong|pillar|lancan|kerb|curb|caro|promenade|lamppost|globe|stall|kiosk|umbrella|tarp|scaffold|dirt|sanbong|walk|ke_|_ke\b/;
+// Tên KHÔNG-PHẢI-NHÀ loại MẠNH (đồ phố/kết cấu nhẹ): không bao giờ là nhà dù khối to — đài phun cb_dbp_fountain_nan
+// 96 ô/6.1 m, giàn hoa cb_garden_pergola 64 ô/4.9 m, giàn giáo w5_summo_scaffold 8 m, dãy cột đèn w3_199_lamppost 94 ô.
+const PROP_RE = /pergola|fountain|fence|pillar|lancan|kerb|curb|promenade|lamppost|globe|stall|kiosk|umbrella|tarp|scaffold|dirt|sanbong/;
+// Tên KHÔNG-PHẢI-NHÀ loại YẾU (không gian mở/tường): các từ này CŨNG nằm trong tên nhà thật — 'TƯỜNG TÂY' (tiệm cưới),
+// 'tường hông', 'curtainwall', 'shpplaza', 'lienke' (liền kề), 'AnAn' — nên chỉ phủ quyết khi khối THẤP/MỎNG/THƯA
+// (openVeto); 'ke'/'nan' neo theo token (ke_/nan\b cũ khớp nhầm 'lienke_'/'anan ').
+const OPEN_RE = /garden|park|plaza|rail|wall|rao|tuong|caro|walk|(^|[_\s])(ke|nan)([_\s]|$)/;
+const OPEN_VETO = { H: 4, CELLS: 30, THIN: 3.5, FILL: 0.3 };
 // token (đã bỏ số đuôi) → công trình danh tính. Khớp ĐÚNG token; tiền tố dài khớp startsWith.
 const CIVIC_EXACT = new Set(['ubnd', 'ub', 'nvh', 'cdc', 'hcdc', 'bv', 'bvps', 'cho', 'den', 'dinh', 'chua', 'yte', 'svd',
   'bidv', 'msb', 'acb', 'vib', 'scb', 'vab', 'vcb', 'baoviet', 'gate', 'cong', 'tt', 'thuvien', 'school', 'truong', 'cdkt']);
@@ -347,6 +376,11 @@ const NAME_KIND = {
   tt_vanhoa: 'civic', samnec: 'house', pico_bachdang: 'house',
   tb_tapthe_cho: 'house', w4_maytinh_hanghai: 'house',   // 'cho'/'hanghai' ở đây là tên phố/tiệm, không phải chợ/cơ quan
   tb_goldstar: 'civic', tb_goldstar_thap: 'civic',       // bệnh viện quốc tế (pano_537-540)
+  // CÁNH PHỤ của khuôn viên giữ lại (phản biện WP3: tách khuôn viên → cánh bị gỡ, ô trống lấp fabric chung)
+  dl_hxh_wing: 'heritage',                                // cánh 1T vàng mái ngói đỏ cạnh biệt thự dl_hxh_villa_* (pano_504_h090)
+  tb_fiin_wing: 'civic', tb_antra_wing: 'civic',          // cánh VP sau cổng tb_fiin_cong / tb_antra_cong
+  // nhà RIÊNG dựng đúng ảnh (không phải dãy sinh tự động) — fabric chung không tái tạo được
+  w5_cafe_gach_dth: 'bespoke',                            // quán cà phê tường gạch hoa thông gió (pano_048_h090)
   v2_haithanh_bld: 'civic',                               // khối VP 5T sau cổng 3 cột cờ (cùng khuôn viên v2_cong_haithanh)
   w5_phonglan_bld: 'tower',                               // cao ốc kính 6T có tên (pano_048)
 };
@@ -364,10 +398,23 @@ export function nameKind(name) {
     for (const p of CIVIC_INCL) if (t.includes(p)) return 'civic';
   }
   for (const t of tokens(n)) for (const p of TOWER_PREFIX) if (t.startsWith(p)) return 'tower';
+  if (PROP_RE.test(n)) return 'propn';
   if (OPEN_RE.test(n)) return 'open';
   if (HERIT_RE.test(n)) return 'heritage';
   return '';
 }
+// tên 'open' (yếu) chỉ phủ quyết khi khối thấp / ít ô / mỏng (tường, rào, bậc) / thưa (vườn có chòi rải rác)
+function openVeto(S, height) {
+  const V = OPEN_VETO;
+  if (height < V.H || S.size < V.CELLS) return true;
+  const r = minRect(hull([...S].map((k) => [KX(k) + 0.5, KZ(k) + 0.5])));
+  return 2 * Math.min(r.hx, r.hz) + 1 < V.THIN || S.size < V.FILL * (2 * r.hx + 1) * (2 * r.hz + 1);
+}
+// cánh/nhà phụ cùng khuôn viên: tên có token wing/annex/canh + chung 2 token đầu với công trình giữ lại ≤45 m → cùng loại
+const WING_RE = /(^|[_\s])(wing|annex|canh)([_\s]|$)/;
+const prefix2 = (name) => tokens(name).slice(0, 2).join('_');
+// trùng lặp: bản ưu tiên (vẽ lại theo audit mới hơn) thắng bất kể điểm hạng
+const DUP_PREFER = new Set(['s4_biethu_tp']);   // biển 'CHO THUÊ NHÀ' + cổng sắt xanh đúng audit pano_398_h180
 function styleHint(name) {
   const n = (name || '').toLowerCase();
   if (/phap|bietthu|biethu|villa|colonial|arcade|mansard|manoir|turret|marble/.test(n)) return 'villa';
@@ -399,9 +446,14 @@ function commitSink(sink, THREE, realScene, realFC, colliders, opts) {
     it.hull = hull(pts);
     const mc = massCells(it.shape);
     it.S = mc.S; it.height = mc.top - mc.base; it.base = mc.base;
-    it.bldg = mc.S.size >= PR.MIN_CELLS && it.height >= PR.MIN_H && nk !== 'tree' && nk !== 'open' && tag !== 'prop' && tag !== 'tree';
-    if (!it.bldg) { it.kind = tag || (nk === 'tree' ? 'tree' : nk === 'open' ? 'open' : 'prop'); return it; }
-    it.kind = tag || (nk === 'civic' || nk === 'house' || nk === 'tower' ? nk
+    // HÌNH HỌC quyết trước (≥MIN_CELLS ô đặc, cao ≥MIN_H); tên chỉ phủ quyết khi: thẻ prop/tree/open đặt tay, tên cây/
+    // đồ phố (mạnh), hoặc tên không gian mở/tường (yếu) VÀ khối thấp/mỏng/thưa (openVeto).
+    const massive = mc.S.size >= PR.MIN_CELLS && it.height >= PR.MIN_H;
+    const veto = tag === 'prop' || tag === 'tree' || tag === 'open' || nk === 'tree' || nk === 'propn' ||
+      (nk === 'open' && massive && openVeto(mc.S, it.height));
+    it.bldg = massive && !veto;
+    if (!it.bldg) { it.kind = tag || (nk === 'tree' ? 'tree' : nk === 'open' || nk === 'propn' ? 'open' : 'prop'); return it; }
+    it.kind = tag || (nk === 'civic' || nk === 'house' || nk === 'tower' || nk === 'bespoke' ? nk
       : nk === 'heritage' && mc.S.size >= PR.HERIT_MIN ? 'heritage' : it.height >= PR.TOWER_H ? 'tower' : 'house');
     return it;
   });
@@ -447,12 +499,27 @@ function commitSink(sink, THREE, realScene, realFC, colliders, opts) {
   }
   const tReal = performance.now();
 
+  // 2b) cánh phụ khuôn viên: 'xx_yy_wing' cạnh công trình giữ lại cùng tiền tố 'xx_yy' (≤45 m) → cùng loại (không tách)
+  for (const it of bl) {
+    if (it.kind !== 'house' || it.tag || !WING_RE.test(it.name.toLowerCase())) continue;
+    const pf = prefix2(it.name);
+    for (const o of bl) if (o !== it && o.kind !== 'house' && prefix2(o.name) === pf && Math.hypot(o.cx - it.cx, o.cz - it.cz) <= 45) { it.kind = o.kind; it.wingOf = o.name; break; }
+  }
+
   // 3) quyết định gỡ (chỉ NHÀ chung chung)
   const live = MODE !== 'off';
   for (const it of bl) {
     if (it.kind !== 'house') continue;
     if (it.frac >= PR.OVERLAP) it.removed = 'overlap';
     else if (it.dReal <= PR.NEAR) it.removed = 'near';
+  }
+  // 3b) nhà DÃY SINH TỰ ĐỘNG (thẻ 'house' của rowP/cnRow/…) không có nhà thật gần mà đứng ≥PARK_FRAC trong polygon công
+  //     viên/vườn hoa OSM → gỡ (vd ~10 ln_row trên thảm cỏ vườn hoa An Biên, cam_high_center) — KHÔNG claim chỗ cỏ.
+  for (const it of bl) {
+    if (it.removed || it.kind !== 'house' || it.tag !== 'house') continue;
+    let inP = 0;
+    for (const k of it.keys) if (inPark(KX(k) + 0.5, KZ(k) + 0.5)) inP++;
+    if (inP >= PR.PARK_FRAC * it.keys.length) { it.removed = 'park'; it.parkFrac = +(inP / it.keys.length).toFixed(2); }
   }
   // 4) trùng lặp giữa các nhà còn lại (ưu tiên: danh tính > nhà; khớp nhà thật hơn; chi tiết hơn; vẽ trước)
   const surv = bl.filter((it) => !it.removed);
@@ -478,7 +545,8 @@ function commitSink(sink, THREE, realScene, realFC, colliders, opts) {
       const hr = Math.max(A.height, B.height) / Math.max(0.1, Math.min(A.height, B.height));
       if (hr > PR.DUP_HR) continue;   // tháp trên khối đế KHÔNG phải trùng
     }
-    const loser = contained ? small : rank(A) >= rank(B) ? B : A, winner = loser === A ? B : A;
+    const pref = DUP_PREFER.has(A.name) ? A : DUP_PREFER.has(B.name) ? B : null;
+    const loser = pref ? (pref === A ? B : A) : contained ? small : rank(A) >= rank(B) ? B : A, winner = loser === A ? B : A;
     loser.removed = 'dup'; loser.dupOf = winner.name; dups.push([winner.name || '#' + winner.i, loser.name || '#' + loser.i]);
   }
 
@@ -585,10 +653,13 @@ function commitSink(sink, THREE, realScene, realFC, colliders, opts) {
   _report = {
     mode: MODE, blockMs: +(t0 - stats.t0).toFixed(1), ms: +(performance.now() - t0).toFixed(1), msShape: +(tShape - t0).toFixed(1), msReal: +(tReal - tShape).toFixed(1), msApply: +(tApply - tReal).toFixed(1),
     objects: items.length, buildings: bl.length,
-    kinds: { civic: cnt((it) => it.bldg && it.kind === 'civic'), tower: cnt((it) => it.bldg && it.kind === 'tower'), heritage: cnt((it) => it.bldg && it.kind === 'heritage'), house: cnt((it) => it.bldg && it.kind === 'house'),
+    // kinds = TỔNG nhà theo loại (kể cả bản trùng bị gỡ); keptKinds = chỉ nhà GIỮ LẠI (có claim)
+    kinds: { civic: cnt((it) => it.bldg && it.kind === 'civic'), tower: cnt((it) => it.bldg && it.kind === 'tower'), heritage: cnt((it) => it.bldg && it.kind === 'heritage'), bespoke: cnt((it) => it.bldg && it.kind === 'bespoke'), house: cnt((it) => it.bldg && it.kind === 'house'),
       tree: cnt((it) => it.kind === 'tree'), open: cnt((it) => it.kind === 'open'), prop: cnt((it) => it.kind === 'prop'), sys: cnt((it) => it.kind === 'sys') },
-    removed: { total: nRem, overlap: cnt((it) => it.removed === 'overlap'), near: cnt((it) => it.removed === 'near'), dup: cnt((it) => it.removed === 'dup'), attached: propsRemoved },
+    removed: { total: nRem, overlap: cnt((it) => it.removed === 'overlap'), near: cnt((it) => it.removed === 'near'), park: cnt((it) => it.removed === 'park'), dup: cnt((it) => it.removed === 'dup'), attached: propsRemoved },
     keptBuildings: bl.filter((it) => !it.removed).length,
+    keptKinds: bl.filter((it) => !it.removed).reduce((o, it) => { o[it.kind] = (o[it.kind] || 0) + 1; return o; }, {}),
+    wings: bl.filter((it) => it.wingOf).map((it) => [it.name, it.wingOf, it.kind]),
     colliders: { cells: cols.length, removed: deadCol.size }, featuredClear: { cells: fcs.length, removed: deadFC.size },
     claims: nClaims, dups, bySection: bySec,
     tex: { calls: stats.texCalls, created: stats.texNew, keyHit: stats.texHit, drawn: stats.texDrawn, neverDrawn: stats.texSkipped, drawMs: +stats.texMs.toFixed(1), settleMs: +msTex.toFixed(1), kept: keptTex.size, keptBySize: [...keptTex].reduce((o, t) => { const k = t.name || (t.image ? t.image.width + "x" + t.image.height : "?"); o[k] = (o[k] || 0) + 1; return o; }, {}) }, materialsKept: keptMat.size,
@@ -601,7 +672,7 @@ function commitSink(sink, THREE, realScene, realFC, colliders, opts) {
     attached: items.filter((it) => it.removed === 'attached').map((it) => [it.name || it.o.type, it.host, +it.shape.y0.toFixed(1), it.shape.meshes.length]),
   };
   sink.release();
-  if (typeof console !== 'undefined') console.log(`[cellsink] ${MODE}: ${bl.length} nhà ô → giữ ${_report.keptBuildings}, gỡ ${nRem} (đè ${_report.removed.overlap}, gần ${_report.removed.near}, trùng ${_report.removed.dup}, đồ treo ${propsRemoved}); collider −${deadCol.size}, FC −${deadFC.size}; claim ${nClaims}; ${_report.ms} ms`);
+  if (typeof console !== 'undefined') console.log(`[cellsink] ${MODE}: ${bl.length} nhà ô → giữ ${_report.keptBuildings}, gỡ ${nRem} (đè ${_report.removed.overlap}, gần ${_report.removed.near}, cỏ ${_report.removed.park}, trùng ${_report.removed.dup}, đồ treo ${propsRemoved}); collider −${deadCol.size}, FC −${deadFC.size}; claim ${nClaims}; ${_report.ms} ms`);
   return _report;
 }
 const LAND_Y = 2;   // = LAND_H world.js (nền phố phẳng)
@@ -611,7 +682,9 @@ const LAND_Y = 2;   // = LAND_H world.js (nền phố phẳng)
 // không trong suốt/alphaTest/vertexColors/màu nhuộm (color trắng), không emissive/map phụ, onBeforeCompile mặc định,
 // và UV của geometry nằm trong [0,1]. Ô atlas = kích thước canvas gốc (ảnh lùi vào G px mỗi bên, viền kéo giãn chống
 // loang mip). Mỗi mesh nhận geometry CLONE (UV đổi sang ô atlas) + material atlas dùng chung.
-const AT_PAGE = 2048, AT_G = 4;
+// Viền G px NẰM NGOÀI ảnh (ô = w+2G × h+2G, ảnh giữ nguyên độ phân giải, không co lại) — G=8 an toàn tới mip 3
+// (phản biện: G=4 co ảnh vào trong → mờ chữ + biển kề nhau loang sang nhau ở mip xa).
+const AT_PAGE = 2048, AT_G = 8;
 function atlasKept(kept, createdTex, THREE) {
   const plain = (q) => q && !Array.isArray(q) && (q.isMeshLambertMaterial || q.isMeshBasicMaterial) && q.map && createdTex.has(q.map) &&
     !q.transparent && !q.alphaTest && !q.vertexColors && q.color && q.color.getHex() === 0xffffff &&
@@ -636,7 +709,7 @@ function atlasKept(kept, createdTex, THREE) {
   const list = [...texs.keys()].sort((a, b) => b.image.height - a.image.height || b.image.width - a.image.width);
   const pages = []; let pg = null, x = 0, y = 0, rowH = 0;
   for (const t of list) {
-    const w = t.image.width, h = t.image.height;
+    const w = t.image.width + 2 * AT_G, h = t.image.height + 2 * AT_G;   // ô gồm viền
     if (!pg || x + w > AT_PAGE) { x = 0; y += rowH; rowH = 0; }
     if (!pg || y + h > AT_PAGE) { pg = { items: [] }; pages.push(pg); x = 0; y = 0; rowH = 0; }
     texs.set(t, { pg: pages.length - 1, x, y, w, h }); pg.items.push(t);
@@ -650,8 +723,8 @@ function atlasKept(kept, createdTex, THREE) {
     const g = cv.getContext('2d');
     for (const t of p.items) {
       const c = texs.get(t);
-      g.drawImage(t.image, c.x, c.y, c.w, c.h);                                     // nền ô = ảnh kéo giãn (viền chống loang)
-      g.drawImage(t.image, c.x + AT_G, c.y + AT_G, c.w - 2 * AT_G, c.h - 2 * AT_G);  // ảnh thật lùi vào G px
+      g.drawImage(t.image, c.x, c.y, c.w, c.h);                                     // nền ô = ảnh kéo giãn ra viền (chống loang)
+      g.drawImage(t.image, c.x + AT_G, c.y + AT_G, c.w - 2 * AT_G, c.h - 2 * AT_G);  // ảnh thật 1:1 ở giữa (c.w-2G = w gốc)
     }
     const tx = new THREE.CanvasTexture(cv);
     tx.colorSpace = ref.colorSpace; tx.anisotropy = ref.anisotropy; tx.name = 'cellAtlas' + k;
