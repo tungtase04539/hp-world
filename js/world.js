@@ -3,6 +3,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { makeCellSink } from './cellsink.js';
+import { initClearance, sweepAssemblies, flushClearance } from './clearance.js';   // Đợt 3 W2-A: khoảng trống phố/camera pano
 import { registerModel, shrinkTexturesForMobile, assetURL } from './assets.js';
 import { IS_MOBILE, LITE } from './device.js';
 import {
@@ -964,6 +965,11 @@ export async function buildWorld(scene, prog = () => {}) {
   //  vạch kẻ "dashes", ngõ "paths", vỉa hè hộp "sidewalk_TYPE" do roadnet.js thay thế.)
 
   await prog('street');
+  // ---------- ĐỢT 3 W2-A KHOẢNG TRỐNG: tra cứu lòng đường (roadNet.surfaceAt — biết khe nhựa đường đôi) / hành lang
+  // mặt tiền (xsection.facadeLine) / camera pano (panoclear) cho khối phố này, khối ô (cellsink) và props/trees.
+  // Mọi vật thể cấp cao nhất + collider của khối phố (từ đây tới trước khối ô) được quét 1 lượt ở cuối khối (sweep).
+  initClearance({ ROADS_DT, surfaceAt: world.roadNet && world.roadNet.surfaceAt, nearJunction: world.roadNet && world.roadNet.nearJunction, groundHeight, LAND_H });
+  const _clrN0 = scene.children.length, _clrC0 = colliders.length;
   // ---------- GIÀN VÒM THÉP TRẮNG trang trí (dải công viên trung tâm, gần Trần Bình Trọng) ----------
   // Theo pano thật pano_195 [~555,-234]: dãy vòm bán nguyệt trắng lặp trên lối đi lát.
   {
@@ -1823,6 +1829,15 @@ export async function buildWorld(scene, prog = () => {}) {
       }
     }
   }
+  // ---------- ĐỢT 3 W2-A: QUÉT KHOẢNG TRỐNG khối phố (giàn vòm, cột cờ, quảng trường Nhà hát, kè hồ, băng rôn, xích lô,
+  // đài phun, cây xăng, chữ HẢI PHÒNG, hòn non bộ, dải Hoàng Diệu, công trình đặc trưng): các khối này đặt theo toạ độ tay /
+  // đường thẳng xấp xỉ TRƯỚC khi có mạng đường thật → nhiều cái đứng giữa nút giao/lòng đường (đài phun, hòn non bộ ngay
+  // trên camera pano_014, cây xăng chùm lòng phố, bonsai quảng trường trên road#9) hoặc showroom/khách sạn lấn vỉa hè tới
+  // mép lòng (pano_014/018). Mesh gộp (addMerged) tách theo thành phần liên thông + gom cụm chồng nhau (chậu+tán+kiềng);
+  // cụm vi phạm → dời lùi (nhà: theo pháp tuyến phố ra sau facadeLine ≤ 8 m; đồ nhỏ: ra khỏi lòng/xa camera ≤ 6 m) hoặc gỡ.
+  // Dải phân cách (median) và mặt lát phẳng được giữ nguyên. Báo cáo: world.streetClear.
+  world.streetClear = sweepAssemblies(scene.children.slice(_clrN0), colliders.slice(_clrC0), FEATURED_CLEAR, { keep: (n) => /median|_promenade$|^opera_sq|_dirt$/.test(n) });
+  flushClearance();
 
   await prog('cells');
 

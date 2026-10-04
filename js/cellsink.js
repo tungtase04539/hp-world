@@ -19,6 +19,7 @@ import { RB_B64 } from './buildings_real.js';
 import { claimBox } from './claims.js';
 import { BRAND_MAP, debrand } from './brands.js';
 import { PARKS } from './mapdata.js';
+import { clearanceReady, sampleObject, evalShift, solveShift, sweepAssemblies, flushClearance, CLEAR } from './clearance.js';   // Đợt 3 W2-A
 
 const _q = typeof location !== 'undefined' ? new URLSearchParams(location.search) : new URLSearchParams('');
 // ?cellsink=off → chỉ ghi (không gỡ, không claim) để A/B; =debug → như 'on' + giữ hình chiếu cho overlay QA;
@@ -555,21 +556,79 @@ function commitSink(sink, THREE, realScene, realFC, colliders, opts) {
     loser.removed = 'dup'; loser.dupOf = winner.name; dups.push([winner.name || '#' + winner.i, loser.name || '#' + loser.i]);
   }
 
-  // 5) biển/mái hiên/điều hoà… treo trên mặt tiền nhà bị gỡ (vật thể RỜI cấp cao nhất)
-  const remCell = new Map();
-  for (const it of bl) if (it.removed) for (const k of it.keys) remCell.set(k, it);
+  // 5a) KHOẢNG TRỐNG (Đợt 3 W2-A, js/clearance.js) cho NHÀ còn giữ: chân lấn hành lang phố (quá facadeLine của phố có vỉa,
+  //     mép ngõ h/w), đứng trên lòng đường, hoặc thân < 3 m camera pano (camera trong hành lang + mặt tiền đã ở đúng
+  //     facadeLine thì KHÔNG tính — lệch dữ liệu camera) → DỜI LÙI theo pháp tuyến phố (≤ 8 m; cao ốc ≥ 15 m ≤ 14 m);
+  //     không dời được: nhà chung chung → gỡ ('clear'), công trình danh tính → GIỮ tại chỗ (báo cáo clear.stuck).
+  //     Ghi it.shift; áp dụng (vật thể, ô khối đặc, collider, FC, đồ treo) ở bước 7b — bước 6 cần toạ độ CŨ để tìm chủ.
+  const clr = { moved: [], removed: [], stuck: [], ms: 0 };
+  const tClr0 = performance.now();
+  const IDENT = new Set(['civic', 'tower', 'heritage', 'bespoke']);
+  if (live && clearanceReady()) for (const it of bl) {
+    if (it.removed) continue;
+    const S = sampleObject(it.o);
+    if (!S.nMesh || !evalShift(S, 0, 0, 'bldg').bad) continue;
+    const maxS = it.height >= 15 ? CLEAR.MAX_SHIFT_TOWER : CLEAR.MAX_SHIFT_BLDG;
+    const sol = solveShift(S, 'bldg', IDENT.has(it.kind) ? Math.max(maxS, 12) : maxS);
+    const where = [+it.cx.toFixed(1), +it.cz.toFixed(1)];
+    if (sol) { it.shift = [sol.dx, sol.dz]; clr.moved.push([it.name, it.kind, where, +sol.dx.toFixed(2), +sol.dz.toFixed(2)]); }
+    else if (IDENT.has(it.kind)) { const e = evalShift(S, 0, 0, 'bldg'); clr.stuck.push([it.name, it.kind, where, +e.pen.toFixed(2), +e.pano.toFixed(2)]); }
+    else { it.removed = 'clear'; clr.removed.push([it.name, it.kind, where]); }
+  }
+
+  // 5) biển/mái hiên/điều hoà… treo trên mặt tiền nhà bị gỡ (vật thể RỜI cấp cao nhất) — nhà bị DỜI (5a) thì đồ treo dời theo
+  const remCell = new Map(), shCell = new Map();
+  for (const it of bl) if (it.removed) for (const k of it.keys) remCell.set(k, it); else if (it.shift) for (const k of it.keys) shCell.set(k, it);
   let propsRemoved = 0;
   for (const it of items) {
     if (it.bldg || it.kind === 'sys' || it.kind === 'tree' || !it.shape || !it.hull.length) continue;
     if (it.shape.meshes.every((q) => q.leafy || q.green)) continue;   // tán cây rời (cầu xanh) — không phải đồ treo
     let x = 0, z = 0; for (const [px, pz] of it.hull) { x += px; z += pz; } x /= it.hull.length; z /= it.hull.length;
     const ix = Math.floor(x), iz = Math.floor(z);
-    let host = remCell.get(KEY(ix, iz));
-    if (!host && it.shape.y0 >= (LAND_Y + 1.2)) {   // treo cao (không đứng trên vỉa hè) trong vành 1 m quanh nhà bị gỡ
-      for (let dx = -1; dx <= 1 && !host; dx++) for (let dz = -1; dz <= 1 && !host; dz++) host = remCell.get(KEY(ix + dx, iz + dz));
+    for (const M of [remCell, shCell]) {
+      let host = M.get(KEY(ix, iz));
+      if (!host && it.shape.y0 >= (LAND_Y + 1.2)) {   // treo cao (không đứng trên vỉa hè) trong vành 1 m quanh nhà bị gỡ/dời
+        for (let dx = -1; dx <= 1 && !host; dx++) for (let dz = -1; dz <= 1 && !host; dz++) host = M.get(KEY(ix + dx, iz + dz));
+      }
+      if (!host) continue;
+      if (M === remCell) { it.removed = 'attached'; it.host = host.name; propsRemoved++; }
+      else { it.shift = host.shift; it.host = host.name; }
+      break;
     }
-    if (host) { it.removed = 'attached'; it.host = host.name; propsRemoved++; }
   }
+  // 5c) KHOẢNG TRỐNG cho vật thể KHÔNG phải nhà (cổng, tường rào, kiốt, lan can, đồ phố…) chưa gỡ/chưa dời theo chủ: chỉ
+  //     luật LÒNG ĐƯỜNG + CAMERA (tường rào/cổng đúng ranh đất nằm sát mép vỉa — không đẩy theo facadeLine như nhà).
+  //     Vật nhỏ/vừa (≤ 20 m) dời cứng ≤ 6 m hoặc gỡ; vật TRẢI DÀI (nhóm-chứa toạ độ thế giới, mesh gộp: dãy lều + rào dọc
+  //     kè, hàng cọc…) → sweepAssemblies trên từng mảnh (chỉ mảnh vi phạm bị dời/gỡ, không mất cả dãy).
+  //     Dải phân cách (median) là đồ ĐÚNG trên lòng đường → giữ.
+  if (live && clearanceReady()) {
+    const big = [];
+    for (const it of items) {
+      if (it.bldg || it.removed || it.shift || it.kind === 'sys' || it.kind === 'tree' || !it.shape) continue;
+      if (/median/i.test(it.name) || it.shape.meshes.every((q) => q.leafy || q.green)) continue;
+      const S = sampleObject(it.o);
+      if (!S.nMesh) continue;
+      if (Math.max(S.x1 - S.x0, S.z1 - S.z0) > 20) { big.push(it); continue; }
+      if (!evalShift(S, 0, 0, 'small').bad) continue;
+      const sol = solveShift(S, 'small', CLEAR.MAX_SHIFT_SMALL);
+      const where = [+((S.x0 + S.x1) / 2).toFixed(1), +((S.z0 + S.z1) / 2).toFixed(1)];
+      if (sol) { it.shift = [sol.dx, sol.dz]; clr.moved.push([it.name || it.o.type, it.kind, where, +sol.dx.toFixed(2), +sol.dz.toFixed(2)]); }
+      else { it.removed = 'clear'; clr.removed.push([it.name || it.o.type, it.kind, where]); }
+    }
+    // vật trải dài: mảnh = con của nhóm-chứa (ma trận đơn vị) hoặc thành phần liên thông của mesh gộp; collider/FC của khối ô
+    // nằm trong mảnh dời/tắt theo (sweepAssemblies)
+    const colAll = cols.map((q) => q.c), fcAll = fcs.map((q) => q.e);
+    for (const it of big) {
+      const o = it.o, e = o.matrixWorld.elements;
+      const ident = Math.abs(e[0] - 1) < 1e-6 && Math.abs(e[10] - 1) < 1e-6 && Math.abs(e[12]) < 1e-6 && Math.abs(e[14]) < 1e-6;
+      const parts = o.isGroup && ident ? o.children.slice() : [o];
+      const r = sweepAssemblies(parts, colAll, fcAll, { keep: (n) => /median/i.test(n) });
+      if (r.moved && r.moved.length) clr.moved.push([it.name || o.type, it.kind + '/parts', r.moved.length]);
+      if (r.removed && r.removed.length) clr.removed.push([it.name || o.type, it.kind + '/parts', r.removed.length]);
+    }
+    flushClearance();
+  }
+  clr.ms = +(performance.now() - tClr0).toFixed(1);
 
   // 6) collider + vòng FEATURED_CLEAR: chủ = vật thể chứa tâm (ô khối đặc ±1 / bbox vật nhỏ), gần nhất theo thứ tự tạo
   const owners = new Map();   // ô 8 m → items (vật nhỏ theo bbox)
@@ -600,10 +659,10 @@ function commitSink(sink, THREE, realScene, realFC, colliders, opts) {
     }
     return best;
   };
-  const deadCol = new Set(), deadFC = new Set();
+  const deadCol = new Set(), deadFC = new Set(), shiftCol = [], shiftFC = [];
   if (live) {
-    for (const { c, seq } of cols) { const o = ownerOf(c.x, c.z, seq); if (o && o.removed) deadCol.add(c); }
-    for (const { e, seq } of fcs) { const o = ownerOf(e[0], e[1], seq); if (o && o.removed) deadFC.add(e); }
+    for (const { c, seq } of cols) { const o = ownerOf(c.x, c.z, seq); if (o && o.removed) deadCol.add(c); else if (o && o.shift) shiftCol.push([c, o.shift]); }
+    for (const { e, seq } of fcs) { const o = ownerOf(e[0], e[1], seq); if (o && o.removed) deadFC.add(e); else if (o && o.shift) shiftFC.push([e, o.shift]); }
   }
 
   // 7) áp dụng: gỡ khỏi cảnh, nén mảng collider (colIdx còn null tới lần resolveCollisions đầu) + FEATURED_CLEAR
@@ -618,6 +677,20 @@ function commitSink(sink, THREE, realScene, realFC, colliders, opts) {
     ch.length = w; nRem = dead.size;
     if (deadCol.size) { let w = 0; for (let r = 0; r < colliders.length; r++) if (!deadCol.has(colliders[r])) colliders[w++] = colliders[r]; colliders.length = w; }
     if (deadFC.size) { let w = 0; for (let r = 0; r < realFC.length; r++) if (!deadFC.has(realFC[r])) realFC[w++] = realFC[r]; realFC.length = w; }
+    // 7b) DỜI (W2-A 5a/5c): vật thể (position — nhóm chứa toạ độ thế giới cũng dời đúng), collider + FC của nó, ô khối đặc/
+    //     bao lồi/tâm (cho claim + cellKept ở bước 8)
+    for (const it of items) {
+      if (!it.shift || it.removed) continue;
+      const [dx, dz] = it.shift;
+      it.o.position.x += dx; it.o.position.z += dz; it.o.updateMatrixWorld(true);
+      if (it.bldg) {
+        const ox = Math.round(dx), oz = Math.round(dz);
+        it.keys = it.keys.map((k) => KEY(KX(k) + ox, KZ(k) + oz)); it.S = new Set(it.keys);
+        it.H = it.H.map(([x, z]) => [x + dx, z + dz]); it.cx += dx; it.cz += dz;
+      }
+    }
+    for (const [c, s] of shiftCol) { c.x += s[0]; c.z += s[1]; }
+    for (const [e, s] of shiftFC) { e[0] += s[0]; e[1] += s[1]; }
   }
   // 7a) vẽ texture lười còn hiện ra (texture CHỈ nhà bị gỡ dùng → không bao giờ vẽ)
   const tTex0 = performance.now();
@@ -669,6 +742,7 @@ function commitSink(sink, THREE, realScene, realFC, colliders, opts) {
     claims: nClaims, dups, bySection: bySec,
     tex: { calls: stats.texCalls, created: stats.texNew, keyHit: stats.texHit, drawn: stats.texDrawn, neverDrawn: stats.texSkipped, drawMs: +stats.texMs.toFixed(1), settleMs: +msTex.toFixed(1), kept: keptTex.size, keptBySize: [...keptTex].reduce((o, t) => { const k = t.name || (t.image ? t.image.width + "x" + t.image.height : "?"); o[k] = (o[k] || 0) + 1; return o; }, {}) }, materialsKept: keptMat.size,
     memo: { hit: stats.memoHit, miss: stats.memoMiss }, atlas, brandHits: stats.brandHits,
+    clear: clr,   // W2-A: {moved:[[tên,loại,[x,z],dx,dz]], removed, stuck, ms}
     shops,
     // nhà ô GIỮ LẠI + bao lồi ô khối đặc (để WP2 CẮT footprint thật theo đa giác thay vì bỏ/giữ cả footprint)
     kept: live ? bl.filter((it) => !it.removed).map((it) => ({ name: it.name, kind: it.kind, cx: +it.cx.toFixed(1), cz: +it.cz.toFixed(1), h: +it.height.toFixed(1), hull: it.H.map(([x, z]) => [+x.toFixed(1), +z.toFixed(1)]) })) : [],
@@ -679,7 +753,7 @@ function commitSink(sink, THREE, realScene, realFC, colliders, opts) {
     attached: items.filter((it) => it.removed === 'attached').map((it) => [it.name || it.o.type, it.host, +it.shape.y0.toFixed(1), it.shape.meshes.length]),
   };
   sink.release();
-  if (typeof console !== 'undefined') console.log(`[cellsink] ${MODE}: ${bl.length} nhà ô → giữ ${_report.keptBuildings}, gỡ ${nRem} (đè ${_report.removed.overlap}, gần ${_report.removed.near}, cỏ ${_report.removed.park}, trùng ${_report.removed.dup}, đồ treo ${propsRemoved}); collider −${deadCol.size}, FC −${deadFC.size}; claim ${nClaims}; ${_report.ms} ms`);
+  if (typeof console !== 'undefined') console.log(`[cellsink] ${MODE}: ${bl.length} nhà ô → giữ ${_report.keptBuildings}, gỡ ${nRem} (đè ${_report.removed.overlap}, gần ${_report.removed.near}, cỏ ${_report.removed.park}, trùng ${_report.removed.dup}, đồ treo ${propsRemoved}); collider −${deadCol.size}, FC −${deadFC.size}; claim ${nClaims}; khoảng trống: dời ${clr.moved.length}, gỡ ${clr.removed.length}, kẹt ${clr.stuck.length} (${clr.ms} ms); ${_report.ms} ms`);
   return _report;
 }
 const LAND_Y = 2;   // = LAND_H world.js (nền phố phẳng)
