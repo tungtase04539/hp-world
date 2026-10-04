@@ -641,11 +641,13 @@ function animate() {
   // title screen che kín cảnh. Sau Start luôn vẽ. Ảnh vệ tinh giờ CŨNG qua composer (cùng tone/grade/AO).
   if (!_warm && !started) return;
   const rcam = (window.__hp && window.__hp._aerialCam) || camera;
+  const _f0 = _firstFrameAt ? 0 : performance.now();
   if (composer) { scenePass.camera = rcam; composer.render(); }
   else renderer.render(scene, rcam);
-  if (!_firstFrameAt) { _firstFrameAt = performance.now(); }
+  if (!_firstFrameAt) { _firstFrameAt = performance.now(); _T.firstRenderMs = Math.round(_firstFrameAt - _f0); }
 }
 let _warm = false, _firstFrameAt = 0;
+const _T = { compileSyncMs: null, compileDoneAt: null, warmBy: null, firstRenderMs: null };   // __hp.timing (QA khởi động)
 
 // Service Worker: cache file nặng (GLB) → lần sau vào hiện đủ NGAY, không tải lại
 if ('serviceWorker' in navigator && location.protocol === 'https:') {
@@ -778,7 +780,7 @@ window.__hp = {
         w: sp.sceneRT.width, h: sp.sceneRT.height };
     },
   },
-  get timing() { return { firstFrameMs: _firstFrameAt ? Math.round(_firstFrameAt) : null, warm: _warm }; },
+  get timing() { return { firstFrameMs: _firstFrameAt ? Math.round(_firstFrameAt) : null, warm: _warm, ..._T }; },
   _aerialCam: null, _aerialArea: null,
   // Chụp "VỆ TINH": camera TRỰC GIAO nhìn thẳng xuống tâm (cx,cz), phủ ±half mét,
   // Bắc (−z) hướng LÊN, Đông (+x) sang PHẢI — đúng chiều bản đồ. Để so cấu trúc đường/vị trí nhà.
@@ -868,12 +870,14 @@ if (renderer.compileAsync) {
   const prevRT = renderer.getRenderTarget();
   if (scenePass) renderer.setRenderTarget(scenePass.sceneRT);
   let p;
+  const _c0 = performance.now();
   try { p = renderer.compileAsync(scene, camera); } catch (e) { p = Promise.resolve(); }
+  _T.compileSyncMs = Math.round(performance.now() - _c0);
   renderer.setRenderTarget(prevRT);
   p.then(() => { if (renderer.shadowMap.enabled) renderer.shadowMap.needsUpdate = true; })
     .catch(() => {})
-    .finally(() => { _warm = true; });
-  setTimeout(() => { _warm = true; }, 12000);   // lưới an toàn: driver không báo xong vẫn vẽ
+    .finally(() => { if (!_warm) _T.warmBy = 'compile'; _warm = true; _T.compileDoneAt = Math.round(performance.now()); });
+  setTimeout(() => { if (!_warm) _T.warmBy = 'timeout'; _warm = true; }, 12000);   // lưới an toàn: driver không báo xong vẫn vẽ
 } else _warm = true;
 
 animate();
