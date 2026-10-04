@@ -19223,7 +19223,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
   {
     const P = LM_POLY.market, K = 'market', o = lmOBB(P), G = lmGeo();
     const R = lmShrink(P, 0.6), y0 = LAND_H;
-    lmWalls(G, R, y0, y0 + 3.2, 'hoard');
+    lmWalls(G, R, y0, y0 + 3.2 + 0.3, 'hoard');   // cao 3,5 m = đúng 1 ô texture (dải xanh mép trên nằm ở đỉnh rào)
     lmFlatRoof(G, lmShrink(P, 1.0), y0 + 0.05, 'conc');            // mặt bằng công trường (bê tông/đất nện)
     lmSolid(R, K); world.lmMasses.push({ key: K, ring: R, h: 3.2 });
     // khung bê tông đang đổ (3 sàn) ở nửa sau công trường
