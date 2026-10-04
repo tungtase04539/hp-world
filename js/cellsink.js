@@ -19,7 +19,7 @@ import { RB_B64 } from './buildings_real.js';
 import { claimBox } from './claims.js';
 import { BRAND_MAP, debrand } from './brands.js';
 import { PARKS } from './mapdata.js';
-import { clearanceReady, samplesFromHulls, evalShift, solveShift, sweepAssemblies, flushClearance, massOnStreet, minWidth, thinMeshOf, trimThinWall, corrCount, CLEAR } from './clearance.js';   // Đợt 3 W2-A
+import { clearanceReady, samplesFromHulls, evalShift, solveShift, sweepAssemblies, flushClearance, massOnStreet, minWidth, thinMeshOf, trimThinWall, corrCount, nearAnyRoad, nearestPano, CLEAR } from './clearance.js';   // Đợt 3 W2-A
 
 const _q = typeof location !== 'undefined' ? new URLSearchParams(location.search) : new URLSearchParams('');
 // ?cellsink=off → chỉ ghi (không gỡ, không claim) để A/B; =debug → như 'on' + giữ hình chiếu cho overlay QA;
@@ -588,13 +588,14 @@ function commitSink(sink, THREE, realScene, realFC, colliders, opts) {
     return (it.hc = [...new Set(out)]);
   };
   // THEO TỪNG CẶP (phản biện: tổng giảm mà 1 cặp tăng — s4_mamnon_dth × tb_bvps_trang 22,8 → 52,8 m²)
-  const occ = new Map();   // ô → [nhà…]
-  const occAdd = (k, it) => { const a = occ.get(k); if (a) a.push(it); else occ.set(k, [it]); };
-  const occDel = (k, it) => { const a = occ.get(k); if (!a) return; const i = a.indexOf(it); if (i >= 0) a.splice(i, 1); if (!a.length) occ.delete(k); };
+  const occ = new Map();   // ô → nhà | [nhà…] (đa số ô 1 chủ: không cấp phát mảng)
+  const occAdd = (k, it) => { const a = occ.get(k); if (a === undefined) occ.set(k, it); else if (Array.isArray(a)) a.push(it); else occ.set(k, [a, it]); };
+  const occDel = (k, it) => { const a = occ.get(k); if (a === undefined) return; if (a === it) { occ.delete(k); return; } if (!Array.isArray(a)) return; const i = a.indexOf(it); if (i >= 0) a.splice(i, 1); if (!a.length) occ.delete(k); else if (a.length === 1) occ.set(k, a[0]); };
   if (CLR_ON) for (const it of bl) if (!it.removed) for (const k of hullCells(it)) occAdd(k, it);
+  const tOcc = performance.now(); let tMain = 0, tPart = 0;
   const occPairs = (it, ox, oz) => {   // → Map(nhà khác → số ô chồng) khi dời (ox,oz)
     const m = new Map();
-    for (const k of hullCells(it)) { const a = occ.get(KEY(KX(k) + ox, KZ(k) + oz)); if (a) for (const o of a) if (o !== it) m.set(o, (m.get(o) || 0) + 1); }
+    for (const k of hullCells(it)) { const a = occ.get(KEY(KX(k) + ox, KZ(k) + oz)); if (a === undefined) continue; if (Array.isArray(a)) { for (const o of a) if (o !== it) m.set(o, (m.get(o) || 0) + 1); } else if (a !== it) m.set(a, (m.get(a) || 0) + 1); }
     return m;
   };
   const occMove = (it, ox, oz) => {
@@ -612,6 +613,7 @@ function commitSink(sink, THREE, realScene, realFC, colliders, opts) {
   };
   if (CLR_ON) for (const it of bl) {
     if (it.removed) continue;
+    const tm0 = performance.now();
     const ident = IDENT.has(it.kind);
     const [hx0, hz0, hx1, hz1] = bbOf([it.hull]);
     const container = ident && it.o.isGroup && isIdM(it.o.matrixWorld.elements) && Math.max(hx1 - hx0, hz1 - hz0) > 20;
@@ -629,7 +631,11 @@ function commitSink(sink, THREE, realScene, realFC, colliders, opts) {
       // dừng sớm ở cặp đầu tiên vượt ngưỡng (đo: occPairs dựng Map đầy đủ mỗi ứng viên ~20 ms)
       S.occ = (sx, sz) => {
         const ox = Math.round(sx), oz = Math.round(sz); cnt.clear();
-        for (const k of hc) { const a = occ.get(KEY(KX(k) + ox, KZ(k) + oz)); if (!a) continue; for (const o of a) { if (o === it) continue; const n = (cnt.get(o) || 0) + 1; cnt.set(o, n); if (n > Math.max(1, ov0.get(o) || 0)) return true; } }
+        for (const k of hc) {
+          const a = occ.get(KEY(KX(k) + ox, KZ(k) + oz)); if (a === undefined) continue;
+          if (Array.isArray(a)) { for (const o of a) { if (o === it) continue; const n = (cnt.get(o) || 0) + 1; cnt.set(o, n); if (n > Math.max(1, ov0.get(o) || 0)) return true; } }
+          else if (a !== it) { const n = (cnt.get(a) || 0) + 1; cnt.set(a, n); if (n > Math.max(1, ov0.get(a) || 0)) return true; }
+        }
         return false;
       };
       const maxS = it.height >= 15 ? CLEAR.MAX_SHIFT_TOWER : CLEAR.MAX_SHIFT_BLDG;
@@ -647,6 +653,7 @@ function commitSink(sink, THREE, realScene, realFC, colliders, opts) {
         else { stuck = true; clr.stuck.push([it.name, it.kind, where, +e0.pen.toFixed(2), +e0.pano.toFixed(2), +ms.frac.toFixed(2)]); }
       } else { it.removed = 'clear'; clr.removed.push([it.name, it.kind, where]); }
     }
+    const tm1 = performance.now(); tMain += tm1 - tm0;
     if (it.removed) continue;
     // ---- mảnh PHỤ ----
     if (container) {
@@ -673,6 +680,8 @@ function commitSink(sink, THREE, realScene, realFC, colliders, opts) {
     // mesh lá/thân cây ĐỨNG ĐẤT (chậu cây cảnh, cây trong khuôn viên) + (danh tính kẹt) mesh phụ không phải khối chính: chân
     // trên lòng phố có vỉa (lá: cả camera) → bỏ riêng mesh (nhà vẫn giữ)
     // (mesh phụ chạm/sát khối chính ≤ 0,5 m — cột hành lang vòm, ban công, bậc — là MỘT PHẦN nhà: không bỏ)
+    // (lọc nhanh: nhà xa mọi phố và camera → không mảnh phụ nào vi phạm được)
+    if (!nearAnyRoad(hx0 + dx, hz0 + dz, hx1 + dx, hz1 + dz, 'small') && !nearestPano((hx0 + hx1) / 2 + dx, (hz0 + hz1) / 2 + dz, Math.hypot(hx1 - hx0, hz1 - hz0) / 2 + CLEAR.PANO_R)) continue;
     const massBB = stuck ? it.shape.meshes.filter((q) => q.massive && inMain(q)).map((q) => bbOf([q.h])) : [];
     const touchesMass = (q) => { const b = bbOf([q.h]); return massBB.some((m) => b[0] <= m[2] + 0.5 && b[2] >= m[0] - 0.5 && b[1] <= m[3] + 0.5 && b[3] >= m[1] - 0.5); };
     for (const q of it.shape.meshes) {
@@ -687,6 +696,7 @@ function commitSink(sink, THREE, realScene, realFC, colliders, opts) {
   }
 
   clr.t5a = +(performance.now() - tClr0).toFixed(1);
+  clr.t5aParts = { occ: +(tOcc - tClr0).toFixed(1), main: +tMain.toFixed(1) };
   // 5) biển/mái hiên/điều hoà… treo trên mặt tiền nhà bị gỡ (vật thể RỜI cấp cao nhất) — nhà bị DỜI (5a) thì đồ treo dời theo
   const remCell = new Map(), shCell = new Map();
   for (const it of bl) if (it.removed) for (const k of it.keys) remCell.set(k, it); else if (it.shift) for (const k of it.keys) shCell.set(k, it);
@@ -782,7 +792,7 @@ function commitSink(sink, THREE, realScene, realFC, colliders, opts) {
     const occAt = (x, z, mode) => occS.has(KEY(Math.floor(x), Math.floor(z))) || (mode === 'small' && realB(G.at(x, z)));
     const r = sweep = sweepAssemblies(objs, cols.map((q) => q.c), fcs.map((q) => q.e), { keep: (n) => /median/i.test(n), wallLike: true, occAt });
     flushClearance();
-    clr.sweep = { pieces: r.pieces, assemblies: r.assemblies, kept: r.kept, moved: (r.moved || []).length, removed: (r.removed || []).length, stuck: (r.stuck || []).length, tPieces: r.tPieces, tLink: r.tLink, ms: r.ms };
+    clr.sweep = { pieces: r.pieces, assemblies: r.assemblies, kept: r.kept, moved: (r.moved || []).length, removed: (r.removed || []).length, stuck: (r.stuck || []).length, tPieces: r.tPieces, tLink: r.tLink, tE0: +(r.tE0 || 0).toFixed(1), tSolve: +(r.tSolve || 0).toFixed(1), ms: r.ms };
     for (const m of r.moved || []) clr.moved.push(m);
     for (const m of r.removed || []) clr.removed.push(m);
     // tấm mỏng bị CẮT (trimThinWall) → vật thể = đoạn còn lại đầu tiên (đoạn khác là bản sao cùng material, ngoài sink)

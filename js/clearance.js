@@ -67,6 +67,7 @@ export function initClearance(ctx) {
 let _released = false;
 export function releaseClearance() {
   _cc.clear(); _deadV.clear(); _deadM.clear(); _dirty.clear();
+  _st = null;   // lưới đoạn phố (~10 nghìn đoạn) cũng nhả: sau đó mọi tra cứu trả "không chặn" (chỉ dùng lúc dựng)
   _released = true;
 }
 export const clearanceReady = () => !!_st;
@@ -463,7 +464,7 @@ export function evalShift(S, dx, dz, mode, quick = false) {
   if (S.thin && S.x0 !== undefined && !(quick && n)) {
     const mx = (S.x0 + S.x1) / 2 + dx, mz = (S.z0 + S.z1) / 2 + dz;
     for (const [qx, qz] of panosNear(mx, mz, rad0 + CLEAR.FILL_D)) {
-      let d = Infinity; for (const b of S.body) { const Hs = dx || dz ? b.H.map(([x, z]) => [x + dx, z + dz]) : b.H; d = Math.min(d, hullDist(Hs, qx, qz)); }
+      let d = Infinity; for (const b of S.body) d = Math.min(d, hullDist(b.H, qx - dx, qz - dz));   // (dời điểm thay vì dời bao: không cấp phát)
       if (d >= CLEAR.FILL_D) continue;
       const f = prismFill(S.body, dx, dz, qx, qz, CLEAR.FILL_MAX);
       if (f > fill) fill = f;
@@ -478,21 +479,21 @@ export function evalShift(S, dx, dz, mode, quick = false) {
       }
     }
   }
-  const anyCam = S.x0 === undefined || !!nearestPano((S.x0 + S.x1) / 2 + dx, (S.z0 + S.z1) / 2 + dz, rad0 + CLEAR.PANO_R);
   // MỌI camera trong tầm (trước: chỉ camera gần TÂM bao nhất — tường tranh 24 m beboi_haly cách pano_533 2,3 m lọt luật vì
-  // tâm tường gần pano_548 hơn sau khi dời)
-  if (anyCam) for (const b of S.body) {
-    let cx = 0, cz = 0; for (const [x, z] of b.H) { cx += x; cz += z; } cx = cx / b.H.length + dx; cz = cz / b.H.length + dz;
-    let rad = 0; for (const [x, z] of b.H) rad = Math.max(rad, Math.hypot(x + dx - cx, z + dz - cz));
-    const Hs = dx || dz ? b.H.map(([x, z]) => [x + dx, z + dz]) : b.H;
-    for (const [camx, camz] of panosNear(cx, cz, rad + CLEAR.PANO_R)) {
+  // tâm tường gần pano_548 hơn sau khi dời). Camera lấy 1 lần cho cả vật (hộp + PANO_R), mỗi bao lọc theo tâm/bán kính đệm.
+  const camsA = S.x0 === undefined ? null : panosNear((S.x0 + S.x1) / 2 + dx, (S.z0 + S.z1) / 2 + dz, rad0 + CLEAR.PANO_R);
+  if (!camsA || camsA.length) for (const b of S.body) {
+    if (b.rad === undefined) { let x = 0, z = 0; for (const p of b.H) { x += p[0]; z += p[1]; } b.cx = x / b.H.length; b.cz = z / b.H.length; let r = 0; for (const p of b.H) r = Math.max(r, Math.hypot(p[0] - b.cx, p[1] - b.cz)); b.rad = r; }
+    const cx = b.cx + dx, cz = b.cz + dz, rad = b.rad;
+    for (const [camx, camz] of camsA || panosNear(cx, cz, rad + CLEAR.PANO_R)) {
+    if (camsA && Math.hypot(camx - cx, camz - cz) > rad + CLEAR.PANO_R) continue;
     const cam = { x: camx, z: camz };
-    const d = hullDist(Hs, cam.x, cam.z);
+    const d = hullDist(b.H, cam.x - dx, cam.z - dz);
     if (d < CLEAR.PANO_R && mode === 'bldg' && S.facadeExempt && d > 0.05) {
       // NHÀ: camera (đứng trong hành lang phố) gần MẶT TIỀN đã lùi đúng facadeLine = lệch dữ liệu camera/đường (camera
       // trên vỉa hè phố hẹp) — không đẩy nhà lùi thêm; chỉ tính khi điểm gần nhất (lùi sâu 0,3 m) còn trong hành lang
       if (corridorPen(cam.x, cam.z) || onCarriage(cam.x, cam.z)) {
-        const q = hullClosest(Hs, cam.x, cam.z), ux = (q[0] - cam.x) / d, uz = (q[1] - cam.z) / d;
+        const q = hullClosest(b.H, cam.x - dx, cam.z - dz); q[0] += dx; q[1] += dz; const ux = (q[0] - cam.x) / d, uz = (q[1] - cam.z) / d;
         if (!corridorPen(q[0] + ux * 0.3, q[1] + uz * 0.3)) continue;
       }
     }
@@ -708,7 +709,9 @@ export function sweepAssemblies(objs, cols, fc, opts = {}) {
     // công trình DANH TÍNH (nhóm có tên dựng theo pano): ngõ h/w "mềm" — chỉ phố có vỉa + camera
     const isIdent = mode === 'bldg' && !!opts.identity && opts.identity(name, A);
     if (isIdent) S.softAlley = true;
+    const te0 = (typeof performance !== 'undefined' ? performance : Date).now();
     const e0 = evalShift(S, 0, 0, mode);
+    rep.tE0 = (rep.tE0 || 0) + (typeof performance !== 'undefined' ? performance : Date).now() - te0;
     if (!e0.bad) { rep.kept++; continue; }
     const where = [+((x0 + x1) / 2).toFixed(1), +((z0 + z1) / 2).toFixed(1)];
     // (danh tính phố: không — footprint thật CỦA CHÍNH nó nằm dưới, vd KS Harbour View)
@@ -716,7 +719,9 @@ export function sweepAssemblies(objs, cols, fc, opts = {}) {
     if (mode === 'small') S.corrCap = corrCount(S, 0, 0) + 1;
     // tấm mỏng: chỉ NHÍCH ≤ THIN_SHIFT m (rào tôn dời 8 m dọc phố từng "hợp lệ") — không được thì CẮT đoạn vi phạm (trimThin)
     const maxS = S.thin ? CLEAR.THIN_SHIFT : mode === 'bldg' ? (h >= 15 ? CLEAR.MAX_SHIFT_TOWER : CLEAR.MAX_SHIFT_BLDG) : CLEAR.MAX_SHIFT_SMALL;
+    const ts0 = (typeof performance !== 'undefined' ? performance : Date).now();
     let sol = solveShift(S, mode, maxS);
+    rep.tSolve = (rep.tSolve || 0) + (typeof performance !== 'undefined' ? performance : Date).now() - ts0;
     // công trình danh tính không lùi nổi ra sau facadeLine → ít nhất ra khỏi LÒNG PHỐ (+ camera)
     if (!sol && isIdent) { sol = solveShift(S, 'small', maxS); if (sol) mode = 'bldg/partial'; }
     const myCols = colsOf(A);
