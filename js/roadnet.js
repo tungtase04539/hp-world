@@ -268,6 +268,9 @@ export function buildRoadNet(ROADS_DT, deps) {
         const La = Math.hypot(rx, rz), Lb = Math.hypot(sx, sz);
         if (t * La < 1 || (1 - t) * La < 1 || u * Lb < 1 || (1 - u) * Lb < 1) continue;   // sát đỉnh sẵn có
         if (onArch(x, z)) continue;      // mặt cầu vượt → không phải nút
+        // cắt chéo NÔNG (< 25°): 2 làn/nhánh nhập-tách chồng nhau (nút cầu Bính: 2 way 's' song song cách 5 m cắt nhau
+        // 16°) — chèn nút ở đây sinh nút giao lùi 25-40 m, đa giác méo + vỉa hè vụn. Để 2 dải CHỒNG nhau (lệch 1,5 mm).
+        if (Math.abs(den) < 0.42 * La * Lb) { stats.xshallow = (stats.xshallow || 0) + 1; continue; }
         addIns(wa, ia, t, x, z); addIns(wb, ib, u, x, z); stats.xcross++;
       }
     }
@@ -661,9 +664,22 @@ export function buildRoadNet(ROADS_DT, deps) {
           if (wj === w.wi0) continue;
           const key = segBase2[wj] + j; if (seenStamp[key] === stamp) continue; seenStamp[key] = stamp;
           const o = ways[wj];
-          if (touch(o.node[j]) || touch(o.node[j + 1])) continue;
+          const [ax, az] = o.pts[j], [bx, bz] = o.pts[j + 1];
           const ohw = hwOf(o.c), win = RANK[o.c] > RANK[w.c] || (RANK[o.c] === RANK[w.c] && wj < w.wi0);
-          out.push([o.pts[j][0], o.pts[j][1], o.pts[j + 1][0], o.pts[j + 1][1], ohw - 0.2, win ? ohw + swOf(o.c) - 0.3 : -1]);
+          if (touch(o.node[j]) || touch(o.node[j + 1])) {
+            // đoạn chạm nút 2 đầu (phố cắt ngang ở nút giao) bỏ qua — TRỪ khi gần SONG SONG với đoạn chạy gần nhất
+            // (làn nhập/tách chồng nhau, nút cầu Bính): khi đó vẫn chặn vỉa hè nằm TRONG lòng nó, chỉ xét điểm nằm
+            // ngang thân đoạn (hình chiếu 0..1) để không cắt vỉa hè phố nối tiếp thẳng hàng ở nút miter.
+            const L = Math.hypot(bx - ax, bz - az); if (L < 1) continue;
+            const mx = (ax + bx) / 2, mz = (az + bz) / 2;
+            let bi = 0, bd = Infinity;
+            for (let i = 0; i < P.length - 1; i++) { const d = segDist(mx, mz, P[i][0], P[i][1], P[i + 1][0], P[i + 1][1]); if (d < bd) { bd = d; bi = i; } }
+            const qx = P[bi + 1][0] - P[bi][0], qz = P[bi + 1][1] - P[bi][1], ql = Math.hypot(qx, qz) || 1;
+            if (Math.abs(((bx - ax) * qx + (bz - az) * qz) / (L * ql)) < 0.94 || bd > ohw + hwOf(w.c) + swOf(w.c)) continue;
+            out.push([ax, az, bx, bz, ohw - 0.2, -1, 1]);
+            continue;
+          }
+          out.push([ax, az, bx, bz, ohw - 0.2, win ? ohw + swOf(o.c) - 0.3 : -1, 0]);
         }
       }
     return out;
@@ -672,6 +688,12 @@ export function buildRoadNet(ROADS_DT, deps) {
   function closeQuadOf(cands, reach) {
     return (S1, S2) => {
       for (const c of cands) {
+        if (c[6]) {   // đoạn song song chạm nút: chỉ khi trung điểm ô nằm ngang thân đoạn và đủ gần
+          const mx = (S1.x + S2.x) / 2, mz = (S1.z + S2.z) / 2, dx = c[2] - c[0], dz = c[3] - c[1];
+          const t = ((mx - c[0]) * dx + (mz - c[1]) * dz) / (dx * dx + dz * dz);
+          if (t > 0 && t < 1 && segDist(mx, mz, c[0], c[1], c[2], c[3]) < c[4] + reach) return true;
+          continue;
+        }
         const lim = Math.max(c[4], c[5]) + reach;
         if (segSegDist(S1.x, S1.z, S2.x, S2.z, c[0], c[1], c[2], c[3]) < lim) return true;
       }
@@ -682,6 +704,11 @@ export function buildRoadNet(ROADS_DT, deps) {
   function foreign(x, z, cands) {
     let hit = 0;
     for (const c of cands) {
+      if (c[6]) {   // đoạn song song chạm nút: chỉ "trong lòng" và chỉ khi điểm nằm ngang thân đoạn
+        const dx = c[2] - c[0], dz = c[3] - c[1], t = ((x - c[0]) * dx + (z - c[1]) * dz) / (dx * dx + dz * dz);
+        if (t > 0.02 && t < 0.98 && segDist(x, z, c[0], c[1], c[2], c[3]) < c[4]) return 2;
+        continue;
+      }
       const d = segDist(x, z, c[0], c[1], c[2], c[3]);
       if (d < c[4]) return 2;
       if (d < c[5]) hit = 1;
@@ -754,7 +781,8 @@ export function buildRoadNet(ROADS_DT, deps) {
       else if ((ev & 4) && !(pat & (MK.CDBL | MK.CDY))) pat |= MK.CDW;
     }
     // mặt nhựa nâng theo cấp (+4 mm/cấp): 2 dải chồng nhau (đường đôi/nhánh song song) → dải cấp cao thắng, không z-fight
-    const yR = ROAD_TOP + 0.004 * RANK[w.c];
+    // (+1,5 mm cho way lẻ: 2 dải CÙNG cấp chồng nhau — làn nhập/tách nông không chèn nút — không z-fight vạch kẻ ở gần)
+    const yR = ROAD_TOP + 0.004 * RANK[w.c] + 0.0015 * (w.wi0 & 1);
     // ---- lòng đường ----
     const u0 = sA.trim, u1 = L - sB.trim;
     if (u1 - u0 > 0.2) {
