@@ -18340,7 +18340,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     soviet:   { wall: '#e4ddcb', trim: '#f0ebdd', frame: '#d6cfbb', glass: '#34414b', shut: '#cbc3ae', bayW: 3.0, storeyH: 4.6, kind: 'grid' },
     temple:   { wall: '#d8b98c', trim: '#8a3224', frame: '#7a2a1e', glass: '#4a1f16', shut: '#9a3a26', bayW: 3.2, storeyH: 4.2, kind: 'temple' },
     market:   { wall: '#8fa3b0', trim: '#dde5ea', frame: '#6a7d88', glass: '#33434e', shut: '#5f707b', bayW: 6.0, storeyH: 4.6, kind: 'ribbon' },
-    hoard:    { wall: '#8c9295', trim: '#2f5f9e', frame: '#8c9295', glass: '#000000', shut: '#000000', bayW: 2.0, storeyH: 3.5, kind: 'hoard' },
+    hoard:    { wall: '#c3c8ca', trim: '#2f5f9e', frame: '#8c9295', glass: '#000000', shut: '#000000', bayW: 2.0, storeyH: 3.5, kind: 'hoard' },
   };
   const _lmMats = new Map();
   function lmWallMat(style) {
@@ -18461,10 +18461,11 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
   }
   const lmBase = (ring) => { let y = 1e9; for (const [x, z] of ring) y = Math.min(y, groundHeightNoDeck(x, z)); return y > LAND_H - 1.2 ? Math.min(y, LAND_H + 0.6) : LAND_H; };
   // TƯỜNG quanh vòng ring từ y0 lên y1, texture phong cách; u theo mét/bayW (gốc ở góc trái nhìn từ ngoài), v theo tầng
-  function lmWalls(G, ring, y0, y1, style) {
+  function lmWalls(G, ring, y0, y1, style, skip = null) {
     const S = LM_STYLE[style], mtl = lmWallMat(style);
     for (let i = 0; i < ring.length; i++) {
       const a = ring[i], b = ring[(i + 1) % ring.length], L = Math.hypot(b[0] - a[0], b[1] - a[1]); if (L < 0.2) continue;
+      if (skip && skip(a, b)) continue;
       const [nx, nz] = lmOutN(ring, a, b);
       // phải (nhìn từ ngoài) = (nz, −nx): a→b cùng chiều → p0 = a
       const fwd = (b[0] - a[0]) * nz + (b[1] - a[1]) * -nx > 0;
@@ -19225,7 +19226,12 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
   {
     const P = LM_POLY.market, K = 'market', o = lmOBB(P), G = lmGeo();
     const R = lmShrink(P, 0.6), y0 = LAND_H;
-    lmWalls(G, R, y0, y0 + 3.2 + 0.3, 'hoard');   // cao 3,5 m = đúng 1 ô texture (dải xanh mép trên nằm ở đỉnh rào)
+    // rào tôn trắng-xám cao 3,5 m (= đúng 1 ô texture, dải xanh ở đỉnh). Mặt ĐÔNG (phố Nguyễn Thái Học) đã có rào tôn trắng +
+    // 2 silo + nhà điều hành + cẩu bánh xích của ô "tw (12) CÔNG TRƯỜNG" (khớp pano_214/212) → không dựng chồng cạnh nào sát nó
+    const _twW = [[-1091.4, 129.3, -1065.8, 251.3], [-1091.4, 129.3, -1105, 124.5]];
+    const nearTw = (a, b) => { const mx = (a[0] + b[0]) / 2, mz = (a[1] + b[1]) / 2;
+      return _twW.some(([ax, az, bx, bz]) => { const dx = bx - ax, dz = bz - az, L2 = dx * dx + dz * dz; let t = ((mx - ax) * dx + (mz - az) * dz) / L2; t = Math.max(0, Math.min(1, t)); return Math.hypot(mx - ax - t * dx, mz - az - t * dz) < 9; }); };
+    lmWalls(G, R, y0, y0 + 3.2 + 0.3, 'hoard', nearTw);
     lmFlatRoof(G, lmShrink(P, 1.0), y0 + 0.05, 'conc');            // mặt bằng công trường (bê tông/đất nện)
     lmSolid(R, K); world.lmMasses.push({ key: K, ring: R, h: 3.2 });
     // khung bê tông đang đổ (3 sàn) ở nửa sau công trường

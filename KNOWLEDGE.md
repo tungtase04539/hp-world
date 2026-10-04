@@ -418,7 +418,8 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     (`node tools/qa/lmfit_prep.mjs <dir>` ghi lmpoly.json + segs.json). Kết quả (IoU raster tam giác GLB thật trong game, `tools/qa/
     lmprobe.mjs --metrics`, trước → sau): nhà hát 0,42 → 0,74 (mặt tiền 29 m ra quảng trường × sâu 49 m; GLB Meshy bè ngang 2,3:1, ép
     dị hướng 2,4 — tỉ lệ mặt tiền ~1,5:1 khớp pano_054/250), nhà thờ 0,62 → 0,83 (gần đều: "rộng hơn 8 m" của kiểm toán cũ là bbox
-    gồm 2 hàng cây bách), bưu điện 0,52 → 0,60 (đè lòng đường 8 → 0 m²), bảo tàng 0,64 → 0,70, NHNN 0,71 → 0,81 (lòng đường 134 → 0 m²:
+    gồm 2 hàng cây bách), bưu điện 0,52 → 0,62 (xoay −38°: THÁP ĐỒNG HỒ — mặt +Z GLB — quay ra GÓC TÂY-NAM vát tròn: pano_220 h045
+    thấy tháp chính diện y ảnh thật, pano_362 h315 thấy cánh vòm gạch đỏ = mặt +X GLB; lòng đường ~10 m² ở mép phố chéo), bảo tàng 0,64 → 0,70, NHNN 0,71 → 0,81 (lòng đường 134 → 0 m²:
     góc tây LM_POLY lấn 3,2 m qua bó vỉa phố 't' → phạt hành lang), đình HK 0,40 → 0,52, đền Tam Kỳ 0,69 → 0,95.
     **(2) KIT KHỐI THỦ TỤC** (cùng khối): `lmOBB` (OBB diện tích nhỏ nhất, u = trục dài), `lmEdge(P,a,b)` (hệ toạ độ theo cạnh, v hướng
     vào trong), `lmFitRect` (co hình chữ nhật tới khi 4 góc + 4 trung điểm nằm trong đa giác co m mét), `lmBlock` (tường 1 quad/cạnh,
@@ -449,14 +450,15 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     pano_427 h090/pano_002 h180: tháp ở bờ BẮC) gỡ bằng `lmRemoveCell` (mesh + collider trong bao lồi, `cellKept[].removedByLM`); khối
     địa danh NHƯỜNG chỗ nhà ô GIỮ chạm vào (`lmCellClash`, vd công sở Pháp arcade pano_482 bên Mê Linh).
     **Đo (lmprobe, 19 địa danh):** 0 m² GLB/khối trên lòng đường (trước: THPT 104, NHNN 134, bưu điện 8), 0 biển/xe/NPC trong khối,
-    `__hp.diag()` [], 0 lỗi JS; còn 1 cây (nguồn chưa rõ, (-287,200)) ở mũi bắc Triển lãm. PERF: xem số A/B cùng phiên bên dưới.
+    `__hp.diag()` [], 0 lỗi JS (full; LITE chỉ 404 assets_lite của môi trường); còn 1 cây (nguồn chưa rõ, (-287,200)) ở
+    mũi bắc Triển lãm. PERF: xem số A/B cùng phiên bên dưới.
     **BẪY:** (a) bbox GLB ≠ thân nhà (cây/tấm đế/cánh lệch Meshy) — khớp theo ẢNH CHIẾU BẰNG, không theo bbox; (b) IoU thuần đẩy GLB
     ra lòng đường khi LM_POLY OSM lấn phố game (NHNN, bưu điện) — luôn phạt hành lang facadeLine; (c) θ phải bị CHẶN cả trong bước tinh
     chỉnh (bản đầu trôi −9,5° → mặt tiền bưu điện lệch phố); (d) texture 1 ô theo tầng: tường cao không chia hết storeyH thì dải phào
     ở đỉnh ô bị cắt (rào tôn: cao đúng 1 ô); (e) đoạn code chạy TRƯỚC khối địa danh không gọi được `_lmIn`/`lmSolid` (const/TDZ) — ở
     cells/garden6 sửa bằng toạ độ/chặn tại chỗ; (f) Git Bash: chuỗi chứa chữ "eval" trong lệnh bị chặn cách ly worktree.
-    **Chưa làm/đề xuất:** bưu điện — pano_220 h045/pano_362 h315 cho thấy THÁP ĐỒNG HỒ ở GÓC TÂY-NAM (vát góc ra ngã tư), GLB đặt
-    mặt tiền SSE theo pano_362 (đúng một nửa); ga/UBND/THPT dùng texture canvas riêng (không qua shader atlas citygen); 1 cây Triển lãm.
+    **Chưa làm/đề xuất:** bưu điện thật là nhà chữ L ôm góc (2 cánh dọc 2 phố) còn GLB là khối vuông + 1 cánh chéo → nhìn từ trên
+    vẫn hở góc bắc/tây footprint; ga/UBND/THPT dùng texture canvas riêng (không qua shader atlas citygen); 1 cây Triển lãm.
 
 - **2026-10-04 (wp8)** [ĐỢT 3 WP8 GAME — khởi động, giao thông phố thật, cảm giác chơi, nhiệm vụ, âm thanh, tool Windows]:
     **Khởi động (js/boot.js + main.js + 9 dòng world.js):** UI màn chờ (ngôn ngữ, chất lượng, nhiệm vụ, input) gắn
