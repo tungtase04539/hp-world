@@ -32,6 +32,8 @@ Trò chơi: thế giới 3D Hải Phòng **tỉ lệ 1:1 mét thật** (từ 202
 | `js/assets.js` | Đăng ký + preload + streaming GLB theo khoảng cách |
 | `js/main.js` | Vòng lặp game, camera, người chơi, bloom, autoQuality, `window.__hp` |
 | `js/landmarks.js` | 15 biển thông tin địa danh (vị trí suy ra từ mapdata) |
+| `js/trees.js` | HỆ CÂY instanced (Đợt 3 WP4): `plant/plantLocal` (mọi helper cây chỉ xếp hàng), `plantStreetTrees` (trồng theo dữ liệu dọc phố), `buildTrees` (atlas lá + kit 9 loài + LOD gần/xa/hero GLB) — xem §10 (WP4-trees) |
+| `js/treemap.js` | **SINH TỰ ĐỘNG** bởi `tools/gen_treemap.mjs` từ `audit/audit_enriched.json` (thảm cây 551 pano) — KHÔNG sửa tay |
 | `js/traffic.js` / `js/vehicles.js` / `js/npc.js` / `js/quests.js`... | Giao thông, xe cưỡi được, NPC, nhiệm vụ |
 | `tools/` | Pipeline dữ liệu + test tự động (xem mục 7, 8) |
 
@@ -361,6 +363,80 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-10-04 (WP4-trees)** [ĐỢT 3 WP4 — CÂY ĐƯỜNG PHỐ THẬT: 9 loài instanced, trồng theo dữ liệu 551 pano, LOD gần/xa/hero]
+    (nhánh `worktree-wf_f378e35a-d3b-4`). File: MỚI `js/trees.js` (cả hệ cây), MỚI `js/treemap.js` (SINH TỰ ĐỘNG bởi
+    `node tools/gen_treemap.mjs` từ trường `vegetation` của `audit/audit_enriched.json` — ĐỪNG SỬA TAY; chạy lại ra
+    byte-giống), MỚI `tools/qa/trees.html` (xem kit cây tách game: `?row=all|xacu|bang|…&dist=&far=1&atlas=1&bloom=0`),
+    `js/petals.js`, `js/main.js` (1 chỗ: `petals.update` ~560), `js/world.js` (import `veg`; THÂN ~30 helper cây cells
+    bcTree/bcPalm/twTreeAt/bsTree/bsPalm/tsTree/tsYoung/tsWillow/txTreeAt/txPalm/lnTree/w1-w4Tree/w4Pollard/w4Palm/cnBanyan/
+    cnPalm/v3Willow/garden6 tree…; khối `cell_tree`; vùng cây cũ phượng hero/bakeTree/phuongTree/palm/shadeTree/streetTree/
+    banyan/hồ/OSM-công viên; cây dải phân cách; bỏ "xà cừ 2 bên đại lộ" cap 170; vườn hoa; chỗ `flushTrees`).
+    **TRƯỚC:** 5 đường ống cây (bake icosahedron 80 tam giác xanh lè + ~12 helper cầu lá trong cells + cell_tree + 76
+    phượng GLB Meshy 85-101k tam giác LUÔN bật, castShadow=false) → ~1.200 cây, quota theo thứ tự ROADS_DT (lõi hết
+    quota, phố khác trống), cây ở hw+3,4 = SAU mặt tiền phố s/t.
+    **HỢP ĐỒNG (`js/trees.js`):** `veg.plant(kind,x,z,o)` / `veg.plantLocal(group,lx,lz,kind,o)` CHỈ xếp hàng (không tự
+    thêm collider — helper giữ `addCollider` như cũ). kind = 'xacu'|'bang'|'phuong'|'sau'|'banglang'|'cau'|'catcut'|'da'|
+    'non' hoặc 'shade' (bóng mát: loài theo pano/vùng, không phượng/cau) | 'street' (mọi loài) | 'park'. o = {h, r (tán),
+    bloom, wash (gốc quét vôi), pit (ô gốc bê tông), hero (0..2 = biến thể GLB), yaw, variant, sz, full (độ kín tán),
+    median (cây dải phân cách — miễn kiểm lòng đường)}. `veg.plantStreetTrees(ctx)` trồng theo dữ liệu (thay vòng 46 m);
+    `veg.buildTrees(scene, ctx)` dựng TẤT CẢ ở chỗ `flushTrees` cũ rồi XOÁ hàng đợi → **KHÔNG gọi plant sau buildTrees**
+    (cây không được dựng, chỉ còn collider ma). `world.trees` = {stats(), setSeason(0..1), setHeroModel, bloomNear,
+    uniforms, recs}; `world.treeBloomNear(x,z,r)` cho petals. Ngoài game: `import('/js/trees.js').then(m=>m.treeSystem())`.
+    **KIT + ATLAS:** atlas lá vẽ thủ tục 4×4 ô (canvas 2048² TIER≥2 / 1024² TIER≤1, ~17 ms) — lá kép xà cừ/sấu, lá bàng
+    chùm hoa thị (ít lá vàng/đỏ), lá lông chim 2 lần + chùm hoa phượng, lá + chuỳ hoa tím bằng lăng, chồi non, đa, vỏ,
+    gốc quét vôi, thân + tàu cau. Lưu PREMULTIPLIED (`premultiplyAlpha=true`, `NoColorSpace`) rồi shader chia alpha +
+    tự giải sRGB → mép lá lọc mipmap không viền đen; bù alpha theo mức mip (lá xa không "tan"). 13 kit gần (thân + cành
+    côn cong, 22-170 thẻ lá; 290-1.600 tam giác) + 9 kit XA (thẻ to ×1,8-1,9 ngửa lên, tối 12% vì không tự đổ bóng; 70-212 tam giác). Dáng: xà cừ tán
+    cao rộng, bàng TẦNG ngang, phượng tán DÙ, sấu, bằng lăng, cau vua (thân xám vòng đốt + bẹ xanh + 15 tàu cong), CẮT
+    CỤT (cành cụt mặt cắt sáng + chồi non — 96 pano sau bão Yagi), đa/si (rễ phụ), cây non chống 3 cọc. 1 material
+    Lambert DUY NHẤT cho mọi cây (onBeforeCompile, key 'hpveg1'): `aInst`=(bloom, wash, phase, độ kín tán) per-instance,
+    `aKind` (gỗ/gỗ-vôi/lá/hoa + số ngẫu nhiên riêng từng thẻ ở phần lẻ → cây thưa bỏ bớt thẻ — 1 kit ra nhiều độ kín),
+    gió (uTime), mùa hoa (uBloom: thẻ hoa thu về điểm suy biến khi tắt), lá trong mờ (ánh sáng xuyên lá từ hemi + nắng
+    ngược), thẻ lá nghiêng hẳn về camera mờ dần (không thành vạch sẫm). TIER≥2 (có MSAA): alpha-to-coverage + làm sắc
+    alpha; TIER≤1: alphaTest 0,5. `customDepthMaterial` alpha-test → bóng lá lốm đốm.
+    **LOD (tự quản, `userData.noCull` — instcull KHÔNG đụng):** mỗi 250 ms (hoặc camera đi > 8 m / quay > 10°) nén lại
+    tập instance theo khoảng cách CAMERA: gần ≤ 180 m (TIER≤1 110) kit gần đổ bóng; ≤ 1.000 m (TIER≤1 520) kit xa không
+    đổ bóng, chỉ trong NÓN NHÌN ±(nửa FOV ngang + 31°) (camera trực giao/nhìn dốc xuống → tắt nón); hero GLB ≤ 150 m;
+    ô gốc ≤ 90 m. Trễ 10-12 m chống nhấp nháy ranh. boundingSphere tính tay từ tâm instance + bán kính tán (finish()).
+    **HERO phượng GLB (file KHÔNG đổi):** là LOD GẦN của phượng thủ tục CÙNG chỗ (cùng cao, cùng độ xoè tán theo tỉ lệ
+    bbox GLB), frustum-cull TỪNG cây mỗi khung (luôn giữ trong 30 m — bóng đổ vào khung), castShadow BẬT. Vị trí: 46 cây
+    chọn ĐỀU theo hash trong ứng viên phượng nở dọc p/s ≤ 160 m dải trung tâm + mỗi cây thứ 10 quanh vườn hoa = 67.
+    Lite thiếu/hỏng → thử NGAY bản gốc (như assets.js; cả luống hoa hero). Hero luôn nở (GLB đỏ) nên chỉ hiện khi uBloom ≥ 0,5.
+    **TRỒNG THEO DỮ LIỆU (`plantStreetTrees`):** 2 bên mọi phố p/s/t tại `xsection.treePitLine(c)` (bó vỉa + 0,75 m),
+    nhịp 9,0/9,4 m × (0,88-1,18) lệch pha từng bên; phố r chỉ nơi pano ≤ 60 m nói có cây (mật độ ≥ 2) + 70% hash; mật
+    độ pano: 0 = bỏ, 1 thưa ×2,3, 3 rợp ×0,9. Loại: lòng đường/đoạn khác (lưới đoạn 16 m dùng chung `veg.roadIndex`),
+    nút giao (đỉnh chung ≥ 2 đường + đầu mút, r = nửa lòng + 4,5), footprint nhà THẬT (buildings_real), LM_POLY + 2,5 m,
+    claims landmark/civic/cell/plaza, camera pano 3 m, collider nhỏ (cột/đèn), cách gốc khác < 4,2 m, `ctx.keepClear`
+    (world.js: TRỤC NHÌN spawn → mặt tiền Nhà hát, rộng ±14 m — hàng cây mép bắc phố road#378 từng che kín Nhà hát ở
+    cam_spawn). Loài: trọng số vùng (Hoàng Diệu `hdTreeBelt` xà cừ cắt trụi 60%; ven hồ lakeSD<45; dải trung tâm
+    (polyline hồ→Nhà hát→THĐ/QT→Tố Hữu, < 110 m) phượng 42%; còn lại xà cừ 36/bàng 26/phượng 20/sấu 9/bằng lăng 5) trộn
+    30/70 với loài pano gần nhất; tỉ lệ cắt cụt/cây non/gốc vôi/tán thưa theo pano. Cau dọc phố chỉ khi pano nói rõ
+    "hàng cau" (≥7), đa chỉ trồng đích danh. Hoa: ~35% phượng + bằng lăng nở (mùa hè mặc định).
+    **DỌN CÂY CŨ (`buildTrees`):** toạ độ helper cells có từ thời đường/nhà vẽ tay — đo: 118 cây TRONG LÒNG ĐƯỜNG (hàng
+    cách tim 's' 4,5 m, cau giữa tim…), 125 trong footprint nhà thật, 60 cặp gốc < 3 m. Nay: trong lòng p/s/t/r, cách tim
+    ≥ 0,5 m → DỜI ra treePitLine cùng phía (chỗ mới phải sạch: ngoài lòng đường/nhà thật/3 m camera pano); giữa
+    tim/ngõ h/phố đi bộ w/nhà thật/trùng gốc (< 1,8 m) → BỎ; collider gốc ở
+    đúng (x,z) cũ được dời theo hoặc tách (x=z=1e7 — cùng object nằm trong `colIdx` nên không phải xây lại chỉ mục).
+    Kết quả: dời 58, bỏ 40 (lòng đường) + 115 (nhà thật) + 16 (trùng gốc); còn trên lòng đường chỉ cây dải phân cách.
+    cell_tree: cau trước công sở + phượng allée sang treePitLine (trước hw+2,6/hw+3 = sau mặt tiền).
+    **SỐ ĐO (Chrome headless d3d11, Radeon 890M, autoQuality ghim, 1280×720):** 8.735 cây trong R1600 (xà cừ 2.780,
+    bàng 1.661, phượng 1.377 — 500 nở, cắt cụt 1.311, cau 525, sấu 448, cây non 376, bằng lăng 251, đa 6; 67 hero; 6.779 ô gốc), 22-24 draw call cây (13 kit gần + 9 xa +
+    ô gốc + 3 hero), tam giác cây THẤY ĐƯỢC 0,43-0,99 M (spawn 0,75 M; trước: riêng hero GLB 2,5 M ở spawn). Cùng phiên
+    bật/tắt toàn bộ cây: p50 lệch ≤ 0,7 ms (nhiễu) → không có vấn đề fill-rate. Khởi động (cùng phiên, 2 lượt/bên):
+    buildWorld 14,69 → 14,21 s (−0,48 s), hpReady 19,5 → 18,4 s, heap ~như cũ; phần cây: plantStreetTrees ~82 ms (gồm
+    giải RB_B64 ~13 ms), cả khối cây world.js ~110 ms, buildTrees ~65-85 ms (atlas 17 ms). Tổng scene (std, so baseline
+    dot3): spawn 755 call/4,88 M (738/4,88 M), pano_007 1.595/7,10 M (1.590/7,90 M), cam_high_center 1.187/7,03 M
+    (1.194/7,45 M). 0 lỗi JS (full); lite chỉ còn 404 assets_lite/ do checkout local không có file lite (check_assets ĐỦ).
+    **BẪY:** (1) `flagsFixed`: freezeStatic ghi đè castShadow/receiveShadow MỌI mesh → trees.js đặt lại cờ ở khung đầu
+    sau freeze (kit xa/ô gốc không đổ bóng). (2) QA `shoot.mjs` ẩn InstancedMesh `!frustumCulled && count 150..220` =
+    petals (170) — đừng tạo InstancedMesh khác khớp điều kiện đó. (3) Hero material (Standard của GLB) biên dịch lần đầu
+    khi cây hero đầu tiên vào 150 m (khựng 1 lần, như trước). (4) Tích hợp WP2: truyền lưới footprint DÙNG CHUNG (đã
+    đánh dấu `D.dead` bởi claims) qua `ctx.fpGrid` cho CẢ `plantStreetTrees` lẫn `buildTrees` — thiếu thì trees.js tự giải
+    RB_B64 (không có dead → cây trong khuôn viên được giữ nhưng nằm trên footprint "chết" vẫn bị coi là trong nhà).
+    (5) InstancedMesh tự LOD có thuộc tính instance riêng (`aInst`) → phải `noCull`; instcull chỉ nén matrix + color.
+    (5b) A2C giả định TIER≥2 có MSAA (composer RT samples 4) — đổi post/AA thì xem lại hằng `A2C` trong trees.js.
+    (6) Còn cây cũ CHƯA chuyển (ngoài vùng WP4): cau 'rockery' giữa vòng xuyến (world.js ~1860, vùng WP7), cau sân Nhà
+    khách Hải quân (~9865, WP3), bách tán chóp thông (~8383), cây quanh hải đăng (~20180, ngoài R).
 - **2026-09-07 (di)** [ĐỢT 2 TÍCH HỢP — 6 nhánh worktree song song + 6 phản biện đối kháng, gộp trên `dot2-int`]:
     Quy trình: mỗi nhánh (W1 merge-budget, W2 ground-grid, W3 landmark-lod, W4 visual, W5 hydro-polygon-water,
     W6 landmark-placement) làm trong worktree riêng, tự đo trước/sau trên GPU thật, có agent phản biện đọc diff +

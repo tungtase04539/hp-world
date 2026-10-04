@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kit cây — QA</title>
+<style>html,body{margin:0;height:100%;background:#9fc3e0;overflow:hidden}canvas{display:block}#info{position:fixed;left:8px;top:6px;font:12px monospace;color:#123;background:#fff8;padding:2px 6px}</style>
+<script type="importmap">{"imports":{"three":"../../lib/three.module.js","three/addons/":"../../lib/jsm/"}}</script>
+</head><body><div id="info"></div>
+<script type="module">
+// tools/qa/trees.html — xem KIT cây của js/trees.js tách khỏi game (atlas lá, dáng, LOD, bóng lốm đốm).
+// ?row=all|<loài> &dist=<m> &h=<cao camera> &fov=<độ> &yaw=<rad> &bloom=0|1 &far=1 (đặt cây cách 250 m để thấy kit XA)
+// &atlas=1 (hiện atlas lá thay vì cảnh). Phục vụ tools/qa/shoot-tree (playwright) — window.__ready khi vẽ xong.
+import * as THREE from 'three';
+import * as veg from '../../js/trees.js';
+const Q = new URLSearchParams(location.search);
+const W = innerWidth, H = innerHeight;
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(W, H); renderer.setPixelRatio(1);
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.18;
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0xa9cbe6);
+scene.fog = new THREE.Fog(0xa9cbe6, 700, 2600);
+scene.add(new THREE.HemisphereLight(0xbfe3ff, 0xa8a078, 1.0));
+const sun = new THREE.DirectionalLight(0xfff2dd, 1.32); sun.position.set(40, 90, 30); sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.shadow.camera, { left: -60, right: 60, top: 60, bottom: -60, near: 1, far: 400 }); sun.shadow.bias = -0.0002; sun.shadow.normalBias = 0.03;
+scene.add(sun); scene.add(sun.target);
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), new THREE.MeshLambertMaterial({ color: 0xb9b2a2 }));
+ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
+const kinds = ['xacu', 'xacu', 'bang', 'bang', 'phuong', 'phuong', 'sau', 'banglang', 'cau', 'catcut', 'catcut', 'da', 'non'];
+const vari = [0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0];
+const row = Q.get('row') || 'all', far = Q.get('far') === '1';
+const z0 = far ? -260 : 0;
+let n = 0;
+kinds.forEach((k, i) => {
+  if (row !== 'all' && row !== k) return;
+  const x = (n++) * (k === 'da' ? 22 : 14) - (row === 'all' ? 84 : 0) + (k === 'da' ? 5 : 0);
+  veg.plant(k, x, z0, { variant: vari[i], bloom: Q.get('bloom') === '0' ? 0 : 1, wash: i % 2, pit: 1, yaw: 0.3 + i, h: undefined });
+});
+const sys = veg.buildTrees(scene, { groundHeight: () => 0, R: 5000 });
+scene.matrixWorldAutoUpdate = false; scene.updateMatrixWorld(true);
+const cam = new THREE.PerspectiveCamera(+(Q.get('fov') || 60), W / H, 0.1, 6000);
+const dist = +(Q.get('dist') || 30), ch = +(Q.get('h') || 1.7), yaw = +(Q.get('yaw') || 0);
+const cx = +(Q.get('cx') || 0);
+cam.position.set(cx + Math.sin(yaw) * dist, ch, Math.cos(yaw) * dist + z0 * 0);
+cam.lookAt(cx, +(Q.get('ly') || 6), z0);
+cam.updateMatrixWorld();
+if (Q.get('atlas') === '1') {
+  const tex = sys.recs && scene.children.find((o) => o.isInstancedMesh && o.material.map).material.map;
+  const q = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map: tex, transparent: true }));
+  const s2 = new THREE.Scene(); s2.background = new THREE.Color(0x777777); s2.add(q);
+  const oc = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 2); oc.position.z = 1;
+  renderer.render(s2, oc);
+} else {
+  for (let i = 0; i < 3; i++) renderer.render(scene, cam);
+}
+const st = sys.stats();
+document.getElementById('info').textContent = JSON.stringify({ calls: renderer.info.render.calls, tris: renderer.info.render.triangles, kit: st.kitTris, far: st.farTris, atlasMs: st.atlasMs, buildMs: st.buildMs });
+window.__stats = st; window.__ready = true;
+</script></body></html>
