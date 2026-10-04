@@ -52,14 +52,15 @@ export const LIGHT = {
   exposure: 0.92, maxGain: 4.0,
   aerialExposure: 0.82,      // ảnh VỆ TINH: máy ảnh vệ tinh phơi sáng thấp hơn mắt người (Google Earth tối & tương phản hơn)
   // Thang của mô hình trời (skymodel.js) → 3 nơi dùng:
-  //  - vòm HIỂN THỊ: BAN NGÀY ×1,3 và bão hoà 40% — trời HP thật MÙ ẨM, xanh nhạt gần trắng: đo 160 ảnh pano ngẫu
+  //  - vòm HIỂN THỊ: BAN NGÀY ×1,2 và bão hoà 45% — trời HP thật MÙ ẨM, xanh nhạt gần trắng: đo 160 ảnh pano ngẫu
   //    nhiên, vùng trời ở độ cao ~30-40° có trung vị sRGB(186,198,211) (p25 174,187,201 / p75 201,209,221); bản đầu
-  //    (×0,76, bão hoà 100%) ra ≈(140,170,205) xanh đậm & tối hơn ảnh thật. Chạng vạng/đêm (mặt trời < 3°) trở về
+  //    (×0,76, bão hoà 100%) ra ≈(142,175,210) xanh đậm & tối hơn ảnh thật; ×1,3/40% ra (196,205,218) hơi sáng quá
+  //    (mây + dải mù cộng thêm ~+12 so với mô hình). Chạng vạng/đêm (mặt trời < 3°) trở về
   //    ×0,76 + bão hoà 100% để giữ màu hoàng hôn/giờ xanh (trộn theo độ cao mặt trời skyDayEl). Số liệu: WP5/num/scan.mjs.
   //  - đèn bán cầu/IBL ×0,55 và KHỬ BÃO HOÀ còn 25% (bầu trời thật + mây + tường quanh phố dội lại → bóng râm chỉ hơi
   //    lạnh, không xanh lét; tỉ lệ nắng : bán cầu lúc trưa ≈ 3,5 : 0,8 theo SPEC);
   //  - màu sương = chân trời hiển thị khử bão hoà 35% (mù ẩm HP xám trắng).
-  skyViewGain: 1.3, skyViewSat: 0.4, skyViewGainLow: 0.76, skyDayEl: [3, 15],
+  skyViewGain: 1.2, skyViewSat: 0.45, skyViewGainLow: 0.76, skyDayEl: [3, 15],
   hemiScale: 0.55, hemiSat: 0.25, hazeDesat: 0.35,
   groundAlbedo: [0.17, 0.155, 0.135],   // mặt phố (nhựa/gạch/mái) — màu ánh dội cho hemi.groundColor
   // ĐÊM: trăng (đèn chủ, có bóng mờ) + "nền đêm" (trời có trăng + đèn phố dội lên mù ẩm) cộng vào bán cầu. Chỉ bật
@@ -67,9 +68,10 @@ export const LIGHT = {
   // trăng cộng sớm sẽ sáng hơn trời chạng vạng (bug bản đầu: phố trắng dưới trời nâu sẫm lúc 18:15).
   moonE: [0.060, 0.075, 0.112], moonAmb: [0.014, 0.018, 0.030], moonFade: [-5, -13],
   // ĐÈN PHỐ (ấm, theo `night` — bật từ chạng vạng): bộ đèn cố định nên ánh đèn đường/biển hiệu/cửa hàng hắt lên
-  // mặt phố & tường là phần cộng vào bán cầu (đất ×1, trời ×0,6). Thiếu nó hẻm nhỏ lúc 21:00 đen kịt (sRGB ≈ 15) —
-  // phố HP thật về đêm sáng đèn, mắt vẫn đọc được mặt tiền.
-  cityAmb: [0.034, 0.027, 0.018],
+  // mặt phố & tường là phần cộng vào bán cầu (đất ×1, trời ×0,5 — đèn ở tầm phố nên tường nhận nhiều hơn mái).
+  // Thiếu nó hẻm nhỏ lúc 21:00 đen kịt (sRGB ≈ 15-20, đo pano_141 đêm) — phố HP thật về đêm sáng đèn, mắt vẫn đọc
+  // được mặt tiền. Thang: Lambert three r160 = albedo/π × chiếu sáng, đêm phơi sáng ×4 → tường albedo 0,3 ≈ sRGB 40.
+  cityAmb: [0.090, 0.072, 0.050],
   cloud: 0.40,
 };
 
@@ -282,7 +284,7 @@ export function createDayNight(scene, world) {
     const ls = lum(Esky);
     for (let c = 0; c < 3; c++) Esky[c] = (ls + L_.hemiSat * (Esky[c] - ls)) * L_.hemiScale;
     const MA = L_.moonAmb, GA = L_.groundAlbedo, CA = L_.cityAmb;
-    hemi.color.setRGB(Esky[0] + MA[0] * mA + CA[0] * 0.6 * night, Esky[1] + MA[1] * mA + CA[1] * 0.6 * night, Esky[2] + MA[2] * mA + CA[2] * 0.6 * night);
+    hemi.color.setRGB(Esky[0] + MA[0] * mA + CA[0] * 0.5 * night, Esky[1] + MA[1] * mA + CA[1] * 0.5 * night, Esky[2] + MA[2] * mA + CA[2] * 0.5 * night);
     const sh = Math.max(sA[1], 0);
     _ground.setRGB(GA[0] * (E[0] * sh + Esky[0]), GA[1] * (E[1] * sh + Esky[1]), GA[2] * (E[2] * sh + Esky[2]));
     hemi.groundColor.setRGB(_ground.r + MA[0] * 0.5 * mA + CA[0] * night, _ground.g + MA[1] * 0.5 * mA + CA[1] * night, _ground.b + MA[2] * 0.5 * mA + CA[2] * night);
