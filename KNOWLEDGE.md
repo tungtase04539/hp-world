@@ -370,25 +370,31 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     tín hiệu lẻ (6 mesh/cột) bằng 3 module mới:
     (1) `js/roadnet.js` (thuần JS, chạy được trong node): NỐI LẠI ĐỒ THỊ — ROADS_DT simplify TỪNG way nên đỉnh chung của
     ngã ba bị mất (1.697/2.850 đầu mút lơ lửng): T-snap đầu mút ≤6,5 m vào đoạn của way khác (CHÈN đỉnh, không đổi hình
-    phố đi thẳng — mặt tiền WP1 bám ROADS_DT) + chèn giao điểm X-cross (trừ dưới mặt cầu vòm). Nút: phố p/s/t/r (có vỉa)
+    phố đi thẳng — mặt tiền WP1 bám ROADS_DT) + chèn giao điểm X-cross (trừ dưới mặt cầu vòm và trừ giao cắt NÔNG <25° —
+    làn nhập/tách chồng nhau ở nút cầu Bính: chèn nút ở đó sinh nút giao lùi 25-40 m méo + vỉa hè vụn; nay 2 dải chồng
+    nhau, way lẻ nâng 1,5 mm chống z-fight, đoạn song song chạm nút vẫn chặn vỉa hè nằm TRONG lòng nó). Nút: phố p/s/t/r (có vỉa)
     vs ngõ h/w; 2 nhánh cùng bề rộng gãy ≤50° = nối miter liền; ngõ vào phố = LỐI RẼ cắt ở mép NGOÀI vỉa hè (vỉa hè phố
     chạy liền qua miệng ngõ như thật); còn lại = nút giao, gom CỤM nút sát nhau (đoạn nối ≤14 m, đường kính ≤26 m); mỗi
     cặp nhánh kề nhau 1 góc: bo cung R theo cấp thấp hơn (p7 s6 t4,5 r3 m, kẹp theo bề rộng vỉa và setback ≤45% đoạn
     chạy), thẳng (≈180°) hoặc vòng quanh tâm (>184°). Đa giác nút giao (ear-clip) + vỉa hè góc (zipper bó vỉa↔lưng) +
     mặt đứng bó vỉa 14 cm + mép lưng; vỉa hè bị cắt nơi lấn lòng/vỉa của phố khác (đường đôi, phố song song sát).
-    Số liệu R1600: 3.580 nút, 1.451 nút giao, 1.332 miter, 595 lối rẽ ngõ, 127 nút có đèn (430 cột — mỗi nhánh phố 1 cột ở
-    góc bên PHẢI làn xe tới), 731 nhánh có zebra; 62 ô 450 m × 2 mesh `roads_x,z`/`sidewalk_x,z` = 142k tam giác (cũ: ~350k
-    tam giác các lớp đường trước gộp). Dựng 320-450 ms (cũ: khối roads 414-620 + cell_road 44-82 + cell_curb 152-277 ms,
-    đo cùng phiên) → bớt ~200-400 ms main thread lúc tải.
+    Số liệu R1600: 3.574 nút, 1.447 nút giao, 1.332 miter, 595 lối rẽ ngõ, 126 nút có đèn (426 cột — mỗi nhánh phố 1 cột ở
+    góc bên PHẢI làn xe tới), 715 nhánh có zebra; 63 ô 450 m × 2 mesh `roads_x,z`/`sidewalk_x,z` = 147k tam giác (cũ: ~350k
+    tam giác các lớp đường trước gộp). Dựng 173-181 ms trong trình duyệt (node ~230 ms; cũ: khối roads 414-620 + cell_road
+    44-82 + cell_curb 152-277 ms) → bớt ~400-700 ms main thread lúc tải. Draw call cùng phiên (1 khung, base→mới):
+    pano_062_h090 864→843, pano_007_h090 1592→1577; tam giác 3,56M→3,49M / 7,90M→7,83M.
     (2) `js/roadtex.js`: 1 DataArrayTexture 9 lớp 512² (LITE 256²) sinh TRONG WORKER (Blob dựng từ chính mã các hàm; lỗi →
-    sinh đồng bộ; main thread ~5 ms): nhựa sáng màu nắng (đá dăm, loang), bê tông ngõ, 4 kiểu vỉa hè theo SIDEWALK_BY_ROAD,
+    sinh đồng bộ; main thread ~2 ms): nhựa xám ẤM sáng màu nắng (đá dăm, loang; pano đo R>G>B ~(142,137,127) — bản lạnh
+    g,g+1,g+2 + ánh trời xanh thành mặt đường xanh xám), bê tông ngõ, 4 kiểu vỉa hè theo SIDEWALK_BY_ROAD,
     bó vỉa, decal nắp cống/song chắn rác, lớp macro 32 m (nứt, vá, cụm giọt dầu — vệt tròn tối to trông như ổ gà, đã bỏ).
     MeshPhongMaterial + onBeforeCompile vẽ vạch kẻ THEO (u dọc, v ngang) của dải: tim vàng đôi (p), vàng đứt (s/t), trắng
     phân làn + vạch mép (p), zebra 3 m + vạch dừng nửa PHẢI ở nút giao, vá đường, vệt bánh xe, rãnh biên — 0 tam giác thêm.
     (3) `js/roadmarks.js` SINH bởi `tools/gen_roadmarks.mjs` từ audit_enriched.json (111 pano: tim vàng/đôi/trắng, zebra,
     đèn tín hiệu) → kiểu tim cho đoạn ≤14 m quanh pano, bật zebra/đèn ở nút ≤45 m. Đèn tín hiệu = 2 InstancedMesh
-    (`traffic_signal_poles` cột + cần vươn 3,4 m + 2 đầu đèn + hộp đếm ngược; `traffic_signal_lamps` noCull, instanceColor
-    đổi theo pha 4 Hz, 2 trục vuông góc ngược pha, chu kỳ 30 s).
+    (`traffic_signal_poles` cột + cần vươn 3,4 m + 2 đầu đèn + hộp đếm ngược, trụ openEnded 88 tam giác/cột;
+    `traffic_signal_lamps` noCull CHỈ 3 instance/cột = bóng đang sáng của 2 đầu đèn + ô đếm ngược — bóng tắt trùng màu hộp
+    nên không vẽ; đổi pha = dời ma trận bóng sang ô đỏ/vàng/xanh + đổi màu, 4 Hz; pha xanh 12 → vàng 3 → đỏ 15 s, trục
+    vuông góc lệch 15 s nên xanh/vàng trục này nằm gọn trong đỏ trục kia).
     **BẪY/HỢP ĐỒNG MỚI:** (a) mặt vỉa hè nay = `SIDEWALK_TOP` 0,25 m (xsection: ROAD_TOP 0,11 + CURB_RISE 0,14), cũ 0,18 →
     vật đặt vỉa hè kiểu cũ `gh+0.18` lún 7 cm; vật mới dùng `SIDEWALK_TOP` hoặc `world.roadNet.surfaceAt(x,z)` (độ cao mặt
     nhựa/vỉa hè so với groundHeight; 0 ngoài đường và trên mặt cầu vòm; ~1,4 µs/lần — dùng được cho chân người chơi/NPC).
@@ -400,7 +406,13 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     zebra,arms}], signals, nearJunction(x,z,pad), surfaceAt(x,z), stats, material} cho cây/prop/giao thông/người chơi né
     miệng ngã tư. (f) SIDEWALK_BY_ROAD vẫn khoá theo index ROADS_DT (`swTypeOf(ri)`) — đừng đổi thứ tự ROADS_DT. (g) Cần
     WebGL2 (sampler2DArray/textureGrad); r160 còn fallback WebGL1 nhưng khi đó đường không vẽ. (h) Chạy gen_roadmarks từ
-    GỐC repo đang làm (ghi `js/roadmarks.js` theo cwd). Ảnh A/B + số đo: scratchpad `dot3/WP6` (ab_base vs ab_after).
+    GỐC repo đang làm (ghi `js/roadmarks.js` theo cwd). (i) BẪY miter ngược chiều: mặt cắt đầu dải dùng vector miter m của
+    nút; nếu m NGƯỢC chiều pháp tuyến dải (dot<0) phải đổi dấu m (k=1/|dot|) — vị trí off() như nhau nhưng mặt đứng bó vỉa
+    lấy hướng từ (mx,mz) → 91 mặt bó vỉa từng quay LƯNG về lòng đường, bị cull, lộ khe xanh giữa lòng và vỉa hè (pano_457).
+    (j) Đoạn đường trong 10 m quanh trục cầu VÒM (BRIDGES rise>3) bị cắt CÓ CHỦ Ý kể cả trên bờ (dốc dẫn cầu Bính x≈75,
+    z −950..−900 nằm trên mặt cầu, groundHeight 7-9 m). (k) Kiểm hình học không cần GPU: scratchpad `dot3/WP6/probe`
+    (facecheck.mjs hướng mặt bó vỉa, holecheck.mjs lỗ lòng đường theo tim ROADS_DT, rn_test.mjs+rn_draw.py vẽ mặt bằng PNG).
+    Ảnh A/B + số đo: scratchpad `dot3/WP6` (fin_base vs fin_std, a4_jx*, a4_v5_m.jpg).
 - **2026-09-07 (di)** [ĐỢT 2 TÍCH HỢP — 6 nhánh worktree song song + 6 phản biện đối kháng, gộp trên `dot2-int`]:
     Quy trình: mỗi nhánh (W1 merge-budget, W2 ground-grid, W3 landmark-lod, W4 visual, W5 hydro-polygon-water,
     W6 landmark-placement) làm trong worktree riêng, tự đo trước/sau trên GPU thật, có agent phản biện đọc diff +
