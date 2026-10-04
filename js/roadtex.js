@@ -272,8 +272,12 @@ const MAIN = /* glsl */`
     } else if (Ly == 0) {
       // ---- NHỰA ----
       vec3 a = textureGrad(tRoad, vec3(wxz * 0.25, 0.0), dWx * 0.25, dWy * 0.25).rgb;
+#ifdef RN_LITE
+      col = a * macro * mix(0.9, 1.08, mac.a);   // LITE (TIER ≤1): bỏ mẫu nhựa tầng 2 (tỉ lệ 16 m) — bớt 1 lần đọc texture
+#else
       vec3 b = textureGrad(tRoad, vec3(wxz * 0.0617 + vec2(0.37, 0.71), 0.0), dWx * 0.0617, dWy * 0.0617).rgb;
       col = mix(a, b, 0.4) * macro * mix(0.9, 1.08, mac.a);
+#endif
       bool ribbon = (MKb & 128) == 0;
       if (ribbon) {
         float u = vRUv.x, v = vRUv.y, av = abs(v);
@@ -338,7 +342,11 @@ const MAIN = /* glsl */`
         if ((MKb & 32) != 0 && ds > 4.5 && ds < 4.9 && v < -0.1 && av < hw - 0.4) paintW = 1.0;
         if ((MKb & 64) != 0 && de > 4.5 && de < 4.9 && v > 0.1 && av < hw - 0.4) paintW = 1.0;
         // sơn mòn theo nhiễu (alpha macro + hạt)
+#ifdef RN_LITE
+        float wear = smoothstep(0.08, 0.55, mac.a * 1.2);
+#else
         float wear = smoothstep(0.08, 0.55, textureGrad(tRoad, vec3(wxz * 0.9, 0.0), dWx * 0.9, dWy * 0.9).a * 0.6 + mac.a * 0.6);
+#endif
         float pw = paintW * (0.55 + 0.45 * wear), py = paintY * (0.5 + 0.5 * wear);
         col = mix(col, vec3(0.80, 0.80, 0.77), pw);
         col = mix(col, vec3(0.78, 0.48, 0.035), py);
@@ -370,7 +378,7 @@ const MAIN = /* glsl */`
   }
 `;
 
-// makeRoadMaterial(THREE, {size}) → MeshPhongMaterial dùng chung cho mọi ô 'roads_*' / 'sidewalk_*'
+// makeRoadMaterial(THREE, {size, anisotropy, lite}) → MeshPhongMaterial dùng chung cho mọi ô 'roads_*' / 'sidewalk_*'
 // Màu tạm mỗi lớp (trước khi Worker sinh xong texture ~100 ms — buildWorld còn chạy nhiều giây nên thực tế không thấy)
 const PLACEHOLDER = [[156, 153, 148, 128], [166, 162, 152, 255], [176, 172, 164, 255], [152, 84, 60, 255], [170, 88, 56, 255],
   [160, 116, 92, 255], [190, 188, 180, 255], [0, 0, 0, 0], [200, 200, 200, 128]];
@@ -409,6 +417,7 @@ export function makeRoadMaterial(THREE, opt = {}) {
   const genMs = performance.now() - t0;
   const mat = new THREE.MeshPhongMaterial({ color: 0xffffff, specular: 0x262626, shininess: 18 });
   mat.name = 'roadnet';
+  if (opt.lite) mat.defines = { RN_LITE: '' };   // TIER ≤1: shader nhẹ hơn (2 lần đọc texture ít hơn mỗi điểm ảnh nhựa)
   mat.onBeforeCompile = (sh) => {
     sh.uniforms.tRoad = { value: tex };
     sh.vertexShader = sh.vertexShader
@@ -419,7 +428,7 @@ export function makeRoadMaterial(THREE, opt = {}) {
       .replace('#include <map_fragment>', MAIN)
       .replace('#include <specularmap_fragment>', '#include <specularmap_fragment>\nspecularStrength = rnSpec;');
   };
-  mat.customProgramCacheKey = () => 'roadnet-v2';
+  mat.customProgramCacheKey = () => (opt.lite ? 'roadnet-v2-lite' : 'roadnet-v2');
   mat.userData.genMs = genMs;   // thời gian main thread (worker: chỉ dựng placeholder)
   mat.userData.viaWorker = viaWorker;
   mat.userData.tex = tex;
