@@ -316,9 +316,10 @@ vec3 luClass(float c, float dist, float dens, vec2 w, vec4 d0, vec4 d1, vec4 m, 
     conc = mix(conc, tiles, yard * smoothstep(0.672, 0.684, m.b * 0.7 + md.r * 0.45));   // mép mảng lát SẮC (ranh đổ/lát thật)
     float vac = smoothstep(6.0, 14.0, dist + (md.r - 0.5) * 8.0) * (1.0 - smoothstep(0.12, 0.35, dens + (m.a - 0.5) * 0.15));
     if (vac < 0.01) return conc;
-    vec3 dirt = luS2L(vec3(146.0, 126.0, 100.0)) * (0.6 + 0.7 * d0.a) * mix(0.85, 1.1, m.b);
-    vec3 weed = luS2L(vec3(90.0, 104.0, 58.0)) * (0.55 + 0.9 * d1.r) * mix(0.8, 1.15, md.g);
-    float wv = smoothstep(0.46, 0.6, md.g * 0.75 + m.a * 0.45 + smoothstep(14.0, 30.0, dist) * 0.2);
+    vec3 dirt = luS2L(vec3(140.0, 124.0, 100.0)) * (0.6 + 0.7 * d0.a) * mix(0.85, 1.1, m.b);
+    vec3 weed = luS2L(vec3(100.0, 108.0, 66.0)) * (0.6 + 0.8 * d1.r) * mix(0.85, 1.1, md.g);
+    // mảng cỏ dại: chủ yếu theo nhiễu LỚN (96 m) + chút nhiễu vừa, mép mềm (bản đầu: vằn "rằn ri" ô 20 m từ trên cao)
+    float wv = smoothstep(0.38, 0.66, m.a * 0.75 + md.g * 0.35 + (d1.r - 0.5) * 0.12 + smoothstep(14.0, 30.0, dist) * 0.15);
     vec3 lot = mix(dirt, weed, wv);
     lot = mix(lot, conc * 0.95, smoothstep(0.58, 0.7, md.b * 0.8 + m.r * 0.4));   // mảng bê tông/sân cũ còn sót
     return mix(conc, lot, vac);
@@ -385,8 +386,16 @@ const MAIN = /* glsl */`
     vec2 g = (w - uLuGrid.xy) / uLuGrid.z - 0.5;
     if (dry > 0.0 && g.x > 0.0 && g.y > 0.0 && g.x < uLuGrid.w - 1.0 && g.y < uLuGrid.w - 1.0) {
       vec4 d0 = texture(tLuDet, vec3(w * 0.25, 0.0));
-      vec4 d1 = texture(tLuDet, vec3(w * 0.25 + vec2(0.31, 0.57), 1.0));
       vec4 m = texture(tLuDet, vec3(w * (1.0 / 96.0), 2.0));
+      vec3 col;
+#ifdef LU_LITE
+      // LITE (TIER ≤ 1): 1 mẫu raster gần nhất + 2 mẫu chi tiết (thay 4 + 4) — biên lớp bậc 2 m, đủ cho máy yếu
+      vec4 d1 = vec4(0.5, 0.5, 1.0, 0.74), md = m.gbar;
+      vec4 s = texture(tLuMap, (floor(g + 0.5) + 0.5) / uLuGrid.w);
+      float r0 = floor(s.r * 255.0 + 0.5);
+      col = luClass(mod(r0, 16.0), s.g * (255.0 / 8.0), floor(r0 / 16.0) * (1.0 / 15.0), w, d0, d1, m, md, vcol);
+#else
+      vec4 d1 = texture(tLuDet, vec3(w * 0.25 + vec2(0.31, 0.57), 1.0));
       vec4 md = texture(tLuDet, vec3(w * (1.0 / 23.0) + vec2(0.43, 0.19), 2.0));
       vec2 b = floor(g), f = g - b;
       float inv = 1.0 / uLuGrid.w;
@@ -397,7 +406,6 @@ const MAIN = /* glsl */`
       float dens = mix(mix(floor(r00 / 16.0), floor(r10 / 16.0), f.x), mix(floor(r01 / 16.0), floor(r11 / 16.0), f.x), f.y) * (1.0 / 15.0);
       // khoảng cách: song tuyến THẬT (trường trơn)
       float dist = mix(mix(s00.g, s10.g, f.x), mix(s01.g, s11.g, f.x), f.y) * (255.0 / 8.0);
-      vec3 col;
       if (c00 == c10 && c00 == c01 && c00 == c11) {
         col = luClass(c00, dist, dens, w, d0, d1, m, md, vcol);
       } else {
@@ -411,6 +419,7 @@ const MAIN = /* glsl */`
         vec3 kd = c11 == c00 ? ka : (c11 == c10 ? kb : (c11 == c01 ? kc : luClass(c11, dist, dens, w, d0, d1, m, md, vcol)));
         col = ka * w00 + kb * w10 + kc * w01 + kd * w11;
       }
+#endif
       diffuseColor.rgb = mix(vcol, col, dry);
     }
   }
@@ -456,9 +465,10 @@ export function makeGroundSystem(THREE, opt = {}) {
     tLuMap: { value: mapTex }, tLuDet: { value: detTex }, uLuOn: { value: 0 },
     uLuGrid: { value: new THREE.Vector4(LU_GRID.x0, LU_GRID.z0, LU_GRID.res, n) },
   };
-  const key = 'landuse-v2' + (opt.lite ? '-lite' : '');
+  const key = 'landuse-v3' + (opt.lite ? '-lite' : '');
   function material(mo = {}) {
     const m = new THREE.MeshLambertMaterial({ vertexColors: true });
+    if (opt.lite) m.defines = { LU_LITE: '' };
     if (mo.polygonOffset) { m.polygonOffset = true; m.polygonOffsetFactor = mo.polygonOffset[0]; m.polygonOffsetUnits = mo.polygonOffset[1]; }
     m.onBeforeCompile = (sh, renderer) => { m.userData.webgl1 = !patch(sh, renderer, uniforms); };
     m.customProgramCacheKey = () => key;

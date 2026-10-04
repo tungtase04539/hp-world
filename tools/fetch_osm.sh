@@ -56,4 +56,9 @@ q '[out:json][timeout:90];way["railway"="rail"](20.82,106.55,20.90,106.75);out g
 #     process_osm ghép các member outer thành vòng kín. CHÚ Ý Overpass hay 406/busy → retry mirror.
 q '[out:json][timeout:90];(way["natural"="water"](20.845,106.652,20.884,106.712);rel["natural"="water"](20.845,106.652,20.884,106.712);way(id:236743184););out geom;' osm_water_dt.json
 
+# 12. Sử dụng đất ±2,1 km quanh gốc (Đợt 3 W2-D → node gen_landuse.mjs ở gốc repo → ../js/landuse_data.js):
+#     landuse/amenity(trường, chợ, bãi xe, nơi thờ tự...)/leisure/natural/quảng trường/khu đi bộ/công trình
+B='20.836,106.659,20.879,106.705'
+q "[out:json][timeout:180];(way[\"landuse\"]($B);rel[\"landuse\"]($B);way[\"amenity\"~\"^(school|kindergarten|college|university|hospital|clinic|parking|marketplace|place_of_worship|townhall|police|fire_station|bus_station|fuel|grave_yard|courthouse|library|community_centre|arts_centre|theatre|cinema|prison|monastery)\$\"]($B);rel[\"amenity\"~\"^(school|kindergarten|college|university|hospital|parking|marketplace|place_of_worship|townhall)\$\"]($B);way[\"leisure\"]($B);rel[\"leisure\"]($B);way[\"natural\"~\"^(scrub|grassland|wood|sand|bare_ground|wetland|heath|scree|shingle)\$\"]($B);way[\"place\"=\"square\"]($B);way[\"highway\"=\"pedestrian\"][\"area\"=\"yes\"]($B);way[\"area:highway\"]($B);way[\"man_made\"~\"^(pier|works|wastewater_plant)\$\"]($B);way[\"military\"]($B);way[\"railway\"=\"platform\"]($B);way[\"tourism\"~\"^(attraction|museum|zoo|theme_park)\$\"]($B);way[\"historic\"]($B););out geom;" osm_landuse.json
+
 echo 'Xong. Chạy: node process_osm.mjs'
