@@ -8,6 +8,9 @@
 //    trước khoảng trống, chỗ xuống xe bị chặn giữa quảng trường); bản giải mã riêng còn bỏ qua D.dead của WP2 và tốn
 //    thêm ~35 MB heap. Không có world.rbData → chỉ còn địa danh.
 //  - 19 địa danh OSM (js/landmark_polys.js) — GLB địa danh luôn được vẽ.
+import { makeFootprintGrid, heightOf, PARAPET_H } from './buildings_data.js';
+import { LM_POLY } from './landmark_polys.js';
+
 const LAND_H = 2;   // nền phố phẳng (world.js LAND_H) — chân nhà thật đặt ở đây
 // Chiều cao THÂN chính của địa danh (m, ước theo ảnh/pano; tháp chuông/vòm nhỏ không tính — chỉ dùng cho camera).
 const LM_H = {
