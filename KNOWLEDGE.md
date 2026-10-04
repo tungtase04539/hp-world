@@ -192,14 +192,15 @@ registerModel({ url:'assets/xxx.glb', name, x, z, preload:true, place: (m) => {
   scale = kích_thước_mong_muốn / max(size.x,size.z)   // hoặc /size.y với tượng
   m.rotation.y = orientLong(LM_DIR.key, LM_FACE.key)  // xoay TRƯỚC khi đo lại box
   // đo lại box → dịch tâm về (x,z); y += LAND_H − box.min.y − 0.55 (dìm nhẹ chống lơ lửng)
-  // castShadow/receiveShadow; anisotropy=8 cho mọi map; envMapIntensity=0.85
+  // castShadow/receiveShadow; anisotropy=8 cho mọi map; (envMapIntensity=0.85 ở đây bị assets.js GHI ĐÈ = 0,5 SAU place)
   // thêm plinth (bệ) + bậc thềm che chân model
 }});
 ```
 - box.min.y có thể là tán cây/chi tiết thấp — kiểm tra bằng mắt, chỉnh độ dìm.
 - PBR chỉ đẹp khi scene có `scene.environment` = PMREM. Từ Đợt 3 (WP5) đó là PMREM nướng từ CHÍNH vòm trời
-  (`daynight.js` bakeEnv, ~3 s/lần, tự tối về đêm) — KHÔNG còn RoomEnvironment; GLB `envMapIntensity` = 0,5 và chính
-  sách emissive ở `assets.js` applyGlbMaterialPolicy (xem §10 Đợt 3 WP5).
+  (`daynight.js` bakeEnv, ~3 s/lần, tự tối về đêm) — KHÔNG còn RoomEnvironment; GLB `envMapIntensity` = 0,5
+  (`GLB_ENV_INTENSITY`, ghi bởi `assets.js` applyGlbEnv SAU `place()` cho bản gốc và cho twin lite → 2 bản LOD sáng như
+  nhau) và chính sách emissive ở `assets.js` applyGlbMaterialPolicy (xem §10 Đợt 3 WP5).
 
 ### 5.6 Dập ảnh chuẩn THẲNG vào texture GLB (ảnh nhạy cảm — chân dung Bác Hồ ở Nhà hát lớn)
 Yêu cầu: ảnh nhạy cảm KHÔNG BAO GIỜ để AI sinh/méo — phải là ảnh gốc, dập trực tiếp vào texture.

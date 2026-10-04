@@ -14,8 +14,9 @@ import { Pass, FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
 //    antialias:false khi có hậu kỳ — trước đây MSAA ×3 chỗ, kiểm toán §3 #39). AO (nếu bật) đọc depth này rồi ghép
 //    vào writeBuffer; tắt AO thì chép thẳng (1 quad).
 // 3) AO: SAO (McGuire 2012) nửa độ phân giải, pháp tuyến dựng lại từ depth (KHÔNG vẽ lại cảnh — SSAOPass cũ bị loại
-//    vì +3000 draw call), xoay mẫu theo ma trận Bayer 4×4 + làm mờ hộp 4×4 có trọng số độ sâu (khử nhiễu đúng chu kỳ),
-//    ghép full-res có upsample theo độ sâu (không quầng sáng quanh cột/mép nhà). Chạy được cả camera trực giao (vệ tinh).
+//    vì +3000 draw call), xoay mẫu theo ma trận Bayer 4×4 + làm mờ hộp 4×4 ×2 lần có trọng số độ sâu theo mặt phẳng
+//    cục bộ (khử nhiễu đúng chu kỳ, không bậc thang), ghép full-res có upsample theo độ sâu (không quầng sáng quanh
+//    cột/mép nhà). Chạy được cả camera trực giao (vệ tinh).
 
 // ---------- 1) Tone mapping + grade ----------
 // ĐƯỜNG CONG: đã thử AgX r160 (+look CDL) và ACES (fit RRT+ODT của three) bằng phép tính số trên màu pano thật
@@ -194,23 +195,30 @@ const AO_FS = /* glsl */`${TEX0}
     gl_FragColor = vec4(ao, z, 0.0, 1.0);
   }`;
 
+// Mờ hộp 4×4 = đúng 1 chu kỳ Bayer → khử nhiễu xoay mẫu; chạy 2 LẦN (lần 2 lệch +1 texel: bù nửa texel lệch của lần 1
+// và biến bậc thang 4 texel của "mẫu đan xen + hộp cùng cỡ" thành dốc tam giác — mép dải AO hết răng cưa, review WP5).
+// Trọng số độ sâu so với MẶT PHẲNG cục bộ nội suy theo 1/z (tuyến tính trên màn hình với mặt phẳng phối cảnh), độ dốc
+// lấy phía nhỏ hơn (không lấy qua mép vật): tường gần nhìn xiên đổi độ sâu đáng kể mỗi texel → so với z0 phẳng thì
+// trọng số lệch theo pha Bayer → lộ ô nhiễu.
 const BLUR_FS = /* glsl */`${TEX0}
   uniform sampler2D tAO;
   uniform vec2 uTexel;
+  uniform float uShift;
   varying vec2 vUv;
   void main() {
     vec2 c = texture2D(tAO, vUv).xy;
     float z0 = c.y, s = 0.0, w = 0.0;
     float tol = z0 * 0.035 + 0.15;
-    // so độ sâu với MẶT PHẲNG cục bộ (độ dốc 1 phía nhỏ hơn — không lấy qua mép vật), không với z0 phẳng: tường gần nhìn
-    // xiên có độ sâu đổi > tol mỗi texel → trước đây mờ bị loại gần hết → lộ nhiễu Bayer 4×4 thành mép răng cưa.
-    float zr = HP_TEX0(tAO, vUv + vec2(uTexel.x, 0.0)).y, zl = HP_TEX0(tAO, vUv - vec2(uTexel.x, 0.0)).y;
-    float zt = HP_TEX0(tAO, vUv + vec2(0.0, uTexel.y)).y, zb = HP_TEX0(tAO, vUv - vec2(0.0, uTexel.y)).y;
-    float gx = abs(zr - z0) < abs(z0 - zl) ? zr - z0 : z0 - zl;
-    float gy = abs(zt - z0) < abs(z0 - zb) ? zt - z0 : z0 - zb;
+    float i0 = 1.0 / z0;
+    float ir = 1.0 / HP_TEX0(tAO, vUv + vec2(uTexel.x, 0.0)).y, il = 1.0 / HP_TEX0(tAO, vUv - vec2(uTexel.x, 0.0)).y;
+    float it = 1.0 / HP_TEX0(tAO, vUv + vec2(0.0, uTexel.y)).y, ib = 1.0 / HP_TEX0(tAO, vUv - vec2(0.0, uTexel.y)).y;
+    float gx = abs(ir - i0) < abs(i0 - il) ? ir - i0 : i0 - il;
+    float gy = abs(it - i0) < abs(i0 - ib) ? it - i0 : i0 - ib;
     for (int y = -2; y < 2; y++) for (int x = -2; x < 2; x++) {
-      vec2 t = HP_TEX0(tAO, vUv + vec2(float(x), float(y)) * uTexel).xy;
-      float k = max(0.0, 1.0 - abs(t.y - (z0 + gx * float(x) + gy * float(y))) / tol);
+      vec2 o = vec2(float(x), float(y)) + uShift;
+      vec2 t = HP_TEX0(tAO, vUv + o * uTexel).xy;
+      float zp = 1.0 / max(i0 + gx * o.x + gy * o.y, 1e-6);
+      float k = max(0.0, 1.0 - abs(t.y - zp) / tol);
       s += t.x * k; w += k;
     }
     gl_FragColor = vec4(w > 0.0 ? s / w : c.x, z0, 0.0, 1.0);
@@ -222,7 +230,7 @@ const COMP_FS = /* glsl */`
   uniform mat4 uProjInv;
   uniform float uStrength, uFadeStart, uFadeEnd, uDebug;
   varying vec2 vUv;
-  float zAt(vec2 uv) { vec4 v = uProjInv * vec4(uv * 2.0 - 1.0, texture2D(tDepth, uv).x * 2.0 - 1.0, 1.0); return -v.z / v.w; }
+  float izAt(vec2 uv) { vec4 v = uProjInv * vec4(uv * 2.0 - 1.0, texture2D(tDepth, uv).x * 2.0 - 1.0, 1.0); return -v.w / v.z; }
   void main() {
     vec4 col = texture2D(tColor, vUv);
     float d = texture2D(tDepth, vUv).x;
@@ -230,16 +238,18 @@ const COMP_FS = /* glsl */`
     vec4 vp = uProjInv * vec4(vUv * 2.0 - 1.0, d * 2.0 - 1.0, 1.0);
     float z = -vp.z / vp.w;
     // upsample theo độ sâu: 4 texel nửa phân giải gần nhất, trọng số song tuyến × giống độ sâu. Độ sâu kỳ vọng của
-    // từng texel = mặt phẳng cục bộ (độ dốc 1 phía nhỏ hơn, theo pixel full-res) — tường nhìn xiên không thành khối 2×2.
-    float zr = zAt(vUv + vec2(uFullTexel.x, 0.0)), zl = zAt(vUv - vec2(uFullTexel.x, 0.0));
-    float zt = zAt(vUv + vec2(0.0, uFullTexel.y)), zb = zAt(vUv - vec2(0.0, uFullTexel.y));
-    vec2 g = vec2(abs(zr - z) < abs(z - zl) ? zr - z : z - zl, abs(zt - z) < abs(z - zb) ? zt - z : z - zb);
+    // từng texel = mặt phẳng cục bộ nội suy theo 1/z (độ dốc 1 phía nhỏ hơn, theo pixel full-res) — tường nhìn xiên
+    // không thành khối 2×2.
+    float iz = 1.0 / z;
+    float ir = izAt(vUv + vec2(uFullTexel.x, 0.0)), il = izAt(vUv - vec2(uFullTexel.x, 0.0));
+    float it = izAt(vUv + vec2(0.0, uFullTexel.y)), ib = izAt(vUv - vec2(0.0, uFullTexel.y));
+    vec2 g = vec2(abs(ir - iz) < abs(iz - il) ? ir - iz : iz - il, abs(it - iz) < abs(iz - ib) ? it - iz : iz - ib);
     vec2 hp = vUv / uHalfTexel - 0.5;
     vec2 f = fract(hp), base = (floor(hp) + 0.5) * uHalfTexel;
     vec2 a00 = texture2D(tAO, base).xy, a10 = texture2D(tAO, base + vec2(uHalfTexel.x, 0.0)).xy;
     vec2 a01 = texture2D(tAO, base + vec2(0.0, uHalfTexel.y)).xy, a11 = texture2D(tAO, base + uHalfTexel).xy;
     vec2 o00 = (base - vUv) / uFullTexel, oH = uHalfTexel / uFullTexel;   // vị trí texel so với pixel (px full-res)
-    vec4 ze = z + vec4(dot(g, o00), dot(g, o00 + vec2(oH.x, 0.0)), dot(g, o00 + vec2(0.0, oH.y)), dot(g, o00 + oH));
+    vec4 ze = 1.0 / max(iz + vec4(dot(g, o00), dot(g, o00 + vec2(oH.x, 0.0)), dot(g, o00 + vec2(0.0, oH.y)), dot(g, o00 + oH)), 1e-6);
     float tol = z * 0.03 + 0.1;
     vec4 w = vec4((1.0 - f.x) * (1.0 - f.y), f.x * (1.0 - f.y), (1.0 - f.x) * f.y, f.x * f.y);
     w *= vec4(1.0) / (abs(vec4(a00.y, a10.y, a01.y, a11.y) - ze) / tol + 0.05);
@@ -282,9 +292,9 @@ export class SceneAOPass extends Pass {
       tDepth: { value: this.sceneRT.depthTexture }, uFullTexel: { value: new THREE.Vector2() }, uProjInv: { value: this._pi },
       uProjScale: { value: new THREE.Vector2() }, uIsOrtho: { value: 0 }, uRadius: { value: 1 }, uBias: { value: 0 }, uBiasZ: { value: 0 }, uIntensity: { value: 1 }, uMaxPx: { value: 56 },
     }, { AO_SAMPLES: aoSamples });
-    this.blurMat = sm(BLUR_FS, { tAO: { value: this.aoRT.texture }, uTexel: { value: new THREE.Vector2() } });
+    this.blurMat = sm(BLUR_FS, { tAO: { value: this.aoRT.texture }, uTexel: { value: new THREE.Vector2() }, uShift: { value: 0 } });
     this.compMat = sm(COMP_FS, {
-      tColor: { value: this.sceneRT.texture }, tAO: { value: this.blurRT.texture }, tDepth: { value: this.sceneRT.depthTexture },
+      tColor: { value: this.sceneRT.texture }, tAO: { value: this.aoRT.texture }, tDepth: { value: this.sceneRT.depthTexture },
       uHalfTexel: { value: new THREE.Vector2() }, uFullTexel: { value: new THREE.Vector2() }, uProjInv: { value: this._pi }, uStrength: { value: 1 }, uFadeStart: { value: 1 }, uFadeEnd: { value: 2 }, uDebug: { value: 0 },
     });
     this.copyMat = sm(COPY_FS, { tColor: { value: this.sceneRT.texture } });
@@ -323,7 +333,11 @@ export class SceneAOPass extends Pass {
     const c = this.compMat.uniforms;
     c.uStrength.value = P.strength; c.uFadeStart.value = P.fadeStart; c.uFadeEnd.value = P.fadeEnd;
     this.quad.material = this.aoMat; renderer.setRenderTarget(this.aoRT); this.quad.render(renderer);
-    this.quad.material = this.blurMat; renderer.setRenderTarget(this.blurRT); this.quad.render(renderer);
+    // mờ 2 lần: aoRT → blurRT (lệch 0) → aoRT (lệch +1); compMat đọc aoRT
+    const bu = this.blurMat.uniforms;
+    this.quad.material = this.blurMat;
+    bu.tAO.value = this.aoRT.texture; bu.uShift.value = 0; renderer.setRenderTarget(this.blurRT); this.quad.render(renderer);
+    bu.tAO.value = this.blurRT.texture; bu.uShift.value = 1; renderer.setRenderTarget(this.aoRT); this.quad.render(renderer);
     this.quad.material = this.compMat; renderer.setRenderTarget(out); this.quad.render(renderer);
   }
 }

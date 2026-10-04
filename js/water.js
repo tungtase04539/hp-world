@@ -82,18 +82,20 @@ export function makeShoreTexture() {
   // giữa lòng sông → vệt màu bờ chạy giữa sông nhìn từ trên cao (review WP5, game_8). Bờ THẬT thì phải có ô đất gần:
   // khoảng cách tới tâm ô đất gần nhất − nửa đường chéo ô (5,66 m) là CẬN DƯỚI của khoảng cách tới bờ thật → nâng độ
   // sâu lên ít nhất bằng nó (bờ thật: không đổi; cạnh trong không có đất trong 4 ô = 32 m → ≥ 26 m, hết tô bờ).
+  // Ô lân cận xếp theo khoảng cách tăng dần → dừng ở ô đất ĐẦU TIÊN (bờ thật: 1-9 phép thử; chỉ cạnh trong duyệt hết 80).
   const LR = 4, HALFDIAG = SHORE_STEP * Math.SQRT1_2, CAP = 26 * ENC;
+  const OFF = [];
+  for (let j = -LR; j <= LR; j++) for (let i = -LR; i <= LR; i++) if (i || j) OFF.push([i, j, Math.hypot(i, j) * SHORE_STEP]);
+  OFF.sort((a, b) => a[2] - b[2]);
   let fixed = 0;
   for (let tz = 0; tz < N; tz++) for (let tx = 0; tx < N; tx++) {
     const v = data[(tz * N + tx) * 4];
     if (v <= 128 || v - 128 >= CAP) continue;     // đất, hoặc đã đủ xa bờ để không tô
     let best = (LR + 1) * SHORE_STEP;
-    for (let j = -LR; j <= LR; j++) {
-      const z2 = tz + j; if (z2 < 0 || z2 >= N) continue;
-      for (let i = -LR; i <= LR; i++) {
-        const x2 = tx + i; if (x2 < 0 || x2 >= N) continue;
-        if (data[(z2 * N + x2) * 4] < 128) { const dd = Math.hypot(i, j) * SHORE_STEP; if (dd < best) best = dd; }
-      }
+    for (let k = 0; k < OFF.length; k++) {
+      const x2 = tx + OFF[k][0], z2 = tz + OFF[k][1];
+      if (x2 < 0 || x2 >= N || z2 < 0 || z2 >= N) continue;
+      if (data[(z2 * N + x2) * 4] < 128) { best = OFF[k][2]; break; }
     }
     const lo = Math.round(128 + (best - HALFDIAG) * ENC);
     if (lo > v) { data[(tz * N + tx) * 4] = Math.min(255, lo); fixed++; }
