@@ -13652,7 +13652,9 @@ const w3Pole = (x, z) => {
   }
   // hàng cọ + cây tán xanh mép quảng trường (không chặn quảng trường mở)
   for (const al of [-14, -2, 12, 24]) { const px = qx + nx * (off + 4) + ux * al, pz = qz + nz * (off + 4) + uz * al; w3Palm(px, pz, 7); }
-  for (const al of [-20, 18]) { const px = qx + nx * (off + 8) + ux * al, pz = qz + nz * (off + 8) + uz * al; w3Tree(px, pz, 4.2, 8.5); }
+  // (W2-E: bỏ điểm rơi TRONG footprint Triển lãm — cây (-287,200) từng mọc xuyên mũi bắc nhà triển lãm)
+  const _inTL = (x, z) => { const P = LM_POLY.trienlam; let c = false; if (P) for (let i = 0, j = P.length - 1; i < P.length; j = i++) { const [xi, zi] = P[i], [xj, zj] = P[j]; if ((zi > z) !== (zj > z) && x < (xj - xi) * (z - zi) / (zj - zi) + xi) c = !c; } return c; };
+  for (const al of [-20, 18]) { const px = qx + nx * (off + 8) + ux * al, pz = qz + nz * (off + 8) + uz * al; if (!_inTL(px, pz)) w3Tree(px, pz, 4.2, 8.5); }
 }
 
 // ================= pano_129 — PHAN BỘI CHÂU (nhà ống nhôm-kính/dược phẩm) =================
@@ -18672,16 +18674,20 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     if (!RN || !RN.surfaceAt) { const R = P.slice(); R.off = off; return R; }
     const on = (x, z) => RN.surfaceAt(x, z) > 0.02;
     let moved = false;
+    // mỗi điểm mẫu: độ lùi nhỏ nhất (≤ CAP) để ra khỏi phố; điểm KHÔNG ra được trong CAP = nằm trong dải phố VUÔNG GÓC chạy dọc
+    // vào trong (góc 2 phố — vỉa hè phố kia lấn dọc cạnh này) → bỏ qua, cạnh kia tự lùi. Cạnh lùi = max các điểm.
+    const CAP = 10;
     for (let i = 0; i < n; i++) {
       const a = P[i], b = P[(i + 1) % n], L = Math.hypot(b[0] - a[0], b[1] - a[1]); if (L < 0.5) continue;
       const [nx, nz] = lmOutN(P, a, b), ns = Math.max(2, Math.ceil(L));
-      let d = 0;
-      for (; d <= 24; d += 0.25) {
-        let hit = false;
-        for (let k = 0; k <= ns && !hit; k++) { const t = 0.03 + 0.94 * k / ns; hit = on(a[0] + (b[0] - a[0]) * t - nx * d, a[1] + (b[1] - a[1]) * t - nz * d); }
-        if (!hit) break;
+      let dMax = 0;
+      for (let k = 0; k <= ns; k++) {
+        const t = 0.03 + 0.94 * k / ns, x = a[0] + (b[0] - a[0]) * t, z = a[1] + (b[1] - a[1]) * t;
+        if (!on(x, z)) continue;
+        let d = 0.25; while (d <= CAP && on(x - nx * d, z - nz * d)) d += 0.25;
+        if (d <= CAP && d > dMax) dMax = d;
       }
-      if (d > 0) { off[i] = d + m; moved = true; }
+      if (dMax > 0) { off[i] = dMax + m; moved = true; }
     }
     if (!moved) { const R = P.slice(); R.off = off; return R; }
     const lines = [];
@@ -20168,12 +20174,12 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
         const c = new THREE.BoxGeometry(L + 0.1, 0.16, 0.5); c.rotateY(rot); c.translate(cx, y0 + 2.28, cz); capG.push(c);
         const wr = lmRect(fr, u0, u1, v - 0.2, v + 0.2); lmSolid(wr, K); world.lmMasses.push({ key: K, ring: wr, h: 2.3 });
       };
-      wall(fN, 1, fN.L - 31); wall(fN, fN.L - 26, fN.L - 1.5);
-      wall(fE, 1.5, uG - 9.6); wall(fE, uG + 9.6, fE.L - 1.5);
+      wall(fN, 1, fN.L - 31); wall(fN, fN.L - 26, fN.L - wE - 0.4);   // 2 tuyến rào gặp nhau ở góc Pos (sau vỉa hè Mê Linh)
+      wall(fE, wN + 0.2, uG - 9.6); wall(fE, uG + 9.6, fE.L - 1.5);
       for (const [list, m] of [[wallG, mat(0xe2bf68)], [capG, mat(0xf3ecd8)]]) { const me = new THREE.Mesh(mergeGeometries(list), m); list.forEach((q) => q.dispose()); me.name = 'lm_thptnq_wall'; me.castShadow = true; me.receiveShadow = true; scene.add(me); }
     }
-    blk(fE, 17, uG - 10.5, wE + 3.5, wE + 15.5, 9, 'yellow');   // mặt đông: 2 bên cổng, lùi sau rào
-    blk(fE, uG + 10.5, fE.L - 15, wE + 3.5, wE + 15.5, 9, 'yellow');
+    blk(fE, 17, uG - 10.5, wE + 7, wE + 19, 9, 'yellow');       // mặt đông: 2 bên cổng, lùi ~7 m sau rào (pano_261 h270 thật)
+    blk(fE, uG + 10.5, fE.L - 15, wE + 7, wE + 19, 9, 'yellow');
     const fS = lmEdge(P, E, F);
     blk(fS, 14, fS.L - 14, 1.0, 13, 9.5, 'yellow');
     const fW = lmEdge(P, D, E);
