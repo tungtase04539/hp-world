@@ -75,6 +75,9 @@ export function initMinimap() {
   o.fillStyle = '#e8e3da';
   if (FABRIC === 'real') {
     const D = fabricData();
+    // fill() theo LÔ 64 đa giác (Đợt 3 WP8, đo 890M/Chrome): 1 path chứa ~40k đa giác con → 1 lần fill tốn 5,2 s
+    // (rasterizer sắp cạnh của cả path) — chặn đúng bước khởi động 'actors'; lô 64 → 74 ms, ảnh y hệt (cùng màu đặc).
+    let n = 0;
     o.beginPath();
     for (let b = 0; b < D.nB; b++) {
       if (D.dead[b]) continue;
@@ -83,6 +86,7 @@ export function initMinimap() {
       const p0 = toBase(D.x[s], D.z[s]); o.moveTo(p0[0], p0[1]);
       for (let v = s + 1; v < e; v++) { const p = toBase(D.x[v], D.z[v]); o.lineTo(p[0], p[1]); }
       o.closePath();
+      if (++n % 64 === 0) { o.fill(); o.beginPath(); }
     }
     o.fill();
   }

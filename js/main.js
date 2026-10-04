@@ -1028,6 +1028,9 @@ function startGame() {
   }
 }
 
+// bước 'shaders' của thanh khởi động bắt đầu TỪ ĐÂY (phần đồng bộ của compileAsync bên dưới tốn vài giây — trước
+// bị tính nhầm vào bước 'actors' sau khi WP5 dời biên dịch lên trước khung đầu)
+boot.step('shaders');
 // ẤM MÁY sau màn chờ: compile TOÀN BỘ shader của scene (song song, KHR_parallel_shader_compile)
 // + render bóng 1 lần. Trước đây Three chỉ compile vật thể LỌT KHUNG NHÌN ở frame đầu → bấm
 // "Bắt đầu" camera quét ra toàn cảnh = bão compile shader → khựng vài giây.
@@ -1059,7 +1062,6 @@ if (renderer.compileAsync) {
   setTimeout(() => { if (!_warm) _T.warmBy = 'timeout'; _warm = true; }, 12000);   // lưới an toàn: driver không báo xong vẫn vẽ
 } else _warm = true;
 
-boot.step('shaders');
 animate();
 // Mở nút Bắt đầu sau 2 khung đầu (khung đầu gánh link shader + upload — bấm sớm hơn chỉ thấy đơ). Tab nền: rAF
 // dừng → nút mở khi người chơi quay lại tab (thế giới đã dựng xong, chỉ chờ vẽ).
