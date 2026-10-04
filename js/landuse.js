@@ -340,10 +340,11 @@ vec3 luClass(float c, float dist, float dens, float cov, vec2 w, vec4 d0, vec4 d
     if (vac < 0.01 && far < 0.01) return conc;
     vec3 dirt = luS2L(vec3(140.0, 124.0, 100.0)) * (0.6 + 0.7 * d0.a) * mix(0.85, 1.1, M.b);
     vec3 weed = luS2L(vec3(100.0, 108.0, 66.0)) * (0.6 + 0.8 * d1.r) * mix(0.85, 1.1, M.g);
-    // mảng cỏ dại: nhiễu LỚN không lặp + chút hạt mịn, mép mềm
-    float wv = smoothstep(0.4, 0.62, M.a * 0.9 + (md.g - 0.5) * 0.1 + (d1.r - 0.5) * 0.12 + smoothstep(14.0, 30.0, dist) * 0.1);
+    // mảng cỏ dại: nhiễu LỚN không lặp quyết định CHỖ, hạt mịn (md 23 m + lá cỏ 4 m) làm mép RÁCH; dải chuyển hẹp (mép
+    // mềm 20-50 m nhìn từ cao như vết mờ/sương)
+    float wv = smoothstep(0.47, 0.55, M.a * 0.9 + (md.g - 0.5) * 0.16 + (d1.r - 0.5) * 0.2 + smoothstep(14.0, 30.0, dist) * 0.08);
     vec3 lot = mix(dirt, weed, wv);
-    lot = mix(lot, conc * 0.95, smoothstep(0.6, 0.7, M.b * 0.75 + M.r * 0.35));   // mảng bê tông/sân cũ còn sót
+    lot = mix(lot, conc * 0.95, smoothstep(0.63, 0.67, M.b * 0.75 + M.r * 0.35 + (d0.a - 0.5) * 0.1));   // mảng bê tông/sân cũ còn sót
     // PHỐ XA: trung bình ≈ màu đỉnh khử bão hoà (tấm thô ngoài ±LOCAL_HALF cùng màu đỉnh → hoà mép không lộ).
     // "Ô đất" = lưới xoay 23° ô 26×17 m nắn cong mạnh theo M (mép sắc, KHÔNG viền — viền sẫm đọc thành "đá lát khổng lồ")
     // — mỗi ô 1 tông/1 loại nhẹ (đất bụi, xám, ít cỏ) theo hash, tương phản thấp → mặt bằng ven đô mờ xa; bản loang mềm
@@ -354,7 +355,7 @@ vec3 luClass(float c, float dist, float dens, float cov, vec2 w, vec4 d0, vec4 d
     float h1 = luH(qc), h2 = luH(qc + 17.31);
     vec3 fg = fb * (0.7 + 0.5 * d0.r) * mix(0.92, 1.06, h1) * mix(0.9, 1.05, M.g) * mix(0.86, 1.0, stain);
     fg *= h2 < 0.3 ? vec3(1.04, 0.99, 0.92) : (h2 < 0.4 ? vec3(0.94, 1.0, 0.86) : (h2 < 0.6 ? vec3(0.97, 0.98, 1.0) : vec3(1.0)));
-    fg = mix(fg, fg * vec3(0.9, 1.0, 0.78), smoothstep(0.62, 0.74, M.a) * 0.4);   // cỏ thưa loang qua nhiều ô
+    fg = mix(fg, fg * vec3(0.9, 1.0, 0.78), smoothstep(0.64, 0.7, M.a + (d1.r - 0.5) * 0.15) * 0.4);   // cỏ thưa loang qua nhiều ô
     return mix(mix(conc, lot, vac), fg, far);
   }
   if (c < 2.5) {   // CÔNG NGHIỆP / CẢNG: bê tông tấm lớn bạc + ố dầu + gỉ
