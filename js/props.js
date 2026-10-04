@@ -835,8 +835,14 @@ function cullUpdate(camera, force = false) {
       if (d2 > r1 || d2 < r0) continue;
       // sau lưng camera (góc > ~100°) và đủ xa → bỏ (camera xoay nhanh → cập nhật ngay ở khung kế)
       if (!topDown && d2 > kb && dx * fx + dz * fz < -0.18 * Math.sqrt(d2)) continue;
-      if (idx[k] !== i) { idx[k] = i; changed = true; }
-      for (const at of attrs) { const s = at.size; at.a.array.set(at.src.subarray(i * s, i * s + s), k * s); }
+      if (idx[k] !== i) {
+        idx[k] = i; changed = true;
+        // chép thủ công (subarray() cấp phát 1 view/instance/attribute → hàng chục nghìn object rác mỗi lượt)
+        for (let a = 0; a < attrs.length; a++) {
+          const at = attrs[a], s = at.size, dst = at.a.array, src = at.src;
+          for (let j = 0, o = k * s, p = i * s; j < s; j++) dst[o + j] = src[p + j];
+        }
+      }
       k++;
     }
     if (changed || k !== t.last) {
@@ -917,18 +923,19 @@ export function buildProps(ctx) {
       for (const side of [1, -1]) {
         // pháp tuyến hướng RA vỉa hè bên này: side·(uz, −ux)
         const nx = side * uz, nz = -side * ux;
-        const S = { ri, si, c: r.c, side, ax, az, ux, uz, nx, nz, L, n, ok: new Uint8Array(n), occ: new Uint8Array(n), ev: new Array(n) };
+        // rj[k]: lý do loại ô (QA qua window.__hpProps.sides): 1 xa · 2 giao lộ · 3 dốc/nước · 4 công trình/claim · 5 nhà thật · 6 kè hồ
+        const S = { ri, si, c: r.c, side, ax, az, ux, uz, nx, nz, L, n, ok: new Uint8Array(n), occ: new Uint8Array(n), rj: new Uint8Array(n), ev: new Array(n) };
         const off = (L - n * CELL) / 2;
         for (let k = 0; k < n; k++) {
           const s = off + (k + 0.5) * CELL;
           const x = ax + ux * s + nx * pk, z = az + uz * s + nz * pk;
           stats.cells++;
-          if (x * x + z * z > R_MAX * R_MAX) { rej.far++; continue; }
-          if (roadIdx.blocked(x, z, ri, si)) { rej.junction++; continue; }
-          if (!flat(x, z)) { rej.notFlat++; continue; }
-          if (fcGrid.hit(x, z) || avoid(x, z) || claimAt(x, z, CLAIM_KINDS)) { rej.featured++; continue; }
-          if (inBuilding(x, z)) { rej.building++; continue; }
-          if (lakeSD(x, z) < 14) { rej.lake++; continue; }   // kè hồ Tam Bạc có đồ riêng (lan can/ghế/đèn đôi)
+          if (x * x + z * z > R_MAX * R_MAX) { rej.far++; S.rj[k] = 1; continue; }
+          if (roadIdx.blocked(x, z, ri, si)) { rej.junction++; S.rj[k] = 2; continue; }
+          if (!flat(x, z)) { rej.notFlat++; S.rj[k] = 3; continue; }
+          if (fcGrid.hit(x, z) || avoid(x, z) || claimAt(x, z, CLAIM_KINDS)) { rej.featured++; S.rj[k] = 4; continue; }
+          if (inBuilding(x, z)) { rej.building++; S.rj[k] = 5; continue; }
+          if (lakeSD(x, z) < 14) { rej.lake++; S.rj[k] = 6; continue; }   // kè hồ Tam Bạc có đồ riêng (lan can/ghế/đèn đôi)
           S.ok[k] = 1; stats.valid++;
           S.ev[k] = evAt(x, z);
         }
@@ -943,7 +950,7 @@ export function buildProps(ctx) {
   };
   // mức mặc định khi không có pano gần: lõi phố cổ dày hơn ngoại vi
   const defLevel = (x, z) => { const r = Math.hypot(x, z); return r < 700 ? 2 : r < 1150 ? 1 : 1; };
-  const OCC_POLE = 1, OCC_SHOP = 2, OCC_BIKE = 4, OCC_PED = 8;
+  const OCC_POLE = 1, OCC_SHOP = 2, OCC_BIKE = 4, OCC_PED = 8, OCC_CAR = 16;
 
   // ---------------------------------------------------------------------------------------------------------------
   // 6.2 CỘT ĐIỆN + ĐÈN: tuyến cột điện 1 bên/đường (bên theo hash), đèn cao áp bên kia (p/s) — dây theo từng nhịp
@@ -1312,9 +1319,10 @@ export function buildProps(ctx) {
   // ---------------------------------------------------------------------------------------------------------------
   const carI = [[], [], [], [], []];   // sedan, suv, hatch, taxi, truck
   const CAR_COLS = [0xeeeeec, 0xeeeeec, 0xe4e4e1, 0x16171a, 0x16171a, 0xb4b8bc, 0x8e9398, 0x6c7176, 0x9a1d1d, 0x24406e, 0x6b5a48, 0xcfc4ae];
-  const TAXI_COLS = [0xf4f4f0, 0x2f8f4e, 0x3aa35a, 0xe9e9e4, 0xd85a8c];
+  const TAXI_COLS = [0xf4f4f0, 0x2f8f4e, 0x3aa35a, 0xe9e9e4, 0x2c5aa0];   // trắng · xanh lá · xanh dương-trắng (taxi HP)
   const CAR_LEN = [4.5, 4.6, 3.9, 3.9, 4.8];
-  let nCars = 0;
+  // lượt 1: gom ỨNG VIÊN (mọi kiểm tra) · lượt 2: lấy mẫu ĐỀU theo hash nếu vượt ngân sách (không "N đường đầu ăn hết")
+  const carCand = [];
   for (const S of sides) {
     const e0 = S.ev[(S.n / 2) | 0];
     const mx = S.ax + S.ux * S.L / 2, mz = S.az + S.uz * S.L / 2;
@@ -1338,23 +1346,33 @@ export function buildProps(ctx) {
       let ok = x * x + z * z < R_MAX * R_MAX && flat(x, z) && !panoNear(x, z, 3.5) && !avoid(x, z) && lakeSD(x, z) > 18;
       if (ok) for (const dd of [-len / 2 - 0.5, 0, len / 2 + 0.5]) { if (roadIdx.blocked(x + S.ux * dd, z + S.uz * dd, S.ri, S.si, 4.5, false)) { ok = false; break; } }
       if (ok && obst.hit(x, z, 0.9)) ok = false;
-      if (ok && roll && (inBuilding(x + S.nx * 1.0, z + S.nz * 1.0))) ok = false;
-      if (ok) {
-        // giao thông bên PHẢI: bên side>0 (pháp tuyến (uz,−ux)) là bên TRÁI khi nhìn theo u → xe đỗ đó quay ngược u
-        const dirSign = S.side > 0 ? -1 : 1;
-        const heading = headZ(S.ux * dirSign, S.uz * dirSign) + (hash3(x, z, 105) - 0.5) * 0.04;
-        // nâng phía vỉa hè: local +X = (cosθ, −sinθ); nếu nó chỉ ra vỉa (n) → quay dương quanh trục dọc
-        const lxDotN = Math.cos(heading) * S.nx - Math.sin(heading) * S.nz;
-        const col = mi === 3 ? pick(TAXI_COLS, hash3(x, z, 106)) : mi === 4 ? pick([0xf0f0ec, 0xf0f0ec, 0x2c5aa0, 0xd8d4c8], hash3(x, z, 106)) : pick(CAR_COLS, hash3(x, z, 106));
-        carI[mi].push({ x, z, heading, roll: roll ? (lxDotN > 0 ? 0.085 : -0.085) : 0, yo: roll ? 0.065 : 0, col });
-        for (const dd of [-len * 0.28, len * 0.28]) ctx.addCollider(x + S.ux * dd, z + S.uz * dd, 0.85);
-        obst.add(x, z, len / 2);
-        nCars++;
-        if (nCars >= BUDGET.cars) break;
+      // phố r: 2 bánh trên vỉa → không đè hàng xe máy / quán / xe đẩy đã đặt trên các ô vỉa hè dọc thân xe
+      let k0 = 0, k1 = -1;
+      if (ok && roll) {
+        if (inBuilding(x + S.nx * 1.0, z + S.nz * 1.0)) ok = false;
+        k0 = Math.max(0, Math.floor((s - 0.3 - S.off) / CELL)); k1 = Math.min(S.n - 1, Math.floor((s + len + 0.3 - S.off) / CELL));
+        for (let q = k0; ok && q <= k1; q++) if (S.occ[q] & (OCC_BIKE | OCC_SHOP)) ok = false;
       }
+      if (ok) carCand.push({ S, x, z, mi, len, roll, k0, k1 });
       s += len + 0.7 + hash3(x0, z0, 107) * 1.6;
     }
-    if (nCars >= BUDGET.cars) break;
+  }
+  const keepCar = Math.min(1, BUDGET.cars / Math.max(1, carCand.length));
+  let nCars = 0;
+  for (const C of carCand) {
+    const { S, x, z, mi, len, roll } = C;
+    if (keepCar < 1 && hash3(x, z, 108) >= keepCar) continue;
+    // giao thông bên PHẢI: bên side>0 (pháp tuyến (uz,−ux)) là bên TRÁI khi nhìn theo u → xe đỗ đó quay ngược u
+    const dirSign = S.side > 0 ? -1 : 1;
+    const heading = headZ(S.ux * dirSign, S.uz * dirSign) + (hash3(x, z, 105) - 0.5) * 0.04;
+    // nâng phía vỉa hè: local +X = (cosθ, −sinθ); nếu nó chỉ ra vỉa (n) → quay dương quanh trục dọc
+    const lxDotN = Math.cos(heading) * S.nx - Math.sin(heading) * S.nz;
+    const col = mi === 3 ? pick(TAXI_COLS, hash3(x, z, 106)) : mi === 4 ? pick([0xf0f0ec, 0xf0f0ec, 0x2c5aa0, 0xd8d4c8], hash3(x, z, 106)) : pick(CAR_COLS, hash3(x, z, 106));
+    carI[mi].push({ x, z, heading, roll: roll ? (lxDotN > 0 ? 0.085 : -0.085) : 0, yo: roll ? 0.065 : 0, col });
+    for (const dd of [-len * 0.28, len * 0.28]) ctx.addCollider(x + S.ux * dd, z + S.uz * dd, 0.85);
+    obst.add(x, z, len / 2);
+    if (roll) for (let q = C.k0; q <= C.k1; q++) S.occ[q] |= OCC_CAR;   // người đi bộ phố r không xuyên xe
+    nCars++;
   }
   const tCars = performance.now();
 
@@ -1364,8 +1382,8 @@ export function buildProps(ctx) {
   for (const S of sides) {
     let k = 0;
     while (k < S.n) {
-      if (!S.ok[k] || S.occ[k] & (OCC_BIKE | OCC_SHOP)) { k++; continue; }
-      let k1 = k; while (k1 < S.n && S.ok[k1] && !(S.occ[k1] & (OCC_BIKE | OCC_SHOP))) k1++;
+      if (!S.ok[k] || S.occ[k] & (OCC_BIKE | OCC_SHOP | OCC_CAR)) { k++; continue; }
+      let k1 = k; while (k1 < S.n && S.ok[k1] && !(S.occ[k1] & (OCC_BIKE | OCC_SHOP | OCC_CAR))) k1++;
       const runL = (k1 - k) * CELL;
       const [x, z] = cellPos(S, k, parkingLine(S.c));
       const r0 = Math.hypot(x, z);
@@ -1385,7 +1403,7 @@ export function buildProps(ctx) {
   for (const R of bikeRows) {
     const S = R.S; if (!(S.occ[R.k0] & OCC_BIKE)) continue;
     if (hash3(R.x, R.z, 121) > 0.14) continue;
-    const kk = R.k1 < S.n ? R.k1 : R.k0 - 1; if (kk < 0 || !S.ok[kk] || S.occ[kk] & (OCC_SHOP | OCC_POLE)) continue;
+    const kk = R.k1 < S.n ? R.k1 : R.k0 - 1; if (kk < 0 || !S.ok[kk] || S.occ[kk] & (OCC_SHOP | OCC_POLE | OCC_CAR)) continue;
     const [x, z] = cellPos(S, kk, parkingLine(S.c) + 0.3, (hash3(R.x, R.z, 122) - 0.5));
     if (inBuilding(x, z) || obst.hit(x, z, 0.3)) continue;
     standI.push({ x, z, heading: Math.atan2(-S.nx, -S.nz) + (hash3(x, z, 123) - 0.5) * 2.4 });
@@ -1599,7 +1617,7 @@ export function buildProps(ctx) {
   Object.assign(stats, {
     ms: Math.round(T1 - T0),
     msBreak: { sample: Math.round(tPoles - T0), cables: Math.round(tCables - tPoles), shops: Math.round(tShops - tCables), bikes: Math.round(tBikes - tShops), cars: Math.round(tCars - tBikes), peds: Math.round(tPeds - tCars), inst: Math.round(tInst - tPeds) },
-    bikes: nBikes, bikeRows: bikeRows.length, bikeKeep: +keepRow.toFixed(3), cars: nCars,
+    bikes: nBikes, bikeRows: bikeRows.length, bikeKeep: +keepRow.toFixed(3), cars: nCars, carCand: carCand.length, carKeep: +keepCar.toFixed(3),
     poles: poleI.length + poleLampI.length, trafos: trafoI.length, spans: spans.length, cables: nCables, cableVerts,
     lampsCobra: cobraI.length, lampsOrnate: ornI.length, lampsOnPole: poleLampI.length, flags: flagI.length,
     stools: stoolI.length, parasols: paraI.length, carts: cartI.length, aframes: aframeI.length, bins: binI.length, hydrants: hydI.length, cabinets: cabI.length,
@@ -1609,6 +1627,6 @@ export function buildProps(ctx) {
   });
   console.log('[props]', JSON.stringify(stats));
   // móc gỡ lỗi/QA (không dùng trong game): window.__hpProps.sides / .cull()
-  if (typeof window !== 'undefined') window.__hpProps = { stats, sides, cull: () => CULL.map((t) => [t.mesh.name, t.mesh.count, t.n]), bikeRows, lists: { stoolI, cartI, aframeI, walkI, standI, sitI, carI, cobraI, ornI, poleI, trafoI, binI } };
+  if (typeof window !== 'undefined') window.__hpProps = { stats, sides, cull: () => CULL.map((t) => [t.mesh.name, t.mesh.count, t.n]), bikeRows, lists: { stoolI, cartI, aframeI, walkI, standI, sitI, cars: carI.flat(), bikes: bikeI.flat(), cobraI, ornI, poleI, trafoI, binI } };
   return { stats, update, meshes, cableMeshes, cullStats: () => CULL.map((t) => [t.mesh.name, t.mesh.count, t.n]) };
 }
