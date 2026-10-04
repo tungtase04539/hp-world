@@ -40,6 +40,7 @@ export async function openGame({ port = 8177, host = '127.0.0.1', quality = 'ful
   let hpReadyMs = 0, startReadyMs = 0;
   for (let i = 0; i < 600; i++) {
     if (await pg.evaluate(() => !!(window.__hp && window.__hp.teleport)).catch(() => false)) { hpReadyMs = Date.now() - t0; break; }
+    if (i > 4 && errors.some((e) => e.startsWith('pageerror'))) break;   // lỗi khi dựng thế giới → khỏi chờ 300 s giữ khoá GPU
     await pg.waitForTimeout(500);
   }
   if (!hpReadyMs) errors.push('TIMEOUT: window.__hp không xuất hiện sau 300 s');

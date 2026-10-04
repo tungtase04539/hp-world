@@ -38,7 +38,7 @@ import { SHOP_SIGNS } from './shopsigns.js';
 // ĐỢT 3 WP2: phố từ footprint THẬT (citygen.js) + sổ vùng giữ chỗ (claims.js) + footprint địa danh (landmark_polys.js)
 import { buildRealFabric, fabricData } from './citygen.js';
 import { claimPoly, claimBox, claimCircle } from './claims.js';
-import { LM_POLY } from './landmark_polys.js';
+import { LM_POLY, LM_CENTROID } from './landmark_polys.js';
 import { buildProps, layRoadSurfaceY } from './props.js';                 // Đợt 3 WP7: đồ đạc phố (xe máy/ô tô/cột điện/đèn/người)
 import { furnitureLine } from './xsection.js';
 // Mạng đường thật (Đợt 3 WP6): đồ thị nút giao + dải + vỉa hè/bó vỉa + vạch kẻ trong shader
@@ -17415,21 +17415,12 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
       return out;
     };
     for (const [k, P] of Object.entries(LM_POLY)) claimPoly(expandPoly(P, 3), k === 'square' ? 'plaza' : 'landmark', k);
-    // (2) khối GLB/procedural lệch hoặc to hơn footprint OSM (cỡ GLB = size trong placeGLB, xem bên dưới)
+    // (2) W2-E: mọi GLB/khối địa danh nay KHỚP LM_POLY (world.js khối địa danh, LM_FIT) → bỏ các vòng tròn bù GLB lệch/to cũ
+    // (nhà hát r28, bưu điện, bảo tàng, nhà thờ, ga r30, THPT r44, đình HK, chùa Hàng, NHNN r34, đền Tam Kỳ, chợ Sắt r60) — chúng
+    // giết cả nhà thật NGOÀI footprint. Chỉ giữ cho địa danh KHÔNG có đa giác (đền Nghè: GLB lùi 9 m sau cổng; Nhà Kèn).
     const fc = (x, z, r, name) => claimCircle(x, z, r, 'landmark', name);
-    fc(LM.opera[0], LM.opera[1], 28, 'opera_glb');
-    fc(LM.postoffice[0] - LM_FACE.postoffice[0] * 9, LM.postoffice[1] - LM_FACE.postoffice[1] * 9, 27, 'postoffice_glb');
-    fc(LM.museum[0], LM.museum[1], 21, 'museum_glb');
-    fc(LM.cathedral[0], LM.cathedral[1], 25, 'cathedral_glb');
-    fc(LM.station_bldg[0], LM.station_bldg[1], 30, 'ga_glb');
-    fc(LM.thptnq[0], LM.thptnq[1], 44, 'thptnq_glb');
     fc(LM.dennghe[0] - LM_FACE.dennghe[0] * 9, LM.dennghe[1] - LM_FACE.dennghe[1] * 9, 14, 'dennghe_glb');
-    fc(LM.dinhhk[0], LM.dinhhk[1], 17, 'dinhhk_glb');
-    fc(LM.chuahang[0], LM.chuahang[1], 15, 'chuahang_glb');
-    fc(LM.nhnn[0], LM.nhnn[1], 34, 'nhnn_glb');
-    fc(LM.dentamky[0], LM.dentamky[1], 13, 'dentamky_glb');
     fc(LM.nhaken[0], LM.nhaken[1], 12, 'nhaken');
-    fc(LM.market[0] + 12, LM.market[1] + 4, 60, 'chosat');
     claimBox(947, 800, 30, 27, 0, 'civic', 'cvh_thanhnien');
     // (3) không gian mở thật (tập con openSpace: công viên, vườn hoa, quảng trường, kè, hành lang ray)
     // (GARDENS = bbox TRỤC THẲNG của chính các đa giác PARKS — dải vườn hoa trung tâm chạy CHÉO nên bbox nuốt cả
@@ -18169,18 +18160,8 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
 
   // ===== civic8: TỔ HỢP CIVIC ĐÔNG tile8 (khớp real_8) — đại lộ cắt z≥-985 + bỏ đài phun (310,-1089) tránh chồng kho =====
   {
-    // (1) ĐƯỜNG CHẠY OVAL tâm (169,-832) — sân cỏ + băng đỏ + viền trắng
-    { const cx = 169, cz = -832;
-      if (!isWater(cx, cz) && Math.abs(groundHeightNoDeck(cx, cz) - LAND_H) < 0.4) {
-        const gy = groundHeight(cx, cz), sx = 60, sz = 42;
-        const infield = new THREE.CircleGeometry(1, 48); infield.rotateX(-Math.PI / 2); infield.scale(sx * 0.76, 1, sz * 0.72); infield.translate(cx, gy + 0.04, cz);
-        addMerged([infield], mat(0x5a8f43), 'civic8_track_infield');
-        const band = new THREE.RingGeometry(0.80, 1.0, 64); band.rotateX(-Math.PI / 2); band.scale(sx, 1, sz); band.translate(cx, gy + 0.06, cz);
-        addMerged([band], mat(0x9c4a34), 'civic8_track_band');
-        const lineO = new THREE.RingGeometry(0.985, 1.0, 64); lineO.rotateX(-Math.PI / 2); lineO.scale(sx, 1, sz); lineO.translate(cx, gy + 0.09, cz);
-        const lineI = new THREE.RingGeometry(0.80, 0.815, 64); lineI.rotateX(-Math.PI / 2); lineI.scale(sx, 1, sz); lineI.translate(cx, gy + 0.09, cz);
-        addMerged([lineO, lineI], mat(0xe8e6e0), 'civic8_track_lines'); addCollider(cx, cz, 10);
-      } }
+    // (1) [W2-E] ĐƯỜNG CHẠY OVAL tâm (169,-832) ĐÃ BỎ: nằm TRONG khuôn viên UBND (LM_POLY.ubnd, 163 × 75 m) — vệ tinh (ảnh GE xoay
+    //     ~40°) bị đọc nhầm; nay là vườn trước + dãy nhà UBND dựng theo footprint thật (khối địa danh, world.js).
     // (2) PARTERRE + ĐÀI PHUN (123,-737)
     { const cx = 123, cz = -737;
       if (!isWater(cx, cz) && Math.abs(groundHeightNoDeck(cx, cz) - LAND_H) < 0.4) {
@@ -18284,18 +18265,333 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
 
   await prog('landmarks');
 
+  // ======================================================================================================
+  // ĐỢT 3 W2-E: ĐỊA DANH KHỚP FOOTPRINT THẬT (js/landmark_polys.js LM_POLY) — KNOWLEDGE §10 "W2-E LANDMARKS"
+  // (1) LM_FIT: transform RUNTIME cho GLB (KHÔNG sửa file): xoay th, scale DỊ HƯỚNG sx/sz (m mỗi đơn vị model theo local
+  //     X/Z) + sy chọn theo chiều cao thật, đặt TÂM BBOX model tại (cx,cz). Số đo bằng tools/qa/lmfit.py trên ảnh chiếu
+  //     bằng của chính GLB (tools/qa/glbsheet.html?occ) → IoU với LM_POLY lớn nhất, giới hạn dị hướng; θ chỉ được lệch vài
+  //     độ quanh hướng mặt tiền đã kiểm bằng pano (orientLong/orientLM cũ). Twin lite (assets.js) chép nguyên scale/quat.
+  // (2) KHỐI THỦ TỤC từ đa giác thật cho phần GLB không phủ được (cánh ga, khuôn viên THPT/chùa Hàng/UBND, Việt Tiệp…):
+  //     tường 1 quad/cạnh, texture 1 GIAN × 1 TẦNG lặp 2 chiều theo phong cách (thuộc địa vàng, vòm, trường, công sở,
+  //     đền chùa), mái ngói/đá đen dạng hông hoặc mái bằng. Material chung theo phong cách (gộp lượt 2 freezeStatic).
+  // (3) VA CHẠM ĐA GIÁC: mọi khối/GLB địa danh đăng ký vòng đa giác → world.resolveCollisions bọc thêm lmPush (đẩy ra cạnh
+  //     gần nhất) — oracle đặt cây/hoa/biển/NPC phía sau tự né địa danh; world.lmMasses cho QA/biển.
+  // ======================================================================================================
+  const _lmHash = (a, b) => { const s = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return s - Math.floor(s); };   // hash xác định
+  const _lmIn = (x, z, P) => { let c = false; for (let i = 0, j = P.length - 1; i < P.length; j = i++) { const xi = P[i][0], zi = P[i][1], xj = P[j][0], zj = P[j][1]; if ((zi > z) !== (zj > z) && x < (xj - xi) * (z - zi) / (zj - zi) + xi) c = !c; } return c; };
+  // OBB diện tích nhỏ nhất của đa giác (theo hướng các cạnh): tâm, trục u (dài) / v, nửa cạnh hu ≥ hv
+  function lmOBB(P) {
+    let best = null;
+    for (let i = 0; i < P.length; i++) {
+      const a = P[i], b = P[(i + 1) % P.length], L = Math.hypot(b[0] - a[0], b[1] - a[1]); if (L < 1e-6) continue;
+      const ux = (b[0] - a[0]) / L, uz = (b[1] - a[1]) / L;
+      let u0 = 1e9, u1 = -1e9, v0 = 1e9, v1 = -1e9;
+      for (const [x, z] of P) { const u = x * ux + z * uz, v = -x * uz + z * ux; u0 = Math.min(u0, u); u1 = Math.max(u1, u); v0 = Math.min(v0, v); v1 = Math.max(v1, v); }
+      const A = (u1 - u0) * (v1 - v0);
+      if (!best || A < best.A) best = { A, ux, uz, u0, u1, v0, v1 };
+    }
+    let { ux, uz, u0, u1, v0, v1 } = best;
+    const cu = (u0 + u1) / 2, cv = (v0 + v1) / 2;
+    let o = { cx: cu * ux - cv * uz, cz: cu * uz + cv * ux, ux, uz, vx: -uz, vz: ux, hu: (u1 - u0) / 2, hv: (v1 - v0) / 2 };
+    if (o.hv > o.hu) o = { cx: o.cx, cz: o.cz, ux: o.vx, uz: o.vz, vx: -o.vz, vz: o.vx, hu: o.hv, hv: o.hu };   // u = trục DÀI
+    return o;
+  }
+  // điểm local (u,v) của OBB → thế giới; hình chữ nhật [u0,u1]×[v0,v1] (mét, gốc tâm OBB) → vòng 4 đỉnh
+  const lmAt = (o, u, v) => [o.cx + o.ux * u + o.vx * v, o.cz + o.uz * u + o.vz * v];
+  const lmRect = (o, u0, u1, v0, v1) => [lmAt(o, u0, v0), lmAt(o, u1, v0), lmAt(o, u1, v1), lmAt(o, u0, v1)];
+
+  // ---- va chạm đa giác địa danh (bọc resolveCollisions: isFree/findFree/đặt cây-hoa phía sau đều thấy) ----
+  const _lmSolids = [];
+  function lmSolid(ring, key) {
+    let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9;
+    for (const [x, z] of ring) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
+    _lmSolids.push({ ring, key, x0, z0, x1, z1 });
+  }
+  function lmPush(p, pr) {
+    for (const s of _lmSolids) {
+      if (p.x < s.x0 - pr || p.x > s.x1 + pr || p.z < s.z0 - pr || p.z > s.z1 + pr) continue;
+      const R = s.ring, n = R.length;
+      let ins = false, bd = 1e18, qx = 0, qz = 0;
+      for (let i = 0, j = n - 1; i < n; j = i++) {
+        const ax = R[j][0], az = R[j][1], bx = R[i][0], bz = R[i][1];
+        if ((bz > p.z) !== (az > p.z) && p.x < (ax - bx) * (p.z - bz) / (az - bz) + bx) ins = !ins;
+        const dx = bx - ax, dz = bz - az, L2 = dx * dx + dz * dz || 1e-9;
+        let t = ((p.x - ax) * dx + (p.z - az) * dz) / L2; t = t < 0 ? 0 : t > 1 ? 1 : t;
+        const ex = ax + dx * t, ez = az + dz * t, d2 = (p.x - ex) ** 2 + (p.z - ez) ** 2;
+        if (d2 < bd) { bd = d2; qx = ex; qz = ez; }
+      }
+      const d = Math.sqrt(bd);
+      if (ins) { if (d > 1e-4) { p.x = qx + (qx - p.x) / d * pr; p.z = qz + (qz - p.z) / d * pr; } }
+      else if (d < pr && d > 1e-4) { p.x = qx + (p.x - qx) / d * pr; p.z = qz + (p.z - qz) / d * pr; }
+    }
+  }
+  { const _rc = world.resolveCollisions; world.resolveCollisions = (p, pr = 0.45) => { _rc(p, pr); if (_lmSolids.length) lmPush(p, pr); }; }
+  world.lmMasses = [];                                   // [{key, ring, h}] — QA (lmprobe), biển địa danh
+  world.landmarkHit = (x, z, r = 0.5) => { const p = { x, z }; lmPush(p, r); return Math.abs(p.x - x) + Math.abs(p.z - z) > 0.01; };
+
+  // ---- KIT KHỐI THỦ TỤC ----
+  // texture 1 GIAN (bayW m) × 1 TẦNG (storeyH m), lặp 2 chiều; emissive = kính sáng mờ về đêm (facadeMats → daynight)
+  const LM_STYLE = {
+    colonial: { wall: '#e6c578', trim: '#f5eedb', frame: '#f2ead2', glass: '#2f3c40', shut: '#3f6a4e', bayW: 4.2, storeyH: 5.0, kind: 'shutter' },
+    yellow:   { wall: '#ecc86a', trim: '#f7f0dc', frame: '#f4ecd4', glass: '#30403f', shut: '#2f6a4a', bayW: 3.8, storeyH: 4.4, kind: 'shutter' },
+    arcade:   { wall: '#e9c56e', trim: '#f6efdc', frame: '#f6efdc', glass: '#3a3026', shut: '#6a4a2c', bayW: 4.4, storeyH: 6.0, kind: 'arch' },
+    cream:    { wall: '#ebe2c8', trim: '#f8f4e8', frame: '#f8f4e8', glass: '#3c4b55', shut: '#56656c', bayW: 3.6, storeyH: 4.0, kind: 'band' },
+    soviet:   { wall: '#e4ddcb', trim: '#f0ebdd', frame: '#d6cfbb', glass: '#34414b', shut: '#cbc3ae', bayW: 3.0, storeyH: 4.6, kind: 'grid' },
+    temple:   { wall: '#d8b98c', trim: '#8a3224', frame: '#7a2a1e', glass: '#4a1f16', shut: '#9a3a26', bayW: 3.2, storeyH: 4.2, kind: 'temple' },
+    market:   { wall: '#8fa3b0', trim: '#dde5ea', frame: '#6a7d88', glass: '#33434e', shut: '#5f707b', bayW: 6.0, storeyH: 4.6, kind: 'ribbon' },
+    hoard:    { wall: '#a7abac', trim: '#2f5f9e', frame: '#8c9295', glass: '#000000', shut: '#000000', bayW: 2.0, storeyH: 3.5, kind: 'hoard' },
+  };
+  const _lmMats = new Map();
+  function lmWallMat(style) {
+    let m = _lmMats.get(style); if (m) return m;
+    const S = LM_STYLE[style], W = 128, H = Math.round(128 * S.storeyH / S.bayW);
+    const draw = (em) => (g, w, h) => {
+      g.fillStyle = em ? '#000' : S.wall; g.fillRect(0, 0, w, h);
+      if (!em) {   // vữa ố xác định (hash, không Math.random): vệt mưa + loang
+        for (let i = 0; i < 260; i++) { const a = _lmHash(i, w + h * 7), b = _lmHash(i * 3.1, h); g.fillStyle = `rgba(60,45,20,${(0.03 + 0.05 * _lmHash(i, 9)).toFixed(3)})`; g.fillRect(a * w, b * h, 2 + 3 * _lmHash(i, 2), 2 + 10 * _lmHash(i, 5)); }
+        g.fillStyle = S.trim; g.fillRect(0, 0, w, h * 0.07);                 // gờ tầng (phào)
+        g.fillStyle = 'rgba(0,0,0,0.16)'; g.fillRect(0, h * 0.07, w, h * 0.02);
+      }
+      const k = S.kind;
+      if (k === 'hoard') {                    // rào tôn sóng công trường: gân dọc sáng/tối + vệt gỉ, dải xanh trên đỉnh (phào = trim)
+        if (em) return;
+        for (let x = 0; x < w; x += 8) { g.fillStyle = 'rgba(255,255,255,0.18)'; g.fillRect(x, h * 0.09, 3, h); g.fillStyle = 'rgba(0,0,0,0.14)'; g.fillRect(x + 4, h * 0.09, 2, h); }
+        for (let i = 0; i < 6; i++) { g.fillStyle = 'rgba(120,70,30,0.10)'; g.fillRect(_lmHash(i, 21) * w, h * 0.1, 3, h * (0.3 + 0.6 * _lmHash(i, 22))); }
+        return;
+      }
+      if (k === 'grid') {                     // lưới bê tông kiểu Xô viết (Việt Tiệp)
+        if (!em) { g.fillStyle = S.frame; for (let x = 0; x <= w; x += w / 3) g.fillRect(x - 3, 0, 6, h); g.fillRect(0, h * 0.5 - 3, w, 6); }
+        g.fillStyle = em ? '#4a3c22' : S.glass; for (let i = 0; i < 3; i++) g.fillRect(i * w / 3 + 7, h * 0.16, w / 3 - 14, h * 0.28);
+        return;
+      }
+      if (k === 'ribbon') {                   // băng cửa ngang (chợ Sắt)
+        if (!em) { g.fillStyle = S.trim; g.fillRect(0, h * 0.30, w, h * 0.42); }
+        g.fillStyle = em ? '#3d3320' : S.glass; g.fillRect(0, h * 0.33, w, h * 0.36);
+        if (!em) { g.fillStyle = S.frame; for (let x = 0; x < w; x += w / 6) g.fillRect(x, h * 0.33, 3, h * 0.36); }
+        return;
+      }
+      if (k === 'arch') {                     // cửa vòm cao (sảnh/hiên ga, trệt trường)
+        const ow = w * 0.56, ox = (w - ow) / 2, oy = h * 0.30, oh = h * 0.66;
+        if (!em) { g.fillStyle = S.frame; g.beginPath(); g.ellipse(w / 2, oy, ow / 2 + 6, ow / 2 + 6, 0, Math.PI, 0); g.fill(); g.fillRect(ox - 6, oy, ow + 12, oh); }
+        g.fillStyle = em ? '#5a4628' : S.glass; g.beginPath(); g.ellipse(w / 2, oy, ow / 2, ow / 2, 0, Math.PI, 0); g.fill(); g.fillRect(ox, oy, ow, oh);
+        if (!em) { g.strokeStyle = 'rgba(240,230,200,0.55)'; g.lineWidth = 3; g.beginPath(); g.moveTo(w / 2, oy - ow / 2); g.lineTo(w / 2, oy + oh); g.moveTo(ox, oy + oh * 0.35); g.lineTo(ox + ow, oy + oh * 0.35); g.stroke(); }
+        return;
+      }
+      if (k === 'temple') {                   // gian đền: cột gỗ đỏ, cửa bức bàn song gỗ, tường vàng đất
+        if (!em) { g.fillStyle = S.trim; g.fillRect(0, h * 0.1, w * 0.07, h * 0.9); g.fillRect(w * 0.93, h * 0.1, w * 0.07, h * 0.9); }
+        g.fillStyle = em ? '#3a2412' : S.shut; g.fillRect(w * 0.16, h * 0.22, w * 0.68, h * 0.74);
+        if (!em) { g.strokeStyle = 'rgba(40,14,8,0.65)'; g.lineWidth = 2; for (let x = w * 0.16; x <= w * 0.84; x += w * 0.068) { g.beginPath(); g.moveTo(x, h * 0.22); g.lineTo(x, h * 0.96); g.stroke(); } g.beginPath(); g.moveTo(w * 0.16, h * 0.5); g.lineTo(w * 0.84, h * 0.5); g.stroke(); }
+        return;
+      }
+      // 'shutter' (thuộc địa: cửa sổ cao + chớp xanh) / 'band' (công sở: cửa sổ khung nhôm)
+      const ww = w * (k === 'band' ? 0.6 : 0.36), wx = (w - ww) / 2, wy = h * 0.2, wh = h * (k === 'band' ? 0.5 : 0.6);
+      if (!em) {
+        g.fillStyle = S.frame; g.fillRect(wx - 6, wy - 6, ww + 12, wh + 12);          // khung trát
+        g.fillStyle = S.trim; g.fillRect(wx - 9, wy - 12, ww + 18, 7); g.fillRect(wx - 9, wy + wh + 4, ww + 18, 5);   // lanh tô + bệ
+      }
+      g.fillStyle = em ? '#6a5530' : S.glass; g.fillRect(wx, wy, ww, wh);
+      if (!em && k === 'shutter') {           // 2 cánh chớp mở hai bên + nan ngang
+        g.fillStyle = S.shut; g.fillRect(wx - ww * 0.42 - 6, wy, ww * 0.4, wh); g.fillRect(wx + ww + 6, wy, ww * 0.4, wh);
+        g.strokeStyle = 'rgba(0,0,0,0.25)'; g.lineWidth = 1.5;
+        for (let y = wy + 4; y < wy + wh; y += 5) { g.beginPath(); g.moveTo(wx - ww * 0.42 - 6, y); g.lineTo(wx - 6, y); g.moveTo(wx + ww + 6, y); g.lineTo(wx + ww * 1.4 + 6, y); g.stroke(); }
+      }
+      if (!em) { g.strokeStyle = S.frame; g.lineWidth = 3; g.beginPath(); g.moveTo(w / 2, wy); g.lineTo(w / 2, wy + wh); g.moveTo(wx, wy + wh * 0.38); g.lineTo(wx + ww, wy + wh * 0.38); g.stroke(); }
+    };
+    const map = makeTex(W, H, draw(false), 'lmwall_' + style), emissiveMap = makeTex(W, H, draw(true), 'lmwallE_' + style);
+    for (const t of [map, emissiveMap]) { t.wrapS = t.wrapT = THREE.RepeatWrapping; }
+    if (S.kind === 'hoard') m = new THREE.MeshLambertMaterial({ map, side: THREE.DoubleSide });   // rào: thấy cả từ trong/trên
+    else { m = new THREE.MeshLambertMaterial({ map, emissiveMap, emissive: 0xffd9a0, emissiveIntensity: 0 }); facadeMats.push(m); }   // daynight: kính sáng mờ đêm
+    _lmMats.set(style, m);
+    return m;
+  }
+  const LM_ROOF = { tile: ['#a5533e', '#8e4232'], slate: ['#5d6369', '#4c5257'], conc: ['#a9a59b', '#8f8b82'], green: ['#4f7a5c', '#3f654b'], temple: ['#8a4a32', '#6e3a28'] };
+  function lmRoofMat(kind) {
+    const k = 'roof_' + kind; let m = _lmMats.get(k); if (m) return m;
+    const [c0, c1] = LM_ROOF[kind];
+    const tex = makeTex(128, 128, (g, w, h) => {
+      g.fillStyle = c0; g.fillRect(0, 0, w, h);
+      if (kind === 'conc') { for (let i = 0; i < 160; i++) { g.fillStyle = `rgba(40,38,30,${(0.04 + 0.06 * _lmHash(i, 3)).toFixed(3)})`; g.fillRect(_lmHash(i, 1) * w, _lmHash(i, 2) * h, 3 + 9 * _lmHash(i, 4), 3 + 9 * _lmHash(i, 6)); } return; }
+      for (let y = 0; y < h; y += 8) { g.fillStyle = c1; g.fillRect(0, y + 6, w, 2); for (let x = (y / 8) % 2 ? 0 : 6; x < w; x += 12) { g.fillStyle = `rgba(0,0,0,${(0.05 + 0.08 * _lmHash(x, y)).toFixed(3)})`; g.fillRect(x, y, 2, 6); } }
+    }, 'lmroof_' + kind);
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    m = new THREE.MeshLambertMaterial({ map: tex });
+    _lmMats.set(k, m);
+    return m;
+  }
+  // bộ gom hình học theo material (1 mesh/material/địa danh; freezeStatic gộp tiếp theo ô)
+  function lmGeo() {
+    const B = new Map();
+    const buf = (mtl) => { let b = B.get(mtl); if (!b) B.set(mtl, (b = { p: [], n: [], u: [] })); return b; };
+    // quad p0..p3 (CCW nhìn từ phía pháp tuyến), uv (u0,v0)-(u1,v1)
+    const quad = (mtl, p0, p1, p2, p3, u0, v0, u1, v1) => {
+      const b = buf(mtl);
+      const ax = p1[0] - p0[0], ay = p1[1] - p0[1], az = p1[2] - p0[2], bx = p3[0] - p0[0], by = p3[1] - p0[1], bz = p3[2] - p0[2];
+      let nx = ay * bz - az * by, ny = az * bx - ax * bz, nz = ax * by - ay * bx; const L = Math.hypot(nx, ny, nz) || 1; nx /= L; ny /= L; nz /= L;
+      for (const [p, uu, vv] of [[p0, u0, v0], [p1, u1, v0], [p2, u1, v1], [p0, u0, v0], [p2, u1, v1], [p3, u0, v1]]) { b.p.push(p[0], p[1], p[2]); b.n.push(nx, ny, nz); b.u.push(uu, vv); }
+    };
+    const tri = (mtl, p0, p1, p2, uvs) => {
+      const b = buf(mtl);
+      const ax = p1[0] - p0[0], ay = p1[1] - p0[1], az = p1[2] - p0[2], bx = p2[0] - p0[0], by = p2[1] - p0[1], bz = p2[2] - p0[2];
+      let nx = ay * bz - az * by, ny = az * bx - ax * bz, nz = ax * by - ay * bx; const L = Math.hypot(nx, ny, nz) || 1; nx /= L; ny /= L; nz /= L;
+      [p0, p1, p2].forEach((p, i) => { b.p.push(p[0], p[1], p[2]); b.n.push(nx, ny, nz); b.u.push(uvs[i * 2], uvs[i * 2 + 1]); });
+    };
+    const flush = (name) => {
+      let tris = 0;
+      for (const [mtl, b] of B) {
+        const g = new THREE.BufferGeometry();
+        g.setAttribute('position', new THREE.Float32BufferAttribute(b.p, 3));
+        g.setAttribute('normal', new THREE.Float32BufferAttribute(b.n, 3));
+        g.setAttribute('uv', new THREE.Float32BufferAttribute(b.u, 2));
+        g.computeBoundingSphere();
+        const m = new THREE.Mesh(g, mtl); m.name = name; m.castShadow = true; m.receiveShadow = true;
+        scene.add(m); tris += b.p.length / 9;
+      }
+      B.clear();
+      return tris;
+    };
+    return { quad, tri, flush };
+  }
+  // pháp tuyến NGOÀI của cạnh a→b (thử điểm lệch nhỏ — đúng cả đa giác lõm)
+  function lmOutN(ring, a, b) {
+    const dx = b[0] - a[0], dz = b[1] - a[1], L = Math.hypot(dx, dz) || 1, nx = dz / L, nz = -dx / L;
+    const mx = (a[0] + b[0]) / 2, mz = (a[1] + b[1]) / 2;
+    return _lmIn(mx + nx * 0.05, mz + nz * 0.05, ring) ? [-nx, -nz] : [nx, nz];
+  }
+  const lmBase = (ring) => { let y = 1e9; for (const [x, z] of ring) y = Math.min(y, groundHeightNoDeck(x, z)); return y > LAND_H - 1.2 ? Math.min(y, LAND_H + 0.6) : LAND_H; };
+  // TƯỜNG quanh vòng ring từ y0 lên y1, texture phong cách; u theo mét/bayW (gốc ở góc trái nhìn từ ngoài), v theo tầng
+  function lmWalls(G, ring, y0, y1, style) {
+    const S = LM_STYLE[style], mtl = lmWallMat(style);
+    for (let i = 0; i < ring.length; i++) {
+      const a = ring[i], b = ring[(i + 1) % ring.length], L = Math.hypot(b[0] - a[0], b[1] - a[1]); if (L < 0.2) continue;
+      const [nx, nz] = lmOutN(ring, a, b);
+      // phải (nhìn từ ngoài) = (nz, −nx): a→b cùng chiều → p0 = a
+      const fwd = (b[0] - a[0]) * nz + (b[1] - a[1]) * -nx > 0;
+      const p = fwd ? a : b, q = fwd ? b : a;
+      const nb = Math.max(1, Math.round(L / S.bayW));
+      quadW(G, mtl, p, q, y0 - 0.3, y1, nb, (y1 - (y0 - 0.3)) / S.storeyH, -0.3 / S.storeyH);
+    }
+  }
+  function quadW(G, mtl, p, q, ya, yb, uMax, vSpan, v0) { G.quad(mtl, [p[0], ya, p[1]], [q[0], ya, q[1]], [q[0], yb, q[1]], [p[0], yb, p[1]], 0, v0, uMax, v0 + vSpan); }
+  // MÁI BẰNG (đa giác bất kỳ, earcut) ở cao y + lan can thấp viền ngoài (đã nằm trong tường: tường kéo lên y+par)
+  function lmFlatRoof(G, ring, y, kind = 'conc') {
+    const mtl = lmRoofMat(kind), pts = ring.map(([x, z]) => new THREE.Vector2(x, z));
+    const T = THREE.ShapeUtils.triangulateShape(pts, []);
+    for (const [i, j, k] of T) {
+      const a = ring[i], b = ring[j], c = ring[k];
+      // mặt ngửa lên: (b−a)×(c−a) theo y phải dương → đổi thứ tự nếu cần
+      const cr = (b[1] - a[1]) * (c[0] - a[0]) - (b[0] - a[0]) * (c[1] - a[1]);
+      const P = cr > 0 ? [a, b, c] : [a, c, b];
+      G.tri(mtl, [P[0][0], y, P[0][1]], [P[1][0], y, P[1][1]], [P[2][0], y, P[2][1]], [P[0][0] / 3, P[0][1] / 3, P[1][0] / 3, P[1][1] / 3, P[2][0] / 3, P[2][1] / 3]);
+    }
+  }
+  // MÁI HÔNG trên hình chữ nhật (o, u0..u1, v0..v1) — chân mái y, đua over, dốc pitch (rad); 2 mái thang + 2 mái tam giác + trần đua
+  function lmHipRoof(G, o, u0, u1, v0, v1, y, { over = 0.7, pitch = 0.5, kind = 'tile', flare = 0 } = {}) {
+    const mtl = lmRoofMat(kind);
+    u0 -= over; u1 += over; v0 -= over; v1 += over;
+    const lu = u1 - u0, lv = v1 - v0, alongU = lu >= lv;
+    const P3 = (u, v, yy) => { const [x, z] = lmAt(o, u, v); return [x, yy, z]; };
+    const cu = (u0 + u1) / 2, cv = (v0 + v1) / 2, hs = Math.min(lu, lv) / 2, rise = hs * Math.tan(pitch);
+    const yr = y + rise, ye = y - flare;
+    const c00 = P3(u0, v0, ye), c10 = P3(u1, v0, ye), c11 = P3(u1, v1, ye), c01 = P3(u0, v1, ye);
+    // gờ nóc dọc trục DÀI: R0 ở phía u0 (hoặc v0), R1 phía u1 (hoặc v1)
+    const R0 = alongU ? P3(u0 + hs, cv, yr) : P3(cu, v0 + hs, yr), R1 = alongU ? P3(u1 - hs, cv, yr) : P3(cu, v1 - hs, yr);
+    const sl = hs / Math.cos(pitch) / 3, span = Math.max(lu, lv) / 3;
+    const nY = (p0, p1, p2) => (p1[2] - p0[2]) * (p2[0] - p0[0]) - (p1[0] - p0[0]) * (p2[2] - p0[2]);   // y của (p1−p0)×(p2−p0)
+    const quadUp = (p0, p1, p2, p3) => { if (nY(p0, p1, p3) > 0) G.quad(mtl, p0, p1, p2, p3, 0, 0, span, sl); else G.quad(mtl, p1, p0, p3, p2, 0, 0, span, sl); };
+    const triUp = (p0, p1, p2) => { const L = Math.hypot(p1[0] - p0[0], p1[2] - p0[2]) / 3, uv = [0, 0, L, 0, L / 2, sl]; if (nY(p0, p1, p2) > 0) G.tri(mtl, p0, p1, p2, uv); else G.tri(mtl, p1, p0, p2, uv); };
+    if (alongU) { quadUp(c00, c10, R1, R0); quadUp(c11, c01, R0, R1); triUp(c01, c00, R0); triUp(c10, c11, R1); }
+    else { quadUp(c01, c00, R0, R1); quadUp(c10, c11, R1, R0); triUp(c00, c10, R0); triUp(c11, c01, R1); }
+    // trần đua (mặt quay XUỐNG — nhìn từ dưới phố lên không thấy xuyên mái)
+    if (nY(c00, c10, c01) < 0) G.quad(mtl, c00, c10, c11, c01, 0, 0, lu / 3, lv / 3); else G.quad(mtl, c10, c00, c01, c11, 0, 0, lu / 3, lv / 3);
+  }
+  // KHỐI chữ nhật trong hệ OBB: tường phong cách + mái (hip|flat), đăng ký va chạm + lmMasses
+  function lmBlock(G, key, o, u0, u1, v0, v1, H, style, roof = 'tile', ropt = {}) {
+    const ring = lmRect(o, u0, u1, v0, v1), y0 = lmBase(ring);
+    if (roof === 'flat' || roof === 'conc') { lmWalls(G, ring, y0, y0 + H + 0.8, style); lmFlatRoof(G, ring, y0 + H, 'conc'); }
+    else { lmWalls(G, ring, y0, y0 + H, style); lmHipRoof(G, o, u0, u1, v0, v1, y0 + H, { kind: roof, ...ropt }); }
+    lmSolid(ring, key); world.lmMasses.push({ key, ring, h: H });
+    return ring;
+  }
+  // KHỐI đa giác bất kỳ (đùn) — mái bằng
+  function lmPolyBlock(G, key, ring, H, style, roofKind = 'conc') {
+    const y0 = lmBase(ring);
+    lmWalls(G, ring, y0, y0 + H + 0.8, style); lmFlatRoof(G, ring, y0 + H, roofKind);
+    lmSolid(ring, key); world.lmMasses.push({ key, ring, h: H });
+  }
+  // hệ toạ độ theo CẠNH a→b của đa giác: gốc a, u dọc cạnh, v = pháp tuyến hướng VÀO trong (dải nhà sát mép khuôn viên)
+  function lmEdge(P, a, b) {
+    const L = Math.hypot(b[0] - a[0], b[1] - a[1]), ux = (b[0] - a[0]) / L, uz = (b[1] - a[1]) / L;
+    const [nx, nz] = lmOutN(P, a, b);
+    return { cx: a[0], cz: a[1], ux, uz, vx: -nx, vz: -nz, L };
+  }
+  // co hình chữ nhật [u0,u1]×[v0,v1] (hệ o) tới khi 4 góc + 4 trung điểm nằm trong đa giác P co m mét (bước 0,5 m, phía vi phạm)
+  function lmFitRect(P, o, u0, u1, v0, v1, m = 1) {
+    const Q = lmShrink(P, m);
+    for (let it = 0; it < 120; it++) {
+      const bad = [];
+      for (const [u, v, side] of [[u0, v0, 'a'], [u1, v0, 'b'], [u1, v1, 'c'], [u0, v1, 'd'], [(u0 + u1) / 2, v0, 'v0'], [(u0 + u1) / 2, v1, 'v1'], [u0, (v0 + v1) / 2, 'u0'], [u1, (v0 + v1) / 2, 'u1']]) {
+        const [x, z] = lmAt(o, u, v); if (!_lmIn(x, z, Q)) bad.push(side);
+      }
+      if (!bad.length) return [u0, u1, v0, v1];
+      for (const s of bad) {
+        if (s === 'u0' || s === 'a' || s === 'd') u0 += 0.5;
+        if (s === 'u1' || s === 'b' || s === 'c') u1 -= 0.5;
+        if (s === 'v0' || s === 'a' || s === 'b') v0 += 0.5;
+        if (s === 'v1' || s === 'c' || s === 'd') v1 -= 0.5;
+      }
+      if (u1 - u0 < 2 || v1 - v0 < 2) return null;
+    }
+    return null;
+  }
+  // đa giác co vào d mét (đệm miter đơn giản — đủ cho footprint lồi/lõm nhẹ của địa danh)
+  function lmShrink(P, d) {
+    let s = 0; for (let i = 0; i < P.length; i++) { const a = P[i], b = P[(i + 1) % P.length]; s += a[0] * b[1] - b[0] * a[1]; }
+    const sg = s < 0 ? -1 : 1, out = [];
+    for (let i = 0; i < P.length; i++) {
+      const a = P[(i + P.length - 1) % P.length], b = P[i], c = P[(i + 1) % P.length];
+      const n1 = [-(b[1] - a[1]), b[0] - a[0]], n2 = [-(c[1] - b[1]), c[0] - b[0]];
+      const l1 = Math.hypot(n1[0], n1[1]) || 1, l2 = Math.hypot(n2[0], n2[1]) || 1;
+      let nx = n1[0] / l1 + n2[0] / l2, nz = n1[1] / l1 + n2[1] / l2; const ln = Math.hypot(nx, nz) || 1; nx /= ln; nz /= ln;
+      const cosh = Math.max(0.5, (n1[0] * nx + n1[1] * nz) / l1);
+      out.push([b[0] + sg * nx * d / cosh, b[1] + sg * nz * d / cosh]);
+    }
+    return out;
+  }
+
+  // ---- BẢNG KHỚP GLB ↔ LM_POLY (tools/qa/lmfit.py; IoU = ảnh chiếu bằng GLB ∩ footprint OSM, đo trước/sau ở KNOWLEDGE §10) ----
+  // sy = chiều cao chọn theo ảnh pano thật (không theo scale ngang): nhà hát mái chính ~15 m / đỉnh ~19,5 m, nhà thờ thân 17 m /
+  // tháp ~30 m, bưu điện ~17/20 m, bảo tàng ~14 m, NHNN ~18 m, ga ~14 m (tháp ~17 m), đình HK ~6,5 m.
+  const LM_FIT = {
+    opera: { th: 0.0285, sx: 15.14, sy: 24, sz: 36.19, dx: 0, dz: 5 },          // mặt tiền 29 m ra quảng trường (nam), sâu 49 m
+    cathedral: { th: 1.5275, sx: 23.89, sy: 24, sz: 27.99, dx: 0, dz: 0 },
+    postoffice: { th: 0.4032, sx: 25.36, sy: 23, sz: 29.71, dx: 2, dz: -2 },   // phạt phần lòi ra ngoài (mặt tiền SSE sát phố)
+    museum: { th: -0.0063, sx: 19.61, sy: 16, sz: 26.92, dx: 0, dz: 1 },
+    nhnn: { th: -1.1206, sx: 30.3, sy: 23, sz: 34.81, dx: -1, dz: 1 },
+    dinhhk: { th: 0.0436, sx: 14.84, sy: 16, sz: 22.06, dx: 3, dz: 4 },
+    dentamky: { th: 1.5738, sx: 12.43, sy: 11.6, sz: 11.95, dx: 0, dz: 0 },
+  };
+  // tâm đích = tâm DIỆN TÍCH LM_POLY + (dx,dz)
+  for (const [k, f] of Object.entries(LM_FIT)) { const c = LM_CENTROID[k] || LM[k]; f.cx = c[0] + f.dx; f.cz = c[1] + f.dz; }
+  world.lmFit = LM_FIT;
+
   // Đặt GLB địa danh (từ ảnh thật qua Meshy): scale theo cạnh dài/chiều cao,
   // xoay theo hướng thật, hạ tâm về (x,z), dìm nhẹ chân chống lơ lửng
-  function placeGLB({ url, name, x, z, rot = 0, size = 26, bySide = 'max', sink = 0.55, preload = false, radius }) {
+  // fit (W2-E): {th,sx,sy,sz,cx,cz} — scale DỊ HƯỚNG + xoay + tâm theo LM_FIT (bỏ qua rot/size/x,z)
+  function placeGLB({ url, name, x, z, rot = 0, size = 26, bySide = 'max', sink = 0.55, preload = false, radius, fit = null, key = null }) {
+    if (fit) { x = fit.cx; z = fit.cz; }
     registerModel({
       url, name, x, z, preload, radius,
       place: (m) => {
         m.updateMatrixWorld(true);
         const box = new THREE.Box3().setFromObject(m);
-        const sz = box.getSize(new THREE.Vector3());
-        const s = size / (bySide === 'y' ? sz.y : Math.max(sz.x, sz.z));
-        m.scale.setScalar(s);
-        m.rotation.y = rot;
+        if (fit) { m.scale.set(fit.sx, fit.sy, fit.sz); m.rotation.y = fit.th; }
+        else {
+          const sz = box.getSize(new THREE.Vector3());
+          const s = size / (bySide === 'y' ? sz.y : Math.max(sz.x, sz.z));
+          m.scale.setScalar(s);
+          m.rotation.y = rot;
+        }
+        if (key) m.userData.lmKey = key;
         m.updateMatrixWorld(true);
         box.setFromObject(m);
         const c = box.getCenter(new THREE.Vector3());
@@ -18401,14 +18697,16 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     grp.position.set(x, LAND_H, z); grp.rotation.y = rot;
     grp.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
     scene.add(grp);
-    addCollider(x, z, Math.max(W, D) * 0.45);
+    // W2-E: va chạm/QA theo đúng hình chữ nhật thân nhà (thay vòng tròn r23 — tường vô hình 9 m trước mặt tiền)
+    const ring = [[-W / 2, -D / 2], [W / 2, -D / 2], [W / 2, D / 2], [-W / 2, D / 2]].map(([lx, lz]) => localPt(x, z, lx, lz, rot));
+    lmSolid(ring, 'ubnd'); world.lmMasses.push({ key: 'ubnd', ring, h: Hh + roofH });
   }
 
   // Cung Văn hoá Lao động Hữu nghị Việt Tiệp (53 Lạch Tray) — khối ngang dài, lưới bê tông, huy hiệu vàng.
   // (x,z) = tâm footprint OSM (LM.viettiep, way ngoài relation 19780771, 76×75m); chỉ dựng KHỐI TRƯỚC dày D,
   // ép sát mép mặt tiền footprint (quay ra quảng trường → Lạch Tray), phần hội trường phía sau để trống.
-  function buildVietTiep(x, z, rot) {
-    const W = LM_SIZE.viettiep[0], Hh = 14, D = 20;
+  function buildVietTiep(x, z, rot, W = LM_SIZE.viettiep[0], D = 20, push = (LM_SIZE.viettiep[1] - D) / 2) {
+    const Hh = 14;
     const facTex = makeTex(1024, 200, (g, w, h) => {
       g.fillStyle = '#e9e3d3'; g.fillRect(0, 0, w, h); speckle(g, w, h, 140, 0.05);
       g.fillStyle = '#f2eee2'; g.fillRect(0, 0, w, h * 0.09);
@@ -18452,14 +18750,34 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     roofSlab.position.set(0, Hh + 0.75, 0); grp.add(roofSlab);
     const canopy = new THREE.Mesh(new THREE.BoxGeometry(W * 0.16, 0.5, 4.5), mat(0xcfc7b2)); canopy.position.set(0, 4.6, D / 2 + 1.8); grp.add(canopy);
     // đẩy khối trước từ tâm footprint ra mép mặt tiền (local +Z = hướng mặt tiền)
-    const push = (LM_SIZE.viettiep[1] - D) / 2, px = x + Math.sin(rot) * push, pz = z + Math.cos(rot) * push;
+    const px = x + Math.sin(rot) * push, pz = z + Math.cos(rot) * push;
     grp.position.set(px, LAND_H, pz); grp.rotation.y = rot;
     grp.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
     scene.add(grp);
-    addCollider(px, pz, Math.max(W, D) * 0.45);
+    const ring = [[-W / 2, -D / 2], [W / 2, -D / 2], [W / 2, D / 2], [-W / 2, D / 2]].map(([lx, lz]) => localPt(px, pz, lx, lz, rot));
+    lmSolid(ring, 'viettiep'); world.lmMasses.push({ key: 'viettiep', ring, h: Hh });
   }
   // trước đây hardcode (1030,1023) quay nam — sai 25m và 66° so với footprint OSM (audit 2026-09)
-  buildVietTiep(LM.viettiep[0], LM.viettiep[1], orientLong(LM_DIR.viettiep, LM_FACE.viettiep));
+  // W2-E: Cung VH LĐ Hữu nghị Việt Tiệp theo FOOTPRINT 16 đỉnh (LM_POLY, 76 × 75 m) — bản cũ chỉ khối trước 76 × 20 m đẩy từ
+  // tâm-đỉnh LM nên lòi 9 m ra NGOÀI footprint, phần còn lại là bãi cỏ (IoU 0,19). Nay: khối mặt tiền (huy hiệu, lưới bê tông)
+  // áp đúng cạnh mặt tiền 53,5 m (cạnh có pháp tuyến ngoài ≈ LM_FACE, ra quảng trường → Lạch Tray) + thân cung đùn theo đa giác
+  // 12 m + khối khán phòng 21 m ở giữa.
+  {
+    const P = LM_POLY.viettiep, K = 'viettiep';
+    let bi = 0, bs = -1;
+    for (let i = 0; i < P.length; i++) {
+      const a = P[i], b = P[(i + 1) % P.length], [nx, nz] = lmOutN(P, a, b), L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      const s = L * Math.max(0, nx * LM_FACE.viettiep[0] + nz * LM_FACE.viettiep[1]); if (s > bs) { bs = s; bi = i; }
+    }
+    const a = P[bi], b = P[(bi + 1) % P.length], f = lmEdge(P, a, b), Df = 18;
+    const [cx, cz] = lmAt(f, f.L / 2, Df / 2 + 0.3);
+    buildVietTiep(cx, cz, Math.atan2(-f.vx, -f.vz), f.L - 0.6, Df, 0);
+    const G = lmGeo();
+    lmPolyBlock(G, K, lmShrink(P, 0.4), 12, 'soviet');
+    const o = lmOBB(P), r = lmFitRect(P, o, -14, 14, -12, 12, 4);
+    if (r) lmBlock(G, K, o, r[0], r[1], r[2], r[3], 21, 'soviet', 'conc');
+    G.flush('lm_viettiep');
+  }
 
   // Trung tâm Triển lãm & Mỹ thuật (1 Nguyễn Đức Cảnh, footprint OSM way 240463140) — colonial kem 2 tầng,
   // cửa vòm, pilaster trắng, HÀNG CỜ đỏ trên parapet (theo ảnh thật).
@@ -18521,26 +18839,30 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     grp.position.set(x, LAND_H, z); grp.rotation.y = rot;
     grp.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
     scene.add(grp);
-    addCollider(x, z, Math.max(W, D) * 0.42);
+    // W2-E: va chạm theo hình chữ nhật thân nhà (vòng r24 cũ = tường vô hình 19 m quanh khối 10 m)
+    const ring = [[-W / 2, -D / 2], [W / 2, -D / 2], [W / 2, D / 2], [-W / 2, D / 2]].map(([lx, lz]) => localPt(x, z, lx, lz, rot));
+    lmSolid(ring, 'trienlam'); world.lmMasses.push({ key: 'trienlam', ring, h: Hh });
   }
   // footprint OSM 57×10m trục bắc-nam; mặt dài quay ĐÔNG ra quảng trường tượng Lê Chân (pano_037 h270 thấy
   // "mặt tiền dài, biển TRUNG TÂM TRIỂN LÃM" khi nhìn tây). Bản cũ (-293,164) quay bắc ra Quang Trung là sai;
   // 2 bản trùng lặp (hộp cạnh tượng + khối PANO-LOOP V2 tại (-302,172)) đã bỏ (audit 2026-09).
-  buildTrienLam(LM.trienlam[0], LM.trienlam[1], orientLong(LM_DIR.trienlam, LM_FACE.trienlam));
+  { const o = lmOBB(LM_POLY.trienlam); buildTrienLam(o.cx, o.cz, orientLong([o.ux, o.uz], LM_FACE.trienlam)); }   // W2-E: tâm OBB footprint (LM lệch 6 m)
 
   // ---------- NHÀ HÁT LỚN: GLB chất lượng gốc, đặt & xoay đúng footprint OSM ----------
-  const thOpera = orientLong(LM_DIR.opera, LM_FACE.opera);
+  const thOpera = LM_FIT.opera.th;
   {
-    const [opX, opZ] = LM.opera;
+    // W2-E: GLB khớp footprint OSM 29 m (mặt tiền ra quảng trường, phía NAM) × 49 m sâu — bản cũ scale đều 49 m theo
+    // cạnh dài GLB nên mặt tiền rộng 49 m × sâu 37 m, quay ngang footprint (IoU 0,42 → 0,74). Mặt tiền GLB (Meshy) vốn
+    // bè ngang 2,3:1; ép còn ~1,5:1 khớp ảnh pano_054/250 (mặt tiền hẹp, cao) — chân dung KHÔNG đổi (chỉ transform).
+    const F = LM_FIT.opera, opX = F.cx, opZ = F.cz;
     registerModel({
       url: 'assets/nhahat.glb', name: 'Nhà hát lớn', x: opX, z: opZ, preload: true,
       place: (m) => {
         m.updateMatrixWorld(true);
         const box = new THREE.Box3().setFromObject(m);
-        const size = box.getSize(new THREE.Vector3());
-        const s = 49 / Math.max(size.x, size.z);  // cạnh dài thật từ OSM (LM_SIZE)
-        m.scale.setScalar(s);
+        m.scale.set(F.sx, F.sy, F.sz);
         m.rotation.y = thOpera; // trục dài + mặt tiền theo cạnh thật (quay ra quảng trường)
+        m.userData.lmKey = 'opera';
         m.updateMatrixWorld(true);
         box.setFromObject(m);
         const center = box.getCenter(new THREE.Vector3());
@@ -18564,23 +18886,27 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
         // Chân dung Chủ tịch Hồ Chí Minh: ẢNH CHUẨN đã được dập thẳng vào texture
         // của nhahat.glb (tools: xem KNOWLEDGE.md §5.6 — fit affine UV↔3D rồi composite).
         // TUYỆT ĐỐI không dùng hình AI cho chân dung; muốn đổi ảnh → dập lại texture.
-        const fw = (box.max.x - box.min.x) + 3, fd = (box.max.z - box.min.z) + 3;
+        // bệ + bậc theo FOOTPRINT thật (OBB LM_POLY + 1,2 m), không theo bbox GLB (bbox gồm tấm đế Meshy chìm dưới đất)
+        const ob = lmOBB(LM_POLY.opera), thP = Math.atan2(-ob.vz, ob.vx);   // local X = trục ngắn (mặt tiền 29 m), local Z = trục dài
+        const fw = ob.hv * 2 + 2.4, fd = ob.hu * 2 + 2.4;
         const plinth = new THREE.Mesh(new THREE.BoxGeometry(fw, 0.9, fd), mat(0xcfc5ac));
-        plinth.position.set(opX, LAND_H + 0.15, opZ);
-        plinth.rotation.y = thOpera;
+        plinth.position.set(ob.cx, LAND_H + 0.15, ob.cz);
+        plinth.rotation.y = thP;
         plinth.receiveShadow = true;
         scene.add(plinth);
+        // mặt tiền = phía NAM (LM_FACE): đầu trục local Z nào cùng chiều LM_FACE
+        const fs = (Math.sin(thP) * LM_FACE.opera[0] + Math.cos(thP) * LM_FACE.opera[1]) >= 0 ? 1 : -1;
         for (let st = 0; st < 3; st++) {
           const step = new THREE.Mesh(new THREE.BoxGeometry(fw * 0.7 - st * 2, 0.3, 1.6), mat(0xd8cdb0));
-          const [sx2, sz2] = localPt(opX, opZ, 0, fd / 2 + 1.4 - st * 0.7, thOpera);
+          const [sx2, sz2] = localPt(ob.cx, ob.cz, 0, fs * (fd / 2 + 1.4 - st * 0.7), thP);
           step.position.set(sx2, LAND_H + 0.15 + st * 0.22, sz2);
-          step.rotation.y = thOpera;
+          step.rotation.y = thP;
           step.receiveShadow = true;
           scene.add(step);
         }
       },
     });
-    addCollider(LM.opera[0], LM.opera[1], 15);
+    lmSolid(LM_POLY.opera, 'opera');   // va chạm theo footprint thật (thay vòng tròn r15 cũ — xuyên 2 cánh, chặn hụt)
 
     // quảng trường: sân lát gạch hoa văn tròn, đài phun nước, cột cờ, bồn hoa
     const paveTex = makeTex(256, 256, (gc, w, h) => {
@@ -18794,51 +19120,51 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     // trục dài gian giữa theo cạnh dài OSM; tháp chuông (đầu -X mô hình) quay về LM_FACE = đầu NAM gian giữa
     // (override process_osm theo pano_255: nhìn tây từ 31 Hoàng Văn Thụ thấy tháp ngang z≈-330). LM_FACE cũ
     // trỏ đông ra HVT ⊥ gian giữa → phép lật dưới đây thành "tung đồng xu" (tháp từng ở đầu bắc).
-    let thCa = orientLong(LM_DIR.cathedral, null);
-    // đảm bảo đầu -X (mặt tiền) hướng về LM_FACE: nếu -X đang quay ngược face thì lật π
-    if ((-Math.cos(thCa)) * LM_FACE.cathedral[0] + Math.sin(thCa) * LM_FACE.cathedral[1] < 0) thCa += Math.PI;
-    placeGLB({
-      url: 'assets/nhatho.glb', name: 'Nhà thờ chính tòa',
-      x: LM.cathedral[0], z: LM.cathedral[1], rot: thCa, size: 45,
-    });
-    addCollider(LM.cathedral[0], LM.cathedral[1], 15);
-    const [c1x, c1z] = localPt(LM.cathedral[0], LM.cathedral[1], -19, 0, thCa);
-    const [c2x, c2z] = localPt(LM.cathedral[0], LM.cathedral[1], 19, 0, thCa);
-    addCollider(c1x, c1z, 7);
-    addCollider(c2x, c2z, 7);
+    // W2-E: θ cũ (orientLong + lật theo LM_FACE) = 87°; LM_FIT 87,5° + scale ngang gần đều (gian giữa 45 m, ngang 16,9 m
+    // đúng footprint — "rộng hơn 8 m" của kiểm toán cũ là bbox GLB gồm 2 hàng cây bách + tháp lệch, không phải thân nhà)
+    placeGLB({ url: 'assets/nhatho.glb', name: 'Nhà thờ chính tòa', fit: LM_FIT.cathedral, key: 'cathedral' });
+    lmSolid(LM_POLY.cathedral, 'cathedral');
   }
 
   // ---------- BƯU ĐIỆN: GLB từ ảnh thật (Wikimedia Commons) ----------
   {
-    // lùi nhẹ khỏi mặt phố (đường trong game vẽ rộng hơn thực tế)
-    const poX = LM.postoffice[0] - LM_FACE.postoffice[0] * 9;
-    const poZ = LM.postoffice[1] - LM_FACE.postoffice[1] * 9;
-    placeGLB({
-      url: 'assets/buudien.glb', name: 'Bưu điện trung tâm',
-      x: poX, z: poZ,
-      rot: orientLong(LM_DIR.postoffice, LM_FACE.postoffice), size: 49,
-    });
-    addCollider(poX, poZ, 22);
+    // W2-E: khớp footprint (bản cũ lùi 9 m khỏi phố theo LM_FACE + scale đều 49 m: 271 m² ngoài footprint, 8 m² trên lòng đường)
+    placeGLB({ url: 'assets/buudien.glb', name: 'Bưu điện trung tâm', fit: LM_FIT.postoffice, key: 'postoffice' });
+    lmSolid(LM_POLY.postoffice, 'postoffice');
   }
 
   // ---------- BẢO TÀNG: GLB từ ảnh thật (tòa nhà vàng kem thật, không phải gạch đỏ) ----------
   // mặt tiền 36m quay NAM ra Điện Biên Phủ (66 ĐBP); nhà góc phố ĐBP × Đinh Tiên Hoàng cách đều 34m nên
   // LM_FACE là override trong process_osm, xoay bằng orientLM (từng quay tây ra ĐTH — audit 2026-09)
-  placeGLB({
-    url: 'assets/baotang.glb', name: 'Bảo tàng Hải Phòng',
-    x: LM.museum[0], z: LM.museum[1],
-    rot: orientLM('museum'), size: 36,
-  });
-  addCollider(LM.museum[0], LM.museum[1], 18);
+  // W2-E: footprint 36 × 29 m — GLB cũ scale đều theo 36 m chỉ sâu 20 m; nay sâu ×1,37 (LM_FIT), cao ~14,7 m (2 tầng + vòm)
+  placeGLB({ url: 'assets/baotang.glb', name: 'Bảo tàng Hải Phòng', fit: LM_FIT.museum, key: 'museum' });
+  lmSolid(LM_POLY.museum, 'museum');
 
   // ---------- GA HẢI PHÒNG: GLB từ ảnh thật + sân ga & đoàn tàu SAU LƯNG ----------
   // Toà ga theo footprint OSM way 241081956 (LM.station_bldg — dải 118×21m dọc ray, trục 225°); mặt tiền
   // GLB (local +Z: biển GA HẢI PHÒNG + đồng hồ) quay TÂY-BẮC ra quảng trường ga / Lương Khánh Thiện (LM_FACE).
   // Bản cũ: GLB tại node+25m nam quay mặt NAM ra bãi ray, tàu nằm giữa nhà ga và phố (audit 2026-09).
   {
-    const [gx, gz] = LM.station_bldg, thGa = orientLong(LM_DIR.station_bldg, LM_FACE.station_bldg);
-    placeGLB({ url: 'assets/ga.glb', name: 'Ga Hải Phòng', x: gx, z: gz, rot: thGa, size: 55 });
-    addCollider(gx, gz, 27);
+    const thGa = orientLong(LM_DIR.station_bldg, LM_FACE.station_bldg);
+    // W2-E: footprint OSM = dải 118 m: SẢNH GIỮA 26 × 20,5 m (nhô cả 2 phía) + cánh tây 58 m + cánh đông 34 m, sâu 12 m.
+    // GLB (mặt đứng đủ, tỉ lệ 5,6:1 = footprint, nhưng scale đều 118 m thì cao 80 m!) đặt ở SẢNH: dài 60 m, sâu 14,2 m, thân
+    // ~14 m / tháp đồng hồ ~17 m (bản cũ 55 m dài, cột cờ 37 m, IoU 0,31). Phần cánh còn lại = khối thủ tục vòm 2 tầng + mái ngói.
+    const o = lmOBB(LM_POLY.station_bldg), eS = (o.ux * 0.713 - o.uz * 0.701) >= 0 ? 1 : -1;   // eS·u = hướng ĐÔNG-NAM dọc ray
+    const PAV = 12.2;                                   // tâm sảnh cách tâm OBB 12,2 m về phía đông (đo từ 2 chỗ nhô của đa giác)
+    const [pcx, pcz] = lmAt(o, eS * PAV, 0);
+    LM_FIT.station_bldg = { th: thGa, sx: 30, sy: 17.5, sz: 40, cx: pcx, cz: pcz };
+    placeGLB({ url: 'assets/ga.glb', name: 'Ga Hải Phòng', fit: LM_FIT.station_bldg, key: 'station_bldg' });
+    {
+      const G = lmGeo(), hv = 6;                        // cánh sâu 12 m (đa giác)
+      const up = eS * PAV;                              // toạ độ u (OBB) của tâm sảnh; GLB phủ [up−30, up+30]
+      for (const [a, b] of [[-o.hu, up - 30 + 0.8], [up + 30 - 0.8, o.hu]]) if (b - a > 3) lmBlock(G, 'station_bldg', o, a, b, -hv, hv, 10, 'arcade', 'tile', { pitch: 0.42, over: 0.8 });
+      // thân sảnh phía SAU GLB (đa giác sâu 20,5 m, GLB 14,2 m) — phía TRƯỚC để trống (mặt tiền GLB)
+      const vb = LM_FACE.station_bldg[0] * o.vx + LM_FACE.station_bldg[1] * o.vz > 0 ? -1 : 1;   // dấu v phía SAU
+      const pv0 = vb > 0 ? 3 : -10.2, pv1 = vb > 0 ? 10.2 : -3;
+      lmBlock(G, 'station_bldg', o, eS * PAV - 12.5, eS * PAV + 12.5, pv0, pv1, 11.5, 'arcade', 'tile', { pitch: 0.42, over: 0.6 });
+      G.flush('lm_station_wings');
+    }
+    lmSolid(LM_POLY.station_bldg, 'station_bldg');
     // sân ga + đường ray + đoàn tàu: local X dọc ray, local -Z = sau lưng nhà ga (ngược LM_FACE)
     const g = new THREE.Group();
     const canopy = new THREE.Mesh(new THREE.BoxGeometry(30, 0.5, 8), mat(0x8a8f96));
@@ -18869,83 +19195,73 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     addCollider(rcx, rcz, 14);
   }
 
-  // ---------- CHỢ SẮT (khối lớn xanh xám + tháp tròn góc như tòa nhà thật) ----------
+  // ---------- CHỢ SẮT — CÔNG TRƯỜNG XÂY LẠI (W2-E, theo pano thật 10/2024) ----------
+  // Pano_116/214/013/212 (Google 10/2024): chợ cũ đã phá, cả khu (LM_POLY 147 × 114 m, OSM 'construction') là CÔNG TRƯỜNG:
+  // tường rào tôn xám cao ~3 m, cẩu tháp, máy khoan cọc, container lán trại. Bản cũ: hộp 110 × 80 × 23 m + tháp tròn (chợ trước
+  // 2019) dịch tay (+12,+4), lòi khỏi footprint phía đông. Biển địa danh/nhiệm vụ "Chợ Sắt" giữ nguyên (landmarks.js).
   {
-    // Chợ Sắt: khối hội chợ lớn lấp gần kín footprint thật (~147×114m), 6-7 tầng.
-    // NÂNG CẤP theo ảnh thật: BĂNG CỬA SỔ NGANG (ribbon) thay cột dọc + khung thép biển trên nóc.
-    const g = new THREE.Group();
-    const grey = mat(0x8fa3b0);
-    const ribbonTex = makeTex(512, 256, (g2, w, h) => {
-      g2.fillStyle = '#8fa3b0'; g2.fillRect(0, 0, w, h); speckle(g2, w, h, 120, 0.06);
-      for (let b = 0; b < 5; b++) {                       // 5 băng cửa ngang chạy suốt
-        const by = h * (0.10 + b * 0.17);
-        g2.fillStyle = '#dde5ea'; g2.fillRect(0, by - 3, w, h * 0.105 + 6);
-        g2.fillStyle = '#33434e'; g2.fillRect(0, by, w, h * 0.10);
-        g2.fillStyle = 'rgba(255,255,255,0.10)'; g2.fillRect(0, by, w, h * 0.035);
-        g2.strokeStyle = '#6a7d88'; g2.lineWidth = 2;      // đố kính chia nhịp
-        for (let fx = 0; fx < w; fx += 26) { g2.beginPath(); g2.moveTo(fx, by); g2.lineTo(fx, by + h * 0.10); g2.stroke(); }
+    const P = LM_POLY.market, K = 'market', o = lmOBB(P), G = lmGeo();
+    const R = lmShrink(P, 0.6), y0 = LAND_H;
+    lmWalls(G, R, y0, y0 + 3.2, 'hoard');
+    lmFlatRoof(G, lmShrink(P, 1.0), y0 + 0.05, 'conc');            // mặt bằng công trường (bê tông/đất nện)
+    lmSolid(R, K); world.lmMasses.push({ key: K, ring: R, h: 3.2 });
+    // khung bê tông đang đổ (3 sàn) ở nửa sau công trường
+    const fr = lmFitRect(P, o, -12, 22, -16, 10, 12);
+    const conc = mat(0xb9b6ae), concD = mat(0x9c9990), yel = mat(0xe3c341), wht = mat(0xe9ecee), dark = mat(0x3e4246), blue = mat(0x2f62a8);
+    const parts = new Map(); const put = (m, g) => { let a = parts.get(m); if (!a) parts.set(m, (a = [])); a.push(g); };
+    const boxAt = (m, x, y, z, w, h, d, rot = 0) => { const g = new THREE.BoxGeometry(w, h, d); g.rotateY(rot); g.translate(x, y, z); put(m, g); };
+    const rotU = Math.atan2(-o.uz, o.ux);
+    if (fr) {
+      const [u0, u1, v0, v1] = fr, nu = Math.max(2, Math.round((u1 - u0) / 7.5)), nv = Math.max(2, Math.round((v1 - v0) / 7.5));
+      for (let i = 0; i <= nu; i++) for (let j = 0; j <= nv; j++) {
+        const [x, z] = lmAt(o, u0 + (u1 - u0) * i / nu, v0 + (v1 - v0) * j / nv);
+        const lv = (i + j) % 3 === 0 ? 3 : 2;                    // cột đã lên tới sàn 2-3 (đang thi công)
+        boxAt(conc, x, y0 + lv * 1.9, z, 0.5, lv * 3.8, 0.5);
       }
-      g2.fillStyle = '#5f707b'; g2.fillRect(0, h * 0.95, w, h * 0.05);
-    });
-    const marketFacade = new THREE.MeshLambertMaterial({ map: ribbonTex });
-    // 110×80 dịch (+12,+4) so với node OSM: sim đối chiếu polyline đường → 0 điểm đè
-    // lòng/vỉa hè đường, 0 chạm hồ (user: "chợ Sắt che cả đường, không lấn chiếm vỉa hè")
-    const HW = 110, HD = 80, HH = 23;
-    const hall = new THREE.Mesh(new THREE.BoxGeometry(HW, HH, HD),
-      [marketFacade, marketFacade, grey, grey, marketFacade, marketFacade]);
-    hall.position.y = HH / 2; g.add(hall);
-    // KHUNG THÉP biển quảng cáo trên nóc (bộ xương giàn — nét rất nhận diện của Chợ Sắt cũ)
-    {
-      const steel = mat(0x55606a);
-      const fW = 62, fH = 7.5, fz = -HD * 0.18;
-      for (let i = 0; i <= 6; i++) {                       // cột đứng
-        const px = -fW / 2 + (fW * i) / 6;
-        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, fH, 6), steel);
-        post.position.set(px, HH + fH / 2, fz); g.add(post);
+      for (let l = 1; l <= 2; l++) {
+        const [cx, cz] = lmAt(o, (u0 + u1) / 2 - (l - 1) * (u1 - u0) * 0.12, (v0 + v1) / 2);
+        boxAt(l === 1 ? conc : concD, cx, y0 + l * 3.8, cz, (u1 - u0) * (l === 1 ? 1 : 0.76), 0.3, v1 - v0, rotU);
       }
-      for (const fy of [HH + 1.6, HH + fH - 0.6]) {        // thanh ngang trên/dưới
-        const rail = new THREE.Mesh(new THREE.BoxGeometry(fW + 1, 0.36, 0.36), steel);
-        rail.position.set(0, fy, fz); g.add(rail);
-      }
-      for (let i = 0; i < 6; i++) {                        // giằng chéo
-        const px = -fW / 2 + fW * (i + 0.5) / 6;
-        const diag = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 7.6, 5), steel);
-        diag.rotation.z = (i % 2 ? 1 : -1) * 0.72;
-        diag.position.set(px, HH + fH / 2 - 0.4, fz); g.add(diag);
-      }
+      lmSolid(lmRect(o, u0, u1, v0, v1), K);
     }
-    // tháp tròn ở góc trước — nét nhận diện của chợ Sắt
-    const drumX = HW / 2 - 12, drumZ = HD / 2 - 8;
-    const drum = new THREE.Mesh(new THREE.CylinderGeometry(13, 13, 33, 18), mat(0xa3b5c0));
-    drum.position.set(drumX, 16.5, drumZ);
-    g.add(drum);
-    for (let fy = 6; fy <= 27; fy += 5) {
-      const strip = new THREE.Mesh(new THREE.CylinderGeometry(13.2, 13.2, 2, 18), sharedMats.window);
-      strip.position.set(drumX, fy, drumZ);
-      g.add(strip);
+    // cẩu tháp × 2 (thân giàn vuông 1,8 m, tay cần 48 m, đối trọng)
+    const crane = (u, v, H, yaw) => {
+      const [x, z] = lmAt(o, u, v);
+      boxAt(yel, x, y0 + H / 2, z, 1.8, H, 1.8);
+      for (let k = 6; k < H; k += 6) boxAt(dark, x, y0 + k, z, 2.0, 0.25, 2.0);   // nút giàn
+      const ca = Math.cos(yaw), sa = Math.sin(yaw);
+      boxAt(yel, x + ca * 18, y0 + H + 0.8, z - sa * 18, 48, 1.3, 1.3, yaw);
+      boxAt(wht, x - ca * 8, y0 + H + 0.8, z + sa * 8, 14, 1.1, 1.6, yaw);
+      boxAt(concD, x - ca * 12, y0 + H - 0.4, z + sa * 12, 3.2, 2.4, 2.4, yaw);
+      boxAt(wht, x + ca * 1.6, y0 + H - 1.6, z - sa * 1.6, 2.4, 2.4, 2.2, yaw);   // cabin
+      boxAt(yel, x, y0 + H + 5, z, 1.0, 9, 1.0);                                    // đỉnh tháp
+      addCollider(x, z, 1.4);
+    };
+    crane(o.hu * -0.35, o.hv * 0.25, 46, rotU + 0.6);
+    crane(o.hu * 0.4, -o.hv * 0.35, 40, rotU - 1.9);
+    // máy khoan cọc nhồi (cần 24 m trên xe xích)
+    for (const [fu, fv, yw] of [[-0.62, -0.3, 0.3], [-0.15, 0.55, 1.6], [0.6, 0.35, 2.4]]) {
+      const [x, z] = lmAt(o, o.hu * fu, o.hv * fv);
+      if (!_lmIn(x, z, lmShrink(P, 6))) continue;
+      boxAt(dark, x, y0 + 1.1, z, 5.5, 2.2, 3.4, yw);
+      boxAt(yel, x, y0 + 3.0, z, 3.2, 1.8, 2.6, yw);
+      boxAt(wht, x + Math.cos(yw) * 1.8, y0 + 13, z - Math.sin(yw) * 1.8, 0.8, 22, 0.8);
+      addCollider(x, z, 2.6);
     }
-    const drumCap = new THREE.Mesh(new THREE.CylinderGeometry(14, 14, 1.6, 18), mat(0x7a8d99));
-    drumCap.position.set(drumX, 33.6, drumZ);
-    g.add(drumCap);
-    const sign = new THREE.Mesh(new THREE.PlaneGeometry(40, 7),
-      new THREE.MeshLambertMaterial({ map: signTexture('CHỢ SẮT', '#b03428', '#ffe9b8') }));
-    sign.position.set(-14, 19, HD / 2 + 0.1); g.add(sign);
-    // sạp hàng vỉa hè phía trước (giữ tầm người)
-    for (const sx of [-40, -30, -20, 18, 28, 38]) {
-      const stall = new THREE.Mesh(new THREE.BoxGeometry(6, 2.4, 3.4), mat(0xe8b84d));
-      stall.position.set(sx, 1.2, HD / 2 + 5); g.add(stall);
-      const canopy = new THREE.Mesh(new THREE.ConeGeometry(4, 1.6, 4), mat(0xd84040, { flatShading: true }));
-      canopy.rotation.y = Math.PI / 4;
-      canopy.position.set(sx, 3.4, HD / 2 + 5); g.add(canopy);
-    }
-    const thMk = orientLong(LM_DIR.market, LM_FACE.market);
-    const mkX = LM.market[0] + 12, mkZ = LM.market[1] + 4;   // dịch khỏi lòng đường (sim kiểm chứng)
-    g.position.set(mkX, LAND_H, mkZ);
-    g.rotation.y = thMk;
-    scene.add(g);
-    addCollider(mkX, mkZ, 58);
-    const [drX, drZ] = localPt(mkX, mkZ, drumX, drumZ, thMk); // tháp tròn góc
-    addCollider(drX, drZ, 13);
+    // container lán trại (2 tầng) sát rào phía mặt tiền
+    { const fs = (o.vx * LM_FACE.market[0] + o.vz * LM_FACE.market[1]) >= 0 ? 1 : -1;
+      for (let k = 0; k < 3; k++) for (let l = 0; l < (k === 1 ? 2 : 1); l++) {
+        const [x, z] = lmAt(o, -12 + k * 6.6, fs * (o.hv - 12));
+        if (_lmIn(x, z, lmShrink(P, 3))) boxAt(l ? wht : blue, x, y0 + 1.3 + l * 2.6, z, 6.1, 2.6, 2.4, rotU);
+      } }
+    for (const [m, list] of parts) { const g = mergeGeometries(list); list.forEach((q) => q.dispose()); const me = new THREE.Mesh(g, m); me.name = 'lm_market_site'; me.castShadow = true; me.receiveShadow = true; scene.add(me); }
+    G.flush('lm_market');
+    // băng rôn trên rào mặt tiền (chữ CHUNG, không thương hiệu)
+    let bi = 0, bs = -1;
+    for (let i = 0; i < R.length; i++) { const a = R[i], b = R[(i + 1) % R.length], [nx, nz] = lmOutN(R, a, b), L = Math.hypot(b[0] - a[0], b[1] - a[1]); const s = L * Math.max(0, nx * LM_FACE.market[0] + nz * LM_FACE.market[1]); if (s > bs) { bs = s; bi = i; } }
+    { const a = R[bi], b = R[(bi + 1) % R.length], [nx, nz] = lmOutN(R, a, b);
+      const sg = new THREE.Mesh(new THREE.PlaneGeometry(22, 1.6), new THREE.MeshLambertMaterial({ map: signTexture('CHỢ SẮT · ĐANG XÂY DỰNG', '#1f4f8f', '#ffffff') }));
+      sg.position.set((a[0] + b[0]) / 2 + nx * 0.06, y0 + 2.2, (a[1] + b[1]) / 2 + nz * 0.06); sg.rotation.y = Math.atan2(nx, nz); scene.add(sg); }
   }
 
   // ---------- CẦU HOÀNG VĂN THỤ & CẦU BÍNH (đúng vị trí + trục thật từ way OSM) ----------
@@ -19664,77 +19980,76 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
 
   // ---------- 3 TRƯỜNG HỌC THẬT (footprint OSM) ----------
   // THPT Ngô Quyền (trường Bonnal): GLB từ ảnh thật — cổng + dãy nhà vàng
-  placeGLB({
-    url: 'assets/thptnq.glb', name: 'THPT Ngô Quyền',
-    x: LM.thptnq[0], z: LM.thptnq[1],
-    // Trường Bonnal là NHÀ GÓC: cạnh dài (mặt tiền +Z của mô hình) chạy dọc Phố Nguyễn
-    // Đức Cảnh (tiếp tuyến OSM thật [0.981,-0.195], nằm phía Bắc trường), cạnh ngắn quay
-    // ra Phố Mê Linh (phía Đông). → mặt tiền dài quay VUÔNG GÓC ra Nguyễn Đức Cảnh, pháp
-    // tuyến hướng Bắc: [-0.195,-0.981] (khớp footprint OSM + ảnh Street View "32 Nguyễn Đức Cảnh").
-    rot: orientFace([-0.195, -0.981]), size: 80,
-  });
-  addCollider(LM.thptnq[0], LM.thptnq[1], 32);
-  // 2 trường THCS: khối lớp chữ U + sân + cột cờ + cổng bảng tên (chưa có ảnh kiến trúc đạt chuẩn)
+  // W2-E: GLB = CỔNG "NGÔ QUYỀN" + dãy 2 tầng cạnh cổng (diorama Meshy, tỉ lệ thật ~10 m/đơn vị) — bản cũ phóng 80 m nên
+  // cao 46 m, đè 104 m² lòng đường, che kín camera pano_261/037. Nay: cổng tỉ lệ thật trên mặt ĐÔNG (phố Mê Linh — pano_261
+  // h270 "ngay trước cổng chính", LM_FACE) + khuôn viên 108 × 88 m (LM_POLY) dựng thủ tục theo ảnh pano_427/037: dãy 3 tầng
+  // vàng cửa chớp xanh dọc Nguyễn Đức Cảnh (bắc), dãy 2 tầng 3 phía còn lại, sân trường ở giữa có cây.
+  {
+    const P = LM_POLY.thptnq, G = lmGeo(), K = 'thptnq';
+    const A = P[0], D = P[3], E = P[4], F = P[5];
+    const fE = lmEdge(P, A, F);                          // mặt ĐÔNG (Mê Linh), gốc A (góc đông-bắc)
+    const S = 10, uG = 60.6, dG = 12.7 * S / 10;         // tâm cổng cách A 60,6 m dọc cạnh; GLB sâu 12,7 m
+    const [gx, gz] = lmAt(fE, uG, dG / 2 + 1.0);
+    LM_FIT.thptnq = { th: Math.atan2(-fE.vx, -fE.vz), sx: S, sy: S, sz: S, cx: gx, cz: gz };   // +Z (cổng) quay RA phố
+    placeGLB({ url: 'assets/thptnq.glb', name: 'THPT Ngô Quyền', fit: LM_FIT.thptnq, key: K });
+    lmSolid(lmRect(fE, uG - 9.4, uG + 9.4, 1.0, 1.0 + dG), K);
+    const blk = (o, u0, u1, v0, v1, H, st, roof = 'tile') => { const r = lmFitRect(P, o, u0, u1, v0, v1, 0.8); if (r) lmBlock(G, K, o, r[0], r[1], r[2], r[3], H, st, roof, { pitch: 0.4, over: 0.7 }); };
+    const fN = lmEdge(P, D, A);                          // mặt BẮC (Nguyễn Đức Cảnh) D→A
+    blk(fN, 2, fN.L - 2, 1.2, 15, 15, 'colonial');        // dãy chính 3 tầng × 5 m
+    blk(fE, 17, uG - 10.5, 1.2, 13, 9, 'yellow');         // mặt đông: 2 bên cổng
+    blk(fE, uG + 10.5, fE.L - 15, 1.2, 13, 9, 'yellow');
+    const fS = lmEdge(P, E, F);
+    blk(fS, 14, fS.L - 14, 1.0, 13, 9.5, 'yellow');
+    const fW = lmEdge(P, D, E);
+    blk(fW, 16.5, fW.L - 14.5, 1.0, 13, 9.5, 'yellow');
+    G.flush('lm_thptnq');
+    // sân trường: vài cây bàng/xà cừ lớn (trees.js dựng; seeded)
+    for (let i = 0; i < 6; i++) {
+      const o2 = lmOBB(P), [tx, tz] = lmAt(o2, (_lmHash(i, 3) - 0.5) * o2.hu * 0.7, (_lmHash(i, 7) - 0.5) * o2.hv * 0.6);
+      if (!world.landmarkHit(tx, tz, 3.5)) { veg.plant('park', tx, tz, {}); addCollider(tx, tz, 0.55); }
+    }
+  }
+  // 2 trường THCS: khuôn viên theo FOOTPRINT thật (LM_POLY) — W2-E thay khối chữ U 53 × 46 m đặt ở tâm-đỉnh LM (lệch, đè nhà
+  // bên cạnh): dãy học 3 tầng phía sau + 2 cánh 2 tầng, sân giữa có cây + cột cờ, cổng + biển tên ở mặt tiền (LM_FACE).
   function schoolCompound(key, label) {
-    const [sx, sz] = LM[key];
-    const th = orientLong(LM_DIR[key], LM_FACE[key]);
-    const g = new THREE.Group();
-    const wallM = mat(0xf2d488);
-    const trimM = mat(0xfdf6e0);
-    function block(w, d, floors, lx, lz, rotL = 0) {
-      const hgt = 3.4 * floors + 0.6;
-      const b = new THREE.Mesh(new THREE.BoxGeometry(w, hgt, d), wallM);
-      b.position.set(lx, hgt / 2, lz);
-      b.rotation.y = rotL;
-      g.add(b);
-      for (let f = 0; f < floors; f++) {
-        const strip = new THREE.Mesh(new THREE.BoxGeometry(w + 0.14, 1.2, d + 0.14), sharedMats.window);
-        strip.position.set(lx, 2.2 + f * 3.4, lz);
-        strip.rotation.y = rotL;
-        g.add(strip);
+    // DÃY NHÀ VEN CHU VI: mỗi cạnh ≥ 14 m của footprint 1 dải sâu 11 m (2 tầng; cạnh > 45 m 3 tầng), co vừa đa giác (lmFitRect,
+    // hệ toạ độ theo cạnh) — chạy đúng cho đa giác lõm/chữ L (THCS NQ: nhánh hẹp 17 m ra phố + khối chính 60 × 55 m). Cạnh mặt tiền
+    // (pháp tuyến ngoài ≈ LM_FACE, dài nhất) chừa khoảng 16 m giữa cho cổng.
+    const P = LM_POLY[key], o = lmOBB(P), G = lmGeo(), F = LM_FACE[key];
+    let fi = 0, fsc = -1;
+    for (let i = 0; i < P.length; i++) { const a = P[i], b = P[(i + 1) % P.length], [nx, nz] = lmOutN(P, a, b), sc = Math.hypot(b[0] - a[0], b[1] - a[1]) * Math.max(0, nx * F[0] + nz * F[1]); if (sc > fsc) { fsc = sc; fi = i; } }
+    for (let i = 0; i < P.length; i++) {
+      const a = P[i], b = P[(i + 1) % P.length], e = lmEdge(P, a, b); if (e.L < 14) continue;
+      const H = (e.L > 45 ? 3 : 2) * 3.6, pieces = i === fi ? [[0, e.L / 2 - 8], [e.L / 2 + 8, e.L]] : [[0, e.L]];
+      for (const [s0, s1] of pieces) {
+        if (s1 - s0 < 6) continue;
+        const r = lmFitRect(P, e, s0, s1, 0.8, 11.8, 0.4);
+        if (r && r[1] - r[0] > 5) lmBlock(G, key, e, r[0], r[1], r[2], r[3], H, 'yellow', 'tile', { pitch: 0.4, over: 0.7 });
       }
-      const roof = new THREE.Mesh(new THREE.BoxGeometry(w + 0.8, 0.5, d + 0.8), mat(0xb0543c));
-      roof.position.set(lx, hgt + 0.25, lz);
-      roof.rotation.y = rotL;
-      g.add(roof);
     }
-    block(46, 11, 3, 0, -14);      // dãy chính (song song mặt phố, lùi sâu)
-    block(13, 22, 2, -20, 6);      // cánh trái
-    block(13, 22, 2, 20, 6);       // cánh phải
-    // sân trường + cột cờ
-    const yard = new THREE.Mesh(new THREE.PlaneGeometry(42, 24), mat(0xcabfa8));
-    yard.rotation.x = -Math.PI / 2;
-    yard.position.set(0, 0.06, 8);
-    g.add(yard);
-    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.12, 9, 6), mat(0xd8d8d8));
-    pole.position.set(0, 4.5, 4); g.add(pole);
-    const fl = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 1.4),
-      new THREE.MeshLambertMaterial({ color: 0xd8332a, side: THREE.DoubleSide }));
-    fl.position.set(1.1, 8.2, 4); g.add(fl);
+    G.flush('lm_' + key);
+    const fe = lmEdge(P, P[fi], P[(fi + 1) % P.length]);
+    const UV = (t, d) => { const [x, z] = lmAt(fe, fe.L / 2 + t, d); return [(x - o.cx) * o.ux + (z - o.cz) * o.uz, (x - o.cx) * o.vx + (z - o.cz) * o.vz]; };
+    const Ht = o.hv, D2 = o.hu * 2;
+    // cổng + biển tên + tường rào thấp ở mặt tiền; cột cờ giữa sân
+    const [gx, gz] = lmAt(o, ...UV(0, 1.2)), th = Math.atan2(F[0], F[1]);
+    const g = new THREE.Group(), trimM = mat(0xfdf6e0), wallM = mat(0xf2d488);
+    for (const px of [-4.4, 4.4]) { const post = new THREE.Mesh(new THREE.BoxGeometry(0.9, 3.6, 0.9), trimM); post.position.set(px, 1.8, 0); g.add(post); }
+    const lintel = new THREE.Mesh(new THREE.BoxGeometry(7.8, 1.2, 1), new THREE.MeshLambertMaterial({ map: signTexture(label, '#28457d', '#ffe9b8') }));
+    lintel.position.set(0, 3.9, 0); g.add(lintel);
+    for (const side of [-1, 1]) { const fence = new THREE.Mesh(new THREE.BoxGeometry(14, 1.4, 0.4), wallM); fence.position.set(side * 11.5, 0.7, 0); g.add(fence); }
+    g.position.set(gx, LAND_H, gz); g.rotation.y = th; scene.add(g);
+    for (const px of [-4.4, 4.4]) { const [cx, cz] = localPt(gx, gz, px, 0, th); addCollider(cx, cz, 0.6); }
+    const [px, pz] = lmAt(o, ...UV(0, 9));
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.12, 9, 6), mat(0xd8d8d8)); pole.position.set(px, LAND_H + 4.5, pz); scene.add(pole);
+    const fl = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 1.4), new THREE.MeshLambertMaterial({ color: 0xd8332a, side: THREE.DoubleSide }));
+    fl.position.set(px, LAND_H + 8.2, pz); scene.add(fl);
     fl.userData.dyn = true;
-    updaters.push((dt, time) => { fl.rotation.y = Math.sin(time * 1.7 + sx) * 0.35; });
-    // cổng + bảng tên quay ra phố (local +z)
-    for (const gx of [-4.4, 4.4]) {
-      const post = new THREE.Mesh(new THREE.BoxGeometry(0.9, 3.6, 0.9), trimM);
-      post.position.set(gx, 1.8, 21); g.add(post);
-    }
-    const lintel = new THREE.Mesh(new THREE.BoxGeometry(7.8, 1.2, 1),
-      new THREE.MeshLambertMaterial({ map: signTexture(label, '#28457d', '#ffe9b8') }));
-    lintel.position.set(0, 3.9, 21); g.add(lintel);
-    // tường rào thấp hai bên cổng
-    for (const side of [-1, 1]) {
-      const fence = new THREE.Mesh(new THREE.BoxGeometry(17, 1.4, 0.4), wallM);
-      fence.position.set(side * 14.5, 0.7, 21); g.add(fence);
-    }
-    g.position.set(sx, LAND_H, sz);
-    g.rotation.y = th;
-    scene.add(g);
-    addCollider(sx, sz, 3);
-    const [b1x, b1z] = localPt(sx, sz, 0, -14, th);
-    addCollider(b1x, b1z, 24);
-    for (const wingX of [-20, 20]) {
-      const [wx, wz] = localPt(sx, sz, wingX, 6, th);
-      addCollider(wx, wz, 11);
+    updaters.push((dt, time) => { fl.rotation.y = th + Math.PI / 2 + Math.sin(time * 1.7 + px) * 0.35; });
+    addCollider(px, pz, 0.3);
+    for (let i = 0; i < 5; i++) {                                         // cây sân trường
+      const [tx, tz] = lmAt(o, ...UV((_lmHash(i, key.length) - 0.5) * Ht * 1.1, 14 + _lmHash(i, 17) * Math.max(4, D2 - 34)));
+      if (_lmIn(tx, tz, lmShrink(P, 3)) && !world.landmarkHit(tx, tz, 3)) { veg.plant('park', tx, tz, {}); addCollider(tx, tz, 0.55); }
     }
   }
   schoolCompound('thcsnq', 'THCS NGÔ QUYỀN');
@@ -19833,48 +20148,104 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
 
   // Đình Hàng Kênh — đình cổ 300 năm, footprint OSM; mặt tiền quay NAM ra ao đình (LM_FACE override [0,1],
   // FACADE_SHORT_SIDE vì cạnh dài OSM 30m chạy bắc-nam — orientLong từng cho quay TÂY, audit 2026-09)
-  placeGLB({
-    url: 'assets/dinhhk.glb', name: 'Đình Hàng Kênh',
-    x: LM.dinhhk[0], z: LM.dinhhk[1],
-    rot: orientLM('dinhhk'), size: 30,
-  });
-  addCollider(LM.dinhhk[0], LM.dinhhk[1], 15);
+  placeGLB({ url: 'assets/dinhhk.glb', name: 'Đình Hàng Kênh', fit: LM_FIT.dinhhk, key: 'dinhhk' });   // W2-E: khớp footprint
+  lmSolid(LM_POLY.dinhhk, 'dinhhk');
 
   // Chùa Dư Hàng (Phúc Lâm tự) — gác chuông 3 tầng mái
-  placeGLB({
-    url: 'assets/chuahang.glb', name: 'Chùa Dư Hàng',
-    x: LM.chuahang[0], z: LM.chuahang[1],
-    rot: orientLong(LM_DIR.chuahang, LM_FACE.chuahang), size: 25,
-  });
-  addCollider(LM.chuahang[0], LM.chuahang[1], 12);
+  // W2-E: GLB (gác 3 tầng mái) chỉ là CỔNG/GÁC CHUÔNG — bản cũ phóng 25 m đứng giữa khuôn viên 74 × 61 m trống (IoU 0,13).
+  // Nay: gác ~14 m ở mặt TÂY (lối vào phố Chùa Hàng, LM_FACE) + chính điện 2 tầng mái, 2 dãy nhà tổ/nhà khách, hậu cung, sân
+  // có cây cổ thụ — tường gỗ son/vàng đất, mái ngói nâu (khối thủ tục trong LM_POLY).
+  {
+    const P = LM_POLY.chuahang, G = lmGeo(), K = 'chuahang', o = lmOBB(P);
+    const fs = (o.ux * LM_FACE.chuahang[0] + o.uz * LM_FACE.chuahang[1]) >= 0 ? 1 : -1;   // fs·u = phía mặt tiền (tây)
+    // GLB: +Z ra mặt tiền; tâm cách mép tây ~9 m trong khuôn viên
+    const gu = fs * (o.hu - 9), [gx, gz] = lmAt(o, gu, 0);
+    LM_FIT.chuahang = { th: Math.atan2(fs * o.ux, fs * o.uz), sx: 7, sy: 9.5, sz: 7, cx: gx, cz: gz };
+    placeGLB({ url: 'assets/chuahang.glb', name: 'Chùa Dư Hàng', fit: LM_FIT.chuahang, key: K });
+    lmSolid(lmRect(o, gu - 5, gu + 5, -5, 5), K);
+    const blk = (u0, u1, v0, v1, H, roofP) => {
+      const a = Math.min(fs * u0, fs * u1), b = Math.max(fs * u0, fs * u1);   // u0/u1 tính từ MẶT TIỀN vào (dương = vào trong)
+      const r = lmFitRect(P, o, a, b, v0, v1, 1.0); if (!r) return;
+      lmBlock(G, K, o, r[0], r[1], r[2], r[3], H, 'temple', 'temple', { pitch: roofP, over: 1.1, flare: 0.35 });
+      return r;
+    };
+    // toạ độ "từ mặt tiền": d = o.hu − fs·u  ⇒ u = fs·(o.hu − d)
+    const U = (d) => o.hu - d;
+    const main = blk(U(40), U(22), -12, 12, 6.0, 0.62);   // chính điện 18 × 24 m
+    if (main) {   // tầng mái thứ 2 (chồng diêm): khối nhỏ hơn nhô lên trên mái dưới
+      const y0 = lmBase(lmRect(o, main[0], main[1], main[2], main[3]));
+      const iu0 = main[0] + 4, iu1 = main[1] - 4, iv0 = main[2] + 5, iv1 = main[3] - 5;
+      lmWalls(G, lmRect(o, iu0, iu1, iv0, iv1), y0 + 6.0, y0 + 10.2, 'temple');
+      lmHipRoof(G, o, iu0, iu1, iv0, iv1, y0 + 10.2, { kind: 'temple', pitch: 0.66, over: 1.0, flare: 0.3 });
+    }
+    blk(U(52), U(44), -15, 15, 5.0, 0.6);                 // hậu cung
+    blk(U(48), U(16), -27, -19, 4.6, 0.58);              // nhà tổ / nhà khách hai bên sân
+    blk(U(48), U(16), 19, 27, 4.6, 0.58);
+    G.flush('lm_chuahang');
+    for (let i = 0; i < 7; i++) {                        // cây cổ thụ trong sân chùa (đa/sứ/bàng)
+      const [tx, tz] = lmAt(o, fs * U(14 + _lmHash(i, 11) * 34), (_lmHash(i, 13) - 0.5) * 34);
+      if (_lmIn(tx, tz, lmShrink(P, 3)) && !world.landmarkHit(tx, tz, 3)) { veg.plant('park', tx, tz, {}); addCollider(tx, tz, 0.55); }
+    }
+  }
 
   // Ngân hàng Nhà nước — tân cổ điển Pháp đá granite (ảnh Commons, dựng mirror nửa trái)
-  placeGLB({
-    url: 'assets/nhnn.glb', name: 'Ngân hàng Nhà nước',
-    x: LM.nhnn[0], z: LM.nhnn[1],
-    rot: orientLong(LM_DIR.nhnn, LM_FACE.nhnn), size: 63,
-  });
-  addCollider(LM.nhnn[0], LM.nhnn[1], 28);
+  // W2-E: θ −64° (cũ −59°) + sâu ×1,15 khớp footprint 59 × 50 m — bản cũ scale đều 63 m chìa 134 m² ra lòng đường
+  placeGLB({ url: 'assets/nhnn.glb', name: 'Ngân hàng Nhà nước', fit: LM_FIT.nhnn, key: 'nhnn' });
+  lmSolid(LM_POLY.nhnn, 'nhnn');
 
   // Đền Tam Kỳ — thờ Quan lớn Tuần Tranh, bên hồ Tam Bạc
-  placeGLB({
-    url: 'assets/dentamky.glb', name: 'Đền Tam Kỳ',
-    x: LM.dentamky[0], z: LM.dentamky[1],
-    rot: orientLong(LM_DIR.dentamky, LM_FACE.dentamky), size: 22,
-  });
-  addCollider(LM.dentamky[0], LM.dentamky[1], 11);
+  placeGLB({ url: 'assets/dentamky.glb', name: 'Đền Tam Kỳ', fit: LM_FIT.dentamky, key: 'dentamky' });
+  lmSolid(LM_POLY.dentamky, 'dentamky');
 
   // ---------- ĐỢT ĐỊA DANH 2: procedural (chưa có ảnh đạt chuẩn) ----------
   // UBND TP / Hôtel de Ville — DỰNG LẠI procedural theo ảnh thật (mansard + dormer vòm +
   //   đồng hồ + phào/quoin trắng) tại đúng toạ độ & hướng OSM. Bản cũ (portico + mái đỏ) đã bỏ.
-  buildUBND(LM.ubnd[0], LM.ubnd[1], orientLong(LM_DIR.ubnd, LM_FACE.ubnd));
+  // W2-E: khuôn viên UBND 163 × 75 m (LM_POLY) — bản cũ CHỈ 1 khối 52 × 17 m (8% footprint) đặt ở tâm đỉnh. Nay: vườn trước
+  // có đài phun + hàng cờ dọc Hoàng Diệu (pano_020 h270), dãy chính lùi 20 m (khối Hôtel de Ville mansard + đồng hồ ở giữa +
+  // 2 dãy thuộc địa mái đá đen), cánh tây + dãy sau bao sân trong, Trung tâm Hội nghị 5 tầng kem mái xanh ở đầu đông (pano_020 h315).
+  {
+    const P = LM_POLY.ubnd, G = lmGeo(), K = 'ubnd', o = lmOBB(P);
+    const fv = (o.vx * LM_FACE.ubnd[0] + o.vz * LM_FACE.ubnd[1]) >= 0 ? 1 : -1;     // fv·v = phía phố (mặt tiền)
+    const eu = (o.ux * 1 + o.uz * 0) >= 0 ? 1 : -1;                                     // eu·u = phía ĐÔNG
+    const V = (d) => fv * (o.hv - d), T = (t) => eu * t;                               // d: sâu từ mép phố; t: dọc phố (+ đông)
+    const blk = (t0, t1, d0, d1, H, st, roof, ro = {}) => {
+      const u0 = Math.min(T(t0), T(t1)), u1 = Math.max(T(t0), T(t1)), v0 = Math.min(V(d0), V(d1)), v1 = Math.max(V(d0), V(d1));
+      const r = lmFitRect(P, o, u0, u1, v0, v1, 1.0); if (r) lmBlock(G, K, o, r[0], r[1], r[2], r[3], H, st, roof, ro);
+    };
+    const [ux, uz] = lmAt(o, T(-10), V(28.5));
+    buildUBND(ux, uz, Math.atan2(fv * o.vx, fv * o.vz));          // khối chính 52 m (mansard, đồng hồ) — local +Z ra phố
+    blk(-63, -36.2, 20, 37, 12.5, 'colonial', 'slate', { pitch: 0.85, over: 0.5 });
+    blk(16.2, 40, 20, 37, 12.5, 'colonial', 'slate', { pitch: 0.85, over: 0.5 });
+    blk(-79, -63.2, 20, 71, 12.5, 'colonial', 'slate', { pitch: 0.85, over: 0.5 });   // cánh tây
+    blk(-63, 40, 57, 72, 12.5, 'colonial', 'slate', { pitch: 0.85, over: 0.5 });      // dãy sau
+    blk(44, 79, 12, 66, 18, 'cream', 'green', { pitch: 0.28, over: 0.9 });            // Trung tâm Hội nghị
+    G.flush('lm_ubnd');
+    // vườn trước: bồn phun + vòi, 2 bồn hoa tròn, hàng cờ đỏ sát vỉa hè
+    const [fx, fz] = lmAt(o, T(-10), V(10));
+    const basin = new THREE.Mesh(new THREE.CylinderGeometry(6.5, 6.8, 0.7, 28), mat(0xd8d2c2)); basin.position.set(fx, LAND_H + 0.35, fz); scene.add(basin);
+    const pool = new THREE.Mesh(new THREE.CylinderGeometry(6, 6, 0.1, 28), mat(0x5d8fa0)); pool.position.set(fx, LAND_H + 0.66, fz); scene.add(pool);
+    const tier = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.6, 2.4, 12), mat(0xe2dccb)); tier.position.set(fx, LAND_H + 1.5, fz); scene.add(tier);
+    addCollider(fx, fz, 6.8);
+    for (const t of [-34, 14]) {
+      const [bx, bz] = lmAt(o, T(t), V(10));
+      const bed = new THREE.Mesh(new THREE.CylinderGeometry(5, 5.2, 0.5, 24), mat(0x4f8a3e)); bed.position.set(bx, LAND_H + 0.25, bz); scene.add(bed);
+      const rim = new THREE.Mesh(new THREE.CylinderGeometry(5.3, 5.3, 0.35, 24, 1, true), mat(0xd8d2c2)); rim.position.set(bx, LAND_H + 0.18, bz); scene.add(rim);
+    }
+    const flagM = new THREE.MeshLambertMaterial({ color: 0xd8202a, side: THREE.DoubleSide });
+    for (let t = -54; t <= 34; t += 11) {
+      const [px, pz] = lmAt(o, T(t), V(3.2));
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 9, 6), mat(0xe0e0e0)); pole.position.set(px, LAND_H + 4.5, pz); scene.add(pole);
+      const fl = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 1.2), flagM); fl.position.set(px + 0.9 * o.ux * eu, LAND_H + 8.2, pz + 0.9 * o.uz * eu); fl.rotation.y = Math.atan2(-o.uz, o.ux); scene.add(fl);
+      addCollider(px, pz, 0.25);
+    }
+  }
 
   // Rạp Tháng Tám — DỰNG LẠI theo ảnh thật: art-deco kem, THÁP GIỮA bậc thang + chữ
   //   "THÁNG 8" đỏ dọc, gân sọc dọc trên tường, băng poster màu + marquee "CHIẾU PHIM".
   //   Footprint OSM 59×19m dọc đông-tây: mặt tiền ở ĐẦU HỒI TÂY ra Đinh Tiên Hoàng (pano_052 "trước Nhà hát
   //   Tháng 8"), hội trường sâu 59m về đông. Bản cũ 24×30 quay nam, vuông góc footprint (audit 2026-09).
   {
-    const [rx, rz] = LM.rap78;   // 1:1 — tâm footprint thật
+    const _ro = lmOBB(LM_POLY.rap78), rx = _ro.cx, rz = _ro.cz;   // W2-E: tâm OBB footprint (LM = tâm-đỉnh, lệch 6,5 m dọc trục)
     const th = orientLM('rap78');
     const RW = LM_SIZE.rap78[1], RD = LM_SIZE.rap78[0];   // rộng mặt tiền 19, sâu hội trường 59
     const CRE = '#efe6c8', TRIM = '#f7f1de';
@@ -19931,7 +20302,8 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     g.rotation.y = th;
     g.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
     scene.add(g);
-    for (const lz of [-RD / 4, RD / 4]) { const [cx, cz] = localPt(rx, rz, 0, lz, th); addCollider(cx, cz, 13); }
+    { const ring = [[-RW / 2, -RD / 2], [RW / 2, -RD / 2], [RW / 2, RD / 2], [-RW / 2, RD / 2]].map(([lx, lz]) => localPt(rx, rz, lx, lz, th));
+      lmSolid(ring, 'rap78'); world.lmMasses.push({ key: 'rap78', ring, h: 12.5 }); }   // W2-E: va chạm hình chữ nhật (2 vòng r13 cũ)
   }
 
   // Nhà Kèn — lầu bát giác vườn hoa Nguyễn Du (Pháp 1920s). DỰNG LẠI theo ảnh thật:
