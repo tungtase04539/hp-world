@@ -483,7 +483,9 @@ function genKit(d, far, seed) {
     const sMul = far ? 1.9 : 1;
     // kit XA: thẻ ngửa lên nhiều hơn (nhìn từ trên/xa tán vẫn kín — ảnh vệ tinh), gần: theo loài
     crownCards(cx, d.cy, cz, d.rx, d.ry, tips, n, d.cardS[0] * sMul, d.cardS[1] * sMul, d.cells, (d.up || 0.2) + (far ? 0.55 : 0));
-    if (d.flowers) crownCards(cx, d.cy, cz, d.rx * 0.97, d.ry, [], far ? 6 : Math.round(d.flowers * CARD_Q), (far ? 2.4 : 1.2), (far ? 3.2 : 2.0), d.cells, 0.55, 3, true);
+    // hoa: kit XA trên mặt vòm (nhìn từ cao); kit GẦN thành chùm ở ĐẦU CÀNH khắp tán (W2-B — trước chỉ mặt trên vòm nên
+    // đứng dưới đường nhìn lên gần như không thấy hoa, tháng 6 trông như tháng 10)
+    if (d.flowers) crownCards(cx, d.cy, cz, d.rx * 0.97, d.ry, far ? [] : tips, far ? 8 : Math.round(d.flowers * 1.8 * CARD_Q), (far ? 2.4 : 1.4), (far ? 3.2 : 2.3), d.cells, 0.55, 3, far);
   } else if (d.form === 'tier') {
     // BÀNG: thân thẳng tới ngọn, các TẦNG cành gần nằm ngang, lá dồn đầu cành thành tầng phẳng (dáng chùa)
     trunk(d.r0, d.r0 * 0.3, H * 0.94);
@@ -914,7 +916,8 @@ const VERT_BEGIN = `vec3 transformed = vec3( position );
   }
   // ĐỘ KÍN TÁN từng cây (aInst.w 0..1): thẻ lá/hoa có số ngẫu nhiên riêng (phần lẻ aKind × 2,5) lớn hơn → bỏ
   // ⇒ cùng 1 kit mà cây thưa/cây dày khác nhau, lộ trời + cành như ảnh thật (pano 10/2024 sau bão Yagi)
-  if ( aKind > 1.5 && fract( aKind ) * 2.5 > aInst.w ) transformed = vec3( 0.0, -3.0, 0.0 );
+  // (thẻ HOA không theo độ kín tán — độ rộ do lịch quyết; cây tỉa trơ vẫn nở trên phần cành còn lại)
+  if ( aKind > 1.5 && aKind < 2.5 && fract( aKind ) * 2.5 > aInst.w ) transformed = vec3( 0.0, -3.0, 0.0 );
   float hpSw = aSway * uWind, hpPh = aInst.z;
   transformed.x += hpSw * ( 0.2 * sin( uTime * 0.83 + hpPh ) + 0.07 * sin( uTime * 2.1 + hpPh * 2.3 ) );
   transformed.z += hpSw * ( 0.16 * cos( uTime * 0.67 + hpPh * 1.3 ) );
