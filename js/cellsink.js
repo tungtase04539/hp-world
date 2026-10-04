@@ -625,8 +625,13 @@ function commitSink(sink, THREE, realScene, realFC, colliders, opts) {
     let dx = 0, dz = 0, stuck = false;
     const e0 = S.nMesh ? evalShift(S, 0, 0, 'bldg') : { bad: false };
     if (e0.bad) {
-      const ov0 = occPairs(it, 0, 0);
-      S.occ = (sx, sz) => { for (const [o, n] of occPairs(it, Math.round(sx), Math.round(sz))) if (n > Math.max(1, ov0.get(o) || 0)) return true; return false; };
+      const ov0 = occPairs(it, 0, 0), hc = hullCells(it), cnt = new Map();
+      // dừng sớm ở cặp đầu tiên vượt ngưỡng (đo: occPairs dựng Map đầy đủ mỗi ứng viên ~20 ms)
+      S.occ = (sx, sz) => {
+        const ox = Math.round(sx), oz = Math.round(sz); cnt.clear();
+        for (const k of hc) { const a = occ.get(KEY(KX(k) + ox, KZ(k) + oz)); if (!a) continue; for (const o of a) { if (o === it) continue; const n = (cnt.get(o) || 0) + 1; cnt.set(o, n); if (n > Math.max(1, ov0.get(o) || 0)) return true; } }
+        return false;
+      };
       const maxS = it.height >= 15 ? CLEAR.MAX_SHIFT_TOWER : CLEAR.MAX_SHIFT_BLDG;
       const mS = ident ? Math.max(maxS, 12) : maxS;
       let sol = solveShift(S, 'bldg', mS);

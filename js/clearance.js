@@ -147,9 +147,10 @@ export function massOnStreet(hulls) {
 }
 // LẤP KHUNG: phần (0..1) khung nhìn 64×36 của 1 camera (mắt nền+2,2 m, FOV dọc 60°, 16:9 — như kiểm toán) bị các LĂNG TRỤ
 // đứng (bao lồi H dời dx,dz; y0..y1 so với nền) che trong FILL_D m, lớn nhất trên 8 hướng 0..315°. Raster 2,5D theo cột.
-const _rows = new Uint8Array(36);
-export function prismFill(body, dx, dz, cx, cz) {
-  const W = 64, Hh = 36, tanV = Math.tan(Math.PI / 6), tanH = tanV * 16 / 9, EYE = CLEAR.EYE, FD = CLEAR.FILL_D;
+// (lưới 32×18 — cùng tỉ lệ khung kiểm toán 64×36, rẻ hơn 4 lần; stop > 0: dừng sớm khi 1 hướng vượt ngưỡng)
+const _rows = new Uint8Array(18);
+export function prismFill(body, dx, dz, cx, cz, stop = 0) {
+  const W = 32, Hh = 18, tanV = Math.tan(Math.PI / 6), tanH = tanV * 16 / 9, EYE = CLEAR.EYE, FD = CLEAR.FILL_D;
   const P = [];
   for (const b of body) {
     if (!b.H || b.H.length < 2 || b.y1 === undefined) continue;
@@ -185,6 +186,7 @@ export function prismFill(body, dx, dz, cx, cz) {
       if (any) for (let j = 0; j < Hh; j++) cov += _rows[j];
     }
     const f = cov / (W * Hh); if (f > worst) worst = f;
+    if (stop && worst > stop) return worst;
   }
   return worst;
 }
@@ -463,7 +465,7 @@ export function evalShift(S, dx, dz, mode, quick = false) {
     for (const [qx, qz] of panosNear(mx, mz, rad0 + CLEAR.FILL_D)) {
       let d = Infinity; for (const b of S.body) { const Hs = dx || dz ? b.H.map(([x, z]) => [x + dx, z + dz]) : b.H; d = Math.min(d, hullDist(Hs, qx, qz)); }
       if (d >= CLEAR.FILL_D) continue;
-      const f = prismFill(S.body, dx, dz, qx, qz);
+      const f = prismFill(S.body, dx, dz, qx, qz, CLEAR.FILL_MAX);
       if (f > fill) fill = f;
       if (f <= CLEAR.FILL_MAX) continue;
       if (quick) return { bad: true };
