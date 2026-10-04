@@ -19586,6 +19586,12 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
   // che kín chân dung/mặt tiền (cam_spawn)
   const opKeep = (x, z) => _segD(x, z, LM.opera[0], LM.opera[1] + 16, LM.opera[0], LM.opera[1] + 75) < 14;
   veg.plantStreetTrees({ ROADS_DT, groundHeightNoDeck, isWater, addCollider, colliders, lakeSD, hdTreeBelt, R: BUILD_RADIUS, landH: LAND_H, keepClear: opKeep, fpGrid: world.rbGrid });   // rbGrid: footprint đã đánh D.dead (WP2) — proc: undefined → trees tự giải mã
+  // W2-B: hàng cây NON chống cọc trên quảng trường lát đá phía nam Nhà hát (pano_541/055/249 — trồng lại sau bão Yagi);
+  // hộp = claim 'road9_tay' (khối claims), chừa trục nhìn spawn → Nhà hát + vòng spawn
+  { const ux = 0.2989, uz = 0.9543, wx = -0.9543, wz = 0.2989, sp = [EXTRAS.square[0] - 5, EXTRAS.square[1] + 23];
+    veg.plantPlazaYoung({ ROADS_DT, groundHeightNoDeck, isWater, addCollider, colliders, R: BUILD_RADIUS, landH: LAND_H, fpGrid: world.rbGrid,
+      box: { cx: 41 + ux * 43.5 + wx * 47.5, cz: 59 + uz * 43.5 + wz * 47.5, ux, uz, hu: 51.5, hw: 47.5 },
+      keepClear: (x, z) => opKeep(x, z) || (x - sp[0]) ** 2 + (z - sp[1]) ** 2 < 20 * 20 }); }
 
   // ---------- CÂY ĐA/SI CỔ THỤ (pano-loop V2: 5 finding "thân bạnh, rễ phụ rủ, tán rất rộng") ----------
   function banyanTree(x, z) {
