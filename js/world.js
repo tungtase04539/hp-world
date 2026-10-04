@@ -17616,7 +17616,10 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
         geos.push(pg);
       });
       if (geos.length) {
-        const m = new THREE.Mesh(mergeGeometries(geos), new THREE.MeshLambertMaterial({ map: tex, side: THREE.DoubleSide }));
+        // W2-F: hộp đèn biển SÁNG về đêm (emissiveMap = chính texture; daynight đặt emissiveIntensity = đêm × LIGHT.signGlow)
+        const sm = new THREE.MeshLambertMaterial({ map: tex, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: 0, side: THREE.DoubleSide });
+        (world.signMats || (world.signMats = [])).push(sm);
+        const m = new THREE.Mesh(mergeGeometries(geos), sm);
         geos.forEach((gg) => gg.dispose());
         m.name = 'real_shop_signs_' + a; scene.add(m);
       }

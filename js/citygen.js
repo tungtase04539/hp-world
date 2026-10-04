@@ -352,7 +352,10 @@ ${gl1 ? GL1_GROUND_MAIN : GL2_GROUND_MAIN}
     vec3 sc = (sW2 * t2.rgb * signCol * 1.15 + tW2 * textCol + kW2 * t2.rgb) / max(sW2 + tW2 + kW2, 1e-3);
     float ss = sW + tW;
     tx.rgb = mix(tx.rgb, sc, ss); sW = 0.0; tW = 0.0; kW += ss;
-    fabGlow += sc * 0.45 * ss;
+    // ĐÊM: biển tự sáng nhưng TRẦN độ chói (W2-F): nền trắng/vàng nhạt × 0,45 từng loá qua bloom, chữ không đọc được;
+    // nay độ chói phát sáng ≤ 0,45 × 0,24 — nền đậm (đỏ/xanh/lục, chói < 0,24) giữ nguyên, nền sáng giảm tới ~4×.
+    float sLum = dot(sc, vec3(0.2126, 0.7152, 0.0722));
+    fabGlow += sc * (0.45 * ss) * min(1.0, 0.24 / max(sLum, 1e-3));
   }
   float sum = max(wW + gW + kW + sW + tW, 1e-3);
   vec3 col = (wW * tx.rgb * tint * 1.25 + (gW + kW) * tx.rgb + sW * tx.rgb * signCol * 1.15 + tW * textCol) / sum;
@@ -361,7 +364,9 @@ ${gl1 ? GL1_GROUND_MAIN : GL2_GROUND_MAIN}
   // ánh đèn nhân với chính texture (rèm/nội thất/hàng hoá vẫn đọc được, không thành ô trắng loá)
   float lit = step(litP, h21(vec2(seed * 31.7 + cellKey, 4.1)));
   vec3 warm = vec3(1.0, 0.76, 0.46);
-  fabGlow += (gW / sum) * lit * warm * (0.18 + tx.rgb * 1.1) + isG * (kW / sum) * lit * (tx.rgb * 0.9 + warm * 0.06);
+  // nhà ở VN: ~nửa số phòng sáng đèn tuýp/LED TRẮNG LẠNH, nửa đèn vàng ấm (W2-F; trước: mọi cửa sổ cùng màu cam)
+  vec3 roomC = h21(vec2(seed * 13.3 + cellKey, 7.7)) < 0.5 ? vec3(0.80, 0.88, 1.0) : warm;
+  fabGlow += (gW / sum) * lit * roomC * (0.18 + tx.rgb * 1.1) + isG * (kW / sum) * lit * (tx.rgb * 0.9 + warm * 0.06);
 }`))
       .replace('#include <color_fragment>', '')
       .replace('#include <emissivemap_fragment>', 'totalEmissiveRadiance = fabGlow * emissive.r;\n#ifdef HP_UNLIT_K\ntotalEmissiveRadiance *= HP_UNLIT_K;\n#endif')

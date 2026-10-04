@@ -75,6 +75,13 @@ export const LIGHT = {
   // Thiếu nó hẻm nhỏ lúc 21:00 đen kịt (sRGB ≈ 15-20, đo pano_141 đêm) — phố HP thật về đêm sáng đèn, mắt vẫn đọc
   // được mặt tiền. Thang: Lambert three r160 = albedo/π × chiếu sáng, đêm phơi sáng ×4 → tường albedo 0,3 ≈ sRGB 40.
   cityAmb: [0.090, 0.072, 0.050],
+  // W2-F: vũng sáng quanh đèn DỰNG TAY (buildLampPools; đỉnh opacity cộng sáng — cùng thang props_lamp_pools 0,2) và
+  // độ tự sáng ban đêm của biển chữ thật neo mặt tiền (nền màu + chữ trắng: 0,35 đọc rõ, không loá bloom như nền trắng).
+  poolOpacity: 0.2, signGlow: 0.35,
+  // chia ánh đèn phố dội (cityAmb) giữa mặt NGỬA (trời: lòng đường/vỉa hè/mái) và mặt ÚP (đất). Bản WP5: 0,5 / 1,0 →
+  // tường (pháp tuyến ngang = trung bình) 0,75 nhưng lòng đường chỉ 0,5 → đo 21:00 lòng đường sRGB ≈ 36-37, "phố đen".
+  // W2-F: 0,7 / 0,8 → tường GIỮ 0,75 (mặt tiền không sáng thêm), mặt đường +40% (đọc được lòng đường giữa 2 vũng đèn).
+  cityAmbUp: 0.7, cityAmbDown: 0.8,
   cloud: 0.40,
 };
 
@@ -158,6 +165,70 @@ const SKY_FS = /* glsl */`
   }`;
 
 function smooth(a, b, x) { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); }
+
+// ---- VŨNG SÁNG ĐÈN cho các đèn DỰNG TAY trong world.js (đèn hồ Tam Bạc/ven hồ, đèn ô phố cells…) — Đợt 3 wave 2 (W2-F) ----
+// Đèn của js/props.js (cobra/đèn cột/đèn gang 3 bóng) đã có vũng riêng ('props_lamp_pools'); đèn dựng tay chỉ có quả cầu
+// sharedMats.lampGlow tự sáng nên ban đêm mặt đường quanh chúng đen kịt (đo 21:00: lòng đường pano_007 sRGB ≈ 37 dù đèn
+// sáng ngay cạnh). Quét MỘT lần sau freezeStatic: mọi đỉnh của mesh dùng lampGlow (đã gộp ô — toạ độ thế giới) → gom ô
+// 1,5 m liền kề = 1 đầu đèn (cầu/chao) → vũng cộng sáng (cùng kiểu props: quad nằm trên mặt lát, falloff dạng cos³,
+// MeshBasic additive có sương) bán kính theo độ cao đèn. 1 InstancedMesh, ~100-150 quad, hiện khi đêm.
+function buildLampPools(scene, world) {
+  const LG = world.sharedMats && world.sharedMats.lampGlow;
+  if (!LG || typeof document === 'undefined') return null;
+  const gh = world.groundHeight || (() => 2);
+  const surf = world.roadNet && world.roadNet.surfaceAt ? world.roadNet.surfaceAt : () => 0.012;
+  const C = 1.5, cells = new Map(), key = (i, j) => (i + 8192) * 16384 + (j + 8192);
+  const v = new THREE.Vector3();
+  scene.traverse((o) => {
+    if (!o.isMesh || o.isInstancedMesh || o.material !== LG) return;
+    const p = o.geometry && o.geometry.attributes.position;
+    if (!p || !p.array) return;
+    o.updateMatrixWorld(true);
+    for (let i = 0; i < p.count; i++) {
+      v.fromBufferAttribute(p, i).applyMatrix4(o.matrixWorld);
+      const k = key(Math.floor(v.x / C), Math.floor(v.z / C));
+      let c = cells.get(k); if (!c) cells.set(k, (c = { i: Math.floor(v.x / C), j: Math.floor(v.z / C), x: 0, z: 0, n: 0, y: -1e9, g: -1 }));
+      c.x += v.x; c.z += v.z; c.n++; if (v.y > c.y) c.y = v.y;
+    }
+  });
+  // gom ô liền kề (8 hướng) thành đầu đèn
+  const heads = [];
+  for (const c of cells.values()) {
+    if (c.g >= 0) continue;
+    const h = { x: 0, z: 0, n: 0, y: -1e9 }, st = [c]; c.g = heads.length;
+    while (st.length) {
+      const q = st.pop(); h.x += q.x; h.z += q.z; h.n += q.n; if (q.y > h.y) h.y = q.y;
+      for (let di = -1; di <= 1; di++) for (let dj = -1; dj <= 1; dj++) {
+        const r = cells.get(key(q.i + di, q.j + dj)); if (r && r.g < 0) { r.g = c.g; st.push(r); }
+      }
+    }
+    heads.push(h);
+  }
+  const list = [];
+  for (const h of heads) {
+    const x = h.x / h.n, z = h.z / h.n, g = gh(x, z), hh = h.y - g;
+    if (hh < 2.2 || hh > 16 || g < 0.5) continue;             // đèn treo thấp/cột cờ/vật trên nước — bỏ
+    list.push({ x, z, y: g + Math.max(0.012, surf(x, z)) + 0.035, s: Math.max(8, Math.min(15, hh * 2.6)) });
+  }
+  if (!list.length) return null;
+  const cv = document.createElement('canvas'); cv.width = cv.height = 64;
+  const g2 = cv.getContext('2d'); const gr = g2.createRadialGradient(32, 32, 0, 32, 32, 32);
+  for (let i = 0; i <= 10; i++) { const t = i / 10; const a = Math.pow(1 + (t / 0.55) ** 2, -1.5) * (1 - t * t * t * t); gr.addColorStop(t, `rgba(255,255,255,${a.toFixed(3)})`); }
+  g2.fillStyle = gr; g2.fillRect(0, 0, 64, 64);
+  const tex = new THREE.CanvasTexture(cv);
+  const mat = new THREE.MeshBasicMaterial({ map: tex, color: 0xffcf96, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: true });
+  const geo = new THREE.PlaneGeometry(1, 1); geo.rotateX(-Math.PI / 2);
+  const mesh = new THREE.InstancedMesh(geo, mat, list.length);
+  const m4 = new THREE.Matrix4();
+  list.forEach((p, i) => mesh.setMatrixAt(i, m4.makeScale(p.s, 1, p.s).setPosition(p.x, p.y, p.z)));
+  mesh.instanceMatrix.needsUpdate = true;
+  mesh.computeBoundingSphere();
+  mesh.name = 'night_lamp_pools';
+  mesh.castShadow = false; mesh.receiveShadow = false; mesh.renderOrder = 3; mesh.visible = false;
+  mesh.matrixAutoUpdate = false; mesh.userData.noCull = true; mesh.raycast = () => {};
+  scene.add(mesh);
+  return { mesh, mat, n: list.length };
+}
 
 export function createDayNight(scene, world) {
   // ---- đèn (bộ cố định) ----
@@ -289,10 +360,11 @@ export function createDayNight(scene, world) {
     const ls = lum(Esky);
     for (let c = 0; c < 3; c++) Esky[c] = (ls + L_.hemiSat * (Esky[c] - ls)) * L_.hemiScale;
     const MA = L_.moonAmb, GA = L_.groundAlbedo, CA = L_.cityAmb;
-    hemi.color.setRGB(Esky[0] + MA[0] * mA + CA[0] * 0.5 * night, Esky[1] + MA[1] * mA + CA[1] * 0.5 * night, Esky[2] + MA[2] * mA + CA[2] * 0.5 * night);
+    const cU = L_.cityAmbUp * night, cD = L_.cityAmbDown * night;
+    hemi.color.setRGB(Esky[0] + MA[0] * mA + CA[0] * cU, Esky[1] + MA[1] * mA + CA[1] * cU, Esky[2] + MA[2] * mA + CA[2] * cU);
     const sh = Math.max(sA[1], 0);
     _ground.setRGB(GA[0] * (E[0] * sh + Esky[0]), GA[1] * (E[1] * sh + Esky[1]), GA[2] * (E[2] * sh + Esky[2]));
-    hemi.groundColor.setRGB(_ground.r + MA[0] * 0.5 * mA + CA[0] * night, _ground.g + MA[1] * 0.5 * mA + CA[1] * night, _ground.b + MA[2] * 0.5 * mA + CA[2] * night);
+    hemi.groundColor.setRGB(_ground.r + MA[0] * 0.5 * mA + CA[0] * cD, _ground.g + MA[1] * 0.5 * mA + CA[1] * cD, _ground.b + MA[2] * 0.5 * mA + CA[2] * cD);
     hemi.intensity = 1;
     // phơi sáng: thích nghi theo độ rọi ngang (trưa = 1), trần ×maxGain
     const adapt = lum(Esky) + lum(E) * sh + lum(MA) * mA;
@@ -360,6 +432,8 @@ export function createDayNight(scene, world) {
   applySky();
   updateFog(0);
   bakeEnv();
+  const lampPools = buildLampPools(scene, world);   // vũng sáng đèn dựng tay (W2-F) — 1 lần, sau freezeStatic
+  if (lampPools) console.info('[daynight] vũng sáng đèn dựng tay:', lampPools.n);
 
   return {
     sun, hemi, skyDome,
@@ -432,6 +506,9 @@ export function createDayNight(scene, world) {
       if (world.facadeMats) {
         for (const m of world.facadeMats) m.emissiveIntensity = glow * 0.95;
       }
+      // biển hiệu chữ thật neo mặt tiền (world.js real_shop_signs_*): hộp đèn sáng vừa phải về đêm (W2-F)
+      if (world.signMats) for (const m of world.signMats) m.emissiveIntensity = glow * LIGHT.signGlow;
+      if (lampPools) { lampPools.mesh.visible = glow > 0.03; lampPools.mat.opacity = Math.min(1, glow) * LIGHT.poolOpacity; }
       if (world.lighthouseLamp) {
         world.lighthouseLamp.emissiveIntensity = 0.2 + glow * (1.2 + Math.sin(now * 0.004) * 0.8);
       }
