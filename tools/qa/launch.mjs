@@ -2,6 +2,7 @@
 // (diag/tour/perf/mobile). Cùng quy ước với tools/qa/shoot.mjs: server tĩnh `python -m http.server <port>` ở gốc
 // repo/worktree, playwright-core nạp từ PW_PATH (mặc định: bản cài ở scratchpad phiên 04e77d80 — đổi nếu bị dọn).
 // Dùng: const g = await openGame({ port, quality, viewport, mobile, pin }); … await g.close();   (pin: khoá autoQuality, mặc định bật)
+// openGame tự giữ KHOÁ GPU toàn máy tới g.close() — LUÔN gọi g.close() (kể cả khi lỗi) để nhả khoá sớm.
 //   g.pg (Page) · g.errors (lỗi JS) · g.hpReadyMs (window.__hp có) · g.startReadyMs (nút Bắt đầu mở, js/boot.js)
 import os from 'os';
 import path from 'path';
@@ -17,6 +18,10 @@ export const defaultOut = (name) => path.join(os.tmpdir(), 'hp-qa', name);
 export async function openGame({ port = 8177, host = '127.0.0.1', quality = 'full', viewport = { width: 1280, height: 720 },
   mobile = false, start = true, extra = '', pin = true } = {}) {
   const { chromium } = await import(PW);
+  // KHOÁ GPU TOÀN MÁY (tools/qa/gpulock.mjs — SPEC Đợt 3 §2.0: nhiều Chrome GPU song song từng làm máy BSOD 0x133).
+  // Giữ tới g.close() (hoặc tới khi tiến trình thoát). Chạy dưới `gpulock.mjs run --` thì tái nhập, không chờ.
+  const { acquireGpu } = await import('./gpulock.mjs');
+  const releaseGpu = await acquireGpu(`launch :${port} ${quality || ''}${mobile ? ' mobile' : ''}`);
   const br = await chromium.launch({
     executablePath: CHROME, headless: true,
     args: ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist', '--enable-unsafe-swiftshader=false',
@@ -59,7 +64,7 @@ export async function openGame({ port = 8177, host = '127.0.0.1', quality = 'ful
         }
       }).catch(() => {});
     },
-    close: () => br.close(),
+    close: async () => { try { await br.close(); } finally { releaseGpu(); } },
   };
 }
 

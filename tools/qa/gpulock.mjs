@@ -14,6 +14,9 @@ const LOCK = path.join(os.tmpdir(), 'hpworld_gpu.lock');
 const STALE_MS = 20 * 60 * 1000;     // khoá bỏ quên (tiến trình chết) quá 20 phút thì cướp
 
 export async function acquireGpu(who = 'unknown', timeoutMs = 60 * 60 * 1000) {
+  // TÁI NHẬP: tiến trình con của `gpulock.mjs run -- …` đã được cha giữ khoá (HPWORLD_GPU_LOCK=1) — xin lại sẽ tự
+  // chờ chính mình tới khi khoá "cũ" 20 phút rồi cướp. Trả hàm nhả rỗng.
+  if (process.env.HPWORLD_GPU_LOCK === '1') return () => {};
   const t0 = Date.now();
   for (;;) {
     try {
@@ -39,7 +42,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(new URL(im
   if (process.argv[2] !== 'run' || i < 0) { console.error('usage: node tools/qa/gpulock.mjs run -- <cmd> [args]'); process.exit(2); }
   const [cmd, ...args] = process.argv.slice(i + 1);
   const rel = await acquireGpu(`cli ${cmd} ${args.join(' ').slice(0, 80)}`);
-  const r = spawnSync(cmd, args, { stdio: 'inherit', shell: process.platform === 'win32' });
+  const r = spawnSync(cmd, args, { stdio: 'inherit', shell: process.platform === 'win32', env: { ...process.env, HPWORLD_GPU_LOCK: '1' } });
   rel();
   process.exit(r.status ?? 1);
 }
