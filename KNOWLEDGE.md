@@ -491,6 +491,12 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     1/5, 1/4 — ma trận UV riêng từng texture r160), không còn mọi cửa cùng sáng. Cây (-287,200) trong Triển lãm = w3Tree khối pano_036
     (chạy trước địa danh) → chặn tại chỗ bằng LM_POLY.trienlam. `tools/qa/launch.mjs`: pageerror chờ thêm 20 s rồi "ABORT: …" (không
     còn báo nhầm TIMEOUT 300 s). `tools/qa/lmprobe.mjs` thêm `street {gRoad,gSide,mRoad,mSide,hRoad,hSide,inv,invRoad,invSide}`.
+    Số cuối (lmprobe `fix/final`): IoU nhà hát 0,725 (GLB + khối sau), nhà thờ 0,84, ga 0,915, bưu điện 0,568, bảo tàng 0,724, NHNN
+    0,735, đình HK 0,524, đền Tam Kỳ 0,951, chợ Sắt 0,963; va chạm không thấy 0 m² mọi khoá; khối thủ tục trên vỉa hè 0 m²; 0 cây/biển/
+    xe/NPC trong khối; `__hp.diag()` []; diag.mjs "TẤT CẢ THỰC THỂ OK — 0 lỗi JS"; LITE chỉ 4× 404 assets_lite (môi trường). PERF A/B
+    cùng phiên (dot3 ea5f57f cổng riêng, traffic off, 24 view std, 1 mẫu/view): draw call std1 −18..+33, std2 −62..+24; tam giác
+    ±0,3 M (1 mẫu cam_high_lake −0,7 M); fps 60 (vsync) cả hai; hpReady 3,9-4,5 s ↔ 4,2-4,6 s; startReady 5,5-6,9 ↔ 5,7-6,8 s; bước
+    boot 'landmarks' 246-289 ↔ 239-286 ms (nhiễu) — trung tính.
     **Chưa làm/đề xuất:** bưu điện thật là nhà chữ L ôm góc (2 cánh dọc 2 phố) còn GLB là khối vuông + 1 cánh chéo → nhìn từ trên
     vẫn hở góc bắc/tây footprint; ga/UBND/THPT dùng texture canvas riêng (không qua shader atlas citygen); tháp 13 tầng
     `v6_ndc_tower13` cần DỜI sang bờ bắc Nguyễn Đức Cảnh (lane ô WP3/W2-A — W2-E chỉ gỡ khỏi sân trường); nhà hát rộng 40 m > footprint
