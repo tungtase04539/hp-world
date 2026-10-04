@@ -1351,7 +1351,9 @@ export function buildProps(ctx) {
     const e0 = S.ev[(S.n / 2) | 0];
     const mx = S.ax + S.ux * S.L / 2, mz = S.az + S.uz * S.L / 2;
     const lvl = e0 ? e0[3] : (Math.hypot(mx, mz) < 900 ? 1 : 0);
-    let fill = S.c === 'r' ? [0.0, 0.1, 0.3][lvl] : [0.1, 0.42, 0.78][lvl];
+    // mức 0 CÓ pano (ảnh không thấy ô tô đỗ): 0,1 từng cho 68% pano "không ô tô" vẫn có xe ≤ 30 m (đo khớp bằng
+    // chứng) → 0,04; mức 0 do KHÔNG có pano (ngoại vi > 900 m) giữ 0,1
+    let fill = S.c === 'r' ? [0.0, 0.1, 0.3][lvl] : [e0 ? 0.04 : 0.1, 0.42, 0.78][lvl];
     if (S.c === 'p') fill *= 0.7;
     if (fill <= 0) continue;
     const roll = S.c === 'r';
@@ -1368,9 +1370,9 @@ export function buildProps(ctx) {
       const sc = s + len / 2;
       if (sc > S.L - len / 2 - 1) break;
       const x = S.ax + S.ux * sc + S.nx * lat, z = S.az + S.uz * sc + S.nz * lat;
-      // camera pano nằm giữa lòng đường: ô tô đỗ ≤ 7,5 m (van/tải 9 m) che gần nửa khung hình mà ảnh thật ở đó trống
-      // (đo: van 2,1 m ngay trước pano_102) → giữ trống quanh 551 điểm chụp; còn lại vẫn đỗ theo bằng chứng
-      let ok = x * x + z * z < R_MAX * R_MAX && flat(x, z) && !panoNear(x, z, mi >= 4 ? 9 : 7.5) && !avoid(x, z) && !clearAt(x, z) && lakeSD(x, z) > 18;
+      // camera pano nằm giữa lòng đường: ô tô đỗ ≤ 6 m (van/tải 8 m) che gần nửa khung hình mà ảnh thật ở đó trống
+      // (đo: van 2,1 m ngay trước pano_102) → giữ trống quanh 551 điểm chụp (7,5/9 m từng bớt 16% ô tô — quá tay)
+      let ok = x * x + z * z < R_MAX * R_MAX && flat(x, z) && !panoNear(x, z, mi >= 4 ? 8 : 6) && !avoid(x, z) && !clearAt(x, z) && lakeSD(x, z) > 18;
       if (ok) for (const dd of [-len / 2 - 0.5, 0, len / 2 + 0.5]) { if (roadIdx.blocked(x + S.ux * dd, z + S.uz * dd, S.ri, S.si, 4.5, false)) { ok = false; break; } }
       if (ok && obst.hit(x, z, 0.9)) ok = false;
       // phố r: 2 bánh trên vỉa → không đè hàng xe máy / quán / xe đẩy đã đặt trên các ô vỉa hè dọc thân xe
@@ -1655,6 +1657,6 @@ export function buildProps(ctx) {
   });
   console.log('[props]', JSON.stringify(stats));
   // móc gỡ lỗi/QA (không dùng trong game): window.__hpProps.sides / .cull()
-  if (typeof window !== 'undefined') window.__hpProps = { stats, sides, cull: () => CULL.map((t) => [t.mesh.name, t.mesh.count, t.n]), bikeRows, lists: { stoolI, cartI, aframeI, walkI, standI, sitI, cars: carI.flat(), bikes: bikeI.flat(), cobraI, ornI, poleI, trafoI, binI } };
+  if (typeof window !== 'undefined') window.__hpProps = { stats, sides, cull: () => CULL.map((t) => [t.mesh.name, t.mesh.count, t.n]), bikeRows, lists: { stoolI, cartI, aframeI, walkI, standI, sitI, cars: carI.flat(), bikes: bikeI.flat(), cobraI, ornI, poleI, poleLampI, trafoI, binI } };
   return { stats, update, meshes, cableMeshes, cullStats: () => CULL.map((t) => [t.mesh.name, t.mesh.count, t.n]) };
 }
