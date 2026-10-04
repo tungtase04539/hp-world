@@ -8,7 +8,7 @@
 //    hoặc từ BẢNG MÀU BĂM theo hạt giống instance (da, tóc, mũ bảo hiểm, quần, khẩu trang, giày, túi, hàng chở) —
 //    vì vậy MỘT draw call vẫn ra hàng trăm người/xe khác màu.
 //  - CỔNG (gate): +k = chỉ hiện khi bit (k−1) của aOpt bật, −k = chỉ hiện khi bit đó TẮT; đỉnh bị tắt thu về 0
-//    (tam giác suy biến). aOpt = bit tuỳ chọn (0..11) + 4096 × hạt giống (0..255) — hạt giống CỐ ĐỊNH theo tác tử
+//    (tam giác suy biến). aOpt = bit tuỳ chọn (0..12) + 8192 × hạt giống (0..255) — hạt giống CỐ ĐỊNH theo tác tử
 //    (không băm theo vị trí: xe chạy thì vị trí đổi → màu nhấp nháy).
 //  - CHI (limb): 1/2 đùi T/P, 3/4 cẳng chân, 5/6 cánh tay, 7/8 cẳng tay, 9 thân trên, 10 đầu-cổ, 0 hông/khác.
 //    Vertex shader xoay chi quanh khớp (hông/gối/vai/khuỷu) theo pha bước → đi bộ có gập gối, tay đánh ngược chân;
@@ -17,7 +17,7 @@
 //    vai→khuỷu→tay nắm ghi-đông) khi dựng — chi là ống elip nối khớp, nên dáng ngồi khớp từng loại xe.
 // Tỉ lệ người: cao 1,70 m (instance scale 0,9-1,06), đầu 0,227 m = 1/7,5 chiều cao (KHÔNG chibi), vai 0,37-0,40 m.
 import * as THREE from 'three';
-import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 // ---------------------------------------------------------------------------------------------------------------------
 // 0. KÊNH MÀU, BIT TUỲ CHỌN, BẢNG MÀU
@@ -34,8 +34,10 @@ export const OPT = {
   NONLA: 0, CAP: 1, BAG: 4, SIT: 7,                       // người đi bộ
   TAXI: 0, RACK: 1,                                       // ô tô
   MASK_A: 2, HAIR_A: 3, SLEEVE_A: 5, SHORTS_A: 6, MASK_B: 8, HAIR_B: 9, SLEEVE_B: 10, SHORTS_B: 11,
+  PARKED: 12,
 };
-export const optWord = (bits, seed) => { let v = 0; for (const b of bits) v += 1 << b; return v + 4096 * (seed & 255); };
+// bit 12 = PARKED (xe đỗ: đèn KHÔNG sáng đêm) → xe chạy & xe đỗ dùng CHUNG 1 vật liệu/1 chương trình shader
+export const optWord = (bits, seed) => { let v = 0; for (const b of new Set(bits)) v += 1 << b; return v + 8192 * (seed & 255); };
 
 const P = (a) => a.map((h) => new THREE.Color(h));
 // bảng màu (sRGB hex → tuyến tính qua THREE.Color) — theo ảnh pano HP tháng 10
@@ -64,9 +66,11 @@ const _c = new THREE.Color();
 const v3 = (a) => new THREE.Vector3(a[0], a[1], a[2]);
 // gắn thuộc tính kit cho 1 mảnh: c = hex (sRGB) | [r,g,b] tuyến tính; shade = hệ số nhân màu (tối viền, AO giả)
 function tag(geo, o = {}) {
-  let g = geo;
+  const g = geo;
   if (!g.attributes.normal) g.computeVertexNormals();
-  if (g.index) { const n = g.toNonIndexed(); g.dispose(); g = n; }
+  // giữ CHỈ SỐ (mảnh mượt đã chia sẻ đỉnh khi dựng; mảnh phẳng có đỉnh riêng mỗi mặt) → gộp thẳng, KHÔNG cần
+  // mergeVertices (đo node: 2-5 ms/mô hình × ~25 mô hình lúc khởi động)
+  if (!g.index) { const n = g.attributes.position.count, ix = new (n > 65535 ? Uint32Array : Uint16Array)(n); for (let i = 0; i < n; i++) ix[i] = i; g.setIndex(new THREE.BufferAttribute(ix, 1)); }
   for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal' && k !== 'color') g.deleteAttribute(k);
   g.clearGroups();
   const n = g.attributes.position.count;
@@ -86,16 +90,28 @@ function tag(geo, o = {}) {
 export class Kit {
   constructor() { this.parts = []; }
   add(geo, o) { this.parts.push(tag(geo, o)); return this; }
-  // gộp + đánh chỉ số lại (đỉnh trùng mọi thuộc tính gộp lại → ~2× ít lần chạy vertex shader)
+  // gộp các mảnh (đều có chỉ số) thành 1 hình
   build() {
-    const m = mergeGeometries(this.parts, false);
+    const g = mergeGeometries(this.parts, false);
     this.parts.forEach((p) => p.dispose()); this.parts = [];
-    const g = mergeVertices(m, 1e-4); if (g !== m) m.dispose();
     g.computeBoundingSphere(); g.computeBoundingBox();
     return g;
   }
 }
 export const triCount = (g) => (g.index ? g.index.count : g.attributes.position.count) / 3;
+// cache: mỗi mô hình dựng 1 lần; mỗi InstancedMesh cần geometry RIÊNG (attribute instance gắn vào geometry) →
+// trả bản NÔNG dùng chung index/position/normal/color/aKit (không nhân bộ nhớ đỉnh, không dựng lại ~5-20 ms/mô hình)
+const _geoCache = new Map();
+export function shared(key, make) {
+  let g = _geoCache.get(key);
+  if (!g) { g = make(); _geoCache.set(key, g); }
+  const c = new THREE.BufferGeometry();
+  c.setIndex(g.index);
+  for (const k in g.attributes) c.setAttribute(k, g.attributes[k]);
+  c.boundingSphere = g.boundingSphere; c.boundingBox = g.boundingBox;
+  c.userData = { ...g.userData };
+  return c;
+}
 
 const _u = new THREE.Vector3(), _v = new THREE.Vector3(), _d = new THREE.Vector3(), _r = new THREE.Vector3();
 function frameOf(dir, ref) {
@@ -401,15 +417,26 @@ function disc(x, y, z, r1, sx, n, r0 = 0) {
   return g.translate(x, y, z);
 }
 function bikeWheel(K, z, R, w, { spokes = false, det = 2 } = {}) {
-  const n = det > 1 ? 14 : det > 0 ? 12 : 8, rr = R * 0.66;
+  const n = det > 0 ? 12 : 8, rr = R * 0.66;
   K.add(tyre(0, R, z, R, w, rr + 0.01, n), { c: BK.tyre, r: 0.85 });
   // vành: 2 mặt đĩa (đúc: bạc; nan: tối + nan mảnh) + ổ trục
   for (const s of [-1, 1]) {
     K.add(disc(s * w * 0.42, R, z, rr + 0.012, s, n), { c: spokes ? BK.dark : BK.alloy, r: 0.35, m: spokes ? 0 : 1, shade: spokes ? 1 : 0.8 });
     if (det > 0) K.add(disc(s * w * 0.5, R, z, 0.05, s, 6), { c: BK.alloy, r: 0.3, m: 1 });
   }
-  if (det > 1 && spokes) for (let k = 0; k < 6; k++) { const a = k * Math.PI / 3; K.add(beam([0, R + Math.cos(a) * 0.05, z + Math.sin(a) * 0.05], [0, R + Math.cos(a + 0.5) * (rr - 0.01), z + Math.sin(a + 0.5) * (rr - 0.01)], w * 0.9, 0.008), { c: BK.chrome, r: 0.3, m: 1 }); }
-  if (det > 1 && !spokes) for (let k = 0; k < 5; k++) { const a = k * Math.PI * 0.4; for (const s of [-1, 1]) K.add(beam([s * w * 0.43, R + Math.cos(a) * 0.05, z + Math.sin(a) * 0.05], [s * w * 0.43, R + Math.cos(a) * (rr - 0.01), z + Math.sin(a) * (rr - 0.01)], 0.004, 0.03), { c: 0x2a2b2e, r: 0.5 }); }
+  // nan: dải phẳng trên MẶT NGOÀI 2 bên (nan đúc: tối trên vành bạc; nan căm: bạc trên vành tối) — 2 tam giác/nan/bên
+  if (det > 1) {
+    const ns = spokes ? 8 : 5, hw = spokes ? 0.006 : 0.016;
+    for (let k = 0; k < ns; k++) {
+      const a = (k / ns) * Math.PI * 2, ca = Math.cos(a), sa = Math.sin(a), cb = -sa, sb = ca;
+      for (const s of [-1, 1]) {
+        const x = s * (w * 0.42 + 0.002), r0 = 0.05, r1 = rr - 0.01;
+        const P = (r, o) => [x, R + ca * r + cb * o, z + sa * r + sb * o];
+        K.add(s > 0 ? quad(P(r0, -hw), P(r1, -hw), P(r1, hw), P(r0, hw)) : quad(P(r0, -hw), P(r0, hw), P(r1, hw), P(r1, -hw)),
+          spokes ? { c: BK.chrome, r: 0.3, m: 1 } : { c: 0x2a2b2e, r: 0.5 });
+      }
+    }
+  }
 }
 // gương + ghi-đông + tay nắm (grip ở ±gx): cần gương mảnh chếch ra ngoài, mặt gương chữ nhật bo (hình bầu dục dẹt)
 function handlebar(K, hy, hz, gx, my, det) {
@@ -517,14 +544,14 @@ export function motorbikeGeometry(type = 'scooter', { rider = 'none', lo = false
 // LOD XA xe máy (+người lái): bóng dáng ~150 tam giác
 export function motorbikeFarGeometry({ rider = true } = {}) {
   const K = new Kit();
-  for (const z of [0.63, -0.6]) K.add(tube([{ p: [-0.05, 0, 0], rx: 0.28, rz: 0.28 }, { p: [0.05, 0, 0], rx: 0.28, rz: 0.28 }], 8, { ref: [0, 0, 1], fixed: true }).translate(0, 0.28, z), { c: BK.tyre, r: 0.9 });
+  for (const z of [0.63, -0.6]) for (const s of [-1, 1]) K.add(disc(s * 0.05, 0.28, z, 0.28, s, 7), { c: BK.tyre, r: 0.9 });
   K.add(slab([[0.85, 0.45], [0.6, 1.02], [0.45, 1.02], [0.35, 0.55], [-0.1, 0.42], [-0.95, 0.62], [-0.95, 0.78], [-0.2, 0.84], [0.1, 0.6], [0.4, 0.4]], 0.34, 0, 0), { ch: CH.PAINT, r: 0.4 });
   K.add(box(0.64, 0.04, 0.04, 0, 1.06, 0.42), { c: BK.black });
   if (!rider) { K.add(box(0.28, 0.08, 0.7, 0, 0.84, -0.45), { c: BK.seat, r: 0.6 }); const g = K.build(); g.userData.shadow = [0.42, 1.12, 0.5]; return g; }
   K.add(tube([{ p: [0, 0.86, -0.22], rx: 0.15, rz: 0.1 }, { p: [0, 1.15, -0.12], rx: 0.17, rz: 0.11 }, { p: [0, 1.38, -0.05], rx: 0.16, rz: 0.09 }], 6), { ch: CH.TOP, r: 0.9 });
-  K.add(ell([0, 1.53, 0.0], 0.11, 0.13, 0.12, 6, 4), { ch: CH.HELM, r: 0.4 });
+  K.add(ell([0, 1.53, 0.0], 0.11, 0.13, 0.12, 5, 3), { ch: CH.HELM, r: 0.4 });
   K.add(tube([{ p: [0, 0.88, -0.6], rx: 0.15, rz: 0.1 }, { p: [0, 1.15, -0.55], rx: 0.16, rz: 0.1 }, { p: [0, 1.36, -0.52], rx: 0.15, rz: 0.09 }], 6), { ch: CH.TOP2, gate: OPT.PILLION + 1, r: 0.9 });
-  K.add(ell([0, 1.5, -0.5], 0.11, 0.13, 0.12, 6, 4), { ch: CH.HELM2, gate: OPT.PILLION + 1, r: 0.4 });
+  K.add(ell([0, 1.5, -0.5], 0.11, 0.13, 0.12, 5, 3), { ch: CH.HELM2, gate: OPT.PILLION + 1, r: 0.4 });
   for (const s of [-1, 1]) {
     K.add(beam([s * 0.17, 1.33, -0.1], [s * 0.3, 1.06, 0.38], 0.07, 0.07), { ch: CH.TOP, r: 0.9 });
     K.add(beam([s * 0.12, 0.85, -0.15], [s * 0.15, 0.62, 0.25], 0.1, 0.11), { ch: CH.BOT, r: 0.9 });
@@ -561,17 +588,17 @@ const CARS = {
 function carSection(z, w, yb, yt, tum, rt, crown) {
   const rb = Math.min(0.07, (yt - yb) * 0.25), h = yt - yb;
   const half = [
-    [w - rb, yb], [w - rb * 0.3, yb + rb * 0.3], [w * 0.99, yb + rb], [w, yb + h * 0.42],
-    [w - tum * 0.45, yt - rt * 1.2], [w - tum - rt * 0.35, yt - rt * 0.3], [w - tum - rt, yt],
+    [w - rb, yb], [w * 0.99, yb + rb], [w, yb + h * 0.42],
+    [w - tum * 0.45, yt - rt * 1.2], [w - tum - rt, yt],
   ];
   const pts = [[0, yb, z]];
   for (const [x, y] of half) pts.push([x, y, z]);
   pts.push([0, yt + crown, z]);
   for (let k = half.length - 1; k >= 0; k--) pts.push([-half[k][0], half[k][1], z]);
-  return pts;   // 1 + 7 + 1 + 7 = 16
+  return pts;   // 1 + 5 + 1 + 5 = 12
 }
 // hệ số tối dần về gầm theo chỉ số điểm (AO giả: gầm/hốc bánh gần đen, hông sáng)
-const SEC_SHADE = [0.12, 0.2, 0.42, 0.85, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0.85, 0.42, 0.2];
+const SEC_SHADE = [0.12, 0.25, 0.8, 1, 1, 1, 1, 1, 1, 1, 0.8, 0.25];
 const lerpK = (keys, z) => {   // keys [[z,y]...] z giảm dần
   if (z >= keys[0][0]) return keys[0][1];
   for (let i = 0; i < keys.length - 1; i++) {
@@ -585,13 +612,13 @@ function carBody(K, T, { lo = false, topKeys, rtK = 0.08, tumK = 0.05 } = {}) {
   const zs = new Set();
   const add = (z) => zs.add(Math.round(z * 1000) / 1000);
   add(L / 2); add(L / 2 - 0.06); add(L / 2 - 0.18); add(L / 2 - 0.4); add(-L / 2); add(-L / 2 + 0.06); add(-L / 2 + 0.18); add(-L / 2 + 0.4);
-  const nA = lo ? 3 : 7;
+  const nA = lo ? 2 : 5;
   for (const zw of [zf, zr]) {
     add(zw + rA + 0.012); add(zw + rA - 0.002); add(zw - rA + 0.002); add(zw - rA - 0.012);
     for (let k = 1; k < nA; k++) add(zw + rA - (2 * rA * k) / nA);
   }
   const span = (zf - rA) - (zr + rA);
-  const nm = lo ? 2 : 4;
+  const nm = lo ? 1 : 3;
   for (let k = 1; k < nm; k++) add(zr + rA + (span * k) / nm);
   for (const z of T.extraZ || []) add(z);
   const list = [...zs].filter((z) => z <= L / 2 && z >= -L / 2).sort((a, b) => b - a);
@@ -659,8 +686,8 @@ function greenhouse(K, T, { lo = false } = {}) {
 }
 // lốp ô tô (hông + gai) + mâm hợp kim 5-7 nan (mặt NGOÀI) — trục X, tâm (x, R, z)
 function carWheel(K, x, z, R, wdt, sx, { lo = false } = {}) {
-  const n = lo ? 10 : 16, rr = R * 0.64;
-  K.add(tyre(x, R, z, R, wdt, rr, n, 0.045), { c: CK.tyre, r: 0.88 });
+  const n = lo ? 8 : 12, rr = R * 0.64;
+  K.add(lo ? tube([{ p: [-wdt / 2, 0, 0], rx: R, rz: R }, { p: [wdt / 2, 0, 0], rx: R, rz: R }], n, { capA: false, capB: false, ref: [0, 0, 1], fixed: true }).translate(x, R, z) : tyre(x, R, z, R, wdt, rr, 14, 0.045), { c: CK.tyre, r: 0.88 });
   // mâm hợp kim: vành ngoài bạc, 6 nan bạc trên nền hốc tối (lùi vào 5 cm), ổ trục — chỉ mặt NGOÀI (sx)
   const face = x + sx * (wdt / 2 - 0.025);
   if (!lo) {
@@ -781,22 +808,49 @@ function truckGeometry(T, lo) {
 // LOD XA ô tô: thân loft thô + nhà kính + 4 bánh — CHUNG cho mọi kiểu (instance scale theo kích thước kiểu)
 export function carFarGeometry() {
   const K = new Kit();
-  const T = { L: 4.4, W: 1.76, R: 0.31, zf: 1.32, zr: -1.28, clr: 0.18, nose: [0.36, 0.72], hood: 0.86, belt: 0.92, tail: [0.42, 0.96], deckZ: -1.8,
-    gh: { zA: 0.62, zAt: -0.12, zCt: -1.42, zC: -1.78, roof: 1.48, beltW: 0.8, roofW: 0.66, cPaint: false } };
-  const topKeys = [[2.2, 0.72], [1.8, 0.82], [0.62, 0.88], [0.3, 0.92], [-1.78, 0.95], [-2.2, 0.9]];
-  carBody(K, T, { lo: true, topKeys });
-  greenhouse(K, T, { lo: true });
-  for (const z of [T.zf, T.zr]) for (const s of [-1, 1]) K.add(tube([{ p: [-0.1, 0, 0], rx: 0.31, rz: 0.31 }, { p: [0.1, 0, 0], rx: 0.31, rz: 0.31 }], 8, { ref: [0, 0, 1] }).translate(s * 0.76, 0.31, z), { c: CK.tyre, r: 0.9 });
-  for (const s of [-1, 1]) { K.add(box(0.3, 0.1, 0.05, s * 0.58, 0.64, 2.17), { c: CK.lens, ch: CH.HEAD }); K.add(box(0.28, 0.12, 0.05, s * 0.66, 0.84, -2.17), { c: CK.red, ch: CH.TAIL }); }
+  const L = 4.4, hw = 0.88, R = 0.31;
+  // thân: 7 trạm × mặt cắt 8 điểm (mũi thấp, ca-pô, thân, cốp), đáy cao tại 2 trục bánh (gợi hốc bánh)
+  const st = [[2.2, 0.36, 0.7, 0.8], [1.9, 0.28, 0.84, 0.97], [1.32, 0.62, 0.88, 1], [0.6, 0.2, 0.92, 1], [-0.6, 0.2, 0.95, 1], [-1.28, 0.62, 0.96, 1], [-2.0, 0.3, 0.97, 0.97], [-2.2, 0.42, 0.92, 0.82]];
+  const sec = ([z, yb, yt, k]) => { const w = hw * k; return [[0, yb, z], [w - 0.06, yb, z], [w, yb + 0.08, z], [w, yt - 0.12, z], [w - 0.07, yt, z], [0, yt + 0.01, z], [-w + 0.07, yt, z], [-w, yt - 0.12, z], [-w, yb + 0.08, z], [-w + 0.06, yb, z]]; };
+  K.add(loft(st.map(sec), { shade: [0.15, 0.3, 0.8, 1, 1, 1, 1, 1, 0.8, 0.3] }), { ch: CH.PAINT, r: 0.35 });
+  // nhà kính: khối thang (kính) + nóc sơn
+  const gh = (z, y, w) => [[w, 0.92, z], [w * 0.82, y, z], [-w * 0.82, y, z], [-w, 0.92, z]];
+  K.add(loft([gh(0.62, 0.93, 0.8), gh(-0.12, 1.46, 0.8), gh(-1.42, 1.46, 0.8), gh(-1.78, 0.97, 0.8)], { c: CK.glass }), { c: CK.glass, r: 0.08 });
+  K.add(box(1.24, 0.03, 1.25, 0, 1.47, -0.77), { ch: CH.PAINT, r: 0.35 });
+  for (const z of [1.32, -1.28]) for (const sx of [-1, 1]) K.add(disc(sx * (hw - 0.02), R, z, R, sx, 8), { c: CK.tyre, r: 0.9 });
+  for (const s2 of [-1, 1]) { K.add(box(0.32, 0.1, 0.05, s2 * 0.55, 0.62, 2.19), { c: CK.lens, ch: CH.HEAD }); K.add(box(0.28, 0.12, 0.05, s2 * 0.6, 0.82, -2.19), { c: CK.red, ch: CH.TAIL }); }
   const g = K.build(); g.userData.shadow = [1.06, 2.38, 0.55]; return g;
 }
-// tỉ lệ instance của LOD xa theo kiểu (dài, cao, rộng so với mẫu 4,4 × 1,48 × 1,76)
+// RẤT XA (> ~260 m, xe vài px): hộp thân + hộp kính — ~30 tam giác
+export function carFar2Geometry() {
+  const K = new Kit();
+  K.add(box(1.74, 0.56, 4.36, 0, 0.6, 0), { ch: CH.PAINT, r: 0.4 });
+  K.add(box(1.5, 0.52, 2.2, 0, 1.13, -0.4), { c: CK.glass, r: 0.1 });
+  K.add(box(1.46, 0.03, 1.9, 0, 1.4, -0.45), { ch: CH.PAINT, r: 0.4 });
+  const g = K.build(); g.userData.shadow = [1.06, 2.38, 0.55]; return g;
+}
 export const CAR_FAR_SCALE = { sedan: [1.0, 1.0, 1.0], hatch: [0.85, 1.02, 0.95], suv: [1.05, 1.16, 1.05], mpv: [1.06, 1.18, 1.01], van: [1.23, 1.5, 1.12], truck: [1.12, 1.55, 0.99] };
 
 // ---------------------------------------------------------------------------------------------------------------------
 // 5. NGƯỜI ĐI BỘ instanced (1 mô hình + cổng: nón lá, mũ lưỡi trai, tóc dài, khẩu trang, túi, váy; dáng đi/đứng/ngồi
 //    do vertex shader) — chi gán id để xoay quanh khớp
 // ---------------------------------------------------------------------------------------------------------------------
+export function pedestrianFarGeometry() {
+  const K = new Kit();
+  const J = restJoints();
+  K.add(tube([{ p: [0, 0.8, 0], rx: 0.14, rz: 0.1 }, { p: [0, 1.0, 0], rx: 0.15, rz: 0.1 }], 5, { capA: true, capB: false }), { ch: CH.BOT, r: 0.9 });
+  K.add(tube([{ p: [0, 1.0, 0], rx: 0.15, rz: 0.1 }, { p: [0, 1.38, 0], rx: 0.18, rz: 0.1 }, { p: [0, 1.46, 0], rx: 0.07, rz: 0.06 }], 5, { capA: false, capB: true }), { ch: CH.TOP, limb: 9, r: 0.9 });
+  K.add(ell([0, SK.headY, SK.headZ], 0.08, 0.115, 0.098, 6, 4), { ch: CH.SKIN, limb: 10, r: 0.7 });
+  K.add(ell([0, SK.headY + 0.012, -0.01], 0.086, 0.118, 0.104, 6, 3, 0, Math.PI * 0.5), { ch: CH.HAIR, limb: 10, r: 0.7 });
+  K.add(ell([0, SK.headY - 0.1, -0.07], 0.07, 0.13, 0.04, 4, 3), { ch: CH.HAIR, gate: OPT.HAIR_A + 1, limb: 10, r: 0.7 });
+  K.add(tube([{ p: [0, SK.headY + 0.06, 0], rx: 0.235, rz: 0.235 }, { p: [0, SK.headY + 0.215, 0], rx: 0.005, rz: 0.005 }], 8, { capA: true, capB: false, ref: [1, 0, 0], fixed: true }), { c: 0xd8c48c, gate: OPT.NONLA + 1, limb: 10, r: 0.85 });
+  K.add(ell([0, SK.headY + 0.035, 0.0], 0.092, 0.1, 0.106, 6, 2, 0, Math.PI * 0.5), { ch: CH.BAG, gate: OPT.CAP + 1, limb: 10, r: 0.85 });
+  for (const [sd, sx, lt, la] of [['L', 1, 1, 5], ['R', -1, 2, 6]]) {
+    K.add(tube([{ p: J['hip' + sd], rx: 0.075, rz: 0.08 }, { p: J['kn' + sd], rx: 0.055, rz: 0.06 }, { p: [sx * SK.anX, 0.03, 0.02], rx: 0.045, rz: 0.07 }], 4, { capA: false }), { ch: CH.LOWLEG, limb: lt, r: 0.9 });
+    K.add(tube([{ p: J['sh' + sd], rx: 0.048, rz: 0.048 }, { p: J['el' + sd], rx: 0.038, rz: 0.038 }, { p: [sx * SK.wrX, SK.wrY - 0.08, SK.wrZ], rx: 0.03, rz: 0.03 }], 4, { capA: false }), { ch: CH.FOREARM, limb: la, r: 0.9 });
+  }
+  const g = K.build(); g.userData.shadow = [0.3, 0.26, 0.42]; return g;
+}
 export function pedestrianGeometry({ lo = false } = {}) {
   const K = new Kit();
   person(K, restJoints(), { who: 'A', lo, limbs: true, nonla: OPT.NONLA + 1, cap: OPT.CAP + 1, hair: OPT.HAIR_A + 1, mask: OPT.MASK_A + 1, bag: OPT.BAG + 1 });
@@ -847,7 +901,7 @@ ${Object.entries(PAL).map(([k, a]) => `uniform vec3 uKit_${k}[${a.length}];`).jo
 varying vec2 vKitRM;
 varying float vKitLamp;
 float kitBit(float b) { return mod(floor(aOpt / exp2(b)) + 0.5, 2.0) > 1.0 ? 1.0 : 0.0; }
-float kitH(float k) { float s = floor(aOpt / 4096.0); return fract(sin(s * 12.9898 + k * 78.233 + 0.5) * 43758.5453); }
+float kitH(float k) { float s = floor(aOpt / 8192.0); return fract(sin(s * 12.9898 + k * 78.233 + 0.5) * 43758.5453); }
 #define KIT_PICK(arr, n, k) arr[int(min(kitH(k) * float(n), float(n) - 0.5))]
 float kitGate() {
   float g = aKit.y;
@@ -934,7 +988,7 @@ const GL_COLOR = /* glsl */`
 #ifdef USE_COLOR
   vColor.xyz = color * t;
 #endif
-  vKitLamp = (ch > 4.5 && ch < 6.5) ? ch - 4.0 : (ch > 15.5 && ch < 16.5) ? 3.0 : (ch > 22.5 && ch < 23.5) ? 4.0 : 0.0;
+  vKitLamp = kitBit(${OPT.PARKED}.0) > 0.5 ? 0.0 : (ch > 4.5 && ch < 6.5) ? ch - 4.0 : (ch > 15.5 && ch < 16.5) ? 3.0 : (ch > 22.5 && ch < 23.5) ? 4.0 : 0.0;
   float m = step(1.5, aKit.w);
   vKitRM = vec2(aKit.w - 2.0 * m, m);
 }
@@ -983,17 +1037,15 @@ function patchVS(vs, depth) {
 const GL_FRAG_HEAD = 'uniform float uNight;\nvarying vec2 vKitRM;\nvarying float vKitLamp;\n';
 // đèn: 1 pha (trắng ấm), 2 hậu (đỏ), 3 hộp đèn taxi (vàng ấm), 4 xi-nhan (hổ phách, tắt)
 const GL_LAMP = /* glsl */`
-#ifndef KIT_NOLAMP
   if (vKitLamp > 0.5) {
     vec3 le = vKitLamp < 1.5 ? vec3(2.6, 2.4, 2.0) : vKitLamp < 2.5 ? vec3(1.6, 0.05, 0.03) : vKitLamp < 3.5 ? vec3(1.7, 1.5, 0.7) : vec3(0.0);
     totalEmissiveRadiance += le * uNight;
   }
-#endif
 `;
 const _mats = new Map();
-// opts: { walk: 'none'|'cpu'|'path', shirts: bool, std: bool, lamps (đèn xe sáng đêm — xe ĐỖ: false), name }
-export function kitMaterial({ walk = 'none', shirts = false, std = true, lamps = true, name = 'kit' } = {}) {
-  const key = [walk, shirts, std, lamps, name].join('|');
+// opts: { walk: 'none'|'cpu'|'path', shirts: bool, std: bool, name } — cùng tham số → CÙNG vật liệu (cache)
+export function kitMaterial({ walk = 'none', shirts = false, std = true, name = 'kit' } = {}) {
+  const key = [walk, shirts, std, name].join('|');
   if (_mats.has(key)) return _mats.get(key);
   const m = std ? new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8, metalness: 0, envMapIntensity: 0.85 })
     : new THREE.MeshLambertMaterial({ vertexColors: true });
@@ -1002,7 +1054,6 @@ export function kitMaterial({ walk = 'none', shirts = false, std = true, lamps =
   if (shirts) m.defines.KIT_SHIRTS = '';
   if (walk === 'cpu') m.defines.KIT_WALK_CPU = '';
   if (walk === 'path') m.defines.KIT_WALK_PATH = '';
-  if (!lamps) m.defines.KIT_NOLAMP = '';
   m.onBeforeCompile = (sh) => {
     sh.uniforms.uKitTime = KIT_U.uKitTime; sh.uniforms.uNight = KIT_U.uNight;
     Object.assign(sh.uniforms, PALU);
@@ -1048,59 +1099,58 @@ export function kitShadowMaterial() {
 // 7. NHÂN VẬT CHƠI / NPC: người kit → SkinnedMesh (1 draw call/người, xương = khớp SK). Màu NƯỚNG theo scheme.
 // ---------------------------------------------------------------------------------------------------------------------
 // limb id → xương: 0 hông, 1/2 đùi, 3/4 cẳng chân, 5/6 cánh tay, 7/8 cẳng tay, 9 thân, 10 đầu
-export function humanoidGeometry(scheme) {
+const _humCache = new Map();
+function humanoidBase(hat, longHair, backpack) {
+  const key = hat + '|' + !!longHair + '|' + !!backpack;
+  if (_humCache.has(key)) return _humCache.get(key);
   const K = new Kit();
-  const s = scheme;
-  person(K, restJoints(), { who: 'A', limbs: true, nonla: s.hat === 'nonla' ? 1 : 0, cap: s.hat === 'cap' ? 2 : 0, hair: s.longHair ? 3 : 0, bag: 0 });
-  if (s.backpack) {
-    K.add(tube([{ p: [0, 1.04, -0.15], rx: 0.15, rz: 0.08 }, { p: [0, 1.22, -0.17], rx: 0.16, rz: 0.09 }, { p: [0, 1.38, -0.15], rx: 0.14, rz: 0.07 }], 8, { ref: [0, 0, 1] }), { c: s.backpack, limb: 9, r: 0.7 });
+  person(K, restJoints(), { who: 'A', limbs: true, nonla: hat === 'nonla' ? 1 : 0, cap: hat === 'cap' ? 2 : 0, hair: longHair ? 3 : 0, bag: 0 });
+  if (backpack) {
+    K.add(tube([{ p: [0, 1.04, -0.15], rx: 0.15, rz: 0.08 }, { p: [0, 1.22, -0.17], rx: 0.16, rz: 0.09 }, { p: [0, 1.38, -0.15], rx: 0.14, rz: 0.07 }], 8, { ref: [0, 0, 1] }), { ch: CH.CARGO, limb: 9, r: 0.7 });
     for (const sx of [1, -1]) K.add(beam([sx * 0.12, 1.4, -0.06], [sx * 0.13, 1.12, 0.1], 0.03, 0.012), { c: 0x2a2a2e, limb: 9, r: 0.7 });
   }
-  // nướng kênh → màu theo scheme (không instance); cổng: 1 nón lá, 2 mũ lưỡi trai, 3 tóc dài — đã chọn ở trên
-  const g0 = mergeGeometries(K.parts, false); K.parts.forEach((p) => p.dispose());
-  const pos = g0.attributes.position, kit = g0.attributes.aKit, col = g0.attributes.color;
-  const C = new THREE.Color();
+  // gắn chỉ số xương theo chi (0 hông, 1/2 đùi, 3/4 cẳng, 5/6 cánh tay, 7/8 cẳng tay, 9 thân, 10 đầu → thứ tự xương character.js)
+  const BONE = [0, 7, 8, 9, 10, 3, 4, 5, 6, 1, 2];
+  for (const g of K.parts) {
+    const kit = g.attributes.aKit, n = kit.count, si = new Uint16Array(n * 4), sw = new Float32Array(n * 4);
+    for (let i = 0; i < n; i++) { si[i * 4] = BONE[Math.round(kit.getZ(i))] || 0; sw[i * 4] = 1; }
+    g.setAttribute('skinIndex', new THREE.BufferAttribute(si, 4));
+    g.setAttribute('skinWeight', new THREE.BufferAttribute(sw, 4));
+  }
+  const g = K.build();
+  _humCache.set(key, g);
+  return g;
+}
+export function humanoidGeometry(scheme) {
+  const s = scheme;
+  const base = humanoidBase(s.hat, s.longHair, s.backpack);
+  // nướng kênh → màu theo scheme (không instance): mỗi nhân vật 1 mảng màu riêng, còn lại dùng chung với bản gốc
   const pick = (ch) => {
     switch (ch) {
-      case CH.TOP: case CH.FOREARM: return ch === CH.FOREARM && !s.longSleeve ? s.skin : s.shirt;
+      case CH.TOP: return s.shirt;
+      case CH.FOREARM: return s.longSleeve ? s.shirt : s.skin;
       case CH.BOT: return s.shorts;
       case CH.LOWLEG: return s.shortsLong === false ? s.skin : s.shorts;
       case CH.SKIN: return s.skin;
       case CH.HAIR: return s.hair;
       case CH.SHOE: return s.shoe ?? 0x2a2420;
       case CH.BAG: return s.cap;
+      case CH.CARGO: return s.backpack;
       default: return null;
     }
   };
-  const keep = [];
-  for (let i = 0; i < pos.count; i += 3) {
-    let ok = true;
-    for (let j = 0; j < 3; j++) { const gt = kit.getY(i + j); if (gt > 0.5 && !((gt === 1 && s.hat === 'nonla') || (gt === 2 && s.hat === 'cap') || (gt === 3 && s.longHair))) ok = false; }
-    if (ok) keep.push(i);
+  const kit = base.attributes.aKit, col0 = base.attributes.color, n = kit.count, col = new Float32Array(n * 3);
+  const C = new THREE.Color();
+  for (let i = 0; i < n; i++) {
+    const hx = pick(Math.round(kit.getX(i)));
+    let r = col0.getX(i), g = col0.getY(i), b = col0.getZ(i);
+    if (hx != null) { C.setHex(hx); r *= C.r; g *= C.g; b *= C.b; }
+    col[i * 3] = r; col[i * 3 + 1] = g; col[i * 3 + 2] = b;
   }
-  const n = keep.length * 3;
-  const P2 = new Float32Array(n * 3), N2 = new Float32Array(n * 3), C2 = new Float32Array(n * 3), SI = new Uint16Array(n * 4), SW = new Float32Array(n * 4);
-  const BONE = [0, 7, 8, 9, 10, 3, 4, 5, 6, 1, 2];   // limb → chỉ số xương (xem character.js)
-  let o = 0;
-  for (const i0 of keep) for (let j = 0; j < 3; j++) {
-    const i = i0 + j;
-    P2.set([pos.getX(i), pos.getY(i), pos.getZ(i)], o * 3);
-    N2.set([g0.attributes.normal.getX(i), g0.attributes.normal.getY(i), g0.attributes.normal.getZ(i)], o * 3);
-    const hx = pick(kit.getX(i));
-    let r = col.getX(i), gg = col.getY(i), b = col.getZ(i);
-    if (hx != null) { C.setHex(hx); r *= C.r; gg *= C.g; b *= C.b; }
-    C2.set([r, gg, b], o * 3);
-    SI[o * 4] = BONE[Math.round(kit.getZ(i))] || 0; SW[o * 4] = 1;
-    o++;
-  }
-  g0.dispose();
-  let g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.BufferAttribute(P2, 3));
-  g.setAttribute('normal', new THREE.BufferAttribute(N2, 3));
-  g.setAttribute('color', new THREE.BufferAttribute(C2, 3));
-  g.setAttribute('skinIndex', new THREE.BufferAttribute(SI, 4));
-  g.setAttribute('skinWeight', new THREE.BufferAttribute(SW, 4));
-  g = mergeVertices(g, 1e-4);
-  g.computeBoundingSphere();
+  const g = new THREE.BufferGeometry();
+  g.setIndex(base.index);
+  for (const k of ['position', 'normal', 'skinIndex', 'skinWeight']) g.setAttribute(k, base.attributes[k]);
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  g.boundingSphere = base.boundingSphere;
   return g;
 }

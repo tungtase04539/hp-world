@@ -3,7 +3,7 @@ import { ROADS_DT } from './terrain.js';
 import { TIER } from './device.js';
 import { SIDEWALK_W, ROAD_TOP, SIDEWALK_TOP } from './xsection.js';
 import { buildRoadGraph, edgePoint } from './roadgraph.js';
-import { motorbikeGeometry, motorbikeFarGeometry, carGeometry, carFarGeometry, CAR_FAR_SCALE, pedestrianGeometry, kitMaterial, kitShadowMaterial,
+import { motorbikeGeometry, motorbikeFarGeometry, carGeometry, carFarGeometry, CAR_FAR_SCALE, pedestrianGeometry, kitMaterial, kitShadowMaterial, shared,
   contactShadowGeometry, KIT_U, OPT, optWord, BIKE_PAINT, CAR_PAINT, TAXI_PAINT, SHIRT, JACKET } from './models_kit.js';
 
 // ============================================================
@@ -53,9 +53,9 @@ const VMAX = {
 const BIKE_KINDS = [['scooter', 0.45], ['underbone', 0.4], ['bigscooter', 0.15]];
 const CAR_KINDS = [['sedan', 0.27], ['hatch', 0.2], ['suv', 0.19], ['mpv', 0.13], ['van', 0.12], ['truck', 0.09]];
 const WALK_KINDS = [['ped', 1]];
-// LOD: gần hơn NEAR_* m vẽ mô hình đủ (xe máy+người ≈ 1,1-1,5k tam giác, ô tô ≈ 2,3k); xa hơn: mô hình thu gọn
-// (xe máy+người ≈ 0,33k, ô tô ≈ 0,97k chung mọi kiểu — scale instance theo kích thước kiểu)
-const NEAR_BIKE = TIER >= 3 ? 70 : TIER === 2 ? 55 : 40, NEAR_CAR = TIER >= 3 ? 95 : TIER === 2 ? 75 : 55;
+// LOD: gần hơn NEAR_* m vẽ mô hình đủ (xe máy+người ≈ 1,1-1,5k tam giác, ô tô ≈ 1,9k); xa hơn: mô hình thu gọn
+// (xe máy+người ≈ 0,27k, ô tô ≈ 0,28k chung mọi kiểu — scale instance theo kích thước kiểu)
+const NEAR_BIKE = TIER >= 3 ? 50 : TIER === 2 ? 42 : 32, NEAR_CAR = TIER >= 3 ? 70 : TIER === 2 ? 58 : 45;
 
 // PRNG xác định (seed cố định → ảnh A/B so sánh được; KHÔNG Math.random)
 let _seed = 0x5eed1234;
@@ -74,7 +74,7 @@ export function createTraffic(scene, world, opts = {}) {
 
   // ---------- Mesh instanced ----------
   const STD = TIER >= 2;   // MeshStandard (sơn bóng + kính phản chiếu trời) từ TIER 2; LITE: Lambert
-  const vehMat = kitMaterial({ name: 'traffic', shirts: true, std: STD }), walkMat = kitMaterial({ name: 'traffic_walk', shirts: true, walk: 'cpu', std: STD });
+  const vehMat = kitMaterial({ name: 'veh', shirts: true, std: STD }), walkMat = kitMaterial({ name: 'traffic_walk', shirts: true, walk: 'cpu', std: STD });
   const groups = {};   // kind → {mesh, cap, list:[agents], sets, n (ô đang ghi khung này)}
   // DỮ LIỆU THEO INSTANCE: 1 bộ đệm XEN KẼ (stride 28: ma trận 16 | sơn 3 | áo A 3 | áo B 3 | pha 1 | nhịp bước 1
   // | aOpt 1 = bit phụ kiện + hạt giống màu) × 3 BẢN XOAY VÒNG mỗi khung. Lý do (đo 2026-10-04, Radeon 890M, ANGLE d3d11): ghi đè mỗi khung vào CHÍNH
@@ -113,12 +113,12 @@ export function createTraffic(scene, world, opts = {}) {
     g.geo.setAttribute('aShirt', s.sh); g.geo.setAttribute('aShirt2', s.sh2); g.geo.setAttribute('aOpt', s.opt);
     if (g.walk) { g.geo.setAttribute('aPhase', s.ph); g.geo.setAttribute('aWalk', s.wk); }
   }
-  for (const [k, w] of BIKE_KINDS) makeGroup('bike_' + k, motorbikeGeometry(k, { rider: 'ride' }), Math.ceil(CAP.bike * Math.min(1, w * 1.6)), vehMat, false);
-  for (const [k, w] of CAR_KINDS) makeGroup('car_' + k, carGeometry(k), Math.ceil(CAP.car * Math.min(1, w * 1.8)), vehMat, false);
-  makeGroup('walk_ped', pedestrianGeometry(), CAP.walk, walkMat, true);
+  for (const [k, w] of BIKE_KINDS) makeGroup('bike_' + k, shared('ride_' + k, () => motorbikeGeometry(k, { rider: 'ride' })), Math.ceil(CAP.bike * Math.min(1, w * 1.6)), vehMat, false);
+  for (const [k, w] of CAR_KINDS) makeGroup('car_' + k, shared('car_' + k, () => carGeometry(k)), Math.ceil(CAP.car * Math.min(1, w * 1.8)), vehMat, false);
+  makeGroup('walk_ped', shared('ped', pedestrianGeometry), CAP.walk, walkMat, true);
   // LOD xa: CHUNG cho mọi kiểu xe máy / ô tô (tác tử ghi vào nhóm gần HOẶC nhóm xa theo khoảng cách mỗi khung)
-  makeGroup('bike_far', motorbikeFarGeometry(), CAP.bike, vehMat, false);
-  makeGroup('car_far', carFarGeometry(), CAP.car, vehMat, false);
+  makeGroup('bike_far', shared('ride_far', motorbikeFarGeometry), CAP.bike, vehMat, false);
+  makeGroup('car_far', shared('car_far', carFarGeometry), CAP.car, vehMat, false);
   // BÓNG TIẾP ĐẤT mềm: MỘT InstancedMesh trong suốt cho mọi tác tử (trước: 8 mesh bóng, mỗi nhóm 1) — đĩa đơn vị,
   // ma trận instance mang sẵn scale (rx, 1, rz) theo kiểu + độ đậm aShA; bộ đệm xen kẽ riêng (stride 17) × 3 bản xoay vòng.
   const SH_STRIDE = 17, SH_CAP = CAP.bike + CAP.car + CAP.walk;

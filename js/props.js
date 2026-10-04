@@ -26,7 +26,7 @@ import { LITE } from './device.js';
 import { RB_B64 } from './buildings_real.js';
 import { decodeRB, makeFootprintGrid } from './buildings_data.js';
 import { claimAt } from './claims.js';
-import { motorbikeGeometry, motorbikeFarGeometry, carGeometry, carFarGeometry, CAR_FAR_SCALE, pedestrianGeometry, kitMaterial, KIT_U, OPT, optWord } from './models_kit.js';
+import { motorbikeGeometry, motorbikeFarGeometry, carGeometry, carFarGeometry, carFar2Geometry, CAR_FAR_SCALE, pedestrianGeometry, pedestrianFarGeometry, kitMaterial, shared, KIT_U, OPT, optWord } from './models_kit.js';
 
 // =====================================================================================================================
 // 0. TIỆN ÍCH: hash tất định theo toạ độ, màu
@@ -1268,11 +1268,12 @@ export function buildProps(ctx) {
   // XE MÁY / Ô TÔ / NGƯỜI = BỘ MÔ HÌNH CHUNG js/models_kit.js (W2-C — cùng nguồn với giao thông): MeshStandard (sơn
   // bóng, kính phản chiếu trời) từ TIER 2; xe ĐỖ không bật đèn ban đêm (lamps:false). Phụ kiện bật theo bit aOpt
   // (hash toạ độ: mũ treo gương, thùng sau, rổ xe cub, taxi, giá nóc, nón lá/mũ/tóc dài/khẩu trang/túi, ngồi).
-  // gần: xe máy ~1,2k tam giác (≤ 70 m — xe 1,1 m cao ở 70 m chỉ còn ~12 px); xa: bóng dáng ~0,1k
-  const NEAR_BIKE = LITE ? 50 : 70, FAR_BIKE = LITE ? 260 : 420;
-  const matVeh = kitMaterial({ name: 'props_veh', std: !LITE, lamps: false });
+  // gần: xe máy ~0,85-0,95k tam giác (≤ 50 m — xe 1,1 m cao ở 50 m còn ~16 px); xa: bóng dáng ~0,1k
+  const NEAR_BIKE = LITE ? 40 : 50, FAR_BIKE = LITE ? 260 : 420;
+  const matVeh = kitMaterial({ name: 'veh', shirts: true, std: !LITE });   // CHUNG với giao thông (bit PARKED tắt đèn)
   const kitOpt = (fn) => (m, list) => { const a = new Float32Array(list.length); list.forEach((it, i) => { a[i] = fn(it); }); m.geometry.setAttribute('aOpt', new THREE.InstancedBufferAttribute(a, 1)); };
   const seedOf = (it, k) => Math.floor(hash3(it.x, it.z, k) * 256);
+  const parkedFar = () => optWord([OPT.PARKED], 0);
   const matPole = propMaterial({ name: 'pole', gate: [0.55, 0.45] });
   const matClut = propMaterial({ name: 'clutter', palA: [0xd8322a, 0x2a62c4, 0x2f9a4c, 0xe8e2d4, 0xd8322a, 0xf0b52c, 0x2a62c4, 0xe8e2d4] });
   const matPed = kitMaterial({ name: 'props_ped', std: !LITE, walk: 'path' });
@@ -1285,34 +1286,36 @@ export function buildProps(ctx) {
   // xe máy: 3 kiểu kit (cub = xe số + rổ trước) — MỖI KIỂU 1 InstancedMesh (gộp biến thể bắt GPU xử lý mọi bộ đỉnh
   // cho mỗi xe: đo +0,27 M tam giác suy biến ở cam_spawn) + LOD xa chung. bikeI: 0 ga nhỏ · 1 xe số · 2 ga lớn · 3 cub
   const bikeKit = [['scooter', bikeI[0]], ['underbone', [...bikeI[1], ...bikeI[3].map((b) => ({ ...b, cub: 1 }))]], ['bigscooter', bikeI[2]]];
-  const bikeOpt = (it) => optWord([...(hash3(it.x, it.z, 94) < 0.38 ? [OPT.MIRRORHELM] : []), ...(it.top ? [OPT.TOPBOX] : []), ...(it.cub ? [OPT.BASKET] : [])], seedOf(it, 96));
+  const bikeOpt = (it) => optWord([OPT.PARKED, ...(hash3(it.x, it.z, 94) < 0.38 ? [OPT.MIRRORHELM] : []), ...(it.top ? [OPT.TOPBOX] : []), ...(it.cub ? [OPT.BASKET] : [])], seedOf(it, 96));
   for (const it of bikeI[2]) it.top = hash3(it.x, it.z, 95) < 0.4;
   const bikeTris = {};
   const allBikes = bikeI.flat();
   const bikeColor = (it) => it.col;
   for (const [nm, list] of bikeKit) {
-    const g = motorbikeGeometry(nm); bikeTris[nm] = triCount(g);
+    const g = shared('bike_' + nm, () => motorbikeGeometry(nm)); bikeTris[nm] = triCount(g);
     inst('props_bike_' + nm, g, matVeh, list, { rMax: NEAR_BIKE, keepBehind: 25, color: bikeColor, extra: kitOpt(bikeOpt) });
   }
-  inst('props_bikes_far', motorbikeFarGeometry({ rider: false }), matVeh, allBikes, { rMin: NEAR_BIKE, rMax: FAR_BIKE, cast: false, color: bikeColor, extra: kitOpt(() => 0) });
-  // ô tô: 6 kiểu kit gần (taxi = hatchback + hộp đèn; ~40% "SUV" là MPV 7 chỗ) + LOD xa CHUNG (scale theo kiểu)
-  // ≤ 90 m (trước 130 m với mô hình 0,5k): ô tô 1,5 m cao ở 90 m còn ~17 px — mô hình xa 1k tam giác đủ dáng
-  const NEAR_CAR = LITE ? 70 : 90, FAR_CAR = LITE ? 420 : 750;
+  inst('props_bikes_far', shared('bike_far_parked', () => motorbikeFarGeometry({ rider: false })), matVeh, allBikes, { rMin: NEAR_BIKE, rMax: FAR_BIKE, cast: false, color: bikeColor, extra: kitOpt(parkedFar) });
+  // ô tô: 6 kiểu kit gần (taxi = hatchback + hộp đèn; ~40% "SUV" là MPV 7 chỗ) + 2 LOD xa CHUNG (scale theo kiểu):
+  // ≤ 60 m đủ chi tiết (~1,9k tam giác) · 60-260 m thân loft thô (~0,28k, ô tô 1,5 m cao ở 60 m còn ~25 px) ·
+  // 260-750 m hộp (~30 tam giác, vài px)
+  const NEAR_CAR = LITE ? 50 : 60, MID_CAR = LITE ? 200 : 260, FAR_CAR = LITE ? 420 : 750;
   const carKit = {
     sedan: carI[0], suv: carI[1].filter((c) => hash3(c.x, c.z, 97) >= 0.4), mpv: carI[1].filter((c) => hash3(c.x, c.z, 97) < 0.4),
     hatch: [...carI[2], ...carI[3].map((c) => ({ ...c, taxi: 1 }))], truck: carI[4], van: carI[5],
   };
-  const carOpt = (it) => optWord([...(it.taxi ? [OPT.TAXI] : []), ...(hash3(it.x, it.z, 98) < 0.3 ? [OPT.RACK] : [])], seedOf(it, 99));
+  const carOpt = (it) => optWord([OPT.PARKED, ...(it.taxi ? [OPT.TAXI] : []), ...(hash3(it.x, it.z, 98) < 0.3 ? [OPT.RACK] : [])], seedOf(it, 99));
   const carTris = {};
   const farCars = [];
   for (const nm in carKit) {
-    const g = carGeometry(nm); carTris[nm] = triCount(g);
+    const g = shared('car_' + nm, () => carGeometry(nm)); carTris[nm] = triCount(g);
     inst('props_car_' + nm, g, matVeh, carKit[nm], { y: yRoad, rMax: NEAR_CAR, color: (it) => it.col, extra: kitOpt(carOpt) });
     const f = CAR_FAR_SCALE[nm];
     for (const c of carKit[nm]) farCars.push({ ...c, sc: [f[2], f[1], f[0]] });
   }
   const allCars = carI.flat();
-  inst('props_cars_far', carFarGeometry(), matVeh, farCars, { y: yRoad, rMin: NEAR_CAR, rMax: FAR_CAR, cast: false, color: (it) => it.col, extra: kitOpt(() => 0) });
+  inst('props_cars_mid', shared('car_far', carFarGeometry), matVeh, farCars, { y: yRoad, rMin: NEAR_CAR, rMax: MID_CAR, cast: false, color: (it) => it.col, extra: kitOpt(parkedFar) });
+  inst('props_cars_far', shared('car_far2', carFar2Geometry), matVeh, farCars, { y: yRoad, rMin: MID_CAR, rMax: FAR_CAR, cast: false, color: (it) => it.col, extra: kitOpt(parkedFar) });
   // CỘT & ĐÈN (gần: 6 biến thể / xa: 5 biến thể)
   const NEAR_POLE = LITE ? 140 : 200, FAR_POLE = LITE ? 600 : 1100;
   const poleTint = (it) => { if (it.col) return it.col; const v = 0.86 + hash3(it.x, it.z, 131) * 0.2; COL.setRGB(v, v, v * 0.98); return COL.getHex(); };
@@ -1388,8 +1391,9 @@ export function buildProps(ctx) {
   // NGƯỜI (kit, 1 draw call): đi qua-lại / đứng / NGỒI ghế nhựa — CÙNG một mô hình, dáng do vertex shader (bit SIT:
   // đùi gập 109°, cẳng thẳng đứng, hông hạ xuống mặt ghế); nón lá ~16%, tóc dài (nữ) ~45%, mũ, khẩu trang, túi, quần
   // đùi, áo dài tay theo hash; chiều cao 1,56-1,80 m (instance scale)
-  const NEAR_PED = LITE ? 140 : 240;
-  const pedGeo = pedestrianGeometry(), pedTris = triCount(pedGeo);
+  // gần ≤ 60 m: người đủ (~0,9k tam giác, gập gối, bóng đổ) · 60-240 m: người thu gọn (~0,2k, không đổ bóng)
+  const NEAR_PED = LITE ? 140 : 240, MID_PED = LITE ? 45 : 60;
+  const pedGeo = shared('ped', pedestrianGeometry), pedTris = triCount(pedGeo);
   const people = [
     ...walkI.map((p) => ({ ...p })),
     ...standI.map((p) => ({ ...p, walk: [0, 0, hash3(p.x, p.z, 151), 0] })),
@@ -1406,11 +1410,13 @@ export function buildProps(ctx) {
     if (h(159) < (it.fem ? 0.35 : 0.12)) b.push(OPT.SLEEVE_A);
     return optWord(b, seedOf(it, 160));
   };
-  inst('props_people', pedGeo, matPed, people, { rMax: NEAR_PED, keepBehind: 40, color: (it) => pick(SHIRT, hash3(it.x, it.z, 152)), extra: (m, list) => {
+  const pedExtra = (m, list) => {
     const a = new Float32Array(list.length * 4); list.forEach((it, i) => a.set(it.walk, i * 4));
     m.geometry.setAttribute('aPath', new THREE.InstancedBufferAttribute(a, 4));
     kitOpt(pedOpt)(m, list);
-  } });
+  };
+  inst('props_people', pedGeo, matPed, people, { rMax: MID_PED, keepBehind: 40, color: (it) => pick(SHIRT, hash3(it.x, it.z, 152)), extra: pedExtra });
+  inst('props_people_far', shared('ped_far', pedestrianFarGeometry), matPed, people, { rMin: MID_PED, rMax: NEAR_PED, keepBehind: 40, cast: false, color: (it) => pick(SHIRT, hash3(it.x, it.z, 152)), extra: pedExtra });
   // vũng sáng đèn đêm (cộng sáng, chỉ hiện khi đêm). Phản biện: quad đặt ở lòng +0,03 nằm DƯỚI vỉa hè (+0,18/+0,25)
   // và dưới vạch kẻ → vũng bị bó vỉa cắt thẳng, vạch tối giữa vũng; opacity 0,42 + lõi phẳng → "đĩa sơn" vàng sáng hơn
   // mặt tiền. Nay: quad ở yWalk+0,02 (trên MỌI mặt lát: lòng, vạch, vỉa dot3/WP6) → một vũng mềm phủ cả lòng + mép vỉa;
