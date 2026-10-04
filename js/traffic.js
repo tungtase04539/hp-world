@@ -3,7 +3,8 @@ import { ROADS_DT } from './terrain.js';
 import { TIER } from './device.js';
 import { SIDEWALK_W, ROAD_TOP, SIDEWALK_TOP } from './xsection.js';
 import { buildRoadGraph, edgePoint } from './roadgraph.js';
-import { motorbikeGeometry, carGeometry, walkerGeometry, trafficMaterial, trafficShadowMaterial, contactShadowGeometry, trafficUniforms } from './trafficmodels.js';
+import { motorbikeGeometry, motorbikeFarGeometry, carGeometry, carFarGeometry, CAR_FAR_SCALE, pedestrianGeometry, kitMaterial, kitShadowMaterial, shared,
+  contactShadowGeometry, KIT_U, OPT, optWord, BIKE_PAINT, CAR_PAINT, TAXI_PAINT, SHIRT, JACKET } from './models_kit.js';
 
 // ============================================================
 // THÀNH PHỐ SỐNG (Đợt 3 WP8) — xe máy, ô tô, người đi bộ trên đồ thị PHỐ THẬT (js/roadgraph.js).
@@ -21,9 +22,11 @@ import { motorbikeGeometry, carGeometry, walkerGeometry, trafficMaterial, traffi
 //    đường → xe dừng/bấm còi (đếm số còi cho audio.js);
 //  - người đi bộ trên vỉa hè 2 bên (xsection: mép bó vỉa + 55% bề rộng vỉa hè), KHÔNG đi vào footprint nhà thật
 //    (footprints.js): gặp nhà thì nép ra mép vỉa, vẫn kẹt thì quay đầu;
-//  - vẽ INSTANCED: 3 kiểu xe máy (1 người / chở 2 / chở hàng) + 3 kiểu ô tô (con / gầm cao / 16 chỗ) + 2 kiểu người
-//    (đầu trần / nón lá) = 8 draw call cho cả thành phố (không đổ bóng vào bản đồ bóng — elip bóng tiếp đất trong
-//    mô hình); tay chân vung bằng vertex shader; chân người đi bộ trên mặt vỉa hè SIDEWALK_TOP (xsection).
+//  - vẽ INSTANCED bằng BỘ MÔ HÌNH CHUNG js/models_kit.js (W2-C): 3 kiểu xe máy (ga nhỏ / xe số / ga lớn — người lái
+//    + người ngồi sau / hàng chở là PHỤ KIỆN bật theo bit instance) + 6 kiểu ô tô (con / hatchback / gầm cao / MPV /
+//    16 chỗ / tải nhỏ; taxi = hộp đèn bật theo bit) + 1 người đi bộ (nón lá / mũ / tóc dài / khẩu trang / túi theo bit),
+//    LOD XA (> 55-95 m) 1 xe máy + 1 ô tô thu gọn, 1 mesh BÓNG TIẾP ĐẤT chung = 13 draw call cho cả thành phố (không
+//    đổ bóng vào bản đồ bóng); dáng đi (gập gối, tay đánh) bằng vertex shader; chân trên SIDEWALK_TOP (xsection).
 // HỢP ĐỒNG: InstancedMesh ở đây mang userData.noCull (instcull.js KHÔNG được nén — ma trận đổi mỗi khung) và
 // boundingSphere = đĩa VẼ DRAW_R quanh người chơi (frustum cull đúng; harness tools/qa không ẩn nhầm).
 // ============================================================
@@ -46,14 +49,13 @@ const VMAX = {
   bike: { p: [8.5, 11], s: [8, 10.5], t: [6, 8.5], r: [4.5, 7] },
   car: { p: [9, 12], s: [8.5, 11], t: [7, 9], r: [4.5, 6] },
 };
-const BIKE_KINDS = [['single', 0.58], ['pillion', 0.3], ['cargo', 0.12]];
-const CAR_KINDS = [['sedan', 0.55], ['suv', 0.25], ['van', 0.2]];
-const WALK_KINDS = [['plain', 0.8], ['nonla', 0.2]];
-// màu (sRGB) — xe máy: đen/đỏ/trắng/xanh/bạc/nâu; ô tô: trắng/bạc/đen/đỏ/xanh; áo: trơn, sơ-mi, áo chống nắng
-const BIKE_PAINT = [0x1b1b1d, 0x1b1b1d, 0x9b1b1b, 0xd9d9d6, 0xd9d9d6, 0x1f3f7a, 0x8d9095, 0x5a3b2a, 0x2c6a3e, 0xc9a24a];
-const CAR_PAINT = [0xe9e9e6, 0xe9e9e6, 0xe9e9e6, 0xa6a9ad, 0xa6a9ad, 0x17181a, 0x17181a, 0x8a1a1a, 0x234a7a, 0x6b6e62];
-const SHIRT = [0xe9e6dc, 0x2b4f8a, 0x7a2b2b, 0x3d6b4a, 0xd2b48c, 0x8fa9c9, 0x222225, 0xe0c64a, 0xc27aa0, 0x5f6b78, 0xf0f0ec, 0x8a5a3a];
-const PANTS = [0x2a3140, 0x1e1f22, 0x3c4a63, 0x4a4036, 0x6b6f75, 0x23324d];
+// kiểu xe theo tỉ lệ pano HP (xe ga ≈ xe số, ô tô con/hatchback chiếm đa số, nhiều xe 16 chỗ/tải nhỏ trong phố)
+const BIKE_KINDS = [['scooter', 0.45], ['underbone', 0.4], ['bigscooter', 0.15]];
+const CAR_KINDS = [['sedan', 0.27], ['hatch', 0.2], ['suv', 0.19], ['mpv', 0.13], ['van', 0.12], ['truck', 0.09]];
+const WALK_KINDS = [['ped', 1]];
+// LOD: gần hơn NEAR_* m vẽ mô hình đủ (xe máy+người ≈ 1,1-1,5k tam giác, ô tô ≈ 1,9k); xa hơn: mô hình thu gọn
+// (xe máy+người ≈ 0,27k, ô tô ≈ 0,28k chung mọi kiểu — scale instance theo kích thước kiểu)
+const NEAR_BIKE = TIER >= 3 ? 50 : TIER === 2 ? 42 : 32, NEAR_CAR = TIER >= 3 ? 70 : TIER === 2 ? 58 : 45;
 
 // PRNG xác định (seed cố định → ảnh A/B so sánh được; KHÔNG Math.random)
 let _seed = 0x5eed1234;
@@ -139,10 +141,11 @@ export function createTraffic(scene, world, opts = {}) {
   }
 
   // ---------- Mesh instanced ----------
-  const vehMat = trafficMaterial(false), walkMat = trafficMaterial(true), shadowMat = trafficShadowMaterial();
-  const groups = {};   // kind → {mesh, cap, list:[agents], aShirt, aShirt2}
-  // DỮ LIỆU THEO INSTANCE: 1 bộ đệm XEN KẼ (stride 28: ma trận 16 | sơn 3 | áo 3 | áo sau/quần 3 | pha 1 | nhịp bước 1
-  // | đệm 1) × 3 BẢN XOAY VÒNG mỗi khung. Lý do (đo 2026-10-04, Radeon 890M, ANGLE d3d11): ghi đè mỗi khung vào CHÍNH
+  const STD = TIER >= 2;   // MeshStandard (sơn bóng + kính phản chiếu trời) từ TIER 2; LITE: Lambert
+  const vehMat = kitMaterial({ name: 'veh', shirts: true, std: STD }), walkMat = kitMaterial({ name: 'traffic_walk', shirts: true, walk: 'cpu', std: STD });
+  const groups = {};   // kind → {mesh, cap, list:[agents], sets, n (ô đang ghi khung này)}
+  // DỮ LIỆU THEO INSTANCE: 1 bộ đệm XEN KẼ (stride 28: ma trận 16 | sơn 3 | áo A 3 | áo B 3 | pha 1 | nhịp bước 1
+  // | aOpt 1 = bit phụ kiện + hạt giống màu) × 3 BẢN XOAY VÒNG mỗi khung. Lý do (đo 2026-10-04, Radeon 890M, ANGLE d3d11): ghi đè mỗi khung vào CHÍNH
   // bộ đệm GPU còn đang vẽ khung trước bắt trình điều khiển ĐỒNG BỘ CPU↔GPU → mất 5-9 fps khi bật giao thông, dù
   // update() chỉ tốn 0,5 ms và giao thông chỉ +0,15 M tam giác ("đóng băng" giao thông = như tắt). Ghi vào bản
   // khung N−2 thì GPU đã đọc xong → hết chờ (thử nghiệm: hồi lại 70-90% số fps mất). 1 lần tải/nhóm/khung thay vì 2-6.
@@ -155,7 +158,7 @@ export function createTraffic(scene, world, opts = {}) {
       const ib = new THREE.InstancedInterleavedBuffer(new Float32Array(cap * STRIDE), STRIDE, 1);
       ib.setUsage(THREE.DynamicDrawUsage);
       const at = (size, off) => new THREE.InterleavedBufferAttribute(ib, size, off);
-      sets.push({ ib, mat: at(16, 0), col: at(3, 16), sh: at(3, 19), sh2: at(3, 22), ph: at(1, 25), wk: at(1, 26) });
+      sets.push({ ib, mat: at(16, 0), col: at(3, 16), sh: at(3, 19), sh2: at(3, 22), ph: at(1, 25), wk: at(1, 26), opt: at(1, 27) });
     }
     mesh.count = 0;
     // KHÔNG đổ bóng vào bản đồ bóng: main.js chỉ làm mới bóng 4,5-10 Hz (mỗi lần +~20 ms trên 890M) → bóng thật của xe
@@ -168,27 +171,40 @@ export function createTraffic(scene, world, opts = {}) {
     // frustum cull theo ĐĨA VẼ (r160: InstancedMesh.boundingSphere tính 1 lần từ ma trận lúc đầu rồi cũ mãi)
     mesh.boundingSphere = new THREE.Sphere(new THREE.Vector3(), DRAW_R + 12);
     mesh.matrixAutoUpdate = false;    // gốc tĩnh ở (0,0,0); chỉ dữ liệu instance đổi
-    // BÓNG TIẾP ĐẤT mềm (trafficmodels.contactShadowGeometry): mesh trong suốt RIÊNG nhưng DÙNG CHUNG bộ đệm instance
-    // (cùng InterleavedBuffer → 1 lần tải GPU cho cả thân + bóng), cùng count/đĩa cull.
-    const smesh = new THREE.InstancedMesh(contactShadowGeometry(...geo.userData.shadow), shadowMat, cap);
-    smesh.name = 'traffic_' + key + '_shadow';
-    smesh.count = 0; smesh.castShadow = false; smesh.receiveShadow = false;
-    smesh.userData.noCull = true; smesh.raycast = () => {};
-    smesh.boundingSphere = mesh.boundingSphere; smesh.matrixAutoUpdate = false;
-    scene.add(smesh);
-    const g = { key, mesh, smesh, geo, cap, list: [], sets, k: 0, walk };
+    const g = { key, mesh, geo, cap, list: [], sets, k: 0, walk, n: 0, sh: geo.userData.shadow || [0.5, 1, 0.5] };
     bindSet(g, sets[0]);
     scene.add(mesh);
     groups[key] = g;
   }
   function bindSet(g, s) {
-    g.mesh.instanceMatrix = s.mat; g.mesh.instanceColor = s.col; g.smesh.instanceMatrix = s.mat;
-    g.geo.setAttribute('aShirt', s.sh); g.geo.setAttribute('aShirt2', s.sh2);
+    g.mesh.instanceMatrix = s.mat; g.mesh.instanceColor = s.col;
+    g.geo.setAttribute('aShirt', s.sh); g.geo.setAttribute('aShirt2', s.sh2); g.geo.setAttribute('aOpt', s.opt);
     if (g.walk) { g.geo.setAttribute('aPhase', s.ph); g.geo.setAttribute('aWalk', s.wk); }
   }
-  for (const [k, w] of BIKE_KINDS) makeGroup('bike_' + k, motorbikeGeometry(k), Math.ceil(CAP.bike * Math.min(1, w * 1.6)), vehMat, false);
-  for (const [k, w] of CAR_KINDS) makeGroup('car_' + k, carGeometry(k), Math.ceil(CAP.car * Math.min(1, w * 1.7)), vehMat, false);
-  for (const [k, w] of WALK_KINDS) makeGroup('walk_' + k, walkerGeometry(k), Math.ceil(CAP.walk * Math.min(1, w * 1.4)), walkMat, true);
+  for (const [k, w] of BIKE_KINDS) makeGroup('bike_' + k, shared('ride_' + k, () => motorbikeGeometry(k, { rider: 'ride' })), Math.ceil(CAP.bike * Math.min(1, w * 1.6)), vehMat, false);
+  for (const [k, w] of CAR_KINDS) makeGroup('car_' + k, shared('car_' + k, () => carGeometry(k)), Math.ceil(CAP.car * Math.min(1, w * 1.8)), vehMat, false);
+  makeGroup('walk_ped', shared('ped', pedestrianGeometry), CAP.walk, walkMat, true);
+  // LOD xa: CHUNG cho mọi kiểu xe máy / ô tô (tác tử ghi vào nhóm gần HOẶC nhóm xa theo khoảng cách mỗi khung)
+  makeGroup('bike_far', shared('ride_far', motorbikeFarGeometry), CAP.bike, vehMat, false);
+  makeGroup('car_far', shared('car_far', carFarGeometry), CAP.car, vehMat, false);
+  // BÓNG TIẾP ĐẤT mềm: MỘT InstancedMesh trong suốt cho mọi tác tử (trước: 8 mesh bóng, mỗi nhóm 1) — đĩa đơn vị,
+  // ma trận instance mang sẵn scale (rx, 1, rz) theo kiểu + độ đậm aShA; bộ đệm xen kẽ riêng (stride 17) × 3 bản xoay vòng.
+  const SH_STRIDE = 17, SH_CAP = CAP.bike + CAP.car + CAP.walk;
+  const shGeo = contactShadowGeometry(1, 1, 1);
+  const shSets = [];
+  for (let k = 0; k < NSET; k++) {
+    const ib = new THREE.InstancedInterleavedBuffer(new Float32Array(SH_CAP * SH_STRIDE), SH_STRIDE, 1);
+    ib.setUsage(THREE.DynamicDrawUsage);
+    shSets.push({ ib, mat: new THREE.InterleavedBufferAttribute(ib, 16, 0), a: new THREE.InterleavedBufferAttribute(ib, 1, 16) });
+  }
+  const shMesh = new THREE.InstancedMesh(shGeo, kitShadowMaterial(), SH_CAP);
+  shMesh.name = 'traffic_shadow'; shMesh.count = 0; shMesh.castShadow = false; shMesh.receiveShadow = false;
+  shMesh.userData.noCull = true; shMesh.raycast = () => {}; shMesh.matrixAutoUpdate = false;
+  shMesh.boundingSphere = new THREE.Sphere(new THREE.Vector3(), DRAW_R + 12);
+  let shK = 0;
+  const shBind = (s) => { shMesh.instanceMatrix = s.mat; shGeo.setAttribute('aShA', s.a); };
+  shBind(shSets[0]);
+  scene.add(shMesh);
 
   // ---------- Tác tử ----------
   const agents = [];   // {type:'bike'|'car'|'walk', grp, e, dir, s, lat, vmax, v, prev, next, ...}
@@ -359,11 +375,42 @@ export function createTraffic(scene, world, opts = {}) {
   function newAgent(type) {
     const grp = groupFor(type);
     if (grp.list.length >= grp.cap) return null;
-    const a = { type, grp, pk: 0 };   // pk: độ lệch ngang lách xe đỗ (place() cộng vào latCur)
-    a.paint = new THREE.Color(type === 'car' ? pick(CAR_PAINT) : pick(BIKE_PAINT));
-    a.shirt = new THREE.Color(pick(SHIRT));
-    a.shirt2 = new THREE.Color(type === 'walk' ? pick(PANTS) : pick(SHIRT));
-    if (type === 'walk') a.phase = rnd() * 6.28;
+    const a = { type, grp, kind: grp.key.slice(grp.key.indexOf('_') + 1), pk: 0 };   // pk: độ lệch ngang lách xe đỗ (W2-F, place() cộng vào latCur)
+    // phụ kiện + màu theo tỉ lệ pano HP: ~30% xe chở 2, ~10% chở hàng, khẩu trang ~35%, nữ (tóc dài) ~45% — nữ
+    // đi xe thường mặc áo chống nắng dài tay; người ngồi sau CHỈ có bit B khi có PILLION (cổng B không lồng nhau)
+    const bits = [];
+    const female = rnd() < 0.45, female2 = rnd() < 0.55;
+    let top = pick(SHIRT), top2 = pick(SHIRT);
+    if (type === 'bike') {
+      const r = rnd();
+      if (r < 0.3) bits.push(OPT.PILLION); else if (r < 0.4) bits.push(OPT.CARGO);
+      if (rnd() < 0.35) bits.push(OPT.MASK_A);
+      if (female) { bits.push(OPT.HAIR_A); if (rnd() < 0.65) { bits.push(OPT.SLEEVE_A); top = pick(JACKET); } } else if (rnd() < 0.15) bits.push(OPT.SHORTS_A);
+      else if (rnd() < 0.2) bits.push(OPT.SLEEVE_A);
+      if (r < 0.3) {
+        if (rnd() < 0.3) bits.push(OPT.MASK_B);
+        if (female2) { bits.push(OPT.HAIR_B); if (rnd() < 0.5) { bits.push(OPT.SLEEVE_B); top2 = pick(JACKET); } }
+      }
+      a.paint = new THREE.Color(pick(BIKE_PAINT));
+    } else if (type === 'car') {
+      const taxi = (a.kind === 'sedan' || a.kind === 'hatch') && rnd() < 0.28;
+      if (taxi) bits.push(OPT.TAXI);
+      if ((a.kind === 'suv' || a.kind === 'mpv') && rnd() < 0.3) bits.push(OPT.RACK);
+      a.paint = new THREE.Color(taxi ? pick(TAXI_PAINT) : pick(CAR_PAINT));
+    } else {
+      const r = rnd();
+      if (r < 0.12) bits.push(OPT.NONLA); else if (r < 0.24) bits.push(OPT.CAP);
+      if (female) bits.push(OPT.HAIR_A); else if (rnd() < 0.18) bits.push(OPT.SHORTS_A);
+      if (rnd() < 0.2) bits.push(OPT.MASK_A);
+      if (rnd() < 0.25) bits.push(OPT.BAG);
+      if (rnd() < (female ? 0.4 : 0.15)) bits.push(OPT.SLEEVE_A);
+      a.paint = new THREE.Color(top);
+      a.phase = rnd() * 6.28;
+      a.sc = female ? 0.92 + rnd() * 0.06 : 0.97 + rnd() * 0.07;   // cao 1,56-1,80 m
+    }
+    a.opt = optWord(bits, Math.floor(rnd() * 256));
+    a.shirt = new THREE.Color(top);
+    a.shirt2 = new THREE.Color(top2);
     grp.list.push(a);
     agents.push(a);
     return a;
@@ -588,36 +635,74 @@ export function createTraffic(scene, world, opts = {}) {
     a.x = _p.x; a.z = _p.z;
   }
 
-  const DRAW_R2 = DRAW_R * DRAW_R;
-  function writeInstances(px, pz) {
-    for (const k in groups) {
-      const g = groups[k], L = g.list;
-      g.k = (g.k + 1) % NSET;
-      const s = g.sets[g.k], arr = s.ib.array;
-      let n = 0;   // ô instance đang ghi (chỉ tác tử trong bán kính vẽ)
-      for (let j = 0; j < L.length; j++) {
-        const a = L[j];
-        if ((a.x - px) * (a.x - px) + (a.z - pz) * (a.z - pz) > DRAW_R2) continue;
-        if (!(Math.abs(a.x - a.yx) + Math.abs(a.z - a.yz) < 4)) { a.yx = a.x; a.yz = a.z; a.y = groundHeight(a.x, a.z) + (a.type === 'walk' ? SIDEWALK_TOP : ROAD_TOP); }
-        const ch = Math.cos(a.h), shh = Math.sin(a.h), cl = Math.cos(a.lean || 0), sl = Math.sin(a.lean || 0);
-        const o = n * STRIDE;
-        // R = Ry(h)·Rz(lean) (cột-trước như Matrix4.elements)
-        arr[o] = ch * cl; arr[o + 1] = sl; arr[o + 2] = -shh * cl; arr[o + 3] = 0;
-        arr[o + 4] = -ch * sl; arr[o + 5] = cl; arr[o + 6] = shh * sl; arr[o + 7] = 0;
-        arr[o + 8] = shh; arr[o + 9] = 0; arr[o + 10] = ch; arr[o + 11] = 0;
-        arr[o + 12] = a.x; arr[o + 13] = a.y; arr[o + 14] = a.z; arr[o + 15] = 1;
-        arr[o + 16] = a.paint.r; arr[o + 17] = a.paint.g; arr[o + 18] = a.paint.b;
-        arr[o + 19] = a.shirt.r; arr[o + 20] = a.shirt.g; arr[o + 21] = a.shirt.b;
-        arr[o + 22] = a.shirt2.r; arr[o + 23] = a.shirt2.g; arr[o + 24] = a.shirt2.b;
-        arr[o + 25] = a.phase || 0;
-        arr[o + 26] = a.type === 'walk' && a.v > 0.2 ? a.v * 3.9 : 0;   // nhịp bước ∝ tốc độ (bước ~0,8 m)
-        n++;
+  const DRAW_R2 = DRAW_R * DRAW_R, LOD_HYST = 5;
+  const gBikeFar = groups.bike_far, gCarFar = groups.car_far;
+  // Ghi instance: mỗi tác tử trong bán kính vẽ → nhóm GẦN của kiểu nó hoặc nhóm XA (LOD) theo khoảng cách; mỗi nhóm
+  // ghi vào bản đệm khung N−2 của nó (xem STRIDE/NSET) — 1 lần tải/nhóm/khung. Bóng tiếp đất: 1 bộ đệm chung.
+  // LOD gần/xa theo khoảng cách tới CAMERA (cx, cz), KHÔNG tới người chơi: camera LITE lùi tới CAM_MAX 36 m > NEAR_BIKE
+  // 32 m, camera đạo diễn __cine bay xa người chơi → bản XA (người que trên nêm) từng hiện cách ống kính 2-6 m (phản biện).
+  // Trễ LOD_HYST 5 m (xa → gần khi < ngưỡng − 5 m) — không nhấp nháy ở ngưỡng. Cắt DRAW_R + mô phỏng vẫn quanh người chơi.
+  // Người đi bộ: pha bước tích phân trên CPU (a.wph) + biên độ êm theo tốc độ (a.wamp) — trước: biên độ nhảy 0↔1 ở
+  // 0,2 m/s và pha = uKitTime·nhịp nhảy khi nhịp đổi.
+  function writeInstances(px, pz, cx, cz, dt) {
+    for (const k in groups) { const g = groups[k]; g.k = (g.k + 1) % NSET; g.n = 0; g.arr = g.sets[g.k].ib.array; }
+    shK = (shK + 1) % NSET;
+    const ss = shSets[shK], sa = ss.ib.array;
+    let ns = 0;
+    for (let j = 0; j < agents.length; j++) {
+      const a = agents[j];
+      const d2 = (a.x - px) * (a.x - px) + (a.z - pz) * (a.z - pz);
+      if (d2 > DRAW_R2) continue;
+      if (!(Math.abs(a.x - a.yx) + Math.abs(a.z - a.yz) < 4)) { a.yx = a.x; a.yz = a.z; a.y = groundHeight(a.x, a.z) + (a.type === 'walk' ? SIDEWALK_TOP : ROAD_TOP); }
+      let g = a.grp, sx = 1, sy = 1, sz = 1;
+      if (a.type !== 'walk') {
+        const lim = (a.type === 'bike' ? NEAR_BIKE : NEAR_CAR) - (a.far ? LOD_HYST : 0);
+        a.far = (a.x - cx) * (a.x - cx) + (a.z - cz) * (a.z - cz) > lim * lim;
       }
-      g.mesh.count = n; g.smesh.count = n;
-      if (!n) continue;
+      if (a.type === 'bike' && a.far) g = gBikeFar;
+      else if (a.type === 'car' && a.far) { g = gCarFar; const f = CAR_FAR_SCALE[a.kind]; sx = f[2]; sy = f[1]; sz = f[0]; }
+      else if (a.type === 'walk') {
+        sx = sy = sz = a.sc || 1;
+        a.wph = ((a.wph ?? a.phase ?? 0) + dt * (a.v > 0.05 ? a.v * 4.5 / sx : 0)) % 6.2832;   // nhịp bước (rad/s) ∝ tốc độ / chiều dài chân
+        const wt = Math.min(1, Math.max(0, (a.v - 0.05) / 0.55));
+        a.wamp = (a.wamp ?? wt) + (wt - (a.wamp ?? wt)) * Math.min(1, dt * 5);
+      }
+      const arr = g.arr, o = g.n * STRIDE;
+      const ch = Math.cos(a.h), shh = Math.sin(a.h), cl = Math.cos(a.lean || 0), sl = Math.sin(a.lean || 0);
+      // R = Ry(h)·Rz(lean)·S (cột-trước như Matrix4.elements)
+      arr[o] = ch * cl * sx; arr[o + 1] = sl * sx; arr[o + 2] = -shh * cl * sx; arr[o + 3] = 0;
+      arr[o + 4] = -ch * sl * sy; arr[o + 5] = cl * sy; arr[o + 6] = shh * sl * sy; arr[o + 7] = 0;
+      arr[o + 8] = shh * sz; arr[o + 9] = 0; arr[o + 10] = ch * sz; arr[o + 11] = 0;
+      arr[o + 12] = a.x; arr[o + 13] = a.y; arr[o + 14] = a.z; arr[o + 15] = 1;
+      arr[o + 16] = a.paint.r; arr[o + 17] = a.paint.g; arr[o + 18] = a.paint.b;
+      arr[o + 19] = a.shirt.r; arr[o + 20] = a.shirt.g; arr[o + 21] = a.shirt.b;
+      arr[o + 22] = a.shirt2.r; arr[o + 23] = a.shirt2.g; arr[o + 24] = a.shirt2.b;
+      arr[o + 25] = a.type === 'walk' ? a.wph : 0;    // pha bước (rad)
+      arr[o + 26] = a.type === 'walk' ? a.wamp : 0;   // biên độ bước 0..1
+      arr[o + 27] = a.opt || 0;
+      g.n++;
+      // bóng tiếp đất: elip (rx, rz) của mô hình gần, theo hướng xe (không nghiêng theo lean)
+      const shp = a.grp.sh, ks = a.type === 'walk' ? (a.sc || 1) : 1, rx = shp[0] * ks, rz = shp[1] * ks, q = ns * SH_STRIDE;   // elip của mô hình GẦN theo kiểu (đã đúng kích thước — không nhân scale LOD xa)
+      sa[q] = ch * rx; sa[q + 1] = 0; sa[q + 2] = -shh * rx; sa[q + 3] = 0;
+      sa[q + 4] = 0; sa[q + 5] = 1; sa[q + 6] = 0; sa[q + 7] = 0;
+      sa[q + 8] = shh * rz; sa[q + 9] = 0; sa[q + 10] = ch * rz; sa[q + 11] = 0;
+      sa[q + 12] = a.x; sa[q + 13] = a.y; sa[q + 14] = a.z; sa[q + 15] = 1;
+      sa[q + 16] = shp[2];
+      ns++;
+    }
+    for (const k in groups) {
+      const g = groups[k], s = g.sets[g.k];
+      g.mesh.count = g.n;
+      if (!g.n) continue;
       bindSet(g, s);
-      s.ib.clearUpdateRanges(); s.ib.addUpdateRange(0, n * STRIDE); s.ib.needsUpdate = true;
+      s.ib.clearUpdateRanges(); s.ib.addUpdateRange(0, g.n * STRIDE); s.ib.needsUpdate = true;
       g.mesh.boundingSphere.center.set(px, 2, pz);
+    }
+    shMesh.count = ns;
+    if (ns) {
+      shBind(ss);
+      ss.ib.clearUpdateRanges(); ss.ib.addUpdateRange(0, ns * SH_STRIDE); ss.ib.needsUpdate = true;
+      shMesh.boundingSphere.center.set(px, 2, pz);
     }
   }
 
@@ -626,17 +711,19 @@ export function createTraffic(scene, world, opts = {}) {
 
   let enabled = true, msEMA = 0;
   // đèn pha/đèn hậu sáng theo đêm (main.js truyền dayNight.update().night mỗi khung)
-  const setNight = (v) => { trafficUniforms.uNight.value = v; };
+  const setNight = (v) => { KIT_U.uNight.value = v; };
   function setEnabled(on) {
     enabled = !!on;
-    for (const k in groups) groups[k].mesh.visible = groups[k].smesh.visible = enabled;
+    for (const k in groups) groups[k].mesh.visible = enabled;
+    shMesh.visible = enabled;
   }
-  function update(dt, time, playerPos) {
+  // camPos (tuỳ chọn, main.js: camera.position): tâm chọn LOD gần/xa; thiếu → dùng người chơi
+  function update(dt, time, playerPos, camPos) {
     if (!enabled) return stats;
     frameNo++;
     const now = performance.now();
     const px = playerPos.x, pz = playerPos.z;
-    trafficUniforms.uTime.value = time;
+    KIT_U.uKitTime.value = time;
     if (now - bubAt > 1000 || Math.hypot(px - bubX, pz - bubZ) > 60) {
       // dịch chuyển xa (teleport) → rải lại toàn bộ trong bóng mới (từ 12 m — ảnh pano QA từng có ô tô đè lên camera)
       const jump = Math.hypot(px - bubX, pz - bubZ) > RB;
@@ -669,7 +756,7 @@ export function createTraffic(scene, world, opts = {}) {
       const st = Math.min(a.acc, 0.2); a.acc = 0;
       stepAgent(a, st, px, pz);
     }
-    writeInstances(px, pz);
+    writeInstances(px, pz, camPos ? camPos.x : px, camPos ? camPos.z : pz, dt);
     // thống kê cho âm thanh: mức xe gần (0..1) + số còi phát sinh
     let near = 0;
     let nb = 0, nc = 0, nw = 0;

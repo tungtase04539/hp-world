@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kit người xe — QA</title>
+<style>html,body{margin:0;height:100%;background:#b9cfe0;overflow:hidden}canvas{display:block}#info{position:fixed;left:8px;top:6px;font:12px monospace;color:#123;background:#fff8;padding:2px 6px;max-width:96vw}</style>
+<script type="importmap">{"imports":{"three":"../../lib/three.module.js","three/addons/":"../../lib/jsm/"}}</script>
+</head><body><div id="info"></div>
+<script type="module">
+// tools/qa/models.html — xem KIT người & xe (js/models_kit.js) + nhân vật chơi (character.js) tách khỏi game.
+// ?row=cars|bikes|riders|people|heroes|all &cx= &cz= &dist= &h= &yaw= (rad) &ly= (cao điểm nhìn) &fov= &night=1 &lo=1 (LOD xa)
+// &std=0 (Lambert) — window.__ready khi vẽ xong; window.__stats = số tam giác từng mô hình.
+import * as THREE from 'three';
+import * as KIT from '../../js/models_kit.js';
+import { makeHumanoid } from '../../js/character.js';
+const Q = new URLSearchParams(location.search);
+const W = innerWidth, H = innerHeight;
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(W, H); renderer.setPixelRatio(1);
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = Q.get('night') === '1' ? 1.6 : 1.0;
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+const night = Q.get('night') === '1' ? 1 : 0;
+const scene = new THREE.Scene(); scene.background = new THREE.Color(night ? 0x0c1220 : 0xb6cce0);
+// IBL: vòm gradient trời mù ẩm HP (gần trắng xanh) → nền xám ấm
+{
+  const sky = new THREE.Scene();
+  const g = new THREE.SphereGeometry(50, 32, 16);
+  const m = new THREE.ShaderMaterial({ side: THREE.BackSide, uniforms: { k: { value: night ? 0.08 : 1 } }, vertexShader: 'varying vec3 vP; void main(){ vP = position; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.); }',
+    fragmentShader: 'uniform float k; varying vec3 vP; void main(){ float y = normalize(vP).y; vec3 top = vec3(0.55,0.68,0.85), hor = vec3(0.86,0.9,0.94), gr = vec3(0.32,0.3,0.27); vec3 c = y > 0. ? mix(hor, top, pow(y, 0.6)) : mix(hor, gr, pow(-y, 0.4)); gl_FragColor = vec4(c*k*1.4, 1.); }' });
+  sky.add(new THREE.Mesh(g, m));
+  const pm = new THREE.PMREMGenerator(renderer);
+  scene.environment = pm.fromScene(sky, 0.02).texture;
+}
+scene.add(new THREE.HemisphereLight(0xbfd8f0, 0x8a8070, night ? 0.08 : 0.75));
+const sun = new THREE.DirectionalLight(0xfff0dc, night ? 0.05 : 2.6); sun.position.set(30, 60, 40); sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.shadow.camera, { left: -30, right: 30, top: 30, bottom: -30, near: 1, far: 200 }); sun.shadow.bias = -0.0003; sun.shadow.normalBias = 0.02;
+scene.add(sun); scene.add(sun.target);
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), new THREE.MeshLambertMaterial({ color: 0x8d8b86 }));
+ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
+KIT.KIT_U.uNight.value = night;
+const std = Q.get('std') !== '0', lo = Q.get('lo') === '1';
+const stats = {};
+const M4 = new THREE.Matrix4(), QT = new THREE.Quaternion(), E = new THREE.Euler(), V = new THREE.Vector3(), S = new THREE.Vector3(1, 1, 1);
+// items: [{x,z,h,opt,paint,shirt,shirt2,phase,walk,sc}]
+function place(geo, mat, items, name) {
+  const m = new THREE.InstancedMesh(geo, mat, items.length);
+  const n = items.length, opt = new Float32Array(n), sh = new Float32Array(n * 3), sh2 = new Float32Array(n * 3), ph = new Float32Array(n), wk = new Float32Array(n), path = new Float32Array(n * 4);
+  const C = new THREE.Color();
+  items.forEach((it, i) => {
+    E.set(0, it.h || 0, 0); QT.setFromEuler(E); V.set(it.x, 0, it.z); M4.compose(V, QT, it.sc ? new THREE.Vector3(...it.sc) : S); m.setMatrixAt(i, M4);
+    C.setHex(it.paint ?? 0xffffff); m.setColorAt(i, C);
+    C.setHex(it.shirt ?? 0xeeeeee); sh.set([C.r, C.g, C.b], i * 3);
+    C.setHex(it.shirt2 ?? 0x2b4f8a); sh2.set([C.r, C.g, C.b], i * 3);
+    opt[i] = it.opt || 0; ph[i] = it.phase || 0; wk[i] = it.walk || 0;
+  });
+  geo = geo.clone();
+  geo.setAttribute('aOpt', new THREE.InstancedBufferAttribute(opt, 1));
+  geo.setAttribute('aShirt', new THREE.InstancedBufferAttribute(sh, 3));
+  geo.setAttribute('aShirt2', new THREE.InstancedBufferAttribute(sh2, 3));
+  geo.setAttribute('aPhase', new THREE.InstancedBufferAttribute(ph, 1));
+  geo.setAttribute('aWalk', new THREE.InstancedBufferAttribute(wk, 1));
+  geo.setAttribute('aPath', new THREE.InstancedBufferAttribute(path, 4));
+  m.geometry = geo;
+  m.castShadow = true; m.receiveShadow = true; m.name = name;
+  if (mat.userData.depth) m.customDepthMaterial = mat.userData.depth;
+  m.frustumCulled = false;
+  scene.add(m);
+  stats[name] = KIT.triCount(geo);
+  return m;
+}
+const O = KIT.OPT, ow = KIT.optWord;
+const row = Q.get('row') || 'all';
+const only = Q.get('only');   // một mô hình ở gốc toạ độ: car:<kiểu> | bike:<kiểu> | ride:<kiểu> — &oh= hướng (rad) &opt=bit,bit
+if (only) {
+  const [k, t] = only.split(':'), oh = +(Q.get('oh') || 0);
+  const bits = (Q.get('opt') || '').split(',').filter(Boolean).map(Number);
+  const mat = k === 'ped' || k === 'pedfar' ? KIT.kitMaterial({ name: 'ped', std, shirts: true, walk: 'cpu' }) : KIT.kitMaterial({ name: 'veh', std, shirts: true });
+  const geo = k === 'car' ? (lo ? KIT.carFarGeometry() : KIT.carGeometry(t)) : k === 'bike' ? KIT.motorbikeGeometry(t, { rider: 'none', lo }) : k === 'ride' ? KIT.motorbikeGeometry(t, { rider: 'ride', lo }) : k === 'bikefar' ? KIT.motorbikeFarGeometry() : k === 'pedfar' ? KIT.pedestrianFarGeometry() : KIT.pedestrianGeometry();
+  place(geo, mat, [{ x: 0, z: 0, h: oh, paint: +(Q.get('paint') || 0xb4b7ba), shirt: 0xd96b2b, shirt2: 0x9cc7e6, opt: KIT.optWord(bits, +(Q.get('seed') || 5)), walk: +(Q.get('walk') || 0), phase: +(Q.get('ph') || 0) }], only);
+}
+const matV = KIT.kitMaterial({ name: 'veh', std, shirts: true });
+const matP = KIT.kitMaterial({ name: 'ped', std, shirts: true, walk: 'cpu' });
+if (!only && (row === 'cars' || row === 'all')) {
+  KIT.CAR_TYPES.forEach((t, i) => {
+    const g = lo ? KIT.carFarGeometry() : KIT.carGeometry(t);
+    const sc = lo ? KIT.CAR_FAR_SCALE[t] : null;
+    place(g, matV, [{ x: i * 3.2 - 8, z: 0, h: -0.5, paint: KIT.CAR_PAINT[(i * 5) % 12], opt: ow(i === 0 || i === 1 ? [] : [O.RACK], i), sc: sc && [sc[2], sc[1], sc[0]] }], 'car_' + t);
+  });
+  place(KIT.carGeometry('sedan'), matV, [{ x: -8, z: -7, h: 2.6, paint: KIT.TAXI_PAINT[0], opt: ow([O.TAXI], 3) }, { x: -3, z: -7, h: 2.6, paint: 0x16171a, opt: 0 }], 'taxi');
+  place(KIT.carGeometry('hatch'), matV, [{ x: 2, z: -7, h: 2.6, paint: KIT.TAXI_PAINT[2], opt: ow([O.TAXI], 4) }], 'taxi_h');
+}
+if (!only && (row === 'bikes' || row === 'all')) {
+  KIT.BIKE_TYPES.forEach((t, i) => {
+    place(KIT.motorbikeGeometry(t, { rider: 'none', lo }), matV, [0, 1, 2].map((k) => ({ x: i * 2.2 - 3 + k * 0.7, z: 4 + k * 0.1, h: -1.3 + k * 0.05, paint: KIT.BIKE_PAINT[(i * 3 + k) % 12], opt: ow(k === 1 ? [O.MIRRORHELM] : k === 2 ? [O.TOPBOX, O.BASKET] : [], k + i) })), 'bike_' + t);
+  });
+}
+if (!only && (row === 'riders' || row === 'all')) {
+  KIT.BIKE_TYPES.forEach((t, i) => {
+    place(KIT.motorbikeGeometry(t, { rider: 'ride', lo }), matV, [0, 1, 2].map((k) => ({ x: i * 2.4 - 3 + k * 0.8, z: 8 + k * 0.4, h: -0.9, paint: KIT.BIKE_PAINT[(i * 4 + k) % 12],
+      shirt: KIT.SHIRT[(i * 3 + k * 5) % 15], shirt2: KIT.JACKET[(i + k) % 7], opt: ow(k === 1 ? [O.PILLION, O.MASK_A, O.HAIR_B, O.SLEEVE_B] : k === 2 ? [O.CARGO, O.SLEEVE_A, O.HAIR_A, O.MASK_A] : [O.SHORTS_A], 7 * i + k * 3) })), 'ride_' + t);
+  });
+  place(KIT.motorbikeFarGeometry(), matV, [{ x: 5, z: 8, h: -0.9, paint: 0x9b1b1b, shirt: 0x2b4f8a, opt: ow([O.PILLION], 2) }], 'bike_far');
+}
+if (!only && (row === 'people' || row === 'all')) {
+  const g = KIT.pedestrianGeometry();
+  const items = [];
+  const opts = [[], [O.NONLA], [O.HAIR_A, O.BAG], [O.CAP, O.SHORTS_A], [O.HAIR_A, O.MASK_A, O.SLEEVE_A], [O.SIT], [O.NONLA, O.HAIR_A], [O.MASK_A], [O.SIT, O.HAIR_A]];
+  opts.forEach((o, k) => items.push({ x: k * 0.9 - 4, z: 12, h: k % 2 ? -0.5 : 0.4, shirt: KIT.SHIRT[(k * 4) % 15], shirt2: 0x2a3550, opt: ow(o, k * 11 + 3), phase: k * 1.3, walk: k % 3 === 1 ? 5.4 : 0, sc: k % 2 ? [0.94, 0.94, 0.94] : [1.02, 1.02, 1.02] }));
+  place(g, matP, items, 'peds');
+}
+if (!only && (row === 'heroes' || row === 'all')) {
+  const schemes = [{ hat: 'cap' }, { shirt: 0x2e86c1, shorts: 0x24455f, hat: 'cap', cap: 0x1a5276, backpack: 0 }, { shirt: 0xc0392b, shorts: 0x5b3256, skin: 0xe8b080, hat: 'nonla', backpack: 0 }, { shirt: 0x2ea08a, shorts: 0x4a4038, skin: 0xe8b080, hat: null, hair: 0x1a1210, backpack: 0 }];
+  schemes.forEach((s, i) => {
+    const r = makeHumanoid(s); r.group.position.set(i * 1.0 - 1.5, 0, 16); r.group.rotation.y = 0.3 * (i - 1.5);
+    if (i === 1) r.animate(0.25, 0.8, 1.0, 1.6);
+    if (i === 2) r.sit(true);
+    r.group.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+    scene.add(r.group); r.group.updateMatrixWorld(true);
+    stats['hero' + i] = r.tris || 0;
+  });
+}
+KIT.KIT_U.uKitTime.value = +(Q.get('t') || 1.2);
+const cam = new THREE.PerspectiveCamera(+(Q.get('fov') || 40), W / H, 0.05, 2000);
+const dist = +(Q.get('dist') || 9), ch = +(Q.get('h') || 1.6), yaw = +(Q.get('yaw') || 0.5);
+const cx = +(Q.get('cx') || 0), cz = +(Q.get('cz') || 0), ly = +(Q.get('ly') || 0.8);
+cam.position.set(cx + Math.sin(yaw) * dist, ch, cz + Math.cos(yaw) * dist);
+cam.lookAt(cx, ly, cz);
+for (let i = 0; i < 3; i++) renderer.render(scene, cam);
+document.getElementById('info').textContent = JSON.stringify({ calls: renderer.info.render.calls, tris: renderer.info.render.triangles, ...stats });
+window.__stats = stats; window.__ready = true;
+</script></body></html>

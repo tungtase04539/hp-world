@@ -44,7 +44,8 @@ Trò chơi: thế giới 3D Hải Phòng **tỉ lệ 1:1 mét thật** (từ 202
 | `js/device.js` | `TIER` + `GFX` (núm chất lượng ánh sáng/hậu kỳ — chỉ theo TIER, không theo cảm ứng) |
 | `js/landmarks.js` | 15 biển thông tin địa danh (vị trí suy ra từ mapdata) |
 | `js/traffic.js` / `js/vehicles.js` / `js/npcs.js` / `js/quests.js`... | Giao thông, xe cưỡi được, NPC, nhiệm vụ |
-| `js/roadgraph.js` / `js/trafficmodels.js` | Đồ thị phố thật (nút giao, đường đôi một chiều — thuần JS, chạy được trong node) / mô hình xe máy·ô tô·người đi bộ INSTANCED + shader nhuộm |
+| `js/roadgraph.js` | Đồ thị phố thật (nút giao, đường đôi một chiều — thuần JS, chạy được trong node) |
+| `js/models_kit.js` | BỘ MÔ HÌNH NGƯỜI & XE DÙNG CHUNG (wave 2 W2-C): người 7,5 đầu (dáng đi/ngồi trong vertex shader), người lái IK, 3 xe máy, 6 ô tô (thân loft + hốc bánh thật), LOD xa, `kitMaterial` (kênh màu/cổng phụ kiện theo instance), `humanoidGeometry` (SkinnedMesh nhân vật chơi/NPC) — dùng bởi traffic.js, props.js, character.js. Xem trang `tools/qa/models.html` |
 | `js/footprints.js` | Tra cứu footprint nhà thật ĐANG VẼ (world.rbData/rbGrid của WP2, không có thì chỉ địa danh LM_POLY) cho gameplay: camera chống xuyên tường, chỗ xuống xe, người đi bộ |
 | `js/trees.js` | HỆ CÂY instanced (Đợt 3 WP4): `plant/plantLocal` (mọi helper cây chỉ xếp hàng), `plantStreetTrees` (trồng theo dữ liệu dọc phố), `buildTrees` (atlas lá + kit 9 loài + LOD gần/xa/hero GLB) — xem §10 (WP4-trees) |
 | `js/treemap.js` | **SINH TỰ ĐỘNG** bởi `tools/gen_treemap.mjs` từ `audit/audit_enriched.json` (thảm cây 551 pano) — KHÔNG sửa tay |
@@ -629,6 +630,116 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     khác; hero twin đặt sq = 0. Probe CPU mô phỏng shader phải áp cả phép ép (`r.sq`, `r.zx/zz`) — rprobe3 cũ không có. (4) `facadeFit` chỉ thấy footprint
     thật, LM_POLY và hộp claim 'cell' NHỎ (< 1500 m²); khuôn viên lớn của cell sink và GLB địa danh ngoài LM_POLY thì không. (5) trang QA trees.html đặt cây quanh gốc toạ độ
     (= Nhà hát): phải `median:1` + `facade:false`, không thì cây bị bỏ/dời như cây thật.
+- **2026-10-04 (W2-C người-xe)** [ĐỢT 3 wave 2 W2-C — BỘ MÔ HÌNH NGƯỜI & XE DÙNG CHUNG `js/models_kit.js`: giao thông,
+    xe đỗ, người vỉa hè, nhân vật chơi/NPC]: trước: người đi bộ/lái xe/NPC là hình nộm hộp chibi (NPC ~25 capsule + ~25
+    Lambert riêng/người), ô tô hộp bánh "nửa đĩa" (bánh lút nửa trong thân vì thân không có hốc bánh), 3 bộ dựng hình
+    riêng (trafficmodels.js — ĐÃ XOÁ, props.js §3, character.js).
+    **Hình học (models_kit.js §1):** `tube` (ống qua các vòng elip, pháp tuyến mượt — chi người, thân, lốp, nón lá),
+    `loft` (mặt cắt khép kín cùng chiều, màu theo điểm → gầm tối dần = AO giả), `slab` (profile z-y đùn theo X + vát
+    mép + co bề ngang TUYẾN TÍNH theo y/z → yếm xe hẹp dưới rộng trên, đuôi thon; tuyến tính thì mặt hông vẫn phẳng),
+    `disc`, `quad`. Mỗi đỉnh: color + `aKit` = (KÊNH màu, CỔNG phụ kiện, CHI, nhám + 2·kim loại). Mọi mảnh GIỮ CHỈ SỐ
+    (mảnh mượt đã chia đỉnh khi dựng, mảnh phẳng có đỉnh riêng/mặt) và gộp thẳng — BỎ mergeVertices: dựng nhanh 3-5×
+    (node: ô tô 10 → 2 ms, xe máy 7 → 2 ms), đỉnh +5-18%. `shared(key, make)` = cache: giao thông + props dùng CHUNG
+    buffer đỉnh, mỗi InstancedMesh nhận bản nông (attribute instance gắn vào geometry nên không dùng chung object).
+    **BẪY ống/lốp:** khung vòng tính theo hướng tâm vòng trước→sau; mặt cắt KHÔNG đơn điệu theo trục (lốp: hông đi
+    ngược trục rồi gai xuôi trục) làm khung LẬT → xoắn → dùng `fixed:true` (1 khung = vòng cuối − vòng đầu).
+    **Màu = kênh × nguồn (1 draw call vẫn đa dạng):** sơn = instanceColor, áo A/B = `aShirt`/`aShirt2`, còn lại BẢNG
+    MÀU BĂM theo hạt giống instance (da 6, tóc 4, mũ bảo hiểm 10, quần 8, khẩu trang 4, giày 4, túi 6, hàng chở 6);
+    kênh có điều kiện: cẳng tay = áo nếu bit tay dài (áo chống nắng) else da, cẳng chân = da nếu quần đùi. `aOpt` = bit
+    0-12 + 8192 × hạt giống (CỐ ĐỊNH theo tác tử — băm theo vị trí thì xe chạy nhấp nháy màu). CỔNG ±k: hiện khi bit
+    (k−1) bật/tắt, tắt → đỉnh thu về 0 (tam giác suy biến): người ngồi sau, hàng chở, rổ xe cub, thùng sau, mũ treo
+    gương, taxi, giá nóc, nón lá, mũ lưỡi trai, tóc dài, khẩu trang, túi. Bit tính trên GLSL ES1 bằng floor/mod/exp2.
+    **Người (§2):** khung `SK` 1,70 m, đầu 0,227 m = 1/7,5 (hông 0,90, gối 0,49, vai ±0,182 ở 1,40, khuỷu 1,115, cổ 1,45);
+    `person(K, J)` dựng chi là ống elip NỐI KHỚP (đùi/cẳng có bắp, cánh tay tay áo, bàn tay, giày nêm, đầu elip cằm hẹp
+    + mũi, tóc chừa trán, mũ bảo hiểm nửa đầu + lưỡi trai, nón lá ống lõm 0,47 m) ~0,9k tam giác; `riderJoints` = IK 2
+    khớp (hông→gối→bàn chân trên sàn/gác chân theo kiểu xe; vai→khuỷu→tay nắm ghi-đông, khuỷu chếch ra-xuống) → người
+    lái/người ngồi sau NƯỚNG SẴN vào hình xe. Người đi bộ instanced: dáng do vertex shader `kitPose` (hông ±0,42·a, gối
+    gập khi chân đưa ra trước, tay đánh ngược chân, khuỷu gập, hạ cả người 0,81·(1−cos góc đùi) để chân trụ không nhấc
+    khỏi đất) — 'cpu' (giao thông: aPhase = PHA bước rad do CPU tích phân 4,5·v/scale mỗi khung, aWalk = BIÊN ĐỘ 0..1
+    êm theo tốc độ; bản đầu shader tự tính pha = uKitTime·nhịp → đổi nhịp là pha nhảy, biên độ bật 0↔1 ở 0,2 m/s = dáng
+    giật) hoặc 'path' (props: đi qua-lại trên GPU như WP7);
+    bit SIT = ngồi ghế nhựa (đùi −1,9 rad tức gối CAO hơn hông, cẳng +1,9 thẳng đứng, hạ hông 0,53 m → hông 0,37 trên
+    mặt ghế 0,27). Hằng khớp trong GLSL sinh từ SK (đổi 1 chỗ). Cao 1,56-1,80 m (instance scale, nữ thấp hơn).
+    **Xe máy (§3):** 'scooter' (ga nhỏ 14"), 'underbone' (xe số 17", vành căm; cub = + rổ trước), 'bigscooter' (ga lớn
+    16", thùng sau); gương cần mảnh + mặt gương dẹt, biển số, đèn pha/hậu/xi-nhan, ống xả crôm; det 2 (xe ĐỖ ~0,84-0,95k
+    tam giác, nan = mảnh phẳng 2 tam giác thay hộp 12), det 1 (xe CHẠY: không vát mép), LOD xa ~0,27k (có người) / ~0,1k
+    (xe đỗ). Xe chạy + người lái ≈ 1,08k, + người ngồi sau (cổng) ≈ 1,5k tam giác.
+    **Ô tô (§4):** 'sedan' 4,42 m, 'hatch' 3,72, 'suv' 4,6, 'mpv' 4,65, 'van' (16 chỗ) 5,4, 'truck' (tải nhỏ bạt) 4,9;
+    taxi = sedan/hatch + cổng hộp đèn (chữ chung, không thương hiệu). THÂN = loft ~26 trạm × mặt cắt 12 điểm (bo gầm,
+    hông phình 42% chiều cao, vai thu vào, nóc ca-pô/cốp theo khoá z) — HỐC BÁNH THẬT: đáy mặt cắt nâng theo cung tròn
+    bán kính R+5,5 cm quanh trục bánh, 2 trạm kép sát mép hốc tạo vách đứng; khối gầm tối chặn nhìn xuyên hốc. NHÀ KÍNH
+    4 trạm (chân/đỉnh kính lái, đỉnh/chân kính sau), mặt hông kính tối + máng nóc + nóc sơn, trụ A sơn, B đen, C (sedan
+    sơn), gioăng đen chân kính; lốp có hông + mâm hợp kim 6 nan (mặt ngoài), đèn pha ôm góc, lưới tản nhiệt + nẹp crôm,
+    hốc gió, biển số, gương, tay nắm cửa. ~1,85-1,94k tam giác (tải 1,0k); LOD 60-260 m thân loft thô ~0,28k (chung mọi
+    kiểu, instance scale theo kích thước kiểu `CAR_FAR_SCALE`), > 260 m hộp ~30 tam giác.
+    **Vật liệu (§6):** `kitMaterial` = MeshStandard (TIER ≥ 2: sơn bóng r 0,28-0,32, kính r 0,05 phản chiếu IBL trời của
+    daynight, mâm kim loại) / Lambert (LITE) + onBeforeCompile (kênh, cổng, dáng, nhám/kim loại theo đỉnh). Đèn PHA/HẬU
+    cộng SAU `#include <emissivemap_fragment>` = theo CẢNH như trafficmodels dot3 (pha 2,6 → phơi sáng đêm ×4 + bloom
+    ngưỡng 0,9 → xe ngược chiều LOÉ — chữ ký phố đêm VN). BẪY (phản biện): bản đầu cộng TRƯỚC chunk → post.js nhân
+    HP_UNLIT_K ≈ 1,18/4 ≈ 0,3 lúc đêm → pha còn 0,77 < ngưỡng bloom = vệt mờ. HỘP ĐÈN TAXI (biển hiệu) giữ TRƯỚC chunk
+    (theo màn hình). LOD xa xe máy PHẢI có kênh HEAD/TAIL (2 tấm trước/sau = 4 tam giác) — thiếu là mọi xe máy ngoài
+    NEAR_BIKE tối om về đêm. Bit 12 PARKED tắt đèn → xe chạy + xe đỗ dùng CHUNG 1 vật liệu/1 chương trình; props gắn
+    `customDepthMaterial` cùng cổng/dáng (bóng đổ đúng). Lưỡi trai/mặt phẳng bóng nhỏ phải nhám (≥ 0,6): mặt phẳng
+    r 0,3 hướng lên phản chiếu trời thành vệt TRẮNG.
+    **Giao thông (traffic.js):** 3 xe máy + 6 ô tô + 1 người đi bộ + LOD xa (xe máy ≤ 50 m / ô tô ≤ 70 m dùng mô hình
+    đủ, xa hơn ghi vào nhóm 'bike_far'/'car_far' — TIER 2: 42/58, LITE 32/45) + MỘT mesh bóng tiếp đất chung
+    `traffic_shadow` (stride 17: ma trận có sẵn scale elip + độ đậm, 3 bản xoay vòng) = 13 draw call (trước 16). Gần/xa
+    chọn theo khoảng cách tới CAMERA (main.js truyền `camera.position` làm tham số 4 của `traffic.update`), trễ 5 m
+    (xa → gần khi < ngưỡng − 5 m); cắt DRAW_R + mô phỏng vẫn quanh NGƯỜI CHƠI. BẪY (phản biện): chọn theo người chơi
+    thì camera LITE lùi tới CAM_MAX 36 m > NEAR_BIKE 32 m và camera đạo diễn __cine (quay trailer) thấy người que trên
+    nêm cách ống kính 2-6 m. GIỚI HẠN THUỘC TÍNH: người đi bộ giao thông dùng 14/16 vertex attribute (position, normal,
+    color, aKit, aOpt, aShirt, aShirt2, aPhase, aWalk, instanceMatrix ×4, instanceColor) — thêm uv/thuộc tính mới sẽ
+    vượt MAX_VERTEX_ATTRIBS 16 trên di động. Stride
+    28 giữ nguyên, ô đệm cuối thành aOpt. Phụ kiện theo tỉ lệ pano: chở 2 ~30%, chở hàng ~10%, khẩu trang ~35%, nữ ~45%
+    (65% mặc áo chống nắng dài tay), taxi ~28% sedan/hatch; bit của người ngồi sau CHỈ bật khi có PILLION (cổng không
+    lồng nhau). Props (props.js, chỉ phần mô hình/instance — vị trí đặt GIỮ NGUYÊN): bikeI[0..3] → scooter / underbone
+    (+cub = rổ) / bigscooter; carI → sedan, suv (~40% thành mpv theo hash), hatch (+taxi), truck, van; người 1 mô hình
+    (đứng/đi/ngồi theo bit) gần ≤ 60 m + xa 60-240 m (~0,24k, không đổ bóng); xe máy gần ≤ 50 m (trước 80), ô tô gần
+    ≤ 60 m (trước 130). Đã xoá mô hình cũ + nhánh dáng đi trong propMaterial. `parkedCars[i].hw` = nửa bề ngang THẬT
+    của mô hình kể cả gương (bounding box: xe 16 chỗ ~1,18 m, SUV ~1,1 m) — code né xe đỗ đừng giả định 0,9 m.
+    Người: nắp trên cánh tay chìm dưới vai áo (−22 mm, vào trong 24 mm, vòm 15 mm — trước nhô như cầu vai); khẩu trang =
+    VỎ cầu ±80° quanh mặt từ dưới mũi tới cằm theo cùng `faceShape` của đầu, nở 7% (hộp phẳng cũ đen ở < 4 m như râu);
+    người gần có lông mày (màu tóc) + hốc mắt tối (4 hộp mỏng, +48 tam giác); LOD xa có GỐI (đùi chi 1/2 + cẳng 3/4 —
+    1 ống thì dáng ngồi chĩa cả chân lên 19°).
+    **Nhân vật chơi/NPC (character.js):** `makeHumanoid` giữ API (group, legL/legR/armL/armR/head/torso, blob, animate,
+    sit) nhưng là MỘT SkinnedMesh 11 xương (hông, thân, đầu, vai/khuỷu, hông/gối) từ người kit + 1 bóng tròn; màu nướng
+    theo scheme trên hình gốc cache theo (mũ, tóc dài, ba lô). Xoay X DƯƠNG đưa chi ra SAU: sit() cũ đặt đùi +1 rad = chân
+    ra sau yên — nay đùi −1,32, gối +1,38, thân chồm 0,16; TAY giải IK số tới tay nắm xe Cub GLB đo trong game ≈ (±0,37,
+    1,27, 0,27) hệ nhân vật (gốc ở chân, +Z trước): cánh tay (−0,2, ±0,3, ±0,5), cẳng tay −1,8 (khuỷu dạng ra-xuống, bàn
+    tay lệch tay nắm < 1 cm; bản −0,95/−0,45 cẳng tay nằm ngang, bàn tay thấp 14 cm và vượt 26 cm). Bind: Skeleton được
+    tạo trước khi ma trận xương cập nhật — `mesh.bind()` tự updateMatrixWorld + calculateInverses (đừng truyền
+    boneInverses). Cầu bao đặt tay (r 1,25) — không tính lại từ xương. BẪY WEBGL1 (phản biện): chunk
+    `skinning_pars_vertex` của three r160 dùng `textureSize()`/`texelFetch()` (chỉ GLSL ES 3.0) → trên WebGL1 cả program
+    màu lẫn bóng KHÔNG biên dịch, người chơi + NPC biến mất. character.js thay chunk (onBeforeCompile cho vật liệu +
+    `customDepthMaterial`) bằng bản `texture2D` với cỡ texture xương CỐ ĐỊNH 8×8 (11 xương × 4 texel, đúng công thức
+    `Skeleton.computeBoneTexture`) — chạy cả WebGL2 (three #define texture2D texture). Thêm xương → sửa NBONE. Kiểm:
+    Chrome `--disable-es3-apis` + init script trả null cho getContext('webgl2') → lỗi shader = base (2, đạo hàm
+    citygen/roadtex — W2-F sửa). LITE dùng Lambert như kit.
+    **QA:** `tools/qa/models.html` (gallery kit: ?row=cars|bikes|riders|people|heroes|all, ?only=car:sedan|bike:…|ride:…|ped|pedfar|bikefar,
+    &opt=bit,bit &lo=1 &night=1 &std=0 + camera dist/h/yaw/ly). BẪY chụp headless: (1) bảng hướng dẫn mở = `modal` →
+    main.js bỏ cập nhật nhân vật (teleport không dời người, mount không đặt lên yên) — bấm Escape trước; (2) __cine bật
+    = cũng bỏ cập nhật nhân vật; (3) công cụ Write file .html ở worktree có hook mở Browser pane (WebGL ngoài khoá GPU)
+    → đóng tab ngay.
+    **Số đo (Radeon 890M, TIER 3, views 11 góc, base = export dot3 ea5f57f có assets hard-link phục vụ song song, cùng
+    phiên, traffic on):** draw call giảm ở 9-10/11 góc (cam_spawn 389 → 361-363, pano_007 560-585 → 499-526,
+    cam_high_center 440 → 379-403, game_3 415 → 331-334, pano_071 682-744 → 609-634, pano_102 436-519 → 402-428);
+    tam giác ≈ bằng (cam_spawn 4,07 → 4,04 M, cam_high_center 6,25 → 6,21, game_3 6,69 → 6,66; pano_021 dao động
+    ±1 M giữa các lượt ở CẢ 2 bên); fps TB 59,2 → 59,9 (trần 60, p95 trong nhiễu). Lượt đầu (LOD xa ô tô 968 tam giác ×
+    ~1.500 xe đỗ, xe máy gần 80 m) +0,5..+2,8 M tam giác, p95 +1,5-4 ms → mới thêm LOD 3 mức. Heap sau GC ép (CDP
+    HeapProfiler.collectGarbage) 388 → 389-390 MB; geometries 497 → 456; programs 66 → 68. Khởi động: hpReady/Start
+    trong nhiễu (4,24 s / 5,83 s ↔ 4,11-4,28 / 5,8-6,2 s); dựng mọi mô hình kit ~40 ms. 0 lỗi JS full + lite;
+    diag 0; traffic.check() 0 sai bên/ra ngoài/chồng. RIÊNG người + xe (giao thông + xe/người props + nhân vật chơi;
+    đo = chênh khi ẩn chúng, gồm cả lượt bóng): base 43-48 draw call / 0,36-0,39 M tam giác → 16-26 / 0,32-0,35 M
+    (cam_spawn, pano_007, pano_130, phố Điện Biên Phủ; số base CHƯA tính NPC — mỗi NPC cũ ~25 mesh) — ngân sách ≤ 40 đạt.
+    **Sau phản biện (cùng ngày):** 3 lỗi bắt buộc + đánh bóng ở trên (WebGL1 skinning, đèn xe máy xa + pha/hậu theo
+    cảnh, LOD theo camera, dáng tay lái Cub, khẩu trang/mắt/mày/vai, gối LOD xa, pha bước CPU, hw xe đỗ). Đo lại (2 lượt
+    đảo thứ tự, cùng phiên, base dot3 ea5f57f): draw call thấp hơn 11/11 góc (cam_spawn 389 → 362-363, pano_007 560-585
+    → 524, cam_high_center 465 → 399-400, game_3 415 → 353-354, pano_089 788 → 673-698), tam giác bằng hoặc thấp hơn
+    (≤ −0,07 M), fps 60,1 ↔ 60,1 (trần), p95 trong nhiễu; đo không trần vsync dao động ±3 ms giữa các lượt CÙNG bản →
+    không kết luận được chênh p95 ~2 ms. Heap sau GC 389 MB, programs 68, geometries 456; người + xe 20-22 draw call
+    (full) / 14-18 (LITE). WebGL1 ép: 2 lỗi shader = base (không còn boneTexture). Đêm pano_007_h090: đèn pha/hậu xe
+    máy xa hiện lại như dot3; xe ngược chiều 7 m loé bloom.
+
 - **2026-10-04 (wp8)** [ĐỢT 3 WP8 GAME — khởi động, giao thông phố thật, cảm giác chơi, nhiệm vụ, âm thanh, tool Windows]:
     **Khởi động (js/boot.js + main.js + 9 dòng world.js):** UI màn chờ (ngôn ngữ, chất lượng, nhiệm vụ, input) gắn
     TRƯỚC khi dựng; `buildWorld` thành `async buildWorld(scene, prog)` với `await prog('<bước>')` ở cấp 1 giữa các khu

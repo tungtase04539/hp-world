@@ -25,6 +25,7 @@ import { PROPS_EVIDENCE } from './props_evidence.js';
 import { LITE } from './device.js';
 import { rbData, rbGrid } from './rbdata.js';   // footprint thật giải mã 1 lần cho cả trang (W2-F)
 import { claimAt } from './claims.js';
+import { motorbikeGeometry, motorbikeFarGeometry, carGeometry, carFarGeometry, carFar2Geometry, CAR_FAR_SCALE, pedestrianGeometry, pedestrianFarGeometry, kitMaterial, shared, KIT_U, OPT, optWord } from './models_kit.js';
 
 // =====================================================================================================================
 // 0. TIỆN ÍCH: hash tất định theo toạ độ, màu
@@ -96,14 +97,6 @@ function beam(a, b, w, h) {
   g.applyMatrix4(new THREE.Matrix4().compose(new THREE.Vector3((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2), q, new THREE.Vector3(1, 1, 1)));
   return g;
 }
-// PROFILE NGANG (mặt bên z-y) đùn theo trục X, rộng w, tâm x0 — dáng xe nhận ra được với vài chục tam giác
-function prof(pts, w, x0 = 0) {
-  const sh = new THREE.Shape(pts.map(([z, y]) => new THREE.Vector2(z, y)));
-  const g = new THREE.ExtrudeGeometry(sh, { depth: w, bevelEnabled: false, curveSegments: 1, steps: 1 });
-  g.rotateY(-Math.PI / 2);            // shape-x → z thế giới, hướng đùn → −x
-  g.translate(x0 + w / 2, 0, 0);
-  return g;
-}
 // GỘP NHIỀU MODEL vào 1 hình (aVar = chỉ số model); InstancedMesh chọn model theo iVar từng instance — vertex shader
 // thu đỉnh của model khác về 0 (tam giác suy biến). Cột-đèn (6), đồ lặt vặt (6), kính đèn (4), người (2) → MỖI NHÓM
 // 1 draw call. Xe máy/ô tô KHÔNG gộp (nhiều instance × đỉnh suy biến của 3-5 model khác — xem 6.8).
@@ -134,10 +127,6 @@ uniform float uPropTime;
 uniform vec3 uPalA[8];
 uniform vec3 uPalB[8];
 uniform vec2 uGate;
-#ifdef PROP_WALK
-attribute float aLimb;
-attribute vec4 aWalk;
-#endif
 float propHash(vec2 p, float k) { p = floor(p * 3.0) + k * 17.13; return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
 vec2 propIP() {
 #ifdef USE_INSTANCING
@@ -153,36 +142,6 @@ float propGate() {
   if (aPaint > 5.5) return step(propHash(ip, 4.0), uGate.y);
   return 1.0;
 }
-#ifdef PROP_WALK
-// đi qua-lại trên đoạn dài L (m) với tốc độ spd, dừng 'pause' giây ở 2 đầu; chân/tay đánh quanh hông/vai
-void propWalk(inout vec3 p, inout vec3 n) {
-  float L = aWalk.x, spd = aWalk.y, ph0 = aWalk.z, pau = aWalk.w;
-  float walking = 0.0, dirv = 1.0, s = 0.0;
-  if (spd > 0.01 && L > 0.5) {
-    float tw = L / spd, P = 2.0 * (tw + pau);
-    float u = mod(uPropTime + ph0 * P, P);
-    if (u < tw) { s = u * spd - 0.5 * L; walking = 1.0; }
-    else if (u < tw + pau) { s = 0.5 * L; }
-    else if (u < 2.0 * tw + pau) { s = 0.5 * L - (u - tw - pau) * spd; dirv = -1.0; walking = 1.0; }
-    else { s = -0.5 * L; dirv = -1.0; }
-  }
-  float ph = uPropTime * max(spd, 0.6) * 4.6 + ph0 * 6.2831;
-  float sw = sin(ph) * walking;
-  float ang = 0.0, py = 0.9;
-  if (aLimb > 0.5 && aLimb < 1.5) ang = 0.42 * sw;
-  else if (aLimb > 1.5 && aLimb < 2.5) ang = -0.42 * sw;
-  else if (aLimb > 2.5 && aLimb < 3.5) { ang = -0.36 * sw; py = 1.38; }
-  else if (aLimb > 3.5) { ang = 0.36 * sw; py = 1.38; }
-  if (ang != 0.0) {
-    float c = cos(ang), si = sin(ang);
-    vec3 q = p - vec3(0.0, py, 0.0);
-    p = vec3(q.x, q.y * c - q.z * si, q.y * si + q.z * c) + vec3(0.0, py, 0.0);
-    n = vec3(n.x, n.y * c - n.z * si, n.y * si + n.z * c);
-  }
-  if (dirv < 0.0) { p.xz = -p.xz; n.xz = -n.xz; }
-  p.z += s; p.y += abs(cos(ph)) * 0.03 * walking;
-}
-#endif
 `;
 const PROP_COLOR = /* glsl */`
 #if defined( USE_COLOR_ALPHA )
@@ -208,51 +167,37 @@ const PROP_COLOR = /* glsl */`
   else if (aPaint > 6.5) vColor.xyz *= pa;
 }
 `;
-const PROP_NORMAL = /* glsl */`
-#include <beginnormal_vertex>
-#ifdef PROP_WALK
-  vec3 propP = vec3(position); propWalk(propP, objectNormal);
-#endif
-`;
 const PROP_BEGIN = /* glsl */`
 #include <begin_vertex>
-#ifdef PROP_WALK
-#ifdef PROP_DEPTH
-  vec3 propN = vec3(0.0, 1.0, 0.0); vec3 propP = vec3(position); propWalk(propP, propN);
-#endif
-  transformed = propP;
-#endif
   transformed *= propGate();
 `;
 function hookUniforms(sh, u) {
   sh.uniforms.uPropTime = PROP_TIME; sh.uniforms.uPalA = u.uPalA; sh.uniforms.uPalB = u.uPalB; sh.uniforms.uGate = u.uGate;
 }
 // palA/palB: 8 hex; gate: [xác suất phụ kiện cổng 1, cổng 2]
-function propMaterial({ palA = [0xffffff], palB = [0xffffff], gate = [1, 1], walk = false, name = '' } = {}) {
+function propMaterial({ palA = [0xffffff], palB = [0xffffff], gate = [1, 1], name = '' } = {}) {
   const P = (a) => { const r = []; for (let i = 0; i < 8; i++) r.push(new THREE.Color(a[i % a.length])); return r; };
   const u = { uPalA: { value: P(palA) }, uPalB: { value: P(palB) }, uGate: { value: new THREE.Vector2(gate[0], gate[1]) } };
   const m = new THREE.MeshLambertMaterial({ vertexColors: true });
   m.name = 'props_' + name;
-  if (walk) m.defines = { PROP_WALK: '' };
   m.onBeforeCompile = (sh) => {
     hookUniforms(sh, u);
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\n' + PROP_HEAD)
       .replace('#include <color_vertex>', PROP_COLOR)
-      .replace('#include <beginnormal_vertex>', PROP_NORMAL)
       .replace('#include <begin_vertex>', PROP_BEGIN);
   };
-  m.customProgramCacheKey = () => 'hp_props_v2' + (walk ? '_walk' : '');
+  m.customProgramCacheKey = () => 'hp_props_v2';
   // bóng đổ: cùng phụ kiện/dáng đi (nếu không, bóng của mũ "đã tắt" hay người đang đi sẽ đứng yên một chỗ)
   const d = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking });
-  d.defines = walk ? { PROP_WALK: '', PROP_DEPTH: '' } : { PROP_DEPTH: '' };
+  d.defines = { PROP_DEPTH: '' };
   d.onBeforeCompile = (sh) => {
     hookUniforms(sh, u);
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\n' + PROP_HEAD)
       .replace('#include <begin_vertex>', PROP_BEGIN);
   };
-  d.customProgramCacheKey = () => 'hp_props_depth_v2' + (walk ? '_walk' : '');
+  d.customProgramCacheKey = () => 'hp_props_depth_v2';
   m.userData.depth = d;
   return m;
 }
@@ -295,230 +240,7 @@ const C = {
   tyre: 0x19191b, rim: 0x3b3d42, hub: 0x9a9fa5, black: 0x1a1a1c, dark: 0x2e3034, steel: 0x8e9399, chrome: 0xb8bcc0,
   seat: 0x1c1c1e, light: 0xe9eef2, red: 0xa81c1c, amber: 0xd98a1c, plate: 0xe7e6dc, glass: 0x26313b, white: 0xf1f1ec,
 };
-function bikeWheel(parts, z, r, w) {
-  parts.push(finish(cyl(r, r, w, 12, 0, r, z, 'x'), [C.tyre, C.rim, C.rim]));
-  parts.push(finish(cyl(r * 0.36, r * 0.36, w + 0.03, 6, 0, r, z, 'x'), C.hub));
-}
-function bikeCommon(parts, { hbY, hbZ, mirrorY }) {
-  parts.push(finish(box(0.68, 0.035, 0.035, 0, hbY, hbZ), C.black));                       // ghi-đông + tay nắm
-  for (const s of [-1, 1]) {
-    parts.push(finish(beam([s * 0.22, hbY + 0.01, hbZ], [s * 0.28, mirrorY, hbZ + 0.04], 0.018, 0.018), C.black)); // cần gương
-    parts.push(finish(box(0.12, 0.075, 0.025, s * 0.29, mirrorY + 0.02, hbZ + 0.045, 0, s * 0.25, 0), C.black)); // mặt gương
-  }
-}
-// (a) XE GA NHỎ phổ thông (bánh 14"): sàn để chân, yếm trước, đuôi tròn — ~480 tam giác
-function modelScooter() {
-  const P = [];
-  bikeWheel(P, 0.63, 0.25, 0.09); bikeWheel(P, -0.6, 0.25, 0.1);
-  P.push(finish(box(0.34, 0.06, 0.5, 0, 0.3, 0.1), 0x2a2b2d));                                 // sàn để chân (thảm cao su)
-  P.push(finish(prof([[-0.1, 0.27], [-0.3, 0.3], [-0.4, 0.5], [-0.78, 0.55], [-0.93, 0.64], [-0.92, 0.72], [-0.6, 0.79], [-0.14, 0.79], [-0.08, 0.6]], 0.34), 0xffffff, 1)); // thân sau
-  P.push(finish(box(0.13, 0.2, 0.5, 0.11, 0.32, -0.4), 0x2d2e31));                              // hộp số/động cơ (bên trái = +X)
-  P.push(finish(prof([[0.3, 0.3], [0.44, 0.33], [0.58, 0.74], [0.57, 0.98], [0.47, 1.0], [0.38, 0.8], [0.26, 0.4]], 0.4), 0xffffff, 1)); // yếm trước
-  P.push(finish(prof([[0.42, 0.47], [0.55, 0.535], [0.72, 0.535], [0.88, 0.45], [0.86, 0.41], [0.72, 0.495], [0.55, 0.495], [0.44, 0.43]], 0.13), 0xffffff, 1)); // chắn bùn
-  P.push(finish(beam([0, 0.25, 0.63], [0, 0.95, 0.53], 0.07, 0.05), C.dark));                   // phuộc
-  P.push(finish(box(0.36, 0.13, 0.2, 0, 1.03, 0.5), 0xffffff, 1));                              // ốp đầu
-  P.push(finish(box(0.2, 0.07, 0.04, 0, 1.02, 0.61), C.light));                                 // đèn pha
-  bikeCommon(P, { hbY: 1.07, hbZ: 0.44, mirrorY: 1.31 });
-  P.push(finish(prof([[-0.94, 0.74], [-0.86, 0.83], [-0.45, 0.86], [-0.2, 0.85], [-0.13, 0.79], [-0.92, 0.71]], 0.3), C.seat)); // yên
-  P.push(finish(box(0.16, 0.06, 0.04, 0, 0.66, -0.94), C.red));                                 // đèn hậu
-  P.push(finish(box(0.32, 0.03, 0.2, 0, 0.82, -0.82), C.steel));                                // tay dắt sau
-  P.push(finish(cyl(0.045, 0.05, 0.42, 6, -0.13, 0.3, -0.58, 'z'), C.steel));                   // ống xả (bên phải = −X)
-  P.push(finish(box(0.18, 0.12, 0.02, 0, 0.47, -0.9), C.plate));                                // biển số
-  // phụ kiện cổng 1: mũ bảo hiểm treo gương phải (màu bảng A)
-  P.push(finish(new THREE.SphereGeometry(0.135, 7, 4, 0, Math.PI * 2, 0, Math.PI * 0.62).translate(0.3, 1.13, 0.5), 0xffffff, 5));
-  return mergeParts(P);
-}
-// (b) XE SỐ phổ thông (underbone): bánh to mảnh, khung lộ, máy lộ — ~520 tam giác
-function modelUnderbone() {
-  const P = [];
-  bikeWheel(P, 0.64, 0.3, 0.075); bikeWheel(P, -0.62, 0.3, 0.085);
-  P.push(finish(prof([[0.28, 0.42], [0.42, 0.45], [0.52, 0.86], [0.47, 0.94], [0.38, 0.88], [0.24, 0.5]], 0.36), 0xffffff, 1)); // ốp chân
-  P.push(finish(beam([0, 0.6, 0.42], [0, 0.48, 0.02], 0.1, 0.1), 0xffffff, 1));                // khung
-  P.push(finish(box(0.24, 0.24, 0.34, 0, 0.34, 0.06), 0x47494d));                               // lốc máy
-  P.push(finish(cyl(0.08, 0.08, 0.2, 6, 0, 0.42, 0.25, 'x'), C.steel));                         // đầu xi-lanh
-  P.push(finish(prof([[0.05, 0.5], [-0.25, 0.52], [-0.7, 0.66], [-0.9, 0.74], [-0.88, 0.8], [-0.15, 0.8], [0.08, 0.66]], 0.3), 0xffffff, 1)); // ốp thân sau
-  P.push(finish(prof([[-0.92, 0.79], [-0.89, 0.88], [-0.3, 0.91], [0.06, 0.88], [0.1, 0.82], [-0.88, 0.77]], 0.28), C.seat));
-  P.push(finish(box(0.24, 0.025, 0.3, 0, 0.84, -0.86), C.steel));                               // baga sau
-  P.push(finish(prof([[0.4, 0.58], [0.55, 0.64], [0.74, 0.64], [0.92, 0.52], [0.9, 0.48], [0.74, 0.6], [0.55, 0.6], [0.42, 0.54]], 0.12), 0xffffff, 1));
-  for (const s of [-1, 1]) P.push(finish(beam([s * 0.07, 0.3, 0.64], [s * 0.07, 0.92, 0.49], 0.035, 0.035), C.chrome)); // phuộc
-  P.push(finish(box(0.3, 0.14, 0.22, 0, 1.0, 0.47), 0xffffff, 1));                              // ốp đèn
-  P.push(finish(box(0.16, 0.08, 0.04, 0, 0.98, 0.585), C.light));
-  bikeCommon(P, { hbY: 1.05, hbZ: 0.44, mirrorY: 1.29 });
-  P.push(finish(box(0.05, 0.1, 0.6, 0.12, 0.36, -0.32), C.dark));                               // hộp xích (trái)
-  P.push(finish(cyl(0.05, 0.045, 0.62, 6, -0.14, 0.27, -0.4, 'z'), C.steel));                  // ống xả (phải)
-  for (const s of [-1, 1]) P.push(finish(beam([s * 0.13, 0.3, -0.62], [s * 0.13, 0.76, -0.5], 0.04, 0.04), C.dark)); // giảm xóc
-  P.push(finish(box(0.14, 0.06, 0.05, 0, 0.76, -0.98), C.red));
-  P.push(finish(box(0.18, 0.12, 0.02, 0, 0.58, -0.96), C.plate));
-  P.push(finish(new THREE.SphereGeometry(0.135, 7, 4, 0, Math.PI * 2, 0, Math.PI * 0.62).translate(0.3, 1.11, 0.48), 0xffffff, 5));
-  return mergeParts(P);
-}
-// (c) XE GA LỚN: bánh 16", thân dài, sàn phẳng; phụ kiện cổng 2: thùng sau — ~560 tam giác
-function modelBigScooter() {
-  const P = [];
-  bikeWheel(P, 0.68, 0.29, 0.1); bikeWheel(P, -0.64, 0.28, 0.11);
-  P.push(finish(box(0.36, 0.07, 0.5, 0, 0.36, 0.12), 0x2a2b2d));
-  P.push(finish(prof([[-0.12, 0.33], [-0.32, 0.36], [-0.45, 0.58], [-0.82, 0.62], [-1.0, 0.72], [-0.98, 0.8], [-0.62, 0.86], [-0.14, 0.86], [-0.08, 0.66]], 0.36), 0xffffff, 1));
-  P.push(finish(box(0.14, 0.22, 0.52, 0.12, 0.36, -0.42), 0x2d2e31));
-  P.push(finish(prof([[0.32, 0.36], [0.48, 0.4], [0.64, 0.8], [0.62, 1.04], [0.5, 1.06], [0.4, 0.86], [0.28, 0.44]], 0.44), 0xffffff, 1));
-  P.push(finish(prof([[0.46, 0.55], [0.6, 0.62], [0.78, 0.62], [0.96, 0.52], [0.94, 0.48], [0.78, 0.58], [0.6, 0.58], [0.48, 0.51]], 0.14), 0xffffff, 1));
-  P.push(finish(beam([0, 0.29, 0.68], [0, 1.0, 0.58], 0.08, 0.06), C.dark));
-  P.push(finish(box(0.4, 0.14, 0.22, 0, 1.1, 0.55), 0xffffff, 1));
-  P.push(finish(box(0.26, 0.06, 0.05, 0, 1.08, 0.67), C.light));
-  P.push(finish(box(0.3, 0.12, 0.03, 0, 1.22, 0.62, -0.5, 0, 0), C.glass));                   // kính chắn gió nhỏ
-  bikeCommon(P, { hbY: 1.12, hbZ: 0.48, mirrorY: 1.36 });
-  P.push(finish(prof([[-1.0, 0.81], [-0.9, 0.9], [-0.48, 0.93], [-0.2, 0.92], [-0.13, 0.86], [-0.98, 0.78]], 0.32), C.seat));
-  P.push(finish(box(0.2, 0.06, 0.04, 0, 0.74, -1.0), C.red));
-  P.push(finish(box(0.34, 0.03, 0.2, 0, 0.9, -0.86), C.steel));
-  P.push(finish(cyl(0.05, 0.055, 0.46, 6, -0.14, 0.34, -0.62, 'z'), C.steel));
-  P.push(finish(box(0.18, 0.12, 0.02, 0, 0.52, -0.96), C.plate));
-  P.push(finish(box(0.42, 0.3, 0.38, 0, 1.1, -0.86), 0x2b2c2f, 6));                            // thùng sau (cổng 2)
-  P.push(finish(new THREE.SphereGeometry(0.135, 7, 4, 0, Math.PI * 2, 0, Math.PI * 0.62).translate(-0.31, 1.17, 0.52), 0xffffff, 5));
-  return mergeParts(P);
-}
-// (d) XE CUB đời cũ: rổ trước, yên dài, ốp chân lớn — ~500 tam giác
-function modelCub() {
-  const P = [];
-  bikeWheel(P, 0.64, 0.3, 0.08); bikeWheel(P, -0.62, 0.3, 0.085);
-  P.push(finish(prof([[0.26, 0.4], [0.44, 0.44], [0.55, 0.9], [0.48, 0.97], [0.38, 0.92], [0.22, 0.5]], 0.44), 0xefe9dc));  // ốp chân màu kem
-  P.push(finish(beam([0, 0.62, 0.42], [0, 0.5, 0.02], 0.12, 0.12), 0xffffff, 1));
-  P.push(finish(box(0.24, 0.24, 0.34, 0, 0.34, 0.06), 0x55575b));
-  P.push(finish(prof([[0.05, 0.52], [-0.25, 0.54], [-0.7, 0.66], [-0.88, 0.72], [-0.86, 0.8], [-0.15, 0.8], [0.08, 0.68]], 0.32), 0xffffff, 1));
-  P.push(finish(prof([[-0.95, 0.79], [-0.92, 0.89], [-0.3, 0.92], [0.04, 0.9], [0.08, 0.83], [-0.9, 0.77]], 0.3), 0x3a2a22));
-  P.push(finish(box(0.3, 0.025, 0.34, 0, 0.84, -0.86), C.steel));
-  P.push(finish(prof([[0.4, 0.6], [0.55, 0.66], [0.74, 0.66], [0.92, 0.54], [0.9, 0.5], [0.74, 0.62], [0.55, 0.62], [0.42, 0.56]], 0.12), 0xffffff, 1));
-  for (const s of [-1, 1]) P.push(finish(beam([s * 0.07, 0.3, 0.64], [s * 0.07, 0.94, 0.5], 0.04, 0.04), C.dark));
-  P.push(finish(box(0.34, 0.16, 0.22, 0, 1.02, 0.48), 0xffffff, 1));
-  P.push(finish(box(0.16, 0.09, 0.04, 0, 1.0, 0.6), C.light));
-  bikeCommon(P, { hbY: 1.07, hbZ: 0.44, mirrorY: 1.3 });
-  P.push(finish(box(0.34, 0.22, 0.26, 0, 0.92, 0.7), 0x2b2b2b));                               // rổ trước (lưới sắt)
-  P.push(finish(box(0.05, 0.1, 0.6, 0.12, 0.36, -0.32), C.dark));
-  P.push(finish(cyl(0.05, 0.045, 0.62, 6, -0.14, 0.27, -0.4, 'z'), C.steel));
-  P.push(finish(box(0.14, 0.06, 0.05, 0, 0.76, -0.98), C.red));
-  P.push(finish(box(0.18, 0.12, 0.02, 0, 0.58, -0.96), C.plate));
-  P.push(finish(new THREE.SphereGeometry(0.135, 7, 4, 0, Math.PI * 2, 0, Math.PI * 0.62).translate(-0.3, 1.13, 0.48), 0xffffff, 5));
-  return mergeParts(P);
-}
-// LOD xa của xe máy: bóng dáng 1 khối + 2 bánh lục giác — ~72 tam giác
-function modelBikeFar() {
-  const P = [];
-  for (const z of [0.63, -0.6]) P.push(finish(cyl(0.27, 0.27, 0.1, 6, 0, 0.27, z, 'x'), C.tyre));
-  P.push(finish(prof([[0.85, 0.45], [0.6, 1.02], [0.45, 1.02], [0.35, 0.55], [-0.1, 0.42], [-0.95, 0.62], [-0.95, 0.78], [-0.2, 0.84], [0.1, 0.6], [0.4, 0.4]], 0.36), 0xffffff, 1));
-  P.push(finish(box(0.66, 0.05, 0.05, 0, 1.06, 0.44), C.black));
-  return mergeParts(P);
-}
-
-// ---------- Ô TÔ (song song mép đường) ----------
-function carWheels(P, zf, zr, xw, r, w) {
-  for (const z of [zf, zr]) for (const s of [-1, 1]) {
-    P.push(finish(cyl(r, r, w, 10, s * xw, r, z, 'x'), [C.tyre, 0x1e1e20, 0x1e1e20]));          // lốp (mặt bên đen)
-    P.push(finish(cyl(r * 0.64, r * 0.64, w + 0.02, 8, s * xw, r, z, 'x'), [0x8d9297, 0xb3b8bd, 0xb3b8bd])); // mâm bạc
-  }
-}
-function carLights(P, zF, zB, yF, yB, xs) {
-  for (const s of [-1, 1]) {
-    P.push(finish(box(0.34, 0.1, 0.05, s * xs, yF, zF), C.light));
-    P.push(finish(box(0.3, 0.1, 0.05, s * xs, yB, zB), C.red));
-  }
-  P.push(finish(box(0.5, 0.12, 0.02, 0, yF - 0.17, zF + 0.01), C.plate));
-  P.push(finish(box(0.5, 0.12, 0.02, 0, yB - 0.12, zB - 0.01), C.plate));
-}
-// SEDAN 4.5×1.76×1.45 — ~330 tam giác
-function modelSedan() {
-  const P = [];
-  carWheels(P, 1.35, -1.35, 0.77, 0.31, 0.22);
-  P.push(finish(prof([[2.25, 0.32], [2.28, 0.62], [2.1, 0.78], [1.15, 0.86], [-1.4, 0.88], [-2.22, 0.84], [-2.27, 0.55], [-2.22, 0.32], [-1.7, 0.3], [-1.62, 0.55], [-1.08, 0.55], [-1.0, 0.3], [1.0, 0.3], [1.08, 0.55], [1.62, 0.55], [1.7, 0.3]], 1.74), 0xffffff, 1));
-  P.push(finish(prof([[1.15, 0.86], [0.42, 1.36], [-0.82, 1.4], [-1.52, 0.9]], 1.5), C.glass));          // nhà kính
-  P.push(finish(box(1.52, 0.05, 1.22, 0, 1.4, -0.2), 0xffffff, 1));                                       // nóc
-  for (const s of [-1, 1]) {
-    P.push(finish(beam([s * 0.74, 0.86, 1.13], [s * 0.74, 1.39, 0.42], 0.07, 0.06), 0xffffff, 1));      // trụ A
-    P.push(finish(box(0.06, 0.52, 0.12, s * 0.75, 1.13, -0.18), 0xffffff, 1));                          // trụ B
-    P.push(finish(beam([s * 0.74, 0.88, -1.5], [s * 0.74, 1.4, -0.8], 0.07, 0.08), 0xffffff, 1));       // trụ C
-    P.push(finish(box(0.08, 0.1, 0.16, s * 0.93, 0.98, 0.98), 0xffffff, 1));                            // gương
-  }
-  P.push(finish(box(0.8, 0.14, 0.03, 0, 0.58, 2.27), C.dark));                                             // ca-lăng
-  carLights(P, 2.25, -2.25, 0.72, 0.76, 0.58);
-  return mergeParts(P);
-}
-// SUV 4.6×1.86×1.72 — ~360 tam giác
-function modelSUV() {
-  const P = [];
-  carWheels(P, 1.42, -1.38, 0.8, 0.36, 0.25);
-  P.push(finish(prof([[2.3, 0.4], [2.32, 0.8], [2.15, 0.98], [1.1, 1.04], [-2.0, 1.06], [-2.3, 1.02], [-2.32, 0.5], [-2.25, 0.38], [-1.78, 0.38], [-1.68, 0.66], [-1.08, 0.66], [-0.98, 0.38], [1.02, 0.38], [1.12, 0.66], [1.72, 0.66], [1.82, 0.38]], 1.84), 0xffffff, 1));
-  P.push(finish(prof([[1.1, 1.04], [0.45, 1.62], [-1.95, 1.64], [-2.15, 1.06]], 1.6), C.glass));
-  P.push(finish(box(1.62, 0.06, 2.3, 0, 1.65, -0.75), 0xffffff, 1));
-  for (const s of [-1, 1]) {
-    P.push(finish(beam([s * 0.8, 1.04, 1.08], [s * 0.8, 1.63, 0.46], 0.07, 0.07), 0xffffff, 1));
-    P.push(finish(box(0.06, 0.6, 0.12, s * 0.81, 1.34, -0.3), 0xffffff, 1));
-    P.push(finish(box(0.06, 0.6, 0.18, s * 0.81, 1.34, -1.98), 0xffffff, 1));
-    P.push(finish(box(0.05, 0.05, 2.0, s * 0.62, 1.71, -0.75), C.dark));                                 // baga nóc
-    P.push(finish(box(0.08, 0.11, 0.17, s * 0.99, 1.16, 1.02), 0xffffff, 1));
-  }
-  P.push(finish(box(0.95, 0.24, 0.03, 0, 0.74, 2.32), C.dark));
-  carLights(P, 2.3, -2.31, 0.9, 0.92, 0.62);
-  return mergeParts(P);
-}
-// HATCHBACK / TAXI 3.9×1.7×1.5 (taxi: hộp đèn TAXI trên nóc) — ~310 tam giác
-function modelHatch(taxi = false) {
-  const P = [];
-  carWheels(P, 1.2, -1.2, 0.74, 0.3, 0.2);
-  P.push(finish(prof([[1.95, 0.32], [1.98, 0.64], [1.8, 0.8], [1.0, 0.88], [-1.85, 0.92], [-1.95, 0.86], [-1.96, 0.36], [-1.55, 0.3], [-1.48, 0.53], [-0.92, 0.53], [-0.85, 0.3], [0.85, 0.3], [0.92, 0.53], [1.48, 0.53], [1.55, 0.3]], 1.68), 0xffffff, 1));
-  P.push(finish(prof([[1.0, 0.88], [0.35, 1.42], [-1.6, 1.45], [-1.88, 0.92]], 1.46), C.glass));
-  P.push(finish(box(1.48, 0.05, 1.9, 0, 1.45, -0.6), 0xffffff, 1));
-  for (const s of [-1, 1]) {
-    P.push(finish(beam([s * 0.72, 0.88, 0.98], [s * 0.72, 1.43, 0.36], 0.06, 0.06), 0xffffff, 1));
-    P.push(finish(box(0.06, 0.52, 0.12, s * 0.73, 1.16, -0.35), 0xffffff, 1));
-    P.push(finish(box(0.06, 0.52, 0.2, s * 0.73, 1.17, -1.65), 0xffffff, 1));
-    P.push(finish(box(0.08, 0.1, 0.15, s * 0.9, 1.0, 0.86), 0xffffff, 1));
-  }
-  P.push(finish(box(0.7, 0.14, 0.03, 0, 0.58, 1.97), C.dark));
-  carLights(P, 1.95, -1.95, 0.72, 0.8, 0.55);
-  if (taxi) P.push(finish(box(0.52, 0.16, 0.2, 0, 1.56, -0.35), [C.white, C.white, 0xf3d24a, C.white, 0x2a5aa8, 0x2a5aa8]));
-  return mergeParts(P);
-}
-// XE TẢI NHỎ thùng bạt (tải 1 tấn) 4.8×1.7×2.2 — thùng bạt màu bảng A — ~300 tam giác
-function modelTruck() {
-  const P = [];
-  carWheels(P, 1.55, -1.25, 0.72, 0.3, 0.2);
-  P.push(finish(prof([[2.4, 0.35], [2.42, 1.0], [2.3, 1.75], [1.35, 1.82], [1.32, 0.35]], 1.66), 0xffffff, 1));    // ca-bin
-  P.push(finish(box(1.6, 0.55, 0.05, 0, 1.38, 2.4, -0.12, 0, 0), C.glass));                                         // kính lái
-  for (const s of [-1, 1]) P.push(finish(box(0.03, 0.45, 0.7, s * 0.84, 1.4, 1.9), C.glass));
-  P.push(finish(box(1.7, 0.12, 3.15, 0, 0.62, -0.88), C.dark));                                                     // sàn thùng
-  P.push(finish(box(1.72, 1.45, 3.1, 0, 1.42, -0.88), 0xffffff, 2));                                                // bạt
-  P.push(finish(box(1.7, 0.22, 0.6, 0, 0.45, 1.85), C.dark));
-  for (const s of [-1, 1]) {
-    P.push(finish(box(0.3, 0.1, 0.05, s * 0.6, 0.62, 2.43), C.light));
-    P.push(finish(box(0.2, 0.1, 0.04, s * 0.7, 0.7, -2.45), C.red));
-  }
-  P.push(finish(box(0.5, 0.14, 0.02, 0, 0.5, -2.46), C.plate));
-  return mergeParts(P);
-}
-// XE VAN / MINIBUS 16 chỗ 5.2×1.88×2.1 (rất phổ biến: xe hợp đồng, xe khách nhỏ, xe công ty) — ~560 tam giác
-function modelVan() {
-  const P = [];
-  carWheels(P, 1.72, -1.55, 0.82, 0.33, 0.22);
-  // thân dưới (tới gờ kính), hốc bánh khoét
-  P.push(finish(prof([[2.58, 0.38], [2.63, 0.92], [2.42, 1.14], [-2.56, 1.16], [-2.6, 0.42], [-1.95, 0.36], [-1.9, 0.72], [-1.2, 0.72], [-1.14, 0.36], [1.36, 0.36], [1.42, 0.72], [2.04, 0.72], [2.1, 0.36]], 1.86), 0xffffff, 1));
-  // dải kính (kính lái dốc + cửa sổ hông liền)
-  P.push(finish(prof([[2.42, 1.14], [1.72, 1.98], [-2.5, 2.0], [-2.56, 1.16]], 1.8), C.glass));
-  P.push(finish(box(1.84, 0.12, 4.32, 0, 2.04, -0.36), 0xffffff, 1));                                   // nóc
-  for (const s of [-1, 1]) {
-    P.push(finish(beam([s * 0.9, 1.14, 2.38], [s * 0.9, 1.99, 1.74], 0.07, 0.07), 0xffffff, 1));          // trụ A
-    for (const z of [0.95, -0.7]) P.push(finish(box(0.06, 0.86, 0.14, s * 0.91, 1.57, z), 0xffffff, 1)); // trụ B/C
-    P.push(finish(box(0.06, 0.86, 0.22, s * 0.91, 1.57, -2.44), 0xffffff, 1));                          // trụ sau
-    P.push(finish(box(0.08, 0.14, 0.2, s * 1.0, 1.32, 2.2), C.black));                                   // gương
-    P.push(finish(box(0.02, 0.05, 1.6, s * 0.94, 1.0, -0.2), C.dark));                                   // ray cửa lùa
-  }
-  P.push(finish(box(0.9, 0.22, 0.03, 0, 0.68, 2.64), C.dark));                                           // ca-lăng
-  carLights(P, 2.62, -2.61, 0.84, 0.98, 0.66);
-  return mergeParts(P);
-}
-// LOD xa ô tô: thân + ca-bin (mặt bên kính, nóc sơn) — 24 tam giác
-function modelCarFar() {
-  const P = [];
-  P.push(finish(box(1.74, 0.55, 4.4, 0, 0.58, 0), 0xffffff, 1));
-  P.push(finish(box(1.5, 0.5, 2.3, 0, 1.12, -0.2), [C.glass, C.glass, 0xffffff, C.glass, C.glass, C.glass], 0));
-  return mergeParts(P);
-}
+// (xe máy / ô tô / người: js/models_kit.js — bộ mô hình chung với giao thông, W2-C)
 
 // ---------- CỘT ĐIỆN BÊ TÔNG (local: +X = phía lòng đường, +Z = dọc phố) ----------
 const POLE_H = 9.4;
@@ -703,47 +425,6 @@ function modelAFrame() {
   const m = mergeGeometries(parts); parts.forEach((p) => p.dispose());
   return m;
 }
-
-// ---------- NGƯỜI (cao ~1.65 m; aLimb 1/2 chân trái/phải, 3/4 tay trái/phải) ----------
-// màu: áo = instance (aPaint 1), quần = bảng A (2), da = bảng B (3), tóc cố định, nón lá = phụ kiện cổng 1
-function personParts(P, sit) {
-  const LIMB = (g, col, paint, limb) => P.push(finish(g, col, paint, limb));
-  if (!sit) {
-    for (const [s, limb] of [[1, 1], [-1, 2]]) {
-      LIMB(taper(0.13, 0.15, 0.16, 0.17, 0.46, s * 0.1, 0.44, 0), 0xffffff, 2, limb);              // đùi
-      LIMB(taper(0.1, 0.12, 0.13, 0.14, 0.42, s * 0.1, 0.04, 0), 0xffffff, 2, limb);               // cẳng
-      LIMB(box(0.11, 0.06, 0.24, s * 0.1, 0.03, 0.04), 0x2a2622, 0, limb);                          // giày dép
-    }
-    LIMB(box(0.33, 0.16, 0.2, 0, 0.94, 0), 0xffffff, 2, 0);                                         // hông
-  } else {
-    // ngồi ghế nhựa thấp (mặt ghế ~0.27 m): đùi nằm ngang về +Z, cẳng chân dựng
-    for (const s of [1, -1]) {
-      P.push(finish(box(0.15, 0.15, 0.44, s * 0.1, 0.38, 0.2), 0xffffff, 2, 0));
-      P.push(finish(taper(0.11, 0.12, 0.13, 0.14, 0.32, s * 0.11, 0.02, 0.42), 0xffffff, 2, 0));
-      P.push(finish(box(0.11, 0.06, 0.22, s * 0.11, 0.03, 0.47), 0x2a2622, 0, 0));
-    }
-    P.push(finish(box(0.33, 0.16, 0.24, 0, 0.36, 0), 0xffffff, 2, 0));
-  }
-  const y0 = sit ? 0.44 : 1.0, lean = sit ? 0.12 : 0;
-  // thân trên (thuôn: hông 0.32 → vai 0.4)
-  const torso = taper(0.31, 0.2, 0.4, 0.22, 0.52, 0, y0, 0); if (lean) { torso.translate(0, -y0, 0); torso.rotateX(lean); torso.translate(0, y0, 0); }
-  P.push(finish(torso, 0xffffff, 1, 0));
-  const sy = y0 + 0.48, hz = lean * 0.5;
-  for (const [s, limb] of [[1, 3], [-1, 4]]) {
-    if (!sit) {
-      LIMB(taper(0.09, 0.1, 0.1, 0.11, 0.3, s * 0.245, sy - 0.32, 0), 0xffffff, 1, limb);          // cánh tay (áo)
-      LIMB(taper(0.07, 0.08, 0.085, 0.09, 0.27, s * 0.25, sy - 0.6, 0), 0xffffff, 3, limb);        // cẳng tay (da)
-    } else {
-      P.push(finish(beam([s * 0.24, sy - 0.05, hz], [s * 0.2, sy - 0.32, 0.22], 0.1, 0.1), 0xffffff, 1, 0));
-      P.push(finish(beam([s * 0.2, sy - 0.32, 0.22], [s * 0.14, sy - 0.44, 0.42], 0.08, 0.08), 0xffffff, 3, 0));
-    }
-  }
-  P.push(finish(box(0.09, 0.08, 0.09, 0, sy + 0.06, hz), 0xffffff, 3, 0));                         // cổ
-  P.push(finish(new THREE.SphereGeometry(0.105, 8, 6).scale(0.92, 1.08, 1).translate(0, sy + 0.2, hz), 0xffffff, 3, 0)); // đầu
-  P.push(finish(new THREE.SphereGeometry(0.112, 8, 4, 0, Math.PI * 2, 0, Math.PI * 0.55).translate(0, sy + 0.215, hz - 0.012), 0x161412, 0, 0)); // tóc
-  P.push(finish(new THREE.ConeGeometry(0.25, 0.17, 10, 1, true).translate(0, sy + 0.36, hz), 0xd8c48a, 4, 0)); // nón lá (cổng 1)
-}
-function modelPerson(sit) { const P = []; personParts(P, sit); return mergeParts(P); }
 
 // =====================================================================================================================
 // 4. CHỈ MỤC KHÔNG GIAN: đoạn đường, bằng chứng pano, vật cản nhỏ
@@ -1583,35 +1264,60 @@ export function buildProps(ctx) {
     return m;
   }
   const tag = (list, v) => { for (const it of list) it.v = v; return list; };
-  // gần: model chi tiết ~500 tam giác (≤ 80 m — xe 1,1 m cao ở 80 m chỉ còn ~10 px); xa: bóng dáng 72 tam giác
-  const NEAR_BIKE = LITE ? 55 : 80, FAR_BIKE = LITE ? 260 : 420;
-  const matBike = propMaterial({ name: 'bike', palA: [0x1c1c1e, 0xd8d6cf, 0xb3261e, 0x2c4f8a, 0xe2c23a, 0x9aa0a6, 0xd27aa0, 0x2d6b3d], gate: [0.38, 0.33] });
-  const matCar = propMaterial({ name: 'car', palA: [0x2b5aa4, 0x3a7a46, 0x8a8f86, 0xe9e7e0, 0x2b5aa4, 0x5a7f9a, 0xbfb59b, 0x3a7a46] });
+  // XE MÁY / Ô TÔ / NGƯỜI = BỘ MÔ HÌNH CHUNG js/models_kit.js (W2-C — cùng nguồn với giao thông): MeshStandard (sơn
+  // bóng, kính phản chiếu trời) từ TIER 2; xe ĐỖ không bật đèn ban đêm (lamps:false). Phụ kiện bật theo bit aOpt
+  // (hash toạ độ: mũ treo gương, thùng sau, rổ xe cub, taxi, giá nóc, nón lá/mũ/tóc dài/khẩu trang/túi, ngồi).
+  // gần: xe máy ~0,85-0,95k tam giác (≤ 50 m — xe 1,1 m cao ở 50 m còn ~16 px); xa: bóng dáng ~0,1k
+  const NEAR_BIKE = LITE ? 40 : 50, FAR_BIKE = LITE ? 260 : 420;
+  const matVeh = kitMaterial({ name: 'veh', shirts: true, std: !LITE });   // CHUNG với giao thông (bit PARKED tắt đèn)
+  const kitOpt = (fn) => (m, list) => { const a = new Float32Array(list.length); list.forEach((it, i) => { a[i] = fn(it); }); m.geometry.setAttribute('aOpt', new THREE.InstancedBufferAttribute(a, 1)); };
+  const seedOf = (it, k) => Math.floor(hash3(it.x, it.z, k) * 256);
+  const parkedFar = () => optWord([OPT.PARKED], 0);
   const matPole = propMaterial({ name: 'pole', gate: [0.55, 0.45] });
   const matClut = propMaterial({ name: 'clutter', palA: [0xd8322a, 0x2a62c4, 0x2f9a4c, 0xe8e2d4, 0xd8322a, 0xf0b52c, 0x2a62c4, 0xe8e2d4] });
-  const PANTS = [0x23262c, 0x2f3540, 0x1f2a3a, 0x4a4238, 0x5b6470, 0x2b2b2e, 0x6b5f50, 0x3c4a5c];
-  const SKIN = [0xe2b48a, 0xd9a476, 0xc99063, 0xedc39b, 0xd6a07a, 0xc48a5c, 0xe8bc94, 0xdcaa80];
-  const matPed = propMaterial({ name: 'ped', palA: PANTS, palB: SKIN, gate: [0.16, 0], walk: true });
+  const matPed = kitMaterial({ name: 'props_ped', std: !LITE, walk: 'path' });
   const SHIRT = [0xe9e6df, 0xe9e6df, 0x3a6ea5, 0xb5473a, 0x4a7a52, 0x6a6f76, 0xd8b24a, 0xc86a92, 0x2f3540, 0xf2f2f0, 0x8a5a3c, 0x5c8fbf, 0xd96b2b];
   // vật liệu kính đèn/bóng đèn của RIÊNG props (cùng program với propMaterial) — cường độ chép từ sharedMats.lampGlow mỗi khung
   const glow = ctx.sharedMats && ctx.sharedMats.lampGlow;
   const matGlow = propMaterial({ name: 'glow' });
   matGlow.color.setHex(0xfff2c8); matGlow.emissive.setHex(0xffd890); matGlow.emissiveIntensity = 0;
 
-  // xe máy: 4 model gần — MỖI MODEL 1 InstancedMesh (gộp biến thể sẽ bắt GPU xử lý cả 4 bộ đỉnh cho mỗi xe:
-  // đo +0,27 M tam giác suy biến ở cam_spawn; tách = +3 draw call cùng program, rẻ hơn) + LOD xa chung
-  const bikeTris = [modelScooter(), modelUnderbone(), modelBigScooter(), modelCub()].map((g) => [g, triCount(g)]);
+  // xe máy: 3 kiểu kit (cub = xe số + rổ trước) — MỖI KIỂU 1 InstancedMesh (gộp biến thể bắt GPU xử lý mọi bộ đỉnh
+  // cho mỗi xe: đo +0,27 M tam giác suy biến ở cam_spawn) + LOD xa chung. bikeI: 0 ga nhỏ · 1 xe số · 2 ga lớn · 3 cub
+  const bikeKit = [['scooter', bikeI[0]], ['underbone', [...bikeI[1], ...bikeI[3].map((b) => ({ ...b, cub: 1 }))]], ['bigscooter', bikeI[2]]];
+  const bikeOpt = (it) => optWord([OPT.PARKED, ...(hash3(it.x, it.z, 94) < 0.38 ? [OPT.MIRRORHELM] : []), ...(it.top ? [OPT.TOPBOX] : []), ...(it.cub ? [OPT.BASKET] : [])], seedOf(it, 96));
+  for (const it of bikeI[2]) it.top = hash3(it.x, it.z, 95) < 0.4;
+  const bikeTris = {};
   const allBikes = bikeI.flat();
   const bikeColor = (it) => it.col;
-  ['scooter', 'underbone', 'bigscooter', 'cub'].forEach((nm, i) => inst('props_bike_' + nm, bikeTris[i][0], matBike, bikeI[i], { rMax: NEAR_BIKE, keepBehind: 25, color: bikeColor }));
-  inst('props_bikes_far', modelBikeFar(), matBike, allBikes.map((b) => ({ ...b, v: 0 })), { rMin: NEAR_BIKE, rMax: FAR_BIKE, cast: false, color: bikeColor });
-  // ô tô: 5 model gần + LOD xa
-  const NEAR_CAR = LITE ? 90 : 130, FAR_CAR = LITE ? 420 : 750;
-  const carModels = [modelSedan(), modelSUV(), modelHatch(false), modelHatch(true), modelTruck(), modelVan()];
-  const carTris = carModels.map(triCount);
-  const allCars = carI.flat();
-  ['sedan', 'suv', 'hatch', 'taxi', 'truck', 'van'].forEach((nm, i) => inst('props_car_' + nm, carModels[i], matCar, carI[i], { y: yRoad, rMax: NEAR_CAR, color: (it) => it.col }));
-  inst('props_cars_far', modelCarFar(), matCar, allCars.map((c) => ({ ...c, v: 0 })), { y: yRoad, rMin: NEAR_CAR, rMax: FAR_CAR, cast: false, color: (it) => it.col });
+  for (const [nm, list] of bikeKit) {
+    const g = shared('bike_' + nm, () => motorbikeGeometry(nm)); bikeTris[nm] = triCount(g);
+    inst('props_bike_' + nm, g, matVeh, list, { rMax: NEAR_BIKE, keepBehind: 25, color: bikeColor, extra: kitOpt(bikeOpt) });
+  }
+  inst('props_bikes_far', shared('bike_far_parked', () => motorbikeFarGeometry({ rider: false })), matVeh, allBikes, { rMin: NEAR_BIKE, rMax: FAR_BIKE, cast: false, color: bikeColor, extra: kitOpt(parkedFar) });
+  // ô tô: 6 kiểu kit gần (taxi = hatchback + hộp đèn; ~40% "SUV" là MPV 7 chỗ) + 2 LOD xa CHUNG (scale theo kiểu):
+  // ≤ 60 m đủ chi tiết (~1,9k tam giác) · 60-260 m thân loft thô (~0,28k, ô tô 1,5 m cao ở 60 m còn ~25 px) ·
+  // 260-750 m hộp (~30 tam giác, vài px)
+  const NEAR_CAR = LITE ? 50 : 60, MID_CAR = LITE ? 200 : 260, FAR_CAR = LITE ? 420 : 750;
+  const carKit = {
+    sedan: carI[0], suv: carI[1].filter((c) => hash3(c.x, c.z, 97) >= 0.4), mpv: carI[1].filter((c) => hash3(c.x, c.z, 97) < 0.4),
+    hatch: [...carI[2], ...carI[3].map((c) => ({ ...c, taxi: 1 }))], truck: carI[4], van: carI[5],
+  };
+  const carOpt = (it) => optWord([OPT.PARKED, ...(it.taxi ? [OPT.TAXI] : []), ...(hash3(it.x, it.z, 98) < 0.3 ? [OPT.RACK] : [])], seedOf(it, 99));
+  const carTris = {};
+  const farCars = [];
+  for (const nm in carKit) {
+    const g = shared('car_' + nm, () => carGeometry(nm)); carTris[nm] = triCount(g);
+    inst('props_car_' + nm, g, matVeh, carKit[nm], { y: yRoad, rMax: NEAR_CAR, color: (it) => it.col, extra: kitOpt(carOpt) });
+    const f = CAR_FAR_SCALE[nm];
+    // hw: nửa bề ngang THẬT của mô hình (kể cả gương) — cho giao thông né xe đỗ (xe 16 chỗ 1,18 m, SUV ~1,1 m; không phải 0,9 m)
+    const hw = +Math.max(g.boundingBox.max.x, -g.boundingBox.min.x).toFixed(3);
+    for (const c of carKit[nm]) { c.hw = hw; farCars.push({ ...c, sc: [f[2], f[1], f[0]] }); }
+    if (nm === 'hatch') for (const c of carI[3]) c.hw = hw;   // taxi: bản sao {...c, taxi} ở trên, gốc trong carI[3]
+  }
+  const allCars = carI.flat();   // = parkedCars (mỗi phần tử có hw)
+  inst('props_cars_mid', shared('car_far', carFarGeometry), matVeh, farCars, { y: yRoad, rMin: NEAR_CAR, rMax: MID_CAR, cast: false, color: (it) => it.col, extra: kitOpt(parkedFar) });
+  inst('props_cars_far', shared('car_far2', carFar2Geometry), matVeh, farCars, { y: yRoad, rMin: MID_CAR, rMax: FAR_CAR, cast: false, color: (it) => it.col, extra: kitOpt(parkedFar) });
   // CỘT & ĐÈN (gần: 6 biến thể / xa: 5 biến thể)
   const NEAR_POLE = LITE ? 140 : 200, FAR_POLE = LITE ? 600 : 1100;
   const poleTint = (it) => { if (it.col) return it.col; const v = 0.86 + hash3(it.x, it.z, 131) * 0.2; COL.setRGB(v, v, v * 0.98); return COL.getHex(); };
@@ -1684,18 +1390,35 @@ export function buildProps(ctx) {
     const fg = new THREE.PlaneGeometry(1.2, 0.8); fg.translate(0.62, 0, 0);
     inst('props_flags', fg, new THREE.MeshLambertMaterial({ map: ft, side: THREE.DoubleSide }), flagI.map((f) => ({ ...f, y: f.y + 6.1 })), { rMax: FAR_POLE * 0.6, cast: false });
   }
-  // NGƯỜI: đứng/đi (biến thể 0) + ngồi (biến thể 1) — 1 draw call
-  const NEAR_PED = LITE ? 140 : 240;
-  const pedTris = triCount(modelPerson(false));
+  // NGƯỜI (kit, 1 draw call): đi qua-lại / đứng / NGỒI ghế nhựa — CÙNG một mô hình, dáng do vertex shader (bit SIT:
+  // đùi gập 109°, cẳng thẳng đứng, hông hạ xuống mặt ghế); nón lá ~16%, tóc dài (nữ) ~45%, mũ, khẩu trang, túi, quần
+  // đùi, áo dài tay theo hash; chiều cao 1,56-1,80 m (instance scale)
+  // gần ≤ 60 m: người đủ (~0,9k tam giác, gập gối, bóng đổ) · 60-240 m: người thu gọn (~0,2k, không đổ bóng)
+  const NEAR_PED = LITE ? 140 : 240, MID_PED = LITE ? 45 : 60;
+  const pedGeo = shared('ped', pedestrianGeometry), pedTris = triCount(pedGeo);
   const people = [
-    ...walkI.map((p) => ({ ...p, v: 0 })),
-    ...standI.map((p) => ({ ...p, v: 0, walk: [0, 0, hash3(p.x, p.z, 151), 0] })),
-    ...sitI.map((p) => ({ ...p, v: 1, walk: [0, 0, 0, 0] })),
+    ...walkI.map((p) => ({ ...p })),
+    ...standI.map((p) => ({ ...p, walk: [0, 0, hash3(p.x, p.z, 151), 0] })),
+    ...sitI.map((p) => ({ ...p, walk: [0, 0, 0, 0], sit: 1 })),
   ];
-  inst('props_people', variants([modelPerson(false), modelPerson(true)]), matPed, people, { rMax: NEAR_PED, keepBehind: 40, color: (it) => pick(SHIRT, hash3(it.x, it.z, 152)), extra: (m, list) => {
+  for (const it of people) { const f = hash3(it.x, it.z, 153) < 0.45, s = f ? 0.92 + hash3(it.x, it.z, 154) * 0.06 : 0.97 + hash3(it.x, it.z, 154) * 0.07; it.fem = f; it.sc = [s, s, s]; }
+  const pedOpt = (it) => {
+    const h = (k) => hash3(it.x, it.z, k), b = [];
+    if (it.sit) b.push(OPT.SIT);
+    const r = h(155); if (r < 0.16) b.push(OPT.NONLA); else if (r < 0.26) b.push(OPT.CAP);
+    if (it.fem) b.push(OPT.HAIR_A); else if (h(156) < 0.2) b.push(OPT.SHORTS_A);
+    if (h(157) < 0.14) b.push(OPT.MASK_A);
+    if (h(158) < 0.2) b.push(OPT.BAG);
+    if (h(159) < (it.fem ? 0.35 : 0.12)) b.push(OPT.SLEEVE_A);
+    return optWord(b, seedOf(it, 160));
+  };
+  const pedExtra = (m, list) => {
     const a = new Float32Array(list.length * 4); list.forEach((it, i) => a.set(it.walk, i * 4));
-    m.geometry.setAttribute('aWalk', new THREE.InstancedBufferAttribute(a, 4));
-  } });
+    m.geometry.setAttribute('aPath', new THREE.InstancedBufferAttribute(a, 4));
+    kitOpt(pedOpt)(m, list);
+  };
+  inst('props_people', pedGeo, matPed, people, { rMax: MID_PED, keepBehind: 40, color: (it) => pick(SHIRT, hash3(it.x, it.z, 152)), extra: pedExtra });
+  inst('props_people_far', shared('ped_far', pedestrianFarGeometry), matPed, people, { rMin: MID_PED, rMax: NEAR_PED, keepBehind: 40, cast: false, color: (it) => pick(SHIRT, hash3(it.x, it.z, 152)), extra: pedExtra });
   // vũng sáng đèn đêm (cộng sáng, chỉ hiện khi đêm). Phản biện: quad đặt ở lòng +0,03 nằm DƯỚI vỉa hè (+0,18/+0,25)
   // và dưới vạch kẻ → vũng bị bó vỉa cắt thẳng, vạch tối giữa vũng; opacity 0,42 + lõi phẳng → "đĩa sơn" vàng sáng hơn
   // mặt tiền. Nay: quad ở yWalk+0,02 (trên MỌI mặt lát: lòng, vạch, vỉa dot3/WP6) → một vũng mềm phủ cả lòng + mép vỉa;
@@ -1739,7 +1462,7 @@ export function buildProps(ctx) {
       pools.userData.poolMat.opacity = Math.min(1, gI) * 0.2;
     }
   };
-  if (ctx.updaters) ctx.updaters.push((dt, time) => { PROP_TIME.value = time; });
+  if (ctx.updaters) ctx.updaters.push((dt, time) => { PROP_TIME.value = time; KIT_U.uKitTime.value = time; });
   // móc vào scene.onBeforeRender (gọi 1 lần/lượt render với camera CHÍNH — không gọi trong pass bóng)
   const prevHook = scene.onBeforeRender;
   scene.onBeforeRender = function (renderer, sc, camera, rt) {
@@ -1758,12 +1481,12 @@ export function buildProps(ctx) {
     stools: stoolI.length, parasols: paraI.length, carts: cartI.length, aframes: aframeI.length, bins: binI.length, hydrants: hydI.length, cabinets: cabI.length,
     walkers: walkI.length, standing: standI.length, sitting: sitI.length,
     instancedMeshes: drawGroups, trisAllInstances: Math.round(tris),
-    modelTris: { scooter: bikeTris[0][1], underbone: bikeTris[1][1], big: bikeTris[2][1], cub: bikeTris[3][1], sedan: carTris[0], suv: carTris[1], hatch: carTris[2], truck: carTris[4], van: carTris[5], ped: pedTris },
+    modelTris: { ...bikeTris, ...carTris, ped: pedTris },
   });
   console.log('[props]', JSON.stringify(stats));
   // móc gỡ lỗi/QA (không dùng trong game): window.__hpProps.sides / .cull()
   if (typeof window !== 'undefined') window.__hpProps = { stats, sides, cull: () => CULL.map((t) => [t.mesh.name, t.mesh.count, t.n]), bikeRows, lists: { stoolI, cartI, aframeI, walkI, standI, sitI, cars: carI.flat(), bikes: bikeI.flat(), cobraI, ornI, poleI, poleLampI, trafoI, binI } };
-  // parkedCars: ô tô đỗ {x,z,heading,len,…} (tâm ở curbLine − 0,95; phố r: curbLine − 0,05) — cho WP8 giao thông né
+  // parkedCars: ô tô đỗ {x,z,heading,len,hw,…} (tâm ở curbLine − 0,95; phố r: curbLine − 0,05) — cho WP8 giao thông né
   // làn đỗ (xe chạy cách bó vỉa ≥ 1,9 m nơi có xe đỗ) mà không phải đọc lại collider
   return { stats, update, meshes, cableMeshes, parkedCars: allCars, cullStats: () => CULL.map((t) => [t.mesh.name, t.mesh.count, t.n]) };
 }
