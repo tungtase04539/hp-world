@@ -1,4 +1,5 @@
-import { groundHeightNoDeck, BUILD_RADIUS } from './world.js';
+import { groundHeightNoDeck, BUILD_RADIUS, FABRIC } from './world.js';
+import { fabricData } from './citygen.js';
 import { ROADS_DT, BUILDINGS, PARKS, RAIL, STREETS } from './mapdata.js';
 import { LANDMARKS } from './landmarks.js';
 import { quests } from './quests.js';
@@ -69,9 +70,23 @@ export function initMinimap() {
     o.closePath(); o.fill();
   }
 
-  // 4) footprint nhà (chỉ trong bán kính)
+  // 4) footprint nhà (chỉ trong bán kính) — ĐỢT 3: FABRIC 'real' vẽ footprint THẬT đã dựng (bỏ nhà dead dưới
+  //    địa danh/vùng mở), 1 lần lúc init (~25k đa giác, 1 path → 1 lần fill); 'proc' giữ OSM BUILDINGS cũ.
   o.fillStyle = '#e8e3da';
-  for (const b of BUILDINGS) {
+  if (FABRIC === 'real') {
+    const D = fabricData();
+    o.beginPath();
+    for (let b = 0; b < D.nB; b++) {
+      if (D.dead[b]) continue;
+      const s = D.vStart[b], e = D.vStart[b + 1];
+      if (D.x[s] * D.x[s] + D.z[s] * D.z[s] > EXT * EXT) continue;
+      const p0 = toBase(D.x[s], D.z[s]); o.moveTo(p0[0], p0[1]);
+      for (let v = s + 1; v < e; v++) { const p = toBase(D.x[v], D.z[v]); o.lineTo(p[0], p[1]); }
+      o.closePath();
+    }
+    o.fill();
+  }
+  if (FABRIC !== 'real') for (const b of BUILDINGS) {
     const [fx, fz] = b.p[0];
     if (fx * fx + fz * fz > EXT * EXT) continue;
     o.beginPath();

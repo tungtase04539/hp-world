@@ -29,6 +29,8 @@ Trò chơi: thế giới 3D Hải Phòng **tỉ lệ 1:1 mét thật** (từ 202
 | `js/mapdata.js` | **SINH TỰ ĐỘNG** bởi `tools/process_osm.mjs` — KHÔNG sửa tay |
 | `js/terrain.js` | Cao độ/đất-nước thuần JS (không import three → chạy được trong node để test) |
 | `js/world.js` | Dựng toàn bộ thế giới 3D, collider, spawn, `buildWorld(scene)` |
+| `js/citygen.js` | ĐỢT 3: dựng PHỐ NHÀ THẬT từ footprint RB01 (`buildings_real.js`) — 1 quad/cạnh tường + shader atlas, mái/tum/bồn/tôn, ban công/mái hiên/hộp biển/điều hoà 3D (ô gần), va chạm đa giác (`fabricCollide/At/Hit`), `fabricData()` dùng chung. Cờ `FABRIC` (world.js, `?fabric=proc` = phố giả cũ) |
+| `js/facade_atlas.js` (+ `facade_atlas_worker.js`) | Atlas mặt tiền/mái/chi tiết/biển hiệu VN vẽ thủ tục bằng rasterizer phần mềm (8×8 ô, alpha = mặt nạ), vẽ trong Worker |
 | `js/assets.js` | Đăng ký + preload + streaming GLB theo khoảng cách |
 | `js/main.js` | Vòng lặp game, camera, người chơi, chuỗi hậu kỳ (composer), autoQuality, `window.__hp` |
 | `js/daynight.js` | Ngày/đêm (1440 s/ngày, mặt trời thiên văn), vòm trời shader, đèn mặt trời/trăng + bán cầu, sương FogExp2, PMREM bầu trời (IBL), hộp bóng snap texel, chế độ vệ tinh — Đợt 3 WP5 |
@@ -638,6 +640,101 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     dùng được cho hệ chạy sau (đạo cụ WP7), nhưng `veg.plant` sau đó vẫn KHÔNG dựng.
     (6) Còn cây cũ CHƯA chuyển (ngoài vùng WP4): cau 'rockery' giữa vòng xuyến (world.js ~1860, vùng WP7), cau sân Nhà
     khách Hải quân (~9865, WP3), bách tán chóp thông (~8383), cây quanh hải đăng (~20180, ngoài R).
+- **2026-10-04 (dot3-WP2 FABRIC)** [PHỐ NHÀ THẬT TỪ FOOTPRINT — `js/citygen.js` + `js/facade_atlas.js` (+ `_worker.js`)]:
+    **(1) CỜ `FABRIC`** (world.js cạnh BUILD_RADIUS): mặc định `'real'`; `?fabric=proc` = bộ sinh nhà GIẢ cũ để A/B. Các khối
+    `if (FABRIC === 'proc') {` thay `{` ở: vòng OSM BUILDINGS, mái hiên/biển generic (InstancedMesh cap 300), `house()` rows,
+    `shophouse_infill`, `block_infill` (+ dãy LHP), `port_kho`, `_buildAnchor` (Sở GTVT/Cảng vụ/BV QT), 3 `tower()` giả. CHƯA
+    gate (thuộc khối cells — WP3): `port_kho_100+` (fix t8) và `port_kho_0..`. Hàm `house()`/`facadeMats` giữ (grandMat dùng).
+    Mọi chỗ đọc `_bldGrid`/`houseEvidence`/`nearRealBuilding` nay chỉ còn trong nhánh proc (FABRIC 'real' không nạp chúng).
+    **(2) VÙNG GIỮ CHỖ trước khi dựng** (world.js, ngay sau `cornersDry`, TRƯỚC mái hiên/biển/cây): `LM_POLY` (+3 m, đệm miter)
+    kind 'landmark' ('square' → 'plaza'); vòng tròn khối GLB lệch/to hơn footprint (opera 28, bưu điện lùi 9 m r27, bảo tàng
+    21, nhà thờ 25, ga 30, THPT NQ 44, đền Nghè, đình HK, chùa Hàng, NHNN 34, đền Tam Kỳ, Nhà Kèn, Chợ Sắt +12,+4 r60); hộp CVH
+    Thanh Niên; `PARKS` (đa giác OSM — KHÔNG dùng `GARDENS`: đó là bbox TRỤC THẲNG của chính các park, dải vườn hoa chạy chéo
+    nên bbox nuốt ~110 nhà thật hai bên phố); tập con THẬT SỰ MỞ của `openSpace` (quảng trường Nhà hát r62, hành lang Nhà hát→
+    Quán hoa, QT Lê Chân, QT Triển lãm, chợ Cột Đèn, bãi Cầu Đất, road#9 2 hộp, CV ĐBP tây, 2 promenade Tam Bạc, CV Bạch Đằng,
+    Bến Bính, hành lang ray Mê Linh). Zone dạng HÀM thử tại TÂM: `clearedZone`, `inSuperblock`, hộp nút cầu HVT, `lakeSD<16`,
+    `hoSenSD<10`, kè hồ 25 m. Các zone openSpace kiểu "khuôn viên công sở / bệnh viện / ngã tư bảo tàng / kè sông 42 m / cầu Lạc
+    Long" CỐ Ý BỎ: chúng chặn nhà GIẢ, còn footprint thật ở đó là nhà thật. Nhà bị `D.dead[b]=1` khi tâm trong claim HOẶC
+    `claimOverlapFrac>0.2` (mọi kind — claim 'cell' của WP3 tự có hiệu lực, miễn đăng ký TRƯỚC khối này) HOẶC chứa/sát (<0,5 m)
+    điểm camera pano (lệch đăng ký/đè đường). v0: 289 do claim + 119 do zone + 9 do pano. `claims.js` thêm lọc nhanh BBOX
+    trong `claimOverlapFrac` (kết quả y hệt; cần khi WP3 rải ~1.200 claim 'cell').
+    **(3) ATLAS** (`facade_atlas.js`): rasterizer PHẦN MỀM ghi thẳng Uint8ClampedArray (không canvas: premultiply hỏng RGB ở
+    mặt nạ 0, getImageData 2048² 30-40 ms; Clamped để cộng sáng/bóng không quấn 255→0). 8×8 ô, mỗi ô 1 MÔ-ĐUN = 1 bay 4 m × 1
+    tầng (tầng trệt 3,9 / trên 3,3 / lan can 0,9 m) hoặc 4×4 m mái/chi tiết; 60 ô: 20 tầng trên (nhôm kính+hoa sắt, ban công
+    Juliet, chuồng cọp, ốp gạch, điều hoà, lô gia, cửa chớp Pháp, vòm, con tiện, KTT, vách kính, băng cửa, biệt thự, công sở,
+    tôn kho), 13 tầng trệt (tạp hoá kệ hàng, shop quần áo, quán ăn ghế nhựa, nhà thuốc, cửa cuốn ×2, kính, cửa xếp, nhà ở ×2,
+    phố cũ cửa gỗ vòm, kho, công sở), 7 tường hông/sau/chung (vữa, xi măng thô, ố, cửa sổ nhỏ, mảng gạch, QUẢNG CÁO VẼ TAY từ
+    chung "HÚT BỂ PHỐT"), 2 lan can mái, 4 mái (bê tông, GẠCH LÁ NEM ĐỎ giữ màu, tôn sóng, ngói), 8 chi tiết, 5 ô × 4 dải BIỂN
+    HIỆU (20 từ CHUNG: CÀ PHÊ, TẠP HOÁ, PHỞ BÒ... + SĐT giả — KHÔNG thương hiệu), mặt trước CỤC NÓNG ĐIỀU HOÀ `D_AC` (đặt SAU
+    các ô SIGN: SIGN0.. phải liên tiếp). KÊNH ALPHA = MẶT NẠ: 255 tường (nhân màu nhà), 191 kính (sáng đêm), 128 giữ màu, 64 nền
+    biển (nhân màu biển), 0 chữ biển (màu tương phản). THỨ TỰ CÓ CHỦ Ý: biên tường↔giữ (khung/song sắt — nhiều nhất) khi mipmap
+    trộn chỉ đi qua vùng "kính", không qua biển/chữ. Nhiễu xác định (hash + value noise, không Math.random). VẼ TRONG WORKER
+    (`facade_atlas_worker.js`, module worker, chữ bằng OffscreenCanvas): luồng chính chỉ `buildFacadeAtlas(size,{layoutOnly:true})`
+    lấy chỉ số ô cho shader + DataTexture ĐÚNG KÍCH THƯỚC tô xám chờ; ảnh về thì `tex.image.data = data; needsUpdate` (BẪY: three
+    r160 dùng texStorage2D BẤT BIẾN — không được đổi kích thước texture sau lần upload đầu). Worker lỗi → vẽ đồng bộ. 2048²
+    (TIER≥2) / 1024² (TIER≤1); node 83-88 ms, worker 190-210 ms (onmessage chỉ chạy khi buildWorld nhả luồng chính — log
+    "worker 7-8 s" là thời điểm nhận, không phải thời gian vẽ; vẫn về TRƯỚC khung hình đầu).
+    **(4) BUILDER** (`buildRealFabric(scene, ctx)`): MỖI CẠNH = 1 QUAD (cạnh cắt nóc hồi = 3 tam giác), uv = (bay, ĐỘ CAO LOCAL m);
+    shader (Lambert + onBeforeCompile, `textureGrad` + đệm 3 px/ô + TRẦN MIP ~log2(ô)−3,5 chống loang ô kề) chọn mô-đun THEO
+    FRAGMENT: tầng từ độ cao, bay = floor(uv.x), bộ mô-đun theo STYLE; tầng trên 80% "mô-đun chính" của nhà; mặt phố ≥3 bay
+    (dãy nhà ống gộp) → MỖI BAY 1 nhà (màu WALL_PALETTE + mô-đun riêng); dải biển 2,95-3,85 m phủ chữ từ 20 dải SIGN theo hash.
+    aFac u8×4 = (seed, kind|cờ, style hoặc ô atlas, số tầng); cờ +8 nhà LỚN/CAO/độc lập (≥5 tầng, ≥600 m² từ 3 tầng, KTT/kính/
+    biệt thự/công sở → hông + sau cũng có cửa sổ đều, ~12% bay trơn), +16 mặt phố dài, +32 mái dốc, +64·CẤP ĐƯỜNG trước mặt tiền
+    (`frontClass`: p/s/t → 8% bay là nhà ở, r/w 45%, ngõ h 85% — phố nhỏ/ngõ thôi "toàn cửa hàng"). Nhà ≥9 tầng mà dữ liệu ghi
+    nhà ống/phố cũ → mô-đun KTT hoặc kính (tháp 20 tầng mang mô-đun nhà ống trông giả). MÔ-ĐUN TẦNG TRỆT chọn bằng HASH
+    NGUYÊN uint (`ihash/pidx`): `groundModule()` JS ra ĐÚNG TỪNG BIT như GPU (kiểm 8192 mẫu, Radeon 890M/ANGLE) → citygen biết bay
+    nào có dải biển (`SIGN_EXT`) và dựng HỘP BIỂN 3D lồi 0,22 m đúng chỗ (mặt trước = kind 6, shader vẽ y hệt mặt phố sau nó →
+    không "nhảy" khi ẩn ô chi tiết). BẪY: hash FLOAT trong GLSL ≠ JS (float32/FMA) — muốn JS biết GPU chọn gì thì dùng số nguyên.
+    CẠNH NÂNG (`faceRoad`): cạnh SIDE/BACK ≥3 m nhìn thẳng ra lòng đường trong 26 m mà không nhà nào che → vẽ như MẶT PHỐ (v0
+    gắn FRONT chỉ khi đường cách ≤ ~6,5 m sau mặt tiền chuẩn → nhà lùi 10-20 m quay TƯỜNG TRƠN ra phố, vd pano_085/092; v0: 10,6k
+    cạnh được nâng; không áp "mỗi bay 1 nhà" cho cạnh nâng). Ban đêm: material đẩy vào `world.facadeMats` → daynight đặt
+    emissiveIntensity, shader lấy `emissive.r` làm hệ số đêm (KHÔNG sửa daynight.js); kính sáng ngẫu nhiên theo ô + cửa hàng
+    trệt + biển, ánh đèn NHÂN với texture. AO giả: chân tường tối dần 0-1,7 m.
+    Mái: FLAT_PARAPET = đa giác (earcut/quạt) + mặt TRONG lan can; FLAT +0,25; GABLE/SHED tôn theo trục DÀI OBB (cắt đa giác bằng
+    Sutherland-Hodgman theo đường nóc, tường lên tới mặt mái + đỉnh hồi); HIP ngói chỉ cho nhà ~chữ nhật (diện tích/OBB ≥0,85,
+    ≤6 đỉnh) trên OBB đua 0,35 m. Sàn mái bằng: lá nem đỏ 45% nhà <300 m² (15% nhà lớn), còn lại bê tông SẪM nhuộm màu mái;
+    `roofVar` = mỗi mái 1 độ sáng 0,78-1,14 theo hạt giống (vệ tinh là MẢNG LOANG; ô bê tông 4 m có vết đậm lặp lại → nhìn từ
+    trên thành "lưới caro" — vết loang trong ô phải MỀM). Đồ trên mái bằng (nhà <900 m²): tum thang 45% (≥3 tầng, phía SAU mặt
+    phố, mặt cửa D_DOOR), bồn inox lục giác 70% (trên tum nếu có), MÁI TÔN che sân thượng 70% nhà <300 m² / 40% lớn hơn, phủ
+    55-95% chiều dài, ~70% đỏ gỉ/nâu đỏ (mảng đỏ chủ đạo của vệ tinh HP) + 2 cột thép phía phố, máy nước nóng 10% nghiêng NAM.
+    Vệt gỉ trên ô tôn CHỈ làm tối (tô màu nâu M_KEEP → thành vạch trắng hồng trên tôn xanh).
+    Chi tiết mặt phố (ô 'det'): ban công sàn+lan can xây/sắt (TUBE 62%, OLD 50%...), mái hiên bạt sọc 40% (2,88→2,4 m, ra
+    1,5 m), hộp biển 3D, CỤC NÓNG ĐIỀU HOÀ 3D (0,82×0,54×0,3 m treo +2,58..3,12 m mỗi tầng trên — dưới mép sàn ban công tầng trên
+    +3,18 m nên không cắt ban công; 20% bay nhà ống, 30% KTT). Chi tiết chỉ dựng cho nhà có tâm r ≤ 1650 m.
+    Ô: CHÍNH 450 m `fab_main_<tx>,<tz>` (đuôi _x,z cho nearCull) — ĐO cùng phiên 300/450/600 m: 450 giảm MỘT NỬA draw call của
+    phố (pano_007 58→26, cam_spawn 38→21, kể cả lượt bóng), tam giác vẽ chỉ +0,01-0,05 M; 600 không lợi thêm. CHI TIẾT 300 m
+    `fab_det_<tx>_<tz>` (CỐ Ý không khớp regex _x,z: hiện trong 380 m (LITE: không có) do `scene.onBeforeRender` nối chuỗi
+    bật/tắt, nhịp 0,25 s). Mọi mesh `userData.noMerge=true` + freezeStatic `collect` bỏ qua (aFac không sống qua merge/split).
+    v0 (25.192 footprint): dựng 24.775 nhà; 57 ô chính (≤57 draw call cả thành phố) 0,74 M tam giác + 107-110 ô chi tiết
+    0,75 M tam giác (chỉ phần trong 380 m được vẽ); dựng 510-640 ms (giải mã 5, claims 60-70, hình học 340-450 ms).
+    **(5) VA CHẠM ĐA GIÁC**: lưới 16 m trên bbox nhà (+2 m), dựng NGAY sau khi chốt D.dead; `fabricCollide(p,r)` 2 lượt: trong
+    nhà → ra cạnh gần nhất KHÔNG dẫn sang nhà kề (tường chung), ngoài mà gần < r → đẩy theo điểm gần nhất. Gắn cuối
+    `world.resolveCollisions` (nên mọi oracle đặt cây/hoa/diag tự thấy nhà thật). Mới: `world.isFree(x,z,r)`,
+    `world.findFree(x,z,r,maxD)` (xoắn ốc 1 m, đất khô), `world.fabric = {stats, meshes, detMeshes, collide, at, hit, frontEdges,
+    material}`; `citygen.fabricData()` = RB01 giải mã DÙNG CHUNG (D.dead = nhà đã bỏ — camera/minimap/cell sink phải bỏ qua).
+    **(6) RÀ LẠI vị trí**: biển địa danh (landmarks.js) chỉ DỜI khi trong/cách footprint <1,3 m: nhà thờ ~7 m, đền Nghè 8 m, đình
+    HK 3 m, NHNN 8 m; npcSpots/vehicleSpawns (trừ thuyền) dời khi chạm nhà; cyclo (−220,174) hết nằm trong nhà (đa giác 46×46
+    dưới claim QT Lê Chân). `__hp.diag()` RỖNG cả real lẫn proc; 0/551 camera pano trong nhà; 400/400 điểm thử trong nhà bị
+    đẩy ra. BIỂN THẬT `SHOP_SIGNS`: NEO vào mặt tiền thật gần nhất ≤22 m đúng dải biển 3,4 m (0,27 m trước tường — trước hộp
+    biển 3D), quay theo pháp tuyến cạnh, biển trùng toạ độ rải dọc mặt tiền không chồng; không có mặt tiền → bỏ. LƯỚI AN TOÀN
+    THƯƠNG HIỆU `_BRAND` (world.js, cả 2 nhánh): catalog pano còn HANA/INAX/MB/"BẢO MIN…" → bỏ biển đó (WP3 làm sạch tận gốc
+    gen_shopsigns). Minimap vẽ footprint thật còn sống (1 path, 1 lần).
+    **ĐO** (Chrome headless d3d11, Radeon 890M, ?quality=full TIER 3, 1280×720, máy dùng chung với 7 agent — fps ±; A/B CÙNG
+    PHIÊN proc → real, fog cố định 2600, 2 phiên): hpReadyMs 19,7-23,2 → 8,7-9,5 s (baseline dot3 18,9); cam_spawn 738 call/
+    4,88 M tri → 709-712/3,92 M; pano_007_h090 1.577-1.706/7,9-9,1 M → 1.353-1.355/6,59 M (fps 42-44 → 50-51); cam_high_center
+    1.160/7,44 M → 1.089-1.091/6,46 M (fps 46-49 → 51-57); game_3 1.197/8,13 M → 1.172/7,17 M; pano_102_h090 1.079/4,57 M →
+    856-993/3,5-4,3 M. 12 góc std so baseline: calls −4…−21%, tris −13…−26% (game_3 dao động 1,17k-1,66k call giữa các lượt do
+    hệ khác — đo trực tiếp: phố thật chỉ chiếm 8 call/0,14 M tri ở góc aerial này). Heap 730-950 MB cả hai nhánh (dao động theo
+    GC; hình học ô chi tiết giữ bản CPU ~50 MB vì mất ngữ cảnh WebGL cần upload lại). LITE (TIER 1): không lỗi mới (8 lỗi 404
+    `assets_lite/*.glb` do worktree không có assets_lite — có cả ở proc), hpReady 6,8-7,4 s.
+    **BẪY/BÀI HỌC**: (a) helper GLSL dùng sampler `map` phải chèn SAU `#include <map_pars_fragment>`, không sau `<common>`;
+    (b) đo trong máy dùng chung: autoQuality nấc 3 (near view, fog 220/1300, không hoàn tác) có thể bật giữa chừng → ảnh
+    aerial mù sương — script chụp nên ghi `scene.fog.far` mỗi shot hoặc ép fog; (c) v0 footprint lùi khỏi phố + mặt phố không
+    liên tục: phố thật vẫn "thưa" tới khi WP1 (frontage snap, lô, infill) về; renderer chỉ bù phần "tường trơn quay ra phố"
+    (faceRoad); (d) tam giác ô chi tiết tăng theo số MẶT PHỐ (hộp biển 8, điều hoà 8, ban công 12, cột 6 tam giác/cái): khi WP1
+    v1 thêm lô/infill phải đo lại ngân sách ≤1,5 M (núm: xác suất trong citygen, DET_RMAX, DET_R); (e) `sed -i` của Git Bash
+    đổi CRLF→LF cả file — sửa file repo bằng python/Edit.
+
 - **2026-09-07 (di)** [ĐỢT 2 TÍCH HỢP — 6 nhánh worktree song song + 6 phản biện đối kháng, gộp trên `dot2-int`]:
     Quy trình: mỗi nhánh (W1 merge-budget, W2 ground-grid, W3 landmark-lod, W4 visual, W5 hydro-polygon-water,
     W6 landmark-placement) làm trong worktree riêng, tự đo trước/sau trên GPU thật, có agent phản biện đọc diff +

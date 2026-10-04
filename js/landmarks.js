@@ -368,6 +368,8 @@ export function buildLandmarkSigns(scene, world) {
   }
   const signs = [];
   for (const lm of LANDMARKS) {
+    // ĐỢT 3: phố nhà THẬT (citygen) — biển nằm trong footprint thì dời ra chỗ trống gần nhất (minimap/quest dùng chung lm)
+    if (world.fabric && world.findFree && world.fabric.hit(lm.x, lm.z, 1.3)) { const q = world.findFree(lm.x, lm.z, 1.3, 30); lm.x = q[0]; lm.z = q[1]; }
     const y = world.groundHeight(lm.x, lm.z);
     const post = new THREE.Mesh(
       new THREE.CylinderGeometry(0.12, 0.15, 2.2, 6),
