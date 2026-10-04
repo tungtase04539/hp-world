@@ -71,8 +71,12 @@ Quan hệ dữ liệu: `tools/fetch_osm.sh` → `osm_*.json` → `tools/process_
 
 ### Tỉ lệ hiển thị 1:1 (mét thật)
 - Đường lòng: p=13, s=10, t=8, r=5.5, w=3.5 (region 12). Nhà dân footprint THẬT, 3.3m/tầng.
-- Địa danh GLB scale theo `LM_SIZE[key]` (cạnh dài thật OSM): opera 49, bưu điện 49, nhà thờ 45, ga 55,
-  bảo tàng 36, NHNN 63, chợ Sắt 132×96, THPT NQ 80... Cầu HVT nhịp vòm 200m, trụ Bính 101m, cần cẩu 50m.
+- Địa danh GLB: TỪ ĐỢT 3 W2-E khớp footprint OSM `LM_POLY` bằng bảng `LM_FIT` (world.js: xoay + scale sx/sy/sz, đo bằng
+  tools/qa/lmfit.py — xem §10 "Đ3-W2-E"). **LUẬT MẶT ĐỨNG:** trục ngang của mặt tiền lệch ≤ 10% so với sy (đồng hồ/cửa vòm/chân
+  dung không méo; chỉ CHIỀU SÂU được giãn); **nhà hát scale ĐỀU tuyệt đối** (chân dung Bác — §5.6). Phần footprint GLB không phủ
+  (sau nhà hát, cánh ga, khuôn viên trường/chùa/UBND, Việt Tiệp) là khối thủ tục từ đa giác; va chạm GLB = VIỀN chiếu bằng GLB
+  (`LM_OUTLINE`, tools/qa/lmoutline.py), không phải LM_POLY nguyên khối. (Cũ: scale ĐỀU theo `LM_SIZE` — nhà hát 49, ga 55, THPT 80 → sai hướng/tỉ lệ.)
+  Cầu HVT nhịp vòm 200m, trụ Bính 101m, cần cẩu 50m.
 - Tốc độ THẬT (m/s): đi 5, chạy 11, xe máy 23 (~83 km/h), thuyền 19. Camera far 16000, fog 600-4200.
 - Nhân vật ~1.7m. Đồ nội thất phố (ghế/đèn/biển/thùng rác) giữ TẦM NGƯỜI (~0.5-3m), KHÔNG scale theo 1:1.
 
@@ -229,6 +233,8 @@ Quy trình đã kiểm chứng (scratchpad `bake.mjs`, dùng `@gltf-transform/co
    (gờ nổi của bake cũ tạo "vòng sáng" quanh đầu); metallicRoughness = (255,235,0) mờ hoàn toàn.
 4. baseColor có thể phóng 2048→4096 (lanczos3, JPEG q95) để ảnh dập nét gấp đôi.
 5. Ghi lại texture vào doc, write GLB, `gltf-transform meshopt`. Ảnh chỉ scale ĐỀU — cấm kéo méo.
+   Cả transform RUNTIME của nhahat.glb (world.js `LM_FIT.opera`) cũng phải sx = sy = sz (Đ3-W2-E từng ép mặt tiền 0,66:1 → chân
+   dung hẹp 0,76 → 0,50, phản biện bắt lỗi; nay s = 21 đều).
 - Kiểm tra nhanh model đơn lẻ (không cần vào game): trang `glbtest.html` (?m=<tên file>) render
   2 hướng ±z bằng three.js thuần — soi mặt tiền/texture trong ~5 giây.
 - Tọa độ nào là "tường nhìn thấy": tra tam giác theo VỊ TRÍ 3D rồi xem UV của chúng — đừng đoán
@@ -739,6 +745,96 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     không kết luận được chênh p95 ~2 ms. Heap sau GC 389 MB, programs 68, geometries 456; người + xe 20-22 draw call
     (full) / 14-18 (LITE). WebGL1 ép: 2 lỗi shader = base (không còn boneTexture). Đêm pano_007_h090: đèn pha/hậu xe
     máy xa hiện lại như dot3; xe ngược chiều 7 m loé bloom.
+- **2026-10-04 (Đ3-W2-E LANDMARKS)** [ĐỊA DANH KHỚP FOOTPRINT THẬT — GLB transform dị hướng + khuôn viên thủ tục theo LM_POLY]:
+    **(1) KHỚP GLB (world.js, khối ngay sau `await prog('landmarks')`):** bảng `LM_FIT {key: th, sx, sy, sz, dx, dz}` → `placeGLB({fit,
+    key})` đặt `scale.set(sx,sy,sz)` + `rotation.y = th` + TÂM BBOX model tại `LM_CENTROID + (dx,dz)` (file GLB KHÔNG đổi; twin lite
+    assets.js chép nguyên `scale` vector nên LOD khớp). sx/sz = m mỗi đơn vị model theo local X/Z, dị hướng có giới hạn; sy CHỌN theo
+    chiều cao thật trong pano (không theo scale ngang — ga scale đều 118 m thì cao 80 m). Số đo bằng **`tools/qa/lmfit.py`**: ảnh chiếu
+    bằng của GLB GỐC (`tools/qa/glbsheet.html?m=<glb>&occ=0.12` — bỏ 12% chiều cao dưới: tấm đế/bậc Meshy; chụp hàng loạt
+    `OCC=0.12 node tools/qa/glbsheets.mjs <port> <dir>/sheets nhahat,ga,…`) → lưới θ (±vài độ quanh hướng mặt tiền ĐÃ KIỂM bằng pano),
+    sx, sz, dời tâm, cực đại `IoU − lam·(phần ngoài đa giác nở buf) − lamR·(phần trong hành lang phố: cách tim < facadeLine − 0,5 m)`
+    (`node tools/qa/lmfit_prep.mjs <dir>` ghi lmpoly.json + segs.json). Kết quả (IoU raster tam giác GLB thật trong game, `tools/qa/
+    lmprobe.mjs --metrics`, trước → sau; SỐ CUỐI sau phản biện ở mục "SAU PHẢN BIỆN" bên dưới): nhà hát 0,42 → 0,74 (BẢN ĐẦU ép mặt
+    tiền dị hướng — SAI, đã sửa: scale ĐỀU 21, xem dưới), nhà thờ 0,62 → 0,83 (gần đều: "rộng hơn 8 m" của kiểm toán cũ là bbox
+    gồm 2 hàng cây bách), bưu điện 0,52 → 0,62 (xoay −38°: THÁP ĐỒNG HỒ — mặt +Z GLB — quay ra GÓC TÂY-NAM vát tròn: pano_220 h045
+    thấy tháp chính diện y ảnh thật, pano_362 h315 thấy cánh vòm gạch đỏ = mặt +X GLB; lòng đường ~10 m² ở mép phố chéo), bảo tàng 0,64 → 0,70, NHNN 0,71 → 0,81 (lòng đường 134 → 0 m²:
+    góc tây LM_POLY lấn 3,2 m qua bó vỉa phố 't' → phạt hành lang), đình HK 0,40 → 0,52, đền Tam Kỳ 0,69 → 0,95.
+    **(2) KIT KHỐI THỦ TỤC** (cùng khối): `lmOBB` (OBB diện tích nhỏ nhất, u = trục dài), `lmEdge(P,a,b)` (hệ toạ độ theo cạnh, v hướng
+    vào trong), `lmFitRect` (co hình chữ nhật tới khi 4 góc + 4 trung điểm nằm trong đa giác co m mét), `lmBlock` (tường 1 quad/cạnh,
+    texture 1 GIAN × 1 TẦNG lặp 2 chiều — `LM_STYLE` colonial/yellow/arcade/cream/soviet/temple/market/hoard, emissive mờ đêm qua
+    facadeMats — + mái hông `lmHipRoof` ngói/đá đen/xanh/ngói đền, hoặc mái bằng earcut), `lmPolyBlock` (đùn đa giác). Material chung
+    theo phong cách → freezeStatic lượt 2 gộp theo ô. Dùng cho: GA (GLB 60 m ở SẢNH giữa — đa giác nhô 2 phía, 12,2 m về đông tâm OBB —
+    + 2 cánh vòm 2 tầng mái ngói + khối sau sảnh; IoU 0,31 → 0,90, cột cờ 37 → 23 m), THPT NGÔ QUYỀN (GLB = cổng "NGÔ QUYỀN" + dãy
+    cạnh cổng, tỉ lệ thật 10 m/đơn vị trên mặt ĐÔNG Mê Linh — pano_261 h270 gần y hệt ảnh thật; bản cũ phóng 80 m cao 46 m che camera;
+    dãy 3 tầng vàng cửa chớp xanh lùi sau tường rào dọc Nguyễn Đức Cảnh + nhà 2 tầng kính góc đông-bắc theo pano_037/427, dãy 2 tầng
+    3 phía, sân có cây), CHÙA HÀNG (gác 3 mái ~14 m ở mặt tây + chính điện 2 tầng mái chồng diêm + hậu cung + 2 dãy nhà tổ, sân cây),
+    UBND (khuôn viên 163 × 75 m: vườn trước 20 m có đài phun, 2 thảm cỏ, hàng cau + cờ, rào sắt chân xây; dãy chính = khối mansard
+    đồng hồ cũ `buildUBND` + 2 dãy thuộc địa mái đá; cánh tây + dãy sau bao sân trong; Trung tâm Hội nghị 5 tầng kem mái xanh đầu đông
+    — pano_020 h270/h315), VIỆT TIỆP (thân cung đùn theo đa giác 16 đỉnh 12 m + khán phòng 21 m + khối mặt tiền huy hiệu áp đúng CẠNH
+    mặt tiền 53,5 m — IoU 0,19 → 0,97), 2 THCS (dải nhà ven CHU VI: mỗi cạnh ≥14 m một dải sâu 11 m — chạy đúng đa giác lõm/chữ L).
+    Rạp Tháng Tám/Triển lãm: tâm OBB footprint (LM tâm-đỉnh lệch 6 m) → IoU 0,99. **CHỢ SẮT = CÔNG TRƯỜNG** (pano_116/214/013/212
+    10/2024: chợ cũ đã phá, rào tôn xám, cẩu tháp, máy khoan cọc): rào tôn theo đa giác + khung bê tông 3 sàn + 2 cẩu tháp + 3 máy khoan
+    + container lán trại + băng rôn "CHỢ SẮT · ĐANG XÂY DỰNG" (biển/nhiệm vụ địa danh giữ nguyên). Đường chạy oval "civic8" (169,-832)
+    nằm TRONG khuôn viên UBND (đọc nhầm ảnh vệ tinh) đã bỏ.
+    **(3) VA CHẠM ĐA GIÁC + DỮ LIỆU CHUNG:** `lmSolid(ring,key)`; `world.resolveCollisions` được BỌC thêm `lmPush` (đẩy ra cạnh gần
+    nhất, lọc bbox) → `isFree/findFree`, oracle đặt cây/hoa/biển phía sau, người chơi đều thấy địa danh; bỏ các vòng tròn cũ (nhà
+    hát r15, ga r27, bưu điện r22, NHNN r28, Triển lãm r24 = tường vô hình 19 m…). `world.lmMasses [{key, ring, h}]` (khối + GLB của
+    khuôn viên), `world.landmarkHit(x,z,r)`, `world.lmFit`. `js/footprints.js` (cần camera/xuống xe/người đi bộ) lấy `lmMasses` cho
+    địa danh có khối → SÂN TRONG/VƯỜN TRƯỚC không còn là vật cản (sau phản biện: mọi GLB cũng có khối = viền GLB, `glb: true`). `js/landmarks.js`: biển dời ra
+    nếu trong nhà thật HOẶC trong khối địa danh. Claims (khối WP2): bỏ vòng tròn bù GLB lệch/to (nhà hát r28, ga r30, THPT r44, NHNN r34,
+    chợ Sắt r60…) vì GLB nay nằm trong LM_POLY (+3 m) — chỉ giữ đền Nghè, Nhà Kèn (không có đa giác) + SÂN NHÀ THỜ r25 (xem dưới).
+    **(4) VẬT LẠ:** cây trong footprint nhà thờ (garden6 (-114,-345), (-118,-378)), cây xà cừ (-210,275) trong cổng THPT bỏ; cây chu vi
+    vườn hoa né `world.landmarkHit`; tháp kính 13 tầng `v6_ndc_tower13` (ô v6, đặt nhầm phía NAM Nguyễn Đức Cảnh = giữa sân trường —
+    pano_427 h090/pano_002 h180: tháp ở bờ BẮC) gỡ bằng `lmRemoveCell` (mesh + collider trong bao lồi, `cellKept[].removedByLM`); khối
+    địa danh NHƯỜNG chỗ nhà ô GIỮ chạm vào (`lmCellClash`, vd công sở Pháp arcade pano_482 bên Mê Linh).
+    **Đo (lmprobe, 19 địa danh):** 0 m² GLB/khối trên lòng đường trừ bưu điện ~11 m² ở mép phố chéo (trước: THPT 104, NHNN 134), 0 biển/xe/NPC trong khối,
+    `__hp.diag()` [], 0 lỗi JS (full; LITE chỉ 404 assets_lite của môi trường).
+    **PERF (A/B CÙNG PHIÊN với dot3 ea5f57f phục vụ ở cổng riêng, Radeon 890M d3d11, ?quality=full TIER 3, 1280×720, autoQuality
+    khoá):** heap SAU GC (`--js-flags=--expose-gc`, 3×gc) 394/395 → 396/396 MB; hpReady 4,2-4,6 s cả hai (nhiễu); startReady 6,1-6,8 →
+    5,9 s; draw call/tam giác (lấy MIN 3 mẫu — mẫu 1 khung đôi khi gồm lượt bóng: game_3 390 ↔ 828 call cùng code): cam_spawn 389/
+    4,08 M → 394/4,07 M, game_3 390/6,67 M → 399/6,68 M, pano_055_h000 426/3,96 M → 405/3,97 M, cam_high_center 440/6,33 M →
+    443/6,05 M; fps 58-61 (trần vsync) cả hai. Khối thủ tục ~vài nghìn tam giác, material chung theo phong cách (gộp ô).
+    **BẪY:** (a) bbox GLB ≠ thân nhà (cây/tấm đế/cánh lệch Meshy) — khớp theo ẢNH CHIẾU BẰNG, không theo bbox; (b) IoU thuần đẩy GLB
+    ra lòng đường khi LM_POLY OSM lấn phố game (NHNN, bưu điện) — luôn phạt hành lang facadeLine; (c) θ phải bị CHẶN cả trong bước tinh
+    chỉnh (bản đầu trôi −9,5° → mặt tiền bưu điện lệch phố); (d) texture 1 ô theo tầng: tường cao không chia hết storeyH thì dải phào
+    ở đỉnh ô bị cắt (rào tôn: cao đúng 1 ô); (e) đoạn code chạy TRƯỚC khối địa danh không gọi được `_lmIn`/`lmSolid` (const/TDZ) — ở
+    cells/garden6 sửa bằng toạ độ/chặn tại chỗ; (f) Git Bash: chuỗi chứa chữ "eval" trong lệnh bị chặn cách ly worktree.
+    **SAU PHẢN BIỆN (5 lỗi phải sửa — đã sửa, số đo lmprobe cùng phiên):**
+    (i) **MẶT ĐỨNG KHÔNG MÉO** — `lmfit.py --sy S --fax x|z|xz --fcap 1.1` (trục ngang mặt tiền ∈ [sy/1,1, sy·1,1]; trục sâu tự do ≤
+    amax). Nhà hát: s = 21 ĐỀU (chân dung đúng tỉ lệ như dot3 — `fix/portrait_cmp.png`), mặt tiền (z local 0,429) đặt ở mép NAM
+    footprint, GLB rộng 40 m gồm 2 cánh thấp (Meshy bè 2,3:1 — chấp nhận lòi 5 m mỗi bên ra quảng trường thay vì méo ảnh), phần SAU
+    footprint (26 × 25 m) = khối thủ tục phong cách `opera` 2 tầng cao 12,8 m (pano_052/053 h270 thật); BỆ 1,35 m phủ cả tấm đế Meshy
+    tối màu chìa 5 m trước mặt tiền (đỉnh tấm đế đo LAND_H + 0,89 — bản trước giãn sâu thành "thảm tối") + 3 bậc. Ga: GLB ĐỀU 19
+    (đồng hồ tròn lại; bản trước 30/17,5 = elip 1,7:1), dài 38 m, chỉ sâu giãn (2 đầu hồi bị cánh che), 2 cánh thủ tục dài thêm. Chùa
+    Hàng: ĐỀU 8 (bản trước kéo cao 36%). NHNN sy 24,5 sx 26,95 (1,10; cũ 1,32), bảo tàng sy 17 sx 18,7 (cũ 1,23), nhà thờ sz 26,4
+    (1,10; cũ 1,17), bưu điện sy 24 sx 25,5 sz 24,51 θ −43° (2 mặt phố, phạt cả VỈA HÈ `--lamR 10 --corr facade`).
+    (ii) **VA CHẠM = VIỀN GLB**: `LM_OUTLINE` (tools/qa/lmoutline.py: hợp ô chiếm của ảnh chiếu bằng GLB bỏ 12% dưới → đóng khe →
+    Douglas-Peucker 0,02 đv, toạ độ model quanh tâm bbox; 10 GLB ~5 KB) biến đổi theo LM_FIT → `lmSolidGLB` (va chạm + lmMasses
+    glb:true). Bản đầu `lmSolid(LM_POLY)` = tường vô hình: NHNN 62 m² lòng đường + 97 m² vỉa hè, bưu điện 137 m² vỉa hè, góc trống
+    bắc/tây bưu điện. Nay lmprobe "va chạm không thấy" (landmarkHit r 0,45 cách tam giác GLB/khối > 1 m, ngoài nhà thật) = 0 m² mọi
+    địa danh; GLB còn chạm vỉa hè (thấy được): bưu điện 12 m², NHNN 4 m².
+    (iii) **KHỐI NÉ VỈA HÈ**: `lmOffStreet(P, m)` — mỗi cạnh lùi vào tới khi điểm mẫu (1 m) ra khỏi lòng + vỉa hè (`roadNet.surfaceAt`
+    > 0,02) + lề m; điểm mẫu KHÔNG ra được trong 10 m = nằm trong dải phố VUÔNG GÓC (vỉa hè phố kia chạy dọc vào ở góc) → bỏ qua
+    (bản đầu thuật toán lùi cả cạnh 24 m → đa giác hỏng). THPT: khối trong Pos, tường rào vàng 2,2 m chạy đúng mép sau vỉa hè Mê Linh
+    + Nguyễn Đức Cảnh (gặp nhau ở góc), cổng GLB chạm tuyến rào, dãy đông lùi 7 m sau rào (pano_260 h180 / pano_261 h270 thật); mặt
+    lấy theo HÌNH HỌC (`lmSide(P, dir)`: chuỗi cạnh có pháp tuyến ≈ hướng) thay chỉ số đỉnh. Chợ Sắt: rào tôn = lmOffStreet, cạnh
+    trùng rào tw(12) lấy từ `world.twWalls` (twWall ghi lại) thay toạ độ chép tay. Khối trên vỉa hè: THPT 44 → 0,5 m², chợ Sắt 79 → 0.
+    (iv) **SÂN NHÀ THỜ**: bỏ vòng claim r25 làm sống lại 7 footprint máy học (MS/GOOGLE, 543 m², 2-3 tầng) trong sân, 1 khối che tháp
+    chuông ở pano_255 h270/h315 → khôi phục `claimCircle(LM.cathedral, 25, 'cathedral_grounds')` (các vòng khác bỏ không làm sống
+    nhà nào). (v) Đêm: emissive khối thủ tục = lưới 5 gian × 4 tầng ô thấp phân giải sáng/tắt theo hash (`emissiveMap.repeat`
+    1/5, 1/4 — ma trận UV riêng từng texture r160), không còn mọi cửa cùng sáng. Cây (-287,200) trong Triển lãm = w3Tree khối pano_036
+    (chạy trước địa danh) → chặn tại chỗ bằng LM_POLY.trienlam. `tools/qa/launch.mjs`: pageerror chờ thêm 20 s rồi "ABORT: …" (không
+    còn báo nhầm TIMEOUT 300 s). `tools/qa/lmprobe.mjs` thêm `street {gRoad,gSide,mRoad,mSide,hRoad,hSide,inv,invRoad,invSide}`.
+    Số cuối (lmprobe `fix/final`): IoU nhà hát 0,725 (GLB + khối sau), nhà thờ 0,84, ga 0,915, bưu điện 0,568, bảo tàng 0,724, NHNN
+    0,735, đình HK 0,524, đền Tam Kỳ 0,951, chợ Sắt 0,963; va chạm không thấy 0 m² mọi khoá; khối thủ tục trên vỉa hè 0 m²; 0 cây/biển/
+    xe/NPC trong khối; `__hp.diag()` []; diag.mjs "TẤT CẢ THỰC THỂ OK — 0 lỗi JS"; LITE chỉ 4× 404 assets_lite (môi trường). PERF A/B
+    cùng phiên (dot3 ea5f57f cổng riêng, traffic off, 24 view std, 1 mẫu/view): draw call std1 −18..+33, std2 −62..+24; tam giác
+    ±0,3 M (1 mẫu cam_high_lake −0,7 M); fps 60 (vsync) cả hai; hpReady 3,9-4,5 s ↔ 4,2-4,6 s; startReady 5,5-6,9 ↔ 5,7-6,8 s; bước
+    boot 'landmarks' 246-289 ↔ 239-286 ms (nhiễu) — trung tính.
+    **Chưa làm/đề xuất:** bưu điện thật là nhà chữ L ôm góc (2 cánh dọc 2 phố) còn GLB là khối vuông + 1 cánh chéo → nhìn từ trên
+    vẫn hở góc bắc/tây footprint; ga/UBND/THPT dùng texture canvas riêng (không qua shader atlas citygen); tháp 13 tầng
+    `v6_ndc_tower13` cần DỜI sang bờ bắc Nguyễn Đức Cảnh (lane ô WP3/W2-A — W2-E chỉ gỡ khỏi sân trường); nhà hát rộng 40 m > footprint
+    29 m (đánh đổi để chân dung không méo — chủ dự án có thể chọn s nhỏ hơn: thân thấp hơn).
 
 - **2026-10-04 (wp8)** [ĐỢT 3 WP8 GAME — khởi động, giao thông phố thật, cảm giác chơi, nhiệm vụ, âm thanh, tool Windows]:
     **Khởi động (js/boot.js + main.js + 9 dòng world.js):** UI màn chờ (ngôn ngữ, chất lượng, nhiệm vụ, input) gắn

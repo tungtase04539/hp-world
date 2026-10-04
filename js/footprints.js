@@ -33,12 +33,19 @@ export function footprintIndex(world = {}) {
   const grid = D ? (world.rbGrid || makeFootprintGrid(D)) : null;
   const bAt = grid ? (x, z) => grid.at(x, z) : () => -1;
   const lms = [];
-  for (const k in LM_POLY) {
-    if (!LM_H[k]) continue;
-    const pts = LM_POLY[k];
+  const addLm = (k, pts, h) => {
     let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9;
     for (const [x, z] of pts) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
-    lms.push({ k, pts, x0, z0, x1, z1, top: LAND_H + LM_H[k] });
+    lms.push({ k, pts, x0, z0, x1, z1, top: LAND_H + h });
+  };
+  // Đợt 3 W2-E: khuôn viên (THPT/THCS, chùa Hàng, UBND, Việt Tiệp, ga, chợ Sắt…) dựng thành CÁC KHỐI riêng (world.lmMasses
+  // {key, ring, h}) — sân trong/vườn trước KHÔNG còn là vật cản (người đi bộ, xuống xe, cần camera). Địa danh chỉ có GLB vẫn
+  // lấy cả đa giác LM_POLY.
+  const massKeys = new Set();
+  for (const m of (world.lmMasses || [])) { massKeys.add(m.key); addLm(m.key, m.ring, m.h); }
+  for (const k in LM_POLY) {
+    if (!LM_H[k] || massKeys.has(k)) continue;
+    addLm(k, LM_POLY[k], LM_H[k]);
   }
   const lmAt = (x, z) => {
     for (const l of lms) if (x >= l.x0 && x <= l.x1 && z >= l.z0 && z <= l.z1 && pip(l.pts, x, z)) return l;

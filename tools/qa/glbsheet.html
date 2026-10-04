@@ -1,0 +1,72 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>GLB contact sheet</title></head><body style="margin:0;background:#222">
+<!-- Tờ ảnh GLB (QA địa danh, Đợt 3 W2-E): ?m=<tên file trong assets/> → 6 hình chiếu TRỰC GIAO của model GỐC (chưa xoay):
+     TRÊN (Bắc = −Z lên trên), +Z (mặt "trước" theo quy ước), −Z, +X, −X, phối cảnh 3/4. Khung chia vạch 0,1 đơn vị model.
+     Dùng để biết mặt tiền của GLB nằm phía nào + tỉ lệ dài/rộng/cao trước khi khớp footprint (world.js fitLM).
+     Chạy: python -m http.server <port> ở gốc repo, mở /tools/qa/glbsheet.html?m=nhahat (cần assets/ cục bộ). -->
+<canvas id="c" width="1500" height="1000"></canvas>
+<script type="importmap">{"imports":{"three":"../../lib/three.module.js","three/addons/":"../../lib/jsm/"}}</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+const cv = document.getElementById('c');
+const r = new THREE.WebGLRenderer({ canvas: cv, antialias: true, preserveDrawingBuffer: true });
+r.setScissorTest(true);
+const sc = new THREE.Scene(); sc.background = new THREE.Color(0x9ab4cc);
+sc.add(new THREE.HemisphereLight(0xffffff, 0x8a8070, 1.6));
+const dl = new THREE.DirectionalLight(0xffffff, 1.6); dl.position.set(2, 4, 3); sc.add(dl);
+const grid = new THREE.GridHelper(4, 40, 0x444444, 0x777777); sc.add(grid);
+const lo = new GLTFLoader(); lo.setMeshoptDecoder(MeshoptDecoder);
+const m = new URLSearchParams(location.search).get('m') || 'nhahat';
+lo.load('../../assets/' + m + '.glb', (g) => {
+  const o = g.scene; sc.add(o);
+  o.traverse((q) => { if (q.isMesh && q.material) { q.material.emissiveIntensity = 0; } });
+  const box = new THREE.Box3().setFromObject(o), c = box.getCenter(new THREE.Vector3()), s = box.getSize(new THREE.Vector3());
+  grid.position.y = box.min.y;
+  const R = Math.max(s.x, s.y, s.z) * 0.62;
+  const W = 500, H = 500;
+  const views = [
+    ['TOP (N=-Z up)', [c.x, c.y + 10, c.z], [0, 0, -1]], ['+Z side', [c.x, c.y, c.z + 10], [0, 1, 0]], ['-Z side', [c.x, c.y, c.z - 10], [0, 1, 0]],
+    ['+X side', [c.x + 10, c.y, c.z], [0, 1, 0]], ['-X side', [c.x - 10, c.y, c.z], [0, 1, 0]], ['3/4 from +X+Z', null, null],
+  ];
+  views.forEach(([name, p, up], i) => {
+    const x = (i % 3) * W, y = Math.floor(i / 3) * H;
+    let cam;
+    if (p) { cam = new THREE.OrthographicCamera(-R, R, R, -R, 0.01, 50); cam.position.set(...p); cam.up.set(...up); cam.lookAt(c); }
+    else { cam = new THREE.PerspectiveCamera(40, 1, 0.01, 50); cam.position.set(c.x + s.x * 1.1, c.y + s.y * 1.2, c.z + s.z * 1.6 + 0.5); cam.lookAt(c); }
+    r.setViewport(x, 1000 - y - H, W, H); r.setScissor(x, 1000 - y - H, W, H); r.render(sc, cam);
+  });
+  window.__info = { m, size: [s.x, s.y, s.z].map((v) => +v.toFixed(3)), min: box.min.toArray().map((v) => +v.toFixed(3)), max: box.max.toArray().map((v) => +v.toFixed(3)) };
+  // ?occ=<phần chiều cao bỏ qua, mặc định 0.12>: ẢNH CHIẾU BẰNG (ô 0,01 đơn vị) của tam giác có đỉnh cao hơn min.y + occ·H
+  // (bỏ đế/sân/bậc) + độ cao lớn nhất mỗi ô → window.__occ {x0,z0,cs,nx,nz,occ:'0/1 chuỗi',h:[...]} để tối ưu khớp footprint offline
+  const oq = new URLSearchParams(location.search).get('occ');
+  if (oq !== null) {
+    const fr = +oq || 0.12, cs = 0.01, x0 = box.min.x, z0 = box.min.z, nx = Math.ceil(s.x / cs) + 1, nz = Math.ceil(s.z / cs) + 1;
+    const occ = new Uint8Array(nx * nz), hm = new Float32Array(nx * nz), yCut = box.min.y + fr * s.y;
+    const v = new THREE.Vector3();
+    o.updateMatrixWorld(true);
+    o.traverse((q) => {
+      if (!q.isMesh) return;
+      const pa = q.geometry.attributes.position, ix = q.geometry.index, n = ix ? ix.count : pa.count;
+      const X = new Float32Array(pa.count), Y = new Float32Array(pa.count), Z = new Float32Array(pa.count);
+      for (let i = 0; i < pa.count; i++) { v.fromBufferAttribute(pa, i).applyMatrix4(q.matrixWorld); X[i] = v.x; Y[i] = v.y; Z[i] = v.z; }
+      for (let t = 0; t < n; t += 3) {
+        const a = ix ? ix.getX(t) : t, b = ix ? ix.getX(t + 1) : t + 1, c = ix ? ix.getX(t + 2) : t + 2;
+        const ym = Math.max(Y[a], Y[b], Y[c]); if (ym < yCut) continue;
+        const mnx = Math.min(X[a], X[b], X[c]), mxx = Math.max(X[a], X[b], X[c]), mnz = Math.min(Z[a], Z[b], Z[c]), mxz = Math.max(Z[a], Z[b], Z[c]);
+        const den = (Z[b] - Z[c]) * (X[a] - X[c]) + (X[c] - X[b]) * (Z[a] - Z[c]);
+        for (let i = Math.floor((mnx - x0) / cs); i <= Math.floor((mxx - x0) / cs); i++) for (let j = Math.floor((mnz - z0) / cs); j <= Math.floor((mxz - z0) / cs); j++) {
+          if (i < 0 || j < 0 || i >= nx || j >= nz) continue;
+          const px = x0 + (i + 0.5) * cs, pz = z0 + (j + 0.5) * cs;
+          let ins = (mxx - mnx < cs && mxz - mnz < cs);
+          if (!ins && Math.abs(den) > 1e-12) { const l1 = ((Z[b] - Z[c]) * (px - X[c]) + (X[c] - X[b]) * (pz - Z[c])) / den, l2 = ((Z[c] - Z[a]) * (px - X[c]) + (X[a] - X[c]) * (pz - Z[c])) / den; ins = l1 >= -0.05 && l2 >= -0.05 && l1 + l2 <= 1.05; }
+          if (ins) { occ[j * nx + i] = 1; if (ym - box.min.y > hm[j * nx + i]) hm[j * nx + i] = ym - box.min.y; }
+        }
+      }
+    });
+    let str = ''; for (let k = 0; k < occ.length; k++) str += occ[k] ? '1' : '0';
+    window.__occ = { m, x0, z0, cs, nx, nz, H: s.y, occ: str, h: Array.from(hm, (q) => +q.toFixed(3)) };
+  }
+  window.__done = true;
+}, undefined, (e) => { window.__err = String(e); window.__done = true; });
+</script></body></html>

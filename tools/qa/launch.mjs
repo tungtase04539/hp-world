@@ -37,12 +37,15 @@ export async function openGame({ port = 8177, host = '127.0.0.1', quality = 'ful
   const t0 = Date.now();
   const q = quality ? `?quality=${quality}` : '?';
   await pg.goto(`http://${host}:${port}/index.html${q}${extra}`, { waitUntil: 'domcontentloaded', timeout: 120000 });
-  let hpReadyMs = 0, startReadyMs = 0;
+  let hpReadyMs = 0, startReadyMs = 0, tErr = 0, aborted = false;
   for (let i = 0; i < 600; i++) {
     if (await pg.evaluate(() => !!(window.__hp && window.__hp.teleport)).catch(() => false)) { hpReadyMs = Date.now() - t0; break; }
+    // pageerror khi dựng thế giới: có thể KHÔNG chết (lỗi phụ) → chờ thêm 20 s; vẫn chưa có __hp thì bỏ (khỏi giữ khoá GPU 300 s)
+    if (!tErr && errors.some((e) => e.startsWith('pageerror'))) tErr = Date.now();
+    if (tErr && Date.now() - tErr > 20000) { aborted = true; break; }
     await pg.waitForTimeout(500);
   }
-  if (!hpReadyMs) errors.push('TIMEOUT: window.__hp không xuất hiện sau 300 s');
+  if (!hpReadyMs) errors.push(aborted ? `ABORT: pageerror khi dựng thế giới, không có window.__hp sau ${((Date.now() - t0) / 1000).toFixed(0)} s` : 'TIMEOUT: window.__hp không xuất hiện sau 300 s');
   if (start && hpReadyMs) {
     await pg.evaluate(() => { const b = document.getElementById('startBtn'); if (b) b.click(); }).catch(() => {});
     for (let i = 0; i < 400; i++) {
