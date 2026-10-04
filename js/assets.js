@@ -1,4 +1,4 @@
-import { Box3, Vector3 } from 'three';
+import { Box3, Vector3, RGBAFormat, UnsignedByteType, NearestFilter, LinearFilter } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { IS_MOBILE, LITE, TIER } from './device.js';
@@ -334,20 +334,73 @@ function queueReveal(roots, onDone) {
 // texture GLB (texSubImage2D 4096²). Nay: budgetMs > 0 (main.js truyền khi CHƯA Bắt đầu — màn chờ che cảnh, vệt tiến
 // trình chạy bằng CSS compositor) → upload LIÊN TIẾP tới hết ngân sách/khung để hàng đợi cạn trước khi vào game; sau
 // Bắt đầu: texture LỚN (≥ 2048²) cách nhau ≥ 2 khung (không 2 khung nặng liền nhau — giật cảm nhận rõ hơn 1 khung lẻ).
+// UPLOAD CHIA DẢI (WebGL2): texture lớn (≥ 2048²) không đẩy 1 phát 35-45 ms nữa — initTexture cấp phát texStorage2D +
+// tham số (bỏ qua lần đẩy điểm ảnh bằng cách tạm thay state.texSubImage2D), rồi mỗi khung đẩy 1 DẢI ~6 MB hàng ảnh bằng
+// texSubImage2D(…, x, y, w, h, …, ImageBitmap) + UNPACK_SKIP_ROWS (WebGL2 cho phép chọn hình chữ nhật con của
+// TexImageSource), dải cuối → generateMipmap. Model vẫn ở layer ẩn tới khi đủ dải → không ai thấy texture dở dang.
+// Chỉ ảnh flipY=false RGBA8 (mọi texture GLTF); còn lại / WebGL1 → initTexture nguyên khối như cũ.
+const STRIP_BYTES = 6 * 1024 * 1024;
+let _strip = null;
+function canSplit(t) {
+  const im = t.image;
+  return !!(_renderer && _renderer.capabilities.isWebGL2 && im && typeof ImageBitmap !== 'undefined' && im instanceof ImageBitmap
+    && im.width <= _renderer.capabilities.maxTextureSize && im.height <= _renderer.capabilities.maxTextureSize
+    && !t.flipY && t.format === RGBAFormat && t.type === UnsignedByteType && !t.isCompressedTexture && !(t.mipmaps && t.mipmaps.length));
+}
+function beginSplit(t) {
+  const st = _renderer.state, orig = st.texSubImage2D;
+  st.texSubImage2D = () => {};
+  try { _renderer.initTexture(t); } catch (e) { st.texSubImage2D = orig; return false; }
+  st.texSubImage2D = orig;
+  const im = t.image;
+  _strip = { t, y: 0, W: im.width, H: im.height, rows: Math.max(32, Math.floor(STRIP_BYTES / (im.width * 4))) };
+  return true;
+}
+function stepSplit() {
+  const S = _strip, gl = _renderer.getContext(), st = _renderer.state, t = S.t;
+  const tex = _renderer.properties.get(t).__webglTexture;
+  if (!tex || gl.isContextLost()) { _strip = null; return; }
+  const h = Math.min(S.rows, S.H - S.y);
+  st.bindTexture(gl.TEXTURE_2D, tex);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+  gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, !!t.premultiplyAlpha);
+  gl.pixelStorei(gl.UNPACK_ALIGNMENT, t.unpackAlignment);
+  gl.pixelStorei(gl.UNPACK_COLORSPACE_CONVERSION_WEBGL, gl.NONE);
+  gl.pixelStorei(gl.UNPACK_SKIP_ROWS, S.y);
+  try { gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, S.y, S.W, h, gl.RGBA, gl.UNSIGNED_BYTE, t.image); } catch (e) { console.warn('[asset] upload dải lỗi', e); }
+  gl.pixelStorei(gl.UNPACK_SKIP_ROWS, 0);
+  S.y += h;
+  if (S.y >= S.H) {
+    if (t.generateMipmaps && t.minFilter !== NearestFilter && t.minFilter !== LinearFilter) gl.generateMipmap(gl.TEXTURE_2D);
+    _strip = null;
+  }
+  st.unbindTexture();
+}
 let _bigGap = 0;
 export function pumpAssetUploads(budgetMs = 0) {
   const t0 = budgetMs > 0 ? performance.now() : 0;
   if (_bigGap > 0) _bigGap--;
   for (;;) {
+    if (_strip) {
+      stepSplit();
+      if (!budgetMs || performance.now() - t0 > budgetMs) return;
+      continue;
+    }
     const it = _reveal[0];
     if (!it || !it.compiled) return;
     const t = it.textures[0];
     if (t) {
       const im = t.image, big = im && (im.width || 0) * (im.height || 0) >= 2048 * 2048;
-      if (!budgetMs && big && _bigGap > 0) return;
-      it.textures.shift();
-      try { _renderer.initTexture(t); } catch (e) { }
-      if (big) _bigGap = 2;
+      if (big && canSplit(t)) {
+        it.textures.shift();
+        if (beginSplit(t)) { if (!budgetMs) return; continue; }   // initTexture (không điểm ảnh) chiếm khung này
+        try { _renderer.initTexture(t); } catch (e) { }
+      } else {
+        if (!budgetMs && big && _bigGap > 0) return;
+        it.textures.shift();
+        try { _renderer.initTexture(t); } catch (e) { }
+        if (big) _bigGap = 2;
+      }
     } else {
       for (const r of it.roots) r.traverse((o) => { if (o.isMesh) o.layers.set(0); });
       _reveal.shift();
