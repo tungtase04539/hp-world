@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+import { makeCellSink } from './cellsink.js';
 import { registerModel, shrinkTexturesForMobile, assetURL } from './assets.js';
 import { IS_MOBILE, LITE } from './device.js';
 import {
@@ -1972,7 +1973,7 @@ export function buildWorld(scene) {
     }
 
     // 2) DÃY SHOWROOM/GARA Ô TÔ phía NAM đường (Toản Auto, Tùng Lâm... — biển đỏ/đen chữ to)
-    const SHOWROOMS = ['TOẢN AUTO', 'TÙNG LÂM AUTO', 'LIÊU NHÂN AUTO', 'QUỐC TOÀN', 'BẢO MINH', 'AUTO 568', 'GARA ĐẠI PHÁT', 'SALON Ô TÔ HP'];
+    const SHOWROOMS = ['TOẢN AUTO', 'TÙNG LÂM AUTO', 'LIÊU NHÂN AUTO', 'QUỐC TOÀN', 'BẢO HIỂM Ô TÔ', 'AUTO 568', 'GARA ĐẠI PHÁT', 'SALON Ô TÔ HP'];
     const srBg = ['#b91c1c', '#111318', '#1c56a0', '#b91c1c', '#0f6a38', '#111318', '#b06010', '#1c56a0'];
     for (let k = 0; k < SHOWROOMS.length; k++) {
       const al = 42 + k * 41;
@@ -2251,7 +2252,10 @@ export function buildWorld(scene) {
   }
 
   // ---------- CÔNG TRÌNH ĐÍCH DANH LÔ 2 (agent lm_drafts — 12 khối, 19 công trình có tên) ----------
+  // KHỐI Ô DỰNG TAY đi qua BỒN CHỨA (js/cellsink.js): che scene/addCollider/FEATURED_CLEAR, hoà giải với nhà THẬT ở cửa ra.
+  const _cells = makeCellSink(THREE, scene, addCollider, FEATURED_CLEAR, colliders, makeTex);
   {
+  const scene = _cells.scene, addCollider = _cells.addCollider, FEATURED_CLEAR = _cells.fc, makeTex = _cells.makeTex;   // bóng — xem cellsink.js
 // ============================================================================
 // NHÁP 12 KHỐI CÔNG TRÌNH ĐÍCH DANH CÒN THIẾU (cụm lỗi 'landmark' severity 3,
 // gom từ compare_v6_sol56 + compare_v7_sol56, đối chiếu audit_done.json).
@@ -2272,14 +2276,14 @@ export function buildWorld(scene) {
 // ============================================================================
 
 // === HELPER CHUNG (dán 1 LẦN trước các block dưới) ===
-const lmSign = (txt, bg, fg = '#ffffff', px = 50) => new THREE.MeshLambertMaterial({
+const lmSign = _cells.memo('lmSign', (txt, bg, fg = '#ffffff', px = 50) => new THREE.MeshLambertMaterial({
   map: makeTex(512, 84, (g, w, h) => {
     g.fillStyle = bg; g.fillRect(0, 0, w, h);
     g.fillStyle = fg; g.font = `bold ${px}px system-ui, sans-serif`;
     g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, w / 2, h / 2 + 2, w - 26);
   }, 'sign|' + txt + '|' + bg + '|' + fg + '|' + px),
-});
-const lmFacade = (baseCss, winCss, cols, rows) => {           // như facadeTex world.js:1612
+}));
+const lmFacade = _cells.memo('lmFacade', (baseCss, winCss, cols, rows) => {           // như facadeTex world.js:1612
   const t = makeTex(256, 256, (g, w, h) => {
     g.fillStyle = baseCss; g.fillRect(0, 0, w, h);
     const mx = w * 0.12, my = h * 0.12, cw = (w - mx * 2) / cols, ch = (h - my * 2) / rows;
@@ -2288,7 +2292,7 @@ const lmFacade = (baseCss, winCss, cols, rows) => {           // như facadeTex 
     }
   }, 'fac|' + baseCss + '|' + winCss + '|' + cols + '|' + rows);
   return new THREE.MeshLambertMaterial({ map: t });
-};
+});
 const lmOK = (x, z) => Math.abs(groundHeightNoDeck(x, z) - LAND_H) < 0.4 && !isWater(x, z);
 // tháp dải cửa sổ theo mẫu bandTower (world.js:1495) nhưng nhận ry + material thân
 const lmTower = (x, z, ry, W, D, FL, FH, wallMat, name) => {
@@ -2302,7 +2306,7 @@ const lmTower = (x, z, ry, W, D, FL, FH, wallMat, name) => {
   }
   const roof = new THREE.Mesh(new THREE.BoxGeometry(W + 1, 0.7, D + 1), mat(0xb8b2a2)); roof.position.y = H + 0.35; g.add(roof);
   g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
-  g.name = name; scene.add(g);
+  g.name = name; g.userData.kind = 'tower'; scene.add(g);   // tháp quan sát từ pano (skyline/ngân hàng/KS) → giữ + claim
   addCollider(x, z, Math.max(W, D) * 0.52);
   FEATURED_CLEAR.push([x, z, Math.max(W, D) / 2 + 10]);
   return g;
@@ -2574,8 +2578,8 @@ const lmTower = (x, z, ry, W, D, FL, FH, wallMat, name) => {
   const ry = -2.937;                            // cả dãy mặt quay BẮC ra NĐC/hồ
   const ROW = [
     // [tên biển, bx, bz, W, FL, màu tường, nền biển, chữ]
-    ['MAY10', -575.2, 291.1, 5, 2, 0x2a6db5, '#1c56a0', '#ffffff'],
-    ["NOAH'S", -567.9, 289.6, 10, 2, 0xf4f2ec, '#22252a', '#ffffff'],
+    ['THỜI TRANG NAM', -575.2, 291.1, 5, 2, 0x2a6db5, '#1c56a0', '#ffffff'],
+    ['THỜI TRANG NỮ', -567.9, 289.6, 10, 2, 0xf4f2ec, '#22252a', '#ffffff'],
     ['NHÀ THUỐC 116', -559.5, 287.9, 7, 4, 0x1553a0, '#1050c8', '#ffffff'],
     ['NHÀ THUỐC 69', -553.2, 286.6, 6, 3, 0x8f959b, '#c1201a', '#ffffff'],
     ['ĐÔNG MẬN — TRÁI CÂY NHẬP KHẨU', -547.3, 285.3, 6, 4, 0xe8c85a, '#d97706', '#ffffff'],
@@ -3194,21 +3198,21 @@ const HB_RYN = 0.2025;                         // mặt tiền bờ BẮC quay N
 const hbPt = (s, off) => [HB_A[0] + HB_U[0] * s + HB_N[0] * off, HB_A[1] + HB_U[1] * s + HB_N[1] * off];
 const hbOK = (x, z) => Math.abs(groundHeightNoDeck(x, z) - 2.0) < 0.4 && !isWater(x, z);
 const hbRnd = (i) => { const v = Math.sin(i * 127.1 + 311.7) * 43758.5453; return v - Math.floor(v); };
-const hbSign = (txt, bg, fg = '#ffffff', px = 46) => new THREE.MeshLambertMaterial({
+const hbSign = _cells.memo('hbSign', (txt, bg, fg = '#ffffff', px = 46) => new THREE.MeshLambertMaterial({
   map: makeTex(512, 84, (g, w, h) => {
     g.fillStyle = bg; g.fillRect(0, 0, w, h);
     g.fillStyle = fg; g.font = `bold ${px}px system-ui, sans-serif`;
     g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, w / 2, h / 2 + 2, w - 26);
   }, 'sign|' + txt + '|' + bg + '|' + fg + '|' + px), side: THREE.DoubleSide,
-});
-const hbVSign = (txt, bg, fg = '#ffffff') => new THREE.MeshLambertMaterial({ // biển ĐỨNG
+}));
+const hbVSign = _cells.memo('hbVSign', (txt, bg, fg = '#ffffff') => new THREE.MeshLambertMaterial({ // biển ĐỨNG
   map: makeTex(64, 512, (g, w, h) => {
     g.fillStyle = bg; g.fillRect(0, 0, w, h);
     g.fillStyle = fg; g.font = 'bold 38px system-ui, sans-serif'; g.textAlign = 'center';
     g.save(); g.translate(w / 2, h / 2); g.rotate(Math.PI / 2); g.fillText(txt, 0, 13, h - 30); g.restore();
   }, 'vsign|' + txt + '|' + bg + '|' + fg), side: THREE.DoubleSide,
-});
-const hbFacade = (baseCss, winCss, cols, rows) => new THREE.MeshLambertMaterial({
+}));
+const hbFacade = _cells.memo('hbFacade', (baseCss, winCss, cols, rows) => new THREE.MeshLambertMaterial({
   map: makeTex(256, 256, (g, w, h) => {
     g.fillStyle = baseCss; g.fillRect(0, 0, w, h);
     const mx = w * 0.12, my = h * 0.12, cw = (w - mx * 2) / cols, ch = (h - my * 2) / rows;
@@ -3216,7 +3220,7 @@ const hbFacade = (baseCss, winCss, cols, rows) => new THREE.MeshLambertMaterial(
       g.fillStyle = winCss; g.fillRect(mx + c * cw + cw * 0.16, my + r * ch + ch * 0.16, cw * 0.68, ch * 0.66);
     }
   }, 'fac|' + baseCss + '|' + winCss + '|' + cols + '|' + rows),
-});
+}));
 // nhà ống ĐÍCH DANH: thân + kính trệt + biển ngang, mặt tiền local +Z quay ra phố
 const hbShopAt = (x, z, ry, W, D, FL, wallHex, sign, name) => {
   if (!hbOK(x, z)) return null;
@@ -3261,9 +3265,9 @@ const hbShop = (s, side, W, D, FL, wallHex, sign, name) => {
     const v = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 3.2), hbVSign('ĐẶC SẢN HẢI PHÒNG', '#e8b823', '#c62828'));
     v.position.set(-2.7, 3.4, 4 + 0.12); bcc.add(v);
   }
-  const mp = hbShop(249, 1, 8, 10, 4, 0xf4f2ec, ['CTCP BỆNH VIỆN QUỐC TẾ MEDIPHARCARE', '#1c56a0', '#ffffff', 30], 'hbt_mediphar'); // (-775.4,618.1)
+  const mp = hbShop(249, 1, 8, 10, 4, 0xf4f2ec, ['PHÒNG KHÁM ĐA KHOA QUỐC TẾ', '#1c56a0', '#ffffff', 30], 'hbt_mediphar'); // (-775.4,618.1)
   if (mp) { // biển đứng CAM trên cao (đặc trưng nhìn dọc phố h270)
-    const v = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 5), hbVSign('MEDIPHAR CARE', '#e2711d'));
+    const v = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 5), hbVSign('PHÒNG KHÁM', '#e2711d'));
     v.position.set(3.6, 9.2, 5 + 0.12); mp.add(v);
   }
   // BỜ BẮC (chẵn, đông→tây): Giang Pháo — Apollo — Koji
@@ -3278,7 +3282,7 @@ const hbShop = (s, side, W, D, FL, wallHex, sign, name) => {
       const p = new THREE.Mesh(new THREE.BoxGeometry(0.08, 2.4, 0.08), stMat); p.position.set(3.35, py, pz); ap.add(p);
     }
   }
-  hbShop(249.5, -1, 7, 9, 3, 0xd96b2b, ['Koji — CHI NHÁNH HẢI PHÒNG', '#d96b2b', '#ffffff', 34], 'hbt_koji');              // (-780.8,594.6)
+  hbShop(249.5, -1, 7, 9, 3, 0xd96b2b, ['MỸ PHẨM — CHI NHÁNH HẢI PHÒNG', '#d96b2b', '#ffffff', 34], 'hbt_koji');              // (-780.8,594.6)
 }
 
 // === (T2) DÃY BÁN LẺ 233-243 — pano_279 (điểm 1.5)
@@ -3600,14 +3604,14 @@ const hbShop = (s, side, W, D, FL, wallHex, sign, name) => {
 // ============================================================================
 
 // === HELPER CHUNG MẶT TRẬN BẮC (dán 1 LẦN trước các block) ===
-const bcSign = (txt, bg, fg = '#ffffff', px = 52) => new THREE.MeshLambertMaterial({
+const bcSign = _cells.memo('bcSign', (txt, bg, fg = '#ffffff', px = 52) => new THREE.MeshLambertMaterial({
   map: makeTex(512, 84, (g, w, h) => {
     g.fillStyle = bg; g.fillRect(0, 0, w, h);
     g.fillStyle = fg; g.font = `bold ${px}px system-ui, sans-serif`;
     g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, w / 2, h / 2 + 2, w - 26);
   }, 'sign|' + txt + '|' + bg + '|' + fg + '|' + px),
-});
-const bcFacade = (baseCss, winCss, cols, rows) => {
+}));
+const bcFacade = _cells.memo('bcFacade', (baseCss, winCss, cols, rows) => {
   const t = makeTex(256, 256, (g, w, h) => {
     g.fillStyle = baseCss; g.fillRect(0, 0, w, h);
     const mx = w * 0.12, my = h * 0.12, cw = (w - mx * 2) / cols, ch = (h - my * 2) / rows;
@@ -3616,7 +3620,7 @@ const bcFacade = (baseCss, winCss, cols, rows) => {
     }
   }, 'fac|' + baseCss + '|' + winCss + '|' + cols + '|' + rows);
   return new THREE.MeshLambertMaterial({ map: t });
-};
+});
 const bcOK = (x, z) => Math.abs(groundHeightNoDeck(x, z) - 2.0) < 0.45 && !isWater(x, z);
 // cây tán rộng đơn giản (trunk + 2 cầu lá) — thêm vào group cha tại local (lx,lz)
 const bcTree = (parent, lx, lz, h = 7, r = 3.2) => {   // Đợt 3 WP4: xếp hàng vào hệ cây instanced (js/trees.js)
@@ -4184,7 +4188,7 @@ const bcPalm = (parent, lx, lz, h = 9) => {   // Đợt 3 WP4: cau vua instanced
       const p = new THREE.Mesh(new THREE.BoxGeometry(0.6, 2.2, 0.6), mat(0xf2f0ea));
       p.position.set(-46, gy + 1.1, pz); fg.add(p);
     }
-    const bb = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 1.5), bcSign('VINASHIP', '#b01f1f', '#ffd21a', 50));
+    const bb = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 1.5), bcSign('CÔNG TY VẬN TẢI BIỂN', '#b01f1f', '#ffd21a', 50));
     bb.position.set(-45.7, gy + 1.6, -851); bb.rotation.y = Math.PI / 2; fg.add(bb); // bảng đỏ trên rào
     for (const [px, pz, ph] of [[-43, -856, 9], [-43, -830, 10]]) {
       const pg = new THREE.Group(); pg.position.set(px, gy, pz);
@@ -4309,7 +4313,7 @@ const bcPalm = (parent, lx, lz, h = 9) => {   // Đợt 3 WP4: cau vua instanced
       r.position.set(0, H + 0.9, s * D * 0.22); r.rotation.x = -s * 0.32; g.add(r);
     }
     g.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
-    g.name = 'port_kho_' + wi; scene.add(g);
+    g.name = 'port_kho_' + wi; g.userData.kind = 'house'; scene.add(g);
     for (const lx of [-W / 3, 0, W / 3]) addCollider(xc + lx, zc, D / 2 + 1);
     FEATURED_CLEAR.push([xc, zc, W / 2 + 8]); wi++;
   }
@@ -4481,14 +4485,14 @@ const bcPalm = (parent, lx, lz, h = 9) => {   // Đợt 3 WP4: cau vua instanced
 // ============================================================================
 
 // === HELPER CHUNG dg* (dán 1 LẦN trước 12 block) ===
-const dgSign = (txt, bg, fg = '#ffffff', px = 46) => new THREE.MeshLambertMaterial({
+const dgSign = _cells.memo('dgSign', (txt, bg, fg = '#ffffff', px = 46) => new THREE.MeshLambertMaterial({
   map: makeTex(512, 84, (g, w, h) => {
     g.fillStyle = bg; g.fillRect(0, 0, w, h);
     g.fillStyle = fg; g.font = `bold ${px}px system-ui, sans-serif`;
     g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, w / 2, h / 2 + 2, w - 26);
   }, 'sign|' + txt + '|' + bg + '|' + fg + '|' + px),
-});
-const dgFacade = (baseCss, winCss, cols, rows) => new THREE.MeshLambertMaterial({
+}));
+const dgFacade = _cells.memo('dgFacade', (baseCss, winCss, cols, rows) => new THREE.MeshLambertMaterial({
   map: makeTex(256, 256, (g, w, h) => {
     g.fillStyle = baseCss; g.fillRect(0, 0, w, h);
     const mx = w * 0.12, my = h * 0.12, cw = (w - mx * 2) / cols, ch = (h - my * 2) / rows;
@@ -4496,7 +4500,7 @@ const dgFacade = (baseCss, winCss, cols, rows) => new THREE.MeshLambertMaterial(
       g.fillStyle = winCss; g.fillRect(mx + c * cw + cw * 0.16, my + r * ch + ch * 0.16, cw * 0.68, ch * 0.66);
     }
   }, 'fac|' + baseCss + '|' + winCss + '|' + cols + '|' + rows),
-});
+}));
 const dgOK = (x, z) => Math.abs(groundHeightNoDeck(x, z) - 2.0) < 0.4 && !isWater(x, z);
 // Nhà phố/shophouse: thân + kính trệt + biển băng mặt tiền + mái; trả group để gắn thêm
 const dgShop = (x, z, ry, W, D, FL, FH, wallMat, name, signTxt, signBg, signFg) => {
@@ -4822,7 +4826,7 @@ const dgRail = (ax, az, bx, bz, h, kind, colHex) => {
   const g1 = dgShop(797.7, -432.9, ryS, 22, 13, 3, 3.4, dgFacade('#eeddab', '#54626c', 7, 3),
     'dbp_vosa', null, null);
   if (g1) {
-    const bs = new THREE.Mesh(new THREE.PlaneGeometry(12, 1.5), dgSign('VOSA CORPORATION — VOSA HAIPHONG', '#f4f6f8', '#0e5a9e', 34));
+    const bs = new THREE.Mesh(new THREE.PlaneGeometry(12, 1.5), dgSign('ĐẠI LÝ HÀNG HẢI — HẢI PHÒNG', '#f4f6f8', '#0e5a9e', 34));
     bs.position.set(0, 3 * 3.4 + 1.0, 2); g1.add(bs);
     dgRail(787, -439.5, 808, -439.0, 1.4, 'bar', 0x3a3f45);
   }
@@ -4894,8 +4898,8 @@ const dgRail = (ax, az, bx, bz, h, kind, colHex) => {
     const g = new THREE.Group(); g.position.set(bx, groundHeight(bx, bz), bz); g.rotation.y = ryE;
     const left = new THREE.Mesh(new THREE.BoxGeometry(6.2, 9.9, D), mat(0x232428)); left.position.set(-3.3, 4.95, 0); g.add(left);
     const right = new THREE.Mesh(new THREE.BoxGeometry(6.2, 9.3, D), dgFacade('#efe9d8', '#5c6a72', 2, 3)); right.position.set(3.3, 4.65, 0); g.add(right);
-    const s1 = new THREE.Mesh(new THREE.PlaneGeometry(5.6, 1.1), dgSign('GENCE', '#17181b', '#d8d3c0', 60)); s1.position.set(-3.3, 5.6, D / 2 + 0.08); g.add(s1);
-    const s2 = new THREE.Mesh(new THREE.PlaneGeometry(5.8, 1.0), dgSign('TAGONE FLORAL', '#f4f1e8', '#4a4438', 44)); s2.position.set(3.3, 4.4, D / 2 + 0.08); g.add(s2);
+    const s1 = new THREE.Mesh(new THREE.PlaneGeometry(5.6, 1.1), dgSign('ĐỒ DA', '#17181b', '#d8d3c0', 60)); s1.position.set(-3.3, 5.6, D / 2 + 0.08); g.add(s1);
+    const s2 = new THREE.Mesh(new THREE.PlaneGeometry(5.8, 1.0), dgSign('HOA TƯƠI', '#f4f1e8', '#4a4438', 44)); s2.position.set(3.3, 4.4, D / 2 + 0.08); g.add(s2);
     const glass = new THREE.Mesh(new THREE.BoxGeometry(11.6, 2.4, 0.12), sharedMats.window); glass.position.set(0, 1.5, D / 2 + 0.04); g.add(glass);
     const roof = new THREE.Mesh(new THREE.BoxGeometry(W + 0.8, 0.6, D + 0.8), mat(0xb8b2a2)); roof.position.y = 10.1; g.add(roof);
     g.traverse((o) => { if (o.isMesh) o.castShadow = true; }); g.name = 'lkt_gence_tagone'; scene.add(g);
@@ -5010,14 +5014,14 @@ const dgRail = (ax, az, bx, bz, h, kind, colHex) => {
 // ============================================================================
 
 // === HELPER CHUNG TB (dán 1 LẦN trước 15 block dưới) ===
-const tbSign = (txt, bg, fg = '#ffffff', px = 50) => new THREE.MeshLambertMaterial({
+const tbSign = _cells.memo('tbSign', (txt, bg, fg = '#ffffff', px = 50) => new THREE.MeshLambertMaterial({
   map: makeTex(512, 84, (g, w, h) => {
     g.fillStyle = bg; g.fillRect(0, 0, w, h);
     g.fillStyle = fg; g.font = `bold ${px}px system-ui, sans-serif`;
     g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, w / 2, h / 2 + 2, w - 26);
   }, 'sign|' + txt + '|' + bg + '|' + fg + '|' + px),
-});
-const tbFacade = (baseCss, winCss, cols, rows, archTret = false) => {  // archTret: trệt cửa vòm (phố Pháp)
+}));
+const tbFacade = _cells.memo('tbFacade', (baseCss, winCss, cols, rows, archTret = false) => {  // archTret: trệt cửa vòm (phố Pháp)
   const t = makeTex(256, 256, (g, w, h) => {
     g.fillStyle = baseCss; g.fillRect(0, 0, w, h);
     const mx = w * 0.1, my = h * 0.1, cw = (w - mx * 2) / cols, ch = (h - my * 2) / rows;
@@ -5031,7 +5035,7 @@ const tbFacade = (baseCss, winCss, cols, rows, archTret = false) => {  // archTr
     }
   });
   return new THREE.MeshLambertMaterial({ map: t });
-};
+});
 const tbOK = (x, z) => Math.abs(groundHeightNoDeck(x, z) - LAND_H) < 0.4 && !isWater(x, z);
 // khối nhà hộp nhanh: trả group đã đặt+xoay (front = local +Z), KHÔNG collider (tự thêm ngoài)
 const tbBlockM = (x, z, ry, W, H, D, wallMat, name) => {
@@ -5152,7 +5156,7 @@ const tbHut = (x, z, ry, wallHex, roofHex) => {
   if (tbOK(-88, -641)) {
     const ry = Math.atan2(-0.358, -0.934);         // ≈ -2.776
     const g = tbBlockM(-88, -641, ry, 24, 16.5, 14, tbFacade('#3a3f45', '#20242a', 10, 5), 'tb_goldstar');
-    const s = new THREE.Mesh(new THREE.PlaneGeometry(16, 2.0), tbSign('GOLD STAR HOSPITAL', '#17181a', '#d43b3b', 46));
+    const s = new THREE.Mesh(new THREE.PlaneGeometry(16, 2.0), tbSign('BỆNH VIỆN QUỐC TẾ', '#17181a', '#d43b3b', 46));
     s.position.set(0, 12.6, 7.2); g.add(s);
     const s2 = new THREE.Mesh(new THREE.PlaneGeometry(6, 1.1), tbSign('NHÀ THUỐC', '#7a1f1f', '#ffe9c9', 46));
     s2.position.set(-7, 2.6, 7.2); g.add(s2);
@@ -5418,7 +5422,7 @@ const tbHut = (x, z, ry, wallHex, roofHex) => {
   }
   if (tbOK(53, -353)) {
     const g = tbBlockM(53, -353, -Math.PI / 2, 9, 13.2, 10, tbFacade('#23262a', '#101214', 3, 4), 'tb_hana');
-    const s = new THREE.Mesh(new THREE.PlaneGeometry(5.5, 1.3), tbSign('HANA', '#17181a', '#f2f0ea', 58));
+    const s = new THREE.Mesh(new THREE.PlaneGeometry(5.5, 1.3), tbSign('MỸ PHẨM', '#17181a', '#f2f0ea', 58));
     s.position.set(0, 11.2, 5.15); g.add(s);
     tbDone(g, 53, -353, 6.5, 11);
   }
@@ -5782,14 +5786,14 @@ const tbHut = (x, z, ry, wallHex, roofHex) => {
 // ============================================================================
 
 // === HELPER tw (dán 1 LẦN trước 12 block) ===
-const twSign = (txt, bg, fg = '#ffffff', px = 44) => new THREE.MeshLambertMaterial({
+const twSign = _cells.memo('twSign', (txt, bg, fg = '#ffffff', px = 44) => new THREE.MeshLambertMaterial({
   map: makeTex(512, 84, (g, w, h) => {
     g.fillStyle = bg; g.fillRect(0, 0, w, h);
     g.fillStyle = fg; g.font = `bold ${px}px system-ui, sans-serif`;
     g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, w / 2, h / 2 + 2, w - 24);
   }),
-});
-const twFacade = (baseCss, winCss, cols, rows) => {
+}));
+const twFacade = _cells.memo('twFacade', (baseCss, winCss, cols, rows) => {
   const t = makeTex(256, 256, (g, w, h) => {
     g.fillStyle = baseCss; g.fillRect(0, 0, w, h);
     const mx = w * 0.1, my = h * 0.12, cw = (w - mx * 2) / cols, ch = (h - my * 2) / rows;
@@ -5798,7 +5802,7 @@ const twFacade = (baseCss, winCss, cols, rows) => {
     }
   });
   return new THREE.MeshLambertMaterial({ map: t });
-};
+});
 const twStripe = (a, b) => new THREE.MeshLambertMaterial({    // bạt sọc (xanh-trắng...)
   map: makeTex(128, 64, (g, w, h) => {
     for (let i = 0; i < 8; i++) { g.fillStyle = i % 2 ? a : b; g.fillRect(i * w / 8, 0, w / 8, h); }
@@ -6313,7 +6317,7 @@ const twBDz = (x) => -470 + 7 * (x + 541) / 561;              // tim Bạch Đ�
     twDone(kh, -1109.3, -0.2, 8);
     const af = twGrp(-1100.5, 3.4, ryTL + 0.2, 'afani');
     twBox(af, 4, 2.3, 2.3, mat(0x5a4fa0), 0, 1.15, 0);
-    const at = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 0.6), twSign('AFANI', '#5a4fa0', '#ffffff', 40));
+    const at = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 0.6), twSign('THỜI TRANG', '#5a4fa0', '#ffffff', 40));
     at.position.set(0, 1.5, 1.2); af.add(at);
     twDone(af, -1100.5, 3.4, 2.6);
     const hw = twGrp(-1096, -16, ryTL, 'tuonghong_xam');       // tường hông bê tông cao
@@ -6529,14 +6533,14 @@ const twBDz = (x) => -470 + 7 * (x + 541) / 561;              // tim Bạch Đ�
 // ============================================================================
 
 // === HELPER CHUNG DL (dán 1 LẦN trước 15 block dưới) ===
-const dlSign = (txt, bg, fg = '#ffffff', px = 50) => new THREE.MeshLambertMaterial({
+const dlSign = _cells.memo('dlSign', (txt, bg, fg = '#ffffff', px = 50) => new THREE.MeshLambertMaterial({
   map: makeTex(512, 84, (g, w, h) => {
     g.fillStyle = bg; g.fillRect(0, 0, w, h);
     g.fillStyle = fg; g.font = `bold ${px}px system-ui, sans-serif`;
     g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, w / 2, h / 2 + 2, w - 26);
   }, 'sign|' + txt + '|' + bg + '|' + fg + '|' + px),
-});
-const dlFacade = (baseCss, winCss, cols, rows, archTret = false) => {   // archTret: trệt cửa vòm kiểu Pháp
+}));
+const dlFacade = _cells.memo('dlFacade', (baseCss, winCss, cols, rows, archTret = false) => {   // archTret: trệt cửa vòm kiểu Pháp
   const t = makeTex(256, 256, (g, w, h) => {
     g.fillStyle = baseCss; g.fillRect(0, 0, w, h);
     const mx = w * 0.1, my = h * 0.1, cw = (w - mx * 2) / cols, ch = (h - my * 2) / rows;
@@ -6550,7 +6554,7 @@ const dlFacade = (baseCss, winCss, cols, rows, archTret = false) => {   // archT
     }
   });
   return new THREE.MeshLambertMaterial({ map: t });
-};
+});
 const dlOK = (x, z) => Math.abs(groundHeightNoDeck(x, z) - 2.0) < 0.4 && !isWater(x, z);
 // khối nhà hộp nhanh: group đã đặt + xoay (mặt tiền = local +Z), KHÔNG collider
 const dlBlock = (x, z, ry, W, H, D, wallMat, name) => {
@@ -7333,15 +7337,15 @@ const dlUmb = (x, z, hex) => {
 // ============================================================================
 
 // === HELPER CHUNG bs* (dán 1 LẦN trước các block) ===
-const bsSign = (txt, bg, fg = '#ffffff', px = 50) => new THREE.MeshLambertMaterial({
+const bsSign = _cells.memo('bsSign', (txt, bg, fg = '#ffffff', px = 50) => new THREE.MeshLambertMaterial({
   map: makeTex(512, 84, (g, w, h) => {
     g.fillStyle = bg; g.fillRect(0, 0, w, h);
     g.fillStyle = fg; g.font = `bold ${px}px system-ui, sans-serif`;
     g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, w / 2, h / 2 + 2, w - 26);
   }, 'sign|' + txt + '|' + bg + '|' + fg + '|' + px),
-});
+}));
 // lưới cửa sổ; arch=true → hàng DƯỚI cùng thành cửa vòm (nhà Pháp/kho Pháp)
-const bsFacade = (baseCss, winCss, cols, rows, arch = false) => {
+const bsFacade = _cells.memo('bsFacade', (baseCss, winCss, cols, rows, arch = false) => {
   const t = makeTex(256, 256, (g, w, h) => {
     g.fillStyle = baseCss; g.fillRect(0, 0, w, h);
     const mx = w * 0.1, my = h * 0.1, cw = (w - mx * 2) / cols, ch = (h - my * 2) / rows;
@@ -7356,7 +7360,7 @@ const bsFacade = (baseCss, winCss, cols, rows, arch = false) => {
     }
   });
   return new THREE.MeshLambertMaterial({ map: t });
-};
+});
 // sọc chéo đỏ-trắng (bó vỉa cầu Lạc Long, cột barie)
 const bsStripeMat = () => {
   const t = makeTex(64, 32, (g, w, h) => {
@@ -7995,7 +7999,7 @@ const bsHipRoof = (W, D, hexa = 0x8a4a34, x = 0, y = 0, z = 0) => {
   };
   west(P(225, 13, NW), 8, 10, 2, '#4a4440', '#c9c2b6', 'bs_duyphuoc', 'DUY PHƯỚC', '#d9822b', '#ffffff');
   west(P(232, 13, NW), 9, 10, 4, '#f0efe9', '#48505a', 'bs_hoangbach', 'HOÀNG BÁCH', '#f2b722', '#5a3a10');
-  west(P(245, 13, NW), 12, 10, 3, '#e2b96a', '#5a4a30', 'bs_habeco', 'HABECO', '#1a6b35', '#ffffff');
+  west(P(245, 13, NW), 12, 10, 3, '#e2b96a', '#5a4a30', 'bs_habeco', 'BIA HƠI', '#1a6b35', '#ffffff');
   {                                                        // CTY THĂNG LONG 4T kính — bờ ĐÔNG (h0 từ 069)
     const [bx, bz] = P(255, 12, NE);
     if (bsOK(bx, bz)) {
@@ -8090,7 +8094,7 @@ const bsHipRoof = (W, D, hexa = 0x8a4a34, x = 0, y = 0, z = 0) => {
   const k1 = stepGable(-358, -922, 16, 10, 6.8, Math.PI / 2, 'bs_khohoang_1');
   stepGable(-352, -908, 14, 9, 6.2, Math.PI / 2, 'bs_khohoang_2');
   if (k1) {                                                // băng rôn Vinacomin (071 h270 sev2)
-    const vn = new THREE.Mesh(new THREE.PlaneGeometry(5.5, 0.75), bsSign('VINACOMIN', '#0e5a8a', '#ffffff', 48));
+    const vn = new THREE.Mesh(new THREE.PlaneGeometry(5.5, 0.75), bsSign('CÔNG TY THAN', '#0e5a8a', '#ffffff', 48));
     vn.position.set(0, 4.6, 5.2); k1.add(vn);
   }
   for (const [px, pz, r, hh] of [[-424, -916, 8, 5], [-347, -961, 9, 5.5]]) {  // đống đá hộc rip-rap
@@ -8621,21 +8625,21 @@ const bsHipRoof = (W, D, hexa = 0x8a4a34, x = 0, y = 0, z = 0) => {
 // ============================================================================
 
 // === HELPER ts (dán 1 LẦN trước 15 block) ===
-const tsSign = (txt, bg, fg = '#ffffff', px = 46) => new THREE.MeshLambertMaterial({
+const tsSign = _cells.memo('tsSign', (txt, bg, fg = '#ffffff', px = 46) => new THREE.MeshLambertMaterial({
   map: makeTex(512, 84, (g, w, h) => {
     g.fillStyle = bg; g.fillRect(0, 0, w, h);
     g.fillStyle = fg; g.font = `bold ${px}px system-ui, sans-serif`;
     g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, w / 2, h / 2 + 2, w - 24);
   }),
-});
-const tsSignV = (txt, bg, fg = '#ffffff', px = 38) => new THREE.MeshLambertMaterial({ // biển đứng
+}));
+const tsSignV = _cells.memo('tsSignV', (txt, bg, fg = '#ffffff', px = 38) => new THREE.MeshLambertMaterial({ // biển đứng
   map: makeTex(64, 512, (g, w, h) => {
     g.fillStyle = bg; g.fillRect(0, 0, w, h);
     g.fillStyle = fg; g.font = `bold ${px}px system-ui, sans-serif`; g.textAlign = 'center';
     g.save(); g.translate(w / 2, h / 2); g.rotate(Math.PI / 2); g.fillText(txt, 0, 12, h - 30); g.restore();
   }),
-});
-const tsFacade = (baseCss, winCss, cols, rows) => {
+}));
+const tsFacade = _cells.memo('tsFacade', (baseCss, winCss, cols, rows) => {
   const t = makeTex(256, 256, (g, w, h) => {
     g.fillStyle = baseCss; g.fillRect(0, 0, w, h);
     const mx = w * 0.1, my = h * 0.12, cw = (w - mx * 2) / cols, ch = (h - my * 2) / rows;
@@ -8644,7 +8648,7 @@ const tsFacade = (baseCss, winCss, cols, rows) => {
     }
   });
   return new THREE.MeshLambertMaterial({ map: t });
-};
+});
 const tsStripe = (a, b) => new THREE.MeshLambertMaterial({ // bạt sọc (xanh-trắng…)
   map: makeTex(128, 64, (g, w, h) => {
     for (let i = 0; i < 8; i++) { g.fillStyle = i % 2 ? a : b; g.fillRect(i * w / 8, 0, w / 8, h); }
@@ -8941,7 +8945,7 @@ const tsShop = (bx, bz, ry, W, FL, wallMat, txt, sbg, sfg, opt = {}) => {
     tsBox(g, 14, 4.6, 8, mat(0x9aa0a2), 0, 2.3, 0);           // kiốt tôn xám 2 tầng thấp
     tsBox(g, 14.4, 0.2, 8.4, mat(0x7d838a), 0, 4.7, 0);
     // hàng billboard VIFON trên mái (4 tấm màu như ảnh)
-    const BB = [['VIFON — GIỮ TRỌN HƯƠNG VỊ ỚT TƯƠI', '#c1201a', '#ffe9b0'],
+    const BB = [['MÌ ĂN LIỀN — GIỮ TRỌN HƯƠNG VỊ ỚT TƯƠI', '#c1201a', '#ffe9b0'],
       ['BỘT CANH', '#f2efe8', '#c1201a'],
       ['SNACK', '#e8b83a', '#7a3a10'],
       ['PHỞ BÒ ĂN LIỀN', '#7ab4d8', '#153a5e']];
@@ -8992,7 +8996,7 @@ const tsShop = (bx, bz, ry, W, FL, wallMat, txt, sbg, sfg, opt = {}) => {
     ['PHỤC VỤ HIẾU HỶ', -717.7, 71.8, -2.852, 6, 3, '#cfb96a', '#57503f', '#c1201a', '#ffe9b0', {}],
     ['KIM THANH', -730.5, 56.8, 0.289, 5.5, 3, '#e0b53a', '#6b5a33', '#c1201a', '#ffffff', { arch: 0xf5d76a }],
     // pano_492
-    ['PROSIMEX — HAIPHONG BRANCH — BỘ THƯƠNG MẠI', -754.0, 83.2, -2.852, 9, 3, '#efe6cf', '#5f6d74', '#c1201a', '#ffffff', { px: 24 }],
+    ['CÔNG TY THƯƠNG MẠI — CHI NHÁNH HẢI PHÒNG', -754.0, 83.2, -2.852, 9, 3, '#efe6cf', '#5f6d74', '#c1201a', '#ffffff', { px: 24 }],
     ['LỢI — TINH • SÀNH SỨ GIA DỤNG', -764.1, 66.8, 0.289, 6, 4, '#efe0b0', '#5f6d74', '#1c56a0', '#ffffff', {}],
     ['ONLINE', -772.7, 69.3, 0.289, 5, 4, '#9e3b30', '#e8d8c2', '#22252a', '#ffd54a', {}],
     ['BÌNH THỦY — TẤM XỐP CÁCH NHIỆT • KIM TRANG', -775.2, 88.9, -2.852, 6.5, 3, '#e8c85a', '#5f6d74', '#1c56a0', '#ffffff', { awn: tsStripe('#2a5fa8', '#f4efe4'), px: 26 }],
@@ -9618,7 +9622,7 @@ const tsShop = (bx, bz, ry, W, FL, wallMat, txt, sbg, sfg, opt = {}) => {
   }
   // COOLER CITY — 3T mặt xanh dương + mascot (kề đông đền, bearing 291→~31°)
   const gCC = tsShop(-832.2, -71.5, ry, 6, 3, tsFacade('#2a7fc0', '#bfe3f2', 2, 2),
-    'COOLER CITY — ICE CREAM & TEA', '#2a7fc0', '#ffffff', { D: 8, px: 28 });
+    'KEM & TRÀ SỮA', '#2a7fc0', '#ffffff', { D: 8, px: 28 });
   if (gCC) {
     const mc = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 0.14, 16), mat(0xf6f4ee));
     mc.rotation.x = Math.PI / 2; mc.position.set(-1.8, 5.4, 8 / 2 + 0.1); gCC.add(mc); // mascot tròn trắng
@@ -9724,14 +9728,14 @@ const tsShop = (bx, bz, ry, W, FL, wallMat, txt, sbg, sfg, opt = {}) => {
 
 // ===== HELPER CHUNG (dán 1 LẦN) =====
 const cbOK = (x, z) => Math.abs(groundHeightNoDeck(x, z) - LAND_H) < 0.4 && !isWater(x, z);
-const cbSign = (txt, bg, fg = '#ffffff', px = 48) => new THREE.MeshLambertMaterial({
+const cbSign = _cells.memo('cbSign', (txt, bg, fg = '#ffffff', px = 48) => new THREE.MeshLambertMaterial({
   map: makeTex(512, 84, (g, w, h) => {
     g.fillStyle = bg; g.fillRect(0, 0, w, h);
     g.fillStyle = fg; g.font = `bold ${px}px system-ui, sans-serif`;
     g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, w / 2, h / 2 + 2, w - 24);
   }),
-});
-const cbFacade = (baseCss, winCss, cols, rows) => new THREE.MeshLambertMaterial({
+}));
+const cbFacade = _cells.memo('cbFacade', (baseCss, winCss, cols, rows) => new THREE.MeshLambertMaterial({
   map: makeTex(256, 256, (g, w, h) => {
     g.fillStyle = baseCss; g.fillRect(0, 0, w, h);
     const mx = w * 0.12, my = h * 0.12, cw = (w - mx * 2) / cols, ch = (h - my * 2) / rows;
@@ -9739,7 +9743,7 @@ const cbFacade = (baseCss, winCss, cols, rows) => new THREE.MeshLambertMaterial(
       g.fillStyle = winCss; g.fillRect(mx + c * cw + cw * 0.16, my + r * ch + ch * 0.16, cw * 0.68, ch * 0.66);
     }
   }, 'fac|' + baseCss + '|' + winCss + '|' + cols + '|' + rows),
-});
+}));
 // tháp dải cửa sổ (mẫu bandTower world.js:1595) nhận ry + material thân
 const cbTower = (x, z, ry, W, D, FL, FH, wallMat, name) => {
   if (!cbOK(x, z)) return null;
@@ -9752,7 +9756,7 @@ const cbTower = (x, z, ry, W, D, FL, FH, wallMat, name) => {
   }
   const roof = new THREE.Mesh(new THREE.BoxGeometry(W + 1, 0.7, D + 1), mat(0xb8b2a2)); roof.position.y = H + 0.35; g.add(roof);
   g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
-  g.name = name; scene.add(g);
+  g.name = name; g.userData.kind = 'tower'; scene.add(g);   // cao ốc có tên (VP/kính/KS) → giữ + claim như lmTower
   addCollider(x, z, Math.max(W, D) * 0.52);
   FEATURED_CLEAR.push([x, z, Math.max(W, D) / 2 + 9]);
   return g;
@@ -9786,8 +9790,15 @@ const cbAnchorTex = () => {
   return t;
 };
 // TƯỜNG RÀO chạy theo polyline pts (ĐÃ offset ra mép vỉa hè). H=2.6, dày 0.4, có bệ+mũ+trụ.
+// material tường theo số lần lặp texture (lượng tử 0,5) — trước đây clone texture+material MỖI đoạn tường
+const _cbWallMats = new Map();
+const cbWallMat = (tex, rep) => {
+  const q = Math.max(1, Math.round(rep * 2) / 2), k = tex.uuid + '|' + q;
+  let m = _cbWallMats.get(k);
+  if (!m) { const t = tex.clone(); t.repeat.set(q, 1); t.needsUpdate = true; m = new THREE.MeshLambertMaterial({ map: t }); _cbWallMats.set(k, m); }
+  return m;
+};
 const cbWallRun = (pts, tex, name) => {
-  const wallMat = new THREE.MeshLambertMaterial({ map: tex.clone() });
   const H = 2.6, TH = 0.4;
   const pillarG = [];
   for (let i = 0; i < pts.length - 1; i++) {
@@ -9797,8 +9808,7 @@ const cbWallRun = (pts, tex, name) => {
     if (!cbOK(mx, mz)) continue;
     const ang = Math.atan2(-dz, dx);                                        // local X dọc đoạn
     const y0 = groundHeight(mx, mz);
-    const wm = wallMat.clone(); wm.map = tex.clone(); wm.map.repeat.set(Math.max(1, L / 2.4), 1); wm.map.needsUpdate = true;
-    const wall = new THREE.Mesh(new THREE.BoxGeometry(L, H, TH), wm);
+    const wall = new THREE.Mesh(new THREE.BoxGeometry(L, H, TH), cbWallMat(tex, L / 2.4));
     wall.position.set(mx, y0 + H / 2, mz); wall.rotation.y = ang; wall.castShadow = true; wall.receiveShadow = true;
     wall.name = name; scene.add(wall);
     const plinth = new THREE.Mesh(new THREE.BoxGeometry(L, 0.55, TH + 0.22), mat(0xb08a48));
@@ -9850,7 +9860,8 @@ const cbWallRun = (pts, tex, name) => {
     // sân trước + đài phun nhỏ + cau (phía BẮC = -z)
     const pool = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.4, 0.6, 14), mat(0xdcd6c4)); pool.position.set(bx, groundHeight(bx, bz) + 0.3, bz - 9); scene.add(pool);
     const wat = new THREE.Mesh(new THREE.CylinderGeometry(1.9, 1.9, 0.5, 14), new THREE.MeshLambertMaterial({ color: 0x5ec8e8, transparent: true, opacity: 0.85 })); wat.position.set(bx, groundHeight(bx, bz) + 0.42, bz - 9); scene.add(wat);
-    for (const dxp of [-8, 8]) { const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.34, 6, 7), sharedMats.trunk); tr.position.set(bx + dxp, groundHeight(bx, bz) + 3, bz - 8); g.add(tr); const cr = new THREE.Mesh(new THREE.SphereGeometry(1.7, 7, 6), sharedMats.leafDark); cr.position.set(bx + dxp, groundHeight(bx, bz) + 6.4, bz - 8); scene.add(cr); }
+    // thân cau: toạ độ THẾ GIỚI → thêm vào scene (trước đây g.add vào nhóm đã xoay π → cây cắm vào Nhà hát)
+    for (const dxp of [-8, 8]) { const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.34, 6, 7), sharedMats.trunk); tr.position.set(bx + dxp, groundHeight(bx, bz) + 3, bz - 8); scene.add(tr); const cr = new THREE.Mesh(new THREE.SphereGeometry(1.7, 7, 6), sharedMats.leafDark); cr.position.set(bx + dxp, groundHeight(bx, bz) + 6.4, bz - 8); scene.add(cr); }
     const hyd = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.18, 0.9, 8), mat(0xd11a1a)); hyd.position.set(bx + 12, groundHeight(bx, bz) + 0.45, bz - 6); scene.add(hyd);
     addCollider(bx, bz, W * 0.52); FEATURED_CLEAR.push([bx, bz, W / 2 + 10]);
     // khối MSB trắng cao kề ĐÔNG (pano_454 h180 phải: 6T trắng biển MSB đỏ)
@@ -9896,7 +9907,7 @@ const cbWallRun = (pts, tex, name) => {
   }
   // 2 tháp kính lùi sâu
   const gA = cbTower(612, -640, Math.PI / 2, 26, 20, 13, 3.3, mat(0x8f979e), 'cb_cang_towerA');
-  if (gA) { const s = new THREE.Mesh(new THREE.PlaneGeometry(9, 1.6), cbSign('DEEP C', '#0e5aa0')); s.position.set(0, 13 * 3.3 - 2, 20 / 2 + 0.12); gA.add(s); }
+  if (gA) { const s = new THREE.Mesh(new THREE.PlaneGeometry(9, 1.6), cbSign('VĂN PHÒNG CHO THUÊ', '#0e5aa0')); s.position.set(0, 13 * 3.3 - 2, 20 / 2 + 0.12); gA.add(s); }
   cbTower(600, -600, Math.PI / 2, 22, 18, 11, 3.3, mat(0x33566a), 'cb_cang_towerB');
 }
 
@@ -10042,7 +10053,7 @@ const cbWallRun = (pts, tex, name) => {
     const body = new THREE.Mesh(new THREE.BoxGeometry(W, H, D), cbFacade('#8a7f72', '#c9c2b4', 6, 3)); body.position.y = H / 2; g.add(body);
     const canopy = new THREE.Mesh(new THREE.BoxGeometry(W, 0.5, 3), mat(0x2e6e56)); canopy.position.set(0, 4, D / 2 + 1.4); g.add(canopy);
     for (const sx of [-5, 5]) { const lion = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.6, 2.2), mat(0xe8e4da)); lion.position.set(sx, 0.8, D / 2 + 2.2); g.add(lion); }
-    const s = new THREE.Mesh(new THREE.PlaneGeometry(13, 1.5), cbSign('COMMERCIAL BUILDING — SSI', '#8a1414', '#ffffff', 34)); s.position.set(0, H - 1.3, D / 2 + 0.1); g.add(s);
+    const s = new THREE.Mesh(new THREE.PlaneGeometry(13, 1.5), cbSign('TÒA NHÀ THƯƠNG MẠI', '#8a1414', '#ffffff', 34)); s.position.set(0, H - 1.3, D / 2 + 0.1); g.add(s);
     g.traverse((o) => { if (o.isMesh) o.castShadow = true; }); g.name = 'cb_commercial_ssi'; scene.add(g);
     addCollider(bx, bz, W * 0.52); FEATURED_CLEAR.push([bx, bz, W / 2 + 9]);
   }
@@ -10064,7 +10075,7 @@ const cbWallRun = (pts, tex, name) => {
     const body = new THREE.Mesh(new THREE.BoxGeometry(W, H, D), cbFacade('#f2f0ea', '#8090a0', 4, 2)); body.position.y = H / 2; g.add(body);
     const roof = new THREE.Mesh(new THREE.BoxGeometry(W + 1, 0.8, D + 1), mat(0x9a5a44)); roof.position.y = H + 0.4; g.add(roof);
     // biển MB xanh trước sân + cau
-    const s = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 2), cbSign('MB', '#1c3f8a', '#ffd21a', 60)); s.position.set(0, 2, D / 2 + 3.4); g.add(s);
+    const s = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 2), cbSign('ATM', '#1c3f8a', '#ffd21a', 60)); s.position.set(0, 2, D / 2 + 3.4); g.add(s);
     for (const dxp of [-4, 4]) veg.plantLocal(g, dxp, D / 2 + 2.6, 'cau', { h: 7 });   // Đợt 3 WP4: cau instanced
     // rào sắt trắng
     const rail = new THREE.Mesh(new THREE.BoxGeometry(W, 1.1, 0.1), mat(0xf4f4f0)); rail.position.set(0, 0.55, D / 2 + 4); g.add(rail);
@@ -10128,14 +10139,14 @@ const cbWallRun = (pts, tex, name) => {
 // ============================================================================
 
 // === HELPER CHUNG (dán 1 LẦN) ===
-const cnSign = (txt, bg, fg = '#ffffff', px = 46) => new THREE.MeshLambertMaterial({
+const cnSign = _cells.memo('cnSign', (txt, bg, fg = '#ffffff', px = 46) => new THREE.MeshLambertMaterial({
   map: makeTex(512, 84, (g, w, h) => {
     g.fillStyle = bg; g.fillRect(0, 0, w, h);
     g.fillStyle = fg; g.font = `bold ${px}px system-ui, sans-serif`;
     g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, w / 2, h / 2 + 2, w - 24);
   }),
-});
-const cnFacade = (baseCss, winCss, cols, rows, archTret = false) => {
+}));
+const cnFacade = _cells.memo('cnFacade', (baseCss, winCss, cols, rows, archTret = false) => {
   const t = makeTex(256, 256, (g, w, h) => {
     g.fillStyle = baseCss; g.fillRect(0, 0, w, h);
     const mx = w * 0.1, my = h * 0.12, cw = (w - mx * 2) / cols, ch = (h - my * 2) / rows;
@@ -10150,7 +10161,7 @@ const cnFacade = (baseCss, winCss, cols, rows, archTret = false) => {
     }
   });
   return new THREE.MeshLambertMaterial({ map: t });
-};
+});
 const cnOK = (x, z) => Math.abs(groundHeightNoDeck(x, z) - 2.0) < 0.4 && !isWater(x, z);
 const cnBlock = (x, z, ry, W, H, D, wallMat, name) => {   // khối hộp cơ bản
   const g = new THREE.Group(); g.position.set(x, groundHeight(x, z), z); g.rotation.y = ry;
@@ -10206,7 +10217,7 @@ const cnRow = (ax, az, ux, uz, sd, off, count, step, palette, signs) => {
       s.position.set(0, 3.55, D / 2 + 0.1); g.add(s);
     }
     // clearR NHỎ (2.5 < step) để unit liền kề không tự chặn nhau; vẫn đánh dấu chiếm chỗ
-    g.name = 'cn_row'; cnDone(g, cx, cz, Math.max(W, D) * 0.5, 2.5);
+    g.name = 'cn_row'; g.userData.kind = 'house'; cnDone(g, cx, cz, Math.max(W, D) * 0.5, 2.5);
   }
 };
 // tháp dải cửa sổ (glass office/residential)
@@ -10219,7 +10230,7 @@ const cnTower = (x, z, ry, W, D, FL, FH, wallMat, name) => {
     band.position.y = f * FH + FH * 0.62; g.add(band);
   }
   cnRoof(g, W, D, 0xb0aa9a, H + 0.35);
-  g.name = name; return g;
+  g.name = name; g.userData.kind = 'tower'; return g;   // cao ốc có tên → giữ + claim (vd cn_shpplaza 41 m)
 };
 // cây đa/si cổ thụ: thân + rễ phụ buông + tán lớn
 const cnBanyan = (x, z, scl = 1) => {
@@ -10582,14 +10593,14 @@ const cnUmb = (x, z, hex) => {                             // ô dù chợ cóc 
 
 // ---------- HELPER dm* (dán 1 LẦN, trước các block) ----------
 const dmOK = (x, z) => Math.abs(groundHeightNoDeck(x, z) - LAND_H) < 0.4 && !isWater(x, z);
-const dmSign = (txt, bg, fg = '#ffffff', px = 46) => new THREE.MeshLambertMaterial({
+const dmSign = _cells.memo('dmSign', (txt, bg, fg = '#ffffff', px = 46) => new THREE.MeshLambertMaterial({
   map: makeTex(512, 84, (g, w, h) => {
     g.fillStyle = bg; g.fillRect(0, 0, w, h);
     g.fillStyle = fg; g.font = `bold ${px}px system-ui, sans-serif`;
     g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, w / 2, h / 2 + 2, w - 24);
   }),
-});
-const dmFacade = (baseCss, winCss, cols, rows) => new THREE.MeshLambertMaterial({
+}));
+const dmFacade = _cells.memo('dmFacade', (baseCss, winCss, cols, rows) => new THREE.MeshLambertMaterial({
   map: makeTex(256, 256, (g, w, h) => {
     g.fillStyle = baseCss; g.fillRect(0, 0, w, h);
     const mx = w * 0.1, my = h * 0.1, cw = (w - mx * 2) / cols, ch = (h - my * 2) / rows;
@@ -10597,7 +10608,7 @@ const dmFacade = (baseCss, winCss, cols, rows) => new THREE.MeshLambertMaterial(
       g.fillStyle = winCss; g.fillRect(mx + c * cw + cw * 0.16, my + r * ch + ch * 0.16, cw * 0.68, ch * 0.66);
     }
   }, 'fac|' + baseCss + '|' + winCss + '|' + cols + '|' + rows),
-});
+}));
 // pano(px,pz) trên tim đường u=(ux,uz); dời DỌC 'along' + NGANG 'off' về phía sgn(±1) của pháp tuyến trái.
 // Trả tâm nhà + ry (mặt tiền local +Z quay NGƯỢC pháp tuyến, tức về phía đường).
 const dmFront = (px, pz, ux, uz, along, sgn, off) => {
@@ -10715,7 +10726,7 @@ const dmBox = (cx, cz, ry, W, D, FL, FH, wallMat, name) => {
     const wave = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 3.2, H, 16, 1, false, 0, Math.PI * 0.6), mat(0xc7bda6));
     wave.position.set(-6, H / 2, 6.8); g.add(wave);                            // gợn sóng mặt tiền (gần đúng)
     const eye = new THREE.Mesh(new THREE.CircleGeometry(2.0, 20), dmSign('◉', '#c7bda6', '#2a5a86', 120)); eye.position.set(-6, H * 0.55, 7.05); g.add(eye);
-    const s = new THREE.Mesh(new THREE.PlaneGeometry(9, 1.8), dmSign('LIEN A', '#2a5a86', '#ffffff', 56)); s.position.set(6, H - 2.2, 7.05); g.add(s);
+    const s = new THREE.Mesh(new THREE.PlaneGeometry(9, 1.8), dmSign('CHĂN GA GỐI ĐỆM', '#2a5a86', '#ffffff', 56)); s.position.set(6, H - 2.2, 7.05); g.add(s);
     g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
   }
 }
@@ -10826,15 +10837,15 @@ const dmBox = (cx, cz, ry, W, D, FL, FH, wallMat, name) => {
 const txOK = (x, z) => Math.abs(groundHeightNoDeck(x, z) - 2.0) < 0.4 && !isWater(x, z);
 const txRnd = (i) => { const v = Math.sin(i * 91.7 + 47.3) * 43758.5453; return v - Math.floor(v); };
 // biển ngang (băng mặt tiền)
-const txSign = (txt, bg, fg = '#ffffff', px = 46) => new THREE.MeshLambertMaterial({
+const txSign = _cells.memo('txSign', (txt, bg, fg = '#ffffff', px = 46) => new THREE.MeshLambertMaterial({
   map: makeTex(512, 84, (g, w, h) => {
     g.fillStyle = bg; g.fillRect(0, 0, w, h);
     g.fillStyle = fg; g.font = `bold ${px}px system-ui, sans-serif`;
     g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, w / 2, h / 2 + 2, w - 26);
   }, 'sign|' + txt + '|' + bg + '|' + fg + '|' + px), side: THREE.DoubleSide,
-});
+}));
 // lưới cửa sổ; arch=true → hàng DƯỚI thành cửa vòm (nhà Pháp/arcade)
-const txFacade = (baseCss, winCss, cols, rows, arch = false) => new THREE.MeshLambertMaterial({
+const txFacade = _cells.memo('txFacade', (baseCss, winCss, cols, rows, arch = false) => new THREE.MeshLambertMaterial({
   map: makeTex(256, 256, (g, w, h) => {
     g.fillStyle = baseCss; g.fillRect(0, 0, w, h);
     const mx = w * 0.1, my = h * 0.1, cw = (w - mx * 2) / cols, ch = (h - my * 2) / rows;
@@ -10848,7 +10859,7 @@ const txFacade = (baseCss, winCss, cols, rows, arch = false) => new THREE.MeshLa
       } else g.fillRect(x, y, ww, hh);
     }
   }),
-});
+}));
 // nhà ống ĐÍCH DANH: thân + kính trệt + biển băng, mặt tiền local +Z ra phố. Trả group.
 const txShop = (x, z, ry, W, D, FL, wallMat, signMat, name) => {
   if (!txOK(x, z)) return null;
@@ -11170,14 +11181,14 @@ const txRy = (F, off) => { const s = off >= 0 ? -1 : 1; return Math.atan2(s * F.
 // ============================================================================
 
 // ===================== HELPER CHUNG ln* (dán 1 LẦN) =====================
-const lnSign = (txt, bg, fg = '#ffffff', px = 40) => new THREE.MeshLambertMaterial({
+const lnSign = _cells.memo('lnSign', (txt, bg, fg = '#ffffff', px = 40) => new THREE.MeshLambertMaterial({
   map: makeTex(512, 84, (g, w, h) => {
     g.fillStyle = bg; g.fillRect(0, 0, w, h);
     g.fillStyle = fg; g.font = `bold ${px}px system-ui, sans-serif`;
     g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, w / 2, h / 2 + 2, w - 24);
   }),
-});
-const lnFacade = (baseCss, winCss, cols, rows, arch = false) => new THREE.MeshLambertMaterial({
+}));
+const lnFacade = _cells.memo('lnFacade', (baseCss, winCss, cols, rows, arch = false) => new THREE.MeshLambertMaterial({
   map: makeTex(256, 256, (g, w, h) => {
     g.fillStyle = baseCss; g.fillRect(0, 0, w, h);
     const mx = w * 0.1, my = h * 0.12, cw = (w - mx * 2) / cols, ch = (h - my * 2) / rows;
@@ -11189,7 +11200,7 @@ const lnFacade = (baseCss, winCss, cols, rows, arch = false) => new THREE.MeshLa
       } else g.fillRect(mx + c * cw + cw * 0.16, my + r * ch + ch * 0.16, cw * 0.68, ch * 0.66);
     }
   }),
-});
+}));
 const lnGround = (x, z) => Math.abs(groundHeightNoDeck(x, z) - 2.0) < 0.4 && !isWater(x, z);
 // GUARD lòng đường: segment mọi ROADS_DT + nửa lòng; nhà (có collider) phải cách ≥ half+2
 // (né spillover ở NGÃ TƯ khi offset từ 1 phố rơi vào phố cắt). Props/cây dùng lnGround (né guard).
@@ -11282,7 +11293,7 @@ const rowP = (p, sd, a0, a1, step, Dv, signs) => {
     lnBody(g, W, H, D, mat(LN_PAL[seed % LN_PAL.length]));
     lnWins(g, W, FL, FH, D); lnShut(g, W, D); lnRoof(g, W, D, 0x9a958a, H + 0.24);
     if (signs && (seed % 2)) lnBoard(g, signs[seed % signs.length], '#b3241c', '#ffe9b0', W, D, 3.5, 30);
-    lnFin(g, 'ln_row', bx, bz, Math.max(W, D) * 0.5, 2.5);
+    g.userData.kind = 'house'; lnFin(g, 'ln_row', bx, bz, Math.max(W, D) * 0.5, 2.5);
   }
 };
 const treeP = (p, sd, along, scl) => { const [tx, tz] = at(p, sd, along, 0, -1.0); lnTree(tx, tz, scl); };
@@ -11547,7 +11558,7 @@ const treeP = (p, sd, along, scl) => { const [tx, tz] = at(p, sd, along, 0, -1.0
   { const [bx, bz, ry] = at('p039', 1, -6, 9);
     if (lnOK(bx, bz)) { const g = lnMk(bx, bz, ry), W = 7, D = 9, H = 3 * 3.4; lnBody(g, W, H, D, mat(0xe07a2a)); const glass = new THREE.Mesh(new THREE.BoxGeometry(W * 0.9, 3.0, 0.12), sharedMats.window); glass.position.set(0, 1.7, D / 2 + 0.06); g.add(glass); lnBoard(g, 'THỜI TRANG', '#e07a2a', '#ffffff', W, D, H - 1.4, 40); lnRoof(g, W, D, 0x9a958a, H + 0.24); lnFin(g, 'ln_sunfly', bx, bz, 5, 9); } }
   { const [bx, bz, ry] = at('p039', 1, 2, 9);
-    if (lnOK(bx, bz)) { const g = lnMk(bx, bz, ry), W = 7, D = 9, H = 4 * 3.4; lnBody(g, W, H, D, mat(0x2a2d32)); const glass = new THREE.Mesh(new THREE.BoxGeometry(W * 0.9, H * 0.7, 0.12), sharedMats.window); glass.position.set(0, H * 0.5, D / 2 + 0.06); g.add(glass); lnBoard(g, 'HOANG PHUC', '#22252a', '#ffe08a', W, D, H - 1.4, 34); lnRoof(g, W, D, 0x9a958a, H + 0.24); lnFin(g, 'ln_hoangphuc', bx, bz, 5, 9); } }
+    if (lnOK(bx, bz)) { const g = lnMk(bx, bz, ry), W = 7, D = 9, H = 4 * 3.4; lnBody(g, W, H, D, mat(0x2a2d32)); const glass = new THREE.Mesh(new THREE.BoxGeometry(W * 0.9, H * 0.7, 0.12), sharedMats.window); glass.position.set(0, H * 0.5, D / 2 + 0.06); g.add(glass); lnBoard(g, 'THỜI TRANG', '#22252a', '#ffe08a', W, D, H - 1.4, 34); lnRoof(g, W, D, 0x9a958a, H + 0.24); lnFin(g, 'ln_hoangphuc', bx, bz, 5, 9); } }
   { const [bx, bz, ry] = at('p039', 1, 14, 10);
     if (lnOK(bx, bz)) { const g = lnMk(bx, bz, ry), W = 10, D = 10, H = 3 * 3.5; lnBody(g, W, H, D, lnFacade('#eceae4', '#8a9098', 4, 3)); lnBoard(g, 'VIỆN NGHIÊN CỨU DA - GIÀY', '#1c4a8a', '#ffffff', W, D, H - 1.3, 22); lnRoof(g, W, D, 0xb0aa9a, H + 0.28); lnFin(g, 'ln_dagiay', bx, bz, 6, 10); } }
   // Cindy Hotel 6T kem (038 bờ nam) + crocs/TOKYOLIFE 3T
@@ -11557,7 +11568,7 @@ const treeP = (p, sd, along, scl) => { const [tx, tz] = at(p, sd, along, 0, -1.0
   // dãy Pháp cũ 2T (541, Trần Phú, bờ nam)
   { const [bx, bz, ry] = at('p541', 1, 0, 9);
     if (lnOK(bx, bz)) { const g = lnMk(bx, bz, ry), W = 8, D = 9, H = 2 * 3.6; lnBody(g, W, H, D, lnFacade('#e3d3ad', '#7a6a48', 4, 2, true)); lnHip(g, W, D, 0x8a5a3a, H + 0.5); for (let bx2 = -W / 2 + 0.6; bx2 < W / 2; bx2 += 0.7) { const bl = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.7, 6), mat(0xf0e6c8)); bl.position.set(bx2, H - 3.2, D / 2 + 0.32); g.add(bl); } lnBoard(g, 'MINH TỈNH — BÁNH MÌ', '#c1201a', '#ffe08a', W, D, 3.2, 26); lnFin(g, 'ln_phap_tranphu', bx, bz, 5, 9); } }
-  for (const p of ['p039', 'p038']) { rowP(p, 1, -18, 18, 6.2, 9, ['crocs', 'Kappa', 'ecko unltd', 'BAC A BANK']); rowP(p, -1, -18, 18, 6.2, 9, ['THỜI TRANG', 'PHÚ TÀI', 'ĐỒNG HỒ']); }
+  for (const p of ['p039', 'p038']) { rowP(p, 1, -18, 18, 6.2, 9, ['GIÀY DÉP', 'ĐỒ THỂ THAO', 'THỜI TRANG', 'NGÂN HÀNG']); rowP(p, -1, -18, 18, 6.2, 9, ['THỜI TRANG', 'PHÚ TÀI', 'ĐỒNG HỒ']); }
   rowP('p541', 1, -18, 18, 6.2, 9, ['BÁNH MÌ', 'MẸ 81', 'CAFE']); rowP('p541', -1, -18, 18, 6.2, 9, ['MINH TỈNH', 'TẠP HÓA']);
 }
 
@@ -11575,7 +11586,7 @@ const treeP = (p, sd, along, scl) => { const [tx, tz] = at(p, sd, along, 0, -1.0
   // tiệm VÀNG TRƯỜNG THỊNH 3T 10m (181 bờ đông)
   { const [bx, bz, ry] = at('p181', -1, 0, 10);
     if (lnOK(bx, bz)) { const g = lnMk(bx, bz, ry), W = 10, D = 10, H = 3 * 3.4; lnBody(g, W, H, D, mat(0x2a2d32)); const glass = new THREE.Mesh(new THREE.BoxGeometry(W * 0.9, 3.0, 0.12), sharedMats.window); glass.position.set(0, 1.7, D / 2 + 0.06); g.add(glass); lnBoard(g, 'VÀNG TRƯỜNG THỊNH', '#ffe000', '#22252a', W, D, H - 1.4, 26); lnRoof(g, W, D, 0x9a958a, H + 0.24); lnFin(g, 'ln_truongthinh', bx, bz, 6, 10); } }
-  for (const p of ['p181', 'p182']) { rowP(p, -1, -16, 16, 6.0, 9, ['KÍNH MẮT HÙNG 16', 'SIÊU THỊ 18K', 'VUA CHẢ CÁ']); rowP(p, 1, -16, 16, 6.0, 9, ['KÍNH MẮT ĐƯỜNG', 'STARPOST', 'ANH CƯỜNG']); }
+  for (const p of ['p181', 'p182']) { rowP(p, -1, -16, 16, 6.0, 9, ['KÍNH MẮT HÙNG 16', 'SIÊU THỊ 18K', 'VUA CHẢ CÁ']); rowP(p, 1, -16, 16, 6.0, 9, ['KÍNH MẮT ĐƯỜNG', 'CHUYỂN PHÁT NHANH', 'ANH CƯỜNG']); }
 }
 
 // ============================================================================
@@ -11586,7 +11597,7 @@ const treeP = (p, sd, along, scl) => { const [tx, tz] = at(p, sd, along, 0, -1.0
 // ============================================================================
 {
   { const [bx, bz, ry] = at('p144', -1, 4, 9);
-    if (lnOK(bx, bz)) { const g = lnMk(bx, bz, ry), W = 8, D = 9, H = 3 * 3.4; lnBody(g, W, H, D, lnFacade('#f2f0ea', '#3a3d42', 3, 3)); lnBoard(g, 'HIDOO — HIENMAC', '#22252a', '#ffe08a', W, D, H - 1.4, 28); lnRoof(g, W, D, 0x9a958a, H + 0.24); lnFin(g, 'ln_hidoo', bx, bz, 5, 9); } }
+    if (lnOK(bx, bz)) { const g = lnMk(bx, bz, ry), W = 8, D = 9, H = 3 * 3.4; lnBody(g, W, H, D, lnFacade('#f2f0ea', '#3a3d42', 3, 3)); lnBoard(g, 'THỜI TRANG HIỀN MẠC', '#22252a', '#ffe08a', W, D, H - 1.4, 28); lnRoof(g, W, D, 0x9a958a, H + 0.24); lnFin(g, 'ln_hidoo', bx, bz, 5, 9); } }
   { const [bx, bz, ry] = at('p144', -1, -8, 9);
     if (lnOK(bx, bz)) { const g = lnMk(bx, bz, ry), W = 7, D = 9, H = 3 * 3.4; lnBody(g, W, H, D, lnFacade('#eaf0ee', '#3f6a8a', 3, 3)); lnBoard(g, 'HƯƠNG VIỆT — BÁNH KEM', '#1c6ea8', '#ffffff', W, D, 3.4, 24); lnRoof(g, W, D, 0x9a958a, H + 0.24); lnFin(g, 'ln_huongviet', bx, bz, 5, 9); } }
   // 88 MÊ LINH khóa-rèm 4T (145 bờ đông) + CÔNG TRƯỜNG GM (145 bờ tây)
@@ -11595,7 +11606,7 @@ const treeP = (p, sd, along, scl) => { const [tx, tz] = at(p, sd, along, 0, -1.0
   { const [bx, bz, ry] = at('p145', 1, 0, 12);
     if (lnOK(bx, bz)) { const g = lnMk(bx, bz, ry), W = 12, H = 8, D = 12;
       const fence = new THREE.Mesh(new THREE.BoxGeometry(W, 2.4, 0.2), mat(0x3f7a5a)); fence.position.set(0, 1.2, D / 2 + 0.2); g.add(fence);
-      const net = new THREE.Mesh(new THREE.BoxGeometry(W - 1, H, 0.1), mat(0x2f8a5a)); net.position.set(0, H / 2, D / 2 - 1); net.material.transparent = true; net.material.opacity = 0.5; g.add(net);
+      const net = new THREE.Mesh(new THREE.BoxGeometry(W - 1, H, 0.1), mat(0x2f8a5a, { transparent: true, opacity: 0.5 })); net.position.set(0, H / 2, D / 2 - 1); g.add(net);
       const core = new THREE.Mesh(new THREE.BoxGeometry(W - 3, H, D - 3), mat(0xb8b0a2)); core.position.set(0, H / 2, -1); g.add(core);
       lnFin(g, 'ln_gm_congtruong', bx, bz, 7, 13); } }
   // 2 chắn ray ĐỎ-TRẮNG tại nút giao đường sắt (-145,591)
@@ -11658,14 +11669,14 @@ const v5place = (cx, cz, ux, uz, half, sd, along, D, yard = 0) => {
   const nx = -uz, nz = ux, off = half + 2.3 + D / 2 + yard;
   return { bx: cx + ux * along + nx * sd * off, bz: cz + uz * along + nz * sd * off, ry: Math.atan2(-nx * sd, -nz * sd) };
 };
-const v5Sign = (txt, bg, fg = '#ffffff', px = 46) => new THREE.MeshLambertMaterial({
+const v5Sign = _cells.memo('v5Sign', (txt, bg, fg = '#ffffff', px = 46) => new THREE.MeshLambertMaterial({
   map: makeTex(512, 84, (g, w, h) => {
     g.fillStyle = bg; g.fillRect(0, 0, w, h);
     g.fillStyle = fg; g.font = `bold ${px}px system-ui, sans-serif`;
     g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, w / 2, h / 2 + 2, w - 24);
   }),
-});
-const v5Facade = (base, win, cols, rows, arch = false) => {
+}));
+const v5Facade = _cells.memo('v5Facade', (base, win, cols, rows, arch = false) => {
   const t = makeTex(256, 256, (g, w, h) => {
     g.fillStyle = base; g.fillRect(0, 0, w, h);
     const mx = w * 0.1, my = h * 0.1, cw = (w - mx * 2) / cols, ch = (h - my * 2) / rows;
@@ -11677,7 +11688,7 @@ const v5Facade = (base, win, cols, rows, arch = false) => {
     }
   });
   return new THREE.MeshLambertMaterial({ map: t });
-};
+});
 const v5Roof = (g, W, D, H, hex = 0x9a958a) => { const r = new THREE.Mesh(new THREE.BoxGeometry(W + 0.5, 0.5, D + 0.5), mat(hex)); r.position.y = H + 0.25; g.add(r); };
 const v5Done = (g, name, x, z, colR, clearR) => {
   g.traverse((o) => { if (o.isMesh) o.castShadow = true; }); g.name = name; scene.add(g);
@@ -11742,7 +11753,7 @@ const P542 = { cx: 183.7, cz: 91.4, ux: 0.917, uz: -0.398, half: 5 };       // T
     const gate = v5place(P432.cx, P432.cz, P432.ux, P432.uz, P432.half, 1, 3, 0, 0); // D=0 -> off = half+2.3
     for (const s of [-6, 6]) { const [px, pz] = localPt(gate.bx, gate.bz, s, 0, gate.ry);
       const post = new THREE.Mesh(new THREE.BoxGeometry(0.9, 3.4, 0.9), mat(0x9c3b2a)); post.position.set(px, groundHeight(px, pz) + 1.7, pz); scene.add(post); }
-    const bars = new THREE.Mesh(new THREE.BoxGeometry(11, 2.2, 0.1), mat(0x33383d)); bars.material.transparent = true; bars.material.opacity = 0.55;
+    const bars = new THREE.Mesh(new THREE.BoxGeometry(11, 2.2, 0.1), mat(0x33383d, { transparent: true, opacity: 0.55 }));
     bars.position.set(gate.bx, groundHeight(gate.bx, gate.bz) + 1.3, gate.bz); bars.rotation.y = gate.ry; scene.add(bars);
     // sân gạch đỏ giữa cổng và nhà
     const yard = new THREE.Mesh(new THREE.PlaneGeometry(16, 13), mat(0xb15a3e)); yard.rotation.x = -Math.PI / 2;
@@ -11960,15 +11971,15 @@ const P542 = { cx: 183.7, cz: 91.4, ux: 0.917, uz: -0.398, half: 5 };       // T
 const V4H = 2.0;
 const v4OK = (x, z) => Math.abs(groundHeightNoDeck(x, z) - V4H) < 0.4 && !isWater(x, z);
 // biển ngang băng mặt tiền
-const v4Sign = (txt, bg, fg = '#ffffff', px = 46) => new THREE.MeshLambertMaterial({
+const v4Sign = _cells.memo('v4Sign', (txt, bg, fg = '#ffffff', px = 46) => new THREE.MeshLambertMaterial({
   map: makeTex(512, 84, (g, w, h) => {
     g.fillStyle = bg; g.fillRect(0, 0, w, h);
     g.fillStyle = fg; g.font = `bold ${px}px system-ui, sans-serif`;
     g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, w / 2, h / 2 + 2, w - 24);
   }), side: THREE.DoubleSide,
-});
+}));
 // lưới cửa sổ; arch=true → hàng DƯỚI thành vòm cuốn (arcade Pháp)
-const v4Facade = (baseCss, winCss, cols, rows, arch = false) => new THREE.MeshLambertMaterial({
+const v4Facade = _cells.memo('v4Facade', (baseCss, winCss, cols, rows, arch = false) => new THREE.MeshLambertMaterial({
   map: makeTex(256, 256, (g, w, h) => {
     g.fillStyle = baseCss; g.fillRect(0, 0, w, h);
     const mx = w * 0.09, my = h * 0.09, cw = (w - mx * 2) / cols, ch = (h - my * 2) / rows;
@@ -11981,7 +11992,7 @@ const v4Facade = (baseCss, winCss, cols, rows, arch = false) => new THREE.MeshLa
       } else g.fillRect(x0, y0, ww, hh);
     }
   }),
-});
+}));
 // pano(px,pz) trên tim đường u=(ux,uz); dời DỌC along + NGANG off về phía sgn(±1) pháp tuyến trái.
 // Trả tâm nhà + ry (mặt tiền local +Z quay NGƯỢC pháp tuyến → về phía đường).
 const v4Front = (px, pz, ux, uz, along, sgn, off) => {
@@ -12228,14 +12239,14 @@ const v4Box = (cx, cz, ry, W, D, FL, FH, wallMat, name, para = true) => {
 
 // ===== HELPER v2* (dán 1 LẦN) =====
 const v2OK = (x, z) => Math.abs(groundHeightNoDeck(x, z) - 2) < 0.5 && !isWater(x, z);
-const v2Sign = (txt, bg, fg = '#ffffff', px = 46) => new THREE.MeshLambertMaterial({
+const v2Sign = _cells.memo('v2Sign', (txt, bg, fg = '#ffffff', px = 46) => new THREE.MeshLambertMaterial({
   map: makeTex(512, 84, (g, w, h) => {
     g.fillStyle = bg; g.fillRect(0, 0, w, h);
     g.fillStyle = fg; g.font = `bold ${px}px system-ui, sans-serif`;
     g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, w / 2, h / 2 + 2, w - 24);
   }),
-});
-const v2Facade = (baseCss, winCss, cols, rows) => new THREE.MeshLambertMaterial({
+}));
+const v2Facade = _cells.memo('v2Facade', (baseCss, winCss, cols, rows) => new THREE.MeshLambertMaterial({
   map: makeTex(256, 256, (g, w, h) => {
     g.fillStyle = baseCss; g.fillRect(0, 0, w, h);
     const mx = w * 0.12, my = h * 0.12, cw = (w - mx * 2) / cols, ch = (h - my * 2) / rows;
@@ -12243,7 +12254,7 @@ const v2Facade = (baseCss, winCss, cols, rows) => new THREE.MeshLambertMaterial(
       g.fillStyle = winCss; g.fillRect(mx + c * cw + cw * 0.16, my + r * ch + ch * 0.16, cw * 0.68, ch * 0.66);
     }
   }, 'fac|' + baseCss + '|' + winCss + '|' + cols + '|' + rows),
-});
+}));
 // nhà hộp mặt tiền texture (local +Z = mặt tiền, quay ra đường theo ry). Tự collider + FEATURED_CLEAR.
 const v2Box = (cx, cz, ry, W, D, FL, FH, wallMat, name) => {
   if (!v2OK(cx, cz)) return null;
@@ -12265,7 +12276,7 @@ const v2Tower = (x, z, ry, W, D, FL, FH, wallMat, name) => {
   for (let f = 0; f < FL; f++) { const band = new THREE.Mesh(new THREE.BoxGeometry(W + 0.14, 1.5, D + 0.14), sharedMats.window); band.position.y = f * FH + FH * 0.62; g.add(band); }
   const roof = new THREE.Mesh(new THREE.BoxGeometry(W + 1, 0.7, D + 1), mat(0xb8b2a2)); roof.position.y = H + 0.35; g.add(roof);
   g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
-  g.name = name; scene.add(g);
+  g.name = name; g.userData.kind = 'tower'; scene.add(g);   // cao ốc có tên → giữ + claim (vd v2_curtainwall156 51 m)
   addCollider(x, z, Math.max(W, D) * 0.52); FEATURED_CLEAR.push([x, z, Math.max(W, D) / 2 + 9]);
   return g;
 };
@@ -12524,21 +12535,21 @@ const __v3stats = {};
 
 // === HELPER v3 (dán 1 LẦN trước 9 block) ===
 const v3Hex = (n) => (typeof n === 'number' ? '#' + (n & 0xffffff).toString(16).padStart(6, '0') : n);
-const v3Sign = (txt, bg, fg = '#ffffff', px = 44) => new THREE.MeshLambertMaterial({
+const v3Sign = _cells.memo('v3Sign', (txt, bg, fg = '#ffffff', px = 44) => new THREE.MeshLambertMaterial({
   map: makeTex(512, 84, (g, w, h) => {
     g.fillStyle = bg; g.fillRect(0, 0, w, h);
     g.fillStyle = fg; g.font = `bold ${px}px system-ui, sans-serif`;
     g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, w / 2, h / 2 + 2, w - 24);
   }),
-});
-const v3SignV = (txt, bg, fg = '#ffffff', px = 38) => new THREE.MeshLambertMaterial({
+}));
+const v3SignV = _cells.memo('v3SignV', (txt, bg, fg = '#ffffff', px = 38) => new THREE.MeshLambertMaterial({
   map: makeTex(64, 512, (g, w, h) => {
     g.fillStyle = bg; g.fillRect(0, 0, w, h);
     g.fillStyle = fg; g.font = `bold ${px}px system-ui, sans-serif`; g.textAlign = 'center';
     g.save(); g.translate(w / 2, h / 2); g.rotate(Math.PI / 2); g.fillText(txt, 0, 12, h - 30); g.restore();
   }),
-});
-const v3Facade = (baseCss, winCss, cols, rows) => new THREE.MeshLambertMaterial({
+}));
+const v3Facade = _cells.memo('v3Facade', (baseCss, winCss, cols, rows) => new THREE.MeshLambertMaterial({
   map: makeTex(256, 256, (g, w, h) => {
     g.fillStyle = baseCss; g.fillRect(0, 0, w, h);
     const mx = w * 0.1, my = h * 0.12, cw = (w - mx * 2) / cols, ch = (h - my * 2) / rows;
@@ -12546,7 +12557,7 @@ const v3Facade = (baseCss, winCss, cols, rows) => new THREE.MeshLambertMaterial(
       g.fillStyle = winCss; g.fillRect(mx + c * cw + cw * 0.18, my + r * ch + ch * 0.18, cw * 0.62, ch * 0.6);
     }
   }),
-});
+}));
 const v3Stripe = (a, b) => new THREE.MeshLambertMaterial({
   map: makeTex(128, 64, (g, w, h) => { for (let i = 0; i < 8; i++) { g.fillStyle = i % 2 ? a : b; g.fillRect(i * w / 8, 0, w / 8, h); } }),
 });
@@ -12737,14 +12748,14 @@ const v3Row = (bx, bz, tx, tz, ry, list) => { // list: [{off, ...v3Shop opts}]
 
 // === HELPERS v6 (prefix RIÊNG — không trùng dl*/cn*/tx*/ln*/hb*/tb*/cb*/lm*) ===
 const v6OK = (x, z) => Math.abs(groundHeightNoDeck(x, z) - 2.0) < 0.4 && !isWater(x, z);
-const v6Sign = (txt, bg, fg = '#ffffff', px = 42) => new THREE.MeshLambertMaterial({
+const v6Sign = _cells.memo('v6Sign', (txt, bg, fg = '#ffffff', px = 42) => new THREE.MeshLambertMaterial({
   map: makeTex(512, 88, (g, w, h) => {
     g.fillStyle = bg; g.fillRect(0, 0, w, h);
     g.fillStyle = fg; g.font = `bold ${px}px system-ui, sans-serif`;
     g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, w / 2, h / 2 + 2, w - 24);
   }),
-});
-const v6Facade = (baseCss, winCss, cols, rows) => new THREE.MeshLambertMaterial({
+}));
+const v6Facade = _cells.memo('v6Facade', (baseCss, winCss, cols, rows) => new THREE.MeshLambertMaterial({
   map: makeTex(256, 256, (g, w, h) => {
     g.fillStyle = baseCss; g.fillRect(0, 0, w, h);
     const mx = w * 0.12, my = h * 0.12, cw = (w - mx * 2) / cols, ch = (h - my * 2) / rows;
@@ -12752,7 +12763,7 @@ const v6Facade = (baseCss, winCss, cols, rows) => new THREE.MeshLambertMaterial(
       g.fillStyle = winCss; g.fillRect(mx + c * cw + cw * 0.16, my + r * ch + ch * 0.16, cw * 0.68, ch * 0.66);
     }
   }, 'fac|' + baseCss + '|' + winCss + '|' + cols + '|' + rows),
-});
+}));
 // road frame helpers: A=điểm tim của pano gốc, U=hướng dọc phố; N=(-Uz,Ux)
 const v6Pt = (F, s, off) => [F.A[0] + F.U[0] * s + (-F.U[1]) * off, F.A[1] + F.U[1] * s + F.U[0] * off];
 const v6Off = (F, D, san = 0) => F.half + 2.3 + D / 2 + san;               // độ lớn pháp tuyến
@@ -13135,14 +13146,14 @@ const F_CCU = { A: [-564.8, 395.9], U: [0.189, 0.982], half: 4 };      // Cát C
 // === HELPER v1 (dán 1 LẦN trước các block) ===
 const v1OK = (x, z) => Math.abs(groundHeightNoDeck(x, z) - LAND_H) < 0.4 && !isWater(x, z);
 const v1dry = (x, z) => Math.abs(groundHeightNoDeck(x, z) - LAND_H) < 0.4;
-const v1Sign = (txt, bg, fg = '#ffffff', px = 46) => new THREE.MeshLambertMaterial({
+const v1Sign = _cells.memo('v1Sign', (txt, bg, fg = '#ffffff', px = 46) => new THREE.MeshLambertMaterial({
   map: makeTex(512, 96, (g, w, h) => {
     g.fillStyle = bg; g.fillRect(0, 0, w, h);
     g.fillStyle = fg; g.font = `bold ${px}px system-ui, sans-serif`;
     g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, w / 2, h / 2 + 2, w - 24);
   }),
-});
-const v1Fac = (baseCss, winCss, cols, rows) => new THREE.MeshLambertMaterial({
+}));
+const v1Fac = _cells.memo('v1Fac', (baseCss, winCss, cols, rows) => new THREE.MeshLambertMaterial({
   map: makeTex(256, 256, (g, w, h) => {
     g.fillStyle = baseCss; g.fillRect(0, 0, w, h);
     const mx = w * 0.1, my = h * 0.1, cw = (w - mx * 2) / cols, ch = (h - my * 2) / rows;
@@ -13150,7 +13161,7 @@ const v1Fac = (baseCss, winCss, cols, rows) => new THREE.MeshLambertMaterial({
       g.fillStyle = winCss; g.fillRect(mx + c * cw + cw * 0.16, my + r * ch + ch * 0.15, cw * 0.68, ch * 0.68);
     }
   }),
-});
+}));
 const v1caro = () => {                                  // gạch caro đỏ-xám kè Tam Bạc (theo sidewalkMaterial)
   const t = makeTex(256, 256, (g, w, h) => {
     const s = w / 4;
@@ -13490,13 +13501,13 @@ const v1House = (cx, cz, ry, W, D, FL, facMat, name, roofHex = 0xb8b2a2) => {
 // ============================================================================
 
 // ===== HELPER CHUNG w2* (dán 1 LẦN trước các block dưới) =====
-const w2Sign = (txt, bg, fg = '#ffffff', px = 40) => new THREE.MeshLambertMaterial({
+const w2Sign = _cells.memo('w2Sign', (txt, bg, fg = '#ffffff', px = 40) => new THREE.MeshLambertMaterial({
   map: makeTex(512, 96, (g, w, h) => {
     g.fillStyle = bg; g.fillRect(0, 0, w, h);
     g.fillStyle = fg; g.font = `bold ${px}px system-ui, sans-serif`;
     g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, w / 2, h / 2 + 2, w - 24);
   }),
-});
+}));
 const w2OK = (x, z) => Math.abs(groundHeightNoDeck(x, z) - 2.0) < 0.4 && !isWater(x, z);
 
 // một shophouse: thân + dải cửa sổ theo tầng + kính trệt + biển + mái + (mái hiên).
@@ -13598,7 +13609,7 @@ const w2Umb = (x, z, hex) => {
     { a: -39, W: 5, FL: 2, D: 8, wallHex: 0x1a72c4, name: 'VIỄN THÔNG — KHẢI HẬU', bg: '#1560b0', fg: '#ffffff', px: 32, id: 'khaihau' },
     { a: -32, W: 6, FL: 3, D: 9, wallHex: 0x201d1a, name: 'QUANG HẠNH — TRANG SỨC', bg: '#201d1a', fg: '#e8c35a', px: 28, id: 'quanghanh' },
     { a: -25, W: 5, FL: 2, D: 8, wallHex: 0xf4b8cf, name: 'LuLu', bg: '#e57ba3', fg: '#ffffff', px: 48, id: 'lulu' },
-    { a: -2, W: 7, FL: 3, D: 9, wallHex: 0xf2efe9, name: 'HIDOO 82', bg: '#f2efe9', fg: '#151515', px: 46, id: 'hidoo82', awn: 0x2f6f3a },
+    { a: -2, W: 7, FL: 3, D: 9, wallHex: 0xf2efe9, name: 'THỜI TRANG 82', bg: '#f2efe9', fg: '#151515', px: 46, id: 'hidoo82', awn: 0x2f6f3a },
     { a: 5, W: 5, FL: 2, D: 8, wallHex: 0x1550a0, name: 'Cường Hưng ELECTRIC', bg: '#1550a0', fg: '#ffd21a', px: 28, id: 'cuonghung' },
     { a: 11, W: 6, FL: 3, D: 9, wallHex: 0x1f8a4c, name: 'KARAOKE', bg: '#1f8a4c', fg: '#ffffff', px: 40, id: 'vinaktv' },
     { a: 34, W: 5, FL: 2, D: 8, wallHex: 0x2a2320, name: 'THỜI TRANG', bg: '#2a2320', fg: '#e8c35a', px: 38, id: 'ivy' },
@@ -13950,14 +13961,14 @@ function w2FacadeYellow() {
 // === HELPER w3 (dán 1 LẦN trước 10 block) ===
 const w3dry = (x, z) => Math.abs(groundHeightNoDeck(x, z) - 2) < 0.45;
 const w3OK = (x, z) => w3dry(x, z) && !isWater(x, z);
-const w3Sign = (txt, bg, fg = '#ffffff', px = 44) => new THREE.MeshLambertMaterial({
+const w3Sign = _cells.memo('w3Sign', (txt, bg, fg = '#ffffff', px = 44) => new THREE.MeshLambertMaterial({
   map: makeTex(512, 88, (g, w, h) => {
     g.fillStyle = bg; g.fillRect(0, 0, w, h);
     g.fillStyle = fg; g.font = `bold ${px}px system-ui, sans-serif`;
     g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, w / 2, h / 2 + 2, w - 24);
   }),
-});
-const w3Fac = (baseCss, winCss, cols, rows) => new THREE.MeshLambertMaterial({
+}));
+const w3Fac = _cells.memo('w3Fac', (baseCss, winCss, cols, rows) => new THREE.MeshLambertMaterial({
   map: makeTex(256, 256, (g, w, h) => {
     g.fillStyle = baseCss; g.fillRect(0, 0, w, h);
     const mx = w * 0.1, my = h * 0.1, cw = (w - mx * 2) / cols, ch = (h - my * 2) / rows;
@@ -13965,7 +13976,7 @@ const w3Fac = (baseCss, winCss, cols, rows) => new THREE.MeshLambertMaterial({
       g.fillStyle = winCss; g.fillRect(mx + c * cw + cw * 0.17, my + r * ch + ch * 0.16, cw * 0.66, ch * 0.66);
     }
   }),
-});
+}));
 const w3Stripe = (a, b) => new THREE.MeshLambertMaterial({
   map: makeTex(128, 64, (g, w, h) => { for (let i = 0; i < 8; i++) { g.fillStyle = i % 2 ? a : b; g.fillRect(i * w / 8, 0, w / 8, h); } }),
 });
@@ -14288,21 +14299,21 @@ const w3Pole = (x, z) => {
 
 // === HELPER CHUNG w4 (dán 1 LẦN trước 12 block) ===
 const w4OK = (x, z) => Math.abs(groundHeightNoDeck(x, z) - 2.0) < 0.4 && !isWater(x, z);
-const w4Sign = (txt, bg, fg = '#ffffff', px = 44) => new THREE.MeshLambertMaterial({
+const w4Sign = _cells.memo('w4Sign', (txt, bg, fg = '#ffffff', px = 44) => new THREE.MeshLambertMaterial({
   map: makeTex(512, 84, (g, w, h) => {
     g.fillStyle = bg; g.fillRect(0, 0, w, h);
     g.fillStyle = fg; g.font = `bold ${px}px system-ui, sans-serif`;
     g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, w / 2, h / 2 + 2, w - 24);
   }),
-});
-const w4VSign = (txt, bg, fg = '#ffffff') => new THREE.MeshLambertMaterial({   // biển DỌC (HOTEL...)
+}));
+const w4VSign = _cells.memo('w4VSign', (txt, bg, fg = '#ffffff') => new THREE.MeshLambertMaterial({   // biển DỌC (HOTEL...)
   map: makeTex(64, 512, (g, w, h) => {
     g.fillStyle = bg; g.fillRect(0, 0, w, h);
     g.fillStyle = fg; g.font = 'bold 40px system-ui, sans-serif'; g.textAlign = 'center';
     g.save(); g.translate(w / 2, h / 2); g.rotate(Math.PI / 2); g.fillText(txt, 0, 12); g.restore();
   }),
-});
-const w4Facade = (baseCss, winCss, cols, rows) => new THREE.MeshLambertMaterial({
+}));
+const w4Facade = _cells.memo('w4Facade', (baseCss, winCss, cols, rows) => new THREE.MeshLambertMaterial({
   map: makeTex(256, 256, (g, w, h) => {
     g.fillStyle = baseCss; g.fillRect(0, 0, w, h);
     const mx = w * 0.12, my = h * 0.12, cw = (w - mx * 2) / cols, ch = (h - my * 2) / rows;
@@ -14310,7 +14321,7 @@ const w4Facade = (baseCss, winCss, cols, rows) => new THREE.MeshLambertMaterial(
       g.fillStyle = winCss; g.fillRect(mx + c * cw + cw * 0.16, my + r * ch + ch * 0.16, cw * 0.68, ch * 0.66);
     }
   }, 'fac|' + baseCss + '|' + winCss + '|' + cols + '|' + rows),
-});
+}));
 const w4Done = (g, x, z, colR, clearR) => {
   g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
   scene.add(g);
@@ -14596,7 +14607,7 @@ const w4Pole = (x, z, wireTo) => {
     const aw = new THREE.Mesh(new THREE.BoxGeometry(14.4, 0.5, 3.0), mat(0x2a2c30)); aw.position.set(0, 4.0, 5.6); g.add(aw);   // mái hắt đen trà chanh
     const s = new THREE.Mesh(new THREE.PlaneGeometry(10, 1.2), w4Sign('TRÀ CHANH · Diamond', '#22252a', '#ffd54a', 34)); s.position.set(0, 3.55, 5.62); g.add(s);
     const hv = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 4.4), w4VSign('HOTEL', '#a3121a')); hv.position.set(6.6, 9.5, 5.55); g.add(hv);
-    const s2 = new THREE.Mesh(new THREE.PlaneGeometry(4.4, 1.0), w4Sign('HATRACO', '#1c56a0', '#ffffff', 34)); s2.position.set(4.6, 6.4, 5.6); g.add(s2);
+    const s2 = new THREE.Mesh(new THREE.PlaneGeometry(4.4, 1.0), w4Sign('VẬN TẢI', '#1c56a0', '#ffffff', 34)); s2.position.set(4.6, 6.4, 5.6); g.add(s2);
     w4Done(g, 365.3, -315.5, 7, 12);
   }
   for (const [px, pz] of [[356, -309], [356, -317], [360, -322], [352, -313]]) w4Umb(px, pz, 0xc02020);  // ô dù KIM THANH đỏ
@@ -14763,14 +14774,14 @@ const w4Pole = (x, z, wireTo) => {
 // === HELPER CHUNG w5 (dán 1 LẦN trước các block) ===
 const w5LAND = 2;                                        // groundHeightNoDeck nền phẳng ≈ 2.0
 const w5OK = (x, z) => Math.abs(groundHeightNoDeck(x, z) - w5LAND) < 0.5 && !isWater(x, z);
-const w5Sign = (txt, bg, fg = '#ffffff', px = 46) => new THREE.MeshLambertMaterial({
+const w5Sign = _cells.memo('w5Sign', (txt, bg, fg = '#ffffff', px = 46) => new THREE.MeshLambertMaterial({
   map: makeTex(512, 84, (g, w, h) => {
     g.fillStyle = bg; g.fillRect(0, 0, w, h);
     g.fillStyle = fg; g.font = `bold ${px}px system-ui, sans-serif`;
     g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, w / 2, h / 2 + 2, w - 24);
   }),
-});
-const w5Facade = (baseCss, winCss, cols, rows) => new THREE.MeshLambertMaterial({
+}));
+const w5Facade = _cells.memo('w5Facade', (baseCss, winCss, cols, rows) => new THREE.MeshLambertMaterial({
   map: makeTex(256, 256, (g, w, h) => {
     g.fillStyle = baseCss; g.fillRect(0, 0, w, h);
     const mx = w * 0.12, my = h * 0.12, cw = (w - mx * 2) / cols, ch = (h - my * 2) / rows;
@@ -14778,7 +14789,7 @@ const w5Facade = (baseCss, winCss, cols, rows) => new THREE.MeshLambertMaterial(
       g.fillStyle = winCss; g.fillRect(mx + c * cw + cw * 0.16, my + r * ch + ch * 0.16, cw * 0.68, ch * 0.66);
     }
   }, 'fac|' + baseCss + '|' + winCss + '|' + cols + '|' + rows),
-});
+}));
 // khối nhà cơ bản: thân + mái bằng, mặt tiền = local +Z. Trả group để đắp thêm.
 const w5Build = (x, z, ry, W, D, FL, FH, wallMat, name) => {
   if (!w5OK(x, z)) return null;
@@ -15008,7 +15019,7 @@ const w5Awning = (g, W, D, y, col) => {
       const sc = new THREE.Mesh(mergeGeometries(scg), mat(0xd2502a)); sc.castShadow = true; sc.name = 'w5_summo_scaffold'; scene.add(sc); scg.forEach((gg) => gg.dispose());
       // bạt che xanh lá phủ mặt
       const tarp = new THREE.Mesh(new THREE.PlaneGeometry(8, 7), mat(0x2f7d4f)); tarp.rotation.y = -2.956; tarp.position.set(bx, gy + 3.6, bz - 2.6); tarp.name = 'w5_summo_tarp'; scene.add(tarp);
-      const s = new THREE.Mesh(new THREE.PlaneGeometry(3.0, 0.7), w5Sign('SUMMO', '#d2502a', '#ffffff', 46)); s.position.set(bx, gy + 6.5, bz - 3.1); s.rotation.y = -2.956; scene.add(s);
+      const s = new THREE.Mesh(new THREE.PlaneGeometry(3.0, 0.7), w5Sign('CÔNG TRÌNH', '#d2502a', '#ffffff', 46)); s.position.set(bx, gy + 6.5, bz - 3.1); s.rotation.y = -2.956; scene.add(s);
       // đống gạch vụn
       for (const [dx, dz] of [[3, 2], [-2, 3], [4, -2]]) { const r = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.6, 1.0), mat(0x9a5a44)); r.position.set(bx + dx, gy + 0.35, bz + dz); r.rotation.y = dx; r.castShadow = true; scene.add(r); }
       addCollider(bx, bz, 5); FEATURED_CLEAR.push([bx, bz, 10]);
@@ -15078,14 +15089,14 @@ const w5Awning = (g, W, D, y, col) => {
 {
 // ---- HELPER w1 (dán 1 lần) ----
 const w1OK = (x, z) => !isWater(x, z) && Math.abs(groundHeightNoDeck(x, z) - 2.0) < 0.5;
-const w1Sign = (txt, bg, fg = '#ffffff', px = 46) => new THREE.MeshLambertMaterial({
+const w1Sign = _cells.memo('w1Sign', (txt, bg, fg = '#ffffff', px = 46) => new THREE.MeshLambertMaterial({
   map: makeTex(512, 84, (g, w, h) => {
     g.fillStyle = bg; g.fillRect(0, 0, w, h);
     g.fillStyle = fg; g.font = `bold ${px}px system-ui, sans-serif`;
     g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, w / 2, h / 2 + 2, w - 24);
   }),
-});
-const w1Facade = (baseCss, winCss, cols, rows) => new THREE.MeshLambertMaterial({
+}));
+const w1Facade = _cells.memo('w1Facade', (baseCss, winCss, cols, rows) => new THREE.MeshLambertMaterial({
   map: makeTex(256, 256, (g, w, h) => {
     g.fillStyle = baseCss; g.fillRect(0, 0, w, h);
     const mx = w * 0.12, my = h * 0.12, cw = (w - mx * 2) / cols, ch = (h - my * 2) / rows;
@@ -15093,7 +15104,7 @@ const w1Facade = (baseCss, winCss, cols, rows) => new THREE.MeshLambertMaterial(
       g.fillStyle = winCss; g.fillRect(mx + c * cw + cw * 0.16, my + r * ch + ch * 0.16, cw * 0.68, ch * 0.66);
     }
   }, 'fac|' + baseCss + '|' + winCss + '|' + cols + '|' + rows),
-});
+}));
 // F = {c:[cx,cz], u:[ux,uz], nb:[nx,nz](đơn vị, phía CHÍNH), half}
 const w1Pt = (F, along, off, sgn) => [
   F.c[0] + F.u[0] * along + F.nb[0] * off * sgn,
@@ -16085,7 +16096,7 @@ function cuBuildCurbs(deps) {
         rf.position.set(0, H + 0.95, sgn * D * 0.22); rf.rotation.x = -sgn * 0.32; g.add(rf);
       }
       g.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
-      g.name = 'port_kho_' + wi; scene.add(g);
+      g.name = 'port_kho_' + wi; g.userData.kind = 'house'; scene.add(g);
       for (const lx of [-W / 3, 0, W / 3]) addCollider(xc + lx, zc, D / 2 + 1);
       FEATURED_CLEAR.push([xc, zc, W / 2 + 8]);
       wi++;
@@ -16109,14 +16120,14 @@ function cuBuildCurbs(deps) {
 // ============================================================================
 {
   // ---------- HELPERS TỰ CHỨA (sb*) ----------
-  const sbSign = (txt, bg, fg = '#ffffff', px = 42) => new THREE.MeshLambertMaterial({
+  const sbSign = _cells.memo('sbSign', (txt, bg, fg = '#ffffff', px = 42) => new THREE.MeshLambertMaterial({
     map: makeTex(512, 96, (g, w, h) => {
       g.fillStyle = bg; g.fillRect(0, 0, w, h);
       g.fillStyle = fg; g.font = `bold ${px}px system-ui, sans-serif`;
       g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, w / 2, h / 2 + 2, w - 24);
     }),
-  });
-  const sbFacade = (baseCss, winCss, cols, rows, arch = false) => new THREE.MeshLambertMaterial({
+  }));
+  const sbFacade = _cells.memo('sbFacade', (baseCss, winCss, cols, rows, arch = false) => new THREE.MeshLambertMaterial({
     map: makeTex(256, 256, (g, w, h) => {
       g.fillStyle = baseCss; g.fillRect(0, 0, w, h);
       const mx = w * 0.11, my = h * 0.12, cw = (w - mx * 2) / cols, ch = (h - my * 2) / rows;
@@ -16128,7 +16139,7 @@ function cuBuildCurbs(deps) {
         } else g.fillRect(mx + c * cw + cw * 0.16, my + r * ch + ch * 0.16, cw * 0.68, ch * 0.66);
       }
     }),
-  });
+  }));
   const sbOK = (x, z) => Math.abs(groundHeightNoDeck(x, z) - 2.0) < 0.5 && !isWater(x, z);
 
   /*SB_DATA_START*/ // vùng THUẦN TOÁN (không phụ thuộc three) — smoke verify eval khối này
@@ -16150,7 +16161,7 @@ function cuBuildCurbs(deps) {
       board: ['CẦU ĐẤT 158', '#7a2b22', '#f0e0c0'] },
     { p: [316.5, 487.0], sd: -1, along: 3.5, W: 22, D: 9, FL: 3, yard: 2.2, type: 'shop',
       wall: '#efe6d2', win: '#7a8793', roof: '#9a958a', name: 'sb_371_coop',
-      board: ['CO.OP — SIÊU THỊ MINI • THÁI', '#0f6a38', '#ffffff', 34] },
+      board: ['SIÊU THỊ MINI • THÁI', '#0f6a38', '#ffffff', 34] },
     // --- pano_370 (347,513) — Cầu Đất số 65-182 ---
     { p: [347.3, 513.3], sd: 1, along: 0, W: 12, D: 9, FL: 2, yard: 2.2, type: 'french',
       wall: '#e6cf86', win: '#5f6a70', shut: '#3f6a52', roof: '#9a958a', name: 'sb_370_coanh',
@@ -16323,14 +16334,14 @@ const saFacade = (wallCss, bandCss, floors, bays) => {
 };
 
 // biển hiệu chữ (MeshBasic — không ăn nắng, đọc rõ như biển thật)
-const saSign = (txt, bg, fg, size) => new THREE.MeshBasicMaterial({
+const saSign = _cells.memo('saSign', (txt, bg, fg, size) => new THREE.MeshBasicMaterial({
   side: THREE.DoubleSide,
   map: makeTex(512, 128, (g, w, h) => {
     g.fillStyle = bg || '#c01822'; g.fillRect(0, 0, w, h);
     g.fillStyle = fg || '#ffffff'; g.font = 'bold ' + (size || 44) + 'px system-ui, sans-serif';
     g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, w / 2, h / 2 + 4, w - 22);
   }),
-});
+}));
 
 // DÃY NHÀ CHÍNH: cx,cz = TIM ĐƯỜNG; (nx,nz) = pháp tuyến ĐƠN VỊ (+n);
 // side=±1 chọn bờ; front = khoảng cách mặt tiền→tim; D = độ sâu nhà;
@@ -16382,7 +16393,7 @@ const saRow = (cx, cz, nx, nz, side, front, D, lots, name) => {
     run += L.w;
   }
   g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
-  g.name = name; scene.add(g);
+  g.name = name; g.userData.kind = 'house'; scene.add(g);
   return g;
 };
 
@@ -16454,7 +16465,7 @@ const SA_ROWS = [
   // --- (SA-11) QUANG TRUNG ~70-92 bờ BẮC (đối diện hồ): Tổng kho chăn ga + Vua Đồ Chơi + gia dụng ---
   { name: 'sa_quangtrung003', cx: -325.7, cz: 139.0, nx: -0.197, nz: -0.980, side: 1, front: 7.6, D: 10, lots: [
     { w: 6, fl: 4, wall: '#eceae2', band: '#e46a1b', sign: 'CHĂN GA GỐI ĐỆM', ssz: 32 },
-    { w: 6, fl: 4, wall: '#f2ede2', band: '#c01822', sign: 'VUA ĐỒ CHƠI' },
+    { w: 6, fl: 4, wall: '#f2ede2', band: '#c01822', sign: 'ĐỒ CHƠI' },
     { w: 6, fl: 4, wall: '#e6ded0', band: '#1c56a0', sign: 'GIA DỤNG' },
   ] },
   // --- (SA-12) NGUYỄN ĐỨC CẢNH ~46 ven hồ (bờ ĐÔNG): SIXDO + Mixue + JK Jeans + VietABank ---
@@ -16571,14 +16582,14 @@ const s2bFacade = (wallCss, bandCss, floors, bays) => {
 };
 
 // biển hiệu chữ (MeshBasic — không ăn nắng, đọc rõ)
-const s2bSign = (txt, bg, fg, size) => new THREE.MeshBasicMaterial({
+const s2bSign = _cells.memo('s2bSign', (txt, bg, fg, size) => new THREE.MeshBasicMaterial({
   side: THREE.DoubleSide,
   map: makeTex(512, 128, (g, w, h) => {
     g.fillStyle = bg || '#c01822'; g.fillRect(0, 0, w, h);
     g.fillStyle = fg || '#ffffff'; g.font = 'bold ' + (size || 44) + 'px system-ui';
     g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, w / 2, h / 2 + 4);
   }),
-});
+}));
 
 // DÃY LIỀN KỀ: cx,cz=tim đường; (nx,nz)=pháp tuyến đơn vị; side=±1 chọn bờ;
 // hw=lòng đường; D=độ sâu nhà; lots=[{w,fl,wall,band,sign,sfg,ssz,kind}]
@@ -16654,7 +16665,7 @@ const s2bRow = (cx, cz, nx, nz, side, hw, D, lots, name) => {
     run += L.w;
   }
   g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
-  g.name = name; scene.add(g);
+  g.name = name; g.userData.kind = 'house'; scene.add(g);
   return g;
 };
 
@@ -16803,7 +16814,7 @@ const s2bRow = (cx, cz, nx, nz, side, hw, D, lots, name) => {
   ], 's2b_chuahang246_a');
   s2bRow(cx, cz, nx, nz, -1, 8, 8, [
     { w: 4, kind: 'tin', wall: '#cdbf9a', band: '#2f6ea5' },
-    { w: 4, fl: 3, wall: '#eef1f4', band: '#1450a0', sign: 'BẢO MINH' },
+    { w: 4, fl: 3, wall: '#eef1f4', band: '#1450a0', sign: 'BẢO HIỂM' },
   ], 's2b_chuahang246_b');
 }
 
@@ -16868,13 +16879,13 @@ const s1OK = (x, z) => Math.abs(groundHeightNoDeck(x, z) - s1LAND) < 0.45 && !is
 const s1Speck = (g, w, h, n, a) => { for (let i = 0; i < n; i++) { g.fillStyle = `rgba(60,50,40,${(a * Math.random()).toFixed(3)})`; g.fillRect(Math.random() * w, Math.random() * h, 2, 2); } };
 
 // Biển chữ (nền/chữ) — vật liệu phẳng
-const s1Sign = (txt, bg, fg = '#ffffff', px = 46) => new THREE.MeshLambertMaterial({
+const s1Sign = _cells.memo('s1Sign', (txt, bg, fg = '#ffffff', px = 46) => new THREE.MeshLambertMaterial({
   map: makeTex(512, 96, (g, w, h) => {
     g.fillStyle = bg; g.fillRect(0, 0, w, h);
     g.fillStyle = fg; g.font = `bold ${px}px system-ui, sans-serif`;
     g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, w / 2, h / 2 + 3, w - 24);
   }),
-});
+}));
 
 // Mặt tiền tổng quát cols×rows ô cửa. style:
 //   'shutter' — tường màu + cửa cao CHỚP louvered (màu shutter) + khung kem
@@ -17032,7 +17043,7 @@ function s1ShopRow(P, cols, heroes, gateSeg) {
     const s = new THREE.Mesh(new THREE.PlaneGeometry(segW * 0.82, 0.95), s1Sign(hr.txt, hr.bg, hr.fg, hr.px || 36)); s.position.set(lx, H - 1.0, P.D / 2 + 0.1); g.add(s);
     if (hr.cross) { const cr = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 0.7), new THREE.MeshLambertMaterial({ map: makeTex(64, 64, (gg, w, h) => { gg.fillStyle = '#ffffff'; gg.fillRect(0, 0, w, h); gg.fillStyle = '#12a04a'; gg.fillRect(w * 0.4, h * 0.15, w * 0.2, h * 0.7); gg.fillRect(w * 0.15, h * 0.4, w * 0.7, h * 0.2); }) })); cr.position.set(lx + segW * 0.42, H - 1.0, P.D / 2 + 0.12); g.add(cr); }
   }
-  g.traverse((o) => { if (o.isMesh) o.castShadow = true; }); g.name = P.key || 's1_shoprow'; scene.add(g);
+  g.traverse((o) => { if (o.isMesh) o.castShadow = true; }); g.name = P.key || 's1_shoprow'; g.userData.kind = 'house'; scene.add(g);
   s1Register(P);
 }
 
@@ -17109,14 +17120,14 @@ const s2Facade = (wallCss, bandCss, floors, bays) => {
 };
 
 // biển hiệu chữ (MeshBasic — không ăn nắng, đọc rõ như biển thật)
-const s2Sign = (txt, bg, fg, size) => new THREE.MeshBasicMaterial({
+const s2Sign = _cells.memo('s2Sign', (txt, bg, fg, size) => new THREE.MeshBasicMaterial({
   side: THREE.DoubleSide,
   map: makeTex(512, 128, (g, w, h) => {
     g.fillStyle = bg || '#c01822'; g.fillRect(0, 0, w, h);
     g.fillStyle = fg || '#ffffff'; g.font = 'bold ' + (size || 46) + 'px system-ui';
     g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, w / 2, h / 2 + 4);
   }),
-});
+}));
 
 // DÃY SHOPHOUSE LIỀN KỀ: cx,cz = tim đường; (nx,nz)=pháp tuyến đơn vị;
 // side=±1 chọn bờ; hw=lòng đường; D=độ sâu nhà; lots=[{w,fl,wall,band,sign,sfg,ssz,kind}]
@@ -17162,7 +17173,7 @@ const s2Row = (cx, cz, nx, nz, side, hw, D, lots, name) => {
     run += L.w;
   }
   g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
-  g.name = name; scene.add(g);
+  g.name = name; g.userData.kind = 'house'; scene.add(g);
   return g;
 };
 
@@ -17236,7 +17247,7 @@ const s2Row = (cx, cz, nx, nz, side, hw, D, lots, name) => {
   ], 's2_catcut_winmart');
   s2Row(cx, cz, nx, nz, -1, 8, 10, [
     { w: 12, fl: 4, wall: '#eef1f4', band: '#232326', sign: 'ONLY HAIR' },
-    { w: 10, fl: 3, wall: '#cf5a2a', band: '#1c56a0', sign: 'POS.vn' },
+    { w: 10, fl: 3, wall: '#cf5a2a', band: '#1c56a0', sign: 'PHỤ KIỆN' },
   ], 's2_catcut_thoitrang');
 }
 
@@ -17313,14 +17324,14 @@ const s2Row = (cx, cz, nx, nz, side, hw, D, lots, name) => {
 const s3OK = (x, z) => !isWater(x, z) && Math.abs(groundHeight(x, z) - groundHeightNoDeck(x, z)) < 0.5;
 // điểm đặt + hướng mặt tiền từ pano gốc theo heading la bàn
 const s3PH = (px, pz, h, R) => { const r = h * Math.PI / 180; return [px + R * Math.sin(r), pz - R * Math.cos(r), -r]; };
-const s3Sign = (txt, bg, fg = '#ffffff', px = 44) => new THREE.MeshLambertMaterial({
+const s3Sign = _cells.memo('s3Sign', (txt, bg, fg = '#ffffff', px = 44) => new THREE.MeshLambertMaterial({
   map: makeTex(512, 88, (g, w, h) => {
     g.fillStyle = bg; g.fillRect(0, 0, w, h);
     g.fillStyle = fg; g.font = `bold ${px}px system-ui, sans-serif`;
     g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, w / 2, h / 2 + 2, w - 24);
   }),
-});
-const s3Facade = (baseCss, winCss, cols, rows) => new THREE.MeshLambertMaterial({
+}));
+const s3Facade = _cells.memo('s3Facade', (baseCss, winCss, cols, rows) => new THREE.MeshLambertMaterial({
   map: makeTex(256, 256, (g, w, h) => {
     g.fillStyle = baseCss; g.fillRect(0, 0, w, h);
     const mx = w * 0.12, my = h * 0.12, cw = (w - mx * 2) / cols, ch = (h - my * 2) / rows;
@@ -17328,7 +17339,7 @@ const s3Facade = (baseCss, winCss, cols, rows) => new THREE.MeshLambertMaterial(
       g.fillStyle = winCss; g.fillRect(mx + c * cw + cw * 0.16, my + r * ch + ch * 0.16, cw * 0.68, ch * 0.66);
     }
   }, 'fac|' + baseCss + '|' + winCss + '|' + cols + '|' + rows),
-});
+}));
 // khung group đặt tại tim khối (gate s3OK)
 const s3Grp = (x, z, ry, name) => {
   if (!s3OK(x, z)) return null;
@@ -17567,14 +17578,14 @@ const s4Off = (px, pz, H, off) => [px + Math.sin(H * Math.PI / 180) * off,
                                    pz - Math.cos(H * Math.PI / 180) * off];
 const s4Ry  = (H) => -H * Math.PI / 180;                                  // mặt tiền quay về pano
 
-const s4Sign = (txt, bg, fg = '#ffffff', px = 46) => new THREE.MeshLambertMaterial({
+const s4Sign = _cells.memo('s4Sign', (txt, bg, fg = '#ffffff', px = 46) => new THREE.MeshLambertMaterial({
   map: makeTex(512, 84, (g, w, h) => {
     g.fillStyle = bg; g.fillRect(0, 0, w, h);
     g.fillStyle = fg; g.font = `bold ${px}px system-ui, sans-serif`;
     g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, w / 2, h / 2 + 2, w - 24);
   }),
-});
-const s4Facade = (baseCss, winCss, cols, rows) => new THREE.MeshLambertMaterial({
+}));
+const s4Facade = _cells.memo('s4Facade', (baseCss, winCss, cols, rows) => new THREE.MeshLambertMaterial({
   map: makeTex(256, 256, (g, w, h) => {
     g.fillStyle = baseCss; g.fillRect(0, 0, w, h);
     const mx = w * 0.12, my = h * 0.12, cw = (w - mx * 2) / cols, ch = (h - my * 2) / rows;
@@ -17583,7 +17594,7 @@ const s4Facade = (baseCss, winCss, cols, rows) => new THREE.MeshLambertMaterial(
       g.fillRect(mx + c * cw + cw * 0.16, my + r * ch + ch * 0.16, cw * 0.68, ch * 0.66);
     }
   }),
-});
+}));
 
 // Shophouse/nhà ống phổ thông: tường màu, kính trệt, dải cửa sổ, biển hiệu.
 // signs = [[txt,bg,fg,y], ...]  (đặt trên mặt tiền +Z)
@@ -17650,7 +17661,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     const s = new THREE.Mesh(new THREE.PlaneGeometry(Math.min(W * 0.8, 7), 1.4), s4Sign(signTxt, signBg || '#c1201a'));
     s.position.set(0, 4.4, D / 2 + 0.12); g.add(s);
   }
-  g.traverse((o) => { if (o.isMesh) o.castShadow = true; }); g.name = name; scene.add(g);
+  g.traverse((o) => { if (o.isMesh) o.castShadow = true; }); g.name = name; g.userData.kind = 'tower'; scene.add(g);   // cao ốc có tên → giữ + claim
   addCollider(x, z, Math.max(W, D) * 0.52);
   FEATURED_CLEAR.push([x, z, Math.max(W, D) / 2 + 10]);
   return g;
@@ -17658,7 +17669,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
 
 // ===========================================================================
 // (S1) pano_252 (−45,−196.6) HOÀNG VĂN THỤ ~số 45–47 — dãy nhà ống/shophouse
-//   2T mật độ cao (audit h270: 'HOÀNG NGÂN 47', 'AnAn Made in VN', 'SEVEN.art',
+//   2T mật độ cao (audit h270: 'HOÀNG NGÂN 47', 'AnAn Made in VN', 'NỘI THẤT',
 //   'HUNG'). Dãy LIỀN KỀ sát vỉa hè phía TÂY (h270). off 14 → x=−59; ry=+π/2
 //   (mặt quay ĐÔNG về pano); trải dọc phố theo z, mỗi lô 6m.
 // ===========================================================================
@@ -17668,7 +17679,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
   const ROW = [                                       // [dz dọc phố, W, FL, tường, biển, nền]
     [-9, 6, 2, 0xf1ece0, 'HOÀNG NGÂN 47', '#b91c1c'],
     [-3, 6, 2, 0xe7d9a0, 'AnAn — THỜI TRANG', '#0e5a8a'],
-    [ 3, 6, 3, 0xd8cfc0, 'SEVEN.art', '#22252a'],
+    [ 3, 6, 3, 0xd8cfc0, 'NỘI THẤT', '#22252a'],
     [ 9, 6, 2, 0xdfe6df, 'HÙNG — CHO THUÊ NHÀ', '#c1201a'],
   ];
   for (const [dz, W, FL, wall, txt, bg] of ROW) {
@@ -17697,7 +17708,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     arch.rotation.z = Math.PI / 2; arch.position.set(0, 2.6, D / 2 + 0.1); g.add(arch);
     const cornice = new THREE.Mesh(new THREE.BoxGeometry(W + 0.8, 0.6, D + 0.8), mat(0xece7dc)); cornice.position.y = H + 0.3; g.add(cornice);
     // 3 biển thời trang trên mặt tiền
-    const S = [['ELISE', '#7a1533', -8.5], ['CHRISBELLA', '#1c1c1c', 0], ['KARAOKE 35', '#8e1f24', 8.5]];
+    const S = [['THỜI TRANG', '#7a1533', -8.5], ['TÚI XÁCH', '#1c1c1c', 0], ['KARAOKE 35', '#8e1f24', 8.5]];
     for (const [txt, bg, sx] of S) {
       const s = new THREE.Mesh(new THREE.PlaneGeometry(7.4, 1.2), s4Sign(txt, bg, '#ffd21a', 40));
       s.position.set(sx, H - 1.1, D / 2 + 0.12); g.add(s);
@@ -17866,13 +17877,16 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
 {
   const [tx, tz] = s4Off(211.7, 80.4, 90, 14);        // (225.7, 80.4)
   s4Shop(tx, tz, s4Ry(90), 8, 9, 3, 0xf4c430, 's4_tgdd_tp',
-    [['thegioididong', '#f4c430', '#0e3a8a', 8.2]]);  // biển vàng chữ xanh, dưới mái
+    [['ĐIỆN THOẠI', '#f4c430', '#0e3a8a', 8.2]]);  // biển vàng chữ xanh, dưới mái
   const [vx, vz] = s4Off(211.7, 80.4, 180, 16);       // (211.7, 96.4)
   s4Colonial(vx, vz, s4Ry(180), 15, 12, 2, '#e8d9a8', '#137a3a', 's4_biethu_tp', 'CHO THUÊ NHÀ', '#b91c1c');
 }
 
 
   }
+  world.cellSink = _cells.commit({ foliage: [sharedMats.leafGreen, sharedMats.leafGreen2, sharedMats.leafDark, sharedMats.flower, sharedMats.trunk] });   // gỡ nhà ô trùng nhà thật + claim công trình giữ + xuất cellShops
+  world.cellShops = world.cellSink.shops || [];
+  world.cellKept = world.cellSink.kept || [];   // nhà ô GIỮ: {name,kind,cx,cz,h,hull} — WP2 cắt footprint thật theo bao lồi
 
   // (MÁI HIÊN BẠT + BIỂN HIỆU chuyển xuống SAU khối bằng-chứng-nhà: cần houseEvidence/openSpace/panoDenies
   //  để biển hiệu chỉ mọc trước NHÀ THẬT — hết biển "bay" lơ lửng trên mặt hồ/quảng trường/vườn hoa)

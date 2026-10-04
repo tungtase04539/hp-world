@@ -31,6 +31,8 @@ Trò chơi: thế giới 3D Hải Phòng **tỉ lệ 1:1 mét thật** (từ 202
 | `js/world.js` | Dựng toàn bộ thế giới 3D, collider, spawn, `buildWorld(scene)` |
 | `js/citygen.js` | ĐỢT 3: dựng PHỐ NHÀ THẬT từ footprint RB01 (`buildings_real.js`) — 1 quad/cạnh tường + shader atlas, mái/tum/bồn/tôn, ban công/mái hiên/hộp biển/điều hoà 3D (ô gần), va chạm đa giác (`fabricCollide/At/Hit`), `fabricData()` dùng chung (world.js đặt `world.rbData`/`world.rbGrid` cho cây/props/camera). Cờ `FABRIC` (world.js, `?fabric=proc` = phố giả cũ) |
 | `js/facade_atlas.js` (+ `facade_atlas_worker.js`) | Atlas mặt tiền/mái/chi tiết/biển hiệu VN vẽ thủ tục bằng rasterizer phần mềm (8×8 ô, alpha = mặt nạ), vẽ trong Worker |
+| `js/cellsink.js` | "Bồn chứa" khối ô dựng tay (world.js "cells"): che scene/addCollider/FEATURED_CLEAR/makeTex, ở cửa ra gỡ nhà ô trùng footprint THẬT, claim kind `'cell'` cho công trình giữ, xuất `world.cellShops` (nhà bị gỡ) + `world.cellKept` (nhà giữ + bao lồi, để WP2 cắt footprint); bỏ qua nhà `FLAG.SYNTH`; `realBuildings()` = giải mã RB01 dùng chung |
+| `js/brands.js` | Danh sách chặn tên THƯƠNG HIỆU thật (nguồn duy nhất cho `gen_shopsigns.mjs` + lưới an toàn vẽ biển trong cellsink) |
 | `js/assets.js` | Đăng ký + preload + streaming GLB theo khoảng cách |
 | `js/main.js` | Vòng lặp game, camera, người chơi, chuỗi hậu kỳ (composer), autoQuality, `window.__hp` |
 | `js/daynight.js` | Ngày/đêm (1440 s/ngày, mặt trời thiên văn), vòm trời shader, đèn mặt trời/trăng + bán cầu, sương FogExp2, PMREM bầu trời (IBL), hộp bóng snap texel, chế độ vệ tinh — Đợt 3 WP5 |
@@ -785,6 +787,90 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     dùng được cho hệ chạy sau (đạo cụ WP7), nhưng `veg.plant` sau đó vẫn KHÔNG dựng.
     (6) Còn cây cũ CHƯA chuyển (ngoài vùng WP4): cau 'rockery' giữa vòng xuyến (world.js ~1860, vùng WP7), cau sân Nhà
     khách Hải quân (~9865, WP3), bách tán chóp thông (~8383), cây quanh hải đăng (~20180, ngoài R).
+- **2026-10-04 (dot3-WP3)** [ĐỢT 3 — CELL SINK: hoà giải ~1.140 nhà ô dựng tay với footprint THẬT + lọc thương hiệu + bớt texture]:
+    **Cơ chế** (`js/cellsink.js`; world.js chỉ thêm 2 dòng vào + 2 dòng ra quanh khối ô 2265-18160): trước `{` khối ô
+    `const _cells = makeCellSink(THREE, scene, addCollider, FEATURED_CLEAR, colliders, makeTex)`; dòng đầu TRONG khối khai
+    báo lại `scene/addCollider/FEATURED_CLEAR/makeTex` = bản bóng của sink (ghi lại mọi `scene.add`, collider, vòng FC —
+    FC vẫn đẩy THẲNG vào mảng thật vì rowP/cnRow/ln đọc nó lúc dựng). Cuối khối `world.cellSink = _cells.commit(...)`,
+    `world.cellShops = ...shops`:
+    (1) hình chiếu XZ từng vật thể cấp cao nhất (bao lồi từng mesh → ô 1 m "khối đặc": mesh không phải cầu/nón/tán lá/
+    kính mờ, cao ≥2,5 m); "nhà" = ≥20 ô và cao ≥3 m — HÌNH HỌC QUYẾT TRƯỚC, tên chỉ PHỦ QUYẾT khi: thẻ prop/tree/open,
+    tên cây (TREE_RE) hoặc đồ phố MẠNH (`PROP_RE` đài phun/giàn hoa/cột đèn/giàn giáo/kiốt/rào/bó vỉa…), hoặc tên không
+    gian mở/tường YẾU (`OPEN_RE` garden/park/plaza/wall/tuong/rail/rao… + token neo `ke`/`nan`) MÀ khối thấp <4 m / <30 ô /
+    mỏng <3,5 m / thưa <30% hộp (`openVeto`). (2) Phân loại theo tên (`nameKind`: token bỏ số nhà đuôi kể cả `17a`;
+    CIVIC_EXACT/PREFIX/INCL, TOWER_PREFIX, HERIT_RE + ghi đè `NAME_KIND`, ghi đè 'heritage' bỏ ngưỡng 100 m²) + thẻ
+    `userData.kind` ở finisher (`lmTower/cbTower/cnTower/v2Tower/s4Tower`='tower'; dãy chung rowP/cnRow/saRow/s2bRow/s2Row/
+    s1ShopRow/port_kho='house'); kind 'bespoke' = nhà riêng dựng đúng ảnh (w5_cafe_gach_dth); CÁNH khuôn viên (token
+    wing/annex/canh + chung 2 token đầu với công trình giữ ≤45 m) thừa hưởng loại công trình. (3) NHÀ chung chung bị GỠ khi
+    footprint thật (`realBuildings()` = `makeFootprintGrid(decodeRB(RB_B64))`, BỎ QUA nhà `FLAG.SYNTH` — hợp đồng RB v1:
+    nhà sinh là phỏng đoán, không làm bằng chứng gỡ nhà tay) phủ ≥30% ô khối đặc HOẶC cách ≤5 m; nhà DÃY SINH TỰ ĐỘNG (thẻ
+    'house') không có nhà thật gần mà ≥30% khối đặc nằm trong polygon công viên OSM (`PARKS`) → gỡ 'park' (9 ln_row trên cỏ
+    vườn hoa An Biên). GIỮ + `claimBox(...,
+    'cell', tên)` (hộp diện tích nhỏ nhất +0,5 m; khuôn viên thưa → 1 hộp/cụm ô liền ≥12 ô): công trình danh tính (UBND/
+    công sở/trường/chùa/đình/chợ/bệnh viện/KS/ngân hàng/khuôn viên/công thự Pháp), tháp ≥22 m + cao ốc kính có tên, và
+    NHÀ DI SẢN Pháp (`HERIT_RE` phap|bietthu|villa|arcade|mansard|manoir|turret…) có khối đặc ≥100 m² — đối chiếu pano
+    089/070/160/255/504: mô hình ô (tường vàng/kem, cửa vòm, chớp xanh, mái ngói đỏ) giống thật hơn hẳn fabric chung.
+    (4) Cặp trùng giữa các nhà còn lại (giao ≥50% nhà nhỏ & ≥25% nhà lớn, tỉ lệ cao ≤2; hoặc nằm trọn ≥90%) → giữ 1
+    (`DUP_PREFER`: bản vẽ lại theo audit mới hơn thắng, vd s4_biethu_tp 'CHO THUÊ NHÀ' pano_398_h180).
+    (5) Đồ treo mặt tiền của nhà bị gỡ (biển/mái hiên/điều hoà: tâm trong ô nhà, hoặc treo ≥1,2 m trong vành 1 m) gỡ theo.
+    (6) Collider/FC: chủ = vật thể chứa tâm vòng, gần nhất theo THỨ TỰ TẠO (seq) → gỡ cùng chủ (an toàn: `colIdx` còn null
+    tới resolveCollisions đầu tiên). (7) `world.cellShops` [{name,x,z,ry,w,d,h,floors,wall,roof,signs[],style(tube/old/
+    villa/glass/ktt/shed),realB(chỉ số footprint thật khớp nhất trong RB đang chạy),frac,why}] cho lớp mặt tiền WP2;
+    `world.cellKept` [{name,kind,cx,cz,h,hull}] = nhà ô GIỮ + bao lồi ô khối đặc → WP2 nên CẮT footprint thật theo đa giác
+    này (bỏ/giữ cả footprint theo claimOverlapFrac>0,2 để lại nhà thật đâm xuyên mô hình tay khi footprint gộp lớn phủ <20%).
+    **Số đo** (bản sau phản biện; 890M TIER3, A/B cùng phiên r8, autoQuality ghim, máy đang tải): 3.345 vật thể / 1.152 nhà
+    ô → GIỮ 288 (keptKinds: công trình 133, tháp 38, di sản 49, bespoke 1, nhà 67 ở chỗ chưa có footprint thật; `kinds` là
+    TỔNG gồm cả bản trùng bị gỡ) — GỠ 855 (đè 537, gần 309, cỏ công viên 9) + 9 bản trùng + 133 đồ treo; collider
+    −1.077/2.462, FC −954/1.665; 288 claim 'cell'; 846 cellShops (616 có chữ biển). Commit ~315-335 ms (hình chiếu 51-55,
+    đối chiếu nhà thật 31-37, áp dụng + vẽ 502 texture + atlas ~240). Trước/sau: draw call cam_spawn 738/511,
+    pano_007_h090 1.590/1.245, pano_141 1.391/978, cam_high_center 1.194/842, game_3 1.197/848 (TB 12 góc 1.042/769);
+    fps pano_007 42,7/56,4, pano_021 47,2/56,9, pano_141 49,5/59, cam_high_center 49,7/52,1 (TB 53,7/57,4); cảnh sau
+    freeze: con cấp gốc 3.291/1.697, mesh 3.937/2.343, material 2.883/1.188, texture 1.934/273 (canvas 1.842/181), ước
+    lượng bộ nhớ texture 2.346/2.058 MB; tam giác cả cảnh 14,0/14,4 M (fabric thủ tục CŨ mọc vào chỗ nhà ô bị gỡ — WP2 tắt
+    nó); hpReady 21,0/19,1 s, heap 711/782 MB (1 mẫu mỗi bên, nhiễu ±5 s/±80 MB — các lượt trước 830/741, 848/782). LITE
+    (tier 1): 0 lỗi, diag [], atlas 3 trang (2048, 2048, 128), texture 216 (canvas 174) ~152 MB, draw call cam_spawn 677.
+    Thử trước với footprint RB v1 của dot3 (tráo tạm 2 file dữ liệu, bỏ qua FLAG.SYNTH): giữ 290, gỡ đè 618 / gần 224 /
+    cỏ 11 — ổn định so với v0.
+    **Texture (mục tiêu <400 canvas):** makeTex trong khối ô LƯỜI: trả texture + canvas RỖNG (qua makeTex gốc + hàm vẽ rỗng
+    → đúng TEXQ/anisotropy), commit mới VẼ texture còn được cảnh dùng; texture chỉ nhà bị gỡ dùng KHÔNG BAO GIỜ vẽ (chữ biển
+    của chúng lấy bằng ngữ cảnh 2D GIẢ `recorderCtx`). Texture "thường" của vật thể GIỮ được XẾP ATLAS vài trang 2048²
+    (material dùng chung theo trang → freezeStatic lượt 2 gộp). 63 helper biển/mặt tiền thuần (`xxSign/xxFacade`, gồm
+    lnSign/twSign/twFacade/lnFacade/w2Sign/cbSign/w1Sign/lmSign) bọc `_cells.memo(tên, fn)` (cùng tham số nguyên thuỷ →
+    cùng material); `cbWallRun` hết clone texture+material mỗi đoạn (cache theo số lặp lượng tử 0,5). Đo: 1.563 lần gọi makeTex trong khối → vẽ 501, KHÔNG BAO GIỜ
+    vẽ 1.062 (vẽ canvas ~71 ms); 478 texture thường của vật thể giữ → atlas 8 trang (12 material). CẢ CẢNH sau freeze: texture
+    1.934 → 273 (canvas 1.842 → 181, mục tiêu <400 ĐẠT). Ô atlas: ảnh giữ NGUYÊN độ phân giải ở giữa + viền kéo giãn NGOÀI
+    ảnh, viền theo cỡ (≥128 px → 8 px, an toàn tới mip 3; ảnh 32-64 px → 2-4 px) — bản đầu co ảnh vào trong 4 px (mờ chữ,
+    biển kề nhau loang ở mip xa). Trục ≥512 giữ ô = cỡ gốc (ảnh co 2G ≤3%) — nới thành 528 thì chỉ 3 ảnh/kệ 2048: trang
+    7 → 9; bản cuối 8 trang (212 biển 512×84 + 193 ảnh 256² chiếm phần lớn; ~+25 MB GPU so với bản co vào trong).
+    **Thương hiệu:** `js/brands.js` = danh sách chặn DUY NHẤT (`gen_shopsigns.mjs` import nó; cellsink dùng làm lưới an toàn
+    lúc vẽ biển: chữ khớp bị thay TRƯỚC fillText). Đã thay trong nguồn world.js: CO.OP, HABECO, SSI, thegioididong, ELISE/
+    CHRISBELLA, SEVEN.art, MEDIPHARCARE, Koji, HANA, MAY10, VOSA, VINASHIP, VINACOMIN, GENCE, AFANI, DEEP C, MB, LIEN A,
+    HOANG PHUC, crocs/Kappa/ecko/BAC A BANK, STARPOST, HIDOO, HATRACO, SUMMO, VIFON, COOLER CITY, PROSIMEX, POS.vn, VUA ĐỒ
+    CHƠI, BẢO MINH (×2, cả showroom 1986), GOLD STAR HOSPITAL → BỆNH VIỆN QUỐC TẾ, NOAH'S → THỜI TRANG NỮ, TAGONE FLORAL →
+    HOA TƯƠI. shopsigns.js sinh lại (tái lập được: chạy lại → diff rỗng). Quét MỌI chuỗi
+    world.js/shopsigns.js/landmarks/npcs/quests/i18n bằng BRAND_MAP → 0 (chỉ "PIZZA" = từ chung).
+    Token hãng TRÙNG TỪ THƯỜNG (GO!, SHELL, APPLE, AQUA, GUARDIAN, FORMAT) + viết tắt ngắn (LG, AIA, ILA, EMS) + AN KHANG chỉ
+    khớp khi là TỪ ĐẦU biển (AN KHANG/GUARDIAN cả sau 'NHÀ THUỐC'): lưới an toàn thay CẢ biển → 'NHÀ HÀNG AN KHANG' từng
+    thành 'NHÀ THUỐC', "LET'S GO!" thành 'SIÊU THỊ'. Mẫu `BẢO M\.{2,}` đặt trong nhóm có `\b` phía sau KHÔNG BAO GIỜ khớp
+    (\b sau '...' cần chữ cái) → tách regex riêng.
+    **Sửa lỗi:** cau nhà khách Hải quân (9947) thêm vào nhóm đã xoay π bằng toạ độ THẾ GIỚI → cắm vào Nhà hát (giờ
+    `scene.add`); `mat(0x2f8a5a)`/`mat(0x33383d)` từng bị gán `transparent/opacity` TRỰC TIẾP lên material DÙNG CHUNG của
+    cache mat() (mọi vật cùng màu trong suốt theo) → `mat(c, {transparent, opacity})`.
+    **Bẫy:** (a) TRONG khối ô, texture từ makeTex CHƯA có pixel tới commit — đừng đọc canvas/getImageData trong khối; key
+    makeTex trong khối là cache RIÊNG của sink. (b) Kết quả helper đã memo là material DÙNG CHUNG — không mutate (dùng
+    `mat(c, opts)`/tạo mới). (c) Gỡ ~1.000 vòng FC làm dịch các vòng phát theo HẠN MỨC thứ tự ROADS_DT (46 phượng hero +
+    30 đèn ở ~20800-20835 dùng `nearFeatured`; cây/hoa dùng resolveCollisions làm oracle) — vd phượng hero trước pano_007
+    biến mất; WP4 (đã tích hợp vào dot3, world.js ~20339) thay quota đó bằng trồng theo dữ liệu. Fabric thủ tục CŨ
+    (block_infill…) cũng mọc vào chỗ trống → tam giác tăng tới khi WP2 tắt nó: ĐỪNG ship WP3 thiếu WP2. (d) `?cellsink=off` (chỉ ghi, không gỡ/claim) / `=debug` (giữ hình chiếu + claim cho overlay QA) / `=dump`
+    (ghi dòng nguồn mỗi scene.add). (e) Thêm vật thể vào khối ô: TÊN quyết định giữ/gỡ — công trình có danh tính phải khớp
+    CIVIC_*/HERIT_RE hoặc gắn `userData.kind='civic'`. (f) `realBuildings()` giải mã RB01 MỘT lần cho cả trang — WP2/WP8 dùng
+    lại, đừng decode lần 2. (g) QA perf: máy dùng chung làm autoQuality nhảy nấc 3 (sương 220-1300 m → ảnh vệ tinh xanh trắng)
+    → so A/B phải ghim (bản QA scratch vá `function autoQuality(){return;` qua page.route, hoặc `__hp.pinQuality` của WP8).
+    (h) Regex tên KHÔNG neo là bẫy: `ke_` khớp 'lienke_' (8 nhà liền kề 3-4T), `nan\b` khớp 'AnAn', `wall`/`plaza`/`tuong`
+    khớp 'curtainwall'(51 m)/'shpplaza'(41 m)/'TƯỜNG TÂY' → nhà bị xếp 'open', KHÔNG gỡ, KHÔNG claim. Kiểm bằng
+    `?cellsink=dump`: lọc `!bldg && cells≥20 && height≥3` — chỉ được còn đồ phố thật (cây, đài phun, giàn hoa, cột đèn, kiốt,
+    giàn giáo). (i) Khuôn viên = NHIỀU vật thể cấp cao nhất: cánh phụ mang tên chung ('xx_wing') rơi vào 'house' bị gỡ
+    trong khi cổng/biệt thự cùng khuôn viên được giữ → thêm NAME_KIND hoặc đặt tên có token 'wing'.
 - **2026-09-07 (di)** [ĐỢT 2 TÍCH HỢP — 6 nhánh worktree song song + 6 phản biện đối kháng, gộp trên `dot2-int`]:
     Quy trình: mỗi nhánh (W1 merge-budget, W2 ground-grid, W3 landmark-lod, W4 visual, W5 hydro-polygon-water,
     W6 landmark-placement) làm trong worktree riêng, tự đo trước/sau trên GPU thật, có agent phản biện đọc diff +
