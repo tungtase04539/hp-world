@@ -660,7 +660,7 @@ function animate() {
       if (!v.mounted && !v.land) updateVehicle(v, dt, 0, 0, time);
     }
 
-    const tStat = traffic.update(dt, time, pState.pos, camera);
+    const tStat = traffic.update(dt, time, pState.pos);
     if (window.__hp && window.__hp._aerialCam) { /* chế độ vệ tinh: giữ camera top-down, không cập nhật */ }
     else if (cine.active) cine.update(dt); else updateCamera(dt);   // đạo diễn lo camera khi bật
     const sky = dayNight.update(dt, pState.pos, camera);   // camera: hộp bóng bám hướng nhìn

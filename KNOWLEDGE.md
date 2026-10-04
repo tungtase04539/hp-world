@@ -28,11 +28,14 @@ Trò chơi: thế giới 3D Hải Phòng **tỉ lệ 1:1 mét thật** (từ 202
 | `index.html` | UI, importmap `three` → `./lib/three.module.js`, màn hình chờ |
 | `js/mapdata.js` | **SINH TỰ ĐỘNG** bởi `tools/process_osm.mjs` — KHÔNG sửa tay |
 | `js/terrain.js` | Cao độ/đất-nước thuần JS (không import three → chạy được trong node để test) |
-| `js/world.js` | Dựng toàn bộ thế giới 3D, collider, spawn, `buildWorld(scene)` |
+| `js/world.js` | Dựng toàn bộ thế giới 3D, collider, spawn, `async buildWorld(scene, prog)` (Đợt 3: `await prog('<bước>')` ở cấp 1 = báo tiến trình + nhường luồng) |
+| `js/boot.js` | Màn chờ: thanh dựng thế giới theo bước (trọng số = lần khởi động trước, localStorage `hp3d.bootProfile.v1`), nút Bắt đầu khoá tới khi sẵn sàng |
 | `js/assets.js` | Đăng ký + preload + streaming GLB theo khoảng cách |
 | `js/main.js` | Vòng lặp game, camera, người chơi, bloom, autoQuality, `window.__hp` |
 | `js/landmarks.js` | 15 biển thông tin địa danh (vị trí suy ra từ mapdata) |
-| `js/traffic.js` / `js/vehicles.js` / `js/npc.js` / `js/quests.js`... | Giao thông, xe cưỡi được, NPC, nhiệm vụ |
+| `js/traffic.js` / `js/vehicles.js` / `js/npcs.js` / `js/quests.js`... | Giao thông, xe cưỡi được, NPC, nhiệm vụ |
+| `js/roadgraph.js` / `js/trafficmodels.js` | Đồ thị phố thật (nút giao, đường đôi một chiều — thuần JS, chạy được trong node) / mô hình xe máy·ô tô·người đi bộ INSTANCED + shader nhuộm |
+| `js/footprints.js` | Tra cứu footprint nhà thật RB01 + địa danh cho gameplay: camera chống xuyên tường, chỗ xuống xe, người đi bộ |
 | `tools/` | Pipeline dữ liệu + test tự động (xem mục 7, 8) |
 
 Quan hệ dữ liệu: `tools/fetch_osm.sh` → `osm_*.json` → `tools/process_osm.mjs` → `js/mapdata.js`
@@ -273,16 +276,27 @@ node process_osm.mjs     # sinh ../js/mapdata.js + mask_debug.png + log kiểm t
 ## 8. Kiểm thử tự động (chạy trước MỌI lần push thay đổi thế giới)
 
 ```bash
-python3 -m http.server 8123 --directory <repo> &   # server tĩnh
-cd tools
-node diag.mjs      # JS errors + mọi thực thể (NPC/xe/hoa/biển) đặt đúng chỗ & tiếp cận được
-node waterbfs.mjs  # flood-fill nước: thuyền đi được từ Bến Bính tới mọi bến (in water_debug.png)
-node tour.mjs      # chụp ~16 ảnh các địa danh (tour-*.png) — XEM BẰNG MẮT từng ảnh
-node perf.mjs      # FPS headless (swiftshader chậm là bình thường, autoQuality sẽ hạ cấp)
-node mobile.mjs    # viewport điện thoại + joystick
+# Windows (từ Đợt 3 WP8): Chrome HỆ THỐNG headless + GPU thật (ANGLE d3d11) qua playwright-core — tools/qa/launch.mjs.
+# PW_PATH = module playwright-core (mặc định: bản ở scratchpad phiên 04e77d80), CHROME_PATH = chrome.exe.
+python -m http.server 8177            # ở gốc repo/worktree (mỗi agent 1 cổng riêng)
+node tools/diag.mjs --port 8177       # 0 lỗi JS + __hp.diag() (thực thể tiếp cận được, TRONG vùng chơi) + bất biến
+                                      # giao thông (xe đi bên PHẢI, không ngược chiều đường đôi, người đi bộ không
+                                      # đứng trong nhà thật) + nhiệm vụ; thoát mã 1 nếu có vấn đề
+node tools/waterbfs.mjs               # flood-fill nước: thuyền đi được từ Bến Bính tới mọi bến (node thuần, 0,4 s)
+node tools/tour.mjs --port 8177 --out <dir>    # ~26 ảnh: mỗi địa danh trong vùng chơi nhìn từ 1 điểm pano thật
+                                      # (raycast chọn điểm không bị che) + giao thông + đêm + vệ tinh — XEM BẰNG MẮT
+node tools/perf.mjs --port 8177 [--quality lite]   # fps/p50/p95, draw call+tam giác (gồm shadow), ms CPU/khung,
+                                      # ms giao thông, bootProfile từng bước, heap — kèm tier+GPU
+node tools/mobile.mjs --port 8177 --out <dir>  # viewport điện thoại dọc/ngang + cảm ứng giả lập (TIER 1)
+node tools/qa/shoot.mjs --port 8177 --out <dir> --views tools/qa/views_std.json --perf   # ảnh so pano/vệ tinh
 ```
+- Mọi tool trên gọi `__hp.pinQuality(true)` ngay sau khi vào game: máy chạy nhiều agent làm fps headless tụt →
+  autoQuality nhảy nấc 3 (sương gần, không hoàn tác) → ảnh trắng xoá, số đo không so được. Số headless dao động
+  tới ±2× giữa các phiên: chỉ so A/B CÙNG phiên (vd. serve bản `dot3` ở cổng khác rồi chụp nối tiếp).
 - Debug trong game: `window.__hp` = { teleport(x,z,yaw,pitch,dist), setTime(0..1), gh(x,z) *(=NoDeck!)*,
-  pick(nx,ny) raycast tên mesh, diag() }.
+  pick(nx,ny) raycast tên mesh, diag() } + (Đợt 3 WP8) `world`, `pState`, `traffic` (stats()/check()/setEnabled),
+  `footprints` (js/footprints.js: blocked/topAt/boom), `PLAY_RADIUS`, `bootProfile` (ms từng bước khởi động),
+  `pinQuality(on)`, `camOcclusion(on)` (cần boom chống xuyên tường; harness tắt để góc chụp khớp baseline).
 - **QUAN TRỌNG — quy ước teleport**: camera đặt tại `(x + sin(yaw)·d, z + cos(yaw)·d)` nhìn NGƯỢC về người chơi
   ⇒ **yaw 0 = camera phía nam, NHÌN VỀ BẮC (−z); yaw π = nhìn về nam (+z)**.
   Muốn ngắm mặt nam của công trình: đứng phía nam nó và dùng yaw 0. (Đã từng nhầm ngược → tưởng model sai chỗ.)
