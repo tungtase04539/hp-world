@@ -57,7 +57,7 @@ export function luCompose(cls, fp, grid, extra = null) {
   }
   // (1) tô footprint sống (even-odd, tâm điểm ảnh) — nhà nằm trên bể bơi OSM (bể có mái) không đè
   if (fp && fp.nB) {
-    const xs = new Float64Array(64);
+    const xs = new Float64Array(512);   // giao điểm / hàng quét (512: footprint phức tạp nhất vẫn dư)
     for (let b = 0; b < fp.nB; b++) {
       if (fp.dead && fp.dead[b]) continue;
       const s = fp.vStart[b], e = fp.vStart[b + 1];
@@ -70,7 +70,7 @@ export function luCompose(cls, fp, grid, extra = null) {
         let k = 0;
         for (let a = s, p = e - 1; a < e; p = a++) {
           const za = fp.z[a], zb = fp.z[p];
-          if ((za > zc) !== (zb > zc) && k < 64) xs[k++] = fp.x[a] + (zc - za) * (fp.x[p] - fp.x[a]) / (zb - za);
+          if ((za > zc) !== (zb > zc) && k < 512) xs[k++] = fp.x[a] + (zc - za) * (fp.x[p] - fp.x[a]) / (zb - za);
         }
         if (k < 2) continue;
         // sắp xếp chèn (k nhỏ)
