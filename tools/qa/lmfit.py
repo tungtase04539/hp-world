@@ -3,7 +3,7 @@
 # OCC=0.12 — ảnh chiếu bằng của GLB GỐC bỏ 12% chiều cao dưới cùng), D/lmpoly.json + D/segs.json (node tools/qa/lmfit_prep.mjs D).
 # Tìm θ (±dth độ quanh θ0 = hướng mặt tiền đã kiểm pano), sx, sz (m/đơn vị, |sx/sz| ≤ amax), dời tâm (dx,dz) cực đại
 #   IoU − lam·(phần ngoài đa giác nở buf m)/A_poly − lamR·(phần trong hành lang phố: cách tim < facadeLine − 0,5 m)/A_poly
-# usage: python tools/qa/lmfit.py <glb> <lmkey> <theta0_rad> --data D [--amax 1.6] [--dth 12] [--lam 0.5 --buf 2] [--lamR 4]
+# usage: python tools/qa/lmfit.py <glb> <lmkey> <theta0_rad> --data D [--amax 1.6] [--dth 12] [--lam 0.5 --buf 2] [--lamR 4] [--corr facade|curb]
 import sys, json, math
 import numpy as np
 from matplotlib.path import Path
@@ -48,7 +48,7 @@ if lamR > 0:
         dx, dz = bx - ax, bz - az; L2 = dx * dx + dz * dz or 1e-9
         t = np.clip(((XX - ax) * dx + (ZZ - az) * dz) / L2, 0, 1)
         d = np.hypot(XX - ax - t * dx, ZZ - az - t * dz)
-        road |= d < (fl - 0.5)
+        road |= d < ((cl + 0.3) if opt('corr', 'facade') == 'curb' else (fl - 0.5))   # --corr curb: chỉ lòng đường
 # đa giác nở 3 m (claim) để phạt phần tràn
 def shoelace(p): return 0.5 * abs(np.dot(p[:, 0], np.roll(p[:, 1], -1)) - np.dot(np.roll(p[:, 0], -1), p[:, 1]))
 cx0 = P[:, 0].mean(); cz0 = P[:, 1].mean()

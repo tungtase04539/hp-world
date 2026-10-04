@@ -449,9 +449,14 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     vườn hoa né `world.landmarkHit`; tháp kính 13 tầng `v6_ndc_tower13` (ô v6, đặt nhầm phía NAM Nguyễn Đức Cảnh = giữa sân trường —
     pano_427 h090/pano_002 h180: tháp ở bờ BẮC) gỡ bằng `lmRemoveCell` (mesh + collider trong bao lồi, `cellKept[].removedByLM`); khối
     địa danh NHƯỜNG chỗ nhà ô GIỮ chạm vào (`lmCellClash`, vd công sở Pháp arcade pano_482 bên Mê Linh).
-    **Đo (lmprobe, 19 địa danh):** 0 m² GLB/khối trên lòng đường (trước: THPT 104, NHNN 134, bưu điện 8), 0 biển/xe/NPC trong khối,
+    **Đo (lmprobe, 19 địa danh):** 0 m² GLB/khối trên lòng đường trừ bưu điện ~11 m² ở mép phố chéo (trước: THPT 104, NHNN 134), 0 biển/xe/NPC trong khối,
     `__hp.diag()` [], 0 lỗi JS (full; LITE chỉ 404 assets_lite của môi trường); còn 1 cây (nguồn chưa rõ, (-287,200)) ở
-    mũi bắc Triển lãm. PERF: xem số A/B cùng phiên bên dưới.
+    mũi bắc Triển lãm.
+    **PERF (A/B CÙNG PHIÊN với dot3 ea5f57f phục vụ ở cổng riêng, Radeon 890M d3d11, ?quality=full TIER 3, 1280×720, autoQuality
+    khoá):** heap SAU GC (`--js-flags=--expose-gc`, 3×gc) 394/395 → 396/396 MB; hpReady 4,2-4,6 s cả hai (nhiễu); startReady 6,1-6,8 →
+    5,9 s; draw call/tam giác (lấy MIN 3 mẫu — mẫu 1 khung đôi khi gồm lượt bóng: game_3 390 ↔ 828 call cùng code): cam_spawn 389/
+    4,08 M → 394/4,07 M, game_3 390/6,67 M → 399/6,68 M, pano_055_h000 426/3,96 M → 405/3,97 M, cam_high_center 440/6,33 M →
+    443/6,05 M; fps 58-61 (trần vsync) cả hai. Khối thủ tục ~vài nghìn tam giác, material chung theo phong cách (gộp ô).
     **BẪY:** (a) bbox GLB ≠ thân nhà (cây/tấm đế/cánh lệch Meshy) — khớp theo ẢNH CHIẾU BẰNG, không theo bbox; (b) IoU thuần đẩy GLB
     ra lòng đường khi LM_POLY OSM lấn phố game (NHNN, bưu điện) — luôn phạt hành lang facadeLine; (c) θ phải bị CHẶN cả trong bước tinh
     chỉnh (bản đầu trôi −9,5° → mặt tiền bưu điện lệch phố); (d) texture 1 ô theo tầng: tường cao không chia hết storeyH thì dải phào
