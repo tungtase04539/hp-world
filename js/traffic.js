@@ -72,33 +72,41 @@ export function createTraffic(scene, world, opts = {}) {
   // ---------- Mesh instanced ----------
   const vehMat = trafficMaterial(false), walkMat = trafficMaterial(true);
   const groups = {};   // kind → {mesh, cap, list:[agents], aShirt, aShirt2}
+  // DỮ LIỆU THEO INSTANCE: 1 bộ đệm XEN KẼ (stride 28: ma trận 16 | sơn 3 | áo 3 | áo sau/quần 3 | pha 1 | nhịp bước 1
+  // | đệm 1) × 3 BẢN XOAY VÒNG mỗi khung. Lý do (đo 2026-10-04, Radeon 890M, ANGLE d3d11): ghi đè mỗi khung vào CHÍNH
+  // bộ đệm GPU còn đang vẽ khung trước bắt trình điều khiển ĐỒNG BỘ CPU↔GPU → mất 5-9 fps khi bật giao thông, dù
+  // update() chỉ tốn 0,5 ms và giao thông chỉ +0,15 M tam giác ("đóng băng" giao thông = như tắt). Ghi vào bản
+  // khung N−2 thì GPU đã đọc xong → hết chờ (thử nghiệm: hồi lại 70-90% số fps mất). 1 lần tải/nhóm/khung thay vì 2-6.
+  const STRIDE = 28, NSET = 3;
   function makeGroup(key, geo, cap, mat, walk) {
     const mesh = new THREE.InstancedMesh(geo, mat, cap);
     mesh.name = 'traffic_' + key;
-    mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-    const sh = new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3);
-    const sh2 = new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3);
-    geo.setAttribute('aShirt', sh); geo.setAttribute('aShirt2', sh2);
-    let ph = null, wk = null;
-    if (walk) {
-      ph = new THREE.InstancedBufferAttribute(new Float32Array(cap), 1);
-      wk = new THREE.InstancedBufferAttribute(new Float32Array(cap), 1);
-      geo.setAttribute('aPhase', ph); geo.setAttribute('aWalk', wk);
-      mesh.customDepthMaterial = walkDepthMaterial();
+    const sets = [];
+    for (let k = 0; k < NSET; k++) {
+      const ib = new THREE.InstancedInterleavedBuffer(new Float32Array(cap * STRIDE), STRIDE, 1);
+      ib.setUsage(THREE.DynamicDrawUsage);
+      const at = (size, off) => new THREE.InterleavedBufferAttribute(ib, size, off);
+      sets.push({ ib, mat: at(16, 0), col: at(3, 16), sh: at(3, 19), sh2: at(3, 22), ph: at(1, 25), wk: at(1, 26) });
     }
-    for (let i = 0; i < cap; i++) mesh.setColorAt(i, new THREE.Color(1, 1, 1));
-    mesh.instanceColor.setUsage(THREE.DynamicDrawUsage);
+    if (walk) mesh.customDepthMaterial = walkDepthMaterial();
     mesh.count = 0;
     mesh.castShadow = !IS_MOBILE || TIER >= 2;
     mesh.receiveShadow = true;
     mesh.userData.noCull = true;      // instcull: KHÔNG nén (ma trận đổi mỗi khung)
-    // frustum cull theo BONG BÓNG (r160: InstancedMesh.boundingSphere tính 1 lần từ ma trận lúc đầu rồi cũ mãi)
+    mesh.raycast = () => {};          // instanceMatrix xen kẽ không có .array — và tia chọn (__hp.pick…) không cần xe chạy
+    // frustum cull theo ĐĨA VẼ (r160: InstancedMesh.boundingSphere tính 1 lần từ ma trận lúc đầu rồi cũ mãi)
     mesh.boundingSphere = new THREE.Sphere(new THREE.Vector3(), DRAW_R + 12);
-    mesh.matrixAutoUpdate = false;    // gốc tĩnh ở (0,0,0); chỉ instanceMatrix đổi
+    mesh.matrixAutoUpdate = false;    // gốc tĩnh ở (0,0,0); chỉ dữ liệu instance đổi
+    const g = { key, mesh, geo, cap, list: [], sets, k: 0, walk };
+    bindSet(g, sets[0]);
     scene.add(mesh);
-    groups[key] = { key, mesh, cap, list: [], sh, sh2, ph, wk, walk };
+    groups[key] = g;
   }
-  const nBikeK = BIKE_KINDS.length, nCarK = CAR_KINDS.length;
+  function bindSet(g, s) {
+    g.mesh.instanceMatrix = s.mat; g.mesh.instanceColor = s.col;
+    g.geo.setAttribute('aShirt', s.sh); g.geo.setAttribute('aShirt2', s.sh2);
+    if (g.walk) { g.geo.setAttribute('aPhase', s.ph); g.geo.setAttribute('aWalk', s.wk); }
+  }
   for (const [k, w] of BIKE_KINDS) makeGroup('bike_' + k, motorbikeGeometry(k), Math.ceil(CAP.bike * Math.min(1, w * 1.6)), vehMat, false);
   for (const [k, w] of CAR_KINDS) makeGroup('car_' + k, carGeometry(k), Math.ceil(CAP.car * Math.min(1, w * 1.7)), vehMat, false);
   for (const [k, w] of WALK_KINDS) makeGroup('walk_' + k, walkerGeometry(k), Math.ceil(CAP.walk * Math.min(1, w * 1.4)), walkMat, true);
@@ -106,7 +114,6 @@ export function createTraffic(scene, world, opts = {}) {
   // ---------- Tác tử ----------
   const agents = [];   // {type:'bike'|'car'|'walk', grp, e, dir, s, lat, vmax, v, prev, next, ...}
   const _p = { x: 0, z: 0, tx: 0, tz: 1 }, _q = { x: 0, z: 0, tx: 0, tz: 1 };
-  const tmpCol = new THREE.Color();
 
   const rightOf = (o) => [-o.tz, o.tx];
   // lệch ngang (dương = bên phải hướng đi) theo loại + cấp phố
@@ -260,7 +267,7 @@ export function createTraffic(scene, world, opts = {}) {
   function newAgent(type) {
     const grp = groupFor(type);
     if (grp.list.length >= grp.cap) return null;
-    const a = { type, grp, slot: -1 };
+    const a = { type, grp };
     a.paint = new THREE.Color(type === 'car' ? pick(CAR_PAINT) : pick(BIKE_PAINT));
     a.shirt = new THREE.Color(pick(SHIRT));
     a.shirt2 = new THREE.Color(type === 'walk' ? pick(PANTS) : pick(SHIRT));
@@ -449,43 +456,32 @@ export function createTraffic(scene, world, opts = {}) {
   const DRAW_R2 = DRAW_R * DRAW_R;
   function writeInstances(px, pz) {
     for (const k in groups) {
-      const g = groups[k], arr = g.mesh.instanceMatrix.array, carr = g.mesh.instanceColor.array;
-      const sh = g.sh.array, sh2 = g.sh2.array;
-      const L = g.list;
-      let i = 0;   // ô instance đang ghi (chỉ tác tử trong bán kính vẽ)
+      const g = groups[k], L = g.list;
+      g.k = (g.k + 1) % NSET;
+      const s = g.sets[g.k], arr = s.ib.array;
+      let n = 0;   // ô instance đang ghi (chỉ tác tử trong bán kính vẽ)
       for (let j = 0; j < L.length; j++) {
         const a = L[j];
-        if ((a.x - px) * (a.x - px) + (a.z - pz) * (a.z - pz) > DRAW_R2) { a.slot = -1; continue; }   // ô cũ có thể bị xe khác ghi đè
+        if ((a.x - px) * (a.x - px) + (a.z - pz) * (a.z - pz) > DRAW_R2) continue;
         if (!(Math.abs(a.x - a.yx) + Math.abs(a.z - a.yz) < 4)) { a.yx = a.x; a.yz = a.z; a.y = groundHeight(a.x, a.z) + (a.type === 'walk' ? 0 : ROAD_TOP); }
-        const y = a.y;
         const ch = Math.cos(a.h), shh = Math.sin(a.h), cl = Math.cos(a.lean || 0), sl = Math.sin(a.lean || 0);
-        const o = i * 16;
+        const o = n * STRIDE;
         // R = Ry(h)·Rz(lean) (cột-trước như Matrix4.elements)
         arr[o] = ch * cl; arr[o + 1] = sl; arr[o + 2] = -shh * cl; arr[o + 3] = 0;
         arr[o + 4] = -ch * sl; arr[o + 5] = cl; arr[o + 6] = shh * sl; arr[o + 7] = 0;
         arr[o + 8] = shh; arr[o + 9] = 0; arr[o + 10] = ch; arr[o + 11] = 0;
-        arr[o + 12] = a.x; arr[o + 13] = y; arr[o + 14] = a.z; arr[o + 15] = 1;
-        if (a.slot !== i || a.grp !== g) {                         // màu chỉ ghi khi đổi chỗ
-          a.slot = i;
-          carr[i * 3] = a.paint.r; carr[i * 3 + 1] = a.paint.g; carr[i * 3 + 2] = a.paint.b;
-          sh[i * 3] = a.shirt.r; sh[i * 3 + 1] = a.shirt.g; sh[i * 3 + 2] = a.shirt.b;
-          sh2[i * 3] = a.shirt2.r; sh2[i * 3 + 1] = a.shirt2.g; sh2[i * 3 + 2] = a.shirt2.b;
-          g.colorDirty = true;
-          if (g.walk) g.ph.array[i] = a.phase;
-        }
-        if (g.walk) g.wk.array[i] = a.v > 0.2 ? a.v * 3.9 : 0;   // nhịp bước ∝ tốc độ (bước ~0,8 m)
-        i++;
+        arr[o + 12] = a.x; arr[o + 13] = a.y; arr[o + 14] = a.z; arr[o + 15] = 1;
+        arr[o + 16] = a.paint.r; arr[o + 17] = a.paint.g; arr[o + 18] = a.paint.b;
+        arr[o + 19] = a.shirt.r; arr[o + 20] = a.shirt.g; arr[o + 21] = a.shirt.b;
+        arr[o + 22] = a.shirt2.r; arr[o + 23] = a.shirt2.g; arr[o + 24] = a.shirt2.b;
+        arr[o + 25] = a.phase || 0;
+        arr[o + 26] = a.type === 'walk' && a.v > 0.2 ? a.v * 3.9 : 0;   // nhịp bước ∝ tốc độ (bước ~0,8 m)
+        n++;
       }
-      const n = i;
       g.mesh.count = n;
       if (!n) continue;
-      const im = g.mesh.instanceMatrix; im.clearUpdateRanges(); im.addUpdateRange(0, n * 16); im.needsUpdate = true;
-      if (g.colorDirty) {
-        for (const at of [g.mesh.instanceColor, g.sh, g.sh2]) { at.clearUpdateRanges(); at.addUpdateRange(0, n * 3); at.needsUpdate = true; }
-        if (g.walk) { g.ph.clearUpdateRanges(); g.ph.addUpdateRange(0, n); g.ph.needsUpdate = true; }
-        g.colorDirty = false;
-      }
-      if (g.walk) { g.wk.clearUpdateRanges(); g.wk.addUpdateRange(0, n); g.wk.needsUpdate = true; }
+      bindSet(g, s);
+      s.ib.clearUpdateRanges(); s.ib.addUpdateRange(0, n * STRIDE); s.ib.needsUpdate = true;
       g.mesh.boundingSphere.center.set(px, 2, pz);
     }
   }
