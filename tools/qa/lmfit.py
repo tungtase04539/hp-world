@@ -4,6 +4,10 @@
 # Tìm θ (±dth độ quanh θ0 = hướng mặt tiền đã kiểm pano), sx, sz (m/đơn vị, |sx/sz| ≤ amax), dời tâm (dx,dz) cực đại
 #   IoU − lam·(phần ngoài đa giác nở buf m)/A_poly − lamR·(phần trong hành lang phố: cách tim < facadeLine − 0,5 m)/A_poly
 # usage: python tools/qa/lmfit.py <glb> <lmkey> <theta0_rad> --data D [--amax 1.6] [--dth 12] [--lam 0.5 --buf 2] [--lamR 4] [--corr facade|curb]
+#        [--sy S --fax x|z|xz --fcap 1.1]  ← RÀNG BUỘC MẶT ĐỨNG (sau phản biện W2-E): trục ngang của MẶT TIỀN (local x nếu mặt tiền là
+#        ±Z của GLB, z nếu ±X; xz = cả hai, vd bưu điện góc phố / nhà thờ tháp nhìn mọi phía) chỉ được lệch ≤ fcap so với sy (chiều cao
+#        chọn theo pano) — đồng hồ/chân dung/cửa vòm không méo. fcap 1.0 = ĐỀU tuyệt đối (nhà hát: chân dung Bác — KNOWLEDGE §5.6).
+#        Trục còn lại (chiều sâu) tự do trong amax so với trục mặt tiền.
 import sys, json, math
 import numpy as np
 from matplotlib.path import Path
@@ -14,6 +18,13 @@ def opt(k, d):
     if '--' + k in a: return a[a.index('--' + k) + 1]
     return d
 amax = float(opt('amax', '1.7')); dth = float(opt('dth', '10'))
+SY = float(opt('sy', '0')); FAX = opt('fax', ''); FCAP = float(opt('fcap', '1.1'))
+def fok(sx, sz):   # ràng buộc mặt đứng: trục mặt tiền trong [sy/fcap, sy·fcap]
+    if not SY or not FAX: return True
+    e = 1e-6
+    if 'x' in FAX and not (SY / FCAP - e <= sx <= SY * FCAP + e): return False
+    if 'z' in FAX and not (SY / FCAP - e <= sz <= SY * FCAP + e): return False
+    return True
 O = json.load(open(S + f'sheets/{glb}_occ.json'))
 P = np.array(json.load(open(S + 'lmpoly.json'))[key])
 nx, nz, cs = O['nx'], O['nz'], O['cs']
@@ -76,11 +87,13 @@ if '--fixed' in a:
 else:
     r = [float(v) for v in opt('sxr', '5,80').split(',')]; sxs = np.geomspace(r[0], r[1], 36)
     r = [float(v) for v in opt('szr', '5,80').split(',')]; szs = np.geomspace(r[0], r[1], 36)
+    if SY and 'x' in FAX: sxs = [SY] if FCAP <= 1.0001 else np.geomspace(SY / FCAP, SY * FCAP, 9)
+    if SY and 'z' in FAX: szs = [SY] if FCAP <= 1.0001 else np.geomspace(SY / FCAP, SY * FCAP, 9)
 for dt in np.arange(-dth, dth + 0.01, 2):
     th = th0 + math.radians(dt)
     for sx in sxs:
         for sz in szs:
-            if max(sx / sz, sz / sx) > amax: continue
+            if max(sx / sz, sz / sx) > amax or not fok(sx, sz): continue
             iou, A, I = score(th, sx, sz, 0, 0)
             if not best or iou > best[0]: best = (iou, th, sx, sz, 0, 0)
 # tinh chỉnh
@@ -92,7 +105,7 @@ for it in range(3):
                 for ddx in np.arange(-4, 4.1, 1):
                     for ddz in np.arange(-4, 4.1, 1):
                         t2, x2, z2 = th + math.radians(dt), sx * fx, sz * fz
-                        if max(x2 / z2, z2 / x2) > amax or abs(t2 - th0) > math.radians(dth) + 1e-9: continue
+                        if max(x2 / z2, z2 / x2) > amax or abs(t2 - th0) > math.radians(dth) + 1e-9 or not fok(x2, z2): continue
                         r = score(t2, x2, z2, dx + ddx, dz + ddz)
                         if r[0] > iou: iou, th2, sx2, sz2, dx2, dz2 = r[0], t2, x2, z2, dx + ddx, dz + ddz; best = (iou, th2, sx2, sz2, dx2, dz2)
     iou, th, sx, sz, dx, dz = best
@@ -103,4 +116,5 @@ ii = ((wx - x0) / G).astype(int); jj2 = ((wz - z0) / G).astype(int); ok = (ii >=
 roadM2 = road[jj2[ok], ii[ok]].sum() * w_cell * sx * sz
 print('iou_raw', round(iou_raw, 3), 'roadM2', round(roadM2))
 print(json.dumps({'glb': glb, 'key': key, 'iou': round(iou, 3), 'theta': round(th, 4), 'dthDeg': round(math.degrees(th - th0), 1), 'sx': round(sx, 2), 'sz': round(sz, 2),
-                  'dx': dx, 'dz': dz, 'cx': round(cx0 + dx, 2), 'cz': round(cz0 + dz, 2), 'occM2': round(A), 'polyM2': round(polyA), 'outM2': round(A - I), 'lenX': round(sx * info['size'][0], 1), 'lenZ': round(sz * info['size'][2], 1), 'H@sx': round(sx * info['size'][1], 1)}))
+                  'dx': dx, 'dz': dz, 'cx': round(cx0 + dx, 2), 'cz': round(cz0 + dz, 2), 'occM2': round(A), 'polyM2': round(polyA), 'outM2': round(A - I), 'lenX': round(sx * info['size'][0], 1), 'lenZ': round(sz * info['size'][2], 1), 'H@sx': round(sx * info['size'][1], 1),
+                  'sy': SY or None, 'H@sy': round(SY * info['size'][1], 1) if SY else None, 'fx/sy': round(sx / SY, 3) if SY else None, 'fz/sy': round(sz / SY, 3) if SY else None}))

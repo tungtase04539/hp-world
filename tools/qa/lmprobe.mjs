@@ -63,7 +63,7 @@ try {
         x0 -= 4; z0 -= 4; x1 += 4; z1 += 4;
         const nx = Math.ceil((x1 - x0) / CS), nz = Math.ceil((z1 - z0) / CS);
         if (nx * nz > 4e6) { out[key] = { err: 'grid too big' }; continue; }
-        const occ = new Uint8Array(nx * nz);
+        const occ = new Uint8Array(nx * nz);   // 1 = tam giác GLB, 2 = khối thủ tục (không tính viền GLB glb:true)
         let tris = 0, ymax = -1e9;
         const mark = (x, z) => { const i = Math.floor((x - x0) / CS), j = Math.floor((z - z0) / CS); if (i >= 0 && j >= 0 && i < nx && j < nz) occ[j * nx + i] = 1; };
         for (const r of R) r.traverse((o) => {
@@ -92,23 +92,40 @@ try {
         });
         // khối thủ tục địa danh (world.lmMasses) cùng key
         for (const M of (W.lmMasses || [])) {
-          if (M.key !== key) continue;
+          if (M.key !== key || M.glb) continue;
           let mx0 = 1e9, mz0 = 1e9, mx1 = -1e9, mz1 = -1e9; for (const [x, z] of M.ring) { mx0 = Math.min(mx0, x); mx1 = Math.max(mx1, x); mz0 = Math.min(mz0, z); mz1 = Math.max(mz1, z); }
           for (let i = Math.max(0, Math.floor((mx0 - x0) / CS)); i <= Math.min(nx - 1, Math.floor((mx1 - x0) / CS)); i++) for (let j = Math.max(0, Math.floor((mz0 - z0) / CS)); j <= Math.min(nz - 1, Math.floor((mz1 - z0) / CS)); j++)
-            if (inPoly(x0 + (i + 0.5) * CS, z0 + (j + 0.5) * CS, M.ring)) occ[j * nx + i] = 1;
+            if (inPoly(x0 + (i + 0.5) * CS, z0 + (j + 0.5) * CS, M.ring) && !occ[j * nx + i]) occ[j * nx + i] = 2;
           if (M.h + LAND > ymax) ymax = M.h + LAND;
         }
-        const occAt = (x, z) => { const i = Math.floor((x - x0) / CS), j = Math.floor((z - z0) / CS); return i >= 0 && j >= 0 && i < nx && j < nz && occ[j * nx + i] === 1; };
+        const occAt = (x, z) => { const i = Math.floor((x - x0) / CS), j = Math.floor((z - z0) / CS); return i >= 0 && j >= 0 && i < nx && j < nz && occ[j * nx + i] > 0; };
+        // GLB + khối thủ tục nở 1 m (2 ô) — va chạm trong vùng này coi là "thấy được"
+        const occD = new Uint8Array(nx * nz);
+        for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) if (occ[j * nx + i]) for (let a2 = -2; a2 <= 2; a2++) for (let b2 = -2; b2 <= 2; b2++) { const ii = i + a2, jj = j + b2; if (ii >= 0 && jj >= 0 && ii < nx && jj < nz) occD[jj * nx + ii] = 1; }
         // so với đa giác
         let A = 0, B = 0, I = 0, road = 0, fabIn = 0, fabCells = 0;
+        // trên PHỐ (lòng 0,02 < s < 0,2 | vỉa hè s ≥ 0,2): GLB / khối thủ tục / va chạm địa danh (landmarkHit r 0,45) / va chạm KHÔNG
+        // thấy (không tam giác GLB trong 1 m, ngoài khối thủ tục, ngoài nhà thật fabric)
+        const sf = { gRoad: 0, gSide: 0, mRoad: 0, mSide: 0, hRoad: 0, hSide: 0, inv: 0, invRoad: 0, invSide: 0 }, invEx = [];
         const RN = W.roadNet, FG = W.rbGrid;
         for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
           const px = x0 + (i + 0.5) * CS, pz = z0 + (j + 0.5) * CS;
           const o = occ[j * nx + i], p = P ? inPoly(px, pz, P) : false;
           if (o) A++; if (p) B++; if (o && p) I++;
-          if (o && !p && RN && RN.surfaceAt) { const s = RN.surfaceAt(px, pz); if (s > 0.02 && s < 0.2) road++; }
+          const s = RN && RN.surfaceAt ? RN.surfaceAt(px, pz) : 0, onR = s > 0.02 && s < 0.2, onS = s >= 0.2;
+          if (o && !p && onR) road++;
+          if (o === 1) { if (onR) sf.gRoad++; else if (onS) sf.gSide++; }
+          if (o === 2) { if (onR) sf.mRoad++; else if (onS) sf.mSide++; }
+          if (W.landmarkHit && W.landmarkHit(px, pz, 0.45)) {
+            if (onR) sf.hRoad++; else if (onS) sf.hSide++;
+            if (!occD[j * nx + i] && !(W.fabric && W.fabric.hit && W.fabric.hit(px, pz, 0.45))) {
+              sf.inv++; if (onR) sf.invRoad++; else if (onS) sf.invSide++;
+              if (invEx.length < 5 && (i + 3 * j) % 11 === 0) invEx.push([+px.toFixed(1), +pz.toFixed(1)]);
+            }
+          }
           if (p && FG && FG.at(px, pz) >= 0) fabIn++;
         }
+        for (const k2 in sf) sf[k2] = +(sf[k2] * CS * CS).toFixed(1);
         const cell2 = CS * CS;
         // vật lạ: cây (recs) + collider nhỏ trong đa giác (lùi 0,5 m vào trong)
         const trees = [], cols = [];
@@ -122,7 +139,7 @@ try {
         if (sign) { const i = Math.floor((sign.x - x0) / CS), j = Math.floor((sign.z - z0) / CS); signIn = { x: +sign.x.toFixed(1), z: +sign.z.toFixed(1), inLM: !!(i >= 0 && j >= 0 && i < nx && j < nz && occ[j * nx + i]), inPoly: P ? inPoly(sign.x, sign.z, P) : null, inFab: W.fabric ? W.fabric.hit(sign.x, sign.z, 0.6) : null, inLmSolid: W.landmarkHit ? W.landmarkHit(sign.x, sign.z, 0.6) : null }; }
         out[key] = { roots: R.length, tris, h: +(ymax - LAND).toFixed(1), occM2: +(A * cell2).toFixed(0), polyM2: +(B * cell2).toFixed(0),
           iou: +(I / Math.max(1, A + B - I)).toFixed(3), cover: +(I / Math.max(1, B)).toFixed(3), outsideM2: +((A - I) * cell2).toFixed(0), roadM2: +(road * cell2).toFixed(0),
-          fabInM2: +(fabIn * cell2).toFixed(0), cellIn, trees: trees.length, treeList: trees.slice(0, 8), smallCols: cols.length, colList: cols.slice(0, 8), sign: signIn };
+          fabInM2: +(fabIn * cell2).toFixed(0), street: sf, invEx, cellIn, trees: trees.length, treeList: trees.slice(0, 8), smallCols: cols.length, colList: cols.slice(0, 8), sign: signIn };
       }
       const spots = [];
       if (W.landmarkHit) {
