@@ -6,7 +6,8 @@
 //     hoặc nằm trong ~5 m; gỡ kèm collider + vòng FEATURED_CLEAR + biển/mái hiên treo trên mặt tiền của nó. Thuộc tính
 //     (chữ biển, màu tường, số tầng, vị trí, hướng, footprint thật khớp nhất) xuất ra `world.cellShops` cho lớp mặt tiền.
 //   • CÔNG TRÌNH CÓ DANH TÍNH (UBND/công sở/trường/chùa/đình/chợ/bệnh viện/khách sạn/ngân hàng/khuôn viên + cao ốc
-//     ≥22 m) → GIỮ + đăng ký hộp giữ chỗ claims.js kind 'cell' → lớp nhà thật (WP2) bỏ footprint nằm dưới.
+//     ≥22 m + nhà DI SẢN Pháp/biệt thự/arcade ≥100 m²) → GIỮ + đăng ký hộp giữ chỗ claims.js kind 'cell' → lớp nhà
+//     thật (WP2) bỏ footprint nằm dưới.
 //   • Cặp nhà TRÙNG nhau (nhiều đợt agent vẽ cùng 1 toà) → giữ 1.
 //   • Cây, đồ phố, tường/rào, mặt sân, và các HỆ THỐNG nhúng (cell_road rd_*, cell_tree tr_*, cell_dens de_*,
 //     cell_curb street_curbs, cloverleaf) → không đụng.
@@ -29,6 +30,8 @@ export const CELLSINK_PARAMS = {
   MIN_CELLS: 20,    // "dạng nhà": khối đặc ≥20 ô 1 m²
   MIN_H: 3,         //            và cao ≥3 m
   TOWER_H: 22,      // ≥22 m (~6-7 tầng): cao ốc quan sát từ pano → giữ như công trình danh tính
+  HERIT_MIN: 100,   // nhà Pháp/biệt thự/arcade (tên HERIT_RE) có khối đặc ≥100 ô 1 m² → GIỮ như di sản (dáng riêng
+                    // dựng theo pano: vòm, mansard, tháp góc, cửa chớp — fabric chung không tái tạo được); nhỏ hơn → nhà
   DUP_MIN: 0.5,     // trùng lặp: giao ≥50% diện tích nhà nhỏ hơn
   DUP_MAX: 0.25,    //            và ≥25% nhà lớn hơn
   DUP_HR: 2,        //            và tỉ lệ chiều cao ≤2 (tháp trên khối đế KHÔNG phải trùng)
@@ -334,6 +337,9 @@ const CIVIC_PREFIX = ['congso', 'conso', 'coquan', 'truso', 'chicucthue', 'sotup
 // cao ốc văn phòng/kính có tên (5-7 tầng, thấp hơn TOWER_H) — dáng riêng nhìn từ pano → giữ như tháp
 const TOWER_PREFIX = ['caooc', 'toakinh'];
 const CIVIC_INCL = ['hotel', 'bank', 'school', 'tower', 'hospital'];
+// nhà DI SẢN thời Pháp (biệt thự, nhà Pháp cổ, dãy arcade, mansard, tháp góc) — đối chiếu pano_089/070/160/255/504:
+// mô hình ô (tường vàng/kem, cửa vòm, cửa chớp xanh, mái ngói đỏ) giống ảnh thật hơn hẳn fabric chung → giữ nếu đủ lớn
+const HERIT_RE = /phap|bietthu|biethu|villa|colonial|arcade|mansard|manoir|turret/;
 // ghi đè tay theo tên đầy đủ (đối chiếu pano: công trình đứng riêng có danh tính / nhà nhầm token)
 const NAME_KIND = {
   nhahang_bocong_hd: 'civic',     // nhà hàng bo cong đứng giữa bãi giải toả Hoàng Diệu (pano_015-021)
@@ -359,6 +365,7 @@ export function nameKind(name) {
   }
   for (const t of tokens(n)) for (const p of TOWER_PREFIX) if (t.startsWith(p)) return 'tower';
   if (OPEN_RE.test(n)) return 'open';
+  if (HERIT_RE.test(n)) return 'heritage';
   return '';
 }
 function styleHint(name) {
@@ -394,7 +401,8 @@ function commitSink(sink, THREE, realScene, realFC, colliders, opts) {
     it.S = mc.S; it.height = mc.top - mc.base; it.base = mc.base;
     it.bldg = mc.S.size >= PR.MIN_CELLS && it.height >= PR.MIN_H && nk !== 'tree' && nk !== 'open' && tag !== 'prop' && tag !== 'tree';
     if (!it.bldg) { it.kind = tag || (nk === 'tree' ? 'tree' : nk === 'open' ? 'open' : 'prop'); return it; }
-    it.kind = tag || (nk === 'civic' || nk === 'house' || nk === 'tower' ? nk : it.height >= PR.TOWER_H ? 'tower' : 'house');
+    it.kind = tag || (nk === 'civic' || nk === 'house' || nk === 'tower' ? nk
+      : nk === 'heritage' && mc.S.size >= PR.HERIT_MIN ? 'heritage' : it.height >= PR.TOWER_H ? 'tower' : 'house');
     return it;
   });
   const tShape = performance.now();
@@ -577,7 +585,7 @@ function commitSink(sink, THREE, realScene, realFC, colliders, opts) {
   _report = {
     mode: MODE, blockMs: +(t0 - stats.t0).toFixed(1), ms: +(performance.now() - t0).toFixed(1), msShape: +(tShape - t0).toFixed(1), msReal: +(tReal - tShape).toFixed(1), msApply: +(tApply - tReal).toFixed(1),
     objects: items.length, buildings: bl.length,
-    kinds: { civic: cnt((it) => it.bldg && it.kind === 'civic'), tower: cnt((it) => it.bldg && it.kind === 'tower'), house: cnt((it) => it.bldg && it.kind === 'house'),
+    kinds: { civic: cnt((it) => it.bldg && it.kind === 'civic'), tower: cnt((it) => it.bldg && it.kind === 'tower'), heritage: cnt((it) => it.bldg && it.kind === 'heritage'), house: cnt((it) => it.bldg && it.kind === 'house'),
       tree: cnt((it) => it.kind === 'tree'), open: cnt((it) => it.kind === 'open'), prop: cnt((it) => it.kind === 'prop'), sys: cnt((it) => it.kind === 'sys') },
     removed: { total: nRem, overlap: cnt((it) => it.removed === 'overlap'), near: cnt((it) => it.removed === 'near'), dup: cnt((it) => it.removed === 'dup'), attached: propsRemoved },
     keptBuildings: bl.filter((it) => !it.removed).length,
