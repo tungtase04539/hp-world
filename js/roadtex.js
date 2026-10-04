@@ -395,6 +395,21 @@ function genInWorker(S, done) {
   w.postMessage(S);
 }
 
+// WebGL1: màu lớp mặt (sRGB PLACEHOLDER → tuyến tính) theo aSurf.x; mọi tam giác một polygon cùng lớp nên varying float
+// nội suy vẫn là hằng (không cần flat).
+function gl1Patch(sh) {
+  const lin = (c) => { c /= 255; return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+  const col = (l) => { const c = PLACEHOLDER[l]; return `vec3(${lin(c[0]).toFixed(4)}, ${lin(c[1]).toFixed(4)}, ${lin(c[2]).toFixed(4)})`; };
+  let chain = col(6);   // ≥6: bó vỉa (mặt đứng)
+  for (let l = 5; l >= 0; l--) chain = `L < ${l}.5 ? ${col(l)} : ${chain}`;
+  sh.vertexShader = sh.vertexShader
+    .replace('#include <common>', '#include <common>\nattribute vec4 aSurf;\nvarying float vLay;')
+    .replace('#include <begin_vertex>', '#include <begin_vertex>\nvLay = aSurf.x;');
+  sh.fragmentShader = sh.fragmentShader
+    .replace('#include <common>', '#include <common>\nvarying float vLay;')
+    .replace('#include <map_fragment>', `{ float L = floor(vLay + 0.5); diffuseColor.rgb *= (${chain}); }`);
+}
+
 export function makeRoadMaterial(THREE, opt = {}) {
   const S = opt.size || 512;
   const t0 = performance.now();
@@ -419,7 +434,11 @@ export function makeRoadMaterial(THREE, opt = {}) {
   const mat = new THREE.MeshPhongMaterial({ color: 0xffffff, specular: 0x262626, shininess: 18 });
   mat.name = 'roadnet';
   if (opt.lite) mat.defines = { RN_LITE: '' };   // TIER ≤1: shader nhẹ hơn (2 lần đọc texture ít hơn mỗi điểm ảnh nhựa)
-  mat.onBeforeCompile = (sh) => {
+  mat.onBeforeCompile = (sh, renderer) => {
+    // WebGL1 (three r160 vẫn fallback 'webgl' khi trình duyệt/driver chặn WebGL2): shader chính cần sampler2DArray,
+    // flat ivec, textureGrad → KHÔNG biên dịch được → cả mạng đường/vỉa hè biến mất. Nhánh dự phòng GLSL ES 1.0: màu
+    // phẳng theo lớp mặt (aSurf.x, cùng bảng PLACEHOLDER), không vạch kẻ. renderer = tham số thứ 2 của onBeforeCompile.
+    if (renderer && renderer.capabilities && renderer.capabilities.isWebGL2 === false) { gl1Patch(sh); mat.userData.webgl1 = true; return; }
     sh.uniforms.tRoad = { value: tex };
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\nattribute vec4 aSurf;\nattribute vec2 aZeb;\nflat varying ivec2 vCode;\nvarying vec2 vSurf;\nvarying vec2 vZeb;\nvarying vec2 vRUv;\nvarying vec3 vWP;')
