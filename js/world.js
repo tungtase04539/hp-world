@@ -20976,12 +20976,13 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
           for (let i = 0; i < n; i++) { a[i * 3] = c.r; a[i * 3 + 1] = c.g; a[i * 3 + 2] = c.b; }
           g.setAttribute('color', new THREE.BufferAttribute(a, 3)); return g;
         };
-        // khung cục bộ: X = về phía tim đường, Y lên, −Z = mặt đèn quay về xe đang tới
+        // khung cục bộ: X = về phía tim đường, Y lên, −Z = mặt đèn quay về xe đang tới. Trụ/cần/giằng openEnded (nắp
+        // tròn khuất trong đế/đầu cột, nhìn từ dưới không thấy) → 88 tam giác/cột thay vì 140.
         const ARM = 3.4, H = 5.7;
-        const pole = new THREE.CylinderGeometry(0.085, 0.12, H + 0.3, 8); pole.translate(0, (H + 0.3) / 2, 0); parts.push(colored(pole, 0x7a7f84));
-        const base = new THREE.CylinderGeometry(0.16, 0.18, 0.5, 8); base.translate(0, 0.25, 0); parts.push(colored(base, 0x55595e));
-        const arm = new THREE.CylinderGeometry(0.05, 0.065, ARM, 6); arm.rotateZ(Math.PI / 2); arm.translate(ARM / 2, H, 0); parts.push(colored(arm, 0x7a7f84));
-        const brace = new THREE.CylinderGeometry(0.025, 0.025, 1.6, 4); brace.rotateZ(Math.PI / 2 - 0.42); brace.translate(0.72, H - 0.33, 0); parts.push(colored(brace, 0x7a7f84));
+        const pole = new THREE.CylinderGeometry(0.085, 0.12, H + 0.3, 8, 1, true); pole.translate(0, (H + 0.3) / 2, 0); parts.push(colored(pole, 0x7a7f84));
+        const base = new THREE.CylinderGeometry(0.16, 0.18, 0.5, 8, 1, true); base.translate(0, 0.25, 0); parts.push(colored(base, 0x55595e));
+        const arm = new THREE.CylinderGeometry(0.05, 0.065, ARM, 6, 1, true); arm.rotateZ(Math.PI / 2); arm.translate(ARM / 2, H, 0); parts.push(colored(arm, 0x7a7f84));
+        const brace = new THREE.CylinderGeometry(0.025, 0.025, 1.6, 4, 1, true); brace.rotateZ(Math.PI / 2 - 0.42); brace.translate(0.72, H - 0.33, 0); parts.push(colored(brace, 0x7a7f84));
         const headHi = new THREE.BoxGeometry(0.34, 1.0, 0.24); headHi.translate(ARM - 0.15, H - 0.62, 0); parts.push(colored(headHi, 0x1b1d20));
         const headLo = new THREE.BoxGeometry(0.34, 1.0, 0.24); headLo.translate(0.26, 2.75, 0); parts.push(colored(headLo, 0x1b1d20));
         const cnt = new THREE.BoxGeometry(0.5, 0.36, 0.16); cnt.translate(ARM - 0.62, H - 0.32, 0); parts.push(colored(cnt, 0x15171a));
@@ -20989,15 +20990,19 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
         parts.forEach((g) => g.dispose());
         const poleIM = new THREE.InstancedMesh(sigGeo, new THREE.MeshLambertMaterial({ vertexColors: true }), SIG.length);
         poleIM.name = 'traffic_signal_poles';
-        const lampGeo = new THREE.CircleGeometry(0.105, 10);   // mặt kính tròn quay −Z
+        // CHỈ vẽ bóng ĐANG SÁNG: bóng tắt trùng màu hộp đèn (0x1b1d20) nên không cần instance riêng → mỗi cột 3 instance
+        // (bóng sáng đầu cao + đầu thấp + ô đếm ngược) thay vì 7; đổi pha = dời ma trận bóng sáng sang ô đỏ/vàng/xanh.
+        const lampGeo = new THREE.CircleGeometry(0.105, 8);   // mặt kính tròn quay −Z
         lampGeo.rotateY(Math.PI);
-        const lampIM = new THREE.InstancedMesh(lampGeo, new THREE.MeshBasicMaterial({ color: 0xffffff }), SIG.length * 7);
+        const lampIM = new THREE.InstancedMesh(lampGeo, new THREE.MeshBasicMaterial({ color: 0xffffff }), SIG.length * 3);
         lampIM.name = 'traffic_signal_lamps';
-        lampIM.userData.noCull = true;     // instanceColor đổi theo pha → instcull không được nén/ghi đè
+        lampIM.userData.noCull = true;     // ma trận/màu đổi theo pha → instcull không được nén/ghi đè
+        lampIM.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
         const M = new THREE.Matrix4(), Ml = new THREE.Matrix4(), lampOff = [];
-        // 3 bóng đầu cao + 3 bóng đầu thấp (đỏ trên, vàng giữa, xanh dưới) + 1 ô đếm ngược
-        for (const [hx, hy] of [[ARM - 0.15, H - 0.62], [0.26, 2.75]]) for (let k = 0; k < 3; k++) lampOff.push([hx, hy + 0.3 - k * 0.3, -0.125, k]);
-        lampOff.push([ARM - 0.62, H - 0.32, -0.085, 3]);
+        // ô 0-2 đầu cao, 3-5 đầu thấp (đỏ trên, vàng giữa, xanh dưới), 6 ô đếm ngược
+        for (const [hx, hy] of [[ARM - 0.15, H - 0.62], [0.26, 2.75]]) for (let k = 0; k < 3; k++) lampOff.push([hx, hy + 0.3 - k * 0.3, -0.125]);
+        lampOff.push([ARM - 0.62, H - 0.32, -0.085]);
+        const slotM = new Float32Array(SIG.length * 7 * 16);   // ma trận thế giới của 7 ô bóng mỗi cột
         const sigInfo = [];
         SIG.forEach((s, i) => {
           // cơ sở: X = +nR (về tim đường), Y = lên, Z = −d (về phía nút) → det +1
@@ -21006,31 +21011,36 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
           M.setPosition(s.x, s.y, s.z);
           poleIM.setMatrixAt(i, M);
           const ph = ((Math.sin(s.jx * 0.0123 + s.jz * 0.0371) * 43758.5453) % 1 + 1) % 1 * 30;
-          sigInfo.push({ ph: ph + s.phase * 15 });
-          lampOff.forEach(([lx, ly, lz], k) => {
-            Ml.makeTranslation(lx, ly, lz);
-            Ml.premultiply(M);
-            lampIM.setMatrixAt(i * 7 + k, Ml);
-          });
+          sigInfo.push({ ph: ph + s.phase * 15, on: -1 });
+          lampOff.forEach(([lx, ly, lz], k) => { Ml.makeTranslation(lx, ly, lz); Ml.premultiply(M); Ml.toArray(slotM, (i * 7 + k) * 16); });
         });
-        poleIM.instanceMatrix.needsUpdate = true; lampIM.instanceMatrix.needsUpdate = true;
-        const OFF = new THREE.Color(0x141414), RED = new THREE.Color(1.0, 0.12, 0.06), YEL = new THREE.Color(1.0, 0.62, 0.0),
-          GRN = new THREE.Color(0.1, 1.0, 0.45), CNT = new THREE.Color(0.9, 0.15, 0.1);
-        for (let i = 0; i < SIG.length * 7; i++) lampIM.setColorAt(i, OFF);
+        poleIM.instanceMatrix.needsUpdate = true;
+        const OFF = new THREE.Color(0x141414), COL = [new THREE.Color(1.0, 0.12, 0.06), new THREE.Color(1.0, 0.62, 0.0), new THREE.Color(0.1, 1.0, 0.45)];
+        const lm = lampIM.instanceMatrix.array;
+        const setPhase = (i, on) => {
+          lm.set(slotM.subarray((i * 7 + on) * 16, (i * 7 + on) * 16 + 16), (i * 3) * 16);
+          lm.set(slotM.subarray((i * 7 + 3 + on) * 16, (i * 7 + 3 + on) * 16 + 16), (i * 3 + 1) * 16);
+          lm.set(slotM.subarray((i * 7 + 6) * 16, (i * 7 + 6) * 16 + 16), (i * 3 + 2) * 16);
+          lampIM.setColorAt(i * 3, COL[on]); lampIM.setColorAt(i * 3 + 1, COL[on]);
+          lampIM.setColorAt(i * 3 + 2, on === 1 ? OFF : COL[on]);   // đếm ngược: đỏ/xanh, tắt khi vàng
+        };
+        // pha: xanh 12 s → vàng 3 s → đỏ 15 s; trục vuông góc lệch 15 s → xanh/vàng của trục này nằm GỌN trong đỏ trục kia
+        const phaseOf = (i, time) => { const t = (time + sigInfo[i].ph) % 30; return t < 12 ? 2 : t < 15 ? 1 : 0; };
+        for (let i = 0; i < SIG.length; i++) { sigInfo[i].on = phaseOf(i, 0); setPhase(i, sigInfo[i].on); }
         lampIM.instanceColor.setUsage(THREE.DynamicDrawUsage);
+        lampIM.instanceMatrix.needsUpdate = true; lampIM.instanceColor.needsUpdate = true;
         poleIM.computeBoundingSphere(); lampIM.computeBoundingSphere();
         scene.add(poleIM); scene.add(lampIM);
         let lastT = -1;
         updaters.push((dt, time) => {
           const tq = Math.floor(time * 4);           // 4 Hz là đủ (đèn đổi theo giây)
           if (tq === lastT) return; lastT = tq;
+          let dirty = false;
           for (let i = 0; i < SIG.length; i++) {
-            const t = (time + sigInfo[i].ph) % 30;
-            const on = t < 13 ? 2 : t < 16 ? 1 : 0;    // xanh 13 s → vàng 3 s → đỏ 14 s
-            for (let h = 0; h < 2; h++) for (let k = 0; k < 3; k++) lampIM.setColorAt(i * 7 + h * 3 + k, k === on ? (k === 0 ? RED : k === 1 ? YEL : GRN) : OFF);
-            lampIM.setColorAt(i * 7 + 6, on === 0 ? CNT : on === 2 ? GRN : OFF);
+            const on = phaseOf(i, time);
+            if (on !== sigInfo[i].on) { sigInfo[i].on = on; setPhase(i, on); dirty = true; }
           }
-          lampIM.instanceColor.needsUpdate = true;
+          if (dirty) { lampIM.instanceMatrix.needsUpdate = true; lampIM.instanceColor.needsUpdate = true; }
         });
       }
     }
