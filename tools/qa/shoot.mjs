@@ -1,8 +1,12 @@
 // tools/qa/shoot.mjs — chụp game headless Chrome (GPU thật d3d11 qua ANGLE) + đo perf + gom lỗi JS.
 // Server tĩnh: python -m http.server <port> (chạy ở gốc repo/worktree). Mỗi agent dùng 1 cổng riêng.
 // usage: node shoot.mjs --port 8177 --out <dir> --views <views.json> [--quality full] [--w 1280 --h 720] [--perf] [--swiftshader]
-//        [--traffic on|off]  (giao thông WP8 phụ thuộc nhịp khung → ảnh KHÔNG tất định; chấm pano/so A/B ảnh dùng off,
-//        đo perf giữ on = chi phí thật; view có thể ghi "traffic": "on"|"off" riêng)
+//        [--traffic on|off] [--gl1] [--args "--flag1 --flag2"] [--qs "&time=21"]
+//        --gl1 = getContext('webgl2') trả null (init script; cờ Chrome --disable-es3-apis KHÔNG có tác dụng ở headless
+//        mới — đo 2026-10-04) → three r160 lùi WebGL1: kiểm nhánh dự phòng shader, kết quả ghi webgl2:false;
+//        --args = cờ Chrome thêm; --qs = query thêm vào URL game
+//        --traffic: giao thông WP8 phụ thuộc nhịp khung → ảnh KHÔNG tất định; chấm pano/so A/B ảnh dùng off,
+//        đo perf giữ on = chi phí thật; view có thể ghi "traffic": "on"|"off" riêng
 // Tự chờ khoá GPU toàn máy (có thể phải đợi agent khác chụp xong). Giữ mỗi lần chụp NGẮN (ít góc) để không chiếm khoá lâu.
 // views.json = [{id, kind:'pano', X, Z, h, pitch?}, {id, kind:'aerial', x, z, half}, {id, kind:'cam', x, z, yaw, pitch, dist}]
 // In ra JSON: {errors, buildMs, tier, gpu, perf:{...}, shots:[...]}
@@ -20,6 +24,8 @@ const W = +arg('w', 1280), H = +arg('h', 720);
 const PERF = A.includes('--perf');
 const HOST = arg('host', '127.0.0.1');
 const TRAFFIC = arg('traffic', 'on');
+const EXTRA_ARGS = [...(A.includes('--gl1') ? ['--disable-es3-apis'] : []), ...String(arg('args', '')).split(/\s+/).filter(Boolean)];
+const QS = arg('qs', '');
 fs.mkdirSync(OUT, { recursive: true });
 // GPU THẬT + KHOÁ TOÀN MÁY (tools/qa/gpulock.mjs): 8 Chrome GPU song song từng làm máy BSOD 0x133 ba lần (2026-10-04)
 // → mọi lần chụp xếp hàng, 1 Chrome GPU tại một thời điểm. --swiftshader = render CPU (rất chậm: >30 s/khung ở 1280×720,
@@ -31,19 +37,24 @@ const br = await chromium.launch({
   executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe',
   headless: true,
   args: [...(USE_GPU ? ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist'] : ['--use-angle=swiftshader', '--enable-unsafe-swiftshader']),
-    '--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows'],
+    '--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows', ...EXTRA_ARGS],
 });
 const pg = await br.newPage({ viewport: { width: W, height: H } });
+if (A.includes('--gl1')) await pg.addInitScript(() => { const g = HTMLCanvasElement.prototype.getContext; HTMLCanvasElement.prototype.getContext = function (t, o) { return t === 'webgl2' ? null : g.call(this, t, o); }; });
 const errors = [];
 pg.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
 pg.on('console', (m) => { if (m.type() === 'error') errors.push('console: ' + m.text().slice(0, 300)); });
 const t0 = Date.now();
-await pg.goto(`http://${HOST}:${PORT}/index.html?quality=${Q}`, { waitUntil: 'domcontentloaded', timeout: 120000 });
+await pg.goto(`http://${HOST}:${PORT}/index.html?quality=${Q}${QS}`, { waitUntil: 'domcontentloaded', timeout: 120000 });
 let hpAt = 0;
 for (let i = 0; i < 400; i++) {
   const ok = await pg.evaluate(() => !!(window.__hp && window.__hp.teleport)).catch(() => false);
   if (ok) { hpAt = Date.now() - t0; break; }
   await pg.waitForTimeout(500);
+}
+if (!hpAt) {   // game không khởi động được (lỗi module/shader…) → in lỗi thay vì văng TypeError khó hiểu
+  console.log(JSON.stringify({ errors: ['TIMEOUT: window.__hp không xuất hiện', ...errors.slice(0, 20)] }, null, 1));
+  await br.close(); releaseGpu(); process.exit(1);
 }
 await pg.evaluate(() => { const sb = document.getElementById('startBtn'); if (sb) sb.click(); }).catch(() => {});
 // Đợt 3 (WP8): nút Bắt đầu khoá (class 'loading') tới khi thế giới dựng xong + khung đầu đã vẽ; cú bấm sớm được
@@ -61,7 +72,7 @@ const bootProfile = await pg.evaluate(() => window.__hp && window.__hp.bootProfi
 const pinned = A.includes('--nopin') ? null
   : await pg.evaluate(() => (window.__hp && window.__hp.pinQuality ? window.__hp.pinQuality(true) : null)).catch(() => null);
 await pg.waitForTimeout(+arg('settle', '15000'));
-const info = await pg.evaluate(() => ({ tier: window.__hp.tier, gpu: window.__hp.gpu }));
+const info = await pg.evaluate(() => ({ tier: window.__hp.tier, gpu: window.__hp.gpu, webgl2: window.__hp.renderer.capabilities.isWebGL2 }));
 await pg.evaluate(() => {
   for (const id of ['titleScreen', 'hud', 'dialogue', 'prompt', 'toast', 'banner', 'touchControls', 'gpuWarn']) {
     const el = document.getElementById(id); if (el) el.style.display = 'none';

@@ -994,9 +994,13 @@ export function buildTrees(scene, ctx = {}) {
   const mat = new THREE.MeshLambertMaterial({ map: atlas, vertexColors: true, alphaTest: A2C ? 0.04 : 0.5, side: THREE.DoubleSide, alphaToCoverage: A2C });
   mat.onBeforeCompile = (sh) => patchShader(sh, false);
   mat.customProgramCacheKey = () => 'hpveg1';
+  // WebGL1 (r160 tự lùi khi không có WebGL2): dFdx/fwidth trong FRAG_MAP cần GL_OES_standard_derivatives — three chỉ
+  // chèn #extension khi material.extensions.derivatives (WebGL2 bỏ qua cờ này). Thiếu → 2 lỗi biên dịch, mất hết cây.
+  mat.extensions = { derivatives: true };
   const depthMat = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map: atlas, alphaTest: 0.5, side: THREE.DoubleSide });
   depthMat.onBeforeCompile = (sh) => patchShader(sh, true);
   depthMat.customProgramCacheKey = () => 'hpveg1d';
+  depthMat.extensions = { derivatives: true };
   // ---- kit (chỉ loại đang dùng) ----
   const usedK = new Set(recs.map((r) => r.kit)), usedS = new Set(recs.map((r) => r.sp));
   const nearKits = [], farKits = [];
