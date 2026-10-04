@@ -14,8 +14,9 @@
 //   • Gió: lắc tán bằng onBeforeCompile (rẻ). Mùa hoa theo LỊCH trong game (W2-B: bloomShare — mặc định 4/10 ~17%
 //     phượng còn hoa muộn; rộ tháng 5-7; ?date= / world.trees.setDate).
 //   • W2-B: KÍCH THƯỚC THẬT theo loài (SPX: cao / mép dưới tán / bán kính) → biến hình TỪNG CÂY trong shader (aShape:
-//     nâng tán, co tán ngang, dời tán) trên kit chung; tán cách mặt tiền ≥ 1,5 m (facadeFit); tán thoáng (chùm đầu cành);
-//     cắt cụt / tỉa trơ theo pano; hero GLB chỉ quanh Nhà hát, ≤ 3 cây GLB cùng lúc.
+//     nâng tán, co tán ngang, ép nửa tán phía tường / nghiêng nhẹ) trên kit chung; tán cách mặt tiền ≥ 1,5 m (facadeFit:
+//     TÁN LỆCH, thân thẳng); tán thoáng (chùm đầu cành); cắt cụt / tỉa trơ theo pano; hero GLB chỉ quanh Nhà hát, ngoài
+//     khung pano thật (heroSpotOk), ≤ 3 cây GLB cùng lúc; kit XA có sy/nâng/co tán riêng (khớp ranh LOD).
 //
 // Hợp đồng dùng (world.js):
 //   plant(kind, x, z, o)          — xếp hàng 1 cây (toạ độ thế giới). kind: 'xacu'|'bang'|'phuong'|'sau'|'banglang'|
@@ -27,7 +28,7 @@
 //   plantLocal(parent, lx, lz, kind, o) — cây trong Group (toạ độ local của parent, giải ở buildTrees; parent bị gỡ
 //                                   khỏi scene trước đó → cây bị bỏ).
 //   plantStreetTrees(ctx)          — trồng THEO DỮ LIỆU dọc phố p/s/t (+ r nơi pano nói có cây) tại xsection.treePitLine.
-//   plantPlazaYoung(ctx)           — hàng cây non chống cọc trên quảng trường lát đá (hộp ctx.box) — W2-B.
+//   plantPlazaYoung(ctx)           — hàng cây non chống cọc trên quảng trường lát đá (claim ctx.claim | hộp ctx.box) — W2-B.
 //   buildTrees(scene, ctx)         — dựng atlas + kit + InstancedMesh, móc scene.onBeforeRender (LOD + gió). Trả handle.
 // Mọi vị trí/hash TẤT ĐỊNH (không Math.random) để A/B ảnh so được.
 import * as THREE from 'three';
@@ -619,8 +620,8 @@ export function plantLocal(parent, lx, lz, kind, o = {}) { Q.push({ kind, parent
 // ---- camera 551 pano (js/panoclear.js): không trồng/dời cây trong r m quanh điểm chụp (lưới 8 m, dựng 1 lần) ----
 // PANO_CLEAR 4,5 m: camera pano thật đứng trên LÒNG ĐƯỜNG (xe chụp đi giữa làn) → quanh nó không có gốc cây; trước 3 m
 // thì 68 camera có cây < 4 m, tán bàng/xà cừ che kín nửa trên khung (pano_019/008). Áp cho MỌI cây trừ dải phân cách
-// (o.median). HERO_PANO_CLEAR 12 m: tán GLB phượng xoè 6-7 m — hero 9,7 m trước pano_001_h090 che ~35% khung.
-const PANO_CLEAR = 4.5, HERO_PANO_CLEAR = 12;
+// (o.median).
+const PANO_CLEAR = 4.5;
 // HERO GLB (W2-B): chỉ là "tủ kính" quanh Nhà hát (≤ HERO_SHOW_R) — "thành phố hoa phượng đỏ" — và mỗi lúc chỉ vẽ
 // HERO_MAX cây GLB gần camera nhất trong HERO_R (trước: 57 hero cả dải trung tâm, ≤ 8 cùng lúc → 1,19 M tam giác)
 const OPERA = LM_CENTROID.opera, HERO_SHOW_R = 120, HERO_MAX = 3;
@@ -630,6 +631,40 @@ function nearPano(x, z, r) {
   const ci = Math.floor(x / 8), cj = Math.floor(z / 8);
   for (let i = ci - 1; i <= ci + 1; i++) for (let j = cj - 1; j <= cj + 1; j++) { const a = _PG.get(i * 100003 + j); if (!a) continue; for (let q = 0; q < a.length; q += 2) if ((a[q] - x) ** 2 + (a[q + 1] - z) ** 2 < r * r) return true; }
   return false;
+}
+// ---- CHỖ ĐẶT HERO GLB (tủ kính phượng đỏ quanh Nhà hát, luôn nở) — không được chắn khung pano thật. Review W2-B:
+// pano_055_h000 (std) có 3 vòm đỏ 25-49 m GIỮA khung che lối vào Nhà hát (pano thật 10/2024: xanh, cây tỉa/cây non).
+// Pano thật chụp 8 hướng (h000..h315) ⇒ "nón ±45° của hướng chụp" = mọi hướng ⇒ luật: (1) cách MỌI camera pano
+// ≥ HERO_PANO_MIN (vòm 6-7 m ở ≥ 35 m chỉ ~1/5 khung, không còn "chiếm giữa khung"; 50 m thì cả vùng ≤ 120 m quanh
+// Nhà hát chỉ còn khối phía bắc — pano dày đặc); (2) ngoài NÊM NHÌN tới đa giác Nhà hát (+ bán kính tán) từ mọi camera
+// pano ≤ HERO_VIEW_R quanh Nhà hát + camera spawn (0, 72) — không che mặt Nhà hát từ chỗ có ảnh thật (pano xa hơn:
+// Nhà hát nhỏ, nêm từ mọi phía phủ kín cả vùng). Thay HERO_PANO_CLEAR 12 m cũ (nearPano chỉ dò ±1 ô 8 m — r 12 m sót).
+const HERO_PANO_MIN = 35, HERO_CROWN_R = 7, HERO_VIEW_R = 160;
+let _HV = null;
+function heroSpotOk(x, z) {
+  if (!_HV) {
+    const OP = LM_POLY.opera; _HV = [];
+    const views = PANO_CAM.map(([px, pz]) => [px, pz, true]).filter(([px, pz]) => Math.hypot(px - OPERA[0], pz - OPERA[1]) < HERO_VIEW_R);
+    views.push([0, 72, false]);
+    for (const [px, pz, pano] of views) {
+      const dir = Math.atan2(OPERA[0] - px, OPERA[1] - pz);
+      let a0 = 1e9, a1 = -1e9, dn = 1e9;
+      for (const [vx, vz] of OP) {
+        let a = Math.atan2(vx - px, vz - pz) - dir; a = Math.atan2(Math.sin(a), Math.cos(a));
+        a0 = Math.min(a0, a); a1 = Math.max(a1, a); dn = Math.min(dn, Math.hypot(vx - px, vz - pz));
+      }
+      _HV.push({ x: px, z: pz, pano, dir, a0, a1, dn });
+    }
+  }
+  for (const [px, pz] of PANO_CAM) if ((px - x) ** 2 + (pz - z) ** 2 < HERO_PANO_MIN * HERO_PANO_MIN) return false;
+  for (const v of _HV) {
+    const dx = x - v.x, dz = z - v.z, d = Math.hypot(dx, dz);
+    if (d > v.dn + HERO_CROWN_R || d < 1) continue;            // sau lưng mặt Nhà hát gần nhất → không che
+    let a = Math.atan2(dx, dz) - v.dir; a = Math.atan2(Math.sin(a), Math.cos(a));
+    const hw = Math.atan2(HERO_CROWN_R, d);
+    if (a + hw > v.a0 && a - hw < v.a1) return false;
+  }
+  return true;
 }
 // ---- tra pano gần nhất (≤ 60 m) ----
 const VG = new Map(), VCELL = 60;
@@ -717,8 +752,12 @@ function footprints(ctx) {
   return _fp;
 }
 // dữ liệu đỉnh footprint đi cùng lưới (ctx.fpData = world.rbData, D.dead đã đánh) — cần cho khoảng cách tới mặt tiền
+let _fpWarn = false;
 function footprintData(ctx) {
-  if (ctx.fpGrid) return ctx.fpData || null;
+  if (ctx.fpGrid) {
+    if (!ctx.fpData && !_fpWarn) { _fpWarn = true; console.warn('[trees] fpGrid không kèm fpData → TẮT khoảng cách mặt tiền (facadeFit)'); }
+    return ctx.fpData || null;
+  }
   footprints(ctx);
   return _fpD;
 }
@@ -845,7 +884,7 @@ export function plantStreetTrees(ctx) {
             ctx.addCollider && ctx.addCollider(tx, tz, sp === SP.CAU ? 0.45 : 0.55);
             st.planted++;
             // hero GLB: chỉ "tủ kính" quanh Nhà hát (W2-B — trước cả dải trung tâm ≤ 160 m)
-            if (sp === SP.PHUONG && (c === 'p' || c === 's') && Math.hypot(tx - OPERA[0], tz - OPERA[1]) < HERO_SHOW_R && !(ctx.hdTreeBelt && ctx.hdTreeBelt(tx, tz)) && !nearPano(tx, tz, HERO_PANO_CLEAR)) heroCand.push(q);
+            if (sp === SP.PHUONG && (c === 'p' || c === 's') && Math.hypot(tx - OPERA[0], tz - OPERA[1]) < HERO_SHOW_R && !(ctx.hdTreeBelt && ctx.hdTreeBelt(tx, tz)) && heroSpotOk(tx, tz)) heroCand.push(q);
           }
           acc += step;
         }
@@ -867,8 +906,18 @@ export function plantStreetTrees(ctx) {
 // Nhà hát phía nam (Trần Phú) trồng lại sau bão Yagi. Lưới hàng song song trục hộp claim `box` {cx,cz,ux,uz,hu,hw} nhịp
 // `step` m, giữ ~72% theo hash; né lòng đường (+1,5 m), nhà thật, địa danh (LM_POLY + 3 m, kể cả quảng trường Nhà hát),
 // collider (chậu bonsai/đài phun/cột đèn), gốc khác < 5 m, camera pano 4,5 m, ctx.keepClear (trục nhìn spawn → Nhà hát).
+// ctx.claim = tên claim hộp (vd 'road9_tay') → hộp lấy THẲNG từ claims (W2-D/E sửa claim thì hàng cây đi theo);
+// ctx.box = hộp cho sẵn (dự phòng / trang QA)
 export function plantPlazaYoung(ctx) {
-  const { box, ROADS_DT, groundHeightNoDeck, isWater } = ctx;
+  const { ROADS_DT, groundHeightNoDeck, isWater } = ctx;
+  let box = ctx.box;
+  if (ctx.claim) {
+    const c = claimsAll().find((q) => q.name === ctx.claim && q.type === 'box');
+    // claims.js: local X → (cosθ, −sinθ), local Z → (sinθ, cosθ) = (−uz, ux) — đúng trục w của hộp dưới đây
+    if (c) box = { cx: c.cx, cz: c.cz, ux: Math.cos(c.rot), uz: -Math.sin(c.rot), hu: c.hx, hw: c.hz };
+    else console.warn('[trees] plantPlazaYoung: không thấy claim', ctx.claim);
+  }
+  if (!box) return 0;
   const LAND = ctx.landH ?? 2, step = ctx.step || 8.5, RI = roadIndex(ROADS_DT, ctx.R || 1600), fp = footprints(ctx);
   const inLMpad = (x, z, pad) => {
     for (const P of Object.values(LM_POLY)) {
@@ -907,16 +956,23 @@ const VERT_DECL = 'attribute float aKind;\nattribute float aSway;\nattribute flo
 const VERT_BEGIN = `vec3 transformed = vec3( position );
 #ifdef USE_INSTANCING
   // W2-B BIẾN HÌNH TỪNG CÂY (aShape, đơn vị kit): x = NÂNG tán (thân từ gốc vôi → chạc giãn ra, tán dời lên nguyên khối),
-  // y = co/giãn tán NGANG quanh trục thân (chỉ đỉnh tán: aHt ≥ 2), zw = DỜI tán (né mặt tiền → thân NGHIÊNG thẳng từ trên gốc vôi)
-  float hpCr = step( 1.5, aHt ), hpH = aHt - 2.0 * hpCr;
-  transformed.xz *= mix( 1.0, aShape.y, hpCr );
-  transformed.xz += aShape.zw * hpH;
+  // |y| = co/giãn tán NGANG quanh trục thân (chỉ đỉnh tán: aHt ≥ 2). zw theo DẤU của y:
+  //   y > 0 → zw = NGHIÊNG tự nhiên nhẹ (dời tán ≤ ~6°, thân thẳng từ trên gốc vôi tới chạc)
+  //   y < 0 → TÁN LỆCH (né mặt tiền): zw = hướng ra lòng đường × tỉ lệ ÉP s — nửa tán phía TƯỜNG co về trục thân
+  //           (×(1−s) theo pháp tuyến tường), nửa phía đường giữ nguyên; THÂN THẲNG ĐỨNG (cây sát nhà bị tỉa phía nhà)
+  float hpCr = step( 1.5, aHt ), hpH = aHt - 2.0 * hpCr, hpSq = step( aShape.y, 0.0 );
+  transformed.xz *= mix( 1.0, abs( aShape.y ), hpCr );
+  float hpSL = length( aShape.zw );
+  vec2 hpN = aShape.zw / max( hpSL, 1e-5 );
+  transformed.xz += hpN * ( max( - dot( transformed.xz, hpN ), 0.0 ) * hpSL * hpSq * hpCr );
+  transformed.xz += aShape.zw * ( hpH * ( 1.0 - hpSq ) );
   transformed.y += aShape.x * hpH;
   // hoa theo MÙA: cây chưa tới lượt nở / trái mùa → thu thẻ hoa về 1 điểm (tam giác suy biến, không raster); cây đang
   // nở giữ phần thẻ hoa ∝ độ sâu dưới ngưỡng (đầu/cuối mùa lác đác vài chùm, giữa mùa đỏ rực)
   if ( aKind > 2.5 ) {
     float hpR = aInst.x, hpS = uBloom.x;
     if ( hpR > 1.5 ) { hpR -= 2.0; hpS = uBloom.y; }
+    if ( hpR < -0.5 && hpS <= 0.05 ) hpR = 1.0;     // cây đôi hero (luôn nở) — trừ khi tắt hẳn mùa hoa (setSeason(0))
     if ( fract( aKind ) * 2.5 >= clamp( ( hpS - hpR ) * 8.0, 0.0, 1.0 ) ) transformed = vec3( 0.0, -3.0, 0.0 );
   }
   // ĐỘ KÍN TÁN từng cây (aInst.w 0..1): thẻ lá/hoa có số ngẫu nhiên riêng (phần lẻ aKind × 2,5) lớn hơn → bỏ
@@ -1021,15 +1077,19 @@ const SPX = [
   [13, 18, 4.0, 5.5, 7.0, 10.0],     // đa/si
   [4.0, 6.5, 2.2, 3.0, 1.1, 1.9],    // cây non chống cọc (pano_541: 5-7 m, tán từ ~2,5 m)
 ];
-const FACADE_CLEAR = 1.5;   // tán cách mặt tiền ≥ 1,5 m (dời tán ra phía lòng đường, không đủ thì thu nhỏ)
+const FACADE_CLEAR = 1.5;   // tán cách mặt tiền ≥ 1,5 m (ép nửa tán phía tường — tán lệch ra lòng đường, không đủ thì thu nhỏ)
+const SQ_MAX = 0.72;        // ép tối đa nửa tán phía tường còn 28% bán kính
+// nghiêng TỰ NHIÊN tối đa (độ) của thân trên đoạn gốc vôi → chạc (cây đứng tự do; cây sát nhà/cây non/cắt cụt: 0)
+const LEAN_NAT_DEG = 5.5;
 // LM_POLY làm "tường" cao (địa danh) — bbox để lọc nhanh. BỎ các đa giác KHUÔN VIÊN/quảng trường (tường rào/hè trống,
 // tán cây vươn qua rào là đúng thật): square, trường học, chùa Hàng, Việt Tiệp
 const LM_OPEN = new Set(['square', 'thptnq', 'thcsnq', 'thcstp', 'chuahang', 'viettiep']);
 const LMW = Object.entries(LM_POLY).filter(([k]) => !LM_OPEN.has(k)).map(([, P]) => { let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9; for (const [x, z] of P) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); } return { P, x0, z0, x1, z1 }; });
-// tán (tâm gốc x,z, mép dưới B m, bán kính R m) vướng mặt tiền nào cao hơn mép tán? → {ox, oz (m, dời tâm tán), R (m)}.
+// tán (tâm gốc x,z, mép dưới B m, bán kính R m) vướng mặt tiền nào cao hơn mép tán? → {sq (0..SQ_MAX tỉ lệ ép nửa tán
+// phía tường), nx, nz (pháp tuyến tường → lòng đường), R (m), d (m, gốc → tường gần nhất)}.
 // Chỉ tường cao ≥ mép tán − 0,3 m (tán xoè trên mái nhà 1 tầng là bình thường). Gốc nằm TRONG nhà/địa danh → bỏ qua.
 function facadeFit(x, z, B, R, fp, D, CB) {
-  const out = { ox: 0, oz: 0, R, d: 1e9 };
+  const out = { sq: 0, nx: 0, nz: 0, R, d: 1e9 };
   if (!fp || !D) return out;
   const S = R + FACADE_CLEAR + 0.5, E = [];
   let best = 1e9, nx = 0, nz = 0;
@@ -1069,18 +1129,43 @@ function facadeFit(x, z, B, R, fp, D, CB) {
   }
   out.d = best;
   if (inside || best >= R + FACADE_CLEAR) return out;
-  // dời tâm tán theo pháp tuyến mặt tiền gần nhất (ra phía lòng đường), tối đa 35% bán kính / 1,6 m — thân NGHIÊNG
-  // thẳng (≤ ~18° với chạc 5 m; dời 2,2 m + cong h^1,5 từng thành thân 'chuối' — pano_092)
-  const o = Math.min(R + FACADE_CLEAR - best, Math.min(0.35 * R, 1.6));
-  const cx = x + nx * o, cz = z + nz * o;
-  let dc = 1e9;
-  for (let k = 0; k < E.length; k += 4) {
-    const ax = E[k], az = E[k + 1], dx = E[k + 2] - ax, dz = E[k + 3] - az, L2 = dx * dx + dz * dz || 1;
-    let t = ((cx - ax) * dx + (cz - az) * dz) / L2; t = t < 0 ? 0 : t > 1 ? 1 : t;
-    const d = Math.hypot(cx - ax - t * dx, cz - az - t * dz); if (d < dc) dc = d;
+  // TÁN LỆCH (review W2-B: dời tán ≤ 1,6 m trên đoạn thân gốc vôi→chạc 1,4-3,3 m = thân gãy 20-55°, pano thật thân gần
+  // thẳng đứng): THÂN GIỮ THẲNG, nửa tán phía tường bị ÉP về trục thân theo pháp tuyến mặt tiền gần nhất — (1−s)·R ≤
+  // khoảng trống (best − 1,5 m), s ≤ SQ_MAX (cây sát nhà ở HP bị tỉa phẳng phía nhà, tán vươn ra lòng đường). Không đủ
+  // (thân quá sát tường) → thu R. Rồi kiểm MỌI tường trong tầm (góc phố/nhà thứ 2) với hình tán đã ép → thu dần R.
+  const room = best - FACADE_CLEAR, Rmin = Math.max(1.2, R * 0.42), tx = -nz, tz = nx;
+  let Rf = R, s = 1 - room / R;
+  if (s > SQ_MAX) { s = SQ_MAX; Rf = Math.max(Rmin, Math.min(R, room / (1 - SQ_MAX))); }
+  if (s < 0) s = 0;
+  // hình tán ép: điểm (a theo pháp tuyến n — dương = phía đường, b theo tiếp tuyến); a < 0 bị nhân (1−s)
+  const clearOK = (Rc, sc) => {
+    const k = 1 - sc;
+    for (let q = 0; q < 24; q++) {
+      const ang = q * 0.2618, ca = Math.cos(ang), a = ca < 0 ? ca * k : ca, b = Math.sin(ang);
+      const px = x + (nx * a + tx * b) * Rc, pz = z + (nz * a + tz * b) * Rc;
+      for (let e = 0; e < E.length; e += 4) {
+        const ax = E[e], az = E[e + 1], dx = E[e + 2] - ax, dz = E[e + 3] - az, L2 = dx * dx + dz * dz || 1;
+        let t = ((px - ax) * dx + (pz - az) * dz) / L2; t = t < 0 ? 0 : t > 1 ? 1 : t;
+        if ((px - ax - t * dx) ** 2 + (pz - az - t * dz) ** 2 < (FACADE_CLEAR - 0.05) ** 2) return false;
+      }
+    }
+    // cạnh tường nằm GỌN trong tán (nhà nhỏ/ki-ốt): điểm gần thân nhất của cạnh lọt trong hình tán
+    for (let e = 0; e < E.length; e += 4) {
+      const ax = E[e], az = E[e + 1], dx = E[e + 2] - ax, dz = E[e + 3] - az, L2 = dx * dx + dz * dz || 1;
+      let t = ((x - ax) * dx + (z - az) * dz) / L2; t = t < 0 ? 0 : t > 1 ? 1 : t;
+      const qx = ax + t * dx - x, qz = az + t * dz - z;
+      let a = qx * nx + qz * nz; const b = qx * tx + qz * tz;
+      if (a < 0) a /= Math.max(k, 0.05);
+      if (a * a + b * b < Rc * Rc) return false;
+    }
+    return true;
+  };
+  for (let it = 0; it < 12 && !clearOK(Rf, s); it++) {
+    if (Rf <= Rmin + 1e-3) break;
+    Rf = Math.max(Rmin, Rf * 0.88);
+    s = Math.min(SQ_MAX, Math.max(0, 1 - room / Rf));
   }
-  out.ox = nx * o; out.oz = nz * o;
-  out.R = Math.max(Math.min(R, dc - FACADE_CLEAR), Math.max(1.2, R * 0.42));
+  out.sq = s; out.nx = nx; out.nz = nz; out.R = Rf;
   return out;
 }
 
@@ -1161,9 +1246,9 @@ export function buildTrees(scene, ctx = {}) {
     else sp = KIND_OF[e.kind] ?? SP.XACU;
     if (!V) V = vegAt(x, z);
     const o = e.o;
-    // hero GLB (showcase, luôn nở đỏ) chỉ trong HERO_SHOW_R quanh Nhà hát + cách camera pano ≥ 12 m — còn lại: phượng thủ
+    // hero GLB (showcase, luôn nở đỏ) chỉ trong HERO_SHOW_R quanh Nhà hát + không chắn khung pano (heroSpotOk) — còn lại: phượng thủ
     // tục nở theo LỊCH như mọi cây (W2-B: trước 57 hero rải cả dải trung tâm + vườn hoa → "vòm đỏ" khắp nơi tháng 10)
-    const heroOk = sp === SP.PHUONG && o.hero !== undefined && o.hero >= 0 && !nearPano(x, z, HERO_PANO_CLEAR) && Math.hypot(x - OPERA[0], z - OPERA[1]) < HERO_SHOW_R;
+    const heroOk = sp === SP.PHUONG && o.hero !== undefined && o.hero >= 0 && Math.hypot(x - OPERA[0], z - OPERA[1]) < HERO_SHOW_R && heroSpotOk(x, z);
     // CẮT CỤT / TỈA TRƠ theo bằng chứng pano (bão Yagi 9/2024 → pano 10/2024): loài đặt đích danh bởi helper cũ
     // (phượng allée, xà cừ vườn hoa…) cũng bị cắt khi pano ≤ 60 m nói "cắt cụt/trụi" — trước chỉ cây 'shade/street/park'
     if (!heroOk && V.near && V.polLvl > 0 && sp !== SP.CAU && sp !== SP.DA && sp !== SP.NON && sp !== SP.CATCUT && hxz(x, z, 5) < V.pollard * 0.85) sp = SP.CATCUT;
@@ -1216,9 +1301,10 @@ export function buildTrees(scene, ctx = {}) {
   for (let s = 0; s < SP_N; s++) farKits[s] = usedS.has(s) ? genKit(KIT_DEFS[SP_KITS[s][0]], true, 5000 + s * 13) : null;
   // ---- KÍCH THƯỚC THẬT → biến hình kit (W2-B). Mỗi cây: tán né mặt tiền (facadeFit) rồi quy về đơn vị kit:
   //   sy = (H − B)/(top − base) (co dọc theo ĐỘ SÂU TÁN), lift = B/sy − base (nâng tán: thân trống dài ra, gốc vôi giữ),
-  //   sxz = bề dày thân ∝ sy, cs = R/(rad·sxz) (co tán ngang quanh trục), (ox,oz) = dời tán về phía lòng đường.
+  //   sxz = bề dày thân ∝ sy, cs = R/(rad·sxz) (co tán ngang quanh trục); sát tường: ép nửa tán phía tường (sq, hướng
+  //   snx/snz → zx/zz kit), đứng tự do: nghiêng nhẹ (ox,oz ≤ 5,5°). Cùng số đo cho kit XA (syF/liftF/csF).
   const fpD = ctx.facade === false ? null : footprintData(ctx);   // facade:false = trang QA kit (tools/qa/trees.html)
-  const fit = { moved: 0, shrunk: 0, maxOff: 0, ms: 0 };
+  const fit = { squeezed: 0, shrunk: 0, maxSq: 0, ms: 0 };
   const tF = performance.now();
   // hộp claim 'cell' nhỏ (nhà ô dựng tay giữ lại) → lưới 32 m cho facadeFit
   const CB = new Map();
@@ -1232,42 +1318,64 @@ export function buildTrees(scene, ctx = {}) {
       const k = i * 100003 + j; let a = CB.get(k); if (!a) CB.set(k, (a = [])); a.push(e);
     }
   }
+  const LEAN_T = Math.tan(LEAN_NAT_DEG * Math.PI / 180);
   for (const r of recs) {
-    const k = nearKits[r.kit], cau = r.sp === SP.CAU;
-    if (cau) { r.sy = clamp(r.H / k.top, 0.45, 1.3); r.sxz = r.sy * (0.92 + hxz(r.x, r.z, 43) * 0.12); continue; }
-    let R = r.Rr, ox = 0, oz = 0;
+    const k = nearKits[r.kit], kf = farKits[r.sp], cau = r.sp === SP.CAU;
+    r.sq = 0; r.snx = 0; r.snz = 0; r.zx = 0; r.zz = 0;
+    if (cau) {
+      r.sy = clamp(r.H / k.top, 0.45, 1.3); r.sxz = r.sy * (0.92 + hxz(r.x, r.z, 43) * 0.12);
+      r.syF = clamp(r.H / kf.top, 0.45, 1.3); r.liftF = 0; r.csF = 1;
+      continue;
+    }
+    let R = r.Rr;
     if (fpD) {
       const f = facadeFit(r.x, r.z, r.B, R, fpG, fpD, CB);
-      if (f.ox || f.oz) { ox = f.ox; oz = f.oz; fit.moved++; fit.maxOff = Math.max(fit.maxOff, Math.hypot(ox, oz)); }
+      if (f.sq > 0.005) { r.sq = f.sq; r.snx = f.nx; r.snz = f.nz; fit.squeezed++; fit.maxSq = Math.max(fit.maxSq, f.sq); }
       if (f.R < R - 0.05) fit.shrunk++;
       R = f.R; r.fd = f.d;
-    }
-    // nghiêng TỰ NHIÊN (cây phố HP hiếm khi thẳng đứng — pano_007/085): tán lệch 0,15-0,8 m hướng ngẫu nhiên, chỉ khi
-    // không có tường nào trong tầm (không phá khoảng cách mặt tiền)
-    if (!ox && !oz && (r.fd === undefined || r.fd > R + FACADE_CLEAR + 1)) {
-      const a = hxz(r.x, r.z, 59) * 6.283, m = (0.15 + 0.65 * hxz(r.x, r.z, 60)) * Math.min(1, r.B / 5);
-      ox = Math.cos(a) * m; oz = Math.sin(a) * m;
     }
     r.sy = clamp((r.H - r.B) / Math.max(0.5, k.top - k.base), 0.4, 2.4);
     r.lift = clamp(r.B / r.sy - k.base, -(k.fork - WASH_TOP) * 0.6, 14);
     // bề dày thân theo CHIỀU CAO cây so với kit (không theo độ sâu tán — cây cắt cụt tán nông từng ra thân 1 m)
     r.sxz = clamp((r.H / k.def.H) ** 0.8 * (0.88 + hxz(r.x, r.z, 43) * 0.22), 0.45, 1.5);
     r.cs = clamp(R / (k.rad * r.sxz), 0.35, 1.9);
-    // dời tán: thế giới → kit (nghịch đảo xoay yaw rồi chia sxz; nghiêng lx/lz nhỏ bỏ qua)
+    // kit XA (variant 0 của loài, > NEAR_R): sy/nâng/co tán RIÊNG theo số đo kit xa → mép dưới/ngọn/bán kính tán khớp
+    // kit gần ở ranh LOD (trước: dùng aShape của kit gần → mép tán nhảy −1..+1,7 m khi đổi LOD). Khớp mép/ngọn THỰC của
+    // kit gần (kể cả khi kẹp sy/nâng — cắt cụt biến thể 1 không hạ tán dưới chạc được), không phải B/H mong muốn
+    const Bn = (k.base + r.lift) * r.sy, Tn = (k.top + r.lift) * r.sy;
+    r.syF = clamp((Tn - Bn) / Math.max(0.5, kf.top - kf.base), 0.4, 2.4);
+    r.liftF = clamp(Bn / r.syF - kf.base, -(kf.fork - WASH_TOP) * 0.6, 14);
+    r.csF = clamp(R / (kf.rad * r.sxz), 0.35, 1.9);
+    // nghiêng TỰ NHIÊN (cây phố HP ít khi thẳng tuyệt đối — pano_007/085) chỉ cây ĐỨNG TỰ DO (không tường trong tầm),
+    // không cây non chống cọc / cắt cụt; dời tán ≤ tan(5,5°) × đoạn thân gốc vôi → chạc (shader dồn nghiêng vào đoạn
+    // này) — review W2-B: 0,15-0,8 m trên đoạn 1,4-3,3 m từng ra thân gãy 9-17°, cộng dời né tường tới 55°
+    let ox = 0, oz = 0;
+    if (!r.sq && r.sp !== SP.NON && r.sp !== SP.CATCUT && (r.fd === undefined || r.fd > R + FACADE_CLEAR + 1) && Number.isFinite(k.fork)) {
+      const seg = Math.max(0, (Math.min(k.fork, kf.fork) + Math.min(r.lift, r.liftF) - WASH_TOP) * Math.min(r.sy, r.syF));
+      const a = hxz(r.x, r.z, 59) * 6.283, m = Math.min((0.15 + 0.65 * hxz(r.x, r.z, 60)) * Math.min(1, r.B / 5), LEAN_T * seg);
+      ox = Math.cos(a) * m; oz = Math.sin(a) * m;
+    }
+    // thế giới → kit (nghịch đảo xoay yaw; nghiêng lx/lz nhỏ bỏ qua): dời tán chia sxz; hướng ép tán chỉ xoay
     const c = Math.cos(r.yaw), s = Math.sin(r.yaw);
     r.ox = (ox * c - oz * s) / r.sxz; r.oz = (ox * s + oz * c) / r.sxz;
+    if (r.sq) { r.zx = (r.snx * c - r.snz * s) * r.sq; r.zz = (r.snx * s + r.snz * c) * r.sq; } else { r.zx = r.ox; r.zz = r.oz; }
     r.Rf = R; r.wox = ox; r.woz = oz;
   }
-  fit.ms = +(performance.now() - tF).toFixed(1); fit.maxOff = +fit.maxOff.toFixed(2);
+  fit.ms = +(performance.now() - tF).toFixed(1); fit.maxSq = +fit.maxSq.toFixed(2);
   // ---- ma trận + màu + thuộc tính từng cây ----
+  // M/SHP: kit GẦN; MF/SHPF: kit XA (sy + nâng/co tán riêng theo số đo kit xa). SHP.y < 0 = cờ TÁN LỆCH (xem VERT_BEGIN)
   const M = new Float32Array(N * 16), COL = new Float32Array(N * 3), INST = new Float32Array(N * 4), SHP = new Float32Array(N * 4);
+  const MF = new Float32Array(N * 16), SHPF = new Float32Array(N * 4);
   const px = new Float32Array(N), pz = new Float32Array(N);
   const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _e = new THREE.Euler(), _s = new THREE.Vector3(), _p = new THREE.Vector3();
   const SP_TINT = [[1, 1, 1], [1.04, 1.03, 0.95], [1.0, 1.03, 0.95], [1, 1, 1], [1, 1, 1], [1, 1, 1], [1, 1, 1], [0.95, 0.97, 0.95], [1.03, 1.03, 1]];
   const setM = (i, r) => {
     _e.set(r.lx, r.yaw, r.lz); _q.setFromEuler(_e); _s.set(r.sxz, r.sy, r.sxz); _p.set(r.x, r.y, r.z);
     _m.compose(_p, _q, _s); _m.toArray(M, i * 16);
-    SHP[i * 4] = r.lift; SHP[i * 4 + 1] = r.cs; SHP[i * 4 + 2] = r.ox; SHP[i * 4 + 3] = r.oz;
+    _s.set(r.sxz, r.syF, r.sxz); _m.compose(_p, _q, _s); _m.toArray(MF, i * 16);
+    const sg = r.sq > 0 ? -1 : 1;
+    SHP[i * 4] = r.lift; SHP[i * 4 + 1] = sg * r.cs; SHP[i * 4 + 2] = r.zx; SHP[i * 4 + 3] = r.zz;
+    SHPF[i * 4] = r.liftF; SHPF[i * 4 + 1] = sg * r.csF; SHPF[i * 4 + 2] = r.zx; SHPF[i * 4 + 3] = r.zz;
   };
   recs.forEach((r, i) => {
     setM(i, r);
@@ -1280,7 +1388,7 @@ export function buildTrees(scene, ctx = {}) {
   });
   // ---- nhóm InstancedMesh ----
   const groups = [];
-  const mkGroup = (kitObj, cap, name, cast) => {
+  const mkGroup = (kitObj, cap, name, cast, S) => {
     const geo = kitObj.geo.clone();
     const aInst = new THREE.InstancedBufferAttribute(new Float32Array(cap * 4), 4); aInst.setUsage(THREE.DynamicDrawUsage);
     geo.setAttribute('aInst', aInst);
@@ -1295,13 +1403,13 @@ export function buildTrees(scene, ctx = {}) {
     mesh.userData.noMerge = true;
     mesh.boundingSphere = new THREE.Sphere(new THREE.Vector3(), -1);
     scene.add(mesh);
-    const g = { mesh, cap, idx: new Int32Array(cap).fill(-1), k: 0, dirty: false, aInst, aShape, cast, tris: kitObj.tris };
+    const g = { mesh, cap, idx: new Int32Array(cap).fill(-1), k: 0, dirty: false, aInst, aShape, S, cast, tris: kitObj.tris };
     groups.push(g); return g;
   };
   const nearCount = new Array(KIT_DEFS.length).fill(0), farCount = new Array(SP_N).fill(0);
   for (const r of recs) { nearCount[r.kit]++; farCount[r.sp]++; }
-  const nearG = KIT_DEFS.map((d, i) => (nearCount[i] ? mkGroup(nearKits[i], nearCount[i], 'trees_' + SP_NAME[d.sp] + i, true) : null));
-  const farG = Array.from({ length: SP_N }, (_, s) => (farCount[s] ? mkGroup(farKits[s], farCount[s], 'trees_far_' + SP_NAME[s], false) : null));
+  const nearG = KIT_DEFS.map((d, i) => (nearCount[i] ? mkGroup(nearKits[i], nearCount[i], 'trees_' + SP_NAME[d.sp] + i, true, SHP) : null));
+  const farG = Array.from({ length: SP_N }, (_, s) => (farCount[s] ? mkGroup(farKits[s], farCount[s], 'trees_far_' + SP_NAME[s], false, SHPF) : null));
   const kitOf = new Uint8Array(N), spOf = new Uint8Array(N), heroOf = new Int8Array(N);
   recs.forEach((r, i) => { kitOf[i] = r.kit; spOf[i] = r.sp; heroOf[i] = r.hero; });
   // ---- ô gốc cây (bó vỉa bê tông + đất) dọc vỉa hè: 1 InstancedMesh, chỉ hiện trong tầm gần ----
@@ -1342,7 +1450,7 @@ export function buildTrees(scene, ctx = {}) {
     if (g.idx[k] !== i) {
       g.idx[k] = i; g.dirty = true;
       g.mesh.instanceMatrix.array.set(src16.subarray(i * 16, i * 16 + 16), k * 16);
-      if (!g.pit && !g.hero) { g.mesh.instanceColor.array.set(COL.subarray(i * 3, i * 3 + 3), k * 3); g.aInst.array.set(INST.subarray(i * 4, i * 4 + 4), k * 4); g.aShape.array.set(SHP.subarray(i * 4, i * 4 + 4), k * 4); }
+      if (!g.pit && !g.hero) { g.mesh.instanceColor.array.set(COL.subarray(i * 3, i * 3 + 3), k * 3); g.aInst.array.set(INST.subarray(i * 4, i * 4 + 4), k * 4); g.aShape.array.set(g.S.subarray(i * 4, i * 4 + 4), k * 4); }
     }
     g.k++;
   };
@@ -1392,7 +1500,7 @@ export function buildTrees(scene, ctx = {}) {
       const dx = px[i] - cx, dz = pz[i] - cz, d2 = dx * dx + dz * dz, prev = state[i];
       if (heroPick[i]) { state[i] = 3; heroNear.push(i); }
       else if (d2 < (prev === 1 || prev === 3 ? n2h : n2)) { state[i] = 1; write(nearG[kitOf[i]], i, M); }
-      else if (d2 < f2 && (coneCos < -1 || dx * coneFx + dz * coneFz >= coneCos * Math.sqrt(d2))) { state[i] = 2; write(farG[spOf[i]], i, M); }
+      else if (d2 < f2 && (coneCos < -1 || dx * coneFx + dz * coneFz >= coneCos * Math.sqrt(d2))) { state[i] = 2; write(farG[spOf[i]], i, MF); }
       else state[i] = 0;
       if (pitG && pitOf[i] && d2 < p2) write(pitG, i, PM);
     }
@@ -1455,15 +1563,16 @@ export function buildTrees(scene, ctx = {}) {
     heroG[v] = { mesh, cap: L.length, idx: new Int32Array(L.length).fill(-1), k: 0, dirty: false, hero: true };
     const HB = [8.6, 10.8, 8.8];
     for (const i of L) {
-      const r = recs[i], k = nearKits[r.kit];
+      const r = recs[i], k = nearKits[r.kit], kf = farKits[r.sp];
       // cao hero như cũ (HERO_BASE_H × 0.82..1.32), cây thủ tục thay thế (cây ĐÔI) cùng cao + cùng độ xoè tán (aspect
       // GLB), không nâng/dời tán (GLB không biến hình được)
       const h = HB[v] * (0.82 + hxz(r.x, r.z, 61) * 0.5);
       _e.set(0, r.yaw, 0); _q.setFromEuler(_e); _s.setScalar(h); _p.set(r.x, r.y, r.z);
       _m.compose(_p, _q, _s).multiply(B); _m.toArray(HM, i * 16);
       heroBox[i * 2] = Math.max(h * aspect * 0.6, h * 0.6); heroBox[i * 2 + 1] = h;
-      r.sy = h / k.top; r.sxz = r.sy * 0.95; r.lift = 0; r.ox = r.oz = 0;
+      r.sy = h / k.top; r.sxz = r.sy * 0.95; r.lift = 0; r.ox = r.oz = 0; r.sq = 0; r.zx = r.zz = 0;
       r.cs = clamp((h * aspect * 0.5) / (k.rad * r.sxz), 0.5, 1.6);
+      r.syF = h / kf.top; r.liftF = 0; r.csF = clamp((h * aspect * 0.5) / (kf.rad * r.sxz), 0.5, 1.6);
       setM(i, r);
       for (const g of [nearG[kitOf[i]], farG[spOf[i]]]) if (g) g.idx.fill(-1);   // ép ghi lại hàng ma trận
     }
@@ -1479,7 +1588,7 @@ export function buildTrees(scene, ctx = {}) {
     let best = -1, bd = rMax * rMax; const ci = Math.floor(x / 32), cj = Math.floor(z / 32), rc = Math.ceil(rMax / 32);
     for (let i = ci - rc; i <= ci + rc; i++) for (let j = cj - rc; j <= cj + rc; j++) {
       const a = BG.get(i * 100003 + j); if (!a) continue;
-      for (const t of a) { if ((share - recs[t].rank) * 8 < 0.2) continue; const d = (px[t] - x) ** 2 + (pz[t] - z) ** 2; if (d < bd) { bd = d; best = t; } }
+      for (const t of a) { if ((share - recs[t].rank) * 8 < 0.2 || (recs[t].rank < 0 && share <= 0.05)) continue; const d = (px[t] - x) ** 2 + (pz[t] - z) ** 2; if (d < bd) { bd = d; best = t; } }
     }
     if (best < 0) return null;
     const r = recs[best];
