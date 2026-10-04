@@ -185,6 +185,7 @@ export function buildRoadNet(ROADS_DT, deps) {
   const MEDIANS = deps.MEDIANS || [], MARKS = deps.MARKS || [];
   const gh = (x, z) => Math.max(ghN(x, z), LAND_H);
   const stats = { tsnap: 0, tsnapIns: 0, xcross: 0, nodes: 0, junctions: 0, miters: 0, driveways: 0, deadEnds: 0, signals: 0, zebraArms: 0, runs: 0, waterGaps: 0, chordCorners: 0 };
+  const gapQuads = [];   // W2-A: [4 đỉnh XZ của mẩu nhựa khe, mặt nhựa so với nền] × n → surfaceAt (makeQueries)
 
   // ---------- 0) way ----------
   const ways = [];
@@ -851,6 +852,8 @@ export function buildRoadNet(ROADS_DT, deps) {
           emit('roads', [[A[0], yA, A[1], A[0], A[1]], [B[0], yB, B[1], B[0], B[1]], [B[3][0], yB, B[3][1], B[3][0], B[3][1]], [A[3][0], yA, A[3][1], A[3][0], A[3][1]]],
             quadTris, [0, 1, 0], [RL.ASPHALT, MK.WUV, 0], null);
           stats.gapFill = (stats.gapFill || 0) + area;
+          // W2-A: surfaceAt phải biết mẩu nhựa phủ khe (trước đây trả 0,25 = vỉa hè ở đây → cây/cột/đèn đứng giữa lòng)
+          gapQuads.push(A[0], A[1], B[0], B[1], B[3][0], B[3][1], A[3][0], A[3][1], ROAD_TOP + 0.004 * RANK[w.c] - lo);
         }
       }
     }
@@ -1106,15 +1109,35 @@ export function buildRoadNet(ROADS_DT, deps) {
     } }
   const jd = new Float32Array(junctions.length * 4), jpoly = junctions.map((J) => (J.poly ? Float32Array.from(J.poly.flat()) : null));
   junctions.forEach((J, i) => { jd[i * 4] = J.x; jd[i * 4 + 1] = J.z; jd[i * 4 + 2] = J.rad; jd[i * 4 + 3] = J.yTop ?? -1; });
-  const q = makeQueries(segs, jd, jpoly, pub, ARCH.map((b) => ({ x: b.x, zc: b.zc, sin: b.sin, cos: b.cos, half: b.half })));
+  const q = makeQueries(segs, jd, jpoly, pub, ARCH.map((b) => ({ x: b.x, zc: b.zc, sin: b.sin, cos: b.cos, half: b.half })), Float32Array.from(gapQuads));
   stats.ms = Math.round((typeof performance !== 'undefined' ? performance : Date).now() - t0);
   return { tiles, signals, stats, nearJunction: q.nearJunction, surfaceAt: q.surfaceAt, junctions: pub };
 }
 
 // Hàm tra cứu dựng từ dữ liệu GỌN (xem cuối buildRoadNet). segs = [ax,az,bx,bz,hw,mặt nhựa,mép ngoài vỉa hè|-1]×n,
 // jd = [x,z,rad,yTop]×n, jpoly = đa giác nút giao (x,z phẳng) | null.
-function makeQueries(segs, jd, jpoly, pub, ARCH) {
+function makeQueries(segs, jd, jpoly, pub, ARCH, gq = new Float32Array(0)) {
   const C = 16, grid = new Map(), nSeg = segs.length / 7;
+  // mẩu nhựa phủ khe đường đôi (gapFill): [x0,z0,x1,z1,x2,z2,x3,z3,mặt]×n — tứ giác lồi, lưới ô C
+  const ggrid = new Map(), nG = gq.length / 9;
+  for (let q = 0; q < nG; q++) {
+    let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9;
+    for (let k = 0; k < 4; k++) { const x = gq[q * 9 + k * 2], z = gq[q * 9 + k * 2 + 1]; if (x < x0) x0 = x; if (x > x1) x1 = x; if (z < z0) z0 = z; if (z > z1) z1 = z; }
+    for (let i = Math.floor(x0 / C); i <= Math.floor(x1 / C); i++) for (let j = Math.floor(z0 / C); j <= Math.floor(z1 / C); j++) { const k = i * 100003 + j; let l = ggrid.get(k); if (!l) ggrid.set(k, l = []); l.push(q); }
+  }
+  const inGap = (x, z) => {   // → mặt nhựa khe (so với nền) | −1
+    const l = ggrid.get(Math.floor(x / C) * 100003 + Math.floor(z / C)); if (!l) return -1;
+    for (const q of l) {
+      const o = q * 9; let s = 0, inside = true;
+      for (let k = 0; k < 4; k++) {
+        const ax = gq[o + k * 2], az = gq[o + k * 2 + 1], bx = gq[o + ((k + 1) % 4) * 2], bz = gq[o + ((k + 1) % 4) * 2 + 1];
+        const c = (bx - ax) * (z - az) - (bz - az) * (x - ax);
+        if (c !== 0) { if (!s) s = Math.sign(c); else if (Math.sign(c) !== s) { inside = false; break; } }
+      }
+      if (inside) return gq[o + 8];
+    }
+    return -1;
+  };
   for (let s = 0; s < nSeg; s++) {
     const ax = segs[s * 7], az = segs[s * 7 + 1], bx = segs[s * 7 + 2], bz = segs[s * 7 + 3];
     const L = Math.hypot(bx - ax, bz - az), n = Math.max(1, Math.ceil(L / (C * 0.5)));
@@ -1167,7 +1190,10 @@ function makeQueries(segs, jd, jpoly, pub, ARCH) {
     let jy = -1;
     nearJ(x, z, 0, (i) => { if (jpoly[i] && pip(jpoly[i], x, z)) { jy = jd[i * 4 + 3]; return true; } return false; });
     if (jy >= 0) return Math.max(jy, road);
-    return road >= 0 ? road : side ? SIDEWALK_TOP : 0;
+    if (road >= 0) return road;
+    // khe đường đôi phủ nhựa (W2-A): dải vỉa hè giải tích của 2 way trùm khe → trước trả 0,25 (vỉa) dù mặt vẽ là NHỰA
+    if (nG) { const gy = inGap(x, z); if (gy >= 0) return gy; }
+    return side ? SIDEWALK_TOP : 0;
   };
   return { nearJunction, surfaceAt };
 }

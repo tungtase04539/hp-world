@@ -321,6 +321,10 @@ node tools/mobile.mjs --port 8177 --out <dir>  # viewport điện thoại dọc/
 node tools/qa/shoot.mjs --port 8177 --out <dir> --views tools/qa/views_std.json --perf   # ảnh so pano/vệ tinh
                                       # [--traffic off]: giao thông phụ thuộc nhịp khung → ảnh không tất định; chấm pano /
                                       # so ảnh A/B dùng off, đo perf giữ on (chi phí thật)
+node tools/qa/clearance.mjs --port 8177 --out <x.json> [--src] [--eval f.js] [--nohold --stack]   # (Đợt 3 W2-A)
+                                      # KHOẢNG TRỐNG: 551 camera pano (< 3 m / lấp khung trong 6 m), vật tĩnh trên NHỰA đã
+                                      # vẽ, khối lấn vỉa hè; SwiftShader ~10 s, chạy TRƯỚC freezeStatic (--nohold: chạy tiếp
+                                      # qua freeze để bắt lỗi gộp; --eval: hàm (scene, world) dò thêm) — xem §10 W2-A
 ```
 - **KHOÁ GPU TOÀN MÁY** (`tools/qa/gpulock.mjs`): mọi tool trên (launch.mjs `openGame` giữ khoá tới `g.close()`,
   shoot.mjs giữ tới khi xong) xếp hàng — chỉ 1 Chrome GPU trên cả máy (8 Chrome GPU song song từng làm máy BSOD
@@ -836,6 +840,84 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     `v6_ndc_tower13` cần DỜI sang bờ bắc Nguyễn Đức Cảnh (lane ô WP3/W2-A — W2-E chỉ gỡ khỏi sân trường); nhà hát rộng 40 m > footprint
     29 m (đánh đổi để chân dung không méo — chủ dự án có thể chọn s nhỏ hơn: thân thấp hơn).
 
+- **2026-10-04 (W2-A CLEARANCE)** [ĐỢT 3 WAVE 2 — KHOẢNG TRỐNG: không vật gì chắn camera pano / lòng đường / vỉa hè; bản
+    SAU PHẢN BIỆN — giữ địa danh, không xuyên nhà, tấm mỏng theo chữ spec, nhả bộ đệm]:
+    **Kiểm toán** `tools/qa/clearance.mjs` (+ `clearance_page.js` tiêm vào trang): `node tools/qa/clearance.mjs --port <p>
+    --out x.json [--src] [--probe pts.json] [--prof f] [--eval f.js] [--nohold --stack]`. Chạy SwiftShader (KHÔNG vẽ — vẫn xin
+    khoá GPU), ~10 s: vá TẠM main.js qua page.route để gọi `window.__hpPreFreeze(scene, world)` NGAY TRƯỚC freezeStatic (còn
+    tên vật thể, geometry chưa gộp/nhả CPU, `?fabfree=0`), rồi giữ trang. `--src` gắn DÒNG NGUỒN world.js cho mọi scene.add
+    ('@L<dòng>'). `--eval f.js` = thân hàm async (scene, world) chạy trong trang SAU kiểm toán → res.eval (dò surfaceAt, vật quanh
+    1 điểm, chồng nhà ô…). Dòng TIÊU ĐỀ in cả chỉ số CHỮ spec lẫn chỉ số tinh chỉnh. Chỉ số cho 551 PANO_CAM (mắt = nền + 2,2 m):
+    (a) `nearAll` = đúng chữ spec (tam giác ở tầm 0,3-2,6 m cách camera < 3 m NGANG); `near` = bỏ MẶT NHÀ khi camera nằm trong
+    hành lang phố và điểm gần nhất lùi sâu 0,6 m đã ra ngoài mặt đường/vỉa hè đã vẽ; (b) raster phần mềm 64×36 × 8 hướng (FOV dọc
+    60°, 16:9): `fillAll` = >40% điểm ảnh trong 6 m (chữ spec); `fillCorr` = phần điểm ảnh trong 6 m mà điểm chạm (lùi 0,6 m) vẫn
+    trên lòng/vỉa hè > 20% (vật LẤN phố); (c) `onRoad` = collider r ≤ 3 / cây / props / đỉnh CHÂN (≤ nền + 0,45 m) trên tam giác
+    NHỰA đã phát của `roads_*`, trừ 3 m quanh mesh *median*; (d) `sidewalk` = khối cao ≥ 2,5 m trên tam giác vỉa hè, `block` =
+    còn < 0,8 m lối đi.
+    **SỬA TẠI NGUỒN:**
+    (1) `js/roadnet.js` (chỉ surfaceAt): gapFill ghi tứ giác nhựa phủ khe đường đôi (`gapQuads`) → surfaceAt trả mặt nhựa (~0,12)
+    trong khe thay vì 0,25 (vỉa). Hồ Sen lưới 0,25 m: 1.744 mẫu nhựa bị coi là vỉa → 0.
+    (2) MỚI `js/clearance.js` — SINGLETON như claims.js (`initClearance({ROADS_DT, surfaceAt, nearJunction, groundHeight,
+    isWater, LAND_H})` ở đầu khối phố 'street'; `releaseClearance()` sau buildProps — nhả đệm + lưới đoạn phố; chưa init / đã nhả
+    → mọi hàm = "không chặn"). Tra cứu: `onCarriage` (CHÍNH XÁC), `onCarriageFast` (đệm LƯỚI ĐỈNH 0,5 m — 4 đỉnh ô cùng kết quả
+    thì trả luôn, khác nhau = ô MÉP → tính chính xác; bản cũ lấy tâm ô sai ±0,35 m làm bàn/cột "dời hợp lệ" vẫn chạm mép nhựa),
+    `onStreetCarriage` (nhựa phố CÓ VỈA p/s/t/r — ngõ h/w không tính), `corridorPen(x,z,streetsOnly)` (phố có vỉa facadeLine −
+    d − 0,3; ngõ h/w nửa lòng − d − 0,4), `clearPt/clearDisc/nudgeDisc`, `panosNear`, `massOnStreet(hulls)` (tỉ lệ ô 1 m của khối
+    chính trên lòng phố có vỉa), `prismFill(body,dx,dz,cx,cz)` (raster 2,5D lăng trụ đứng 32×18 × 8 hướng, cùng FOV/mắt với
+    kiểm toán), `trimThinWall(mesh)` (CẮT tấm Box/Plane mỏng dọc trục dài: bỏ đoạn lấn hành lang/trên lòng phố và đoạn trong
+    6 m quanh camera còn vi phạm, giữ đoạn ≥ 2 m — mỗi đoạn = bản sao mesh, geometry cắt tại chỗ, UV cắt theo từng mặt nên
+    chữ/ảnh không bị ép). `evalShift(S,dx,dz,mode)` cờ trên S: `softAlley` (ngõ h/w mềm), `occ(dx,dz)` (chặn dời vào chỗ đã có
+    nhà), `corrCap` (đồ nhỏ không bị đẩy SÂU hơn vào hành lang phố — trước: hộp ngoài hành lang bị đẩy RA vỉa hè trước camera),
+    `thin` (luật lấp khung ≤ 40% trong 6 m, KHÔNG miễn mặt tiền), `facadeExempt` (chỉ NHÀ khối). Luật camera xét MỌI camera trong
+    tầm (bản cũ chỉ camera gần TÂM bao → tường tranh 24 m beboi_haly cách pano_533 2,3 m lọt luật). `solveShift`: lặp theo vector
+    đẩy rồi dò lưới cực. `sweepAssemblies(objs, cols, fc, opts)` (mesh gộp → thành phần liên thông + hàn 2 mm; instance; mảnh chồng
+    → CỤM): DỜI hoặc GỠ; danh tính (`opts.identity`) ngõ mềm, lùi không nổi → 'small' → GỠ chỉ khi ≥ 12% ô khối chính trên lòng
+    phố có vỉa, không thì GIỮ ('stuck') + bỏ con phụ tự vi phạm; tấm mỏng nhích ≤ 3 m → CẮT → gỡ; cụm trải dài → gỡ mảnh vi
+    phạm; `opts.occAt(x,z,mode)` chặn dời vào chỗ có nhà. Trả `colDead/fcDead/colTouched/fcTouched` — NGƯỜI GỌI NÉN mảng
+    collider/FEATURED_CLEAR (bản cũ đỗ collider ở 1e7: 266 collider chết + vòng FC r 38 m của KS đã gỡ vẫn chặn props).
+    (3) world.js khối phố: `world.streetClear = sweepAssemblies(...)` + `flushClearance()` + nén collider/FC + công trình danh
+    tính ĐÃ DỜI → `claimPoly(bao khối chính cũ ∪ mới, 'clear')` (footprint thật từng khuất TRONG mô hình). Kết quả: dời 31 (đài
+    phun ra khỏi nút giao, bonsai Nhà hát, xích lô, cây xăng, tháp Eximbank 14 m, toà Hoàng Long 5,6 m, KS Harbour View 9,4 m
+    lùi sau mặt tiền — trước bị gỡ vì ngõ h ri1107), gỡ 19 (6 showroom Hoàng Diệu TRÙNG nhà thật, 5 hòn non bộ trên "vòng
+    xuyến" không có thật, đài phun giữa nút, caooc_minhkhai — 58% khối chính trên lòng phố), ~50-70 ms.
+    (4) `js/cellsink.js` commit: **5a** nhà giữ lại: lưới CHIẾM CHỖ = ô 1 m trong BAO LỒI (it.H = hình claim/cellKept) mọi nhà ô
+    sống + đa giác LM_POLY gần đó; dời không được làm chồng TỪNG CẶP tăng quá max(1 ô, chồng sẵn) (địa danh: chỉ chặn lấn MỚI) và
+    cập nhật lưới sau mỗi lần dời. Danh tính (civic/tower/heritage/bespoke): ngõ h/w mềm; NHÓM CHỨA toạ độ thế giới > 20 m
+    (beboi_haly) tách theo CON — chỉ con có khối đặc quyết dời nhóm, con phụ vi phạm → dời ≤ 6 m (tấm mỏng ≤ 3 m) / CẮT
+    (trimThinWall) / bỏ; lùi không nổi → 'small' → GỠ khi ≥ 12% ô khối chính trên lòng phố, không thì GIỮ (dl_truong_lt).
+    Mesh lá/thân cây ĐỨNG ĐẤT (tán nâng > nền + 2,6 m mới miễn — bs_nhakhachtp cầu lá trên lòng phố t) và (kẹt) mesh phụ KHÔNG
+    chạm khối chính mà chân trên lòng phố → bỏ riêng mesh. **6a** chủ collider/FC tính TRƯỚC 5c (thêm luật: nhà vừa thêm NGAY
+    TRƯỚC collider + collider trong bbox bao mọi mesh của nó — collider lều bạt lqd_higashi từng sống sót giữa lòng LQĐ); bước 6
+    bỏ qua collider 5c đã xử lý; mảnh dời/bỏ/cắt riêng (partMoves/partDrops/partDead) kéo collider theo. **5c** sweep mọi vật
+    không phải nhà (tán lá chỉ miễn khi NÂNG cao), occAt = ô khối đặc nhà giữ (+ footprint thật cho đồ nhỏ — chặn cả tường/cổng thì
+    gỡ thêm ~15 cổng pano như mamnon_cong). Nhà gỡ 'clear' xuất `shops` như 'overlap'/'near'. Số: dời 275 (141 nhà, 97 danh
+    tính, 4 một phần), gỡ 86 (11 nhà: w4_lkt_thapkinh 56% khối trên lòng, s4_phapco_thd 43%, dth_congso_phap 26%, cb_dbp_office
+    22%, s3_congso_phap_lkt 16% + 6 nhà thường), cắt 9 tấm mỏng, kẹt 1; giữ 279 (dot3 290).
+    (5) Chặn đặt tay (một dòng, khu khác): flowerBed/heroBed/garden6/lan can Hồ Sen; ghế đá, biển tên phố, nhà chờ xe buýt NUDGE
+    với okFn KHÔNG vào footprint thật còn dựng (world.rbGrid); cột tín hiệu < 3,3 m camera bỏ; tên `median_block/median_bush/
+    bridge_group`. (6) `js/props.js`: clearPt cho bàn ghế/ô dù/xe đẩy/biển A/thùng/xe máy; cột điện + đèn dùng `clearDisc(x,z,
+    0,3, 3,3)` (đèn cobra ở MÉP nhựa: tâm ngoài, chân chạm). `js/trees.js`: loại gốc trên nhựa (khe/nút giao).
+    **Số đo kiểm toán (551 camera; dot3 ea5f57f → sau):** cam vi phạm (near|fillCorr) 175 → 35; near 141 → 12; nearAll (chữ
+    spec) 153 → 36; fillCorr 89 → 29; fillAll > 0,4 (chữ spec) 208 → 181; vật trên nhựa 1.676 → 55 = TOÀN BỘ ngoài nhánh này
+    (khối landmark/nature W2-E: civic8_parterre_jet L18228, chậu hoa trước Nhà hát L18673/18677, hàng rào L18780, nhóm L19797,
+    sân rào L19822, rạp 78 L19969 — dòng theo bản này); lấn vỉa hè 183 → 76 (chặn kín 62 → 10: arcade/công trình danh tính GIỮ lại
+    trùm vỉa hè là đúng thật). Chồng bao lồi nhà ô giữ ≥ 2 m²: dot3 13 cặp/353 m² → 12 cặp/258 m² (không cặp mới; s4_mamnon_dth ×
+    tb_bvps_trang 22,8 → 24,8 = sai số lưới). Ảnh pano: pano_084/411/060/548/059/041 GIỮ địa danh (≥ dot3), pano_533 hết tường
+    tranh trước ống kính, pano_109/146 rào tôn hết lấp khung, c_lkt_pair hết mái đỏ xuyên nhà.
+    **Hiệu năng (GPU 890M tier 3, cùng phiên, std views):** bootProfile street 157 vs 89 ms (+~70), cells 816 vs 562 ms (+~250:
+    5a ~60 + lưới chiếm chỗ ~20, quét 5c ~170, phần còn lại chủ collider/chuẩn bị); hpReady nhiễu ±0,5 s; heap SAU GC 385 vs
+    389 MB (releaseClearance); draw call/tam giác bằng hoặc thấp hơn mọi góc, 60 fps; collider 17.331 vs 17.665 (6 collider
+    đỗ 1e7 thêm là cơ chế bỏ cây của trees.js).
+    **BẪY:** (a) kiểm toán chạy TRƯỚC freezeStatic — lỗi ở freeze không hiện → `--nohold --stack` sau mỗi thay đổi gỡ mesh (geometry
+    rỗng → bakeGeo "reading 'attributes'"). (b) Gỡ mảnh = dựng lại chỉ số: đỉnh còn trong buffer. (c) Đừng gắn surfaceAt vào
+    vòng lặp mọi ô vỉa hè (+0,17 s). (d) `extractShape.leafy` = MỌI mesh gộp xanh — không phải "tán cây"; foliage dùng chung chỉ
+    miễn khi tán NÂNG cao. (e) Đệm nền theo ô 1 m lấy tâm ô → mép mặt cầu rơi xuống nước, cột lan can trên cầu "không chạm nền" —
+    clearance dùng groundHeight ĐÚNG điểm. (f) Kiểm camera theo "camera gần tâm" bỏ sót vật dài. (g) Dời danh tính 10-14 m hợp lệ
+    theo luật (w4_lkt_arcade lùi 10 m, cn_shpplaza 6 m — pano thật có sân trước) nhưng cần mắt người duyệt. (h) Mô hình đặt sai
+    hướng so với 2 pano (tường tranh beboi: pano_548 thấy dọc trái, pano_533 thấy chắn ngang) → CẮT đoạn sát camera, không xoay.
+    (i) ~25 camera chỉ vi phạm vì nhà THẬT ở phố hẹp / camera ngoài lòng theo ROADS_DT = lệch dữ liệu (đề xuất: QA kẹp camera vào
+    lòng phố gần nhất). Ảnh A/B + số: scratchpad `dot3/W2-A` (p2_s1a/b, p2_s2a/b, p2_s3, p3_std1/2 .jpg; audit_base_p2 ↔
+    audit_p2o.json; p2_probe2.json; PROGRESS.md; phản biện review/REVIEW.md).
 - **2026-10-04 (wp8)** [ĐỢT 3 WP8 GAME — khởi động, giao thông phố thật, cảm giác chơi, nhiệm vụ, âm thanh, tool Windows]:
     **Khởi động (js/boot.js + main.js + 9 dòng world.js):** UI màn chờ (ngôn ngữ, chất lượng, nhiệm vụ, input) gắn
     TRƯỚC khi dựng; `buildWorld` thành `async buildWorld(scene, prog)` với `await prog('<bước>')` ở cấp 1 giữa các khu
