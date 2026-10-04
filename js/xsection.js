@@ -9,9 +9,12 @@
 // Bề rộng lòng đường đầy đủ theo cấp OSM (giữ đúng ROAD_W cũ của world.js — mọi offset cũ suy từ đây)
 export const ROAD_W = { p: 13, s: 10, t: 8, r: 5.5, w: 3.5, h: 3 };
 export const ROAD_HW = Object.fromEntries(Object.entries(ROAD_W).map(([k, v]) => [k, v / 2]));
-// Bề rộng vỉa hè MỖI BÊN. p/s/t = 0.28·w như bộ dựng đường cũ (layRoad) để không lệch khi chưa đổi road builder;
-// r = 1.5 m (phố dân sinh HP: vỉa hẹp 1-2 m theo pano), w (phố đi bộ) và h (ngõ) không có vỉa.
-export const SIDEWALK_W = { p: 3.64, s: 2.8, t: 2.24, r: 1.5, w: 0, h: 0 };
+// Bề rộng vỉa hè MỖI BÊN. Đợt 3 WP1 hiệu chỉnh theo 404 pano có ghi bề rộng vỉa (audit_enriched.sidewalk "~3-4 m",
+// gán cấp phố ROADS_DT gần nhất ≤ 8 m): trung vị p 3,5 (n 21) · s 3,5 (n 199) · t 3,0 (n 122) · r 2,5 (n 39, p25 1,75).
+// Giá trị cũ s 2,8 / t 2,24 (= 0,28·w của layRoad) / r 1,5 hẹp hơn thật 0,7-1 m → mặt tiền (facadeLine) đứng gần tim
+// đường hơn pano (pano_141/150: game 6 m, thật ~9-10 m). p giữ 3,64; r lấy 2,0 (thận trọng: footprint thật đường r
+// hay sát lòng). w (phố đi bộ) và h (ngõ) không có vỉa. ĐỔI Ở ĐÂY → chạy lại tools/process_buildings.mjs.
+export const SIDEWALK_W = { p: 3.64, s: 3.5, t: 3.0, r: 2.0, w: 0, h: 0 };
 export const CURB_RISE = 0.14;      // mặt vỉa hè cao hơn mặt nhựa (m)
 export const ROAD_TOP = 0.11;       // mặt nhựa so với nền LAND_H (lớp dọc: KNOWLEDGE §5.3)
 export const SIDEWALK_TOP = ROAD_TOP + CURB_RISE;

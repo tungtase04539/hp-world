@@ -26,6 +26,9 @@ Hoặc deploy thẳng lên GitHub Pages (toàn bộ là file tĩnh, Three.js đ�
   cầu Hoàng Văn Thụ/cầu Bính đặt đúng vị trí bắc qua sông Cấm thật, mọi cây cầu phố tự sinh
   nơi phố cắt sông. Minimap chính là bản đồ thật thu nhỏ.
   Dữ liệu bản đồ © OpenStreetMap contributors (ODbL) — xử lý offline thành `js/mapdata.js`.
+  Footprint nhà thật: [Overture Maps Foundation](https://overturemaps.org) buildings — gồm OpenStreetMap (ODbL),
+  Google Open Buildings (CC BY 4.0 / ODbL) và Microsoft ML Buildings (ODbL) — xử lý offline
+  (`tools/process_buildings.mjs`) thành `js/buildings_real.js`.
 - **Mô hình 3D chất lượng cao** (nhánh `assets-storage`, tải qua raw.githubusercontent.com):
   - Nhà hát lớn: dựng bằng Meshy Image-to-3D từ ảnh chụp thật
     ["Haiphong Opera House"](https://commons.wikimedia.org/wiki/File:Haiphong_Opera_House.jpg)
