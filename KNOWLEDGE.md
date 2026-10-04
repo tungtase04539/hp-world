@@ -29,7 +29,7 @@ Trò chơi: thế giới 3D Hải Phòng **tỉ lệ 1:1 mét thật** (từ 202
 | `js/mapdata.js` | **SINH TỰ ĐỘNG** bởi `tools/process_osm.mjs` — KHÔNG sửa tay |
 | `js/terrain.js` | Cao độ/đất-nước thuần JS (không import three → chạy được trong node để test) |
 | `js/world.js` | Dựng toàn bộ thế giới 3D, collider, spawn, `buildWorld(scene)` |
-| `js/cellsink.js` | "Bồn chứa" khối ô dựng tay (world.js "cells"): che scene/addCollider/FEATURED_CLEAR/makeTex, ở cửa ra gỡ nhà ô trùng footprint THẬT, claim kind `'cell'` cho công trình giữ, xuất `world.cellShops`; `realBuildings()` = giải mã RB01 dùng chung |
+| `js/cellsink.js` | "Bồn chứa" khối ô dựng tay (world.js "cells"): che scene/addCollider/FEATURED_CLEAR/makeTex, ở cửa ra gỡ nhà ô trùng footprint THẬT, claim kind `'cell'` cho công trình giữ, xuất `world.cellShops` (nhà bị gỡ) + `world.cellKept` (nhà giữ + bao lồi, để WP2 cắt footprint); bỏ qua nhà `FLAG.SYNTH`; `realBuildings()` = giải mã RB01 dùng chung |
 | `js/brands.js` | Danh sách chặn tên THƯƠNG HIỆU thật (nguồn duy nhất cho `gen_shopsigns.mjs` + lưới an toàn vẽ biển trong cellsink) |
 | `js/assets.js` | Đăng ký + preload + streaming GLB theo khoảng cách |
 | `js/main.js` | Vòng lặp game, camera, người chơi, bloom, autoQuality, `window.__hp` |
@@ -394,23 +394,30 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     villa/glass/ktt/shed),realB(chỉ số footprint thật khớp nhất trong RB đang chạy),frac,why}] cho lớp mặt tiền WP2;
     `world.cellKept` [{name,kind,cx,cz,h,hull}] = nhà ô GIỮ + bao lồi ô khối đặc → WP2 nên CẮT footprint thật theo đa giác
     này (bỏ/giữ cả footprint theo claimOverlapFrac>0,2 để lại nhà thật đâm xuyên mô hình tay khi footprint gộp lớn phủ <20%).
-    **Số đo** (890M TIER3, A/B cùng phiên, autoQuality ghim): 3.345 vật thể / 1.139 nhà ô → GIỮ 286 (công trình 144, tháp 25, di sản 49, 68 nhà
-    ở chỗ chưa có footprint thật) — GỠ 844 (đè 536, gần 308) + 9 bản trùng + 133 đồ treo; collider −1.067/2.462, FC
-    −945/1.665; 286 claim 'cell'; 844 cellShops (617 có chữ biển). Commit ~340 ms (hình chiếu 77, đối chiếu nhà thật 32,
-    áp dụng + vẽ 501 texture + atlas 226). Sau/trước: draw call cam_spawn 503/738, pano_007_h090 1.237/1.590,
-    cam_high_center 842/1.194, game_3 843/1.197; fps pano_007 56,6/44, pano_141 58/44,5, pano_021 59,3/46,8, cam_high_center 53,5/49,8 (đã
-    chạm vsync ở phần lớn góc); cảnh sau freeze: con cấp gốc 1.686/3.291, mesh 2.332/3.937, material 1.183/2.883;
-    hpReady 20,2/20,6 s (1 mẫu mỗi bên — khối ô nhanh hơn ~0,6 s nhưng nhiễu ±5 s), heap 741/830 MB; tam giác ±0..+15% (fabric thủ tục CŨ mọc vào chỗ nhà ô bị gỡ — WP2 tắt nó).
+    **Số đo** (bản sau phản biện; 890M TIER3, A/B cùng phiên r8, autoQuality ghim, máy đang tải): 3.345 vật thể / 1.152 nhà
+    ô → GIỮ 288 (keptKinds: công trình 133, tháp 38, di sản 49, bespoke 1, nhà 67 ở chỗ chưa có footprint thật; `kinds` là
+    TỔNG gồm cả bản trùng bị gỡ) — GỠ 855 (đè 537, gần 309, cỏ công viên 9) + 9 bản trùng + 133 đồ treo; collider
+    −1.077/2.462, FC −954/1.665; 288 claim 'cell'; 846 cellShops (616 có chữ biển). Commit ~315-335 ms (hình chiếu 51-55,
+    đối chiếu nhà thật 31-37, áp dụng + vẽ 502 texture + atlas ~240). Trước/sau: draw call cam_spawn 738/511,
+    pano_007_h090 1.590/1.245, pano_141 1.391/978, cam_high_center 1.194/842, game_3 1.197/848 (TB 12 góc 1.042/769);
+    fps pano_007 42,7/56,4, pano_021 47,2/56,9, pano_141 49,5/59, cam_high_center 49,7/52,1 (TB 53,7/57,4); cảnh sau
+    freeze: con cấp gốc 3.291/1.697, mesh 3.937/2.343, material 2.883/1.188, texture 1.934/273 (canvas 1.842/181), ước
+    lượng bộ nhớ texture 2.346/2.058 MB; tam giác cả cảnh 14,0/14,4 M (fabric thủ tục CŨ mọc vào chỗ nhà ô bị gỡ — WP2 tắt
+    nó); hpReady 21,0/19,1 s, heap 711/782 MB (1 mẫu mỗi bên, nhiễu ±5 s/±80 MB — các lượt trước 830/741, 848/782). LITE
+    (tier 1): 0 lỗi, diag [], atlas 3 trang (2048, 2048, 128), texture 216 (canvas 174) ~152 MB, draw call cam_spawn 677.
+    Thử trước với footprint RB v1 của dot3 (tráo tạm 2 file dữ liệu, bỏ qua FLAG.SYNTH): giữ 290, gỡ đè 618 / gần 224 /
+    cỏ 11 — ổn định so với v0.
     **Texture (mục tiêu <400 canvas):** makeTex trong khối ô LƯỜI: trả texture + canvas RỖNG (qua makeTex gốc + hàm vẽ rỗng
     → đúng TEXQ/anisotropy), commit mới VẼ texture còn được cảnh dùng; texture chỉ nhà bị gỡ dùng KHÔNG BAO GIỜ vẽ (chữ biển
     của chúng lấy bằng ngữ cảnh 2D GIẢ `recorderCtx`). Texture "thường" của vật thể GIỮ được XẾP ATLAS vài trang 2048²
     (material dùng chung theo trang → freezeStatic lượt 2 gộp). 63 helper biển/mặt tiền thuần (`xxSign/xxFacade`, gồm
     lnSign/twSign/twFacade/lnFacade/w2Sign/cbSign/w1Sign/lmSign) bọc `_cells.memo(tên, fn)` (cùng tham số nguyên thuỷ →
     cùng material); `cbWallRun` hết clone texture+material mỗi đoạn (cache theo số lặp lượng tử 0,5). Đo: 1.563 lần gọi makeTex trong khối → vẽ 501, KHÔNG BAO GIỜ
-    vẽ 1.062 (vẽ canvas ~71 ms); 478 texture thường của vật thể giữ → atlas 7 trang (11 material). CẢ CẢNH sau freeze: texture
-    1.934 → 271 (canvas 1.855 → 192, mục tiêu <400 ĐẠT). Ô atlas: ảnh giữ NGUYÊN độ phân giải ở giữa + viền kéo giãn NGOÀI
+    vẽ 1.062 (vẽ canvas ~71 ms); 478 texture thường của vật thể giữ → atlas 8 trang (12 material). CẢ CẢNH sau freeze: texture
+    1.934 → 273 (canvas 1.842 → 181, mục tiêu <400 ĐẠT). Ô atlas: ảnh giữ NGUYÊN độ phân giải ở giữa + viền kéo giãn NGOÀI
     ảnh, viền theo cỡ (≥128 px → 8 px, an toàn tới mip 3; ảnh 32-64 px → 2-4 px) — bản đầu co ảnh vào trong 4 px (mờ chữ,
-    biển kề nhau loang ở mip xa); viền 8 px cho MỌI ảnh làm trang 7 → 9 (+~64 MB GPU), viền theo cỡ giữ __ATLAS__.
+    biển kề nhau loang ở mip xa). Trục ≥512 giữ ô = cỡ gốc (ảnh co 2G ≤3%) — nới thành 528 thì chỉ 3 ảnh/kệ 2048: trang
+    7 → 9; bản cuối 8 trang (212 biển 512×84 + 193 ảnh 256² chiếm phần lớn; ~+25 MB GPU so với bản co vào trong).
     **Thương hiệu:** `js/brands.js` = danh sách chặn DUY NHẤT (`gen_shopsigns.mjs` import nó; cellsink dùng làm lưới an toàn
     lúc vẽ biển: chữ khớp bị thay TRƯỚC fillText). Đã thay trong nguồn world.js: CO.OP, HABECO, SSI, thegioididong, ELISE/
     CHRISBELLA, SEVEN.art, MEDIPHARCARE, Koji, HANA, MAY10, VOSA, VINASHIP, VINACOMIN, GENCE, AFANI, DEEP C, MB, LIEN A,
