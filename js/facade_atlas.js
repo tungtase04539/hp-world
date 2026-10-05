@@ -313,13 +313,17 @@ function interior(x0, y0, x1, y1, lit = 0) {
 // kệ hàng + hàng hoá (hộp/thùng/bao nhiều màu nhưng XỈN — không "confetti")
 // W3-C: hàng hoá XỈN hơn + nhiều thùng các-tông/bao bì trung tính (trước: 9 màu bão hoà → "giá sách cầu vồng" mọi cửa hàng)
 const GOODS = [[160, 72, 60], [190, 158, 84], [70, 104, 140], [222, 214, 196], [96, 128, 86], [168, 132, 96], [186, 120, 74], [176, 150, 116], [214, 212, 206], [150, 120, 88], [120, 116, 108]];
+// W3-C: hàng hoá KHỐI (hộp/thùng/bao to nhỏ, chồng, có chỗ trống) thay hàng que mảnh đều nhau ("giá sách cầu vồng")
 function shelves(x0, y0, x1, y1) {
   for (let y = y0 + 0.4; y < y1 - 0.2; y += 0.42) {
     rect(x0, y, x1, y + 0.04, [110, 100, 90], M_KEEP);
-    for (let x = x0 + 0.03; x < x1 - 0.1;) {
-      const w = R(0.1, 0.32), h = R(0.15, 0.36), c = GOODS[(rnd() * GOODS.length) | 0], k = R(0.55, 0.9);
+    for (let x = x0 + 0.03; x < x1 - 0.12;) {
+      if (rnd() < 0.12) { x += R(0.1, 0.3); continue; }
+      const w = Math.min(x1 - 0.03 - x, R(0.16, 0.46)), h = R(0.12, 0.34), c = GOODS[(rnd() * GOODS.length) | 0], k = R(0.6, 0.92);
       rect(x, y + 0.04, x + w, y + 0.04 + h, [c[0] * k, c[1] * k, c[2] * k], M_KEEP);
-      x += w + R(0.0, 0.05);
+      hline(y + 0.04 + h, x, x + w, 0.012, [c[0] * k * 0.7, c[1] * k * 0.7, c[2] * k * 0.7], M_KEEP);
+      if (h < 0.22 && rnd() < 0.5) { const c2 = GOODS[(rnd() * GOODS.length) | 0]; rect(x + 0.02, y + 0.05 + h, x + w * R(0.5, 0.9), y + 0.05 + h + R(0.08, 0.14), [c2[0] * k, c2[1] * k, c2[2] * k], M_KEEP); }
+      x += w + R(0.01, 0.06);
     }
   }
 }

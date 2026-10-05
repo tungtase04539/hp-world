@@ -31,7 +31,7 @@ export function guardCellPalette(kept, THREE) {
   const box = new THREE.Box3(), sz = new THREE.Vector3();
   const before = _cache.size;
   for (const it of kept) {
-    if (!it.bldg || !it.o) continue;
+    if (!it.o || it.kind === 'tree') continue;   // mọi vật GIỮ LẠI (cả mặt tiền mỏng không đạt ngưỡng "nhà"); lọc kích thước bên dưới
     it.o.updateMatrixWorld(true);
     it.o.traverse((m) => {
       if (!m.isMesh || m.isInstancedMesh || !m.geometry) return;

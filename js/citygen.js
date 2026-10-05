@@ -473,6 +473,9 @@ ${gl1 ? GL1_GROUND_MAIN : GL2_GROUND_MAIN}
   return m;
 }
 export function fabricMaterial() { return _mat || makeMaterial(); }
+// W3-C: chẩn đoán — kiểu dựng (aFac.z tường: kiểu | tuổi<<4 | biển lớn<<6) + cờ bằng chứng FEF của nhà b
+let _rsz = null, _evb = null;
+export function fabricFacadeOf(b) { return _rsz ? { z: _rsz[b], rs: _rsz[b] & 15, age: (_rsz[b] >> 4) & 3, panel: (_rsz[b] >> 6) & 1, ev: _evb[b] } : null; }
 export function fabricAtlasInfo() { return _atlas ? { size: _atlas.size, height: _atlas.height, ms: Math.round(_atlas.ms), cells: _atlas.mods.length, how: _atlas.how } : null; }
 
 // ---------- bộ đệm hình học tăng dần (typed array) ----------
@@ -746,7 +749,7 @@ function renderStyles(D, CX, CZ) {
     sts.obs++;
     for (const dh of [-8, 0, 8]) {
       const a = ((h + dh) * Math.PI) / 180, dx = Math.sin(a), dz = -Math.cos(a);
-      for (let d = 2; d <= 45; d += 0.75) { const b = fabricAt(px + dx * d, pz + dz * d); if (b >= 0) { if (!ev[b]) sts.evHit++; ev[b] |= f; break; } }
+      for (let d = 2; d <= 45; d += 1) { const b = fabricAt(px + dx * d, pz + dz * d); if (b >= 0) { if (!ev[b]) sts.evHit++; ev[b] |= f; break; } }
     }
   }
   // 2) vùng + tuổi của pano gần nhất (≤ 90 m), lưới 64 m
@@ -787,7 +790,7 @@ function renderStyles(D, CX, CZ) {
       else if ((e & FEF.TEN) && fl >= 3 && fl <= 8) rs = RS.TEN;
       else if ((e & FEF.NEO) && fl <= 6 && (area >= 250 || sty === STYLE.CIVIC || sty === STYLE.VILLA)) rs = RS.NEO;
       else if ((e & FEF.COL) && fl <= 5 && sty !== STYLE.SHED) rs = RS.COL;
-      else if ((e & (FEF.GLASS | FEF.SHOW)) && rs !== RS.TOWER) rs = fl <= 6 && fL <= 12 ? RS.MODERN : STYLE.GLASS;
+      else if ((e & (FEF.GLASS | FEF.SHOW)) && rs !== RS.TOWER) rs = fl <= 6 && fL <= 12 && area < 450 ? RS.MODERN : STYLE.GLASS;
       else if ((e & FEF.TOWER) && fl >= 7 && rs !== STYLE.GLASS) rs = RS.TOWER;
     } else {
       // (c) vùng (pano gần nhất): XÁC SUẤT, không phải mặc định cứng
@@ -885,6 +888,7 @@ export function buildRealFabric(scene, ctx) {
   buildCollision(D);   // lưới va chạm ngay sau khi chốt D.dead — faceRoad (bên dưới) cần fabricAt
   const tRs0 = performance.now();
   const RV = renderStyles(D, CX, CZ), RSZ = RV.rsz, EVB = RV.ev;   // W3-C: kiểu dựng/tuổi/biển lớn từng nhà
+  _rsz = RSZ; _evb = EVB;
   st.facade = { obs: RV.stats.obs, evHit: RV.stats.evHit, rs: RV.stats.rs.join(','), age: RV.stats.age.join(','), panel: RV.stats.panel, ms: Math.round(performance.now() - tRs0) };
   const tClaims = performance.now() - T0 - tDecode;
   const mat = fabricMaterial();

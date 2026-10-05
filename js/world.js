@@ -129,6 +129,16 @@ export const sharedMats = {
   flower: mat(0xd8402c, { emissive: 0x8f2416, emissiveIntensity: 0.10, flatShading: true }),
   cloud: new THREE.MeshLambertMaterial({ color: 0xffffff, transparent: true, opacity: 0.92, flatShading: true }),
 };
+// W3-C: kính nhà ô PHẢN TRỜI (cùng công thức kính phố citygen): + bức xạ gián tiếp × màu trời theo góc nhìn (Fresnel) →
+// mặt khuất nắng không còn mảng xanh than đặc (pano_138/386/391/409/418). Đêm: emissive do daynight như cũ.
+sharedMats.window.onBeforeCompile = (sh) => {
+  sh.fragmentShader = sh.fragmentShader.replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
+#if defined( RE_IndirectDiffuse )
+  { float ndv = clamp(abs(dot(geometryNormal, geometryViewDir)), 0.0, 1.0);
+    reflectedLight.indirectDiffuse += vec3(0.50, 0.62, 0.78) * (0.45 + 0.55 * pow(1.0 - ndv, 4.0)) * irradiance * RECIPROCAL_PI; }
+#endif`);
+};
+sharedMats.window.customProgramCacheKey = () => 'cellglass_w3c';
 
 // ---------- Texture thủ tục ----------
 // LITE: hạ độ phân giải MỌI texture thủ tục (đo được: 1.875 texture riêng ≈ 1.6GB RAM texture trên
@@ -21216,6 +21226,10 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     const tex = new THREE.CanvasTexture(canvas);
     const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false }));
     sp.scale.set(16, 4, 1);
+    // W3-C (AUDIT3 OTHER): ?labels=0 ẩn nhãn chữ nổi (tên địa danh/NPC) — CHỈ cho ảnh QA so pano (pano_037/428 từng có
+    // nhãn lơ lửng trong khung); người chơi giữ nhãn. sp.userData.worldLabel để tool bật/tắt.
+    sp.userData.worldLabel = true;
+    try { if (new URLSearchParams(location.search).get('labels') === '0') sp.visible = false; } catch (e) { }
     return sp;
   };
 

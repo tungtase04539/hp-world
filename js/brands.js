@@ -40,7 +40,7 @@ export const BRAND_MAP = [
   [/\b(PICO|SAMNEC|MEDIA ?MART|ĐIỆN MÁY XANH|NGUYỄN KIM|SONY|PANASONIC|TOSHIBA|BEKO|HITACHI|TCL|SHARP|ELECTROLUX)\b.*/i, 'ĐIỆN MÁY'],
   [/\b(CHIGO|GREE|DAIKIN|HIKAWA|CASPER|FUNIKI)\b.*/i, 'ĐIỀU HÒA'],
   [/\b(BOSCH|TAKARA|SPELIER|MALLOCA|HAFELE|CANZY)\b.*/i, 'THIẾT BỊ NHÀ BẾP'],
-  [/\b(INAX|TOTO|VIGLACERA|CAESAR|AMERICAN ?STANDARD)\b.*/i, 'THIẾT BỊ VỆ SINH'],
+  [/\b(INAX|TOTO|VIGLACERA|CAESAR|AMERICAN ?STANDARD|MIKADO)\b.*/i, 'THIẾT BỊ VỆ SINH'],   // W3-C: + MIKADO (pano_455)
   [/\b(OMRON|MEDIPHARCARE|MEDIPHAR)\b.*/i, 'THIẾT BỊ Y TẾ'],
   [/\bSKF\b.*/i, 'VÒNG BI'],
   // xe / lốp / dầu
@@ -85,6 +85,8 @@ export const BRAND_MAP = [
   [/\bDELTA ?GROUP\b.*/i, 'NHÀ THẦU XÂY DỰNG'],
   [/\bSUMMO\b.*/i, 'CÔNG TRÌNH'],
   [/\b(VINCOM|VINHOMES|VINGROUP|PULLMAN|MELIA|SHERATON|HILTON|MARRIOTT|NOVOTEL|MƯỜNG ?THANH|AVANI)\b.*/i, 'KHÁCH SẠN'],
+  [/\b(H?ARBOUR ?VIEW|SOLIS ?HOTEL)\b.*/i, 'KHÁCH SẠN'],   // W3-C: '...ARBOUR VIEW' (khách sạn thật, pano_041) lọt lưới
+  [/\bATLANTIC\b.*/i, 'MÁY NƯỚC NÓNG'],
   [/\b(HIDOO|HDOO|GENCE)\b.*/i, 'CỬA HÀNG'],
   [/\bBRG\b.*/i, 'SIÊU THỊ'],
   [/\bCP ?(PORK|FRESH)\b.*/i, 'CỬA HÀNG THỊT'],
