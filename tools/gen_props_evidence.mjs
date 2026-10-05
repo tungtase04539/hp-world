@@ -92,8 +92,8 @@ for (const e of j) {
   //      độ tin cậy, không phải chợ thật).
   const mk = all.replace(/(phố|ngõ( \d+)?|đường) chợ con/g, 'phố cc').replace(/chợ sắt/g, 'tttm').replace(/ghép lệch[^.;|]*/g, '');
   let market = 0;
-  if (/chợ dân sinh|chợ cóc|chợ tạm|chợ (rau|cá|hoa|hải sản|quần áo|vải|kim khí|thực phẩm|họp)|phố chợ|khu chợ|dãy chợ|sân chợ|đầu chợ|nhà chợ|ngõ chợ|cổng chợ|cửa ngõ chợ|biến thành chợ|rừng ô|dãy ô\/?dù|kín (các )?sạp|sạp[^.;|]{0,30}(kín|tràn|chiếm|dày|san sát|hai bên)|(sạp|ô\/?dù|bạt)[^.;|]{0,24}(che|phủ) (kín|gần như)|chợ[^.;|]{0,12}họp|họp chợ/.test(mk)) market = 3;
-  else if (/sạp(?! báo| sách| truyện| hàng rong)|quầy chợ|ô\/?dù chợ|dù chợ|giá treo quần áo|bày (hàng|sạp)|hàng ho[áa][^.;|]{0,12}bày|bày[^.;|]{0,12}hàng ho[áa]|lều bạt|quầy (hàng|hoa quả|trái cây)/.test(mk)) market = 2;
+  if (/chợ dân sinh|chợ cóc|chợ tạm|chợ (rau|cá|hoa|hải sản|quần áo|vải|kim khí|thực phẩm|họp)|phố chợ|khu chợ|dãy chợ|sân chợ|đầu chợ|nhà chợ|ngõ chợ|cổng chợ|cửa ngõ chợ|biến thành chợ|rừng ô|dãy ô\/?dù|(sạp|ô\/?dù|bạt)[^.;|]{0,24}(che|phủ) (kín|gần như)|chợ[^.;|]{0,12}họp|họp chợ/.test(mk)) market = 3;
+  else if (/kín (các )?sạp|sạp[^.;|]{0,30}(kín|tràn|chiếm|dày|san sát|hai bên)|sạp(?! báo| sách| truyện| hàng rong)|quầy chợ|ô\/?dù chợ|dù chợ|giá treo quần áo|bày (hàng|sạp)|hàng ho[áa][^.;|]{0,12}bày|bày[^.;|]{0,12}hàng ho[áa]|lều bạt|quầy (hàng|hoa quả|trái cây)/.test(mk)) market = 2;
   else if (/hàng rong|gánh hàng|xe đẩy (bánh|hàng)|ô\/?dù bán hàng|dù bán hàng|ô dù (lớn|bán)|sạp báo/.test(mk)) market = 1;
   let sp = 0;
   if (/ô\s?\/\s?dù|dù\s?\/\s?ô|ô dù|dù (che|chợ|bán|đỏ|lớn|màu|xanh|trắng|tím|cam|hồng|cầu vồng|nhiều|quán)/.test(mk)) sp |= 1;

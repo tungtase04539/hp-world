@@ -558,7 +558,7 @@ export function placeStreetLife(P) {
         }
       }
       // (3) mức 3: hàng lấn dải 1,1 m lòng đường sát bó vỉa
-      if (lv === 3 && hash3(t, S.az * 1.3, 325) < 0.55) {
+      if (lv === 3 && hash3(t, S.az * 1.3, 325) < 0.4) {
         const [x, z] = P2(hw - 0.55, 0.9);
         const rv = hash3(x, z, 326) < 0.5 ? 3 : hash3(x, z, 327) < 0.75 ? 1 : 4;
         if (okAt(S, x, z, 0.75, true) && !obst.hit(x, z, 0.55)) {

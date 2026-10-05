@@ -1164,7 +1164,7 @@ export function buildProps(ctx) {
     const narrow = SIDEWALK_W[S.c] <= 2.0;
     const lat = narrow ? curbLine(S.c) + 0.78 : parkingLine(S.c);
     const t0 = S.off + R.k0 * CELL + 0.35, t1 = S.off + R.k1 * CELL - 0.35;
-    // W3-E: hàng = CHUỖI CỤM theo lô nhà (2,8-5,2 m — mỗi cửa hàng 1 cụm) cách nhau khe lối vào 0,6-1,1 m; mỗi cụm góc
+    // W3-E: hàng = CHUỖI CỤM theo lô nhà (3,2-6 m — mỗi cửa hàng 1 cụm) cách nhau khe lối vào 0,5-0,9 m; mỗi cụm góc
     // nền/mũi ra-vào/khoảng cách riêng (ảnh pano: không phải 1 hàng đều tắp suốt 20 m). Trong cụm: xe KỀ NHAU không xuyên
     // nhau (phản biện WP7: lệch so với xe TRƯỚC giới hạn ±0,1 rad; xe đỗ xiên hẳn ±25° chừa thêm 0,3 m trước và sau).
     let prevA = null, padNext = 0, cEnd = -1, baseAng = 0, noseIn = true, spacing = 0.72, step = 0;
