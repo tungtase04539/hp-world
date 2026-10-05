@@ -384,7 +384,7 @@ export const signCategory = (t) => { const s = String(t || '').toUpperCase(); fo
 // (1) PHÂN LOẠI ô (gọi NGAY sau lấy mẫu 6.1, trước mọi đồ hè): S.mk[k] mức chợ 0-3, S.fore[k] = sân trước công trình
 //     tôn giáo/công sở/cổng/địa danh (không xe máy/chợ/quán/đồ hè — pano_276 chùa, 524 cổng Hải Thành)
 export function marketLevels(P) {
-  const { sides, cellPos, XS } = P;
+  const { sides, cellPos, XS, CELL } = P;
   const inBuildingAt = P.inBuilding;
   const st = P.st, T0 = performance.now();
   // ---- mức chợ từng ô ----
@@ -401,8 +401,9 @@ export function marketLevels(P) {
       // dò 3 điểm sau mặt tiền (1,5 / 4 / 8 m): công trình có sân trước lùi sâu (chùa 276 lùi ~10 m sau sân lát)
       let cb = null;
       // (dò sâu tới 17 m chỉ khi chưa gặp nhà THẬT — có dãy nhà phố đứng trước thì công trình phía sau không phải sân trước)
+      const sk = S.off + (k + 0.5) * CELL;   // toạ độ tính tại chỗ (không cấp phát mảng — 37k ô × 5 điểm dò)
       for (const d of [1.5, 4, 8, 12, 17]) {   // chùa HBT 276: điện lùi ~16 m sau sân lát
-        const [bx, bz] = cellPos(S, k, X.fac + d);
+        const bx = S.ax + S.ux * sk + S.nx * (X.fac + d), bz = S.az + S.uz * sk + S.nz * (X.fac + d);
         const c = P.claimAt(bx, bz, ['cell', 'landmark', 'civic']);
         if (c && (c.kind !== 'cell' || isForecourtName(c.name) || isMarketName(c.name))) { cb = c; break; }
         if (!cb && c) cb = c;
@@ -410,7 +411,7 @@ export function marketLevels(P) {
       }
       let mClaim = !!(cb && isMarketName(cb.name));
       if (cb && !mClaim && (cb.kind !== 'cell' || isForecourtName(cb.name))) { S.fore[k] = 1; st.forecourt++; }
-      if (!mClaim) { const [cx2, cz2] = cellPos(S, k, X.fac + 8); const c2 = P.claimAt(cx2, cz2, ['cell']); mClaim = !!(c2 && isMarketName(c2.name)); }
+      if (!mClaim) { const c2 = P.claimAt(S.ax + S.ux * sk + S.nx * (X.fac + 8), S.az + S.uz * sk + S.nz * (X.fac + 8), ['cell']); mClaim = !!(c2 && isMarketName(c2.name)); }
       let lv = 0;
       const e = S.ev[k];
       if (e && e[7]) { const d = Math.hypot(e[0] - x, e[1] - z); if (d <= 45) lv = Math.max(0, e[7] - (d > 30 ? 1 : 0)); }

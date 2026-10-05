@@ -974,7 +974,7 @@ export function buildProps(ctx) {
       if (cross) {
         const mx = P.x + S.ux * along * 0.5 - nxA * lat(true) * 0.5, mz = P.z + S.uz * along * 0.5 - nzA * lat(true) * 0.5;
         const ox = P.x + S.ux * along - nxA * lat(true), oz = P.z + S.uz * along - nzA * lat(true);
-        if (roadIdx.wideAt(mx, mz, S.ri, 3) || openSpace(ox, oz) || !inBuilding(ox + nxA * 1.2, oz + nzA * 1.2)) cross = false;   // phải có nhà bên kia
+        if (!inBuilding(ox + nxA * 1.2, oz + nzA * 1.2) || roadIdx.wideAt(mx, mz, S.ri, 3) || openSpace(ox, oz)) cross = false;   // phải có nhà bên kia
       }
       const la = lat(cross);
       const tx = P.x + S.ux * along - nxA * la, tz = P.z + S.uz * along - nzA * la;
@@ -1275,16 +1275,16 @@ export function buildProps(ctx) {
       // W3-E: bỏ luật cũ "lakeSD > 18" (cấm ô tô trong 18 m quanh MỌI hồ → phố Quang Trung/Nguyễn Đức Cảnh ven hồ trống
       // trơn, pano 005/028/033 thật có ô tô đỗ phía NHÀ). Nay chỉ cấm phía KÈ/promenade (đi ra phía vỉa hè này lại gần hồ
       // hơn) và sát mép nước (< 6 m); cấm cả bên phố mà phía vỉa là công viên/quảng trường/promenade (322, 542, 065).
-      const lk = lakeSD(x, z);
-      const lakeSide = lk < 6 || (lk < 40 && lakeSD(x + S.nx * 6, z + S.nz * 6) < lk - 1.5);
-      const [ox, oz] = [x + S.nx * (X.fac - lat + 2), z + S.nz * (X.fac - lat + 2)];
-      const parkSide = openSpace(ox, oz) || openSpace(x + S.nx * (X.sw * 0.5 + 0.95), z + S.nz * (X.sw * 0.5 + 0.95)) || !!claimAt(ox, oz, ['park', 'plaza']);
-      let why = !(x * x + z * z < R_MAX * R_MAX && flat(x, z)) ? 1 : (avoid(x, z) || clearAt(x, z)) ? 2 : lakeSide ? 3 : parkSide ? 4
+      const lakeSide = () => { const lk = lakeSD(x, z); return lk < 6 || (lk < 40 && lakeSD(x + S.nx * 6, z + S.nz * 6) < lk - 1.5); };
+      const parkSide = () => { const ox = x + S.nx * (X.fac - lat + 2), oz = z + S.nz * (X.fac - lat + 2); return openSpace(ox, oz) || openSpace(x + S.nx * (X.sw * 0.5 + 0.95), z + S.nz * (X.sw * 0.5 + 0.95)) || !!claimAt(ox, oz, ['park', 'plaza']); };
+      // thứ tự kiểm: rẻ trước (camera pano, nút giao, vật cản) — lakeSD (đa giác hồ) + openSpace là 2 truy vấn đắt nhất
+      let why = !(x * x + z * z < R_MAX * R_MAX && flat(x, z)) ? 1 : (avoid(x, z) || clearAt(x, z)) ? 2
         : (panoNear(x, z, rc) || panoNear(x + hx, z + hz, rp) || panoNear(x - hx, z - hz, rp)) ? 5 : 0;
       // nút giao: không đỗ trong 12 m tính từ LÒNG phố p/s cắt ngang (t/r 6,6 m); ngõ h/w (không vỉa) 4,5 m như cũ (pano 065/193/327:
       // ô tô đỗ chắn làn rẽ ở miệng giao lộ)
       if (!why) for (const dd of [-len / 2 - 0.5, 0, len / 2 + 0.5]) { if (roadIdx.nearCross(x + S.ux * dd, z + S.uz * dd, S.ri, 12, 4.5)) { why = 6; break; } }
       if (!why && obst.hit(x, z, mi === 6 ? 1.2 : 0.9)) why = 7;
+      if (!why) why = lakeSide() ? 3 : parkSide() ? 4 : 0;
       let ok = !why;
       if (why) { carRej[why]++; if (carRejPts.length < 60000) carRejPts.push(+x.toFixed(1), +z.toFixed(1), why); }
       if (ok && mi === 6) for (const dd of [-4, 4]) if (obst.hit(x + S.ux * dd, z + S.uz * dd, 0.9)) { ok = false; break; }
