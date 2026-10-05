@@ -130,7 +130,7 @@ const SETS = {
   G4: ['G_HOME0', 'G_CIVIC'],
   G5: ['G_WARE'],
   G6: ['G_CIVIC', 'G_CIVIC', 'G_GLASS'],
-  G7: ['G_COL', 'G_COL', 'G_OLD', 'G_OLD', 'G_OPEN0', 'G_OPEN2', 'G_SHUT1'],
+  G7: ['G_OLD', 'G_OLD', 'G_OLD', 'G_COL', 'G_OPEN0', 'G_OPEN2', 'G_SHOP1', 'G_SHUT1'],   // phố Pháp vẫn là phố buôn bán: cửa vòm gỗ đóng ÍT
   G8: ['G_NEO', 'G_NEO', 'G_NEO', 'G_COL'],
   G9: ['G_HOARD'],
   G10: ['G_SHOW', 'G_SHOW', 'G_ELEC', 'G_GLASS', 'G_OPEN1', 'G_SHOP3'],
@@ -798,7 +798,7 @@ function renderStyles(D, CX, CZ) {
         if ((sty === STYLE.OLD || sty === STYLE.VILLA) && fl <= 5 && r2 < 0.6) rs = RS.COL;
         else if (sty === STYLE.CIVIC && fl <= 6 && r2 < 0.5) rs = RS.NEO;
         else if (sty === STYLE.TUBE && fl <= 3 && r2 < 0.12) rs = RS.COL;
-      } else if (sty === STYLE.OLD && fl <= 4 && r2 < 0.2) rs = RS.COL;
+      } else if (sty === STYLE.OLD && fl <= 4 && r2 < 0.1) rs = RS.COL;
       if (sty === STYLE.KTT && r3 < ((zf & FEZ.OLDQ) ? 0.6 : 0.3)) rs = RS.TEN;
       if (rs === STYLE.TUBE && (zf & FEZ.COMM) && !(zf & FEZ.OLDQ) && r3 < 0.16) rs = RS.MODERN;
       if ((rs === STYLE.TUBE || rs === STYLE.OLD) && fl <= 5 && hh(seed, 307) < 0.008) rs = RS.CONS;   // pano: 70/1.920 quan sát (~3,6%) đang xây
@@ -1107,6 +1107,20 @@ export function buildRealFabric(scene, ctx) {
               DT.quad([sx0, ys0, sz0, fx0, ys0, fz0, fx0, yt + rh, fz0, sx0, yt + rh, sz0], -ex, 0, -ez, [0, 0, depth / 4, 0, depth / 4, 1, 0, 1], wcol, s8, K_DET, railCell, 0);
               DT.quad([fx1, ys0, fz1, sx1, ys0, sz1, sx1, yt + rh, sz1, fx1, yt + rh, fz1], ex, 0, ez, [0, 0, depth / 4, 0, depth / 4, 1, 0, 1], wcol, s8, K_DET, railCell, 0);
               st.detTris += 8; st.balc++;
+              // W3-C: BIỂN BẢNG LỚN treo MẶT TRƯỚC ban công tầng 1-2 (phố chính buôn bán — Tô Hiệu, Cầu Đất: biển phủ cả lan
+              // can + nửa cửa) — cạnh có ban công thì shader không vẽ biển phẳng trên tường (bị ban công che). 1 quad/bay.
+              if (k <= 2 && rc === 0 && tubeLike) {
+                const bwP = L / nb, pPan = (styF & 64) ? (k === 1 ? 0.45 : 0.15) : (k === 1 ? 0.1 : 0.03);
+                for (let q = 0; q < nb; q++) {
+                  if (hh(seed * 13 + q, 600 + k) >= pPan) continue;
+                  const a0 = Math.max(inset, q * bwP + 0.06), a1 = Math.min(L - inset, (q + 1) * bwP - 0.06); if (a1 - a0 < 1.5) continue;
+                  const od = depth + 0.05, p0x = ax + ex * a0 + nx * od, p0z = az + ez * a0 + nz * od, p1x = ax + ex * a1 + nx * od, p1z = az + ez * a1 + nz * od;
+                  const ybP = ys0 + 0.3, ytP = ybP + Math.min(2.7, (a1 - a0) * 0.55);
+                  const pi = (hh(seed + q * 7, 611 + k) * PANEL_CELLS * 2) | 0, v0 = (pi & 1) * 0.5 + 0.004, v1 = v0 + 0.492, c8 = (hh(seed + q, 613 + k) * 255) | 0;
+                  DT.quad([p0x, ybP, p0z, p1x, ybP, p1z, p1x, ytP, p1z, p0x, ytP, p0z], nx, 0, nz, [0.004, v0, 0.996, v0, 0.996, v1, 0.004, v1], WHITE, s8, K_DET, MOD.PANEL0 + (pi >> 1), c8);
+                  st.detTris += 2; st.panel3d = (st.panel3d || 0) + 1;
+                }
+              }
             }
           }
           // ---- MÁI HIÊN (W3-C): TÔN sóng xanh dương chủ đạo (ô D_AWN2) hoặc BẠT (ô D_AWN sọc), sâu 1,4-2,2 m; bằng chứng pano
