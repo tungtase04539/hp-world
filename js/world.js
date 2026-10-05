@@ -48,7 +48,7 @@ import { furnitureLine } from './xsection.js';
 import { buildRoadNet } from './roadnet.js';
 import { makeRoadMaterial } from './roadtex.js';
 import { ROAD_MARK_EVIDENCE } from './roadmarks.js';
-import { ROAD_W as XS_ROAD_W } from './xsection.js';
+import { ROAD_W as XS_ROAD_W, roadHW as XS_HW, facadeLine as XS_FL } from './xsection.js';   // W3-A: XS_HW(way) = nửa lòng RIÊNG từng phố
 
 // Thế giới dựng từ dữ liệu OpenStreetMap thật của Hải Phòng (tỉ lệ 1:10,
 // trung tâm phóng đại 2.2x). Mọi con phố trung tâm là phố thật.
@@ -1097,7 +1097,7 @@ export async function buildWorld(scene, prog = () => {}) {
         const [x1, z1] = r.pts[i], [x2, z2] = r.pts[i + 1];
         if (Math.max(x1, x2) < -1210 || Math.min(x1, x2) > -200 || Math.max(z1, z2) < 50 || Math.min(z1, z2) > 410) continue;
         const sd = lakeSD((x1 + x2) / 2, (z1 + z2) / 2);
-        if (sd > -4 && sd < 60) parSegs.push([x1, z1, x2, z2, ROAD_W[r.c] / 2]);
+        if (sd > -4 && sd < 60) parSegs.push([x1, z1, x2, z2, XS_HW(r)]);
       }
     }
     const railG = [], benchG = [], lampPostG = [], globeG = [], caroG = [];
@@ -1350,7 +1350,7 @@ export async function buildWorld(scene, prog = () => {}) {
           const mx = x1 + dxn * d, mz = z1 + dzn * d;
           if (mx * mx + mz * mz > 1300 * 1300) continue;
           const side = brnd() < 0.5 ? 1 : -1;
-          const off = side * furnitureLine('p');          // dải cột/biển sát bó vỉa (xsection) — không chắn hàng xe máy
+          const off = side * furnitureLine(r);            // dải cột/biển sát bó vỉa (xsection, lòng riêng phố) — không chắn hàng xe máy
           const cx = mx + off * px, cz = mz + off * pz;
           const gy = groundHeight(cx, cz);
           if (gy < LAND_H - 0.5 || isWater(cx, cz)) continue;
@@ -1456,7 +1456,7 @@ export async function buildWorld(scene, prog = () => {}) {
     // BÀI HỌC PANO-LOOP V1: tọa độ pano = TIM ĐƯỜNG (xe Google) → không đặt đồ vật tại đó.
     // Dò điểm trên MẶT LÁT KÈ HỒ: đất chuẩn + cách trục mọi đường lớn >(nửa lòng+2m) + gần mép hồ.
     const _hsd = (px, pz, x1, z1, x2, z2) => { const dx = x2 - x1, dz = z2 - z1, l2 = dx * dx + dz * dz; let t = l2 ? ((px - x1) * dx + (pz - z1) * dz) / l2 : 0; t = Math.max(0, Math.min(1, t)); return Math.hypot(px - (x1 + dx * t), pz - (z1 + dz * t)); };
-    const _onRoadHP = (px, pz) => { for (const r of ROADS_DT) { if (r.c === 'w' || r.c === 'h') continue; const hw = ROAD_W[r.c] / 2 + 2; for (let i = 0; i < r.pts.length - 1; i++) if (_hsd(px, pz, r.pts[i][0], r.pts[i][1], r.pts[i + 1][0], r.pts[i + 1][1]) < hw) return true; } return false; };
+    const _onRoadHP = (px, pz) => { for (const r of ROADS_DT) { if (r.c === 'w' || r.c === 'h') continue; const hw = XS_HW(r) + 2; for (let i = 0; i < r.pts.length - 1; i++) if (_hsd(px, pz, r.pts[i][0], r.pts[i][1], r.pts[i + 1][0], r.pts[i + 1][1]) < hw) return true; } return false; };
     let x = -718.6, z = 219.3;
     {
       let best = null, bd = 1e9;
@@ -3031,11 +3031,12 @@ const hbShop = (s, side, W, D, FL, wallHex, sign, name) => {
   hbShopAt(-884.9, 604.2, -1.368, 8, 6, 4, 0xe9e6df, null, 'hbt_ngo326_dong'); // bờ đông ngõ, mặt quay TÂY
   // biển xanh 'Ngõ 326' trên cột tại góc tây miệng ngõ (ảnh h000/h270)
   {
-    const [px, pz] = hbPt(363, -6); const py = groundHeight(px, pz);
-    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 3.2, 5), mat(0x5a6068));
-    post.position.set(px, py + 1.6, pz); post.castShadow = true; scene.add(post);
-    const sg = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.55), hbSign('Ngõ 326 HAI BÀ TRƯNG', '#1c56a0', '#ffffff', 34));
-    sg.position.set(px, py + 3.0, pz); sg.rotation.y = HB_RYN; scene.add(sg);
+    // W3-A (AUDIT3 CAMOBS pano_281 h0: biển 2,5 m ngay trước ống kính) → biển số ngõ thật ~0,6×0,3 m, cột lùi về mép nhà
+    const [px, pz] = hbPt(363, -8.5); const py = groundHeight(px, pz);
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.05, 2.7, 5), mat(0x5a6068));
+    post.position.set(px, py + 1.35, pz); post.castShadow = true; scene.add(post);
+    const sg = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.3), hbSign('Ngõ 326 HAI BÀ TRƯNG', '#1c56a0', '#ffffff', 34));
+    sg.position.set(px, py + 2.55, pz); sg.rotation.y = HB_RYN; scene.add(sg);
     addCollider(px, pz, 0.15);
   }
 }
@@ -15024,7 +15025,7 @@ const w1AddSign = (r, txt, bg, fg, y, px = 42, wRatio = 0.9, hh = 1.1) => {
   function trOnRoad(x, z) {
     for (const r of ROADS_DT) {
       if (r.c === 'w') continue;
-      const hw = ROAD_W[r.c] / 2 + 0.3;   // bó vỉa + 0.3: hố cây xsection.treePitLine (+0.45..0.75) phải lọt
+      const hw = (r.c in ROAD_W ? XS_HW(r) : ROAD_W[r.c] / 2) + 0.3;   // bó vỉa + 0.3 (W3-A: lòng riêng phố): hố cây treePitLine phải lọt
       for (let i = 0; i < r.pts.length - 1; i++)
         if (_segD(x, z, r.pts[i][0], r.pts[i][1], r.pts[i + 1][0], r.pts[i + 1][1]) < hw) return true;
     }
@@ -15040,7 +15041,7 @@ const w1AddSign = (r, txt, bg, fg, y, px = 42, wRatio = 0.9, hh = 1.1) => {
         const dx = x2 - x1, dz = z2 - z1, l2 = dx * dx + dz * dz;
         let t = l2 ? ((px - x1) * dx + (pz - z1) * dz) / l2 : 0; t = Math.max(0, Math.min(1, t));
         const cx = x1 + dx * t, cz = z1 + dz * t, d = Math.hypot(px - cx, pz - cz);
-        if (!best || d < best.d) best = { d, cx, cz, dx, dz, c: r.c };
+        if (!best || d < best.d) best = { d, cx, cz, dx, dz, c: r.c, w: r.w, sw: r.sw };
       }
     }
     return best;
@@ -15087,7 +15088,7 @@ const w1AddSign = (r, txt, bg, fg, y, px = 42, wRatio = 0.9, hh = 1.1) => {
     // pháp tuyến hướng VỀ công trình (phía vỉa hè, không phải lòng đường)
     let nx = -uz, nz = ux;
     if (Math.hypot((seg.cx + nx * 3) - lx, (seg.cz + nz * 3) - lz) > Math.hypot(seg.cx - lx, seg.cz - lz)) { nx = -nx; nz = -nz; }
-    const off = veg.treePitLine(seg.c);                  // hố cây sát bó vỉa (xsection — Đợt 3 WP4; trước hw+2,6)
+    const off = veg.treePitLine(seg);                    // hố cây sát bó vỉa (xsection theo phố — W3-A; trước hw+2,6)
     // tâm hàng = hình chiếu công trình lên đường; trải ±3 nhịp 9 m
     const bcx = seg.cx + nx * off, bcz = seg.cz + nz * off;
     for (let k = -3; k <= 3; k++) {
@@ -15109,7 +15110,7 @@ const w1AddSign = (r, txt, bg, fg, y, px = 42, wRatio = 0.9, hh = 1.1) => {
       // bám TIM PHỐ THẬT (đường A→C vẽ tay lệch tim 0,1-1,9 m → hố cây treePitLine tính từ A→C lọt lòng đường 1 bên)
       const sg = trNearestSeg(cx, cz), sl = sg && sg.d < 12 ? Math.hypot(sg.dx, sg.dz) || 1 : 0;
       const bx = sl ? sg.cx : cx, bz = sl ? sg.cz : cz, mx = sl ? -sg.dz / sl : nx, mz = sl ? sg.dx / sl : nz;
-      const off = veg.treePitLine(sl ? sg.c : 's');        // xsection (trước hw+3 = sau mặt tiền)
+      const off = veg.treePitLine(sl ? sg : 's');          // xsection theo phố (trước hw+3 = sau mặt tiền)
       for (const s of [1, -1]) {
         const px = bx + mx * s * off, pz = bz + mz * s * off;
         const hh = ((px * 3.3 + pz * 1.9) % 1 + 1) % 1;   // hash vị trí
@@ -16976,7 +16977,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     // KHÔNG đặt panô/hàng rào GIỮA ĐƯỜNG (user: "biển sao vàng giữa đường dẹp hết") — tọa độ
     // hardcode từ trước giờ rơi vào lòng đường sau các đợt chỉnh map
     const onRoadM = (x, z) => {
-      for (const r of ROADS_DT) { if (!'pstr'.includes(r.c)) continue; const hw = ROAD_W[r.c] / 2 + 2;
+      for (const r of ROADS_DT) { if (!'pstr'.includes(r.c)) continue; const hw = XS_HW(r) + 2;
         for (let i = 0; i < r.pts.length - 1; i++) { const [x1, z1] = r.pts[i], [x2, z2] = r.pts[i + 1];
           const ddx = x2 - x1, ddz = z2 - z1, l2 = ddx * ddx + ddz * ddz || 1e-9;
           let t = ((x - x1) * ddx + (z - z1) * ddz) / l2; t = Math.max(0, Math.min(1, t));
@@ -17144,7 +17145,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
           const Ls = Math.hypot(bx - ax, bz - az), st = Math.max(1, Math.ceil(Ls / 2));
           for (let s = 0; s <= st; s++) { ntot++;
             const px = ax + (bx - ax) * s / st, pz = az + (bz - az) * s / st;
-            for (const r of ROADS_DT) { if (r.c === 'w' || r.c === 'h') continue; const hw = ROAD_W[r.c] / 2;
+            for (const r of ROADS_DT) { if (r.c === 'w' || r.c === 'h') continue; const hw = XS_HW(r);
               let br = false;
               for (let k = 0; k < r.pts.length - 1; k++) if (_hsd(px, pz, r.pts[k][0], r.pts[k][1], r.pts[k + 1][0], r.pts[k + 1][1]) < hw - 0.5) { hit++; br = true; break; }
               if (br) break; } }
@@ -17334,7 +17335,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
   const _sqX = EXTRAS.square[0], _sqZ = EXTRAS.square[1];
   // đoạn đường lớn (p/s/t) để né đè nhà lên lòng/mép đường cắt ngang
   const _majSeg = [];
-  for (const r of ROADS_DT) { if (r.c !== 'p' && r.c !== 's' && r.c !== 't') continue; const hw = ROAD_W[r.c] / 2; for (let i = 0; i < r.pts.length - 1; i++) _majSeg.push([r.pts[i][0], r.pts[i][1], r.pts[i + 1][0], r.pts[i + 1][1], hw]); }
+  for (const r of ROADS_DT) { if (r.c !== 'p' && r.c !== 's' && r.c !== 't') continue; const hw = XS_HW(r); for (let i = 0; i < r.pts.length - 1; i++) _majSeg.push([r.pts[i][0], r.pts[i][1], r.pts[i + 1][0], r.pts[i + 1][1], hw]); }
   function openSpace(x, z) {
     if (inPark(x, z)) return true;                                   // công viên OSM
     if (Math.hypot(x - _sqX, z - _sqZ) < 62) return true;            // quảng trường Nhà hát
@@ -20056,7 +20057,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
         for (let s = 20; s < len; s += 46) {
           const t = s / len;
           sideFlip = -sideFlip;
-          const off = sideFlip * (ROAD_W[r.c] / 2 + 3.4);
+          const off = sideFlip * Math.min(XS_HW(r) + 3.4, XS_FL(r) - 0.6);   // W3-A: lòng riêng phố, không lọt vào nhà
           const tx = x1 + (x2 - x1) * t + off * px;
           const tz = z1 + (z2 - z1) * t + off * pz;
           if (Math.abs(groundHeightNoDeck(tx, tz) - LAND_H) > 0.3) continue;

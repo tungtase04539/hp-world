@@ -20,7 +20,7 @@
 //      né), trước freezeStatic. ctx xem chú thích ở buildProps.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { ROAD_HW, SIDEWALK_W, ROAD_TOP, SIDEWALK_TOP, curbLine, facadeLine, parkingLine, furnitureLine } from './xsection.js';
+import { ROAD_HW, SIDEWALK_W, ROAD_TOP, SIDEWALK_TOP, curbLine, facadeLine, parkingLine, furnitureLine, roadHW, sidewalkW } from './xsection.js';
 import { PROPS_EVIDENCE } from './props_evidence.js';
 import { LITE } from './device.js';
 import { rbData, rbGrid } from './rbdata.js';   // footprint thật giải mã 1 lần cho cả trang (W2-F)
@@ -435,7 +435,7 @@ function makeRoadIndex(ROADS_DT, HW, SW) {
   const segs = [];   // [ax,az,bx,bz,hw,sw,ri,si]
   const key = (i, j) => (i + 4096) * 8192 + (j + 4096);
   for (let ri = 0; ri < ROADS_DT.length; ri++) {
-    const r = ROADS_DT[ri], hw = HW[r.c] ?? 1.5, sw = SW[r.c] ?? 0;
+    const r = ROADS_DT[ri], hw = roadHW(r), sw = sidewalkW(r);   // Đợt 3 W3-A: bề rộng riêng từng phố
     for (let si = 0; si < r.pts.length - 1; si++) {
       const [ax, az] = r.pts[si], [bx, bz] = r.pts[si + 1];
       const id = segs.length; segs.push([ax, az, bx, bz, hw, sw, ri, si]);
@@ -686,7 +686,7 @@ export function buildProps(ctx) {
   for (let ri = 0; ri < ROADS_DT.length; ri++) {
     const r = ROADS_DT[ri];
     if (r.c !== 'p' && r.c !== 's' && r.c !== 't' && r.c !== 'r') continue;
-    const pk = parkingLine(r.c);
+    const pk = parkingLine(r);
     for (let si = 0; si < r.pts.length - 1; si++) {
       const [ax, az] = r.pts[si], [bx, bz] = r.pts[si + 1];
       const L = Math.hypot(bx - ax, bz - az); if (L < 4) continue;
@@ -698,7 +698,7 @@ export function buildProps(ctx) {
         // pháp tuyến hướng RA vỉa hè bên này: side·(uz, −ux)
         const nx = side * uz, nz = -side * ux;
         // rj[k]: lý do loại ô (QA qua window.__hpProps.sides): 1 xa · 2 giao lộ · 3 dốc/nước · 4 công trình/claim · 5 nhà thật · 6 kè hồ
-        const S = { ri, si, c: r.c, side, ax, az, ux, uz, nx, nz, L, n, ok: new Uint8Array(n), occ: new Uint8Array(n), rj: new Uint8Array(n), ev: new Array(n) };
+        const S = { ri, si, c: r.c, w: r.w, sw: r.sw, side, ax, az, ux, uz, nx, nz, L, n, ok: new Uint8Array(n), occ: new Uint8Array(n), rj: new Uint8Array(n), ev: new Array(n) };
         const off = (L - n * CELL) / 2;
         for (let k = 0; k < n; k++) {
           const s = off + (k + 0.5) * CELL;
@@ -746,7 +746,7 @@ export function buildProps(ctx) {
     const p0 = r.pts[0];
     const hs = hash3(p0[0], p0[1], 11);
     const powerSide = hs < 0.5 ? 1 : -1;
-    const fl = furnitureLine(r.c);
+    const fl = furnitureLine(r);
     // ---- tuyến cột điện ----
     {
       const list = byRoad.get(ri * 2 + (powerSide > 0 ? 1 : 0)) || [];
@@ -834,7 +834,7 @@ export function buildProps(ctx) {
   const markObstCells = () => {
     for (const S of sides) for (let k = 0; k < S.n; k++) {
       if (!S.ok[k]) continue;
-      const [x, z] = cellPos(S, k, parkingLine(S.c));
+      const [x, z] = cellPos(S, k, parkingLine(S));
       if (obst.hit(x, z, 0.3)) S.occ[k] |= OCC_POLE;
     }
   };
@@ -886,7 +886,7 @@ export function buildProps(ctx) {
     const arr = cableArr;
     const S = P.S, nxA = -S.nx, nzA = -S.nz, y0 = P.y;
     const nDrop = P.tangle >= 2 ? 4 + ((hash3(P.x, P.z, 41) * 5) | 0) : 1 + ((hash3(P.x, P.z, 41) * 3) | 0);
-    const fl = facadeLine(P.c), fl0 = furnitureLine(P.c);
+    const fl = facadeLine(P.S), fl0 = furnitureLine(P.S);
     for (let i = 0; i < nDrop; i++) {
       const u1 = hash3(P.x + i, P.z, 42), u2 = hash3(P.x, P.z + i, 43), u3 = hash3(P.x + i, P.z + i, 44);
       const along = (u1 - 0.5) * 22;
@@ -939,20 +939,20 @@ export function buildProps(ctx) {
       if (Math.abs(mx - fx) > S.L / 2 + 40 || Math.abs(mz - fz) > S.L / 2 + 40) continue;
       for (let k = 0; k < S.n; k++) {
         if (!S.ok[k]) continue;
-        const [x, z] = cellPos(S, k, parkingLine(S.c));
+        const [x, z] = cellPos(S, k, parkingLine(S));
         const d = (x - fx) ** 2 + (z - fz) ** 2; if (d < bd) { bd = d; best = [S, k]; }
       }
     }
     if (best) placeFood(best[0], best[1], 3 + ((hash3(fx, fz, 51) * 3) | 0));
   }
   function placeFood(S, k, nSet) {
-    const sw = SIDEWALK_W[S.c], fl = facadeLine(S.c);
+    const sw = sidewalkW(S), fl = facadeLine(S);
     const lat0 = fl - Math.min(1.1, sw * 0.35);
     for (let j = 0; j < nSet; j++) {
       const kk = k + (j % 2 ? 1 : -1) * Math.ceil(j / 2);
       if (kk < 0 || kk >= S.n || !S.ok[kk] || (S.occ[kk] & (OCC_POLE | OCC_SHOP))) continue;
       const u = hash3(S.ax + kk, S.az + j, 52);
-      const lat = Math.max(curbLine(S.c) + 0.55, lat0 - u * Math.max(0, sw - 1.6));
+      const lat = Math.max(curbLine(S) + 0.55, lat0 - u * Math.max(0, sw - 1.6));
       const [x, z] = cellPos(S, kk, lat, (u - 0.5) * 1.4);
       if (inBuilding(x, z) || obst.hit(x, z, 0.55) || !clearPt(x, z, 1.6)) continue;   // W2-A: bộ bàn ghế + khách ~1,1 m (+ lề)
       const rot = hash3(x, z, 53) * 6.28;
@@ -974,7 +974,7 @@ export function buildProps(ctx) {
     if (hash3(S.ax, S.az + k, 56) < 0.4) {
       const kk = Math.min(S.n - 1, k + 2);
       if (S.ok[kk] && !(S.occ[kk] & OCC_POLE)) {
-        const [x, z] = cellPos(S, kk, parkingLine(S.c));
+        const [x, z] = cellPos(S, kk, parkingLine(S));
         if (!inBuilding(x, z) && !obst.hit(x, z, 0.7) && clearPt(x, z, 1.2)) { cartI.push({ x, z, heading: Math.atan2(S.ux, S.uz) }); S.occ[kk] |= OCC_SHOP; obst.add(x, z, 0.8); ctx.addCollider(x, z, 0.6); }
       }
     }
@@ -984,7 +984,7 @@ export function buildProps(ctx) {
     for (let k = 0; k < S.n; k++) {
       if (!S.ok[k] || S.occ[k]) continue;
       const e = S.ev[k];
-      const [x, z] = cellPos(S, k, parkingLine(S.c));
+      const [x, z] = cellPos(S, k, parkingLine(S));
       const cl = e ? e[6] : 0;
       const h1 = hash3(x, z, 61), h2 = hash3(x, z, 62), h3 = hash3(x, z, 63);
       const open = openSpace(x, z);
@@ -997,7 +997,7 @@ export function buildProps(ctx) {
       // biển đứng chữ A trước cửa hàng
       const pA = (cl & 8) ? 0.06 : 0.012;
       if (!open && h3 < pA) {
-        const lat = facadeLine(S.c) - 0.45;
+        const lat = facadeLine(S) - 0.45;
         const [ax2, az2] = cellPos(S, k, lat, (h1 - 0.5) * 2);
         if (!inBuilding(ax2, az2) && !obst.hit(ax2, az2, 0.4) && clearPt(ax2, az2, 0.4)) { aframeI.push({ x: ax2, z: az2, heading: Math.atan2(-S.nx, -S.nz) + (h2 - 0.5) * 0.5, cell: (hash3(ax2, az2, 64) * 8) | 0 }); S.occ[k] |= OCC_SHOP; }
         continue;
@@ -1009,7 +1009,7 @@ export function buildProps(ctx) {
     if (S.c === 'r') continue;
     for (let k = 0; k < S.n; k++) {
       if (!S.ok[k] || S.occ[k] & (OCC_SHOP | OCC_POLE)) continue;
-      const [x, z] = cellPos(S, k, furnitureLine(S.c) + 0.15);
+      const [x, z] = cellPos(S, k, furnitureLine(S) + 0.15);
       const e = S.ev[k], cl = e ? e[6] : 0;
       const hb = hash3(x, z, 71);
       if (hb < ((cl & 4) ? 0.06 : 0.03)) {
@@ -1020,7 +1020,7 @@ export function buildProps(ctx) {
         if (obst.hit(x, z, 0.3) || !clearPt(x, z, 0.3)) continue;
         hydI.push({ x, z, heading: 0 }); obst.add(x, z, 0.3); S.occ[k] |= OCC_SHOP;
       } else if (hb > 0.5 && hb < 0.5 + ((cl & 16) ? 0.02 : 0.004)) {
-        const [x2, z2] = cellPos(S, k, facadeLine(S.c) - 0.35);
+        const [x2, z2] = cellPos(S, k, facadeLine(S) - 0.35);
         if (inBuilding(x2, z2) || obst.hit(x2, z2, 0.5) || !clearPt(x2, z2, 0.5)) continue;
         cabI.push({ x: x2, z: z2, heading: Math.atan2(-S.nx, -S.nz), col: pick([0xbfc3c4, 0xd6d0bf, 0x9aa69c], hash3(x2, z2, 73)) });
         obst.add(x2, z2, 0.55); ctx.addCollider(x2, z2, 0.45); S.occ[k] |= OCC_SHOP;
@@ -1039,7 +1039,7 @@ export function buildProps(ctx) {
     let k = 0;
     while (k < S.n) {
       if (!S.ok[k] || (S.occ[k] & OCC_SHOP)) { k++; continue; }
-      const [x, z] = cellPos(S, k, parkingLine(S.c));
+      const [x, z] = cellPos(S, k, parkingLine(S));
       const e = S.ev[k];
       let lv = e ? e[2] : defLevel(x, z);
       if (lv > 0 && openSpace(x, z)) lv = 0;
@@ -1065,10 +1065,10 @@ export function buildProps(ctx) {
     const { S } = R;
     if (hash3(R.x, R.z, 83) > keepRow) { for (let q = R.k0; q < R.k1; q++) S.occ[q] &= ~OCC_BIKE; continue; }
     // vỉa ≤ 2 m (phố r: 1,5 m nhánh này / 2,0 m sau WP1) → xe xiên 55-70° sát bó vỉa, không vuông góc chạm mặt tiền
-    const narrow = SIDEWALK_W[S.c] <= 2.0;
+    const narrow = sidewalkW(S) <= 2.0;
     const baseAng = narrow ? 0.95 + hash3(R.x, R.z, 84) * 0.25 : 1.22 + hash3(R.x, R.z, 84) * 0.35;   // rad so với trục phố
     const noseIn = hash3(R.x, R.z, 85) < 0.78;                 // phần lớn mũi vào nhà
-    const lat = narrow ? curbLine(S.c) + 0.78 : parkingLine(S.c);
+    const lat = narrow ? curbLine(S) + 0.78 : parkingLine(S);
     const spacing = 0.66 + hash3(R.x, R.z, 86) * 0.12;
     const t0 = S.off + R.k0 * CELL + 0.35, t1 = S.off + R.k1 * CELL - 0.35;
     // hàng thật không thẳng tắp nhưng xe KỀ NHAU không xuyên nhau (phản biện: cách 0,66-0,78 m mà lệch ±8° độc lập →
@@ -1126,7 +1126,7 @@ export function buildProps(ctx) {
     if (S.c === 'p') fill *= 0.7;
     if (fill <= 0) continue;
     const roll = S.c === 'r';
-    const lat = roll ? curbLine(S.c) - 0.05 : curbLine(S.c) - 0.95;
+    const lat = roll ? curbLine(S) - 0.05 : curbLine(S) - 0.95;
     let s = 2 + hash3(S.ax, S.az + S.side, 101) * 6;
     while (s < S.L - 3) {
       const x0 = S.ax + S.ux * s, z0 = S.az + S.uz * s;
@@ -1199,13 +1199,13 @@ export function buildProps(ctx) {
       if (!S.ok[k] || S.occ[k] & (OCC_BIKE | OCC_SHOP | OCC_CAR)) { k++; continue; }
       let k1 = k; while (k1 < S.n && S.ok[k1] && !(S.occ[k1] & (OCC_BIKE | OCC_SHOP | OCC_CAR))) k1++;
       const runL = (k1 - k) * CELL;
-      const [x, z] = cellPos(S, k, parkingLine(S.c));
+      const [x, z] = cellPos(S, k, parkingLine(S));
       const r0 = Math.hypot(x, z);
       const dens = r0 < 700 ? 1 / 34 : r0 < 1150 ? 1 / 60 : 1 / 110;
       if (runL >= 6 && hash3(x, z, 111) < runL * dens && !openSpace(x, z)) {
         const L = Math.min(runL - 2, 8 + hash3(x, z, 112) * 18);
         const sMid = (k + (k1 - k) / 2) * CELL;
-        const lat = SIDEWALK_W[S.c] >= 2.2 ? parkingLine(S.c) + (hash3(x, z, 113) - 0.5) * 0.6 : curbLine(S.c) + SIDEWALK_W[S.c] * 0.55;
+        const lat = sidewalkW(S) >= 2.2 ? parkingLine(S) + (hash3(x, z, 113) - 0.5) * 0.6 : curbLine(S) + sidewalkW(S) * 0.55;
         const [wx, wz] = cellPos(S, 0, lat, sMid - 0.5 * CELL);
         walkI.push({ x: wx, z: wz, heading: Math.atan2(S.ux, S.uz), walk: [L, 1.05 + hash3(wx, wz, 114) * 0.45, hash3(wx, wz, 115), 1 + hash3(wx, wz, 116) * 4] });
         for (let q = k; q < k1; q++) S.occ[q] |= OCC_PED;
@@ -1218,7 +1218,7 @@ export function buildProps(ctx) {
     const S = R.S; if (!(S.occ[R.k0] & OCC_BIKE)) continue;
     if (hash3(R.x, R.z, 121) > 0.14) continue;
     const kk = R.k1 < S.n ? R.k1 : R.k0 - 1; if (kk < 0 || !S.ok[kk] || S.occ[kk] & (OCC_SHOP | OCC_POLE | OCC_CAR)) continue;
-    const [x, z] = cellPos(S, kk, parkingLine(S.c) + 0.3, (hash3(R.x, R.z, 122) - 0.5));
+    const [x, z] = cellPos(S, kk, parkingLine(S) + 0.3, (hash3(R.x, R.z, 122) - 0.5));
     if (inBuilding(x, z) || obst.hit(x, z, 0.3)) continue;
     standI.push({ x, z, heading: Math.atan2(-S.nx, -S.nz) + (hash3(x, z, 123) - 0.5) * 2.4 });
   }

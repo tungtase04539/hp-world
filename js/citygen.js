@@ -39,7 +39,7 @@ import { claimAt, claimOverlapFrac } from './claims.js';
 import { buildFacadeAtlas, MOD, ATLAS_N, SIGN_CELLS, SIGN_EXT, SIGN_Y } from './facade_atlas.js';
 import { TIER } from './device.js';
 import { ROADS_DT } from './mapdata.js';
-import { ROAD_HW } from './xsection.js';
+import { ROAD_HW, roadHW } from './xsection.js';
 import { PANO_CAM } from './panoclear.js';
 
 // Ô CHÍNH 450 m (tường + mái + đồ mái; ~57 ô cho R1750): đo cùng phiên 300/450/600 m — 450 giảm MỘT NỬA draw call của
@@ -485,7 +485,7 @@ function roadGrid() {
   if (_rgrid) return _rgrid;
   _rgrid = new Map();
   for (const r of ROADS_DT) for (let i = 0; i + 1 < r.pts.length; i++) {
-    const [ax, az] = r.pts[i], [bx, bz] = r.pts[i + 1], hw = ROAD_HW[r.c] ?? 2.75, pad = hw + 16;
+    const [ax, az] = r.pts[i], [bx, bz] = r.pts[i + 1], hw = r.c in ROAD_HW ? roadHW(r) : 2.75, pad = hw + 16;   // W3-A: lòng riêng phố
     const seg = [ax, az, bx, bz, hw, r.c === 'h' ? 2 : (r.c === 'r' || r.c === 'w') ? 1 : 0];
     for (let gi = Math.floor((Math.min(ax, bx) - pad) / RG); gi <= Math.floor((Math.max(ax, bx) + pad) / RG); gi++)
       for (let gj = Math.floor((Math.min(az, bz) - pad) / RG); gj <= Math.floor((Math.max(az, bz) + pad) / RG); gj++) {

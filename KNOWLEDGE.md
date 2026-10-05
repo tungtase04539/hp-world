@@ -50,6 +50,7 @@ Trò chơi: thế giới 3D Hải Phòng **tỉ lệ 1:1 mét thật** (từ 202
 | `js/trees.js` | HỆ CÂY instanced (Đợt 3 WP4): `plant/plantLocal` (mọi helper cây chỉ xếp hàng), `plantStreetTrees` (trồng theo dữ liệu dọc phố), `buildTrees` (atlas lá + kit 9 loài + LOD gần/xa/hero GLB) — xem §10 (WP4-trees) |
 | `js/treemap.js` | **SINH TỰ ĐỘNG** bởi `tools/gen_treemap.mjs` từ `audit/audit_enriched.json` (thảm cây 551 pano) — KHÔNG sửa tay |
 | `js/roadnet.js` / `js/roadtex.js` / `js/roadmarks.js` | Mạng đường (Đợt 3 WP6): đồ thị nút giao + dải + vỉa hè/bó vỉa theo `xsection.js`; 1 material Phong + DataArrayTexture (worker) + vạch kẻ trong shader; bằng chứng vạch kẻ/đèn từ pano (SINH bởi `tools/gen_roadmarks.mjs`) |
+| `js/xsection.js` | MẶT CẮT PHỐ — nguồn duy nhất cho lòng/bó vỉa/vỉa hè/hố cây/xe đỗ/mặt tiền. Từ Đợt 3 W3-A mọi hàm nhận CẤP hoặc WAY `{c, w?, sw?}` (`roadHW/roadW/sidewalkW/curbLine/facadeLine/treePitLine/parkingLine/furnitureLine`) — truyền WAY để dùng bề rộng thật từng phố (`ROADS_DT[i].w/.sw`, SINH bởi `tools/street_fit.mjs` qua process_osm) |
 | `js/traffic.js` / `js/vehicles.js` / `js/npc.js` / `js/quests.js`... | Giao thông, xe cưỡi được, NPC, nhiệm vụ |
 | `tools/` | Pipeline dữ liệu + test tự động (xem mục 7, 8) |
 
@@ -292,6 +293,12 @@ node process_osm.mjs     # sinh ../js/mapdata.js + mask_debug.png + log kiểm t
   đã thất bại vì coastline hở ở mép bbox), lọc đa số 3×3.
 - Muốn thêm địa danh mới: tìm id qua Overpass `nwr["name"~"..."]`, thêm id vào fetch_osm.sh mục 6
   và `addWay/addNode` trong process_osm.mjs phần 5.
+- **Mặt cắt phố + tim đường (Đợt 3 W3-A)**: process_osm §3c gọi `tools/street_fit.mjs` — cần `tools/ov_buildings.csv`
+  (gitignore; thiếu → bề rộng chỉ theo ghi đè pano/cấp, tim chỉ dịch theo pano) + `tools/pano_loop/list_full_551.json`.
+  `ROADS_DT[i]` nay có thể mang `w` (lòng m) / `sw` (vỉa m) và tim ĐÃ DỊCH theo camera pano + tường Overture; THỨ TỰ/CHỈ
+  SỐ way giữ nguyên (lọc độ dài trên bản simplify 6 m cũ). `node process_osm.mjs --fitlog f.json` ghi mỏ neo/dịch từng way.
+  Đổi mapdata → CHẠY LẠI `node tools/process_buildings.mjs` (mặt tiền bám facadeLine theo TỪNG way) rồi
+  `node tools/qa/clearance.mjs --xsec` (lệch tim camera + mặt nhà game vs Overture, không cần trình duyệt).
 - `js/roadmarks.js` SINH bởi `node tools/gen_roadmarks.mjs` (chạy từ GỐC repo; đọc `audit/audit_enriched.json`) — không sửa tay.
 - `js/landuse_data.js` (raster sử dụng đất mặt đất, Đợt 3 W2-D) SINH bởi `node tools/gen_landuse.mjs [--ppm xem.ppm]` (chạy từ
   GỐC repo; đọc `tools/osm_landuse.json` = fetch_osm.sh mục 12, + PARKS/LM_POLY/osm_alleys) — không sửa tay. Chạy lại khi

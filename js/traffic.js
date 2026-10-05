@@ -222,7 +222,7 @@ export function createTraffic(scene, world, opts = {}) {
     if (a.type === 'walk') {
       let sd = side || a.side;
       if (e.oneway) { sd = outerSide(dir < 0 ? a.dir : dir, e); if (dir < 0) a.side = sd; }
-      const sw = SIDEWALK_W[e.c] || 1.2;
+      const sw = (e.sw ?? SIDEWALK_W[e.c]) || 1.2;   // W3-A: vỉa riêng phố (roadgraph e.sw)
       return sd * (hw + Math.max(0.6, sw * a.lat01));
     }
     if (e.oneway) {   // một chiều: dùng CẢ lòng đường (xe máy dàn khắp, ô tô giữa ±)
@@ -520,7 +520,7 @@ export function createTraffic(scene, world, opts = {}) {
       const e = edges[a.e], hw = e.hw;
       let lo, hi;
       if (a.type === 'walk') {
-        const sw = SIDEWALK_W[e.c] || 1.2, i0 = hw + 0.25, i1 = hw + Math.max(0.6, sw - 0.25);
+        const sw = (e.sw ?? SIDEWALK_W[e.c]) || 1.2, i0 = hw + 0.25, i1 = hw + Math.max(0.6, sw - 0.25);
         lo = a.side > 0 ? i0 : -i1; hi = a.side > 0 ? i1 : -i0;
       } else {
         const m = a.type === 'car' ? 1.1 : 0.5;

@@ -20,7 +20,7 @@
 //   position, normal, uv (dải: u dọc m, v ngang m có dấu; vỉa hè: u dọc, d cách bó vỉa; mặt đứng: u, cao),
 //   aSurf = (lớp texture, mã vạch kẻ, nửa lòng hw, d cách bó vỉa), aZeb = (u bắt đầu vùng zebra đầu, u đầu vùng zebra cuối).
 // Vạch kẻ vẽ TRONG shader (roadtex.js) theo (u, v) → 0 tam giác thêm, không z-fight.
-import { ROAD_HW, SIDEWALK_W, ROAD_TOP, SIDEWALK_TOP } from './xsection.js';
+import { ROAD_HW, SIDEWALK_W, ROAD_TOP, SIDEWALK_TOP, roadHW, sidewalkW } from './xsection.js';
 
 const STREET = { p: 1, s: 1, t: 1, r: 1 };
 const RANK = { p: 5, s: 4, t: 3, r: 2, w: 1, h: 0 };
@@ -51,8 +51,6 @@ export const MK = {
 // — pano_153/225/195, pano_155-160). Trong các vòng này vẫn vẽ tim đường dù gần MEDIANS.
 const MEDIAN_SKIP = [[572, -451.2, 90], [667.9, -640.2, 90], [589.3, -204, 90], [176, -457, 90], [287, -455, 90], [414, -454, 90]];
 
-const hwOf = (c) => ROAD_HW[c] ?? ROAD_HW.r;
-const swOf = (c) => SIDEWALK_W[c] ?? 0;
 const nR = (d) => [-d[1], d[0]];          // pháp tuyến "phải" của hướng d (x đông, z nam): bên phải người đi theo d
 const norm = (x, z) => { const l = Math.hypot(x, z) || 1; return [x / l, z / l]; };
 const D2R = Math.PI / 180;
@@ -189,7 +187,8 @@ export function buildRoadNet(ROADS_DT, deps) {
 
   // ---------- 0) way ----------
   const ways = [];
-  ROADS_DT.forEach((r, ri) => { const pts = dedupe(r.pts.map(([x, z]) => [x, z])); if (pts.length >= 2) ways.push({ ri, c: r.c, pts }); });
+  // Đợt 3 W3-A: nửa lòng/vỉa hè RIÊNG từng way (mapdata ROADS_DT[i].w/.sw qua xsection.roadHW/sidewalkW; thiếu → theo cấp)
+  ROADS_DT.forEach((r, ri) => { const pts = dedupe(r.pts.map(([x, z]) => [x, z])); if (pts.length >= 2) ways.push({ ri, c: r.c, pts, hw: roadHW(r), sw: sidewalkW(r) }); });
   const vkey = (x, z) => Math.round(x * 20) + ',' + Math.round(z * 20);
   // mặt cầu VÒM có mô hình riêng (terrain BRIDGES: HVT, Bính…) — dải đường dưới vòm bị cắt (kiểm giải tích, không gọi địa hình)
   const ARCH = (deps.bridges || []).filter((b) => b.rise > 3);
@@ -287,7 +286,7 @@ export function buildRoadNet(ROADS_DT, deps) {
     const n = w.pts.length;
     w.armF = new Array(n); w.armB = new Array(n); w.node = new Array(n);
     for (let k = 0; k < n; k++) w.node[k] = nodeAt(w.pts[k][0], w.pts[k][1]);
-    const hw = hwOf(w.c), sw = swOf(w.c);
+    const hw = w.hw, sw = w.sw;
     const swType = deps.swTypeOf ? deps.swTypeOf(w.ri) : 'gach_xam';
     for (let k = 0; k < n; k++) {
       for (const dir of [1, -1]) {
@@ -747,7 +746,7 @@ export function buildRoadNet(ROADS_DT, deps) {
           const key = segBase2[wj] + j; if (seenStamp[key] === stamp) continue; seenStamp[key] = stamp;
           const o = ways[wj];
           const [ax, az] = o.pts[j], [bx, bz] = o.pts[j + 1];
-          const ohw = hwOf(o.c), win = RANK[o.c] > RANK[w.c] || (RANK[o.c] === RANK[w.c] && wj < w.wi0);
+          const ohw = o.hw, win = RANK[o.c] > RANK[w.c] || (RANK[o.c] === RANK[w.c] && wj < w.wi0);
           if (touch(o.node[j]) || touch(o.node[j + 1])) {
             // đoạn chạm nút 2 đầu (phố cắt ngang ở nút giao) bỏ qua — TRỪ khi gần SONG SONG với đoạn chạy gần nhất
             // (làn nhập/tách chồng nhau, nút cầu Bính): khi đó vẫn chặn vỉa hè nằm TRONG lòng nó, chỉ xét điểm nằm
@@ -757,11 +756,11 @@ export function buildRoadNet(ROADS_DT, deps) {
             let bi = 0, bd = Infinity;
             for (let i = 0; i < P.length - 1; i++) { const d = segDist(mx, mz, P[i][0], P[i][1], P[i + 1][0], P[i + 1][1]); if (d < bd) { bd = d; bi = i; } }
             const qx = P[bi + 1][0] - P[bi][0], qz = P[bi + 1][1] - P[bi][1], ql = Math.hypot(qx, qz) || 1;
-            if (Math.abs(((bx - ax) * qx + (bz - az) * qz) / (L * ql)) < 0.94 || bd > ohw + hwOf(w.c) + swOf(w.c)) continue;
+            if (Math.abs(((bx - ax) * qx + (bz - az) * qz) / (L * ql)) < 0.94 || bd > ohw + w.hw + w.sw) continue;
             out.push([ax, az, bx, bz, ohw - 0.2, -1, 1, wj, o.c]);
             continue;
           }
-          out.push([ax, az, bx, bz, ohw - 0.2, win ? ohw + swOf(o.c) - 0.3 : -1, 0, wj, o.c]);
+          out.push([ax, az, bx, bz, ohw - 0.2, win ? ohw + o.sw - 0.3 : -1, 0, wj, o.c]);
         }
       }
     return out;
@@ -800,7 +799,7 @@ export function buildRoadNet(ROADS_DT, deps) {
 
   for (const w of ways) {
     const n = w.pts.length;
-    const street = !!STREET[w.c], hw = hwOf(w.c), sw = swOf(w.c);
+    const street = !!STREET[w.c], hw = w.hw, sw = w.sw;
     const swLayer = SW_LAYER[deps.swTypeOf ? deps.swTypeOf(w.ri) : 'gach_xam'] ?? RL.GACH_XAM;
     const roadLayer = street ? RL.ASPHALT : w.c === 'w' ? RL.GACH_XAM : RL.CONCRETE;
     let ka = 0;
@@ -1101,7 +1100,7 @@ export function buildRoadNet(ROADS_DT, deps) {
   const segs = new Float32Array(nSeg * 7);
   { let k = 0;
     for (const w of ways) {
-      const hw = hwOf(w.c), top = ROAD_TOP + 0.004 * RANK[w.c], outer = STREET[w.c] ? hw + swOf(w.c) : -1;
+      const hw = w.hw, top = ROAD_TOP + 0.004 * RANK[w.c], outer = STREET[w.c] ? hw + w.sw : -1;
       for (let i = 0; i < w.pts.length - 1; i++, k += 7) {
         segs[k] = w.pts[i][0]; segs[k + 1] = w.pts[i][1]; segs[k + 2] = w.pts[i + 1][0]; segs[k + 3] = w.pts[i + 1][1];
         segs[k + 4] = hw; segs[k + 5] = top; segs[k + 6] = outer;

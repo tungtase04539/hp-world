@@ -279,6 +279,8 @@ try {
   const fit = fitToPanos(ROADS_DT, panos, W0, walls0, { log: fitlog });
   // đo lại tường trên tim ĐÃ dịch (way từng chạy xuyên nhà thiếu trạm hợp lệ) rồi chốt bề rộng
   const WD = chooseWidths(ROADS_DT, measureWalls(ROADS_DT, ov));
+  // không để lòng HẸP hơn lúc khớp tim (mỏ neo pano đã tính "camera trong lòng" theo W0) → lấy bề rộng lớn hơn của 2 lượt
+  WD.forEach((o, ri) => { if (W0[ri].w > o.w && o.w > 0) { o.w = W0[ri].w; if (W0[ri].sw >= 0) o.sw = W0[ri].sw; } else if (!(o.w > 0) && W0[ri].w > 0) Object.assign(o, W0[ri]); });
   ROADS_DT.forEach((r, ri) => { if (WD[ri].w > 0) { r.w = WD[ri].w; if (WD[ri].sw >= 0) r.sw = WD[ri].sw; } });
   const src = {}; WD.forEach((o) => { src[o.src] = (src[o.src] || 0) + 1; });
   console.log(`mặt cắt phố: ${Date.now() - t0} ms; overture ${ov ? ov.n : 0} nhà; nguồn bề rộng ${JSON.stringify(src)}`);

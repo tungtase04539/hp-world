@@ -13,7 +13,7 @@
 //       (bao bbox từng mesh — rẻ, hơi dư) → solveShift() đẩy LÙI (theo pháp tuyến phố / ra xa camera) tối đa maxShift m;
 //       không được thì gỡ.
 import { PANO_CAM } from './panoclear.js';
-import { ROAD_HW, SIDEWALK_W } from './xsection.js';
+import { ROAD_HW, SIDEWALK_W, roadHW, sidewalkW } from './xsection.js';
 
 export const CLEAR = {
   PANO_R: 3.0,        // bán kính trống quanh camera pano (m, ngang) ở tầm thân người
@@ -42,7 +42,7 @@ for (const [x, z] of PANO_CAM) { const k = Math.floor(x / PC) * 100003 + Math.fl
 export function initClearance(ctx) {
   const segs = [], grid = new Map();
   (ctx.ROADS_DT || []).forEach((rd, ri) => {
-    const c = rd.c, hw = ROAD_HW[c] ?? 1.5, sw = SIDEWALK_W[c] ?? 0;
+    const c = rd.c, hw = c in ROAD_HW ? roadHW(rd) : 1.5, sw = c in SIDEWALK_W ? sidewalkW(rd) : 0;   // W3-A: lòng/vỉa riêng phố
     const street = sw > 0;
     for (let i = 0; i + 1 < rd.pts.length; i++) {
       const [ax, az] = rd.pts[i], [bx, bz] = rd.pts[i + 1];

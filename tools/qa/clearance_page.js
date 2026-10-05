@@ -416,11 +416,11 @@
     // ---------- (d) khối nhà lấn vỉa hè: ô 0,5 m dưới bao lồi từng mesh khối (cao ≥ 2,5 m, ≥ 1,2 m mỗi chiều) ----------
     const SWW = XS.SIDEWALK_W, HW = XS.ROAD_HW;
     const segIdx = new Map(), SC2 = 16, segs = [];
-    ROADS_DT.forEach((rd) => { if (!(SWW[rd.c] > 0)) return; for (let i = 0; i + 1 < rd.pts.length; i++) { const [ax, az] = rd.pts[i], [bx, bz] = rd.pts[i + 1]; const s = { ax, az, bx, bz, c: rd.c }; const id = segs.length; segs.push(s); const pad = HW[rd.c] + SWW[rd.c] + 2; for (let gi = Math.floor((Math.min(ax, bx) - pad) / SC2); gi <= Math.floor((Math.max(ax, bx) + pad) / SC2); gi++) for (let gj = Math.floor((Math.min(az, bz) - pad) / SC2); gj <= Math.floor((Math.max(az, bz) + pad) / SC2); gj++) { const k = gi * 100003 + gj; let a = segIdx.get(k); if (!a) segIdx.set(k, (a = [])); a.push(id); } } });
+    ROADS_DT.forEach((rd) => { if (!(SWW[rd.c] > 0)) return; for (let i = 0; i + 1 < rd.pts.length; i++) { const [ax, az] = rd.pts[i], [bx, bz] = rd.pts[i + 1]; const s = { ax, az, bx, bz, c: rd.c, w: rd.w, sw: rd.sw }; const id = segs.length; segs.push(s); const pad = (XS.roadHW ? XS.roadHW(rd) + XS.sidewalkW(rd) : HW[rd.c] + SWW[rd.c]) + 2; for (let gi = Math.floor((Math.min(ax, bx) - pad) / SC2); gi <= Math.floor((Math.max(ax, bx) + pad) / SC2); gi++) for (let gj = Math.floor((Math.min(az, bz) - pad) / SC2); gj <= Math.floor((Math.max(az, bz) + pad) / SC2); gj++) { const k = gi * 100003 + gj; let a = segIdx.get(k); if (!a) segIdx.set(k, (a = [])); a.push(id); } } });
     const swPen = (x, z) => {   // độ lấn vào vỉa hè (m, tính từ mặt tiền facadeLine vào trong) của phố gần nhất có vỉa
       const a = segIdx.get(Math.floor(x / SC2) * 100003 + Math.floor(z / SC2)); if (!a) return null;
       let best = null;
-      for (const id of a) { const s = segs[id], dx = s.bx - s.ax, dz = s.bz - s.az, l2 = dx * dx + dz * dz || 1; let t = ((x - s.ax) * dx + (z - s.az) * dz) / l2; t = t < 0 ? 0 : t > 1 ? 1 : t; const d = Math.hypot(x - s.ax - t * dx, z - s.az - t * dz); const fl = HW[s.c] + SWW[s.c]; if (d < fl && (!best || fl - d > best.pen)) best = { pen: fl - d, sw: SWW[s.c], c: s.c }; }
+      for (const id of a) { const s = segs[id], dx = s.bx - s.ax, dz = s.bz - s.az, l2 = dx * dx + dz * dz || 1; let t = ((x - s.ax) * dx + (z - s.az) * dz) / l2; t = t < 0 ? 0 : t > 1 ? 1 : t; const d = Math.hypot(x - s.ax - t * dx, z - s.az - t * dz); const fl = XS.roadHW ? XS.facadeLine(s) : HW[s.c] + SWW[s.c]; if (d < fl && (!best || fl - d > best.pen)) best = { pen: fl - d, sw: XS.roadHW ? XS.sidewalkW(s) : SWW[s.c], c: s.c }; }
       return best;
     };
     const sidewalk = [];

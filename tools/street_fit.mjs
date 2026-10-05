@@ -31,7 +31,8 @@ const UX = 111320 * Math.cos((LAT0 * Math.PI) / 180), UZ = 110574;
 const SHIFT = { 'Microsoft ML Buildings': [-1, -1], 'Google Open Buildings': [-1, -2.5], OpenStreetMap: [0, 0] };
 const STREET = { p: 1, s: 1, t: 1, r: 1 };
 // kẹp bề rộng lòng theo cấp khi suy từ Overture (m)
-export const W_BOUNDS = { p: [10, 24], s: [7, 16], t: [6, 13], r: [4.5, 10] };
+// (trần s 14 = Tô Hiệu/Trần Phú đo pano; phần tường Overture xa hơn trần → vỉa hè/sân trước rộng hơn, không phải lòng)
+export const W_BOUNDS = { p: [10, 20], s: [7, 14], t: [6, 12], r: [4.5, 9] };
 // GHI ĐÈ theo bằng chứng pano (AUDIT3 FP-1 §2c + ảnh thật): tên phố (regex) [+ cấp] → lòng w (m) [+ vỉa sw]. Phố ĐÔI
 // (2 way một chiều song song) ghi đè là bề rộng MỖI chiều.
 export const WIDTH_OVERRIDES = [
@@ -193,7 +194,7 @@ export function chooseWidths(roads, walls) {
       return;
     }
     const tw = parseFloat(r.tags?.width);
-    if (tw >= 3 && tw <= 30) { Object.assign(o, { w: tw, src: 'osm-width' }); return; }
+    if (tw >= 3 && tw <= 30) { Object.assign(o, { w: Math.max(tw, W_BOUNDS[r.c][0]), src: 'osm-width' }); return; }   // xe Google đi qua → ≥ sàn cấp
     if (dual) { o.src = 'dual'; return; }   // nửa đường đôi: tia Overture đo cả 2 chiều → giữ mặc định cấp
     const m = walls[ri];
     if (m && m.n >= 6 && m.n >= 0.12 * m.nSt) { Object.assign(o, fromW(r.c, m.W25), { src: 'overture' }); return; }
@@ -215,7 +216,9 @@ export function fitToPanos(roads, panos, widths, walls, { Ra = 45, Rb = 12, maxS
     const m = walls[ri]; if (!m || !m.st || isDual[ri] || !m.W25) return null;
     const a = [];
     for (const q of m.st) if (q.W <= 1.25 * m.W25 && Math.hypot(q.x - x, q.z - z) <= rad) a.push(q.m);
-    return a.length >= 3 ? quant(a, 0.5) : null;
+    // ≥ 4 trạm và nhất quán (khoảng tứ phân vị ≤ 2,5 m) — 3 trạm lệch nhau (sân lùi 1 bên) từng kéo tim 7 m (pano_362)
+    if (a.length < 4 || quant(a, 0.75) - quant(a, 0.25) > 2.5) return null;
+    return quant(a, 0.5);
   };
   const idx = segIndex(roads, 'pstr');
   const all = segIndex(roads, null); idx.gAll = all.g; idx.segsAll = all.segs;
@@ -243,8 +246,10 @@ export function fitToPanos(roads, panos, widths, walls, { Ra = 45, Rb = 12, maxS
     if (alley) { skipped.alley = (skipped.alley || 0) + 1; continue; }
     const hw = hwOf(best.ri), a = Math.max(0.75, hw - 1.25);
     // đích: tim giữa 2 tường Overture (nếu tin được), kẹp sao cho camera vẫn TRONG lòng (|v − D| ≤ a); không có → dời ít nhất
+    // dời TỐI THIỂU để camera vào lòng; tim tường chỉ được kéo thêm ≤ 3 m quanh đó (nhiễu tường 1 bên/sân lùi)
+    const D0 = Math.max(best.v - a, Math.min(best.v + a, 0));
     const mid = midAt(best.ri, best.x, best.z);
-    const tgt = mid == null ? 0 : mid;
+    const tgt = mid == null ? D0 : Math.max(D0 - wallCap, Math.min(D0 + wallCap, mid));
     const C = { pid, ...best, nx: -best.uz, nz: best.ux, a, mid, D: Math.max(best.v - a, Math.min(best.v + a, tgt)) };
     cands.push(C);
     const r = roads[best.ri];
