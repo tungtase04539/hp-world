@@ -46,6 +46,7 @@ export const WIDTH_OVERRIDES = [
   // tim tường Overture lệch đông 2-3 m)
   { re: /Lý Tự Trọng/, panos: ['pano_515', 'pano_516'], w: 9, sw: 2.5, center: true, why: 'tường mỏ neo Hải quân cách camera ~7,5 m (h090)' },
   { re: /Minh Khai/, panos: ['pano_265', 'pano_266', 'pano_267', 'pano_268', 'pano_269', 'pano_272', 'pano_273', 'pano_510', 'pano_511', 'pano_500', 'pano_237', 'pano_238'], w: 10.5, why: '~10,5 m' },
+  { re: /Phan Đình Phùng/, panos: ['pano_305', 'pano_306', 'pano_307', 'pano_308', 'pano_309', 'pano_310'], w: 6.5, sw: 2.5, why: 'pano_308 h0: ngõ ~6 m vẽ thành phố 2 làn (Overture W25 cho 12)' },
   { re: /Dư Hàng/, w: 6.5, why: 'pano_184/189: chợ, ~6,5 m' },
   { re: /Hạ Lý/, w: 6, why: 'pano_102-115/445: phố chợ 5-6 m' },
   { re: /Chu Văn An/, w: 6.5, why: 'pano_486-488: ~6-7 m (audit 5,5)' },
