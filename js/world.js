@@ -5945,7 +5945,7 @@ const twBDz = (x) => -470 + 7 * (x + 541) / 561;              // tim Bạch Đ�
     { // nền caro đỏ-xám (quad ShapeGeometry, mép ngoài s=13.2 — trước mép nước)
       const caro = makeTex(128, 128, (gc, w, h) => {
         for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) {
-          gc.fillStyle = (i + j) % 2 ? '#b8574a' : '#9aa0a2'; gc.fillRect(i * 32, j * 32, 32, 32);
+          gc.fillStyle = (i + j) % 2 ? '#b8897a' : '#a4a29d'; gc.fillRect(i * 32, j * 32, 32, 32);
         }
       });
       caro.wrapS = caro.wrapT = THREE.RepeatWrapping; caro.repeat.set(0.25, 0.25);
@@ -7202,7 +7202,7 @@ const bsHipRoof = (W, D, hexa = 0x8a4a34, x = 0, y = 0, z = 0) => {
   bsRingRail(-315.5, -567.2, -265.5, -466.2, 0x1c5c34, { useDeck: false, guard: landG });
   // vỉa hè caro đỏ-xám dọc mép ĐBP (ảnh 363/196)
   const caro = makeTex(64, 64, (gg, w, h) => {
-    for (let yy = 0; yy < 2; yy++) for (let xx = 0; xx < 2; xx++) { gg.fillStyle = (xx + yy) % 2 ? '#b6b0a6' : '#a8452e'; gg.fillRect(xx * 32, yy * 32, 32, 32); }
+    for (let yy = 0; yy < 2; yy++) for (let xx = 0; xx < 2; xx++) { gg.fillStyle = (xx + yy) % 2 ? '#b6b0a6' : '#b38a7b'; gg.fillRect(xx * 32, yy * 32, 32, 32); }
   });
   caro.wrapS = caro.wrapT = THREE.RepeatWrapping; caro.repeat.set(20, 1.2);
   const walk = new THREE.Mesh(new THREE.PlaneGeometry(62, 3.6), new THREE.MeshLambertMaterial({ map: caro }));
@@ -8273,7 +8273,7 @@ const tsStripe = (a, b) => new THREE.MeshLambertMaterial({ // bạt sọc (xanh-
 const tsCaroMat = (() => { // gạch caro đỏ-xám kè sông (pano_204/208 h000 — ảnh đã xem)
   const t = makeTex(128, 128, (g) => {
     for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) {
-      g.fillStyle = (i + j) % 2 ? '#b8574a' : '#9aa0a2'; g.fillRect(i * 32, j * 32, 32, 32);
+      g.fillStyle = (i + j) % 2 ? '#b8897a' : '#a4a29d'; g.fillRect(i * 32, j * 32, 32, 32);
     }
   });
   t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(0.25, 0.25);
@@ -12180,7 +12180,7 @@ const v3Stripe = (a, b) => new THREE.MeshLambertMaterial({
 });
 const v3Caro = (() => { // gạch caro đỏ-xám promenade (audit pano_298/203/134 "vỉa hè caro đỏ-xám")
   const t = makeTex(128, 128, (g) => {
-    for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) { g.fillStyle = (i + j) % 2 ? '#b8574a' : '#9aa0a2'; g.fillRect(i * 32, j * 32, 32, 32); }
+    for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) { g.fillStyle = (i + j) % 2 ? '#b8897a' : '#a4a29d'; g.fillRect(i * 32, j * 32, 32, 32); }
   });
   t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(0.25, 0.25);
   return new THREE.MeshLambertMaterial({ map: t });
