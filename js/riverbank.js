@@ -29,7 +29,7 @@ export function snapBankGrid(geo, { step, waterSD, isRiverAt, skip, landY, recol
     const x = pos.getX(i), z = pos.getZ(i);
     if (skip && skip(x, z)) continue;
     const sd = waterSD(x, z);
-    if (sd >= B || sd < -B - step * 1.05) continue;
+    if (sd >= B || sd < -B - step * 1.5) continue;
     if (isRiverAt && !isRiverAt(x, z)) continue;
     // gradient (hướng ra ĐẤT) bằng sai phân trung tâm
     let gx = waterSD(x + H, z) - waterSD(x - H, z), gz = waterSD(x, z + H) - waterSD(x, z - H);
