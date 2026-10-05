@@ -420,6 +420,56 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-10-05 (Đ3-W3-D SURFACES)** [ĐỢT 3 wave 3 — BỀ MẶT THEO BẰNG CHỨNG: vạch tim, zebra, đèn tín hiệu, vật liệu vỉa hè,
+    vườn hoa, bụi cắt tỉa, trời] (AUDIT3 FP-4: MARK 23 pano, PAVE 20, PARK 17, SKY 6 — mặc định "chỉ thêm" → sai dương tính):
+    **(1) Bằng chứng mới — `tools/gen_roadmarks.mjs` → `js/roadmarks.js` (SINH):** giữ `ROAD_MARK_EVIDENCE` (chữ pano), thêm
+    `ROAD_MARK_LABELS` = NHÃN NHÌN ẢNH pano thật theo trục đường (`tools/pano_loop/mark_labels.json`, 169 pano trên 72 way s/t:
+    Y vàng đứt 98 · D vàng đôi 5 · W vạch trắng 30 · N không vạch 36 — nhìn tờ ảnh 3 pano/way, cách làm ở scratchpad W3-D
+    probe/waysheet.py), `ROAD_PAVE_EVIDENCE` (vật liệu vỉa hè từ chữ `sidewalk` 539 pano: 2 xám · 3 caro đỏ-xám · 4 đỏ · 5 tự chèn
+    xám; mệnh đề ĐẦU có vật liệu thắng, bỏ mệnh đề "bó vỉa/viền/bồn cây"), `OSM_SIGNALS` 88 / `OSM_CROSSINGS` 403 (Overpass
+    `fetch_osm.sh` §13 → `tools/osm_crossings.json`, gitignored; thiếu file → generator GIỮ mảng OSM cũ trong roadmarks.js).
+    BẪY đã thử và BỎ: dò vạch vàng tự động trên ảnh pano (ngưỡng màu) — vạch sơn mòn nắng (220,183,131) lẫn biển/taxi/tường
+    vàng → tách kém (âm/dương chồng nhau); OSM `oneway=yes` KHÔNG suy được "không tim vàng" (LKT/ĐTH/NĐC oneway vẫn kẻ vàng).
+    **(2) `js/roadnet.js` vạch tim:** nhãn ảnh gán cho WAY gần nhất (≤ 12 m) rồi LAN dọc way ≤ 150 m (đo tới đa tuyến đoạn
+    chạy) > chữ pano ≤ 14 m > mặc định: p như cũ; s vàng+mép nếu lòng ≥ 7,5 m; t vàng nếu lòng ≥ 7,5 m; r/h không. Bề rộng
+    lòng = `ROADS_DT[ri].w` nếu generator có (W3-A per-way width) — chưa có thì theo cấp (t 8 → vẫn vàng: nhãn mới là thứ bỏ
+    vàng ở Hạ Lý/Dư Hàng/Chùa Hàng/Mê Linh/Lê Lợi/Bến Bính/NTP). Nhãn N: p chỉ mép, s chỉ rãnh biên, t/r trơn. ĐƯỜNG ĐÔI (way
+    song song cùng chiều |cos|>0,94, khe mép lòng −0,5…8 m ở ≥ 60% mẫu 10 m) → không vàng, vạch trắng đứt (Lê Quang Đạo 216/478).
+    **(3) Zebra/đèn:** CHỈ khi có node OSM trong vùng nút (rad + 10 m) hoặc bằng chứng chữ pano ≤ 45 m — mỗi điểm bằng chứng
+    gán cho MỘT nút tốt nhất (tổng hạng nhánh + 2·số nhánh p/s − d/12; số nhánh chỉ còn là "tie-breaker"). Đèn: OSM hoặc (pano
+    + ≥ 2 nhánh p/s/t); cụm ≥ 45 m ưu tiên OSM > pano > hạng (nút bị bỏ đèn chỉ giữ zebra nếu có node/chữ zebra). Zebra theo NHÁNH: node OSM gần vị trí vạch (gốc + setback + 2,3 m,
+    ≤ 14 m, lệch ngang ≤ hw + 2,5) → nhánh đó; nút có đèn → mọi nhánh phố; node ở tâm/bằng chứng chữ → nhánh p/s/t. Số liệu
+    R1750: đèn 131 → 31 (25 OSM + 6 pano), nhánh zebra 750 → 245 (115 OSM, 85 theo đèn, 45 chữ). (dot3: 131 nút đèn chỉ 23 có
+    node OSM; 33/42 pano tả "đèn tín hiệu" nằm ≤ 50 m node OSM → OSM HP đáng tin cho đèn.) **VẠCH QUA ĐƯỜNG GIỮA KHỐI** (116):
+    node OSM không thuộc nút có zebra (rad + 4) trên lòng phố (≤ hw + 2) hoặc chữ pano "có vạch qua đường" không có nút ≤ 45 m
+    → TÁCH dải tại uc + 1,5 m: phần trước ZEB1 với aZeb.y = uc + 2,3 (vạch u ∈ [uc − 1,5; uc + 1,5]), phần sau ZEB0 với
+    aZeb.x = uc − 2,3 (tim đường dừng/tiếp 3,3 m quanh vạch như ở nút) — shader roadtex KHÔNG đổi. `stats` mới: sigOsm/sigEv/
+    zebOsm/zebSig/zebEv/midX/midXs/marks{def,lab,ev,none,dual}/paveEv.
+    **(4) Vỉa hè:** vật liệu theo TỪNG Ô vỉa hè = bằng chứng chữ pano gần nhất đã gán cho cùng way (≤ 120 m), góc nút giao lấy
+    điểm 8 m vào nhánh; `SIDEWALK_BY_ROAD` chỉ còn dự phòng (đo: lệch chữ pano ~45% — 111 pano "caro đỏ-xám" đang vẽ xám, Mê
+    Linh/Tô Hiệu/Hồ Sen xám đang vẽ đỏ; file đó KHÔNG có generator). Texture `roadtex.js`: lớp 3 CARO = viên 40×20 cm (dài dọc
+    phố) xen kẽ đỏ-hồng bạc màu (184,138,122) ↔ xám (166,163,157) như bàn cờ 1:1 (đo ảnh 004/010/028/225/400/405: viên đỏ r−g
+    22-47; bản cũ (158,82,58) 88% đỏ → ảnh game (136,53,38) phủ kín); lớp 4 "gạch đỏ" (172,134,121) — (168,104,84) vẫn ra cam
+    (169,113,90) trên ảnh; lớp 5 = gạch tự chèn "con sâu" XÁM. Canvas caro kè hồ (`sidewalkMaterial`) cùng mẫu; 5 canvas caro
+    ô cells (#b8574a/#a8452e/#b24a3a: Thế Lữ, Tam Bạc tsCaroMat, ĐBP, dm7…) → #b8897a/#b38a7b. BẪY chữ pano: mệnh đề "sân/
+    quảng trường/trước cổng" là SÂN, không phải vỉa hè phố (pano_167 sân trường đỏ từng lan cả Lê Lợi) → bỏ qua.
+    **(5) Vườn hoa (dải An Biên → Tố Hữu, khối "DẢI VƯỜN HOA" world.js):** ảnh thật sau cải tạo = SÂN LÁT ĐÁ XÁM + hàng cây
+    + viền bụi cắt tỉa thấp + ô cỏ ô liu xỉn có bó vỉa đá + bồn tròn phẳng/bụi tròn (vệ tinh real_3: tán cây phủ, khoảng hở là
+    sân xám). Nay: `garden_plaza` (ExtrudeGeometry cùng cao +0,12 như thảm cỏ cũ — không thêm chỗ chồng lòng đường; texture granite
+    60 cm, UV = mét) + ô cỏ 11×11 m trên lưới 17 m (4 góc trong polygon, KHÔNG trên lòng/vỉa hè roadnet, ≥ 9 m camera pano, ~1/5 để
+    trống) + bồn tròn gò thấp 0,15 m màu đỉnh lốm đốm (thay vòm bán cầu hồng/xanh) + bụi tròn cắt tỉa ở ½ bồn + VIỀN BỤI dọc mép
+    polygon: mỗi cạnh chọn độ thụt nhỏ nhất 1,6…6 m có ≥ 70% điểm ngoài lòng/vỉa hè (mép polygon nong ×1,14 thường nằm trên vỉa
+    hè), hở lối vào 3 m giữa cạnh > 26 m. Bỏ lối chữ thập be. `world.gardenStats`.
+    **(6) `js/hedges.js` (mới):** bụi cắt tỉa/bụi dải phân cách "lổn nhổn" = quét mặt cắt 7 điểm (đáy · hông phồng · vai · đỉnh)
+    dọc đa tuyến, vòng ~0,8 m, lệch nhiễu hash TẤT ĐỊNH, ~15 tam giác/m, màu đỉnh tối chân/sáng đỉnh + texture lá DataTexture
+    128² dùng chung (nền ≈ 240: texture sRGB nhân TUYẾN TÍNH — nền 196 làm bụi gần đen). Dùng cho viền vườn hoa, dải phân cách
+    Lê Quang Đạo (thay hộp 3,2 m), mép công viên Trần Phú dm7, sân tượng Lê Chân. Material có map → freezeStatic không gộp lượt 1.
+    **(7) Trời:** đo 120 pano audit3 × 4 hướng (probe/skycmp.py: pixel trời mịn, 3 dải hàng trên khung, cùng FOV): thật dải
+    cao (193,205,224) / thấp (189,202,219); dot3 (187,199,215) / (200,208,220) → trung vị trời game ĐÃ gần thật (WP5), lệch hệ
+    thống: thiên đỉnh hơi tối/ít xanh, dải thấp TRẮNG SỮA hơn. Sửa CHỈ vòm hiển thị ban ngày (IBL/đèn bán cầu/màu sương giữ
+    nguyên): hệ số theo độ cao `LIGHT.skyGradeLo/Hi` trộn theo smoothstep(0,12…0,6, v.y) × trọng số ngày. Trời thật dao động
+    rộng (p25 xanh đậm ↔ p75 trắng mù) — 1 hằng số không khớp được mọi ngày; KHÔNG kéo thiên đỉnh sáng (vật lý: thiên đỉnh tối hơn).
+    **ĐO / KIỂM:** (điền sau)
 - **2026-10-04 (W2-F POLISH)** [ĐỢT 3 wave 2 — WebGL1, giải mã RB 1 lần, kho cảng, ĐÊM, giao thông né xe đỗ, dọn code chết, hitch]:
     **(1) WebGL1** (three r160 tự lùi WebGL1 khi không có WebGL2): KIỂM bằng `tools/qa/shoot.mjs --gl1` (init script cho
     `getContext('webgl2')` trả null — cờ Chrome `--disable-es3-apis` KHÔNG có tác dụng ở headless mới: vẫn webgl2:true;
