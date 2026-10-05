@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { installToneMapping, SceneAOPass, FinalPass, AO as AO_CFG, GRADE, timePass } from './post.js';
-import { buildWorld, groundHeight, groundHeightNoDeck, landAt, WORLD_BOUNDS, EXTRAS, BUILD_RADIUS, texCacheStats } from './world.js';
+import { buildWorld, groundHeight, groundHeightNoDeck, landAt, WORLD_BOUNDS, EXTRAS, BUILD_RADIUS, texCacheStats, surfaceY, spawnY } from './world.js';
 import { IS_MOBILE, HAS_TOUCH, TIER, GPU_NAME, QUALITY_PREF, setQualityPref, IGPU_ON_BIG_MACHINE, GFX } from './device.js';
 import { createTraffic } from './traffic.js';
 import { makeHumanoid } from './character.js';
@@ -305,7 +305,7 @@ function updateCamera(dt) {
   if (allow < cam.cur) cam.cur = allow;                               // co NGAY: không bao giờ lọt vào trong nhà
   else cam.cur += (allow - cam.cur) * (1 - Math.exp(-2.5 * dt));      // nhả ra từ từ
   _des.set(_tgtS.x + ux * cam.cur, _tgtS.y + sp * cam.cur, _tgtS.z + uz * cam.cur);
-  const gy = groundHeight(_des.x, _des.z);
+  const gy = surfaceY(_des.x, _des.z, _tgtS.y - 1.5);   // W3-F: mặt cầu nâng (tham chiếu = chân người chơi)
   _des.y = Math.max(_des.y, gy + 1.2, 1.2);
   camera.position.copy(_des);
   camera.lookAt(_tgtS);
@@ -324,7 +324,7 @@ const WALK = 3.0, RUN = 7.0, GRAV = 26, JUMP = 6.5;
 function tryMove(nx, nz) {
   if (nx < WORLD_BOUNDS.minX + 30 || nx > WORLD_BOUNDS.maxX - 30
     || nz < WORLD_BOUNDS.minZ + 30 || nz > WORLD_BOUNDS.maxZ - 30) return false;
-  return groundHeight(nx, nz) > 0.32;
+  return surfaceY(nx, nz, pState.pos.y) > 0.32;   // W3-F: đi được trên mặt cầu nâng qua sông
 }
 
 function updatePlayerOnFoot(dt, time) {
@@ -349,7 +349,7 @@ function updatePlayerOnFoot(dt, time) {
     pState.yaw += wrapPI(Math.atan2(dir.x, dir.z) - pState.yaw) * (1 - Math.exp(-10 * dt));
   } else resolveAll(pState.pos, 0.45);
 
-  const gy = groundHeight(pState.pos.x, pState.pos.z);
+  const gy = surfaceY(pState.pos.x, pState.pos.z, pState.pos.y);   // W3-F: giữ tầng mặt cầu đang đứng
   if (consumeJump() && pState.onGround) { pState.vy = JUMP; pState.onGround = false; }
   pState.vy -= GRAV * dt;
   let y = pState.pos.y + pState.vy * dt;
@@ -911,7 +911,7 @@ window.__hp = {
     if (pState.mounted) { pState.mounted.mounted = false; pState.mounted = null; player.sit(false); }
     x = Math.max(WORLD_BOUNDS.minX + 31, Math.min(WORLD_BOUNDS.maxX - 31, x));   // clamp vào biên đi-được (tránh kẹt ngoài map — tryMove chặn mọi bước khi ở ngoài)
     z = Math.max(WORLD_BOUNDS.minZ + 31, Math.min(WORLD_BOUNDS.maxZ - 31, z));
-    pState.pos.set(x, Math.max(groundHeight(x, z), 0), z);
+    pState.pos.set(x, Math.max(spawnY(x, z), 0), z);   // W3-F: pano trên mặt cầu (285) đứng TRÊN cầu
     pState.vy = 0;
     cam.yaw = camYaw; cam.pitch = pitch; cam.dist = dist; cam.snap = true; cam.lastDrag = performance.now();
     const cp = Math.cos(pitch);

@@ -1,0 +1,533 @@
+// bridges.js — CẦU THEO WAY OSM (Đợt 3 W3-F, AUDIT3 FP-6 "elevated decks"): mặt cầu nâng + lan can + trụ + vòm HVT,
+// và bộ lan can/dầm biên/trụ cho cầu PHẲNG (Lạc Long, Tam Kỳ, Tam Bạc…). Dữ liệu: mapdata BRIDGE_WAYS (SINH bởi
+// tools/process_osm.mjs §6b4 — mỗi way: pts [[x,z,y]] cách ~3 m, w bề rộng mặt cầu, kind span|ramp|flat, ri chỉ số ROADS_DT).
+//
+// Vì sao: mô hình cũ (world.js "CẦU HOÀNG VĂN THỤ") dựng 1 hộp thẳng nối 2 đầu way bắc (75,−898)→(−45,−1883): vòm đỏ lệch
+// ~110 m về đông pano_285 và tâm vòm ở z −1391 (trên đất Thủy Nguyên); 2 nút XOẮN ỐC phía Hải Phòng (đặc trưng thật
+// của cầu HVT, ảnh pano_304/349) không tồn tại — roadnet vẽ chúng thành vòng nhựa NẰM ĐẤT (tấm đen trên nền đất).
+//
+// TRA CAO ĐỘ (thuần JS, không three): makeDeckIndex(ways) → { yAt(x,z,yRef), topAt(x,z), nearestAt(x,z) }
+//   yAt: mặt cầu (≤ yRef + 1,2 m — "bước lên") CAO NHẤT phủ (x,z); −∞ nếu không — người chơi/xe/tác tử giao thông giữ
+//        mặt cầu đang đứng (nút xoắn 2 tầng chồng nhau, cầu vượt trên phố mặt đất), lên cầu bằng dốc từ đầu nối mặt đất.
+//   nearestAt: mặt cầu có TIM gần (x,z) nhất (đặt camera pano / spawn khi không có cao độ tham chiếu).
+import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+
+export const DECK_DEPTH = { span: 1.9, ramp: 1.35 };
+const STEP_UP = 1.2;
+
+export function makeDeckIndex(ways) {
+  const segs = [];   // [ax, az, ay, bx, bz, by, hw]
+  for (const b of ways) {
+    if (b.kind === 'flat') continue;
+    const P = b.pts, hw = b.w / 2, dy = b.kind === 'deck' ? 0.11 : 0.02;   // mặt nhựa trên cao độ hồ sơ
+    for (let i = 0; i < P.length - 1; i++) segs.push([P[i][0], P[i][1], P[i][2] + dy, P[i + 1][0], P[i + 1][1], P[i + 1][2] + dy, hw]);
+  }
+  const C = 16, G = new Map(), key = (i, j) => (i + 4096) * 8192 + (j + 4096);
+  segs.forEach((s, si) => {
+    const r = s[6] + 1;
+    for (let i = Math.floor((Math.min(s[0], s[3]) - r) / C); i <= Math.floor((Math.max(s[0], s[3]) + r) / C); i++)
+      for (let j = Math.floor((Math.min(s[1], s[4]) - r) / C); j <= Math.floor((Math.max(s[1], s[4]) + r) / C); j++) {
+        const k = key(i, j); let a = G.get(k); if (!a) G.set(k, a = []); a.push(si);
+      }
+  });
+  // duyệt các mặt cầu phủ (x,z): cb(y, khoảng cách ngang tới tim)
+  function each(x, z, pad, cb) {
+    const a = G.get(key(Math.floor(x / C), Math.floor(z / C))); if (!a) return;
+    for (const si of a) {
+      const s = segs[si], dx = s[3] - s[0], dz = s[4] - s[1], l2 = dx * dx + dz * dz; if (l2 < 1e-6) continue;
+      let t = ((x - s[0]) * dx + (z - s[1]) * dz) / l2;
+      if (t < -0.02 || t > 1.02) continue;
+      t = t < 0 ? 0 : t > 1 ? 1 : t;
+      const d = Math.hypot(x - s[0] - dx * t, z - s[1] - dz * t);
+      if (d > s[6] + pad) continue;
+      cb(s[2] + (s[5] - s[2]) * t, d);
+    }
+  }
+  return {
+    segs,
+    yAt(x, z, yRef) {
+      let best = -Infinity;
+      each(x, z, 0.15, (y) => { if (y <= yRef + STEP_UP && y > best) best = y; });
+      return best;
+    },
+    topAt(x, z) { let best = -Infinity; each(x, z, 0.15, (y) => { if (y > best) best = y; }); return best; },
+    nearestAt(x, z) { let best = -Infinity, bd = Infinity; each(x, z, 0.15, (y, d) => { if (d < bd) { bd = d; best = y; } }); return best; },
+    nearestInfo(x, z) { let best = -Infinity, bd = Infinity; each(x, z, 0.15, (y, d) => { if (d < bd) { bd = d; best = y; } }); return { y: best, d: bd }; },
+    covers(x, z, pad = 0) { let hit = false; each(x, z, pad, () => { hit = true; }); return hit; },
+  };
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// Bộ đệm hình học đơn giản (position/normal/color/uv) — gộp thành 1 BufferGeometry mỗi material.
+function Buf() { return { p: [], n: [], c: [], u: [], idx: [] }; }
+function quad(B, a, b, c, d, nrm, col, uv) {   // a,b,c,d theo chiều ngược kim đồng hồ nhìn từ phía pháp tuyến
+  const o = B.p.length / 3;
+  for (const v of [a, b, c, d]) B.p.push(v[0], v[1], v[2]);
+  for (let i = 0; i < 4; i++) { B.n.push(nrm[0], nrm[1], nrm[2]); B.c.push(col[0], col[1], col[2]); }
+  if (uv) for (const t of uv) B.u.push(t[0], t[1]); else for (let i = 0; i < 4; i++) B.u.push(0, 0);
+  B.idx.push(o, o + 1, o + 2, o, o + 2, o + 3);
+}
+function toGeo(B) {
+  if (!B.idx.length) return null;
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(B.p, 3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(B.n, 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(B.c, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(B.u, 2));
+  g.setIndex(B.idx);
+  return g;
+}
+// dải "hộp" dọc polyline: mỗi đoạn i→i+1 nối 2 mặt cắt; prof = [[l, y], ...] (l ngang, + = phải), mặt nối các cặp liên tiếp
+function sweep(B, frames, prof, col, closed) {
+  const nP = prof.length;
+  for (let i = 0; i < frames.length - 1; i++) {
+    const F1 = frames[i], F2 = frames[i + 1];
+    for (let k = 0; k < (closed ? nP : nP - 1); k++) {
+      const p1 = prof[k], p2 = prof[(k + 1) % nP];
+      const A = [F1.x + F1.nx * p1[0], F1.y + p1[1], F1.z + F1.nz * p1[0]];
+      const Bp = [F1.x + F1.nx * p2[0], F1.y + p2[1], F1.z + F1.nz * p2[0]];
+      const Cp = [F2.x + F2.nx * p2[0], F2.y + p2[1], F2.z + F2.nz * p2[0]];
+      const D = [F2.x + F2.nx * p1[0], F2.y + p1[1], F2.z + F2.nz * p1[0]];
+      // pháp tuyến mặt: (B−A) × (D−A)
+      const ux = Bp[0] - A[0], uy = Bp[1] - A[1], uz = Bp[2] - A[2], vx = D[0] - A[0], vy = D[1] - A[1], vz = D[2] - A[2];
+      let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx; const nl = Math.hypot(nx, ny, nz) || 1;
+      nx /= nl; ny /= nl; nz /= nl;
+      quad(B, A, D, Cp, Bp, [-nx, -ny, -nz], col);
+    }
+  }
+}
+// hộp đặc (trụ vuông/dầm) quay quanh trục y
+function box(B, cx, cy, cz, sx, sy, sz, rotY, col) {
+  const c = Math.cos(rotY), s = Math.sin(rotY);
+  const P = (lx, ly, lz) => [cx + lx * c + lz * s, cy + ly, cz - lx * s + lz * c];
+  const hx = sx / 2, hy = sy / 2, hz = sz / 2;
+  const N = (lx, ly, lz) => [lx * c + lz * s, ly, -lx * s + lz * c];
+  quad(B, P(-hx, -hy, hz), P(hx, -hy, hz), P(hx, hy, hz), P(-hx, hy, hz), N(0, 0, 1), col);
+  quad(B, P(hx, -hy, -hz), P(-hx, -hy, -hz), P(-hx, hy, -hz), P(hx, hy, -hz), N(0, 0, -1), col);
+  quad(B, P(hx, -hy, hz), P(hx, -hy, -hz), P(hx, hy, -hz), P(hx, hy, hz), N(1, 0, 0), col);
+  quad(B, P(-hx, -hy, -hz), P(-hx, -hy, hz), P(-hx, hy, hz), P(-hx, hy, -hz), N(-1, 0, 0), col);
+  quad(B, P(-hx, hy, hz), P(hx, hy, hz), P(hx, hy, -hz), P(-hx, hy, -hz), N(0, 1, 0), col);
+}
+// trụ tròn (không nắp dưới), n mặt
+function cyl(B, cx, cz, y0, y1, r0, r1, n, col) {
+  for (let k = 0; k < n; k++) {
+    const a1 = (k / n) * Math.PI * 2, a2 = ((k + 1) / n) * Math.PI * 2, am = (a1 + a2) / 2;
+    const c1 = Math.cos(a1), s1 = Math.sin(a1), c2 = Math.cos(a2), s2 = Math.sin(a2);
+    quad(B, [cx + c1 * r0, y0, cz + s1 * r0], [cx + c1 * r1, y1, cz + s1 * r1], [cx + c2 * r1, y1, cz + s2 * r1], [cx + c2 * r0, y0, cz + s2 * r0],
+      [Math.cos(am), 0, Math.sin(am)], col);
+  }
+}
+const shade = (hex, f) => { const c = new THREE.Color(hex); return [c.r * f, c.g * f, c.b * f]; };
+
+// texture mặt cầu: nhựa xám + vạch mép trắng liền + vạch giữa trắng đứt (làn một chiều 2 làn) — lặp dọc 12 m.
+// twoWay: tim VÀNG liền đôi (cầu phố 2 chiều — ảnh pano_074 h270 Cầu Lạc Long)
+function deckTexture(twoWay) {
+  const W = 64, H = 256;   // u ngang (0..1 = mép trái → mép phải), v dọc 12 m
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+  const g = cv.getContext('2d');
+  g.fillStyle = '#7b7a76'; g.fillRect(0, 0, W, H);
+  let s = 11; const rnd = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
+  for (let i = 0; i < 2600; i++) { const v = 100 + rnd() * 40 | 0; g.fillStyle = `rgba(${v},${v - 2},${v - 6},0.35)`; g.fillRect(rnd() * W, rnd() * H, 1, 1); }
+  g.fillStyle = '#e9e6dc';
+  g.fillRect(2, 0, 2, H); g.fillRect(W - 4, 0, 2, H);          // vạch mép
+  if (twoWay) { g.fillStyle = '#d9b23a'; g.fillRect(W / 2 - 2, 0, 1, H); g.fillRect(W / 2 + 1, 0, 1, H); }
+  else g.fillRect(W / 2 - 1, 0, 2, H * 0.4);                   // vạch giữa đứt (4,8 m / 12 m)
+  const t = new THREE.CanvasTexture(cv);
+  t.wrapS = THREE.ClampToEdgeWrapping; t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8;
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+// gạch vỉa hè cầu phố: ô vuông đỏ hồng mạch xám (ảnh pano_074 h180) — 1 texture = 2×2 ô (0,3 m)
+function tileTexture() {
+  const S = 64, cv = document.createElement('canvas'); cv.width = cv.height = S;
+  const g = cv.getContext('2d');
+  let s = 5; const rnd = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
+  g.fillStyle = '#8f8a82'; g.fillRect(0, 0, S, S);
+  for (let j = 0; j < 2; j++) for (let i = 0; i < 2; i++) { const k = 0.92 + rnd() * 0.12; g.fillStyle = `rgb(${178 * k | 0},${112 * k | 0},${104 * k | 0})`; g.fillRect(i * 32 + 1, j * 32 + 1, 30, 30); }
+  for (let i = 0; i < 300; i++) { const v = rnd() < 0.5 ? 0 : 255; g.fillStyle = `rgba(${v},${v},${v},0.07)`; g.fillRect(rnd() * S, rnd() * S, 1.5, 1.5); }
+  const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8; t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+// tấm lan can con tiện trắng hoa văn ô van (alpha) — 1 ô = 1,5 m × 0,73 m
+function balTexture() {
+  const W = 192, H = 96, cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+  const g = cv.getContext('2d'); g.clearRect(0, 0, W, H);
+  g.strokeStyle = '#f2efe8'; g.fillStyle = '#f2efe8';
+  g.fillRect(0, H - 8, W, 8); g.fillRect(0, 0, W, 6);
+  g.lineWidth = 5;
+  for (let x = 12; x < W; x += 24) { g.beginPath(); g.ellipse(x, H / 2, 9, 30, 0, 0, Math.PI * 2); g.stroke(); }
+  const t = new THREE.CanvasTexture(cv); t.wrapS = THREE.RepeatWrapping; t.wrapT = THREE.ClampToEdgeWrapping; t.anisotropy = 4; t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// deps: { ways (BRIDGE_WAYS), ROADS_DT, groundHeightNoDeck, roadSurfaceAt(x,z) (world.roadNet.surfaceAt), panoCams,
+//         hw(c), sw(c) (xsection), LAND_H, isWater, lite, addCollider }
+export function buildBridges(scene, deps) {
+  const t0 = performance.now();
+  const { ways, groundHeightNoDeck: ghN, LAND_H = 2 } = deps;
+  const index = makeDeckIndex(ways);
+  const stats = { decks: 0, deckM: 0, piers: 0, portals: 0, flatRails: 0, tris: 0 };
+  const conc = Buf(), concD = Buf(), top = Buf(), rail = Buf(), red = Buf(), cable = Buf(), lamp = Buf(), concBal = Buf();
+  const top2 = Buf(), walk = Buf(), balPanel = Buf();   // cầu phố 'deck': lòng 2 chiều, vỉa hè gạch, tấm lan can hoa văn
+  const CONC = shade(0xc9c6bd, 1), CONC_SIDE = shade(0xbab6ac, 1), CONC_UNDER = shade(0x8d8a83, 1), PIER = shade(0xbcb8ae, 1);
+  const RAIL = shade(0x9aa1a3, 1), RED = shade(0xc63a2c, 1), CABLE = shade(0xe2ddd4, 1);
+  const panoNear = (x, z, r) => { for (const p of deps.panoCams || []) if ((p[0] - x) ** 2 + (p[1] - z) ** 2 < r * r) return true; return false; };
+  const roadAt = (x, z) => (deps.roadSurfaceAt ? deps.roadSurfaceAt(x, z) > 0 : false);
+  const groundY = (x, z) => Math.max(ghN(x, z), -3);
+
+  // ---- khung (frame) dọc polyline: tâm, cao độ, pháp tuyến ngang (phải) ----
+  const framesOf = (P) => P.map((p, i) => {
+    const a = P[Math.max(0, i - 1)], b = P[Math.min(P.length - 1, i + 1)];
+    let tx = b[0] - a[0], tz = b[1] - a[1]; const l = Math.hypot(tx, tz) || 1; tx /= l; tz /= l;
+    return { x: p[0], z: p[1], y: p[2], tx, tz, nx: -tz, nz: tx };
+  });
+
+  // ================= CẦU PHỐ NÂNG NHẸ (kind 'deck' — Cầu Lạc Long, pano_074) =================
+  // mặt cắt: lòng (ROAD_W cấp) + bó vỉa sơn sọc đỏ-trắng 1,5 m + vỉa hè gạch đỏ + gờ + lan can con tiện trắng hoa văn
+  // ô van (tấm alpha) + tay vịn + trụ vuông 3 m; dầm biên xuống −1 m; trụ vuông trong nước mỗi ~20 m.
+  const urbanDecks = [];
+  function urbanDeck(b) {
+    const F = framesOf(b.pts), W = b.w / 2, hw = Math.min(deps.hw(b.c), W - 1.5);
+    const RT = 0.11, ST = 0.25, PL = 0.3;
+    stats.decks++; urbanDecks.push(b);
+    let acc = 0;
+    const P3 = (Fr, l, dy) => [Fr.x + Fr.nx * l, Fr.y + dy, Fr.z + Fr.nz * l];
+    for (let i = 0; i < F.length - 1; i++) {
+      const A = F[i], Bf = F[i + 1], L = Math.hypot(Bf.x - A.x, Bf.z - A.z);
+      // lòng đường (texture 2 chiều: tim vàng đôi)
+      quad(top2, P3(A, -hw, RT), P3(A, hw, RT), P3(Bf, hw, RT), P3(Bf, -hw, RT), [0, 1, 0], [1, 1, 1], [[0, acc / 12], [1, acc / 12], [1, (acc + L) / 12], [0, (acc + L) / 12]]);
+      for (const sg of [-1, 1]) {
+        // vỉa hè gạch (uv theo mét /0,6)
+        const a1 = sg * hw, a2 = sg * (W - PL);
+        const V = [P3(A, a1, ST), P3(Bf, a1, ST), P3(Bf, a2, ST), P3(A, a2, ST)];
+        const UV = [[a1 / 0.6, acc / 0.6], [a1 / 0.6, (acc + L) / 0.6], [a2 / 0.6, (acc + L) / 0.6], [a2 / 0.6, acc / 0.6]];
+        if (sg > 0) quad(walk, V[0], V[3], V[2], V[1], [0, 1, 0], [1, 1, 1], [UV[0], UV[3], UV[2], UV[1]]);
+        else quad(walk, V[0], V[1], V[2], V[3], [0, 1, 0], [1, 1, 1], UV);
+        // bó vỉa: 2 nửa 1,5 m đỏ / trắng
+        for (const [t0, t1, red] of [[0, 0.5, true], [0.5, 1, false]]) {
+          const fa = { x: A.x + (Bf.x - A.x) * t0, y: A.y + (Bf.y - A.y) * t0, z: A.z + (Bf.z - A.z) * t0, nx: A.nx, nz: A.nz };
+          const fb = { x: A.x + (Bf.x - A.x) * t1, y: A.y + (Bf.y - A.y) * t1, z: A.z + (Bf.z - A.z) * t1, nx: A.nx, nz: A.nz };
+          const col = red ? shade(0xb8352a, 1) : shade(0xe6e2d8, 1);
+          sweep(conc, [fa, fb], sg > 0 ? [[hw, ST], [hw, RT]] : [[-hw, RT], [-hw, ST]], col, false);
+          // gờ chân lan can (mặt trên + 2 mặt đứng) cùng sọc
+          sweep(conc, [fa, fb], sg > 0 ? [[W, ST + 0.32], [W - PL, ST + 0.32], [W - PL, ST]] : [[-(W - PL), ST], [-(W - PL), ST + 0.32], [-W, ST + 0.32]], red ? shade(0xb8352a, 1) : shade(0xe6e2d8, 1), false);
+        }
+        // tấm lan can hoa văn + tay vịn
+        const lp = sg * (W - PL / 2);
+        quad(balPanel, P3(A, lp, ST + 0.32), P3(Bf, lp, ST + 0.32), P3(Bf, lp, ST + 1.05), P3(A, lp, ST + 1.05), [A.nx * sg, 0, A.nz * sg], [1, 1, 1],
+          [[acc / 1.5, 0], [(acc + L) / 1.5, 0], [(acc + L) / 1.5, 1], [acc / 1.5, 1]]);
+        sweep(concBal, [A, Bf], [[lp - 0.13, ST + 1.04], [lp + 0.13, ST + 1.04], [lp + 0.13, ST + 1.16], [lp - 0.13, ST + 1.16]], shade(0xeeebe3, 1), true);
+      }
+      acc += L; stats.deckM += L;
+    }
+    // trụ lan can vuông mỗi 3 m (2 bên)
+    for (let i = 0; i < F.length; i++) for (const sg of [-1, 1]) {
+      const A = F[i], lp = sg * (W - PL / 2);
+      box(concBal, A.x + A.nx * lp, A.y + ST + 0.32 + 0.45, A.z + A.nz * lp, 0.3, 0.9, 0.3, Math.atan2(A.tx, A.tz), shade(0xeeebe3, 1));
+    }
+    // dầm biên ngoài + mặt dưới
+    sweep(conc, F, [[W, -1.0], [W, ST + 0.32]], CONC_SIDE, false);
+    sweep(conc, F, [[-W, ST + 0.32], [-W, -1.0]], CONC_SIDE, false);
+    sweep(concD, F, [[-W, -1.0], [W, -1.0]], CONC_UNDER, false);
+    // trụ trong nước mỗi ~20 m
+    let s = 0, next = 10;
+    for (let i = 0; i < F.length - 1; i++) {
+      const A = F[i], Bf = F[i + 1], L = Math.hypot(Bf.x - A.x, Bf.z - A.z);
+      while (next <= s + L) {
+        const t = (next - s) / L; next += 20;
+        const x = A.x + (Bf.x - A.x) * t, z = A.z + (Bf.z - A.z) * t, y = A.y + (Bf.y - A.y) * t;
+        if (!deps.isWater(x, z)) continue;
+        box(conc, x, (y - 1.0 - 3) / 2, z, 2 * W * 0.86, y - 1.0 + 3, 1.5, Math.atan2(A.nx, A.nz), PIER);
+        stats.piers++;
+      }
+      s += L;
+    }
+  }
+
+  // ================= CẦU NÂNG: mặt cầu + lan can + mặt dưới =================
+  for (const b of ways) {
+    if (b.kind === 'flat') continue;
+    if (b.kind === 'deck') { urbanDeck(b); continue; }
+    const F = framesOf(b.pts), hw = b.w / 2, D = DECK_DEPTH[b.kind] || 1.4;
+    const PAR = 0.42, PH = 0.95;                       // gờ bê tông lan can: dày, cao
+    stats.decks++;
+    // mặt nhựa giữa 2 gờ (uv: u ngang 0..1, v dọc theo mét/12)
+    let acc = 0;
+    for (let i = 0; i < F.length - 1; i++) {
+      const A = F[i], Bf = F[i + 1], L = Math.hypot(Bf.x - A.x, Bf.z - A.z);
+      const li = hw - PAR;
+      const p = (Fr, l) => [Fr.x + Fr.nx * l, Fr.y + 0.02, Fr.z + Fr.nz * l];
+      quad(top, p(A, -li), p(A, li), p(Bf, li), p(Bf, -li), [0, 1, 0], [1, 1, 1], [[0, acc / 12], [1, acc / 12], [1, (acc + L) / 12], [0, (acc + L) / 12]]);
+      acc += L; stats.deckM += L;
+    }
+    // gờ lan can 2 bên + mặt hông dầm (fascia) + mặt dưới
+    for (const sg of [-1, 1]) {
+      const li = sg * (hw - PAR), lo = sg * hw;
+      // mặt ngoài (từ đáy dầm lên) → đỉnh gờ → mặt trong (xuống mặt nhựa). sweep: pháp tuyến = hướng đoạn mặt cắt quay
+      // CHIỀU KIM ĐỒNG HỒ 90° trong mặt (l phải, y lên) ⇒ mặt cắt đi NGƯỢC chiều kim đồng hồ = pháp tuyến ra ngoài.
+      const prof = sg > 0 ? [[lo, -D], [lo, PH], [li, PH], [li, 0.02]] : [[li, 0.02], [li, PH], [lo, PH], [lo, -D]];
+      sweep(conc, F, prof, CONC, false);
+      // tay vịn thép trên gờ: thanh ngang + cột 2,5 m
+      const rl = sg * (hw - PAR / 2);
+      sweep(rail, F, [[rl - 0.05, PH + 0.42], [rl + 0.05, PH + 0.42], [rl + 0.05, PH + 0.5], [rl - 0.05, PH + 0.5]], RAIL, true);
+      sweep(rail, F, [[rl - 0.03, PH + 0.18], [rl + 0.03, PH + 0.18], [rl + 0.03, PH + 0.23], [rl - 0.03, PH + 0.23]], RAIL, true);
+      let s = 0;
+      for (let i = 0; i < F.length - 1; i++) {
+        const A = F[i], Bf = F[i + 1], L = Math.hypot(Bf.x - A.x, Bf.z - A.z);
+        for (let u = (2.5 - (s % 2.5)) % 2.5; u < L; u += 2.5) {
+          const t = u / L, x = A.x + (Bf.x - A.x) * t + A.nx * rl, z = A.z + (Bf.z - A.z) * t + A.nz * rl, y = A.y + (Bf.y - A.y) * t;
+          box(rail, x, y + PH + 0.25, z, 0.07, 0.5, 0.07, Math.atan2(A.tx, A.tz), RAIL);
+        }
+        s += L;
+      }
+    }
+    sweep(concD, F, [[-hw, -D], [hw, -D]], CONC_UNDER, false);
+    // đèn đường trên gờ ngoài (cột 9 m + cần vươn) mỗi 36 m, so le 2 bên
+    {
+      let s = 0, k = 0;
+      for (let i = 0; i < F.length - 1; i++) {
+        const A = F[i], Bf = F[i + 1], L = Math.hypot(Bf.x - A.x, Bf.z - A.z);
+        for (let u = (36 - (s % 36)) % 36; u < L; u += 36) {
+          const t = u / L, sg = (k++ & 1) ? 1 : -1, l = sg * (hw - PAR / 2);
+          const x = A.x + (Bf.x - A.x) * t + A.nx * l, z = A.z + (Bf.z - A.z) * t + A.nz * l, y = A.y + (Bf.y - A.y) * t + PH;
+          cyl(lamp, x, z, y, y + 9, 0.13, 0.09, 6, shade(0x8e9496, 1));
+          box(lamp, x - A.nx * sg * 1.0, y + 9, z - A.nz * sg * 1.0, 0.1, 0.1, 2.0, Math.atan2(A.nx, A.nz), shade(0x8e9496, 1));
+          box(lamp, x - A.nx * sg * 1.9, y + 8.9, z - A.nz * sg * 1.9, 0.35, 0.18, 0.7, Math.atan2(A.nx, A.nz), shade(0x55595b, 1));
+        }
+        s += L;
+      }
+    }
+  }
+
+  // ================= TRỤ cầu nâng =================
+  // khoảng cách trụ: dốc xoắn 24 m, nhịp chính 42 m; bỏ trong nhịp vòm; dời ±6 m khỏi lòng phố mặt đất / camera pano;
+  // tầng TRÊN chồng lên tầng dưới → khung cổng 2 cột đứng NGOÀI mép tầng dưới + xà mũ.
+  const arch = deps.arch || null;   // {z0, z1} nhịp vòm (không trụ giữa)
+  for (const b of ways) {
+    if (b.kind === 'flat' || b.kind === 'deck') continue;
+    const F = framesOf(b.pts), hw = b.w / 2, D = DECK_DEPTH[b.kind] || 1.4;
+    const SP = b.kind === 'span' ? 42 : 24;
+    let s = 0, next = SP * 0.5;
+    for (let i = 0; i < F.length - 1; i++) {
+      const A = F[i], Bf = F[i + 1], L = Math.hypot(Bf.x - A.x, Bf.z - A.z);
+      while (next <= s + L) {
+        const t = (next - s) / L;
+        next += SP;
+        const fx = A.x + (Bf.x - A.x) * t, fz = A.z + (Bf.z - A.z) * t, fy = A.y + (Bf.y - A.y) * t;
+        if (Math.hypot(fx, fz) > 2050) continue;
+        if (arch && b.kind === 'span' && fz < arch.z0 - 6 && fz > arch.z1 + 6) continue;
+        const under = fy - D;
+        // chỗ đặt: tâm, dời dọc ±3/±6 m nếu vướng lòng phố/camera
+        let px = fx, pz = fz, ok = false;
+        for (const dl of [0, 3, -3, 6, -6]) {
+          const qx = fx + A.tx * dl, qz = fz + A.tz * dl;
+          if (roadAt(qx, qz) || panoNear(qx, qz, 4)) continue;
+          px = qx; pz = qz; ok = true; break;
+        }
+        if (!ok) continue;
+        const gy = groundY(px, pz);
+        if (under - gy < 2.2) continue;                     // gầm thấp: dốc sát đất → không trụ (tường chắn bên dưới)
+        // tầng dưới chồng ở đây? (mặt cầu khác thấp hơn ≥ 3 m phủ trong bán kính hw+1)
+        let lower = null;
+        for (const o of ways) {
+          if (o === b || o.kind === 'flat') continue;
+          const P = o.pts;
+          for (let k = 0; k < P.length - 1; k++) {
+            const dx = P[k + 1][0] - P[k][0], dz = P[k + 1][1] - P[k][1], l2 = dx * dx + dz * dz; if (!l2) continue;
+            let tt = ((px - P[k][0]) * dx + (pz - P[k][1]) * dz) / l2; if (tt < 0 || tt > 1) continue;
+            const qx = P[k][0] + dx * tt, qz = P[k][1] + dz * tt, d = Math.hypot(px - qx, pz - qz);
+            const qy = P[k][2] + (P[k + 1][2] - P[k][2]) * tt;
+            if (d < o.w / 2 + hw && qy < fy - 3) { const l = Math.hypot(dx, dz); lower = { x: qx, z: qz, y: qy, nx: -dz / l, nz: dx / l, hw: o.w / 2 }; break; }
+          }
+          if (lower) break;
+        }
+        const R = b.kind === 'span' ? 1.25 : 0.95;
+        if (lower) {
+          // cổng: 2 cột ngoài mép tầng dưới, xà mũ dưới tầng trên
+          const off = lower.hw + 1.4;
+          const pts2 = [[lower.x + lower.nx * off, lower.z + lower.nz * off], [lower.x - lower.nx * off, lower.z - lower.nz * off]];
+          for (const [cx, cz] of pts2) cyl(conc, cx, cz, groundY(cx, cz) - 0.2, under - 0.6, 0.8, 0.75, 10, PIER);
+          const mx = (pts2[0][0] + pts2[1][0]) / 2, mz = (pts2[0][1] + pts2[1][1]) / 2;
+          box(conc, mx, under - 0.6, mz, 2 * off + 1.6, 1.2, 1.6, Math.atan2(lower.nx, lower.nz) + Math.PI / 2, CONC_SIDE);
+          stats.portals++;
+          continue;
+        }
+        cyl(conc, px, pz, gy - 0.2, under - 1.1, R, R * 0.92, 12, PIER);
+        // mũ trụ (xà ngang dưới mặt cầu)
+        box(conc, px, under - 0.55, pz, b.w * 0.82, 1.1, 1.8, Math.atan2(A.tx, A.tz), CONC_SIDE);
+        stats.piers++;
+      }
+      s += L;
+    }
+  }
+
+  // ================= VÒM THÉP HVT (nhịp chính) =================
+  if (arch) {
+    const spans = ways.filter((b) => b.kind === 'span');
+    const mid = (z) => {   // tim giữa 2 làn + cao độ mặt cầu tại z
+      let sx = 0, sy = 0, n = 0;
+      for (const b of spans) {
+        const P = b.pts;
+        for (let k = 0; k < P.length - 1; k++) {
+          const z0 = P[k][1], z1 = P[k + 1][1];
+          if ((z - z0) * (z - z1) > 0 || z0 === z1) continue;
+          const t = (z - z0) / (z1 - z0); sx += P[k][0] + (P[k + 1][0] - P[k][0]) * t; sy += P[k][2] + (P[k + 1][2] - P[k][2]) * t; n++; break;
+        }
+      }
+      return n ? [sx / n, sy / n] : null;
+    };
+    const A0 = mid(arch.z0), A1 = mid(arch.z1);
+    if (A0 && A1) {
+      const ax = A1[0] - A0[0], az = arch.z1 - arch.z0, AL = Math.hypot(ax, az), ux = ax / AL, uz = az / AL, nx = -uz, nz = ux;
+      const RIB = 14.5, H = arch.h || 38, TILT = 0.22, N = 36;
+      const ribPt = (sg, t) => {   // t 0..1 dọc vòm
+        const along = t * AL, yb = A0[1] + (A1[1] - A0[1]) * t;
+        const hh = Math.sin(t * Math.PI) * H;
+        const lat = sg * (RIB - Math.sin(TILT) * hh);
+        return [A0[0] + ux * along + nx * lat, yb + 0.5 + hh * Math.cos(TILT), arch.z0 + uz * along + nz * lat];
+      };
+      for (const sg of [-1, 1]) {
+        // sườn vòm: hộp 1,8 × 2,4 m dọc đường cong
+        for (let k = 0; k < N; k++) {
+          const p1 = ribPt(sg, k / N), p2 = ribPt(sg, (k + 1) / N);
+          const dx = p2[0] - p1[0], dy = p2[1] - p1[1], dz = p2[2] - p1[2], L = Math.hypot(dx, dy, dz);
+          const g = new THREE.BoxGeometry(1.8, 2.4, L + 0.25);
+          const m = new THREE.Matrix4().lookAt(new THREE.Vector3(0, 0, 0), new THREE.Vector3(dx, dy, dz), new THREE.Vector3(0, 1, 0));
+          m.setPosition((p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2, (p1[2] + p2[2]) / 2);
+          g.applyMatrix4(m);
+          red.geos = red.geos || []; red.geos.push(g);
+        }
+        // dây treo đan chéo (network arch): chân dây lệch dọc ±0,08 nhịp
+        for (let k = 2; k <= N - 2; k += 2) {
+          const t = k / N, top2 = ribPt(sg, t);
+          for (const dd of [-0.08, 0.08]) {
+            const tf = t + dd; if (tf < 0.03 || tf > 0.97) continue;
+            const along = tf * AL, yb = A0[1] + (A1[1] - A0[1]) * tf + 0.9;
+            const foot = [A0[0] + ux * along + nx * sg * 12.2, yb, arch.z0 + uz * along + nz * sg * 12.2];
+            const dx = top2[0] - foot[0], dy = top2[1] - foot[1], dz = top2[2] - foot[2], L = Math.hypot(dx, dy, dz);
+            const g = new THREE.CylinderGeometry(0.09, 0.09, L, 4, 1, true);
+            const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(dx / L, dy / L, dz / L));
+            g.applyMatrix4(new THREE.Matrix4().compose(new THREE.Vector3((top2[0] + foot[0]) / 2, (top2[1] + foot[1]) / 2, (top2[2] + foot[2]) / 2), q, new THREE.Vector3(1, 1, 1)));
+            cable.geos = cable.geos || []; cable.geos.push(g);
+          }
+        }
+      }
+      // giằng ngang giữa 2 sườn ở đỉnh
+      for (const t of [0.3, 0.4, 0.5, 0.6, 0.7]) {
+        const p1 = ribPt(-1, t), p2 = ribPt(1, t);
+        const dx = p2[0] - p1[0], dy = p2[1] - p1[1], dz = p2[2] - p1[2], L = Math.hypot(dx, dy, dz);
+        const g = new THREE.BoxGeometry(1.0, 1.0, L);
+        const m = new THREE.Matrix4().lookAt(new THREE.Vector3(0, 0, 0), new THREE.Vector3(dx, dy, dz), new THREE.Vector3(0, 1, 0));
+        m.setPosition((p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2, (p1[2] + p2[2]) / 2);
+        g.applyMatrix4(m); red.geos.push(g);
+      }
+      // trụ chân vòm (2 trụ lớn mỗi đầu, xuống nước)
+      for (const [P, z] of [[A0, arch.z0], [A1, arch.z1]]) {
+        for (const sg of [-1, 1]) {
+          const cx = P[0] + nx * sg * 9.5, cz = z + nz * sg * 9.5;
+          cyl(conc, cx, cz, -3, P[1] - 2.4, 2.4, 2.2, 14, PIER);
+        }
+        box(conc, P[0], P[1] - 2.6, z, 31, 2.2, 4.5, Math.atan2(nx, nz) + Math.PI / 2, CONC_SIDE);
+      }
+      stats.arch = { z0: arch.z0, z1: arch.z1, x0: +A0[0].toFixed(1), y0: +A0[1].toFixed(1) };
+    }
+  }
+
+  // ================= CẦU PHẲNG: lan can con tiện trắng + dầm biên + trụ trong nước =================
+  // (mặt đường/vỉa hè sơn đỏ-trắng do roadnet vẽ ở LAND_H; ở đây chỉ phần "cầu": lan can ở MÉP NGOÀI vỉa hè, dầm biên từ
+  //  mặt vỉa hè xuống dưới mặt nước, trụ vuông dưới mép ~ 18 m/trụ) — chỉ đoạn trên nước + 14 m mỗi bên.
+  const BAL = shade(0xe9e6de, 1), BAL_D = shade(0xcfcbc1, 1);
+  for (const b of ways) {
+    if (b.kind !== 'flat') continue;
+    const ri = b.ri && b.ri.length ? b.ri[0] : -1;
+    const road = ri >= 0 && deps.ROADS_DT ? deps.ROADS_DT[ri] : null;
+    if (!road) continue;
+    if (!road.pts.some(([x, z]) => Math.hypot(x, z) < 1700)) continue;
+    const c = road.c, edge = deps.hw(c) + deps.sw(c);
+    // lấy mẫu 1,5 m dọc tim ROADS_DT; đánh dấu ướt
+    const S = [];
+    for (let i = 0; i < road.pts.length - 1; i++) {
+      const [ax, az] = road.pts[i], [bx, bz] = road.pts[i + 1], L = Math.hypot(bx - ax, bz - az), n = Math.max(1, Math.ceil(L / 1.5));
+      const tx = (bx - ax) / L, tz = (bz - az) / L;
+      for (let k = 0; k < n; k++) { const x = ax + (bx - ax) * k / n, z = az + (bz - az) * k / n; S.push({ x, z, tx, tz, nx: -tz, nz: tx, wet: deps.isWater(x, z) }); }
+    }
+    if (!S.some((s) => s.wet)) continue;
+    // mở rộng vùng "cầu" 14 m mỗi đầu đoạn ướt
+    const on = S.map(() => false);
+    S.forEach((s, i) => { if (!s.wet) return; for (let k = Math.max(0, i - 9); k <= Math.min(S.length - 1, i + 9); k++) on[k] = true; });
+    for (const sg of [-1, 1]) {
+      let prev = null, bay = 0;
+      for (let i = 0; i < S.length; i++) {
+        const s = S[i];
+        // miệng phố khác chạm cầu (nút giao) → hở lan can
+        const ex = s.x + s.nx * sg * edge, ez = s.z + s.nz * sg * edge;
+        const blocked = !on[i] || (deps.roadSurfaceAt && (() => { const v = deps.roadSurfaceAt(s.x + s.nx * sg * (edge + 1.2), s.z + s.nz * sg * (edge + 1.2)); return v > 0 && v < 0.2; })());
+        if (blocked) { prev = null; continue; }
+        const y0 = LAND_H + 0.25;
+        if (prev) {
+          const F2 = [{ x: prev[0], z: prev[1], y: y0, nx: s.nx, nz: s.nz }, { x: ex, z: ez, y: y0, nx: s.nx, nz: s.nz }];
+          // gờ chân + tay vịn (mặt cắt ngược chiều kim đồng hồ — xem sweep)
+          sweep(concBal, F2, [[0.16, 0], [0.16, 0.22], [-0.16, 0.22], [-0.16, 0]], BAL_D, false);
+          sweep(concBal, F2, [[-0.12, 0.98], [0.12, 0.98], [0.12, 1.1], [-0.12, 1.1]], BAL, true);
+          // con tiện: 2 thanh / 1,5 m
+          for (const t of [0.25, 0.75]) box(concBal, prev[0] + (ex - prev[0]) * t, y0 + 0.6, prev[1] + (ez - prev[1]) * t, 0.11, 0.76, 0.11, 0, BAL);
+          if ((bay++ % 2) === 0) box(concBal, ex, y0 + 0.58, ez, 0.26, 1.16, 0.26, Math.atan2(s.tx, s.tz), BAL);
+          // dầm biên: mặt đứng ngoài từ mặt vỉa hè xuống −0,6 (che khe nước dưới đường) — chỉ đoạn trên nước
+          if (s.wet) {
+            const o = 0.18 * sg;
+            const a = [prev[0] + s.nx * o, y0, prev[1] + s.nz * o], bb = [prev[0] + s.nx * o, -0.6, prev[1] + s.nz * o];
+            const cc = [ex + s.nx * o, -0.6, ez + s.nz * o], d = [ex + s.nx * o, y0, ez + s.nz * o];
+            // thứ tự (trên-đầu, dưới-đầu, dưới-cuối, trên-cuối) cho pháp tuyến +phải → bên trái đảo thứ tự
+            if (sg > 0) quad(concBal, a, bb, cc, d, [s.nx, 0, s.nz], shade(0xb7b2a6, 1));
+            else quad(concBal, d, cc, bb, a, [-s.nx, 0, -s.nz], shade(0xb7b2a6, 1));
+          }
+          stats.flatRails += 1.5;
+        }
+        prev = [ex, ez];
+      }
+    }
+    // trụ trong nước mỗi ~18 m (dưới tim đường)
+    let acc = 0;
+    for (let i = 0; i < S.length; i++) {
+      if (S[i].wet && acc >= 18) { const s = S[i]; box(concBal, s.x, -1.2, s.z, (edge + 0.2) * 2 * 0.9, 4.2, 1.6, Math.atan2(s.nx, s.nz), shade(0xa9a499, 1)); acc = 0; }
+      acc += 1.5;
+    }
+  }
+
+  // ---- ráp mesh ----
+  const out = [];
+  const addMesh = (B, mat, name) => {
+    let g = toGeo(B);
+    if (B.geos && B.geos.length) {
+      const gs = B.geos.map((x) => { const y = x.index ? x.toNonIndexed() : x; y.deleteAttribute('uv'); return y; });
+      const gg = mergeGeometries(gs); B.geos.forEach((x) => x.dispose());
+      g = gg;
+    }
+    if (!g) return;
+    const m = new THREE.Mesh(g, mat); m.name = name; m.castShadow = true; m.receiveShadow = true;
+    scene.add(m); out.push(m); stats.tris += (g.index ? g.index.count : g.attributes.position.count) / 3;
+  };
+  const vc = (hex) => new THREE.MeshLambertMaterial({ color: hex, vertexColors: true });
+  addMesh(conc, vc(0xffffff), 'bridge_group_conc');
+  addMesh(concD, vc(0xffffff), 'bridge_group_under');
+  addMesh(concBal, vc(0xffffff), 'bridge_group_flat');
+  addMesh(rail, vc(0xffffff), 'bridge_group_rail');
+  addMesh(lamp, vc(0xffffff), 'bridge_group_lamps');
+  const topMat = new THREE.MeshLambertMaterial({ map: deckTexture() });
+  addMesh(top, topMat, 'bridge_group_deck');
+  addMesh(top2, new THREE.MeshLambertMaterial({ map: deckTexture(true) }), 'bridge_group_deck2');
+  addMesh(walk, new THREE.MeshLambertMaterial({ map: tileTexture() }), 'bridge_group_walk');
+  const bp = toGeo(balPanel);
+  if (bp) {
+    const m = new THREE.Mesh(bp, new THREE.MeshLambertMaterial({ map: balTexture(), alphaTest: 0.5, side: THREE.DoubleSide }));
+    m.name = 'bridge_group_balpanel'; m.userData.noMerge = true; scene.add(m); out.push(m);
+  }
+  if (red.geos) addMesh({ p: [], n: [], c: [], u: [], idx: [], geos: red.geos }, new THREE.MeshLambertMaterial({ color: 0xc63a2c }), 'bridge_group_arch');
+  if (cable.geos) addMesh({ p: [], n: [], c: [], u: [], idx: [], geos: cable.geos }, new THREE.MeshLambertMaterial({ color: 0xe2ddd4 }), 'bridge_group_cables');
+  stats.ms = Math.round(performance.now() - t0);
+  stats.tris = Math.round(stats.tris);
+  return { index, stats, meshes: out };
+}

@@ -1,8 +1,11 @@
 // Địa hình từ dữ liệu OpenStreetMap thật (không phụ thuộc three.js — chạy được cả trong node)
-import { WORLD, DT_BOX, MASK, RIVERS, ROADS_DT, ROADS_REGION, LM, LM_DIR, LM_FACE, EXTRAS, TREES, PARKS, RAIL, BUILDINGS, WATER } from './mapdata.js';
+import { WORLD, DT_BOX, MASK, RIVERS, ROADS_DT, ROADS_REGION, LM, LM_DIR, LM_FACE, EXTRAS, TREES, PARKS, RAIL, BUILDINGS, WATER, BRIDGE_WAYS } from './mapdata.js';
 
 export const WORLD_BOUNDS = WORLD;
-export { LM, LM_DIR, LM_FACE, EXTRAS, TREES, PARKS, RAIL, DT_BOX, RIVERS, ROADS_DT, ROADS_REGION, BUILDINGS, WATER };
+export { LM, LM_DIR, LM_FACE, EXTRAS, TREES, PARKS, RAIL, DT_BOX, RIVERS, ROADS_DT, ROADS_REGION, BUILDINGS, WATER, BRIDGE_WAYS };
+// Đợt 3 W3-F: chỉ số ROADS_DT của các way CẦU NÂNG (HVT: nhịp chính + nút xoắn + dốc dẫn) — mặt đường do js/bridges.js
+// dựng trên cao; roadnet/cây/prop/cầu phẳng địa hình KHÔNG được coi chúng là phố mặt đất.
+export const ELEVATED_RI = new Set((BRIDGE_WAYS || []).filter((b) => b.kind !== 'flat').flatMap((b) => b.ri));
 
 const SEA_FLOOR = -4, LAND_H = 2;
 
@@ -198,7 +201,9 @@ function polyWeight(x, z) { return 1 - smoothstep(R_POLY, R_POLY_END, Math.hypot
 
 const riverIdx = makeBucketIndex(RIVERS.map((r) => ({ pts: r.pts, meta: [r.w, r.sh || 28] })));
 const regionIdx = makeBucketIndex(ROADS_REGION.map((r) => ({ pts: r.pts, meta: 0 })));
-const dtRoadIdx = makeBucketIndex(ROADS_DT.map((r) => ({ pts: r.pts, meta: r.c })));
+// cầu nâng (ELEVATED_RI) bỏ khỏi chỉ mục "phố băng sông = mặt cầu phẳng 2,05": nhịp chính HVT từng tạo mặt cầu phẳng
+// ngay mặt nước → camera pano_285 đứng sát mặt sông thay vì trên mặt cầu cao ~18 m
+const dtRoadIdx = makeBucketIndex(ROADS_DT.filter((r, i) => !ELEVATED_RI.has(i)).map((r) => ({ pts: r.pts, meta: r.c })));
 
 // hệ số đào lòng sông 0..1 theo POLYLINE (ngoài thành phố)
 function riverFactorLine(x, z) {
@@ -243,9 +248,12 @@ export const BRIDGES = EXTRAS.bridges.map((b) => ({
 const PIERS = []; // world.js đăng ký sau khi dò bờ
 export function addPier(p) { PIERS.push(p); }
 
+// BRIDGES[0] (HVT) KHÔNG còn mặt cầu giải tích: đoạn thẳng nối 2 đầu way bắc lệch ~110 m khỏi cầu thật — mặt cầu HVT
+// nay theo way OSM (js/bridges.js, tra cao độ bằng world.surfaceY có tham chiếu cao độ). Cầu Bính giữ công thức cũ.
+const ARCH_DECKS = BRIDGES.slice(1);
 function deckHeight(x, z, wet) {
   let h = -Infinity;
-  for (const b of BRIDGES) {
+  for (const b of ARCH_DECKS) {
     const dx = x - b.x, dz = z - b.zc;
     const along = dx * b.sin + dz * b.cos;      // dọc trục cầu
     const across = dx * b.cos - dz * b.sin;     // ngang trục cầu

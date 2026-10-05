@@ -66,6 +66,9 @@ const smooth = (t) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
 
 export function createTraffic(scene, world, opts = {}) {
   const { groundHeight } = world;
+  // W3-F: mặt cầu nâng (nút xoắn/nhịp chính HVT): giữ tầng đang chạy (tham chiếu = cao độ lần trước), tác tử mới đặt
+  // bằng spawnY (mặt cầu nếu dưới không phải phố mặt đất). Bản world cũ không có surfaceY → mặt đất như trước.
+  const groundAt = (a) => (world.surfaceY ? (a.y == null ? world.spawnY(a.x, a.z) : world.surfaceY(a.x, a.z, a.y - ROAD_TOP)) : groundHeight(a.x, a.z));
   const PLAY_R = opts.playRadius || 1588;
   const fp = opts.footprints || null;
   const G = buildRoadGraph(ROADS_DT, { radius: PLAY_R, margin: 60 });
@@ -356,7 +359,7 @@ export function createTraffic(scene, world, opts = {}) {
       if (rnd() * 90 > (dens[e.c] || 0)) continue;              // trọng số mật độ theo cấp phố
       a.e = ei; a.dir = rnd() < 0.5 ? 0 : 1; a.s = rnd() * e.L;
       if (!dirOK(a, e, a.dir)) a.dir ^= 1;
-      a.prev = null; a.next = null; a.rb = 6; a.prevRb = 0; a.pk = 0;
+      a.prev = null; a.next = null; a.rb = 6; a.prevRb = 0; a.pk = 0; a.y = undefined; a.yx = 1e9;   // W3-F: chỗ mới → cao độ đặt lại bằng spawnY (mặt cầu nâng)
       a.lat01 = rnd(); a.drive01 = rnd();
       if (a.type === 'walk') { a.side = rnd() < 0.5 ? 1 : -1; a.lat01 = 0.35 + rnd() * 0.4; a.walkV = 1.1 + rnd() * 0.5; }
       a.latCur = latFor(a, e);
@@ -653,7 +656,7 @@ export function createTraffic(scene, world, opts = {}) {
       const a = agents[j];
       const d2 = (a.x - px) * (a.x - px) + (a.z - pz) * (a.z - pz);
       if (d2 > DRAW_R2) continue;
-      if (!(Math.abs(a.x - a.yx) + Math.abs(a.z - a.yz) < 4)) { a.yx = a.x; a.yz = a.z; a.y = groundHeight(a.x, a.z) + (a.type === 'walk' ? SIDEWALK_TOP : ROAD_TOP); }
+      if (!(Math.abs(a.x - a.yx) + Math.abs(a.z - a.yz) < 4)) { a.yx = a.x; a.yz = a.z; a.y = groundAt(a) + (a.type === 'walk' ? SIDEWALK_TOP : ROAD_TOP); }
       let g = a.grp, sx = 1, sy = 1, sz = 1;
       if (a.type !== 'walk') {
         const lim = (a.type === 'bike' ? NEAR_BIKE : NEAR_CAR) - (a.far ? LOD_HYST : 0);

@@ -189,7 +189,13 @@ export function buildRoadNet(ROADS_DT, deps) {
 
   // ---------- 0) way ----------
   const ways = [];
-  ROADS_DT.forEach((r, ri) => { const pts = dedupe(r.pts.map(([x, z]) => [x, z])); if (pts.length >= 2) ways.push({ ri, c: r.c, pts }); });
+  let nAll = 0;   // si = chỉ số way NẾU không bỏ cầu nâng → seed vá đường/lệch 1,5 mm của mọi phố khác GIỮ NGUYÊN
+  ROADS_DT.forEach((r, ri) => {
+    const pts = dedupe(r.pts.map(([x, z]) => [x, z])); if (pts.length < 2) return;
+    const si = nAll++;
+    if (deps.skipWay && deps.skipWay(ri)) return;   // W3-F: cầu nâng (js/bridges.js dựng mặt cầu trên cao)
+    ways.push({ ri, si, c: r.c, pts });
+  });
   const vkey = (x, z) => Math.round(x * 20) + ',' + Math.round(z * 20);
   // mặt cầu VÒM có mô hình riêng (terrain BRIDGES: HVT, Bính…) — dải đường dưới vòm bị cắt (kiểm giải tích, không gọi địa hình)
   const ARCH = (deps.bridges || []).filter((b) => b.rise > 3);
@@ -911,7 +917,7 @@ export function buildRoadNet(ROADS_DT, deps) {
     }
     // mặt nhựa nâng theo cấp (+4 mm/cấp): 2 dải chồng nhau (đường đôi/nhánh song song) → dải cấp cao thắng, không z-fight
     // (+1,5 mm cho way lẻ: 2 dải CÙNG cấp chồng nhau — làn nhập/tách nông không chèn nút — không z-fight vạch kẻ ở gần)
-    const yR = ROAD_TOP + 0.004 * RANK[w.c] + 0.0015 * (w.wi0 & 1);
+    const yR = ROAD_TOP + 0.004 * RANK[w.c] + 0.0015 * (w.si & 1);
     const cands = street && sw > 0 ? foreignCands(P, w, nA, nB) : [];
     // ---- lòng đường ----
     const u0 = sA.trim, u1 = L - sB.trim;
@@ -919,7 +925,7 @@ export function buildRoadNet(ROADS_DT, deps) {
       const zebOK = street && u1 - u0 >= 14;
       // aZeb = u của 2 đầu dải tại NÚT GIAO (vạch kẻ dừng trước nút; nối miter/đường cụt: vạch chạy liền)
       const zeb = [sA.junc ? u0 : -1e4, sB.junc ? u1 : 1e4];
-      const seed = ((w.wi0 * 131 + ka * 17) & 255) << 13;
+      const seed = ((w.si * 131 + ka * 17) & 255) << 13;
       const pr = pat | seed | (zebOK && sA.zebra ? MK.ZEB0 : 0) | (zebOK && sB.zebra ? MK.ZEB1 : 0) |
         (zebOK && sA.stop ? MK.STOP0 : 0) | (zebOK && sB.stop ? MK.STOP1 : 0);
       for (const [a, b, gA, gB] of pieces(u0, u1)) {

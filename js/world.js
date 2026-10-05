@@ -11,7 +11,10 @@ import {
   WORLD_BOUNDS, LM, LM_DIR, LM_FACE, EXTRAS, TREES, PARKS, RAIL, DT_BOX, ROADS_DT, BRIDGES, BUILDINGS,
   groundHeight, groundHeightNoDeck, isWater, landAt, riverFactor,
   nearestRiverPoint, findShore, addPier, LAKE_POLY, lakeSD, HOSEN_POLY, hoSenSD,
+  BRIDGE_WAYS, ELEVATED_RI, waterSD, WATER,
 } from './terrain.js';
+import { buildBridges, makeDeckIndex } from './bridges.js';   // Đợt 3 W3-F: cầu theo way OSM (HVT xoắn ốc, Lạc Long…)
+import { snapBankGrid, buildRiverbanks } from './riverbank.js';   // Đợt 3 W3-F: bờ kè sông (tường kè, dải dạo, lan can, đèn)
 import { LM_SIZE, FACADE_SHORT_SIDE } from './mapdata.js';
 import { makeWaterMaterial } from './water.js';
 import { makeGroundSystem } from './landuse.js';   // Đợt 3 W2-D: mặt đất theo sử dụng đất (raster + shader)
@@ -48,13 +51,56 @@ import { furnitureLine } from './xsection.js';
 import { buildRoadNet } from './roadnet.js';
 import { makeRoadMaterial } from './roadtex.js';
 import { ROAD_MARK_EVIDENCE } from './roadmarks.js';
-import { ROAD_W as XS_ROAD_W } from './xsection.js';
+import { ROAD_W as XS_ROAD_W, SIDEWALK_W } from './xsection.js';
 
 // Thế giới dựng từ dữ liệu OpenStreetMap thật của Hải Phòng (tỉ lệ 1:10,
 // trung tâm phóng đại 2.2x). Mọi con phố trung tâm là phố thật.
 export { groundHeight, groundHeightNoDeck, isWater, landAt, WORLD_BOUNDS, LM, LM_DIR, LM_FACE, EXTRAS };
 
 const LAND_H = 2;
+// ---- Đợt 3 W3-F: MẶT CẦU NÂNG (js/bridges.js) — tra cao độ CÓ THAM CHIẾU (nút xoắn HVT 2 tầng, cầu vượt trên phố) ----
+// groundHeight(x,z) KHÔNG gồm mặt cầu nâng (đặt cây/prop/nhà vẫn ở mặt đất bên dưới). Người chơi/xe/giao thông/camera dùng:
+//   surfaceY(x, z, yRef) = max(mặt đất, mặt cầu cao nhất ≤ yRef + 1,2 m) — giữ đúng tầng đang đi, lên cầu bằng dốc
+//   spawnY(x, z)         = cao độ đặt khi KHÔNG có tham chiếu (teleport/camera pano/spawn): mặt cầu có tim gần nhất NẾU
+//                          bên dưới không phải lòng/vỉa hè phố mặt đất (pano_285 trên nhịp chính; pano_349 dưới vòng xoắn).
+export const DECKS = makeDeckIndex(BRIDGE_WAYS || []);
+let _roadSurf = null;
+export function surfaceY(x, z, yRef) {
+  const g = groundHeight(x, z), d = DECKS.yAt(x, z, yRef);
+  return d > g ? d : g;
+}
+// spawnY: mặt cầu nếu tim mặt cầu GẦN hơn tim phố mặt đất gần nhất (pano_074 trên Cầu Lạc Long: tim cầu 2,9 m, đầu cụt
+// phố Bạch Đằng dưới cầu 10,6 m; pano_349 dưới vòng xoắn: tim phố mặt đất 0,5 m < tim dốc 3,6 m → mặt đất)
+let _gSeg = null;
+function groundRoadDist(x, z) {
+  if (!_gSeg) {
+    _gSeg = new Map();
+    ROADS_DT.forEach((r, ri) => {
+      if (ELEVATED_RI.has(ri)) return;
+      for (let i = 0; i < r.pts.length - 1; i++) {
+        const [ax, az] = r.pts[i], [bx, bz] = r.pts[i + 1];
+        for (let gx = Math.floor((Math.min(ax, bx) - 16) / 32); gx <= Math.floor((Math.max(ax, bx) + 16) / 32); gx++)
+          for (let gz = Math.floor((Math.min(az, bz) - 16) / 32); gz <= Math.floor((Math.max(az, bz) + 16) / 32); gz++) {
+            const k = gx * 65536 + gz; let a = _gSeg.get(k); if (!a) _gSeg.set(k, a = []); a.push([ax, az, bx, bz]);
+          }
+      }
+    });
+  }
+  const a = _gSeg.get(Math.floor(x / 32) * 65536 + Math.floor(z / 32)); if (!a) return Infinity;
+  let best = Infinity;
+  for (const [ax, az, bx, bz] of a) {
+    const dx = bx - ax, dz = bz - az, l2 = dx * dx + dz * dz;
+    let t = l2 ? ((x - ax) * dx + (z - az) * dz) / l2 : 0; t = t < 0 ? 0 : t > 1 ? 1 : t;
+    const d = Math.hypot(x - ax - dx * t, z - az - dz * t); if (d < best) best = d;
+  }
+  return best;
+}
+export function spawnY(x, z) {
+  const g = groundHeight(x, z), D = DECKS.nearestInfo(x, z);
+  if (!(D.y > g + 0.8)) return g;
+  if (_roadSurf && _roadSurf(x, z) > 0 && g > 0.5 && groundRoadDist(x, z) < D.d) return g;   // phố mặt đất dưới, tim gần hơn
+  return D.y;
+}
 
 function clamp(v, a, b) { return Math.min(b, Math.max(a, v)); }
 function smoothstep(a, b, x) {
@@ -542,7 +588,11 @@ export async function buildWorld(scene, prog = () => {}) {
   const world = {
     colliders, updaters, groundHeight, groundHeightNoDeck, isWater, sharedMats,
     vehicleSpawns: [], npcSpots: {}, walkPaths: [],
+    surfaceY, spawnY, decks: DECKS,   // W3-F: mặt cầu nâng (xem trên)
   };
+  // W3-F: ROADS_DT cho các hệ đặt đồ THEO PHỐ MẶT ĐẤT (cây, prop, khoảng trống W2-A): way cầu nâng (ELEVATED_RI) thu về
+  // 1 điểm (giữ CHỈ SỐ — SIDEWALK_BY_ROAD/treemap khoá theo ri) → không cây/cột/xe đỗ mọc dưới-xuyên mặt cầu xoắn HVT.
+  const ROADS_GROUND = ROADS_DT.map((r, i) => (ELEVATED_RI.has(i) ? { c: r.c, pts: [r.pts[0]] } : r));
   // đẩy điểm ra khỏi vật cản — chỉ mục lưới XÂY 1 LẦN rồi CHÈN TĂNG DẦN (tránh xây lại O(P·C) lúc tải:
   // ~9000 addCollider xen kẽ resolveCollisions khi rải cây → trước đây xây lại toàn map mỗi lần).
   let colIdx = null;
@@ -754,6 +804,14 @@ export async function buildWorld(scene, prog = () => {}) {
       // với lưới local là z-fight (phản biện Đợt 2). Thấp hơn 1,8 cm + polygonOffset đẩy lưới ra sau trong depth.
       return Math.max(h, coarse.yAt(x, z)) + 0.012;
     });
+    // W3-F: NẮN bờ sông theo polygon (đỉnh ±0,72 ô quanh mép → về mép / chân kè) — hết bờ dốc thoải ~5 m (nước sát vỉa hè)
+    {
+      const colA = local.geo.attributes.color.array;
+      const nSnap = snapBankGrid(local.geo, { step: (2 * LOCAL_HALF) / N, waterSD, landY: LAND_H + 0.012,
+        skip: (x, z) => FINE_BOXES.some(([x1, x2, z1, z2]) => x > x1 - 14 && x < x2 + 14 && z > z1 - 14 && z < z2 + 14),
+        recolor: (i, x, z) => vertexHC(x, z, colA, i) });
+      console.log('[world] W3-F nắn bờ sông lưới nền:', nSnap, 'đỉnh');
+    }
     // polygonOffset nhẹ: lưới local lùi sau trong depth so với các mặt lát +0.03 đặt trên nó (chống z-fight ở xa)
     const groundLocal = new THREE.Mesh(local.geo, luSys.material({ polygonOffset: [1, 2] }));
     // tên 'ground_local': freezeStatic bỏ qua theo /^ground/ (không gộp, không castShadow), nearCull không khớp
@@ -888,7 +946,10 @@ export async function buildWorld(scene, prog = () => {}) {
   }
   {
     const net = buildRoadNet(ROADS_DT, {
-      groundHeightNoDeck, groundHeight, isWater, LAND_H, R: BUILD_RADIUS, T: 450, MEDIANS, bridges: BRIDGES,
+      // W3-F: cầu nâng (HVT nhịp chính + nút xoắn + dốc dẫn) do js/bridges.js dựng trên cao → roadnet BỎ dải mặt đất của
+      // chúng (từng là vòng nhựa nằm đất, pano_304/349); BRIDGES[0] (đoạn thẳng HVT cũ) không còn cắt dải dưới "vòm"
+      groundHeightNoDeck, groundHeight, isWater, LAND_H, R: BUILD_RADIUS, T: 450, MEDIANS, bridges: BRIDGES.slice(1),
+      skipWay: (ri) => ELEVATED_RI.has(ri),
       swTypeOf: (ri) => SIDEWALK_BY_ROAD[ri] || SIDEWALK_DEFAULT, MARKS: ROAD_MARK_EVIDENCE,
     });
     const rmat = makeRoadMaterial(THREE, { size: LITE ? 256 : 512, anisotropy: LITE ? 4 : 8, lite: LITE });
@@ -914,9 +975,18 @@ export async function buildWorld(scene, prog = () => {}) {
     // API cho hệ khác (cây/prop/giao thông/người chơi): nút giao thật + cột đèn tín hiệu + tra cứu "gần ngã tư" +
     // surfaceAt(x,z) = độ cao mặt nhựa/vỉa hè so với groundHeight (0 ngoài đường) để chân người/xe không lún vào vỉa hè
     world.roadNet = { junctions: net.junctions, signals: net.signals, nearJunction: net.nearJunction, surfaceAt: net.surfaceAt, stats: net.stats, material: rmat };
+    _roadSurf = net.surfaceAt;   // W3-F spawnY: phố mặt đất dưới mặt cầu nâng?
     console.log('[world] mạng đường:', net.junctions.length, 'nút giao,', net.signals.length, 'cột đèn,', tris, 'tam giác,',
       net.stats.ms, 'ms dựng +', rmat.userData.genMs.toFixed(0), 'ms texture');
   }
+  // ---------- W3-F BỜ KÈ SÔNG (js/riverbank.js): tường kè + gờ mọi bờ sông trong R; phố chạy dọc bờ → dải dạo ca-rô +
+  // lan can gang hoa văn + đèn 2 bóng + hoa giấy + collider; cây non chống cọc (trồng ở khối cây) ----------
+  world.riverbank = buildRiverbanks(scene, {
+    WATER, waterSD, roads: ROADS_DT.map((r, i) => (ELEVATED_RI.has(i) ? { c: r.c, pts: [] } : r)), LAND_H, R: BUILD_RADIUS + 40,
+    hw: (c) => XS_ROAD_W[c] / 2, sw: (c) => SIDEWALK_W[c] || 0, keClear: (c) => Math.max(7, XS_ROAD_W[c] / 2 + (SIDEWALK_W[c] || 0) + 2.5),
+    roadSurfaceAt: world.roadNet && world.roadNet.surfaceAt, lampGlow: sharedMats.lampGlow, addCollider, panoCams: PANO_CAM,
+  });
+  console.log('[world] W3-F bờ kè sông:', JSON.stringify(world.riverbank.stats));
   function addMerged(geos, material, name) {
     if (!geos.length) return;
     const merged = mergeGeometries(geos);
@@ -971,7 +1041,7 @@ export async function buildWorld(scene, prog = () => {}) {
   // ---------- ĐỢT 3 W2-A KHOẢNG TRỐNG: tra cứu lòng đường (roadNet.surfaceAt — biết khe nhựa đường đôi) / hành lang
   // mặt tiền (xsection.facadeLine) / camera pano (panoclear) cho khối phố này, khối ô (cellsink) và props/trees.
   // Mọi vật thể cấp cao nhất + collider của khối phố (từ đây tới trước khối ô) được quét 1 lượt ở cuối khối (sweep).
-  initClearance({ ROADS_DT, surfaceAt: world.roadNet && world.roadNet.surfaceAt, nearJunction: world.roadNet && world.roadNet.nearJunction, groundHeight, isWater, LAND_H });
+  initClearance({ ROADS_DT: ROADS_GROUND, surfaceAt: world.roadNet && world.roadNet.surfaceAt, nearJunction: world.roadNet && world.roadNet.nearJunction, groundHeight, isWater, LAND_H });
   const _clrN0 = scene.children.length, _clrC0 = colliders.length;
   // ---------- GIÀN VÒM THÉP TRẮNG trang trí (dải công viên trung tâm, gần Trần Bình Trọng) ----------
   // Theo pano thật pano_195 [~555,-234]: dãy vòm bán nguyệt trắng lặp trên lối đi lát.
@@ -8995,6 +9065,7 @@ const tsShop = (bx, bz, ry, W, FL, wallMat, txt, sbg, sfg, opt = {}) => {
       const e = Math.min(d + 28, L), mid = (d + e) / 2;
       const mx = x1 + ux * mid, mz = z1 + uz * mid;
       FEATURED_CLEAR.push([mx + nx * 9, mz + nz * 9, 13]);     // chặn nhà trên kè (kể cả khi còn ướt)
+      if (world.riverbank && world.riverbank.stats.promM > 0) continue;   // W3-F: dải dạo + lan can kè do js/riverbank.js dựng theo mép polygon (bản này từng nằm lệch 1 m cạnh lan can mới)
       if (!tsOK(mx + nx * 4.8, mz + nz * 4.8) || !tsOK(mx + nx * 9.0, mz + nz * 9.0)) continue;
       const c = [[d, 4.6], [e, 4.6], [e, 9.2], [d, 9.2]].map(([a, o]) =>
         new THREE.Vector2(x1 + ux * a + nx * o, z1 + uz * a + nz * o));
@@ -9040,6 +9111,7 @@ const tsShop = (bx, bz, ry, W, FL, wallMat, txt, sbg, sfg, opt = {}) => {
       const e = Math.min(d + 28, L), mid = (d + e) / 2;
       const mx = x1 + ux * mid, mz = z1 + uz * mid;
       FEATURED_CLEAR.push([mx + nx * 9, mz + nz * 9, 13]);
+      if (world.riverbank && world.riverbank.stats.promM > 0) continue;   // W3-F: dải dạo + lan can kè do js/riverbank.js dựng theo mép polygon (bản này từng nằm lệch 1 m cạnh lan can mới)
       if (!tsOK(mx + nx * 4.8, mz + nz * 4.8) || !tsOK(mx + nx * 9.0, mz + nz * 9.0)) continue;
       const c = [[d, 4.6], [e, 4.6], [e, 9.2], [d, 9.2]].map(([a, o]) =>
         new THREE.Vector2(x1 + ux * a + nx * o, z1 + uz * a + nz * o));
@@ -19468,72 +19540,16 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     const dm = new THREE.Mesh(mergeGeometries(deckG), mat(0xcfd4da)); deckG.forEach((x) => x.dispose()); g.add(dm);
     const rm = new THREE.Mesh(mergeGeometries(railG), mat(railColor)); railG.forEach((x) => x.dispose()); g.add(rm);
   }
+  // W3-F: Cầu Hoàng Văn Thụ dựng THEO WAY OSM (js/bridges.js: nhịp chính 2 làn + 2 nút xoắn ốc + vòm đỏ trên lòng sông
+  // thật z −1030…−1200) — khối cũ (hộp thẳng nối 2 đầu way bắc, vòm tâm z −1391) đã bỏ. Kèm bộ lan can/dầm/trụ cầu phẳng.
   {
-    // Cầu Hoàng Văn Thụ: HAI vòm thép đỏ nghiêng vào nhau — dáng "cánh chim biển" thật
-    const b = BRIDGES[0];
-    const g = bridgeGroup(b);
-    bridgeDeckAndRails(g, b, 0xe8524a);
-    const redG = [], cabG = [], pierG = [], capG = [];
-    const TILT = 0.24, RIB_X = 14, ARCH_H = 45, AS = 200; // 1:1 — nhịp chính 200m, vòm 45m
-    for (const s of [-1, 1]) {
-      const arcPts = [];
-      for (let i = 0; i <= 24; i++) {
-        const tt = i / 24;
-        arcPts.push(new THREE.Vector3(0, Math.sin(tt * Math.PI) * ARCH_H + 2, (tt - 0.5) * AS));
-      }
-      const rib = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(arcPts), 40, 1.4, 8);
-      rib.rotateZ(-s * TILT); rib.translate(s * RIB_X, 0, 0); redG.push(rib);
-    }
-    // giằng ngang nối hai đỉnh vòm
-    for (const tt of [0.34, 0.5, 0.66]) {
-      const y = Math.sin(tt * Math.PI) * ARCH_H + 2;
-      const xOff = RIB_X - Math.sin(TILT) * y;
-      const brace = new THREE.CylinderGeometry(0.55, 0.55, xOff * 2 * Math.cos(TILT) + 1, 6);
-      brace.rotateZ(Math.PI / 2); brace.translate(0, y * Math.cos(TILT), (tt - 0.5) * AS); redG.push(brace);
-    }
-    // dây treo ĐAN CHÉO (network arch — đặc trưng thật của cầu Hoàng Văn Thụ)
-    const _upV = new THREE.Vector3(0, 1, 0), _q = new THREE.Quaternion(), _m4 = new THREE.Matrix4(), _one = new THREE.Vector3(1, 1, 1), _p3 = new THREE.Vector3(), _v3 = new THREE.Vector3();
-    for (let i = 2; i <= 22; i += 2) {
-      const tt = i / 24;
-      const topYr = Math.sin(tt * Math.PI) * ARCH_H + 2;
-      const zz = (tt - 0.5) * AS;
-      for (const dDir of [-1, 1]) {
-        const zd = zz + dDir * AS * 0.075; // chân dây lệch dọc cầu -> các dây cắt nhau
-        if (Math.abs(zd) > AS / 2 + 4) continue;
-        const ttd = zd / b.half;
-        const deckY = LAND_H + b.rise * Math.max(0, 1 - ttd * ttd);
-        for (const s of [-1, 1]) {
-          const topY = topYr * Math.cos(TILT);
-          const topX = s * (RIB_X - Math.sin(TILT) * topYr);
-          const dz = zd - zz;
-          const len = Math.hypot(topY - deckY, topX - s * 13, dz);
-          if (len < 2) continue;
-          const cable = new THREE.CylinderGeometry(0.11, 0.11, len, 4);
-          _v3.set(topX - s * 13, topY - deckY, -dz).normalize();
-          _q.setFromUnitVectors(_upV, _v3);
-          _p3.set((topX + s * 13) / 2, (topY + deckY) / 2, zz + dz / 2);
-          cable.applyMatrix4(_m4.compose(_p3, _q, _one));
-          cabG.push(cable);
-        }
-      }
-    }
-    // trụ dẫn cầu đôi đỡ mặt cầu ngoài nhịp vòm (cầu dẫn thật chạy dài hai phía)
-    for (const dir of [-1, 1]) {
-      for (let a = AS / 2 + 30; a < b.half - 12; a += 40) {
-        const along = dir * a;
-        const ttd = along / b.half;
-        const deckY = LAND_H + b.rise * Math.max(0, 1 - ttd * ttd);
-        if (deckY < 2.6) continue;
-        for (const sx of [-9, 9]) {
-          const pier = new THREE.CylinderGeometry(1.6, 1.9, deckY - 0.2, 8);
-          pier.translate(sx, (deckY - 0.2) / 2, along); pierG.push(pier);
-        }
-        const cap = new THREE.BoxGeometry(24, 1.4, 3); cap.translate(0, deckY - 0.9, along); capG.push(cap);
-      }
-    }
-    for (const [arr, c] of [[redG, 0xd8402e], [cabG, 0xe8e0d8], [pierG, 0xb9bec4], [capG, 0xa9aeb4]]) {
-      if (arr.length) { const m = new THREE.Mesh(mergeGeometries(arr), mat(c)); arr.forEach((x) => x.dispose()); g.add(m); }
-    }
+    const br = buildBridges(scene, {
+      ways: BRIDGE_WAYS || [], ROADS_DT, groundHeightNoDeck, isWater, LAND_H, panoCams: PANO_CAM,
+      roadSurfaceAt: world.roadNet ? world.roadNet.surfaceAt : null, hw: (c) => XS_ROAD_W[c] / 2, sw: (c) => SIDEWALK_W[c] || 0,
+      arch: { z0: -1030, z1: -1200, h: 38 },
+    });
+    world.bridges = br;
+    console.log('[world] cầu W3-F:', JSON.stringify(br.stats));
   }
   {
     const b = BRIDGES[1];
@@ -20085,11 +20101,22 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
   // keepClear: TRỤC NHÌN spawn → mặt tiền Nhà hát (ảnh đầu tiên người chơi thấy) — hàng cây mép bắc phố road#378 từng
   // che kín chân dung/mặt tiền (cam_spawn)
   const opKeep = (x, z) => _segD(x, z, LM.opera[0], LM.opera[1] + 16, LM.opera[0], LM.opera[1] + 75) < 14;
-  veg.plantStreetTrees({ ROADS_DT, groundHeightNoDeck, isWater, addCollider, colliders, lakeSD, hdTreeBelt, R: BUILD_RADIUS, landH: LAND_H, keepClear: opKeep, fpGrid: world.rbGrid });   // rbGrid: footprint đã đánh D.dead (WP2) — proc: undefined → trees tự giải mã
+  // W3-F: phố ven SÔNG có dải dạo (world.riverbank.keep) KHÔNG trồng cây đường phố cổ thụ (ảnh pano_198-203/290-299: dải dạo
+  // ven sông là CÂY NON chống cọc sau bão Yagi, phía nhà không cây) — luật "kè hồ rợp cổ thụ" (KNOWLEDGE §8b) chỉ cho HỒ
+  const rbKeep = world.riverbank ? world.riverbank.keep : () => false;
+  veg.plantStreetTrees({ ROADS_DT: ROADS_GROUND, groundHeightNoDeck, isWater, addCollider, colliders, lakeSD, hdTreeBelt, R: BUILD_RADIUS, landH: LAND_H, keepClear: (x, z) => opKeep(x, z) || rbKeep(x, z), fpGrid: world.rbGrid });   // rbGrid: footprint đã đánh D.dead (WP2) — proc: undefined → trees tự giải mã
+  if (world.riverbank) {
+    let n = 0;
+    for (const [x, z] of world.riverbank.saplings) {
+      if (isWater(x, z) || colliders.some((c) => Math.abs(c.x - x) < 1.2 && Math.abs(c.z - z) < 1.2 && (c.x - x) ** 2 + (c.z - z) ** 2 < (c.r + 0.6) ** 2)) continue;
+      veg.plant('non', x, z, { pit: 1, wash: 0 }); addCollider(x, z, 0.3); n++;
+    }
+    console.log('[world] W3-F cây non dải dạo ven sông:', n);
+  }
   // W2-B: hàng cây NON chống cọc trên quảng trường lát đá phía nam Nhà hát (pano_541/055/249 — trồng lại sau bão Yagi);
   // hộp = claim 'road9_tay' (khối claims), chừa trục nhìn spawn → Nhà hát + vòng spawn
   { const sp = [EXTRAS.square[0] - 5, EXTRAS.square[1] + 23];
-    veg.plantPlazaYoung({ ROADS_DT, groundHeightNoDeck, isWater, addCollider, colliders, R: BUILD_RADIUS, landH: LAND_H, fpGrid: world.rbGrid,
+    veg.plantPlazaYoung({ ROADS_DT: ROADS_GROUND, groundHeightNoDeck, isWater, addCollider, colliders, R: BUILD_RADIUS, landH: LAND_H, fpGrid: world.rbGrid,
       claim: 'road9_tay',
       keepClear: (x, z) => opKeep(x, z) || (x - sp[0]) ** 2 + (z - sp[1]) ** 2 < 20 * 20 }); }
 
@@ -20107,7 +20134,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
   // Đợt 3: nhịp 14 → 10 m (pano_008-013/031-034: hàng cây sát nhau, gốc quét vôi), loài theo pano (xà cừ/bàng/phượng)
   {
     // lòng đường (trừ w/h) + 1,2 m — tra lưới đoạn đường dùng chung của trees.js (trước: quét MỌI đoạn mỗi ứng viên)
-    const RI = veg.roadIndex(ROADS_DT, BUILD_RADIUS), _onRoadT = (px, pz) => RI.nearRoad(px, pz, 1.2, 'wh');
+    const RI = veg.roadIndex(ROADS_GROUND, BUILD_RADIUS), _onRoadT = (px, pz) => RI.nearRoad(px, pz, 1.2, 'wh');
     for (let e = 0; e < LAKE_POLY.length; e++) {
       const [ax, az] = LAKE_POLY[e], [bx, bz] = LAKE_POLY[(e + 1) % LAKE_POLY.length];
       const dx = bx - ax, dz = bz - az, L = Math.hypot(dx, dz);
@@ -21228,7 +21255,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
   // claims/FEATURED_CLEAR, footprint thật, keepClear) và NGAY TRƯỚC flushTrees/freezeStatic (InstancedMesh của props
   // không qua bake/merge). Mọi offset ngang theo js/xsection.js; mật độ theo js/props_evidence.js (551 pano). KNOWLEDGE §10.
   world.props = buildProps({
-    scene, LAND_H, ROADS_DT, groundHeightNoDeck, isWater, lakeSD, sharedMats, updaters, addCollider, colliders,
+    scene, LAND_H, ROADS_DT: ROADS_GROUND, groundHeightNoDeck, isWater, lakeSD, sharedMats, updaters, addCollider, colliders,
     featuredClear: FEATURED_CLEAR, reserved: propReserved, openSpace, nearPanoCam,
     avoid: (x, z) => clearedZone(x, z) || inSuperblock(x, z),
     gardens: GARDENS, square: EXTRAS.square,
@@ -21237,7 +21264,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     // phố r không vỉa → nền +0,012). Hằng +0,25 cũ làm prop lơ lửng 7-24 cm (phản biện WP7).
     surfaceY: world.roadNet && world.roadNet.surfaceAt
       ? (x, z) => Math.max(groundHeightNoDeck(x, z), LAND_H) + Math.max(0.012, world.roadNet.surfaceAt(x, z))
-      : layRoadSurfaceY(ROADS_DT, groundHeightNoDeck, LAND_H),
+      : layRoadSurfaceY(ROADS_GROUND, groundHeightNoDeck, LAND_H),
     stringLights: [[EXTRAS.square[0] - 10, EXTRAS.square[1] + 10], [-430, 195]],
     keepClear: [
       [EXTRAS.square[0] - 5, EXTRAS.square[1] + 23, 18],                     // = SPAWN main.js (khung hình đầu tiên)

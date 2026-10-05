@@ -233,7 +233,7 @@ for (const w of dtRoads) {
   const len = plLen(pts);
   if (c === 'r' && len < 260 && !isCentralRoad(pts)) continue;   // giữ phố nhỏ trong lõi
   if (c === 'w' && len < 150) continue;
-  ROADS_DT.push({ c, pts, name: w.tags?.name || '' });
+  ROADS_DT.push({ c, pts, name: w.tags?.name || '', id: w.id, tags: w.tags || {} });   // id/tags: chỉ dùng nội bộ (BRIDGE_WAYS, bờ kè) — KHÔNG xuất
 }
 console.log(`roads downtown: ${ROADS_DT.length}`);
 
@@ -249,7 +249,7 @@ try {
     if (pts.length < 2) continue;
     if (!isCentralRoad(pts)) continue;          // giai đoạn trung tâm: chỉ giữ hẻm trong lõi
     if (plLen(pts) < 28) continue;              // mẩu vụn (lối rẽ vào 1 nhà) bỏ
-    ROADS_DT.push({ c: 'h', pts, name: '' });
+    ROADS_DT.push({ c: 'h', pts, name: '', id: w.id, tags: w.tags || {} });
     nH++;
   }
   console.log(`ngõ/hẻm lõi (h): ${nH}`);
@@ -582,6 +582,207 @@ const WATER = [];
     WATER.filter((w) => w.n).map((w) => w.n + '(' + w.pts.length + ')').join(', '));
 }
 
+// ---------- 6b3. BỜ SÔNG LÙI KHỎI PHỐ VEN SÔNG (Đợt 3 W3-F, AUDIT3 FP-6) ----------
+// Polygon nước OSM (natural=water) vẽ từ ảnh cũ: mép sông Tam Bạc/Cấm chạy ĐÈ lên lòng phố ven sông (tim phố Tam Bạc
+// cách mép nước 2-6 m ở đoạn cong pano_197-203, 221, 519) → trong game nước sát chân camera, không có vỉa hè/kè.
+// Thật (ảnh pano_203/221): tim phố → lòng (hw) → bó vỉa → vỉa hè/dải dạo lát caro ~4,5-5 m → lan can trên gờ kè →
+// mặt nước thấp hơn 1,5-2 m. Quy tắc: mép SÔNG phải cách tim mọi phố p/s/t/r CHẠY DỌC bờ (góc ≤ 40°, không phải cầu)
+// ít nhất KE_CLEAR(c) = hw + vỉa hè + 2,5 m (t 9,5 · s 11 · p 12,6 · r 7); cách lối đi ven sông OSM (footway=sidewalk,
+// đúng tuyến dải dạo) ≥ 3 m. Đỉnh vi phạm bị ĐẨY ra xa theo pháp tuyến phố về phía nước (polygon được chia ≤ 3 m trước).
+// Chỉ polygon SÔNG/KÊNH (hồ giữ nguyên: dải kè hồ Tam Bạc bám LAKE_POLY), chỉ trong |x|,|z| < 2000.
+// Kiểm: scratchpad dot3/W3-F/cmpwater.py (polygon vs ảnh vệ tinh), plot.py.
+{
+  const { ROAD_HW, SIDEWALK_W } = await import('../js/xsection.js');
+  const PROM = 2.5, FOOT_CLEAR = 3.0, CITY = 2000;
+  const clearOf = (c) => Math.max(7, (ROAD_HW[c] ?? 2.75) + (SIDEWALK_W[c] ?? 0) + PROM);
+  const isRiver = (n) => /^(Sông|Kênh)/.test(n || '');
+  // phố ứng viên: p/s/t/r không phải cầu + lối đi lát ven sông OSM (footway=sidewalk)
+  const segs = [];   // [ax, az, bx, bz, clear]
+  for (const r of ROADS_DT) {
+    if (!['p', 's', 't', 'r'].includes(r.c)) continue;
+    if (r.tags && r.tags.bridge && r.tags.bridge !== 'no') continue;
+    for (let i = 0; i < r.pts.length - 1; i++) segs.push([...r.pts[i], ...r.pts[i + 1], clearOf(r.c)]);
+  }
+  try {
+    for (const w of load('osm_alleys.json')) {
+      const t = w.tags || {};
+      if (t.highway !== 'footway' || t.footway !== 'sidewalk' || !w.geometry || (t.bridge && t.bridge !== 'no')) continue;
+      const pts = w.geometry.map((g) => toXZ(g.lon, g.lat));
+      if (!pts.some(([x, z]) => Math.abs(x) < CITY && Math.abs(z) < CITY)) continue;
+      for (let i = 0; i < pts.length - 1; i++) segs.push([...pts[i], ...pts[i + 1], FOOT_CLEAR]);
+    }
+  } catch (e) { /* không có osm_alleys.json */ }
+  const G = new Map(), GC = 32, gk = (i, j) => i * 100003 + j;
+  segs.forEach((s, si) => {
+    const r = s[4] + 2;
+    for (let i = Math.floor((Math.min(s[0], s[2]) - r) / GC); i <= Math.floor((Math.max(s[0], s[2]) + r) / GC); i++)
+      for (let j = Math.floor((Math.min(s[1], s[3]) - r) / GC); j <= Math.floor((Math.max(s[1], s[3]) + r) / GC); j++) {
+        const k = gk(i, j); let a = G.get(k); if (!a) G.set(k, a = []); a.push(si);
+      }
+  });
+  const inPolyRaw = (x, z, P) => { let c = false; for (let i = 0, j = P.length - 1; i < P.length; j = i++) { const [xi, zi] = P[i], [xj, zj] = P[j]; if ((zi > z) !== (zj > z) && x < (xj - xi) * (z - zi) / (zj - zi) + xi) c = !c; } return c; };
+  let moved = 0, maxPush = 0;
+  for (const W of WATER) {
+    if (!isRiver(W.n)) continue;
+    const P0 = W.pts;
+    if (!P0.some(([x, z]) => Math.abs(x) < CITY && Math.abs(z) < CITY)) continue;
+    // chia nhỏ cạnh ≤ 3 m trong vùng thành phố
+    const P = [];
+    for (let i = 0; i < P0.length; i++) {
+      const a = P0[i], b = P0[(i + 1) % P0.length];
+      P.push([a[0], a[1]]);
+      if (Math.abs(a[0]) > CITY + 50 || Math.abs(a[1]) > CITY + 50) continue;
+      const L = Math.hypot(b[0] - a[0], b[1] - a[1]), n = Math.floor(L / 3);
+      for (let k = 1; k <= n; k++) P.push([a[0] + (b[0] - a[0]) * k / (n + 1), a[1] + (b[1] - a[1]) * k / (n + 1)]);
+    }
+    const Q = P.map((p) => p.slice());
+    let touched = false;
+    for (let i = 0; i < P.length; i++) {
+      const [x, z] = P[i];
+      if (Math.abs(x) > CITY || Math.abs(z) > CITY) continue;
+      const pa = P[(i + P.length - 1) % P.length], pb = P[(i + 1) % P.length];
+      let tx = pb[0] - pa[0], tz = pb[1] - pa[1]; const tl = Math.hypot(tx, tz) || 1; tx /= tl; tz /= tl;
+      const cell = G.get(gk(Math.floor(x / GC), Math.floor(z / GC))); if (!cell) continue;
+      let best = null;
+      for (const si of cell) {
+        const [ax, az, bx, bz, need] = segs[si];
+        const dx = bx - ax, dz = bz - az, L = Math.hypot(dx, dz); if (L < 0.5) continue;
+        const ux = dx / L, uz = dz / L;
+        if (Math.abs(ux * tx + uz * tz) < Math.cos(40 * Math.PI / 180)) continue;          // không chạy dọc bờ
+        const t = (x - ax) * ux + (z - az) * uz; if (t < -1 || t > L + 1) continue;
+        const px = ax + ux * Math.max(0, Math.min(L, t)), pz = az + uz * Math.max(0, Math.min(L, t));
+        const nx = -uz, nz = ux;
+        // phía NƯỚC của phố: phía có nước ở khoảng need+8 m (polygon gốc); 2 phía đều nước / đều đất → bỏ (cầu, đảo)
+        const wa = inPolyRaw(px + nx * (need + 8), pz + nz * (need + 8), P0), wb = inPolyRaw(px - nx * (need + 8), pz - nz * (need + 8), P0);
+        if (wa === wb) continue;
+        const sg = wa ? 1 : -1, s = ((x - px) * nx + (z - pz) * nz) * sg;   // khoảng cách có dấu về phía nước
+        if (s >= need) continue;
+        const push = need - s;
+        if (!best || push > best.push) best = { push, x: px + nx * sg * need + (x - px - nx * ((x - px) * nx + (z - pz) * nz)), z: pz + nz * sg * need + (z - pz - nz * ((x - px) * nx + (z - pz) * nz)) };
+      }
+      if (best) { Q[i] = [best.x, best.z]; moved++; maxPush = Math.max(maxPush, best.push); touched = true; }
+    }
+    if (!touched) continue;
+    const S = simplify(Q.concat([Q[0]]), 1.0).slice(0, -1);
+    W.pts = S.map(([x, z]) => [Math.round(x * 10) / 10, Math.round(z * 10) / 10]);
+  }
+  console.log(`bờ sông lùi khỏi phố ven sông: ${moved} đỉnh đẩy, đẩy tối đa ${maxPush.toFixed(1)} m`);
+}
+
+// ---------- 6b4. CẦU THEO WAY OSM (Đợt 3 W3-F): BRIDGE_WAYS = mặt cầu có cao độ cho js/bridges.js ----------
+// Cầu Hoàng Văn Thụ THẬT = 2 làn một chiều (bắc 738297304 x≈−48, nam 930885732 x≈−59, layer 2) chạy thẳng z −930 → −1880
+// + HAI NÚT XOẮN ỐC phía Hải Phòng (đông 1022715416 tâm (17,−930), tây 1022715417 tâm (−133,−932), r ≈ 63 m, layer 1)
+// + dốc dẫn mặt đất 743181389/743181388 (cùng tên, không gắn bridge). Mô hình cũ = 1 đoạn thẳng nối 2 đầu way bắc
+// (75,−898)→(−45,−1883) ⇒ vòm lệch ~110 m về đông pano_285 và tâm vòm ở z −1391 (trên đất Thủy Nguyên).
+// Cao độ: XÍCH đi theo chiều xe (way nối đuôi → đầu ≤ 3 m), quãng s từ đầu dốc mặt đất (y = LAND_H) tới đỉnh xoắn
+// (đỉnh đầu tiên của đoạn thẳng dài ≥ 200 m) dốc ĐỀU → HVT_TOP; nhịp chính y theo z (HVT_SPAN, ease) — 2 làn cùng z
+// cùng cao độ. Dốc đều 1,9 %: vòng dưới (layer 1) và nửa vòng trên (layer 2) cách nhau 1 vòng ≈ 404 m ⇒ ~7,8 m (tĩnh
+// không ~6,4 m — ảnh pano_304 h90: dốc dưới ~6 m, mặt trên ~14 m).
+// Cầu phẳng (Lạc Long, Tam Kỳ, Tam Bạc…): kind 'flat' — mặt đường do roadnet vẽ ở LAND_H, bridges.js chỉ thêm lan can/
+// dầm biên/trụ. ri = chỉ số ROADS_DT của way (roadnet bỏ dải mặt đất của cầu nâng; traffic/props tra cao độ mặt cầu).
+const BRIDGE_WAYS = [];
+{
+  const LAND_H = 2, HVT_TOP = 15, CITY = 2100;
+  const HVT_SPAN = [[-930, 15], [-1020, 19.4], [-1110, 20.6], [-1200, 19.4], [-1880, 2.0]];   // (z, y) nhịp chính
+  const spanY = (z) => {
+    const K = HVT_SPAN;
+    if (z >= K[0][0]) return K[0][1];
+    for (let i = 0; i < K.length - 1; i++) {
+      const [z0, y0] = K[i], [z1, y1] = K[i + 1];
+      if (z <= z0 && z >= z1) { const t = (z0 - z) / (z0 - z1), e = (1 - Math.cos(Math.PI * t)) / 2; return y0 + (y1 - y0) * e; }
+    }
+    return K[K.length - 1][1];
+  };
+  const riOf = new Map();
+  ROADS_DT.forEach((r, i) => { if (r.id == null) return; let a = riOf.get(r.id); if (!a) riOf.set(r.id, a = []); a.push(i); });
+  const resample = (pts, step) => {
+    const out = [pts[0].slice()];
+    for (let i = 0; i < pts.length - 1; i++) {
+      const [ax, az] = pts[i], [bx, bz] = pts[i + 1], L = Math.hypot(bx - ax, bz - az), n = Math.max(1, Math.ceil(L / step));
+      for (let k = 1; k <= n; k++) out.push([ax + (bx - ax) * k / n, az + (bz - az) * k / n]);
+    }
+    return out;
+  };
+  const r2 = (v) => Math.round(v * 100) / 100;
+  const widthOf = (t, c) => {
+    const w = parseFloat(t.width); if (w > 3) return w;
+    const ln = parseInt(t.lanes, 10);
+    if (ln > 0) return ln * 3.5 + (t.oneway === 'yes' ? 3.5 : 2.5);
+    return { p: 13, s: 10, t: 8, r: 6 }[c] + (t.oneway === 'yes' ? 0 : 3);
+  };
+  const raw = load('osm_roads_dt.json').filter((w) => w.geometry && w.tags && CLS[w.tags.highway]);
+  const isBr = (t) => t.bridge && t.bridge !== 'no';
+  // --- HVT: xích theo chiều xe ---
+  const HVT = raw.filter((w) => w.tags.name === 'Cầu Hoàng Văn Thụ').map((w) => ({ w, pts: w.geometry.map((g) => toXZ(g.lon, g.lat)) }));
+  const used = new Set();
+  const nextOf = (a) => {
+    const e = a.pts[a.pts.length - 1]; let best = null, bd = 3;
+    for (const b of HVT) { if (b === a || used.has(b)) continue; const d = Math.hypot(b.pts[0][0] - e[0], b.pts[0][1] - e[1]); if (d < bd) { bd = d; best = b; } }
+    return best;
+  };
+  const starts = HVT.filter((a) => !HVT.some((b) => b !== a && Math.hypot(b.pts[b.pts.length - 1][0] - a.pts[0][0], b.pts[b.pts.length - 1][1] - a.pts[0][1]) < 3));
+  for (const st of starts) {
+    const chain = []; let cur = st;
+    while (cur && !used.has(cur)) { used.add(cur); chain.push(cur); cur = nextOf(cur); }
+    // quãng s dọc xích; điểm nối nhịp chính = đầu (hoặc cuối) đoạn thẳng dài ≥ 200 m
+    const segs = [];
+    for (const c of chain) segs.push(resample(c.pts, 3));
+    const all = []; segs.forEach((S, k) => S.forEach((p, i) => { if (k && !i) return; all.push(p); }));
+    const cum = [0]; for (let i = 1; i < all.length; i++) cum.push(cum[i - 1] + Math.hypot(all[i][0] - all[i - 1][0], all[i][1] - all[i - 1][1]));
+    // đoạn nhịp chính = các cạnh GỐC dài ≥ 200 m (vòng xoắn chia cạnh ~10-15 m) → chỉ số trong all qua toạ độ đỉnh gốc
+    let jStart = -1, jEnd = -1;
+    const idxOf = (p) => { let bi = -1, bd = 0.01; for (let i = 0; i < all.length; i++) { const d = Math.abs(all[i][0] - p[0]) + Math.abs(all[i][1] - p[1]); if (d < bd) { bd = d; bi = i; } } return bi; };
+    for (const c of chain) for (let i = 0; i < c.pts.length - 1; i++) {
+      if (Math.hypot(c.pts[i + 1][0] - c.pts[i][0], c.pts[i + 1][1] - c.pts[i][1]) < 200) continue;
+      const a = idxOf(c.pts[i]), b = idxOf(c.pts[i + 1]);
+      if (jStart < 0 || a < jStart) jStart = a;
+      if (b > jEnd) jEnd = b;
+    }
+    const groundAtStart = all[0][1] > -1000;      // xích bắt đầu ở phía Hải Phòng (dốc lên) hay từ bờ bắc (dốc xuống)
+    const ys = all.map((p, i) => {
+      if (i >= jStart && i <= jEnd) return spanY(p[1]);
+      if (groundAtStart) return LAND_H + (HVT_TOP - LAND_H) * Math.min(1, cum[i] / cum[jStart]);
+      return LAND_H + (HVT_TOP - LAND_H) * Math.min(1, (cum[cum.length - 1] - cum[i]) / (cum[cum.length - 1] - cum[jEnd]));
+    });
+    // tách lại theo way (mỗi way 1 bản ghi: hình + cao độ + ri)
+    let off = 0;
+    segs.forEach((S, k) => {
+      const c = chain[k], n = S.length - (k ? 1 : 0), i0 = k ? off - 1 : 0;
+      const pts = [];
+      for (let i = i0; i < off + n; i++) pts.push([r2(all[i][0]), r2(all[i][1]), r2(ys[i])]);
+      off += n;
+      const kind = isBr(c.w.tags) ? (c.w.tags.layer === '2' ? 'span' : 'ramp') : 'ramp';
+      BRIDGE_WAYS.push({ id: c.w.id, n: 'Cầu Hoàng Văn Thụ', c: CLS[c.w.tags.highway], kind, w: kind === 'span' ? 11 : 10.5, ri: riOf.get(c.w.id) || [], pts });
+    });
+  }
+  // --- cầu phố NÂNG NHẸ (kind 'deck'): mặt cầu cao hơn phố 2 bờ — ảnh pano_074 (Cầu Lạc Long): mặt cầu cao ~2 m trên
+  //     ngã ba Bạch Đằng ngay dưới (h180), lan can con tiện trắng hoa văn ô van, bó vỉa sơn sọc đỏ-trắng, vỉa hè gạch đỏ.
+  //     Hồ sơ (way OSM dài 232 m, gồm cả đoạn trên đất): đầu TÂY dốc êm (cos) 70 m lên +h; đầu ĐÔNG phẳng mặt đất 32 m
+  //     (đoạn qua nút phố Tam Bạc + vòng xuyến — ảnh vệ tinh: mặt cầu hạ xuống đúng phố ven bờ đông) rồi dốc 35 m.
+  const DECK_RISE = { 'Cầu Lạc Long': { h: 2.0, west: 70, eastFlat: 32, east: 35 } };
+  for (const w of raw) {
+    if (!isBr(w.tags) || !(w.tags.name in DECK_RISE)) continue;
+    let pts = resample(w.geometry.map((g) => toXZ(g.lon, g.lat)), 3);
+    if (pts[0][0] > pts[pts.length - 1][0]) pts = pts.reverse();       // đi từ TÂY sang ĐÔNG
+    const c = CLS[w.tags.highway], P = DECK_RISE[w.tags.name];
+    const cum = [0]; for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+    const L = cum[cum.length - 1];
+    const ease = (t) => (1 - Math.cos(Math.PI * Math.max(0, Math.min(1, t)))) / 2;
+    BRIDGE_WAYS.push({ id: w.id, n: w.tags.name, c, kind: 'deck', w: r2(widthOf(w.tags, c)), ri: riOf.get(w.id) || [],
+      pts: pts.map(([x, z], i) => { const y = LAND_H + P.h * Math.min(ease(cum[i] / P.west), ease((L - cum[i] - P.eastFlat) / P.east)); return [r2(x), r2(z), r2(y)]; }) });
+  }
+  // --- cầu phẳng khác trong thành phố ---
+  for (const w of raw) {
+    if (!isBr(w.tags) || w.tags.name === 'Cầu Hoàng Văn Thụ' || (w.tags.name in DECK_RISE)) continue;
+    const pts = w.geometry.map((g) => toXZ(g.lon, g.lat));
+    if (!pts.some(([x, z]) => Math.hypot(x, z) < CITY)) continue;
+    const c = CLS[w.tags.highway];
+    BRIDGE_WAYS.push({ id: w.id, n: w.tags.name || '', c, kind: 'flat', w: r2(widthOf(w.tags, c)), ri: riOf.get(w.id) || [],
+      pts: resample(pts, 3).map(([x, z]) => [r2(x), r2(z), LAND_H]) });
+  }
+  console.log('BRIDGE_WAYS:', BRIDGE_WAYS.map((b) => `${b.id}:${b.kind}/${b.pts.length}p/ri${b.ri.join('.')}/y${Math.min(...b.pts.map((p) => p[2])).toFixed(1)}-${Math.max(...b.pts.map((p) => p[2])).toFixed(1)}`).join(' '));
+}
+
 // ---------- 6c. ĐƯỜNG SẮT THẬT (tuyến chính Hà Nội - Hải Phòng vào ga) ----------
 const RAIL = [];
 for (const w of load('osm_rail.json')) {
@@ -718,6 +919,7 @@ export const MEDIANS = ${JSON.stringify(MEDIANS)};
 export const GARDENS = ${JSON.stringify(GARDENS)};
 export const BUILDINGS = ${JSON.stringify(BUILDINGS)};
 export const WATER = ${JSON.stringify(WATER)};
+export const BRIDGE_WAYS = ${JSON.stringify(BRIDGE_WAYS)};
 `;
 fs.writeFileSync(new URL('../js/mapdata.js', import.meta.url), out);   // relative (portable Win/Linux)
 console.log(`mapdata.js: ${(out.length / 1024).toFixed(0)}KB`);
