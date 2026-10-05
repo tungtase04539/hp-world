@@ -265,7 +265,7 @@ export function buildRiverbanks(scene, deps) {
     if (mode !== 'prom' && north && hash(s.x, s.z, 61) < 0.2) boat(s);
     if (mode === 'strip') {
       stats.stripM += s.L;
-      stripRail(s); if (hash(s.x, s.z, 71) < 0.17 && gapW > 4) shack(s, gapW);
+      stripRail(s); if (hash(s.x, s.z, 71) < 0.14 && gapW > 4) shack(s, gapW);
       continue;
     }
     if (mode === 'wild') { stats.wildM += s.L; continue; }
@@ -360,17 +360,19 @@ export function buildRiverbanks(scene, deps) {
   }
   // lán tôn/bạt tự phát giữa lan can và kè (ảnh pano_519 h180: mái tôn xanh, bạt cam/xanh, thấp ~2,4 m)
   function shack(s, gapW) {
-    const dep = Math.min(gapW - 1.2, 4), wid = 3 + hash(s.x, s.z, 72) * 2.5, h = 2.2 + hash(s.x, s.z, 73) * 0.6;
+    // thấp (1,9-2,4 m), mái tôn/bạt MÀU (xanh dương, cam, gỉ) nhô 0,6 m về phía phố + diềm bạt rủ — nhìn từ phố thấy MÁI và
+    // BẠT sặc sỡ (ảnh 519 h180), không phải bức tường xám
+    const dep = Math.min(gapW - 1.2, 3.6), wid = 2.6 + hash(s.x, s.z, 72) * 2.2, h = 1.9 + hash(s.x, s.z, 73) * 0.5;
     const cx = s.x + s.nx * (0.3 + dep / 2), cz = s.z + s.nz * (0.3 + dep / 2), ang = Math.atan2(s.tx, s.tz);
     const gy = TOP - 0.25;
-    const wallC = [rgb(0xb3ad9f), rgb(0x9aa6ad), rgb(0xbcae90)][Math.floor(hash(s.x, s.z, 74) * 3)];   // tôn/ván bạc màu (sáng — mặt hướng phố thường trong bóng)
+    const wallC = [rgb(0xb3ad9f), rgb(0x9aa6ad), rgb(0xbcae90)][Math.floor(hash(s.x, s.z, 74) * 3)];
     box(shackB, cx, gy + h / 2, cz, dep, h, wid, ang, wallC);
-    const roofC = [rgb(0x2f6aa8), rgb(0x8c4a2e), rgb(0x7d8487), rgb(0xd9772b)][Math.floor(hash(s.x, s.z, 75) * 4)];
-    box(shackB, cx, gy + h + 0.06, cz, dep + 0.9, 0.08, wid + 0.6, ang, roofC);
-    if (hash(s.x, s.z, 76) < 0.6) {   // bạt che phía trước
-      const bx = cx - s.nx * (dep / 2 + 0.6), bz = cz - s.nz * (dep / 2 + 0.6);
-      box(shackB, bx, gy + h - 0.35, bz, 1.2, 0.05, wid * 0.9, ang, hash(s.x, s.z, 77) < 0.5 ? rgb(0xd9772b) : rgb(0x2f7fc1));
-    }
+    const roofC = [rgb(0x3b78c4), rgb(0xd9772b), rgb(0x9c5a3c), rgb(0x2f8fd0)][Math.floor(hash(s.x, s.z, 75) * 4)];
+    const rx = cx + s.nx * 0.3, rz = cz + s.nz * 0.3;
+    box(shackB, rx, gy + h + 0.08, rz, dep + 1.2, 0.12, wid + 0.5, ang, roofC);
+    // diềm bạt rủ phía phố
+    const fx = cx + s.nx * (dep / 2 + 0.85), fz = cz + s.nz * (dep / 2 + 0.85);
+    box(shackB, fx, gy + h - 0.3, fz, 0.05, 0.65, wid + 0.4, ang, hash(s.x, s.z, 77) < 0.5 ? rgb(0x2f7fc1) : rgb(0xe08a3a));
     stats.shacks++;
   }
   // thuyền gỗ neo sát kè (thân thon 2 đầu + mui bạt)

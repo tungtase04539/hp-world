@@ -20123,7 +20123,9 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
   // W3-F: phố ven SÔNG có dải dạo (world.riverbank.keep) KHÔNG trồng cây đường phố cổ thụ (ảnh pano_198-203/290-299: dải dạo
   // ven sông là CÂY NON chống cọc sau bão Yagi, phía nhà không cây) — luật "kè hồ rợp cổ thụ" (KNOWLEDGE §8b) chỉ cho HỒ
   const rbKeep = world.riverbank ? world.riverbank.keep : () => false;
-  veg.plantStreetTrees({ ROADS_DT: ROADS_GROUND, groundHeightNoDeck, isWater, addCollider, colliders, lakeSD, hdTreeBelt, R: BUILD_RADIUS, landH: LAND_H, keepClear: (x, z) => opKeep(x, z) || rbKeep(x, z), fpGrid: world.rbGrid });   // rbGrid: footprint đã đánh D.dead (WP2) — proc: undefined → trees tự giải mã
+  // W3-F: không trồng cây đường phố DƯỚI mặt cầu nâng (gầm > 3 m — tán xuyên mặt cầu xoắn HVT, pano_349 h180)
+  const underDeck = (x, z) => DECKS.covers(x, z, 3) && DECKS.nearestAt(x, z) > groundHeight(x, z) + 3;
+  veg.plantStreetTrees({ ROADS_DT: ROADS_GROUND, groundHeightNoDeck, isWater, addCollider, colliders, lakeSD, hdTreeBelt, R: BUILD_RADIUS, landH: LAND_H, keepClear: (x, z) => opKeep(x, z) || rbKeep(x, z) || underDeck(x, z), fpGrid: world.rbGrid });   // rbGrid: footprint đã đánh D.dead (WP2) — proc: undefined → trees tự giải mã
   if (world.riverbank) {
     let n = 0;
     for (const [x, z] of world.riverbank.saplings) {
