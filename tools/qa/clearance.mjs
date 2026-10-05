@@ -5,6 +5,16 @@
 //   Vá TẠM main.js qua page.route (chỉ trong phiên QA này): gọi window.__hpPreFreeze(scene, world) ngay trước
 //   world.freezeStatic → tools/qa/clearance_page.js đọc cảnh còn nguyên tên + geometry (xem đầu file đó).
 // In tóm tắt + ghi JSON đầy đủ: {stats, cams:[cam vi phạm/sát ngưỡng], onRoad:[…], sidewalk:[…], worstAll:[…]}.
+// --xsec (Đợt 3 W3-A): KIỂM MẶT CẮT PHỐ chỉ bằng dữ liệu (KHÔNG mở trình duyệt, không cần server/khoá GPU) — lệch tim
+//   camera↔ROADS_DT theo bề rộng TỪNG phố + mặt nhà gần nhất mỗi hướng nhìn game vs Overture (xem tools/qa/xsec.mjs).
+//   node tools/qa/clearance.mjs --xsec [--out f.json] [--ids 487,441] [--repo <worktree khác để A/B>]
+if (process.argv.includes('--xsec')) {
+  const { runXsec } = await import('./xsec.mjs');
+  const av = process.argv.slice(2), res = await runXsec(av);
+  const oi = av.indexOf('--out'); if (oi >= 0) (await import('fs')).writeFileSync(av[oi + 1], JSON.stringify(res, null, 1));
+  console.log('XSEC', JSON.stringify(res.stats));
+  process.exit(0);
+}
 const PW = process.env.PW_PATH || 'file:///C:/Users/Admin/AppData/Local/Temp/claude/C--Users-Admin-hp-world/04e77d80-6633-4919-bfa9-5d86fbe6ae69/scratchpad/node_modules/playwright-core/index.mjs';
 const { chromium } = await import(PW);
 import fs from 'fs';

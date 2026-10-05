@@ -34,7 +34,7 @@
 import fs from 'fs';
 import { ROADS_DT, PARKS, RAIL, LM } from '../js/mapdata.js';
 import { waterSD } from '../js/terrain.js';
-import { ROAD_HW, facadeLine } from '../js/xsection.js';
+import { roadHW, facadeLine } from '../js/xsection.js';
 import { LM_POLY } from '../js/landmark_polys.js';
 import { PANO_CAM } from '../js/panoclear.js';
 import { PANO_SIDES } from '../js/panosides.js';
@@ -66,7 +66,8 @@ ROADS_DT.forEach((r, ri) => {
     const [ax, az] = r.pts[i], [bx, bz] = r.pts[i + 1], L = Math.hypot(bx - ax, bz - az);
     if (L < 0.5) continue;
     const ux = (bx - ax) / L, uz = (bz - az) / L;
-    SEGS.push({ ri, k: i, ax, az, bx, bz, L, ux, uz, nx: -uz, nz: ux, c: r.c, hw: ROAD_HW[r.c] ?? 2.75, fl: facadeLine(r.c) });
+    // Đợt 3 W3-A: lòng/mặt tiền RIÊNG từng phố (mapdata ROADS_DT[i].w/.sw — tools/street_fit.mjs), không còn theo cấp
+    SEGS.push({ ri, k: i, ax, az, bx, bz, L, ux, uz, nx: -uz, nz: ux, c: r.c, hw: roadHW(r), fl: facadeLine(r) });
   }
 });
 const segGrid = new Grid(32);
@@ -168,8 +169,10 @@ for (const r of RAIL) for (let i = 0; i + 1 < r.pts.length; i++) {
 const railGrid = new Grid(32); RAILS.forEach((r, i) => railGrid.insert(i, [Math.min(r[0], r[2]) - r[4], Math.min(r[1], r[3]) - r[4], Math.max(r[0], r[2]) + r[4], Math.max(r[1], r[3]) + r[4]]));
 function nearRail(x, z) { let h = false; railGrid.query([x, z, x, z], (i) => { const r = RAILS[i]; if (!h && segDist(x, z, r[0], r[1], r[2], r[3]) < r[4]) h = true; }); return h; }
 // Không được dựng nhà SINH tại điểm này
+// Đợt 3 W3-A: nhà SINH cách camera pano ≥ 6 m (trước 3 m — AUDIT3 CAMNEAR: tường SYNTH 3,1 m ở pano_501, 3,9 m ở 460)
+const SYN_CAM = 6;
 const synBlocked = (x, z) => waterSD(x, z) < 1.5 || inPolyList(PARK_POLYS, x, z) || inPolyList(LM_POLYS, x, z, 3) || noSynZone(x, z) || nearRail(x, z) ||
-  nearCam(x, z, 3) || Math.hypot(x, z) > R_SYN;
+  nearCam(x, z, SYN_CAM) || Math.hypot(x, z) > R_SYN;
 
 
 // ======================================================================================================
@@ -425,6 +428,10 @@ function movePts(P, idx, vec, f) {
   return P.map((p, i) => (idx.has(i) ? [p[0] + vec.get(i)[0] * f, p[1] + vec.get(i)[1] * f] : p));
 }
 
+// Đợt 3 W3-A: kéo mặt tiền tối đa 1,5 m RA phố (trước 7,2 m — facadeLine theo cấp hẹp hơn phố thật nên nhà thật bị kéo
+// 3-7 m vào lòng phố thật: AUDIT3 CAMNEAR pano_441 3,4 vs 9,5 m Overture). Nay facadeLine theo từng phố ≈ tường Overture
+// → chỉ còn bù co ML ~1 m.
+const SNAP_MAX = 1.5;
 let nSnap = 0, nSnapPart = 0, snapDist = 0;
 const DBG = process.env.DEBUG_PT ? process.env.DEBUG_PT.split(',').map(Number) : null;
 const dbgNear = (b) => DBG && b.bb && b.bb[0] < DBG[0] + 12 && b.bb[2] > DBG[0] - 12 && b.bb[1] < DBG[1] + 12 && b.bb[3] > DBG[1] - 12;
@@ -434,7 +441,7 @@ function snapFront(bi) {
   if (b.civic || b.big) { if (dbg) dbg('civic/big', b.civic, b.big); return; }
   const P = b.pts; const n = P.length;
   const fronts = [];
-  for (let k = 0; k < n; k++) { const f = frontOf(P, k, bi, 7.2, dbg); if (f) fronts.push({ k, ...f }); }
+  for (let k = 0; k < n; k++) { const f = frontOf(P, k, bi, SNAP_MAX, dbg); if (f) fronts.push({ k, ...f }); }
   if (!fronts.length) { if (dbg) dbg('no front'); return; }
   b.hadFront = 1;
   // vector dời mỗi đỉnh: tới facadeLine của đoạn (đỉnh thuộc 2 cạnh mặt phố khác phố → giao 2 đường)
@@ -457,11 +464,15 @@ function snapFront(bi) {
   }
   if (!vec.size) return;
   const idx = new Set(vec.keys());
+  // Đợt 3 W3-A: camera pano trong 15 m — mặt tiền KHÔNG được tiến gần camera hơn footprint Overture gốc (camera truth)
+  const bbP = bbox(P), cams = [];
+  camGrid.query([bbP[0] - 15, bbP[1] - 15, bbP[2] + 15, bbP[3] + 15], (i) => { const [x, z] = PANO_CAM[i]; cams.push([x, z, pointInPoly(P, x, z) ? 0 : polyEdgeDist(P, x, z)]); });
   // thử f = 1, nếu vướng thì chia đôi dần
   let lo = 0, hi = 1, ok = null;
   const test = (fr) => {
     const Q = movePts(P, idx, vec, fr);
     if (!isSimple(Q) || signedArea(Q) >= 0) return null;
+    for (const [x, z, d0] of cams) if (pointInPoly(Q, x, z) || polyEdgeDist(Q, x, z) < d0 - 0.05) return null;
     // vùng quét = Q trừ P ≈ kiểm từng tứ giác (cạnh cũ → cạnh mới) của các cạnh mặt phố
     for (const f of fronts) {
       const i0 = f.k, i1 = (f.k + 1) % n;
@@ -1443,8 +1454,10 @@ function nearestOnPoly(P, x, z) {
   }
   return best;
 }
+// Đợt 3 W3-A: nhà SINH ≥ 6 m (SYN_CAM), nhà thật đã sửa ≥ 3 m (trước 3 / 1 m). Nhà thật mà cắt mất > 50% → giữ nguyên hình
+// gốc (camera đứng sát nhà thật = thật).
 function camGuard(b) {
-  const need = (b.synth ? 3 : 1) + 0.1, P0 = b.pts, A0 = b.area, R0 = b.rect;   // +0,1 m cho làm tròn toạ độ
+  const need = (b.synth ? SYN_CAM : 3) + 0.1, P0 = b.pts, A0 = b.area, R0 = b.rect;   // +0,1 m cho làm tròn toạ độ
   for (let pass = 0; pass < 3; pass++) {
     const P = b.pts, bb = bbox(P); let hit = null;
     camGrid.query([bb[0] - need, bb[1] - need, bb[2] + need, bb[3] + need], (i) => {

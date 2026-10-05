@@ -20,9 +20,17 @@ export const ROAD_TOP = 0.11;       // mặt nhựa so với nền LAND_H (lớp
 export const SIDEWALK_TOP = ROAD_TOP + CURB_RISE;
 
 const k = (c) => (c in ROAD_W ? c : 'r');
-export const curbLine = (c) => ROAD_HW[k(c)];                                 // mép lòng = mép bó vỉa
-export const facadeLine = (c) => ROAD_HW[k(c)] + SIDEWALK_W[k(c)];             // mặt tiền nhà sát vỉa
-export const treePitLine = (c) => ROAD_HW[k(c)] + Math.min(0.75, SIDEWALK_W[k(c)] * 0.3);   // hố cây sát bó vỉa
-export const parkingLine = (c) => ROAD_HW[k(c)] + Math.max(0.6, SIDEWALK_W[k(c)] * 0.55);   // tâm hàng xe máy đỗ
-export const furnitureLine = (c) => ROAD_HW[k(c)] + 0.35;                      // cột điện/đèn/biển báo
-export const hasSidewalk = (c) => SIDEWALK_W[k(c)] > 0;
+// Đợt 3 W3-A — BỀ RỘNG RIÊNG TỪNG PHỐ: mọi hàm dưới nhận CẤP ('p'|'s'|…) như cũ HOẶC một way ROADS_DT / đoạn mang
+// {c, w?, sw?} (mapdata ROADS_DT[i].w = lòng thật, .sw = vỉa thật — tools/street_fit.mjs: ghi đè pano → tag OSM width →
+// tường nhà Overture 2 bên → mặc định cấp). Không có w/sw → đúng giá trị cấp cũ. Lớp nào bám mép phố hãy truyền WAY
+// (facadeLine(r) thay vì facadeLine(r.c)) để lòng/vỉa/mặt tiền/cây/xe đỗ khớp nhau và khớp nhà thật (buildings_real).
+const isObj = (x) => x !== null && typeof x === 'object';
+export const roadHW = (x) => (isObj(x) ? (x.w > 0 ? x.w / 2 : ROAD_HW[k(x.c)]) : ROAD_HW[k(x)]);   // nửa lòng
+export const roadW = (x) => 2 * roadHW(x);
+export const sidewalkW = (x) => (isObj(x) ? (x.sw >= 0 ? x.sw : SIDEWALK_W[k(x.c)]) : SIDEWALK_W[k(x)]);
+export const curbLine = (c) => roadHW(c);                                          // mép lòng = mép bó vỉa
+export const facadeLine = (c) => roadHW(c) + sidewalkW(c);                         // mặt tiền nhà sát vỉa
+export const treePitLine = (c) => roadHW(c) + Math.min(0.75, sidewalkW(c) * 0.3);  // hố cây sát bó vỉa
+export const parkingLine = (c) => roadHW(c) + Math.max(0.6, sidewalkW(c) * 0.55);  // tâm hàng xe máy đỗ
+export const furnitureLine = (c) => roadHW(c) + 0.35;                              // cột điện/đèn/biển báo
+export const hasSidewalk = (c) => sidewalkW(c) > 0;
