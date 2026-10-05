@@ -123,7 +123,7 @@ export function createTraffic(scene, world, opts = {}) {
       }
       edges[ei].park = m; parkStats.edges++; parkStats.spans += m.length;
     }
-  })(world.props && world.props.parkedCars);
+  })(world.props && [...(world.props.parkedCars || []), ...(world.props.stalls || [])]);   // W3-E: + hàng chợ lấn dải lòng đường sát bó vỉa
   // độ lệch ngang mục tiêu (hệ tác tử: dương = phải hướng đi) để không đè xe đỗ trong cửa sổ [s, s+look] phía trước
   function parkShift(a, e, lat) {
     if (!e.park || a.type === 'walk' || Math.abs(lat) < 0.05) return 0;

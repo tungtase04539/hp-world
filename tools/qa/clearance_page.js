@@ -369,6 +369,8 @@
     const PL = (window.__hpProps && window.__hpProps.lists) || {};
     for (const key of Object.keys(PL)) {
       if (key === 'cars' || key === 'walkI' || key === 'standI' || key === 'sitI') continue;
+      // W3-E: hàng chợ CỐ Ý lấn dải 1,1 m lòng sát bó vỉa (giao thông lách như xe đỗ), xe khách/xe phủ bạt đỗ trong lòng, băng rôn/cổng chào treo trên cao giữa phố
+      if (key === 'mkRoad' || key === 'coaches' || key === 'covered' || key === 'banners' || key === 'gates') continue;
       for (const it of PL[key] || []) { const k = surfCls(it.x, it.z); if (isRoadAt(k, it.x, it.z)) onRoad.push({ src: 'props.' + key, name: key + (it.v !== undefined ? ':' + it.v : ''), x: +it.x.toFixed(1), z: +it.z.toFixed(1), cls: k }); }
     }
     // (c4) mọi vật thể cấp cao nhất khác (cell/streetscape/địa danh thủ tục…): đỉnh CHÂN (≤ mặt đất + 0,45 m), gom theo
