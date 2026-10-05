@@ -49,11 +49,16 @@ export const FLAG = { SYNTH: 1, OSM: 2, GOOGLE: 4, MS: 8, PANO: 16, BIG: 32, LOT
 // Người dùng có cell/nhà tay riêng (WP3 cellsink) nên BỎ QUA nhà FLAG.SYNTH khi quyết định xoá nhà tay (nhà sinh là phỏng
 // đoán lấp chỗ trống, nhà tay mang danh tính/ảnh pano thật).
 // INFO (byte thứ 6 mỗi nhà, v1): bit 0-2 = cấp phố mà mặt tiền chính nhìn ra (chỉ số ROADC: 0 không có, 1 p … 6 h),
-// bit 3 = góc phố (mặt tiền nhìn ra ≥ 2 phố), bit 4-5 = công năng tầng trệt (USE_*), bit 6-7 dự trữ = 0.
+// bit 3 = góc phố (mặt tiền nhìn ra ≥ 2 phố), bit 4-5 = công năng tầng trệt (USE_*), bit 6-7 = kiểu ô (PK_*, W3-B; 0 = không rõ).
 export const ROADC = ['', 'p', 's', 't', 'r', 'w', 'h'];
-export const INFO = { ROAD_MASK: 7, CORNER: 8, USE_SHIFT: 4, USE_MASK: 48, USE_HOME: 0, USE_SHOP: 1, USE_OFFICE: 2, USE_GATE: 3 };
+// bit 6-7 (W3-B, Đợt 3 wave 3): KIỂU Ô theo bằng chứng pano (tools/parcels_ev.mjs) — 0 không rõ / dãy phố mặc định,
+// 1 KHUÔN VIÊN (biệt thự/công sở/trường/viện có tường rào — không biển hàng; tường+cổng do js/parcels.js dựng),
+// 2 CHỢ (mặt chợ/sạp), 3 NHÀ Ở (dãy nhà dân, pano không thấy bán hàng). Dành cho renderer mặt tiền (W3-C) đọc thêm.
+export const INFO = { ROAD_MASK: 7, CORNER: 8, USE_SHIFT: 4, USE_MASK: 48, USE_HOME: 0, USE_SHOP: 1, USE_OFFICE: 2, USE_GATE: 3,
+  PK_SHIFT: 6, PK_MASK: 192, PK_COMPOUND: 1, PK_MARKET: 2, PK_HOME: 3 };
 export const infoRoad = (info) => ROADC[info & 7] || '';
 export const infoUse = (info) => (info >> 4) & 3;
+export const infoParcel = (info) => (info >> 6) & 3;
 
 // Màu tường (sRGB hex) — hiệu chỉnh theo pano Hải Phòng: vàng kem "vàng Hải Phòng", trắng ngà, xám nhạt, hồng nhạt,
 // xanh ngọc nhạt, be... Chỉ số ổn định (dữ liệu nhị phân lưu chỉ số) — CHỈ THÊM vào cuối, không đổi thứ tự.

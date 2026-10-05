@@ -40,6 +40,7 @@ function nearPanoCam(x, z, r = 5) {
 import { SHOP_SIGNS } from './shopsigns.js';
 // ĐỢT 3 WP2: phố từ footprint THẬT (citygen.js) + sổ vùng giữ chỗ (claims.js) + footprint địa danh (landmark_polys.js)
 import { buildRealFabric, fabricData } from './citygen.js';
+import { buildParcels } from './parcels.js';   // Đợt 3 W3-B: tường rào/hàng rào/rào tôn + cổng của ô khuôn viên/đất trống
 import { claimPoly, claimBox, claimCircle } from './claims.js';
 import { LM_POLY, LM_CENTROID } from './landmark_polys.js';
 import { buildProps, layRoadSurfaceY } from './props.js';                 // Đợt 3 WP7: đồ đạc phố (xe máy/ô tô/cột điện/đèn/người)
@@ -17498,6 +17499,11 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     // DỮ LIỆU FOOTPRINT DÙNG CHUNG (đã đánh D.dead): WP8 footprints.js / WP7 props (ctx.footprints {D, grid}) / WP4 cây
     // (fpGrid) PHẢI dùng 2 cái này — tự decodeRB sẽ tránh/va vào cả nhà đã bị gỡ (dưới quảng trường, công viên, ngoài R1600).
     world.rbData = fabricData(); world.rbGrid = _fab.grid;
+    // W3-B Ô ĐẤT: mặt phố của KHUÔN VIÊN (tường rào/hàng rào sắt + cổng) và ĐẤT TRỐNG (rào tôn/tường lô) — generator không
+    // còn bịa nhà ống vào đó (tools/parcels_ev.mjs). Cắt theo footprint SỐNG (sau claims) + nhà ô giữ; va chạm bọc resolveCollisions.
+    { const _par = buildParcels(scene, { groundHeightNoDeck, landH: LAND_H, D: world.rbData, grid: world.rbGrid, cellKept: world.cellKept, maxR: BUILD_RADIUS });
+      world.parcels = _par;
+      if (_par.segs.length) { const _rc = world.resolveCollisions; world.resolveCollisions = (p, pr = 0.45) => { _rc(p, pr); _par.collide(p, pr); }; } }
   }
 
   // ---------- MÁI HIÊN BẠT + BIỂN HIỆU shophouse dọc phố thương mại (rải rộng, rất thân thuộc) ----------
