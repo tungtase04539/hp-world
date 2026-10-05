@@ -420,6 +420,60 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-10-05 (W3-B PARCELS)** [ĐỢT 3 wave 3 — Ô ĐẤT THẬT: khuôn viên tường rào + cổng, đất trống rào tôn, chợ, tỉ lệ cửa
+    hàng theo phố, claim quảng trường, Chợ Con — AUDIT3 FP-2]:
+    **Vấn đề (AUDIT3 S2 Σ345 + GAP):** generator chỉ biết 1 kiểu ô (dãy nhà ống) → lấp khe/lõi ô bằng nhà ống SINH vào khuôn
+    viên biệt thự/cơ quan/trường, sân chợ, lô quây tôn; kéo mặt tiền biệt thự ra sát vỉa hè; công năng trệt chỉ theo cấp phố
+    (phố biệt thự đầy biển hàng); claim 'plaza' quá to giết dãy phố thật (vòng r50 'qt_trienlam' đặt ĐÚNG tâm pano_428; vòng
+    r62 + hành lang ±55 m quanh Nhà hát giết 2 dãy phố cũ Hoàng Văn Thụ/Đinh Tiên Hoàng); Chợ Con dời 10 m ra phố + 1 ô trùng.
+    **(1) BẰNG CHỨNG Ô ĐẤT — MỚI `tools/parcels_ev.mjs`** (node, không three): phân loại TỪNG quan sát pano (audit_enriched
+    .buildings: style/features/color) → `compound` (công sở/trụ sở/cơ quan/trường/viện/y tế/UBND/nhà văn hoá/mầm non/bảo tàng/
+    biệt thự…, có tường-rào-cổng-sân hoặc loại "mạnh" → walled + kiểu tường + màu tường & màu song sắt RIÊNG theo cụm chữ "tường/
+    rào/trụ/cổng … màu" + "cổng"/"chòi gác"), `home` (liền kề/nhà ở/tập thể…), `shop`, `vacant` (đất trống/lô đất/bãi/giải toả/
+    quây tôn — "đang xây/đổ nát" là NHÀ, không phải lô trống), `market`. Chữ cấp pano (area/summary/special: lô đất trống, quây
+    tường, chợ dân sinh…) chỉ áp cho hướng pano KHÔNG tả nhà nào (ô 45° + 2 ô kề tắt trong PANO_SIDES). `kindAt(x,z)`: bỏ phiếu
+    theo NÓN nhìn ±25° (nới theo bề rộng quan sát) từ mọi pano ≤ 40 m, trọng số giảm theo lệch góc + khoảng cách; thắng khi ≥ 0,15
+    và ≥ 1,4× kiểu nhì; `kindAtPoly` cộng phiếu tâm + trung điểm cạnh (nhà dài vắt 2 nón). Lớp sử dụng đất OSM của W2-D
+    (`js/landuse_data.js` giải nén trong node) → `LU_VETO` (sân lát/quảng trường, chùa, khuôn viên trường-viện-cơ quan, bãi xe,
+    công trường, cỏ, sân thể thao, chợ). Tên phố từ `tools/osm_roads_dt.json` (ROADS_DT không có tên) → tỉ lệ cửa hàng ĐO theo
+    phố từ chính 551 pano; bảng VÙNG `ZONES` (biệt thự/hành chính: Đinh Tiên Hoàng, Hồ Xuân Hương, Lê Đại Hành, Nguyễn Tri
+    Phương, Cù Chính Lan, Trần Quang Khải → trần cửa hàng 0,2; đô thị mới Lê Quang Đạo 0,3) + ô đa giác (Ngõ 80 Hạ Lý…).
+    **(2) GENERATOR `process_buildings.mjs`:** nhà THẬT nằm trong nón khuôn viên: KHÔNG kéo mặt tiền ra vỉa (giữ khoảng lùi thật),
+    không chia lô nhà ống, không kéo sâu, kiểu VILLA/CIVIC (mô-đun trệt không cửa hàng), công năng HOME/OFFICE; nhà ở → HOME, cửa
+    hàng/chợ → SHOP; không bằng chứng trực tiếp → `shopProb` = bảng cấp phố kéo về tỉ lệ đo theo phố (Bayes k = 4), phố r khu phố cũ
+    ≤ 0,35, trần vùng. INFO bit 6-7 = KIỂU Ô (`INFO.PK_*`, `infoParcel()` — 1 khuôn viên, 2 chợ, 3 nhà ở) cho renderer mặt tiền.
+    Bước 7 (lô khe) — thứ tự veto: nước/công viên/cảng → MIỆNG NGÕ thật (`osm_alleys.json` service/footway… cắt dải lô 0-6 m, không
+    chạy dọc phố; ngõ < 28 m và footway không vào ROADS_DT) → `parcelVeto`: compound (walled → TƯỜNG RÀO/HÀNG RÀO + SÂN 22 m) /
+    vacant (RÀO TÔN hoặc TƯỜNG LÔ + 18 m) / market (sân 12 m) / ≥ 2/3 mẫu đất OSM cấm (tường theo lớp: khuôn viên → hàng rào, chùa →
+    tường, công trường → kiểu tường theo chữ pano đất trống gần nhất) / dải 25 m chạm trường-viện-cơ quan thật (class Overture) →
+    hàng rào; lô không có phiếu nào: KẸP giữa 2 lô khuôn viên (±8 m) hoặc phố VÙNG biệt thự (1 bên khuôn viên / mặc định hàng rào
+    biệt thự) → khuôn viên. Tường đặt ở facadeLine + 0,3 m (mép sau vỉa hè), đoạn cách PANO_CAM < 3,5 m bỏ. Bằng chứng lấp khe
+    THÊM: nón pano shop/home ≥ 0,3 trong 22 m (lỗ Overture, AUDIT3 469). Bước 8: ô đất OSM cấm + sân khuôn viên/lô trống = 3
+    (cấm nhà sinh lõi ô, cấm nới 8a/9a). OPEN_RX thêm chợ/công trường/đất trống/bến xe/khuôn viên-cơ quan-trường-viện-biệt thự.
+    Trần tầng: lô < 90 m² không bốc thăm đuôi 7-8 tầng (nhà "kim" 152/023/225), mặt phố khuôn viên/vùng biệt thự ≤ 4 tầng (không
+    cộng "+1 tầng phố thương mại": trung bình mặt phố ≤ 25 m quanh 436 pano = 3,00 vs pano 3,06 — đã khớp).
+    **Thứ tự mọc theo HASH** (lõi ô 8 + nới 8a): trước xáo bằng RNG tuần tự → thêm/bớt 1 ứng viên xáo CẢ thành phố; nay sắp theo
+    hash từng ô/nhà → thay đổi chỉ lan cục bộ (A/B đối chứng, gộp nhánh).
+    **RB_PARCELS** (export mới trong `js/buildings_real.js`, ~21 KB): `walls [kind, màu|màuSắt<<4, x0,z0,…]` polyline, SÂN ở bên
+    TRÁI hướng polyline; `gates [x,z,góc,rộng,kind,chòi gác,theo tia pano,màu]` (1 cổng/dãy ≥ 10 m tại chỗ tia quan sát "cổng"
+    cắt dãy, không có thì giữa dãy).
+    **(3) RENDERER MỚI `js/parcels.js` `buildParcels(scene, ctx)`** (world.js ngay sau khối fabric): tường rào xây (trụ 3,2 m +
+    gờ), hàng rào sắt trên tường lửng (trụ 2,6 m, song sắt alphaTest 2 mặt), rào tôn (tấm sóng + cột hộp), tường lô (bê tông/gạch),
+    cổng 2 trụ chóp + 2 cánh sắt, chòi gác. 2 material (texture canvas 4 HÀNG lặp theo u: vữa/tôn/bê tông/gạch × vertex colour;
+    song sắt/cánh cổng) → 2 mesh cả thành phố, `userData.noMerge` (freezeStatic gộp làm mất uv), không tên đuôi _x,z. Cắt lúc chạy:
+    footprint SỐNG (rbGrid), bao nhà ô giữ (cellKept), nước, và mọi mesh MỎNG-DÀI-THẤP chạm đất đã có (tường/rào/cổng dựng tay
+    theo HÌNH HỌC, không theo tên — tường mỏ neo cb_wall_ltt pano_515 không bị dựng đôi). Va chạm: lưới đoạn, bọc
+    `world.resolveCollisions` (isFree/findFree/đặt vật phía sau tự né). `world.parcels.stats`.
+    **(4) world.js:** claim `qt_nhahat` vòng r62 → HỘP (0,70) ±40×±42 (khoảng lát giữa Hoàng Văn Thụ x≈−38 và Đinh Tiên Hoàng x≈36),
+    hành lang `hl_quanhoa` ±55 → ±22 (+vòng đầu 22), BỎ `qt_trienlam`; nhà SINH chạm ≤ 6 m quanh nhà ô DANH TÍNH giữ lại bị đánh
+    D.dead trước buildRealFabric (`world.synthNearCellKilled`); Chợ Con bz 793 → 783 (tâm footprint OSM), ô chợ trùng
+    `w2_chocon_market` bỏ (giữ ô dù). **citygen.js (1 dòng, vùng W3-C):** nhà có KIỂU Ô ≠ 0 không bán hàng → cạnh hông được NÂNG
+    thành mặt phố và mặt dãy gộp (wideF) cũng rc 3 (trước: lấy cấp phố → biệt thự mọc dải biển ở cạnh hông).
+    **BẪY:** (a) `\b` của JS không hiểu chữ có dấu ("chợ\b" không bao giờ khớp) → ranh giới tường minh; (b) "tôn" khớp trong
+    "bê tông" → `tôn(?!g)`; (c) màu tường rào phải lấy từ CỤM chữ tả tường/rào/trụ/cổng — "chòi gác vàng" từng nhuộm cả rào;
+    (d) tường dựng tay trong ô cells nằm ngay mặt phố — phải dò hình học trước khi dựng tường dữ liệu; (e) đo cảnh trước freeze
+    bằng `scene.updateMatrixWorld()` 1 lượt (updateWorldMatrix từng mesh chậm); (f) Bash sandbox chặn mọi lệnh có chữ "ev·al" →
+    gọi tools/qa/clearance.mjs qua wrapper ghép cờ.
 - **2026-10-04 (W2-F POLISH)** [ĐỢT 3 wave 2 — WebGL1, giải mã RB 1 lần, kho cảng, ĐÊM, giao thông né xe đỗ, dọn code chết, hitch]:
     **(1) WebGL1** (three r160 tự lùi WebGL1 khi không có WebGL2): KIỂM bằng `tools/qa/shoot.mjs --gl1` (init script cho
     `getContext('webgl2')` trả null — cờ Chrome `--disable-es3-apis` KHÔNG có tác dụng ở headless mới: vẫn webgl2:true;

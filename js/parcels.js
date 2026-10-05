@@ -17,7 +17,7 @@ import { RB_PARCELS } from './buildings_real.js';
 export const PWALL = { MASONRY: 0, FENCE: 1, HOARD: 2, LOTWALL: 3 };
 // màu (sRGB): 0 vàng Hải Phòng, 1 trắng kem, 2 xám bê tông, 3 xanh nhạt, 4 gạch đỏ, 5 tôn xanh dương, 6 tôn xanh lá,
 // 7 tôn đỏ, 8 tôn kẽm xám gỉ
-const COLS = [0xdcc07e, 0xe7e2d3, 0xa7a49c, 0xa3b59c, 0xa25f4b, 0x4a74a0, 0x55805a, 0x9c4032, 0x9b9d99];
+const COLS = [0xe2c682, 0xe9e5d8, 0xb5b2aa, 0xa9bba2, 0xa8644f, 0x5f8ab4, 0x679470, 0xa94a3b, 0xc3c6c3];
 const hash = (a, b) => { const s = Math.sin(a * 12.9898 + b * 78.233) * 43758.5453; return s - Math.floor(s); };
 
 // ---------- texture: 4 HÀNG (v) lặp theo u — 0 vữa trát, 1 tôn sóng, 2 bê tông tấm, 3 gạch/tường cũ ----------
@@ -81,17 +81,34 @@ function railTexture() {
 
 // ---------- bộ dựng hình học ----------
 class GB {
-  constructor() { this.p = []; this.n = []; this.uv = []; this.c = []; this.i = []; }
+  // mảng ĐỊNH KIỂU tự nới ×2 (không tạo hàng trăm nghìn mảng nhỏ): pos f32×3, normal i8n×3, uv f32×2, color u8n×3 (TUYẾN TÍNH)
+  constructor() { this.nv = 0; this.ni = 0; this.alloc(4096, 6144); }
+  alloc(nv, ni) {
+    const P = new Float32Array(nv * 3), N = new Int8Array(nv * 3), U = new Float32Array(nv * 2), C = new Uint8Array(nv * 3), I = new Uint32Array(ni);
+    if (this.P) { P.set(this.P.subarray(0, this.nv * 3)); N.set(this.N.subarray(0, this.nv * 3)); U.set(this.U.subarray(0, this.nv * 2)); C.set(this.C.subarray(0, this.nv * 3)); I.set(this.I.subarray(0, this.ni)); }
+    Object.assign(this, { P, N, U, C, I, cv: nv, ci: ni });
+  }
+  get count() { return this.nv; }
   // tứ giác a,b,c,d (vòng quanh mép); thứ tự tam giác tự chọn để MẶT TRƯỚC (CCW) quay theo pháp tuyến nrm
   quad(a, b, c, d, nrm, uvs, col) {
-    const o = this.p.length / 3;
-    for (const v of [a, b, c, d]) this.p.push(v[0], v[1], v[2]);
-    for (let k = 0; k < 4; k++) { this.n.push(nrm[0], nrm[1], nrm[2]); this.c.push(col.r, col.g, col.b); }
-    for (const t of uvs) this.uv.push(t[0], t[1]);
-    const e1 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], e2 = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
-    const cx = e1[1] * e2[2] - e1[2] * e2[1], cy = e1[2] * e2[0] - e1[0] * e2[2], cz = e1[0] * e2[1] - e1[1] * e2[0];
-    if (cx * nrm[0] + cy * nrm[1] + cz * nrm[2] >= 0) this.i.push(o, o + 1, o + 2, o, o + 2, o + 3);
-    else this.i.push(o, o + 2, o + 1, o, o + 3, o + 2);
+    if (this.nv + 4 > this.cv || this.ni + 6 > this.ci) this.alloc(this.cv * 2, this.ci * 2);
+    const o = this.nv, P = this.P, N = this.N, U = this.U, C = this.C;
+    const cr = Math.round(Math.min(1, col.r) * 255), cg = Math.round(Math.min(1, col.g) * 255), cb = Math.round(Math.min(1, col.b) * 255);
+    const nx = Math.round(nrm[0] * 127), ny = Math.round(nrm[1] * 127), nz = Math.round(nrm[2] * 127);
+    const V = [a, b, c, d];
+    for (let k = 0; k < 4; k++) {
+      const v = V[k], j = (o + k) * 3;
+      P[j] = v[0]; P[j + 1] = v[1]; P[j + 2] = v[2];
+      N[j] = nx; N[j + 1] = ny; N[j + 2] = nz;
+      C[j] = cr; C[j + 1] = cg; C[j + 2] = cb;
+      U[(o + k) * 2] = uvs[k][0]; U[(o + k) * 2 + 1] = uvs[k][1];
+    }
+    const e1x = b[0] - a[0], e1y = b[1] - a[1], e1z = b[2] - a[2], e2x = c[0] - a[0], e2y = c[1] - a[1], e2z = c[2] - a[2];
+    const cx = e1y * e2z - e1z * e2y, cy = e1z * e2x - e1x * e2z, cz = e1x * e2y - e1y * e2x;
+    const I = this.I, i = this.ni;
+    if (cx * nrm[0] + cy * nrm[1] + cz * nrm[2] >= 0) { I[i] = o; I[i + 1] = o + 1; I[i + 2] = o + 2; I[i + 3] = o; I[i + 4] = o + 2; I[i + 5] = o + 3; }
+    else { I[i] = o; I[i + 1] = o + 2; I[i + 2] = o + 1; I[i + 3] = o; I[i + 4] = o + 3; I[i + 5] = o + 2; }
+    this.nv += 4; this.ni += 6;
   }
   // hộp định hướng: tâm chân (cx, y0, cz), trục u = (ux,uz), dài L, dày T, cao từ y0 tới y1; faces: bỏ đáy
   box(cx, cz, ux, uz, L, T, y0, y1, col, row, uScale = 1, skipEnds = false) {
@@ -111,11 +128,11 @@ class GB {
   }
   geometry() {
     const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(this.p, 3));
-    g.setAttribute('normal', new THREE.Float32BufferAttribute(this.n, 3));
-    g.setAttribute('uv', new THREE.Float32BufferAttribute(this.uv, 2));
-    g.setAttribute('color', new THREE.Float32BufferAttribute(this.c, 3));
-    g.setIndex(this.i);
+    g.setAttribute('position', new THREE.BufferAttribute(this.P.slice(0, this.nv * 3), 3));
+    g.setAttribute('normal', new THREE.BufferAttribute(this.N.slice(0, this.nv * 3), 3, true));
+    g.setAttribute('uv', new THREE.BufferAttribute(this.U.slice(0, this.nv * 2), 2));
+    g.setAttribute('color', new THREE.BufferAttribute(this.C.slice(0, this.nv * 3), 3, true));
+    g.setIndex(new THREE.BufferAttribute(this.I.slice(0, this.ni), 1));
     g.computeBoundingSphere(); g.computeBoundingBox();
     return g;
   }
@@ -216,13 +233,17 @@ export function buildParcels(scene, ctx = {}) {
     for (let i = 0; i + 1 < pts.length; i++) {
       const [ax, az] = pts[i], [bx, bz] = pts[i + 1], L = Math.hypot(bx - ax, bz - az); if (L < 0.2) continue;
       const ux = (bx - ax) / L, uz = (bz - az) / L, n = Math.max(1, Math.ceil(L / 0.8));
-      let cur = null;
+      // điểm thử lùi vào trong 0,15 m (tường đứng trên mép sau vỉa hè; nhà thật sát vạch thì cạnh nhà ở phía trong)
+      const badAt = (s) => { const x = ax + ux * s, z = az + uz * s; return blocked(x - uz * 0.15, z + ux * 0.15) || gateHit(x, z); };
+      // ranh tốt/xấu giữa 2 mẫu → chia đôi 4 lần (±5 cm): tường áp sát trụ cổng / tường nhà, không hở khe tới 0,8 m
+      const edge = (good, bad) => { for (let it = 0; it < 4; it++) { const m = (good + bad) / 2; if (badAt(m)) bad = m; else good = m; } return good; };
+      let cur = null, prevS = 0, prevBad = false;
       for (let k = 0; k <= n; k++) {
-        const s = (L * k) / n, x = ax + ux * s, z = az + uz * s;
-        // điểm thử lùi vào trong 0,15 m (tường đứng trên mép sau vỉa hè; nhà thật sát vạch thì cạnh nhà ở phía trong)
-        const bad = blocked(x - uz * 0.15, z + ux * 0.15) || gateHit(x, z);
-        if (bad) { if (cur) { pieces.push(cur); cur = null; } continue; }
-        if (!cur) cur = { ax: x, az: z, ux, uz, s0: s, s1: s }; else cur.s1 = s;
+        const s = (L * k) / n;
+        const bad = badAt(s);
+        if (bad) { if (cur) { cur.s1 = edge(cur.s1, s); pieces.push(cur); cur = null; } prevBad = true; prevS = s; continue; }
+        if (!cur) cur = { ax, az, ux, uz, s0: k > 0 && prevBad ? edge(s, prevS) : s, s1: s }; else cur.s1 = s;
+        prevBad = false; prevS = s;
       }
       if (cur) pieces.push(cur);
     }
@@ -230,7 +251,7 @@ export function buildParcels(scene, ctx = {}) {
     for (const pc of pieces) {
       const L = pc.s1 - pc.s0; if (L < 1.2) continue;
       any = true; st.len[kind] += L;
-      emitWall(kind, col, pc.ax, pc.az, pc.ux, pc.uz, L);
+      emitWall(kind, col, pc.ax + pc.ux * pc.s0, pc.az + pc.uz * pc.s0, pc.ux, pc.uz, L);
     }
     if (any) st.runs++;
   }
@@ -327,21 +348,21 @@ export function buildParcels(scene, ctx = {}) {
 
   st.msWalls = Math.round((performance.now() - t2) * 10) / 10;
   const out = { meshes: [], stats: st, segs };
-  if (solid.p.length) {
+  if (solid.count) {
     const mat = new THREE.MeshLambertMaterial({ vertexColors: true, map: solidTexture() });
     mat.name = 'parcel_solid';
     const m = new THREE.Mesh(solid.geometry(), mat);
     m.name = 'parcel_walls'; m.castShadow = true; m.receiveShadow = true; m.userData.noMerge = true; m.userData.parcels = 1;
     scene.add(m); out.meshes.push(m);
-    st.tris += solid.i.length / 3;
+    st.tris += solid.ni / 3;
   }
-  if (rail.p.length) {
+  if (rail.count) {
     const mat = new THREE.MeshLambertMaterial({ vertexColors: true, map: railTexture(), alphaTest: 0.5, side: THREE.DoubleSide });
     mat.name = 'parcel_rail';
     const m = new THREE.Mesh(rail.geometry(), mat);
     m.name = 'parcel_rails'; m.castShadow = false; m.receiveShadow = true; m.userData.noMerge = true; m.userData.parcels = 1;
     scene.add(m); out.meshes.push(m);
-    st.tris += rail.i.length / 3;
+    st.tris += rail.ni / 3;
   }
   // ---- va chạm: lưới 24 m trên đoạn ----
   const CS = 24, grid = new Map(), key = (i, j) => i * 100003 + j;

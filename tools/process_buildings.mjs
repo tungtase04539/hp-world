@@ -1900,6 +1900,7 @@ for (const b of B) {
   let use = INFO.USE_HOME;
   if (style === STYLE.GLASS) use = INFO.USE_OFFICE;
   else if (pkk === 'compound') use = style === STYLE.VILLA ? INFO.USE_HOME : INFO.USE_OFFICE;   // W3-B: khuôn viên — không bán hàng
+  else if (pkk === 'home') use = INFO.USE_HOME;                                                 // W3-B: dãy nhà ở (pano)
   else if (style === STYLE.CIVIC || style === STYLE.SHED || (style === STYLE.VILLA && R() < 0.6)) use = INFO.USE_GATE;
   else if (/cửa hàng|shop|bán|quán|kinh doanh|biển|cửa cuốn|nhà hàng|cà phê|spa|showroom/.test(ouse)) use = INFO.USE_SHOP;
   else if (pkk === 'shop' || pkk === 'market') use = INFO.USE_SHOP;                            // W3-B: nón quan sát pano

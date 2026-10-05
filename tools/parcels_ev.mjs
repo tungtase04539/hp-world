@@ -62,6 +62,10 @@ export function classifyObs(o) {
     r.walled = RX_WALLWORD.test(all) || RX_STRONG.test(s);
     if (r.walled) r.wall = /hàng rào sắt|rào sắt|con tiện|song sắt|hàng rào (trắng|xanh|đen|trang trí)|tường lửng/.test(all) ? WALL.FENCE
       : /tường rào|tường (vàng|trắng|bao)|phù điêu/.test(all) ? WALL.MASONRY : WALL.FENCE;
+  } else if (/cao ốc|cao tầng|văn phòng|tòa nhà|toà nhà|khách sạn/.test(s) && /tường rào|hàng rào|rào sắt/.test(all)) {
+    // cao ốc / văn phòng có TƯỜNG RÀO phía trước (225 h270: cụm cao ốc sau tường rào mỏ neo khu cảng) → khuôn viên (giữ kiểu kính)
+    r.kind = 'compound'; r.civic = true; r.walled = true;
+    r.wall = /hàng rào sắt|rào sắt|song sắt/.test(all) ? WALL.FENCE : WALL.MASONRY;
   } else if (RX_SHOPT.test(s) || RX_SHOPF.test(f)) r.kind = 'shop';
   else if (RX_ROWHOME.test(s)) r.kind = 'home';
   // MÀU: chỉ cụm chữ tả TƯỜNG/RÀO/TRỤ/CỔNG (màu nhà/chòi gác/cờ không tính — 496 "chòi gác vàng" từng nhuộm cả rào).
