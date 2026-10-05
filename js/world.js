@@ -21222,7 +21222,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
   const trees = veg.buildTrees(scene, { groundHeight, R: BUILD_RADIUS, lakeSD, hdTreeBelt, colliders, fpGrid: world.rbGrid, fpData: world.rbData });
   world.trees = trees;                        // stats()/setSeason(0..1) — __hp.scene… hoặc world.trees.stats()
   world.treeBloomNear = trees.bloomNear;      // cánh phượng rơi quanh cây đang nở gần người chơi (petals.js)
-  loadHeroTrees(trees);  // nạp GLB cây phượng ảnh-thật → LOD gần ≤150 m (bất đồng bộ)
+  trees.onHeroSeason(() => loadHeroTrees(trees));  // nạp GLB cây phượng ảnh-thật → LOD gần ≤150 m (bất đồng bộ) — W3-G: CHỈ khi vào mùa phượng
   // ---------- ĐỒ ĐẠC PHỐ (Đợt 3 WP7, js/props.js) ----------
   // Chạy SAU mọi cây (kể cả dải vườn hoa) + công trình + nhà thật + điểm xe/NPC mặc định (né collider nhỏ r≤1 m,
   // claims/FEATURED_CLEAR, footprint thật, keepClear) và NGAY TRƯỚC flushTrees/freezeStatic (InstancedMesh của props

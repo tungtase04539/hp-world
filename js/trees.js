@@ -1900,9 +1900,18 @@ export function buildTrees(scene, ctx = {}) {
   };
   // LỊCH: setDate(tháng, ngày) → tỉ lệ nở theo bloomShare; setSeason(s) = ghi đè tỉ lệ (0..1, cả 2 loài; null = về lịch)
   let doy = parseDateParam(), seasonOverride = null;
+  // W3-G: GLB phượng hero (3 file ~5,5 MB, luôn đỏ) chỉ NẠP khi vào mùa phượng (tỉ lệ nở ≥ HERO_SEASON) — ngày mặc định 4/10
+  // không tải/giải mã GLB nào (trước: tải ngay khi dựng dù không bao giờ hiện). world.js: trees.onHeroSeason(() => loadHeroTrees(trees))
+  let heroLoader = null, heroLoadFired = false;
+  const maybeLoadHeroes = () => {
+    if (!heroLoader || heroLoadFired || U.uBloom.value.x < HERO_SEASON || !heroList.some((l) => l.length)) return;
+    heroLoadFired = true; heroLoader();
+  };
+  const onHeroSeason = (fn) => { heroLoader = fn; maybeLoadHeroes(); };
   const applySeason = () => {
     const [a, b] = seasonOverride != null ? [seasonOverride, seasonOverride] : bloomShare(doy);
     U.uBloom.value.set(a, b); lastT = -1e9;
+    maybeLoadHeroes();
   };
   applySeason();
   const setSeason = (b) => { seasonOverride = b == null ? null : clamp(+b, 0, 1); applySeason(); };
@@ -1916,7 +1925,7 @@ export function buildTrees(scene, ctx = {}) {
     if (lastDayT > 0.85 && t < 0.15) { doy = doy % 365 + 1; if (seasonOverride == null) applySeason(); }
     lastDayT = t;
   };
-  _built = { setHeroModel, bloomNear, stats, setSeason, setDate, getDate, uniforms: U, recs };
+  _built = { setHeroModel, onHeroSeason, bloomNear, stats, setSeason, setDate, getDate, uniforms: U, recs };
   // lưới gốc dựng lại theo vị trí CUỐI (sau dời/bỏ) → hệ chạy sau buildTrees (đạo cụ WP7…) vẫn tra được trunkNear
   Q.length = 0; _trunkGrid.clear(); for (const r of recs) addTrunk(r.x, r.z);
   return _built;
