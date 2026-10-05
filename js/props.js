@@ -1305,7 +1305,9 @@ export function buildProps(ctx) {
         k0 = Math.max(0, Math.floor((s - 0.3 - S.off) / CELL)); k1 = Math.min(S.n - 1, Math.floor((s + len + 0.3 - S.off) / CELL));
         for (let q = k0; ok && q <= k1; q++) if (S.occ[q] & (OCC_BIKE | OCC_SHOP)) ok = false;
       }
-      if (ok) carCand.push({ S, x, z, mi, len, roll, k0, k1, cov: mi < 6 && (roll || Math.hypot(x, z) > 700) && hash3(x, z, 110) < ((ec && (ec[9] & 64)) ? 0.35 : 0.06) });
+      // ô tô phủ bạt: CHỈ phố r khu dân cư (5%) hoặc pano nói "phủ bạt" (35%) — bản đầu 6% mọi phố ngoài lõi đặt khối xanh
+      // xám ngay cạnh camera pano_028 (ảnh thật: sedan đen)
+      if (ok) carCand.push({ S, x, z, mi, len, roll, k0, k1, cov: mi < 6 && hash3(x, z, 110) < ((ec && (ec[9] & 64)) ? 0.35 : roll ? 0.05 : 0) });
       s += len + 0.7 + hash3(x0, z0, 107) * 1.6;
     }
     carry = s - S.L;   // mang phần dư sang đoạn nối tiếp (âm = xe vừa bị chặn ở cuối đoạn → bắt đầu sát khớp)
@@ -1333,7 +1335,7 @@ export function buildProps(ctx) {
       coachI.push({ x, z, heading, col: pick([0x2c5aa0, 0xc8302a, 0x2f8f4e, 0xe08a1e, 0x1f3f73, 0x6a2a7a], hash3(x, z, 111)), len, hw: 1.3 });
       for (const dd of [-4, 0, 4]) ctx.addCollider(x + S.ux * dd, z + S.uz * dd, 1.25);
     } else if (C.cov) {   // ô tô phủ bạt (khu dân cư; pano "ô tô phủ bạt") — vẫn là xe đỗ cho giao thông né
-      coveredI.push({ x, z, heading, roll: rl, yo, col: pick([0xb9bcc0, 0xc8cacb, 0x9fa4a8, 0x3a5f8a, 0x8a9a8a], hash3(x, z, 112)), len: 4.6, hw: 0.95 });
+      coveredI.push({ x, z, heading, roll: rl, yo, col: pick([0xb9bcc0, 0xc8cacb, 0x9fa4a8, 0xaeb2b4, 0x3a5f8a], hash3(x, z, 112)), len: 4.6, hw: 0.95 });   // bạt bạc (đa số) / xanh
       for (const dd of [-len * 0.28, len * 0.28]) ctx.addCollider(x + S.ux * dd, z + S.uz * dd, 0.85);
     } else {
       carI[mi].push({ x, z, heading, roll: rl, yo, col, len });

@@ -421,6 +421,57 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-10-05 (W3-E STREET LIFE)** [ĐỢT 3 wave 3 — AUDIT3 FP-5: CHỢ DÂN SINH, hàng tràn hè theo loại cửa hàng, ô tô/xe máy
+    đỗ theo bằng chứng, xe khách, xe ba gác, trạm biến áp kiốt, đèn gang 2/5 cầu, cờ treo nhà, băng rôn, cổng chào ngõ]:
+    MỚI `js/streetlife.js` (gọi từ `buildProps` — dùng chung lưới ô vỉa hè 3 m `sides`, vật liệu/bộ dựng hình props truyền
+    qua `G` → không thêm program shader cho đồ chợ). `tools/gen_props_evidence.mjs` thêm 3 cột (props_evidence.js
+    [..., market 0-3, spill bits, deco bits]) + `PROPS_MARKETS` = đa giác chợ OSM amenity=marketplace NHÚNG SẴN trong bộ sinh
+    (tools/osm_*.json bị gitignore; làm mới: `node tools/gen_props_evidence.mjs --osm tools/osm_landuse.json`).
+    **Mức chợ ô** (`marketLevels`, ngay sau lấy mẫu 6.1): pano ≤ 45 m có market (≥ 30 m bớt 1); đa giác OSM trong/≤ 12 m → 3,
+    ≤ 40 → 2, ≤ 80 → 1, NHƯNG pano ≤ 30 m không nhắc chợ/ô/bạt/hàng → trần 1 (bằng chứng âm thắng); ô dựng tay tên `cho_*`
+    ngay sau mặt tiền → 3; phố p trần 1; openSpace (công viên/quảng trường/kè hồ) → 0. Từ khoá: tên riêng có chữ "chợ" bị xoá
+    trước khi so (phố Chợ Con 455-457 = phố vật liệu xây dựng, Chợ Sắt đang xây, ghi chú "ghép lệch … chợ tam bạc"),
+    "sạp hàng rong/sạp báo" chỉ là mức 1, "sạp … kín/tràn/chiếm" (không có cụm chợ) là mức 2 (189 Dư Hàng: hàng hiên + xe
+    máy, không phải phố ô dù). **Sân trước** `S.fore` = claim cell/landmark/civic sau mặt tiền 1,5/4/8/12/17 m (dừng khi gặp nhà
+    THẬT — có dãy phố đứng trước thì công trình phía sau không phải sân trước) có tên chùa/đền/đình/nhà thờ/UBND/trường/cổng/…
+    → không xe máy/chợ/quán/đồ hè (chùa Hai Bà Trưng 276: điện lùi ~16 m sau sân lát, xe máy từng dựng kín trước sân).
+    **Đặt chợ**: đi dọc bên phố bước 2,1-2,8 m (mức 3, 95%) / 2,8-4,4 m (mức 2, 55%) / 3 m (mức 1, 10%); khối 9 m chọn chủ đề
+    ô dù/bạt; mỗi đơn vị thử ô (cán lệch 0,75 m khỏi sạp, vỉa ≥ 2,6 m cán giữa vỉa) → vị trí khác → bạt (mức ≥ 2 gần như liền
+    mái); hàng dưới đất (sạp phủ bạt, mẹt, bạt trải đất, bao tải, sọt) SÁT MẶT TIỀN khi vỉa ≥ 2,6 m (chừa dải bó vỉa cho xe máy
+    đỗ — ảnh 184/189), người bán ngồi ghế đẩu sau hàng (ghế = biến thể nhóm hàng, người = kit SIT), khách đứng phía đường;
+    mức 3 (40% đơn vị) thêm hàng ở dải 1,1 m lòng đường sát bó vỉa (cách nút giao ≥ 4 m) → `world.props.stalls` (traffic.js lách như xe
+    đỗ). Mọi vật: tâm ≥ 2,5 m + bán kính tới camera pano, không trong nhà thật, không trên nhựa phố khác (`onCarriageFast`).
+    BẪY: (a) cán ô vào `obst` với bán kính lớn → mọi sạp ngay dưới ô bị loại (bản đầu: ô không có hàng); (b) hàng giữa vỉa
+    hè → xe máy (parkingLine) bị loại sạch khỏi phố chợ — thật thì xe máy đỗ ngoài, hàng trong; (c) `flat()` (groundHeightNoDeck
+    + isWater) là truy vấn đắt nhất của vòng chợ — ô đã kiểm dốc lúc lấy mẫu, bỏ trong okAt.
+    **Hàng tràn hè** theo chữ biển hiệu thật (SHOP_SIGNS → `signCategory`: cafe/food/furn/bike/toys/fruit/flower/cloth/hard/
+    plant — chỉ chọn đồ, chữ không hiển thị; SHOP_SIGNS đã lọc thương hiệu nên regex chỉ dùng từ chung): quán cà phê = bộ bàn
+    ghế + dù 70%, cửa hàng xe máy = 1-2 hàng xe MỚI mũi ra đường, nội thất/bàn thờ+két, đồ chơi, giá treo quần áo, xô hoa,
+    hàng chồng; + theo bằng chứng pano (spill bits ≤ 25 m) + chậu cây trước nhà (3% ô lõi).
+    **Ô tô** (props.js 6.6): bỏ luật `lakeSD > 18` (cấm ô tô 18 m quanh MỌI hồ → Quang Trung/Nguyễn Đức Cảnh trống) → chỉ cấm
+    phía kè (đi ra phía vỉa lại gần hồ hơn) + phía vỉa là công viên/quảng trường (322/542/065); nút giao: tâm/đầu xe cách LÒNG
+    phố p/s cắt ngang ≥ 12 m, t/r ≥ 6,6 m, ngõ 4,5 m (`roadIdx.nearCross`; 15 m mọi nút bỏ ~25% ô tô lõi); phố r có pano: "đỗ ven đường" 0,4, "kín hai bên"
+    0,75 (trước 0,1/0,3); s/t không pano 0,2; viên nang quanh camera giữ 6,5-8 m CHỈ khi pano không nhắc ô tô đỗ, có thì xe
+    con tâm ≥ 4,5 m/đầu ≥ 3,5 m (AUDIT3: viên nang bỏ chính các xe gần camera); xe khách 11,4 m (pano "xe khách đỗ nối
+    đuôi" ≤ 40 m — 441 Bến Bính), ô tô phủ bạt (bạt bạc) CHỈ phố r 5% / pano "phủ bạt" 35% (bản 6% mọi phố ngoài lõi đặt khối
+    xanh xám sát camera 028 mà ảnh thật là sedan đen). Bước ô đỗ đi dọc TỪNG TUYẾN (cùng phố +
+    cùng bên, đoạn nối tiếp — `byRoad`), phần dư MANG sang đoạn kế, đoạn kế thẳng hàng (< 12°) cho xe chồm qua khớp (trước: mỗi
+    đoạn polyline tự bắt đầu lại ở 2-8 m + chừa 3 m cuối → phố cong ven hồ chia đoạn 10-25 m gần như không có xe — 028/033).
+    Thứ tự kiểm rẻ trước (camera pano → nút giao → vật cản → lakeSD/openSpace). QA: `__hpProps.carRejPts` [x,z,lý do].
+    **Xe máy**: hàng = chuỗi CỤM theo lô 3,2-6 m cách khe lối vào 0,5-0,9 m, mỗi cụm góc/mũi/khoảng riêng; bảng màu tối
+    (đen/xám/bạc/trắng — ảnh tháng 10); ước lượng ngân sách ×0,5 (thực đo, chú thích 0,8 cũ sai); xe trưng bày cửa hàng xe.
+    **Tiện ích**: cột điện phố cũ (t/r lõi, búi dây) 23-29 m; nhịp dây KHÔNG qua phố rộng/nút giao/khoảng mở (`roadIdx.wideAt`
+    + openSpace ở ¼ ½ ¾ nhịp), dây sang nhà bên kia chỉ phố t/r và phải có nhà (363: lưới dây trên nút giao); trạm biến áp
+    kiốt (bằng chứng "trạm biến áp … vỉa hè/hộp", "tủ điện lớn", "hai tủ" — 207/092; nền ~1/1.000 m phố s/t lõi; ≥ 7 m camera — khối
+    xám sát ống kính 276 mà ảnh thật trống); đèn gang 5 cầu quảng trường Nhà hát / 2 cầu ven hồ / 3 cầu vườn
+    hoa — nhóm `props_furniture2` RIÊNG (gộp vào nhóm cột 1.300 instance làm mọi cột gánh đỉnh suy biến); cờ treo nhà (cán
+    chếch 30° cắm vào mặt tiền THẬT dò từ facadeLine), băng rôn khẩu hiệu chung căng ngang phố + 2 cọc, cổng chào NGÕ (miệng
+    way h/w/r ≤ 40 m, lùi 3,5 m vào ngõ; cổng trường/công viên không tính), xe ba gác đỗ dải đỗ (22 pano).
+    **Giao diện**: `world.props.stalls` [{x,z,heading,len,hw,kind}] (traffic.js gộp với parkedCars); `parkedCars` thêm xe
+    khách (hw 1,3) + xe phủ bạt; `__hpProps.lists` thêm mkOver/mkGround/mkRoad/spill/kioskI/coaches/covered/flagsHouse/
+    banners/gates (clearance_page bỏ qua mkRoad/coaches/covered/banners/gates — cố ý trên lòng/treo cao). props.js `XS(c)` =
+    MỘT chỗ lấy mặt cắt cho phần W3-E — W3-A (bề rộng theo way) thay hàm này là đủ.
+    **Số đo**: (điền)
 - **2026-10-04 (W2-F POLISH)** [ĐỢT 3 wave 2 — WebGL1, giải mã RB 1 lần, kho cảng, ĐÊM, giao thông né xe đỗ, dọn code chết, hitch]:
     **(1) WebGL1** (three r160 tự lùi WebGL1 khi không có WebGL2): KIỂM bằng `tools/qa/shoot.mjs --gl1` (init script cho
     `getContext('webgl2')` trả null — cờ Chrome `--disable-es3-apis` KHÔNG có tác dụng ở headless mới: vẫn webgl2:true;
