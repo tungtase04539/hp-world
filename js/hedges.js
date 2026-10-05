@@ -89,7 +89,7 @@ export function hedgeGeometry(paths, gy, opt = {}) {
     const nR = P.length;
     for (const [ri, flip] of [[0, true], [nR - 1, false]]) {
       const r = base0 + ri * NP;
-      for (let k = 1; k < NP - 2; k++) { if (flip) idx.push(r, r + k + 1, r + k); else idx.push(r, r + k, r + k + 1); }
+      for (let k = 1; k < NP - 1; k++) { if (flip) idx.push(r, r + k + 1, r + k); else idx.push(r, r + k, r + k + 1); }
     }
   }
   const g = new THREE.BufferGeometry();
