@@ -101,7 +101,7 @@ for (const e of j) {
   if (/hàng ho[áa]|bày hàng|thùng carton|bao tải|thùng xốp|hàng (kim khí|nhựa)|lấn chiếm/.test(mk)) sp |= 4;
   // ('ô' trần = "ô tô" → chỉ nhận ô/dù, dù (không "mặc dù"), ô che/lớn/đỏ/trắng)
   if (/(quán|cà phê|cafe|café|trà|bia)[^.;|]{0,40}(ô\/?dù|(?<!mặc )dù|ô (che|lớn|đỏ|trắng))|(ô\/?dù|(?<!mặc )dù)[^.;|]{0,30}(quán|cà phê|cafe|café|trà|bia)|bàn ghế[^.;|]{0,24}dù|dù[^.;|]{0,24}bàn ghế|sân vườn/.test(mk)) sp |= 8;
-  if (/xe (máy|điện)[^.;|]{0,30}trưng bày|trưng bày[^.;|]{0,30}xe (máy|điện)|cửa hàng xe (máy|điện)|đại lý (xe|honda|yamaha)|showroom xe (máy|điện)|sạp xe máy điện/.test(mk)) sp |= 16;
+  if (/xe (máy|điện)[^.;|]{0,30}trưng bày|trưng bày[^.;|]{0,30}xe (máy|điện)|cửa hàng xe (máy|điện)|đại lý xe|showroom xe (máy|điện)|sạp xe máy điện/.test(mk)) sp |= 16;
   if (/nội thất|đồ gỗ|đồ thờ|thờ cúng|két sắt|bàn ghế gỗ|sofa|giường/.test(mk)) sp |= 32;
   if (/đồ chơi|thú bông/.test(mk)) sp |= 64;
   if (/trái cây|hoa quả|rau( củ|,| quả| xanh)|củ quả|mẹt|rổ/.test(mk)) sp |= 128;

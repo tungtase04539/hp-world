@@ -1281,9 +1281,9 @@ export function buildProps(ctx) {
       const parkSide = openSpace(ox, oz) || openSpace(x + S.nx * (X.sw * 0.5 + 0.95), z + S.nz * (X.sw * 0.5 + 0.95)) || !!claimAt(ox, oz, ['park', 'plaza']);
       let why = !(x * x + z * z < R_MAX * R_MAX && flat(x, z)) ? 1 : (avoid(x, z) || clearAt(x, z)) ? 2 : lakeSide ? 3 : parkSide ? 4
         : (panoNear(x, z, rc) || panoNear(x + hx, z + hz, rp) || panoNear(x - hx, z - hz, rp)) ? 5 : 0;
-      // nút giao: không đỗ trong 15 m tính từ LÒNG phố cắt ngang (p/s/t/r); ngõ h/w (không vỉa) 4,5 m như cũ (pano 065/193/327:
+      // nút giao: không đỗ trong 12 m tính từ LÒNG phố p/s cắt ngang (t/r 6,6 m); ngõ h/w (không vỉa) 4,5 m như cũ (pano 065/193/327:
       // ô tô đỗ chắn làn rẽ ở miệng giao lộ)
-      if (!why) for (const dd of [-len / 2 - 0.5, 0, len / 2 + 0.5]) { if (roadIdx.nearCross(x + S.ux * dd, z + S.uz * dd, S.ri, 15, 4.5)) { why = 6; break; } }
+      if (!why) for (const dd of [-len / 2 - 0.5, 0, len / 2 + 0.5]) { if (roadIdx.nearCross(x + S.ux * dd, z + S.uz * dd, S.ri, 12, 4.5)) { why = 6; break; } }
       if (!why && obst.hit(x, z, mi === 6 ? 1.2 : 0.9)) why = 7;
       let ok = !why;
       if (why) { carRej[why]++; if (carRejPts.length < 60000) carRejPts.push(+x.toFixed(1), +z.toFixed(1), why); }
