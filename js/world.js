@@ -6022,7 +6022,8 @@ const twBDz = (x) => -470 + 7 * (x + 541) / 561;              // tim Bạch Đ�
     // ===== KÈ TAM BẠC (bờ bắc, đoạn KHÔ z<30): nền caro + lan can xanh rêu =====
     const zR = (x) => 25 - 0.322 * (x + 1154);                 // tim Thế Lữ theo x
     const off = (x, s) => [x + 0.3065 * s, zR(x) + 0.9516 * s];
-    { // nền caro đỏ-xám (quad ShapeGeometry, mép ngoài s=13.2 — trước mép nước)
+    const _rbKe = world.riverbank && world.riverbank.stats.promM > 0;   // W3-F: kè/dải dạo do js/riverbank.js dựng → bỏ nền caro + lan can tay
+    if (!_rbKe) { // nền caro đỏ-xám (quad ShapeGeometry, mép ngoài s=13.2 — trước mép nước)
       const caro = makeTex(128, 128, (gc, w, h) => {
         for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) {
           gc.fillStyle = (i + j) % 2 ? '#b8574a' : '#9aa0a2'; gc.fillRect(i * 32, j * 32, 32, 32);
@@ -6039,7 +6040,7 @@ const twBDz = (x) => -470 + 7 * (x + 541) / 561;              // tim Bạch Đ�
     }
     { // lan can sắt xanh rêu dọc mép kè (s=13.4) + cây non chống cọc + đèn + bảng tin
       const [lx1, lz1] = off(-1116, 13.4), [lx2, lz2] = off(-1046, 13.4);
-      twRail(lx1, lz1, lx2, lz2, 1.05, 0x3f6f4f, 2.4);
+      if (!_rbKe) twRail(lx1, lz1, lx2, lz2, 1.05, 0x3f6f4f, 2.4);
       for (let x = -1112; x <= -1050; x += 13) {
         const [tx, tz] = off(x, 11.6); twTreeAt(tx, tz, 1.2, 3.2); // cây non
       }
@@ -7393,7 +7394,8 @@ const bsHipRoof = (W, D, hexa = 0x8a4a34, x = 0, y = 0, z = 0) => {
   }
   {                                                        // kè đông #243: lan can xanh + đèn lồng + cọ
     const landG = (x, z) => groundHeightNoDeck(x, z) > 1.6;
-    const m = bsRingRail(-344.6, -431.1, -372.8, -505.9, 0x2a7a4d, { useDeck: false, guard: landG });
+    // W3-F: lan can kè do js/riverbank.js dựng theo mép polygon — bỏ bản tay (trùng lan can mới); đèn lồng + cọ giữ
+    const m = (world.riverbank && world.riverbank.stats.promM > 0) ? null : bsRingRail(-344.6, -431.1, -372.8, -505.9, 0x2a7a4d, { useDeck: false, guard: landG });
     if (m) m.name = 'bs_ke_thelu';
     const A = [-333, -382], U = [-0.3531, -0.9356], NE = [0.9356, -0.3531];
     for (let t = 56; t <= 126; t += 16) {                  // cột đèn lồng: 3 lồng vàng-đỏ treo cong
@@ -9086,7 +9088,7 @@ const tsShop = (bx, bz, ry, W, FL, wallMat, txt, sbg, sfg, opt = {}) => {
     }
     for (let d = 12; d < L - 8; d += 34) {                     // liễu rủ xen cây non chống cọc
       const px = x1 + ux * d + nx * 7.9, pz = z1 + uz * d + nz * 7.9;
-      if (ti++ % 2) tsWillow(px, pz); else tsYoung(px, pz);
+      if (ti++ % 2) tsWillow(px, pz); else if (!(world.riverbank && world.riverbank.stats.promM > 0)) tsYoung(px, pz);   // W3-F: cây non do kit
     }
     for (let d = 24; d < L - 10; d += 41) {                    // đèn LED cần cong (294 s2)
       const px = x1 + ux * d + nx * 8.4, pz = z1 + uz * d + nz * 8.4;
@@ -9135,10 +9137,12 @@ const tsShop = (bx, bz, ry, W, FL, wallMat, txt, sbg, sfg, opt = {}) => {
       hedge.position.set(hx, groundHeight(hx, hz) + 0.45, hz);
       hedge.rotation.y = Math.atan2(ux, uz) - Math.PI / 2; scene.add(hedge);
     }
-    for (let d = 14; d < L - 8; d += 31) {                     // đèn cổ đôi bóng
+    // W3-F: kit riverbank.js đã có đèn 2 bóng 16 m + cây NON chống cọc (ảnh 198/203/207/212/294: dải dạo KHÔNG cổ thụ)
+    const _rbK = world.riverbank && world.riverbank.stats.promM > 0;
+    for (let d = 14; d < L - 8 && !_rbK; d += 31) {            // đèn cổ đôi bóng
       tsLamp2(x1 + ux * d + nx * 8.2, z1 + uz * d + nz * 8.2);
     }
-    for (let d = 22; d < L - 10; d += 26) {                    // phượng/bàng xen cây non
+    for (let d = 22; d < L - 10 && !_rbK; d += 26) {           // phượng/bàng xen cây non
       const px = x1 + ux * d + nx * 7.4, pz = z1 + uz * d + nz * 7.4;
       if ((d / 26 | 0) % 3 === 2) tsYoung(px, pz); else tsTree(px, pz, 3.6, 7.5, (d / 26 | 0) % 2 ? 0x3e6b2f : 0x4f7d35);
     }
@@ -12905,7 +12909,9 @@ const v1House = (cx, cz, ry, W, D, FL, facMat, name, roofHex = 0xb8b2a2) => {
     [-347.2, -419.5, -0.353, -0.936, 0.94, -0.35],  // 302 bờ tây
     [-362.2, -459.4, -0.353, -0.936, 0.94, -0.35],  // 303 bờ tây
   ];
-  for (const [tx, tz, ux, uz, snx, snz] of SEGS) {
+  // W3-F: bờ kè + dải dạo do js/riverbank.js dựng theo mép polygon (bản tay này nằm lệch cạnh lan can mới, hoa giấy = đĩa hồng)
+  const _rbOn = world.riverbank && world.riverbank.stats.promM > 0;
+  for (const [tx, tz, ux, uz, snx, snz] of (_rbOn ? [] : SEGS)) {
     const barAng = Math.atan2(ux, uz) + Math.PI / 2;    // thanh/dải nằm dọc bờ
     for (let a = -16; a <= 16; a += 2.5) {              // giữ gần pano, tránh trôi vào phố cắt ngang
       const bx = tx + ux * a, bz = tz + uz * a;
@@ -13937,7 +13943,7 @@ const w3Pole = (x, z) => {
     g.strokeStyle = 'rgba(40,20,12,.28)'; g.lineWidth = 2; for (let i = 0; i <= 4; i++) { g.beginPath(); g.moveTo(i * s, 0); g.lineTo(i * s, h); g.moveTo(0, i * s); g.lineTo(w, i * s); g.stroke(); }
   }) });
   const caroG = [], railG = [], poleG = [], globeG = [], bougG = [];   // (cây: Đợt 3 WP4 → js/trees.js)
-  for (let a = -30; a <= 20; a += 2.5) {                        // z = -331.5 + 0.998a ∈ [-361,-311] (trong KHE)
+  for (let a = -30; a <= ((world.riverbank && world.riverbank.stats.promM > 0) ? -31 : 20); a += 2.5) {   // z ∈ [-361,-311] (KHE); W3-F: riverbank.js thay
     const bx = tx + ux * a, bz = tz + uz * a;
     let edge = -1;
     for (let d = 4; d <= 24; d += 2) { const x = bx + snx * d, z = bz + snz * d; if (!w3dry(x, z)) { edge = d - 2; break; } }
@@ -21270,7 +21276,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
   world.props = buildProps({
     scene, LAND_H, ROADS_DT: ROADS_GROUND, groundHeightNoDeck, isWater, lakeSD, sharedMats, updaters, addCollider, colliders,
     featuredClear: FEATURED_CLEAR, reserved: propReserved, openSpace, nearPanoCam,
-    avoid: (x, z) => clearedZone(x, z) || inSuperblock(x, z),
+    avoid: (x, z) => clearedZone(x, z) || inSuperblock(x, z) || (world.riverbank ? world.riverbank.promSide(x, z) : false),   // W3-F: dải dạo ven sông trống
     gardens: GARDENS, square: EXTRAS.square,
     footprints: world.rbGrid ? { D: world.rbData, grid: world.rbGrid } : null,   // WP2: footprint đã đánh D.dead (claims) → khỏi giải mã lần 2
     // chân prop chạm MẶT ĐANG VẼ: WP6 roadnet (vỉa mọi cấp +0,25) nếu đã gộp, không thì mặt layRoad cũ (vỉa p/s/t +0,18,

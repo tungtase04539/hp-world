@@ -433,7 +433,21 @@ export function buildRiverbanks(scene, deps) {
     }
     return false;
   } : () => false;
+  // promSide(x,z): điểm thuộc hành lang phố có dải dạo VÀ ở PHÍA SÔNG của tim phố (gần nước hơn tim) — đồ vỉa hè props.js
+  // (quán cóc, xe máy đỗ, cột) không đặt lên dải dạo ca-rô (ảnh pano_203: dải dạo trống, chỉ cây non + đèn)
+  const promSide = keepSegs.size ? (x, z) => {
+    const a = G.get(gk(Math.floor(x / GC), Math.floor(z / GC))); if (!a) return false;
+    for (const si of a) {
+      if (!keepSegs.has(si)) continue;
+      const r = segs[si], dx = r.bx - r.ax, dz = r.bz - r.az, l2 = dx * dx + dz * dz; if (!l2) continue;
+      let t = ((x - r.ax) * dx + (z - r.az) * dz) / l2; if (t < -0.05 || t > 1.05) continue; t = Math.max(0, Math.min(1, t));
+      const px = r.ax + dx * t, pz = r.az + dz * t;
+      if (Math.hypot(x - px, z - pz) > deps.hw(r.c) + deps.sw(r.c) + 1.5) continue;
+      if (waterSD(x, z) < waterSD(px, pz) - 0.5) return true;
+    }
+    return false;
+  } : () => false;
   stats.promM = Math.round(stats.promM); stats.wildM = Math.round(stats.wildM); stats.stripM = Math.round(stats.stripM);
   stats.ms = Math.round(performance.now() - t0);
-  return { stats, saplings, keep, meshes };
+  return { stats, saplings, keep, promSide, meshes };
 }
