@@ -320,6 +320,7 @@ class Geo {
     return g;
   }
 }
+const FINE_N = 1.5, FINE_S = 0.8;   // W3-G: kit gần thẻ lá ×1,5 số lượng, ×0,8 cạnh (tán mịn hơn, cùng độ phủ)
 const WASH_TOP = 1.3;    // trên mức gốc quét vôi (WASH_H 1,25) — đoạn thân kéo giãn khi nâng tán bắt đầu từ đây
 const _T = new THREE.Vector3(), _N = new THREE.Vector3(), _B = new THREE.Vector3(), _P = new THREE.Vector3(), _U = new THREE.Vector3(0, 1, 0), _X = new THREE.Vector3(1, 0, 0);
 // ống côn theo polyline pts=[[x,y,z,r],...]; uv quấn hết bề ngang ô, v trải theo chiều dài; col(y)→[r,g,b]; sway(x,y,z)
@@ -452,8 +453,8 @@ function genKit(d, far, seed) {
   const leafCell = (cells) => cellRect(cells[(r() * cells.length) | 0], 3);
   // thẻ lá quanh tâm tán ellipsoid c=(cx,cy,cz),(rx,ry); tips = điểm hút (đầu cành)
   // W3-G (AUDIT3 TREECARD — thẻ lá "bay" tách khỏi tán ở pano_386/400/496/538): (1) MỌI thẻ bám khung cành: thẻ chùm ở đầu
-  // cành như cũ; thẻ "vỏ tán" (¼ còn lại) trước đây rải đều trên vỏ ellipsoid không cành đỡ → nay đặt trên đoạn từ một
-  // điểm cành (đầu/giữa cành) ra phía vỏ (30-85%); (2) kẹp vào vỏ ellipsoid ×1,0 (trước 1,08); (3) số "độ kín tán" của
+  // cành như cũ; thẻ "vỏ tán" (¼ còn lại) trước đây rải đều trên vỏ ellipsoid không cành đỡ → nay chùm LỎNG (bán kính ×2)
+  // quanh 1 điểm cành (đầu/giữa cành); (2) kẹp vào vỏ ellipsoid ×1,0 (trước 1,08); (3) số "độ kín tán" của
   // thẻ TƯƠNG QUAN THEO CHÙM (70% chùm + 30% thẻ) → cây thưa mất nguyên chùm, chùm còn lại vẫn dày (không còn thẻ lẻ).
   const crownCards = (cx, cy, cz, rx, ry, tips, n, sMin, sMax, cells, upBias, kind = 2, topOnly = false) => {
     G.crown = true;
@@ -529,8 +530,10 @@ function genKit(d, far, seed) {
       tube(G, [[Math.cos(a) * 0.62, -0.3, Math.sin(a) * 0.62, 0.035], [Math.cos(a) * 0.1, 1.55, Math.sin(a) * 0.1, 0.03]], 4, rectBark, 0, () => [1.55, 1.38, 1.1], () => 0);
     }
     // kit XA: ~19% số thẻ cũ (cardsFar), thẻ ×1,9 (nhìn từ trên cao/vệ tinh tán vẫn thành khối liền, không lấm tấm)
-    const n = Math.round(far ? Math.max(14, d.cardsFar || d.cards * 0.19) : d.cards * CARD_Q);
-    const sMul = far ? 1.9 : 1;
+    // W3-G: kit GẦN thẻ NHỎ hơn (×0,8) và NHIỀU hơn (×1,5) — cùng diện tích lá, hạt mịn hơn: thẻ 1,5-2,4 m từng đọc thành
+    // "miếng lá vuông phẳng" ở 5-15 m (AUDIT3 TREECARD 455/473 "thẻ lá vỡ hạt/vuông"); kit XA giữ nguyên
+    const n = Math.round(far ? Math.max(14, d.cardsFar || d.cards * 0.19) : d.cards * CARD_Q * FINE_N);
+    const sMul = far ? 1.9 : FINE_S;
     // kit XA: thẻ ngửa lên nhiều hơn (nhìn từ trên/xa tán vẫn kín — ảnh vệ tinh), gần: theo loài
     crownCards(cx, d.cy, cz, d.rx, d.ry, tips, n, d.cardS[0] * sMul, d.cardS[1] * sMul, d.cells, (d.up || 0.2) + (far ? 0.55 : 0));
     // hoa: kit XA trên mặt vòm (nhìn từ cao); kit GẦN thành chùm ở ĐẦU CÀNH khắp tán (W2-B — trước chỉ mặt trên vòm nên
@@ -541,7 +544,8 @@ function genKit(d, far, seed) {
     trunk(d.r0, d.r0 * 0.3, H * 0.94);
     G.crown = true;
     let wsum = 0; for (const [, R] of d.tiers) wsum += R * R;
-    const nCards = far ? Math.max(22, d.cardsFar || d.cards * 0.21) : d.cards * CARD_Q, sMul = far ? 1.8 : 1;
+    // (bàng: ×1,3 nữa — tầng lá phải thành ĐĨA dày quanh cả cành, không phải vài miếng ở mút: W3-G)
+    const nCards = far ? Math.max(22, d.cardsFar || d.cards * 0.21) : d.cards * CARD_Q * FINE_N * 1.3, sMul = far ? 1.8 : FINE_S;
     d.tiers.forEach(([ty, R], ti) => {
       const nb = far ? 4 : d.branches + (ti === d.tiers.length - 1 ? -2 : 0), az0 = r() * 6.28, tips = [];
       for (let b = 0; b < nb; b++) {
@@ -556,7 +560,7 @@ function genKit(d, far, seed) {
         let px, py, pz, cr = -1;
         // W2-B: chùm lá bàng chặt hơn quanh đầu cành (80%, toả 1,0 m) → tầng lá thành các "đĩa" rời, lộ trời giữa tầng
         // W3-G: số "độ kín" tương quan theo chùm (cây thưa mất nguyên chùm — không còn thẻ lẻ "bay")
-        if (i < n * (far ? 0.7 : 0.8)) { const ti = i % tips.length, tp = tips[ti], sp = far ? 1.3 : 1.0; px = tp[0] + (r() + r() - 1) * sp; py = tp[1] + 0.1 + r() * 0.6; pz = tp[2] + (r() + r() - 1) * sp; cr = tipR[ti]; }
+        if (i < n * (far ? 0.7 : 0.8)) { const ti = i % tips.length, tp = tips[ti], sp = far ? 1.3 : 1.35; px = tp[0] + (r() + r() - 1) * sp; py = tp[1] + 0.05 + r() * 0.55; pz = tp[2] + (r() + r() - 1) * sp; cr = tipR[ti]; }
         else if (far) { const a = r() * 6.28, rr = Math.sqrt(0.08 + r() * 0.92) * R; px = lx * ty + Math.cos(a) * rr; py = ty + 0.2 + r() * 0.55; pz = lz * ty + Math.sin(a) * rr; }
         else {   // W3-G: lá lấp tầng bám cành (chùm lỏng 1,8 m quanh 1 điểm cành), không rải đều đĩa tầng (thẻ không cành đỡ)
           const ti = (r() * tips.length) | 0, tp = tips[ti]; px = tp[0] + (r() + r() - 1) * 1.8; py = tp[1] + 0.05 + r() * 0.5; pz = tp[2] + (r() + r() - 1) * 1.8; cr = tipR[ti] * 0.6 + r() * 0.4;
@@ -860,7 +864,9 @@ function vegAt(x, z, ri = -1, park = false) {
     // bão Yagi: dải trung tâm (pano_001_h090) gần như TOÀN BỘ trơ cành
     pollard = lvl ? clamp(-0.2 + lvl * 0.13, 0, 0.8) : pollard * 0.6;
     polLvl = lvl;
-    young = V[o + 8] ? V[o + 8] / 10 * 0.6 : 0.03;
+    // W3-G: "HÀNG cây non/mới trồng" (6) → 80% cây non chống cọc (pano_304 nút HVT, kè sông 299/294 sau bão Yagi), "cây non"
+    // lẻ (3) → 25% (W2-B: 36% / 18%)
+    young = V[o + 8] >= 6 ? 0.8 : V[o + 8] ? 0.25 : 0.03;
     dens = V[o + 9];
     if (V[o + 10]) wash = 0.9;
     thin = V[o + 12] || (lvl >= 5 ? 1 : 0);   // tán thưa / trụi lá — hoặc vùng cắt cụt nặng (cây còn lại cũng xơ xác)
@@ -868,7 +874,7 @@ function vegAt(x, z, ri = -1, park = false) {
   }
   return { w, pollard, young, dens, wash, pano, cauRaw, near, thin, polLvl, zoneCut, tunnel, palm, lean };
 }
-// hố cây vỉa hè GIÁP vườn hoa/công viên (đa giác PARKS = claim 'park') trong 8 m — hè phía vườn (8 hướng)
+// cây GIÁP vườn hoa/công viên (đa giác PARKS = claim 'park') trong 8 m — hè phía vườn, hàng cây viền vườn (8 hướng)
 const PK = ['park'], PKD = [[8, 0], [-8, 0], [0, 8], [0, -8], [5.7, 5.7], [-5.7, 5.7], [5.7, -5.7], [-5.7, -5.7]];
 function nearParkEdge(x, z) { for (const [dx, dz] of PKD) if (claimAt(x + dx, z + dz, PK)) return true; return false; }
 // cau/cọ KHÔNG có bằng chứng: pano gần nhất (≤ 35 m) mô tả cây mà không nhắc cau/cọ và KHÔNG pano nào ≤ 50 m nhắc cau/cọ
@@ -962,17 +968,34 @@ const HERO_SPOTS = [
   { cam: [295.8, 39.4], h: 180, d: 18.7, lat: -7.2, kind: 'da', H: 17.5, R: 9.5 },
   { cam: [-211.7, 114.1], h: 180, d: 21, lat: -6.7, kind: 'me', H: 16.5, R: 10 },
 ];
-// chỗ đặt: điểm đo được → chỗ trống GẦN NHẤT (≤ 8 m, vòng 1 m × 16 hướng) không lòng đường / không nhà / không địa danh.
-// Trả [[x, z, bán kính cấm cây khác]] cho hàng cây vỉa hè.
+// chỗ đặt BÁM PHỐ (không bám camera — camera pano lệch tim phố tới 9 m, W3-A sẽ dời tim phố): điểm "d m trước camera" → điểm
+// gần nhất trên CHÍNH phố của camera → hố cây treePitLine phía lat (trái/phải theo hướng nhìn) → chỗ trống gần nhất ≤ 4 m
+// (không lòng đường / nhà / địa danh / camera pano 6 m). Trả [[x, z, bán kính cấm cây khác]] cho hàng cây vỉa hè.
 function plantHeroSpots(ctx, RI, fp) {
   const keep = [];
+  const segNear = (x, z, maxD, onlyRi = -1) => {
+    let best = null, bd = maxD; const ci = Math.floor(x / RI.SC), cj = Math.floor(z / RI.SC), k = Math.ceil(maxD / RI.SC);
+    for (let i = ci - k; i <= ci + k; i++) for (let j = cj - k; j <= cj + k; j++) {
+      const a = RI.sg.get(i * 100003 + j); if (!a) continue;
+      for (const id of a) { const sg = RI.segs[id]; if (!'pstr'.includes(sg.c) || (onlyRi >= 0 && sg.ri !== onlyRi)) continue; const d = RI.segD(x, z, sg); if (d < bd) { bd = d; best = sg; } }
+    }
+    return best;
+  };
   for (const S of HERO_SPOTS) {
     const hr = S.h * Math.PI / 180, fx = Math.sin(hr), fz = -Math.cos(hr), lx = fz, lz = -fx;
-    const x0 = S.cam[0] + fx * S.d + lx * S.lat, z0 = S.cam[1] + fz * S.d + lz * S.lat;
+    const ax0 = S.cam[0] + fx * S.d, az0 = S.cam[1] + fz * S.d;
+    const s0 = segNear(S.cam[0], S.cam[1], 25), s1 = s0 && (segNear(ax0, az0, 30, s0.ri) || s0);
+    let x0 = ax0 + lx * S.lat, z0 = az0 + lz * S.lat;
+    if (s1) {
+      const dx = s1.bx - s1.ax, dz = s1.bz - s1.az, L2 = dx * dx + dz * dz || 1, L = Math.sqrt(L2);
+      const t = clamp(((ax0 - s1.ax) * dx + (az0 - s1.az) * dz) / L2, 0, 1), qx = s1.ax + t * dx, qz = s1.az + t * dz;
+      let nx = -dz / L, nz = dx / L; if ((nx * lx + nz * lz) * Math.sign(S.lat) < 0) { nx = -nx; nz = -nz; }
+      x0 = qx + nx * treePitLine(s1.c); z0 = qz + nz * treePitLine(s1.c);
+    }
     const free = (x, z) => !RI.nearRoad(x, z, 0.6, 'wh') && !onCarriage(x, z) && !(fp && fp.at(x, z) >= 0) && !nearPano(x, z, 6)
       && !(ctx.isWater && ctx.isWater(x, z));
     let px = null, pz = null;
-    for (let rr = 0; rr <= 8 && px === null; rr += 1) {
+    for (let rr = 0; rr <= 4 && px === null; rr += 0.5) {
       for (let q = 0; q < (rr ? 16 : 1); q++) { const a = q / 16 * Math.PI * 2, x = x0 + Math.cos(a) * rr, z = z0 + Math.sin(a) * rr; if (free(x, z)) { px = x; pz = z; break; } }
     }
     if (px === null) { console.warn('[trees] hero spot không có chỗ trống', S.kind, x0.toFixed(1), z0.toFixed(1)); continue; }
@@ -1469,7 +1492,7 @@ export function buildTrees(scene, ctx = {}) {
     // W3-G: cây DẢI PHÂN CÁCH / CÔNG VIÊN / VƯỜN HOA (claim 'park' = đa giác PARKS) → mức cắt cụt theo ngữ cảnh polP
     // (cây hố vỉa hè GIÁP công viên/vườn hoa cũng tính: pano_400_h270 hàng cây hè phía vườn hoa cắt trụi như cây trong vườn)
     // (dò mép vườn 8 hướng CHỈ khi có pano ≤ 60 m nói cây dải/vườn bị cắt — nơi khác kết quả như nhau, đỡ ~50k lần claimAt)
-    const park = e.kind === 'park' || !!o.median || !!claimAt(x, z, PK) || (!!o.pit && panoMax(x, z, 16, 60) > 0 && nearParkEdge(x, z));
+    const park = e.kind === 'park' || !!o.median || !!claimAt(x, z, PK) || (panoMax(x, z, 16, 60) > 0 && nearParkEdge(x, z));
     if (e.kind === 'shade' || e.kind === 'street' || e.kind === 'park') ({ sp, V } = resolveSpecies(x, z, e.kind, ri, park));
     else sp = KIND_OF[e.kind] ?? SP.XACU;
     if (!V) V = vegAt(x, z, ri, park);
@@ -1655,7 +1678,8 @@ export function buildTrees(scene, ctx = {}) {
   recs.forEach((r, i) => {
     setM(i, r);
     px[i] = r.x; pz[i] = r.z;
-    const b = 0.86 + hxz(r.x, r.z, 51) * 0.24, tt = SP_TINT[r.sp];
+    // W3-G: lá tối hơn ~7% (pano 10/2024: tán xanh ô-liu sẫm, game sáng/vàng hơn ảnh thật — AUDIT3 §4.7 lệch màu hệ thống)
+    const b = 0.8 + hxz(r.x, r.z, 51) * 0.22, tt = SP_TINT[r.sp];
     let cr = tt[0] * b * (1 + (hxz(r.x, r.z, 52) - 0.5) * 0.14), cg = tt[1] * b, cb = tt[2] * b * (1 + (hxz(r.x, r.z, 53) - 0.5) * 0.2);
     if (r.sp === SP.BANG && hxz(r.x, r.z, 54) < 0.18) { cr *= 1.25; cg *= 1.05; cb *= 0.7; }   // bàng ngả vàng
     COL[i * 3] = cr; COL[i * 3 + 1] = cg; COL[i * 3 + 2] = cb;
