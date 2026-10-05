@@ -259,9 +259,10 @@ export function buildRiverbanks(scene, deps) {
     // Tam Bạc đoạn BẮC (bắc Lạc Long → cửa Cấm, z < −600): luôn 'strip' — ảnh 519/336/331: hàng cổ thụ + lan can sắt cũ
     // + dải lán/bạt bên bờ, KHÔNG dải dạo ca-rô (dù bờ gần phố)
     const north = /Tam Bạc/.test(s.poly.n) && s.z < -600 && s.x < -250;
-    const mode = !s.road || s.bridge ? 'wild' : (gapW > 7 || north) ? 'strip' : 'prom';
-    // thuyền gỗ neo dọc bờ tự phát/bờ thường sông Tam Bạc đoạn bắc (ảnh vệ tinh tile 7: thuyền đậu dày 2 bờ)
-    if (mode !== 'prom' && /Tam Bạc/.test(s.poly.n) && s.z < -560 && hash(s.x, s.z, 61) < 0.2) boat(s);
+    // bờ xa phố (> 7 m) NGOÀI đoạn bắc Tam Bạc (bờ Cấm cạnh nút HVT, pano_349 h270: bãi bê tông + lan can thấp, không lán) → chỉ kè
+    const mode = !s.road || s.bridge ? 'wild' : north ? 'strip' : gapW > 7 ? 'wild' : 'prom';
+    // thuyền gỗ neo dọc bờ sông Tam Bạc đoạn bắc (ảnh vệ tinh tile 7: thuyền đậu dày 2 bờ; pano_519 h180)
+    if (mode !== 'prom' && north && hash(s.x, s.z, 61) < 0.2) boat(s);
     if (mode === 'strip') {
       stats.stripM += s.L;
       stripRail(s); if (hash(s.x, s.z, 71) < 0.17 && gapW > 4) shack(s, gapW);
@@ -362,7 +363,7 @@ export function buildRiverbanks(scene, deps) {
     const dep = Math.min(gapW - 1.2, 4), wid = 3 + hash(s.x, s.z, 72) * 2.5, h = 2.2 + hash(s.x, s.z, 73) * 0.6;
     const cx = s.x + s.nx * (0.3 + dep / 2), cz = s.z + s.nz * (0.3 + dep / 2), ang = Math.atan2(s.tx, s.tz);
     const gy = TOP - 0.25;
-    const wallC = [rgb(0x8a8578), rgb(0x6f7a83), rgb(0x9b8f74)][Math.floor(hash(s.x, s.z, 74) * 3)];
+    const wallC = [rgb(0xb3ad9f), rgb(0x9aa6ad), rgb(0xbcae90)][Math.floor(hash(s.x, s.z, 74) * 3)];   // tôn/ván bạc màu (sáng — mặt hướng phố thường trong bóng)
     box(shackB, cx, gy + h / 2, cz, dep, h, wid, ang, wallC);
     const roofC = [rgb(0x2f6aa8), rgb(0x8c4a2e), rgb(0x7d8487), rgb(0xd9772b)][Math.floor(hash(s.x, s.z, 75) * 4)];
     box(shackB, cx, gy + h + 0.06, cz, dep + 0.9, 0.08, wid + 0.6, ang, roofC);
