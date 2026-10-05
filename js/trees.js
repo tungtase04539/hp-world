@@ -407,8 +407,8 @@ const KIT_DEFS = [
   // CÂY CẮT TRỤI "BỘ XƯƠNG" (pano_001_h090/152/400/515 tháng 10/2024 sau bão Yagi): thân 3-4,5 m + 4-6 cành lớn ngóc 25-45°
   // bị cưa cụt (mặt cắt sáng), mỗi cành chẻ 2 nhánh cụt, chồi non lưa thưa ở đầu nhánh — KHÁC cắt cụt ngọn (CATCUT: cành cụt
   // ngắn 1-2,7 m sát thân). Thân mảnh (Ø 0,45-0,6 m), cao 7,5-11 m.
-  { sp: SP.LOP, form: 'lopped', H: 9.2, trunkH: 3.4, r0: 0.27, r1: 0.21, lean: 0.02, limbs: 5, limbAng: [0.55, 0.95], limbLen: 3.7, subLen: 2.4, shoots: 30, cardS: [0.7, 1.15], cells: [CELL.SHOOT, CELL.SHOOT, CELL.XACU_A], bark: [0.9, 0.87, 0.83] },
-  { sp: SP.LOP, form: 'lopped', H: 10, trunkH: 3.9, r0: 0.3, r1: 0.23, lean: 0.04, limbs: 4, limbAng: [0.45, 0.8], limbLen: 4.2, subLen: 2.6, shoots: 22, cardS: [0.7, 1.1], cells: [CELL.SHOOT, CELL.XACU_A], bark: [0.88, 0.85, 0.8] },
+  { sp: SP.LOP, form: 'lopped', H: 9.2, trunkH: 3.4, r0: 0.27, r1: 0.21, lean: 0.02, limbs: 5, limbAng: [0.55, 0.95], limbLen: 3.7, subLen: 2.4, shoots: 16, cardS: [0.5, 0.85], cells: [CELL.SHOOT], bark: [0.9, 0.87, 0.83] },
+  { sp: SP.LOP, form: 'lopped', H: 10, trunkH: 3.9, r0: 0.3, r1: 0.23, lean: 0.04, limbs: 4, limbAng: [0.45, 0.8], limbLen: 4.2, subLen: 2.6, shoots: 12, cardS: [0.5, 0.8], cells: [CELL.SHOOT], bark: [0.88, 0.85, 0.8] },
 ];
 const SP_KITS = Array.from({ length: SP_N }, () => []);
 KIT_DEFS.forEach((d, i) => SP_KITS[d.sp].push(i));
@@ -521,7 +521,9 @@ function genKit(d, far, seed) {
     }
     if (d.roots && !far) for (let q = 0; q < d.roots; q++) {      // rễ phụ buông (đa/si) — KHÔNG thuộc tán: chân rễ chạm đất
       G.crown = false;
-      const a = r() * 6.28, rr = 2 + r() * (d.rx - 3), x = cx + Math.cos(a) * rr, z = cz + Math.sin(a) * rr, yt = d.cy - d.ry * (0.55 + r() * 0.3);
+      // W3-G: rễ phụ buông GẦN thân (1,2-3,2 m, như ảnh pano_088/400 — "màn rễ" quanh gốc), trước 2..rx−3 = tới 6 m × cỡ
+      // instance → rễ đứng giữa lòng đường (thử 2026-10-05)
+      const a = r() * 6.28, rr = 1.2 + r() * 2.0, x = cx + Math.cos(a) * rr, z = cz + Math.sin(a) * rr, yt = d.cy - d.ry * (0.55 + r() * 0.3);
       tube(G, [[x, yt, z, 0.05 + r() * 0.05], [x + (r() - 0.5) * 0.3, yt * 0.5, z + (r() - 0.5) * 0.3, 0.05 + r() * 0.06], [x, -0.2, z, 0.06 + r() * 0.08]], 4, rectBark, 0, woodAO, woodSway);
     }
     if (d.stakes && !far) for (let q = 0; q < 3; q++) {            // cọc chống (cây non)
@@ -964,38 +966,24 @@ export function roadIndex(ROADS_DT, R = 1600) {
 //   400 h180: đa cổ thụ ở góc phố, vỉa hè PHẢI (Trần Phú), gốc ~21° phải, ~20 m (tán trùm nửa trái khung h270)
 //   001 h180: me tây (rain tree) tán dù rất rộng ở góc nút giao bên PHẢI, gốc ~18° phải, ~22 m
 const HERO_SPOTS = [
-  { cam: [854, -201.6], h: 180, d: 16, lat: 6, kind: 'da', H: 17, R: 8.5 },
-  { cam: [295.8, 39.4], h: 180, d: 18.7, lat: -7.2, kind: 'da', H: 17.5, R: 9.5 },
-  { cam: [-211.7, 114.1], h: 180, d: 21, lat: -6.7, kind: 'me', H: 16.5, R: 10 },
+  { cam: [854, -201.6], h: 180, d: 16.4, lat: 1.5, kind: 'da', H: 17, R: 8.5 },      // gốc −5,2°, cúi 8,6° → 16,5 m
+  { cam: [295.8, 39.4], h: 180, d: 18.7, lat: -7.2, kind: 'da', H: 17.5, R: 9.5 },   // gốc +21°, ~20 m
+  { cam: [-211.7, 114.1], h: 180, d: 21, lat: -6.7, kind: 'me', H: 16.5, R: 10 },    // gốc +18°, ~22 m
 ];
-// chỗ đặt BÁM PHỐ (không bám camera — camera pano lệch tim phố tới 9 m, W3-A sẽ dời tim phố): điểm "d m trước camera" → điểm
-// gần nhất trên CHÍNH phố của camera → hố cây treePitLine phía lat (trái/phải theo hướng nhìn) → chỗ trống gần nhất ≤ 4 m
-// (không lòng đường / nhà / địa danh / camera pano 6 m). Trả [[x, z, bán kính cấm cây khác]] cho hàng cây vỉa hè.
+// chỗ đặt = điểm ĐO TRÊN ẢNH (hướng + cự ly từ camera pano) → chỗ trống GẦN NHẤT ≤ 8 m (vòng 0,5 m × 16 hướng) không lòng
+// đường / nhà / địa danh / camera pano 6 m. KHÔNG "bám phố": ở 088 phố Lương Khánh Thiện trong ROADS_DT lệch ~45° so với ảnh
+// (đa thật đứng ở miệng ngõ bên trái), bám hố cây của phố đẩy cây sang phải khung (thử 2026-10-05). Trả [[x, z, bán kính
+// cấm cây khác]] cho hàng cây vỉa hè.
 function plantHeroSpots(ctx, RI, fp) {
   const keep = [];
-  const segNear = (x, z, maxD, onlyRi = -1) => {
-    let best = null, bd = maxD; const ci = Math.floor(x / RI.SC), cj = Math.floor(z / RI.SC), k = Math.ceil(maxD / RI.SC);
-    for (let i = ci - k; i <= ci + k; i++) for (let j = cj - k; j <= cj + k; j++) {
-      const a = RI.sg.get(i * 100003 + j); if (!a) continue;
-      for (const id of a) { const sg = RI.segs[id]; if (!'pstr'.includes(sg.c) || (onlyRi >= 0 && sg.ri !== onlyRi)) continue; const d = RI.segD(x, z, sg); if (d < bd) { bd = d; best = sg; } }
-    }
-    return best;
-  };
   for (const S of HERO_SPOTS) {
     const hr = S.h * Math.PI / 180, fx = Math.sin(hr), fz = -Math.cos(hr), lx = fz, lz = -fx;
-    const ax0 = S.cam[0] + fx * S.d, az0 = S.cam[1] + fz * S.d;
-    const s0 = segNear(S.cam[0], S.cam[1], 25), s1 = s0 && (segNear(ax0, az0, 30, s0.ri) || s0);
-    let x0 = ax0 + lx * S.lat, z0 = az0 + lz * S.lat;
-    if (s1) {
-      const dx = s1.bx - s1.ax, dz = s1.bz - s1.az, L2 = dx * dx + dz * dz || 1, L = Math.sqrt(L2);
-      const t = clamp(((ax0 - s1.ax) * dx + (az0 - s1.az) * dz) / L2, 0, 1), qx = s1.ax + t * dx, qz = s1.az + t * dz;
-      let nx = -dz / L, nz = dx / L; if ((nx * lx + nz * lz) * Math.sign(S.lat) < 0) { nx = -nx; nz = -nz; }
-      x0 = qx + nx * treePitLine(s1.c); z0 = qz + nz * treePitLine(s1.c);
-    }
-    const free = (x, z) => !RI.nearRoad(x, z, 0.6, 'wh') && !onCarriage(x, z) && !(fp && fp.at(x, z) >= 0) && !nearPano(x, z, 6)
+    const x0 = S.cam[0] + fx * S.d + lx * S.lat, z0 = S.cam[1] + fz * S.d + lz * S.lat;
+    // gốc cách mép lòng đường ≥ 2,2 m (rễ phụ đa ≤ ~1,9 m quanh gốc phải nằm trên hè/đất, không xuống lòng đường)
+    const free = (x, z) => !RI.nearRoad(x, z, 2.2, 'wh') && !onCarriage(x, z) && !(fp && fp.at(x, z) >= 0) && !nearPano(x, z, 6)
       && !(ctx.isWater && ctx.isWater(x, z));
     let px = null, pz = null;
-    for (let rr = 0; rr <= 4 && px === null; rr += 0.5) {
+    for (let rr = 0; rr <= 8 && px === null; rr += 0.5) {
       for (let q = 0; q < (rr ? 16 : 1); q++) { const a = q / 16 * Math.PI * 2, x = x0 + Math.cos(a) * rr, z = z0 + Math.sin(a) * rr; if (free(x, z)) { px = x; pz = z; break; } }
     }
     if (px === null) { console.warn('[trees] hero spot không có chỗ trống', S.kind, x0.toFixed(1), z0.toFixed(1)); continue; }
@@ -1627,7 +1615,7 @@ export function buildTrees(scene, ctx = {}) {
     r.lift = clamp(r.B / r.sy - k.base, -(k.fork - WASH_TOP) * 0.6, 14);
     // bề dày thân theo CHIỀU CAO cây so với kit (không theo độ sâu tán — cây cắt cụt tán nông từng ra thân 1 m)
     // W3-G: số mũ 0,8 → 0,7 + trần 1,3 (thân xà cừ 20 m từng Ø ~1,3 m ở gốc); cây kè hồ nghiêng: thân mảnh ×0,85
-    r.sxz = clamp((r.H / k.def.H) ** 0.7 * (0.88 + hxz(r.x, r.z, 43) * 0.22), 0.45, r.big ? 1.6 : 1.18) * (r.tiltX || r.tiltZ ? 0.85 : 1);
+    r.sxz = clamp((r.H / k.def.H) ** 0.7 * (0.88 + hxz(r.x, r.z, 43) * 0.22), 0.45, 1.18) * (r.tiltX || r.tiltZ ? 0.85 : 1);
     r.cs = clamp(R / (k.rad * r.sxz), 0.35, 1.9);
     // kit XA (variant 0 của loài, > NEAR_R): sy/nâng/co tán RIÊNG theo số đo kit xa → mép dưới/ngọn/bán kính tán khớp
     // kit gần ở ranh LOD (trước: dùng aShape của kit gần → mép tán nhảy −1..+1,7 m khi đổi LOD). Khớp mép/ngọn THỰC của
