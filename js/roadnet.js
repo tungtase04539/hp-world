@@ -20,7 +20,7 @@
 //   position, normal, uv (dải: u dọc m, v ngang m có dấu; vỉa hè: u dọc, d cách bó vỉa; mặt đứng: u, cao),
 //   aSurf = (lớp texture, mã vạch kẻ, nửa lòng hw, d cách bó vỉa), aZeb = (u bắt đầu vùng zebra đầu, u đầu vùng zebra cuối).
 // Vạch kẻ vẽ TRONG shader (roadtex.js) theo (u, v) → 0 tam giác thêm, không z-fight.
-import { ROAD_HW, SIDEWALK_W, ROAD_TOP, SIDEWALK_TOP, roadHW, sidewalkW } from './xsection.js';
+import { ROAD_TOP, SIDEWALK_TOP, roadHW, sidewalkW } from './xsection.js';
 
 const STREET = { p: 1, s: 1, t: 1, r: 1 };
 const RANK = { p: 5, s: 4, t: 3, r: 2, w: 1, h: 0 };

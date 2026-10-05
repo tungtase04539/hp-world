@@ -275,12 +275,12 @@ try {
   if (!ov) console.log('  (không có ov_buildings.csv — bề rộng phố chỉ theo ghi đè pano/cấp)');
   const panos = JSON.parse(fs.readFileSync(new URL('./pano_loop/list_full_551.json', import.meta.url), 'utf8')).map((e) => [e.X, e.Z, e.id]);
   const walls0 = measureWalls(ROADS_DT, ov);
-  const W0 = chooseWidths(ROADS_DT, walls0);
+  const W0 = chooseWidths(ROADS_DT, walls0, panos);
   const argv = process.argv.slice(2), fitlog = argv.includes('--fitlog') ? argv[argv.indexOf('--fitlog') + 1] : null;
   const fit = fitToPanos(ROADS_DT, panos, W0, walls0, { log: fitlog });
   // đo lại tường trên tim ĐÃ dịch (way từng chạy xuyên nhà thiếu trạm hợp lệ) rồi chốt bề rộng
   const walls1 = measureWalls(ROADS_DT, ov);
-  const WD = chooseWidths(ROADS_DT, walls1);
+  const WD = chooseWidths(ROADS_DT, walls1, panos);
   // không để lòng HẸP hơn lúc khớp tim (mỏ neo pano đã tính "camera trong lòng" theo W0) → lấy bề rộng lớn hơn của 2 lượt
   WD.forEach((o, ri) => { if (W0[ri].w > o.w && o.w > 0) { o.w = W0[ri].w; if (W0[ri].sw >= 0) o.sw = W0[ri].sw; } else if (!(o.w > 0) && W0[ri].w > 0) Object.assign(o, W0[ri]); });
   const cap = capWidths(ROADS_DT, WD, walls1, Object.values(LM_POLY), panos);

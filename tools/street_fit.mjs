@@ -33,14 +33,19 @@ const STREET = { p: 1, s: 1, t: 1, r: 1 };
 // kẹp bề rộng lòng theo cấp khi suy từ Overture (m)
 // (trần s 14 = Tô Hiệu/Trần Phú đo pano; phần tường Overture xa hơn trần → vỉa hè/sân trước rộng hơn, không phải lòng)
 export const W_BOUNDS = { p: [10, 20], s: [7, 14], t: [6, 12], r: [4.5, 9] };
-// GHI ĐÈ theo bằng chứng pano (AUDIT3 FP-1 §2c + ảnh thật): tên phố (regex) [+ cấp] → lòng w (m) [+ vỉa sw]. Phố ĐÔI
-// (2 way một chiều song song) ghi đè là bề rộng MỖI chiều.
+// GHI ĐÈ theo bằng chứng pano (AUDIT3 FP-1 §2c + ảnh thật): tên phố (regex) [+ cấp] [+ CHỈ way gần các pano `panos`] → lòng w
+// (m) [+ vỉa sw]. Có `panos` → chỉ áp cho way p/s/t/r gần nhất của các camera đó (bằng chứng là cục bộ: Lý Tự Trọng 12 m đo ở
+// pano_524/525, đoạn nam qua tường mỏ neo Hải quân pano_515 hẹp hơn — áp cả phố từng đẩy hành lang trùm tường rào dựng tay,
+// W2-A gỡ mất tường). `two`: phố ĐÔI (2 way một chiều) → w là TỔNG 2 chiều.
 export const WIDTH_OVERRIDES = [
-  { re: /Bến Bính/, w: 14, why: 'pano_079/382/441: lòng ~14 m (game 8-10)' },
-  { re: /Trần Phú/, c: 'st', two: true, w: 14, why: 'pano_040/041/230: ~14 m' },
-  { re: /Tô Hiệu/, two: true, w: 14, why: 'pano_170/175/368: ~14 m' },
-  { re: /Lý Tự Trọng/, w: 12, why: 'pano_524/525: ~12 m' },
-  { re: /Minh Khai/, w: 10.5, why: 'pano_265-273/510: ~10,5 m' },
+  { re: /Bến Bính/, panos: ['pano_079', 'pano_382', 'pano_441', 'pano_534'], w: 14, why: 'lòng ~14 m (game 8-10)' },
+  { re: /Trần Phú/, c: 'st', two: true, panos: ['pano_040', 'pano_041', 'pano_230', 'pano_228', 'pano_229', 'pano_231', 'pano_397', 'pano_399', 'pano_400', 'pano_401', 'pano_402', 'pano_542'], w: 14, why: '~14 m' },
+  { re: /Tô Hiệu/, two: true, panos: ['pano_170', 'pano_175', 'pano_368', 'pano_172', 'pano_176'], w: 14, why: '~14 m' },
+  { re: /Lý Tự Trọng/, panos: ['pano_524', 'pano_525', 'pano_526'], w: 12, why: '~12 m' },
+  // center: tim đặt TẠI camera (ảnh: camera ~giữa tường rào đông và mặt nhà tây; tường rào dựng tay không có trong Overture nên
+  // tim tường Overture lệch đông 2-3 m)
+  { re: /Lý Tự Trọng/, panos: ['pano_515', 'pano_516'], w: 9, sw: 2.5, center: true, why: 'tường mỏ neo Hải quân cách camera ~7,5 m (h090)' },
+  { re: /Minh Khai/, panos: ['pano_265', 'pano_266', 'pano_267', 'pano_268', 'pano_269', 'pano_272', 'pano_273', 'pano_510', 'pano_511', 'pano_500', 'pano_237', 'pano_238'], w: 10.5, why: '~10,5 m' },
   { re: /Dư Hàng/, w: 6.5, why: 'pano_184/189: chợ, ~6,5 m' },
   { re: /Hạ Lý/, w: 6, why: 'pano_102-115/445: phố chợ 5-6 m' },
   { re: /Chu Văn An/, w: 6.5, why: 'pano_486-488: ~6-7 m (audit 5,5)' },
@@ -157,7 +162,17 @@ export function dualPartner(roads, ri) {
 }
 
 // B. bề rộng lòng/vỉa từng way → [{w, sw, src}] (w = 0: mặc định cấp)
-export function chooseWidths(roads, walls) {
+export function chooseWidths(roads, walls, panos = []) {
+  // way p/s/t/r gần nhất của mỗi camera (≤ 14 m) — cho ghi đè cục bộ `panos`
+  const panoWay = new Map();
+  if (panos.length) {
+    const idx = segIndex(roads, 'pstr');
+    for (const [px, pz, pid] of panos) {
+      let best = null;
+      idx.g.query([px - 14, pz - 14, px + 14, pz + 14], (i) => { const s = idx.segs[i]; const d = sdist(px, pz, s[2], s[3], s[4], s[5]); if (d < 14 && (!best || d < best.d)) best = { d, ri: s[0] }; });
+      if (best) panoWay.set(pid, best.ri);
+    }
+  }
   const out = roads.map(() => ({ w: 0, sw: -1, src: 'class' }));
   const fromW = (c, W) => {
     const [lo, hi] = W_BOUNDS[c]; const sw0 = SIDEWALK_W[c];
@@ -183,14 +198,15 @@ export function chooseWidths(roads, walls) {
     if (!STREET[r.c]) return;
     const o = out[ri];
     const dual = dualPartner(roads, ri);
-    const ov = WIDTH_OVERRIDES.find((q) => q.re.test(r.name || '') && (!q.c || q.c.includes(r.c)));
+    const ov = WIDTH_OVERRIDES.find((q) => q.re.test(r.name || '') && (!q.c || q.c.includes(r.c)) && (!q.panos || q.panos.some((id) => panoWay.get(id) === ri)));
     if (ov) {
       // phố đôi: ghi đè 'two' = TỔNG bề rộng 2 chiều → mỗi chiều w/2 (tối thiểu 6); không 'two' → mỗi way w
       const w = dual && ov.two ? Math.max(6, ov.w / 2) : ov.w;
       const m = walls[ri];
       let sw = -1;
-      if (m && m.n >= 6 && !dual) sw = Math.round(Math.max(1.0, Math.min(SIDEWALK_W[r.c] + 3, (m.W25 - w) / 2)) * 10) / 10;
-      Object.assign(o, { w, sw, src: 'pano' + (dual ? '-dual' : '') });
+      if (ov.sw >= 0) sw = ov.sw;
+      else if (m && m.n >= 6 && !dual) sw = Math.round(Math.max(1.0, Math.min(SIDEWALK_W[r.c] + 3, (m.W25 - w) / 2)) * 10) / 10;
+      Object.assign(o, { w, sw, src: 'pano' + (dual ? '-dual' : ''), center: !!ov.center });
       return;
     }
     const tw = parseFloat(r.tags?.width);
@@ -299,8 +315,8 @@ export function fitToPanos(roads, panos, widths, walls, { Ra = 45, Rb = 12, maxS
     // đích: tim giữa 2 tường Overture (nếu tin được), kẹp sao cho camera vẫn TRONG lòng (|v − D| ≤ a); không có → dời ít nhất
     // dời TỐI THIỂU để camera vào lòng; tim tường chỉ được kéo thêm ≤ 3 m quanh đó (nhiễu tường 1 bên/sân lùi)
     const D0 = Math.max(best.v - a, Math.min(best.v + a, 0));
-    const mid = midAt(best.ri, best.x, best.z);
-    const tgt = mid == null ? D0 : Math.max(D0 - wallCap, Math.min(D0 + wallCap, mid));
+    const mid = widths[best.ri].center ? null : midAt(best.ri, best.x, best.z);
+    const tgt = widths[best.ri].center ? best.v : mid == null ? D0 : Math.max(D0 - wallCap, Math.min(D0 + wallCap, mid));
     const C = { pid, ...best, nx: -best.uz, nz: best.ux, a, mid, D: Math.max(best.v - a, Math.min(best.v + a, tgt)) };
     cands.push(C);
     const r = roads[best.ri];
@@ -333,7 +349,7 @@ export function fitToPanos(roads, panos, widths, walls, { Ra = 45, Rb = 12, maxS
   // mỏ neo pano cùng way > 30 m: D = tim tường kẹp ±wallCap m, trọng số 0,6 → mặt tiền 2 bên đối xứng như thật.
   let nWall = 0;
   roads.forEach((r, ri) => {
-    const m = walls[ri]; if (!STREET[r.c] || !m || !m.st || isDual[ri] || r.tags?.bridge || /^Cầu /.test(r.name || '')) return;
+    const m = walls[ri]; if (!STREET[r.c] || !m || !m.st || isDual[ri] || widths[ri].center || r.tags?.bridge || /^Cầu /.test(r.name || '')) return;
     for (let j = 0; j < m.st.length; j += 2) {
       const q = m.st[j];
       if (anchors.some((A) => A.ri === ri && !A.wall && Math.hypot(A.x - q.x, A.z - q.z) < 30)) continue;
