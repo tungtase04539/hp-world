@@ -133,7 +133,8 @@ function genLayers(S) {
     put(L_GACH);
   }
   // ---- 3: CARO ĐỎ-XÁM (W3-D): viên 40×20 cm (dài dọc phố) xen kẽ ĐỎ HỒNG ĐẤT NUNG BẠC MÀU ↔ XÁM như bàn cờ — đo trên ảnh
-  // pano thật (004/010/028/225/400/405 hướng vỉa hè, nắng): viên đỏ ~sRGB(180,110,92) độ bão hoà ~0,45, viên xám ~(165,160,152).
+  // pano thật (004/010/028/225/400/405 hướng vỉa hè; tách 2 cụm theo r−g): viên đỏ r−g ≈ 22-47 (vd (151,129,122), (164,119,97),
+  // (207,160,139) nắng), viên xám trung tính. Texture (184,138,122)/(166,163,157) → ảnh game (161,124,106)-ish dưới nắng ấm.
   // Bản cũ đỏ (158,82,58) bão hoà 0,63 chiếm 72% + 16% đỏ sẫm → ảnh game đo (136,53,38) đỏ gạch chói phủ kín (AUDIT3 PAVE
   // "checker too saturated" 028/198/464); giảm ~35% bão hoà, đỏ:xám = 1:1 theo ô cờ, 4% viên thay lệch màu/vá. ----
   {
@@ -143,7 +144,7 @@ function genLayers(S) {
     for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
       const l = (rnd() - 0.5) * 16, red = ((r + c) & 1) === 0, swap = rnd() < 0.04;
       const isRed = swap ? !red : red;
-      col.push(isRed ? [180 + l, 112 + l * 0.75, 94 + l * 0.65] : [167 + l, 162 + l, 153 + l]);
+      col.push(isRed ? [184 + l, 138 + l * 0.8, 122 + l * 0.75] : [166 + l, 163 + l, 157 + l]);
     }
     for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
       const c = Math.floor(x / bw), r = Math.floor(y / bh), fx = (x % bw) / bw, fy = (y % bh) / bh;

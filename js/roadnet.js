@@ -679,20 +679,15 @@ export function buildRoadNet(ROADS_DT, deps) {
   };
 
   // lớp vỉa hè: bằng chứng chữ pano gần nhất trên way (≤ 120 m tới đa tuyến P / tới điểm), không có → SIDEWALK_BY_ROAD
-  const paveOfRun = (w, P) => {
-    let best = null, bd = 120;
-    if (w.pave) for (const Pv of w.pave) { const d = distToPolyline([Pv[0], Pv[1]], P); if (d < bd) { bd = d; best = Pv[2]; } }
-    if (best != null) stats.paveEv = (stats.paveEv || 0) + 1;
+  // (theo TỪNG Ô vỉa hè: phố dài đổi vật liệu dọc đường như ảnh thật — Mê Linh xám, đoạn công sở caro…)
+  const paveAt = (w, x, z) => {
+    let best = null, bd = 120 * 120;
+    if (w.pave) for (const Pv of w.pave) { const d = (Pv[0] - x) ** 2 + (Pv[1] - z) ** 2; if (d < bd) { bd = d; best = Pv[2]; } }
     return best;
   };
   const armSwLayer = (a) => {
     const w = ways[a.wi];
-    if (w && w.pave) {
-      const x = a.O[0] + a.d[0] * 8, z = a.O[1] + a.d[1] * 8;
-      let best = null, bd = 120 * 120;
-      for (const Pv of w.pave) { const d = (Pv[0] - x) ** 2 + (Pv[1] - z) ** 2; if (d < bd) { bd = d; best = Pv[2]; } }
-      if (best != null) return best;
-    }
+    if (w && w.pave) { const v = paveAt(w, a.O[0] + a.d[0] * 8, a.O[1] + a.d[1] * 8); if (v != null) return v; }
     return SW_LAYER[a.swType] ?? RL.GACH_XAM;
   };
 
@@ -1008,7 +1003,6 @@ export function buildRoadNet(ROADS_DT, deps) {
     const P = w.pts.slice(ka, kb + 1), cum = [0];
     for (let i = 1; i < P.length; i++) cum.push(cum[i - 1] + Math.hypot(P[i][0] - P[i - 1][0], P[i][1] - P[i - 1][1]));
     const L = cum[cum.length - 1];
-    if (street && sw > 0 && w.pave) { const pl = paveOfRun(w, P); if (pl != null) swLayer = pl; }   // W3-D: vật liệu theo pano
     let anyIn = false;
     for (let i = 0; i < P.length - 1 && !anyIn; i++) if (segDist(0, 0, P[i][0], P[i][1], P[i + 1][0], P[i + 1][1]) < R + T * 0.5) anyIn = true;
     if (!anyIn) return;
@@ -1097,6 +1091,7 @@ export function buildRoadNet(ROADS_DT, deps) {
         us.sort((p1, p2) => p1 - p2);
         for (const u of us) if (u > u0 + 7 && u < u1 - 7 && (!xu.length || u - xu[xu.length - 1] > 9)) xu.push(u);
         stats.midX += xu.length;
+        if (xu.length && (stats.midXs ||= []).length < 400) for (const u of xu) { let j = 0; while (j < P.length - 2 && cum[j + 1] < u) j++; const t = (u - cum[j]) / Math.max(1e-6, cum[j + 1] - cum[j]); stats.midXs.push([+(P[j][0] + (P[j + 1][0] - P[j][0]) * t).toFixed(1), +(P[j][1] + (P[j + 1][1] - P[j][1]) * t).toFixed(1)]); }
       }
       const spl = xu.map((u) => u + 1.5);
       for (const [a, b, gA, gB] of pieces(u0, u1)) {
@@ -1189,8 +1184,10 @@ export function buildRoadNet(ROADS_DT, deps) {
             const t1 = S1.h + SIDEWALK_TOP, t2 = S2.h + SIDEWALK_TOP;
             const i1 = off(S1, vin), o1 = off(S1, vout), i2 = off(S2, vin), o2 = off(S2, vout);
             const paint = isWater((i1[0] + i2[0]) / 2, (i1[1] + i2[1]) / 2) ? MK.PAINT : 0;   // trên cầu
+            let lay = swLayer;
+            if (w.pave) { const v = paveAt(w, (o1[0] + i2[0]) / 2, (o1[1] + i2[1]) / 2); if (v != null) { lay = v; stats.paveEv = (stats.paveEv || 0) + 1; } }
             emit('sidewalk', [[i1[0], t1, i1[1], S1.u, 0, 0], [o1[0], t1, o1[1], S1.u, sw, sw], [o2[0], t2, o2[1], S2.u, sw, sw], [i2[0], t2, i2[1], S2.u, 0, 0]],
-              quadTris, [0, 1, 0], [swLayer, paint, hw], null);
+              quadTris, [0, 1, 0], [lay, paint, hw], null);
             // mặt đứng bó vỉa (về phía lòng đường) + mép lưng xuống đất
             face('sidewalk', i1, i2, t1, S1.h + ROAD_TOP, t2, S2.h + ROAD_TOP, -S1.mx * sg, -S1.mz * sg, S1.u, S2.u, [RL.CURB, MK.FACE | paint, 0]);
             face('sidewalk', o1, o2, t1, S1.h - 0.05, t2, S2.h - 0.05, S1.mx * sg, S1.mz * sg, S1.u, S2.u, [RL.CURB, MK.FACE | MK.BACK, 0]);

@@ -46,6 +46,7 @@ import { buildProps, layRoadSurfaceY } from './props.js';                 // Đ�
 import { furnitureLine } from './xsection.js';
 // Mạng đường thật (Đợt 3 WP6): đồ thị nút giao + dải + vỉa hè/bó vỉa + vạch kẻ trong shader
 import { buildRoadNet } from './roadnet.js';
+import { hedgeGeometry, hedgeMaterial } from './hedges.js';   // Đợt 3 W3-D: bụi cắt tỉa lổn nhổn (vườn hoa, dải phân cách)
 import { makeRoadMaterial } from './roadtex.js';
 import { ROAD_MARK_EVIDENCE, ROAD_MARK_LABELS, OSM_SIGNALS, OSM_CROSSINGS, ROAD_PAVE_EVIDENCE } from './roadmarks.js';
 import { ROAD_W as XS_ROAD_W } from './xsection.js';
@@ -203,7 +204,7 @@ function sidewalkMaterial(type) {
       for (let y = 0; y < R; y++) for (let x = 0; x < C; x++) {
         const rr = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453, rv = rr - Math.floor(rr);
         const red = ((x + y) & 1) === 0 ? rv > 0.04 : rv < 0.04;
-        g.fillStyle = red ? jitter([180, 112, 94], 9) : jitter([167, 162, 153], 9);
+        g.fillStyle = red ? jitter([184, 138, 122], 9) : jitter([166, 163, 157], 9);
         g.fillRect(x * bw, y * bh, bw, bh);
       }
       g.strokeStyle = 'rgba(40,30,25,.30)'; g.lineWidth = 2;
@@ -4179,15 +4180,13 @@ const dgRail = (ax, az, bx, bz, h, kind, colHex) => {
     const th = Math.atan2(-uz, ux), gy = groundHeight((ax + bx) / 2, (az + bz) / 2);
     const curb = new THREE.BoxGeometry(L, 0.32, 1.5); curb.rotateY(th);
     curb.translate((ax + bx) / 2, gy + 0.16, (az + bz) / 2); curbG.push(curb);
-    for (let t = 1.8; t < L - 1.8; t += 4.2) {          // bụi cây 3.2m + khe 1m
-      const hb = new THREE.BoxGeometry(3.2, 0.85, 1.0); hb.rotateY(th);
-      hb.translate(ax + ux * t, gy + 0.32 + 0.42, az + uz * t); hedgeG.push(hb);
-    }
+    // W3-D: BỤI DÀY LIỀN (ảnh 216/478/215 h000: chuỗi ngọc/ô rô lổn nhổn phủ kín dải, không phải hộp 3,2 m xếp hàng)
+    hedgeG.push([[ax + ux * 1.2, az + uz * 1.2], [bx - ux * 1.2, bz - uz * 1.2]]);
   }
   if (curbG.length) {
     const cm = new THREE.Mesh(mergeGeometries(curbG), mat(0xb9bdb9));
     cm.receiveShadow = true; cm.name = 'lqd_median_curb'; scene.add(cm);
-    const hm = new THREE.Mesh(mergeGeometries(hedgeG), mat(0x3f7d3a, { flatShading: true }));
+    const hm = new THREE.Mesh(hedgeGeometry(hedgeG, (x, z) => groundHeight(x, z) + 0.3, { h: 0.85, w: 1.15, seg: 0.7, rough: 0.09, top: 0.08, wild: 0.6, seed: 9, base: [0.29, 0.42, 0.18] }), hedgeMaterial());
     hm.castShadow = true; hm.name = 'lqd_median_hedge'; scene.add(hm);
   }
 }
@@ -10356,7 +10355,7 @@ const dmBox = (cx, cz, ry, W, D, FL, FH, wallMat, name) => {
   const nx = -u[1], nz = u[0];                                                 // pháp tuyến trái (về BẮC/park)
   const tiles = [], hedgeG = [];
   const checker = makeTex(128, 128, (g, w, h) => {
-    for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) { g.fillStyle = (i + j) % 2 ? '#b24a3a' : '#8f9298'; g.fillRect(i * 32, j * 32, 32, 32); }
+    for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) { g.fillStyle = (i + j) % 2 ? '#b8897a' : '#a6a39d'; g.fillRect(i * 32, j * 32, 32, 32); }   // W3-D: caro bạc màu như ảnh (bản cũ #b24a3a đỏ chói)
   });
   checker.wrapS = checker.wrapT = THREE.RepeatWrapping; checker.repeat.set(24, 2);
   for (let d = 8; d < L; d += 4.5) {
@@ -10366,7 +10365,8 @@ const dmBox = (cx, cz, ry, W, D, FL, FH, wallMat, name) => {
     // cây cắt trụi: thân dày + vài cụt nhánh, tán thưa
     if ((d | 0) % 12 < 5) veg.plant('catcut', px, pz, { h: 7.6 });   // Đợt 3 WP4: kit cắt trụi instanced
     // rào cây thấp mép quảng trường
-    const hg = new THREE.BoxGeometry(4.6, 0.7, 0.8); hg.translate(bx - nx * 4.5, LAND_H + 0.35, bz - nz * 4.5); hedgeG.push(hg);
+    const hx = bx - nx * 4.5, hz = bz - nz * 4.5;   // W3-D: bụi cắt tỉa lổn nhổn (js/hedges.js) thay hộp 4,6 m
+    hedgeG.push([[hx - u[0] * 2.3, hz - u[1] * 2.3], [hx + u[0] * 2.3, hz + u[1] * 2.3]]);
   }
   // dải lát caro (2 hình chữ nhật dài phủ mép park)
   const plaza = new THREE.Mesh(new THREE.PlaneGeometry(L - 10, 12), new THREE.MeshLambertMaterial({ map: checker }));
@@ -10374,7 +10374,7 @@ const dmBox = (cx, cz, ry, W, D, FL, FH, wallMat, name) => {
   plaza.position.set(A[0] + u[0] * L / 2 - nx * 8, LAND_H + 0.03, A[1] + u[1] * L / 2 - nz * 8);
   plaza.receiveShadow = true; plaza.name = 'dm_park_plaza'; scene.add(plaza);
   const addM = (arr, m, nm) => { if (arr.length) { const mesh = new THREE.Mesh(mergeGeometries(arr), m); mesh.castShadow = true; mesh.name = nm; scene.add(mesh); } };
-  addM(hedgeG, mat(0x3f7a3a), 'dm_park_hedge');
+  if (hedgeG.length) { const hm = new THREE.Mesh(hedgeGeometry(hedgeG, (x, z) => LAND_H + 0.03, { h: 0.72, w: 0.8, seed: 21, base: [0.25, 0.37, 0.17] }), hedgeMaterial()); hm.castShadow = true; hm.name = 'dm_park_hedge'; scene.add(hm); }
 }
 
 // === (dm8) DÃY BIỆT THỰ PHÁP 2T Trần Hưng Đạo (pano_535 217.2,-35.6 h270=1; 237/236 h270).
@@ -19216,7 +19216,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
       const LX = LM.lechan[0], LZ = LM.lechan[1];
       const faceV = [0.992, -0.126], perpV = [0.126, 0.992];   // mặt tượng = hướng cổng trường
       const P = (a, b) => [LX + a * faceV[0] + b * perpV[0], LZ + a * faceV[1] + b * perpV[1]];
-      const redGranite = mat(0x9c4636), topiary = mat(0x3f7a3a, { flatShading: true }), potM = mat(0x6f4636), hedgeM = mat(0x356b33);
+      const redGranite = mat(0x9c4636), topiary = mat(0x3f7a3a, { flatShading: true }), potM = mat(0x6f4636);
       // nền lát granite sáng + trục lối đi granite ĐỎ
       const pave = new THREE.Mesh(new THREE.BoxGeometry(30, 0.12, 24), mat(0xbdb6a6));
       pave.position.set(LX, LAND_H + 0.06, LZ); pave.rotation.y = thLC; pave.receiveShadow = true; scene.add(pave);
@@ -19239,10 +19239,10 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
         addCollider(wx, wz, 1.2);
       }
       // hàng rào cắt thấp viền quảng trường
-      for (const [a, b, w, d] of [[0, -12, 30, 1], [0, 12, 30, 1], [-14.5, 0, 1, 24], [14.5, 0, 1, 24]]) {
-        const [wx, wz] = P(a, b);
-        const hedge = new THREE.Mesh(new THREE.BoxGeometry(w, 0.9, d), hedgeM);
-        hedge.position.set(wx, LAND_H + 0.45, wz); hedge.rotation.y = thLC; scene.add(hedge);
+      {   // W3-D: viền bụi cắt tỉa lổn nhổn (js/hedges.js) thay 4 hộp phẳng — 4 cạnh quanh sân tượng
+        const ring = [P(-14.5, -12), P(14.5, -12), P(14.5, 12), P(-14.5, 12), P(-14.5, -12)];
+        const hm = new THREE.Mesh(hedgeGeometry([ring], () => LAND_H + 0.1, { h: 0.85, w: 1.0, seed: 33, base: [0.23, 0.36, 0.16] }), hedgeMaterial());
+        hm.castShadow = true; hm.name = 'lechan_hedge'; scene.add(hm);
       }
       // cột cờ đỏ phía sau tượng
       for (const b of [-5, 0, 5]) {
@@ -20906,26 +20906,50 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
   // ---------- DẢI VƯỜN HOA TRUNG TÂM (chuỗi vườn hoa đặc trưng Hải Phòng) ----------
   // An Biên → Ng.Văn Trỗi → Ng.Bỉnh Khiêm → Nguyễn Du(Nhà Kèn) → Kim Đồng → Tố Hữu
   {
-    // Bồn công viên VN thực tế = phần lớn BỤI TRÒN CẮT TỈA XANH (topiary) + điểm hoa đỏ/vàng dịu,
-    // KHÔNG phải thảm vòm neon hồng/tím/cam. Palette: 4 xanh (topiary) + đỏ gạch + vàng nghệ + hồng nhạt.
-    // (bài học bt: vòm hoa bão hòa + emissive cao → GPT chấm "hoạt hình/mô màu", trừ điểm nhiều pano công viên)
-    const flowerCols = [0x4c8b3f, 0x3f7d3a, 0x5a9a48, 0xc0392b, 0x4c8b3f, 0xd4a017, 0xcf7a8f];
-    // material bồn hoa CHIA SẺ theo màu (trước: tạo material mới mỗi bồn — hàng trăm bồn)
-    const flowerDomeM = flowerCols.map((col) =>
-      new THREE.MeshLambertMaterial({ color: col, emissive: col, emissiveIntensity: 0.05, flatShading: true }));
-    const hedgeM = mat(0x3f7a3a);
-    const pathM = mat(0xd8cba8);
-    const bedRimM = mat(0xa89878);
-    const lawnM = mat(0x6fae4e);
-    // GOM geometry bồn hoa theo material (trước: 2 mesh/bồn × ~262 bồn = ~524 mesh rời
-    // ngay khu trung tâm đông người chơi → giờ 8 mesh)
-    const rimGeos = [], domeGeos = flowerCols.map(() => []);
+    // Đợt 3 W3-D — VƯỜN HOA THẬT (ảnh pano 001/056/225/230/235/340/400/405 h090-h270, 10/2024): sau cải tạo, dải vườn
+    // hoa HP chủ yếu là QUẢNG TRƯỜNG LÁT ĐÁ XÁM có hàng cây, VIỀN BỤI CẮT TỈA thấp 0,6-0,8 m dọc mép, các Ô CỎ chữ nhật
+    // (xanh ô liu xỉn, không xanh neon) có bó vỉa đá, bồn cây tròn PHẲNG + bụi tròn cắt tỉa. Bản cũ: thảm cỏ 0x6fae4e
+    // phủ kín ô đất (AUDIT3 PARK "neon lawns", 001 056 225 230 235 400 405 428) + vòm hoa bán cầu hồng/xanh ("toy dome
+    // mounds") + lối chữ thập be. Màu cỏ: đo ảnh vệ tinh W2-D cỏ ~(95,105,82); trên phố ô cỏ nắng ~(100-125,115-135,60-80).
+    const bedRimM = mat(0x9d998f);                     // bó vỉa đá xám bồn/ô cỏ (bản cũ be 0xa89878)
+    const plazaTex = makeTex(256, 256, (g2, w, h) => {   // đá granite xám lát 60×60 cm (texture = 2,4 m)
+      const N = 4, s2 = w / N;
+      for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+        const rr = Math.sin(x * 91.7 + y * 47.3) * 43758.5453, l = ((rr - Math.floor(rr)) - 0.5) * 16;
+        g2.fillStyle = `rgb(${(176 + l) | 0},${(174 + l) | 0},${(168 + l) | 0})`; g2.fillRect(x * s2, y * s2, s2, s2);
+        const r2 = Math.sin(x * 13.1 + y * 7.7) * 9137.3; if (r2 - Math.floor(r2) < 0.3) { g2.fillStyle = 'rgba(70,64,58,0.07)'; g2.fillRect(x * s2 + 6, y * s2 + 4, s2 * 0.6, s2 * 0.5); }
+      }
+      g2.strokeStyle = 'rgba(40,38,34,.30)'; g2.lineWidth = 2;
+      for (let i = 0; i <= N; i++) { g2.beginPath(); g2.moveTo(i * s2, 0); g2.lineTo(i * s2, h); g2.moveTo(0, i * s2); g2.lineTo(w, i * s2); g2.stroke(); }
+    }, 'w3d_garden_plaza');
+    plazaTex.wrapS = plazaTex.wrapT = THREE.RepeatWrapping; plazaTex.repeat.set(1 / 2.4, 1 / 2.4);
+    const plazaM = new THREE.MeshLambertMaterial({ map: plazaTex });
+    // bồn cây tròn PHẲNG (gò thấp 0,15 m, mặt lốm đốm bụi/hoa dịu) + ~½ bồn có bụi tròn cắt tỉa ở giữa — thay vòm bán cầu
+    const bedTops = [[0.27, 0.37, 0.19], [0.30, 0.40, 0.20], [0.50, 0.30, 0.24], [0.56, 0.48, 0.20], [0.28, 0.38, 0.18]];
+    const rimGeos = [], bedGeos = [], topiGeos = [];
+    const hpGy = (x, z) => LAND_H + 0.1;   // chân bụi chìm 2 cm dưới mặt sân lát (+0,12)
+    const onPaved = (x, z) => world.roadNet && world.roadNet.surfaceAt && world.roadNet.surfaceAt(x, z) > 0.05;   // lòng/vỉa hè roadnet
+    const tintGeo = (g2, rgb, seedV, amp) => {   // màu đỉnh tuyến tính × nhiễu tất định theo vị trí đỉnh
+      const P = g2.attributes.position, c = new Float32Array(P.count * 3), lin = (v) => Math.pow(v, 2.2);
+      for (let i = 0; i < P.count; i++) {
+        const n = 1 + (fracH(Math.sin(P.getX(i) * 7.1 + P.getZ(i) * 5.3 + seedV) * 4375.85) - 0.5) * amp, yk = 0.8 + 0.2 * Math.min(1, Math.max(0, (P.getY(i) - LAND_H) / 1.2));
+        c[i * 3] = lin(Math.min(1, rgb[0] * n * yk)); c[i * 3 + 1] = lin(Math.min(1, rgb[1] * n * yk)); c[i * 3 + 2] = lin(Math.min(1, rgb[2] * n * yk));
+      }
+      g2.setAttribute('color', new THREE.BufferAttribute(c, 3));
+      return g2;
+    };
     function flowerBed(bx, bz, r, seed) {
       if (onCarriageDisc(bx, bz, r + 0.3) || clrNearPano(bx, bz, 3 + r)) return;   // W2-A: phố cắt qua vườn (roadnet) / camera pano
-      const rim = new THREE.CylinderGeometry(r, r + 0.3, 0.4, 10); rim.translate(bx, LAND_H + 0.2, bz); rimGeos.push(rim);
-      const dome = new THREE.SphereGeometry(r * 0.92, 8, 5, 0, Math.PI * 2, 0, Math.PI / 2);
-      dome.scale(1, 0.5, 1); dome.translate(bx, LAND_H + 0.38, bz); domeGeos[seed % flowerCols.length].push(dome);
+      const rim = new THREE.CylinderGeometry(r, r + 0.12, 0.32, 14); rim.translate(bx, LAND_H + 0.16, bz); rimGeos.push(rim);
+      const top = new THREE.SphereGeometry(r * 0.94, 12, 4, 0, Math.PI * 2, 0, Math.PI / 2);
+      top.scale(1, 0.16, 1); top.translate(bx, LAND_H + 0.3, bz); bedGeos.push(tintGeo(top.toNonIndexed(), bedTops[seed % bedTops.length], seed, 0.35));
+      if (seed % 2 === 0) {   // bụi tròn cắt tỉa (ô rô/chuỗi ngọc) ~1,1-1,5 m
+        const rr = 0.55 + 0.2 * fracH(Math.sin(bx * 3.3 + bz) * 917.3);
+        const ball = new THREE.IcosahedronGeometry(rr, 1); ball.scale(1, 0.85, 1); ball.translate(bx, LAND_H + 0.3 + rr * 0.8, bz);
+        topiGeos.push(tintGeo(ball.toNonIndexed(), [0.22, 0.34, 0.16], seed + 3, 0.3));
+      }
     }
+    const hedgePaths = [], parterres = [], curbGeos = [];
     // MỖI Ô ĐẤT có HƯỚNG RIÊNG (phố cong, ô xéo khác nhau) → KHÔNG dùng 1 góc lưới chung
     // (dùng chung làm vườn xiên so với mép ô). Tính HÌNH CHỮ NHẬT BAO DIỆN TÍCH NHỎ NHẤT của
     // CHÍNH polygon công viên (min-area rect: 1 cạnh trùng cạnh đa giác) → vườn khớp mép ô, cạnh
@@ -20977,10 +21001,11 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
       const SC = 1.14;   // nong polygon ra ~ tới vỉa hè (giữ nguyên HÌNH DẠNG)
       const spoly = poly.map(([x, z]) => [cx0 + (x - cx0) * SC, cz0 + (z - cz0) * SC]);
       const shape = new THREE.Shape(spoly.map(([x, z]) => new THREE.Vector2(x, -z)));   // (x,-z): sau rotateX ra đúng XZ
+      // W3-D: nền QUẢNG TRƯỜNG ĐÁ XÁM (cùng cao độ thảm cỏ cũ +0,12 — không thêm chỗ chồng lòng đường); UV = toạ độ m
       const lawnGeo = new THREE.ExtrudeGeometry(shape, { depth: 0.12, bevelEnabled: false });
       lawnGeo.rotateX(-Math.PI / 2);
-      const lawn = new THREE.Mesh(lawnGeo, lawnM);
-      lawn.position.y = LAND_H; lawn.receiveShadow = true; scene.add(lawn);
+      const lawn = new THREE.Mesh(lawnGeo, plazaM);
+      lawn.position.y = LAND_H; lawn.receiveShadow = true; lawn.name = 'garden_plaza'; scene.add(lawn);
       // point-in-polygon (ray cast) để CẮT luống hoa/cây theo đúng hình
       const inPoly = (x, z) => { let c = false; for (let i = 0, j = spoly.length - 1; i < spoly.length; j = i++) { const [xi, zi] = spoly[i], [xj, zj] = spoly[j]; if (((zi > z) !== (zj > z)) && (x < (xj - xi) * (z - zi) / (zj - zi) + xi)) c = !c; } return c; };
       // extent theo TRỤC ô đất (GU dọc / GV ngang) quanh tâm
@@ -20989,15 +21014,14 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
       const uc = (u1 + u2) / 2, vc = (v1 + v2) / 2, uw = u2 - u1, vw = v2 - v1;
       const L = (ox, oz) => [cx0 + ox * GU[0] + oz * GV[0], cz0 + ox * GU[1] + oz * GV[1]];
       // lối đi chữ thập lát gạch — vừa khít extent ô, giao ở tâm
-      const gg = new THREE.Group(); gg.position.set(cx0, LAND_H, cz0); gg.rotation.y = GROT; scene.add(gg);
-      const pH = new THREE.Mesh(new THREE.BoxGeometry(uw, 0.16, 3.4), pathM); pH.position.set(uc, 0.14, vc); gg.add(pH);
-      const pV = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.16, vw), pathM); pV.position.set(uc, 0.14, vc); gg.add(pV);
+      // (W3-D: bỏ 2 dải lối chữ thập be — cả vườn đã là sân lát; lối đi = khoảng sân giữa các ô cỏ)
       // bồn hoa TRUNG TÂM (Meshy) — trừ vườn Nhà Kèn giữ Nhà Kèn
       const [bcx, bcz] = L(uc, vc);
       const isKen = Math.hypot(cx0 - LM.nhaken[0], cz0 - LM.nhaken[1]) < 20;
       if (!isKen) heroBed(bcx, bcz, Math.max(7, Math.min(14, uw * 0.21, vw * 0.21)));
       else addCollider(bcx, bcz, 5);
-      // LUỐNG HOA lưới — CHỈ trong polygon (đi được)
+      // Ô CỎ chữ nhật 11×11 m có bó vỉa đá trên lưới 17 m (giữa ô: bồn cây tròn phẳng) — CHỈ trong polygon, không
+      // đè lòng/vỉa hè roadnet; ~1/5 ô để trống thành sân lát (ảnh 225/230: sân rộng giữa các ô cỏ)
       let bi = 3;
       for (let ox = u1 + 8; ox <= u2 - 8; ox += 17) {
         for (let oz = v1 + 8; oz <= v2 - 8; oz += 17) {
@@ -21005,7 +21029,41 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
           if (Math.hypot(ox - uc, oz - vc) < Math.max(12, uw * 0.12)) continue;         // chừa bồn giữa
           const [wx, wz] = L(ox, oz);
           if (!inPoly(wx, wz)) continue;
+          const hs = 5.5, cor = [L(ox - hs, oz - hs), L(ox + hs, oz - hs), L(ox + hs, oz + hs), L(ox - hs, oz + hs)];
+          const okP = cor.every(([qx, qz]) => inPoly(qx, qz) && !onPaved(qx, qz)) && !clrNearPano(wx, wz, 9) && fracH(Math.sin(ox * 0.71 + oz * 1.37 + cx0) * 7919.3) > 0.2;
+          if (okP) parterres.push({ x: wx, z: wz, rot: GROT, hs });
           flowerBed(wx, wz, 1.7 + ((bi * 7) % 3) * 0.45, bi); bi++;
+        }
+      }
+      // VIỀN BỤI CẮT TỈA dọc mép vườn (thụt 1,6 m vào trong polygon), hở lối vào ~3 m giữa mỗi cạnh dài và 2 m ở góc;
+      // đoạn nào chạm lòng/vỉa hè roadnet hoặc gần camera pano (≤ 3,5 m) thì cắt
+      {
+        const inset = 1.6, nb2 = spoly.length;
+        for (let i = 0; i < nb2; i++) {
+          const [ax, az] = spoly[i], [bx, bz] = spoly[(i + 1) % nb2], eL = Math.hypot(bx - ax, bz - az);
+          if (eL < 8) continue;
+          const ex = (bx - ax) / eL, ez = (bz - az) / eL;
+          let nx = -ez, nz = ex;   // pháp tuyến hướng VÀO trong polygon
+          if (!inPoly((ax + bx) / 2 + nx * 3, (az + bz) / 2 + nz * 3)) { nx = -nx; nz = -nz; }
+          const gaps = eL > 26 ? [[eL / 2 - 1.5, eL / 2 + 1.5]] : [];
+          let cur = [];
+          const flush = () => { if (cur.length >= 2) hedgePaths.push(cur); cur = []; };
+          // thụt vào: mép polygon (đã nong ×1,14) thường nằm trên vỉa hè → chọn MỘT độ thụt cho cả cạnh = độ thụt nhỏ nhất
+          // (1,6 → 6 m, bước 0,8) mà ≥ 70% điểm mẫu nằm ngoài lòng/vỉa hè roadnet → bụi chạy sát mép trong vỉa hè như ảnh thật
+          let ins = -1;
+          for (let q = inset; q <= 6.01 && ins < 0; q += 0.8) {
+            let ok = 0, n = 0;
+            for (let t = 2.2; t <= eL - 2.2; t += 2) { n++; const px = ax + ex * t + nx * q, pz = az + ez * t + nz * q; if (inPoly(px, pz) && !onPaved(px, pz)) ok++; }
+            if (n && ok >= 0.7 * n) ins = q;
+          }
+          if (ins < 0) continue;
+          for (let t = 2.2; t <= eL - 2.2 + 1e-6; t += 1.0) {
+            const px = ax + ex * t + nx * ins, pz = az + ez * t + nz * ins;
+            const bad = gaps.some(([g0, g1]) => t > g0 && t < g1) || !inPoly(px, pz) || onPaved(px, pz) || onCarriageDisc(px, pz, 0.5) || clrNearPano(px, pz, 3.5);
+            if (bad) { flush(); continue; }
+            cur.push([px, pz]);
+          }
+          flush();
         }
       }
       // Cây quanh CHU VI: rải dọc BIÊN polygon, thụt vào ~4m, nhịp 12 m (Đợt 3: trước 24 m — vườn hoa thật rợp cây,
@@ -21038,9 +21096,22 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
       }
       // KHÔNG chặn giữa vườn (trừ Nhà Kèn) — công viên/vườn hoa ĐI ĐƯỢC
     }
-    // xả bồn hoa đã gom → 1 mesh vành + 7 mesh vòm hoa theo màu
-    if (rimGeos.length) { const m = new THREE.Mesh(mergeGeometries(rimGeos), bedRimM); m.receiveShadow = true; m.name = 'flowerbed_rims'; scene.add(m); rimGeos.forEach((x) => x.dispose()); }
-    domeGeos.forEach((arr, i) => { if (!arr.length) return; const m = new THREE.Mesh(mergeGeometries(arr), flowerDomeM[i]); m.name = 'flowerbed_domes_' + i; scene.add(m); arr.forEach((x) => x.dispose()); });
+    // xả: vành bồn + bó vỉa ô cỏ (đá xám) · mặt bồn phẳng + bụi tròn (màu đỉnh) · ô cỏ · viền bụi cắt tỉa (js/hedges.js)
+    for (const P of parterres) {
+      const lg = new THREE.BoxGeometry(P.hs * 2, 0.08, P.hs * 2); lg.rotateY(P.rot); lg.translate(P.x, LAND_H + 0.16, P.z); bedGeos.push(tintGeo(lg.toNonIndexed(), [0.38, 0.45, 0.25], P.x, 0.12));   // cỏ ô liu xỉn ≈ sRGB(97,115,64) (bản cũ 0x6fae4e neon)
+      for (const [ox, oz, lx, lz] of [[0, -P.hs, P.hs * 2 + 0.3, 0.15], [0, P.hs, P.hs * 2 + 0.3, 0.15], [-P.hs, 0, 0.15, P.hs * 2], [P.hs, 0, 0.15, P.hs * 2]]) {
+        const c = new THREE.BoxGeometry(lx, 0.2, lz); c.translate(ox, 0, oz); c.rotateY(P.rot); c.translate(P.x, LAND_H + 0.18, P.z); curbGeos.push(c);
+      }
+    }
+    const allRim = [...rimGeos, ...curbGeos];
+    if (allRim.length) { const m = new THREE.Mesh(mergeGeometries(allRim.map((g2) => (g2.index ? g2.toNonIndexed() : g2))), bedRimM); m.receiveShadow = true; m.name = 'flowerbed_rims'; scene.add(m); allRim.forEach((x) => x.dispose()); }
+    if (bedGeos.length) { const m = new THREE.Mesh(mergeGeometries(bedGeos), new THREE.MeshLambertMaterial({ vertexColors: true })); m.receiveShadow = true; m.name = 'garden_beds'; scene.add(m); bedGeos.forEach((x) => x.dispose()); }
+    if (topiGeos.length) { const m = new THREE.Mesh(mergeGeometries(topiGeos), new THREE.MeshLambertMaterial({ vertexColors: true })); m.castShadow = true; m.name = 'garden_topiary'; scene.add(m); topiGeos.forEach((x) => x.dispose()); }
+    if (hedgePaths.length) {
+      const hg = hedgeGeometry(hedgePaths, hpGy, { h: 0.72, w: 0.75, seg: 0.8, rough: 0.05, top: 0.06, seed: 5, base: [0.25, 0.37, 0.17] });
+      const hm = new THREE.Mesh(hg, hedgeMaterial()); hm.castShadow = true; hm.receiveShadow = true; hm.name = 'garden_hedges'; scene.add(hm);
+      world.gardenStats = { hedgeM: hedgePaths.reduce((s2, p2) => s2 + (p2.length - 1), 0), hedgeTris: hg.index.count / 3, parterres: parterres.length, beds: rimGeos.length, topiary: topiGeos.length };
+    }
   }
 
   // ---------- KÈ HỒ SEN (cell_nam V1): lan can đỏ + nhịp vòm trắng bờ tây, phượng bờ đông ----------
