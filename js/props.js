@@ -26,7 +26,7 @@ import { LITE } from './device.js';
 import { rbData, rbGrid } from './rbdata.js';   // footprint thật giải mã 1 lần cho cả trang (W2-F)
 import { claimAt } from './claims.js';
 import { motorbikeGeometry, motorbikeFarGeometry, carGeometry, carFarGeometry, carFar2Geometry, CAR_FAR_SCALE, pedestrianGeometry, pedestrianFarGeometry, kitMaterial, shared, KIT_U, OPT, optWord } from './models_kit.js';
-import { onCarriage, clearPt, clearDisc, nearPano } from './clearance.js';   // Đợt 3 W2-A: lòng đường thật (biết khe đường đôi/nút giao) + 3 m quanh camera pano
+import { onCarriage, onCarriageFast, clearPt, clearDisc, nearPano } from './clearance.js';   // Đợt 3 W2-A: lòng đường thật (biết khe đường đôi/nút giao) + 3 m quanh camera pano
 import { PROPS_MARKETS } from './props_evidence.js';
 import { SHOP_SIGNS } from './shopsigns.js';
 // Đợt 3 W3-E (STREET LIFE): chợ dân sinh, hàng tràn hè theo biển hiệu, cờ treo nhà, băng rôn, cổng chào + mô hình xe khách,
@@ -492,8 +492,9 @@ function makeRoadIndex(ROADS_DT, HW, SW) {
     const ci = Math.floor(x / CELL), cj = Math.floor(z / CELL), n = Math.ceil(R / CELL);
     for (let i = ci - n; i <= ci + n; i++) for (let j = cj - n; j <= cj + n; j++) {
       const a = map.get(key(i, j)); if (!a) continue;
-      // phố rộng p/s (nửa lòng ≥ 5 m): dMain; phố t/r: 2/3 dMain (lưới phố cũ dày — 15 m ở mọi nút bỏ ~25% ô tô)
-      for (const id of a) { const s = segs[id]; if (s[6] === ri) continue; if (segD(x, z, s) < s[4] + (s[5] > 0 ? (s[4] >= 5 ? dMain : dMain * 0.67) : dAlley)) return true; }
+      // phố rộng p/s cắt ngang (nửa lòng ≥ 5 m — làn rẽ thật): dMain; phố t/r cắt ngang: ~½ dMain (nút nhỏ lưới phố cũ —
+      // 15 m ở mọi nút bỏ ~25% ô tô, đo bằng nh_run: 1.486 ứng viên bị loại vì nút giao)
+      for (const id of a) { const s = segs[id]; if (s[6] === ri) continue; if (segD(x, z, s) < s[4] + (s[5] > 0 ? (s[4] >= 5 ? dMain : dMain * 0.55) : dAlley)) return true; }
     }
     return false;
   }
@@ -759,7 +760,7 @@ export function buildProps(ctx) {
   const slStats = newStreetLifeStats();
   const bikeDisplay = [];
   const SL = {
-    sides, CELL, cellPos, hash3, evAt, inBuilding, obst, flat, roadIdx, nearPano, onCarriage, openSpace, claimAt, XS,
+    sides, CELL, cellPos, hash3, evAt, inBuilding, obst, flat, roadIdx, nearPano, onCarriage, onCarriageFast, openSpace, claimAt, XS,
     OCC: { POLE: OCC_POLE, SHOP: OCC_SHOP, BIKE: OCC_BIKE, PED: OCC_PED, CAR: OCC_CAR, MKT: OCC_MKT }, addCollider: ctx.addCollider, R_MAX,
     SHOP_SIGNS, MARKETS: PROPS_MARKETS, evidence: PROPS_EVIDENCE, st: slStats, LITE, ROADS_DT,
   };
@@ -903,10 +904,12 @@ export function buildProps(ctx) {
     if (X.sw < 2.4) continue;
     for (let k = 1; k < S.n - 1; k++) {
       if (!S.ok[k] || S.occ[k]) continue;
+      const e = S.ev[k], hk = hash3(S.ax + k * 3.1, S.az + S.side, 171);
+      if (hk >= (e && (e[9] & 512) ? 0.12 : 0.0045)) continue;   // lọc rẻ trước khi tính toạ độ
       const [x, z] = cellPos(S, k, X.fac - 0.9);
-      const e = S.ev[k], near = e && (e[9] & 512) && Math.hypot(e[0] - x, e[1] - z) < 35;
+      const near = e && (e[9] & 512) && Math.hypot(e[0] - x, e[1] - z) < 35;
       const p = near ? 0.12 : (S.c === 's' || S.c === 't') && X.sw >= 3 && Math.hypot(x, z) < 900 ? 0.0045 : 0;
-      if (hash3(x, z, 171) >= p) continue;
+      if (hk >= p) continue;
       const ok = [[-1, -0.6], [1, -0.6], [-1, 0.6], [1, 0.6]].every(([a, b]) => { const qx = x + S.ux * a + S.nx * b, qz = z + S.uz * a + S.nz * b; return !inBuilding(qx, qz) && !onCarriage(qx, qz); });
       if (!ok || obst.hit(x, z, 1.2) || nearPano(x, z, 4.2) || !flat(x, z)) continue;
       kioskI.push({ x, z, heading: headZ(-S.nx, -S.nz), v: 8, col: pick([0xd8d4c8, 0xc0c4c2, 0xb8c0b4], hash3(x, z, 172)) });
@@ -1647,7 +1650,7 @@ export function buildProps(ctx) {
   // móc gỡ lỗi/QA (không dùng trong game): window.__hpProps.sides / .cull()
   if (typeof window !== 'undefined') window.__hpProps = { stats, sides, carRejPts, cull: () => CULL.map((t) => [t.mesh.name, t.mesh.count, t.n]), bikeRows, lists: { stoolI, cartI, aframeI, walkI, standI, sitI, cars: carI.flat(), bikes: bikeI.flat(), cobraI, ornI, poleI, poleLampI, trafoI, binI,
     // W3-E (mkRoad = hàng chợ CỐ Ý lấn dải 1,1 m lòng đường sát bó vỉa — clearance_page bỏ qua như ô tô đỗ)
-    mkOver: LIFE.overI, mkGround: LIFE.groundI.filter((g) => !g.road), mkRoad: LIFE.groundI.filter((g) => g.road), spill: LIFE.spillI,
+    mkOver: LIFE.overI.filter((g) => !g.road), mkGround: LIFE.groundI.filter((g) => !g.road), mkRoad: [...LIFE.groundI, ...LIFE.overI].filter((g) => g.road), spill: LIFE.spillI,
     kioskI, coaches: coachI, covered: coveredI, flagsHouse: LIFE.flagsHouse, banners: LIFE.banners, gates: LIFE.gates } };
   // parkedCars: ô tô đỗ {x,z,heading,len,hw,…} (tâm ở curbLine − 0,95; phố r: curbLine − 0,05) — cho WP8 giao thông né
   // làn đỗ (xe chạy cách bó vỉa ≥ 1,9 m nơi có xe đỗ) mà không phải đọc lại collider
