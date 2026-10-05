@@ -891,6 +891,31 @@ function parcelVeto(s, sg, ta, tb, F, uBase) {
 }
 // W3-B (AUDIT3 GAP 469 — lỗ Overture, không nhà thật nào trong 62 m): lô nằm GẦN pano (≤ 22 m) trong nón quan sát tả nhà
 // ống bán hàng / nhà ở (điểm phiếu ≥ 0,3) là đủ bằng chứng dù phía sau không có footprint thật
+// W3-B: MIỆNG NGÕ thật (tools/osm_alleys.json — service/footway/path/track; ngõ < 28 m và lối đi bộ KHÔNG vào ROADS_DT nên
+// lấp khe từng bít mất) → lô khe / tường rào cắt qua đoạn ngõ đó bị bỏ (để thoáng lối vào)
+const ALLEY = [], alleyGrid = new Grid(24);
+try {
+  for (const w of JSON.parse(fs.readFileSync(new URL('./osm_alleys.json', import.meta.url), 'utf8')).elements) {
+    if (!w.geometry || !w.tags || !/^(service|footway|path|track|alley|pedestrian)$/.test(w.tags.highway || '')) continue;
+    if (/^(sidewalk|crossing|traffic_island)$/.test(w.tags.footway || '')) continue;   // vỉa hè/vạch qua đường vẽ thành footway
+    const P = w.geometry.map((g) => [(g.lon - LON0) * UX, -(g.lat - LAT0) * UZ]);
+    for (let i = 0; i + 1 < P.length; i++) {
+      const s = [P[i][0], P[i][1], P[i + 1][0], P[i + 1][1]]; if (Math.hypot(s[2] - s[0], s[3] - s[1]) < 0.3) continue;
+      if (Math.hypot(s[0], s[1]) > R_MAX + 50) continue;
+      ALLEY.push(s); alleyGrid.insert(ALLEY.length - 1, [Math.min(s[0], s[2]), Math.min(s[1], s[3]), Math.max(s[0], s[2]), Math.max(s[1], s[3])]);
+    }
+  }
+} catch { console.log('  (không có tools/osm_alleys.json — bỏ miệng ngõ)'); }
+function alleyMouth(Q, ux, uz) {
+  const bb = bbox(Q); let hit = false;
+  alleyGrid.query(bb, (i) => {
+    if (hit) return; const s = ALLEY[i];
+    const L = Math.hypot(s[2] - s[0], s[3] - s[1]); if (Math.abs(((s[2] - s[0]) * ux + (s[3] - s[1]) * uz) / L) > 0.7) return;   // chạy dọc phố (lối vỉa hè) — không phải miệng ngõ
+    if (pointInPoly(Q, s[0], s[1]) || pointInPoly(Q, s[2], s[3])) { hit = true; return; }
+    for (let k = 0; k < Q.length && !hit; k++) if (segCross([s[0], s[1]], [s[2], s[3]], Q[k], Q[(k + 1) % Q.length])) hit = true;
+  });
+  return hit;
+}
 function pkSupport(F, um) {
   const [x, z] = F.world(um, 6);
   let nearP = false; PEV.near(x, z, 22, (p) => { if (!nearP && Math.hypot(p.x - x, p.z - z) <= 22) nearP = true; });
@@ -919,6 +944,7 @@ function fillGap(s, sg, t0, t1) {
     // cảng/kho phía BẮC Hoàng Diệu (bờ sông Cấm): mặt đường trước kho là bãi/cổng/tường rào, không phải dãy nhà ống
     // (review: lô sinh trước kho cảng x 1132-1244). Chỉ phía bắc tim Hoàng Diệu — phía nam là phố dân thật.
     if (portGapZone(mx, mz)) { stat('gap_veto_port'); GAPDBG.push([mx, mz, 'port']); continue; }
+    if (alleyMouth(frameRect(F, uBase + ta, uBase + tb, 0, 6), s.ux, s.uz)) { stat('gap_veto_alley'); GAPDBG.push([mx, mz, 'alley']); continue; }   // W3-B miệng ngõ
     { const v = parcelVeto(s, sg, ta, tb, F, uBase); if (v) { stat('gap_veto_' + v); GAPDBG.push([mx, mz, v]); continue; } }   // W3-B
     if (forecourt(frameRect(F, uBase + ta, uBase + tb, 0, 25))) { stat('gap_veto_forecourt'); GAPDBG.push([mx, mz, 'forecourt']); continue; }
     if (panoOpenVeto(frameRect(F, uBase + ta, uBase + tb, 0, 12))) { stat('gap_veto_pano'); GAPDBG.push([mx, mz, 'noev']); continue; }
