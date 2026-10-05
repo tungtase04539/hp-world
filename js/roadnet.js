@@ -579,6 +579,8 @@ export function buildRoadNet(ROADS_DT, deps) {
     }
     stats.signals = kept.length;
     stats.sigOsm = kept.filter((J) => J.osmS).length; stats.sigEv = kept.length - stats.sigOsm;
+    // nút bị bỏ đèn (cụm < 45 m) chỉ còn zebra nếu có node OSM / bằng chứng chữ zebra
+    for (const J of junctions) if (J.zebra && !J.signal) J.zebra = J.xPts.length > 0 || J.evZ;
   }
   // zebra theo NHÁNH: node OSM rơi trên nhánh (gần vị trí vạch: gốc + setback + 2,3 m) → nhánh đó; nút có đèn → mọi nhánh
   // phố (như ảnh thật: ngã tư đèn luôn kẻ đủ); node OSM ở tâm nút / bằng chứng chữ → các nhánh p/s/t

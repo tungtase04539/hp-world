@@ -66,7 +66,7 @@ export const LIGHT = {
   //  - màu sương = chân trời hiển thị khử bão hoà 35% (mù ẩm HP xám trắng).
   skyViewGain: 1.2, skyViewSat: 0.45, skyViewGainLow: 0.76, skyDayEl: [3, 15],
   // W3-D: vòm hiển thị ban ngày nhân thêm hệ số theo độ cao (dải thấp ≤ ~7° → LO, ≥ ~37° → HI) — xem shader SKY_FS
-  skyGradeLo: [0.90, 0.94, 0.985], skyGradeHi: [1.03, 1.06, 1.12],
+  skyGradeLo: [0.84, 0.90, 0.97], skyGradeHi: [1.08, 1.10, 1.18],
   hemiScale: 0.55, hemiSat: 0.25, hazeDesat: 0.35,
   groundAlbedo: [0.17, 0.155, 0.135],   // mặt phố (nhựa/gạch/mái) — màu ánh dội cho hemi.groundColor
   // ĐÊM: trăng (đèn chủ, có bóng mờ) + "nền đêm" (trời có trăng + đèn phố dội lên mù ẩm) cộng vào bán cầu. Chỉ bật

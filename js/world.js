@@ -4186,7 +4186,7 @@ const dgRail = (ax, az, bx, bz, h, kind, colHex) => {
   if (curbG.length) {
     const cm = new THREE.Mesh(mergeGeometries(curbG), mat(0xb9bdb9));
     cm.receiveShadow = true; cm.name = 'lqd_median_curb'; scene.add(cm);
-    const hm = new THREE.Mesh(hedgeGeometry(hedgeG, (x, z) => groundHeight(x, z) + 0.3, { h: 0.85, w: 1.15, seg: 0.7, rough: 0.09, top: 0.08, wild: 0.6, seed: 9, base: [0.29, 0.42, 0.18] }), hedgeMaterial());
+    const hm = new THREE.Mesh(hedgeGeometry(hedgeG, (x, z) => groundHeight(x, z) + 0.3, { h: 0.85, w: 1.15, seg: 0.7, rough: 0.09, top: 0.08, wild: 0.6, seed: 9, base: [0.38, 0.52, 0.22] }), hedgeMaterial());
     hm.castShadow = true; hm.name = 'lqd_median_hedge'; scene.add(hm);
   }
 }
@@ -10374,7 +10374,7 @@ const dmBox = (cx, cz, ry, W, D, FL, FH, wallMat, name) => {
   plaza.position.set(A[0] + u[0] * L / 2 - nx * 8, LAND_H + 0.03, A[1] + u[1] * L / 2 - nz * 8);
   plaza.receiveShadow = true; plaza.name = 'dm_park_plaza'; scene.add(plaza);
   const addM = (arr, m, nm) => { if (arr.length) { const mesh = new THREE.Mesh(mergeGeometries(arr), m); mesh.castShadow = true; mesh.name = nm; scene.add(mesh); } };
-  if (hedgeG.length) { const hm = new THREE.Mesh(hedgeGeometry(hedgeG, (x, z) => LAND_H + 0.03, { h: 0.72, w: 0.8, seed: 21, base: [0.25, 0.37, 0.17] }), hedgeMaterial()); hm.castShadow = true; hm.name = 'dm_park_hedge'; scene.add(hm); }
+  if (hedgeG.length) { const hm = new THREE.Mesh(hedgeGeometry(hedgeG, (x, z) => LAND_H + 0.03, { h: 0.72, w: 0.8, seed: 21, base: [0.31, 0.44, 0.20] }), hedgeMaterial()); hm.castShadow = true; hm.name = 'dm_park_hedge'; scene.add(hm); }
 }
 
 // === (dm8) DÃY BIỆT THỰ PHÁP 2T Trần Hưng Đạo (pano_535 217.2,-35.6 h270=1; 237/236 h270).
@@ -21108,7 +21108,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     if (bedGeos.length) { const m = new THREE.Mesh(mergeGeometries(bedGeos), new THREE.MeshLambertMaterial({ vertexColors: true })); m.receiveShadow = true; m.name = 'garden_beds'; scene.add(m); bedGeos.forEach((x) => x.dispose()); }
     if (topiGeos.length) { const m = new THREE.Mesh(mergeGeometries(topiGeos), new THREE.MeshLambertMaterial({ vertexColors: true })); m.castShadow = true; m.name = 'garden_topiary'; scene.add(m); topiGeos.forEach((x) => x.dispose()); }
     if (hedgePaths.length) {
-      const hg = hedgeGeometry(hedgePaths, hpGy, { h: 0.72, w: 0.75, seg: 0.8, rough: 0.05, top: 0.06, seed: 5, base: [0.25, 0.37, 0.17] });
+      const hg = hedgeGeometry(hedgePaths, hpGy, { h: 0.72, w: 0.75, seg: 0.8, rough: 0.05, top: 0.06, seed: 5, base: [0.31, 0.44, 0.20] });
       const hm = new THREE.Mesh(hg, hedgeMaterial()); hm.castShadow = true; hm.receiveShadow = true; hm.name = 'garden_hedges'; scene.add(hm);
       world.gardenStats = { hedgeM: hedgePaths.reduce((s2, p2) => s2 + (p2.length - 1), 0), hedgeTris: hg.index.count / 3, parterres: parterres.length, beds: rimGeos.length, topiary: topiGeos.length };
     }
