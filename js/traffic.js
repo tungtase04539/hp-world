@@ -74,6 +74,13 @@ export function createTraffic(scene, world, opts = {}) {
   const G = buildRoadGraph(ROADS_DT, { radius: PLAY_R, margin: 60 });
   const { nodes, edges } = G;
   const nodeIn = nodes.map((n) => Math.hypot(n.x, n.z) <= PLAY_R + 30);
+  // W3-F: cạnh trên mặt cầu NÂNG (HVT nhịp chính + nút xoắn): người đi bộ KHÔNG đi (làn đi bộ lệch ra ngoài mép mặt cầu →
+  // rơi xuống sông/đất bên dưới) — đánh dấu khi > 1/2 điểm cạnh có mặt cầu cao hơn đất ≥ 2,5 m
+  if (world.decks) for (const e of edges) {
+    let hit = 0;
+    for (let k = 0; k < e.xs.length; k++) if (world.decks.nearestAt(e.xs[k], e.zs[k]) > groundHeight(e.xs[k], e.zs[k]) + 2.5) hit++;
+    e.elev = hit * 2 > e.xs.length;
+  }
 
   // ---------- Ô TÔ ĐỖ mép đường (js/props.js → world.props.parkedCars, tâm ở curbLine − 0,95; phố r curbLine − 0,05) ----------
   // Đợt 3 wave 2 (W2-F): xe chạy từng xuyên qua xe đỗ (xe máy tới hw − 0,55, ô tô hw − 1,1 ⇒ trùng dải đỗ hw − 0,05…hw − 1,85).
@@ -256,6 +263,7 @@ export function createTraffic(scene, world, opts = {}) {
       const far = d ? e2.a : e2.b;
       if (!nodeIn[far] && a.type !== 'walk') continue;         // không chạy ra ngoài vùng chơi
       if (!dirOK(a, e2, d)) continue;                          // không đi ngược chiều đường đôi
+      if (a.type === 'walk' && e2.elev) continue;                 // W3-F: người đi bộ không lên cầu nâng
       edgePoint(e2, d, 0, _q);
       const cos = _p.tx * _q.tx + _p.tz * _q.tz;
       let w = 0.15 + (cos + 1) * (cos + 1);                     // ưu tiên đi thẳng
@@ -357,6 +365,7 @@ export function createTraffic(scene, world, opts = {}) {
       if (ei === undefined) return false;
       const e = edges[ei];
       if (rnd() * 90 > (dens[e.c] || 0)) continue;              // trọng số mật độ theo cấp phố
+      if (a.type === 'walk' && e.elev) continue;                  // W3-F: không sinh người đi bộ trên cầu nâng
       a.e = ei; a.dir = rnd() < 0.5 ? 0 : 1; a.s = rnd() * e.L;
       if (!dirOK(a, e, a.dir)) a.dir ^= 1;
       a.prev = null; a.next = null; a.rb = 6; a.prevRb = 0; a.pk = 0; a.y = undefined; a.yx = 1e9;   // W3-F: chỗ mới → cao độ đặt lại bằng spawnY (mặt cầu nâng)
