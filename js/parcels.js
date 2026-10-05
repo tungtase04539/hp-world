@@ -38,13 +38,13 @@ function solidTexture() {
     g.fillStyle = 'rgba(40,40,40,0.25)'; g.fillRect(0, y0, W, 3); }
   // 1 TÔN SÓNG: gân dọc (bước 16 px = 1/16 ô), sáng/tối theo sóng + vệt gỉ chảy từ đinh vít
   { const y0 = RH;
-    for (let x = 0; x < W; x++) { const s = 0.5 + 0.5 * Math.sin((x / W) * Math.PI * 2 * 16); const v = Math.round(150 + 95 * s); g.fillStyle = `rgb(${v},${v},${v})`; g.fillRect(x, y0, 1, RH); }
+    for (let x = 0; x < W; x++) { const s = 0.5 + 0.5 * Math.sin((x / W) * Math.PI * 2 * 16); const v = Math.round(172 + 78 * s); g.fillStyle = `rgb(${v},${v},${v})`; g.fillRect(x, y0, 1, RH); }
     for (let i = 0; i < 18; i++) { const x = rnd() * W, h = RH * (0.2 + rnd() * 0.6), y = y0 + rnd() * RH * 0.3; const gr = g.createLinearGradient(0, y, 0, y + h); gr.addColorStop(0, 'rgba(120,60,25,0.45)'); gr.addColorStop(1, 'rgba(120,60,25,0)'); g.fillStyle = gr; g.fillRect(x, y, 2 + rnd() * 4, h); }
     g.fillStyle = 'rgba(30,30,30,0.35)'; for (const yy of [0.06, 0.94]) g.fillRect(0, y0 + RH * yy, W, 2);
     const gb = g.createLinearGradient(0, y0 + RH * 0.8, 0, y0 + RH); gb.addColorStop(0, 'rgba(70,60,45,0)'); gb.addColorStop(1, 'rgba(70,60,45,0.4)'); g.fillStyle = gb; g.fillRect(0, y0 + RH * 0.8, W, RH * 0.2); }
   // 2 BÊ TÔNG TẤM: mạch ngang/dọc + mảng ố loang + rêu chân
   { const y0 = 2 * RH;
-    for (let i = 0; i < 3000; i++) { const v = 170 + rnd() * 70; g.fillStyle = `rgb(${v},${v},${v - 4})`; g.fillRect(rnd() * W, y0 + rnd() * RH, 1 + rnd() * 3, 1 + rnd() * 2); }
+    for (let i = 0; i < 3000; i++) { const v = 190 + rnd() * 55; g.fillStyle = `rgb(${v},${v},${v - 4})`; g.fillRect(rnd() * W, y0 + rnd() * RH, 1 + rnd() * 3, 1 + rnd() * 2); }
     for (let i = 0; i < 10; i++) { const r = 10 + rnd() * 40; const x = rnd() * W, y = y0 + rnd() * RH; const gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, 'rgba(60,62,55,0.25)'); gr.addColorStop(1, 'rgba(60,62,55,0)'); g.fillStyle = gr; g.fillRect(x - r, y - r, 2 * r, 2 * r); }
     g.fillStyle = 'rgba(50,50,50,0.4)'; g.fillRect(0, y0 + RH * 0.5, W, 2); g.fillRect(W / 2, y0, 2, RH); g.fillRect(0, y0, 2, RH);
     const gb = g.createLinearGradient(0, y0 + RH * 0.75, 0, y0 + RH); gb.addColorStop(0, 'rgba(50,70,40,0)'); gb.addColorStop(1, 'rgba(50,70,40,0.5)'); g.fillStyle = gb; g.fillRect(0, y0 + RH * 0.75, W, RH * 0.25); }
@@ -136,7 +136,40 @@ export function buildParcels(scene, ctx = {}) {
     return { hull: k.hull, x0, z0, x1, z1 };
   });
   const pip = (R, x, z) => { let c = false; for (let i = 0, j = R.length - 1; i < R.length; j = i++) { const [xi, zi] = R[i], [xj, zj] = R[j]; if ((zi > z) !== (zj > z) && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) c = !c; } return c; };
-  const st = { runs: 0, gates: 0, booths: 0, len: [0, 0, 0, 0], cutLive: 0, cutCell: 0, cutWater: 0, tris: 0 };
+  const st = { runs: 0, gates: 0, booths: 0, len: [0, 0, 0, 0], cutLive: 0, cutCell: 0, cutWater: 0, cutThin: 0, thin: 0, tris: 0 };
+  // TƯỜNG/RÀO/CỔNG DỰNG TAY đã có (ô cells, khối địa danh W2-E…): mọi mesh MỎNG (bề hẹp ≤ 1,2 m), DÀI (≥ 2,5 m), THẤP (≤ 5 m)
+  // chân sát đất — theo HÌNH HỌC, không theo tên (cb_wall_ltt tường mỏ neo pano_515, lm_ubnd_fence…) → không dựng tường đôi
+  const thin = [], TCS = 16, tgrid = new Map(), tkey = (i, j) => i * 100003 + j;
+  if (ctx.scene !== false) {
+    const v = new THREE.Vector3();
+    scene.traverse((o) => {
+      if (!o.isMesh || o.isInstancedMesh || o.userData.parcels) return;
+      if (/^(roads|sidewalk|ground|water|fab_|dashes|paths|aerial|night_|curb|median|tree|veg)/.test(o.name)) return;
+      const g = o.geometry; if (!g || !g.attributes || !g.attributes.position) return;
+      if (!g.boundingBox) g.computeBoundingBox();
+      const bb = g.boundingBox; if (!isFinite(bb.min.x)) return;
+      o.updateWorldMatrix(true, false);
+      const cs = [[bb.min.x, bb.min.z], [bb.max.x, bb.min.z], [bb.max.x, bb.max.z], [bb.min.x, bb.max.z]].map(([x, z]) => { v.set(x, bb.min.y, z).applyMatrix4(o.matrixWorld); return [v.x, v.z, v.y]; });
+      v.set(bb.min.x, bb.max.y, bb.min.z).applyMatrix4(o.matrixWorld);
+      const hgt = v.y - cs[0][2];
+      const e1 = Math.hypot(cs[1][0] - cs[0][0], cs[1][1] - cs[0][1]), e2 = Math.hypot(cs[2][0] - cs[1][0], cs[2][1] - cs[1][1]);
+      if (Math.min(e1, e2) > 1.2 || Math.max(e1, e2) < 2.5 || hgt > 5 || hgt < 0.4) return;
+      if (cs[0][2] > gh(cs[0][0], cs[0][1]) + 1.2) return;   // không chạm đất (biển, mái hiên)
+      const q = cs.map((c) => [c[0], c[1]]);
+      let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9; for (const [x, z] of q) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
+      thin.push(q);
+      for (let i = Math.floor((x0 - 1.2) / TCS); i <= Math.floor((x1 + 1.2) / TCS); i++) for (let j = Math.floor((z0 - 1.2) / TCS); j <= Math.floor((z1 + 1.2) / TCS); j++) {
+        const k = tkey(i, j); let a = tgrid.get(k); if (!a) tgrid.set(k, (a = [])); a.push(thin.length - 1);
+      }
+    });
+    st.thin = thin.length;
+  }
+  const segD = (px, pz, ax, az, bx, bz) => { const dx = bx - ax, dz = bz - az, L2 = dx * dx + dz * dz || 1e-9; let t = ((px - ax) * dx + (pz - az) * dz) / L2; t = t < 0 ? 0 : t > 1 ? 1 : t; return Math.hypot(px - ax - t * dx, pz - az - t * dz); };
+  function nearThin(x, z, r) {
+    const a = tgrid.get(tkey(Math.floor(x / TCS), Math.floor(z / TCS))); if (!a) return false;
+    for (const k of a) { const q = thin[k]; if (pip(q, x, z)) return true; for (let i = 0; i < 4; i++) if (segD(x, z, q[i][0], q[i][1], q[(i + 1) % 4][0], q[(i + 1) % 4][1]) < r) return true; }
+    return false;
+  }
   // điểm tường bị chặn: nhà thật còn sống, nhà ô giữ lại, nước/đất trũng, ngoài bán kính dựng
   const LAND = ctx.landH ?? 2, maxR = ctx.maxR || 1e9;
   function blocked(x, z) {
@@ -144,6 +177,7 @@ export function buildParcels(scene, ctx = {}) {
     if (G && D) { const b = G.at(x, z); if (b >= 0 && !(D.dead && D.dead[b])) { st.cutLive++; return 2; } }
     for (const k of kept) if (x >= k.x0 && x <= k.x1 && z >= k.z0 && z <= k.z1 && pip(k.hull, x, z)) { st.cutCell++; return 3; }
     const g = gh(x, z); if (!(Math.abs(g - LAND) < 1.6)) { st.cutWater++; return 4; }
+    if (thin.length && nearThin(x, z, 1.4)) { st.cutThin++; return 5; }
     return 0;
   }
   // cổng theo dãy (khe trong tường)

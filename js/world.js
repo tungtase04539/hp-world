@@ -2607,7 +2607,9 @@ const lmTower = (x, z, ry, W, D, FL, FH, wallMat, name) => {
 //     khung thép biển trên nóc, mái hiên bạt xanh sọc, dây điện chằng chịt.
 //     OSM có footprint chợ (268,783) a=2199 đang là hộp trơn → FEATURED_CLEAR thay thế) ===
 {
-  const bx = 268, bz = 793;
+  // W3-B (AUDIT3 LANDMARK/CAMNEAR 460): tâm đúng footprint OSM (268,783) a=2199 m² — bản cũ dời 10 m ra phố (bz 793) làm mặt
+  // chợ cách pano_460 chỉ ~7 m (thật: sạp chợ trước, nhà chợ lùi ~15-18 m sau sân sạp)
+  const bx = 268, bz = 783;
   if (lmOK(bx, bz)) {
     const ry = 0.0873;                           // mặt quay NAM ra Phố Chợ Con
     const g = new THREE.Group(); g.position.set(bx, groundHeight(bx, bz), bz); g.rotation.y = ry;
@@ -13393,7 +13395,9 @@ const w2Umb = (x, z, hex) => {
   const px = 289.7, pz = 817.2, ux = 0.9976, uz = -0.0696, nN = [-0.0696, -0.9976], nS = [0.0696, 0.9976], ryN = 0.070, ryS = -3.072;
   // tòa chợ vàng cũ 2T (bờ BẮC) + giàn billboard VIFON trên mái + mái bạt sọc
   { const off = 4 + 2.0 + 7, cx = px + nN[0] * off, cz = pz + nN[1] * off;
-    if (w2OK(cx, cz)) { const y = groundHeight(cx, cz), g = new THREE.Group(); g.position.set(cx, y, cz); g.rotation.y = ryN;
+    // W3-B: TRÙNG với ô (9) CHỢ CON ở khối đầu (cùng toà chợ, cùng billboard) — cell sink vốn gỡ nó; bỏ hẳn cho tất định
+    // (giữ sạp + ô dù trước chợ ở dưới)
+    if (false && w2OK(cx, cz)) { const y = groundHeight(cx, cz), g = new THREE.Group(); g.position.set(cx, y, cz); g.rotation.y = ryN;
       const body = new THREE.Mesh(new THREE.BoxGeometry(20, 7.2, 12), w2FacadeYellow()); body.position.y = 3.6; g.add(body);
       // giàn khung sắt + 2 billboard VIFON
       for (const sx of [-9.5, 9.5]) { const p = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 5, 6), mat(0x6a6f72)); p.position.set(sx, 9.5, 5); g.add(p); }
@@ -13403,9 +13407,10 @@ const w2Umb = (x, z, hex) => {
       const awn = new THREE.Mesh(new THREE.BoxGeometry(19, 0.16, 3.2), mat(0x2f7db0)); awn.position.set(0, 4.0, 6 + 1.5); g.add(awn);
       g.traverse((m) => { if (m.isMesh) m.castShadow = true; }); g.name = 'w2_chocon_market'; scene.add(g);
       addCollider(cx, cz, 11); FEATURED_CLEAR.push([cx, cz, 16]);
-      // sạp + ô dù trước chợ (KHÔNG collider)
-      for (const [ax, uh] of [[-6, 0xd06a6a], [0, 0x5aa0c8], [6, 0xe0b84a]]) w2Umb(px + ux * ax + nN[0] * (4 + 1.5), pz + uz * ax + nN[1] * (4 + 1.5), uh);
-    } }
+    }
+    // sạp + ô dù trước chợ (KHÔNG collider)
+    if (w2OK(cx, cz)) for (const [ax, uh] of [[-6, 0xd06a6a], [0, 0x5aa0c8], [6, 0xe0b84a]]) w2Umb(px + ux * ax + nN[0] * (4 + 1.5), pz + uz * ax + nN[1] * (4 + 1.5), uh);
+  }
   // bờ NAM: Xuân Gia Vị / Long Tròn / Thanh Phát
   w2Row(px, pz, ux, uz, nS[0], nS[1], 4, ryS, [
     { a: -9, W: 6, FL: 2, D: 9, wallHex: 0xe6dcc4, name: 'XUÂN GIA VỊ', bg: '#1560b0', fg: '#ffffff', px: 34, id: 'xuangiavi', awn: 0x2f7db0 },
@@ -17466,12 +17471,17 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     // (GARDENS = bbox TRỤC THẲNG của chính các đa giác PARKS — dải vườn hoa trung tâm chạy CHÉO nên bbox nuốt cả
     //  ~110 nhà thật hai bên phố → chỉ dùng đa giác PARKS)
     for (const ring of PARKS) claimPoly(ring, 'park', 'osm_park');
-    claimCircle(_sqX, _sqZ, 62, 'plaza', 'qt_nhahat');
+    // W3-B (AUDIT3 GAP 405/428): quảng trường Nhà hát = khoảng lát GIỮA Hoàng Văn Thụ (x≈−38, pano_250) và Đinh Tiên Hoàng
+    // (x≈36, pano_054) từ mặt tiền Nhà hát tới vườn hoa (z 28-112; vệ tinh real_3 khớp footprint Nhà hát) → hộp. Vòng r62 + hành
+    // lang ±55 m cũ giết luôn 2 dãy phố cũ THẬT hai bên (pano_250 h0/h270, 053/054 h90, 249 h270, 405 h0/h90: quán cà phê).
+    claimBox(0, 70, 40, 42, 0, 'plaza', 'qt_nhahat');
     { const ax = 5, az = 15, bx = -45, bz = 125, L = Math.hypot(bx - ax, bz - az);     // hành lang Nhà hát → Quán hoa → cột cờ
-      claimBox((ax + bx) / 2, (az + bz) / 2, L / 2, 55, Math.atan2(-(bz - az) / L, (bx - ax) / L), 'plaza', 'hl_quanhoa');
-      claimCircle(ax, az, 55, 'plaza', 'hl_quanhoa_a'); claimCircle(bx, bz, 55, 'plaza', 'hl_quanhoa_b'); }
+      claimBox((ax + bx) / 2, (az + bz) / 2, L / 2, 22, Math.atan2(-(bz - az) / L, (bx - ax) / L), 'plaza', 'hl_quanhoa');
+      claimCircle(ax, az, 22, 'plaza', 'hl_quanhoa_a'); claimCircle(bx, bz, 22, 'plaza', 'hl_quanhoa_b'); }
     if (LM.lechan) claimCircle(LM.lechan[0], LM.lechan[1], 55, 'plaza', 'qt_lechan');
-    claimCircle(-187.8, 201.6, 50, 'plaza', 'qt_trienlam');
+    // W3-B: vòng 'qt_trienlam' r50 cũ đặt ĐÚNG tâm pano_428 (nút Nguyễn Đức Cảnh × Mê Linh, cách Triển lãm 105 m) giết cả dãy
+    // shophouse THẬT góc đông-nam (pano_428 h90/h180: LUCKY, đồ thờ) → "quảng trường bê tông 40×40 m" (AUDIT3 GAP 428). Bỏ:
+    // sân trước Triển lãm đã nằm trong qt_lechan, góc tây-bắc là công viên (PARKS), trường = LM_POLY thptnq.
     claimCircle(-427, 943, 28, 'plaza', 'cho_cotden');
     claimCircle(90, -757, 40, 'plaza', 'bai_caudat');
     { const ux = 0.2989, uz = 0.9543, wx = -0.9543, wz = 0.2989, rot = Math.atan2(-uz, ux);   // road#9: quảng trường + vườn hoa
@@ -17493,6 +17503,30 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     };
     const fabricReject = (x, z) => clearedZone(x, z) || inSuperblock(x, z) || (x > -300 && x < 120 && z > -1045 && z < -845)
       || lakeSD(x, z) < 16 || hoSenSD(x, z) < 10 || _keHo(x, z);
+    // W3-B: nhà SINH (FLAG.SYNTH — lô khe/lõi ô ĐOÁN) chạm vùng ≤ 6 m quanh nhà ô DANH TÍNH được giữ (công sở/di sản/tháp/
+    // bespoke — world.cellKept) → bỏ trước khi dựng: dãy shophouse bịa che mặt tiền bảo tàng/Ban CHQS/Điện lực/khu cảng vụ
+    // (AUDIT3 LANDMARK 046/464/510/515, KNOWLEDGE WP1: nhà sinh là phỏng đoán, nhà ô mang danh tính pano). buildRealFabric
+    // tự hạ tường chung của láng giềng nhà bị giết (refreshPartyEdges trên mọi D.dead).
+    { const D0 = fabricData(), CS = 32, G = new Map(), K = (i, j) => i * 100003 + j;
+      const idn = (world.cellKept || []).filter((k) => k.kind !== 'house' && k.hull && k.hull.length >= 3);
+      for (let c = 0; c < idn.length; c++) { const H = idn[c].hull; let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9; for (const [x, z] of H) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
+        idn[c].bb = [x0 - 6, z0 - 6, x1 + 6, z1 + 6];
+        for (let i = Math.floor((x0 - 6) / CS); i <= Math.floor((x1 + 6) / CS); i++) for (let j = Math.floor((z0 - 6) / CS); j <= Math.floor((z1 + 6) / CS); j++) { const k = K(i, j); let a = G.get(k); if (!a) G.set(k, (a = [])); a.push(c); } }
+      const sd = (px, pz, ax, az, bx, bz) => { const dx = bx - ax, dz = bz - az, L2 = dx * dx + dz * dz || 1e-9; let t = ((px - ax) * dx + (pz - az) * dz) / L2; t = t < 0 ? 0 : t > 1 ? 1 : t; return Math.hypot(px - ax - t * dx, pz - az - t * dz); };
+      const inH = (H, x, z) => { let c = false; for (let i = 0, j = H.length - 1; i < H.length; j = i++) { const [xi, zi] = H[i], [xj, zj] = H[j]; if ((zi > z) !== (zj > z) && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) c = !c; } return c; };
+      let nK = 0;
+      if (idn.length) for (let b = 0; b < D0.nB; b++) {
+        if (D0.dead[b] || !(D0.flags[b] & RB_FLAG.SYNTH)) continue;
+        let x = 0, z = 0; const v0 = D0.vStart[b], v1 = D0.vStart[b + 1]; for (let v = v0; v < v1; v++) { x += D0.x[v]; z += D0.z[v]; } x /= v1 - v0; z /= v1 - v0;
+        const a = G.get(K(Math.floor(x / CS), Math.floor(z / CS))); if (!a) continue;
+        let hit = false;
+        for (const c of a) {
+          const it = idn[c]; if (hit || x < it.bb[0] - 8 || x > it.bb[2] + 8 || z < it.bb[1] - 8 || z > it.bb[3] + 8) continue;
+          for (let v = v0; v < v1 && !hit; v++) { const px = D0.x[v], pz = D0.z[v]; if (inH(it.hull, px, pz)) { hit = true; break; } for (let i = 0; i < it.hull.length; i++) { const p = it.hull[i], q = it.hull[(i + 1) % it.hull.length]; if (sd(px, pz, p[0], p[1], q[0], q[1]) < 6) { hit = true; break; } } }
+        }
+        if (hit) { D0.dead[b] = 1; nK++; }
+      }
+      world.synthNearCellKilled = nK; }
     _fab = buildRealFabric(scene, { groundHeightNoDeck, landH: LAND_H, reject: fabricReject, maxR: BUILD_RADIUS, facadeMats });
     _fabCollide = _fab.collide;
     world.fabric = _fab;

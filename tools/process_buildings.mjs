@@ -1062,7 +1062,9 @@ let nInterior = 0;
     if (bl.nReal / (bl.nReal + bl.nSyn + bl.nFree) < 0.18) continue;   // ô gần như trống nhà thật: không bịa
     cand.push(o);
   }
-  for (let k = cand.length - 1; k > 0; k--) { const r = Math.floor(R() * (k + 1)); const t = cand[k]; cand[k] = cand[r]; cand[r] = t; }
+  // W3-B: thứ tự theo HASH từng ô (không xáo bằng RNG tuần tự): thêm/bớt 1 ứng viên (veto mới) không xáo lại thứ tự mọc của
+  // CẢ thành phố → thay đổi chỉ lan cục bộ (A/B nhóm đối chứng, gộp nhánh W3-A/W3-B)
+  { const hk = new Map(cand.map((o) => [o, hash32('in' + o)])); cand.sort((a, b) => hk.get(a) - hk.get(b) || a - b); }
   const nearestSeg = (x, z) => {
     let best = null, bd = 80;
     segGrid.query([x - 80, z - 80, x + 80, z + 80], (i) => { const s = SEGS[i]; const d = segDist(x, z, s.ax, s.az, s.bx, s.bz); if (d < bd) { bd = d; best = s; } });
@@ -1104,7 +1106,7 @@ let nInterior = 0;
       if (b.lot || mainFront(bi, 2)) continue;   // nhà mặt phố đã xử lý ở bước 4-6
       ids.push(bi);
     }
-    for (let k = ids.length - 1; k > 0; k--) { const r = Math.floor(R() * (k + 1)); const t = ids[k]; ids[k] = ids[r]; ids[r] = t; }
+    { const hk = new Map(ids.map((i) => [i, hash32(B[i].id + 'grow8a')])); ids.sort((a, b) => hk.get(a) - hk.get(b) || a - b); }   // W3-B: thứ tự theo hash (xem lõi ô)
     for (const bi of ids) {
       const b = B[bi];
       const mr = minRect(b.pts); if (!mr) continue;
