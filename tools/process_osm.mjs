@@ -268,7 +268,8 @@ try {
 // theo 551 camera pano (camera phải nằm TRONG lòng). Cần tools/ov_buildings.csv (gitignore; thiếu → chỉ dịch tim, bề rộng
 // theo ghi đè/cấp). Log: `node process_osm.mjs --fitlog <file.json>`.
 {
-  const { loadOverture, measureWalls, chooseWidths, fitToPanos } = await import('./street_fit.mjs');
+  const { loadOverture, measureWalls, chooseWidths, fitToPanos, capWidths } = await import('./street_fit.mjs');
+  const { LM_POLY } = await import('../js/landmark_polys.js');
   const t0 = Date.now();
   const ov = loadOverture(new URL('./ov_buildings.csv', import.meta.url));
   if (!ov) console.log('  (không có ov_buildings.csv — bề rộng phố chỉ theo ghi đè pano/cấp)');
@@ -278,10 +279,13 @@ try {
   const argv = process.argv.slice(2), fitlog = argv.includes('--fitlog') ? argv[argv.indexOf('--fitlog') + 1] : null;
   const fit = fitToPanos(ROADS_DT, panos, W0, walls0, { log: fitlog });
   // đo lại tường trên tim ĐÃ dịch (way từng chạy xuyên nhà thiếu trạm hợp lệ) rồi chốt bề rộng
-  const WD = chooseWidths(ROADS_DT, measureWalls(ROADS_DT, ov));
+  const walls1 = measureWalls(ROADS_DT, ov);
+  const WD = chooseWidths(ROADS_DT, walls1);
   // không để lòng HẸP hơn lúc khớp tim (mỏ neo pano đã tính "camera trong lòng" theo W0) → lấy bề rộng lớn hơn của 2 lượt
   WD.forEach((o, ri) => { if (W0[ri].w > o.w && o.w > 0) { o.w = W0[ri].w; if (W0[ri].sw >= 0) o.sw = W0[ri].sw; } else if (!(o.w > 0) && W0[ri].w > 0) Object.assign(o, W0[ri]); });
+  const cap = capWidths(ROADS_DT, WD, walls1, Object.values(LM_POLY), panos);
   ROADS_DT.forEach((r, ri) => { if (WD[ri].w > 0) { r.w = WD[ri].w; if (WD[ri].sw >= 0) r.sw = WD[ri].sw; } });
+  console.log(`  kẹp bề rộng: tường Overture ${cap.wall} way, địa danh LM_POLY ${cap.lm} way`);
   const src = {}; WD.forEach((o) => { src[o.src] = (src[o.src] || 0) + 1; });
   console.log(`mặt cắt phố: ${Date.now() - t0} ms; overture ${ov ? ov.n : 0} nhà; nguồn bề rộng ${JSON.stringify(src)}`);
   console.log(`tim theo pano + tường: mỏ neo pano ${fit.anchors} (dịch ≠ 0: ${fit.active}), mỏ neo tường ${fit.wallAnchors}; bỏ ${JSON.stringify(fit.skipped)}; way dời ${fit.moved}:`,

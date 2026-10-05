@@ -204,6 +204,57 @@ export function chooseWidths(roads, walls) {
   return out;
 }
 
+// B2. KẸP sau khớp tim: lòng không được nuốt nhà thật — (i) nửa lòng ≤ phân vị 10% khoảng tường gần nhất (min 2 bên) đo
+// trên tim ĐÃ dịch (lòng trùm footprint Overture ở > 10% trạm = quá rộng/lệch), (ii) lòng + vỉa không vào đa giác địa danh
+// LM_POLY (Bưu điện: lòng rộng mới từng trùm 56 m² nhà thật). Không bao giờ hẹp hơn mặc định cấp.
+export function capWidths(roads, widths, walls, polys = [], panos = []) {
+  const stat = { wall: 0, lm: 0 };
+  // camera pano ĐANG trong lòng way (theo bề rộng trước kẹp) → lòng phải còn chứa nó (|d| + 0,9 m nửa thân xe): pano là
+  // bằng chứng mạnh hơn tường Overture (phố dài: vài đoạn tường sát tim kéo phân vị xuống — Phan Đình Phùng 12 → 8 m
+  // từng đẩy 6 camera ra ngoài bó vỉa)
+  const need = new Float32Array(roads.length);
+  const idx = segIndex(roads, 'pstr');
+  for (const [px, pz] of panos) {
+    let best = null;
+    idx.g.query([px - 14, pz - 14, px + 14, pz + 14], (i) => { const s = idx.segs[i]; const d = sdist(px, pz, s[2], s[3], s[4], s[5]); if (!best || d < best.d) best = { d, ri: s[0] }; });
+    if (!best) continue;
+    const o = widths[best.ri], hwNow = (o.w > 0 ? o.w : ROAD_W[roads[best.ri].c] ?? 5.5) / 2;
+    if (best.d + 0.9 <= hwNow) need[best.ri] = Math.max(need[best.ri], best.d + 0.9);
+  }
+  roads.forEach((r, ri) => {
+    const o = widths[ri]; if (!STREET[r.c] || !(o.w > 0)) return;
+    const hw0 = (ROAD_W[r.c] ?? 5.5) / 2;
+    let hw = o.w / 2, sw = o.sw >= 0 ? o.sw : SIDEWALK_W[r.c];
+    const m = walls[ri];
+    if (m && m.st && m.st.length >= 6) {
+      const near = m.st.map((q) => Math.min(q.W / 2 + q.m, q.W / 2 - q.m));
+      const q10 = quant(near, 0.1);
+      if (q10 != null && hw > q10 - 0.3) { const h = Math.max(hw0, need[ri], q10 - 0.3); if (h < hw) { sw += hw - h; hw = h; stat.wall++; } }
+    }
+    let dmin = Infinity;
+    let rx0 = 1e9, rz0 = 1e9, rx1 = -1e9, rz1 = -1e9; for (const [x, z] of r.pts) { rx0 = Math.min(rx0, x); rx1 = Math.max(rx1, x); rz0 = Math.min(rz0, z); rz1 = Math.max(rz1, z); }
+    const pad = hw + sw + 2;
+    for (const P of polys) {
+      const pb = bbox(P); if (pb[0] > rx1 + pad || pb[2] < rx0 - pad || pb[1] > rz1 + pad || pb[3] < rz0 - pad) continue;
+      for (let i = 0; i + 1 < r.pts.length; i++) {
+        const [ax, az] = r.pts[i], [bx, bz] = r.pts[i + 1];
+        for (const [x, z] of P) dmin = Math.min(dmin, sdist(x, z, ax, az, bx, bz));
+        // cạnh đa giác cắt qua tim: lấy mẫu cạnh 1 m
+        for (let k = 0; k < P.length; k++) {
+          const [px, pz] = P[k], [qx, qz] = P[(k + 1) % P.length], L = Math.hypot(qx - px, qz - pz);
+          for (let t = 0.5; t < L; t += 1) dmin = Math.min(dmin, sdist(px + ((qx - px) * t) / L, pz + ((qz - pz) * t) / L, ax, az, bx, bz));
+        }
+      }
+    }
+    if (dmin < hw + sw) {
+      const h = Math.max(hw0, Math.min(hw, dmin - 0.3)), s = Math.max(Math.min(sw, SIDEWALK_W[r.c]), dmin - h);
+      if (h < hw || s < sw) { hw = h; sw = Math.max(1, Math.min(sw, s)); stat.lm++; }
+    }
+    o.w = Math.round(hw * 20) / 10; if (o.sw >= 0 || sw !== SIDEWALK_W[r.c]) o.sw = Math.round(sw * 10) / 10;
+  });
+  return stat;
+}
+
 // C. trường dịch tim theo vết xe pano
 export function fitToPanos(roads, panos, widths, walls, { Ra = 45, Rb = 12, maxShift = 12, wallCap = 3, log = null } = {}) {
   const hwOf = (ri) => (widths[ri].w > 0 ? widths[ri].w : ROAD_W[roads[ri].c] ?? 5.5) / 2;
