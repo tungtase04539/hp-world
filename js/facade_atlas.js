@@ -943,12 +943,17 @@ export function buildFacadeAtlas(size = 2048, opts = {}) {
   cell('U_VINE', W4, UPH, () => {      // tường cũ phủ CÂY LEO quanh cửa sổ (+ vài chấm hoa giấy)
     WALL(0.7); slab();
     reveal(1.2, 0.95, 2.8, 2.45); glass(1.2, 0.95, 2.8, 2.45, 2, 1); frame(1.2, 0.95, 2.8, 2.45, FR_BROWN, 0.06, 2);
-    for (let k = 0; k < 170; k++) {
-      const x = rnd() < 0.62 ? R(0, 1.35) : R(2.65, 4), y = R(0, UPH), g = R(0.72, 1.18);
-      disc(x, y, R(0.06, 0.17), [44 * g, 90 * g, 42 * g], M_KEEP);
-    }
-    for (let k = 0; k < 50; k++) disc(R(0, 4), R(2.5, UPH), R(0.05, 0.13), [50, 98, 46], M_KEEP);
-    for (let k = 0; k < 12; k++) disc(R(0, 1.3), R(0.2, UPH), 0.05, [190, 64, 118], M_KEEP);
+    // khối lá DÀY theo cụm (mỗi cụm ~60-90 lá nhỏ 3-8 cm, sắc độ lệch nhau) — tránh "chấm bi" đều
+    const clump = (cx, cy, rad, n) => {
+      for (let k = 0; k < n; k++) {
+        const a = rnd() * Math.PI * 2, d = Math.sqrt(rnd()) * rad, g = R(0.62, 1.2), y = R(0.85, 1.1);
+        disc(cx + Math.cos(a) * d, cy + Math.sin(a) * d * 1.3, R(0.03, 0.08), [42 * g, 84 * g * y, 40 * g], M_KEEP);
+      }
+    };
+    for (let k = 0; k < 9; k++) clump(R(0, 1.25), R(0, UPH), R(0.3, 0.6), 90);
+    for (let k = 0; k < 6; k++) clump(R(2.75, 4), R(0, UPH), R(0.25, 0.55), 80);
+    for (let k = 0; k < 5; k++) clump(R(0.8, 3.2), R(2.6, UPH), R(0.2, 0.4), 60);
+    for (let k = 0; k < 14; k++) disc(R(0, 1.3), R(0.2, UPH), R(0.03, 0.05), [184, 70, 120], M_KEEP);
   });
   // ---- trệt ----
   cell('G_COL', W4, GH, () => {        // trệt thuộc địa: chân tường kẻ mạch đá, cửa VÒM cao 2 cánh gỗ pa-nô + ô quạt (không biển)

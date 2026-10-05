@@ -20,7 +20,7 @@ import { claimBox } from './claims.js';
 import { BRAND_MAP, debrand } from './brands.js';
 import { PARKS } from './mapdata.js';
 import { LM_POLY } from './landmark_polys.js';
-import { guardCellPalette } from './cellfacade.js';   // Đợt 3 W3-C: palette guard nhà ô giữ lại
+import { guardCellPalette, cellCanvasFx } from './cellfacade.js';   // Đợt 3 W3-C: palette guard nhà ô giữ lại
 import { clearanceReady, samplesFromHulls, evalShift, solveShift, sweepAssemblies, flushClearance, massOnStreet, minWidth, thinMeshOf, trimThinWall, corrCount, nearAnyRoad, nearestPano, CLEAR } from './clearance.js';   // Đợt 3 W2-A
 
 const _q = typeof location !== 'undefined' ? new URLSearchParams(location.search) : new URLSearchParams('');
@@ -999,9 +999,11 @@ function atlasKept(kept, createdTex, THREE) {
     const cv = document.createElement('canvas'); cv.width = AT_PAGE; cv.height = H; p.H = H;
     const g = cv.getContext('2d');
     for (const t of p.items) {
-      const c = texs.get(t);
+      const c = texs.get(t), fx = cellCanvasFx(t.image);   // W3-C: mặt tiền tối / lỗ cửa sổ đen → kính (js/cellfacade.js)
+      if (fx) g.filter = fx.filter;
       g.drawImage(t.image, c.x, c.y, c.w, c.h);                                     // nền ô = ảnh kéo giãn ra viền (chống loang)
       g.drawImage(t.image, c.x + c.G, c.y + c.G, c.w - 2 * c.G, c.h - 2 * c.G);  // ảnh thật 1:1 ở giữa (c.w-2G = w gốc)
+      if (fx) { g.filter = 'none'; if (fx.lift) { g.globalCompositeOperation = 'lighten'; g.fillStyle = fx.lift; g.fillRect(c.x, c.y, c.w, c.h); g.globalCompositeOperation = 'source-over'; } }
     }
     const tx = new THREE.CanvasTexture(cv);
     tx.colorSpace = ref.colorSpace; tx.anisotropy = ref.anisotropy; tx.name = 'cellAtlas' + k;

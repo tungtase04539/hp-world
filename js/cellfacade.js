@@ -25,6 +25,35 @@ function guarded(q, THREE) {
   return out;
 }
 
+// ẢNH MẶT TIỀN canvas của nhà ô (gộp vào cellAtlas — cellsink atlasKept): "ô vuông đen" cửa sổ (pano_391/409/510/161/060)
+// và mặt tiền gần đen (pano_395 h180) → (a) ảnh mặt tiền (gần vuông, ≥96 px) TỐI (độ chói TB < 0,22) vẽ với filter sáng
+// hơn; (b) sau khi vẽ, phủ 'lighten' một màu kính xám-xanh (78,90,102): pixel tối hơn (lỗ cửa sổ đen, khe) thành KÍNH
+// tối phản trời, pixel sáng (tường sơn) giữ nguyên. Biển dải dài (tỉ lệ > 2,6) và ảnh nhỏ: không đụng.
+let _probe = null;
+function meanLum(img) {
+  try {
+    if (!_probe) { _probe = document.createElement('canvas'); _probe.width = _probe.height = 8; }
+    const g = _probe.getContext('2d', { willReadFrequently: true });
+    g.clearRect(0, 0, 8, 8); g.drawImage(img, 0, 0, 8, 8);
+    const d = g.getImageData(0, 0, 8, 8).data; let s = 0, sat = 0;
+    for (let i = 0; i < d.length; i += 4) {
+      s += 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
+      const mx = Math.max(d[i], d[i + 1], d[i + 2]), mn = Math.min(d[i], d[i + 1], d[i + 2]); sat += mx > 0 ? (mx - mn) / mx : 0;
+    }
+    _lastSat = sat / 64;
+    return s / 64 / 255;
+  } catch (e) { _lastSat = 0; return 1; }
+}
+let _lastSat = 0;
+export function cellCanvasFx(img) {
+  if (!img || !img.width || img.width < 96 || img.height < 96) return null;
+  const ar = img.width / img.height, L = meanLum(img);
+  if (ar > 2.6 || ar < 1 / 2.6) return L < 0.14 ? { filter: 'brightness(1.7) saturate(0.85)', lift: null, dark: true } : null;   // dải dài RẤT tối (mặt "biển" phủ cả nhà, pano_395)
+  // mặt tiền 1 màu BÃO HOÀ (xanh hoàng gia UBND pano_138, đỏ BIDV 046): giảm bão hoà — màu thương hiệu chỉ hợp ở biển
+  const f = L < 0.22 ? 'brightness(1.6) saturate(0.8)' : _lastSat > 0.55 ? 'saturate(0.45) brightness(1.08)' : 'none';
+  return { filter: f, lift: 'rgb(78,90,102)', dark: L < 0.22, sat: +_lastSat.toFixed(2) };
+}
+
 // kept: mục GIỮ LẠI của cell sink ({ o: Object3D, bldg: bool, kind }) — gọi trong commitSink trước khi trả về.
 export function guardCellPalette(kept, THREE) {
   const st = { meshes: 0, materials: 0 };

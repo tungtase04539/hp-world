@@ -437,7 +437,7 @@ ${gl1 ? GL1_GROUND_MAIN : GL2_GROUND_MAIN}
     float base = 1.0 - smoothstep(0.0, 0.9 + 0.7 * ag, hh);
     weather = 1.0 - ag * (0.3 * streak + 0.2 * blot) - (0.06 + 0.16 * ag) * base;
     dirt = 1.0 - (0.04 + 0.1 * ag) * base;
-    tint = mix(tint, vec3(dot(tint, vec3(0.2126, 0.7152, 0.0722))) * vec3(1.0, 0.99, 0.93), (0.1 + 0.3 * blot) * ag);
+    tint = mix(tint, vec3(dot(tint, vec3(0.2126, 0.7152, 0.0722))) * vec3(1.0, 0.99, 0.93), (0.04 + 0.22 * blot) * ag);
   }
   float sum = max(wW + gW + kW + sW + tW, 1e-3);
   vec3 col = (wW * tx.rgb * tint * 1.25 * weather + gW * tx.rgb + kW * tx.rgb * mix(1.0, weather, 0.4) + sW * tx.rgb * signCol * 1.15 + tW * textCol) / sum;
