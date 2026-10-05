@@ -461,6 +461,9 @@ export function placeStreetLife(P) {
     return true;
   };
   const headRoad = (S) => Math.atan2(-S.nx, -S.nz);   // local +Z → lòng đường
+  // có MẶT TIỀN NHÀ THẬT ngay sau ô (dò facadeLine −0,3 … +2,5 m)? — đồ của nhà (chậu cây, hàng tràn) không đứng giữa khoảng
+  // trống (pano_304: chậu cây mọc trên vỉa hè nút giao HVT)
+  const hasFacade = (S, k, da = 0) => { const X = XS(S.c), sk = S.off + (k + 0.5) * CELL + da; for (let d = -0.3; d <= 2.5; d += 0.4) if (inBuilding(S.ax + S.ux * sk + S.nx * (X.fac + d), S.az + S.uz * sk + S.nz * (X.fac + d))) return true; return false; };
   // ---- CHỢ: đi dọc từng bên phố theo bước ô sạp ----
   for (const S of sides) {
     if (!S.mk) continue;
@@ -606,7 +609,7 @@ export function placeStreetLife(P) {
       const u = hash3(S.ax + kk * 3.1, S.az + seed, 331);
       const lat = X.fac - 0.55 - (X.sw >= 3 && u < 0.35 ? 0.9 : 0);
       const [x, z] = cellPos(S, kk, lat, (u - 0.5) * 1.2);
-      if (!okAt(S, x, z, 0.7) || obst.hit(x, z, 0.5)) continue;
+      if (!okAt(S, x, z, 0.7) || obst.hit(x, z, 0.5) || !hasFacade(S, kk)) continue;
       if (cat === 'fruit') groundI.push({ x, z, heading: H, v: u < 0.5 ? 2 : 1, col: 0xffffff });
       else { const vs = SPILL[cat]; spillI.push({ x, z, heading: H + (u - 0.5) * 0.2, v: vs[(u * vs.length) | 0], col: pick([0xa8552e, 0xa8552e, 0xe8e4dc, 0x6a6e70], hash3(x, z, 332)) }); }
       obst.add(x, z, 0.6); if (cat !== 'plant') P.addCollider(x, z, 0.45);
@@ -681,7 +684,7 @@ export function placeStreetLife(P) {
       const X = XS(S.c); const [x, z] = cellPos(S, k, X.fac - 0.5);
       const r0 = Math.hypot(x, z);
       if ((r0 >= 1300 && hk > 0.012) || P.openSpace(x, z)) continue;
-      if (!okAt(S, x, z, 0.5) || obst.hit(x, z, 0.5)) continue;
+      if (!okAt(S, x, z, 0.5) || obst.hit(x, z, 0.5) || !hasFacade(S, k)) continue;
       spillI.push({ x, z, heading: hash3(x, z, 382) * 6.28, v: 2, col: pick([0xa8552e, 0xa8552e, 0xe8e4dc, 0x6a6e70], hash3(x, z, 383)) });
       obst.add(x, z, 0.5); S.occ[k] |= OCC.SHOP; st.plants++;
     }
