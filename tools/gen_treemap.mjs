@@ -28,7 +28,9 @@ const cnt = { n: 0, none: 0, sparse: 0, dense: 0, pollard: 0, young: 0, wash: 0,
 // từ khoá cắt cụt (sau bão Yagi 9/2024 rất phổ biến trên pano 10/2024)
 const CUT_RX = /cắt cụt|cắt trụi|trụi cành|đốn tỉa|trơ cành|cắt tỉa|chỉ còn thân|cụt ngọn|trơ thân|thân trơ|cắt ngọn|cắt tán|khô trơ|cưa cụt|tỉa cụt|trụi lá|cành gãy|thân trụi|cắt cành|đốn/;
 // ngữ cảnh DẢI PHÂN CÁCH / CÔNG VIÊN của 1 câu (cây trong đó khác cây vỉa hè: pano_001/152/056/428)
-const PARK_RX = /dải phân cách|công viên|vườn hoa|vườn cây|quảng trường|đảo giao thông|đảo cây|khuôn viên|vòng xuyến|bùng binh|dải cây xanh|dải vườn/;
+// ("khuôn viên" KHÔNG tính — sân cơ quan sau tường rào, pano_515 "hàng cây lớn vừa bị cắt trụi … cây cọ trong khuôn viên")
+const PARK_RX = /dải phân cách|công viên|vườn hoa|vườn cây|quảng trường|đảo giao thông|đảo cây|vòng xuyến|bùng binh|dải cây xanh|dải vườn/;
+const STREET_RX = /ven phố|vỉa hè|dọc phố|ven đường|hai bên phố|dọc vỉa hè|trên hè/;
 // mức cắt cụt của 1 câu: "hàng cây/nhiều cây/toàn bộ … cắt" 7, "một số/vài/một cây" 3, còn lại 5
 // (W3-G: + "đốn tỉa MẠNH", "cây cổ thụ bị cắt", "cây … lớn … cắt trụi/trơ" — pano_019 "cây xà cừ/cây bàng lớn bị cắt cụt ngọn
 // (đốn tỉa mạnh)" từng ra 3 vì "vài cây phượng" ở câu khác)
@@ -64,11 +66,20 @@ for (const e of src) {
     pollard = cutLevel(vp);
     // W3-G: theo CÂU — câu nói dải phân cách/công viên → polP, còn lại → polS. Câu có cả hai (vd "hàng cây dọc dải phân
     // cách/quảng trường … cắt") → cả hai cùng mức.
-    for (const s of vp.split(/[;.,]/)) {
-      if (!has(s, CUT_RX)) continue;
-      const lv = cutLevel(s), park = has(s, PARK_RX), street = has(s, /ven phố|vỉa hè|dọc phố|ven đường|hai bên phố|dọc vỉa hè|trên hè/);
-      if (park) polP = Math.max(polP, lv);
-      if (!park || street) polS = Math.max(polS, lv);
+    // ngữ cảnh theo CÂU (; .): câu chỉ nói công viên/dải phân cách → cả câu là "park" (pano_038 "dải công viên trung tâm cỏ
+    // xanh, nhiều cây bóng mát bị cắt trụi cành"); câu nói cả hai → theo từng vế (,), vế không nêu gì thừa hưởng ngữ cảnh
+    // nêu TRƯỚC trong câu
+    for (const sen of vp.split(/[;.]/)) {
+      if (!has(sen, CUT_RX)) continue;
+      const sP = has(sen, PARK_RX), sS = has(sen, STREET_RX);
+      let ctx = sP && !sS ? 'P' : 'S';
+      if (sP && sS) ctx = sen.search(PARK_RX) < sen.search(STREET_RX) ? 'P' : 'S';
+      for (const cl of sen.split(',')) {
+        if (has(cl, PARK_RX)) ctx = 'P'; else if (has(cl, STREET_RX)) ctx = 'S';
+        if (!has(cl, CUT_RX)) continue;
+        const lv = cutLevel(cl);
+        if (ctx === 'P') polP = Math.max(polP, lv); else polS = Math.max(polS, lv);
+      }
     }
     if (!polS && !polP) polS = pollard;
     pollard = Math.max(polS, polP);
@@ -79,7 +90,7 @@ for (const e of src) {
   if (has(v, /hầu như không có cây|gần như không có cây|không có cây thật|rất ít cây|không có cây xanh|không thấy cây/)) density = 0;
   // W3-G: + "một số cây", "lác đác", "ít cây lớn" (pano_147 Cát Cụt "một số cây thân gỗ vừa…" từng ra mật độ thường)
   // (không tính khi câu khác nói "hàng cây/nhiều cây/rợp…": "một cây đa cổ thụ" ở pano_400 là điểm nhấn, không phải thưa)
-  else if (has(v, /^ít cây|ít cây (lớn|xanh|đường phố|trên)|ít cây;|ít cây,|ít cây\.|ít cây$|rải rác|thưa|một cây|vài cây|một số cây|lác đác|lưa thưa/) && !has(v, /hàng cây|nhiều cây|rợp|dày đặc|xanh um|hai bên/)) density = 1;
+  else if (has(v, /^ít cây|ít cây (lớn|xanh|đường phố|trên)|ít cây;|ít cây,|ít cây\.|ít cây$|rải rác|thưa|một cây|vài cây|một số cây|lác đác|lưa thưa/) && !has(v, /hàng cây|nhiều (cây|cau|cọ|xà cừ|bàng|phượng|sấu)|rợp|dày đặc|xanh um|hai bên/)) density = 1;
   else if (has(v, /hàng cây|rợp|hai bên|dọc (hai|2) bên|tán (rất )?rộng|cổ thụ|nhiều cây|dày đặc|xanh um/)) density = 3;
   const generic = has(v, /cây bóng mát|hàng cây|cây xanh|cây lớn|cây thân|cổ thụ|cây tán/) ? 1 : 0;
   if (!anySp && !generic && density > 1) density = 1;   // chỉ nói cây cảnh/cỏ → thưa

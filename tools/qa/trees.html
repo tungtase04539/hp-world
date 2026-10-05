@@ -25,14 +25,15 @@ sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.shadow.camera, { left: -60
 scene.add(sun); scene.add(sun.target);
 const ground = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), new THREE.MeshLambertMaterial({ color: 0xb9b2a2 }));
 ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
-const kinds = ['xacu', 'xacu', 'bang', 'bang', 'phuong', 'phuong', 'sau', 'banglang', 'cau', 'catcut', 'catcut', 'da', 'non'];
-const vari = [0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0];
+// W3-G: + topi (cây cảnh cắt tỉa: cầu lá / cây thế), me (me tây hero), lop (cắt trụi "bộ xương")
+const kinds = ['xacu', 'xacu', 'bang', 'bang', 'phuong', 'phuong', 'sau', 'banglang', 'cau', 'catcut', 'catcut', 'da', 'non', 'topi', 'topi', 'me', 'lop', 'lop'];
+const vari = [0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1];
 const row = Q.get('row') || 'all', far = Q.get('far') === '1';
 const z0 = far ? -260 : 0;
 let n = 0;
 kinds.forEach((k, i) => {
   if (row !== 'all' && row !== k) return;
-  const x = (n++) * (k === 'da' ? 22 : 14) - (row === 'all' ? 84 : 0) + (k === 'da' ? 5 : 0);
+  const x = (n++) * (k === 'da' || k === 'me' ? 22 : 14) - (row === 'all' ? 84 : 0) + (k === 'da' || k === 'me' ? 5 : 0);
   veg.plant(k, x, z0, { variant: vari[i], wash: i % 2, pit: 1, yaw: 0.3 + i, h: undefined, median: 1 });   // median: bỏ kiểm nhà/camera pano (trang QA đặt cây ở gốc toạ độ = Nhà hát)
 });
 const sys = veg.buildTrees(scene, { groundHeight: () => 0, R: 5000, facade: false });
