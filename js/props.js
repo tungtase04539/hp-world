@@ -1229,7 +1229,16 @@ export function buildProps(ctx) {
   const CAR_LEN = [4.5, 4.6, 3.9, 3.9, 4.8, 5.25];
   // lượt 1: gom ỨNG VIÊN (mọi kiểm tra) · lượt 2: lấy mẫu ĐỀU theo hash nếu vượt ngân sách (không "N đường đầu ăn hết")
   const carCand = [];
-  for (const S of sides) {
+  // W3-E: đi dọc TỪNG TUYẾN (byRoad: cùng phố + cùng bên, đoạn nối tiếp) — phần dư bước được MANG sang đoạn kế (trước: mỗi
+  // đoạn polyline tự bắt đầu lại ở 2-8 m và chừa 3 m cuối → phố cong bờ hồ chia đoạn 10-25 m gần như không còn chỗ đỗ:
+  // pano_028/033 Nguyễn Đức Cảnh ảnh thật kín ô tô phía nhà, game không chiếc nào trong 18 m)
+  const carSides = [];
+  for (const list of byRoad.values()) for (let i = 0; i < list.length; i++) {
+    const S = list[i], nx2 = list[i + 1];
+    carSides.push([S, i > 0 && list[i - 1].si === S.si - 1, nx2 && nx2.si === S.si + 1 && S.ux * nx2.ux + S.uz * nx2.uz > 0.978]);
+  }
+  let carry = 0;
+  for (const [S, cont, straightNext] of carSides) {
     const e0 = S.ev[(S.n / 2) | 0];
     const mx = S.ax + S.ux * S.L / 2, mz = S.az + S.uz * S.L / 2;
     const lvl = e0 ? e0[3] : (Math.hypot(mx, mz) < 900 ? 1 : 0);
@@ -1239,12 +1248,12 @@ export function buildProps(ctx) {
     // thự/khu dân cư kín ô tô 2 bên mà game trống); r không pano trong lõi 0,1 → 0,15.
     let fill = S.c === 'r' ? (e0 ? [0.0, 0.4, 0.75][lvl] : [0.0, 0.15, 0.15][lvl]) : [e0 ? 0.04 : 0.2, 0.42, 0.78][lvl];
     if (S.c === 'p' && !(e0 && e0[3] >= 1)) fill *= 0.7;   // đại lộ: bớt 30% — trừ khi pano thấy ô tô đỗ (005 Quang Trung)
-    if (fill <= 0) continue;
+    if (fill <= 0) { carry = 0; continue; }
     const roll = S.c === 'r';
     const lat = roll ? curbLine(S.c) - 0.05 : curbLine(S.c) - 0.95;
     const X = XS(S.c);
-    let s = 2 + hash3(S.ax, S.az + S.side, 101) * 6;
-    while (s < S.L - 3) {
+    let s = cont ? Math.max(0.3, carry) : 2 + hash3(S.ax, S.az + S.side, 101) * 6;
+    while (s < S.L - 0.5) {
       const x0 = S.ax + S.ux * s, z0 = S.az + S.uz * s;
       const hc = hash3(x0, z0, 102);
       const mu = hash3(x0, z0, 103);
@@ -1256,7 +1265,8 @@ export function buildProps(ctx) {
       const len = mi === 6 ? 11.4 : CAR_LEN[mi];
       if (hc > fill) { s += len + 2 + hash3(x0, z0, 104) * 9; continue; }
       const sc = s + len / 2;
-      if (sc > S.L - len / 2 - 1) break;
+      // xe phải nằm trọn trong đoạn (đầu xe chừa 1 m), trừ khi đoạn kế THẲNG hàng (< 12°): được chồm qua khớp tới 0,3 m cuối
+      if (sc > S.L - (straightNext ? 0.3 : len / 2 + 1)) break;
       const x = S.ax + S.ux * sc + S.nx * lat, z = S.az + S.uz * sc + S.nz * lat;
       // camera pano nằm giữa lòng đường: ô tô đỗ có ĐẦU XE sát camera che gần nửa khung hình mà ảnh thật ở đó trống
       // (đo: van 5,25 m trước pano_102 — tâm 8,5 m nhưng đầu xe ~6 m, ảnh thật không có xe) → kiểm tra viên nang (tâm
@@ -1298,6 +1308,7 @@ export function buildProps(ctx) {
       if (ok) carCand.push({ S, x, z, mi, len, roll, k0, k1, cov: mi < 6 && (roll || Math.hypot(x, z) > 700) && hash3(x, z, 110) < ((ec && (ec[9] & 64)) ? 0.35 : 0.06) });
       s += len + 0.7 + hash3(x0, z0, 107) * 1.6;
     }
+    carry = s - S.L;   // mang phần dư sang đoạn nối tiếp (âm = xe vừa bị chặn ở cuối đoạn → bắt đầu sát khớp)
   }
   const keepCar = Math.min(1, BUDGET.cars / Math.max(1, carCand.length));
   let nCars = 0;
