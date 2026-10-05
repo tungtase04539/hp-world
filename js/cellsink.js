@@ -20,6 +20,7 @@ import { claimBox } from './claims.js';
 import { BRAND_MAP, debrand } from './brands.js';
 import { PARKS } from './mapdata.js';
 import { LM_POLY } from './landmark_polys.js';
+import { guardCellPalette } from './cellfacade.js';   // Đợt 3 W3-C: palette guard nhà ô giữ lại
 import { clearanceReady, samplesFromHulls, evalShift, solveShift, sweepAssemblies, flushClearance, massOnStreet, minWidth, thinMeshOf, trimThinWall, corrCount, nearAnyRoad, nearestPano, CLEAR } from './clearance.js';   // Đợt 3 W2-A
 
 const _q = typeof location !== 'undefined' ? new URLSearchParams(location.search) : new URLSearchParams('');
@@ -893,6 +894,8 @@ function commitSink(sink, THREE, realScene, realFC, colliders, opts) {
   const tA0 = performance.now();
   if (live && opts.atlas !== false) atlas = atlasKept(items.filter((it) => !it.removed && it.kind !== 'sys'), sink.createdTex, THREE);
   if (atlas) atlas.ms = +(performance.now() - tA0).toFixed(1);
+  // W3-C: mảng tường/kính LỚN màu đặc của nhà giữ lại không được tô màu thương hiệu/kính tối cả mặt (js/cellfacade.js)
+  const palette = live ? guardCellPalette(items.filter((it) => !it.removed && it.kind !== 'sys'), THREE) : null;
   const tApply = performance.now();
   // 8) claim cho mọi nhà/công trình GIỮ LẠI
   let nClaims = 0;
@@ -929,7 +932,7 @@ function commitSink(sink, THREE, realScene, realFC, colliders, opts) {
     colliders: { cells: cols.length, removed: deadCol.size }, featuredClear: { cells: fcs.length, removed: deadFC.size },
     claims: nClaims, dups, bySection: bySec,
     tex: { calls: stats.texCalls, created: stats.texNew, keyHit: stats.texHit, drawn: stats.texDrawn, neverDrawn: stats.texSkipped, drawMs: +stats.texMs.toFixed(1), settleMs: +msTex.toFixed(1), kept: keptTex.size, keptBySize: [...keptTex].reduce((o, t) => { const k = t.name || (t.image ? t.image.width + "x" + t.image.height : "?"); o[k] = (o[k] || 0) + 1; return o; }, {}) }, materialsKept: keptMat.size,
-    memo: { hit: stats.memoHit, miss: stats.memoMiss }, atlas, brandHits: stats.brandHits,
+    memo: { hit: stats.memoHit, miss: stats.memoMiss }, atlas, palette, brandHits: stats.brandHits,
     clear: clr,   // W2-A: {moved:[[tên,loại,[x,z],dx,dz]], removed, stuck, ms}
     shops,
     // nhà ô GIỮ LẠI + bao lồi ô khối đặc (để WP2 CẮT footprint thật theo đa giác thay vì bỏ/giữ cả footprint)

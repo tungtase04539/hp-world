@@ -11,6 +11,9 @@
 // Thứ tự 255>191>128>64>0 có chủ ý: biên tường↔giữ-màu (khung, song sắt — phổ biến nhất) khi mipmap trộn chỉ đi qua
 // vùng "kính", KHÔNG đi qua vùng biển/chữ → mép cửa sổ ở xa không bị nhuộm màu biển hiệu.
 export const ATLAS_N = 8;
+// W3-C: atlas CAO hơn rộng — 8 cột × 12 hàng ô (2048×3072 / LITE 1024×1536; WebGL2 mip NPOT ổn, WebGL1 citygen tự tắt mip).
+// Ô vẫn 256 px (128 LITE) → mọi ô cũ giữ nguyên độ phân giải; 96 chỗ (63 cũ + ô mới W3-C).
+export const ATLAS_ROWS = 12;
 export const M_WALL = 255, M_GLASS = 191, M_KEEP = 128, M_SIGN = 64, M_TEXT = 0;
 export const MOD = {};          // tên mô-đun → chỉ số ô (ổn định theo thứ tự vẽ bên dưới)
 export const MODS = [];
@@ -159,6 +162,20 @@ function sillStreaks(x0, x1, ySill, k = 0.18) {
     }
   }
 }
+// W3-C: vệt ố MỀM chảy dọc — đậm ở đỉnh, nhạt dần xuống, mặt cắt ngang hình chuông + nhiễu (thay shade() chữ nhật cạnh
+// cứng: tường hồi từng ra "vạch sọc" như mã vạch, pano_175 h270)
+function softStreak(xc, w, yTop, len, k) {
+  const i0 = PX(xc - w), i1 = PX(xc + w), j0 = PY(Math.max(0, yTop - len)), j1 = PY(yTop);
+  for (let j = j0; j < j1; j++) {
+    const ym = (j + 0.5) / SY, fy = Math.max(0, 1 - (yTop - ym) / len);
+    let p = ((OY + j) * SIZE + OX + i0) * 4;
+    for (let i = i0; i < i1; i++, p += 4) {
+      const xm = (i + 0.5) / SX, dx = (xm - xc) / w;
+      const f = 1 - k * Math.exp(-dx * dx * 3) * (0.7 + 0.3 * vn(xm * 18 + OX * 0.1, ym * 2.5)) * Math.pow(fy, 0.6);
+      B[p] *= f; B[p + 1] *= f; B[p + 2] *= f;
+    }
+  }
+}
 // gờ sàn bê tông (dải đầu tầng) + bóng dưới gờ — giữ nhuộm màu tường
 function slab(y = 0, h = 0.2) {
   rect(0, y, CW, y + h, [236, 234, 228], M_WALL);
@@ -189,6 +206,35 @@ function glass(x0, y0, x1, y1, tone = 0, curtain = -1) {
     for (let i = i0; i < i1; i++, p += 4) {
       const d = ((i - i0) + (j - j0) * 0.7) / Math.max(1, w);
       if (d > 0.15 && d < 0.35) { B[p] += 18; B[p + 1] += 18; B[p + 2] += 18; }
+    }
+  }
+}
+// W3-C: kính PHẢN TRỜI (vách kính văn phòng/khách sạn): gradient sáng trên → sẫm dưới + mây loang mềm (nhiễu thấp tần)
+// — thay "khối kính đen" (G3 cũ: gradient tối, mask kính → shader không nhuộm, mặt khuất nắng ra gần đen).
+function skyGlass(x0, y0, x1, y1, top, bot, cl = 0.5) {
+  const i0 = PX(x0), i1 = PX(x1), j0 = PY(y0), j1 = PY(y1), hh = Math.max(1, j1 - j0);
+  for (let j = j0; j < j1; j++) {
+    const t = (j - j0) / hh;
+    let p = ((OY + j) * SIZE + OX + i0) * 4;
+    for (let i = i0; i < i1; i++, p += 4) {
+      const xm = (i + 0.5) / SX, ym = (j + 0.5) / SY;
+      const n = Math.max(0, vn(xm * 1.3 + OX * 0.013, ym * 1.9 + OY * 0.007) - 0.42) * cl * 110 + (hash3(OX + i, OY + j, 41) - 0.5) * 4;
+      B[p] = bot[0] + (top[0] - bot[0]) * t + n; B[p + 1] = bot[1] + (top[1] - bot[1]) * t + n; B[p + 2] = bot[2] + (top[2] - bot[2]) * t + n * 0.92;
+      B[p + 3] = M_GLASS;
+    }
+  }
+}
+// W3-C: lớp KÍNH TRONG phủ lên nội thất đã vẽ (thấy hàng bên trong + 1 lớp phản chiếu mỏng + vệt chéo) — G_GLASS cũ phủ
+// glass() kín → che mất hàng, thành mảng tối.
+function glaze(x0, y0, x1, y1, op = 0.3) {
+  const i0 = PX(x0), i1 = PX(x1), j0 = PY(y0), j1 = PY(y1), w = Math.max(1, i1 - i0), hh = Math.max(1, j1 - j0);
+  for (let j = j0; j < j1; j++) {
+    const t = (j - j0) / hh, sr = 118 + 70 * t, sg = 132 + 70 * t, sb = 146 + 66 * t;
+    let p = ((OY + j) * SIZE + OX + i0) * 4;
+    for (let i = i0; i < i1; i++, p += 4) {
+      const d = ((i - i0) + (j - j0) * 0.7) / w, st = d > 0.18 && d < 0.34 ? 0.12 : 0;
+      const o = op + st;
+      B[p] += (sr - B[p]) * o; B[p + 1] += (sg - B[p + 1]) * o; B[p + 2] += (sb - B[p + 2]) * o; B[p + 3] = M_GLASS;
     }
   }
 }
@@ -248,11 +294,14 @@ function plants(x0, x1, y) {
   }
   for (let x = x0 + 0.2; x < x1 - 0.2; x += R(0.5, 0.9)) rect(x, y, x + 0.3, y + 0.25, [150, 80, 50], M_KEEP);
 }
+// W3-C (RAINBOW): quần áo phơi màu NGẪU NHIÊN bão hoà (R(60,240) mỗi kênh) ra dải hồng/tím/xanh chói ở tầng trên khi nhìn
+// xa → bảng màu quần áo THẬT (xanh than, trắng ngà, đen, kaki, nâu đỏ, jean, hồng phai, ô liu), xỉn, thưa hơn.
+const CLOTHES = [[52, 58, 72], [196, 194, 186], [38, 38, 40], [150, 138, 112], [116, 64, 58], [84, 104, 128], [176, 150, 146], [104, 112, 92], [210, 206, 196], [70, 74, 84]];
 function laundry(x0, x1, y) {
   hline(y, x0, x1, 0.012, [80, 80, 80], M_KEEP);
-  for (let x = x0 + 0.1; x < x1 - 0.3; x += R(0.25, 0.45)) {
-    const w = R(0.18, 0.4), h = R(0.3, 0.7);
-    rect(x, y - h, x + w, y, [R(60, 240), R(60, 230), R(60, 230)], M_KEEP);
+  for (let x = x0 + 0.15; x < x1 - 0.3; x += R(0.4, 0.7)) {
+    const w = R(0.16, 0.34), h = R(0.28, 0.6), c = CLOTHES[(rnd() * CLOTHES.length) | 0], k = R(0.78, 1.0);
+    rect(x, y - h, x + w, y, [c[0] * k, c[1] * k, c[2] * k], M_KEEP);
   }
 }
 // nội thất tối (cửa hàng/lô gia): gradient + sàn gạch
@@ -262,7 +311,8 @@ function interior(x0, y0, x1, y1, lit = 0) {
   for (let x = x0; x < x1; x += 0.4) vline(x, y0, y0 + 0.35, 0.01, [90, 84, 76], M_KEEP);
 }
 // kệ hàng + hàng hoá (hộp/thùng/bao nhiều màu nhưng XỈN — không "confetti")
-const GOODS = [[180, 60, 50], [200, 160, 60], [60, 110, 160], [230, 220, 200], [90, 140, 80], [160, 120, 90], [210, 120, 60], [120, 90, 140], [235, 235, 230]];
+// W3-C: hàng hoá XỈN hơn + nhiều thùng các-tông/bao bì trung tính (trước: 9 màu bão hoà → "giá sách cầu vồng" mọi cửa hàng)
+const GOODS = [[160, 72, 60], [190, 158, 84], [70, 104, 140], [222, 214, 196], [96, 128, 86], [168, 132, 96], [186, 120, 74], [176, 150, 116], [214, 212, 206], [150, 120, 88], [120, 116, 108]];
 function shelves(x0, y0, x1, y1) {
   for (let y = y0 + 0.4; y < y1 - 0.2; y += 0.42) {
     rect(x0, y, x1, y + 0.04, [110, 100, 90], M_KEEP);
@@ -283,7 +333,11 @@ const SB_FULL = [0.05, 3.95];
 export const SIGN_EXT = {
   G_SHOP0: SB_FULL, G_SHOP1: SB_FULL, G_SHOP2: SB_FULL, G_SHOP3: SB_FULL, G_SHUT0: SB_FULL, G_SHUT1: SB_FULL,
   G_GLASS: SB_FULL, G_GATE: SB_FULL, G_OLD: [0.5, 3.5], G_MOTO: SB_FULL, G_ELEC: SB_FULL, G_HARD: SB_FULL,
+  // W3-C: trệt mở theo loại hàng + showroom (cùng dải biển đầy bay)
+  G_SHOW: SB_FULL, G_OPEN0: SB_FULL, G_OPEN1: SB_FULL, G_OPEN2: SB_FULL, G_FOOD: SB_FULL,
 };
+// W3-C: biển bảng lớn nhiều tầng (PANEL0.. 2 dải 4×2 m/ô), biển dọc (BLADE0.. 4 dải 1×4 m/ô), biển trên mái (BILL0.. 2 dải/ô)
+export const PANEL_CELLS = 3, BLADE_CELLS = 2, BILL_CELLS = 2;
 function signBand(x0 = SB_FULL[0], x1 = SB_FULL[1]) {
   rect(x0, SIGN_Y[0], x1, SIGN_Y[1], [236, 236, 236], M_SIGN);
   rect(x0, SIGN_Y[0], x1, SIGN_Y[0] + 0.05, [70, 70, 72], M_KEEP); rect(x0, SIGN_Y[1] - 0.05, x1, SIGN_Y[1], [70, 70, 72], M_KEEP);
@@ -319,13 +373,16 @@ function textMask(lines, w, h) {
   return out;   // hàng 0 = TRÊN
 }
 // chép mặt nạ chữ vào vùng (mét): chữ = màu col + mặt nạ m
-function blitText(mask, mw, mh, x0, y0, x1, y1, col, m) {
+function blitText(mask, mw, mh, x0, y0, x1, y1, col, m, op = 1) {
   if (!mask) { hline((y0 + y1) / 2, x0 + (x1 - x0) * 0.15, x1 - (x1 - x0) * 0.15, (y1 - y0) * 0.35, col, m); return; }
   const i0 = PX(x0), i1 = PX(x1), j0 = PY(y0), j1 = PY(y1);
   for (let j = j0; j < j1; j++) for (let i = i0; i < i1; i++) {
     const sx = Math.min(mw - 1, (((i - i0) + 0.5) / (i1 - i0) * mw) | 0), sy = Math.min(mh - 1, ((1 - ((j - j0) + 0.5) / (j1 - j0)) * mh) | 0);
     const a = mask[sy * mw + sx] / 255; if (a < 0.35) continue;
-    const p = ((OY + j) * SIZE + OX + i) * 4; B[p] = col[0]; B[p + 1] = col[1]; B[p + 2] = col[2]; B[p + 3] = m;
+    const p = ((OY + j) * SIZE + OX + i) * 4;
+    if (op >= 1) { B[p] = col[0]; B[p + 1] = col[1]; B[p + 2] = col[2]; }
+    else { B[p] += (col[0] - B[p]) * op; B[p + 1] += (col[1] - B[p + 1]) * op; B[p + 2] += (col[2] - B[p + 2]) * op; }   // sơn phai (W3-C)
+    if (m >= 0) B[p + 3] = m;
   }
 }
 
@@ -335,7 +392,8 @@ function blitText(mask, mw, mh, x0, y0, x1, y1, col, m) {
 export function buildFacadeAtlas(size = 2048, opts = {}) {
   const t0 = typeof performance !== 'undefined' ? performance.now() : 0;
   _layoutOnly = !!opts.layoutOnly;
-  SIZE = size; C = size / ATLAS_N; B = _layoutOnly ? null : new Uint8ClampedArray(size * size * 4);   // Clamped: cộng sáng/bóng không tràn
+  SIZE = size; C = size / ATLAS_N; const HGT = C * ATLAS_ROWS;   // ảnh size × HGT (hàng = SIZE px)
+  B = _layoutOnly ? null : new Uint8ClampedArray(size * HGT * 4);   // Clamped: cộng sáng/bóng không tràn
   for (const k in _bases) delete _bases[k];
   MODS.length = 0; for (const k in MOD) delete MOD[k];
   const UPH = 3.3, GH = 3.9, W4 = 4;
@@ -449,7 +507,7 @@ export function buildFacadeAtlas(size = 2048, opts = {}) {
   });
   // =================== VĂN PHÒNG / KHÁCH SẠN KÍNH ===================
   cell('U_CURT0', W4, UPH, () => {     // vách kính xanh lục + đố nhôm
-    glass(0, 0, W4, UPH, 1, -1); glass(0, 0.0, W4, 0.6, 3, -1);
+    skyGlass(0, 0.6, W4, UPH, [172, 200, 198], [92, 120, 122], 0.55); vgrad(0, 0, W4, 0.6, [96, 118, 120], [80, 100, 104], M_KEEP, 3);   // W3-C: kính xanh lục PHẢN TRỜI (trước: gradient tối)
     for (const x of [0, 1.33, 2.66, 4]) vline(x, 0, UPH, 0.08, [180, 186, 190], M_KEEP);
     hline(0.6, 0, W4, 0.07, [180, 186, 190], M_KEEP); hline(0.04, 0, W4, 0.08, [150, 156, 160], M_KEEP);
   });
@@ -487,14 +545,14 @@ export function buildFacadeAtlas(size = 2048, opts = {}) {
   cell('G_SHOP0', W4, GH, () => {      // tạp hoá/cửa hàng mở: kệ hàng hai bên + đèn tuýp
     groundWall(0.2); threshold();
     interior(0.15, 0.14, 3.85, 2.8, 6); shelves(0.2, 0.14, 1.4, 2.7); shelves(2.6, 0.14, 3.8, 2.7);
-    for (let k = 0; k < 7; k++) { const x = R(1.5, 2.4), y = R(0.15, 0.9); rect(x, y, x + R(0.3, 0.6), y + R(0.25, 0.5), GOODS[(rnd() * 9) | 0], M_KEEP); }  // thùng hàng giữa lối
+    for (let k = 0; k < 7; k++) { const x = R(1.5, 2.4), y = R(0.15, 0.9); rect(x, y, x + R(0.3, 0.6), y + R(0.25, 0.5), GOODS[(rnd() * GOODS.length) | 0], M_KEEP); }  // thùng hàng giữa lối
     tubeLight(0.3, 3.7, 2.6); shutterBox(0.12, 3.88, 2.8); signBand();
   });
   cell('G_SHOP1', W4, GH, () => {      // shop quần áo: giá treo + ma-nơ-canh
     groundWall(0.15); threshold();
     interior(0.15, 0.14, 3.85, 2.8, 14);
     hline(2.25, 0.3, 3.7, 0.03, [180, 180, 180], M_KEEP);
-    for (let x = 0.35; x < 3.6; x += R(0.12, 0.2)) { const c = GOODS[(rnd() * 9) | 0]; rect(x, R(1.2, 1.5), x + 0.1, 2.24, c, M_KEEP); }
+    for (let x = 0.35; x < 3.6; x += R(0.12, 0.2)) { const c = GOODS[(rnd() * GOODS.length) | 0]; rect(x, R(1.2, 1.5), x + 0.1, 2.24, c, M_KEEP); }
     for (const x of [0.8, 3.0]) { rect(x - 0.12, 0.14, x + 0.12, 1.75, [210, 200, 190], M_KEEP); disc(x, 1.85, 0.12, [215, 205, 195], M_KEEP); }
     tubeLight(0.3, 3.7, 2.65); shutterBox(0.12, 3.88, 2.8); signBand();
   });
@@ -509,7 +567,7 @@ export function buildFacadeAtlas(size = 2048, opts = {}) {
   cell('G_SHOP3', W4, GH, () => {      // nhà thuốc/minimart: nội thất sáng, kệ trắng, cửa kính 1 phần
     groundWall(0.1); threshold();
     vgrad(0.15, 0.14, 3.85, 2.8, [210, 214, 212], [176, 178, 174], M_KEEP, 4);
-    for (let y = 0.5; y < 2.5; y += 0.4) { rect(0.2, y, 3.8, y + 0.04, [240, 240, 240], M_KEEP); for (let x = 0.25; x < 3.7; x += R(0.12, 0.3)) rect(x, y + 0.04, x + 0.1, y + R(0.15, 0.3), GOODS[(rnd() * 9) | 0], M_KEEP); }
+    for (let y = 0.5; y < 2.5; y += 0.4) { rect(0.2, y, 3.8, y + 0.04, [240, 240, 240], M_KEEP); for (let x = 0.25; x < 3.7; x += R(0.12, 0.3)) rect(x, y + 0.04, x + 0.1, y + R(0.15, 0.3), GOODS[(rnd() * GOODS.length) | 0], M_KEEP); }
     glass(2.4, 0.14, 3.85, 2.7, 0, -1); frame(2.4, 0.14, 3.85, 2.7, FR_SILVER, 0.06, 2);
     tubeLight(0.3, 3.7, 2.65); signBand();
   });
@@ -524,8 +582,8 @@ export function buildFacadeAtlas(size = 2048, opts = {}) {
   cell('G_GLASS', W4, GH, () => {      // mặt kính cửa hàng hiện đại
     groundWall(0.1); threshold();
     interior(0.15, 0.14, 3.85, 2.8, 30);
-    for (let k = 0; k < 10; k++) { const x = R(0.3, 3.5), y = R(0.15, 1.6); rect(x, y, x + R(0.12, 0.35), y + R(0.15, 0.6), GOODS[(rnd() * 9) | 0], M_KEEP, 0.7); }
-    glass(0.15, 0.14, 3.85, 2.8, 0, -1); frame(0.15, 0.14, 3.85, 2.8, [56, 58, 60], 0.08, 3); vline(2.0, 0.14, 2.3, 0.04, [200, 200, 200], M_KEEP);
+    for (let k = 0; k < 10; k++) { const x = R(0.3, 3.5), y = R(0.15, 1.6); rect(x, y, x + R(0.12, 0.35), y + R(0.15, 0.6), GOODS[(rnd() * GOODS.length) | 0], M_KEEP, 0.7); }
+    glaze(0.15, 0.14, 3.85, 2.8, 0.3); frame(0.15, 0.14, 3.85, 2.8, [56, 58, 60], 0.08, 3); vline(2.0, 0.14, 2.3, 0.04, [200, 200, 200], M_KEEP);   // W3-C: kính TRONG (thấy hàng)
     signBand();
   });
   cell('G_GATE', W4, GH, () => {       // cửa xếp sắt kéo một nửa
@@ -604,7 +662,7 @@ export function buildFacadeAtlas(size = 2048, opts = {}) {
     WALL(0.5);
     const bx = R(0.4, 1.4), by = R(0.3, 1.2), bw = R(1.4, 2.2), bh = R(0.9, 1.5);
     for (let y = by; y < by + bh; y += 0.075) for (let x = bx + ((Math.round(y / 0.075) % 2) * 0.11); x < bx + bw; x += 0.22) {
-      const r = R(128, 168); rect(x, y, x + 0.2, y + 0.062, [r, r * 0.5, r * 0.38], M_KEEP);
+      const r = R(112, 150); rect(x, y, x + 0.2, y + 0.062, [r, r * 0.6, r * 0.48], M_KEEP);   // W3-C: gạch nung XỈN (cam chói → nâu đỏ cũ)
       rect(x + 0.2, y, x + 0.22, y + 0.075, [150, 145, 135], M_KEEP); rect(x, y + 0.062, x + 0.22, y + 0.075, [150, 145, 135], M_KEEP);
     }
   });
@@ -762,8 +820,288 @@ export function buildFacadeAtlas(size = 2048, opts = {}) {
     rect(0.2, 0.14, 1.3, 0.5, [196, 186, 160], M_KEEP); hline(0.32, 0.2, 1.3, 0.02, [160, 150, 128], M_KEEP);   // bao tải
     tubeLight(0.3, 3.7, 2.62); shutterBox(0.12, 3.88, 2.8); signBand();
   });
+
+  // ======================================================================================
+  // W3-C FACADES (Đợt 3 wave 3, AUDIT3 FP-3 + FP-8): TỪ VỰNG MẶT TIỀN MỚI — đặt SAU G_HARD → chỉ số mọi ô cũ GIỮ NGUYÊN.
+  // Thuộc địa Pháp / tân cổ điển, tập thể xuống cấp, đang xây (khung + lưới + rào tôn), kính phản trời / kính sẫm khung trắng,
+  // ốp alu, cao tầng hiện đại, cây leo, trệt MỞ theo loại hàng (cà phê, quần áo, đồ gỗ, quán ăn, showroom), tường hồi lộ
+  // (ố/xi măng thô/quảng cáo sơn), mái hiên TÔN, biển bảng lớn nhiều tầng, biển dọc, biển quảng cáo trên mái. Từ CHUNG, 0 thương hiệu.
+  // ======================================================================================
+  const OCH_L = [246, 240, 226];   // gờ/phào/khung vữa sáng (nhuộm màu nhà)
+  const pilaster = (x0, x1, y0 = 0, y1 = UPH) => { rect(x0, y0, x1, y1, OCH_L, M_WALL); shade(x1, y0, Math.min(CW, x1 + 0.06), y1, 0.74); shade(x0, y0, x0 + 0.03, y1, 0.9); };
+  const louvre = (x0, y0, x1, y1, col) => {
+    const d = [col[0] * 0.66, col[1] * 0.66, col[2] * 0.66];
+    rect(x0, y0, x1, y1, col, M_KEEP);
+    for (let y = y0 + 0.06; y < y1 - 0.04; y += 0.07) hline(y, x0 + 0.04, x1 - 0.04, 0.022, d, M_KEEP);
+    rect(x0, y0, x1, y0 + 0.04, d, M_KEEP); rect(x0, y1 - 0.04, x1, y1, d, M_KEEP); vline(x0 + 0.02, y0, y1, 0.04, d, M_KEEP); vline(x1 - 0.02, y0, y1, 0.04, d, M_KEEP);
+  };
+  const SHUT_C = [[58, 96, 72], [64, 92, 104], [98, 70, 50], [70, 104, 84], [52, 84, 66]];
+  const column = (xc, w, y0, y1) => {     // cột tròn: thân sáng + rãnh soi + bóng khối tròn
+    vgrad(xc - w / 2, y0, xc + w / 2, y1, [246, 244, 238], [236, 234, 228], M_WALL, 3);
+    shade(xc + w * 0.18, y0, xc + w / 2, y1, 0.8); shade(xc - w / 2, y0, xc - w * 0.36, y1, 0.9);
+    for (let k = -2; k <= 2; k++) vline(xc + k * w * 0.16, y0 + 0.12, y1 - 0.12, 0.012, [204, 200, 192], M_WALL);
+    rect(xc - w / 2 - 0.06, y1 - 0.16, xc + w / 2 + 0.06, y1, [248, 246, 240], M_WALL); rect(xc - w / 2 - 0.06, y0, xc + w / 2 + 0.06, y0 + 0.14, [240, 238, 232], M_WALL);
+  };
+  // ---- thuộc địa Pháp (Điện Biên Phủ, Hoàng Văn Thụ, Minh Khai, Lý Tự Trọng, Tam Bạc...) ----
+  cell('U_COL0', W4, UPH, () => {      // trụ áp tường + gờ đầu tầng + cửa sổ CAO khung vữa, 2 cánh chớp lật mở nửa, lan can sắt Juliet
+    WALL(0.75); slab(0, 0.16);
+    pilaster(0, 0.3); pilaster(3.7, 4.0);
+    rect(0, 2.98, W4, UPH, OCH_L, M_WALL); shade(0, 2.9, W4, 2.98, 0.66); hline(3.14, 0, W4, 0.03, [214, 208, 196], M_WALL);
+    rect(1.16, 0.32, 2.84, 2.82, OCH_L, M_WALL); shade(2.84, 0.32, 2.91, 2.82, 0.72);
+    interior(1.3, 0.42, 2.7, 2.66, -6); glass(1.62, 0.95, 2.38, 2.6, 2, -1); frame(1.3, 0.42, 2.7, 2.66, [86, 70, 56], 0.06, 2, 2);
+    const sc = SHUT_C[(rnd() * SHUT_C.length) | 0];
+    louvre(1.3, 0.42, 1.64, 2.66, sc); louvre(2.36, 0.42, 2.7, 2.66, sc);
+    rect(1.88, 2.66, 2.12, 2.88, [250, 246, 236], M_WALL);   // đá đỉnh
+    railing(1.24, 2.76, 0.42, 0.78, IRON_D, 0);
+    sill(1.3, 2.7, 0.42); sillStreaks(1.24, 2.76, 0.34, 0.35);
+  });
+  cell('U_COL1', W4, UPH, () => {      // cửa đi VÒM + ô kính quạt + ban công sắt hoa văn trên bậu đá
+    WALL(0.7); slab(0, 0.16);
+    pilaster(0, 0.26); pilaster(3.74, 4.0);
+    rect(0, 3.02, W4, UPH, OCH_L, M_WALL); shade(0, 2.95, W4, 3.02, 0.66);
+    archFill(1.0, 0.2, 3.0, 2.94, OCH_L, M_WALL);
+    archFill(1.12, 0.22, 2.88, 2.84, [40, 38, 36], M_KEEP);
+    archFill(1.18, 2.0, 2.82, 2.78, [100, 112, 116], M_GLASS);
+    const sc = SHUT_C[(rnd() * SHUT_C.length) | 0];
+    louvre(1.16, 0.22, 1.98, 1.98, sc); glass(2.02, 0.3, 2.84, 1.95, 2, -1); frame(2.0, 0.22, 2.86, 1.98, sc, 0.07, 1, 3);
+    hline(1.99, 1.12, 2.88, 0.06, [80, 66, 52], M_KEEP);
+    rect(0.72, 0.12, 3.28, 0.28, [238, 234, 224], M_WALL); shade(0.72, 0.04, 3.28, 0.12, 0.6);
+    grille(0.78, 0.28, 3.22, 1.18, IRON_D, 2); hline(1.2, 0.76, 3.24, 0.06, IRON_D, M_KEEP);
+  });
+  cell('U_NEO', W4, UPH, () => {       // tân cổ điển TRẮNG (công sở/ngân hàng khu Pháp): cột ở 2 mép bay (ghép = 1 cột) + cửa sổ trán tam giác
+    WALL(0.4); slab(0, 0.2);
+    column(0.0, 0.62, 0.2, 2.95); column(4.0, 0.62, 0.2, 2.95);
+    rect(0, 2.95, W4, UPH, [248, 246, 240], M_WALL); shade(0, 2.88, W4, 2.95, 0.62); hline(3.1, 0, W4, 0.03, [206, 202, 194], M_WALL);
+    rect(1.15, 0.45, 2.85, 2.4, [248, 246, 240], M_WALL); shade(2.85, 0.45, 2.92, 2.4, 0.72);
+    reveal(1.28, 0.55, 2.72, 2.3); glass(1.28, 0.55, 2.72, 2.3, 0, 3); frame(1.28, 0.55, 2.72, 2.3, FR_WHITE, 0.06, 2, 3);
+    for (let j = 0; j < 12; j++) { const t = j / 12, y = 2.44 + t * 0.4, hw = 0.95 * (1 - t); rect(2 - hw, y, 2 + hw, y + 0.04, [250, 248, 242], M_WALL); }
+    shade(1.05, 2.4, 2.95, 2.44, 0.7);
+    sill(1.28, 2.72, 0.55); sillStreaks(1.28, 2.72, 0.47, 0.2);
+  });
+  // ---- tập thể xuống cấp, đang xây ----
+  cell('U_TEN', W4, UPH, () => {       // tập thể cũ: lồng sắt cơi nới gỉ, mảng tôn vá, đồ phơi xỉn, chậu cây, ố đen
+    WALL(0.95); slab(0, 0.16);
+    interior(0.3, 0.25, 3.7, 2.9, -4);
+    glass(0.7, 1.0, 2.0, 2.4, 2, 1); frame(0.7, 1.0, 2.0, 2.4, [96, 84, 70], 0.05, 2);
+    rect(2.3, 0.25, 3.7, 1.7, [118, 128, 132], M_KEEP); for (let x = 2.32; x < 3.68; x += 0.12) vline(x, 0.25, 1.7, 0.04, [92, 100, 104], M_KEEP);
+    laundry(0.35, 3.65, 2.75); plants(0.35, 2.2, 0.28);
+    const col = [74, 62, 54];
+    for (let x = 0.3; x <= 3.71; x += 0.12) vline(x, 0.25, 2.95, 0.022, col, M_KEEP);
+    for (let y = 0.25; y <= 2.96; y += 0.55) hline(y, 0.3, 3.7, 0.04, col, M_KEEP);
+    for (let k = 0; k < 6; k++) softStreak(R(0.1, 3.9), R(0.04, 0.12), R(1.6, 2.9), R(0.8, 2.2), R(0.2, 0.36));   // vệt gỉ/ố chảy
+  });
+  cell('U_CONS', W4, UPH, () => {      // ĐANG XÂY: khung bê tông thô, tường gạch xây dở, lưới che xanh một phần, ống giàn giáo
+    wallBase('cem', 168, 0.7, M_KEEP);
+    interior(0.32, 0.34, 3.68, 2.95, -14);
+    const by = R(0.7, 1.4);
+    for (let y = 0.34; y < 0.34 + by; y += 0.075) for (let x = 0.32 + ((Math.round(y / 0.075) % 2) * 0.11); x < 3.68; x += 0.22) {
+      const r = R(118, 152); rect(x, y, Math.min(3.68, x + 0.2), y + 0.062, [r, r * 0.58, r * 0.46], M_KEEP);
+    }
+    shade(0.32, 2.75, 3.68, 2.95, 0.6);
+    rect(2.2, 0, W4, UPH, [46, 112, 68], M_KEEP, 0.78); for (let y = 0; y < UPH; y += 0.16) hline(y, 2.2, W4, 0.012, [30, 80, 48], M_KEEP);
+    for (const x of [0.15, 3.85]) vline(x, 0, UPH, 0.05, [120, 124, 130], M_KEEP);
+    hline(1.65, 0, W4, 0.05, [120, 124, 130], M_KEEP); hline(0.05, 0, W4, 0.05, [120, 124, 130], M_KEEP);
+  });
+  cell('U_NET', W4, UPH, () => {       // ĐANG XÂY: phủ kín lưới che (xanh lá/ đen) — thấy lờ mờ khung + giàn giáo phía sau
+    wallBase('cem', 168, 0.7, M_KEEP); interior(0.3, 0.3, 3.7, 2.95, -10);
+    vgrad(0, 0, W4, UPH, [52, 116, 74], [40, 96, 60], M_KEEP, 6);
+    for (let y = 0; y < UPH; y += 0.14) hline(y, 0, W4, 0.012, [30, 76, 46], M_KEEP);
+    for (let x = 0; x < W4; x += 0.14) vline(x, 0, UPH, 0.012, [34, 84, 50], M_KEEP);
+    for (const x of [0.6, 2.6]) shade(x, 0, x + 0.08, UPH, 0.7);
+    shade(0, 0.0, W4, 0.25, 0.75); shade(0, 1.6, W4, 1.68, 0.8);
+  });
+  // ---- kính/hiện đại ----
+  cell('U_CURT2', W4, UPH, () => {     // vách kính PHẢN TRỜI sáng + đố nhôm sáng + dải spandrel (hết "khối kính đen")
+    for (let p = 0; p < 3; p++) { const x0 = (p * 4) / 3, k = R(0.9, 1.06); skyGlass(x0, 0.85, x0 + 4 / 3, UPH, [200 * k, 216 * k, 228 * k], [120 * k, 142 * k, 160 * k], 0.6); }
+    vgrad(0, 0, W4, 0.85, [108, 122, 136], [88, 100, 114], M_KEEP, 3);
+    for (const x of [0, 4 / 3, 8 / 3, 4]) vline(x, 0, UPH, 0.07, [206, 210, 214], M_KEEP);
+    hline(0.85, 0, W4, 0.06, [206, 210, 214], M_KEEP); hline(0.03, 0, W4, 0.06, [176, 180, 184], M_KEEP); hline(2.3, 0, W4, 0.035, [196, 200, 204], M_KEEP);
+  });
+  cell('U_CURT3', W4, UPH, () => {     // kính sẫm + khung TRẮNG dày (ngân hàng/showroom) — luôn thấy lưới khung
+    skyGlass(0, 0, W4, UPH, [122, 138, 150], [56, 66, 76], 0.45);
+    for (const x of [0, 1, 2, 3, 4]) vline(x, 0, UPH, 0.11, [232, 232, 228], M_KEEP);
+    for (const y of [0.05, 1.15, 3.25]) hline(y, 0, W4, 0.1, [232, 232, 228], M_KEEP);
+    shade(0, 3.12, W4, 3.2, 0.7);
+  });
+  cell('U_ACP', W4, UPH, () => {       // ỐP ALU nhà phố cải tạo: tấm phẳng (nhuộm màu nhà) + mạch ghép + băng kính ngang
+    vgrad(0, 0, W4, UPH, [240, 240, 238], [228, 228, 226], M_WALL, 2);
+    for (const x of [0, 1.0, 2.0, 3.0, 4.0]) vline(x, 0, UPH, 0.025, [172, 174, 176], M_WALL);
+    for (const y of [0.02, 0.85, 2.45, 3.28]) hline(y, 0, W4, 0.025, [172, 174, 176], M_WALL);
+    skyGlass(0.08, 0.92, 3.92, 2.38, [178, 198, 210], [94, 112, 126], 0.45); frame(0.08, 0.92, 3.92, 2.38, [60, 62, 64], 0.05, 4, 1);
+    shade(0.08, 2.32, 3.92, 2.38, 0.7);
+  });
+  cell('U_TOWER', W4, UPH, () => {     // cao tầng hiện đại: cửa kính lớn + lan can KÍNH + gờ sàn dày + cục nóng
+    WALL(0.12); slab(0, 0.28);
+    skyGlass(0.35, 0.3, 3.0, 2.86, [188, 206, 218], [98, 116, 130], 0.5); frame(0.35, 0.3, 3.0, 2.86, [70, 72, 74], 0.05, 3, 1);
+    vgrad(0.2, 0.3, 3.2, 1.3, [184, 206, 210], [156, 180, 188], M_GLASS, 3); hline(1.3, 0.2, 3.2, 0.05, [206, 210, 212], M_KEEP);
+    acUnit(3.28, 0.34, 0.6, 0.42);
+  });
+  cell('U_VINE', W4, UPH, () => {      // tường cũ phủ CÂY LEO quanh cửa sổ (+ vài chấm hoa giấy)
+    WALL(0.7); slab();
+    reveal(1.2, 0.95, 2.8, 2.45); glass(1.2, 0.95, 2.8, 2.45, 2, 1); frame(1.2, 0.95, 2.8, 2.45, FR_BROWN, 0.06, 2);
+    for (let k = 0; k < 170; k++) {
+      const x = rnd() < 0.62 ? R(0, 1.35) : R(2.65, 4), y = R(0, UPH), g = R(0.72, 1.18);
+      disc(x, y, R(0.06, 0.17), [44 * g, 90 * g, 42 * g], M_KEEP);
+    }
+    for (let k = 0; k < 50; k++) disc(R(0, 4), R(2.5, UPH), R(0.05, 0.13), [50, 98, 46], M_KEEP);
+    for (let k = 0; k < 12; k++) disc(R(0, 1.3), R(0.2, UPH), 0.05, [190, 64, 118], M_KEEP);
+  });
+  // ---- trệt ----
+  cell('G_COL', W4, GH, () => {        // trệt thuộc địa: chân tường kẻ mạch đá, cửa VÒM cao 2 cánh gỗ pa-nô + ô quạt (không biển)
+    WALL(0.8); threshold();
+    for (let y = 0.5; y < GH; y += 0.42) { hline(y, 0, W4, 0.035, [200, 194, 182], M_WALL); shade(0, y - 0.05, W4, y - 0.017, 0.86); }
+    archFill(0.62, 0.14, 3.38, 3.45, OCH_L, M_WALL);
+    archFill(0.75, 0.14, 3.25, 3.35, [44, 40, 36], M_KEEP);
+    archFill(0.8, 2.56, 3.2, 3.3, [96, 106, 112], M_GLASS);
+    const sc = SHUT_C[(rnd() * SHUT_C.length) | 0], d = [sc[0] * 0.78, sc[1] * 0.78, sc[2] * 0.78];
+    for (const [x0, x1] of [[0.8, 1.98], [2.02, 3.2]]) { rect(x0, 0.14, x1, 2.5, sc, M_KEEP); rect(x0 + 0.12, 0.35, x1 - 0.12, 1.15, d, M_KEEP); rect(x0 + 0.12, 1.35, x1 - 0.12, 2.35, d, M_KEEP); }
+    hline(2.53, 0.75, 3.25, 0.06, [70, 58, 46], M_KEEP);
+    rect(1.88, 3.3, 2.12, 3.56, [250, 246, 236], M_WALL);
+    shade(0, 0, W4, 0.5, 0.84);
+  });
+  cell('G_NEO', W4, GH, () => {        // trệt tân cổ điển: bậc đá + cột tròn mép bay + cửa kính cao khung tối
+    WALL(0.4); rect(0, 0, W4, 0.42, [196, 192, 184], M_KEEP); hline(0.21, 0, W4, 0.02, [160, 156, 150], M_KEEP); hline(0.42, 0, W4, 0.03, [222, 218, 210], M_KEEP);
+    interior(0.55, 0.42, 3.45, 3.3, 10); glaze(0.6, 0.45, 3.4, 3.25, 0.4); frame(0.55, 0.42, 3.45, 3.3, [52, 50, 48], 0.07, 3, 2);
+    column(0.0, 0.7, 0.42, 3.55); column(4.0, 0.7, 0.42, 3.55);
+    rect(0, 3.55, W4, GH, [248, 246, 240], M_WALL); shade(0, 3.48, W4, 3.55, 0.6);
+  });
+  cell('G_HOARD', W4, GH, () => {      // rào TÔN công trường (xanh dương) + chữ sơn chung + khoang tầng trệt tối phía trên
+    vgrad(0, 0, W4, 2.6, [72, 110, 168], [54, 88, 142], M_KEEP, 4);
+    for (let x = 0; x < W4; x += 0.2) { vline(x, 0, 2.6, 0.05, [42, 72, 120], M_KEEP); vline(x + 0.08, 0, 2.6, 0.03, [98, 134, 188], M_KEEP); }
+    rect(0, 2.6, W4, 2.68, [200, 200, 200], M_KEEP);
+    interior(0, 2.68, W4, GH, -16);
+    for (const x of [0.2, 3.8]) vline(x, 2.68, GH, 0.28, [150, 150, 146], M_KEEP);
+    const t = textMask([{ t: 'ĐANG THI CÔNG', size: 0.46, y: 0.5 }], 512, 96);
+    blitText(t, 512, 96, 0.3, 1.3, 3.7, 2.05, [236, 236, 232], M_KEEP);
+    for (let k = 0; k < 5; k++) softStreak(R(0.1, 3.9), R(0.06, 0.2), R(0.6, 2.4), R(0.4, 1.6), R(0.12, 0.25));
+  });
+  cell('G_SHOW', W4, GH, () => {       // SHOWROOM kính trong: nội thất SÁNG, sàn bóng, hàng trên bục, đèn âm trần, khung đen mảnh
+    groundWall(0.1); threshold();
+    vgrad(0.1, 0.14, 3.9, 2.85, [236, 234, 230], [200, 198, 194], M_KEEP, 3);
+    rect(0.1, 0.14, 3.9, 0.5, [214, 210, 204], M_KEEP);
+    for (let k = 0; k < 3; k++) { const x = 0.45 + k * 1.15, c = GOODS[(rnd() * GOODS.length) | 0]; rect(x, 0.5, x + 0.72, 0.62, [242, 242, 240], M_KEEP); rect(x + 0.06, 0.62, x + 0.66, R(1.0, 1.5), c, M_KEEP); }
+    for (let x = 0.4; x < 3.7; x += 0.6) disc(x, 2.7, 0.06, [255, 252, 240], M_KEEP);
+    glaze(0.1, 0.14, 3.9, 2.85, 0.24); frame(0.1, 0.14, 3.9, 2.85, [38, 38, 40], 0.05, 2);
+    signBand();
+  });
+  cell('G_OPEN0', W4, GH, () => {      // quán CÀ PHÊ/ĂN mở (không cửa cuốn): ghế nhựa thấp, bàn inox, tủ mát, bảng thực đơn, đèn ấm
+    groundWall(0.3); threshold();
+    vgrad(0.12, 0.14, 3.88, 2.85, [96, 84, 68], [132, 116, 96], M_KEEP, 5);
+    rect(0.12, 0.14, 3.88, 0.42, [152, 142, 128], M_KEEP);
+    rect(2.95, 0.14, 3.72, 2.15, [196, 200, 204], M_KEEP); rect(3.02, 0.3, 3.65, 2.05, [214, 226, 230], M_KEEP);
+    for (let y = 0.45; y < 2.0; y += 0.38) { hline(y, 3.02, 3.65, 0.03, [170, 176, 180], M_KEEP); for (let x = 3.06; x < 3.6; x += 0.1) rect(x, y + 0.02, x + 0.06, y + 0.24, [120, 96, 70], M_KEEP); }
+    rect(0.35, 1.5, 1.6, 2.35, [42, 46, 42], M_KEEP); for (let y = 1.65; y < 2.25; y += 0.12) hline(y, 0.45, R(1.0, 1.5), 0.025, [220, 220, 210], M_KEEP);
+    for (const x of [0.5, 1.6]) { rect(x, 0.62, x + 0.75, 0.68, [196, 198, 200], M_KEEP); vline(x + 0.37, 0.14, 0.62, 0.05, [150, 152, 154], M_KEEP); }
+    for (const x of [0.35, 0.95, 1.45, 2.1, 2.55]) { const c = rnd() < 0.6 ? [176, 44, 40] : [44, 92, 160]; rect(x, 0.14, x + 0.26, 0.4, c, M_KEEP); }
+    for (const x of [0.9, 2.2]) disc(x, 2.62, 0.09, [255, 214, 150], M_KEEP);
+    shutterBox(0.12, 3.88, 2.8); signBand();
+  });
+  cell('G_OPEN1', W4, GH, () => {      // shop QUẦN ÁO/VẢI mở: giá treo đồ xỉn 2 tầng, cuộn vải trên kệ, ma-nơ-canh
+    groundWall(0.2); threshold();
+    interior(0.12, 0.14, 3.88, 2.85, 18);
+    for (const yy of [1.45, 2.5]) { hline(yy, 0.25, 2.6, 0.03, [170, 170, 170], M_KEEP); for (let x = 0.3; x < 2.55; x += R(0.1, 0.17)) { const c = CLOTHES[(rnd() * CLOTHES.length) | 0], k = R(0.8, 1.1); rect(x, yy - R(0.6, 0.85), x + 0.09, yy, [c[0] * k, c[1] * k, c[2] * k], M_KEEP); } }
+    for (let y = 0.4; y < 2.5; y += 0.42) { rect(2.75, y, 3.8, y + 0.03, [120, 104, 86], M_KEEP); for (let x = 2.78; x < 3.75; x += 0.16) { const c = GOODS[(rnd() * GOODS.length) | 0]; rect(x, y + 0.03, x + 0.14, y + 0.3, c, M_KEEP); } }
+    rect(2.95, 0.14, 3.15, 1.5, [214, 204, 194], M_KEEP); disc(3.05, 1.6, 0.1, [214, 204, 194], M_KEEP);
+    tubeLight(0.3, 3.7, 2.7); shutterBox(0.12, 3.88, 2.8); signBand();
+  });
+  cell('G_OPEN2', W4, GH, () => {      // ĐỒ GỖ/nội thất/đồ thờ: tủ gỗ nâu đỏ, bàn ghế, tủ thờ viền vàng, đèn
+    groundWall(0.25); threshold();
+    interior(0.12, 0.14, 3.88, 2.85, 6);
+    rect(0.25, 0.14, 1.45, 2.3, [106, 52, 36], M_KEEP); rect(0.32, 0.25, 0.83, 2.2, [124, 64, 44], M_KEEP); rect(0.87, 0.25, 1.38, 2.2, [124, 64, 44], M_KEEP); hline(2.3, 0.22, 1.48, 0.06, [190, 150, 70], M_KEEP);
+    rect(1.65, 0.14, 2.65, 0.75, [118, 60, 40], M_KEEP); rect(1.6, 0.75, 2.7, 0.82, [140, 74, 50], M_KEEP);
+    for (const x of [1.7, 2.45]) { rect(x, 0.14, x + 0.2, 1.05, [96, 48, 32], M_KEEP); }
+    rect(2.85, 0.14, 3.75, 1.8, [128, 40, 32], M_KEEP); hline(1.8, 2.82, 3.78, 0.05, [196, 156, 72], M_KEEP); rect(3.0, 1.0, 3.6, 1.6, [150, 54, 40], M_KEEP);
+    tubeLight(0.3, 3.7, 2.66); shutterBox(0.12, 3.88, 2.8); signBand();
+  });
+  cell('G_FOOD', W4, GH, () => {       // quán ĂN mặt tiền: quầy inox + nồi to, tủ kính đồ ăn, bàn ghế phía trong, đèn
+    groundWall(0.3); threshold();
+    vgrad(0.12, 0.14, 3.88, 2.85, [104, 92, 76], [136, 122, 104], M_KEEP, 5);
+    rect(0.2, 0.14, 1.9, 1.0, [184, 188, 192], M_KEEP); hline(1.0, 0.18, 1.92, 0.05, [210, 214, 218], M_KEEP);
+    rect(0.35, 1.05, 0.9, 1.5, [160, 164, 168], M_KEEP); rect(1.05, 1.05, 1.7, 1.42, [150, 154, 158], M_KEEP); shade(0.35, 1.05, 1.7, 1.2, 0.8);
+    rect(0.25, 1.55, 1.85, 2.1, [210, 220, 222], M_KEEP); for (let x = 0.35; x < 1.75; x += 0.3) rect(x, 1.62, x + 0.2, 1.8, [200, 150, 90], M_KEEP);
+    for (const x of [2.2, 3.0]) { rect(x, 0.62, x + 0.6, 0.68, [170, 120, 80], M_KEEP); }
+    for (const x of [2.1, 2.55, 2.95, 3.45]) rect(x, 0.14, x + 0.24, 0.4, rnd() < 0.5 ? [176, 44, 40] : [44, 92, 160], M_KEEP);
+    tubeLight(0.3, 3.7, 2.66); shutterBox(0.12, 3.88, 2.8); signBand();
+  });
+  // ---- tường hồi/hông LỘ ra phố (W3-C "không tường trống") ----
+  cell('S_EXP0', W4, UPH, () => {      // tường hồi phơi mưa: ố đen chảy dọc, rêu chân, mảng ẩm, 2 lỗ thông gió song sắt
+    WALL(0.95);
+    for (let k = 0; k < 9; k++) softStreak(R(0.1, 3.9), R(0.05, 0.22), UPH, R(0.8, 3.1), R(0.16, 0.34));
+    softStreak(2.0, 3.0, 0.5, 0.5, 0.12);
+    for (const x of [0.7, 2.9]) if (rnd() < 0.7) { const y = R(1.6, 2.3); rect(x, y, x + 0.42, y + 0.32, [40, 38, 36], M_KEEP); for (let k = 1; k < 5; k++) vline(x + k * 0.084, y, y + 0.32, 0.02, [150, 146, 140], M_KEEP); }
+  });
+  cell('S_EXP1', W4, UPH, () => {      // XI MĂNG THÔ (không sơn): cửa sổ nhỏ song sắt, cục nóng, ống thoát nước, vệt gỉ
+    wallBase('cem', 168, 0.7, M_KEEP);
+    for (let y = 0.5; y < UPH; y += R(0.6, 1.1)) shade(0, y, W4, y + 0.02, 0.9);
+    reveal(0.6, 1.3, 1.5, 2.25); glass(0.6, 1.3, 1.5, 2.25, 2, 0); frame(0.6, 1.3, 1.5, 2.25, [110, 104, 96], 0.05, 2); grille(0.6, 1.3, 1.5, 2.25, IRON_D, 0);
+    acUnit(2.2, 1.2, 0.72, 0.5); vline(3.55, 0, UPH, 0.08, [140, 140, 138], M_KEEP);
+    shade(3.48, 0, 3.75, 1.6, 0.8); shade(2.3, 0.2, 2.42, 1.2, 0.78);
+  });
+  cell('S_EXP2', W4, UPH, () => {      // QUẢNG CÁO SƠN PHAI trên tường hồi (từ CHUNG + SĐT 0000) — nét đặc trưng phố VN
+    WALL(0.6);
+    const t = textMask([{ t: ADS[0], size: 0.4, y: 0.32 }, { t: 'LH: 0000.226.688', size: 0.28, y: 0.76 }], 512, 128);
+    blitText(t, 512, 128, 0.1, 1.0, 3.9, 2.4, [40, 70, 150], M_KEEP, 0.78);
+    for (let k = 0; k < 5; k++) softStreak(R(0.1, 3.9), R(0.06, 0.2), UPH, R(0.8, 2.6), R(0.12, 0.26));
+  });
+  // ---- mái hiên TÔN (HP: tôn xanh dương chủ đạo; nhuộm màu tôn ở citygen) ----
+  cell('D_AWN2', 4, 1.6, () => {
+    for (let i = 0; i < C; i++) {
+      const xm = (i + 0.5) / SX, w = 0.5 + 0.5 * Math.cos((xm / 0.19) * Math.PI * 2), base = 176 + w * 54;
+      for (let j = 0; j < C; j++) { const p = ((OY + j) * SIZE + OX + i) * 4, n = (hash3(i, j, 23) - 0.5) * 6; B[p] = base + n; B[p + 1] = base + n; B[p + 2] = base + n; B[p + 3] = M_WALL; }
+    }
+    for (let k = 0; k < 8; k++) { const x = R(0, 4); shade(x, 0, x + R(0.05, 0.2), R(0.4, 1.4), R(0.72, 0.86)); }
+    shade(0, 0, 4, 0.06, 0.6);
+  });
+  // ---- BIỂN BẢNG LỚN phủ tầng 1-2 (phố thương mại p/s): 3 ô × 2 dải 4×2 m. Nền M_SIGN (nhuộm màu biển), chữ M_TEXT ----
+  const PANEL_W = [['ĐIỆN THOẠI - LAPTOP', 'MUA BÁN - SỬA CHỮA'], ['NỘI THẤT GỖ', 'TỦ BẾP - GIƯỜNG - SOFA'], ['NHA KHOA', 'NIỀNG RĂNG - TRỒNG RĂNG'],
+    ['THỜI TRANG NỮ', 'HÀNG MỚI VỀ'], ['VÀNG BẠC ĐÁ QUÝ', 'MUA BÁN - TRAO ĐỔI'], ['TRUNG TÂM NGOẠI NGỮ', 'TUYỂN SINH CÁC LỚP']];
+  for (let s = 0; s < PANEL_CELLS; s++) cell('PANEL' + s, 4, 4, () => {
+    for (let k = 0; k < 2; k++) {
+      const y0 = k * 2.0, w = PANEL_W[s * 2 + k], wi = 40 + s * 2 + k;
+      vgrad(0, y0, 4, y0 + 2, [246, 246, 246], [208, 208, 208], M_SIGN, 4);
+      rect(0, y0, 4, y0 + 0.06, [58, 58, 60], M_KEEP); rect(0, y0 + 1.94, 4, y0 + 2, [58, 58, 60], M_KEEP);
+      rect(0, y0, 0.05, y0 + 2, [58, 58, 60], M_KEEP); rect(3.95, y0, 4, y0 + 2, [58, 58, 60], M_KEEP);
+      const ph = '0000.' + String(100 + ((wi * 37) % 900)) + '.' + String(100 + ((wi * 71) % 900));
+      const t = textMask([{ t: w[0], size: 0.34, y: 0.32 }, { t: w[1], size: 0.17, y: 0.64 }, { t: 'ĐT: ' + ph, size: 0.13, y: 0.85 }], 512, 256);
+      blitText(t, 512, 256, 0.1, y0 + 0.1, 3.9, y0 + 1.9, [255, 255, 255], M_TEXT);
+    }
+  });
+  // ---- BIỂN DỌC (blade, vuông góc mặt tiền): 2 ô × 4 dải đứng 1×4 m, chữ XẾP DỌC từng ký tự ----
+  const BLADE_W = ['KHÁCH SẠN', 'NHÀ NGHỈ', 'CẦM ĐỒ', 'KARAOKE', 'NHA KHOA', 'CÀ PHÊ', 'THUỐC TÂY', 'SPA'];
+  for (let s = 0; s < BLADE_CELLS; s++) cell('BLADE' + s, 4, 4, () => {
+    for (let k = 0; k < 4; k++) {
+      const x0 = k, L = [...BLADE_W[s * 4 + k].replace(/ /g, '')];
+      vgrad(x0, 0, x0 + 1, 4, [246, 246, 246], [210, 210, 210], M_SIGN, 4);
+      rect(x0, 0, x0 + 0.05, 4, [58, 58, 60], M_KEEP); rect(x0 + 0.95, 0, x0 + 1, 4, [58, 58, 60], M_KEEP);
+      rect(x0, 0, x0 + 1, 0.05, [58, 58, 60], M_KEEP); rect(x0, 3.95, x0 + 1, 4, [58, 58, 60], M_KEEP);
+      const sz = Math.min(0.105, 0.86 / L.length);
+      const t = textMask(L.map((ch, i) => ({ t: ch, size: sz, y: 0.07 + ((i + 0.5) * 0.86) / L.length })), 128, 512);
+      blitText(t, 128, 512, x0 + 0.06, 0.06, x0 + 0.94, 3.94, [255, 255, 255], M_TEXT);
+    }
+  });
+  // ---- BIỂN QUẢNG CÁO TRÊN MÁI: 2 ô × 2 dải 4×2 m, ảnh tự vẽ GIỮ MÀU (không nhuộm), từ chung ----
+  const BILL = [
+    { bg: [[44, 112, 182], [22, 72, 142]], tc: [255, 255, 255], l: ['SƠN CHỐNG THẤM', 'BỀN ĐẸP MỌI THỜI TIẾT'], icon: 0 },
+    { bg: [[248, 204, 46], [232, 172, 22]], tc: [34, 34, 38], l: ['CHO THUÊ QUẢNG CÁO', 'LH: 0000.888.999'], icon: -1 },
+    { bg: [[200, 40, 36], [150, 22, 22]], tc: [255, 240, 200], l: ['ĐIỆN MÁY GIÁ TỐT', 'TRẢ GÓP 0%'], icon: 1 },
+    { bg: [[30, 120, 80], [16, 84, 56]], tc: [255, 255, 255], l: ['CĂN HỘ VEN SÔNG', 'NHẬN NHÀ NGAY'], icon: 2 },
+  ];
+  for (let s = 0; s < 2; s++) cell('BILL' + s, 4, 4, () => {
+    for (let k = 0; k < 2; k++) {
+      const y0 = k * 2.0, A = BILL[s * 2 + k];
+      vgrad(0, y0, 4, y0 + 2, A.bg[0], A.bg[1], M_KEEP, 5);
+      const tx1 = A.icon >= 0 ? 2.75 : 3.9;
+      if (A.icon === 0) { rect(2.95, y0 + 0.3, 3.65, y0 + 1.25, [236, 236, 232], M_KEEP); rect(2.95, y0 + 1.1, 3.65, y0 + 1.25, [200, 44, 40], M_KEEP); disc(3.3, y0 + 1.5, 0.28, [250, 220, 60], M_KEEP); }
+      else if (A.icon === 1) { rect(2.9, y0 + 0.3, 3.7, y0 + 1.6, [230, 232, 236], M_KEEP); rect(2.98, y0 + 0.9, 3.62, y0 + 1.52, [60, 70, 84], M_KEEP); disc(3.3, y0 + 0.6, 0.18, [120, 124, 130], M_KEEP); }
+      else if (A.icon === 2) { for (let q = 0; q < 3; q++) { const x = 2.85 + q * 0.32, h = 0.8 + q * 0.35; rect(x, y0 + 0.25, x + 0.26, y0 + 0.25 + h, [214, 222, 228], M_KEEP); for (let yy = y0 + 0.35; yy < y0 + 0.2 + h; yy += 0.14) hline(yy, x + 0.04, x + 0.22, 0.04, [90, 120, 150], M_KEEP); } }
+      const t = textMask([{ t: A.l[0], size: 0.32, y: 0.36 }, { t: A.l[1], size: 0.2, y: 0.72 }], 512, 256);
+      blitText(t, 512, 256, 0.12, y0 + 0.12, tx1, y0 + 1.88, A.tc, M_KEEP);
+      rect(0, y0, 4, y0 + 0.05, [230, 230, 230], M_KEEP); rect(0, y0 + 1.95, 4, y0 + 2, [230, 230, 230], M_KEEP);
+    }
+  });
   const ms =typeof performance !== 'undefined' ? performance.now() - t0 : 0;
   const data = B ? new Uint8Array(B.buffer) : null;
   B = null; _layoutOnly = false; for (const k in _bases) delete _bases[k];
-  return { data, size, mods: MODS.slice(), MOD: { ...MOD }, ms };
+  if (MODS.length > ATLAS_N * ATLAS_ROWS) throw new Error('facade_atlas: ' + MODS.length + ' ô > ' + ATLAS_N * ATLAS_ROWS);
+  return { data, size, height: HGT, mods: MODS.slice(), MOD: { ...MOD }, ms };
 }

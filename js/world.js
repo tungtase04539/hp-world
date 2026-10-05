@@ -119,7 +119,9 @@ function localPt(cx, cz, lx, lz, th) {
 
 export const sharedMats = {
   lampGlow: mat(0xfff2b8, { emissive: 0xffdd77, emissiveIntensity: 0 }),
-  window: mat(0x557788, { emissive: 0xffcc66, emissiveIntensity: 0 }),
+  // W3-C: kính nhà ô 0x557788 → 0x7f95a3 (phản trời sáng hơn): mảng kính/cửa sổ nhà ô từng ra "khối xanh than/ô vuông
+  // đen" (pano_138/386/391/409, tia dò: mesh gộp mrgm1 màu 557788 phủ cả mặt nhà). Đêm vẫn do daynight (emissive).
+  window: mat(0x7f95a3, { emissive: 0xffcc66, emissiveIntensity: 0 }),
   trunk: mat(0x6b4a2e),
   leafGreen: mat(0x5cb84e, { flatShading: true }),
   leafGreen2: mat(0x7ecb5e, { flatShading: true }),

@@ -36,7 +36,8 @@ import {
   refreshPartyEdges, INFO,
 } from './buildings_data.js';
 import { claimAt, claimOverlapFrac } from './claims.js';
-import { buildFacadeAtlas, MOD, ATLAS_N, SIGN_CELLS, SIGN_EXT, SIGN_Y } from './facade_atlas.js';
+import { buildFacadeAtlas, MOD, ATLAS_N, ATLAS_ROWS, SIGN_CELLS, SIGN_EXT, SIGN_Y, PANEL_CELLS, BLADE_CELLS, BILL_CELLS } from './facade_atlas.js';
+import { FEF, FEZ, FE_OBS, FE_PANO } from './facade_evidence.js';
 import { TIER } from './device.js';
 import { ROADS_DT } from './mapdata.js';
 import { ROAD_HW } from './xsection.js';
@@ -64,7 +65,10 @@ function hh(a, b) { let h = Math.imul(a | 0, 0x9e3779b1) ^ Math.imul((b | 0) + 0
 const lin = (hex) => { const c = new THREE.Color().setHex(hex); return [Math.round(c.r * 255), Math.round(c.g * 255), Math.round(c.b * 255)]; };
 const WALL_LIN = WALL_PALETTE.map(lin);
 const ROOF_LIN = ROOF_PALETTE.map(lin);
-const AWN_LIN = [0x3f6ea8, 0xb24a3e, 0x4f8a5c, 0xd9a03a, 0xe4ddcd, 0x2f8a8a, 0xc0392b, 0x1f4e8c].map(lin);
+// mái hiên (W3-C, AUDIT3 SHOPFRONT): pano HP = TÔN SÓNG xanh dương là chủ đạo, bạt xanh/xanh-trắng, ít đỏ/cam; trước: bạt sọc
+// đỏ/vàng/lá đều nhau + sâu 1,5 m. TÔN (ô D_AWN2, nhuộm) / BẠT (ô D_AWN sọc, nhuộm).
+const AWN_TIN = [0x2f62a8, 0x3a6fb4, 0x2a5596, 0x4580c4, 0x2f62a8, 0x4f8a5c, 0x8e3b2c, 0x9aa0a6, 0x3a6fb4].map(lin);
+const AWN_TARP = [0x2f6db5, 0x1f5fa0, 0x2f6db5, 0xd9832a, 0x3f8a5c, 0xb24a3e, 0x4a7fc0].map(lin);
 // tôn mái che sân thượng — vệ tinh HP: ĐỎ GỈ/nâu đỏ chủ đạo (~70%), xanh dương ~12%, xám/trắng ~12%, xanh lá ít
 const TON_LIN = [0x9b4a32, 0x8e3b2c, 0xa5533e, 0x7d3a2a, 0xb0603f, 0x9b4a32, 0x6e3a2e, 0xa5533e, 0x46617f, 0x3d4f66, 0x9b9890, 0xc4c2bc, 0x4f6b55].map(lin);
 const WHITE = [255, 255, 255], GREY = lin(0xd8d6d0);
@@ -94,30 +98,51 @@ function glslVec3Fn(name, hexes) {
   for (let k = 0; k < v.length - 1; k++) s += `if(i==${k})return ${v[k]};`;
   return s + `return ${v[v.length - 1]};}`;
 }
-const GL1_ARR = /\b(U[0-6]|G[0-6]|GH|SD|BK|PT|SIGNC|WALLP)\[([^[\]]*)\]/g;
+const GL1_ARR = /\b(U\d+|G\d+|GH|SD|BK|PT|SIGNC|WALLP)\[([^[\]]*)\]/g;
 const gl1Idx = (src) => src.replace(GL1_ARR, '$1($2)');
-// Bộ mô-đun theo KIỂU (STYLE): TUBE 0, OLD 1, KTT 2, GLASS 3, VILLA 4, SHED 5, CIVIC 6. Lặp tên = tăng trọng số.
+// KIỂU DỰNG (render style) = 4 bit thấp aFac.z của tường. 0..6 = STYLE dữ liệu (TUBE 0, OLD 1, KTT 2, GLASS 3, VILLA 4,
+// SHED 5, CIVIC 6); 7.. thêm ở W3-C, quyết định LÚC CHẠY trong renderStyles() từ bằng chứng pano (js/facade_evidence.js) +
+// vùng + luật sửa dữ liệu (kho tôn ≥3 tầng, lô kính hẹp, tháp ≥9 tầng). Bit 4-5 = TUỔI (lớp phong hoá 0..3), bit 6 = nhà
+// nhiều BIỂN BẢNG LỚN (phố buôn bán), bit 7 dự trữ.
+const RS = { COL: 7, NEO: 8, CONS: 9, MODERN: 10, TOWER: 11, TEN: 12 };
+const NRS = 13;
+// Bộ mô-đun theo KIỂU DỰNG. Lặp tên = tăng trọng số.
 const SETS = {
   U0: ['U_SLIDE0', 'U_SLIDE0', 'U_SLIDE1', 'U_BALC0', 'U_BALC1', 'U_BALC0', 'U_CAGE', 'U_TILE', 'U_AC', 'U_AC', 'U_LOG'],
-  U1: ['U_SHUT0', 'U_SHUT0', 'U_SHUT1', 'U_ARCH', 'U_BALU', 'U_CAGE', 'U_SLIDE1'],
-  U2: ['U_KTT0', 'U_KTT0', 'U_KTT1', 'U_CAGE', 'U_LOG'],
-  U3: ['U_CURT0', 'U_CURT1', 'U_RIB'],
-  U4: ['U_VILLA', 'U_VILLA', 'U_SHUT0', 'U_ARCH', 'U_BALU'],
+  U1: ['U_SHUT0', 'U_SHUT0', 'U_SHUT1', 'U_ARCH', 'U_BALU', 'U_CAGE', 'U_SLIDE1', 'U_VINE'],
+  U2: ['U_KTT0', 'U_KTT0', 'U_KTT1', 'U_CAGE', 'U_LOG', 'U_TEN'],
+  U3: ['U_CURT2', 'U_CURT2', 'U_CURT0', 'U_CURT1', 'U_CURT3', 'U_RIB'],        // W3-C: kính PHẢN TRỜI sáng (trước: CURT0 tối)
+  U4: ['U_VILLA', 'U_VILLA', 'U_SHUT0', 'U_ARCH', 'U_BALU', 'U_COL0'],
   U5: ['U_SHED'],
   U6: ['U_CIVIC', 'U_CIVIC', 'U_RIB'],
-  // (phản biện: mặt phố liền của WP1 v1 lặp 1 kiểu kệ hàng cả dãy → thêm sửa xe/điện thoại/điện nước, bớt lặp SHOP0)
-  G0: ['G_SHOP0', 'G_SHOP1', 'G_SHOP2', 'G_SHOP3', 'G_MOTO', 'G_ELEC', 'G_HARD', 'G_SHUT0', 'G_SHUT0', 'G_SHUT1', 'G_GLASS', 'G_GATE', 'G_HOME0', 'G_HOME1', 'G_SHOP2', 'G_MOTO'],
-  G1: ['G_OLD', 'G_OLD', 'G_SHOP0', 'G_SHUT0', 'G_SHUT1', 'G_GATE', 'G_SHOP2', 'G_HOME0', 'G_HARD', 'G_ELEC'],
-  G2: ['G_SHOP0', 'G_SHUT0', 'G_GATE', 'G_HOME0', 'G_SHOP2', 'G_HOME1', 'G_MOTO', 'G_HARD'],
-  G3: ['G_GLASS', 'G_GLASS', 'G_SHOP3'],
+  U7: ['U_COL0', 'U_COL0', 'U_COL1', 'U_COL1', 'U_SHUT0', 'U_ARCH', 'U_BALU', 'U_VINE'],   // thuộc địa Pháp
+  U8: ['U_NEO', 'U_NEO', 'U_NEO', 'U_COL0'],                                               // tân cổ điển trắng
+  U9: ['U_CONS', 'U_CONS', 'U_NET'],                                                       // đang xây
+  U10: ['U_ACP', 'U_ACP', 'U_CURT2', 'U_SLIDE0', 'U_TOWER', 'U_ACP'],                       // nhà phố hiện đại (alu/kính)
+  U11: ['U_TOWER', 'U_TOWER', 'U_TOWER', 'U_RIB', 'U_CURT2', 'U_SLIDE0'],                   // cao tầng hiện đại
+  U12: ['U_TEN', 'U_TEN', 'U_KTT0', 'U_KTT1', 'U_CAGE', 'U_LOG'],                           // tập thể xuống cấp
+  // (phản biện WP2: mặt phố liền lặp 1 kiểu kệ hàng cả dãy → sửa xe/điện thoại/điện nước). W3-C: ÍT cửa cuốn (pano ban ngày
+  // phần lớn MỞ cửa), thêm quán mở / quần áo / đồ gỗ / quán ăn / showroom.
+  G0: ['G_SHOP0', 'G_SHOP1', 'G_SHOP2', 'G_SHOP3', 'G_MOTO', 'G_ELEC', 'G_HARD', 'G_OPEN0', 'G_OPEN1', 'G_OPEN2', 'G_FOOD', 'G_SHOW', 'G_SHUT0', 'G_GLASS', 'G_GATE', 'G_OPEN0'],
+  G1: ['G_OLD', 'G_OLD', 'G_SHOP0', 'G_SHUT0', 'G_SHUT1', 'G_GATE', 'G_SHOP2', 'G_HOME0', 'G_HARD', 'G_ELEC', 'G_OPEN2', 'G_FOOD'],
+  G2: ['G_SHOP0', 'G_SHUT0', 'G_GATE', 'G_HOME0', 'G_SHOP2', 'G_HOME1', 'G_MOTO', 'G_HARD', 'G_OPEN0'],
+  G3: ['G_SHOW', 'G_GLASS', 'G_SHOW', 'G_SHOP3'],
   G4: ['G_HOME0', 'G_CIVIC'],
   G5: ['G_WARE'],
   G6: ['G_CIVIC', 'G_CIVIC', 'G_GLASS'],
+  G7: ['G_COL', 'G_COL', 'G_OLD', 'G_OLD', 'G_OPEN0', 'G_OPEN2', 'G_SHUT1'],
+  G8: ['G_NEO', 'G_NEO', 'G_NEO', 'G_COL'],
+  G9: ['G_HOARD'],
+  G10: ['G_SHOW', 'G_SHOW', 'G_ELEC', 'G_GLASS', 'G_OPEN1', 'G_SHOP3'],
+  G11: ['G_SHOW', 'G_GLASS', 'G_CIVIC', 'G_SHOW'],
+  G12: ['G_HOME0', 'G_HOME1', 'G_SHUT1', 'G_OPEN0', 'G_GATE', 'G_HOME0'],
   GH: ['G_HOME0', 'G_HOME0', 'G_HOME1', 'G_HOME1', 'G_SHUT0', 'G_GATE', 'G_SHUT1'],   // mặt ngõ/phố nhỏ: nhà ở
-  SD: ['S_PLAIN0', 'S_PLAIN0', 'S_PLAIN0', 'S_PLAIN2', 'S_PLAIN1', 'S_WIN', 'S_WIN', 'S_BRICK', 'S_BACK'],
-  BK: ['S_BACK', 'S_BACK', 'S_WIN', 'S_PLAIN0', 'S_PLAIN2', 'U_AC', 'U_LOG', 'U_SLIDE1'],
-  PT: ['S_PLAIN1', 'S_PLAIN1', 'S_PLAIN0', 'S_PLAIN2', 'S_ADS', 'S_BRICK'],
+  // tường hông/sau/chung LỘ (W3-C "không tường trống"): thêm tường hồi ố, xi măng thô có cửa sổ nhỏ + điều hoà, quảng cáo sơn
+  SD: ['S_PLAIN0', 'S_EXP0', 'S_PLAIN0', 'S_PLAIN2', 'S_PLAIN1', 'S_WIN', 'S_WIN', 'S_BRICK', 'S_BACK', 'S_EXP1', 'S_EXP0'],
+  BK: ['S_BACK', 'S_BACK', 'S_WIN', 'S_PLAIN0', 'S_PLAIN2', 'U_AC', 'U_LOG', 'U_SLIDE1', 'S_EXP1'],
+  PT: ['S_EXP0', 'S_EXP0', 'S_EXP1', 'S_PLAIN1', 'S_PLAIN2', 'S_ADS', 'S_EXP2', 'S_BRICK', 'S_WIN'],
 };
+const FIXED_G = (st) => st === 5 || st === RS.CONS;   // kho / đang xây: 1 mô-đun trệt cố định, không có bay "nhà ở"
 // ---- MÔ-ĐUN TẦNG TRỆT theo HASH NGUYÊN — bản JS khớp TỪNG BIT với shader (ihash/pidx/pickGi trong makeMaterial) ----
 // Dùng để biết bay nào là cửa hàng CÓ dải biển (SIGN_EXT) → dựng hộp biển 3D đúng chỗ shader vẽ biển.
 // tỉ lệ "nhà ở" theo mã rc: 0 phố chính p/s/t, 1 phố nhỏ r/w, 2 ngõ h, 3 = WP1 v1 ghi công năng trệt NHÀ Ở (INFO USE_HOME: 100%)
@@ -131,9 +156,9 @@ const pidx = (h, n) => Math.floor(((h >>> 8) * n) / 16777216);
 function groundModule(s8, bay, wide, rc, st) {
   const gk = wide ? ihash(s8 * 977 + bay, 101) : s8;
   const g1 = ihash(gk, bay * 2 + 1), g2 = ihash(gk, bay * 2 + 2);
-  if ((g2 >>> 8) < HOME_THR[Math.min(3, rc)]) return SETS.GH[pidx(g1, SETS.GH.length)];
-  const set = SETS['G' + Math.min(6, st)];
-  return st === 5 ? set[0] : set[pidx(g1, set.length)];
+  if (st !== RS.CONS && (g2 >>> 8) < HOME_THR[Math.min(3, rc)]) return SETS.GH[pidx(g1, SETS.GH.length)];
+  const set = SETS['G' + Math.min(NRS - 1, st)];
+  return FIXED_G(st) ? set[0] : set[pidx(g1, set.length)];
 }
 // WebGL1 (GLSL ES 1.0 không có uint/phép bit): BẢNG TRA tính sẵn bằng CHÍNH ihash JS — texel (s8 0..255, bay 0..127 +
 // 128·wide) = g1>>>8 (24 bit ở RGB) + hạng "nhà ở" ở A (c = ngưỡng HOME_THR nhỏ nhất mà g2>>>8 lọt dưới; nhà ở ⇔
@@ -155,15 +180,32 @@ function gmodTexture() {
   t.name = 'fabric_gmod_gl1'; t.needsUpdate = true;
   return (_gmodTex = t);
 }
-// Atlas vẽ trong WORKER (facade_atlas_worker.js): luồng chính chỉ đăng ký thứ tự ô (MOD → shader) + cấp phát texture
-// đúng kích thước tô xám tường trơn; ảnh thật về sau ~0,1-0,2 s (thường TRƯỚC khung hình đầu vì buildWorld còn chạy
-// tiếp vài giây) → gán data cùng kích thước + needsUpdate (texStorage2D bất biến: KHÔNG được đổi kích thước).
-// Worker lỗi/không hỗ trợ module worker → vẽ đồng bộ (fallback).
-function startAtlas(size, tex) {
+// Atlas vẽ trong WORKER (facade_atlas_worker.js): luồng chính chỉ đăng ký thứ tự ô (MOD → shader). W3-C: material dùng
+// texture CHỜ nhỏ 4×4 xám; ảnh atlas về (~0,1-0,3 s, thường trước khung hình đầu) thì tạo DataTexture ĐÚNG kích thước và
+// THAY material.map (cùng "có map" → không đổi program). Sau upload GPU bản CPU (24 MB ở 2048×3072) được thả (onUpdate);
+// mất ngữ cảnh WebGL → map về texture chờ, khôi phục → vẽ lại atlas. Worker lỗi/không hỗ trợ → vẽ đồng bộ.
+// WebGL1: atlas NPOT (2048×3072) không mip được ở GL1 → tắt mip, lọc tuyến tính (cờ m.userData.webgl1 do onBeforeCompile đặt).
+let _atlasTex = null, _phTex = null, _atlasGen = 0;
+function atlasTexture(data, size, hgt, gl1) {
+  const tex = new THREE.DataTexture(data, size, hgt, THREE.RGBAFormat, THREE.UnsignedByteType);
+  tex.colorSpace = THREE.SRGBColorSpace; tex.generateMipmaps = !gl1;
+  tex.minFilter = gl1 ? THREE.LinearFilter : THREE.LinearMipmapLinearFilter; tex.magFilter = THREE.LinearFilter;
+  tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping; tex.anisotropy = LITE_FAB ? 4 : 8;
+  tex.name = 'fabric_atlas';
+  tex.onUpdate = () => { tex.image.data = null; };   // thả bản CPU sau upload (khôi phục ngữ cảnh: vẽ lại, xem startAtlas)
+  tex.needsUpdate = true;
+  return tex;
+}
+function startAtlas(size, m) {
+  const gen = ++_atlasGen, hgt = (size / ATLAS_N) * ATLAS_ROWS;
   const done = (data, ms, how) => {
-    tex.image.data = data; tex.needsUpdate = true;
-    _atlas = { size, ms, mods: Object.keys(MOD), how };
-    console.log('[citygen] atlas ' + size + '² vẽ ' + Math.round(ms) + ' ms (' + how + ')');
+    if (gen !== _atlasGen) return;
+    const old = _atlasTex;
+    _atlasTex = atlasTexture(data, size, hgt, !!m.userData.webgl1);
+    m.map = _atlasTex;
+    if (old) old.dispose();
+    _atlas = { size, height: hgt, ms, mods: Object.keys(MOD), how };
+    console.log('[citygen] atlas ' + size + '×' + hgt + ' vẽ ' + Math.round(ms) + ' ms (' + how + ')');
   };
   const sync = () => { const A = buildFacadeAtlas(size); done(A.data, A.ms, 'sync'); };
   if (typeof Worker === 'undefined') { sync(); return; }
@@ -179,22 +221,30 @@ function startAtlas(size, tex) {
     w.postMessage({ size });
   } catch (e) { sync(); }
 }
+// chuỗi hàm chọn mô-đun theo kiểu dựng: st 0 = mặc định; tập 1 phần tử (kho, đang xây) luôn [0]
+function pickChain(name, pre, arg, idx) {
+  let s = `float ${name}(int st, ${arg}){\n`;
+  for (let k = 1; k < NRS; k++) { const set = pre + k; s += `  if (st == ${k}) return ${set}[${SETS[set].length === 1 ? '0' : idx(set)}];\n`; }
+  return s + `  return ${pre}0[${idx(pre + '0')}];\n}`;
+}
 function makeMaterial() {
-  const size = LITE_FAB ? 1024 : 2048;
+  const size = LITE_FAB ? 1024 : 2048, CPX = size / ATLAS_N, HGT = CPX * ATLAS_ROWS;
   buildFacadeAtlas(size, { layoutOnly: true });     // chỉ số ô cho shader (đồng bộ, ~0 ms)
-  const ph = new Uint8Array(size * size * 4);
-  new Uint32Array(ph.buffer).fill(0xffdee2e2);      // RGBA (226,226,222,255) little-endian: tường trơn chờ atlas
-  const tex = new THREE.DataTexture(ph, size, size, THREE.RGBAFormat, THREE.UnsignedByteType);
-  tex.colorSpace = THREE.SRGBColorSpace; tex.generateMipmaps = true;
-  tex.minFilter = THREE.LinearMipmapLinearFilter; tex.magFilter = THREE.LinearFilter;
-  tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping; tex.anisotropy = LITE_FAB ? 4 : 8; tex.needsUpdate = true;
-  tex.name = 'fabric_atlas';
-  startAtlas(size, tex);
-  const m = new THREE.MeshLambertMaterial({ map: tex, vertexColors: true, emissive: 0xffffff, emissiveIntensity: 0 });
+  _phTex = new THREE.DataTexture(new Uint8Array(16 * 4).fill(222), 4, 4, THREE.RGBAFormat, THREE.UnsignedByteType);
+  _phTex.colorSpace = THREE.SRGBColorSpace; _phTex.minFilter = _phTex.magFilter = THREE.LinearFilter; _phTex.generateMipmaps = false;
+  _phTex.name = 'fabric_atlas_wait'; _phTex.needsUpdate = true;
+  const m = new THREE.MeshLambertMaterial({ map: _phTex, vertexColors: true, emissive: 0xffffff, emissiveIntensity: 0 });
   m.name = 'fabric_mat';
-  const N = ATLAS_N, CPX = size / N;
-  const pad = (3 / CPX).toFixed(5);
-  const maxG = (Math.pow(2, Math.log2(CPX) - 3.5) / size).toFixed(6);   // trần mip ~ (ô còn 11 px): chống loang màu ô kề nhau
+  startAtlas(size, m);
+  // mất/khôi phục ngữ cảnh WebGL: bản CPU atlas đã thả → về texture chờ, rồi vẽ lại
+  const cv = typeof document !== 'undefined' && document.getElementById ? document.getElementById('scene') : null;
+  if (cv) {
+    cv.addEventListener('webglcontextlost', () => { m.map = _phTex; if (_atlasTex) { _atlasTex.dispose(); _atlasTex = null; } }, false);
+    cv.addEventListener('webglcontextrestored', () => { _phTex.needsUpdate = true; startAtlas(size, m); }, false);
+  }
+  // W3-C: vết lấy mẫu → inset ĐỘNG trong ô (nửa vết + 1 texel, tối thiểu 3 px): mip cao/anisotropic không còn lấy lẫn màu ô
+  // bên cạnh (vệt màu dọc mép bay ở xa — một nguồn "RAINBOW"); trần mip giữ như cũ (~ô còn 11 px).
+  const MGP = Math.pow(2, Math.log2(CPX) - 3.5).toFixed(4);
   const setsGlsl = Object.entries(SETS).map(([k, v]) => glslFloatArr(k, v)).join('\n');
   const n = (k) => SETS[k].length + '.0';
   const ni = (k) => SETS[k].length + 'u';
@@ -203,29 +253,21 @@ function makeMaterial() {
   // 3D (hash float GPU/JS lệch nhau do float32/FMA; số nguyên thì không).
   const GL2_GROUND = `uint ihash(uint a, uint b){ uint h = (a * 0x9E3779B1u) ^ ((b + 0x7F4A7C15u) * 0x85EBCA6Bu); h ^= h >> 15u; h *= 0xC2B2AE35u; h ^= h >> 13u; return h; }
 int pidx(uint h, uint n){ return int(((h >> 8u) * n) >> 24u); }
-float pickGi(int st, uint h){
-  if (st == 1) return G1[pidx(h, ${ni('G1')})]; if (st == 2) return G2[pidx(h, ${ni('G2')})]; if (st == 3) return G3[pidx(h, ${ni('G3')})];
-  if (st == 4) return G4[pidx(h, ${ni('G4')})]; if (st == 5) return G5[0]; if (st == 6) return G6[pidx(h, ${ni('G6')})];
-  return G0[pidx(h, ${ni('G0')})];
-}`;
+${pickChain('pickGi', 'G', 'uint h', (s) => `pidx(h, ${ni(s)})`)}`;
   const GL2_GROUND_MAIN = `        uint sI = uint(vFac.x + 0.5), bI = uint(max(bay, 0.0));
         uint gk = wide > 0.5 ? ihash(sI * 977u + bI, 101u) : sI;
         uint g1 = ihash(gk, bI * 2u + 1u), g2 = ihash(gk, bI * 2u + 2u);
         uint thr = rc > 2.5 ? ${HOME_THR[3]}u : rc > 1.5 ? ${HOME_THR[2]}u : (rc > 0.5 ? ${HOME_THR[1]}u : ${HOME_THR[0]}u);
-        bool home = (g2 >> 8u) < thr;
+        bool home = st != ${RS.CONS} && (g2 >> 8u) < thr;
         m = home ? GH[pidx(g1, ${ni('GH')})] : pickGi(st, g1);`;
   // GL1: u1 = (g1>>>8)/2^24 từ bảng tra (RGB 24 bit, NEAREST), pidx(g1,n) = int(u1·n)
   const GL1_GROUND = `uniform sampler2D uGMod;
-float pickGi(int st, float u){
-  if (st == 1) return G1[int(u * ${n('G1')})]; if (st == 2) return G2[int(u * ${n('G2')})]; if (st == 3) return G3[int(u * ${n('G3')})];
-  if (st == 4) return G4[int(u * ${n('G4')})]; if (st == 5) return G5[0]; if (st == 6) return G6[int(u * ${n('G6')})];
-  return G0[int(u * ${n('G0')})];
-}`;
+${pickChain('pickGi', 'G', 'float u', (s) => `int(u * ${n(s)})`)}`;
   const GL1_GROUND_MAIN = `        vec4 gm = texture2D(uGMod, (vec2(vFac.x, mod(max(bay, 0.0), 128.0) + 128.0 * wide) + 0.5) / 256.0);
         vec3 gb = floor(gm.rgb * 255.0 + 0.5);
         float u1 = (gb.r * 65536.0 + gb.g * 256.0 + gb.b) / 16777216.0;
         float rcI = rc > 2.5 ? 3.0 : rc > 1.5 ? 2.0 : (rc > 0.5 ? 1.0 : 0.0);
-        bool home = rcI >= floor(gm.a * 255.0 + 0.5);
+        bool home = st != ${RS.CONS} && rcI >= floor(gm.a * 255.0 + 0.5);
         m = home ? GH[int(u1 * ${n('GH')})] : pickGi(st, u1);`;
   // WebGL1 (three r160 tự lùi về WebGL1 khi máy không có WebGL2 — vd GPU/driver bị chặn WebGL2): GLSL ES 1.0 không có
   // uint/phép bit, textureGrad, mảng const. Nhánh GL1 cùng thuật toán: mảng → hàm if (gl1Idx), hash nguyên → bảng tra
@@ -235,7 +277,10 @@ float pickGi(int st, float u){
   m.onBeforeCompile = (sh, renderer) => {
     const gl1 = !!(renderer && renderer.capabilities && renderer.capabilities.isWebGL2 === false);
     const X = gl1 ? gl1Idx : (s) => s;
-    if (gl1) { sh.uniforms.uGMod = { value: gmodTexture() }; m.userData.webgl1 = true; }
+    if (gl1) {
+      sh.uniforms.uGMod = { value: gmodTexture() }; m.userData.webgl1 = true;
+      if (_atlasTex && _atlasTex.generateMipmaps) { _atlasTex.generateMipmaps = false; _atlasTex.minFilter = THREE.LinearFilter; }   // NPOT ở GL1
+    }
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\nattribute vec4 aFac;\nvarying vec4 vFac;\nvarying vec2 vFUv;')
       .replace('#include <uv_vertex>', '#include <uv_vertex>\nvFac = aFac; vFUv = uv;');
@@ -246,30 +291,30 @@ ${gl1 ? setsGlsl1 : setsGlsl}
 ${gl1 ? glslVec3Fn('SIGNC', SIGN_HEX) : glslVec3Arr('SIGNC', SIGN_HEX)}
 ${gl1 ? glslVec3Fn('WALLP', WALL_PALETTE) : glslVec3Arr('WALLP', WALL_PALETTE)}
 float h21(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
-float pickU(int st, float r){
-  if (st == 1) return U1[int(r * ${n('U1')})]; if (st == 2) return U2[int(r * ${n('U2')})]; if (st == 3) return U3[int(r * ${n('U3')})];
-  if (st == 4) return U4[int(r * ${n('U4')})]; if (st == 5) return U5[0]; if (st == 6) return U6[int(r * ${n('U6')})];
-  return U0[int(r * ${n('U0')})];
-}
+float vnz(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(h21(i), h21(i + vec2(1.0, 0.0)), f.x), mix(h21(i + vec2(0.0, 1.0)), h21(i + vec2(1.0, 1.0)), f.x), f.y); }
+${pickChain('pickU', 'U', 'float r', (s) => `int(r * ${n(s)})`)}
 ${gl1 ? GL1_GROUND : GL2_GROUND}
 float hat(float a, float c, float w){ return max(0.0, 1.0 - abs(a - c) / w); }`))
       .replace('#include <map_pars_fragment>', `#include <map_pars_fragment>
 vec4 fabSample(float m, vec2 f, vec2 gx, vec2 gy){
-  float N = ${N}.0, pad = ${pad};
-  vec2 cell = vec2(mod(m, N), floor(m / N));
-  vec2 auv = (cell + pad + f * (1.0 - 2.0 * pad)) / N;
-  float sc = (1.0 - 2.0 * pad) / N;
-  gx *= sc; gy *= sc;
-  float lg = max(length(gx), length(gy)), mg = ${maxG};
-  if (lg > mg) { gx *= mg / lg; gy *= mg / lg; }
+  vec2 N2 = vec2(${ATLAS_N}.0, ${ATLAS_ROWS}.0);
+  vec2 cell = vec2(mod(m, N2.x), floor(m / N2.x));
+  vec2 gxp = gx * ${CPX}.0, gyp = gy * ${CPX}.0;                 // vết lấy mẫu theo texel ô
+  float lg = max(length(gxp), length(gyp));
+  if (lg > ${MGP}) { float k = ${MGP} / lg; gxp *= k; gyp *= k; lg = ${MGP}; }
+  float ins = max(3.0, 0.5 * lg + 1.0) / ${CPX}.0;               // inset động: không lấn sang ô kề
+  vec2 auv = (cell + clamp(f, vec2(ins), vec2(1.0 - ins))) / N2;
+  vec2 gxa = gxp / vec2(${size}.0, ${HGT}.0), gya = gyp / vec2(${size}.0, ${HGT}.0);
 ${gl1 ? `#ifdef GL_EXT_shader_texture_lod
-  return texture2DGradEXT(map, auv, gx, gy);
+  return texture2DGradEXT(map, auv, gxa, gya);
 #else
   return texture2D(map, auv);
-#endif` : '  return textureGrad(map, auv, gx, gy);'}
+#endif` : '  return textureGrad(map, auv, gxa, gya);'}
 }`)
       .replace('#include <map_fragment>', X(`
 vec3 fabGlow = vec3(0.0);
+vec3 fabRefl = vec3(0.0);
 float fabAO = 1.0;
 {
   float seed = vFac.x / 255.0;
@@ -280,15 +325,19 @@ float fabAO = 1.0;
   float big = step(7.5, kf); kf -= big * 8.0;        // nhà LỚN/CAO/độc lập: tường hông + sau cũng có cửa sổ đều
   int kind = int(kf + 0.5);
   if (kind == 6) kind = 1;                            // mặt trước HỘP BIỂN 3D (ô gần) = vẽ y hệt mặt phố phía sau nó
-  int st = int(vFac.z + 0.5);
+  // W3-C: aFac.z tường = kiểu dựng (4 bit) | tuổi (2 bit) | nhà nhiều biển lớn (1 bit) | cạnh có ban công 3D (1 bit)
+  float zHi = floor(vFac.z / 16.0);
+  int st = int(vFac.z - zHi * 16.0 + 0.5);
+  float age = mod(zHi, 4.0), bigSign = mod(floor(zHi / 4.0), 2.0), hasBalc = step(7.5, zHi);
   vec2 q = vFUv;
   vec2 f; float m; vec2 dq = vec2(1.0);
   vec3 tint = vColor;
-  float isG = 0.0, signSeed = 0.0, litP = 0.58, hh = 0.0, fu = 0.0, cellKey = 0.0, roofVar = 1.0;
+  float isG = 0.0, signSeed = 0.0, litP = 0.58, hh = 0.0, fu = 0.0, cellKey = 0.0, roofVar = 1.0, pnl = 0.0, wallTop = 0.0, glassK = 0.0;
   if (kind <= 3) {
     float floors = max(vFac.w, 1.0);
     hh = max(q.y, 0.0);
     float Htop = ${GROUND_H.toFixed(2)} + (floors - 1.0) * ${FLOOR_H.toFixed(2)};
+    wallTop = Htop + (pitched > 0.5 ? 0.0 : ${PARAPET_H.toFixed(2)});
     float fl, fv, shh;
     if (hh < ${GROUND_H.toFixed(2)}) { fl = 0.0; fv = hh / ${GROUND_H.toFixed(2)}; shh = ${GROUND_H.toFixed(2)}; }
     else if (hh < Htop) { float t = (hh - ${GROUND_H.toFixed(2)}) / ${FLOOR_H.toFixed(2)}; fl = 1.0 + floor(t); fv = fract(t); shh = ${FLOOR_H.toFixed(2)}; }
@@ -301,9 +350,10 @@ float fabAO = 1.0;
       bs = h21(vec2(seed * 13.7 + bay * 1.37, 0.71));
       if (h21(vec2(bs, 5.5)) > 0.25) tint = WALLP[int(h21(vec2(bs, 9.1)) * 23.99)];
     }
+    float pIdx = 0.0;
     if (fl >= floors - 0.01) {
       if (pitched > 0.5) m = SD[0];
-      else m = ((st == 1 || st == 4) && h21(vec2(bs * 7.1, 3.3)) < 0.5) ? ${MOD.P_BALU}.0 : ${MOD.P_PLAIN}.0;
+      else m = ((st == 1 || st == 4 || st == 7 || st == 8) && h21(vec2(bs * 7.1, 3.3)) < 0.5) ? ${MOD.P_BALU}.0 : ${MOD.P_PLAIN}.0;
     } else if (kind == 1) {
       if (fl < 0.5) {
 ${gl1 ? GL1_GROUND_MAIN : GL2_GROUND_MAIN}
@@ -313,6 +363,15 @@ ${gl1 ? GL1_GROUND_MAIN : GL2_GROUND_MAIN}
         float mainR = h21(vec2(bs * 13.1, 1.0)), altR = h21(vec2(bs * 7.3, 2.0));
         float r = h21(vec2(bs * 3.7 + fl * 1.31, bay * 0.71 + 0.3)) < 0.8 ? mainR : altR;
         m = pickU(st, r);
+        // W3-C: BIỂN BẢNG LỚN phủ tầng 1 (đôi khi cả tầng 2) — phố chính p/s/t, nhà buôn bán (pano Tô Hiệu, Cầu Đất, Lạch Tray)
+        if (rc < 0.5 && fl < 2.5 && hasBalc < 0.5 && (st <= 1 || st == 3 || st == 7 || st == 10)) {
+          float pr = h21(vec2(bs * 5.7 + bay * 1.3, 8.8)), pP = bigSign > 0.5 ? 0.4 : 0.1;
+          if (pr < pP && (fl < 1.5 || pr < pP * 0.35)) {
+            pnl = 1.0; pIdx = floor(h21(vec2(bs * 3.3 + bay * 0.7 + fl, 9.4)) * ${(PANEL_CELLS * 2 - 0.01).toFixed(2)});
+            m = ${MOD.PANEL0}.0 + floor(pIdx / 2.0);
+            signSeed = h21(vec2(bs * 11.1 + bay * 2.3 + fl, 4.4)); litP = 0.35;
+          }
+        }
       }
     } else if (kind == 3) m = PT[int(h21(vec2(seed * 5.3 + bay * 0.21, floor(fl * 0.5) + 0.4)) * ${n('PT')})];
     else if (big > 0.5 && fl > 0.5 && st != 5) {   // tháp/chung cư/biệt thự/công sở: mọi mặt có cửa sổ (mô-đun chính 80%)
@@ -327,11 +386,13 @@ ${gl1 ? GL1_GROUND_MAIN : GL2_GROUND_MAIN}
       if (st == 5) m = ${MOD.U_SHED}.0;
     }
     f = vec2(fu, fv);
+    if (pnl > 0.5) { f = vec2(fu, (mod(pIdx, 2.0) + fv) * 0.5); dq.y *= 0.5; }
     cellKey = bay * 7.0 + fl * 13.0;
     fabAO = mix(0.62, 1.0, smoothstep(0.0, 1.7, hh));
+    glassK = (st == 3 || st == 10 || st == 11) ? 1.0 : 0.4;
   } else {
     m = vFac.z; f = fract(q);
-    if (kind == 5) fabAO = 0.92;
+    if (kind == 5) { fabAO = 0.92; signSeed = vFac.w / 255.0; }
     if (kind == 4) roofVar = mix(0.78, 1.14, h21(vec2(seed * 7.7, 3.1)));   // mỗi mái 1 độ sáng (vệ tinh: mảng loang)
   }
   vec2 gx = dFdx(q) * dq, gy = dFdy(q) * dq;
@@ -345,8 +406,11 @@ ${gl1 ? GL1_GROUND_MAIN : GL2_GROUND_MAIN}
     float fvS = clamp((hh - 2.95) / 0.9, 0.0, 0.999);
     float si = floor(signSeed * ${(SIGN_CELLS * 4 - 0.01).toFixed(2)});
     float sm = ${MOD.SIGN0}.0 + floor(si / 4.0);
-    vec2 sk = vec2(1.0, ${(GROUND_H / 3.6).toFixed(4)});      // dv(dải) = dh/0,9/4 ; gy.y đang là dh/GROUND_H
-    vec4 t2 = fabSample(sm, vec2(fu, (mod(si, 4.0) + fvS) / 4.0), gx * sk, gy * sk);
+    // W3-C: dải biển HẸP (G_OLD 0,5-3,5 m) → kéo chữ vừa dải (trước: lấy giữa 75% chữ → "ƠM VĂN PHÒN")
+    bool narrowS = abs(m - ${MOD.G_OLD}.0) < 0.5;
+    float su = narrowS ? clamp((fu * 4.0 - 0.5) / 3.0, 0.0, 1.0) : fu;
+    vec2 sk = vec2(narrowS ? 1.3333 : 1.0, ${(GROUND_H / 3.6).toFixed(4)});      // dv(dải) = dh/0,9/4 ; gy.y đang là dh/GROUND_H
+    vec4 t2 = fabSample(sm, vec2(su, (mod(si, 4.0) + fvS) / 4.0), gx * sk, gy * sk);
     float a2 = t2.a;
     float sW2 = hat(a2, 0.25, 0.125), tW2 = clamp((0.125 - a2) / 0.125, 0.0, 1.0), kW2 = hat(a2, 0.5, 0.125);
     vec3 sc = (sW2 * t2.rgb * signCol * 1.15 + tW2 * textCol + kW2 * t2.rgb) / max(sW2 + tW2 + kW2, 1e-3);
@@ -357,9 +421,31 @@ ${gl1 ? GL1_GROUND_MAIN : GL2_GROUND_MAIN}
     float sLum = dot(sc, vec3(0.2126, 0.7152, 0.0722));
     fabGlow += sc * (0.45 * ss) * min(1.0, 0.24 / max(sLum, 1e-3));
   }
+  // W3-C PALETTE GUARD: màu tường không quá bão hoà (cam/đỏ gạch/xanh nguyên chất phủ cả mặt nhà) — kéo về xám cùng độ sáng
+  float tl = dot(tint, vec3(0.2126, 0.7152, 0.0722));
+  float tmx = max(tint.r, max(tint.g, tint.b)), tmn = min(tint.r, min(tint.g, tint.b));
+  float tsat = (tmx - tmn) / max(tmx, 1e-3);
+  tint = mix(vec3(tl), tint, min(1.0, 0.62 / max(tsat, 1e-3)));
+  // W3-C LỚP PHONG HOÁ (tuổi 0..3 theo vùng/kiểu/bằng chứng pano): vệt ố chảy dọc từ đỉnh tường, mảng ẩm loang, bẩn/rêu chân
+  // tường, bạc màu. Toạ độ tường (m): x = bay·4 + lệch theo nhà, y = độ cao local. Chỉ tường (kind ≤ 3).
+  float weather = 1.0, dirt = 1.0;
+  if (kind <= 3) {
+    float ag = age / 3.0, wx = q.x * 4.0 + seed * 97.0;
+    float streak = smoothstep(0.6, 0.82, vnz(vec2(wx * 2.1, hh * 0.07 + seed * 13.0)));
+    streak *= 0.35 + 0.65 * smoothstep(wallTop - 9.0, wallTop, hh);
+    float blot = smoothstep(0.6, 0.85, vnz(vec2(wx * 0.33, hh * 0.27) + seed * 5.1));
+    float base = 1.0 - smoothstep(0.0, 0.9 + 0.7 * ag, hh);
+    weather = 1.0 - ag * (0.3 * streak + 0.2 * blot) - (0.06 + 0.16 * ag) * base;
+    dirt = 1.0 - (0.04 + 0.1 * ag) * base;
+    tint = mix(tint, vec3(dot(tint, vec3(0.2126, 0.7152, 0.0722))) * vec3(1.0, 0.99, 0.93), (0.1 + 0.3 * blot) * ag);
+  }
   float sum = max(wW + gW + kW + sW + tW, 1e-3);
-  vec3 col = (wW * tx.rgb * tint * 1.25 + (gW + kW) * tx.rgb + sW * tx.rgb * signCol * 1.15 + tW * textCol) / sum;
+  vec3 col = (wW * tx.rgb * tint * 1.25 * weather + gW * tx.rgb + kW * tx.rgb * mix(1.0, weather, 0.4) + sW * tx.rgb * signCol * 1.15 + tW * textCol) / sum;
+  col *= dirt;
   diffuseColor.rgb *= col * roofVar;
+  // W3-C: KÍNH PHẢN CHIẾU TRỜI (cộng vào ánh sáng gián tiếp sau khi tính đèn — xem lights_fragment_end): mặt khuất nắng
+  // không còn "ô đen"; kiểu kính/hiện đại phản mạnh hơn cửa sổ thường.
+  fabRefl = vec3(0.50, 0.62, 0.78) * glassK * (gW / sum);
   // ĐÊM: kính sáng ngẫu nhiên theo ô cửa; cửa hàng trệt sáng gần hết
   // ánh đèn nhân với chính texture (rèm/nội thất/hàng hoá vẫn đọc được, không thành ô trắng loá)
   float lit = step(litP, h21(vec2(seed * 31.7 + cellKey, 4.1)));
@@ -367,17 +453,27 @@ ${gl1 ? GL1_GROUND_MAIN : GL2_GROUND_MAIN}
   // nhà ở VN: ~nửa số phòng sáng đèn tuýp/LED TRẮNG LẠNH, nửa đèn vàng ấm (W2-F; trước: mọi cửa sổ cùng màu cam)
   vec3 roomC = h21(vec2(seed * 13.3 + cellKey, 7.7)) < 0.5 ? vec3(0.80, 0.88, 1.0) : warm;
   fabGlow += (gW / sum) * lit * roomC * (0.18 + tx.rgb * 1.1) + isG * (kW / sum) * lit * (tx.rgb * 0.9 + warm * 0.06);
+  // biển bảng lớn / biển dọc (kind 5) sáng đèn đêm, trần độ chói như dải biển
+  if ((pnl > 0.5 && lit > 0.5) || kind == 5) {
+    float ss2 = (sW + tW) / sum, cLum = dot(col, vec3(0.2126, 0.7152, 0.0722));
+    fabGlow += col * (0.4 * ss2) * min(1.0, 0.24 / max(cLum, 1e-3));
+  }
 }`))
       .replace('#include <color_fragment>', '')
       .replace('#include <emissivemap_fragment>', 'totalEmissiveRadiance = fabGlow * emissive.r;\n#ifdef HP_UNLIT_K\ntotalEmissiveRadiance *= HP_UNLIT_K;\n#endif')
+      .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
+#if defined( RE_IndirectDiffuse )
+  { float ndv = clamp(abs(dot(geometryNormal, geometryViewDir)), 0.0, 1.0);
+    reflectedLight.indirectDiffuse += fabRefl * (0.35 + 0.65 * pow(1.0 - ndv, 4.0)) * irradiance * RECIPROCAL_PI; }
+#endif`)
       .replace('#include <aomap_fragment>', 'reflectedLight.indirectDiffuse *= fabAO; reflectedLight.directDiffuse *= mix(1.0, fabAO, 0.35);');
   };
-  m.customProgramCacheKey = () => 'fabric_v1_' + size;
+  m.customProgramCacheKey = () => 'fabric_v3c_' + size;
   _mat = m;
   return m;
 }
 export function fabricMaterial() { return _mat || makeMaterial(); }
-export function fabricAtlasInfo() { return _atlas ? { size: _atlas.size, ms: Math.round(_atlas.ms), cells: _atlas.mods.length, how: _atlas.how } : null; }
+export function fabricAtlasInfo() { return _atlas ? { size: _atlas.size, height: _atlas.height, ms: Math.round(_atlas.ms), cells: _atlas.mods.length, how: _atlas.how } : null; }
 
 // ---------- bộ đệm hình học tăng dần (typed array) ----------
 class GBuf {
@@ -635,6 +731,91 @@ export function fabricAt(x, z) {
   return -1;
 }
 
+// ---------- W3-C: KIỂU DỰNG + TUỔI + "nhiều biển lớn" theo BẰNG CHỨNG pano (js/facade_evidence.js) + VÙNG + sửa dữ liệu ----------
+// (AUDIT3 §4.3 "defaults only add": kiểu mặt tiền nay đi theo quan sát thật của 551 pano; mặc định chỉ là xác suất theo vùng.)
+// Gọi SAU buildCollision (cần fabricAt). Trả { rsz: aFac.z tường mỗi nhà, ev: cờ FEF bằng chứng trực tiếp, stats }.
+// Xác định: chỉ hash(seed nhà) — A/B ảnh so được.
+function renderStyles(D, CX, CZ) {
+  const nB = D.nB, rsz = new Uint8Array(nB), ev = new Uint16Array(nB);
+  const sts = { obs: 0, evHit: 0, rs: new Array(NRS).fill(0), age: [0, 0, 0, 0], panel: 0 };
+  // 1) tia nhìn từ camera pano theo hướng quan sát (h−8°, h, h+8°; 2-45 m) → nhà ĐẦU TIÊN chạm mang cờ quan sát.
+  //    hướng pano: 0° = bắc = −z, 90° = đông = +x
+  for (let o = 0; o < FE_OBS.length; o += 5) {
+    const f = FE_OBS[o + 3]; if (!f) continue;
+    const px = FE_OBS[o] / 10, pz = FE_OBS[o + 1] / 10, h = FE_OBS[o + 2];
+    sts.obs++;
+    for (const dh of [-8, 0, 8]) {
+      const a = ((h + dh) * Math.PI) / 180, dx = Math.sin(a), dz = -Math.cos(a);
+      for (let d = 2; d <= 45; d += 0.75) { const b = fabricAt(px + dx * d, pz + dz * d); if (b >= 0) { if (!ev[b]) sts.evHit++; ev[b] |= f; break; } }
+    }
+  }
+  // 2) vùng + tuổi của pano gần nhất (≤ 90 m), lưới 64 m
+  const PGZ = 64, pg = new Map();
+  for (let i = 0; i < FE_PANO.length; i += 4) {
+    const k = Math.floor(FE_PANO[i] / 10 / PGZ) * 65536 + Math.floor(FE_PANO[i + 1] / 10 / PGZ);
+    let l = pg.get(k); if (!l) pg.set(k, (l = [])); l.push(i);
+  }
+  const zoneAt = (x, z) => {
+    let best = 90 * 90, bi = -1; const gx = Math.floor(x / PGZ), gz = Math.floor(z / PGZ);
+    for (let i = gx - 1; i <= gx + 1; i++) for (let j = gz - 1; j <= gz + 1; j++) {
+      const l = pg.get(i * 65536 + j); if (!l) continue;
+      for (const q of l) { const d = (FE_PANO[q] / 10 - x) ** 2 + (FE_PANO[q + 1] / 10 - z) ** 2; if (d < best) { best = d; bi = q; } }
+    }
+    return bi;
+  };
+  for (let b = 0; b < nB; b++) {
+    if (D.dead[b]) continue;
+    const s = D.vStart[b], n = D.vStart[b + 1] - s;
+    let A = 0, fL = 0;
+    for (let i = 0; i < n; i++) {
+      const j = i + 1 < n ? i + 1 : 0, ax = D.x[s + i], az = D.z[s + i], bx = D.x[s + j], bz = D.z[s + j];
+      A += ax * bz - bx * az;
+      if (D.edge[s + i] === EDGE.FRONT) { const L = Math.hypot(bx - ax, bz - az); if (L > fL) fL = L; }
+    }
+    const area = Math.abs(A) / 2, sty = Math.min(6, D.style[b]), fl = Math.max(1, D.floors[b]), seed = D.seed[b];
+    const e = ev[b], zi = zoneAt(CX[b], CZ[b]), zf = zi >= 0 ? FE_PANO[zi + 2] : 0, zAge = zi >= 0 ? FE_PANO[zi + 3] : 1;
+    const r1 = hh(seed, 301), r2 = hh(seed, 303), r3 = hh(seed, 305);
+    let rs = sty;
+    // (a) sửa dữ liệu: kho tôn ≥3 tầng (pano_230: khách sạn 25 tầng ra tường tôn), tháp ≥9 tầng, lô kính hẹp (pano_395/386)
+    if (sty === STYLE.SHED && fl >= 3) rs = fl >= 9 ? RS.TOWER : area >= 2500 ? STYLE.GLASS : STYLE.CIVIC;
+    else if (fl >= 9 && (sty === STYLE.TUBE || sty === STYLE.OLD)) rs = r1 < 0.65 ? RS.TOWER : STYLE.GLASS;
+    else if (fl >= 9 && sty === STYLE.GLASS && r1 < 0.4) rs = RS.TOWER;
+    else if (sty === STYLE.GLASS && fl <= 6 && fL <= 10.5 && area < 450) rs = RS.MODERN;
+    // (b) bằng chứng trực tiếp (quan sát pano chạm đúng nhà này) thắng
+    if (e) {
+      if (e & FEF.CONS) rs = RS.CONS;
+      else if ((e & FEF.TEN) && fl >= 3 && fl <= 8) rs = RS.TEN;
+      else if ((e & FEF.NEO) && fl <= 6 && (area >= 250 || sty === STYLE.CIVIC || sty === STYLE.VILLA)) rs = RS.NEO;
+      else if ((e & FEF.COL) && fl <= 5 && sty !== STYLE.SHED) rs = RS.COL;
+      else if ((e & (FEF.GLASS | FEF.SHOW)) && rs !== RS.TOWER) rs = fl <= 6 && fL <= 12 ? RS.MODERN : STYLE.GLASS;
+      else if ((e & FEF.TOWER) && fl >= 7 && rs !== STYLE.GLASS) rs = RS.TOWER;
+    } else {
+      // (c) vùng (pano gần nhất): XÁC SUẤT, không phải mặc định cứng
+      if (zf & FEZ.COLQ) {
+        if ((sty === STYLE.OLD || sty === STYLE.VILLA) && fl <= 5 && r2 < 0.6) rs = RS.COL;
+        else if (sty === STYLE.CIVIC && fl <= 6 && r2 < 0.5) rs = RS.NEO;
+        else if (sty === STYLE.TUBE && fl <= 3 && r2 < 0.12) rs = RS.COL;
+      } else if (sty === STYLE.OLD && fl <= 4 && r2 < 0.2) rs = RS.COL;
+      if (sty === STYLE.KTT && r3 < ((zf & FEZ.OLDQ) ? 0.6 : 0.3)) rs = RS.TEN;
+      if (rs === STYLE.TUBE && (zf & FEZ.COMM) && !(zf & FEZ.OLDQ) && r3 < 0.16) rs = RS.MODERN;
+      if ((rs === STYLE.TUBE || rs === STYLE.OLD) && fl <= 5 && hh(seed, 307) < 0.008) rs = RS.CONS;   // pano: 70/1.920 quan sát (~3,6%) đang xây
+    }
+    // (d) tuổi (lớp phong hoá shader): theo kiểu + vùng + bằng chứng cũ/mới + biến thiên theo hạt giống
+    let age = (rs === RS.TEN || rs === STYLE.OLD || rs === RS.COL || rs === STYLE.KTT) ? 2
+      : (rs === STYLE.GLASS || rs === RS.MODERN || rs === RS.TOWER) ? 0 : 1;
+    age += zAge - 1;
+    if (e & FEF.OLD) age += 1;
+    if (e & FEF.NEW) age -= 1;
+    const r4 = hh(seed, 309); if (r4 < 0.2) age += 1; else if (r4 < 0.32) age -= 1;
+    if (rs === RS.CONS) age = 1;
+    age = Math.max(0, Math.min(3, age));
+    const panel = (e & FEF.BIGSIGN) || ((zf & FEZ.COMM) && hh(seed, 311) < 0.3) ? 1 : 0;
+    rsz[b] = rs | (age << 4) | (panel << 6);
+    sts.rs[rs]++; sts.age[age]++; sts.panel += panel;
+  }
+  return { rsz, ev, stats: sts };
+}
+
 // ======================================================================================
 // buildRealFabric(scene, ctx) — ctx: { groundHeightNoDeck(x,z), landH, reject(cx,cz) → true = bỏ nhà (vùng mở/hàm
 // zone của world.js), maxR (bỏ nhà có tâm ngoài bán kính này — world.js truyền BUILD_RADIUS: ngoài vùng chơi không có
@@ -702,6 +883,9 @@ export function buildRealFabric(scene, ctx) {
   { const killed = []; for (let b = 0; b < D.nB; b++) if (D.dead[b]) killed.push(b);
     const r = refreshPartyEdges(D, grid, killed); st.partyDemoted = r.demoted; st.partyLowered = r.lowered; }
   buildCollision(D);   // lưới va chạm ngay sau khi chốt D.dead — faceRoad (bên dưới) cần fabricAt
+  const tRs0 = performance.now();
+  const RV = renderStyles(D, CX, CZ), RSZ = RV.rsz, EVB = RV.ev;   // W3-C: kiểu dựng/tuổi/biển lớn từng nhà
+  st.facade = { obs: RV.stats.obs, evHit: RV.stats.evHit, rs: RV.stats.rs.join(','), age: RV.stats.age.join(','), panel: RV.stats.panel, ms: Math.round(performance.now() - tRs0) };
   const tClaims = performance.now() - T0 - tDecode;
   const mat = fabricMaterial();
   if (ctx.facadeMats) ctx.facadeMats.push(mat);
@@ -772,10 +956,16 @@ export function buildRealFabric(scene, ctx) {
     // nhà ống nhỏ giữ tường hông trơn (thực tế: tường chung/tường lửa trơn, ít ô thoáng). Nhà ≥9 tầng mà dữ liệu ghi
     // "nhà ống/phố cũ" → mô-đun CHUNG CƯ (KTT) hoặc VĂN PHÒNG KÍNH (GLASS) theo hạt giống — tháp 20 tầng mang mô-đun
     // nhà ống trông giả.
-    const bigFlag = (fl >= 5 || (areaPoly >= 600 && fl >= 3) || sty === STYLE.KTT || sty === STYLE.GLASS || sty === STYLE.CIVIC || sty === STYLE.VILLA) ? 8 : 0;
-    const styF = fl >= 9 && (sty === STYLE.TUBE || sty === STYLE.OLD) ? (hh(seed, 5) < 0.6 ? STYLE.KTT : STYLE.GLASS) : sty;
+    // W3-C: kiểu DỰNG (renderStyles: bằng chứng pano + vùng + sửa dữ liệu — thay luật cũ "≥9 tầng nhà ống → 60% KTT/40% kính")
+    // styF = aFac.z tường (kiểu | tuổi<<4 | biển lớn<<6); rs = kiểu dựng; ev = cờ bằng chứng trực tiếp
+    const styF = RSZ[b], rs = styF & 15, ev = EVB[b];
+    const bigFlag = (fl >= 5 || (areaPoly >= 600 && fl >= 3) || sty === STYLE.KTT || sty === STYLE.GLASS || sty === STYLE.CIVIC || sty === STYLE.VILLA
+      || rs === RS.NEO || rs === RS.CONS || rs === RS.TOWER || rs === RS.TEN) ? 8 : 0;
+    const tubeLike = rs === STYLE.TUBE || rs === STYLE.OLD || rs === RS.COL || rs === RS.MODERN;
+    const detOK = !(rs === STYLE.GLASS || rs === STYLE.SHED || rs === RS.CONS || rs === RS.NEO || rs === RS.TOWER);
     // ---- TƯỜNG ----
     let hasFront = false, fnx = 0, fnz = 0, fL = 0;   // pháp tuyến cạnh mặt phố DÀI nhất (hướng tum thang / mái tôn che)
+    let fAx = 0, fAz = 0, fBx = 0, fBz = 0, fRc = 9;   // W3-C: đầu mút + cấp đường của cạnh đó (biển quảng cáo trên mái)
     for (let i = 0; i < n; i++) {
       const j = (i + 1) % n, ax = X[i], az = Z[i], bx = X[j], bz = Z[j];
       const dx = bx - ax, dz = bz - az, L = Math.hypot(dx, dz); if (L < 0.05) continue;
@@ -792,28 +982,33 @@ export function buildRealFabric(scene, ctx) {
       if (cover > 0) { if (cover >= fl && !pitched) continue; ys = heightOf(Math.min(cover, fl)) - 0.15; }
       const bayW = kind === EDGE.FRONT ? 4.2 : 4.0, nb = Math.max(1, Math.round(L / bayW));
       // dãy nhà ống gộp (mỗi bay 1 nhà) — KHÔNG áp cho cạnh được nâng (đó là hông của MỘT nhà)
-      const wideF = kind === EDGE.FRONT && rcP < 0 && nb >= 3 && fl <= 5 && (styF === STYLE.TUBE || styF === STYLE.OLD) ? 16 : 0;
+      const wideF = kind === EDGE.FRONT && rcP < 0 && nb >= 3 && fl <= 5 && tubeLike ? 16 : 0;
       let rc = rcP >= 0 ? rcP : kind === EDGE.FRONT ? frontClass((ax + bx) / 2, (az + bz) / 2, nx, nz) : 0;
       if (hasInfo && kind === EDGE.FRONT && rcP < 0 && !wideF) { const use = (D.info[b] >> INFO.USE_SHIFT) & 3; if (use === INFO.USE_HOME) rc = 3; else if (use === INFO.USE_SHOP) rc = 0; }
       const kb = kind | bigFlag | wideF | pitchFlag | (rc << 6);
+      // W3-C: cạnh có BAN CÔNG 3D (quyết định ở đây, dựng bên dưới) → bit 7 aFac.z: shader không đặt biển bảng lớn tầng 1-2
+      // (biển phẳng trên tường bị ban công 3D che, pano_092)
+      const balcP = rs === STYLE.TUBE ? 0.62 : (rs === STYLE.OLD || rs === RS.COL) ? 0.5 : rs === STYLE.VILLA ? 0.45 : (rs === STYLE.KTT || rs === RS.TEN) ? 0.3 : rs === RS.MODERN ? 0.2 : 0.15;
+      const hasBalc = kind === EDGE.FRONT && !!DT && L >= 2.8 && L <= 18 && detOK && fl >= 2 && hh(seed, 11 + i) < balcP;
+      const zE = styF | (hasBalc ? 128 : 0);
       const ta = Y[i], tb = Y[j];
-      const a0 = M.v(ax, y0 + ys, az, nx, 0, nz, 0, ys, wcol, s8, kb, styF, fl);
-      M.v(bx, y0 + ys, bz, nx, 0, nz, nb, ys, wcol, s8, kb, styF, fl);
-      M.v(bx, y0 + tb, bz, nx, 0, nz, nb, tb, wcol, s8, kb, styF, fl);
+      const a0 = M.v(ax, y0 + ys, az, nx, 0, nz, 0, ys, wcol, s8, kb, zE, fl);
+      M.v(bx, y0 + ys, bz, nx, 0, nz, nb, ys, wcol, s8, kb, zE, fl);
+      M.v(bx, y0 + tb, bz, nx, 0, nz, nb, tb, wcol, s8, kb, zE, fl);
       if (rt === ROOF.GABLE_TON && TD[i] * TD[j] < 0) {   // cạnh cắt đường nóc → đỉnh hồi
         const tt = TD[i] / (TD[i] - TD[j]);
-        M.v(ax + dx * tt, y0 + H + rise, az + dz * tt, nx, 0, nz, nb * tt, H + rise, wcol, s8, kb, styF, fl);
-        M.v(ax, y0 + ta, az, nx, 0, nz, 0, ta, wcol, s8, kb, styF, fl);
+        M.v(ax + dx * tt, y0 + H + rise, az + dz * tt, nx, 0, nz, nb * tt, H + rise, wcol, s8, kb, zE, fl);
+        M.v(ax, y0 + ta, az, nx, 0, nz, 0, ta, wcol, s8, kb, zE, fl);
         M.t(a0, a0 + 1, a0 + 2); M.t(a0, a0 + 2, a0 + 3); M.t(a0, a0 + 3, a0 + 4);
         st.tris += 3; st.tWall += 3;
       } else {
-        M.v(ax, y0 + ta, az, nx, 0, nz, 0, ta, wcol, s8, kb, styF, fl);
+        M.v(ax, y0 + ta, az, nx, 0, nz, 0, ta, wcol, s8, kb, zE, fl);
         M.t(a0, a0 + 1, a0 + 2); M.t(a0, a0 + 2, a0 + 3);
         st.tris += 2; st.tWall += 2;
       }
       st.walls++;
       if (kind === EDGE.FRONT) {
-        if (L > fL) { fL = L; fnx = nx; fnz = nz; }
+        if (L > fL) { fL = L; fnx = nx; fnz = nz; fAx = ax; fAz = az; fBx = bx; fBz = bz; fRc = rc; }
         hasFront = true;
         frontEdges.push([ax, az, bx, bz, nx, nz, y0, b]);
         // ---- HỘP BIỂN HIỆU 3D (ô gần): đúng các bay mà shader vẽ dải biển (groundModule khớp bit với GPU) ----
@@ -831,14 +1026,14 @@ export function buildRealFabric(scene, ctx) {
             const fa = runA, fb = runB, sA = fa * bw, sB = fb * bw;
             const p0x = ax + ex * sA, p0z = az + ez * sA, p1x = ax + ex * sB, p1z = az + ez * sB;
             const q0x = p0x + nx * BD, q0z = p0z + nz * BD, q1x = p1x + nx * BD, q1z = p1z + nz * BD, d4 = BD / 4;
-            DT.quad([q0x, yb, q0z, q1x, yb, q1z, q1x, yt, q1z, q0x, yt, q0z], nx, 0, nz, [fa, SIGN_Y[0], fb, SIGN_Y[0], fb, SIGN_Y[1], fa, SIGN_Y[1]], wcol, s8, kbBox, styF, fl);
+            DT.quad([q0x, yb, q0z, q1x, yb, q1z, q1x, yt, q1z, q0x, yt, q0z], nx, 0, nz, [fa, SIGN_Y[0], fb, SIGN_Y[0], fb, SIGN_Y[1], fa, SIGN_Y[1]], wcol, s8, kbBox, zE, fl);
             DT.quad([p0x, yb, p0z, q0x, yb, q0z, q0x, yt, q0z, p0x, yt, p0z], -ex, 0, -ez, [0, 0, d4, 0, d4, h1, 0, h1], WHITE, s8, K_DET, MOD.D_SIGNF, 0);
             DT.quad([q1x, yb, q1z, p1x, yb, p1z, p1x, yt, p1z, q1x, yt, q1z], ex, 0, ez, [0, 0, d4, 0, d4, h1, 0, h1], WHITE, s8, K_DET, MOD.D_SIGNF, 0);
             st.detTris += 6; st.signBox++;
             runA = -1;
           };
           for (let k = 0; k < nb; k++) {
-            const ext = SIGN_EXT[groundModule(s8, k, wideF > 0, rc, styF)];
+            const ext = SIGN_EXT[groundModule(s8, k, wideF > 0, rc, rs)];
             if (!ext) { if (runA >= 0) emit(); continue; }
             const fa = k + ext[0] / 4, fb = k + ext[1] / 4;
             if (runA >= 0 && (runB < k - 0.1 / 4 || ext[0] > 0.1)) emit();   // không liền mép → đóng hộp cũ
@@ -846,11 +1041,31 @@ export function buildRealFabric(scene, ctx) {
             runB = fb; st.signBay++;
           }
           if (runA >= 0) emit();
+          // ---- W3-C: BIỂN DỌC (blade) vuông góc mặt tiền, tầng 1-2, mép trái bay — phố chính p/s/t buôn bán ----
+          //      2 mặt lớn (chữ xếp dọc, ô BLADE0..) + mặt trước khung tối = 6 tam giác; màu nền theo hạt giống (aFac.w)
+          if (rc === 0 && fl >= 2 && L >= 3 && (tubeLike || rs === RS.TEN)) {
+            const pB = (ev & FEF.BIGSIGN) || (styF & 64) ? 0.14 : 0.045, bw = L / nb, ex = dx / L, ez = dz / L;
+            const yb = y0 + GROUND_H + 0.35, ytB = Math.min(y0 + H - 0.35, yb + (fl >= 3 ? 2.5 : 2.0)), TW = 0.06, D0 = 0.1, D1 = 0.1 + (ytB - yb) / 4;
+            if (ytB - yb > 1.2) for (let k = 0; k < nb; k++) {
+              if (hh(seed * 7 + k, 401) >= pB) continue;
+              const sc = k * bw + 0.3, si = (hh(seed + k, 403) * BLADE_CELLS * 4) | 0, cellB = MOD.BLADE0 + (si >> 2), u0 = (si & 3) / 4, u1 = u0 + 0.248;
+              const c8 = (hh(seed + k, 405) * 255) | 0;
+              const bx0 = ax + ex * sc, bz0 = az + ez * sc;
+              const P = (along, out) => [bx0 + ex * along + nx * out, bz0 + ez * along + nz * out];
+              const [ia, iz] = P(TW, D0), [oa, oz] = P(TW, D1), [jb, jz] = P(-TW, D0), [ob, obz] = P(-TW, D1);
+              // mặt +e: phải = về phía tường → BL ngoài, BR trong
+              DT.quad([oa, yb, oz, ia, yb, iz, ia, ytB, iz, oa, ytB, oz], ex, 0, ez, [u0, 0, u1, 0, u1, 1, u0, 1], WHITE, s8, K_DET, cellB, c8);
+              // mặt −e: phải = ra ngoài → BL trong, BR ngoài
+              DT.quad([jb, yb, jz, ob, yb, obz, ob, ytB, obz, jb, ytB, jz], -ex, 0, -ez, [u0, 0, u1, 0, u1, 1, u0, 1], WHITE, s8, K_DET, cellB, c8);
+              DT.quad([ob, yb, obz, oa, yb, oz, oa, ytB, oz, ob, ytB, obz], nx, 0, nz, [0, 0, 0.05, 0, 0.05, 1, 0, 1], WHITE, s8, K_DET, MOD.D_SIGNF, 0);
+              st.detTris += 6; st.blade = (st.blade || 0) + 1;
+            }
+          }
         }
         // ---- CỤC NÓNG ĐIỀU HOÀ 3D (ô gần): treo CAO trên tường mỗi tầng trên (đáy +2,58 m, đỉnh +3,12 m — dưới mép
         //      sàn ban công tầng trên +3,18 m → không cắt ban công/lan can), lồi 0,3 m; ~14% bay nhà ống, 21% KTT ----
-        if (DT && cover === 0 && fl >= 2 && L >= 2.4 && sty !== STYLE.GLASS && sty !== STYLE.SHED) {
-          const pAC = sty === STYLE.KTT ? 0.21 : (sty === STYLE.TUBE || sty === STYLE.OLD) ? 0.14 : 0.07;   // (v1: ×0,7 — ngân sách)
+        if (DT && cover === 0 && fl >= 2 && L >= 2.4 && !(rs === STYLE.GLASS || rs === STYLE.SHED || rs === RS.CONS || rs === RS.NEO || rs === RS.MODERN)) {
+          const pAC = (rs === STYLE.KTT || rs === RS.TEN) ? 0.21 : (rs === STYLE.TUBE || rs === STYLE.OLD || rs === RS.COL || rs === RS.TOWER) ? 0.14 : 0.07;   // (v1: ×0,7 — ngân sách)
           const bw = L / nb, ex = dx / L, ez = dz / L, AW = 0.82, AH = 0.54, AD = 0.3;
           for (let k = 1; k < fl; k++) for (let q = 0; q < nb; q++) {
             if (hh(seed * 31 + k, 97 + q) >= pAC) continue;
@@ -867,14 +1082,12 @@ export function buildRealFabric(scene, ctx) {
           }
         }
         // ---- CHI TIẾT MẶT PHỐ (ô gần): ban công + mái hiên ----
-        if (DT && L >= 2.8 && L <= 18 && sty !== STYLE.GLASS && sty !== STYLE.SHED) {
-          const r1 = hh(seed, 11 + i);
-          const balcP = sty === STYLE.TUBE ? 0.62 : sty === STYLE.OLD ? 0.5 : sty === STYLE.VILLA ? 0.45 : sty === STYLE.KTT ? 0.3 : 0.15;
-          if (fl >= 2 && r1 < balcP) {
-            const inset = 0.2, depth = sty === STYLE.OLD || sty === STYLE.VILLA ? 0.75 : 0.95;
+        if (DT && L >= 2.8 && L <= 18 && detOK) {
+          if (hasBalc) {
+            const inset = 0.2, depth = rs === STYLE.OLD || rs === STYLE.VILLA || rs === RS.COL ? 0.75 : 0.95;
             const sx0 = ax + (dx / L) * inset, sz0 = az + (dz / L) * inset, sx1 = bx - (dx / L) * inset, sz1 = bz - (dz / L) * inset;
             const wl = L - 2 * inset;
-            const railCell = (sty === STYLE.OLD || hh(seed, 23) < 0.45) ? MOD.D_RAIL : MOD.D_BALW;
+            const railCell = (rs === STYLE.OLD || rs === RS.COL || hh(seed, 23) < 0.45) ? MOD.D_RAIL : MOD.D_BALW;
             const topSkip = hh(seed, 29) < 0.5 ? 1 : 0;   // tầng trên cùng hay là sân thượng lùi → bỏ
             for (let k = 1; k < fl - (fl > 2 ? topSkip : 0); k++) {
               const ys0 = y0 + heightOf(k) - 0.12, yt = ys0 + 0.15;   // sàn tầng k (tầng trên thứ k)
@@ -892,16 +1105,21 @@ export function buildRealFabric(scene, ctx) {
               st.detTris += 8; st.balc++;
             }
           }
-          if ((sty === STYLE.TUBE || sty === STYLE.OLD || sty === STYLE.KTT) && hh(seed, 41 + i) < 0.35) {   // mái hiên bạt sọc
-            const ac = AWN_LIN[(hh(seed, 43) * AWN_LIN.length) | 0];
-            const out = 1.5, yT = y0 + 2.88, yF = y0 + 2.4, inset = 0.15;
+          // ---- MÁI HIÊN (W3-C): TÔN sóng xanh dương chủ đạo (ô D_AWN2) hoặc BẠT (ô D_AWN sọc), sâu 1,4-2,2 m; bằng chứng pano
+          //      "mái hiên/bạt/tôn" ép có + chọn vật liệu. Tôn: dốc thoải, không diềm; bạt: diềm rủ 0,3 m.
+          const pAwn = (ev & FEF.AWN) ? 0.75 : (rs === STYLE.TUBE || rs === STYLE.OLD || rs === STYLE.KTT) ? 0.35 : rs === RS.TEN ? 0.3 : rs === RS.COL ? 0.25 : rs === RS.MODERN ? 0.12 : 0;
+          if (hh(seed, 41 + i) < pAwn) {
+            const tin = (ev & FEF.TIN) ? true : (ev & FEF.TARP) ? false : hh(seed, 45) < 0.55;
+            const ac = tin ? AWN_TIN[(hh(seed, 43) * AWN_TIN.length) | 0] : AWN_TARP[(hh(seed, 43) * AWN_TARP.length) | 0];
+            const out = tin ? 1.5 + hh(seed, 47) * 0.7 : 1.4 + hh(seed, 47) * 0.5, yT = y0 + (tin ? 2.95 : 2.88), yF = tin ? yT - 0.22 * out : y0 + 2.4, inset = 0.15;
+            const cellA = tin ? MOD.D_AWN2 : MOD.D_AWN;
             const sx0 = ax + (dx / L) * inset, sz0 = az + (dz / L) * inset, sx1 = bx - (dx / L) * inset, sz1 = bz - (dz / L) * inset;
             const fx0 = sx0 + nx * out, fz0 = sz0 + nz * out, fx1 = sx1 + nx * out, fz1 = sz1 + nz * out;
             const sl = Math.hypot(out, yT - yF), ny = out / sl, nh = (yT - yF) / sl, wl = L - 2 * inset;
-            DT.quad([sx1, yT, sz1, sx0, yT, sz0, fx0, yF, fz0, fx1, yF, fz1], nx * nh, ny, nz * nh, [0, 1, wl / 4, 1, wl / 4, 0, 0, 0], ac, s8, K_DET, MOD.D_AWN, 0);
-            DT.quad([sx0, yT - 0.02, sz0, sx1, yT - 0.02, sz1, fx1, yF - 0.02, fz1, fx0, yF - 0.02, fz0], -nx * nh, -ny, -nz * nh, [0, 1, wl / 4, 1, wl / 4, 0, 0, 0], ac, s8, K_DET, MOD.D_AWN, 0);
-            DT.quad([fx0, yF - 0.3, fz0, fx1, yF - 0.3, fz1, fx1, yF, fz1, fx0, yF, fz0], nx, 0, nz, [0, 0, wl / 4, 0, wl / 4, 0.19, 0, 0.19], ac, s8, K_DET, MOD.D_AWN, 0);
-            st.detTris += 6; st.awn++;
+            DT.quad([sx1, yT, sz1, sx0, yT, sz0, fx0, yF, fz0, fx1, yF, fz1], nx * nh, ny, nz * nh, [0, 1, wl / 4, 1, wl / 4, 0, 0, 0], ac, s8, K_DET, cellA, 0);
+            DT.quad([sx0, yT - 0.02, sz0, sx1, yT - 0.02, sz1, fx1, yF - 0.02, fz1, fx0, yF - 0.02, fz0], -nx * nh, -ny, -nz * nh, [0, 1, wl / 4, 1, wl / 4, 0, 0, 0], ac, s8, K_DET, cellA, 0);
+            if (!tin) { DT.quad([fx0, yF - 0.3, fz0, fx1, yF - 0.3, fz1, fx1, yF, fz1, fx0, yF, fz0], nx, 0, nz, [0, 0, wl / 4, 0, wl / 4, 0.19, 0, 0.19], ac, s8, K_DET, MOD.D_AWN, 0); st.detTris += 2; }
+            st.detTris += 4; st.awn++;
           }
         }
       }
@@ -979,7 +1197,7 @@ export function buildRealFabric(scene, ctx) {
     }
     st.roofs++;
     // ---- ĐỒ TRÊN MÁI BẰNG (nhà ống): tum thang, bồn inox, mái tôn che sân thượng, máy nước nóng ----
-    if (rt === ROOF.FLAT_PARAPET && areaPoly < 900 && sty !== STYLE.GLASS && sty !== STYLE.SHED) {
+    if (rt === ROOF.FLAT_PARAPET && areaPoly < 900 && sty !== STYLE.GLASS && sty !== STYLE.SHED && rs !== RS.CONS) {
       const inside = (a, c) => { const x = ux * a + vx * c, z = uz * a + vz * c; return pip(X, Z, n, x, z); };
       const W = (a, c) => [ux * a + vx * c, uz * a + vz * c];
       // hướng "sau" dọc trục u: ngược mặt phố
@@ -1082,6 +1300,21 @@ export function buildRealFabric(scene, ctx) {
           st.tris += 2;
         }
       }
+    }
+    // ---- W3-C: BIỂN QUẢNG CÁO TRÊN MÁI (ô chính — thấy từ xa): nhà 3-9 tầng mái bằng, mặt phố chính dài ≥ 6 m; khung tấm
+    //      quay ra phố, lùi 1,2 m sau tường, chân 2 cột thép; nội dung = ô BILL (từ chung, không thương hiệu). ~12 tam giác ----
+    if (hasFront && fRc === 0 && fL >= 6 && fl >= 3 && fl <= 9 && (rt === ROOF.FLAT_PARAPET || rt === ROOF.FLAT)
+      && rs !== RS.CONS && rs !== RS.NEO && rs !== RS.COL && hh(seed, 501) < ((ev & FEF.BIGSIGN) || (styF & 64) ? 0.1 : 0.022)) {
+      const ex = (fBx - fAx) / fL, ez = (fBz - fAz) / fL, Wb = Math.min(fL * 0.8, 10), Hb = Math.min(3.6, Wb * 0.4);
+      const mx = (fAx + fBx) / 2 - fnx * 1.2, mz = (fAz + fBz) / 2 - fnz * 1.2;
+      const yRf = y0 + (rt === ROOF.FLAT ? H + 0.25 : H), yb = y0 + H + PARAPET_H + 0.8, yt = yb + Hb;
+      const lx = mx - ex * Wb / 2, lz = mz - ez * Wb / 2, rx2 = mx + ex * Wb / 2, rz2 = mz + ez * Wb / 2;
+      const si = (hh(seed, 503) * BILL_CELLS * 2) | 0, cellBl = MOD.BILL0 + (si >> 1), v0 = (si & 1) * 0.5 + 0.004, v1 = v0 + 0.492;
+      M.quad([lx, yb, lz, rx2, yb, rz2, rx2, yt, rz2, lx, yt, lz], fnx, 0, fnz, [0.004, v0, 0.996, v0, 0.996, v1, 0.004, v1], WHITE, s8, K_DET, cellBl, 0);
+      const bo = 0.12, blx = lx - fnx * bo, blz = lz - fnz * bo, brx = rx2 - fnx * bo, brz = rz2 - fnz * bo;
+      M.quad([brx, yb, brz, blx, yb, blz, blx, yt, blz, brx, yt, brz], -fnx, 0, -fnz, [0, 0, 0.05, 0, 0.05, 1, 0, 1], WHITE, s8, K_DET, MOD.D_SIGNF, 0);
+      for (const t of [0.22, 0.78]) steelPost(M, lx + (rx2 - lx) * t - fnx * 0.06, lz + (rz2 - lz) * t - fnz * 0.06, yRf, yb, 0.09, fnx, fnz, s8);
+      st.tris += 12; st.bill = (st.bill || 0) + 1;
     }
     st.built++;
   }
