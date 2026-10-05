@@ -29,7 +29,7 @@ function tri(list) {   // [[ax,ay,az],[bx..],[cx..]]… → BufferGeometry phẳ
 const dome = (r, h, x, y, z, seg = 6) => new THREE.SphereGeometry(r, seg, 3, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, h / r, 1).translate(x, y, z);
 
 // Ô DÙ CHỢ tròn 8 múi (múi chẵn = màu instance, lẻ = bảng B) + mặt dưới tối + diềm 14 cm — ~60 tam giác
-function modelUmbrella(G, R = 1.45, yRim = 1.95, yTop = 2.32, nSeg = 8) {
+function modelUmbrella(G, R = 1.45, yRim = 1.85, yTop = 2.2, nSeg = 8) {   // ô chợ thấp: mép ~1,85 m (camera pano ~2,5 m nhìn thấy mặt trên)
   const P = [];
   const rim = (i, y) => { const a = (i / nSeg) * Math.PI * 2 + Math.PI / nSeg; return [Math.cos(a) * R, y, Math.sin(a) * R]; };
   const top = [[], []], und = [], val = [[], []];
@@ -134,10 +134,10 @@ function modelHeap(G) {
 }
 // BAO TẢI/GẠO chồng — ~50 tam giác
 function modelSacks(G) {
-  const P = [], cs = [0xd8cfb4, 0xeeeae0, 0xd0c4a2, 0xe8e2d0];
-  [[-0.3, 0, 0], [0.3, 0.02, 0], [0, 0.3, 0.02], [0.05, 0.6, 0.0]].forEach(([x, y, z], i) => {
-    P.push(G.finish(G.box(0.48, 0.3, 0.34, x, y + 0.15, z, 0, (i - 1.5) * 0.12, 0), cs[i]));
-    P.push(G.finish(dome(0.2, 0.06, x, y + 0.3, z), cs[i]));
+  const P = [], cs = [0xb8a986, 0xc9bfa6, 0xa89a78, 0xbdb39a];   // bao tải/bao gạo cũ (be đục — trắng tinh nhìn như khối nhựa)
+  [[-0.27, 0, 0], [0.27, 0.02, 0], [0, 0.27, 0.02]].forEach(([x, y, z], i) => {
+    P.push(G.finish(G.box(0.42, 0.27, 0.3, x, y + 0.135, z, 0, (i - 1) * 0.12, 0), cs[i]));
+    P.push(G.finish(dome(0.18, 0.05, x, y + 0.27, z), cs[i]));
   });
   return G.mergeParts(P);
 }
@@ -208,7 +208,7 @@ function modelGoods(G) {
   P.push(G.finish(G.box(0.6, 0.45, 0.45, -0.3, 0.225, 0), 0xb08a5a));
   P.push(G.finish(G.box(0.5, 0.4, 0.4, -0.28, 0.65, 0.02, 0, 0.2, 0), 0xa47e50));
   P.push(G.finish(G.box(0.55, 0.5, 0.5, 0.35, 0.25, 0.05), 0x9ab8c8));
-  P.push(G.finish(G.box(0.4, 0.3, 0.35, 0.32, 0.65, 0.05), 0xffffff, 2));
+  P.push(G.finish(G.box(0.4, 0.3, 0.35, 0.32, 0.65, 0.05), 0x8a9aa6));
   return G.mergeParts(P);
 }
 // XE BA GÁC (xe máy kéo thùng hàng — 22 pano nhắc: chợ Hạ Lý 092, Tam Bạc 207…): đầu xe máy + thùng phẳng thành thấp
@@ -385,6 +385,7 @@ export const signCategory = (t) => { const s = String(t || '').toUpperCase(); fo
 //     tôn giáo/công sở/cổng/địa danh (không xe máy/chợ/quán/đồ hè — pano_276 chùa, 524 cổng Hải Thành)
 export function marketLevels(P) {
   const { sides, cellPos, XS } = P;
+  const inBuildingAt = P.inBuilding;
   const st = P.st, T0 = performance.now();
   // ---- mức chợ từng ô ----
   const mk = P.MARKETS.map((m) => { let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9; for (const [x, z] of m.poly) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); } return { poly: m.poly, bb: [x0 - 80, z0 - 80, x1 + 80, z1 + 80] }; });
@@ -399,7 +400,14 @@ export function marketLevels(P) {
       // sân trước công trình tôn giáo/công sở/cổng (ô dựng tay hoặc địa danh ngay sau mặt tiền) → không xe máy/chợ/đồ hè
       // dò 3 điểm sau mặt tiền (1,5 / 4 / 8 m): công trình có sân trước lùi sâu (chùa 276 lùi ~10 m sau sân lát)
       let cb = null;
-      for (const d of [1.5, 4, 8]) { const [bx, bz] = cellPos(S, k, X.fac + d); const c = P.claimAt(bx, bz, ['cell', 'landmark', 'civic']); if (c && (c.kind !== 'cell' || isForecourtName(c.name) || isMarketName(c.name))) { cb = c; break; } if (!cb && c) cb = c; }
+      // (dò sâu tới 17 m chỉ khi chưa gặp nhà THẬT — có dãy nhà phố đứng trước thì công trình phía sau không phải sân trước)
+      for (const d of [1.5, 4, 8, 12, 17]) {   // chùa HBT 276: điện lùi ~16 m sau sân lát
+        const [bx, bz] = cellPos(S, k, X.fac + d);
+        const c = P.claimAt(bx, bz, ['cell', 'landmark', 'civic']);
+        if (c && (c.kind !== 'cell' || isForecourtName(c.name) || isMarketName(c.name))) { cb = c; break; }
+        if (!cb && c) cb = c;
+        if (!c && inBuildingAt(bx, bz)) break;
+      }
       let mClaim = !!(cb && isMarketName(cb.name));
       if (cb && !mClaim && (cb.kind !== 'cell' || isForecourtName(cb.name))) { S.fore[k] = 1; st.forecourt++; }
       if (!mClaim) { const [cx2, cz2] = cellPos(S, k, X.fac + 8); const c2 = P.claimAt(cx2, cz2, ['cell']); mClaim = !!(c2 && isMarketName(c2.name)); }
