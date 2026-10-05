@@ -905,13 +905,14 @@ export function buildProps(ctx) {
     for (let k = 1; k < S.n - 1; k++) {
       if (!S.ok[k] || S.occ[k]) continue;
       const e = S.ev[k], hk = hash3(S.ax + k * 3.1, S.az + S.side, 171);
-      if (hk >= (e && (e[9] & 512) ? 0.12 : 0.0045)) continue;   // lọc rẻ trước khi tính toạ độ
+      if (hk >= (e && (e[9] & 512) ? 0.12 : 0.003)) continue;   // lọc rẻ trước khi tính toạ độ
       const [x, z] = cellPos(S, k, X.fac - 0.9);
       const near = e && (e[9] & 512) && Math.hypot(e[0] - x, e[1] - z) < 35;
-      const p = near ? 0.12 : (S.c === 's' || S.c === 't') && X.sw >= 3 && Math.hypot(x, z) < 900 ? 0.0045 : 0;
+      const p = near ? 0.12 : (S.c === 's' || S.c === 't') && X.sw >= 3 && Math.hypot(x, z) < 900 ? 0.003 : 0;
       if (hk >= p) continue;
       const ok = [[-1, -0.6], [1, -0.6], [-1, 0.6], [1, 0.6]].every(([a, b]) => { const qx = x + S.ux * a + S.nx * b, qz = z + S.uz * a + S.nz * b; return !inBuilding(qx, qz) && !onCarriage(qx, qz); });
-      if (!ok || obst.hit(x, z, 1.2) || nearPano(x, z, 4.2) || !flat(x, z)) continue;
+      // khối 2 m cao: ≥ 7 m camera pano (khối xám sát ống kính pano_276 mà ảnh thật trống) — trừ pano có bằng chứng (≥ 4,2 m)
+      if (!ok || obst.hit(x, z, 1.2) || nearPano(x, z, near ? 4.2 : 7) || !flat(x, z)) continue;
       kioskI.push({ x, z, heading: headZ(-S.nx, -S.nz), v: 8, col: pick([0xd8d4c8, 0xc0c4c2, 0xb8c0b4], hash3(x, z, 172)) });
       ctx.addCollider(x, z, 1.0); obst.add(x, z, 1.3); S.occ[k] |= OCC_POLE;
     }
@@ -1237,7 +1238,7 @@ export function buildProps(ctx) {
     // Phố r (W3-E): pano "ô tô đỗ ven đường" 0,1 → 0,4, "đỗ kín hai bên" 0,3 → 0,75 (pano_501/506/496/547/432: phố biệt
     // thự/khu dân cư kín ô tô 2 bên mà game trống); r không pano trong lõi 0,1 → 0,15.
     let fill = S.c === 'r' ? (e0 ? [0.0, 0.4, 0.75][lvl] : [0.0, 0.15, 0.15][lvl]) : [e0 ? 0.04 : 0.2, 0.42, 0.78][lvl];
-    if (S.c === 'p') fill *= 0.7;
+    if (S.c === 'p' && !(e0 && e0[3] >= 1)) fill *= 0.7;   // đại lộ: bớt 30% — trừ khi pano thấy ô tô đỗ (005 Quang Trung)
     if (fill <= 0) continue;
     const roll = S.c === 'r';
     const lat = roll ? curbLine(S.c) - 0.05 : curbLine(S.c) - 0.95;
@@ -1265,10 +1266,12 @@ export function buildProps(ctx) {
       // pano "dày": TÂM xe ≥ 7,5 m (van/tải 8,5 m), 2 đầu xe ≥ 5,5/6,5 m (thay 4/5 m chỉ xét viên nang; 7 m vẫn để
       // SUV tâm 7,3 m chiếm 1/4 khung pano_024). Không "dày": đầu xe ≥ 6,5/8 m (tâm tự ≥ ~8 m vì xe song song lề).
       const ec = evAt(x, z), dense = !!(ec && ec[3] >= 2);
-      // W3-E: pano CÓ ô tô đỗ (car ≥ 1) → xe con được tới tâm 5,5 m / đầu xe 4,5 m (pano_005: SUV trắng + xe đỏ đỗ 4-7 m
-      // trước camera, game trống); xe van/tải/khách giữ luật cũ (pano_024/102: van đỗ sát camera che nửa khung).
+      // W3-E: pano KHÔNG nhắc ô tô đỗ giữ luật WP7 (pano_024/102: van đỗ sát camera che nửa khung mà ảnh thật trống).
       const seen = !!(ec && ec[3] >= 1);
-      const rp = mi >= 4 ? (dense ? 6.5 : 8) : (seen ? 5 : 6.5), rc = mi >= 4 ? (dense ? 8.5 : 8) : (seen ? 6 : 6.5), hx = S.ux * len / 2, hz = S.uz * len / 2;
+      const coachEv = mi === 6;   // xe khách: CHÍNH là bằng chứng của pano (441 "xe khách đỗ nối đuôi" trước camera)
+      // AUDIT3 FP-5 PARKVEH: "viên nang 6,5-8 m quanh MỌI camera pano bỏ chính những xe gần camera nhất" — pano CÓ ô tô đỗ:
+      // xe con tâm ≥ 4,5 m / đầu xe ≥ 3,5 m (đỗ sát cạnh camera như ảnh 005/501/506), van/tải tâm 6,5 / đầu 5,5 m
+      const rp = coachEv ? 5 : mi >= 4 ? (seen ? 5.5 : 8) : (seen ? 3.5 : 6.5), rc = coachEv ? 6 : mi >= 4 ? (seen ? 6.5 : 8) : (seen ? 4.5 : 6.5), hx = S.ux * len / 2, hz = S.uz * len / 2;
       // W3-E: bỏ luật cũ "lakeSD > 18" (cấm ô tô trong 18 m quanh MỌI hồ → phố Quang Trung/Nguyễn Đức Cảnh ven hồ trống
       // trơn, pano 005/028/033 thật có ô tô đỗ phía NHÀ). Nay chỉ cấm phía KÈ/promenade (đi ra phía vỉa hè này lại gần hồ
       // hơn) và sát mép nước (< 6 m); cấm cả bên phố mà phía vỉa là công viên/quảng trường/promenade (322, 542, 065).
@@ -1650,7 +1653,7 @@ export function buildProps(ctx) {
   // móc gỡ lỗi/QA (không dùng trong game): window.__hpProps.sides / .cull()
   if (typeof window !== 'undefined') window.__hpProps = { stats, sides, carRejPts, cull: () => CULL.map((t) => [t.mesh.name, t.mesh.count, t.n]), bikeRows, lists: { stoolI, cartI, aframeI, walkI, standI, sitI, cars: carI.flat(), bikes: bikeI.flat(), cobraI, ornI, poleI, poleLampI, trafoI, binI,
     // W3-E (mkRoad = hàng chợ CỐ Ý lấn dải 1,1 m lòng đường sát bó vỉa — clearance_page bỏ qua như ô tô đỗ)
-    mkOver: LIFE.overI.filter((g) => !g.road), mkGround: LIFE.groundI.filter((g) => !g.road), mkRoad: [...LIFE.groundI, ...LIFE.overI].filter((g) => g.road), spill: LIFE.spillI,
+    mkOver: LIFE.overI.filter((g) => !g.road), mkGround: LIFE.groundI.filter((g) => !g.road), mkRoad: [...LIFE.groundI, ...LIFE.overI, ...LIFE.spillI].filter((g) => g.road), spill: LIFE.spillI.filter((g) => !g.road),
     kioskI, coaches: coachI, covered: coveredI, flagsHouse: LIFE.flagsHouse, banners: LIFE.banners, gates: LIFE.gates } };
   // parkedCars: ô tô đỗ {x,z,heading,len,hw,…} (tâm ở curbLine − 0,95; phố r: curbLine − 0,05) — cho WP8 giao thông né
   // làn đỗ (xe chạy cách bó vỉa ≥ 1,9 m nơi có xe đỗ) mà không phải đọc lại collider

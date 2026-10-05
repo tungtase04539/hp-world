@@ -93,7 +93,7 @@ for (const e of j) {
   const mk = all.replace(/(phố|ngõ( \d+)?|đường) chợ con/g, 'phố cc').replace(/chợ sắt/g, 'tttm').replace(/ghép lệch[^.;|]*/g, '');
   let market = 0;
   if (/chợ dân sinh|chợ cóc|chợ tạm|chợ (rau|cá|hoa|hải sản|quần áo|vải|kim khí|thực phẩm|họp)|phố chợ|khu chợ|dãy chợ|sân chợ|đầu chợ|nhà chợ|ngõ chợ|cổng chợ|cửa ngõ chợ|biến thành chợ|rừng ô|dãy ô\/?dù|kín (các )?sạp|sạp[^.;|]{0,30}(kín|tràn|chiếm|dày|san sát|hai bên)|(sạp|ô\/?dù|bạt)[^.;|]{0,24}(che|phủ) (kín|gần như)|chợ[^.;|]{0,12}họp|họp chợ/.test(mk)) market = 3;
-  else if (/sạp(?! báo| sách| truyện)|quầy chợ|ô\/?dù chợ|dù chợ|giá treo quần áo|bày (hàng|sạp)|hàng ho[áa][^.;|]{0,12}bày|bày[^.;|]{0,12}hàng ho[áa]|lều bạt|quầy (hàng|hoa quả|trái cây)/.test(mk)) market = 2;
+  else if (/sạp(?! báo| sách| truyện| hàng rong)|quầy chợ|ô\/?dù chợ|dù chợ|giá treo quần áo|bày (hàng|sạp)|hàng ho[áa][^.;|]{0,12}bày|bày[^.;|]{0,12}hàng ho[áa]|lều bạt|quầy (hàng|hoa quả|trái cây)/.test(mk)) market = 2;
   else if (/hàng rong|gánh hàng|xe đẩy (bánh|hàng)|ô\/?dù bán hàng|dù bán hàng|ô dù (lớn|bán)|sạp báo/.test(mk)) market = 1;
   let sp = 0;
   if (/ô\s?\/\s?dù|dù\s?\/\s?ô|ô dù|dù (che|chợ|bán|đỏ|lớn|màu|xanh|trắng|tím|cam|hồng|cầu vồng|nhiều|quán)/.test(mk)) sp |= 1;
@@ -119,7 +119,7 @@ for (const e of j) {
   if (/(ô tô|xe con|xe hơi)[^.;|]{0,24}phủ bạt|bạt phủ (ô tô|xe)/.test(all)) deco |= 64;
   if (/ba gác|xe kéo tay|xe cải tiến/.test(all)) deco |= 128;
   if (/xe đạp[^.;|]{0,24}(dựng|đỗ)|(dựng|đỗ)[^.;|]{0,16}xe đạp/.test(all)) deco |= 256;
-  if (/(trạm biến áp|tủ điện|trạm điện)[^.;|]{0,30}(vỉa hè|promenade|mặt đất|lớn|kiốt|kiosk)|(hai|2) tủ/.test(all)) deco |= 512;
+  if (/trạm biến áp[^.;|]{0,30}(vỉa hè|promenade|mặt đất|kiốt|kiosk|hộp)|(tủ điện|trạm điện)[^.;|]{0,12}lớn|(hai|2) (tủ|trạm)/.test(all)) deco |= 512;
   rows.push([Math.round(e.X * 10) / 10, Math.round(e.Z * 10) / 10, bike, car, pole, lamp, cl, market, sp, deco]);
   stat.bike[bike]++; stat.car[car]++; stat.pole[pole]++; stat.lamp[lamp]++; stat.market[market]++;
   for (let b = 0; b < 6; b++) if (cl & (1 << b)) stat.clutter[1 << b] = (stat.clutter[1 << b] || 0) + 1;
