@@ -1322,7 +1322,8 @@ export function buildRealFabric(scene, ctx) {
     // ---- W3-C: BIỂN QUẢNG CÁO TRÊN MÁI (ô chính — thấy từ xa): nhà 3-9 tầng mái bằng, mặt phố chính dài ≥ 6 m; khung tấm
     //      quay ra phố, lùi 1,2 m sau tường, chân 2 cột thép; nội dung = ô BILL (từ chung, không thương hiệu). ~12 tam giác ----
     if (hasFront && fRc === 0 && fL >= 6 && fl >= 3 && fl <= 9 && (rt === ROOF.FLAT_PARAPET || rt === ROOF.FLAT)
-      && rs !== RS.CONS && rs !== RS.NEO && rs !== RS.COL && hh(seed, 501) < ((ev & FEF.BIGSIGN) || (styF & 64) ? 0.1 : 0.022)) {
+      && rs !== RS.CONS && rs !== RS.NEO && rs !== RS.COL
+      && hh(seed, 501) < (((ev & FEF.BIGSIGN) || (styF & 64) ? 0.1 : 0.022) + (D.info && (D.info[b] & INFO.CORNER) ? 0.12 : 0))) {   // nhà GÓC phố (ngã tư pano_327): +12%
       const ex = (fBx - fAx) / fL, ez = (fBz - fAz) / fL, Wb = Math.min(fL * 0.8, 10), Hb = Math.min(3.6, Wb * 0.4);
       const mx = (fAx + fBx) / 2 - fnx * 1.2, mz = (fAz + fBz) / 2 - fnz * 1.2;
       const yRf = y0 + (rt === ROOF.FLAT ? H + 0.25 : H), yb = y0 + H + PARAPET_H + 0.8, yt = yb + Hb;
