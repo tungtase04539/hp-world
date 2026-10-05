@@ -328,17 +328,18 @@ export function buildRiverbanks(scene, deps) {
     // khóm hoa giấy (bougainvillea) ôm lan can ~mỗi 24-40 m: gò lá xanh + chùm hoa tím hồng, cao giữa thấp 2 đầu,
     // rủ ra phía nước (ảnh pano_203 h0/h270)
     bloomAcc += s.L;
-    if (bloomAcc >= 24 && hash(s.x, s.z, 3) < 0.6) {
+    if (bloomAcc >= 30 && hash(s.x, s.z, 3) < 0.45) {
       bloomAcc = 0;
-      const n = 16 + Math.floor(hash(s.x, s.z, 5) * 8), span = 1.6 + hash(s.x, s.z, 6) * 1.4;
+      // khối LIỀN từ gờ lên (không "nấm hồng" lơ lửng): mật độ dày ở dưới, đỉnh vòm giữa; tán rủ ra phía nước (v < 0)
+      const n = 26 + Math.floor(hash(s.x, s.z, 5) * 10), span = 1.3 + hash(s.x, s.z, 6) * 1.1;
       for (let k = 0; k < n; k++) {
         const uu = hash(s.x, s.z, 10 + k) * 2 - 1, u = uu * span;
-        const v = -0.35 + hash(s.x, s.z, 20 + k) * 0.9;
-        const hmax = 1.25 + 0.5 * (1 - uu * uu);
-        const bx2 = s.x + s.tx * u + s.nx * v, bz2 = s.z + s.tz * u + s.nz * v, by = TOP + 0.35 + hash(s.x, s.z, 30 + k) * hmax;
-        const r = 0.2 + hash(s.x, s.z, 40 + k) * 0.2;
+        const v = -0.6 + hash(s.x, s.z, 20 + k) * 0.95;
+        const hmax = 0.9 + 0.7 * (1 - uu * uu), q = hash(s.x, s.z, 30 + k);
+        const bx2 = s.x + s.tx * u + s.nx * v, bz2 = s.z + s.tz * u + s.nz * v, by = TOP + 0.15 + q * q * hmax;
+        const r = 0.24 + hash(s.x, s.z, 40 + k) * 0.22;
         const hc = hash(s.x, s.z, 50 + k);
-        const col = hc < 0.45 ? rgb(hc < 0.22 ? 0x3d6a2c : 0x50803a) : rgb(hc < 0.75 ? 0xc4307c : 0xdc4d93);
+        const col = hc < 0.5 ? rgb(hc < 0.25 ? 0x3a6229 : 0x4b7a35) : rgb(hc < 0.78 ? 0xb52f72 : 0xcf4a8a);
         blob(bloom, bx2, by, bz2, r, col);
       }
       box(bloom, s.x + s.nx * 0.45, TOP + 0.5, s.z + s.nz * 0.45, 0.1, 1.0, 0.1, 0, rgb(0x5a4632));
