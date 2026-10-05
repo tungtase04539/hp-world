@@ -131,24 +131,45 @@ export function buildParcels(scene, ctx = {}) {
   const P = RB_PARCELS || { walls: [], gates: [] };
   const gh = ctx.groundHeightNoDeck || (() => ctx.landH || 2);
   const D = ctx.D, G = ctx.grid;
+  // lưới ô 16 m dùng chung (chỉ mục bbox → danh sách)
+  const GCS = 16, gkey = (i, j) => i * 100003 + j;
+  const gridAdd = (M, x0, z0, x1, z1, id) => { for (let i = Math.floor(x0 / GCS); i <= Math.floor(x1 / GCS); i++) for (let j = Math.floor(z0 / GCS); j <= Math.floor(z1 / GCS); j++) { const k = gkey(i, j); let a = M.get(k); if (!a) M.set(k, (a = [])); a.push(id); } };
+  const gridGet = (M, x, z) => M.get(gkey(Math.floor(x / GCS), Math.floor(z / GCS)));
   const kept = (ctx.cellKept || []).filter((k) => k.hull && k.hull.length >= 3).map((k) => {
     let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9; for (const [x, z] of k.hull) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
     return { hull: k.hull, x0, z0, x1, z1 };
   });
+  const keptGrid = new Map(); kept.forEach((k, i) => gridAdd(keptGrid, k.x0, k.z0, k.x1, k.z1, i));
   const pip = (R, x, z) => { let c = false; for (let i = 0, j = R.length - 1; i < R.length; j = i++) { const [xi, zi] = R[i], [xj, zj] = R[j]; if ((zi > z) !== (zj > z) && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) c = !c; } return c; };
   const st = { runs: 0, gates: 0, booths: 0, len: [0, 0, 0, 0], cutLive: 0, cutCell: 0, cutWater: 0, cutThin: 0, thin: 0, tris: 0 };
+  // ô 16 m có tường dữ liệu đi qua (lọc nhanh khi quét cảnh)
+  const wallCells = new Set();
+  for (const w of P.walls || []) for (let i = 2; i + 1 < w.length; i += 2) {
+    const x = w[i], z = w[i + 1];
+    for (let di = -1; di <= 1; di++) for (let dj = -1; dj <= 1; dj++) wallCells.add(gkey(Math.floor(x / GCS) + di, Math.floor(z / GCS) + dj));
+    if (i + 3 < w.length) { const L = Math.hypot(w[i + 2] - x, w[i + 3] - z), n = Math.ceil(L / 8); for (let k = 1; k < n; k++) { const xx = x + (w[i + 2] - x) * k / n, zz = z + (w[i + 3] - z) * k / n; wallCells.add(gkey(Math.floor(xx / GCS), Math.floor(zz / GCS))); } }
+  }
   // TƯỜNG/RÀO/CỔNG DỰNG TAY đã có (ô cells, khối địa danh W2-E…): mọi mesh MỎNG (bề hẹp ≤ 1,2 m), DÀI (≥ 2,5 m), THẤP (≤ 5 m)
   // chân sát đất — theo HÌNH HỌC, không theo tên (cb_wall_ltt tường mỏ neo pano_515, lm_ubnd_fence…) → không dựng tường đôi
-  const thin = [], TCS = 16, tgrid = new Map(), tkey = (i, j) => i * 100003 + j;
-  if (ctx.scene !== false) {
+  const thin = [], tgrid = new Map();
+  const t1 = performance.now();
+  if (ctx.scene !== false && wallCells.size) {
     const v = new THREE.Vector3();
+    scene.updateMatrixWorld(true);   // 1 lượt O(n) thay vì updateWorldMatrix(cha…) từng mesh
     scene.traverse((o) => {
       if (!o.isMesh || o.isInstancedMesh || o.userData.parcels) return;
       if (/^(roads|sidewalk|ground|water|fab_|dashes|paths|aerial|night_|curb|median|tree|veg)/.test(o.name)) return;
       const g = o.geometry; if (!g || !g.attributes || !g.attributes.position) return;
+      if (!g.boundingSphere) g.computeBoundingSphere();
+      const bs = g.boundingSphere; if (!bs || !isFinite(bs.radius)) return;
+      v.copy(bs.center).applyMatrix4(o.matrixWorld);
+      const sc = o.matrixWorld.getMaxScaleOnAxis(), rad = bs.radius * sc;
+      if (rad > 60) return;   // mesh lớn (gộp/khối) — không phải tấm tường lẻ
+      let near = false;
+      for (let i = Math.floor((v.x - rad) / GCS); i <= Math.floor((v.x + rad) / GCS) && !near; i++) for (let j = Math.floor((v.z - rad) / GCS); j <= Math.floor((v.z + rad) / GCS); j++) if (wallCells.has(gkey(i, j))) { near = true; break; }
+      if (!near) return;
       if (!g.boundingBox) g.computeBoundingBox();
       const bb = g.boundingBox; if (!isFinite(bb.min.x)) return;
-      o.updateWorldMatrix(true, false);
       const cs = [[bb.min.x, bb.min.z], [bb.max.x, bb.min.z], [bb.max.x, bb.max.z], [bb.min.x, bb.max.z]].map(([x, z]) => { v.set(x, bb.min.y, z).applyMatrix4(o.matrixWorld); return [v.x, v.z, v.y]; });
       v.set(bb.min.x, bb.max.y, bb.min.z).applyMatrix4(o.matrixWorld);
       const hgt = v.y - cs[0][2];
@@ -158,15 +179,14 @@ export function buildParcels(scene, ctx = {}) {
       const q = cs.map((c) => [c[0], c[1]]);
       let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9; for (const [x, z] of q) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
       thin.push(q);
-      for (let i = Math.floor((x0 - 1.2) / TCS); i <= Math.floor((x1 + 1.2) / TCS); i++) for (let j = Math.floor((z0 - 1.2) / TCS); j <= Math.floor((z1 + 1.2) / TCS); j++) {
-        const k = tkey(i, j); let a = tgrid.get(k); if (!a) tgrid.set(k, (a = [])); a.push(thin.length - 1);
-      }
+      gridAdd(tgrid, x0 - 1.5, z0 - 1.5, x1 + 1.5, z1 + 1.5, thin.length - 1);
     });
     st.thin = thin.length;
   }
+  st.msThin = Math.round((performance.now() - t1) * 10) / 10;
   const segD = (px, pz, ax, az, bx, bz) => { const dx = bx - ax, dz = bz - az, L2 = dx * dx + dz * dz || 1e-9; let t = ((px - ax) * dx + (pz - az) * dz) / L2; t = t < 0 ? 0 : t > 1 ? 1 : t; return Math.hypot(px - ax - t * dx, pz - az - t * dz); };
   function nearThin(x, z, r) {
-    const a = tgrid.get(tkey(Math.floor(x / TCS), Math.floor(z / TCS))); if (!a) return false;
+    const a = gridGet(tgrid, x, z); if (!a) return false;
     for (const k of a) { const q = thin[k]; if (pip(q, x, z)) return true; for (let i = 0; i < 4; i++) if (segD(x, z, q[i][0], q[i][1], q[(i + 1) % 4][0], q[(i + 1) % 4][1]) < r) return true; }
     return false;
   }
@@ -175,25 +195,27 @@ export function buildParcels(scene, ctx = {}) {
   function blocked(x, z) {
     if (x * x + z * z > maxR * maxR) return 1;
     if (G && D) { const b = G.at(x, z); if (b >= 0 && !(D.dead && D.dead[b])) { st.cutLive++; return 2; } }
-    for (const k of kept) if (x >= k.x0 && x <= k.x1 && z >= k.z0 && z <= k.z1 && pip(k.hull, x, z)) { st.cutCell++; return 3; }
+    const ka = gridGet(keptGrid, x, z);
+    if (ka) for (const i of ka) { const k = kept[i]; if (x >= k.x0 && x <= k.x1 && z >= k.z0 && z <= k.z1 && pip(k.hull, x, z)) { st.cutCell++; return 3; } }
     const g = gh(x, z); if (!(Math.abs(g - LAND) < 1.6)) { st.cutWater++; return 4; }
     if (thin.length && nearThin(x, z, 1.4)) { st.cutThin++; return 5; }
     return 0;
   }
   // cổng theo dãy (khe trong tường)
-  const gatesByRun = new Map();
   const gateList = (P.gates || []).map((a) => ({ x: a[0], z: a[1], ang: a[2], w: a[3], kind: a[4], booth: a[5], ev: a[6], col: a[7] | 0 }));
   const solid = new GB(), rail = new GB();
   const segs = [];   // va chạm [ax, az, bx, bz, halfT]
-  const gateHit = (x, z) => { for (const g of gateList) if (Math.hypot(x - g.x, z - g.z) < g.w / 2 + 0.55) return g; return null; };
+  const gateGrid = new Map(); gateList.forEach((g, i) => gridAdd(gateGrid, g.x - g.w, g.z - g.w, g.x + g.w, g.z + g.w, i));
+  const gateHit = (x, z) => { const a = gridGet(gateGrid, x, z); if (a) for (const i of a) { const g = gateList[i]; if (Math.hypot(x - g.x, z - g.z) < g.w / 2 + 0.55) return g; } return null; };
+  const t2 = performance.now();
   for (const w of P.walls || []) {
     const kind = w[0], col = w[1], pts = [];
     for (let i = 2; i + 1 < w.length; i += 2) pts.push([w[i], w[i + 1]]);
-    // LẤY MẪU 0,5 m dọc polyline → đoạn liên tục không bị chặn, không trùng khe cổng
+    // LẤY MẪU ~0,8 m dọc polyline → đoạn liên tục không bị chặn, không trùng khe cổng
     const pieces = [];
     for (let i = 0; i + 1 < pts.length; i++) {
       const [ax, az] = pts[i], [bx, bz] = pts[i + 1], L = Math.hypot(bx - ax, bz - az); if (L < 0.2) continue;
-      const ux = (bx - ax) / L, uz = (bz - az) / L, n = Math.max(1, Math.ceil(L / 0.5));
+      const ux = (bx - ax) / L, uz = (bz - az) / L, n = Math.max(1, Math.ceil(L / 0.8));
       let cur = null;
       for (let k = 0; k <= n; k++) {
         const s = (L * k) / n, x = ax + ux * s, z = az + uz * s;
@@ -303,6 +325,7 @@ export function buildParcels(scene, ctx = {}) {
     }
   }
 
+  st.msWalls = Math.round((performance.now() - t2) * 10) / 10;
   const out = { meshes: [], stats: st, segs };
   if (solid.p.length) {
     const mat = new THREE.MeshLambertMaterial({ vertexColors: true, map: solidTexture() });

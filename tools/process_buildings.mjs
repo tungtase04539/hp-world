@@ -889,6 +889,17 @@ function parcelVeto(s, sg, ta, tb, F, uBase) {
   else if (depth) PWALLS.yards.push(frameRect(F, uBase + ta, uBase + tb, 0, depth));
   return why;
 }
+// W3-B (AUDIT3 GAP 469 — lỗ Overture, không nhà thật nào trong 62 m): lô nằm GẦN pano (≤ 22 m) trong nón quan sát tả nhà
+// ống bán hàng / nhà ở (điểm phiếu ≥ 0,3) là đủ bằng chứng dù phía sau không có footprint thật
+function pkSupport(F, um) {
+  const [x, z] = F.world(um, 6);
+  let nearP = false; PEV.near(x, z, 22, (p) => { if (!nearP && Math.hypot(p.x - x, p.z - z) <= 22) nearP = true; });
+  if (!nearP) return false;
+  const k = PEV.kindAt(x, z);
+  const ok = (k.kind === 'shop' || k.kind === 'home') && k.score >= 0.3;
+  if (ok) stat('gap_pk_support');
+  return ok;
+}
 function fillGap(s, sg, t0, t1) {
   const L = t1 - t0; if (L < 3.5) return;
   const R = rng(hash32(`gap${s.ri}_${s.k}_${sg}_${Math.round(t0 * 10)}`));
@@ -912,7 +923,7 @@ function fillGap(s, sg, t0, t1) {
     if (forecourt(frameRect(F, uBase + ta, uBase + tb, 0, 25))) { stat('gap_veto_forecourt'); GAPDBG.push([mx, mz, 'forecourt']); continue; }
     if (panoOpenVeto(frameRect(F, uBase + ta, uBase + tb, 0, 12))) { stat('gap_veto_pano'); GAPDBG.push([mx, mz, 'noev']); continue; }
     if (DBG && Math.hypot(mx - DBG[0], mz - DBG[1]) < 8) console.log('   [dbg gap]', mx.toFixed(1), mz.toFixed(1), s.c, 'ev', builtEvidence(mx, mz, s.ux, s.uz, nx, nz), 'obs', obsSupport(frameRect(F, uBase + ta, uBase + tb, 0, 12)));
-    if (!builtEvidence(mx, mz, s.ux, s.uz, nx, nz) && !obsSupport(frameRect(F, uBase + ta, uBase + tb, 0, 12))) { stat('gap_veto_noev'); GAPDBG.push([mx, mz, 'noev']); continue; }
+    if (!builtEvidence(mx, mz, s.ux, s.uz, nx, nz) && !obsSupport(frameRect(F, uBase + ta, uBase + tb, 0, 12)) && !pkSupport(F, uBase + (ta + tb) / 2)) { stat('gap_veto_noev'); GAPDBG.push([mx, mz, 'noev']); continue; }
     const rect = (d) => frameRect(F, uBase + ta, uBase + tb, 0, d);
     let lo = 0, hi = D;
     const okD = (d) => { const Q = rect(d); if (!sweepFree(Q, -1, { corr: true, zones: true })) return false;
@@ -1840,6 +1851,11 @@ for (const b of B) {
     }
   }
   if (style === STYLE.GLASS && floors < 4 && !fixed) floors = 4 + Math.floor(R() * 4);
+  // W3-B (AUDIT3 HEIGHT "nhà kim"/biệt thự 8-10 tầng: 152, 023, 225): đuôi 7-8 tầng bốc thăm KHÔNG cho lô hẹp < 90 m² (thật:
+  // nhà ống 5-6 tầng là trần trên nền 4×15 m) và KHÔNG cho mặt phố khuôn viên / vùng biệt thự (≤ 4 tầng) khi không có số đo.
+  // Không cộng "+1 tầng phố thương mại": trung bình số tầng mặt phố ≤ 25 m quanh 436 pano = 3,00 vs quan sát pano 3,06.
+  if (!fixed && b.area < 90) floors = Math.min(floors, 6);
+  if (!fixed && b.fronts.length && (pkk === 'compound' || zoneAt(cx, cz, nameAt) === 'villa')) floors = Math.min(floors, 4);
   if (b.synth) floors = Math.min(floors, b.interior ? 5 : 7);   // nhà SINH không bao giờ là cao ốc (cao ốc thật có footprint thật)
   if (b.shallow) floors = Math.min(floors, 3);                   // khối cơi nới nông trước nhà lùi: 1-3 tầng
   if (style === STYLE.VILLA) floors = Math.min(floors, 3);
