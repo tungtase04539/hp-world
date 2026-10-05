@@ -156,10 +156,10 @@ function genLayers(S) {
     for (let i = 0; i < 12; i++) blot(F, S, rnd() * S, rnd() * S, (10 + rnd() * 28) * px, (o, k) => { const m = 1 - 0.12 * k; F[o] *= m; F[o + 1] *= m; F[o + 2] *= m * 0.98; });
     put(L_CARO);
   }
-  // ---- 4: GẠCH ĐỎ ĐẤT NUNG (bạc màu nắng — W3-D giảm bão hoà: (172,88,56) → (176,126,110); (168,104,84) vẫn ra cam chói ở pano_115) ----
+  // ---- 4: GẠCH ĐỎ ĐẤT NUNG (bạc màu nắng — W3-D giảm bão hoà: (172,88,56) → (172,134,121); (168,104,84)/(176,126,110) vẫn ra cam (169,113,90) trên ảnh pano_115/166) ----
   {
     const rnd = mulberry(53);
-    tiles(F, S, 4, rnd, (tx, ty, r) => { const l = (r() - 0.5) * 24; return [176 + l, 126 + l * 0.75, 110 + l * 0.7]; }, 0.62);
+    tiles(F, S, 4, rnd, (tx, ty, r) => { const l = (r() - 0.5) * 24; return [172 + l, 134 + l * 0.8, 121 + l * 0.75]; }, 0.62);
     for (let i = 0; i < 10; i++) blot(F, S, rnd() * S, rnd() * S, (10 + rnd() * 26) * px, (o, k) => { const m = 1 - 0.12 * k; F[o] *= m; F[o + 1] *= m; F[o + 2] *= m; });
     put(L_TERRA);
   }
@@ -398,7 +398,7 @@ const MAIN = /* glsl */`
 
 // makeRoadMaterial(THREE, {size, anisotropy, lite}) → MeshPhongMaterial dùng chung cho mọi ô 'roads_*' / 'sidewalk_*'
 // Màu tạm mỗi lớp (trước khi Worker sinh xong texture ~100 ms — buildWorld còn chạy nhiều giây nên thực tế không thấy)
-const PLACEHOLDER = [[156, 153, 148, 128], [166, 162, 152, 255], [176, 172, 164, 255], [172, 136, 122, 255], [176, 126, 110, 255],
+const PLACEHOLDER = [[156, 153, 148, 128], [166, 162, 152, 255], [176, 172, 164, 255], [172, 136, 122, 255], [172, 134, 121, 255],
   [156, 152, 145, 255], [190, 188, 180, 255], [0, 0, 0, 0], [200, 200, 200, 128]];
 // Sinh texture TRONG WORKER (Blob từ chính mã các hàm ở trên) → không tốn ~100 ms main thread lúc tải; lỗi → sinh đồng bộ.
 function genInWorker(S, done) {

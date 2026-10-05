@@ -37,6 +37,7 @@ function paveClass(t0) {
   let t = (t0 || '').toLowerCase();
   t = t.replace(/(bó vỉa|viền|bồn cây|bồn gốc)[^,.;()]*/g, ' ');
   for (const s of t.split(/[;.]/).map((q) => q.trim()).filter(Boolean)) {
+    if (/^(sân|quảng trường)|trước cổng/.test(s)) continue;   // sân/cổng/quảng trường ≠ vỉa hè phố (pano_167 sân trường đỏ → cả Lê Lợi)
     const red = /đỏ|terracotta|hồng|đất nung|nâu/.test(s), grey = /xám|ghi/.test(s), conc = /bê tông|xi măng|đá tấm|granite/.test(s);
     const mix = /caro|ô cờ|bàn cờ|kẻ ô|xen kẽ|xen|pha|phối/.test(s), hex = /lục giác|con sâu|tự chèn|block/.test(s);
     if (red && (grey || mix)) return 3;
