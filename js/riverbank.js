@@ -24,6 +24,7 @@ const isRiverName = (n) => /^Sông/.test(n || '');
 // skip(x,z): vùng không đụng (hộp lưới mịn hồ). Trả về số đỉnh đã nắn.
 export function snapBankGrid(geo, { step, waterSD, isRiverAt, skip, landY, recolor }) {
   const pos = geo.attributes.position, B = 0.72 * step, H = 0.5;
+  const wsnap = new Map();   // đỉnh NƯỚC đã kéo về mép: i → [x, z, sd gốc] (để hoàn tác nếu tạo tam giác đất phủ nước)
   let n = 0;
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i), z = pos.getZ(i);
@@ -44,9 +45,25 @@ export function snapBankGrid(geo, { step, waterSD, isRiverAt, skip, landY, recol
     // dải ±B quanh mép → kéo VỀ MÉP ở cao độ đất; đỉnh nước kế tiếp GIỮ chỗ nhưng dìm SÂU (−60): tam giác bờ dốc gần đứng,
     // phần nhô trên mặt nước ≤ 2/62 cạnh ô (≤ 0,6 m — sau tường kè). (Kéo cả đỉnh nước về "chân kè 3 m" như lưới mịn hồ
     // 5 m sinh tam giác dài dọc bờ nhô lên mặt nước thành NÊM — ô 13,3 m quá thưa cho cách đó.)
-    if (sd >= -B) { pos.setXYZ(i, ex, landY, ez); if (recolor) recolor(i, ex + gx * 1.5, ez + gz * 1.5); }
+    if (sd >= -B) { if (sd < 0) wsnap.set(i, [x, z, sd]); pos.setXYZ(i, ex, landY, ez); if (recolor) recolor(i, ex + gx * 1.5, ez + gz * 1.5); }
     else pos.setY(i, -60);
     n++;
+  }
+  // tam giác cả 3 đỉnh ở cao độ đất mà TÂM nằm trong nước (góc bờ lõm/bậc polygon — pano_221 h270): trả đỉnh nước sâu nhất
+  // về chỗ cũ + dìm sâu
+  const idx = geo.index ? geo.index.array : null;
+  if (idx && wsnap.size) {
+    for (let t = 0; t < idx.length; t += 3) {
+      const a = idx[t], b = idx[t + 1], c = idx[t + 2];
+      if (pos.getY(a) < landY - 0.01 || pos.getY(b) < landY - 0.01 || pos.getY(c) < landY - 0.01) continue;
+      if (!wsnap.has(a) && !wsnap.has(b) && !wsnap.has(c)) continue;
+      const cx = (pos.getX(a) + pos.getX(b) + pos.getX(c)) / 3, cz = (pos.getZ(a) + pos.getZ(b) + pos.getZ(c)) / 3;
+      if (waterSD(cx, cz) > -1.2) continue;
+      let w = -1, ws = 0;
+      for (const v of [a, b, c]) { const s = wsnap.get(v); if (s && s[2] < ws) { ws = s[2]; w = v; } }
+      if (w < 0) continue;
+      const [ox, oz] = wsnap.get(w); pos.setXYZ(w, ox, -60, oz); wsnap.delete(w);
+    }
   }
   if (n) { pos.needsUpdate = true; if (geo.attributes.color) geo.attributes.color.needsUpdate = true; geo.computeVertexNormals(); geo.computeBoundingSphere(); }
   return n;
@@ -100,7 +117,7 @@ function caroTexture() {
   const g = cv.getContext('2d');
   let s = 7; const rnd = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
   const H = S / 2;
-  const cols = [[146, 98, 86], [134, 131, 124], [134, 131, 124], [146, 98, 86]];
+  const cols = [[138, 100, 90], [126, 123, 117], [126, 123, 117], [138, 100, 90]];   // đỏ-xám bạc màu, tương phản thấp
   for (let j = 0; j < 2; j++) for (let i = 0; i < 2; i++) {
     const [r, gg, b] = cols[j * 2 + i], k = 0.94 + rnd() * 0.1;
     g.fillStyle = `rgb(${r * k | 0},${gg * k | 0},${b * k | 0})`; g.fillRect(i * H, j * H, H, H);
@@ -239,7 +256,10 @@ export function buildRiverbanks(scene, deps) {
     // 'strip' = phố chạy dọc nhưng bờ cách xa > 7 m (Tam Bạc đoạn bắc Lạc Long → cửa Cấm, pano_519/336/331): lan can cũ
     // ở MÉP VỈA HÈ, giữa lan can và kè là dải bờ tự phát (lán tôn, bạt) dưới hàng cây cổ thụ — cây đường phố GIỮ.
     const gapW = s.road ? s.road.d - deps.hw(s.road.c) - deps.sw(s.road.c) : 0;
-    const mode = !s.road || s.bridge ? 'wild' : gapW > 7 ? 'strip' : 'prom';
+    // Tam Bạc đoạn BẮC (bắc Lạc Long → cửa Cấm, z < −600): luôn 'strip' — ảnh 519/336/331: hàng cổ thụ + lan can sắt cũ
+    // + dải lán/bạt bên bờ, KHÔNG dải dạo ca-rô (dù bờ gần phố)
+    const north = /Tam Bạc/.test(s.poly.n) && s.z < -600 && s.x < -250;
+    const mode = !s.road || s.bridge ? 'wild' : (gapW > 7 || north) ? 'strip' : 'prom';
     // thuyền gỗ neo dọc bờ tự phát/bờ thường sông Tam Bạc đoạn bắc (ảnh vệ tinh tile 7: thuyền đậu dày 2 bờ)
     if (mode !== 'prom' && /Tam Bạc/.test(s.poly.n) && s.z < -560 && hash(s.x, s.z, 61) < 0.2) boat(s);
     if (mode === 'strip') {

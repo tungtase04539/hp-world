@@ -126,7 +126,7 @@ function deckTexture(twoWay) {
   const W = 64, H = 256;   // u ngang (0..1 = mép trái → mép phải), v dọc 12 m
   const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
   const g = cv.getContext('2d');
-  g.fillStyle = '#7b7a76'; g.fillRect(0, 0, W, H);
+  g.fillStyle = '#62615e'; g.fillRect(0, 0, W, H);
   let s = 11; const rnd = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
   for (let i = 0; i < 2600; i++) { const v = 100 + rnd() * 40 | 0; g.fillStyle = `rgba(${v},${v - 2},${v - 6},0.35)`; g.fillRect(rnd() * W, rnd() * H, 1, 1); }
   g.fillStyle = '#e9e6dc';
@@ -145,7 +145,7 @@ function tileTexture() {
   const g = cv.getContext('2d');
   let s = 5; const rnd = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
   g.fillStyle = '#8f8a82'; g.fillRect(0, 0, S, S);
-  for (let j = 0; j < 2; j++) for (let i = 0; i < 2; i++) { const k = 0.92 + rnd() * 0.12; g.fillStyle = `rgb(${178 * k | 0},${112 * k | 0},${104 * k | 0})`; g.fillRect(i * 32 + 1, j * 32 + 1, 30, 30); }
+  for (let j = 0; j < 2; j++) for (let i = 0; i < 2; i++) { const k = 0.92 + rnd() * 0.12; g.fillStyle = `rgb(${188 * k | 0},${128 * k | 0},${118 * k | 0})`; g.fillRect(i * 32 + 1, j * 32 + 1, 30, 30); }
   for (let i = 0; i < 300; i++) { const v = rnd() < 0.5 ? 0 : 255; g.fillStyle = `rgba(${v},${v},${v},0.07)`; g.fillRect(rnd() * S, rnd() * S, 1.5, 1.5); }
   const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8; t.colorSpace = THREE.SRGBColorSpace;
   return t;
@@ -382,7 +382,7 @@ export function buildBridges(scene, deps) {
     const A0 = mid(arch.z0), A1 = mid(arch.z1);
     if (A0 && A1) {
       const ax = A1[0] - A0[0], az = arch.z1 - arch.z0, AL = Math.hypot(ax, az), ux = ax / AL, uz = az / AL, nx = -uz, nz = ux;
-      const RIB = 14.5, H = arch.h || 38, TILT = 0.22, N = 36;
+      const RIB = 16, H = arch.h || 38, TILT = 0.24, N = 36;
       const ribPt = (sg, t) => {   // t 0..1 dọc vòm
         const along = t * AL, yb = A0[1] + (A1[1] - A0[1]) * t;
         const hh = Math.sin(t * Math.PI) * H;
@@ -440,16 +440,16 @@ export function buildBridges(scene, deps) {
   // pano_285 h90 (cabin kính cạnh lan can phải). deps.lift = {x, z, side:+1 đông} =================
   if (deps.lift) {
     const { x: lx, z: lz } = deps.lift;
-    const top = index.topAt(lx - 9, lz);          // cao độ mặt cầu cạnh tháp
+    const top = index.topAt(lx - 14, lz);         // cao độ mặt cầu cạnh tháp (tim làn bắc ~14,8 m phía tây)
     if (top > 4) {
       const S = 4.2, H = top + 3.2, STEEL = shade(0x6f7a80, 1), GLASS = shade(0x7e9aa6, 1);
       for (const [sx, sz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) box(rail, lx + sx * S / 2, H / 2 + 0.5, lz + sz * S / 2, 0.28, H, 0.28, 0, STEEL);
       for (let y = 3; y < H; y += 3) box(rail, lx, y, lz, S + 0.2, 0.18, S + 0.2, 0, STEEL);
       box(conc, lx, H / 2 + 0.5, lz, S - 0.3, H - 0.6, S - 0.3, 0, GLASS);                     // giếng kính
       box(conc, lx, H + 0.7, lz, S + 0.6, 0.35, S + 0.6, 0, shade(0x5c666b, 1));               // mái
-      box(conc, (lx + (lx - 8.6)) / 2, top - 0.2, lz, 8.6 - S / 2, 0.4, 2.2, 0, CONC_SIDE);       // cầu nối sang mặt cầu
-      box(rail, (lx + (lx - 8.6)) / 2, top + 0.8, lz - 1.05, 8.6 - S / 2, 0.06, 0.06, 0, RAIL);
-      box(rail, (lx + (lx - 8.6)) / 2, top + 0.8, lz + 1.05, 8.6 - S / 2, 0.06, 0.06, 0, RAIL);
+      box(conc, (lx + (lx - 9.6)) / 2, top - 0.2, lz, 9.6 - S / 2, 0.4, 2.2, 0, CONC_SIDE);       // cầu nối sang mặt cầu
+      box(rail, (lx + (lx - 9.6)) / 2, top + 0.8, lz - 1.05, 9.6 - S / 2, 0.06, 0.06, 0, RAIL);
+      box(rail, (lx + (lx - 9.6)) / 2, top + 0.8, lz + 1.05, 9.6 - S / 2, 0.06, 0.06, 0, RAIL);
       if (deps.addCollider) deps.addCollider(lx, lz, 3.0);
       stats.lift = [lx, lz, +top.toFixed(1)];
     }

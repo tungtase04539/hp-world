@@ -15633,7 +15633,10 @@ for (const R of SA_ROWS) saRow(R.cx, R.cz, R.nx, R.nz, R.side, R.front, R.D, R.l
 
 
   // ===== FIX t7 (cell_struct2): CLOVERLEAF cầu Lạc Long (double-loop, thiếu 1 vòng) =====
-  {
+  // W3-F: đây là 2 nút XOẮN của cầu HVT vẽ nhầm thành vòng nhựa NẰM ĐẤT (tâm (−164/−72, −927) vs thật (−133/17, −932)) —
+  // các "tấm nhựa đen" pano_304/349 + 2 collider r 35,5 m chặn lối vào lòng vòng xoắn. Cầu nâng thật do js/bridges.js dựng
+  // → bỏ khối này khi có BRIDGE_WAYS nâng.
+  if (!ELEVATED_RI.size) {
     const _loopPoints = (cx, cz, r, a0, a1, n) => {
       const pts = [];
       for (let i = 0; i <= n; i++) { const a = a0 + (a1 - a0) * (i / n); pts.push([cx + Math.cos(a) * r, cz + Math.sin(a) * r]); }
@@ -19556,7 +19559,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     const br = buildBridges(scene, {
       ways: BRIDGE_WAYS || [], ROADS_DT, groundHeightNoDeck, isWater, LAND_H, panoCams: PANO_CAM,
       roadSurfaceAt: world.roadNet ? world.roadNet.surfaceAt : null, hw: (c) => XS_ROAD_W[c] / 2, sw: (c) => SIDEWALK_W[c] || 0,
-      arch: { z0: -1030, z1: -1200, h: 38 }, lift: { x: -33.5, z: -1003 }, addCollider,
+      arch: { z0: -1012, z1: -1200, h: 40 }, lift: { x: -33.5, z: -995 }, addCollider,
     });
     world.bridges = br;
     console.log('[world] cầu W3-F:', JSON.stringify(br.stats));
