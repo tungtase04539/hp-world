@@ -427,6 +427,58 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-10-05 (W3-A STREET-GEOMETRY)** [ĐỢT 3 WAVE 3 — MẶT CẮT PHỐ THẬT + TIM ĐƯỜNG KHỚP CAMERA (AUDIT3 FP-1)]:
+    **Vấn đề (AUDIT3, 120 pano):** CAMNEAR 44 pano (mặt tiền 1-6 m; camera kẹt trong khối 487/115), điểm TB pano lệch tim
+    ≥ 3 m chỉ 3,07; 4 cơ chế cộng dồn: bề rộng lòng CHỈ theo cấp (r 5,5 → mặt tiền 4,75 m), snapFront kéo nhà thật ≤ 7,2 m
+    ra facadeLine hẹp đó, tim OSM lệch vết xe Google 3-9 m, guard camera 1 m (thật)/3 m (sinh).
+    **ĐO TRƯỚC KHI SỬA (`scratchpad/dot3/W3-A/ana/midbias.mjs`):** tim giữa 2 bức tường Overture (tia vuông góc, trạm có
+    bề rộng tường-tường ≤ 1,25·W25) so với camera pano: vector TB (0,17; 0,11) m, trung vị |.| 1,6 m (= xe chạy làn phải)
+    → Overture và vết xe Street View KHỚP nhau; tim OSM mới là thứ lệch. simplify 6 m chỉ góp ~0,1 m TB (cong Bến Bính 5,6 → 2,4).
+    **MỚI `tools/street_fit.mjs` (process_osm §3c, tất định — md5 mapdata y hệt khi chạy lại):** (A) `measureWalls`: mỗi way
+    p/s/t/r trạm 5 m (bỏ ≤ 14 m quanh way khác, bỏ trạm trong nhà), tia 2 bên ≤ 30 m tới cạnh Overture đầu tiên (cùng phép
+    dịch nguồn MS/GG với process_buildings) → W25 (phân vị 25% tường-tường: khe/sân lùi chỉ làm W LỚN). (B) `chooseWidths`:
+    ghi đè pano `WIDTH_OVERRIDES` (Bến Bính 14, Trần Phú/Tô Hiệu 14 tổng 2 chiều, Lý Tự Trọng 12, Minh Khai 10,5, Dư Hàng 6,5,
+    Hạ Lý 6, Chu Văn An 6,5, ngõ Tam Bạc r 4,5) → tag `width` (sàn = sàn cấp: xe Google đi qua) → Overture (≥ 6 trạm & ≥ 12%):
+    sw = clamp(max(SW_c, 0,2·W), ≤ SW_c+2,5), w = W − 2sw kẹp `W_BOUNDS` p[10,20] s[7,14] t[6,12] r[4,5,9], phần dư → vỉa →
+    gộp theo TÊN+cấp → mặc định cấp. NỬA ĐƯỜNG ĐÔI (oneway + way oneway cùng tên ngược chiều song song 6-24 m) KHÔNG lấy
+    Overture (tia đo qua chiều kia) → giữ cấp. (C) `fitToPanos`: MỎ NEO PANO = hình chiếu camera lên way p/s/t/r gần nhất ≤ 14 m
+    (bỏ: cầu/dốc cầu `^Cầu `/bridge/layer — W3-F; camera trong lòng+1,5 m way khác = nút; ngõ h/w SONG SONG gần hơn = camera
+    trong ngõ, pano_115); dời cần = đưa camera vào lòng (|v − D| ≤ a = max(0,75, nửa lòng − 1,25)) rồi kéo thêm ≤ 3 m về tim
+    tường Overture (≥ 4 trạm ±15 m, IQR ≤ 2,5 m); phiếu nhất quán: camera NGOÀI lòng đòi dời mà camera cùng way ≤ 90 m phần lớn
+    ở phía kia → bỏ; đơn lẻ chỉ tin ≤ 6 m. MỎ NEO TƯỜNG mỗi 10 m (không đường đôi, cách mỏ neo pano > 30 m): D = tim tường kẹp
+    ±3 m, trọng số 0,6. TRƯỜNG DỊCH 2D: d(x) = (Σw·n nᵀ + λI)⁻¹ Σw·D·n, w = K(dọc/45)·K(ngang/12), K(t) = (1−t²)², λ = 0,2·vết
+    (2 ràng buộc gần song song mâu thuẫn KHÔNG khuếch đại — bản λ 0,02 từng dời Tam Bạc 9,7 m), nhân (vết+λ)/vết, mờ dần
+    khi Σw < 0,5, kẹp ≤ max|D|; áp cho MỌI đỉnh ROADS_DT (kể cả ngõ h) + chèn đỉnh 8 m nơi trường ≠ 0 rồi DP 0,2 m → đầu
+    mút chung/chữ T dính nhau, phố vuông góc chỉ TRƯỢT dọc chính nó. (D) đo lại tường trên tim đã dịch, bề rộng = max(2 lượt),
+    rồi `capWidths`: nửa lòng ≤ phân vị 10% tường gần nhất − 0,3 (nhưng ≥ cấp và ≥ |d camera| + 0,9 của mọi camera đang trong
+    lòng way; phần cắt chuyển sang vỉa) và lòng+vỉa không vào đa giác địa danh `LM_POLY` (Bưu điện từng bị lòng mới trùm 56 m²).
+    **Kết quả dữ liệu:** 489 mỏ neo pano (113 dịch ≠ 0), 202 mỏ neo tường, 231 way dời (Chu Văn An 7,4 m, Phan Đình Phùng 5,6,
+    Tam Bạc 5,3, Phan Bội Châu 4,1…); bề rộng riêng 234 way (p TV 16, s 12,7, t 8,2, r 5,5; 140 nửa đường đôi giữ cấp);
+    ROADS_DT 4.091 → 5.194 đỉnh (toạ độ 0,1 m nơi dịch, nguyên chỗ khác); diện tích footprint Overture nằm trên lòng p/s/t/r
+    11.087 → 8.138 m² dù lòng rộng hơn; LM_POLY dưới lòng: Bưu điện 0, NHNN 47 → 8 m².
+    **HỢP ĐỒNG MỚI:** (1) mapdata `ROADS_DT[i]` có thể mang `w` (lòng) / `sw` (vỉa); THỨ TỰ + TẬP way giữ nguyên (bộ lọc độ dài
+    tính trên bản simplify 6 m cũ `ROADS_LEGACY`, cũng dùng cho `nearestRoadFace` → LM_FACE/LM/… BYTE-IDENTICAL; export đổi:
+    ROADS_DT, STREETS, INTERSECTIONS, MEDIANS). (2) `js/xsection.js`: mọi hàm nhận cấp HOẶC way `{c,w?,sw?}` + `roadHW/roadW/
+    sidewalkW`; ĐÃ chuyển sang way: roadnet (way.hw/sw), props (S.w/sw, makeRoadIndex), trees (roadIndex, treePitLine(rd)),
+    world.js 9 chỗ (`XS_HW(r)`: hồ, băng rôn furnitureLine(r), kè hồ, cây ô trOnRoad/trNearestSeg, onRoadM, guard OSM, _majSeg,
+    đèn cột), roadgraph (edge.hw/sw) → traffic làn/người đi bộ, clearance.js (W2-A hành lang), citygen roadGrid, process_buildings,
+    clearance_page. Lớp MỚI bám mép phố: truyền WAY, đừng truyền r.c. (3) `tools/process_buildings.mjs`: SEGS theo way;
+    `SNAP_MAX` 1,5 m (trước 7,2) + mặt tiền KHÔNG được tiến gần camera pano ≤ 15 m hơn footprint gốc; nhà SINH cách camera
+    ≥ 6 m (`SYN_CAM`, synBlocked + camGuard), nhà thật đã sửa ≥ 3 m (trước 3/1). (4) trees `PANO_CLEAR` 4,5 → 6 m (nón ±45° của
+    4 hướng = mọi hướng; áp mọi đường trồng qua buildTrees). (5) Biển ngõ 326 (pano_281) 1,6×0,55 → 0,6×0,3 m, cột lùi 8,5 m.
+    **QA MỚI** `node tools/qa/clearance.mjs --xsec [--repo <worktree khác>] [--ids …] [--out f]` (= `tools/qa/xsec.mjs`, chỉ dữ
+    liệu, 1-2 s, không trình duyệt): 551 camera → lệch tim theo bề rộng way (off>1,5 / ngoài lòng = |v| > nửa lòng − 0,9 /
+    ngoài bó vỉa) + mặt nhà gần nhất mỗi hướng h0/90/180/270 (nón ±45°, tia 2°) game (RB01) vs Overture: `close` = game <
+    thật − 1,5 (S = nhà sinh, R = thật), `near4`, `inside`. dot3 → W3-A: ngoài lòng 128 → 19, ngoài bó vỉa 78 → 9, lệch ≥ 3 m
+    172 → 111, TB 2,37 → 1,97 m, hướng có nhà THẬT gần hơn thật 560 → 45, near4 59 → 0, camera trong nhà 1 → 0; hướng có nhà
+    SINH gần hơn Overture 541 → 566 (= lấp khe/lõi trên đất trống thật: làn W3-B INFILL). Chữ spec "off ≤ 1,5 m" KHÔNG đạt
+    (295): xe Google đi làn phải, lệch tim w/4 là ĐÚNG thật — dùng "ngoài lòng" làm cổng.
+    **BẪY:** (a) tim tường từ 3 trạm đơn lẻ từng kéo Nguyễn Tri Phương 7,4 m (sân lùi 1 bên) → cần ≥ 4 trạm + IQR + kẹp ±3 m;
+    (b) kẹp q10 tường cả way dài từng đẩy 6 camera Phan Đình Phùng ra ngoài bó vỉa → luôn giữ "camera đang trong lòng";
+    (c) bề rộng 1 giá trị/way: địa danh sát 1 đoạn kéo hẹp CẢ way (Cù Chính Lan 10,8 → 8); (d) world.js cell dựng tay theo trục
+    cũ (HB_A… Hai Bà Trưng dời ≤ 3 m) — sweep W2-A (clearance.js theo way) tự lùi nhà lấn hành lang mới; (e) Python ghi file
+    Windows đổi xuống dòng — git autocrlf chuẩn hoá, diff vẫn gọn.
+
 - **2026-10-04 (W2-F POLISH)** [ĐỢT 3 wave 2 — WebGL1, giải mã RB 1 lần, kho cảng, ĐÊM, giao thông né xe đỗ, dọn code chết, hitch]:
     **(1) WebGL1** (three r160 tự lùi WebGL1 khi không có WebGL2): KIỂM bằng `tools/qa/shoot.mjs --gl1` (init script cho
     `getContext('webgl2')` trả null — cờ Chrome `--disable-es3-apis` KHÔNG có tác dụng ở headless mới: vẫn webgl2:true;

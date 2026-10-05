@@ -219,7 +219,7 @@ export function capWidths(roads, widths, walls, polys = [], panos = []) {
     idx.g.query([px - 14, pz - 14, px + 14, pz + 14], (i) => { const s = idx.segs[i]; const d = sdist(px, pz, s[2], s[3], s[4], s[5]); if (!best || d < best.d) best = { d, ri: s[0] }; });
     if (!best) continue;
     const o = widths[best.ri], hwNow = (o.w > 0 ? o.w : ROAD_W[roads[best.ri].c] ?? 5.5) / 2;
-    if (best.d + 0.9 <= hwNow) need[best.ri] = Math.max(need[best.ri], best.d + 0.9);
+    if (best.d < hwNow) need[best.ri] = Math.max(need[best.ri], Math.min(hwNow, best.d + 0.9));
   }
   roads.forEach((r, ri) => {
     const o = widths[ri]; if (!STREET[r.c] || !(o.w > 0)) return;
