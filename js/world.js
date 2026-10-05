@@ -47,7 +47,7 @@ import { furnitureLine } from './xsection.js';
 // Mạng đường thật (Đợt 3 WP6): đồ thị nút giao + dải + vỉa hè/bó vỉa + vạch kẻ trong shader
 import { buildRoadNet } from './roadnet.js';
 import { makeRoadMaterial } from './roadtex.js';
-import { ROAD_MARK_EVIDENCE } from './roadmarks.js';
+import { ROAD_MARK_EVIDENCE, ROAD_MARK_LABELS, OSM_SIGNALS, OSM_CROSSINGS, ROAD_PAVE_EVIDENCE } from './roadmarks.js';
 import { ROAD_W as XS_ROAD_W } from './xsection.js';
 
 // Thế giới dựng từ dữ liệu OpenStreetMap thật của Hải Phòng (tỉ lệ 1:10,
@@ -196,19 +196,19 @@ function sidewalkMaterial(type) {
   if (_swMatCache[type]) return _swMatCache[type];
   const S = 256;
   const tex = makeTex(S, S, (g, w, h) => {
-    if (type === 'caro_do_xam') {                       // gạch kè hồ Tam Bạc THEO PANO_004:
-      // nền gạch đỏ đất nung TRẦM là chủ đạo, điểm viên xám nhạt rải rác — KHÔNG phải
-      // ca-rô đỏ/trắng xen kẽ đều (user đối chiếu pano chê sai)
-      const s = w / 4;
-      for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) {
+    if (type === 'caro_do_xam') {                       // gạch kè hồ Tam Bạc (W3-D, đo ảnh pano 004/010/028/405):
+      // viên 40×20 cm xen kẽ ĐỎ HỒNG đất nung BẠC MÀU ↔ XÁM như bàn cờ (đỏ:xám ≈ 1:1). Bản cũ "đỏ trầm chủ đạo 88%"
+      // (158,82,58) → ảnh game đo đỏ (136,53,38) phủ kín kè — AUDIT3 PAVE 028/198 "checker too saturated".
+      const C = 4, R = 8, bw = w / C, bh = h / R;
+      for (let y = 0; y < R; y++) for (let x = 0; x < C; x++) {
         const rr = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453, rv = rr - Math.floor(rr);
-        g.fillStyle = rv < 0.72 ? jitter([158, 82, 58], 12)          // đỏ đất nung trầm (chủ đạo)
-          : rv < 0.88 ? jitter([142, 70, 50], 10)                    // đỏ sẫm
-          : jitter([160, 152, 138], 10);                             // xám nhạt điểm xuyết
-        g.fillRect(x * s, y * s, s, s);
+        const red = ((x + y) & 1) === 0 ? rv > 0.04 : rv < 0.04;
+        g.fillStyle = red ? jitter([180, 112, 94], 9) : jitter([167, 162, 153], 9);
+        g.fillRect(x * bw, y * bh, bw, bh);
       }
-      g.strokeStyle = 'rgba(40,20,12,.28)'; g.lineWidth = 2;
-      for (let i = 0; i <= 4; i++) { g.beginPath(); g.moveTo(i * s, 0); g.lineTo(i * s, h); g.moveTo(0, i * s); g.lineTo(w, i * s); g.stroke(); }
+      g.strokeStyle = 'rgba(40,30,25,.30)'; g.lineWidth = 2;
+      for (let i = 0; i <= C; i++) { g.beginPath(); g.moveTo(i * bw, 0); g.lineTo(i * bw, h); g.stroke(); }
+      for (let i = 0; i <= R; i++) { g.beginPath(); g.moveTo(0, i * bh); g.lineTo(w, i * bh); g.stroke(); }
       speckle(g, w, h, 260, 0.08);
     } else if (type === 'terracotta') {                 // gạch đỏ đất nung liền (một vài đoạn)
       tileGrid(g, w, h, 4, [174, 86, 52], 16, 'rgba(70,30,15,.30)'); speckle(g, w, h, 300, 0.10);
@@ -890,6 +890,7 @@ export async function buildWorld(scene, prog = () => {}) {
     const net = buildRoadNet(ROADS_DT, {
       groundHeightNoDeck, groundHeight, isWater, LAND_H, R: BUILD_RADIUS, T: 450, MEDIANS, bridges: BRIDGES,
       swTypeOf: (ri) => SIDEWALK_BY_ROAD[ri] || SIDEWALK_DEFAULT, MARKS: ROAD_MARK_EVIDENCE,
+      LABELS: ROAD_MARK_LABELS, OSM_SIGNALS, OSM_CROSSINGS, PAVE: ROAD_PAVE_EVIDENCE,   // W3-D: vạch/zebra/đèn/vật liệu vỉa hè theo BẰNG CHỨNG
     });
     const rmat = makeRoadMaterial(THREE, { size: LITE ? 256 : 512, anisotropy: LITE ? 4 : 8, lite: LITE });
     let tris = 0;
