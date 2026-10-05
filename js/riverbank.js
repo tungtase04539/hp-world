@@ -36,6 +36,9 @@ export function snapBankGrid(geo, { step, waterSD, isRiverAt, skip, landY, recol
     const gl = Math.hypot(gx, gz); if (gl < 1e-4) continue;
     gx /= gl; gz /= gl;
     const ex = x - gx * sd, ez = z - gz * sd;           // điểm trên mép
+    // mép THẬT phải có đất ngay sau nó: cạnh CHUNG giữa 2 polygon sông (Tam Bạc 2 mảnh nối ở z≈−566) cũng có |sd| nhỏ
+    // → nắn đỉnh nước về đó thành "gờ đất" giữa lòng sông (vệt nêm trắng/cỏ pano_221 h270)
+    if (waterSD(ex + gx * 1.5, ez + gz * 1.5) < 0.3) continue;
     // kênh hẹp: phía nước bên kia mép phải còn nước ≥ B + 8 m — không thì bỏ (nắn sẽ lấp lòng kênh)
     if (waterSD(ex - gx * (B + 8), ez - gz * (B + 8)) > -2) continue;
     if (sd >= -B) { pos.setXYZ(i, ex, landY, ez); if (recolor) recolor(i, ex + gx * 1.5, ez + gz * 1.5); }
@@ -185,7 +188,7 @@ export function buildRiverbanks(scene, deps) {
         const px = r.ax + ux * Math.max(0, Math.min(l, t)), pz = r.az + uz * Math.max(0, Math.min(l, t));
         const d = Math.hypot(s.x - px, s.z - pz);
         if ((px - s.x) * s.nx + (pz - s.z) * s.nz < 0.5 * d) continue;      // phố phải ở phía ĐẤT
-        const lim = deps.keClear(r.c) + 5;
+        const lim = deps.keClear(r.c) + 25;               // ≤ +5: dải dạo; xa hơn: dải bờ "tự phát" (xem dưới)
         if (d > lim) continue;
         if (d < bd) { bd = d; best = { si, d, c: r.c, px, pz, ux, uz }; }
       }
@@ -198,6 +201,8 @@ export function buildRiverbanks(scene, deps) {
   for (let i = 1; i < S.length - 1; i++) if (!S[i].road && S[i - 1].road && S[i + 1].road && S[i - 1].poly === S[i + 1].poly) S[i].road = S[i - 1].road;
 
   const wall = Buf(), cap = Buf(), pave = Buf(), plinth = Buf(), iron = Buf(), panel = Buf(), lamp = Buf(), bloom = Buf();
+  const shackB = Buf(), boatB = Buf();
+  stats.stripM = 0; stats.stripN = 0; stats.shacks = 0; stats.boats = 0;
   const C_TOP = rgb(0xbdb6a6), C_MID = rgb(0x968e7c), C_LOW = rgb(0x5d5a48), C_CAP = rgb(0xc9c3b4);
   const C_IRON = rgb(0x2c4a3a), C_LAMP = rgb(0x1f2a26);
   const saplings = [], keepSegs = new Set(), lampGlobes = [];
@@ -227,8 +232,19 @@ export function buildRiverbanks(scene, deps) {
       if (up) quad(cap, [c1x, y, c1z], [c2x, y, c2z], [c3x, y, c3z], [c4x, y, c4z], [0, 1, 0], C_CAP);
       else quad(cap, [c4x, y, c4z], [c3x, y, c3z], [c2x, y, c2z], [c1x, y, c1z], [0, 1, 0], C_CAP);
     }
-    const prom = !!s.road && !s.bridge;
-    if (!prom) { stats.wildM += s.L; continue; }
+    // phân loại bờ: 'prom' = dải dạo sát phố (bờ cách mép vỉa hè ≤ 7 m — Tam Bạc đoạn cong/tây, pano_198-212, 290-299);
+    // 'strip' = phố chạy dọc nhưng bờ cách xa > 7 m (Tam Bạc đoạn bắc Lạc Long → cửa Cấm, pano_519/336/331): lan can cũ
+    // ở MÉP VỈA HÈ, giữa lan can và kè là dải bờ tự phát (lán tôn, bạt) dưới hàng cây cổ thụ — cây đường phố GIỮ.
+    const gapW = s.road ? s.road.d - deps.hw(s.road.c) - deps.sw(s.road.c) : 0;
+    const mode = !s.road || s.bridge ? 'wild' : gapW > 7 ? 'strip' : 'prom';
+    // thuyền gỗ neo dọc bờ tự phát/bờ thường sông Tam Bạc đoạn bắc (ảnh vệ tinh tile 7: thuyền đậu dày 2 bờ)
+    if (mode !== 'prom' && /Tam Bạc/.test(s.poly.n) && s.z < -560 && hash(s.x, s.z, 61) < 0.2) boat(s);
+    if (mode === 'strip') {
+      stats.stripM += s.L;
+      stripRail(s); if (hash(s.x, s.z, 71) < 0.17 && gapW > 4) shack(s, gapW);
+      continue;
+    }
+    if (mode === 'wild') { stats.wildM += s.L; continue; }
     stats.promM += s.L;
     keepSegs.add(s.road.si);
     // mặt lát dải dạo: ca-rô LIỀN từ gờ kè (+0,45) tới sát bó vỉa (d − hw − 0,15) — phủ luôn vỉa hè phố phía sông
@@ -306,6 +322,42 @@ export function buildRiverbanks(scene, deps) {
       stats.bloom++;
     }
   }
+  // lan can dải bờ tự phát: song sắt sẫm thấp trên gờ, chạy THEO PHỐ ở mép vỉa hè (+0,5 m)
+  function stripRail(s) {
+    const r = s.road, dl = Math.hypot(s.x - r.px, s.z - r.pz) || 1, wx = (s.x - r.px) / dl, wz = (s.z - r.pz) / dl;
+    const off = deps.hw(r.c) + deps.sw(r.c) + 0.5, cx = r.px + wx * off, cz = r.pz + wz * off, ang = Math.atan2(r.ux, r.uz);
+    const y0 = TOP - 0.2;
+    box(plinth, cx, y0 + 0.2, cz, 0.3, 0.4, s.L + 0.05, ang, rgb(0xb9b3a5));
+    const ex = r.ux * (s.L / 2 + 0.02), ez = r.uz * (s.L / 2 + 0.02), yb = y0 + 0.4, yt = y0 + 1.1;
+    quad(panel, [cx - ex, yb, cz - ez], [cx + ex, yb, cz + ez], [cx + ex, yt, cz + ez], [cx - ex, yt, cz - ez], [wx, 0, wz], [1, 1, 1], [[0, 0], [s.L / 2, 0], [s.L / 2, 1], [0, 1]]);
+    box(iron, cx, yt + 0.03, cz, 0.07, 0.06, s.L + 0.05, ang, rgb(0x2a2f2b));
+    if (deps.addCollider && (stats.stripN++ % 2) === 0) deps.addCollider(cx + wx * 0.8, cz + wz * 0.8, 0.9);
+  }
+  // lán tôn/bạt tự phát giữa lan can và kè (ảnh pano_519 h180: mái tôn xanh, bạt cam/xanh, thấp ~2,4 m)
+  function shack(s, gapW) {
+    const dep = Math.min(gapW - 1.2, 4), wid = 3 + hash(s.x, s.z, 72) * 2.5, h = 2.2 + hash(s.x, s.z, 73) * 0.6;
+    const cx = s.x + s.nx * (0.3 + dep / 2), cz = s.z + s.nz * (0.3 + dep / 2), ang = Math.atan2(s.tx, s.tz);
+    const gy = TOP - 0.25;
+    const wallC = [rgb(0x8a8578), rgb(0x6f7a83), rgb(0x9b8f74)][Math.floor(hash(s.x, s.z, 74) * 3)];
+    box(shackB, cx, gy + h / 2, cz, dep, h, wid, ang, wallC);
+    const roofC = [rgb(0x2f6aa8), rgb(0x8c4a2e), rgb(0x7d8487), rgb(0xd9772b)][Math.floor(hash(s.x, s.z, 75) * 4)];
+    box(shackB, cx, gy + h + 0.06, cz, dep + 0.9, 0.08, wid + 0.6, ang, roofC);
+    if (hash(s.x, s.z, 76) < 0.6) {   // bạt che phía trước
+      const bx = cx - s.nx * (dep / 2 + 0.6), bz = cz - s.nz * (dep / 2 + 0.6);
+      box(shackB, bx, gy + h - 0.35, bz, 1.2, 0.05, wid * 0.9, ang, hash(s.x, s.z, 77) < 0.5 ? rgb(0xd9772b) : rgb(0x2f7fc1));
+    }
+    stats.shacks++;
+  }
+  // thuyền gỗ neo sát kè (thân thon 2 đầu + mui bạt)
+  function boat(s) {
+    const L = 6.5 + hash(s.x, s.z, 62) * 3, Wd = 1.7 + hash(s.x, s.z, 63) * 0.5, off = 1.8 + Wd / 2 + hash(s.x, s.z, 64) * 1.2;
+    const cx = s.x - s.nx * off, cz = s.z - s.nz * off, ang = Math.atan2(s.tx, s.tz) + (hash(s.x, s.z, 65) - 0.5) * 0.12;
+    const hull = rgb(hash(s.x, s.z, 66) < 0.5 ? 0x4a3a2c : 0x3d5560);
+    box(boatB, cx, 0.25, cz, Wd, 0.75, L * 0.7, ang, hull);
+    for (const sg of [-1, 1]) box(boatB, cx + s.tx * sg * L * 0.4, 0.35, cz + s.tz * sg * L * 0.4, Wd * 0.55, 0.6, L * 0.18, ang, hull);
+    if (hash(s.x, s.z, 67) < 0.7) box(boatB, cx, 1.05, cz, Wd * 0.9, 0.85, L * 0.32, ang, rgb(hash(s.x, s.z, 68) < 0.5 ? 0x2f6aa8 : 0x6b6a5c));
+    stats.boats++;
+  }
   function blob(B, x, y, z, r, col) {   // khối lá/hoa: bát diện dẹt 8 mặt
     const P = [[x + r, y, z], [x, y, z + r], [x - r, y, z], [x, y, z - r]], T = [x, y + r * 0.7, z], D = [x, y - r * 0.6, z];
     for (let k = 0; k < 4; k++) {
@@ -334,6 +386,8 @@ export function buildRiverbanks(scene, deps) {
   add(iron, vc(), 'riverbank_iron');
   add(lamp, vc(), 'riverbank_lamps');
   add(bloom, vc(), 'riverbank_bloom');
+  add(shackB, vc(), 'riverbank_shacks');
+  const bm = add(boatB, vc(), 'riverbank_boats'); if (bm) bm.castShadow = true;
   add(pave, new THREE.MeshLambertMaterial({ map: caroTexture() }), 'riverbank_promenade');
   // tấm hoa văn: alphaTest, 2 mặt; KHÔNG transparent (gộp được) — bóng: customDepth không cần (tắt cast)
   const pm = add(panel, new THREE.MeshLambertMaterial({ map: railTexture(), alphaTest: 0.5, side: THREE.DoubleSide }), 'riverbank_railpanel', false);
@@ -355,7 +409,7 @@ export function buildRiverbanks(scene, deps) {
     }
     return false;
   } : () => false;
-  stats.promM = Math.round(stats.promM); stats.wildM = Math.round(stats.wildM);
+  stats.promM = Math.round(stats.promM); stats.wildM = Math.round(stats.wildM); stats.stripM = Math.round(stats.stripM);
   stats.ms = Math.round(performance.now() - t0);
   return { stats, saplings, keep, meshes };
 }

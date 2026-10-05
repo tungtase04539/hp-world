@@ -436,6 +436,25 @@ export function buildBridges(scene, deps) {
     }
   }
 
+  // ================= THÁP THANG MÁY bộ hành (cạnh nhịp chính, bờ nam) — ảnh pano_304 h90 (tháp khung thép kính ở trái),
+  // pano_285 h90 (cabin kính cạnh lan can phải). deps.lift = {x, z, side:+1 đông} =================
+  if (deps.lift) {
+    const { x: lx, z: lz } = deps.lift;
+    const top = index.topAt(lx - 9, lz);          // cao độ mặt cầu cạnh tháp
+    if (top > 4) {
+      const S = 4.2, H = top + 3.2, STEEL = shade(0x6f7a80, 1), GLASS = shade(0x7e9aa6, 1);
+      for (const [sx, sz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) box(rail, lx + sx * S / 2, H / 2 + 0.5, lz + sz * S / 2, 0.28, H, 0.28, 0, STEEL);
+      for (let y = 3; y < H; y += 3) box(rail, lx, y, lz, S + 0.2, 0.18, S + 0.2, 0, STEEL);
+      box(conc, lx, H / 2 + 0.5, lz, S - 0.3, H - 0.6, S - 0.3, 0, GLASS);                     // giếng kính
+      box(conc, lx, H + 0.7, lz, S + 0.6, 0.35, S + 0.6, 0, shade(0x5c666b, 1));               // mái
+      box(conc, (lx + (lx - 8.6)) / 2, top - 0.2, lz, 8.6 - S / 2, 0.4, 2.2, 0, CONC_SIDE);       // cầu nối sang mặt cầu
+      box(rail, (lx + (lx - 8.6)) / 2, top + 0.8, lz - 1.05, 8.6 - S / 2, 0.06, 0.06, 0, RAIL);
+      box(rail, (lx + (lx - 8.6)) / 2, top + 0.8, lz + 1.05, 8.6 - S / 2, 0.06, 0.06, 0, RAIL);
+      if (deps.addCollider) deps.addCollider(lx, lz, 3.0);
+      stats.lift = [lx, lz, +top.toFixed(1)];
+    }
+  }
+
   // ================= CẦU PHẲNG: lan can con tiện trắng + dầm biên + trụ trong nước =================
   // (mặt đường/vỉa hè sơn đỏ-trắng do roadnet vẽ ở LAND_H; ở đây chỉ phần "cầu": lan can ở MÉP NGOÀI vỉa hè, dầm biên từ
   //  mặt vỉa hè xuống dưới mặt nước, trụ vuông dưới mép ~ 18 m/trụ) — chỉ đoạn trên nước + 14 m mỗi bên.

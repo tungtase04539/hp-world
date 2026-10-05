@@ -19546,7 +19546,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     const br = buildBridges(scene, {
       ways: BRIDGE_WAYS || [], ROADS_DT, groundHeightNoDeck, isWater, LAND_H, panoCams: PANO_CAM,
       roadSurfaceAt: world.roadNet ? world.roadNet.surfaceAt : null, hw: (c) => XS_ROAD_W[c] / 2, sw: (c) => SIDEWALK_W[c] || 0,
-      arch: { z0: -1030, z1: -1200, h: 38 },
+      arch: { z0: -1030, z1: -1200, h: 38 }, lift: { x: -33.5, z: -1003 }, addCollider,
     });
     world.bridges = br;
     console.log('[world] cầu W3-F:', JSON.stringify(br.stats));
