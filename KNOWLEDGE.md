@@ -447,7 +447,9 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     **Hàng tràn hè** theo chữ biển hiệu thật (SHOP_SIGNS → `signCategory`: cafe/food/furn/bike/toys/fruit/flower/cloth/hard/
     plant — chỉ chọn đồ, chữ không hiển thị; SHOP_SIGNS đã lọc thương hiệu nên regex chỉ dùng từ chung): quán cà phê = bộ bàn
     ghế + dù 70%, cửa hàng xe máy = 1-2 hàng xe MỚI mũi ra đường, nội thất/bàn thờ+két, đồ chơi, giá treo quần áo, xô hoa,
-    hàng chồng; + theo bằng chứng pano (spill bits ≤ 25 m) + chậu cây trước nhà (3% ô lõi).
+    hàng chồng; + theo bằng chứng pano (spill bits ≤ 25 m) + chậu cây trước nhà (3% ô lõi). Đồ của nhà (chậu, hàng
+    tràn) CHỈ đặt khi có mặt tiền nhà thật ngay sau ô (`hasFacade`: dò facadeLine −0,3…+2,5 m) — bản đầu có chậu cây giữa vỉa hè
+    nút giao HVT (304).
     **Ô tô** (props.js 6.6): bỏ luật `lakeSD > 18` (cấm ô tô 18 m quanh MỌI hồ → Quang Trung/Nguyễn Đức Cảnh trống) → chỉ cấm
     phía kè (đi ra phía vỉa lại gần hồ hơn) + phía vỉa là công viên/quảng trường (322/542/065); nút giao: tâm/đầu xe cách LÒNG
     phố p/s cắt ngang ≥ 12 m, t/r ≥ 6,6 m, ngõ 4,5 m (`roadIdx.nearCross`; 15 m mọi nút bỏ ~25% ô tô lõi); phố r có pano: "đỗ ven đường" 0,4, "kín hai bên"
