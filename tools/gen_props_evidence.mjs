@@ -111,7 +111,8 @@ for (const e of j) {
   let deco = 0;
   if (/cờ đỏ sao vàng|cờ tổ quốc|treo cờ|dãy cờ|cờ treo|cờ (đỏ|búa liềm|hội)/.test(all)) deco |= 1;
   if (/(băng rôn|băng-rôn|khẩu hiệu|pano)[^.;|]{0,40}(ngang|căng|qua phố|qua đường)|căng ngang/.test(all)) deco |= 2;
-  if (/cổng chào/.test(all)) deco |= 4;
+  // cổng chào NGÕ/khu dân cư (097/113/277/366/495/505) — không tính cổng trường/công viên (050/324/355: cổng khuôn viên)
+  if (/cổng chào[^.;|]{0,60}(ngõ|khu dân cư|lối vào|văn ho[áa]|khung sắt|băng rôn)/.test(all) && !/cổng chào\)?[^.;|]{0,40}(trường|công viên|mầm non)/.test(all)) deco |= 4;
   if (/(lan can|hàng rào|rào)[^.;|]{0,16}(trắng|con tiện)|con tiện trắng|balustrade/.test(all)) deco |= 8;
   if (/hàng rào sắt|rào sắt|hàng rào song sắt/.test(all)) deco |= 16;
   if (/xe khách[^.;]*(đỗ|đậu|nối)|(đỗ|đậu)[^.;]*xe khách|bến (xe|đỗ) xe khách/.test(all)) deco |= 32;

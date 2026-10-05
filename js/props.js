@@ -761,7 +761,7 @@ export function buildProps(ctx) {
   const SL = {
     sides, CELL, cellPos, hash3, evAt, inBuilding, obst, flat, roadIdx, nearPano, onCarriage, openSpace, claimAt, XS,
     OCC: { POLE: OCC_POLE, SHOP: OCC_SHOP, BIKE: OCC_BIKE, PED: OCC_PED, CAR: OCC_CAR, MKT: OCC_MKT }, addCollider: ctx.addCollider, R_MAX,
-    SHOP_SIGNS, MARKETS: PROPS_MARKETS, evidence: PROPS_EVIDENCE, st: slStats, LITE,
+    SHOP_SIGNS, MARKETS: PROPS_MARKETS, evidence: PROPS_EVIDENCE, st: slStats, LITE, ROADS_DT,
   };
   marketLevels(SL);
 
@@ -1217,6 +1217,9 @@ export function buildProps(ctx) {
   // ---------------------------------------------------------------------------------------------------------------
   const carI = [[], [], [], [], [], []];   // sedan, suv, hatch, taxi, truck, van
   const coachI = [], coveredI = [];          // W3-E: xe khách 11,4 m · ô tô phủ bạt
+  // QA (W3-E): lý do loại ứng viên ô tô — 1 xa/dốc · 2 avoid/keepClear · 3 phía kè hồ · 4 phía công viên/quảng trường
+  // · 5 sát camera pano · 6 gần nút giao · 7 vật cản (window.__hpProps.carRej / carRejPts [x,z,lý do]…)
+  const carRej = [0, 0, 0, 0, 0, 0, 0, 0], carRejPts = [];
   const CAR_COLS = [0xeeeeec, 0xeeeeec, 0xe4e4e1, 0x16171a, 0x16171a, 0xb4b8bc, 0x8e9398, 0x6c7176, 0x9a1d1d, 0x24406e, 0x6b5a48, 0xcfc4ae];
   const TAXI_COLS = [0xf4f4f0, 0x2f8f4e, 0x3aa35a, 0xe9e9e4, 0x2c5aa0];   // trắng · xanh lá · xanh dương-trắng (taxi HP)
   const CAR_LEN = [4.5, 4.6, 3.9, 3.9, 4.8, 5.25];
@@ -1259,7 +1262,10 @@ export function buildProps(ctx) {
       // pano "dày": TÂM xe ≥ 7,5 m (van/tải 8,5 m), 2 đầu xe ≥ 5,5/6,5 m (thay 4/5 m chỉ xét viên nang; 7 m vẫn để
       // SUV tâm 7,3 m chiếm 1/4 khung pano_024). Không "dày": đầu xe ≥ 6,5/8 m (tâm tự ≥ ~8 m vì xe song song lề).
       const ec = evAt(x, z), dense = !!(ec && ec[3] >= 2);
-      const rp = mi >= 4 ? (dense ? 6.5 : 8) : (dense ? 5.5 : 6.5), rc = mi >= 4 ? (dense ? 8.5 : 8) : (dense ? 7.5 : 6.5), hx = S.ux * len / 2, hz = S.uz * len / 2;
+      // W3-E: pano CÓ ô tô đỗ (car ≥ 1) → xe con được tới tâm 5,5 m / đầu xe 4,5 m (pano_005: SUV trắng + xe đỏ đỗ 4-7 m
+      // trước camera, game trống); xe van/tải/khách giữ luật cũ (pano_024/102: van đỗ sát camera che nửa khung).
+      const seen = !!(ec && ec[3] >= 1);
+      const rp = mi >= 4 ? (dense ? 6.5 : 8) : (seen ? 5 : 6.5), rc = mi >= 4 ? (dense ? 8.5 : 8) : (seen ? 6 : 6.5), hx = S.ux * len / 2, hz = S.uz * len / 2;
       // W3-E: bỏ luật cũ "lakeSD > 18" (cấm ô tô trong 18 m quanh MỌI hồ → phố Quang Trung/Nguyễn Đức Cảnh ven hồ trống
       // trơn, pano 005/028/033 thật có ô tô đỗ phía NHÀ). Nay chỉ cấm phía KÈ/promenade (đi ra phía vỉa hè này lại gần hồ
       // hơn) và sát mép nước (< 6 m); cấm cả bên phố mà phía vỉa là công viên/quảng trường/promenade (322, 542, 065).
@@ -1267,12 +1273,14 @@ export function buildProps(ctx) {
       const lakeSide = lk < 6 || (lk < 40 && lakeSD(x + S.nx * 6, z + S.nz * 6) < lk - 1.5);
       const [ox, oz] = [x + S.nx * (X.fac - lat + 2), z + S.nz * (X.fac - lat + 2)];
       const parkSide = openSpace(ox, oz) || openSpace(x + S.nx * (X.sw * 0.5 + 0.95), z + S.nz * (X.sw * 0.5 + 0.95)) || !!claimAt(ox, oz, ['park', 'plaza']);
-      let ok = x * x + z * z < R_MAX * R_MAX && flat(x, z) && !avoid(x, z) && !clearAt(x, z) && !lakeSide && !parkSide
-        && !panoNear(x, z, rc) && !panoNear(x + hx, z + hz, rp) && !panoNear(x - hx, z - hz, rp);
+      let why = !(x * x + z * z < R_MAX * R_MAX && flat(x, z)) ? 1 : (avoid(x, z) || clearAt(x, z)) ? 2 : lakeSide ? 3 : parkSide ? 4
+        : (panoNear(x, z, rc) || panoNear(x + hx, z + hz, rp) || panoNear(x - hx, z - hz, rp)) ? 5 : 0;
       // nút giao: không đỗ trong 15 m tính từ LÒNG phố cắt ngang (p/s/t/r); ngõ h/w (không vỉa) 4,5 m như cũ (pano 065/193/327:
       // ô tô đỗ chắn làn rẽ ở miệng giao lộ)
-      if (ok) for (const dd of [-len / 2 - 0.5, 0, len / 2 + 0.5]) { if (roadIdx.nearCross(x + S.ux * dd, z + S.uz * dd, S.ri, 15, 4.5)) { ok = false; break; } }
-      if (ok && obst.hit(x, z, mi === 6 ? 1.2 : 0.9)) ok = false;
+      if (!why) for (const dd of [-len / 2 - 0.5, 0, len / 2 + 0.5]) { if (roadIdx.nearCross(x + S.ux * dd, z + S.uz * dd, S.ri, 15, 4.5)) { why = 6; break; } }
+      if (!why && obst.hit(x, z, mi === 6 ? 1.2 : 0.9)) why = 7;
+      let ok = !why;
+      if (why) { carRej[why]++; if (carRejPts.length < 60000) carRejPts.push(+x.toFixed(1), +z.toFixed(1), why); }
       if (ok && mi === 6) for (const dd of [-4, 4]) if (obst.hit(x + S.ux * dd, z + S.uz * dd, 0.9)) { ok = false; break; }
       // phố r: 2 bánh trên vỉa → không đè hàng xe máy / quán / xe đẩy đã đặt trên các ô vỉa hè dọc thân xe
       let k0 = 0, k1 = -1;
@@ -1629,7 +1637,7 @@ export function buildProps(ctx) {
     poles: poleI.length + poleLampI.length, trafos: trafoI.length, spans: spans.length, cables: nCables, cableVerts,
     lampsCobra: cobraI.length, lampsOrnate: ornI.length, lampsOnPole: poleLampI.length, flags: flagI.length,
     ornate2: ornI.filter((o) => o.globes === 2).length, ornate5: ornI.filter((o) => o.globes === 5).length, kiosks: kioskI.length,
-    coaches: coachI.length, carsCovered: coveredI.length, bikesDisplay: bikeDisplay.length, life: LIFE.stats,
+    coaches: coachI.length, carsCovered: coveredI.length, bikesDisplay: bikeDisplay.length, life: LIFE.stats, carRej,
     stools: stoolI.length, parasols: paraI.length, carts: cartI.length, aframes: aframeI.length, bins: binI.length, hydrants: hydI.length, cabinets: cabI.length,
     walkers: walkI.length, standing: standI.length, sitting: sitI.length,
     instancedMeshes: drawGroups, trisAllInstances: Math.round(tris),
@@ -1637,7 +1645,7 @@ export function buildProps(ctx) {
   });
   console.log('[props]', JSON.stringify(stats));
   // móc gỡ lỗi/QA (không dùng trong game): window.__hpProps.sides / .cull()
-  if (typeof window !== 'undefined') window.__hpProps = { stats, sides, cull: () => CULL.map((t) => [t.mesh.name, t.mesh.count, t.n]), bikeRows, lists: { stoolI, cartI, aframeI, walkI, standI, sitI, cars: carI.flat(), bikes: bikeI.flat(), cobraI, ornI, poleI, poleLampI, trafoI, binI,
+  if (typeof window !== 'undefined') window.__hpProps = { stats, sides, carRejPts, cull: () => CULL.map((t) => [t.mesh.name, t.mesh.count, t.n]), bikeRows, lists: { stoolI, cartI, aframeI, walkI, standI, sitI, cars: carI.flat(), bikes: bikeI.flat(), cobraI, ornI, poleI, poleLampI, trafoI, binI,
     // W3-E (mkRoad = hàng chợ CỐ Ý lấn dải 1,1 m lòng đường sát bó vỉa — clearance_page bỏ qua như ô tô đỗ)
     mkOver: LIFE.overI, mkGround: LIFE.groundI.filter((g) => !g.road), mkRoad: LIFE.groundI.filter((g) => g.road), spill: LIFE.spillI,
     kioskI, coaches: coachI, covered: coveredI, flagsHouse: LIFE.flagsHouse, banners: LIFE.banners, gates: LIFE.gates } };
