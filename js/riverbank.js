@@ -41,8 +41,11 @@ export function snapBankGrid(geo, { step, waterSD, isRiverAt, skip, landY, recol
     if (waterSD(ex + gx * 1.5, ez + gz * 1.5) < 0.3) continue;
     // kênh hẹp: phía nước bên kia mép phải còn nước ≥ B + 8 m — không thì bỏ (nắn sẽ lấp lòng kênh)
     if (waterSD(ex - gx * (B + 8), ez - gz * (B + 8)) > -2) continue;
+    // dải ±B quanh mép → kéo VỀ MÉP ở cao độ đất; đỉnh nước kế tiếp GIỮ chỗ nhưng dìm SÂU (−60): tam giác bờ dốc gần đứng,
+    // phần nhô trên mặt nước ≤ 2/62 cạnh ô (≤ 0,6 m — sau tường kè). (Kéo cả đỉnh nước về "chân kè 3 m" như lưới mịn hồ
+    // 5 m sinh tam giác dài dọc bờ nhô lên mặt nước thành NÊM — ô 13,3 m quá thưa cho cách đó.)
     if (sd >= -B) { pos.setXYZ(i, ex, landY, ez); if (recolor) recolor(i, ex + gx * 1.5, ez + gz * 1.5); }
-    else { pos.setXYZ(i, ex - gx * 3, -3, ez - gz * 3); if (recolor) recolor(i, ex - gx * 3, ez - gz * 3); }
+    else pos.setY(i, -60);
     n++;
   }
   if (n) { pos.needsUpdate = true; if (geo.attributes.color) geo.attributes.color.needsUpdate = true; geo.computeVertexNormals(); geo.computeBoundingSphere(); }

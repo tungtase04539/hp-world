@@ -987,6 +987,16 @@ export async function buildWorld(scene, prog = () => {}) {
     roadSurfaceAt: world.roadNet && world.roadNet.surfaceAt, lampGlow: sharedMats.lampGlow, addCollider, panoCams: PANO_CAM,
   });
   console.log('[world] W3-F bờ kè sông:', JSON.stringify(world.riverbank.stats));
+  // W3-F: claim 'bridge' dưới mặt cầu nâng (hộp ~12 m dọc way, rộng w + 2 m) → citygen giết footprint "nhà" Overture/OSM vốn là
+  // CHÍNH dốc cầu (tấm đen dẹt trên nền đất pano_304/349), cây/prop tra claimAt tránh mọc xuyên mặt cầu
+  for (const b of BRIDGE_WAYS || []) {
+    if (b.kind === 'flat') continue;
+    const P = b.pts;
+    for (let i = 0; i < P.length - 1; i += 4) {
+      const j = Math.min(P.length - 1, i + 4), dx = P[j][0] - P[i][0], dz = P[j][1] - P[i][1], L = Math.hypot(dx, dz); if (L < 0.5) continue;
+      claimBox((P[i][0] + P[j][0]) / 2, (P[i][1] + P[j][1]) / 2, L / 2 + 0.6, b.w / 2 + 1, Math.atan2(-dz / L, dx / L), 'bridge', 'br_' + b.id);
+    }
+  }
   function addMerged(geos, material, name) {
     if (!geos.length) return;
     const merged = mergeGeometries(geos);

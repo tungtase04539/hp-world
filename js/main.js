@@ -183,8 +183,10 @@ const { npcs, update: updateNPCs, pushOut: pushOutNPCs } = buildNPCs(scene, worl
 // chỉ mục lưới đã dựng → không bao giờ có hiệu lực, npcs.js:99 cũ).
 let _trafficRef = null;   // xe đang chạy cũng là vật cản (gán sau khi tạo giao thông)
 const resolveAll = (p, r = 0.45) => { world.resolveCollisions(p, r); pushOutNPCs(p, r); if (_trafficRef) _trafficRef.pushOut(p, r); };
+let _vehRefY = () => 2;   // W3-F: gán lại sau khi có pState
 const { vehicles, update: updateVehicle, spawn: spawnVehicle } = createVehicles(
-  scene, groundHeight, groundHeightNoDeck, world.vehicleSpawns, resolveAll, { playRadius: PLAY_RADIUS });
+  // W3-F: xe đang lái theo mặt cầu nâng (tham chiếu = cao độ xe); xe đỗ/không lái ở mặt đất (gọi ngay lúc tạo → _vehRefY)
+  scene, (x, z) => surfaceY(x, z, _vehRefY()), groundHeightNoDeck, world.vehicleSpawns, resolveAll, { playRadius: PLAY_RADIUS });
 const fp = footprintIndex(world);   // footprint nhà ĐANG VẼ (world.rbData của WP2; chưa có → chỉ địa danh) → camera, người đi bộ, chỗ xuống xe
 const traffic = createTraffic(scene, world, { playRadius: PLAY_RADIUS, footprints: fp });
 _trafficRef = traffic;
@@ -208,6 +210,7 @@ const pState = {
   onGround: true,
   mounted: null,
 };
+_vehRefY = () => (pState.mounted ? pState.mounted.pos.y : 2);
 player.group.position.copy(pState.pos);
 if (renderer.shadowMap.enabled) {
   player.group.traverse((o) => { if (o.isMesh && !o.material.transparent) { o.castShadow = true; } });
