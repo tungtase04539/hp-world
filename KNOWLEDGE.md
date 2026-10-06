@@ -457,7 +457,9 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     luật làm trơn ±2 (4 T 8.532 → 8.039). `LM_POLY 'thptnq'` (AUDIT3 nói lệch ~60 m) ĐÃ KIỂM: khớp pano_261 (cổng trường ở h270, cách
     mép đa giác 8,6 m) và pano_037 (cổng h135-180) → không sửa; GAP 428 là do claim `qt_trienlam` (đã bỏ).
     **Thứ tự mọc theo HASH** (lõi ô 8 + nới 8a): trước xáo bằng RNG tuần tự → thêm/bớt 1 ứng viên xáo CẢ thành phố; nay sắp theo
-    hash từng ô/nhà → thay đổi chỉ lan cục bộ (A/B đối chứng, gộp nhánh).
+    hash từng ô/nhà → thay đổi chỉ lan cục bộ (A/B đối chứng, gộp nhánh). Cùng lý do: id LÔ chia (bước 5) và ô khối dính = id nhà
+    mẹ + chỉ số TRONG nhà mẹ (`#k`, `#ck`; trước + `newB.length` TOÀN CỤC → bỏ 1 lô ở đâu đó đổi id = seed mặt tiền/màu/tầng của
+    MỌI lô phía sau: biển hiệu nhảy ở pano đối chứng 001/028, nhà ở 506 mọc lại dải biển).
     **RB_PARCELS** (export mới trong `js/buildings_real.js`, ~21 KB): `walls [kind, màu|màuSắt<<4, x0,z0,…]` polyline, SÂN ở bên
     TRÁI hướng polyline; `gates [x,z,góc,rộng,kind,chòi gác,theo tia pano,màu]` (1 cổng/dãy ≥ 10 m tại chỗ tia quan sát "cổng"
     cắt dãy, không có thì giữa dãy).
@@ -475,19 +477,25 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     D.dead trước buildRealFabric (`world.synthNearCellKilled`, 388 nhà); Chợ Con bz 793 → 783 (tâm footprint OSM), ô chợ trùng
     `w2_chocon_market` XOÁ hẳn (giữ ô dù). CỔNG ô dựng tay về RANH ĐẤT: `propLineShift(x, z, front)` (world.js, cạnh import parcels)
     = đẩy cụm cổng ra sau facadeLine + 0,3 m + phần nhô `front`, tính LÚC CHẠY từ `clearance.nearestStreet` (phố có vỉa gần nhất —
-    tự khớp khi W3-A đổi tim/bề rộng phố): Ban CHQS (pano_464) và cổng Điện lực Minh Khai (pano_510, từng đứng lấn vỉa 0,7 m). **citygen.js (1 dòng, vùng W3-C):** nhà có KIỂU Ô ≠ 0 không bán hàng → cạnh hông được NÂNG
-    thành mặt phố và mặt dãy gộp (wideF) cũng rc 3 (trước: lấy cấp phố → biệt thự mọc dải biển ở cạnh hông).
-    **SỐ ĐO:** generator 46.128 → 44.897 nhà (lô khe 4.050 → 3.481, lõi ô 8.877 → ~8.380), b64 1,52 MB (−10 KB) + RB_PARCELS 21 KB,
+    tự khớp khi W3-A đổi tim/bề rộng phố): Ban CHQS (pano_464) và cổng Điện lực Minh Khai (pano_510, từng đứng lấn vỉa 0,7 m).
+    **citygen.js (1 dòng, vùng W3-C):** nhà có KIỂU Ô ≠ 0 không bán hàng → cạnh hông được NÂNG thành mặt phố và mặt dãy gộp (wideF) cũng rc 3 (trước: lấy cấp phố → biệt thự mọc dải biển ở cạnh hông).
+    **SỐ ĐO:** generator 46.128 → 44.914 nhà (lô khe 4.050 → 3.483, lõi ô 8.877 → 8.372), b64 1,52 MB (−10 KB) + RB_PARCELS 21 KB,
     giải mã 6 ms; 425 dãy tường (hàng rào sắt 5,5 km, tường rào 0,37 km, rào tôn 0,8 km, tường lô 0,38 km), 197 cổng (45 đúng tia
-    pano "cổng"); lúc chạy cắt còn ~5,2 km (đè tường tay đã có ~0,7 km, nhà ô giữ, nhà thật sống), ~81 k tam giác, 2 mesh, dựng
-    ~50-90 ms (đo trong SwiftShader/CPU bận: dò tường tay 22 ms). Tỉ lệ nhà SINH trong 40 m quanh 25 pano FP-2: 38,3% → 28,2%
+    pano "cổng"); lúc chạy cắt còn ~5,3 km / 390 dãy / 165 cổng (đè tường tay đã có, nhà ô giữ, nhà thật sống), ~81 k tam giác,
+    2 mesh, dựng ~49 ms (GPU tier 3; dò tường tay 14 ms). PERF A/B CÙNG PHIÊN (24 góc chuẩn, B A B A, tier 3 Radeon 890M iGPU):
+    draw calls 371 → 367, tam giác 3,83 → 3,90 M (+1,8% = mesh tường 1 khối cả thành phố, không bị cắt frustum — chia ô sẽ thêm
+    call nhiều hơn lợi), fps 60,2 = 60,2 (trần vsync), hpReady 4,90 → 4,64 s (nhiễu), 0 lỗi JS (full); LITE 3 lỗi 404 = y hệt dot3
+    (assets_lite/ không có ở máy local). Tỉ lệ nhà SINH trong 40 m quanh 25 pano FP-2: 37,1% → 28,7%
     (496: 56 → 30%, 538: 53 → 0%); quanh 120 pano kiểm toán 30,6 → 26,2%. Kiểm toán clearance (W2-A): camera vi phạm 35 → 33,
-    nearAll 36 → 34, fillAll 181 → 178, vật trên nhựa 53 = 53, lấn vỉa hè 72 → 71. **CHẤM LẠI (cùng người chấm, REAL|TRƯỚC|SAU
-    cạnh nhau, ±0,5):** 30 pano FP-2 × 2 hướng (60 ảnh) 2,88 → 3,39 (+0,51; 20 tốt hơn, 2 kém hơn), nhóm đối chứng 8 pano (15 ảnh)
-    3,73 → 3,77. Tăng mạnh: 515 h90 3 → 6 (tường mỏ neo liền, hết dãy nhà sinh đè), 428 h90 / 405 h0 2 → 5 (sửa claim), 354 h0 2 →
-    5, 496 h90 3 → 5 (hàng rào + cổng + chòi gác + nhà lùi), 441 h270 / 432 h0 / 547 h90 2 → 4, 460 h0 1 → 3. CHƯA sửa: ảnh do
-    camera/mặt cắt phố (CAMNEAR — W3-A), footprint cũ đã phá dỡ (019, 239), lỗ Overture 469, cao ốc sau tường rào 225; cổng 464/510
-    đã về ranh đất nhưng 2 ảnh vẫn ~3 m trước cổng vì camera pano lệch tim phố (thật: cổng ở BÊN KIA phố — W3-A). Ảnh: scratchpad dot3/W3-B g_00..12.jpg, grades.txt.
+    nearAll 36 → 34, fillAll 181 → 178, vật trên nhựa 53 = 53, lấn vỉa hè 72 → 71. **CHẤM LẠI (REAL|TRƯỚC|SAU cạnh nhau,
+    ±0,5; bản cuối chấm lại mọi ảnh đổi > 6/255 so với lượt chấm đầu):** 30 pano FP-2 × 2 hướng (60 ảnh) 2,88 → 3,42 (+0,54; 21 tốt
+    hơn, 1 kém hơn), nhóm đối chứng 8 pano (15 ảnh) 3,73 → 3,77. Tăng mạnh: 515 h90 3 → 6 (tường mỏ neo liền, hết dãy nhà
+    sinh đè), 428 h90 / 405 h0 2 → 5 (sửa claim), 354 h0 2 → 5, 496 h90 3 → 5 (hàng rào + cổng + chòi gác + nhà lùi), 441 h270 / 432 h0 / 547 h90 2 → 4, 460 h0 1 → 3. CHƯA sửa: ảnh do
+    camera/mặt cắt phố (CAMNEAR — W3-A), footprint cũ đã phá dỡ (019, 239), lỗ Overture 469, cao ốc sau tường rào 225; bộ mô-đun trệt NHÀ Ở
+    `GH` của citygen có G_SHUT0/1 mang DẢI BIỂN (SIGN_EXT) → nhà ở/biệt thự theo pano (INFO PK ≠ 0, USE_HOME) vẫn có thể mọc biển "SỬA XE MÁY" (506 h270, 547 h270) — việc của renderer mặt tiền (W3-C): với PK ≠ 0
+    chọn bộ không biển; cổng 464/510 đã về ranh đất nhưng 2 ảnh vẫn ~3 m trước cổng vì camera pano lệch tim phố
+    (thật: cổng ở BÊN KIA phố — W3-A). Ảnh: scratchpad dot3/W3-B g_00..12.jpg + r2/final_00..12.jpg (REAL|dot3|cuối), grades.txt
+    + r2/overrides.txt.
     **BẪY:** (a) `\b` của JS không hiểu chữ có dấu ("chợ\b" không bao giờ khớp) → ranh giới tường minh; (b) "tôn" khớp trong
     "bê tông" → `tôn(?!g)`; (c) màu tường rào phải lấy từ CỤM chữ tả tường/rào/trụ/cổng — "chòi gác vàng" từng nhuộm cả rào;
     (d) tường dựng tay trong ô cells nằm ngay mặt phố — phải dò hình học trước khi dựng tường dữ liệu; (e) đo cảnh trước freeze

@@ -17477,7 +17477,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
       claimCircle(ax, az, 22, 'plaza', 'hl_quanhoa_a'); claimCircle(bx, bz, 22, 'plaza', 'hl_quanhoa_b'); }
     if (LM.lechan) claimCircle(LM.lechan[0], LM.lechan[1], 55, 'plaza', 'qt_lechan');
     // W3-B: vòng 'qt_trienlam' r50 cũ đặt ĐÚNG tâm pano_428 (nút Nguyễn Đức Cảnh × Mê Linh, cách Triển lãm 105 m) giết cả dãy
-    // shophouse THẬT góc đông-nam (pano_428 h90/h180: LUCKY, đồ thờ) → "quảng trường bê tông 40×40 m" (AUDIT3 GAP 428). Bỏ:
+    // shophouse THẬT góc đông-nam (pano_428 h90/h180: cửa hàng giày, đồ thờ) → "quảng trường bê tông 40×40 m" (AUDIT3 GAP 428). Bỏ:
     // sân trước Triển lãm đã nằm trong qt_lechan, góc tây-bắc là công viên (PARKS), trường = LM_POLY thptnq.
     claimCircle(-427, 943, 28, 'plaza', 'cho_cotden');
     claimCircle(90, -757, 40, 'plaza', 'bai_caudat');
