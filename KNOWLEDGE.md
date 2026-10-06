@@ -420,7 +420,7 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
-- **2026-10-05 (W3-B PARCELS)** [ĐỢT 3 wave 3 — Ô ĐẤT THẬT: khuôn viên tường rào + cổng, đất trống rào tôn, chợ, tỉ lệ cửa
+- **2026-10-05/06 (W3-B PARCELS)** [ĐỢT 3 wave 3 — Ô ĐẤT THẬT: khuôn viên tường rào + cổng, đất trống rào tôn, chợ, tỉ lệ cửa
     hàng theo phố, claim quảng trường, Chợ Con — AUDIT3 FP-2]:
     **Vấn đề (AUDIT3 S2 Σ345 + GAP):** generator chỉ biết 1 kiểu ô (dãy nhà ống) → lấp khe/lõi ô bằng nhà ống SINH vào khuôn
     viên biệt thự/cơ quan/trường, sân chợ, lô quây tôn; kéo mặt tiền biệt thự ra sát vỉa hè; công năng trệt chỉ theo cấp phố
@@ -450,8 +450,12 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     biệt thự) → khuôn viên. Tường đặt ở facadeLine + 0,3 m (mép sau vỉa hè), đoạn cách PANO_CAM < 3,5 m bỏ. Bằng chứng lấp khe
     THÊM: nón pano shop/home ≥ 0,3 trong 22 m (lỗ Overture, AUDIT3 469). Bước 8: ô đất OSM cấm + sân khuôn viên/lô trống = 3
     (cấm nhà sinh lõi ô, cấm nới 8a/9a). OPEN_RX thêm chợ/công trường/đất trống/bến xe/khuôn viên-cơ quan-trường-viện-biệt thự.
-    Trần tầng: lô < 90 m² không bốc thăm đuôi 7-8 tầng (nhà "kim" 152/023/225), mặt phố khuôn viên/vùng biệt thự ≤ 4 tầng (không
-    cộng "+1 tầng phố thương mại": trung bình mặt phố ≤ 25 m quanh 436 pano = 3,00 vs pano 3,06 — đã khớp).
+    Trần tầng: lô < 90 m² không bốc thăm đuôi 7-8 tầng (nhà "kim" 152/023/225), lô < 60 m² ≤ 5 tầng; mặt phố khuôn viên/vùng biệt
+    thự ≤ 4 tầng (không cộng "+1 tầng phố thương mại": trung bình mặt phố ≤ 25 m quanh 436 pano = 3,00 vs pano 3,06 — đã khớp).
+    Bước 10 (ghép quan sát → nhà): quan sát ≥ 6 tầng rơi vào mảnh < 9 m²/tầng bị bỏ (`obs_tall_needle_skipped` — tia chạm mảnh nhỏ
+    trước công trình thật: pano_152 mảnh 33 m² thành tháp kính 6 T). Cả thành phố: 6 T 454 → 240, láng giềng hết bị kéo lên 4 T bởi
+    luật làm trơn ±2 (4 T 8.532 → 8.039). `LM_POLY 'thptnq'` (AUDIT3 nói lệch ~60 m) ĐÃ KIỂM: khớp pano_261 (cổng trường ở h270, cách
+    mép đa giác 8,6 m) và pano_037 (cổng h135-180) → không sửa; GAP 428 là do claim `qt_trienlam` (đã bỏ).
     **Thứ tự mọc theo HASH** (lõi ô 8 + nới 8a): trước xáo bằng RNG tuần tự → thêm/bớt 1 ứng viên xáo CẢ thành phố; nay sắp theo
     hash từng ô/nhà → thay đổi chỉ lan cục bộ (A/B đối chứng, gộp nhánh).
     **RB_PARCELS** (export mới trong `js/buildings_real.js`, ~21 KB): `walls [kind, màu|màuSắt<<4, x0,z0,…]` polyline, SÂN ở bên
@@ -463,11 +467,15 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     song sắt/cánh cổng) → 2 mesh cả thành phố, `userData.noMerge` (freezeStatic gộp làm mất uv), không tên đuôi _x,z. Cắt lúc chạy:
     footprint SỐNG (rbGrid), bao nhà ô giữ (cellKept), nước, và mọi mesh MỎNG-DÀI-THẤP chạm đất đã có (tường/rào/cổng dựng tay
     theo HÌNH HỌC, không theo tên — tường mỏ neo cb_wall_ltt pano_515 không bị dựng đôi). Va chạm: lưới đoạn, bọc
-    `world.resolveCollisions` (isFree/findFree/đặt vật phía sau tự né). `world.parcels.stats`.
+    `world.resolveCollisions` (isFree/findFree/đặt vật phía sau tự né). `world.parcels.stats`. ALBEDO: texture chỉ mang hạt/vệt
+    (nền #f3, trung bình ≈ 0,93) — màu thật do vertex colour; bản đầu (nền #e8, hạt 200-250, xám bê tông b5b2aa × 0,85) cho tường lô
+    trong bóng 38/255 trong khi mặt tiền nhà cùng hướng 70-115 (ánh sáng vật lý: phía bóng chỉ có trời) → nay 48.
     **(4) world.js:** claim `qt_nhahat` vòng r62 → HỘP (0,70) ±40×±42 (khoảng lát giữa Hoàng Văn Thụ x≈−38 và Đinh Tiên Hoàng x≈36),
     hành lang `hl_quanhoa` ±55 → ±22 (+vòng đầu 22), BỎ `qt_trienlam`; nhà SINH chạm ≤ 6 m quanh nhà ô DANH TÍNH giữ lại bị đánh
-    D.dead trước buildRealFabric (`world.synthNearCellKilled`); Chợ Con bz 793 → 783 (tâm footprint OSM), ô chợ trùng
-    `w2_chocon_market` bỏ (giữ ô dù). **citygen.js (1 dòng, vùng W3-C):** nhà có KIỂU Ô ≠ 0 không bán hàng → cạnh hông được NÂNG
+    D.dead trước buildRealFabric (`world.synthNearCellKilled`, 388 nhà); Chợ Con bz 793 → 783 (tâm footprint OSM), ô chợ trùng
+    `w2_chocon_market` XOÁ hẳn (giữ ô dù). CỔNG ô dựng tay về RANH ĐẤT: `propLineShift(x, z, front)` (world.js, cạnh import parcels)
+    = đẩy cụm cổng ra sau facadeLine + 0,3 m + phần nhô `front`, tính LÚC CHẠY từ `clearance.nearestStreet` (phố có vỉa gần nhất —
+    tự khớp khi W3-A đổi tim/bề rộng phố): Ban CHQS (pano_464) và cổng Điện lực Minh Khai (pano_510, từng đứng lấn vỉa 0,7 m). **citygen.js (1 dòng, vùng W3-C):** nhà có KIỂU Ô ≠ 0 không bán hàng → cạnh hông được NÂNG
     thành mặt phố và mặt dãy gộp (wideF) cũng rc 3 (trước: lấy cấp phố → biệt thự mọc dải biển ở cạnh hông).
     **SỐ ĐO:** generator 46.128 → 44.897 nhà (lô khe 4.050 → 3.481, lõi ô 8.877 → ~8.380), b64 1,52 MB (−10 KB) + RB_PARCELS 21 KB,
     giải mã 6 ms; 425 dãy tường (hàng rào sắt 5,5 km, tường rào 0,37 km, rào tôn 0,8 km, tường lô 0,38 km), 197 cổng (45 đúng tia
@@ -478,8 +486,8 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     cạnh nhau, ±0,5):** 30 pano FP-2 × 2 hướng (60 ảnh) 2,88 → 3,39 (+0,51; 20 tốt hơn, 2 kém hơn), nhóm đối chứng 8 pano (15 ảnh)
     3,73 → 3,77. Tăng mạnh: 515 h90 3 → 6 (tường mỏ neo liền, hết dãy nhà sinh đè), 428 h90 / 405 h0 2 → 5 (sửa claim), 354 h0 2 →
     5, 496 h90 3 → 5 (hàng rào + cổng + chòi gác + nhà lùi), 441 h270 / 432 h0 / 547 h90 2 → 4, 460 h0 1 → 3. CHƯA sửa: ảnh do
-    camera/mặt cắt phố (CAMNEAR — W3-A), footprint cũ đã phá dỡ (019, 239), lỗ Overture 469, cổng ô cells trên vỉa hè (464, 510),
-    cao ốc sau tường rào 225. Ảnh: scratchpad dot3/W3-B g_00..12.jpg, grades.txt.
+    camera/mặt cắt phố (CAMNEAR — W3-A), footprint cũ đã phá dỡ (019, 239), lỗ Overture 469, cao ốc sau tường rào 225; cổng 464/510
+    đã về ranh đất nhưng 2 ảnh vẫn ~3 m trước cổng vì camera pano lệch tim phố (thật: cổng ở BÊN KIA phố — W3-A). Ảnh: scratchpad dot3/W3-B g_00..12.jpg, grades.txt.
     **BẪY:** (a) `\b` của JS không hiểu chữ có dấu ("chợ\b" không bao giờ khớp) → ranh giới tường minh; (b) "tôn" khớp trong
     "bê tông" → `tôn(?!g)`; (c) màu tường rào phải lấy từ CỤM chữ tả tường/rào/trụ/cổng — "chòi gác vàng" từng nhuộm cả rào;
     (d) tường dựng tay trong ô cells nằm ngay mặt phố — phải dò hình học trước khi dựng tường dữ liệu; (e) đo cảnh trước freeze
