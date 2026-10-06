@@ -668,9 +668,10 @@ export function buildProps(ctx) {
   const T0 = performance.now();
   const { scene, LAND_H, ROADS_DT, groundHeightNoDeck, isWater, lakeSD } = ctx;
   const R_MAX = ctx.radius || 1600;
-  // W3-E: người +900 (người bán ngồi ghế đẩu ở chợ/khách đứng trước sạp — chỉ trong ô chợ, xa > 60 m là LOD 0,24k)
+  // W3-E: pedsMarket = ngân sách RIÊNG người chợ (bán ngồi ghế đẩu/khách đứng trước sạp — chỉ trong ô chợ, xa > 60 m là LOD
+  // 0,24k); peds giữ như dot3 cho người đi bộ + đứng/ngồi quán
   const BUDGET = {
-    bikes: LITE ? 5000 : 16000, cars: LITE ? 1400 : 3600, peds: LITE ? 750 : 2000,
+    bikes: LITE ? 5000 : 16000, cars: LITE ? 1400 : 3600, peds: LITE ? 450 : 1100, pedsMarket: LITE ? 350 : 1100,
   };
   const stats = { cells: 0, valid: 0 };
   const rej = { far: 0, junction: 0, notFlat: 0, featured: 0, building: 0, lake: 0 };
@@ -1403,11 +1404,15 @@ export function buildProps(ctx) {
     if (inBuilding(x, z) || obst.hit(x, z, 0.3)) continue;
     standI.push({ x, z, heading: Math.atan2(-S.nx, -S.nz) + (hash3(x, z, 123) - 0.5) * 2.4 });
   }
-  // ngân sách người: lấy mẫu đều
-  const nPedAll = walkI.length + standI.length + sitI.length;
-  if (nPedAll > BUDGET.peds) {
-    const keep = BUDGET.peds / nPedAll;
-    for (const arr of [walkI, standI, sitI]) { let w = 0; for (const p of arr) if (hash3(p.x, p.z, 124) < keep) arr[w++] = p; arr.length = w; }
+  // ngân sách người: lấy mẫu đều TRONG 2 NHÓM (W3-E) — người chợ (bán ngồi ghế đẩu/khách đứng trước sạp, cờ `vendor`/`mk`,
+  // dồn ở ~6.000 ô chợ) có ngân sách RIÊNG; nhóm chung (đi bộ + đứng/ngồi quán) giữ ngân sách cũ của dot3. Bản lấy mẫu
+  // chung 1 nhóm: 7.500 ứng viên → giữ 26% → người đi bộ cả thành phố tụt 428 → 266 vì chợ đông người
+  const isMk = (p) => !!(p.mk || p.vendor);
+  stats.pedsPre = [walkI.length, standI.length, sitI.length, standI.filter(isMk).length, sitI.filter(isMk).length];
+  {
+    const nMk = stats.pedsPre[3] + stats.pedsPre[4], nGen = walkI.length + standI.length + sitI.length - nMk;
+    const kGen = Math.min(1, BUDGET.peds / Math.max(1, nGen)), kMk = Math.min(1, BUDGET.pedsMarket / Math.max(1, nMk));
+    if (kGen < 1 || kMk < 1) for (const arr of [walkI, standI, sitI]) { let w = 0; for (const p of arr) if (hash3(p.x, p.z, 124) < (isMk(p) ? kMk : kGen)) arr[w++] = p; arr.length = w; }
   }
   // chân mọi đồ vỉa hè còn lại theo mặt đang vẽ (ô tô: yRoad riêng; dây đèn trang trí: y nền riêng)
   groundAll([...bikeI, stoolI, paraI, cartI, aframeI, binI, hydI, cabI, walkI, standI, sitI,

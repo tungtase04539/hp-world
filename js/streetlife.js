@@ -587,11 +587,11 @@ export function placeStreetLife(P) {
           // mức 3 thêm khách thứ 2 lệch dọc phố
           if (hash3(x, z, 323) < (lv === 3 ? 0.6 : lv === 2 ? 0.3 : 0.15)) {
             const [cx, cz] = P2(Math.max(hw - (lv === 3 ? 0.5 : -0.25), latG - 0.85), -0.3);
-            if (okAt(S, cx, cz, 0.3, lv === 3) && !obst.hit(cx, cz, 0.3)) { P.lists.standI.push({ x: cx, z: cz, heading: H + Math.PI + (hash3(cx, cz, 324) - 0.5) * 1.2 }); obst.add(cx, cz, 0.25); st.customers++; }
+            if (okAt(S, cx, cz, 0.3, lv === 3) && !obst.hit(cx, cz, 0.3)) { P.lists.standI.push({ x: cx, z: cz, heading: H + Math.PI + (hash3(cx, cz, 324) - 0.5) * 1.2, mk: 1 }); obst.add(cx, cz, 0.25); st.customers++; }
           }
           if (lv === 3 && hash3(x, z, 334) < 0.35) {
             const [cx, cz] = P2(Math.max(hw - 0.3, latG - 1.0), 1.0);
-            if (okAt(S, cx, cz, 0.3, true) && !obst.hit(cx, cz, 0.35)) { P.lists.standI.push({ x: cx, z: cz, heading: H + Math.PI + (hash3(cx, cz, 335) - 0.5) * 2.0 }); obst.add(cx, cz, 0.25); st.customers++; }
+            if (okAt(S, cx, cz, 0.3, true) && !obst.hit(cx, cz, 0.35)) { P.lists.standI.push({ x: cx, z: cz, heading: H + Math.PI + (hash3(cx, cz, 335) - 0.5) * 2.0, mk: 1 }); obst.add(cx, cz, 0.25); st.customers++; }
           }
         }
       }
