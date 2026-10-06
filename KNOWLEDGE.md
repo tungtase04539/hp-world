@@ -427,7 +427,7 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
-- **2026-10-05 (W3-A STREET-GEOMETRY)** [ĐỢT 3 WAVE 3 — MẶT CẮT PHỐ THẬT + TIM ĐƯỜNG KHỚP CAMERA (AUDIT3 FP-1)]:
+- **2026-10-06 (W3-A STREET-GEOMETRY)** [ĐỢT 3 WAVE 3 — MẶT CẮT PHỐ THẬT + TIM ĐƯỜNG KHỚP CAMERA (AUDIT3 FP-1)]:
     **Vấn đề (AUDIT3, 120 pano):** CAMNEAR 44 pano (mặt tiền 1-6 m; camera kẹt trong khối 487/115), điểm TB pano lệch tim
     ≥ 3 m chỉ 3,07; 4 cơ chế cộng dồn: bề rộng lòng CHỈ theo cấp (r 5,5 → mặt tiền 4,75 m), snapFront kéo nhà thật ≤ 7,2 m
     ra facadeLine hẹp đó, tim OSM lệch vết xe Google 3-9 m, guard camera 1 m (thật)/3 m (sinh).
@@ -452,10 +452,10 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     mút chung/chữ T dính nhau, phố vuông góc chỉ TRƯỢT dọc chính nó. (D) đo lại tường trên tim đã dịch, bề rộng = max(2 lượt),
     rồi `capWidths`: nửa lòng ≤ phân vị 10% tường gần nhất − 0,3 (nhưng ≥ cấp và ≥ |d camera| + 0,9 của mọi camera đang trong
     lòng way; phần cắt chuyển sang vỉa) và lòng+vỉa không vào đa giác địa danh `LM_POLY` (Bưu điện từng bị lòng mới trùm 56 m²).
-    **Kết quả dữ liệu:** 489 mỏ neo pano (113 dịch ≠ 0), 202 mỏ neo tường, 231 way dời (Chu Văn An 7,4 m, Phan Đình Phùng 5,6,
-    Tam Bạc 5,3, Phan Bội Châu 4,1…); bề rộng riêng 234 way (p TV 16, s 12,7, t 8,2, r 5,5; 140 nửa đường đôi giữ cấp);
-    ROADS_DT 4.091 → 5.194 đỉnh (toạ độ 0,1 m nơi dịch, nguyên chỗ khác); diện tích footprint Overture nằm trên lòng p/s/t/r
-    11.087 → 8.138 m² dù lòng rộng hơn; LM_POLY dưới lòng: Bưu điện 0, NHNN 47 → 8 m².
+    **Kết quả dữ liệu:** 489 mỏ neo pano (118 dịch ≠ 0), 202 mỏ neo tường, 232 way dời (Phan Đình Phùng 8,4 m, Chu Văn An 7,4,
+    Tam Bạc 5,3, Phan Bội Châu 4,1…); bề rộng riêng 229 way (trung vị p 16,4, s 12,7, t 8, r 5,5; 140 nửa đường đôi giữ cấp);
+    ROADS_DT 4.091 → 5.214 đỉnh (toạ độ 0,1 m nơi dịch, nguyên chỗ khác); diện tích footprint Overture nằm trên lòng p/s/t/r
+    11.087 → 7.279 m² dù lòng rộng hơn; LM_POLY dưới lòng: Bưu điện 0, NHNN 47 → 8 m².
     **HỢP ĐỒNG MỚI:** (1) mapdata `ROADS_DT[i]` có thể mang `w` (lòng) / `sw` (vỉa); THỨ TỰ + TẬP way giữ nguyên (bộ lọc độ dài
     tính trên bản simplify 6 m cũ `ROADS_LEGACY`, cũng dùng cho `nearestRoadFace` → LM_FACE/LM/… BYTE-IDENTICAL; export đổi:
     ROADS_DT, STREETS, INTERSECTIONS, MEDIANS). (2) `js/xsection.js`: mọi hàm nhận cấp HOẶC way `{c,w?,sw?}` + `roadHW/roadW/
@@ -472,7 +472,26 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     thật − 1,5 (S = nhà sinh, R = thật), `near4`, `inside`. dot3 → W3-A: ngoài lòng 128 → 19, ngoài bó vỉa 78 → 9, lệch ≥ 3 m
     172 → 111, TB 2,37 → 1,97 m, hướng có nhà THẬT gần hơn thật 560 → 45, near4 59 → 0, camera trong nhà 1 → 0; hướng có nhà
     SINH gần hơn Overture 541 → 566 (= lấp khe/lõi trên đất trống thật: làn W3-B INFILL). Chữ spec "off ≤ 1,5 m" KHÔNG đạt
-    (295): xe Google đi làn phải, lệch tim w/4 là ĐÚNG thật — dùng "ngoài lòng" làm cổng.
+    (295): xe Google đi làn phải, lệch tim w/4 là ĐÚNG thật — dùng "ngoài lòng" làm cổng. Số CUỐI (sau phiên 2): ngoài lòng
+    19, ngoài bó vỉa 7, lệch ≥ 3 m 105, TB 1,92 m, close-real 48, close-synth 569; `perpBelowDyn{Synth,Real}` (ngưỡng động spec
+    hw + vỉa − 0,5 − lệch camera về phía đó, hướng vuông góc phố) dot3 1/3 → W3-A 0/2 ⇒ camGuard động của spec ĐÃ thoả nhờ
+    facadeLine theo phố, không cần thêm luật cắt nhà.
+    **PHIÊN 2 (vật đặt tay theo mặt cắt CŨ — lộ ra khi lòng/vỉa theo phố thật):** (6) world.js `FOUNT` 8 đài phun = ĐÚNG toạ độ
+    CAMERA pano (249/359/341/454/231/232/545/020) chứ không phải chỗ đài phun → W2-A chỉ đẩy ~3 m, đài 4 m giữa khung (AUDIT3
+    CAMOBS 359) ⇒ đặt qua `clrNudge`: ngoài lòng, cách MỌI camera ≥ 8 m, không trên footprint, đất khô, ≤ 16 m; không có → bỏ.
+    (7) `cbWallRun` tường mỏ neo Hải quân (LTT/ĐBP/THĐ) vẽ theo facadeLine CẤP cũ → nằm TRONG vỉa mới (THĐ vỉa 7,5 m) → W2-A
+    gỡ 7/29 + 10/41 mảnh (mất đoạn trước pano_515) ⇒ `cbFitFence`: chia ≤ 16 m, đẩy đỉnh ra sau facadeLine(way) + 0,35 (THĐ
+    lùi 5-7,8 m — ảnh pano_225 h270: vỉa caro ~12 m trước tường); process_buildings `CB1` mép đông 655/656 theo (lô SINH mọc sau
+    tường). (8) Collider nhỏ (r ≤ 2,2) còn TRÊN lòng sau cellsink/W2-A/cây = vật cản VÔ HÌNH (chủ đã gỡ/cắt: tường tx_pdp Phan
+    Đình Phùng, cây w1 Trần Phú) ⇒ tách ngay sau buildTrees, trước props (26 cái, `world.ghostColliders` = danh sách).
+    (9) process_osm `NO_MEDIAN ['Trần Hưng Đạo']`: tuyến dài nhất tên THĐ là đoạn BẮC-NAM dọc tường Hải quân — pano_222-227
+    thật = 1 lòng + tim vàng; world.js dải phân cách bỏ mọi khối/bụi/cây ≤ 5 m quanh camera pano (Trần Phú 232-234 đi trên
+    tuyến dải). (10) bồn hoa quảng trường Nhà hát bỏ nếu chạm nhựa (phố vòng nam nay theo cong OSM thật).
+    **KIỂM (phiên 2, scratchpad/dot3/W3-A):** clearance.mjs trình duyệt dot3 → W3-A: cam vi phạm 35 → 12, gần < 3 m 36 → 7,
+    lấp > 40% trong 6 m 181 → 94, trên nhựa 53 → 35, lấn vỉa 72 → 81 (chặn kín 8 → 17: cell danh tính kẹt trong vỉa thật rộng
+    hơn — W3-B/C). Chấm mắt REAL|dot3|W3-A (`comps3/`): 18 pano đích 2,67 → 3,67, đối chứng 10 pano 4,40 → 4,40, 11 pano phụ
+    (vỉa rộng/tường mỏ neo/đài phun) 3,82 → 4,50. Perf cùng phiên 4 cặp (views_perf): hpReady +~210 ms (~4%: 5.214 vs 4.091 đỉnh
+    ROADS_DT rải đều roadnet/citygen/cellsink/props/trees, không điểm nóng), calls/tris/p95 không đổi (±nhiễu).
     **BẪY:** (a) tim tường từ 3 trạm đơn lẻ từng kéo Nguyễn Tri Phương 7,4 m (sân lùi 1 bên) → cần ≥ 4 trạm + IQR + kẹp ±3 m;
     (b) kẹp q10 tường cả way dài từng đẩy 6 camera Phan Đình Phùng ra ngoài bó vỉa → luôn giữ "camera đang trong lòng";
     (c) bề rộng 1 giá trị/way: địa danh sát 1 đoạn kéo hẹp CẢ way (Cù Chính Lan 10,8 → 8); (d) world.js cell dựng tay theo trục
