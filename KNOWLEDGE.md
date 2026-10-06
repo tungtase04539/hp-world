@@ -469,18 +469,30 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     tuyến phố (song song ≤ 40°, không phải cầu) tới ≥ hw + vỉa hè + 2,5 m; footway=sidewalk ven sông ≥ 3 m. 649 đỉnh, tối đa
     9,1 m. Đoạn bắc Lạc Long polygon lệch TÂY (ảnh vệ tinh) — chưa sửa (kéo nước vào sẽ ngập footprint Overture bờ tây).
     **(5) BỜ KÈ** (`js/riverbank.js`): (a) `snapBankGrid` — lưới nền local 13,3 m vẽ bờ thành dốc thoải ~5 m (mép nước theo ô,
-    "nước phẳng với vỉa hè"): đỉnh ±0,72 ô quanh mép polygon kéo VỀ MÉP (cao độ đất), đỉnh nước kế tiếp → chân kè 3 m (−3 m),
-    tô lại màu đỉnh; bỏ kênh hẹp (bên kia mép phải còn nước ≥ B+8 m) và CẠNH CHUNG 2 polygon (sau mép phải là đất — nếu không
+    "nước phẳng với vỉa hè"): đỉnh ±0,72 ô quanh mép polygon kéo VỀ MÉP (cao độ đất), đỉnh nước kế tiếp DÌM −60 m (tam giác bờ
+    gần đứng, phần nhô trên mặt nước ≤ 0,6 m nằm sau tường kè — kéo về "chân kè 3 m" như lưới mịn hồ sinh NÊM dài nhô lên mặt
+    nước vì ô 13,3 m quá thưa), tam giác cả 3 đỉnh cao độ đất mà tâm trong nước → trả đỉnh nước về chỗ cũ; tô lại màu đỉnh; bỏ kênh hẹp (bên kia mép phải còn nước ≥ B+8 m) và CẠNH CHUNG 2 polygon (sau mép phải là đất — nếu không
     thành gờ đất giữa lòng sông, pano_221 h270). (b) mọi mép sông R ≤ 1640: tường kè đứng 0,7 m ra phía nước từ mặt dạo
     (LAND_H + 0,25) xuống −1,4 (đỉnh sáng, vệt rêu sát nước) + gờ đỉnh. (c) phân loại theo phố chạy dọc bờ: 'prom' (bờ cách mép
     vỉa hè ≤ 7 m: dải dạo ca-rô đỏ-xám bạc màu LIỀN từ gờ tới sát bó vỉa + lan can gang xanh (tấm hoa văn alphaTest 1 quad/2 m,
     gờ bê tông — phố s/p sọc đỏ-trắng 1 m như pano_221, t/r xám như 203) + đèn gang 2 bóng 16 m (bóng = sharedMats.lampGlow,
     sáng đêm) + khóm hoa giấy + collider chặn rơi + CÂY NON chống cọc 9 m (world.js veg.plant('non')), phố đó KHÔNG trồng cây
-    đường phố cổ thụ cả 2 bên (keepClear)); 'strip' (> 7 m — Tam Bạc đoạn bắc pano_519/331/336: lan can sắt thấp ở MÉP VỈA HÈ,
-    lán tôn/bạt tự phát giữa lan can và kè, GIỮ cổ thụ); 'wild' (không phố: chỉ kè). Thuyền gỗ neo bờ Tam Bạc đoạn bắc.
+    đường phố cổ thụ cả 2 bên (keepClear), đồ vỉa hè props.js không đặt phía sông (promSide)); 'strip' (Tam Bạc đoạn BẮC Lạc
+    Long → cửa Cấm, z < −600, pano_519/331/336 — LUÔN strip: lan can sắt thấp ở MÉP VỈA HÈ, lán tôn/bạt màu thấp 1,9-2,4 m giữa
+    lan can và kè, GIỮ cổ thụ + xe máy đỗ); 'wild' (không phố, bờ xa > 7 m ngoài đoạn bắc, dưới cầu: chỉ kè). Thuyền gỗ neo bờ
+    Tam Bạc đoạn bắc. BẪY: keep/promSide phải giới hạn theo QUÃNG có dải dạo trên đoạn ROADS_DT (keepSegs si → [t0,t1] + 6 m)
+    — 1 đoạn dài (Phố Tam Bạc 221 → 335) vừa có dải dạo vừa là dải tự phát; áp cả đoạn từng xoá hàng cổ thụ + xe máy phía sông
+    ở pano_336 (12 → 4 cây, 30 → 13 xe trong 22 m).
     Khối ô dựng tay TS-11/TS-12 (dải caro + lan can kè Thế Lữ/Phố Tam Bạc theo vị trí cũ) bỏ phần dải/lan can khi kit chạy.
     **(6) NƯỚC**: sông 0x5c625a → 0x5b5a46 nâu-ô liu (ảnh tầm mắt 203 (80,76,62), 221 (122,114,90), 290 (96,100,79)), nhám
     0,12 → 0,2 (bớt gương trời xám-trắng nhìn ngang); hồ giữ.
+    **(7) DƯỚI MẶT CẦU NÂNG**: world.js `underDeck(x,z)` = có mặt cầu (`DECKS.topAt(x,z,3)`) cao hơn đất 0,8…16 m → KHÔNG cây
+    đường phố (keepClear), KHÔNG đồ vỉa hè props (avoid), và MỌI cây dựng tay/ô/hồ bị `buildTrees` bỏ (hook `ctx.dropAt` —
+    trees.js 1 dòng, thống kê fix.deck): cau/cọ + cây non từng đứng XUYÊN mặt Cầu Lạc Long +2 m (pano_074 h0). Nhịp chính HVT
+    ~19 m: cây nhỏ dưới gầm vẫn được. riverbank `deckAt` → không lan can/đèn/cây non dưới cầu nâng (roadnet bỏ dải mặt đất
+    của cầu nâng nên `roadSurfaceAt` = 0 ở đó). Lòng 2 NÚT XOẮN (way 'ramp' gần tròn quét ≥ 300°): claimCircle 'park'
+    (r − w/2 − 4 ≈ 55 m) → landuse tô CỎ thay bãi đất be (ảnh 304/349: thảm cỏ + cây bụi cắt tỉa). Texture mặt nhựa cầu 256 ×
+    288 px / (bề rộng × 12 m) = texel ~VUÔNG 4 cm: bản 64 × 256 (16 × 4,7 cm) kéo hạt nhựa thành vệt hướng về camera.
     **ĐO / KIỂM**: (điền sau)
 
 - **2026-10-04 (W2-F POLISH)** [ĐỢT 3 wave 2 — WebGL1, giải mã RB 1 lần, kho cảng, ĐÊM, giao thông né xe đỗ, dọn code chết, hitch]:
