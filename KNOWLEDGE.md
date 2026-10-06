@@ -471,7 +471,8 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     phố p/s cắt ngang ≥ 12 m, t/r ≥ 6,6 m, ngõ 4,5 m (`roadIdx.nearCross`; 15 m mọi nút bỏ ~25% ô tô lõi); phố r có pano: "đỗ ven đường" 0,4, "kín hai bên"
     0,75 (trước 0,1/0,3); s/t không pano 0,2; viên nang quanh camera giữ 6,5-8 m CHỈ khi pano không nhắc ô tô đỗ, có thì xe
     con tâm ≥ 4,5 m/đầu ≥ 3,5 m (AUDIT3: viên nang bỏ chính các xe gần camera); xe khách 11,4 m (pano "xe khách đỗ nối
-    đuôi" ≤ 40 m — 441 Bến Bính), ô tô phủ bạt (bạt bạc) CHỈ phố r 5% / pano "phủ bạt" 35% (bản 6% mọi phố ngoài lõi đặt khối
+    đuôi" ≤ 40 m — 441 Bến Bính; bộ sinh chỉ nhận xe khách LỚN có "đỗ" CÙNG mệnh đề, không qua dấu phẩy, loại van/minibus/
+    limousine 16 chỗ → 8 pano; bản đầu `[^.;]*` bắt "xe khách/xe van …, taxi … đỗ" ở 014 → xe khách 11 m chắn camera), ô tô phủ bạt (bạt bạc) CHỈ phố r 5% / pano "phủ bạt" 35% (bản 6% mọi phố ngoài lõi đặt khối
     xanh xám sát camera 028 mà ảnh thật là sedan đen). Bước ô đỗ đi dọc TỪNG TUYẾN (cùng phố +
     cùng bên, đoạn nối tiếp — `byRoad`), phần dư MANG sang đoạn kế, đoạn kế thẳng hàng (< 12°) cho xe chồm qua khớp (trước: mỗi
     đoạn polyline tự bắt đầu lại ở 2-8 m + chừa 3 m cuối → phố cong ven hồ chia đoạn 10-25 m gần như không có xe — 028/033).
