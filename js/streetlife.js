@@ -405,7 +405,7 @@ export const signCategory = (t) => { const s = String(t || '').toUpperCase(); fo
 
 // ---------------------------------------------------------------------------------------------------------------------
 // ĐẶT ĐỒ — gọi trong buildProps sau 6.4 (quán/xe đẩy/biển A/thùng rác) và TRƯỚC 6.5 (xe máy) → xe máy/ô tô/người né.
-// P = { sides, CELL, cellPos, hash3, evAt, inBuilding, obst, flat, roadIdx, nearPano, onCarriage, openSpace, claimAt,
+// P = { sides, CELL, cellPos, hash3, evAt, inBuilding, obst, flat, roadIdx, nearPano, onCarriage, openReal, claimAt,
 //       XS(c) → {hw, sw, curb, park, furn, fac}, OCC, placeFood, lists:{stoolI, paraI, sitI, standI, bikeDisplay},
 //       addCollider, R_MAX, SHOP_SIGNS, MARKETS, LITE, stats }
 // ---------------------------------------------------------------------------------------------------------------------
@@ -452,7 +452,7 @@ export function marketLevels(P) {
       lv = Math.max(lv, lo);
       if (mClaim) lv = 3;   // ngay trước ô dựng tay tên cho_* (Chợ Tam Bạc, Chợ Con…)
       if (S.c === 'p' && lv > 1) lv = 1;
-      if (S.fore[k] || (lv && P.openSpace(x, z))) lv = 0;   // không bày chợ trong công viên/quảng trường/kè hồ (chợ Cột Đèn = ô dựng tay)
+      if (S.fore[k] || (lv && P.openReal(x, z))) lv = 0;   // không bày chợ trong công viên/quảng trường/kè hồ (chợ Cột Đèn = ô dựng tay)
       S.mk[k] = lv; st.mkCells[lv]++;
     }
   }
@@ -730,7 +730,7 @@ export function placeStreetLife(P) {
       if (hk > 0.03) continue;
       const X = XS(S.c); const [x, z] = cellPos(S, k, X.fac - 0.5);
       const r0 = Math.hypot(x, z);
-      if ((r0 >= 1300 && hk > 0.012) || P.openSpace(x, z)) continue;
+      if ((r0 >= 1300 && hk > 0.012) || P.openReal(x, z)) continue;
       if (!okAt(S, x, z, 0.5) || obst.hit(x, z, 0.5) || !hasFacade(S, k)) continue;
       spillI.push({ x, z, heading: hash3(x, z, 382) * 6.28, v: 2, col: pick([0xa8552e, 0xa8552e, 0xe8e4dc, 0x6a6e70], hash3(x, z, 383)) });
       obst.add(x, z, 0.5); S.occ[k] |= OCC.SHOP; st.plants++;

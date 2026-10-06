@@ -695,6 +695,10 @@ export function buildProps(ctx) {
   const flat = (x, z) => Math.abs(groundHeightNoDeck(x, z) - LAND_H) < 0.35 && !isWater(x, z);
   const panoNear = ctx.nearPanoCam || (() => false);
   const openSpace = ctx.openSpace || (() => false);
+  // W3-E: KHÔNG GIAN MỞ THẬT (claim park/plaza của world.js + kè hồ Tam Bạc 16 m). `openSpace` của world.js còn gồm các vùng
+  // "cấm nhà infill" CÓ nhà thật (Z-TTB1/2/3 phố công sở/bệnh viện/nút Nguyễn Tri Phương, siêu khối Hải quân, chợ Nguyễn
+  // Khuyến…) → dùng nó cho luật ô tô/chợ/dây điện W3-E thì xoá sạch ô tô đỗ 2 bên pano_395 (ảnh thật kín xe) và chợ.
+  const openReal = (x, z) => !!claimAt(x, z, ['park', 'plaza']) || lakeSD(x, z) < 16;
   const avoid = ctx.avoid || (() => false);
   // vùng giữ trống cho đồ vỉa hè + ô tô (điểm hồi sinh người chơi: khung hình đầu tiên không bị xe đỗ che) — [[x,z,r],…]
   const keepClear = ctx.keepClear || [];
@@ -760,7 +764,7 @@ export function buildProps(ctx) {
   const slStats = newStreetLifeStats();
   const bikeDisplay = [];
   const SL = {
-    sides, CELL, cellPos, hash3, evAt, inBuilding, obst, flat, roadIdx, nearPano, onCarriage, onCarriageFast, openSpace, claimAt, XS,
+    sides, CELL, cellPos, hash3, evAt, inBuilding, obst, flat, roadIdx, nearPano, onCarriage, onCarriageFast, openReal, claimAt, XS,
     OCC: { POLE: OCC_POLE, SHOP: OCC_SHOP, BIKE: OCC_BIKE, PED: OCC_PED, CAR: OCC_CAR, MKT: OCC_MKT }, addCollider: ctx.addCollider, R_MAX,
     SHOP_SIGNS, MARKETS: PROPS_MARKETS, evidence: PROPS_EVIDENCE, st: slStats, LITE, ROADS_DT,
   };
@@ -836,7 +840,7 @@ export function buildProps(ctx) {
             let clearSpan = true;
             for (const f of [0.25, 0.5, 0.75]) {
               const mx = prev.x + (x - prev.x) * f, mz = prev.z + (z - prev.z) * f;
-              if (roadIdx.wideAt(mx, mz, ri, 4) || openSpace(mx, mz)) { clearSpan = false; break; }
+              if (roadIdx.wideAt(mx, mz, ri, 4) || openReal(mx, mz)) { clearSpan = false; break; }
             }
             if (clearSpan) spans.push([prev, P]);
           }
@@ -974,7 +978,7 @@ export function buildProps(ctx) {
       if (cross) {
         const mx = P.x + S.ux * along * 0.5 - nxA * lat(true) * 0.5, mz = P.z + S.uz * along * 0.5 - nzA * lat(true) * 0.5;
         const ox = P.x + S.ux * along - nxA * lat(true), oz = P.z + S.uz * along - nzA * lat(true);
-        if (!inBuilding(ox + nxA * 1.2, oz + nzA * 1.2) || roadIdx.wideAt(mx, mz, S.ri, 3) || openSpace(ox, oz)) cross = false;   // phải có nhà bên kia
+        if (!inBuilding(ox + nxA * 1.2, oz + nzA * 1.2) || roadIdx.wideAt(mx, mz, S.ri, 3) || openReal(ox, oz)) cross = false;   // phải có nhà bên kia
       }
       const la = lat(cross);
       const tx = P.x + S.ux * along - nxA * la, tz = P.z + S.uz * along - nzA * la;
@@ -1287,8 +1291,8 @@ export function buildProps(ctx) {
       // trơn, pano 005/028/033 thật có ô tô đỗ phía NHÀ). Nay chỉ cấm phía KÈ/promenade (đi ra phía vỉa hè này lại gần hồ
       // hơn) và sát mép nước (< 6 m); cấm cả bên phố mà phía vỉa là công viên/quảng trường/promenade (322, 542, 065).
       const lakeSide = () => { const lk = lakeSD(x, z); return lk < 6 || (lk < 40 && lakeSD(x + S.nx * 6, z + S.nz * 6) < lk - 1.5); };
-      const parkSide = () => { const ox = x + S.nx * (X.fac - lat + 2), oz = z + S.nz * (X.fac - lat + 2); return openSpace(ox, oz) || openSpace(x + S.nx * (X.sw * 0.5 + 0.95), z + S.nz * (X.sw * 0.5 + 0.95)) || !!claimAt(ox, oz, ['park', 'plaza']); };
-      // thứ tự kiểm: rẻ trước (camera pano, nút giao, vật cản) — lakeSD (đa giác hồ) + openSpace là 2 truy vấn đắt nhất
+      const parkSide = () => { const ox = x + S.nx * (X.fac - lat + 2), oz = z + S.nz * (X.fac - lat + 2); return openReal(ox, oz) || openReal(x + S.nx * (X.sw * 0.5 + 0.95), z + S.nz * (X.sw * 0.5 + 0.95)); };
+      // thứ tự kiểm: rẻ trước (camera pano, nút giao, vật cản) — lakeSD (đa giác hồ) + openReal là 2 truy vấn đắt nhất
       let why = !(x * x + z * z < R_MAX * R_MAX && flat(x, z)) ? 1 : (avoid(x, z) || clearAt(x, z)) ? 2
         : (panoNear(x, z, rc) || panoNear(x + hx, z + hz, rp) || panoNear(x - hx, z - hz, rp)) ? 5 : 0;
       // nút giao: không đỗ trong 12 m tính từ LÒNG phố p/s cắt ngang (t/r 6,6 m); ngõ h/w (không vỉa) 4,5 m như cũ (pano 065/193/327:
