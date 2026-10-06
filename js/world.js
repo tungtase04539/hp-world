@@ -20859,6 +20859,9 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
           const mx = x1 + d[0] * s, mz = z1 + d[1] * s;
           if (MEDIAN_SKIP.some(([qx, qz, qr]) => (mx - qx) ** 2 + (mz - qz) ** 2 < qr * qr)) continue;
           if (INTERSECTIONS.some(([px, pz]) => (px - mx) ** 2 + (pz - mz) ** 2 < 14 * 14)) continue;
+          // W3-A: camera pano ≤ 5 m = xe Google chạy QUA chỗ này → không có dải phân cách (Trần Phú pano_232-234 cách tuyến 1-1,5 m;
+          // bồn/xà cừ dải giả từng đứng 1,5-2,4 m trước ống kính)
+          if (clrNearPano(mx, mz, 5)) continue;
           if (isWater(mx, mz)) continue;
           const y = groundHeightNoDeck(mx, mz);
           if (Math.abs(y - LAND_H) > 1) continue;
