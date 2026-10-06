@@ -40,6 +40,7 @@ function nearPanoCam(x, z, r = 5) {
 import { SHOP_SIGNS } from './shopsigns.js';
 // ĐỢT 3 WP2: phố từ footprint THẬT (citygen.js) + sổ vùng giữ chỗ (claims.js) + footprint địa danh (landmark_polys.js)
 import { buildRealFabric, fabricData } from './citygen.js';
+import { applyCellGlass, drawFacadeWindows } from './cellfacade.js';   // Đợt 3 W3-C: kính + mặt tiền vẽ tay của nhà ô
 import { claimPoly, claimBox, claimCircle } from './claims.js';
 import { LM_POLY, LM_CENTROID } from './landmark_polys.js';
 import { buildProps, layRoadSurfaceY } from './props.js';                 // Đợt 3 WP7: đồ đạc phố (xe máy/ô tô/cột điện/đèn/người)
@@ -129,16 +130,9 @@ export const sharedMats = {
   flower: mat(0xd8402c, { emissive: 0x8f2416, emissiveIntensity: 0.10, flatShading: true }),
   cloud: new THREE.MeshLambertMaterial({ color: 0xffffff, transparent: true, opacity: 0.92, flatShading: true }),
 };
-// W3-C: kính nhà ô PHẢN TRỜI (cùng công thức kính phố citygen): + bức xạ gián tiếp × màu trời theo góc nhìn (Fresnel) →
-// mặt khuất nắng không còn mảng xanh than đặc (pano_138/386/391/409/418). Đêm: emissive do daynight như cũ.
-sharedMats.window.onBeforeCompile = (sh) => {
-  sh.fragmentShader = sh.fragmentShader.replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
-#if defined( RE_IndirectDiffuse )
-  { float ndv = clamp(abs(dot(geometryNormal, geometryViewDir)), 0.0, 1.0);
-    reflectedLight.indirectDiffuse += vec3(0.50, 0.62, 0.78) * (0.45 + 0.55 * pow(1.0 - ndv, 4.0)) * irradiance * RECIPROCAL_PI; }
-#endif`);
-};
-sharedMats.window.customProgramCacheKey = () => 'cellglass_w3c';
+// W3-C: kính nhà ô PHẢN TRỜI + lưới ĐỐ KÍNH theo toạ độ thế giới (js/cellfacade.js applyCellGlass): hộp kính đặc dựng tay
+// (dải băng tầng, pod, mặt kính VIB) hết là "khối xanh phẳng" (pano_138/157/386/418). Đêm: emissive do daynight như cũ.
+applyCellGlass(sharedMats.window);
 
 // ---------- Texture thủ tục ----------
 // LITE: hạ độ phân giải MỌI texture thủ tục (đo được: 1.875 texture riêng ≈ 1.6GB RAM texture trên
@@ -1724,13 +1718,7 @@ export async function buildWorld(scene, prog = () => {}) {
   {
     // texture mặt tiền lưới cửa sổ trên nền màu tòa nhà
     const facadeTex = (baseCss, winCss, cols, rows) => {
-      const t = makeTex(256, 256, (g, w, h) => {
-        g.fillStyle = baseCss; g.fillRect(0, 0, w, h);
-        const mx = w * 0.12, my = h * 0.12, cw = (w - mx * 2) / cols, ch = (h - my * 2) / rows;
-        for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
-          g.fillStyle = winCss; g.fillRect(mx + c * cw + cw * 0.16, my + r * ch + ch * 0.16, cw * 0.68, ch * 0.66);
-        }
-      });
+      const t = makeTex(512, 512, (g, w, h) => drawFacadeWindows(g, w, h, baseCss, winCss, cols, rows));   // W3-C: như lmFacade
       t.wrapS = t.wrapT = THREE.RepeatWrapping; return new THREE.MeshLambertMaterial({ map: t });
     };
     // hướng mặt tiền: quay về đoạn đường 'p'/'s' gần nhất
@@ -1907,13 +1895,9 @@ const lmSign = _cells.memo('lmSign', (txt, bg, fg = '#ffffff', px = 50) => new T
   }, 'sign|' + txt + '|' + bg + '|' + fg + '|' + px),
 }));
 const lmFacade = _cells.memo('lmFacade', (baseCss, winCss, cols, rows) => {           // như facadeTex world.js:1612
-  const t = makeTex(256, 256, (g, w, h) => {
-    g.fillStyle = baseCss; g.fillRect(0, 0, w, h);
-    const mx = w * 0.12, my = h * 0.12, cw = (w - mx * 2) / cols, ch = (h - my * 2) / rows;
-    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
-      g.fillStyle = winCss; g.fillRect(mx + c * cw + cw * 0.16, my + r * ch + ch * 0.16, cw * 0.68, ch * 0.66);
-    }
-  }, 'fac|' + baseCss + '|' + winCss + '|' + cols + '|' + rows);
+  // W3-C: 512 px + khung/kính phản trời/cửa chớp (cellfacade.drawFacadeWindows) thay ô màu đặc 256 px ("lỗ vuông đen")
+  const t = makeTex(512, 512, (g, w, h) => drawFacadeWindows(g, w, h, baseCss, winCss, cols, rows),
+    'fac|' + baseCss + '|' + winCss + '|' + cols + '|' + rows);
   return new THREE.MeshLambertMaterial({ map: t });
 });
 const lmOK = (x, z) => Math.abs(groundHeightNoDeck(x, z) - LAND_H) < 0.4 && !isWater(x, z);
@@ -8426,12 +8410,14 @@ const tsShop = (bx, bz, ry, W, FL, wallMat, txt, sbg, sfg, opt = {}) => {
       tsBox(g, W + 0.2, 0.5, 0.5, mat(0xfdfbf4), 0, f * 3.3 + 0.55, D / 2 + 0.15);
     }
     // mái hiên TÔN XANH LÁ liên tục + 3 mảng bạt sọc xanh-trắng
-    const hienM = mat(0x2f7d4f);
+    const hienM = mat(0x2f7d4f, { side: THREE.DoubleSide });   // W3-C: nhìn từ dưới (mặt sau) vẫn thấy
     const hien = new THREE.Mesh(new THREE.PlaneGeometry(W * 0.97, 2.1), hienM);
-    hien.position.set(0, 3.1, D / 2 + 1.0); hien.rotation.x = 0.42; g.add(hien);
+    // W3-C (AUDIT3 FP-3 #5, pano_124 h90): rotation.x DƯƠNG dựng tấm gần THẲNG ĐỨNG (mép trên chĩa ra phố) → "tấm xanh chéo"
+    // 60 m trước mặt camera; mái hiên = dốc thoải xuống phía ngoài (−1,15 rad ≈ 24° so với phương ngang)
+    hien.position.set(0, 3.1, D / 2 + 1.0); hien.rotation.x = -1.15; g.add(hien);
     for (const lx of [-21, -3, 16]) {
       const aw = new THREE.Mesh(new THREE.PlaneGeometry(8, 1.9), tsStripe('#2a5fa8', '#f4efe4'));
-      aw.position.set(lx, 2.5, D / 2 + 2.2); aw.rotation.x = 0.5; g.add(aw);
+      aw.material.side = THREE.DoubleSide; aw.position.set(lx, 2.5, D / 2 + 2.2); aw.rotation.x = -1.1; g.add(aw);
     }
     // biển đích danh (ảnh: chữ hồng nền trắng + tím than + xanh lá)
     const S = (txt, bg, fg, lx, w2 = 8, y = 4.6) => {
@@ -8447,7 +8433,7 @@ const tsShop = (bx, bz, ry, W, FL, wallMat, txt, sbg, sfg, opt = {}) => {
       map: makeTex(64, 64, (gc, w2, h2) => { gc.fillStyle = '#3f9457'; gc.fillRect(0, 0, w2, h2); }),
       transparent: true, opacity: 0.75, side: THREE.DoubleSide,
     }));
-    net.position.set(-26, 3.4, D / 2 + 2.6); net.rotation.x = 0.35; g.add(net);
+    net.position.set(-26, 3.9, D / 2 + 2.6); net.rotation.x = -1.2; g.add(net);   // W3-C: lưới che = mái thoải (trước: vách đứng)
     const rackCols = [0xd46a9a, 0xe4dd8a, 0x7aa0c4, 0xc0392b, 0xf0f0f0];
     for (let i = 0; i < 10; i++) {
       const rk = new THREE.Mesh(new THREE.BoxGeometry(2.1, 1.5, 0.5), mat(rackCols[i % 5]));
@@ -10970,9 +10956,15 @@ const treeP = (p, sd, along, scl) => { const [tx, tz] = at(p, sd, along, 0, -1.0
   { const [bx, bz, ry] = at('p141', -1, 2, 11);
     if (lnOK(bx, bz)) { const g = lnMk(bx, bz, ry), W = 11, D = 11, H = 3 * 3.5;
       lnBody(g, W, H, D, lnFacade('#cdb98c', '#7a6a48', 4, 3, true));
-      const ar = []; for (let c = -1.5; c <= 1.5; c++) { const p = new THREE.BoxGeometry(0.5, 3.6, 0.5); p.translate(c * 2.6, 1.8, D / 2 + 0.2); ar.push(p); if (c < 1.5) { const arc = new THREE.TorusGeometry(1.0, 0.18, 6, 10, Math.PI); arc.translate(c * 2.6 + 1.3, 3.6, D / 2 + 0.2); ar.push(arc); } }
+      // W3-C (AUDIT3 FP-3 #5, pano_239 h270): vòm = Ống xuyến (Torus) treo trước tường, đỉnh 4,6 m xuyên lan can → "vòm trắng
+      // rỗng". Nay: tường lưng vòm ĐẶC (hình chữ nhật trừ nửa tròn, đùn 0,4 m) giữa các trụ, đỉnh 3,55 m dưới lan can.
+      const ar = []; for (let c = -1.5; c <= 1.5; c++) { const p = new THREE.BoxGeometry(0.5, 3.6, 0.5); p.translate(c * 2.6, 1.8, D / 2 + 0.2); ar.push(p); }
       for (let bx2 = -W / 2 + 0.6; bx2 < W / 2; bx2 += 0.7) { const bl = new THREE.CylinderGeometry(0.12, 0.12, 0.9, 6); bl.translate(bx2, 3.9, D / 2 + 0.35); ar.push(bl); }
-      g.add(new THREE.Mesh(mergeGeometries(ar), mat(0xe3d8bf)));
+      const archM = mat(0xe3d8bf);
+      g.add(new THREE.Mesh(mergeGeometries(ar), archM));
+      const sp = new THREE.Shape(); sp.moveTo(-1.3, 2.5); sp.lineTo(-0.95, 2.5); sp.absarc(0, 2.5, 0.95, Math.PI, 0, true); sp.lineTo(1.3, 2.5); sp.lineTo(1.3, 3.55); sp.lineTo(-1.3, 3.55); sp.closePath();
+      const spG = []; for (let c = -1; c <= 1; c++) { const e = new THREE.ExtrudeGeometry(sp, { depth: 0.4, bevelEnabled: false, curveSegments: 10 }); e.translate(c * 2.6, 0, D / 2); spG.push(e); }
+      g.add(new THREE.Mesh(mergeGeometries(spG), archM));
       lnBoard(g, 'CẦM ĐỒ — ANH ĐỨC SƠN', '#c1201a', '#ffe08a', W, D, 3.4, 26); lnHip(g, W, D, 0x7a4a34, H + 0.5); lnFin(g, 'ln_congthu_phap', bx, bz, 6, 12); } }
   // nhà Gốm xanh ngọc BO GÓC 2T (239 h90) — bờ bắc kề đông 239 sd -1
   { const [bx, bz, ry] = at('p239', -1, 6, 9);

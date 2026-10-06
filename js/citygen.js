@@ -40,7 +40,7 @@ import { buildFacadeAtlas, MOD, ATLAS_N, ATLAS_ROWS, SIGN_CELLS, SIGN_EXT, SIGN_
 import { FEF, FEZ, FE_OBS, FE_PANO } from './facade_evidence.js';
 import { TIER } from './device.js';
 import { ROADS_DT } from './mapdata.js';
-import { ROAD_HW } from './xsection.js';
+import { ROAD_HW, SIDEWALK_W } from './xsection.js';
 import { PANO_CAM } from './panoclear.js';
 
 // Ô CHÍNH 450 m (tường + mái + đồ mái; ~57 ô cho R1750): đo cùng phiên 300/450/600 m — 450 giảm MỘT NỬA draw call của
@@ -98,7 +98,7 @@ function glslVec3Fn(name, hexes) {
   for (let k = 0; k < v.length - 1; k++) s += `if(i==${k})return ${v[k]};`;
   return s + `return ${v[v.length - 1]};}`;
 }
-const GL1_ARR = /\b(U\d+|G\d+|GH|SD|BK|PT|SIGNC|WALLP)\[([^[\]]*)\]/g;
+const GL1_ARR = /\b(U\d+|G\d+|GH|SD|BK|PT|XP|SIGNC|WALLP)\[([^[\]]*)\]/g;
 const gl1Idx = (src) => src.replace(GL1_ARR, '$1($2)');
 // KIỂU DỰNG (render style) = 4 bit thấp aFac.z của tường. 0..6 = STYLE dữ liệu (TUBE 0, OLD 1, KTT 2, GLASS 3, VILLA 4,
 // SHED 5, CIVIC 6); 7.. thêm ở W3-C, quyết định LÚC CHẠY trong renderStyles() từ bằng chứng pano (js/facade_evidence.js) +
@@ -141,6 +141,9 @@ const SETS = {
   SD: ['S_PLAIN0', 'S_EXP0', 'S_PLAIN0', 'S_PLAIN2', 'S_PLAIN1', 'S_WIN', 'S_WIN', 'S_BRICK', 'S_BACK', 'S_EXP1', 'S_EXP0'],
   BK: ['S_BACK', 'S_BACK', 'S_WIN', 'S_PLAIN0', 'S_PLAIN2', 'U_AC', 'U_LOG', 'U_SLIDE1', 'S_EXP1'],
   PT: ['S_EXP0', 'S_EXP0', 'S_EXP1', 'S_PLAIN1', 'S_PLAIN2', 'S_ADS', 'S_EXP2', 'S_BRICK', 'S_WIN'],
+  // tường hông/sau LỘ ra phố (exposedSide, rc = 1 trên cạnh không phải mặt phố): cửa sổ nhỏ thưa + điều hoà + ố, ít trơn,
+  // hiếm quảng cáo sơn — KHÔNG bao giờ "trơn cả mặt" (nhà ống HP: tường hồi có ô thoáng/cửa sổ nhỏ/cục nóng)
+  XP: ['S_EXP1', 'S_EXP1', 'S_WIN', 'S_WIN', 'S_BACK', 'U_AC', 'S_EXP0', 'S_EXP0', 'S_PLAIN2', 'S_EXP2'],
 };
 const FIXED_G = (st) => st === 5 || st === RS.CONS;   // kho / đang xây: 1 mô-đun trệt cố định, không có bay "nhà ở"
 // ---- MÔ-ĐUN TẦNG TRỆT theo HASH NGUYÊN — bản JS khớp TỪNG BIT với shader (ihash/pidx/pickGi trong makeMaterial) ----
@@ -379,6 +382,7 @@ ${gl1 ? GL1_GROUND_MAIN : GL2_GROUND_MAIN}
       float r = h21(vec2(seed * 3.7 + fl * 1.31, bay * 0.71 + 0.3)) < 0.8 ? mainR : altR;
       m = (h21(vec2(seed * 2.9 + bay * 0.61, float(kind) + 0.5)) < 0.12) ? SD[0] : pickU(st, r);   // ~12% bay trơn (lõi thang)
     }
+    else if (rc > 0.5 && st != 5) m = XP[int(h21(vec2(seed * 17.9 + bay * 0.37, fl * 0.61 + 0.3)) * ${n('XP')})];   // W3-C: tường hông/sau LỘ ra phố
     else if (kind == 2) m = BK[int(h21(vec2(seed * 9.7 + bay * 0.53, fl * 0.77 + 0.2)) * ${n('BK')})];
     else {
       float r = h21(vec2(seed * 31.3 + bay * 0.5, fl * 0.13 + 0.1));
@@ -585,7 +589,7 @@ function roadGrid() {
   _rgrid = new Map();
   for (const r of ROADS_DT) for (let i = 0; i + 1 < r.pts.length; i++) {
     const [ax, az] = r.pts[i], [bx, bz] = r.pts[i + 1], hw = ROAD_HW[r.c] ?? 2.75, pad = hw + 16;
-    const seg = [ax, az, bx, bz, hw, r.c === 'h' ? 2 : (r.c === 'r' || r.c === 'w') ? 1 : 0];
+    const seg = [ax, az, bx, bz, hw, r.c === 'h' ? 2 : (r.c === 'r' || r.c === 'w') ? 1 : 0, SIDEWALK_W[r.c] ?? 0];
     for (let gi = Math.floor((Math.min(ax, bx) - pad) / RG); gi <= Math.floor((Math.max(ax, bx) + pad) / RG); gi++)
       for (let gj = Math.floor((Math.min(az, bz) - pad) / RG); gj <= Math.floor((Math.max(az, bz) + pad) / RG); gj++) {
         const k = gi * 65536 + gj; let l = _rgrid.get(k); if (!l) _rgrid.set(k, (l = [])); l.push(seg);
@@ -638,6 +642,27 @@ function faceRoad(ax, az, bx, bz, nx, nz, b) {
     if (!blocked) return cls;
   }
   return -1;
+}
+// W3-C (AUDIT3 FP-3 #1 "không tường trống nhìn từ phố"): cạnh HÔNG/SAU không được nâng thành mặt phố (faceRoad: nhìn THẲNG
+// ra lòng đường) nhưng vẫn LỘ ra phố — đầu gần phố cách mép hành lang đường (lòng + vỉa hè) ≤ 3 m và trước mặt tường trống
+// (không có nhà kề sát) → shader dùng bộ mô-đun TƯỜNG HÔNG LỘ (cửa sổ nhỏ thưa, điều hoà, vệt ố, đôi khi quảng cáo sơn) thay
+// vì 45% "trơn cả mặt" (pano_340 h270, 372 h0, 175 h270, 198 h0: tường hông dọc phố trống trơn). Cần lưới va chạm (fabricAt).
+function exposedSide(ax, az, bx, bz, nx, nz, b) {
+  const l = roadGrid().get(Math.floor((ax + bx) / 2 / RG) * 65536 + Math.floor((az + bz) / 2 / RG)); if (!l) return false;
+  let best = 1e9;
+  for (const [px, pz] of [[ax, az], [bx, bz]]) for (const sg of l) {
+    const dx = sg[2] - sg[0], dz = sg[3] - sg[1], L2 = dx * dx + dz * dz || 1e-9;
+    let u = ((px - sg[0]) * dx + (pz - sg[1]) * dz) / L2; u = u < 0 ? 0 : u > 1 ? 1 : u;
+    const d = Math.hypot(px - sg[0] - dx * u, pz - sg[1] - dz * u) - sg[4] - sg[6];
+    if (d < best) best = d;
+  }
+  if (best > 3) return false;
+  let free = 0;
+  for (const t of [0.2, 0.5, 0.8]) {
+    const o = fabricAt(ax + (bx - ax) * t + nx * 1.2, az + (bz - az) * t + nz * 1.2);
+    if (o < 0 || o === b) free++;
+  }
+  return free >= 2;
 }
 
 // ---------- va chạm ----------
@@ -832,7 +857,7 @@ export function buildRealFabric(scene, ctx) {
   const gh = ctx.groundHeightNoDeck, LAND_H = ctx.landH ?? 2;
   const tDecode = performance.now() - T0;
   // ---------- 1) LOẠI NHÀ dưới vùng giữ chỗ (claims) + zone hàm của world.js ----------
-  const st = { total: D.nB, deadPre: 0, deadFar: 0, deadClaim: 0, deadZone: 0, deadWater: 0, deadPano: 0, built: 0, walls: 0, roofs: 0, tris: 0, detTris: 0, balc: 0, awn: 0, signBox: 0, signBay: 0, tanks: 0, tums: 0, canopy: 0, ac: 0, promoted: 0, tWall: 0, tRoof: 0, tPar: 0 };
+  const st = { total: D.nB, deadPre: 0, deadFar: 0, deadClaim: 0, deadZone: 0, deadWater: 0, deadPano: 0, built: 0, walls: 0, roofs: 0, tris: 0, detTris: 0, balc: 0, awn: 0, signBox: 0, signBay: 0, tanks: 0, tums: 0, canopy: 0, ac: 0, promoted: 0, exposed: 0, tWall: 0, tRoof: 0, tPar: 0 };
   const CX = new Float32Array(D.nB), CZ = new Float32Array(D.nB);
   const pts = [];
   // điểm camera pano THẬT (xe Street View chạy trên LÒNG ĐƯỜNG): footprint nào chứa/sát (<0,5 m) điểm này là lệch đăng ký
@@ -987,7 +1012,10 @@ export function buildRealFabric(scene, ctx) {
       const bayW = kind === EDGE.FRONT ? 4.2 : 4.0, nb = Math.max(1, Math.round(L / bayW));
       // dãy nhà ống gộp (mỗi bay 1 nhà) — KHÔNG áp cho cạnh được nâng (đó là hông của MỘT nhà)
       const wideF = kind === EDGE.FRONT && rcP < 0 && nb >= 3 && fl <= 5 && tubeLike ? 16 : 0;
-      let rc = rcP >= 0 ? rcP : kind === EDGE.FRONT ? frontClass((ax + bx) / 2, (az + bz) / 2, nx, nz) : 0;
+      // cạnh không phải mặt phố: rc = 1 ⇔ tường hông/sau/chung LỘ ra phố (exposedSide → shader bộ XP; W3-C)
+      let rc = rcP >= 0 ? rcP : kind === EDGE.FRONT ? frontClass((ax + bx) / 2, (az + bz) / 2, nx, nz)
+        : (L >= 1.5 && rs !== STYLE.SHED && exposedSide(ax, az, bx, bz, nx, nz, b)) ? 1 : 0;
+      if (kind !== EDGE.FRONT && rc) st.exposed++;
       if (hasInfo && kind === EDGE.FRONT && rcP < 0 && !wideF) { const use = (D.info[b] >> INFO.USE_SHIFT) & 3; if (use === INFO.USE_HOME) rc = 3; else if (use === INFO.USE_SHOP) rc = 0; }
       const kb = kind | bigFlag | wideF | pitchFlag | (rc << 6);
       // W3-C: cạnh có BAN CÔNG 3D (quyết định ở đây, dựng bên dưới) → bit 7 aFac.z: shader không đặt biển bảng lớn tầng 1-2

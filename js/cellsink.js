@@ -999,11 +999,11 @@ function atlasKept(kept, createdTex, THREE) {
     const cv = document.createElement('canvas'); cv.width = AT_PAGE; cv.height = H; p.H = H;
     const g = cv.getContext('2d');
     for (const t of p.items) {
-      const c = texs.get(t), fx = cellCanvasFx(t.image);   // W3-C: mặt tiền tối / lỗ cửa sổ đen → kính (js/cellfacade.js)
+      const c = texs.get(t), fx = cellCanvasFx(t.image);   // W3-C: mặt tiền canvas tối / một màu bão hoà → filter (js/cellfacade.js)
       if (fx) g.filter = fx.filter;
       g.drawImage(t.image, c.x, c.y, c.w, c.h);                                     // nền ô = ảnh kéo giãn ra viền (chống loang)
       g.drawImage(t.image, c.x + c.G, c.y + c.G, c.w - 2 * c.G, c.h - 2 * c.G);  // ảnh thật 1:1 ở giữa (c.w-2G = w gốc)
-      if (fx) { g.filter = 'none'; if (fx.lift) { g.globalCompositeOperation = 'lighten'; g.fillStyle = fx.lift; g.fillRect(c.x, c.y, c.w, c.h); g.globalCompositeOperation = 'source-over'; } }
+      if (fx) g.filter = 'none';
     }
     const tx = new THREE.CanvasTexture(cv);
     tx.colorSpace = ref.colorSpace; tx.anisotropy = ref.anisotropy; tx.name = 'cellAtlas' + k;
