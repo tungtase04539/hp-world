@@ -421,7 +421,7 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
-- **2026-10-05 (W3-E STREET LIFE)** [ĐỢT 3 wave 3 — AUDIT3 FP-5: CHỢ DÂN SINH, hàng tràn hè theo loại cửa hàng, ô tô/xe máy
+- **2026-10-05/06 (W3-E STREET LIFE)** [ĐỢT 3 wave 3 — AUDIT3 FP-5: CHỢ DÂN SINH, hàng tràn hè theo loại cửa hàng, ô tô/xe máy
     đỗ theo bằng chứng, xe khách, xe ba gác, trạm biến áp kiốt, đèn gang 2/5 cầu, cờ treo nhà, băng rôn, cổng chào ngõ]:
     MỚI `js/streetlife.js` (gọi từ `buildProps` — dùng chung lưới ô vỉa hè 3 m `sides`, vật liệu/bộ dựng hình props truyền
     qua `G` → không thêm program shader cho đồ chợ). `tools/gen_props_evidence.mjs` thêm 3 cột (props_evidence.js
@@ -429,7 +429,8 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     (tools/osm_*.json bị gitignore; làm mới: `node tools/gen_props_evidence.mjs --osm tools/osm_landuse.json`).
     **Mức chợ ô** (`marketLevels`, ngay sau lấy mẫu 6.1): pano ≤ 45 m có market (≥ 30 m bớt 1); đa giác OSM trong/≤ 12 m → 3,
     ≤ 40 → 2, ≤ 80 → 1, NHƯNG pano ≤ 30 m không nhắc chợ/ô/bạt/hàng → trần 1 (bằng chứng âm thắng); ô dựng tay tên `cho_*`
-    ngay sau mặt tiền → 3; phố p trần 1; openSpace (công viên/quảng trường/kè hồ) → 0. Từ khoá: tên riêng có chữ "chợ" bị xoá
+    ngay sau mặt tiền → 3; phố p trần 1; nhìn ra công viên/quảng trường/kè hồ (`parkBehind`, xem Ô tô) → 0. Từ khoá: tên riêng có
+    chữ "chợ" bị xoá
     trước khi so (phố Chợ Con 455-457 = phố vật liệu xây dựng, Chợ Sắt đang xây, ghi chú "ghép lệch … chợ tam bạc"),
     "sạp hàng rong/sạp báo" chỉ là mức 1, "sạp … kín/tràn/chiếm" (không có cụm chợ) là mức 2 (189 Dư Hàng: hàng hiên + xe
     máy, không phải phố ô dù). **Sân trước** `S.fore` = claim cell/landmark/civic sau mặt tiền 1,5/4/8/12/17 m (dừng khi gặp nhà
@@ -441,17 +442,32 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     đỗ — ảnh 184/189), người bán ngồi ghế đẩu sau hàng (ghế = biến thể nhóm hàng, người = kit SIT), khách đứng phía đường;
     mức 3 (40% đơn vị) thêm hàng ở dải 1,1 m lòng đường sát bó vỉa (cách nút giao ≥ 4 m) → `world.props.stalls` (traffic.js lách như xe
     đỗ). Mọi vật: tâm ≥ 2,5 m + bán kính tới camera pano, không trong nhà thật, không trên nhựa phố khác (`onCarriageFast`).
+    Người: bán ngồi 75/62/45% đơn vị (mức 3/2/1), khách đứng 60/30/15% + mức 3 thêm khách thứ 2 35% (ngân sách người 1.500 →
+    2.000, LITE 550 → 750 — chợ thật đông người). **Đống nông sản** `props_market_produce` (1 draw call riêng, không đổ bóng,
+    ≤ 90 m, LITE 55 m): mỗi vòm hàng của sạp/mẹt/bạt đất (`PRODUCE_SLOTS`, dẫn xuất từ groundI SAU groundAll → không đổi chỗ
+    đặt) có thêm 1 đống 9 quả cầu icosa pháp tuyến TRƠN màu instance pha sáng/tối từng quả + 3 quả bảng A (cổng 1 ~35% đống
+    hàng trộn) + 3 bó lá dẹt (cổng 2 ~40% đống rau) — vòm trơn một màu nhìn như "bãi slime", đống quả lổn nhổn mới đọc ra
+    rau quả; vòm cũ giữ làm lõi + LOD xa. KHÔNG gộp làm biến thể của nhóm hàng đất (mọi instance gánh ~300 đỉnh suy biến).
     BẪY: (a) cán ô vào `obst` với bán kính lớn → mọi sạp ngay dưới ô bị loại (bản đầu: ô không có hàng); (b) hàng giữa vỉa
     hè → xe máy (parkingLine) bị loại sạch khỏi phố chợ — thật thì xe máy đỗ ngoài, hàng trong; (c) `flat()` (groundHeightNoDeck
     + isWater) là truy vấn đắt nhất của vòng chợ — ô đã kiểm dốc lúc lấy mẫu, bỏ trong okAt.
     **Hàng tràn hè** theo chữ biển hiệu thật (SHOP_SIGNS → `signCategory`: cafe/food/furn/bike/toys/fruit/flower/cloth/hard/
     plant — chỉ chọn đồ, chữ không hiển thị; SHOP_SIGNS đã lọc thương hiệu nên regex chỉ dùng từ chung): quán cà phê = bộ bàn
-    ghế + dù 70%, cửa hàng xe máy = 1-2 hàng xe MỚI mũi ra đường, nội thất/bàn thờ+két, đồ chơi, giá treo quần áo, xô hoa,
+    ghế + dù 70%, cửa hàng xe máy = hàng xe MỚI mũi ra đường xếp khít 0,68 m (hàng 2 CHỈ khi vỉa ≥ 3,9 m: xe dài ~1,9 m, bản đầu 2
+    hàng cách 1,05 m xuyên nhau) + 2 ô dù tròn phía đường khi pano "ô/dù bán hàng" (170 Tô Hiệu); pano "xe máy trưng bày" ≤ 25 m:
+    45% ô; nội thất/bàn thờ+két, đồ chơi, giá treo quần áo, xô hoa,
     hàng chồng; + theo bằng chứng pano (spill bits ≤ 25 m) + chậu cây trước nhà (3% ô lõi). Đồ của nhà (chậu, hàng
     tràn) CHỈ đặt khi có mặt tiền nhà thật ngay sau ô (`hasFacade`: dò facadeLine −0,3…+2,5 m) — bản đầu có chậu cây giữa vỉa hè
     nút giao HVT (304).
     **Ô tô** (props.js 6.6): bỏ luật `lakeSD > 18` (cấm ô tô 18 m quanh MỌI hồ → Quang Trung/Nguyễn Đức Cảnh trống) → chỉ cấm
-    phía kè (đi ra phía vỉa lại gần hồ hơn) + phía vỉa là công viên/quảng trường (322/542/065); nút giao: tâm/đầu xe cách LÒNG
+    phía kè (đi ra phía vỉa lại gần hồ hơn) + phía vỉa nhìn ra công viên/quảng trường (322/542/065): `parkBehind` dò từ mặt
+    tiền +0…+18 m theo pháp tuyến, gặp claim park/plaza hoặc kè (`openReal` = claimAt park/plaza ∨ lakeSD < 16) → true, gặp
+    nhà thật trước → false (đa giác công viên OSM lùi sau dải cỏ: 542 claim cách bó vỉa ~16 m). BẪY: `ctx.openSpace` của
+    world.js KHÔNG phải "không gian mở" — nó gồm cả vùng CẤM NHÀ INFILL có nhà thật (Z-TTB1/2/3 phố công sở/bệnh viện/nút
+    Nguyễn Tri Phương, siêu khối Hải quân, chợ Nguyễn Khuyến, hành lang cầu Lạc Long…): dùng nó cho luật ô tô thì pano_395
+    (ảnh thật kín ô tô 2 bên) mất SẠCH xe; luật W3-E (ô tô/chợ/chậu/nhịp dây) dùng `openReal`/`parkBehind`. Mức lấp ô đỗ
+    tính TẠI TỪNG Ô theo pano gần nhất ≤ 60 m (`fillAt`) — trước: pano ở GIỮA đoạn polyline cho cả đoạn (Quang Trung = 1 đoạn
+    thẳng 858 m, pano giữa đoạn "không ô tô" → 0,04 suốt phố; pano_005 ảnh thật 2 xe sát camera). Nút giao: tâm/đầu xe cách LÒNG
     phố p/s cắt ngang ≥ 12 m, t/r ≥ 6,6 m, ngõ 4,5 m (`roadIdx.nearCross`; 15 m mọi nút bỏ ~25% ô tô lõi); phố r có pano: "đỗ ven đường" 0,4, "kín hai bên"
     0,75 (trước 0,1/0,3); s/t không pano 0,2; viên nang quanh camera giữ 6,5-8 m CHỈ khi pano không nhắc ô tô đỗ, có thì xe
     con tâm ≥ 4,5 m/đầu ≥ 3,5 m (AUDIT3: viên nang bỏ chính các xe gần camera); xe khách 11,4 m (pano "xe khách đỗ nối
@@ -459,11 +475,11 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     xanh xám sát camera 028 mà ảnh thật là sedan đen). Bước ô đỗ đi dọc TỪNG TUYẾN (cùng phố +
     cùng bên, đoạn nối tiếp — `byRoad`), phần dư MANG sang đoạn kế, đoạn kế thẳng hàng (< 12°) cho xe chồm qua khớp (trước: mỗi
     đoạn polyline tự bắt đầu lại ở 2-8 m + chừa 3 m cuối → phố cong ven hồ chia đoạn 10-25 m gần như không có xe — 028/033).
-    Thứ tự kiểm rẻ trước (camera pano → nút giao → vật cản → lakeSD/openSpace). QA: `__hpProps.carRejPts` [x,z,lý do].
+    Thứ tự kiểm rẻ trước (camera pano → nút giao → vật cản → lakeSD/parkBehind). QA: `__hpProps.carRejPts` [x,z,lý do].
     **Xe máy**: hàng = chuỗi CỤM theo lô 3,2-6 m cách khe lối vào 0,5-0,9 m, mỗi cụm góc/mũi/khoảng riêng; bảng màu tối
     (đen/xám/bạc/trắng — ảnh tháng 10); ước lượng ngân sách ×0,5 (thực đo, chú thích 0,8 cũ sai); xe trưng bày cửa hàng xe.
     **Tiện ích**: cột điện phố cũ (t/r lõi, búi dây) 23-29 m; nhịp dây KHÔNG qua phố rộng/nút giao/khoảng mở (`roadIdx.wideAt`
-    + openSpace ở ¼ ½ ¾ nhịp), dây sang nhà bên kia chỉ phố t/r và phải có nhà (363: lưới dây trên nút giao); trạm biến áp
+    + openReal ở ¼ ½ ¾ nhịp), dây sang nhà bên kia chỉ phố t/r và phải có nhà (363: lưới dây trên nút giao); trạm biến áp
     kiốt (bằng chứng "trạm biến áp … vỉa hè/hộp", "tủ điện lớn", "hai tủ" — 207/092; nền ~1/1.000 m phố s/t lõi; ≥ 7 m camera — khối
     xám sát ống kính 276 mà ảnh thật trống); đèn gang 5 cầu quảng trường Nhà hát / 2 cầu ven hồ / 3 cầu vườn
     hoa — nhóm `props_furniture2` RIÊNG (gộp vào nhóm cột 1.300 instance làm mọi cột gánh đỉnh suy biến); cờ treo nhà (cán
