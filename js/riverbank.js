@@ -150,6 +150,22 @@ function railTexture() {
   return t;
 }
 
+// tấm lan can dải bờ tự phát (Tam Bạc đoạn bắc): sắt sẫm CHUỖI VÒNG TRÒN lồng nhau (Ø ~0,45 m, tâm cách 0,25 m) giữa thanh
+// trên/dưới — ảnh pano_519 h180, 331 h270 (khối ô B2 "phố thuyền" cũng vẽ kiểu này) — 1 ô = 2 m × 0,7 m
+function ringTexture() {
+  const W = 256, H = 112, cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+  const g = cv.getContext('2d');
+  g.clearRect(0, 0, W, H);
+  g.strokeStyle = '#2b2e2c'; g.fillStyle = '#2b2e2c';
+  g.fillRect(0, 2, W, 7); g.fillRect(0, H - 8, W, 6);                        // thanh trên / dưới
+  g.fillRect(0, 0, 6, H);                                                     // trụ sắt đầu ô
+  g.lineWidth = 3.2;
+  for (let x = 0; x <= W + 32; x += 32) { g.beginPath(); g.arc(x, H / 2, 34, 0, Math.PI * 2); g.stroke(); }
+  const t = new THREE.CanvasTexture(cv);
+  t.wrapS = THREE.RepeatWrapping; t.wrapT = THREE.ClampToEdgeWrapping; t.anisotropy = 4; t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
 // ---------------------------------------------------------------------------------------------------------------
 // deps: { WATER, waterSD, roads (ROADS_DT mặt đất), hw(c), sw(c), roadSurfaceAt, LAND_H, R, lampGlow (material đèn), addCollider,
 //         panoCams, keClear(c) (khoảng kè W3-F: hw + vỉa hè + 2,5), deckAt(x,z) (có mặt cầu nâng phủ — không lan can/đèn dưới cầu) }
@@ -223,7 +239,7 @@ export function buildRiverbanks(scene, deps) {
   for (let i = 1; i < S.length - 1; i++) if (!S[i].road && S[i - 1].road && S[i + 1].road && S[i - 1].poly === S[i + 1].poly) S[i].road = S[i - 1].road;
 
   const wall = Buf(), cap = Buf(), pave = Buf(), plinth = Buf(), iron = Buf(), panel = Buf(), lamp = Buf(), bloom = Buf();
-  const shackB = Buf(), boatB = Buf();
+  const shackB = Buf(), boatB = Buf(), ringPanel = Buf();
   stats.stripM = 0; stats.stripN = 0; stats.shacks = 0; stats.boats = 0;
   const C_TOP = rgb(0xbdb6a6), C_MID = rgb(0x968e7c), C_LOW = rgb(0x5d5a48), C_CAP = rgb(0xc9c3b4);
   const C_IRON = rgb(0x2c4a3a), C_LAMP = rgb(0x1f2a26);
@@ -362,9 +378,18 @@ export function buildRiverbanks(scene, deps) {
     const y0 = TOP - 0.2;
     box(plinth, cx, y0 + 0.2, cz, 0.3, 0.4, s.L + 0.05, ang, rgb(0xb9b3a5));
     const ex = r.ux * (s.L / 2 + 0.02), ez = r.uz * (s.L / 2 + 0.02), yb = y0 + 0.4, yt = y0 + 1.1;
-    quad(panel, [cx - ex, yb, cz - ez], [cx + ex, yb, cz + ez], [cx + ex, yt, cz + ez], [cx - ex, yt, cz - ez], [wx, 0, wz], [1, 1, 1], [[0, 0], [s.L / 2, 0], [s.L / 2, 1], [0, 1]]);
+    quad(ringPanel, [cx - ex, yb, cz - ez], [cx + ex, yb, cz + ez], [cx + ex, yt, cz + ez], [cx - ex, yt, cz - ez], [wx, 0, wz], [1, 1, 1], [[0, 0], [s.L / 2, 0], [s.L / 2, 1], [0, 1]]);
     box(iron, cx, yt + 0.03, cz, 0.07, 0.06, s.L + 0.05, ang, rgb(0x2a2f2b));
-    if (deps.addCollider && (stats.stripN++ % 2) === 0) deps.addCollider(cx + wx * 0.8, cz + wz * 0.8, 0.9);
+    const k = stats.stripN++;
+    // trụ bê tông mỗi ~6 m; chậu cây cảnh dọc chân lan can phía vỉa hè (ảnh 519 h180: chậu xi măng + cây bụi)
+    if (k % 3 === 0) box(plinth, cx, y0 + 0.62, cz, 0.3, 1.24, 0.3, ang, rgb(0xa9a497));
+    if (hash(s.x, s.z, 81) < 0.3) {
+      const px = cx - wx * 0.45, pz = cz - wz * 0.45;
+      cyl(plinth, px, pz, y0 + 0.2, y0 + 0.62, 0.22, 0.28, 8, rgb(0x8b877c));
+      for (let q = 0; q < 5; q++) blob(bloom, px + (hash(s.x, s.z, 82 + q) - 0.5) * 0.5, y0 + 0.78 + hash(s.x, s.z, 87 + q) * 0.45, pz + (hash(s.x, s.z, 92 + q) - 0.5) * 0.5,
+        0.2 + hash(s.x, s.z, 97 + q) * 0.15, rgb(hash(s.x, s.z, 102 + q) < 0.5 ? 0x3d6a2c : 0x507f36));
+    }
+    if (deps.addCollider && (k % 2) === 0) deps.addCollider(cx + wx * 0.8, cz + wz * 0.8, 0.9);
   }
   // lán tôn/bạt tự phát giữa lan can và kè (ảnh pano_519 h180: mái tôn xanh, bạt cam/xanh, thấp ~2,4 m)
   function shack(s, gapW) {
@@ -427,6 +452,8 @@ export function buildRiverbanks(scene, deps) {
   // tấm hoa văn: alphaTest, 2 mặt; KHÔNG transparent (gộp được) — bóng: customDepth không cần (tắt cast)
   const pm = add(panel, new THREE.MeshLambertMaterial({ map: railTexture(), alphaTest: 0.5, side: THREE.DoubleSide }), 'riverbank_railpanel', false);
   if (pm) pm.userData.noMerge = true;
+  const rp = add(ringPanel, new THREE.MeshLambertMaterial({ map: ringTexture(), alphaTest: 0.5, side: THREE.DoubleSide }), 'riverbank_ringpanel', false);
+  if (rp) rp.userData.noMerge = true;
   // bóng đèn (material phát sáng dùng chung của thành phố → sáng về đêm theo daynight)
   if (lampGlobes.length && deps.lampGlow) {
     const gs = lampGlobes.map(([x, y, z]) => { const g = new THREE.SphereGeometry(0.17, 8, 6); g.translate(x, y, z); return g; });

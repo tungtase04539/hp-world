@@ -27,7 +27,7 @@ export function luUnfilter(a, n) { for (let i = n; i < a.length; i++) a[i] = (a[
 // cls (Uint8Array n² ĐÃ bỏ lọc) + footprint sống → { rg: Uint8Array n²·2 (R = lớp | mật độ<<4, G = khoảng cách ×8),
 // cov: Uint8Array (n/8)² (độ phủ nhà ±96 m, 255 = ≥10 %) }. Sửa cls tại chỗ (tô BLD).
 // fp = { x, z: Float32Array (m), vStart: Uint32Array, dead: Uint8Array|null, nB }
-// extra = { plaza: [[[x,z],...],...], park: [...], bld: [...] } — đa giác chạy lúc chạy: claim 'plaza'/'park' (vùng mở mà
+// extra = { plaza: [[[x,z],...],...], park: [...], parking: [...] (W3-F), bld: [...] } — đa giác chạy lúc chạy: claim 'plaza'/'park' (vùng mở mà
 // WP2 đã giết nhà thật: quảng trường, hành lang, kè, công viên) đổi nền phố URB → đá lát / cỏ; 'bld' (bao lồi nhà ô tay
 // GIỮ — world.cellKept) tính là NHÀ cho khoảng cách/mật độ.
 export function luCompose(cls, fp, grid, extra = null) {
@@ -52,6 +52,7 @@ export function luCompose(cls, fp, grid, extra = null) {
   };
   if (extra) {
     for (const P of extra.park || []) fillPoly(P, 8, URB);
+    for (const P of extra.parking || []) fillPoly(P, 6, URB);   // W3-F: claim 'parking' (lòng nút xoắn cầu HVT = bãi nhựa)
     for (const P of extra.plaza || []) fillPoly(P, 3, URB);
     for (const P of extra.bld || []) fillPoly(P, BLD, -1);
   }
@@ -598,8 +599,8 @@ export function makeGroundSystem(THREE, opt = {}) {
     if (started || !canWork) return; started = true; lastFp = fp;
     tMap = performance.now();
     if (!lastExtra) {
-      lastExtra = { plaza: claimPolys('plaza'), park: claimPolys('park'), bld: (ex.cellKept || []).filter((k) => k.hull && k.hull.length >= 3).map((k) => k.hull) };
-      stats.extra = { plaza: lastExtra.plaza.length, park: lastExtra.park.length, bld: lastExtra.bld.length };
+      lastExtra = { plaza: claimPolys('plaza'), park: claimPolys('park'), parking: claimPolys('parking'), bld: (ex.cellKept || []).filter((k) => k.hull && k.hull.length >= 3).map((k) => k.hull) };
+      stats.extra = { plaza: lastExtra.plaza.length, park: lastExtra.park.length, parking: lastExtra.parking.length, bld: lastExtra.bld.length };
     }
     // sao chép (không chuyển quyền): D vẫn được các hệ khác dùng
     const f = fp ? { x: fp.x.slice(), z: fp.z.slice(), vStart: fp.vStart.slice(), dead: fp.dead ? fp.dead.slice() : null, nB: fp.nB } : null;

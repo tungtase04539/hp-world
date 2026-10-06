@@ -997,14 +997,20 @@ export async function buildWorld(scene, prog = () => {}) {
       const j = Math.min(P.length - 1, i + 4), dx = P[j][0] - P[i][0], dz = P[j][1] - P[i][1], L = Math.hypot(dx, dz); if (L < 0.5) continue;
       claimBox((P[i][0] + P[j][0]) / 2, (P[i][1] + P[j][1]) / 2, L / 2 + 0.6, b.w / 2 + 1, Math.atan2(-dz / L, dx / L), 'bridge', 'br_' + b.id);
     }
-    // lòng NÚT XOẮN (way gần tròn quét ≥ 300°): thảm cỏ cây bụi có cắt tỉa (ảnh pano_304 h0/h180, 349 h90) — claim 'park' → nền
-    // landuse = cỏ thay "bãi trống đất" (đất be quanh dốc cầu); phố mặt đất xuyên qua vẫn vẽ đè
+    // lòng NÚT XOẮN (way gần tròn quét ≥ 300°) — ảnh vệ tinh real_7: phần lớn là BÃI NHỰA (bãi đỗ/lối xe, pano_304 h270 mặt
+    // nhựa rộng) + 1 vườn HÌNH BÁN NGUYỆT phía nam (bụi cắt tỉa + lối đi, pano_304 h180): claim 'park' bán elip 38 × 27 m (dây
+    // cung bắc cách tâm vòng 15 m về nam) TRƯỚC, rồi 'parking' cả lòng (r − w/2 − 2) → landuse tô cỏ / bãi đỗ thay "bãi trống
+    // đất be" (dot3: đất + tấm nhựa đen); phố mặt đất xuyên qua vẫn vẽ đè
     if (b.kind === 'ramp' && P.length > 40) {
       let cx = 0, cz = 0; for (const p of P) { cx += p[0]; cz += p[1]; } cx /= P.length; cz /= P.length;
       const rr = P.map((p) => Math.hypot(p[0] - cx, p[1] - cz)), rm = rr.reduce((a, v) => a + v, 0) / rr.length;
       let sw = 0;
       for (let i = 1; i < P.length; i++) { let a = Math.atan2(P[i][1] - cz, P[i][0] - cx) - Math.atan2(P[i - 1][1] - cz, P[i - 1][0] - cx); a -= Math.round(a / (2 * Math.PI)) * 2 * Math.PI; sw += a; }
-      if (Math.abs(sw) > 5.2 && rr.every((r) => Math.abs(r - rm) < 0.12 * rm)) claimCircle(cx, cz, rm - b.w / 2 - 4, 'park', 'loop_' + b.id);
+      if (Math.abs(sw) > 5.2 && rr.every((r) => Math.abs(r - rm) < 0.12 * rm)) {
+        const garden = []; for (let k = 0; k <= 16; k++) { const a = Math.PI * k / 16; garden.push([cx + 38 * Math.cos(a), cz + 15 + 27 * Math.sin(a)]); }
+        claimPoly(garden, 'park', 'loopgarden_' + b.id);
+        claimCircle(cx, cz, rm - b.w / 2 - 2, 'parking', 'loop_' + b.id);
+      }
     }
   }
   function addMerged(geos, material, name) {
@@ -3403,6 +3409,7 @@ const bcPalm = (parent, lx, lz, h = 9) => {   // Đợt 3 WP4: cau vua instanced
 //     → rào ở +7.5m, lều dò NoDeck<1.75 trong 15..32m) ===
 {
   const PTS = [[-536, -904], [-503, -821], [-426, -725]];   // polyline #322 (s)
+  const _rbStrip = world.riverbank && world.riverbank.stats.stripM > 0;
   const g = new THREE.Group(); g.name = 'tambac_phothuyen'; g.position.set(0, 0, 0);
   const ringG = [], postG = [], railG = [];
   const tarps = [mat(0x2f6db5), mat(0x3f8f5a), mat(0xd9822b)];
@@ -3414,9 +3421,11 @@ const bcPalm = (parent, lx, lz, h = 9) => {   // Đợt 3 WP4: cau vua instanced
     const wx = -uz, wz = ux;                                 // pháp tuyến TÂY (phía sông ✓ probe)
     for (let d = 6; d < L - 4; d += 6.5) {
       const px = ax + ux * d, pz = az + uz * d;
-      // — rào sắt hoa văn vòng tròn ở +7.5m (chỉ trên đất) —
+      // — rào sắt hoa văn vòng tròn ở +7.5m (chỉ trên đất) — W3-F: js/riverbank.js dải bờ tự phát ('strip') dựng rào vòng
+      // tròn này theo mép vỉa hè (xsection) cả đoạn bắc → bỏ bản tay (từng thành 2 hàng rào song song, pano_519 h180)
       const fx = px + wx * 7.5, fz = pz + wz * 7.5;
-      if (groundHeightNoDeck(fx, fz) > 1.7) {
+      if (groundHeightNoDeck(fx, fz) > 1.7 && _rbStrip) FEATURED_CLEAR.push([fx + wx * 6, fz + wz * 6, 11]);
+      else if (groundHeightNoDeck(fx, fz) > 1.7) {
         const gy = groundHeight(fx, fz);
         const post = new THREE.BoxGeometry(0.09, 1.15, 0.09); post.translate(fx, gy + 0.575, fz); postG.push(post);
         for (const ry2 of [0.35, 1.05]) {
