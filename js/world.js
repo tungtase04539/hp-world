@@ -47,6 +47,7 @@ import { furnitureLine } from './xsection.js';
 // Mạng đường thật (Đợt 3 WP6): đồ thị nút giao + dải + vỉa hè/bó vỉa + vạch kẻ trong shader
 import { buildRoadNet } from './roadnet.js';
 import { hedgeGeometry, hedgeMaterial } from './hedges.js';   // Đợt 3 W3-D: bụi cắt tỉa lổn nhổn (vườn hoa, dải phân cách)
+import { corridorPen as clrCorridorPen } from './clearance.js';   // W3-D: bụi viền công viên ô phải nằm NGOÀI hành lang phố
 // Đợt 3 W3-D: màu THẢM CỎ cell (đảo giao thông, vườn parterre, sân UBND, công viên ĐBP, nút Lạc Long) = xanh ô liu XỈN
 // như ảnh pano 10/2024 (cỏ nắng ~(100-125,115-135,60-80)); bản cũ 0x6f9a4f/0x5a8f43/0x5d8c45/#4e7a3a = "neon lawn" AUDIT3 PARK.
 const LAWN_OLIVE = 0x6a7b48;
@@ -7217,29 +7218,41 @@ const bsHipRoof = (W, D, hexa = 0x8a4a34, x = 0, y = 0, z = 0) => {
   bsRingRail(-242.2, -589.3, -319.2, -557.3, 0x1c5c34, { useDeck: false, guard: landG });
   bsRingRail(-315.5, -567.2, -265.5, -466.2, 0x1c5c34, { useDeck: false, guard: landG });
   {   // W3-D: HÀNG BỤI CẮT TỈA ~0,9 m chạy liền phía TRONG rào 3 cạnh (ảnh 065 h180: bụi xanh sẫm trước rào, cổ thụ sau —
-      // AUDIT3 PARK "park edge without hedge" 065). Mỗi cạnh: độ thụt nhỏ nhất 1,1…5 m có ≥ 70% điểm ngoài lòng/vỉa hè roadnet.
+      // AUDIT3 PARK "park edge without hedge" 065). Mỗi cạnh: độ thụt nhỏ nhất 1,1…6 m có ≥ 70% điểm "sạch" = ngoài
+      // lòng/vỉa hè roadnet VÀ mép phía phố (−0,6 m) ngoài HÀNH LANG PHỐ của clearance (facadeLine − 0,3) — BẪY: cellsink quét
+      // khối ô (sweepAssemblies → flushClearance) GỠ cả mảnh liên thông (cả dải bụi) nếu chân nó lấn hành lang phố; đo: thụt
+      // 1,75 m (chỉ né vỉa hè) → dải bắc bị gỡ sạch (đỉnh còn, tam giác mất), chỉ còn ~40% bụi.
     const offPaved = (x, z) => !(world.roadNet && world.roadNet.surfaceAt && world.roadNet.surfaceAt(x, z) > 0.05);
     const C0 = [-262, -525], runs = [];
     for (const [x1, z1, x2, z2] of [[-280, -470.4, -217, -468.8], [-242.2, -589.3, -319.2, -557.3], [-315.5, -567.2, -265.5, -466.2]]) {
       const L = Math.hypot(x2 - x1, z2 - z1), ux = (x2 - x1) / L, uz = (z2 - z1) / L;
       let nx = -uz, nz = ux; if ((C0[0] - x1) * nx + (C0[1] - z1) * nz < 0) { nx = -nx; nz = -nz; }
+      const clean = (px, pz) => landG(px, pz) && offPaved(px, pz) && !clrCorridorPen(px - nx * 1.3, pz - nz * 1.3, true) && !clrNearPano(px, pz, 3.5);
       let ins = -1;
-      for (let q = 1.1; q <= 5.01 && ins < 0; q += 0.65) {
+      for (let q = 1.1; q <= 6.01 && ins < 0; q += 0.5) {
         let ok = 0, n = 0;
-        for (let t = 1.5; t <= L - 1.5; t += 2) { n++; const px = x1 + ux * t + nx * q, pz = z1 + uz * t + nz * q; if (landG(px, pz) && offPaved(px, pz)) ok++; }
+        for (let t = 1.5; t <= L - 1.5; t += 2) { n++; if (clean(x1 + ux * t + nx * q, z1 + uz * t + nz * q)) ok++; }
         if (n && ok >= 0.7 * n) ins = q;
       }
       if (ins < 0) continue;
       let cur = [];
       for (let t = 1.5; t <= L - 1.5 + 1e-6; t += 1) {
         const px = x1 + ux * t + nx * ins, pz = z1 + uz * t + nz * ins;
-        if (!landG(px, pz) || !offPaved(px, pz) || clrNearPano(px, pz, 3.5)) { if (cur.length > 1) runs.push(cur); cur = []; continue; }
+        if (!clean(px, pz)) { if (cur.length > 1) runs.push(cur); cur = []; continue; }
         cur.push([px, pz]);
       }
       if (cur.length > 1) runs.push(cur);
     }
-    if (runs.length) {
-      const hm = new THREE.Mesh(hedgeGeometry(runs, (x, z) => groundHeightNoDeck(x, z), { h: 0.9, w: 0.95, seg: 0.8, seed: 13, base: [0.24, 0.36, 0.16] }), hedgeMaterial());
+    // mẩu 2 m nối đầu (hở 1,5 cm — không để sweep HÀN đỉnh trùng thành 1 mảnh): sweep lấy BAO LỒI mảnh liên thông kèm 2 góc
+    // hộp trục → 1 dải chéo dài có "bao" phủ cả lòng phố → bị gỡ; mẩu ngắn thì bao bám sát dải bụi
+    const bits = [];
+    for (const r of runs) for (let i = 0; i + 1 < r.length; i += 2) {
+      const b = r.slice(i, Math.min(r.length, i + 3)).map((q) => q.slice());
+      if (i + 3 < r.length) { const e = b[b.length - 1], f = b[b.length - 2], l = Math.hypot(e[0] - f[0], e[1] - f[1]) || 1; e[0] -= (e[0] - f[0]) / l * 0.015; e[1] -= (e[1] - f[1]) / l * 0.015; }
+      bits.push(b);
+    }
+    if (bits.length) {
+      const hm = new THREE.Mesh(hedgeGeometry(bits, (x, z) => groundHeightNoDeck(x, z), { h: 0.9, w: 0.95, seg: 0.8, seed: 13, base: [0.24, 0.36, 0.16] }), hedgeMaterial());
       hm.receiveShadow = true; hm.name = 'bs_park_dbp_hedge'; g.add(hm);
     }
   }
