@@ -47,6 +47,9 @@ import { furnitureLine } from './xsection.js';
 // Mạng đường thật (Đợt 3 WP6): đồ thị nút giao + dải + vỉa hè/bó vỉa + vạch kẻ trong shader
 import { buildRoadNet } from './roadnet.js';
 import { hedgeGeometry, hedgeMaterial } from './hedges.js';   // Đợt 3 W3-D: bụi cắt tỉa lổn nhổn (vườn hoa, dải phân cách)
+// Đợt 3 W3-D: màu THẢM CỎ cell (đảo giao thông, vườn parterre, sân UBND, công viên ĐBP, nút Lạc Long) = xanh ô liu XỈN
+// như ảnh pano 10/2024 (cỏ nắng ~(100-125,115-135,60-80)); bản cũ 0x6f9a4f/0x5a8f43/0x5d8c45/#4e7a3a = "neon lawn" AUDIT3 PARK.
+const LAWN_OLIVE = 0x6a7b48;
 import { makeRoadMaterial } from './roadtex.js';
 import { ROAD_MARK_EVIDENCE, ROAD_MARK_LABELS, OSM_SIGNALS, OSM_CROSSINGS, ROAD_PAVE_EVIDENCE } from './roadmarks.js';
 import { ROAD_W as XS_ROAD_W } from './xsection.js';
@@ -3864,7 +3867,7 @@ const bcPalm = (parent, lx, lz, h = 9) => {   // Đợt 3 WP4: cau vua instanced
   if (bcOK(ix, iz)) {
     const g = new THREE.Group(); g.position.set(ix, groundHeight(ix, iz), iz);
     const curb = new THREE.Mesh(new THREE.CylinderGeometry(12, 12, 0.35, 22), mat(0x8d8a82)); curb.position.y = 0.18; g.add(curb);
-    const grass = new THREE.Mesh(new THREE.CylinderGeometry(11.2, 11.2, 0.35, 22), mat(0x6f9a4f)); grass.position.y = 0.24; g.add(grass);
+    const grass = new THREE.Mesh(new THREE.CylinderGeometry(11.2, 11.2, 0.35, 22), mat(LAWN_OLIVE)); grass.position.y = 0.24; g.add(grass);
     const rockM = mat(0x8d8a82, { flatShading: true });
     const rocks = [];
     for (let i = 0; i < 7; i++) {                            // cụm núi đá vươn cao ~7-8m
@@ -3880,6 +3883,17 @@ const bcPalm = (parent, lx, lz, h = 9) => {   // Đợt 3 WP4: cau vua instanced
       tp.position.set(tx, 1.15, tz); tp.castShadow = true; g.add(tp);
     }
     bcTree(g, 5.5, -4, 5, 2.2); bcTree(g, -6, 4.5, 4.5, 2);
+    {   // W3-D: ĐẢO GIAO THÔNG như ảnh 304 h180 / 349 h90 — viền bụi cắt tỉa thấp sát bó vỉa + 2 dải bụi lượn trong đảo
+      // (AUDIT3 PARK "traffic islands … instead of clipped shrubs"); toạ độ local của nhóm, đáy = mặt cỏ (+0,41)
+      const ring = []; for (let k = 0; k <= 48; k++) { const a = k / 48 * Math.PI * 2; ring.push([Math.cos(a) * 10.3, Math.sin(a) * 10.3]); }
+      const bands = [ring];
+      for (const [a0, a1, r0] of [[0.35, 2.2, 5.7], [3.5, 5.1, 6.1]]) {
+        const b = []; for (let k = 0; k <= 18; k++) { const a = a0 + (a1 - a0) * k / 18, r = r0 + 0.7 * Math.sin(a * 3.1); b.push([Math.cos(a) * r, Math.sin(a) * r]); }
+        bands.push(b);
+      }
+      const hm = new THREE.Mesh(hedgeGeometry(bands, () => 0.39, { h: 0.62, w: 0.85, seg: 0.7, seed: 41, base: [0.27, 0.40, 0.18] }), hedgeMaterial());
+      hm.castShadow = true; hm.receiveShadow = true; hm.name = 'hvt_nonbo_hedge'; g.add(hm);
+    }
     g.name = 'hvt_nonbo'; scene.add(g);
     addCollider(ix, iz, 6.5);
     FEATURED_CLEAR.push([ix, iz, 15]);
@@ -7188,9 +7202,10 @@ const bsHipRoof = (W, D, hexa = 0x8a4a34, x = 0, y = 0, z = 0) => {
   shape.moveTo(poly[0][0], -poly[0][1]);
   for (let i = 1; i < poly.length; i++) shape.lineTo(poly[i][0], -poly[i][1]);
   shape.closePath();
-  const lawnTex = makeTex(128, 128, (gg, w, h) => {
-    gg.fillStyle = '#4e7a3a'; gg.fillRect(0, 0, w, h);
-    for (let i = 0; i < 300; i++) { gg.fillStyle = `rgba(${60 + Math.random() * 30 | 0},${110 + Math.random() * 40 | 0},50,0.4)`; gg.fillRect(Math.random() * w, Math.random() * h, 3, 3); }
+  const lawnTex = makeTex(128, 128, (gg, w, h) => {   // W3-D: ô liu xỉn + đốm TẤT ĐỊNH (bản cũ #4e7a3a + Math.random)
+    gg.fillStyle = '#687a48'; gg.fillRect(0, 0, w, h);
+    let sd = 7175; const rnd = () => { sd = (sd * 1103515245 + 12345) & 0x7fffffff; return sd / 0x7fffffff; };
+    for (let i = 0; i < 300; i++) { const l = rnd(); gg.fillStyle = `rgba(${84 + l * 34 | 0},${100 + l * 30 | 0},${56 + l * 14 | 0},0.4)`; gg.fillRect(rnd() * w, rnd() * h, 3, 3); }
   });
   lawnTex.wrapS = lawnTex.wrapT = THREE.RepeatWrapping; lawnTex.repeat.set(8, 8);
   const lawn = new THREE.Mesh(new THREE.ShapeGeometry(shape), new THREE.MeshLambertMaterial({ map: lawnTex }));
@@ -7200,6 +7215,33 @@ const bsHipRoof = (W, D, hexa = 0x8a4a34, x = 0, y = 0, z = 0) => {
   bsRingRail(-280, -470.4, -217, -468.8, 0x1c5c34, { useDeck: false, guard: landG });
   bsRingRail(-242.2, -589.3, -319.2, -557.3, 0x1c5c34, { useDeck: false, guard: landG });
   bsRingRail(-315.5, -567.2, -265.5, -466.2, 0x1c5c34, { useDeck: false, guard: landG });
+  {   // W3-D: HÀNG BỤI CẮT TỈA ~0,9 m chạy liền phía TRONG rào 3 cạnh (ảnh 065 h180: bụi xanh sẫm trước rào, cổ thụ sau —
+      // AUDIT3 PARK "park edge without hedge" 065). Mỗi cạnh: độ thụt nhỏ nhất 1,1…5 m có ≥ 70% điểm ngoài lòng/vỉa hè roadnet.
+    const offPaved = (x, z) => !(world.roadNet && world.roadNet.surfaceAt && world.roadNet.surfaceAt(x, z) > 0.05);
+    const C0 = [-262, -525], runs = [];
+    for (const [x1, z1, x2, z2] of [[-280, -470.4, -217, -468.8], [-242.2, -589.3, -319.2, -557.3], [-315.5, -567.2, -265.5, -466.2]]) {
+      const L = Math.hypot(x2 - x1, z2 - z1), ux = (x2 - x1) / L, uz = (z2 - z1) / L;
+      let nx = -uz, nz = ux; if ((C0[0] - x1) * nx + (C0[1] - z1) * nz < 0) { nx = -nx; nz = -nz; }
+      let ins = -1;
+      for (let q = 1.1; q <= 5.01 && ins < 0; q += 0.65) {
+        let ok = 0, n = 0;
+        for (let t = 1.5; t <= L - 1.5; t += 2) { n++; const px = x1 + ux * t + nx * q, pz = z1 + uz * t + nz * q; if (landG(px, pz) && offPaved(px, pz)) ok++; }
+        if (n && ok >= 0.7 * n) ins = q;
+      }
+      if (ins < 0) continue;
+      let cur = [];
+      for (let t = 1.5; t <= L - 1.5 + 1e-6; t += 1) {
+        const px = x1 + ux * t + nx * ins, pz = z1 + uz * t + nz * ins;
+        if (!landG(px, pz) || !offPaved(px, pz) || clrNearPano(px, pz, 3.5)) { if (cur.length > 1) runs.push(cur); cur = []; continue; }
+        cur.push([px, pz]);
+      }
+      if (cur.length > 1) runs.push(cur);
+    }
+    if (runs.length) {
+      const hm = new THREE.Mesh(hedgeGeometry(runs, (x, z) => groundHeightNoDeck(x, z), { h: 0.9, w: 0.95, seg: 0.8, seed: 13, base: [0.24, 0.36, 0.16] }), hedgeMaterial());
+      hm.receiveShadow = true; hm.name = 'bs_park_dbp_hedge'; g.add(hm);
+    }
+  }
   // vỉa hè caro đỏ-xám dọc mép ĐBP (ảnh 363/196)
   const caro = makeTex(64, 64, (gg, w, h) => {
     for (let yy = 0; yy < 2; yy++) for (let xx = 0; xx < 2; xx++) { gg.fillStyle = (xx + yy) % 2 ? '#b6b0a6' : '#b38a7b'; gg.fillRect(xx * 32, yy * 32, 32, 32); }
@@ -15569,7 +15611,7 @@ for (const R of SA_ROWS) saRow(R.cx, R.cz, R.nx, R.nz, R.side, R.front, R.D, R.l
       return geos;
     };
     const cx = -118, cz = -927, R = 40, W = 7, sep = R + 6;
-    const asphaltM = mat(0x3b4046), grassM = mat(0x6f9a4f), curbM = mat(0x8d8a82);
+    const asphaltM = mat(0x3b4046), grassM = mat(LAWN_OLIVE), curbM = mat(0x8d8a82);   // W3-D: cỏ ô liu (bản cũ 0x6f9a4f)
     const y = groundHeight(cx, cz);
     const geos = [];
     const loops = [
@@ -18146,7 +18188,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
         d.setAttribute('color', new THREE.BufferAttribute(cc, 3)); dotG.push(d);
       }
     }
-    addMerged(grass, new THREE.MeshLambertMaterial({ color: 0x5a8f43 }), 'parterre_r4_grass');
+    addMerged(grass, new THREE.MeshLambertMaterial({ color: LAWN_OLIVE }), 'parterre_r4_grass');   // W3-D (bản cũ 0x5a8f43)
     addMerged(path, new THREE.MeshLambertMaterial({ color: 0xccbf9c }), 'parterre_r4_path');
     if (dotG.length) addMerged(dotG, new THREE.MeshLambertMaterial({ vertexColors: true }), 'parterre_r4_flowers');
   }
@@ -18197,7 +18239,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     // (W2-E: bỏ (-114,-345) và (-118,-378) — nằm TRONG footprint nhà thờ (LM_POLY.cathedral), tán xuyên mái gian giữa)
     for (const [tx, tz] of [[-98, -270], [-105, -305], [-100, -340], [-120, -395]]) tree(tx, tz, 3.2);
     for (const [bx, bz] of [[316, -623], [233, -537]]) { if (grassBasin(bx, bz, 18)) fountain(bx, bz, 5); }
-    addMerged(grassG, mat(0x5a8f43), 'garden6_grass');
+    addMerged(grassG, mat(LAWN_OLIVE), 'garden6_grass');   // W3-D (bản cũ 0x5a8f43)
     addMerged(pathG, mat(0xccbf9c), 'garden6_path');
     addMerged(waterG, mat(0x2f7fb5), 'garden6_water');
     addMerged(stoneG, mat(0xbfb49a), 'garden6_stone');
@@ -18213,7 +18255,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
       if (!isWater(cx, cz) && Math.abs(groundHeightNoDeck(cx, cz) - LAND_H) < 0.4) {
         const gy = groundHeight(cx, cz), R = 15;
         const grass = new THREE.CircleGeometry(R, 40); grass.rotateX(-Math.PI / 2); grass.translate(cx, gy + 0.04, cz);
-        addMerged([grass], mat(0x5a8f43), 'civic8_parterre_grass');
+        addMerged([grass], mat(LAWN_OLIVE), 'civic8_parterre_grass');   // W3-D (bản cũ 0x5a8f43)
         const rim = new THREE.RingGeometry(R - 1.4, R + 0.6, 40); rim.rotateX(-Math.PI / 2); rim.translate(cx, gy + 0.07, cz);
         addMerged([rim], mat(0xccbf9c), 'civic8_parterre_path');
         const basin = new THREE.CircleGeometry(4.2, 28); basin.rotateX(-Math.PI / 2); basin.translate(cx, gy + 0.10, cz);
@@ -20475,7 +20517,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
       if (g2.attributes.normal.getY(0) < 0) { const q = g2.attributes.position.array; for (let i = 0; i < q.length; i += 9) for (let c = 0; c < 3; c++) { const t = q[i + 3 + c]; q[i + 3 + c] = q[i + 6 + c]; q[i + 6 + c] = t; } g2.computeVertexNormals(); }
       lawnG.push(g2);
     }
-    if (lawnG.length) { const lm = new THREE.Mesh(mergeGeometries(lawnG), mat(0x5d8c45)); lawnG.forEach((q) => q.dispose()); lm.name = 'lm_ubnd_lawn'; lm.receiveShadow = true; scene.add(lm); }
+    if (lawnG.length) { const lm = new THREE.Mesh(mergeGeometries(lawnG), mat(LAWN_OLIVE));   /* W3-D (bản cũ 0x5d8c45) */ lawnG.forEach((q) => q.dispose()); lm.name = 'lm_ubnd_lawn'; lm.receiveShadow = true; scene.add(lm); }
     for (let t = -59; t <= 39; t += 11) { if (Math.abs(t + 10) < 9) continue; const [px, pz] = lmAt(o, T(t + 5.5), V(4.6)); veg.plant('cau', px, pz, { h: 11.5, pit: 1 }); addCollider(px, pz, 0.45); }
     for (const d of [24, 40, 56]) { const [px, pz] = lmAt(o, T(-73), V(d)); if (_lmIn(px, pz, P) && !world.landmarkHit(px, pz, 3)) { veg.plant('park', px, pz, {}); addCollider(px, pz, 0.55); } }
     { const railG = [], baseG = [];

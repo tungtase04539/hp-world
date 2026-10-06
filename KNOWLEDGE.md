@@ -425,8 +425,8 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     **(1) Bằng chứng mới — `tools/gen_roadmarks.mjs` → `js/roadmarks.js` (SINH):** giữ `ROAD_MARK_EVIDENCE` (chữ pano), thêm
     `ROAD_MARK_LABELS` = NHÃN NHÌN ẢNH pano thật theo trục đường (`tools/pano_loop/mark_labels.json`, 169 pano trên 72 way s/t:
     Y vàng đứt 98 · D vàng đôi 5 · W vạch trắng 30 · N không vạch 36 — nhìn tờ ảnh 3 pano/way, cách làm ở scratchpad W3-D
-    probe/waysheet.py), `ROAD_PAVE_EVIDENCE` (vật liệu vỉa hè từ chữ `sidewalk` 539 pano: 2 xám · 3 caro đỏ-xám · 4 đỏ · 5 tự chèn
-    xám; mệnh đề ĐẦU có vật liệu thắng, bỏ mệnh đề "bó vỉa/viền/bồn cây"), `OSM_SIGNALS` 88 / `OSM_CROSSINGS` 403 (Overpass
+    probe/waysheet.py), `ROAD_PAVE_EVIDENCE` (vật liệu vỉa hè từ chữ `sidewalk` 530 pano: 2 xám 187 · 3 caro đỏ-xám 263 · 4 đỏ 49 · 5 tự chèn xám 31;
+    mệnh đề ĐẦU có vật liệu thắng, bỏ mệnh đề "bó vỉa/viền/bồn cây"), `OSM_SIGNALS` 88 / `OSM_CROSSINGS` 403 (Overpass
     `fetch_osm.sh` §13 → `tools/osm_crossings.json`, gitignored; thiếu file → generator GIỮ mảng OSM cũ trong roadmarks.js).
     BẪY đã thử và BỎ: dò vạch vàng tự động trên ảnh pano (ngưỡng màu) — vạch sơn mòn nắng (220,183,131) lẫn biển/taxi/tường
     vàng → tách kém (âm/dương chồng nhau); OSM `oneway=yes` KHÔNG suy được "không tim vàng" (LKT/ĐTH/NĐC oneway vẫn kẻ vàng).
