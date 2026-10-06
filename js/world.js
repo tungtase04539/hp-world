@@ -207,7 +207,8 @@ function sidewalkMaterial(type) {
       for (let y = 0; y < R; y++) for (let x = 0; x < C; x++) {
         const rr = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453, rv = rr - Math.floor(rr);
         const red = ((x + y) & 1) === 0 ? rv > 0.04 : rv < 0.04;
-        g.fillStyle = red ? jitter([184, 138, 122], 9) : jitter([166, 163, 157], 9);
+        const hv = Math.sin(x * 7.13 + y * 3.71 + 1.3) * 9187.31, l = (hv - Math.floor(hv) - 0.5) * 18, c = red ? [184, 138, 122] : [166, 163, 157];   // tông viên TẤT ĐỊNH
+        g.fillStyle = `rgb(${(c[0] + l) | 0},${(c[1] + l) | 0},${(c[2] + l) | 0})`;
         g.fillRect(x * bw, y * bh, bw, bh);
       }
       g.strokeStyle = 'rgba(40,30,25,.30)'; g.lineWidth = 2;
@@ -12822,14 +12823,19 @@ const v1Fac = _cells.memo('v1Fac', (baseCss, winCss, cols, rows) => new THREE.Me
   }),
 }));
 const v1caro = () => {                                  // gạch caro đỏ-xám kè Tam Bạc (theo sidewalkMaterial)
+  // W3-D: viên 40×20 cm (texture = 1,6 m) bàn cờ ĐỎ HỒNG BẠC MÀU ↔ XÁM 1:1 như ảnh 198/134/299 (bản cũ đỏ trầm 88%
+  // #9e523a/#8e4632 → kè 198 đỏ sẫm phủ kín — AUDIT3 PAVE "checker too saturated" 028/198/464)
   const t = makeTex(256, 256, (g, w, h) => {
-    const s = w / 4;
-    for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) {
+    const C = 4, R = 8, bw = w / C, bh = h / R;
+    for (let y = 0; y < R; y++) for (let x = 0; x < C; x++) {
       const rr = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453, rv = rr - Math.floor(rr);
-      g.fillStyle = rv < 0.72 ? '#9e523a' : rv < 0.88 ? '#8e4632' : '#a09888'; g.fillRect(x * s, y * s, s, s);
+      const red = ((x + y) & 1) === 0 ? rv > 0.04 : rv < 0.04;
+      const hv = Math.sin(x * 7.13 + y * 3.71 + 1.3) * 9187.31, l = (hv - Math.floor(hv) - 0.5) * 18, c = red ? [184, 138, 122] : [166, 163, 157];   // tông viên TẤT ĐỊNH
+      g.fillStyle = `rgb(${(c[0] + l) | 0},${(c[1] + l) | 0},${(c[2] + l) | 0})`; g.fillRect(x * bw, y * bh, bw, bh);
     }
-    g.strokeStyle = 'rgba(40,20,12,.28)'; g.lineWidth = 2;
-    for (let i = 0; i <= 4; i++) { g.beginPath(); g.moveTo(i * s, 0); g.lineTo(i * s, h); g.moveTo(0, i * s); g.lineTo(w, i * s); g.stroke(); }
+    g.strokeStyle = 'rgba(40,30,25,.30)'; g.lineWidth = 2;
+    for (let i = 0; i <= C; i++) { g.beginPath(); g.moveTo(i * bw, 0); g.lineTo(i * bw, h); g.stroke(); }
+    for (let i = 0; i <= R; i++) { g.beginPath(); g.moveTo(0, i * bh); g.lineTo(w, i * bh); g.stroke(); }
   });
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   return new THREE.MeshLambertMaterial({ map: t });
