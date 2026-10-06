@@ -997,6 +997,15 @@ export async function buildWorld(scene, prog = () => {}) {
       const j = Math.min(P.length - 1, i + 4), dx = P[j][0] - P[i][0], dz = P[j][1] - P[i][1], L = Math.hypot(dx, dz); if (L < 0.5) continue;
       claimBox((P[i][0] + P[j][0]) / 2, (P[i][1] + P[j][1]) / 2, L / 2 + 0.6, b.w / 2 + 1, Math.atan2(-dz / L, dx / L), 'bridge', 'br_' + b.id);
     }
+    // lòng NÚT XOẮN (way gần tròn quét ≥ 300°): thảm cỏ cây bụi có cắt tỉa (ảnh pano_304 h0/h180, 349 h90) — claim 'park' → nền
+    // landuse = cỏ thay "bãi trống đất" (đất be quanh dốc cầu); phố mặt đất xuyên qua vẫn vẽ đè
+    if (b.kind === 'ramp' && P.length > 40) {
+      let cx = 0, cz = 0; for (const p of P) { cx += p[0]; cz += p[1]; } cx /= P.length; cz /= P.length;
+      const rr = P.map((p) => Math.hypot(p[0] - cx, p[1] - cz)), rm = rr.reduce((a, v) => a + v, 0) / rr.length;
+      let sw = 0;
+      for (let i = 1; i < P.length; i++) { let a = Math.atan2(P[i][1] - cz, P[i][0] - cx) - Math.atan2(P[i - 1][1] - cz, P[i - 1][0] - cx); a -= Math.round(a / (2 * Math.PI)) * 2 * Math.PI; sw += a; }
+      if (Math.abs(sw) > 5.2 && rr.every((r) => Math.abs(r - rm) < 0.12 * rm)) claimCircle(cx, cz, rm - b.w / 2 - 4, 'park', 'loop_' + b.id);
+    }
   }
   function addMerged(geos, material, name) {
     if (!geos.length) return;
