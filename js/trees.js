@@ -407,8 +407,8 @@ const KIT_DEFS = [
   // CÂY CẮT TRỤI "BỘ XƯƠNG" (pano_001_h090/152/400/515 tháng 10/2024 sau bão Yagi): thân 3-4,5 m + 4-6 cành lớn ngóc 25-45°
   // bị cưa cụt (mặt cắt sáng), mỗi cành chẻ 2 nhánh cụt, chồi non lưa thưa ở đầu nhánh — KHÁC cắt cụt ngọn (CATCUT: cành cụt
   // ngắn 1-2,7 m sát thân). Thân mảnh (Ø 0,45-0,6 m), cao 7,5-11 m.
-  { sp: SP.LOP, form: 'lopped', H: 9.2, trunkH: 3.4, r0: 0.27, r1: 0.21, lean: 0.02, limbs: 5, limbAng: [0.55, 0.95], limbLen: 3.7, subLen: 2.4, shoots: 16, cardS: [0.5, 0.85], cells: [CELL.SHOOT], bark: [0.9, 0.87, 0.83] },
-  { sp: SP.LOP, form: 'lopped', H: 10, trunkH: 3.9, r0: 0.3, r1: 0.23, lean: 0.04, limbs: 4, limbAng: [0.45, 0.8], limbLen: 4.2, subLen: 2.6, shoots: 12, cardS: [0.5, 0.8], cells: [CELL.SHOOT], bark: [0.88, 0.85, 0.8] },
+  { sp: SP.LOP, form: 'lopped', H: 9.2, trunkH: 3.4, r0: 0.27, r1: 0.21, lean: 0.02, limbs: 5, limbAng: [0.55, 0.95], limbLen: 3.7, subLen: 2.4, shoots: 34, cardS: [0.6, 1.0], cells: [CELL.SHOOT], bark: [0.9, 0.87, 0.83] },
+  { sp: SP.LOP, form: 'lopped', H: 10, trunkH: 3.9, r0: 0.3, r1: 0.23, lean: 0.04, limbs: 4, limbAng: [0.45, 0.8], limbLen: 4.2, subLen: 2.6, shoots: 28, cardS: [0.6, 0.95], cells: [CELL.SHOOT], bark: [0.88, 0.85, 0.8] },
 ];
 const SP_KITS = Array.from({ length: SP_N }, () => []);
 KIT_DEFS.forEach((d, i) => SP_KITS[d.sp].push(i));
@@ -1549,7 +1549,8 @@ export function buildTrees(scene, ctx = {}) {
     const wash = o.wash !== undefined ? (o.wash ? 1 : 0) : (sp === SP.CAU || sp === SP.DA || sp === SP.TOPI || sp === SP.ME ? 0 : hxz(x, z, 22) < V.wash ? 1 : 0);
     // độ kín tán (shader bỏ bớt thẻ lá) — W2-B thưa hơn: thường 0,62-0,95; pano "tán thưa/trụi" & tỉa trơ 0,38-0,62; vòm cây 0,82-0,98
     const hf = hxz(x, z, 47);
-    const full = o.full ?? (sp === SP.CAU || sp === SP.CATCUT || sp === SP.NON || sp === SP.TOPI || sp === SP.LOP ? 1 : sp === SP.DA || sp === SP.ME ? 0.82 + 0.15 * hf
+    // (LOP "bộ xương": 0,45-1 — pano 10/2024 một tháng sau bão: cây trơ hẳn lẫn cây đã ra lại chồi lá dọc cành, 056/400/001)
+    const full = o.full ?? (sp === SP.CAU || sp === SP.CATCUT || sp === SP.NON || sp === SP.TOPI ? 1 : sp === SP.LOP ? 0.45 + 0.55 * hf : sp === SP.DA || sp === SP.ME ? 0.82 + 0.15 * hf
       : tun ? 0.82 + 0.16 * hf : V.thin || cut ? 0.34 + 0.22 * hf : sp === SP.BANG ? 0.66 + 0.26 * hf : 0.58 + 0.34 * hf);
     // HẠNG HOA (0..1): cây nở khi hạng < tỉ lệ nở của ngày (uBloom); bằng lăng +2; −1 = luôn nở (cây đôi của hero GLB)
     const rank = heroOk ? -1 : sp === SP.BANGLANG ? 2 + hxz(x, z, 21) : sp === SP.PHUONG ? hxz(x, z, 21) : 3;
