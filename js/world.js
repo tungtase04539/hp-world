@@ -19133,6 +19133,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     updaters.push((dt, time) => { vnFlag.rotation.y = Math.sin(time * 1.8) * 0.35; });
     const bedColors = [0xe8402a, 0xf2ce4b, 0xe87ab8, 0xffffff, 0xf28c3a];
     [[pcx - 16, pcz + 12], [pcx + 16, pcz + 10], [pcx - 22, pcz - 2], [pcx + 22, pcz - 2]].forEach(([bx, bz], bi) => {
+      if (onCarriageDisc(bx, bz, 2.4)) return;   // W3-A: phố vòng nam quảng trường theo đường cong OSM thật (simplify 3 m) — không đặt bồn lên nhựa
       const bed = new THREE.Mesh(new THREE.CylinderGeometry(2, 2.2, 0.6, 8), mat(0x9b6b44));
       bed.position.set(bx, LAND_H + 0.3, bz);
       scene.add(bed);
@@ -21222,6 +21223,11 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
   // fpData (W2-B): đỉnh footprint đi cùng rbGrid → tán cây cách mặt tiền ≥ 1,5 m (ép nửa tán phía tường, thân thẳng)
   const trees = veg.buildTrees(scene, { groundHeight, R: BUILD_RADIUS, lakeSD, hdTreeBelt, colliders, fpGrid: world.rbGrid, fpData: world.rbData });
   world.trees = trees;                        // stats()/setSeason(0..1) — __hp.scene… hoặc world.trees.stats()
+  // W3-A: collider NHỎ (cây/cột/đoạn tường, r ≤ 2,2) còn nằm TRÊN LÒNG đường sau cellsink + quét W2-A + dời/bỏ cây = vật cản
+  // VÔ HÌNH (chủ đã gỡ/dời/cắt mà collider ở lại — lộ ra khi tim/lòng phố theo phố thật: tường tx_pdp Phan Đình Phùng, cây w1
+  // Trần Phú). Tách như trees.js (x = 1e7; colIdx có thể đã dựng). Chạy TRƯỚC props: xe đỗ mép lòng của props là vật cản thật.
+  { let n = 0; for (const c of colliders) if (c.r <= 2.2 && c.x < 1e6 && onCarriageDisc(c.x, c.z, 0)) { c.x = 1e7; c.z = 1e7; n++; }
+    world.ghostColliders = n; }
   world.treeBloomNear = trees.bloomNear;      // cánh phượng rơi quanh cây đang nở gần người chơi (petals.js)
   loadHeroTrees(trees);  // nạp GLB cây phượng ảnh-thật → LOD gần ≤150 m (bất đồng bộ)
   // ---------- ĐỒ ĐẠC PHỐ (Đợt 3 WP7, js/props.js) ----------
