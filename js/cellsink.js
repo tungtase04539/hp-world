@@ -170,16 +170,12 @@ export function makeCellSink(THREE, realScene, realAddCollider, realFC, collider
     const L = lazy.get(t); if (!L) return;
     lazy.delete(t);
     const tq = performance.now();
-    // W3-C: mặt tiền "nền phủ kín + lưới cửa sổ 1 màu" (~25 helper xxFacade của world.js) → vẽ lại 2× bằng khung/kính phản
-    // trời/cửa chớp, giữ nguyên vị trí từng cửa (js/cellfacade.js gridFacadeSpec/paintGridFacade); mẫu khác → vẽ gốc
+    // W3-C: mặt tiền "nền phủ kín + lưới cửa sổ 1 màu" (~25 helper xxFacade của world.js) → vẽ lại bằng khung/kính phản
+    // trời/cửa chớp, giữ nguyên vị trí từng cửa + CÙNG cỡ ảnh (js/cellfacade.js gridFacadeSpec/paintGridFacade); mẫu khác →
+    // vẽ gốc. (Thử 2× độ phân giải: 177 ảnh 512² → cellAtlas 7 → 15 trang 2048², gộp 107 → 535 ms — bỏ.)
     const gf = gridFacadeSpec(L.draw, L.w, L.h);
-    if (gf) {
-      const cv = t.image, q = cv.width / L.w, k = Math.max(L.w, L.h) <= 256 ? 2 : 1;
-      cv.width = Math.round(L.w * q * k); cv.height = Math.round(L.h * q * k);
-      const g = cv.getContext('2d'); g.setTransform(q * k, 0, 0, q * k, 0, 0);
-      paintGridFacade(g, L.w, L.h, gf);
-      t.userData.base = gf.base; stats.texGrid++;
-    } else runDraw(t, L, t.image.getContext('2d'));
+    if (gf) { paintGridFacade(t.image.getContext('2d'), L.w, L.h, gf); t.userData.base = gf.base; t.userData.gridFacade = true; stats.texGrid++; }
+    else runDraw(t, L, t.image.getContext('2d'));
     t.needsUpdate = true;
     stats.texDrawn++; stats.texMs += performance.now() - tq;
   };
@@ -1008,7 +1004,7 @@ function atlasKept(kept, createdTex, THREE) {
     const cv = document.createElement('canvas'); cv.width = AT_PAGE; cv.height = H; p.H = H;
     const g = cv.getContext('2d');
     for (const t of p.items) {
-      const c = texs.get(t), fx = cellCanvasFx(t.image);   // W3-C: mặt tiền canvas tối / một màu bão hoà → filter (js/cellfacade.js)
+      const c = texs.get(t), fx = cellCanvasFx(t);   // W3-C: ảnh canvas nền tối / một màu bão hoà → filter (js/cellfacade.js)
       if (fx) g.filter = fx.filter;
       g.drawImage(t.image, c.x, c.y, c.w, c.h);                                     // nền ô = ảnh kéo giãn ra viền (chống loang)
       g.drawImage(t.image, c.x + c.G, c.y + c.G, c.w - 2 * c.G, c.h - 2 * c.G);  // ảnh thật 1:1 ở giữa (c.w-2G = w gốc)

@@ -25,35 +25,21 @@ function guarded(q, THREE) {
   return out;
 }
 
-// ẢNH MẶT TIỀN canvas của nhà ô (gộp vào cellAtlas — cellsink atlasKept): "ô vuông đen" cửa sổ (pano_391/409/510/161/060)
-// và mặt tiền gần đen (pano_395 h180) → (a) ảnh mặt tiền (gần vuông, ≥96 px) TỐI (độ chói TB < 0,22) vẽ với filter sáng
-// hơn; (b) ảnh mặt tiền 1 màu BÃO HOÀ (TB bão hoà > 0,55) giảm bão hoà. Biển dải dài (tỉ lệ > 2,6) chỉ đụng khi RẤT tối,
-// ảnh nhỏ: không đụng. (Đã thử phủ 'lighten' màu kính lên điểm tối: nâu → tím hồng, bỏ.)
-let _probe = null;
-function meanLum(img) {
-  try {
-    if (!_probe) { _probe = document.createElement('canvas'); _probe.width = _probe.height = 8; }
-    const g = _probe.getContext('2d', { willReadFrequently: true });
-    g.clearRect(0, 0, 8, 8); g.drawImage(img, 0, 0, 8, 8);
-    const d = g.getImageData(0, 0, 8, 8).data; let s = 0, sat = 0;
-    for (let i = 0; i < d.length; i += 4) {
-      s += 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
-      const mx = Math.max(d[i], d[i + 1], d[i + 2]), mn = Math.min(d[i], d[i + 1], d[i + 2]); sat += mx > 0 ? (mx - mn) / mx : 0;
-    }
-    _lastSat = sat / 64;
-    return s / 64 / 255;
-  } catch (e) { _lastSat = 0; return 1; }
-}
-let _lastSat = 0;
-export function cellCanvasFx(img) {
-  if (!img || !img.width || img.width < 96 || img.height < 96) return null;
-  const ar = img.width / img.height, L = meanLum(img);
-  if (ar > 2.6 || ar < 1 / 2.6) return L < 0.14 ? { filter: 'brightness(1.7) saturate(0.85)', dark: true } : null;   // dải dài RẤT tối (mặt "biển" phủ cả nhà, pano_395)
+// ẢNH canvas của nhà ô KHÔNG phải lưới cửa sổ (gộp vào cellAtlas — cellsink atlasKept): mặt tiền gần đen (pano_395 h180)
+// hoặc một màu BÃO HOÀ → filter khi gộp. Độ chói/bão hoà lấy từ MÀU NỀN phủ kín mà cellsink ghi lúc vẽ (t.userData.base) —
+// KHÔNG đọc ngược ảnh (bản đầu dùng drawImage→getImageData 8×8 cho 434 ảnh canvas GPU: gộp atlas 107 → 451 ms). Lưới cửa sổ
+// (t.userData.gridFacade) đã được kẹp màu nền lúc vẽ (paintGridFacade) → bỏ qua. Biển dải dài chỉ đụng khi RẤT tối.
+// (Đã thử phủ 'lighten' màu kính lên điểm tối: cửa chớp nâu → tím hồng (pano_157 h0) — bỏ.)
+export function cellCanvasFx(t) {
+  const img = t && t.image, base = t && t.userData && t.userData.base;
+  if (!img || !base || t.userData.gridFacade || img.width < 96 || img.height < 96) return null;
+  const c = _rgb(base); if (!c) return null;
+  const L = (0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]) / 255, mx = Math.max(c[0], c[1], c[2]), sat = mx > 0 ? (mx - Math.min(c[0], c[1], c[2])) / mx : 0;
+  const ar = img.width / img.height;
+  if (ar > 2.6 || ar < 1 / 2.6) return L < 0.14 ? { filter: 'brightness(1.7) saturate(0.85)' } : null;   // dải dài RẤT tối (mặt "biển" phủ cả nhà)
   // mặt tiền 1 màu BÃO HOÀ (xanh hoàng gia UBND pano_138, đỏ BIDV 046): giảm bão hoà — màu thương hiệu chỉ hợp ở biển
-  const f = L < 0.22 ? 'brightness(1.6) saturate(0.8)' : _lastSat > 0.55 ? 'saturate(0.45) brightness(1.08)' : 'none';
-  // (thử 'lighten' nâng điểm tối lên kính xám-xanh: cửa chớp nâu → tím hồng (pano_157 h0) — BỎ; chỉ giữ filter. Cửa sổ
-  // ĐEN của mặt tiền vẽ tay nay sửa TẠI NGUỒN: gridFacadeSpec/paintGridFacade bên dưới.)
-  return f === 'none' ? null : { filter: f, dark: L < 0.22, sat: +_lastSat.toFixed(2) };
+  const f = L < 0.22 ? 'brightness(1.6) saturate(0.8)' : sat > 0.55 ? 'saturate(0.45) brightness(1.08)' : null;
+  return f ? { filter: f } : null;
 }
 
 // kept: mục GIỮ LẠI của cell sink ({ o: Object3D, bldg: bool, kind }) — gọi trong commitSink trước khi trả về.
@@ -148,6 +134,20 @@ function _rgb(css) {
   if (m && (m[4] === undefined || +m[4] >= 0.999)) return [+m[1], +m[2], +m[3]];
   return null;   // tên màu / trong suốt → không đụng
 }
+// palette guard màu nền mặt tiền (như guarded(): HSL bão hoà ≤ 0,40, sáng 0,30..0,90) — tường xanh hoàng gia/đỏ thương hiệu
+function _guardRGB(c) {
+  const r = c[0] / 255, gg = c[1] / 255, b = c[2] / 255, mx = Math.max(r, gg, b), mn = Math.min(r, gg, b), l = (mx + mn) / 2;
+  let h = 0, sat = 0;
+  if (mx > mn) {
+    const d = mx - mn; sat = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
+    h = mx === r ? (gg - b) / d + (gg < b ? 6 : 0) : mx === gg ? (b - r) / d + 2 : (r - gg) / d + 4; h /= 6;
+  }
+  const S = Math.min(sat, S_MAX), Lc = Math.min(L_MAX, Math.max(L_MIN, l));
+  if (Math.abs(S - sat) < 0.04 && Math.abs(Lc - l) < 0.04) return c;
+  const q = Lc < 0.5 ? Lc * (1 + S) : Lc + S - Lc * S, p = 2 * Lc - q;
+  const f = (t) => { t = (t + 1) % 1; return t < 1 / 6 ? p + (q - p) * 6 * t : t < 0.5 ? q : t < 2 / 3 ? p + (q - p) * (2 / 3 - t) * 6 : p; };
+  return [f(h + 1 / 3) * 255, f(h) * 255, f(h - 1 / 3) * 255];
+}
 const _css = (a) => `rgb(${Math.round(a[0])},${Math.round(a[1])},${Math.round(a[2])})`;
 const _mix = (a, b, t) => _css([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]);
 function _look(B, Wc) {
@@ -234,8 +234,8 @@ export function gridFacadeSpec(draw, W, H) {
   return { base: b.c, win, rects, paths };
 }
 export function paintGridFacade(g, W, H, s) {
-  const B = _rgb(s.base), Wc = _rgb(s.win), L = _look(B, Wc);
-  g.fillStyle = s.base; g.fillRect(0, 0, W, H);
+  const B = _guardRGB(_rgb(s.base)), Wc = _rgb(s.win), L = _look(B, Wc);
+  g.fillStyle = _css(B); g.fillRect(0, 0, W, H);
   // vạch sàn mờ giữa các hàng cửa
   const key = (r) => Math.round(r.y * 4) / 4;
   const rows = [...new Set(s.rects.map(key))].sort((a, b) => a - b);
