@@ -692,7 +692,12 @@ console.log('INTERSECTIONS:', INTERSECTIONS.length);
 
 // MEDIANS: tuyến dài nhất của các đại lộ có dải phân cách thật
 const MEDIANS = [];
+// Đợt 3 W3-A (AUDIT3 XSEC/CAMOBS): tuyến dài nhất mang tên 'Trần Hưng Đạo' là đoạn BẮC-NAM x≈650-670 dọc tường mỏ neo
+// Hải quân (z −880…−450) — ảnh thật pano_222/223/224/225/226/227 đều là MỘT lòng + tim vàng, KHÔNG dải phân cách; bồn/cây
+// dải giả đứng 1,5-3 m trước camera (QA clearance). Tên nào ở đây → không xuất dải phân cách.
+const NO_MEDIAN = ['Trần Hưng Đạo'];
 for (const nm of ['Trần Hưng Đạo', 'Trần Phú', 'Điện Biên Phủ']) {
+  if (NO_MEDIAN.includes(nm)) continue;
   const key = Object.keys(streetAgg).find((k) => k.includes(nm));
   if (key) MEDIANS.push(streetAgg[key].best.map(([x, z]) => [Math.round(x), Math.round(z)]));
 }
