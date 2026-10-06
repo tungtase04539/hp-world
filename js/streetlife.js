@@ -405,9 +405,9 @@ export const signCategory = (t) => { const s = String(t || '').toUpperCase(); fo
 
 // ---------------------------------------------------------------------------------------------------------------------
 // ĐẶT ĐỒ — gọi trong buildProps sau 6.4 (quán/xe đẩy/biển A/thùng rác) và TRƯỚC 6.5 (xe máy) → xe máy/ô tô/người né.
-// P = { sides, CELL, cellPos, hash3, evAt, inBuilding, obst, flat, roadIdx, nearPano, onCarriage, openReal, claimAt,
+// P = { sides, CELL, cellPos, hash3, inBuilding, obst, flat, roadIdx, nearPano, onCarriage(Fast), openReal, parkBehind, claimAt,
 //       XS(c) → {hw, sw, curb, park, furn, fac}, OCC, placeFood, lists:{stoolI, paraI, sitI, standI, bikeDisplay},
-//       addCollider, R_MAX, SHOP_SIGNS, MARKETS, LITE, stats }
+//       addCollider, R_MAX, SHOP_SIGNS, MARKETS, evidence, ROADS_DT, st }
 // ---------------------------------------------------------------------------------------------------------------------
 // (1) PHÂN LOẠI ô (gọi NGAY sau lấy mẫu 6.1, trước mọi đồ hè): S.mk[k] mức chợ 0-3, S.fore[k] = sân trước công trình
 //     tôn giáo/công sở/cổng/địa danh (không xe máy/chợ/quán/đồ hè — pano_276 chùa, 524 cổng Hải Thành)
@@ -452,7 +452,8 @@ export function marketLevels(P) {
       lv = Math.max(lv, lo);
       if (mClaim) lv = 3;   // ngay trước ô dựng tay tên cho_* (Chợ Tam Bạc, Chợ Con…)
       if (S.c === 'p' && lv > 1) lv = 1;
-      if (S.fore[k] || (lv && P.openReal(x, z))) lv = 0;   // không bày chợ trong công viên/quảng trường/kè hồ (chợ Cột Đèn = ô dựng tay)
+      // không bày chợ trong/ven công viên, quảng trường, kè hồ (dò sau mặt tiền — parkBehind; chợ Cột Đèn = ô dựng tay)
+      if (S.fore[k] || (lv && P.parkBehind(x, z, S.nx, S.nz, X.fac - X.park))) lv = 0;
       S.mk[k] = lv; st.mkCells[lv]++;
     }
   }
@@ -730,7 +731,7 @@ export function placeStreetLife(P) {
       if (hk > 0.03) continue;
       const X = XS(S.c); const [x, z] = cellPos(S, k, X.fac - 0.5);
       const r0 = Math.hypot(x, z);
-      if ((r0 >= 1300 && hk > 0.012) || P.openReal(x, z)) continue;
+      if ((r0 >= 1300 && hk > 0.012) || P.parkBehind(x, z, S.nx, S.nz, 0.5)) continue;
       if (!okAt(S, x, z, 0.5) || obst.hit(x, z, 0.5) || !hasFacade(S, k)) continue;
       spillI.push({ x, z, heading: hash3(x, z, 382) * 6.28, v: 2, col: pick([0xa8552e, 0xa8552e, 0xe8e4dc, 0x6a6e70], hash3(x, z, 383)) });
       obst.add(x, z, 0.5); S.occ[k] |= OCC.SHOP; st.plants++;

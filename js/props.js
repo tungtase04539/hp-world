@@ -699,6 +699,14 @@ export function buildProps(ctx) {
   // "cấm nhà infill" CÓ nhà thật (Z-TTB1/2/3 phố công sở/bệnh viện/nút Nguyễn Tri Phương, siêu khối Hải quân, chợ Nguyễn
   // Khuyến…) → dùng nó cho luật ô tô/chợ/dây điện W3-E thì xoá sạch ô tô đỗ 2 bên pano_395 (ảnh thật kín xe) và chợ.
   const openReal = (x, z) => !!claimAt(x, z, ['park', 'plaza']) || lakeSD(x, z) < 16;
+  // bên phố nhìn ra công viên/quảng trường: từ điểm (px,pz) trên vỉa dò theo pháp tuyến ra phía nhà (nx,nz) tới +18 m — đa giác
+  // công viên OSM thường lùi sau dải cỏ/hàng rào (542: claim cách bó vỉa ~16 m); DỪNG khi gặp nhà thật (có dãy nhà đứng trước
+  // thì bên này là phố, công viên phía sau không tính)
+  const parkBehind = (px, pz, nx, nz, d0 = 0) => {
+    if (d0 && openReal(px, pz)) return true;   // chính điểm trên vỉa
+    for (const d of [0, 2, 6, 10, 14, 18]) { const ox = px + nx * (d0 + d), oz = pz + nz * (d0 + d); if (d && inBuilding(ox, oz)) return false; if (openReal(ox, oz)) return true; }
+    return false;
+  };
   const avoid = ctx.avoid || (() => false);
   // vùng giữ trống cho đồ vỉa hè + ô tô (điểm hồi sinh người chơi: khung hình đầu tiên không bị xe đỗ che) — [[x,z,r],…]
   const keepClear = ctx.keepClear || [];
@@ -764,7 +772,7 @@ export function buildProps(ctx) {
   const slStats = newStreetLifeStats();
   const bikeDisplay = [];
   const SL = {
-    sides, CELL, cellPos, hash3, evAt, inBuilding, obst, flat, roadIdx, nearPano, onCarriage, onCarriageFast, openReal, claimAt, XS,
+    sides, CELL, cellPos, hash3, evAt, inBuilding, obst, flat, roadIdx, nearPano, onCarriage, onCarriageFast, openReal, parkBehind, claimAt, XS,
     OCC: { POLE: OCC_POLE, SHOP: OCC_SHOP, BIKE: OCC_BIKE, PED: OCC_PED, CAR: OCC_CAR, MKT: OCC_MKT }, addCollider: ctx.addCollider, R_MAX,
     SHOP_SIGNS, MARKETS: PROPS_MARKETS, evidence: PROPS_EVIDENCE, st: slStats, LITE, ROADS_DT,
   };
@@ -1291,7 +1299,8 @@ export function buildProps(ctx) {
       // trơn, pano 005/028/033 thật có ô tô đỗ phía NHÀ). Nay chỉ cấm phía KÈ/promenade (đi ra phía vỉa hè này lại gần hồ
       // hơn) và sát mép nước (< 6 m); cấm cả bên phố mà phía vỉa là công viên/quảng trường/promenade (322, 542, 065).
       const lakeSide = () => { const lk = lakeSD(x, z); return lk < 6 || (lk < 40 && lakeSD(x + S.nx * 6, z + S.nz * 6) < lk - 1.5); };
-      const parkSide = () => { const ox = x + S.nx * (X.fac - lat + 2), oz = z + S.nz * (X.fac - lat + 2); return openReal(ox, oz) || openReal(x + S.nx * (X.sw * 0.5 + 0.95), z + S.nz * (X.sw * 0.5 + 0.95)); };
+      // phía công viên/quảng trường (giữa vỉa, rồi sau mặt tiền tới +18 m — parkBehind)
+      const parkSide = () => openReal(x + S.nx * (X.sw * 0.5 + 0.95), z + S.nz * (X.sw * 0.5 + 0.95)) || parkBehind(x, z, S.nx, S.nz, X.fac - lat);
       // thứ tự kiểm: rẻ trước (camera pano, nút giao, vật cản) — lakeSD (đa giác hồ) + openReal là 2 truy vấn đắt nhất
       let why = !(x * x + z * z < R_MAX * R_MAX && flat(x, z)) ? 1 : (avoid(x, z) || clearAt(x, z)) ? 2
         : (panoNear(x, z, rc) || panoNear(x + hx, z + hz, rp) || panoNear(x - hx, z - hz, rp)) ? 5 : 0;
