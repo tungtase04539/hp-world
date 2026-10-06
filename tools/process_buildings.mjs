@@ -594,8 +594,11 @@ for (let bi = 0; bi < B.length; bi++) {
     else { pieces.push({ pts: R2, lot: 0, rear: 1 }); nRear++; }
   }
   nLotSrc++; b.dead = 'split';
-  for (const p of pieces) {
-    newB.push({ id: b.id + '#' + newB.length, src: b.src, cls: b.cls, sub: b.sub, name: '', nfl: b.nfl, hgt: b.hgt, pts: p.pts, area: absArea(p.pts),
+  // W3-B: id lô = id nhà mẹ + chỉ số TRONG nhà mẹ (trước: + newB.length toàn cục → thêm/bớt 1 lô ở bất kỳ đâu (veto khuôn viên)
+  // đổi id — tức seed mặt tiền/màu/tầng — của MỌI lô phía sau trong cả thành phố; A/B và gộp nhánh nhiễu toàn cục)
+  for (let pk = 0; pk < pieces.length; pk++) {
+    const p = pieces[pk];
+    newB.push({ id: b.id + '#' + pk, src: b.src, cls: b.cls, sub: b.sub, name: '', nfl: b.nfl, hgt: b.hgt, pts: p.pts, area: absArea(p.pts),
       lot: p.lot, rear: p.rear, cell: p.cell, parent: b.id, snapped: b.snapped, clipped: b.clipped, civic: false, big: false });
     if (p.lot) nLots++;
   }
@@ -608,8 +611,9 @@ for (const b of B) {
   const parts = subdivide(b.pts, mr.ux, mr.uz, b.id + 'cell');   // cắt dọc trục dài mỗi 4,5-7,5 m (bề ngang nhà), sâu 10-16 m
   if (parts.length < 2) continue;
   b.dead = 'cells';
-  for (const q of parts) {
-    newB.push({ id: b.id + '#c' + newB.length, src: b.src, cls: '', sub: '', name: '', nfl: 0, hgt: 0, pts: q, area: absArea(q), cell: 1, parent: b.id,
+  for (let k = 0; k < parts.length; k++) {
+    const q = parts[k];
+    newB.push({ id: b.id + '#c' + k, src: b.src, cls: '', sub: '', name: '', nfl: 0, hgt: 0, pts: q, area: absArea(q), cell: 1, parent: b.id,
       snapped: b.snapped, clipped: b.clipped, civic: false, big: false });
     nCells++;
   }
