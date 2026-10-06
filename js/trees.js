@@ -395,7 +395,7 @@ const KIT_DEFS = [
   { sp: SP.CAU, form: 'palm', H: 13.5, trunkH: 11.2, r0: 0.3, r1: 0.22, shaft: 1.7, fronds: 15, frondL: 4.6, frondW: 1.5 },
   { sp: SP.CATCUT, form: 'pollard', H: 7, trunkH: 4.0, r0: 0.28, r1: 0.22, lean: 0.03, stubs: 4, stubLen: [1.1, 2.3], shoots: 3, cardS: [0.8, 1.3], cells: [CELL.SHOOT], bark: [0.9, 0.87, 0.83] },
   { sp: SP.CATCUT, form: 'pollard', H: 8, trunkH: 4.5, r0: 0.26, r1: 0.2, lean: 0.06, stubs: 5, stubLen: [1.4, 2.7], shoots: 8, cardS: [0.9, 1.6], cells: [CELL.SHOOT, CELL.SHOOT, CELL.XACU_A], bark: [0.9, 0.87, 0.83] },
-  { sp: SP.DA, form: 'round', H: 15, trunkH: 3.6, r0: 1.0, r1: 0.62, lean: 0, limbs: 7, limbAng: [0.85, 1.25], limbLen: 7.6, sub: 3, cy: 10.2, rx: 9.0, ry: 4.6, cards: 130, cardsFar: 32, cardS: [2.1, 3.0], cells: [CELL.DA], bark: [0.82, 0.8, 0.76], up: 0.35, stems: 4, roots: 18 },
+  { sp: SP.DA, form: 'round', H: 15, trunkH: 3.6, r0: 1.0, r1: 0.62, lean: 0, limbs: 7, limbAng: [0.85, 1.25], limbLen: 7.6, sub: 3, cy: 10.2, rx: 9.0, ry: 4.6, cards: 130, cardsFar: 32, cardS: [2.1, 3.0], cells: [CELL.DA], bark: [0.82, 0.8, 0.76], up: 0.35, stems: 4, roots: 30 },
   { sp: SP.NON, form: 'round', H: 4.6, trunkH: 2.2, r0: 0.075, r1: 0.05, lean: 0.01, limbs: 4, limbAng: [0.4, 0.7], limbLen: 1.1, sub: 0, cy: 3.4, rx: 1.3, ry: 1.15, cards: 18, cardsFar: 14, cardS: [0.8, 1.2], cells: [CELL.XACU_A, CELL.SAU], bark: [0.9, 0.86, 0.8], up: 0.2, stakes: true },
   // ---- W3-G ----
   // cây cảnh CẮT TỈA TRÒN (2-3 khối cầu lá dày chồng nhau) / CÂY THẾ (thân cong, các "đĩa" lá phẳng tỉa) — đảo giao thông
@@ -523,8 +523,10 @@ function genKit(d, far, seed) {
       G.crown = false;
       // W3-G: rễ phụ buông GẦN thân (1,2-3,2 m, như ảnh pano_088/400 — "màn rễ" quanh gốc), trước 2..rx−3 = tới 6 m × cỡ
       // instance → rễ đứng giữa lòng đường (thử 2026-10-05)
+      // rễ MẢNH (2-5 cm) và ~55% buông lơ lửng (đầu rễ 0,8-3 m trên đất) — rễ to chạm đất hết từng thành "rừng cột" quanh gốc
       const a = r() * 6.28, rr = 1.2 + r() * 2.0, x = cx + Math.cos(a) * rr, z = cz + Math.sin(a) * rr, yt = d.cy - d.ry * (0.55 + r() * 0.3);
-      tube(G, [[x, yt, z, 0.05 + r() * 0.05], [x + (r() - 0.5) * 0.3, yt * 0.5, z + (r() - 0.5) * 0.3, 0.05 + r() * 0.06], [x, -0.2, z, 0.06 + r() * 0.08]], 4, rectBark, 0, woodAO, woodSway);
+      const yb = r() < 0.55 ? 0.8 + r() * 2.2 : -0.2, rb = yb > 0 ? 0.012 : 0.03 + r() * 0.03;
+      tube(G, [[x, yt, z, 0.03 + r() * 0.02], [x + (r() - 0.5) * 0.3, (yt + yb) * 0.5, z + (r() - 0.5) * 0.3, 0.025 + r() * 0.02], [x + (r() - 0.5) * 0.2, yb, z + (r() - 0.5) * 0.2, rb]], 4, rectBark, 0, woodAO, woodSway);
     }
     if (d.stakes && !far) for (let q = 0; q < 3; q++) {            // cọc chống (cây non)
       G.crown = false;
@@ -970,19 +972,34 @@ const HERO_SPOTS = [
   { cam: [295.8, 39.4], h: 180, d: 18.7, lat: -7.2, kind: 'da', H: 17.5, R: 9.5 },   // gốc +21°, ~20 m
   { cam: [-211.7, 114.1], h: 180, d: 21, lat: -6.7, kind: 'me', H: 16.5, R: 10 },    // gốc +18°, ~22 m
 ];
-// chỗ đặt = điểm ĐO TRÊN ẢNH (hướng + cự ly từ camera pano) → chỗ trống GẦN NHẤT ≤ 8 m (vòng 0,5 m × 16 hướng) không lòng
-// đường / nhà / địa danh / camera pano 6 m. KHÔNG "bám phố": ở 088 phố Lương Khánh Thiện trong ROADS_DT lệch ~45° so với ảnh
-// (đa thật đứng ở miệng ngõ bên trái), bám hố cây của phố đẩy cây sang phải khung (thử 2026-10-05). Trả [[x, z, bán kính
-// cấm cây khác]] cho hàng cây vỉa hè.
+// chỗ đặt = điểm ĐO TRÊN ẢNH (hướng + cự ly từ camera pano). Điểm đó lọt vào khối nhà (phố trong game hẹp/lệch hơn thật) →
+// KÉO VỀ PHÍA TIM PHỐ của camera tới chỗ trống đầu tiên (≤ 14 m, bước 0,5 m: gốc ra vỉa hè trước mặt tiền, giữ gần đúng
+// hướng nhìn); không được thì chỗ trống gần nhất ≤ 8 m. Trống = không lòng đường (gốc cách mép ≥ 2,2 m — rễ phụ đa ≤ ~1,9 m),
+// không nhà, không camera pano 6 m. KHÔNG đặt theo hố cây của phố: ở 088 ROADS_DT lệch ~45° so với ảnh (thử 2026-10-05:
+// cây sang phải khung); chỗ trống gần nhất thuần tuý thì rơi vào khe giữa 2 nhà SAU mặt tiền (bị che khuất).
+// Trả [[x, z, bán kính cấm cây khác]] cho hàng cây vỉa hè.
 function plantHeroSpots(ctx, RI, fp) {
   const keep = [];
+  const free = (x, z) => !RI.nearRoad(x, z, 2.2, 'wh') && !onCarriage(x, z) && !(fp && fp.at(x, z) >= 0) && !nearPano(x, z, 6)
+    && !(ctx.isWater && ctx.isWater(x, z));
+  const segNear = (x, z, maxD) => {
+    let best = null, bd = maxD; const ci = Math.floor(x / RI.SC), cj = Math.floor(z / RI.SC), k = Math.ceil(maxD / RI.SC);
+    for (let i = ci - k; i <= ci + k; i++) for (let j = cj - k; j <= cj + k; j++) {
+      const a = RI.sg.get(i * 100003 + j); if (!a) continue;
+      for (const id of a) { const sg = RI.segs[id]; if (!'pstr'.includes(sg.c)) continue; const d = RI.segD(x, z, sg); if (d < bd) { bd = d; best = sg; } }
+    }
+    return best;
+  };
   for (const S of HERO_SPOTS) {
     const hr = S.h * Math.PI / 180, fx = Math.sin(hr), fz = -Math.cos(hr), lx = fz, lz = -fx;
     const x0 = S.cam[0] + fx * S.d + lx * S.lat, z0 = S.cam[1] + fz * S.d + lz * S.lat;
-    // gốc cách mép lòng đường ≥ 2,2 m (rễ phụ đa ≤ ~1,9 m quanh gốc phải nằm trên hè/đất, không xuống lòng đường)
-    const free = (x, z) => !RI.nearRoad(x, z, 2.2, 'wh') && !onCarriage(x, z) && !(fp && fp.at(x, z) >= 0) && !nearPano(x, z, 6)
-      && !(ctx.isWater && ctx.isWater(x, z));
     let px = null, pz = null;
+    const s0 = segNear(S.cam[0], S.cam[1], 25);
+    if (s0) {
+      const dx = s0.bx - s0.ax, dz = s0.bz - s0.az, L2 = dx * dx + dz * dz || 1, t = ((x0 - s0.ax) * dx + (z0 - s0.az) * dz) / L2;
+      let ux = s0.ax + t * dx - x0, uz = s0.az + t * dz - z0; const ul = Math.hypot(ux, uz);
+      if (ul > 0.5) { ux /= ul; uz /= ul; for (let k = 0; k <= Math.min(14, ul); k += 0.5) { const x = x0 + ux * k, z = z0 + uz * k; if (free(x, z)) { px = x; pz = z; break; } } }
+    }
     for (let rr = 0; rr <= 8 && px === null; rr += 0.5) {
       for (let q = 0; q < (rr ? 16 : 1); q++) { const a = q / 16 * Math.PI * 2, x = x0 + Math.cos(a) * rr, z = z0 + Math.sin(a) * rr; if (free(x, z)) { px = x; pz = z; break; } }
     }
