@@ -490,6 +490,9 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     khách (hw 1,3) + xe phủ bạt; `__hpProps.lists` thêm mkOver/mkGround/mkRoad/spill/kioskI/coaches/covered/flagsHouse/
     banners/gates (clearance_page bỏ qua mkRoad/coaches/covered/banners/gates — cố ý trên lòng/treo cao). props.js `XS(c)` =
     MỘT chỗ lấy mặt cắt cho phần W3-E — W3-A (bề rộng theo way) thay hàm này là đủ.
+    BẪY QA (Windows): `node tools/qa/gpulock.mjs run -- bash -c "a; b"` TREO — spawnSync shell:true chạy qua cmd.exe, dấu nháy
+    bị bỏ → `bash -c bash …` chờ stdin mãi trong khi GIỮ khoá GPU (chặn mọi agent 13 phút). Gói nhiều lệnh vào 1 file .sh rồi
+    `gpulock.mjs run -- bash file.sh`.
     **Số đo**: (điền)
 - **2026-10-04 (W2-F POLISH)** [ĐỢT 3 wave 2 — WebGL1, giải mã RB 1 lần, kho cảng, ĐÊM, giao thông né xe đỗ, dọn code chết, hitch]:
     **(1) WebGL1** (three r160 tự lùi WebGL1 khi không có WebGL2): KIỂM bằng `tools/qa/shoot.mjs --gl1` (init script cho
