@@ -20,7 +20,7 @@ import { claimBox } from './claims.js';
 import { BRAND_MAP, debrand } from './brands.js';
 import { PARKS } from './mapdata.js';
 import { LM_POLY } from './landmark_polys.js';
-import { guardCellPalette, cellCanvasFx } from './cellfacade.js';   // Đợt 3 W3-C: palette guard nhà ô giữ lại
+import { guardCellPalette, cellCanvasFx, gridFacadeSpec, paintGridFacade } from './cellfacade.js';   // Đợt 3 W3-C: palette guard nhà ô giữ lại
 import { clearanceReady, samplesFromHulls, evalShift, solveShift, sweepAssemblies, flushClearance, massOnStreet, minWidth, thinMeshOf, trimThinWall, corrCount, nearAnyRoad, nearestPano, CLEAR } from './clearance.js';   // Đợt 3 W2-A
 
 const _q = typeof location !== 'undefined' ? new URLSearchParams(location.search) : new URLSearchParams('');
@@ -105,7 +105,7 @@ function recorderCtx(W, H) {
 
 export function makeCellSink(THREE, realScene, realAddCollider, realFC, colliders, outerMakeTex) {
   const recs = [], cols = [], fcs = [];
-  const stats = { t0: performance.now(), texCalls: 0, texNew: 0, texHit: 0, texDrawn: 0, texSkipped: 0, texMs: 0, memoHit: 0, memoMiss: 0, brandHits: [] };
+  const stats = { t0: performance.now(), texCalls: 0, texNew: 0, texHit: 0, texDrawn: 0, texSkipped: 0, texMs: 0, texGrid: 0, memoHit: 0, memoMiss: 0, brandHits: [] };
   const createdTex = new Set();
   let seq = 0;
   const DUMP = CELLSINK_MODE === 'dump';
@@ -170,7 +170,16 @@ export function makeCellSink(THREE, realScene, realAddCollider, realFC, collider
     const L = lazy.get(t); if (!L) return;
     lazy.delete(t);
     const tq = performance.now();
-    runDraw(t, L, t.image.getContext('2d'));
+    // W3-C: mặt tiền "nền phủ kín + lưới cửa sổ 1 màu" (~25 helper xxFacade của world.js) → vẽ lại 2× bằng khung/kính phản
+    // trời/cửa chớp, giữ nguyên vị trí từng cửa (js/cellfacade.js gridFacadeSpec/paintGridFacade); mẫu khác → vẽ gốc
+    const gf = gridFacadeSpec(L.draw, L.w, L.h);
+    if (gf) {
+      const cv = t.image, q = cv.width / L.w, k = Math.max(L.w, L.h) <= 256 ? 2 : 1;
+      cv.width = Math.round(L.w * q * k); cv.height = Math.round(L.h * q * k);
+      const g = cv.getContext('2d'); g.setTransform(q * k, 0, 0, q * k, 0, 0);
+      paintGridFacade(g, L.w, L.h, gf);
+      t.userData.base = gf.base; stats.texGrid++;
+    } else runDraw(t, L, t.image.getContext('2d'));
     t.needsUpdate = true;
     stats.texDrawn++; stats.texMs += performance.now() - tq;
   };
@@ -931,7 +940,7 @@ function commitSink(sink, THREE, realScene, realFC, colliders, opts) {
     wings: bl.filter((it) => it.wingOf).map((it) => [it.name, it.wingOf, it.kind]),
     colliders: { cells: cols.length, removed: deadCol.size }, featuredClear: { cells: fcs.length, removed: deadFC.size },
     claims: nClaims, dups, bySection: bySec,
-    tex: { calls: stats.texCalls, created: stats.texNew, keyHit: stats.texHit, drawn: stats.texDrawn, neverDrawn: stats.texSkipped, drawMs: +stats.texMs.toFixed(1), settleMs: +msTex.toFixed(1), kept: keptTex.size, keptBySize: [...keptTex].reduce((o, t) => { const k = t.name || (t.image ? t.image.width + "x" + t.image.height : "?"); o[k] = (o[k] || 0) + 1; return o; }, {}) }, materialsKept: keptMat.size,
+    tex: { calls: stats.texCalls, created: stats.texNew, keyHit: stats.texHit, drawn: stats.texDrawn, grid: stats.texGrid, neverDrawn: stats.texSkipped, drawMs: +stats.texMs.toFixed(1), settleMs: +msTex.toFixed(1), kept: keptTex.size, keptBySize: [...keptTex].reduce((o, t) => { const k = t.name || (t.image ? t.image.width + "x" + t.image.height : "?"); o[k] = (o[k] || 0) + 1; return o; }, {}) }, materialsKept: keptMat.size,
     memo: { hit: stats.memoHit, miss: stats.memoMiss }, atlas, palette, brandHits: stats.brandHits,
     clear: clr,   // W2-A: {moved:[[tên,loại,[x,z],dx,dz]], removed, stuck, ms}
     shops,

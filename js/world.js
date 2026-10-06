@@ -1895,9 +1895,13 @@ const lmSign = _cells.memo('lmSign', (txt, bg, fg = '#ffffff', px = 50) => new T
   }, 'sign|' + txt + '|' + bg + '|' + fg + '|' + px),
 }));
 const lmFacade = _cells.memo('lmFacade', (baseCss, winCss, cols, rows) => {           // như facadeTex world.js:1612
-  // W3-C: 512 px + khung/kính phản trời/cửa chớp (cellfacade.drawFacadeWindows) thay ô màu đặc 256 px ("lỗ vuông đen")
-  const t = makeTex(512, 512, (g, w, h) => drawFacadeWindows(g, w, h, baseCss, winCss, cols, rows),
-    'fac|' + baseCss + '|' + winCss + '|' + cols + '|' + rows);
+  const t = makeTex(256, 256, (g, w, h) => {
+    g.fillStyle = baseCss; g.fillRect(0, 0, w, h);
+    const mx = w * 0.12, my = h * 0.12, cw = (w - mx * 2) / cols, ch = (h - my * 2) / rows;
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+      g.fillStyle = winCss; g.fillRect(mx + c * cw + cw * 0.16, my + r * ch + ch * 0.16, cw * 0.68, ch * 0.66);
+    }
+  }, 'fac|' + baseCss + '|' + winCss + '|' + cols + '|' + rows);
   return new THREE.MeshLambertMaterial({ map: t });
 });
 const lmOK = (x, z) => Math.abs(groundHeightNoDeck(x, z) - LAND_H) < 0.4 && !isWater(x, z);

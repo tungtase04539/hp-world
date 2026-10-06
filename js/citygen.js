@@ -649,14 +649,23 @@ function faceRoad(ax, az, bx, bz, nx, nz, b) {
 // vì 45% "trơn cả mặt" (pano_340 h270, 372 h0, 175 h270, 198 h0: tường hông dọc phố trống trơn). Cần lưới va chạm (fabricAt).
 function exposedSide(ax, az, bx, bz, nx, nz, b) {
   const l = roadGrid().get(Math.floor((ax + bx) / 2 / RG) * 65536 + Math.floor((az + bz) / 2 / RG)); if (!l) return false;
-  let best = 1e9;
-  for (const [px, pz] of [[ax, az], [bx, bz]]) for (const sg of l) {
-    const dx = sg[2] - sg[0], dz = sg[3] - sg[1], L2 = dx * dx + dz * dz || 1e-9;
-    let u = ((px - sg[0]) * dx + (pz - sg[1]) * dz) / L2; u = u < 0 ? 0 : u > 1 ? 1 : u;
-    const d = Math.hypot(px - sg[0] - dx * u, pz - sg[1] - dz * u) - sg[4] - sg[6];
-    if (d < best) best = d;
+  // đầu mút gần phố ≤ 3 m ngoài hành lang: mút cách trung điểm ≤ L/2 → lọc bằng trung điểm trước (1 phép/đoạn), rồi mới tính mút
+  const mx = (ax + bx) / 2, mz = (az + bz) / 2, h2 = Math.hypot(bx - ax, bz - az) / 2;
+  let near = false;
+  for (const sg of l) {
+    const dx = sg[2] - sg[0], dz = sg[3] - sg[1], L2 = dx * dx + dz * dz || 1e-9, lim = sg[4] + sg[6] + 3;
+    let u = ((mx - sg[0]) * dx + (mz - sg[1]) * dz) / L2; u = u < 0 ? 0 : u > 1 ? 1 : u;
+    const ex = mx - sg[0] - dx * u, ez = mz - sg[1] - dz * u;
+    if (ex * ex + ez * ez > (lim + h2) * (lim + h2)) continue;
+    for (let k = 0; k < 2 && !near; k++) {
+      const px = k ? bx : ax, pz = k ? bz : az;
+      let v = ((px - sg[0]) * dx + (pz - sg[1]) * dz) / L2; v = v < 0 ? 0 : v > 1 ? 1 : v;
+      const qx = px - sg[0] - dx * v, qz = pz - sg[1] - dz * v;
+      if (qx * qx + qz * qz <= lim * lim) near = true;
+    }
+    if (near) break;
   }
-  if (best > 3) return false;
+  if (!near) return false;
   let free = 0;
   for (const t of [0.2, 0.5, 0.8]) {
     const o = fabricAt(ax + (bx - ax) * t + nx * 1.2, az + (bz - az) * t + nz * 1.2);
@@ -1014,7 +1023,7 @@ export function buildRealFabric(scene, ctx) {
       const wideF = kind === EDGE.FRONT && rcP < 0 && nb >= 3 && fl <= 5 && tubeLike ? 16 : 0;
       // cạnh không phải mặt phố: rc = 1 ⇔ tường hông/sau/chung LỘ ra phố (exposedSide → shader bộ XP; W3-C)
       let rc = rcP >= 0 ? rcP : kind === EDGE.FRONT ? frontClass((ax + bx) / 2, (az + bz) / 2, nx, nz)
-        : (L >= 1.5 && rs !== STYLE.SHED && exposedSide(ax, az, bx, bz, nx, nz, b)) ? 1 : 0;
+        : ((kind === EDGE.SIDE || kind === EDGE.BACK) && L >= 1.5 && rs !== STYLE.SHED && exposedSide(ax, az, bx, bz, nx, nz, b)) ? 1 : 0;
       if (kind !== EDGE.FRONT && rc) st.exposed++;
       if (hasInfo && kind === EDGE.FRONT && rcP < 0 && !wideF) { const use = (D.info[b] >> INFO.USE_SHIFT) & 3; if (use === INFO.USE_HOME) rc = 3; else if (use === INFO.USE_SHOP) rc = 0; }
       const kb = kind | bigFlag | wideF | pitchFlag | (rc << 6);

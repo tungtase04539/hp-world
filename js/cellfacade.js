@@ -52,7 +52,7 @@ export function cellCanvasFx(img) {
   // mặt tiền 1 màu BÃO HOÀ (xanh hoàng gia UBND pano_138, đỏ BIDV 046): giảm bão hoà — màu thương hiệu chỉ hợp ở biển
   const f = L < 0.22 ? 'brightness(1.6) saturate(0.8)' : _lastSat > 0.55 ? 'saturate(0.45) brightness(1.08)' : 'none';
   // (thử 'lighten' nâng điểm tối lên kính xám-xanh: cửa chớp nâu → tím hồng (pano_157 h0) — BỎ; chỉ giữ filter. Cửa sổ
-  // ĐEN của mặt tiền vẽ tay nay sửa TẠI NGUỒN: drawFacadeWindows bên dưới.)
+  // ĐEN của mặt tiền vẽ tay nay sửa TẠI NGUỒN: gridFacadeSpec/paintGridFacade bên dưới.)
   return f === 'none' ? null : { filter: f, dark: L < 0.22, sat: +_lastSat.toFixed(2) };
 }
 
@@ -131,44 +131,131 @@ totalEmissiveRadiance *= (1.0 - hpFrame) * (hpPane < 0.3 ? 0.25 : 1.0);`)
   return m;
 }
 
-// ---- MẶT TIỀN VẼ TAY (world.js lmFacade / facadeTex) ----
+// ---- MẶT TIỀN VẼ TAY (world.js: ~25 helper xxFacade trong khối ô + facadeTex) ----
 // Trước: ô cửa sổ = HÌNH CHỮ NHẬT ĐẶC màu winCss (thường xanh than '#3f5a6b'/'#274a72') trên ảnh 256 px cho cả mặt nhà
-// 20-40 m → "lỗ vuông đen"/"cửa sổ nhoè" (pano_161 h180, 391, 409, 510, 060). Nay: khung bao sáng hơn tường, gờ bệ cửa đổ bóng,
-// vạch sàn mờ; winCss ẤM (nâu/vàng đất, tối) → CỬA CHỚP gỗ lá sách; còn lại → KÍNH: dải màu dọc (trên phản trời sáng, dưới
-// tối) + đố chữ thập + vệt bóng chéo; winCss SÁNG (khung trắng trên tường đậm) → khung = winCss, kính xám-xanh. Xác định.
-const _rgb = (css) => { const v = parseInt(String(css).replace('#', '').slice(0, 6), 16) || 0; return [(v >> 16) & 255, (v >> 8) & 255, v & 255]; };
-const _mix = (a, b, t) => `rgb(${Math.round(a[0] + (b[0] - a[0]) * t)},${Math.round(a[1] + (b[1] - a[1]) * t)},${Math.round(a[2] + (b[2] - a[2]) * t)})`;
+// 20-40 m → "lỗ vuông đen"/"cửa sổ nhoè" (pano_161 h180, 391, 409, 510, 060). Hơn 20 bản sao helper giống hệt nhau → sửa ở
+// MỘT chỗ: cellsink.materialize chạy hàm vẽ gốc trên ngữ cảnh GHI (gridFacadeSpec); nếu đúng mẫu "nền phủ kín + lưới cửa sổ
+// một màu (chữ nhật/vòm)" thì VẼ LẠI ở 2× độ phân giải bằng paintGridFacade (giữ nguyên vị trí/cỡ từng cửa): khung bao sáng
+// hơn tường, bóng dưới bệ, vạch sàn mờ; winCss ẤM tối (nâu/vàng đất) → CỬA CHỚP lá sách; còn lại → KÍNH (dải dọc: trên phản
+// trời, dưới tối) + đố chữ thập + vệt bóng chéo; winCss SÁNG (khung trắng trên tường đậm) → khung = winCss, kính xám-xanh.
+// Không khớp mẫu (có chữ, gradient, nét, ≥2 màu, chạm mép — caro/rào/sọc) → vẽ gốc như cũ. Xác định.
 const SKY = [200, 214, 224], DEEP = [30, 42, 51], WHITE = [255, 255, 255], FRAME_D = [70, 74, 78];
-export function drawFacadeWindows(g, w, h, baseCss, winCss, cols, rows) {
-  g.fillStyle = baseCss; g.fillRect(0, 0, w, h);
-  const B = _rgb(baseCss), W = _rgb(winCss);
-  const lum = (0.2126 * W[0] + 0.7152 * W[1] + 0.0722 * W[2]) / 255;
-  const shutter = W[0] > W[2] + 18 && lum < 0.55, lightWin = lum > 0.62;
-  const mx = w * 0.12, my = h * 0.12, cw = (w - mx * 2) / cols, ch = (h - my * 2) / rows;
-  g.fillStyle = 'rgba(0,0,0,0.07)';                                          // vạch sàn (gờ bê tông đổ bóng mờ)
-  for (let r = 1; r < rows; r++) g.fillRect(0, my + r * ch - 1, w, Math.max(2, h / 256));
-  const frame = lightWin ? winCss : _mix(B, WHITE, 0.38);
-  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
-    const x0 = mx + c * cw + cw * 0.16, y0 = my + r * ch + ch * 0.16, ww = cw * 0.68, wh = ch * 0.66;
-    const f = Math.max(1, ww * 0.07), lw = Math.max(1, ww * 0.045);
-    g.fillStyle = frame; g.fillRect(x0 - f, y0 - f, ww + 2 * f, wh + 2 * f);   // khung bao
-    g.fillStyle = 'rgba(0,0,0,0.2)'; g.fillRect(x0 - f, y0 + wh + f, ww + 2 * f, Math.max(1, f));   // bóng dưới bệ cửa
-    if (shutter) {                                                                // cửa chớp lá sách 2 cánh
-      g.fillStyle = winCss; g.fillRect(x0, y0, ww, wh);
-      g.fillStyle = 'rgba(0,0,0,0.22)';
-      for (let y = y0 + 2; y < y0 + wh; y += Math.max(2, wh / 14)) g.fillRect(x0, y, ww, Math.max(1, wh / 50));
-      g.fillStyle = 'rgba(0,0,0,0.35)'; g.fillRect(x0 + ww / 2 - lw / 2, y0, lw, wh);
-    } else {
-      const glassTop = lightWin ? [93, 117, 132] : W;
-      const gr = g.createLinearGradient(0, y0, 0, y0 + wh);
-      gr.addColorStop(0, _mix(glassTop, SKY, lightWin ? 0.35 : 0.55));
-      gr.addColorStop(0.55, _mix(glassTop, SKY, 0.18));
-      gr.addColorStop(1, _mix(glassTop, DEEP, 0.3));
-      g.fillStyle = gr; g.fillRect(x0, y0, ww, wh);
-      g.fillStyle = 'rgba(255,255,255,0.09)';                                    // vệt phản chiếu chéo
-      g.beginPath(); g.moveTo(x0 + ww * 0.15, y0 + wh); g.lineTo(x0 + ww * 0.55, y0); g.lineTo(x0 + ww * 0.75, y0); g.lineTo(x0 + ww * 0.35, y0 + wh); g.closePath(); g.fill();
-      g.fillStyle = lightWin ? winCss : _mix(FRAME_D, B, 0.35);                  // đố chữ thập
-      g.fillRect(x0 + ww / 2 - lw / 2, y0, lw, wh); g.fillRect(x0, y0 + wh * 0.32 - lw / 2, ww, lw);
-    }
+function _rgb(css) {
+  const c = String(css).trim();
+  let m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(c);
+  if (m) { const h = m[1].length === 3 ? m[1].replace(/./g, (x) => x + x) : m[1]; const v = parseInt(h, 16); return [(v >> 16) & 255, (v >> 8) & 255, v & 255]; }
+  m = /^rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)\s*(?:[,/]\s*([\d.]+)\s*)?\)$/i.exec(c);
+  if (m && (m[4] === undefined || +m[4] >= 0.999)) return [+m[1], +m[2], +m[3]];
+  return null;   // tên màu / trong suốt → không đụng
+}
+const _css = (a) => `rgb(${Math.round(a[0])},${Math.round(a[1])},${Math.round(a[2])})`;
+const _mix = (a, b, t) => _css([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]);
+function _look(B, Wc) {
+  const lum = (0.2126 * Wc[0] + 0.7152 * Wc[1] + 0.0722 * Wc[2]) / 255;
+  const shutter = Wc[0] > Wc[2] + 18 && lum < 0.55, light = lum > 0.62;
+  return { shutter, light, frame: light ? _css(Wc) : _mix(B, WHITE, 0.38), mull: light ? _css(Wc) : _mix(FRAME_D, B, 0.35), glassTop: light ? [93, 117, 132] : Wc };
+}
+function _glass(g, L, x0, y0, ww, wh) {
+  const gr = g.createLinearGradient(0, y0, 0, y0 + wh);
+  gr.addColorStop(0, _mix(L.glassTop, SKY, L.light ? 0.35 : 0.55));
+  gr.addColorStop(0.55, _mix(L.glassTop, SKY, 0.18));
+  gr.addColorStop(1, _mix(L.glassTop, DEEP, 0.3));
+  g.fillStyle = gr; g.fillRect(x0, y0, ww, wh);
+  g.fillStyle = 'rgba(255,255,255,0.09)';                                      // vệt phản chiếu chéo
+  g.beginPath(); g.moveTo(x0 + ww * 0.15, y0 + wh); g.lineTo(x0 + ww * 0.55, y0); g.lineTo(x0 + ww * 0.75, y0); g.lineTo(x0 + ww * 0.35, y0 + wh); g.closePath(); g.fill();
+}
+function _win(g, L, winCss, x0, y0, ww, wh) {
+  const f = Math.max(0.6, Math.min(ww, wh) * 0.07), lw = Math.max(0.5, ww * 0.045);
+  g.fillStyle = L.frame; g.fillRect(x0 - f, y0 - f, ww + 2 * f, wh + 2 * f);   // khung bao
+  g.fillStyle = 'rgba(0,0,0,0.2)'; g.fillRect(x0 - f, y0 + wh + f, ww + 2 * f, f);   // bóng dưới bệ cửa
+  if (L.shutter) {                                                              // cửa chớp lá sách 2 cánh
+    g.fillStyle = winCss; g.fillRect(x0, y0, ww, wh);
+    g.fillStyle = 'rgba(0,0,0,0.22)';
+    const st = Math.max(1, wh / 14);
+    for (let y = y0 + st * 0.5; y < y0 + wh; y += st) g.fillRect(x0, y, ww, Math.max(0.5, wh / 50));
+    g.fillStyle = 'rgba(0,0,0,0.35)'; g.fillRect(x0 + ww / 2 - lw / 2, y0, lw, wh);
+    return;
   }
+  _glass(g, L, x0, y0, ww, wh);
+  g.fillStyle = L.mull;                                                         // đố chữ thập
+  g.fillRect(x0 + ww / 2 - lw / 2, y0, lw, wh); g.fillRect(x0, y0 + wh * 0.32 - lw / 2, ww, lw);
+}
+function _trace(g, path) {
+  g.beginPath();
+  for (const s of path) {
+    if (s[0] === 'm') g.moveTo(s[1], s[2]);
+    else if (s[0] === 'l') g.lineTo(s[1], s[2]);
+    else if (s[0] === 'a') g.arc(s[1], s[2], s[3], s[4], s[5], s[6]);
+    else g.closePath();
+  }
+}
+function _bbox(path) {
+  let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+  const add = (x, y) => { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; };
+  for (const s of path) { if (s[0] === 'm' || s[0] === 'l') add(s[1], s[2]); else if (s[0] === 'a') { add(s[1] - s[3], s[2] - s[3]); add(s[1] + s[3], s[2] + s[3]); } }
+  return [x0, y0, x1 - x0, y1 - y0];
+}
+// Ghi hàm vẽ gốc trên ngữ cảnh giả. Trả { base, win, rects, paths } nếu là "nền phủ kín + lưới cửa sổ 1 màu", ngược lại null.
+export function gridFacadeSpec(draw, W, H) {
+  const ops = [];
+  let fill = '#000000', bad = false, path = null;
+  const ctx = new Proxy({}, {
+    get(o, p) {
+      if (p === 'fillStyle') return fill;
+      if (p === 'canvas') return { width: W, height: H };
+      if (p === 'fillRect') return (x, y, w, h) => { ops.push({ t: 'r', c: fill, x, y, w, h }); };
+      if (p === 'beginPath') return () => { path = []; };
+      if (p === 'moveTo' || p === 'lineTo') return (x, y) => { if (path) path.push([p === 'moveTo' ? 'm' : 'l', x, y]); else bad = true; };
+      if (p === 'arc') return (x, y, r, a0, a1, ccw) => { if (path) path.push(['a', x, y, r, a0, a1, !!ccw]); else bad = true; };
+      if (p === 'closePath') return () => { if (path) path.push(['z']); };
+      if (p === 'fill') return () => { if (path && path.length) ops.push({ t: 'p', c: fill, path }); path = null; };
+      bad = true; return () => {};     // chữ, gradient, nét, ảnh, alpha, biến đổi… → không phải lưới cửa sổ thuần
+    },
+    set(o, p, v) { if (p === 'fillStyle' && typeof v === 'string') fill = v; else bad = true; return true; },
+  });
+  try { draw(ctx, W, H); } catch (e) { return null; }
+  if (bad || ops.length < 3) return null;
+  const b = ops[0];
+  if (b.t !== 'r' || b.x > 0 || b.y > 0 || b.x + b.w < W || b.y + b.h < H) return null;
+  const win = ops[1].c;
+  if (win === b.c || !_rgb(b.c) || !_rgb(win)) return null;
+  const rects = [], paths = [];
+  let area = 0;
+  for (let i = 1; i < ops.length; i++) {
+    const o = ops[i]; if (o.c !== win) return null;
+    if (o.t === 'r') {
+      if (o.w <= 0 || o.h <= 0) return null;
+      if (o.x < W * 0.03 || o.y < H * 0.03 || o.x + o.w > W * 0.97 || o.y + o.h > H * 0.97) return null;   // chạm mép: caro/rào/sọc
+      if (o.w / o.h > 4 || o.h / o.w > 12 || o.h > H * 0.7) return null;
+      rects.push(o); area += o.w * o.h;
+    } else paths.push(o.path);
+  }
+  if (rects.length < 2 || area > 0.45 * W * H) return null;
+  return { base: b.c, win, rects, paths };
+}
+export function paintGridFacade(g, W, H, s) {
+  const B = _rgb(s.base), Wc = _rgb(s.win), L = _look(B, Wc);
+  g.fillStyle = s.base; g.fillRect(0, 0, W, H);
+  // vạch sàn mờ giữa các hàng cửa
+  const key = (r) => Math.round(r.y * 4) / 4;
+  const rows = [...new Set(s.rects.map(key))].sort((a, b) => a - b);
+  g.fillStyle = 'rgba(0,0,0,0.07)';
+  for (let i = 1; i < rows.length; i++) {
+    const rh = s.rects.find((r) => key(r) === rows[i - 1]).h;
+    g.fillRect(0, (rows[i - 1] + rh + rows[i]) / 2 - 0.5, W, Math.max(1, H / 256));
+  }
+  for (const r of s.rects) _win(g, L, s.win, r.x, r.y, r.w, r.h);
+  for (const p of s.paths) {                                                   // cửa vòm / ô quạt: khung = nét, kính cắt theo hình
+    const [x0, y0, ww, wh] = _bbox(p);
+    g.save(); _trace(g, p); g.strokeStyle = L.frame; g.lineWidth = Math.max(1, ww * 0.12); g.stroke(); g.clip();
+    if (L.shutter) { g.fillStyle = s.win; g.fillRect(x0, y0, ww, wh); } else _glass(g, L, x0, y0, ww, wh);
+    g.restore();
+  }
+}
+// facadeTex (world.js, ngoài khối ô — không qua cellsink): cùng bố cục cũ (lề 12%, cửa 68×66% ô) + cùng cách vẽ
+export function drawFacadeWindows(g, w, h, baseCss, winCss, cols, rows) {
+  const mx = w * 0.12, my = h * 0.12, cw = (w - mx * 2) / cols, ch = (h - my * 2) / rows, rects = [];
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) rects.push({ x: mx + c * cw + cw * 0.16, y: my + r * ch + ch * 0.16, w: cw * 0.68, h: ch * 0.66 });
+  if (!_rgb(baseCss) || !_rgb(winCss)) { g.fillStyle = baseCss; g.fillRect(0, 0, w, h); g.fillStyle = winCss; for (const r of rects) g.fillRect(r.x, r.y, r.w, r.h); return; }
+  paintGridFacade(g, w, h, { base: baseCss, win: winCss, rects, paths: [] });
 }
