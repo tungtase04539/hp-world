@@ -3,18 +3,23 @@
 // đen VIB 157 h180, BIDV đỏ 046) đều là MẢNG TƯỜNG/KÍNH LỚN của nhà ô (world.js khối cells) tô màu thương hiệu/kính tối
 // đặc trên cả mặt nhà. Dò bằng tia (tools pickprobe W3-C): mesh gộp màu đỉnh 0,02/0,02/0,02 và 0,02/0,11/0,39 (tuyến tính).
 // Luật: CHỈ mesh màu đặc (không texture, không màu đỉnh, không trong suốt) có hộp bao thế giới ≥ 3,5 m ngang × 2,5 m cao
-// (mảng tường/kính — không đụng biển, cột, viền, chi tiết nhỏ) → HSL (sRGB) kẹp: bão hoà ≤ 0,40, độ sáng 0,30..0,90.
+// (mảng tường/kính — không đụng biển, cột, viền, chi tiết nhỏ) → HSL (sRGB) kẹp THEO SẮC ĐỘ (sMaxOf): vàng đất/cam (h 15-65°,
+// tường ochre đặc trưng HP — pano thật bão hoà ~0,6) ≤ 0,62; đỏ ≤ 0,40; xanh dương/lá/tím (tường màu thương hiệu: UBND xanh
+// hoàng gia 138, TPBank tím 354, BaoViet 418) ≤ 0,32; độ sáng 0,30..0,90. (Bản đầu kẹp mọi sắc ≤ 0,40: tường ochre nhạt
+// thành be, xanh hoàng gia vẫn còn xanh đậm.)
 // Màu thương hiệu/biển vẫn giữ ở chi tiết nhỏ (biển, dải fascia). Material được NHÂN BẢN 1 lần cho mỗi material gốc
 // (cache) → freezeStatic vẫn gộp theo material như cũ (+ tối đa vài material). Xác định, không ngẫu nhiên.
 const _cache = new Map();
 const _hsl = { h: 0, s: 0, l: 0 };
-const S_MAX = 0.4, L_MIN = 0.3, L_MAX = 0.9;
+const L_MIN = 0.3, L_MAX = 0.9;
+// trần bão hoà theo sắc độ h (0..1): ấm (vàng đất/cam) 0,62 — đỏ 0,40 — lạnh (xanh/tím) 0,32
+const sMaxOf = (h) => { const d = h * 360; return d >= 15 && d <= 65 ? 0.62 : (d < 15 || d >= 330) ? 0.4 : 0.32; };
 
 function guarded(q, THREE) {
   if (_cache.has(q)) return _cache.get(q);
   let out = q;
   q.color.getHSL(_hsl, THREE.SRGBColorSpace);
-  const s = Math.min(_hsl.s, S_MAX), l = Math.min(L_MAX, Math.max(L_MIN, _hsl.l));
+  const s = Math.min(_hsl.s, sMaxOf(_hsl.h)), l = Math.min(L_MAX, Math.max(L_MIN, _hsl.l));
   if (Math.abs(s - _hsl.s) > 0.04 || Math.abs(l - _hsl.l) > 0.04) {
     out = q.clone();
     out.color.setHSL(_hsl.h, s, l, THREE.SRGBColorSpace);
@@ -134,15 +139,15 @@ function _rgb(css) {
   if (m && (m[4] === undefined || +m[4] >= 0.999)) return [+m[1], +m[2], +m[3]];
   return null;   // tên màu / trong suốt → không đụng
 }
-// palette guard màu nền mặt tiền (như guarded(): HSL bão hoà ≤ 0,40, sáng 0,30..0,90) — tường xanh hoàng gia/đỏ thương hiệu
-function _guardRGB(c) {
+// palette guard màu nền mặt tiền (như guarded(): trần bão hoà theo sắc độ, sáng 0,30..0,90); lMin/lMax để kẹp kính
+function _guardRGB(c, sCap = 1, lMin = L_MIN, lMax = L_MAX) {
   const r = c[0] / 255, gg = c[1] / 255, b = c[2] / 255, mx = Math.max(r, gg, b), mn = Math.min(r, gg, b), l = (mx + mn) / 2;
   let h = 0, sat = 0;
   if (mx > mn) {
     const d = mx - mn; sat = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
     h = mx === r ? (gg - b) / d + (gg < b ? 6 : 0) : mx === gg ? (b - r) / d + 2 : (r - gg) / d + 4; h /= 6;
   }
-  const S = Math.min(sat, S_MAX), Lc = Math.min(L_MAX, Math.max(L_MIN, l));
+  const S = Math.min(sat, sMaxOf(h), sCap), Lc = Math.min(lMax, Math.max(lMin, l));
   if (Math.abs(S - sat) < 0.04 && Math.abs(Lc - l) < 0.04) return c;
   const q = Lc < 0.5 ? Lc * (1 + S) : Lc + S - Lc * S, p = 2 * Lc - q;
   const f = (t) => { t = (t + 1) % 1; return t < 1 / 6 ? p + (q - p) * 6 * t : t < 0.5 ? q : t < 2 / 3 ? p + (q - p) * (2 / 3 - t) * 6 : p; };
@@ -153,7 +158,7 @@ const _mix = (a, b, t) => _css([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) *
 function _look(B, Wc) {
   const lum = (0.2126 * Wc[0] + 0.7152 * Wc[1] + 0.0722 * Wc[2]) / 255;
   const shutter = Wc[0] > Wc[2] + 18 && lum < 0.55, light = lum > 0.62;
-  return { shutter, light, frame: light ? _css(Wc) : _mix(B, WHITE, 0.38), mull: light ? _css(Wc) : _mix(FRAME_D, B, 0.35), glassTop: light ? [93, 117, 132] : Wc };
+  return { shutter, light, frame: light ? _css(Wc) : _mix(B, WHITE, 0.38), mull: light ? _css(Wc) : _mix(FRAME_D, B, 0.35), glassTop: light ? [93, 117, 132] : _guardRGB(Wc, 0.3, 0.12, 0.6) };   // kính: không mang màu tím/xanh đậm của winCss (TPBank 354)
 }
 function _glass(g, L, x0, y0, ww, wh) {
   const gr = g.createLinearGradient(0, y0, 0, y0 + wh);
