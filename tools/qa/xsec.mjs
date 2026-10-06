@@ -80,6 +80,9 @@ export async function runXsec(argv) {
       Object.assign(row, { ri: best.ri, c: r.c, w: +(2 * hw).toFixed(1), off: +Math.abs(best.v).toFixed(2), outCarr: Math.abs(best.v) > hw - 0.9, beyondKerb: Math.abs(best.v) > hw, flDyn: +(fl(r) - 0.5).toFixed(2) });
       // hướng nào gần VUÔNG GÓC phố (để in ngưỡng động spec)
       row.perp = [0, 90, 180, 270].filter((h) => { const t = (h * Math.PI) / 180; return Math.abs(Math.sin(t) * best.ux - Math.cos(t) * best.uz) < 0.5; });
+      // ngưỡng động spec theo hướng vuông góc, đã trừ lệch camera về phía đó: hw + vỉa − 0,5 ∓ v (n = pháp tuyến trái (−uz, ux))
+      row.dyn = {};
+      for (const h of row.perp) { const t = (h * Math.PI) / 180, dn = Math.sin(t) * -best.uz + -Math.cos(t) * best.ux; row.dyn[h] = +(fl(r) - 0.5 - Math.sign(dn) * best.v).toFixed(2); }
     }
     row.inside = insideGame(x, z);
     row.game = {}; row.ov = {}; row.flag = [];
@@ -88,6 +91,7 @@ export async function runXsec(argv) {
       row.game[h] = g == null ? null : +g.toFixed(1); row.ov[h] = o == null ? null : +o.toFixed(1);
       if (g != null && (o == null ? g < 10 : g < o - 1.5)) row.flag.push('close' + h + (gb >= 0 && D.flags[gb] & FLAG.SYNTH ? 'S' : 'R'));
       if (g != null && g < 4 && (o == null || o >= 6)) row.flag.push('near4_' + h);
+      if (g != null && row.dyn && row.dyn[h] != null && g < row.dyn[h]) row.flag.push('dyn' + h + (gb >= 0 && D.flags[gb] & FLAG.SYNTH ? 'S' : 'R'));
     }
     rows.push(row);
   }
@@ -102,6 +106,9 @@ export async function runXsec(argv) {
     camsNear4: cnt((r) => r.flag.some((f) => f.startsWith('near4'))),
     headingsCloseSynth: rows.reduce((s, r) => s + r.flag.filter((f) => /^close\d+S/.test(f)).length, 0),
     headingsCloseReal: rows.reduce((s, r) => s + r.flag.filter((f) => /^close\d+R/.test(f)).length, 0),
+    // hướng VUÔNG GÓC phố có mặt nhà game gần hơn ngưỡng động (hw + vỉa − 0,5 − lệch camera về phía đó): S = nhà sinh, R = thật
+    perpBelowDynSynth: rows.reduce((s, r) => s + r.flag.filter((f) => /^dyn\d+S/.test(f)).length, 0),
+    perpBelowDynReal: rows.reduce((s, r) => s + r.flag.filter((f) => /^dyn\d+R/.test(f)).length, 0),
   };
   return { stats: st, rows };
 }

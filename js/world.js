@@ -1413,7 +1413,16 @@ export async function buildWorld(scene, prog = () => {}) {
   {
     const stoneG = [], waterG = [];
     const FOUNT = [[-31,78.7],[276.4,-264.3],[559.2,-300.1],[525.1,-448.2],[685.4,-323.9],[705.6,-358.9],[697.7,-447.5],[295.1,-799.5]];
-    for (const [x, z] of FOUNT) {
+    // W3-A (AUDIT3 CAMOBS pano_359 "đài phun 4 m ở 5 m trước ống kính"): 8 toạ độ trên = ĐÚNG vị trí CAMERA pano thấy đài
+    // phun (249/359/341/454/231/232/545/020), không phải vị trí đài phun → quét W2-A chỉ đẩy ra ~3 m, đứng giữa khung. Đặt ra
+    // NGOÀI nón nhìn: ngoài lòng đường, cách MỌI camera ≥ 8 m, không trên nhà (footprint), đất khô — tìm từ camera ra theo pháp
+    // tuyến phố (≤ 16 m); không có chỗ → bỏ.
+    const { G: _fpG } = realBuildings();
+    const _fpAt = (x, z, r) => [[0, 0], [r, 0], [-r, 0], [0, r], [0, -r]].some(([ox, oz]) => _fpG.at(x + ox, z + oz) >= 0);
+    for (const [x0, z0] of FOUNT) {
+      const nd = clrNudge(x0, z0, 2.1, 16, (px, pz) => !clrNearPano(px, pz, 8) && !isWater(px, pz) && Math.abs(groundHeightNoDeck(px, pz) - LAND_H) < 0.4 && !_fpAt(px, pz, 2.2));
+      if (!nd) continue;
+      const [x, z] = nd;
       const gy = groundHeight(x, z); if (gy < LAND_H - 0.5 || isWater(x, z)) continue;
       const wall = new THREE.CylinderGeometry(2.0, 2.1, 0.55, 22); wall.translate(x, gy + 0.27, z); stoneG.push(wall);
       const inner = new THREE.CylinderGeometry(1.7, 1.7, 0.5, 22); inner.translate(x, gy + 0.24, z); // lòng
@@ -9415,8 +9424,38 @@ const cbWallMat = (tex, rep) => {
   if (!m) { const t = tex.clone(); t.repeat.set(q, 1); t.needsUpdate = true; m = new THREE.MeshLambertMaterial({ map: t }); _cbWallMats.set(k, m); }
   return m;
 };
-const cbWallRun = (pts, tex, name) => {
+// W3-A: polyline tường đặt tay theo mặt cắt CŨ (vỉa/lòng theo CẤP: facadeLine phố s 8,5 m) → nay lòng + vỉa theo phố thật
+// (xsection theo way: Trần Hưng Đạo vỉa 7,5 m, Lý Tự Trọng lòng 9 m) tường nằm TRONG vỉa hè → quét W2-A gỡ trọn đoạn 80 m
+// (pano_515 h090 mất tường mỏ neo; ảnh thật pano_225 h270: vỉa lát caro rộng ~12 m trước tường). Chia ≤ 16 m rồi đẩy từng
+// đỉnh ra SAU mặt tiền phố p/s/t/r gần nhất (facadeLine(way) + 0,35 nửa bề dày bệ); đỉnh đã đứng sau mặt tiền giữ nguyên.
+const cbFitFence = (P) => {
+  const Q = [];
+  for (let i = 0; i + 1 < P.length; i++) {
+    const [ax, az] = P[i], [bx, bz] = P[i + 1], n = Math.max(1, Math.ceil(Math.hypot(bx - ax, bz - az) / 16));
+    for (let k = 0; k < n; k++) Q.push([ax + (bx - ax) * k / n, az + (bz - az) * k / n]);
+  }
+  Q.push(P[P.length - 1].slice());
+  return Q.map(([x, z]) => {
+    let best = null;
+    for (const r of ROADS_DT) {
+      if (r.c !== 'p' && r.c !== 's' && r.c !== 't' && r.c !== 'r') continue;
+      for (let i = 0; i + 1 < r.pts.length; i++) {
+        const [ax, az] = r.pts[i], [bx, bz] = r.pts[i + 1];
+        if (Math.min(ax, bx) > x + 20 || Math.max(ax, bx) < x - 20 || Math.min(az, bz) > z + 20 || Math.max(az, bz) < z - 20) continue;
+        const dx = bx - ax, dz = bz - az, l2 = dx * dx + dz * dz || 1e-9;
+        const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / l2)), qx = ax + dx * t, qz = az + dz * t, d = Math.hypot(x - qx, z - qz);
+        if (!best || d < best.d) best = { d, qx, qz, r };
+      }
+    }
+    if (!best || best.d < 0.5 || best.d > 18) return [x, z];
+    const need = XS_FL(best.r) + 0.35;
+    if (best.d >= need) return [x, z];
+    return [best.qx + (x - best.qx) * need / best.d, best.qz + (z - best.qz) * need / best.d];
+  });
+};
+const cbWallRun = (pts0, tex, name) => {
   const H = 2.6, TH = 0.4;
+  const pts = cbFitFence(pts0);
   const pillarG = [];
   for (let i = 0; i < pts.length - 1; i++) {
     const [ax, az] = pts[i], [bx, bz] = pts[i + 1];
