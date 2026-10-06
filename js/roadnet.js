@@ -1098,36 +1098,37 @@ export function buildRoadNet(ROADS_DT, deps) {
       const spl = xu.map((u) => u + 1.5);
       for (const [a, b, gA, gB] of pieces(u0, u1)) {
         const subs = []; { let s0 = a; for (let i = 0; i < spl.length; i++) if (spl[i] > s0 + 0.05 && spl[i] < b - 0.05) { subs.push([s0, spl[i]]); s0 = spl[i]; } subs.push([s0, b]); }
-        let S = null;
+        let Sfirst = null, Slast = null;   // mặt cắt đầu/cuối của cả mẩu (nắp đường cụt)
         for (const [sa, sb] of subs) {
           const iP = spl.findIndex((v) => Math.abs(v - sa) < 1e-6), iN = spl.findIndex((v) => Math.abs(v - sb) < 1e-6);
           const zebS = [iP >= 0 ? xu[iP] - 2.3 : zeb[0], iN >= 0 ? xu[iN] + 2.3 : zeb[1]];
           const pr = pat | seed | (iP >= 0 ? MK.ZEB0 : zFirst) | (iN >= 0 ? MK.ZEB1 : zLast);
           const Ss = sections(P, cum, sa, sb, sa === a && !gA ? sA.cut : null, sb === b && !gB ? sB.cut : null);
-          if (!S) S = Ss.slice(); else S.push(...Ss.slice(1));
-        for (let i = 0; i < Ss.length - 1; i++) {
-          const S1 = Ss[i], S2 = Ss[i + 1];
-          const y1 = S1.h + yR, y2 = S2.h + yR;
-          const p1a = off(S1, -hw), p1b = off(S1, hw), p2a = off(S2, -hw), p2b = off(S2, hw);
-          let pq = pr;
-          if (w.c === 'p' && (pq & (MK.CDBL | MK.CDY | MK.CDW)) && nearMedian((S1.x + S2.x) / 2, (S1.z + S2.z) / 2)) pq &= ~(MK.CDBL | MK.CDY | MK.CDW);
-          emit('roads', [[p1a[0], y1, p1a[1], S1.u, -hw], [p1b[0], y1, p1b[1], S1.u, hw], [p2b[0], y2, p2b[1], S2.u, hw], [p2a[0], y2, p2a[1], S2.u, -hw]],
-            quadTris, [0, 1, 0], [roadLayer, pq, hw], zebS);
-          if (cands.length) gapFill(w, p1a, p1b, p2a, p2b, y1, y2, cands);
-          if (!street) {   // ngõ: gờ 2 bên xuống đất (không có bó vỉa che)
-            for (const sg of [-1, 1]) {
-              const q1 = sg < 0 ? p1a : p1b, q2 = sg < 0 ? p2a : p2b;
-              face('roads', q1, q2, y1, S1.h - 0.05, y2, S2.h - 0.05, S1.mx * sg, S1.mz * sg, S1.u, S2.u, [RL.CURB, MK.FACE, 0]);
+          if (!Sfirst) Sfirst = Ss[0];
+          Slast = Ss[Ss.length - 1];
+          for (let i = 0; i < Ss.length - 1; i++) {
+            const S1 = Ss[i], S2 = Ss[i + 1];
+            const y1 = S1.h + yR, y2 = S2.h + yR;
+            const p1a = off(S1, -hw), p1b = off(S1, hw), p2a = off(S2, -hw), p2b = off(S2, hw);
+            let pq = pr;
+            if (w.c === 'p' && (pq & (MK.CDBL | MK.CDY | MK.CDW)) && nearMedian((S1.x + S2.x) / 2, (S1.z + S2.z) / 2)) pq &= ~(MK.CDBL | MK.CDY | MK.CDW);
+            emit('roads', [[p1a[0], y1, p1a[1], S1.u, -hw], [p1b[0], y1, p1b[1], S1.u, hw], [p2b[0], y2, p2b[1], S2.u, hw], [p2a[0], y2, p2a[1], S2.u, -hw]],
+              quadTris, [0, 1, 0], [roadLayer, pq, hw], zebS);
+            if (cands.length) gapFill(w, p1a, p1b, p2a, p2b, y1, y2, cands);
+            if (!street) {   // ngõ: gờ 2 bên xuống đất (không có bó vỉa che)
+              for (const sg of [-1, 1]) {
+                const q1 = sg < 0 ? p1a : p1b, q2 = sg < 0 ? p2a : p2b;
+                face('roads', q1, q2, y1, S1.h - 0.05, y2, S2.h - 0.05, S1.mx * sg, S1.mz * sg, S1.u, S2.u, [RL.CURB, MK.FACE, 0]);
+              }
             }
           }
-        }
         }
         const capAt = (Sx, dirSign) => {   // nắp cuối dải (đường cụt, miệng ngõ, mép sông)
           const p1 = off(Sx, -hw), p2 = off(Sx, hw), y = Sx.h + yR;
           face('roads', p1, p2, y, Sx.h - 0.05, y, Sx.h - 0.05, Sx.dx * dirSign, Sx.dz * dirSign, -hw, hw, [RL.CURB, MK.FACE, 0]);
         };
-        if (gA || (a === u0 && sA.capA)) capAt(S[0], -1);
-        if (gB || (b === u1 && sB.capA)) capAt(S[S.length - 1], 1);
+        if (gA || (a === u0 && sA.capA)) capAt(Sfirst, -1);
+        if (gB || (b === u1 && sB.capA)) capAt(Slast, 1);
       }
     }
     // ---- vỉa hè 2 bên ----
