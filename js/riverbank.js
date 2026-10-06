@@ -105,6 +105,9 @@ function toGeo(B) {
   g.setAttribute('color', new THREE.Float32BufferAttribute(B.c, 3));
   g.setAttribute('uv', new THREE.Float32BufferAttribute(B.u, 2));
   g.setIndex(B.idx);
+  // nhả mảng JS nguồn (đã chép sang typed array): closure trả về (keep/promSide…) giữ NGỮ CẢNH hàm dựng — mảng Buf
+  // nằm trong ngữ cảnh đó (hàm con dùng chung) ⇒ không nhả thì ~30 MB heap sống suốt phiên (đo heap sau gc: +54 → …)
+  B.p = B.n = B.c = B.u = B.idx = [];
   return g;
 }
 // hộp quay quanh y (đủ 5 mặt, không đáy)
@@ -510,6 +513,7 @@ export function buildRiverbanks(scene, deps) {
     }
     return false;
   } : () => false;
+  S.length = 0;   // mẫu bờ không còn dùng (closure keep/promSide giữ ngữ cảnh hàm)
   stats.promM = Math.round(stats.promM); stats.wildM = Math.round(stats.wildM); stats.stripM = Math.round(stats.stripM);
   stats.ms = Math.round(performance.now() - t0);
   return { stats, saplings, keep, promSide };   // (không trả mesh — xem bridges.js)

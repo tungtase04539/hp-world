@@ -76,6 +76,9 @@ function toGeo(B) {
   g.setAttribute('color', new THREE.Float32BufferAttribute(B.c, 3));
   g.setAttribute('uv', new THREE.Float32BufferAttribute(B.u, 2));
   g.setIndex(B.idx);
+  // nhả mảng JS nguồn (đã chép sang typed array): closure trả về (keep/promSide…) giữ NGỮ CẢNH hàm dựng — mảng Buf
+  // nằm trong ngữ cảnh đó (hàm con dùng chung) ⇒ không nhả thì ~30 MB heap sống suốt phiên (đo heap sau gc: +54 → …)
+  B.p = B.n = B.c = B.u = B.idx = [];
   return g;
 }
 // dải "hộp" dọc polyline: mỗi đoạn i→i+1 nối 2 mặt cắt; prof = [[l, y], ...] (l ngang, + = phải), mặt nối các cặp liên tiếp
