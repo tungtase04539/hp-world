@@ -51,7 +51,7 @@ export function makeDeckIndex(ways) {
       each(x, z, 0.15, (y) => { if (y <= yRef + STEP_UP && y > best) best = y; });
       return best;
     },
-    topAt(x, z) { let best = -Infinity; each(x, z, 0.15, (y) => { if (y > best) best = y; }); return best; },
+    topAt(x, z, pad = 0.15) { let best = -Infinity; each(x, z, pad, (y) => { if (y > best) best = y; }); return best; },
     nearestAt(x, z) { let best = -Infinity, bd = Infinity; each(x, z, 0.15, (y, d) => { if (d < bd) { bd = d; best = y; } }); return best; },
     nearestInfo(x, z) { let best = -Infinity, bd = Infinity; each(x, z, 0.15, (y, d) => { if (d < bd) { bd = d; best = y; } }); return { y: best, d: bd }; },
     covers(x, z, pad = 0) { let hit = false; each(x, z, pad, () => { hit = true; }); return hit; },
@@ -122,17 +122,35 @@ const shade = (hex, f) => { const c = new THREE.Color(hex); return [c.r * f, c.g
 
 // texture mặt cầu: nhựa xám + vạch mép trắng liền + vạch giữa trắng đứt (làn một chiều 2 làn) — lặp dọc 12 m.
 // twoWay: tim VÀNG liền đôi (cầu phố 2 chiều — ảnh pano_074 h270 Cầu Lạc Long)
+// Texel ~ VUÔNG (256 px / bề rộng ~10 m ≈ 4 cm × 288 px / 12 m ≈ 4,2 cm): bản cũ 64 × 256 (16 × 4,7 cm) kéo hạt nhựa thành
+// VỆT hướng về camera (ảnh W3-F after2 pano_074 h0 / 285 h90 — mặt cầu như "nhoè chuyển động").
 function deckTexture(twoWay) {
-  const W = 64, H = 256;   // u ngang (0..1 = mép trái → mép phải), v dọc 12 m
+  const W = 256, H = 288;   // u ngang (0..1 = mép trái → mép phải), v dọc 12 m
   const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
   const g = cv.getContext('2d');
-  g.fillStyle = '#62615e'; g.fillRect(0, 0, W, H);
+  g.fillStyle = '#625f5a'; g.fillRect(0, 0, W, H);
   let s = 11; const rnd = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
-  for (let i = 0; i < 2600; i++) { const v = 100 + rnd() * 40 | 0; g.fillStyle = `rgba(${v},${v - 2},${v - 6},0.35)`; g.fillRect(rnd() * W, rnd() * H, 1, 1); }
-  g.fillStyle = '#e9e6dc';
-  g.fillRect(2, 0, 2, H); g.fillRect(W - 4, 0, 2, H);          // vạch mép
-  if (twoWay) { g.fillStyle = '#d9b23a'; g.fillRect(W / 2 - 2, 0, 1, H); g.fillRect(W / 2 + 1, 0, 1, H); }
-  else g.fillRect(W / 2 - 1, 0, 2, H * 0.4);                   // vạch giữa đứt (4,8 m / 12 m)
+  // mảng loang (vá, vệt bánh xe) lớn mờ → hạt cốt liệu nhỏ sáng/tối (phủ kín, không theo hướng)
+  for (let i = 0; i < 70; i++) {
+    const v = rnd() < 0.5 ? 0 : 255, r = 6 + rnd() * 26;
+    g.fillStyle = `rgba(${v},${v},${v},${0.025 + rnd() * 0.03})`;
+    g.beginPath(); g.ellipse(rnd() * W, rnd() * H, r, r * (0.6 + rnd() * 0.8), rnd() * 3, 0, Math.PI * 2); g.fill();
+  }
+  for (let i = 0; i < 7000; i++) {
+    const v = rnd() < 0.55 ? 78 + rnd() * 20 : 112 + rnd() * 28, sz = rnd() < 0.85 ? 1 : 2;
+    g.fillStyle = `rgba(${v | 0},${(v - 2) | 0},${(v - 6) | 0},${0.16 + rnd() * 0.2})`;
+    g.fillRect((rnd() * W) | 0, (rnd() * H) | 0, sz, sz);
+  }
+  // vệt bánh xe sẫm nhẹ giữa mỗi làn (2 làn: 1/4, 3/4 bề rộng)
+  for (const c of [0.25, 0.75]) for (const d of [-0.07, 0.07]) {
+    const gr = g.createLinearGradient(W * (c + d) - 10, 0, W * (c + d) + 10, 0);
+    gr.addColorStop(0, 'rgba(30,28,26,0)'); gr.addColorStop(0.5, 'rgba(30,28,26,0.10)'); gr.addColorStop(1, 'rgba(30,28,26,0)');
+    g.fillStyle = gr; g.fillRect(W * (c + d) - 10, 0, 20, H);
+  }
+  g.fillStyle = 'rgba(233,230,220,0.92)';
+  g.fillRect(5, 0, 4, H); g.fillRect(W - 9, 0, 4, H);          // vạch mép ~16 cm
+  if (twoWay) { g.fillStyle = '#d9b23a'; g.fillRect(W / 2 - 5, 0, 3, H); g.fillRect(W / 2 + 2, 0, 3, H); }
+  else g.fillRect(W / 2 - 2, 0, 4, H * 0.4);                   // vạch giữa đứt (4,8 m / 12 m)
   const t = new THREE.CanvasTexture(cv);
   t.wrapS = THREE.ClampToEdgeWrapping; t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8;
   t.colorSpace = THREE.SRGBColorSpace;

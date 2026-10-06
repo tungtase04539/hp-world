@@ -1203,7 +1203,7 @@ export function buildTrees(scene, ctx = {}) {
   const SG = new Map();
   for (const c of (ctx.colliders || [])) if (c.r <= 1.2) { const k = Math.floor(c.x / 8) * 100003 + Math.floor(c.z / 8); let a = SG.get(k); if (!a) SG.set(k, (a = [])); a.push(c); }
   const smallColNear = (x, z, own) => { const ci = Math.floor(x / 8), cj = Math.floor(z / 8); for (let i = ci - 1; i <= ci + 1; i++) for (let j = cj - 1; j <= cj + 1; j++) { const a = SG.get(i * 100003 + j); if (!a) continue; for (const c of a) if ((c.x - x) ** 2 + (c.z - z) ** 2 < (c.r + 0.55) ** 2 && !(own && own.includes(c))) return true; } return false; };   // own: collider của chính cây
-  const fix = { moved: 0, road: 0, fp: 0, dup: 0, pano: 0 };
+  const fix = { moved: 0, road: 0, fp: 0, dup: 0, pano: 0, deck: 0 };
   const DG = new Map(), dkey = (x, z) => Math.floor(x / 4) * 100003 + Math.floor(z / 4);
   const dupNear = (x, z, r) => { const ci = Math.floor(x / 4), cj = Math.floor(z / 4); for (let i = ci - 1; i <= ci + 1; i++) for (let j = cj - 1; j <= cj + 1; j++) { const a = DG.get(i * 100003 + j); if (!a) continue; for (let q = 0; q < a.length; q += 2) if ((a[q] - x) ** 2 + (a[q + 1] - z) ** 2 < r * r) return true; } return false; };
   // đoạn đường mà điểm lọt vào lòng (cách tim < nửa lòng − 0,3) — null nếu không
@@ -1239,6 +1239,7 @@ export function buildTrees(scene, ctx = {}) {
       if (!drop && !e.parent && fpG.at(x, z) >= 0) drop = 'fp';
       if (!drop && nearPano(x, z, PANO_CLEAR)) drop = 'pano';   // cây cell/hồ/OSM/vườn chưa qua lọc camera
       if (!drop && dupNear(x, z, 1.8)) drop = 'dup';
+      if (!drop && ctx.dropAt && ctx.dropAt(x, z)) drop = 'deck';   // W3-F: gốc dưới mặt cầu nâng thấp (thân/tán xuyên mặt cầu)
       if (drop) {
         fix[drop]++;
         if (!e.parent) { const c = (movedCols || colAt(e.x, e.z)).pop(); if (c) { c.x = 1e7; c.z = 1e7; } }   // 1 collider / cây bỏ (kể cả vừa dời)

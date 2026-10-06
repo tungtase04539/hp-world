@@ -985,6 +985,7 @@ export async function buildWorld(scene, prog = () => {}) {
     WATER, waterSD, roads: ROADS_DT.map((r, i) => (ELEVATED_RI.has(i) ? { c: r.c, pts: [] } : r)), LAND_H, R: BUILD_RADIUS + 40,
     hw: (c) => XS_ROAD_W[c] / 2, sw: (c) => SIDEWALK_W[c] || 0, keClear: (c) => Math.max(7, XS_ROAD_W[c] / 2 + (SIDEWALK_W[c] || 0) + 2.5),
     roadSurfaceAt: world.roadNet && world.roadNet.surfaceAt, lampGlow: sharedMats.lampGlow, addCollider, panoCams: PANO_CAM,
+    deckAt: (x, z) => DECKS.covers(x, z, 1.5),
   });
   console.log('[world] W3-F bờ kè sông:', JSON.stringify(world.riverbank.stats));
   // W3-F: claim 'bridge' dưới mặt cầu nâng (hộp ~12 m dọc way, rộng w + 2 m) → citygen giết footprint "nhà" Overture/OSM vốn là
@@ -20123,8 +20124,10 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
   // W3-F: phố ven SÔNG có dải dạo (world.riverbank.keep) KHÔNG trồng cây đường phố cổ thụ (ảnh pano_198-203/290-299: dải dạo
   // ven sông là CÂY NON chống cọc sau bão Yagi, phía nhà không cây) — luật "kè hồ rợp cổ thụ" (KNOWLEDGE §8b) chỉ cho HỒ
   const rbKeep = world.riverbank ? world.riverbank.keep : () => false;
-  // W3-F: không trồng cây đường phố DƯỚI mặt cầu nâng (gầm > 3 m — tán xuyên mặt cầu xoắn HVT, pano_349 h180)
-  const underDeck = (x, z) => DECKS.covers(x, z, 3) && DECKS.nearestAt(x, z) > groundHeight(x, z) + 3;
+  // W3-F: không trồng cây DƯỚI mặt cầu nâng thấp (gầm < 16 m: tán/thân xuyên mặt cầu — xoắn HVT pano_349 h180; cọ/cau,
+  // cây non đứng XUYÊN mặt Cầu Lạc Long +2 m pano_074 h0). Nhịp chính cao ~19 m: cây nhỏ dưới gầm vẫn được (ảnh 304 h90).
+  // Dùng cho cây đường phố (keepClear) VÀ mọi cây dựng tay/ô (buildTrees ctx.dropAt).
+  const underDeck = (x, z) => { const t = DECKS.topAt(x, z, 3); if (!(t > -1e9)) return false; const g = groundHeight(x, z); return t > g + 0.8 && t < g + 16; };
   veg.plantStreetTrees({ ROADS_DT: ROADS_GROUND, groundHeightNoDeck, isWater, addCollider, colliders, lakeSD, hdTreeBelt, R: BUILD_RADIUS, landH: LAND_H, keepClear: (x, z) => opKeep(x, z) || rbKeep(x, z) || underDeck(x, z), fpGrid: world.rbGrid });   // rbGrid: footprint đã đánh D.dead (WP2) — proc: undefined → trees tự giải mã
   if (world.riverbank) {
     let n = 0;
@@ -21267,7 +21270,8 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
 
   // DỰNG toàn bộ cây đã xếp hàng (cells + cell_tree + phố + hồ + công viên + vườn hoa) → InstancedMesh theo loài/LOD
   // fpData (W2-B): đỉnh footprint đi cùng rbGrid → tán cây cách mặt tiền ≥ 1,5 m (ép nửa tán phía tường, thân thẳng)
-  const trees = veg.buildTrees(scene, { groundHeight, R: BUILD_RADIUS, lakeSD, hdTreeBelt, colliders, fpGrid: world.rbGrid, fpData: world.rbData });
+  const trees = veg.buildTrees(scene, { groundHeight, R: BUILD_RADIUS, lakeSD, hdTreeBelt, colliders, fpGrid: world.rbGrid, fpData: world.rbData,
+    dropAt: underDeck });   // W3-F: cây (dựng tay/ô/hồ…) xuyên mặt cầu nâng thấp → bỏ
   world.trees = trees;                        // stats()/setSeason(0..1) — __hp.scene… hoặc world.trees.stats()
   world.treeBloomNear = trees.bloomNear;      // cánh phượng rơi quanh cây đang nở gần người chơi (petals.js)
   loadHeroTrees(trees);  // nạp GLB cây phượng ảnh-thật → LOD gần ≤150 m (bất đồng bộ)
@@ -21278,7 +21282,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
   world.props = buildProps({
     scene, LAND_H, ROADS_DT: ROADS_GROUND, groundHeightNoDeck, isWater, lakeSD, sharedMats, updaters, addCollider, colliders,
     featuredClear: FEATURED_CLEAR, reserved: propReserved, openSpace, nearPanoCam,
-    avoid: (x, z) => clearedZone(x, z) || inSuperblock(x, z) || (world.riverbank ? world.riverbank.promSide(x, z) : false),   // W3-F: dải dạo ven sông trống
+    avoid: (x, z) => clearedZone(x, z) || inSuperblock(x, z) || (world.riverbank ? world.riverbank.promSide(x, z) : false) || underDeck(x, z),   // W3-F: dải dạo ven sông trống; không cột/xe đỗ xuyên mặt cầu nâng thấp
     gardens: GARDENS, square: EXTRAS.square,
     footprints: world.rbGrid ? { D: world.rbData, grid: world.rbGrid } : null,   // WP2: footprint đã đánh D.dead (claims) → khỏi giải mã lần 2
     // chân prop chạm MẶT ĐANG VẼ: WP6 roadnet (vỉa mọi cấp +0,25) nếu đã gộp, không thì mặt layRoad cũ (vỉa p/s/t +0,18,

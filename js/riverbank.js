@@ -152,7 +152,7 @@ function railTexture() {
 
 // ---------------------------------------------------------------------------------------------------------------
 // deps: { WATER, waterSD, roads (ROADS_DT mặt đất), hw(c), sw(c), roadSurfaceAt, LAND_H, R, lampGlow (material đèn), addCollider,
-//         panoCams, keClear(c) (khoảng kè W3-F: hw + vỉa hè + 2,5) }
+//         panoCams, keClear(c) (khoảng kè W3-F: hw + vỉa hè + 2,5), deckAt(x,z) (có mặt cầu nâng phủ — không lan can/đèn dưới cầu) }
 export function buildRiverbanks(scene, deps) {
   const t0 = performance.now();
   const { WATER, waterSD, LAND_H = 2, R = 1650 } = deps;
@@ -216,6 +216,8 @@ export function buildRiverbanks(scene, deps) {
     }
     // dưới mặt cầu phẳng / phố đâm ra sông: có mặt đường NGAY mép nước → không lan can/đèn (tường kè vẫn có)
     s.bridge = deps.roadSurfaceAt ? deps.roadSurfaceAt(s.x + s.nx * 0.8, s.z + s.nz * 0.8) > 0 : false;
+    // dưới mặt cầu NÂNG (Lạc Long +2 m: roadnet bỏ dải mặt đất → roadSurfaceAt = 0) cũng không lan can/đèn/cây non
+    if (!s.bridge && deps.deckAt && deps.deckAt(s.x + s.nx * 0.8, s.z + s.nz * 0.8)) s.bridge = true;
   }
   // làm mượt phân loại: đoạn "dải dạo" ngắn < 6 m giữa bờ thường → bỏ; khe < 6 m giữa 2 đoạn dải dạo → lấp
   for (let i = 1; i < S.length - 1; i++) if (!S[i].road && S[i - 1].road && S[i + 1].road && S[i - 1].poly === S[i + 1].poly) S[i].road = S[i - 1].road;
@@ -225,7 +227,10 @@ export function buildRiverbanks(scene, deps) {
   stats.stripM = 0; stats.stripN = 0; stats.shacks = 0; stats.boats = 0;
   const C_TOP = rgb(0xbdb6a6), C_MID = rgb(0x968e7c), C_LOW = rgb(0x5d5a48), C_CAP = rgb(0xc9c3b4);
   const C_IRON = rgb(0x2c4a3a), C_LAMP = rgb(0x1f2a26);
-  const saplings = [], keepSegs = new Set(), lampGlobes = [];
+  // keepSegs: si → [t0, t1] quãng (m dọc đoạn phố) CÓ dải dạo — keep/promSide chỉ tác dụng trong quãng đó (+6 m): 1 đoạn
+  // ROADS_DT dài (Phố Tam Bạc 221 → 335, 190 m) vừa có dải dạo (đầu nam) vừa là dải bờ tự phát (đoạn bắc) — áp cả đoạn từng
+  // xoá hàng cổ thụ + xe máy đỗ phía sông ở pano_336/337/520 (12 → 4 cây, 30 → 13 xe trong 22 m)
+  const saplings = [], keepSegs = new Map(), lampGlobes = [];
   let lampAcc = 7, saplAcc = 4, bloomAcc = 11;
   const WF = -0.7;                        // mặt tường kè: 0,7 m về phía nước tính từ mép polygon
   for (let i = 0; i < S.length; i++) {
@@ -270,7 +275,10 @@ export function buildRiverbanks(scene, deps) {
     }
     if (mode === 'wild') { stats.wildM += s.L; continue; }
     stats.promM += s.L;
-    keepSegs.add(s.road.si);
+    {
+      const r = segs[s.road.si], t = (s.road.px - r.ax) * s.road.ux + (s.road.pz - r.az) * s.road.uz, k = keepSegs.get(s.road.si);
+      if (k) { if (t < k[0]) k[0] = t; if (t > k[1]) k[1] = t; } else keepSegs.set(s.road.si, [t, t]);
+    }
     // mặt lát dải dạo: ca-rô LIỀN từ gờ kè (+0,45) tới sát bó vỉa (d − hw − 0,15) — phủ luôn vỉa hè phố phía sông
     // (ảnh pano_203: cả dải giữa bó vỉa và lan can là ca-rô đỏ-xám), cao hơn mặt vỉa hè roadnet 1,2 cm
     const outer = s.road.d - deps.hw(s.road.c) - 0.15;
@@ -426,12 +434,20 @@ export function buildRiverbanks(scene, deps) {
     m.name = 'riverbank_globes'; scene.add(m); meshes.push(m);
   }
   // vùng KHÔNG trồng cây đường phố (phố ven sông có dải dạo: cả 2 phía)
+  // quãng có dải dạo của đoạn si chứa hình chiếu (x,z)? (tham số t 0..1 của đoạn; null = không)
+  const inKeep = (si, x, z) => {
+    const k = keepSegs.get(si); if (!k) return null;
+    const r = segs[si], dx = r.bx - r.ax, dz = r.bz - r.az, l2 = dx * dx + dz * dz; if (!l2) return null;
+    const l = Math.sqrt(l2), tm = ((x - r.ax) * dx + (z - r.az) * dz) / l;
+    if (tm < k[0] - 6 || tm > k[1] + 6) return null;
+    const t = tm / l; if (t < -0.05 || t > 1.05) return null;
+    return Math.max(0, Math.min(1, t));
+  };
   const keep = keepSegs.size ? (x, z) => {
     const a = G.get(gk(Math.floor(x / GC), Math.floor(z / GC))); if (!a) return false;
     for (const si of a) {
-      if (!keepSegs.has(si)) continue;
-      const r = segs[si], dx = r.bx - r.ax, dz = r.bz - r.az, l2 = dx * dx + dz * dz; if (!l2) continue;
-      let t = ((x - r.ax) * dx + (z - r.az) * dz) / l2; if (t < -0.05 || t > 1.05) continue; t = Math.max(0, Math.min(1, t));
+      const t = inKeep(si, x, z); if (t === null) continue;
+      const r = segs[si], dx = r.bx - r.ax, dz = r.bz - r.az;
       if (Math.hypot(x - r.ax - dx * t, z - r.az - dz * t) < deps.hw(r.c) + deps.sw(r.c) + 1.5) return true;
     }
     return false;
@@ -441,9 +457,8 @@ export function buildRiverbanks(scene, deps) {
   const promSide = keepSegs.size ? (x, z) => {
     const a = G.get(gk(Math.floor(x / GC), Math.floor(z / GC))); if (!a) return false;
     for (const si of a) {
-      if (!keepSegs.has(si)) continue;
-      const r = segs[si], dx = r.bx - r.ax, dz = r.bz - r.az, l2 = dx * dx + dz * dz; if (!l2) continue;
-      let t = ((x - r.ax) * dx + (z - r.az) * dz) / l2; if (t < -0.05 || t > 1.05) continue; t = Math.max(0, Math.min(1, t));
+      const t = inKeep(si, x, z); if (t === null) continue;
+      const r = segs[si], dx = r.bx - r.ax, dz = r.bz - r.az;
       const px = r.ax + dx * t, pz = r.az + dz * t;
       if (Math.hypot(x - px, z - pz) > deps.hw(r.c) + deps.sw(r.c) + 1.5) continue;
       if (waterSD(x, z) < waterSD(px, pz) - 0.5) return true;
