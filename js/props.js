@@ -1239,16 +1239,17 @@ export function buildProps(ctx) {
   }
   let carry = 0;
   for (const [S, cont, straightNext] of carSides) {
-    const e0 = S.ev[(S.n / 2) | 0];
-    const mx = S.ax + S.ux * S.L / 2, mz = S.az + S.uz * S.L / 2;
-    const lvl = e0 ? e0[3] : (Math.hypot(mx, mz) < 900 ? 1 : 0);
     // mức 0 CÓ pano (ảnh không thấy ô tô đỗ): 0,1 từng cho 68% pano "không ô tô" vẫn có xe ≤ 30 m (đo khớp bằng
     // chứng) → 0,04; mức 0 do KHÔNG có pano (ngoại vi > 900 m): s/t 0,1 → 0,2 (W3-E, FP-5 "nâng nền s/t không bằng chứng").
     // Phố r (W3-E): pano "ô tô đỗ ven đường" 0,1 → 0,4, "đỗ kín hai bên" 0,3 → 0,75 (pano_501/506/496/547/432: phố biệt
     // thự/khu dân cư kín ô tô 2 bên mà game trống); r không pano trong lõi 0,1 → 0,15.
-    let fill = S.c === 'r' ? (e0 ? [0.0, 0.4, 0.75][lvl] : [0.0, 0.15, 0.15][lvl]) : [e0 ? 0.04 : 0.2, 0.42, 0.78][lvl];
-    if (S.c === 'p' && !(e0 && e0[3] >= 1)) fill *= 0.7;   // đại lộ: bớt 30% — trừ khi pano thấy ô tô đỗ (005 Quang Trung)
-    if (fill <= 0) { carry = 0; continue; }
+    // W3-E: mức lấp tính TẠI TỪNG Ô ĐỖ theo pano gần nhất (≤ 60 m) — trước: 1 pano ở GIỮA đoạn polyline cho cả đoạn
+    // (Quang Trung = 1 đoạn thẳng 858 m: pano giữa đoạn "không ô tô" → 0,04 suốt phố, pano_005 ảnh thật 2 xe sát camera)
+    const fillAt = (x, z) => {
+      const e = evAt(x, z), lvl = e ? e[3] : (Math.hypot(x, z) < 900 ? 1 : 0);
+      const f = S.c === 'r' ? (e ? [0.0, 0.4, 0.75][lvl] : [0.0, 0.15, 0.15][lvl]) : [e ? 0.04 : 0.2, 0.42, 0.78][lvl];
+      return S.c === 'p' && !(e && e[3] >= 1) ? f * 0.7 : f;   // đại lộ: bớt 30% — trừ khi pano thấy ô tô đỗ
+    };
     const roll = S.c === 'r';
     const lat = roll ? curbLine(S.c) - 0.05 : curbLine(S.c) - 0.95;
     const X = XS(S.c);
@@ -1263,7 +1264,7 @@ export function buildProps(ctx) {
       const ex = evAt(x0, z0, 40);
       if (!roll && ex && (ex[9] & 32) && hash3(x0, z0, 109) < 0.7) mi = 6;
       const len = mi === 6 ? 11.4 : CAR_LEN[mi];
-      if (hc > fill) { s += len + 2 + hash3(x0, z0, 104) * 9; continue; }
+      if (hc >= fillAt(x0, z0)) { s += len + 2 + hash3(x0, z0, 104) * 9; continue; }
       const sc = s + len / 2;
       // xe phải nằm trọn trong đoạn (đầu xe chừa 1 m), trừ khi đoạn kế THẲNG hàng (< 12°): được chồm qua khớp tới 0,3 m cuối
       if (sc > S.L - (straightNext ? 0.3 : len / 2 + 1)) break;
