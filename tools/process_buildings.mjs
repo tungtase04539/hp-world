@@ -1706,6 +1706,9 @@ for (const o of OBS) {
   const b = B[o.bi];
   // cao ốc (≥ 7 tầng) chỉ khớp nhà có footprint đủ lớn — nhà ống 4×15 m không thể là "tòa văn phòng 12 tầng"
   if (o.floors >= 7 && b.area < 250) { stat('obs_tall_small_skipped'); continue; }
+  // W3-B (AUDIT3 HEIGHT "nhà kim" 152/023): quan sát ≥ 6 tầng (văn phòng/khách sạn/ngân hàng kính) rơi vào mảnh footprint
+  // < 9 m²/tầng (6 T → 54 m²) là tia chạm nhầm mảnh nhỏ trước công trình thật → bỏ (vd pano_152: mảnh 33 m² thành tháp kính 6 T)
+  if (o.floors >= 6 && b.area < 9 * o.floors) { stat('obs_tall_needle_skipped'); continue; }
   nObsHit++;
   (b.obs = b.obs || []).push(o);
   // dãy nhà (bề rộng quan sát ≥ 12 m): lan sang lô mặt phố cùng phía trong ±width/2 dọc phố
@@ -1880,7 +1883,7 @@ for (const b of B) {
   // W3-B (AUDIT3 HEIGHT "nhà kim"/biệt thự 8-10 tầng: 152, 023, 225): đuôi 7-8 tầng bốc thăm KHÔNG cho lô hẹp < 90 m² (thật:
   // nhà ống 5-6 tầng là trần trên nền 4×15 m) và KHÔNG cho mặt phố khuôn viên / vùng biệt thự (≤ 4 tầng) khi không có số đo.
   // Không cộng "+1 tầng phố thương mại": trung bình số tầng mặt phố ≤ 25 m quanh 436 pano = 3,00 vs quan sát pano 3,06.
-  if (!fixed && b.area < 90) floors = Math.min(floors, 6);
+  if (!fixed && b.area < 90) floors = Math.min(floors, b.area < 60 ? 5 : 6);   // lô < 60 m² (≈ 4×15 m): ≤ 5 tầng
   if (!fixed && b.fronts.length && (pkk === 'compound' || zoneAt(cx, cz, nameAt) === 'villa')) floors = Math.min(floors, 4);
   if (b.synth) floors = Math.min(floors, b.interior ? 5 : 7);   // nhà SINH không bao giờ là cao ốc (cao ốc thật có footprint thật)
   if (b.shallow) floors = Math.min(floors, 3);                   // khối cơi nới nông trước nhà lùi: 1-3 tầng

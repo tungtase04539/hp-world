@@ -17,7 +17,7 @@ import { RB_PARCELS } from './buildings_real.js';
 export const PWALL = { MASONRY: 0, FENCE: 1, HOARD: 2, LOTWALL: 3 };
 // màu (sRGB): 0 vàng Hải Phòng, 1 trắng kem, 2 xám bê tông, 3 xanh nhạt, 4 gạch đỏ, 5 tôn xanh dương, 6 tôn xanh lá,
 // 7 tôn đỏ, 8 tôn kẽm xám gỉ
-const COLS = [0xe2c682, 0xe9e5d8, 0xb5b2aa, 0xa9bba2, 0xa8644f, 0x5f8ab4, 0x679470, 0xa94a3b, 0xc3c6c3];
+const COLS = [0xe2c682, 0xe9e5d8, 0xc6c2b8, 0xb3c4ab, 0xb06b55, 0x6a95bf, 0x72a07b, 0xb35444, 0xcfd2cf];
 const hash = (a, b) => { const s = Math.sin(a * 12.9898 + b * 78.233) * 43758.5453; return s - Math.floor(s); };
 
 // ---------- texture: 4 HÀNG (v) lặp theo u — 0 vữa trát, 1 tôn sóng, 2 bê tông tấm, 3 gạch/tường cũ ----------
@@ -28,29 +28,30 @@ function solidTexture() {
   const RH = H / ROWS;
   let seed = 7;
   const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
-  // nền xám sáng (màu thật = vertex colour × texture)
-  g.fillStyle = '#e8e8e8'; g.fillRect(0, 0, W, H);
+  // nền gần TRẮNG (màu thật = vertex colour × texture; texture chỉ mang hạt/vệt — trung bình ≈ 0,93 sRGB. Bản đầu nền e8 + hạt
+  // 200-250 → tường lô xám trong bóng chỉ 38/255, tối hơn hẳn mặt tiền nhà cùng hướng 70-115: ánh sáng vật lý, bóng chỉ có trời)
+  g.fillStyle = '#f3f3f3'; g.fillRect(0, 0, W, H);
   // 0 VỮA TRÁT: hạt + vệt nước mưa chảy từ đỉnh + chân tường ố bẩn
   { const y0 = 0;
-    for (let i = 0; i < 2500; i++) { const v = 200 + rnd() * 50; g.fillStyle = `rgb(${v},${v},${v})`; g.fillRect(rnd() * W, y0 + rnd() * RH, 1 + rnd() * 2, 1 + rnd() * 2); }
+    for (let i = 0; i < 2500; i++) { const v = 218 + rnd() * 37; g.fillStyle = `rgb(${v},${v},${v})`; g.fillRect(rnd() * W, y0 + rnd() * RH, 1 + rnd() * 2, 1 + rnd() * 2); }
     for (let i = 0; i < 14; i++) { const x = rnd() * W, w = 3 + rnd() * 9, h = RH * (0.15 + rnd() * 0.45); const gr = g.createLinearGradient(0, y0, 0, y0 + h); gr.addColorStop(0, 'rgba(70,65,55,0.32)'); gr.addColorStop(1, 'rgba(70,65,55,0)'); g.fillStyle = gr; g.fillRect(x, y0 + 4, w, h); }
     const gb = g.createLinearGradient(0, y0 + RH * 0.7, 0, y0 + RH); gb.addColorStop(0, 'rgba(60,55,45,0)'); gb.addColorStop(1, 'rgba(60,55,45,0.45)'); g.fillStyle = gb; g.fillRect(0, y0 + RH * 0.7, W, RH * 0.3);
     g.fillStyle = 'rgba(40,40,40,0.25)'; g.fillRect(0, y0, W, 3); }
   // 1 TÔN SÓNG: gân dọc (bước 16 px = 1/16 ô), sáng/tối theo sóng + vệt gỉ chảy từ đinh vít
   { const y0 = RH;
-    for (let x = 0; x < W; x++) { const s = 0.5 + 0.5 * Math.sin((x / W) * Math.PI * 2 * 16); const v = Math.round(172 + 78 * s); g.fillStyle = `rgb(${v},${v},${v})`; g.fillRect(x, y0, 1, RH); }
+    for (let x = 0; x < W; x++) { const s = 0.5 + 0.5 * Math.sin((x / W) * Math.PI * 2 * 16); const v = Math.round(196 + 58 * s); g.fillStyle = `rgb(${v},${v},${v})`; g.fillRect(x, y0, 1, RH); }
     for (let i = 0; i < 18; i++) { const x = rnd() * W, h = RH * (0.2 + rnd() * 0.6), y = y0 + rnd() * RH * 0.3; const gr = g.createLinearGradient(0, y, 0, y + h); gr.addColorStop(0, 'rgba(120,60,25,0.45)'); gr.addColorStop(1, 'rgba(120,60,25,0)'); g.fillStyle = gr; g.fillRect(x, y, 2 + rnd() * 4, h); }
     g.fillStyle = 'rgba(30,30,30,0.35)'; for (const yy of [0.06, 0.94]) g.fillRect(0, y0 + RH * yy, W, 2);
     const gb = g.createLinearGradient(0, y0 + RH * 0.8, 0, y0 + RH); gb.addColorStop(0, 'rgba(70,60,45,0)'); gb.addColorStop(1, 'rgba(70,60,45,0.4)'); g.fillStyle = gb; g.fillRect(0, y0 + RH * 0.8, W, RH * 0.2); }
   // 2 BÊ TÔNG TẤM: mạch ngang/dọc + mảng ố loang + rêu chân
   { const y0 = 2 * RH;
-    for (let i = 0; i < 3000; i++) { const v = 190 + rnd() * 55; g.fillStyle = `rgb(${v},${v},${v - 4})`; g.fillRect(rnd() * W, y0 + rnd() * RH, 1 + rnd() * 3, 1 + rnd() * 2); }
-    for (let i = 0; i < 10; i++) { const r = 10 + rnd() * 40; const x = rnd() * W, y = y0 + rnd() * RH; const gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, 'rgba(60,62,55,0.25)'); gr.addColorStop(1, 'rgba(60,62,55,0)'); g.fillStyle = gr; g.fillRect(x - r, y - r, 2 * r, 2 * r); }
+    for (let i = 0; i < 3000; i++) { const v = 212 + rnd() * 40; g.fillStyle = `rgb(${v},${v},${v - 4})`; g.fillRect(rnd() * W, y0 + rnd() * RH, 1 + rnd() * 3, 1 + rnd() * 2); }
+    for (let i = 0; i < 10; i++) { const r = 10 + rnd() * 40; const x = rnd() * W, y = y0 + rnd() * RH; const gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, 'rgba(60,62,55,0.18)'); gr.addColorStop(1, 'rgba(60,62,55,0)'); g.fillStyle = gr; g.fillRect(x - r, y - r, 2 * r, 2 * r); }
     g.fillStyle = 'rgba(50,50,50,0.4)'; g.fillRect(0, y0 + RH * 0.5, W, 2); g.fillRect(W / 2, y0, 2, RH); g.fillRect(0, y0, 2, RH);
     const gb = g.createLinearGradient(0, y0 + RH * 0.75, 0, y0 + RH); gb.addColorStop(0, 'rgba(50,70,40,0)'); gb.addColorStop(1, 'rgba(50,70,40,0.5)'); g.fillStyle = gb; g.fillRect(0, y0 + RH * 0.75, W, RH * 0.25); }
   // 3 GẠCH / tường cũ: hàng gạch 8 px + mảng vữa bong
   { const y0 = 3 * RH;
-    for (let r = 0; r < RH / 8; r++) for (let k = -1; k < W / 24 + 1; k++) { const v = 180 + rnd() * 60; g.fillStyle = `rgb(${v},${v - 8},${v - 14})`; g.fillRect(k * 24 + (r % 2) * 12 + 1, y0 + r * 8 + 1, 22, 6); }
+    for (let r = 0; r < RH / 8; r++) for (let k = -1; k < W / 24 + 1; k++) { const v = 200 + rnd() * 50; g.fillStyle = `rgb(${v},${v - 8},${v - 14})`; g.fillRect(k * 24 + (r % 2) * 12 + 1, y0 + r * 8 + 1, 22, 6); }
     for (let i = 0; i < 8; i++) { const x = rnd() * W, y = y0 + rnd() * RH, w = 20 + rnd() * 50, h = 10 + rnd() * 30; g.fillStyle = 'rgba(225,222,212,0.8)'; g.fillRect(x, y, w, h); } }
   const t = new THREE.CanvasTexture(c);
   t.wrapS = THREE.RepeatWrapping; t.wrapT = THREE.ClampToEdgeWrapping;
@@ -272,7 +273,7 @@ export function buildParcels(scene, ctx = {}) {
     const y = (x, z) => gh(x, z);
     if (kind === PWALL.MASONRY || kind === PWALL.LOTWALL) {
       const H = kind === PWALL.MASONRY ? 2.1 + 0.4 * h : 2.4 + 0.4 * h, T = kind === PWALL.MASONRY ? 0.22 : 0.2;
-      const row = kind === PWALL.MASONRY ? 0 : (h < 0.6 ? 2 : 3), CC = kind === PWALL.LOTWALL ? lin(COLS[col] ?? COLS[2], 0.85 + 0.15 * h) : C;
+      const row = kind === PWALL.MASONRY ? 0 : (h < 0.6 ? 2 : 3), CC = kind === PWALL.LOTWALL ? lin(COLS[col] ?? COLS[2], 0.94 + 0.1 * h) : C;
       const bay = kind === PWALL.MASONRY ? 3.2 : 3.6, nb = Math.max(1, Math.round(L / bay)), bw = L / nb;
       for (let k = 0; k < nb; k++) {
         const [cx, cz] = at((k + 0.5) * bw), g0 = y(cx, cz);
@@ -310,7 +311,7 @@ export function buildParcels(scene, ctx = {}) {
       const H = 2.3 + 0.4 * h, T = 0.06, bay = 2.4, nb = Math.max(1, Math.round(L / bay)), bw = L / nb;
       for (let k = 0; k < nb; k++) {
         const [cx, cz] = at((k + 0.5) * bw), g0 = y(cx, cz);
-        const Ck = lin(COLS[col] ?? COLS[8], 0.85 + 0.25 * hash(cx, cz));
+        const Ck = lin(COLS[col] ?? COLS[8], 0.92 + 0.16 * hash(cx, cz));
         solid.box(cx, cz, ux, uz, bw, T, g0 - 0.2, g0 + H, Ck, 1, 1.6, true);
         segs.push([cx - ux * bw / 2, cz - uz * bw / 2, cx + ux * bw / 2, cz + uz * bw / 2, 0.08]);
       }

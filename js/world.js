@@ -41,6 +41,13 @@ import { SHOP_SIGNS } from './shopsigns.js';
 // ĐỢT 3 WP2: phố từ footprint THẬT (citygen.js) + sổ vùng giữ chỗ (claims.js) + footprint địa danh (landmark_polys.js)
 import { buildRealFabric, fabricData } from './citygen.js';
 import { buildParcels } from './parcels.js';   // Đợt 3 W3-B: tường rào/hàng rào/rào tôn + cổng của ô khuôn viên/đất trống
+import { nearestStreet as clrNearestStreet } from './clearance.js';
+// W3-B (AUDIT3 FP-2 mục 6 "cổng về ranh đất"): cổng/rào của ô dựng tay → lùi về MÉP SAU VỈA HÈ (facadeLine + 0,3 m + `front` =
+// phần nhô ra phố của cụm cổng). Tính lúc chạy từ phố gần nhất (W2-A clearance) → tự khớp khi mặt cắt phố đổi (W3-A).
+function propLineShift(x, z, front = 0.5) {
+  const s = clrNearestStreet(x, z, 25); if (!s || !s.street) return [0, 0];
+  const k = Math.max(0, s.fl + 0.3 + front - s.d); return [s.nx * k, s.nz * k];
+}
 import { claimPoly, claimBox, claimCircle } from './claims.js';
 import { LM_POLY, LM_CENTROID } from './landmark_polys.js';
 import { buildProps, layRoadSurfaceY } from './props.js';                 // Đợt 3 WP7: đồ đạc phố (xe máy/ô tô/cột điện/đèn/người)
@@ -6448,20 +6455,22 @@ const dlUmb = (x, z, hex) => {
     g.name = 'dl_dienluc'; dlDone(g, 340, -162, 0, 20);
     addCollider(340, -172, 8); addCollider(340, -152, 8);
     // cổng: 2 trụ gạch đỏ + giàn thép ngang + băng rôn đỏ + cổng xếp inox
-    const gy = groundHeight(358, -160);
+    // W3-B: cổng từng đứng LẤN vỉa hè Minh Khai (x 358 = 6,3 m từ tim, mặt tiền phố t 7 m) → lùi về mép sau vỉa hè (phố chạy
+    // Bắc-Nam: chỉ dời theo x)
+    const gX = 358 + propLineShift(358, -160, 0.45)[0], gy = groundHeight(gX, -160);
     for (const dz of [-5, 5]) {
       const p = new THREE.Mesh(new THREE.BoxGeometry(0.8, 4.6, 0.8), mat(0x9a4034));
-      p.position.set(358, gy + 2.3, -160 + dz); p.castShadow = true; scene.add(p);
-      addCollider(358, -160 + dz, 0.6);
+      p.position.set(gX, gy + 2.3, -160 + dz); p.castShadow = true; scene.add(p);
+      addCollider(gX, -160 + dz, 0.6);
     }
     const truss = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.28, 10.6), mat(0x8a8f92));
-    truss.position.set(358, gy + 4.8, -160); scene.add(truss);
+    truss.position.set(gX, gy + 4.8, -160); scene.add(truss);
     const bn = new THREE.Mesh(new THREE.PlaneGeometry(9.6, 1.0), dlSign('THỰC HIỆN TỐT LUẬT PHÒNG CHÁY CHỮA CHÁY', '#b3241c', '#ffe9b0', 24));
-    bn.position.set(358.15, gy + 3.7, -160); bn.rotation.y = Math.PI / 2; scene.add(bn);
+    bn.position.set(gX + 0.15, gy + 3.7, -160); bn.rotation.y = Math.PI / 2; scene.add(bn);
     const gate = new THREE.Mesh(new THREE.PlaneGeometry(8.6, 1.7), mat(0xc9ced2));
-    gate.position.set(358.05, gy + 0.9, -160); gate.rotation.y = Math.PI / 2; scene.add(gate); // cổng xếp inox
-    scene.add(dlFence(358, -180, 358, -166, 1.6, 0x3a3f45));
-    scene.add(dlFence(358, -154, 358, -140, 1.6, 0x3a3f45));
+    gate.position.set(gX + 0.05, gy + 0.9, -160); gate.rotation.y = Math.PI / 2; scene.add(gate); // cổng xếp inox
+    scene.add(dlFence(gX, -180, gX, -166, 1.6, 0x3a3f45));
+    scene.add(dlFence(gX, -154, gX, -140, 1.6, 0x3a3f45));
     // nhà cổng mái đỏ nhỏ 1T (ảnh: bên phải cổng)
     const hut = dlBlock(354, -147, Math.PI / 2, 6, 3.4, 5, mat(0xf2ede0), 'dl_dienluc_hut');
     dlHip(hut, 6.4, 5.4, 0x9a4034, 0, 3.7, 0);
@@ -13393,21 +13402,9 @@ const w2Umb = (x, z, hex) => {
 //     u=(0.9976,-0.0696); bờ BẮC quay NAM ry=0.070, base pano_461=(289.7,817.2). ===
 {
   const px = 289.7, pz = 817.2, ux = 0.9976, uz = -0.0696, nN = [-0.0696, -0.9976], nS = [0.0696, 0.9976], ryN = 0.070, ryS = -3.072;
-  // tòa chợ vàng cũ 2T (bờ BẮC) + giàn billboard VIFON trên mái + mái bạt sọc
+  // (W3-B: toà chợ vàng 2T 'w2_chocon_market' bờ BẮC đã BỎ — TRÙNG ô (9) CHỢ CON ở khối đầu (cùng toà chợ, cùng billboard;
+  //  cell sink vốn gỡ nó). Chỉ giữ sạp + ô dù trước chợ.)
   { const off = 4 + 2.0 + 7, cx = px + nN[0] * off, cz = pz + nN[1] * off;
-    // W3-B: TRÙNG với ô (9) CHỢ CON ở khối đầu (cùng toà chợ, cùng billboard) — cell sink vốn gỡ nó; bỏ hẳn cho tất định
-    // (giữ sạp + ô dù trước chợ ở dưới)
-    if (false && w2OK(cx, cz)) { const y = groundHeight(cx, cz), g = new THREE.Group(); g.position.set(cx, y, cz); g.rotation.y = ryN;
-      const body = new THREE.Mesh(new THREE.BoxGeometry(20, 7.2, 12), w2FacadeYellow()); body.position.y = 3.6; g.add(body);
-      // giàn khung sắt + 2 billboard VIFON
-      for (const sx of [-9.5, 9.5]) { const p = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 5, 6), mat(0x6a6f72)); p.position.set(sx, 9.5, 5); g.add(p); }
-      const bbR = new THREE.Mesh(new THREE.PlaneGeometry(9, 3), w2Sign('MÌ ĂN LIỀN', '#c01822', '#ffe08a', 28)); bbR.position.set(-5, 9.6, 5.2); g.add(bbR);
-      const bbB = new THREE.Mesh(new THREE.PlaneGeometry(9, 3), w2Sign('PHỞ BÒ ĂN LIỀN', '#1560b0', '#ffffff', 26)); bbB.position.set(5, 9.6, 5.2); g.add(bbB);
-      // mái bạt sọc xanh trước sạp
-      const awn = new THREE.Mesh(new THREE.BoxGeometry(19, 0.16, 3.2), mat(0x2f7db0)); awn.position.set(0, 4.0, 6 + 1.5); g.add(awn);
-      g.traverse((m) => { if (m.isMesh) m.castShadow = true; }); g.name = 'w2_chocon_market'; scene.add(g);
-      addCollider(cx, cz, 11); FEATURED_CLEAR.push([cx, cz, 16]);
-    }
     // sạp + ô dù trước chợ (KHÔNG collider)
     if (w2OK(cx, cz)) for (const [ax, uh] of [[-6, 0xd06a6a], [0, 0x5aa0c8], [6, 0xe0b84a]]) w2Umb(px + ux * ax + nN[0] * (4 + 1.5), pz + uz * ax + nN[1] * (4 + 1.5), uh);
   }
@@ -13474,8 +13471,8 @@ const w2Umb = (x, z, hex) => {
       const s = new THREE.Mesh(new THREE.PlaneGeometry(16, 1.4), w2Sign('BAN CHỈ HUY QUÂN SỰ QUẬN LÊ CHÂN', '#c01822', '#ffe08a', 26)); s.position.set(0, 3.2, D / 2 + 0.1); g.add(s);
       g.traverse((m) => { if (m.isMesh) m.castShadow = true; }); g.name = 'w2_banchqs'; scene.add(g);
       addCollider(cx, cz, 12); FEATURED_CLEAR.push([cx, cz, 20]); } }
-  // cổng + trụ + quốc huy + cờ + bảng tin ở mép phố (off ~7)
-  { const gx = px + nx * 7, gz = pz + nz * 7;
+  // cổng + trụ + quốc huy + cờ + bảng tin ở mép phố (off ~7; W3-B: lùi về mép sau vỉa hè — cờ nhô +0,6 m ra phố)
+  { const [gsx, gsz] = propLineShift(px + nx * 7, pz + nz * 7, 0.75), gx = px + nx * 7 + gsx, gz = pz + nz * 7 + gsz;
     if (w2OK(gx, gz)) { const y = groundHeight(gx, gz), g = new THREE.Group(); g.position.set(gx, y, gz); g.rotation.y = ry;
       for (const sx of [-3.5, 3.5]) { const pil = new THREE.Mesh(new THREE.BoxGeometry(0.9, 3.4, 0.9), mat(0x9e6a3a)); pil.position.set(sx, 1.7, 0); g.add(pil); }
       const gate = new THREE.Mesh(new THREE.BoxGeometry(6, 2.6, 0.2), mat(0x2f6f4a)); gate.position.set(0, 1.3, 0); g.add(gate);
