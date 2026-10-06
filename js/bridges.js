@@ -535,7 +535,6 @@ export function buildBridges(scene, deps) {
   }
 
   // ---- ráp mesh ----
-  const out = [];
   const addMesh = (B, mat, name) => {
     let g = toGeo(B);
     if (B.geos && B.geos.length) {
@@ -545,7 +544,7 @@ export function buildBridges(scene, deps) {
     }
     if (!g) return;
     const m = new THREE.Mesh(g, mat); m.name = name; m.castShadow = true; m.receiveShadow = true;
-    scene.add(m); out.push(m); stats.tris += (g.index ? g.index.count : g.attributes.position.count) / 3;
+    scene.add(m); stats.tris += (g.index ? g.index.count : g.attributes.position.count) / 3;
   };
   const vc = (hex) => new THREE.MeshLambertMaterial({ color: hex, vertexColors: true });
   addMesh(conc, vc(0xffffff), 'bridge_group_conc');
@@ -560,11 +559,12 @@ export function buildBridges(scene, deps) {
   const bp = toGeo(balPanel);
   if (bp) {
     const m = new THREE.Mesh(bp, new THREE.MeshLambertMaterial({ map: balTexture(), alphaTest: 0.5, side: THREE.DoubleSide }));
-    m.name = 'bridge_group_balpanel'; m.userData.noMerge = true; scene.add(m); out.push(m);
+    m.name = 'bridge_group_balpanel'; m.userData.noMerge = true; scene.add(m);
   }
   if (red.geos) addMesh({ p: [], n: [], c: [], u: [], idx: [], geos: red.geos }, new THREE.MeshLambertMaterial({ color: 0xc63a2c }), 'bridge_group_arch');
   if (cable.geos) addMesh({ p: [], n: [], c: [], u: [], idx: [], geos: cable.geos }, new THREE.MeshLambertMaterial({ color: 0xe2ddd4 }), 'bridge_group_cables');
   stats.ms = Math.round(performance.now() - t0);
   stats.tris = Math.round(stats.tris);
-  return { index, stats, meshes: out };
+  // KHÔNG trả mesh: freezeStatic gộp/tách ô rồi gỡ mesh gốc — giữ tham chiếu = giữ geometry gốc (JS) suốt phiên
+  return { index, stats };
 }

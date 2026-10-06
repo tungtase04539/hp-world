@@ -76,9 +76,13 @@ export function createTraffic(scene, world, opts = {}) {
   const nodeIn = nodes.map((n) => Math.hypot(n.x, n.z) <= PLAY_R + 30);
   // W3-F: cạnh trên mặt cầu NÂNG (HVT nhịp chính + nút xoắn): người đi bộ KHÔNG đi (làn đi bộ lệch ra ngoài mép mặt cầu →
   // rơi xuống sông/đất bên dưới) — đánh dấu khi > 1/2 điểm cạnh có mặt cầu cao hơn đất ≥ 2,5 m
+  // (groundHeight CHỈ gọi ở điểm có mặt cầu phủ — gọi cho mọi điểm mọi cạnh từng tốn ~150 ms bước 'actors')
   if (world.decks) for (const e of edges) {
     let hit = 0;
-    for (let k = 0; k < e.xs.length; k++) if (world.decks.nearestAt(e.xs[k], e.zs[k]) > groundHeight(e.xs[k], e.zs[k]) + 2.5) hit++;
+    for (let k = 0; k < e.xs.length; k++) {
+      const d = world.decks.nearestAt(e.xs[k], e.zs[k]);
+      if (d > -1e9 && d > groundHeight(e.xs[k], e.zs[k]) + 2.5) hit++;
+    }
     e.elev = hit * 2 > e.xs.length;
   }
 

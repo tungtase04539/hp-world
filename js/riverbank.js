@@ -21,13 +21,32 @@ const isRiverName = (n) => /^Sông/.test(n || '');
 
 // ---------------------------------------------------------------------------------------------------------------
 // (1) nắn lưới nền theo mép sông. geo: BufferGeometry lưới local (position y đã tính). waterSD(x,z): âm = trong nước.
-// skip(x,z): vùng không đụng (hộp lưới mịn hồ). Trả về số đỉnh đã nắn.
-export function snapBankGrid(geo, { step, waterSD, isRiverAt, skip, landY, recolor }) {
+// skip(x,z): vùng không đụng (hộp lưới mịn hồ). nx: số đỉnh/hàng (lọc thô), rMax: chỉ trong vùng polygon (R_POLY).
+// Trả về số đỉnh đã nắn.
+export function snapBankGrid(geo, { step, waterSD, isRiverAt, skip, landY, recolor, nx, rMax = Infinity }) {
   const pos = geo.attributes.position, B = 0.72 * step, H = 0.5;
   const wsnap = new Map();   // đỉnh NƯỚC đã kéo về mép: i → [x, z, sd gốc] (để hoàn tác nếu tạo tam giác đất phủ nước)
   let n = 0;
+  // lọc thô (nx = số đỉnh/hàng của lưới đều): chỉ đỉnh cách ≤ 4 ô một chỗ đổi khô/ướt THEO CAO ĐỘ ĐỈNH (y < 1 = ướt) mới cần
+  // waterSD (vùng xử lý: −B − 1,5 ô … +B ⇒ ≤ 2,3 ô từ mép) — bỏ ~85 % lần gọi waterSD trên lưới 301² (~40 ms bước 'ground')
+  let near = null;
+  if (nx && pos.count % nx === 0) {
+    const nz = pos.count / nx, wet = new Uint8Array(pos.count), t = new Uint8Array(pos.count), R = 4;
+    for (let i = 0; i < pos.count; i++) wet[i] = pos.getY(i) < 1.0 ? 1 : 0;
+    for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
+      const k = j * nx + i, w = wet[k];
+      if ((i + 1 < nx && wet[k + 1] !== w) || (j + 1 < nz && wet[k + nx] !== w)) { t[k] = 1; if (i + 1 < nx) t[k + 1] = 1; if (j + 1 < nz) t[k + nx] = 1; }
+    }
+    const h = new Uint8Array(pos.count); near = new Uint8Array(pos.count);   // giãn R ô (Chebyshev): hàng rồi cột
+    for (let j = 0; j < nz; j++) { let last = -1e9; for (let i = 0; i < nx; i++) { if (t[j * nx + i]) last = i; if (i - last <= R) h[j * nx + i] = 1; }
+      last = 1e9; for (let i = nx - 1; i >= 0; i--) { if (t[j * nx + i]) last = i; if (last - i <= R) h[j * nx + i] = 1; } }
+    for (let i = 0; i < nx; i++) { let last = -1e9; for (let j = 0; j < nz; j++) { if (h[j * nx + i]) last = j; if (j - last <= R) near[j * nx + i] = 1; }
+      last = 1e9; for (let j = nz - 1; j >= 0; j--) { if (h[j * nx + i]) last = j; if (last - j <= R) near[j * nx + i] = 1; } }
+  }
   for (let i = 0; i < pos.count; i++) {
+    if (near && !near[i]) continue;
     const x = pos.getX(i), z = pos.getZ(i);
+    if (x * x + z * z > rMax * rMax) continue;   // ngoài R_POLY nước theo POLYLINE (terrain) — polygon không quyết định bờ
     if (skip && skip(x, z)) continue;
     const sd = waterSD(x, z);
     if (sd >= B || sd < -B - step * 1.5) continue;
@@ -433,11 +452,10 @@ export function buildRiverbanks(scene, deps) {
     B.idx.push(o, o + 1, o + 2);
   }
   // ---- ráp mesh ----
-  const meshes = [];
   const add = (B, mat, name, cast = true) => {
     const g = toGeo(B); if (!g) return null;
     const m = new THREE.Mesh(g, mat); m.name = name; m.castShadow = cast; m.receiveShadow = true;
-    scene.add(m); meshes.push(m); return m;
+    scene.add(m); return m;
   };
   const vc = () => new THREE.MeshLambertMaterial({ color: 0xffffff, vertexColors: true });
   add(wall, vc(), 'riverbank_wall');
@@ -458,7 +476,7 @@ export function buildRiverbanks(scene, deps) {
   if (lampGlobes.length && deps.lampGlow) {
     const gs = lampGlobes.map(([x, y, z]) => { const g = new THREE.SphereGeometry(0.17, 8, 6); g.translate(x, y, z); return g; });
     const m = new THREE.Mesh(mergeGeometries(gs), deps.lampGlow); gs.forEach((g) => g.dispose());
-    m.name = 'riverbank_globes'; scene.add(m); meshes.push(m);
+    m.name = 'riverbank_globes'; scene.add(m);
   }
   // vùng KHÔNG trồng cây đường phố (phố ven sông có dải dạo: cả 2 phía)
   // quãng có dải dạo của đoạn si chứa hình chiếu (x,z)? (tham số t 0..1 của đoạn; null = không)
@@ -494,5 +512,5 @@ export function buildRiverbanks(scene, deps) {
   } : () => false;
   stats.promM = Math.round(stats.promM); stats.wildM = Math.round(stats.wildM); stats.stripM = Math.round(stats.stripM);
   stats.ms = Math.round(performance.now() - t0);
-  return { stats, saplings, keep, promSide, meshes };
+  return { stats, saplings, keep, promSide };   // (không trả mesh — xem bridges.js)
 }

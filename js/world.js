@@ -11,7 +11,7 @@ import {
   WORLD_BOUNDS, LM, LM_DIR, LM_FACE, EXTRAS, TREES, PARKS, RAIL, DT_BOX, ROADS_DT, BRIDGES, BUILDINGS,
   groundHeight, groundHeightNoDeck, isWater, landAt, riverFactor,
   nearestRiverPoint, findShore, addPier, LAKE_POLY, lakeSD, HOSEN_POLY, hoSenSD,
-  BRIDGE_WAYS, ELEVATED_RI, waterSD, WATER,
+  BRIDGE_WAYS, ELEVATED_RI, waterSD, WATER, R_POLY,
 } from './terrain.js';
 import { buildBridges, makeDeckIndex } from './bridges.js';   // Đợt 3 W3-F: cầu theo way OSM (HVT xoắn ốc, Lạc Long…)
 import { snapBankGrid, buildRiverbanks } from './riverbank.js';   // Đợt 3 W3-F: bờ kè sông (tường kè, dải dạo, lan can, đèn)
@@ -809,7 +809,7 @@ export async function buildWorld(scene, prog = () => {}) {
       const colA = local.geo.attributes.color.array;
       const nSnap = snapBankGrid(local.geo, { step: (2 * LOCAL_HALF) / N, waterSD, landY: LAND_H + 0.012,
         skip: (x, z) => FINE_BOXES.some(([x1, x2, z1, z2]) => x > x1 - 14 && x < x2 + 14 && z > z1 - 14 && z < z2 + 14),
-        recolor: (i, x, z) => vertexHC(x, z, colA, i) });
+        recolor: (i, x, z) => vertexHC(x, z, colA, i), nx: N + 1, rMax: R_POLY - 10 });
       console.log('[world] W3-F nắn bờ sông lưới nền:', nSnap, 'đỉnh');
     }
     // polygonOffset nhẹ: lưới local lùi sau trong depth so với các mặt lát +0.03 đặt trên nó (chống z-fight ở xa)
@@ -20149,8 +20149,23 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
   veg.plantStreetTrees({ ROADS_DT: ROADS_GROUND, groundHeightNoDeck, isWater, addCollider, colliders, lakeSD, hdTreeBelt, R: BUILD_RADIUS, landH: LAND_H, keepClear: (x, z) => opKeep(x, z) || rbKeep(x, z) || underDeck(x, z), fpGrid: world.rbGrid });   // rbGrid: footprint đã đánh D.dead (WP2) — proc: undefined → trees tự giải mã
   if (world.riverbank) {
     let n = 0;
-    for (const [x, z] of world.riverbank.saplings) {
-      if (isWater(x, z) || colliders.some((c) => Math.abs(c.x - x) < 1.2 && Math.abs(c.z - z) < 1.2 && (c.x - x) ** 2 + (c.z - z) ** 2 < (c.r + 0.6) ** 2)) continue;
+    // collider gần dải dạo: lọc 1 lần theo hộp bao các cây non (colliders.some cho từng cây quét ~20k collider × 234 cây)
+    const SP = world.riverbank.saplings;
+    let bx0 = 1e9, bx1 = -1e9, bz0 = 1e9, bz1 = -1e9;
+    for (const [x, z] of SP) { bx0 = Math.min(bx0, x); bx1 = Math.max(bx1, x); bz0 = Math.min(bz0, z); bz1 = Math.max(bz1, z); }
+    const CG = new Map();
+    for (const c of colliders) {
+      if (c.x < bx0 - 2 || c.x > bx1 + 2 || c.z < bz0 - 2 || c.z > bz1 + 2) continue;
+      const k = Math.floor(c.x / 4) * 100003 + Math.floor(c.z / 4); let a = CG.get(k); if (!a) CG.set(k, a = []); a.push(c);
+    }
+    const colNear = (x, z) => {
+      for (let i = Math.floor(x / 4) - 1; i <= Math.floor(x / 4) + 1; i++) for (let j = Math.floor(z / 4) - 1; j <= Math.floor(z / 4) + 1; j++) {
+        const a = CG.get(i * 100003 + j); if (a) for (const c of a) if (Math.abs(c.x - x) < 1.2 && Math.abs(c.z - z) < 1.2 && (c.x - x) ** 2 + (c.z - z) ** 2 < (c.r + 0.6) ** 2) return true;
+      }
+      return false;
+    };
+    for (const [x, z] of SP) {
+      if (isWater(x, z) || colNear(x, z)) continue;
       veg.plant('non', x, z, { pit: 1, wash: 0 }); addCollider(x, z, 0.3); n++;
     }
     console.log('[world] W3-F cây non dải dạo ven sông:', n);
