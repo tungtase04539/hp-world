@@ -668,9 +668,9 @@ export function buildProps(ctx) {
   const T0 = performance.now();
   const { scene, LAND_H, ROADS_DT, groundHeightNoDeck, isWater, lakeSD } = ctx;
   const R_MAX = ctx.radius || 1600;
-  // W3-E: người +400 (người bán ngồi ghế đẩu ở chợ/khách đứng trước sạp — chỉ trong ô chợ, xa > 60 m là LOD 0,24k)
+  // W3-E: người +900 (người bán ngồi ghế đẩu ở chợ/khách đứng trước sạp — chỉ trong ô chợ, xa > 60 m là LOD 0,24k)
   const BUDGET = {
-    bikes: LITE ? 5000 : 16000, cars: LITE ? 1400 : 3600, peds: LITE ? 550 : 1500,
+    bikes: LITE ? 5000 : 16000, cars: LITE ? 1400 : 3600, peds: LITE ? 750 : 2000,
   };
   const stats = { cells: 0, valid: 0 };
   const rej = { far: 0, junction: 0, notFlat: 0, featured: 0, building: 0, lake: 0 };
