@@ -450,6 +450,10 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     đặt) có thêm 1 đống 9 quả cầu icosa pháp tuyến TRƠN màu instance pha sáng/tối từng quả + 3 quả bảng A (cổng 1 ~35% đống
     hàng trộn) + 3 bó lá dẹt (cổng 2 ~40% đống rau) — vòm trơn một màu nhìn như "bãi slime", đống quả lổn nhổn mới đọc ra
     rau quả; vòm cũ giữ làm lõi + LOD xa. KHÔNG gộp làm biến thể của nhóm hàng đất (mọi instance gánh ~300 đỉnh suy biến).
+    BẪY HIỆU NĂNG "gộp biến thể" (`variants()`: mọi instance chạy đỉnh của MỌI biến thể, biến thể khác bị thu về 0): đo tam giác
+    thấy được ở khung chợ 446 h270 — nhóm hàng đất 6 biến thể ~900 tam giác × 533 instance (≤ 150 m) = 479k (+ lượt bóng) → tách 2
+    nhóm (sạp+mẹt / sọt+bạt đất+bao tải+ghế) và ≤ 100 m; cầu đèn gang 2/5 cầu (35 cột) để RIÊNG `props_lamp_glow2` (gộp vào nhóm
+    kính đèn ~460 instance làm mỗi bóng đèn dây gánh +140 tam giác).
     BẪY: (a) cán ô vào `obst` với bán kính lớn → mọi sạp ngay dưới ô bị loại (bản đầu: ô không có hàng); (b) hàng giữa vỉa
     hè → xe máy (parkingLine) bị loại sạch khỏi phố chợ — thật thì xe máy đỗ ngoài, hàng trong; (c) `flat()` (groundHeightNoDeck
     + isWater) là truy vấn đắt nhất của vòng chợ — ô đã kiểm dốc lúc lấy mẫu, bỏ trong okAt.
