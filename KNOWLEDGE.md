@@ -469,6 +469,17 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     D.dead trước buildRealFabric (`world.synthNearCellKilled`); Chợ Con bz 793 → 783 (tâm footprint OSM), ô chợ trùng
     `w2_chocon_market` bỏ (giữ ô dù). **citygen.js (1 dòng, vùng W3-C):** nhà có KIỂU Ô ≠ 0 không bán hàng → cạnh hông được NÂNG
     thành mặt phố và mặt dãy gộp (wideF) cũng rc 3 (trước: lấy cấp phố → biệt thự mọc dải biển ở cạnh hông).
+    **SỐ ĐO:** generator 46.128 → 44.897 nhà (lô khe 4.050 → 3.481, lõi ô 8.877 → ~8.380), b64 1,52 MB (−10 KB) + RB_PARCELS 21 KB,
+    giải mã 6 ms; 425 dãy tường (hàng rào sắt 5,5 km, tường rào 0,37 km, rào tôn 0,8 km, tường lô 0,38 km), 197 cổng (45 đúng tia
+    pano "cổng"); lúc chạy cắt còn ~5,2 km (đè tường tay đã có ~0,7 km, nhà ô giữ, nhà thật sống), ~81 k tam giác, 2 mesh, dựng
+    ~50-90 ms (đo trong SwiftShader/CPU bận: dò tường tay 22 ms). Tỉ lệ nhà SINH trong 40 m quanh 25 pano FP-2: 38,3% → 28,2%
+    (496: 56 → 30%, 538: 53 → 0%); quanh 120 pano kiểm toán 30,6 → 26,2%. Kiểm toán clearance (W2-A): camera vi phạm 35 → 33,
+    nearAll 36 → 34, fillAll 181 → 178, vật trên nhựa 53 = 53, lấn vỉa hè 72 → 71. **CHẤM LẠI (cùng người chấm, REAL|TRƯỚC|SAU
+    cạnh nhau, ±0,5):** 30 pano FP-2 × 2 hướng (60 ảnh) 2,88 → 3,39 (+0,51; 20 tốt hơn, 2 kém hơn), nhóm đối chứng 8 pano (15 ảnh)
+    3,73 → 3,77. Tăng mạnh: 515 h90 3 → 6 (tường mỏ neo liền, hết dãy nhà sinh đè), 428 h90 / 405 h0 2 → 5 (sửa claim), 354 h0 2 →
+    5, 496 h90 3 → 5 (hàng rào + cổng + chòi gác + nhà lùi), 441 h270 / 432 h0 / 547 h90 2 → 4, 460 h0 1 → 3. CHƯA sửa: ảnh do
+    camera/mặt cắt phố (CAMNEAR — W3-A), footprint cũ đã phá dỡ (019, 239), lỗ Overture 469, cổng ô cells trên vỉa hè (464, 510),
+    cao ốc sau tường rào 225. Ảnh: scratchpad dot3/W3-B g_00..12.jpg, grades.txt.
     **BẪY:** (a) `\b` của JS không hiểu chữ có dấu ("chợ\b" không bao giờ khớp) → ranh giới tường minh; (b) "tôn" khớp trong
     "bê tông" → `tôn(?!g)`; (c) màu tường rào phải lấy từ CỤM chữ tả tường/rào/trụ/cổng — "chòi gác vàng" từng nhuộm cả rào;
     (d) tường dựng tay trong ô cells nằm ngay mặt phố — phải dò hình học trước khi dựng tường dữ liệu; (e) đo cảnh trước freeze
