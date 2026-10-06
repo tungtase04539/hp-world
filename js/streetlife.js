@@ -847,7 +847,9 @@ export function buildStreetLifeMeshes(B, L) {
   const matMkt = G.propMaterial({ name: 'market',
     palA: [0x4f8a2b, 0xc2361f, 0xe08a1e, 0xe8c43a, 0x7a4a2a, 0x9fbf3a, 0x6b2a5a, 0xd9d2c0],
     palB: [0xf2f2ee, 0x1f5fb0, 0xf2f2ee, 0xc8282a, 0x2c8a4a, 0xf0f0ea, 0x2a4f9a, 0xe0c020] });
-  const NEAR_OVER = LITE ? 160 : 300, NEAR_GROUND = LITE ? 90 : 150;
+  // hàng dưới đất ≤ 100 m (LITE 70): nhóm 6 biến thể ~900 tam giác/instance (đỉnh suy biến của biến thể khác) — bản ≤ 150 m: 533
+  // instance thấy được ở khung chợ 446 = 479k tam giác (+ lượt bóng); hàng 0,5-1 m ở 100 m chỉ còn 3-6 px
+  const NEAR_OVER = LITE ? 160 : 300, NEAR_GROUND = LITE ? 70 : 100;
   const out = [];
   if (L.overI.length) out.push(inst('props_market_over', G.variants([modelUmbrella(G), modelUmbrellaSq(G), modelTarp(G), modelTarpStriped(G)]), matMkt, L.overI, { rMax: NEAR_OVER, keepBehind: 30, color: (it) => it.col }));
   if (L.groundI.length) out.push(inst('props_market_ground', G.variants([modelStall(G), modelBaskets(G), modelCrates(G), modelHeap(G), modelSacks(G), modelStool(G)]), matMkt, L.groundI, { rMax: NEAR_GROUND, keepBehind: 25, color: (it) => it.col }));

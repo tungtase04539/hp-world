@@ -1555,11 +1555,15 @@ export function buildProps(ctx) {
   const glowList = [
     ...glassI.filter((g) => g.reach === LAMP_REACH).map((g) => ({ ...g, v: 0 })),
     ...glassI.filter((g) => g.reach !== LAMP_REACH).map((g) => ({ ...g, v: 1 })),
-    ...ornI.map((o) => ({ x: o.x, z: o.z, y: o.y, heading: o.heading, v: o.globes === 2 ? 4 : o.globes === 5 ? 5 : 2 })),
+    ...ornI.filter((o) => o.globes !== 2 && o.globes !== 5).map((o) => ({ x: o.x, z: o.z, y: o.y, heading: o.heading, v: 2 })),
     ...bulbs.map((b) => ({ ...b, v: 3 })),
   ];
   const bulbGeo = () => mergeParts([finish(new THREE.IcosahedronGeometry(0.07, 0), 0xffffff)]);
-  inst('props_lamp_glow', variants([modelLampGlass(LAMP_REACH, LAMP_H + 0.01), modelLampGlass(POLE_LAMP_ARM.reach + 0.08, POLE_LAMP_ARM.y + 0.07), modelOrnateGlobes(), bulbGeo(), modelOrnate2Globes(G), modelOrnate5Globes(G)]), matGlow, glowList, { rMax: FAR_POLE, cast: false });
+  inst('props_lamp_glow', variants([modelLampGlass(LAMP_REACH, LAMP_H + 0.01), modelLampGlass(POLE_LAMP_ARM.reach + 0.08, POLE_LAMP_ARM.y + 0.07), modelOrnateGlobes(), bulbGeo()]), matGlow, glowList, { rMax: FAR_POLE, cast: false });
+  // W3-E: cầu đèn gang 2/5 cầu (35 cột) — nhóm RIÊNG: gộp làm biến thể 4/5 của nhóm kính đèn (~460 instance thấy được, đa số
+  // bóng đèn dây/kính đèn cao áp) khiến MỌI instance gánh +140 tam giác suy biến (đo khung chợ 446: +64k tam giác)
+  const glow2 = ornI.filter((o) => o.globes === 2 || o.globes === 5).map((o) => ({ x: o.x, z: o.z, y: o.y, heading: o.heading, v: o.globes === 2 ? 0 : 1 }));
+  if (glow2.length) inst('props_lamp_glow2', variants([modelOrnate2Globes(G), modelOrnate5Globes(G)]), matGlow, glow2, { rMax: FAR_POLE, cast: false });
   // ĐỒ LẶT VẶT (1 draw call): ghế nhựa, ô dù, xe đẩy, thùng rác, trụ cứu hoả, tủ điện
   const NEAR_CL = LITE ? 140 : 260;
   for (const it of stoolI) it.col = pick([0xd8322a, 0xd8322a, 0x2a62c4, 0x2a62c4, 0x2f9a4c, 0xe8e2d4], hash3(it.x, it.z, 141));
