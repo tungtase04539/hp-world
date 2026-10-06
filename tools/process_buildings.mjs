@@ -148,8 +148,10 @@ function clearedZone(x, z) {
   return true;
 }
 // Siêu khối Hải quân/Cảng + nút giao cầu HVT: CHỈ cấm nhà SINH (nhà thật để WP2 claim quyết định)
-// Đợt 3 W3-A: mép TÂY tới sát lòng Lý Tự Trọng (x 480): tim mới cách tường mỏ neo ~8 m → dải 2-3 m trước tường từng mọc lô SINH
-const CB1 = [[480, -468], [648, -468], [653, -800], [560, -800], [560, -682], [480, -672]];
+// Đợt 3 W3-A: mép TÂY tới sát lòng Lý Tự Trọng (x 480): tim mới cách tường mỏ neo ~8 m → dải 2-3 m trước tường từng mọc lô SINH;
+// mép ĐÔNG x 655-656: tường mỏ neo Trần Hưng Đạo nay đặt sau mặt tiền theo phố (world.js cbFitFence, x ≈ 650-654) → lô SINH
+// (shophouse biển BÁNH ĐA CUA) từng mọc NGAY sau tường, trong khuôn viên Hải quân (pano_225 h270)
+const CB1 = [[480, -468], [655, -468], [656, -800], [560, -800], [560, -682], [480, -672]];
 const noSynZone = (x, z) => clearedZone(x, z) || pointInPoly(CB1, x, z) || (x > -300 && x < 120 && z > -1045 && z < -845);
 // camera pano: lưới 8 m
 const camGrid = new Grid(8); PANO_CAM.forEach(([x, z], i) => camGrid.insert(i, [x, z, x, z]));

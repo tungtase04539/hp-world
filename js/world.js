@@ -21265,8 +21265,8 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
   // W3-A: collider NHỎ (cây/cột/đoạn tường, r ≤ 2,2) còn nằm TRÊN LÒNG đường sau cellsink + quét W2-A + dời/bỏ cây = vật cản
   // VÔ HÌNH (chủ đã gỡ/dời/cắt mà collider ở lại — lộ ra khi tim/lòng phố theo phố thật: tường tx_pdp Phan Đình Phùng, cây w1
   // Trần Phú). Tách như trees.js (x = 1e7; colIdx có thể đã dựng). Chạy TRƯỚC props: xe đỗ mép lòng của props là vật cản thật.
-  { let n = 0; for (const c of colliders) if (c.r <= 2.2 && c.x < 1e6 && onCarriageDisc(c.x, c.z, 0)) { c.x = 1e7; c.z = 1e7; n++; }
-    world.ghostColliders = n; }
+  { const gl = []; for (const c of colliders) if (c.r <= 2.2 && c.x < 1e6 && onCarriageDisc(c.x, c.z, 0)) { gl.push([+c.x.toFixed(1), +c.z.toFixed(1), c.r]); c.x = 1e7; c.z = 1e7; }
+    world.ghostColliders = gl; }   // QA: [[x, z, r]] đã tách
   world.treeBloomNear = trees.bloomNear;      // cánh phượng rơi quanh cây đang nở gần người chơi (petals.js)
   loadHeroTrees(trees);  // nạp GLB cây phượng ảnh-thật → LOD gần ≤150 m (bất đồng bộ)
   // ---------- ĐỒ ĐẠC PHỐ (Đợt 3 WP7, js/props.js) ----------
