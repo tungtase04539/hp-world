@@ -852,7 +852,11 @@ export function buildStreetLifeMeshes(B, L) {
   const NEAR_OVER = LITE ? 160 : 300, NEAR_GROUND = LITE ? 70 : 100;
   const out = [];
   if (L.overI.length) out.push(inst('props_market_over', G.variants([modelUmbrella(G), modelUmbrellaSq(G), modelTarp(G), modelTarpStriped(G)]), matMkt, L.overI, { rMax: NEAR_OVER, keepBehind: 30, color: (it) => it.col }));
-  if (L.groundI.length) out.push(inst('props_market_ground', G.variants([modelStall(G), modelBaskets(G), modelCrates(G), modelHeap(G), modelSacks(G), modelStool(G)]), matMkt, L.groundI, { rMax: NEAR_GROUND, keepBehind: 25, color: (it) => it.col }));
+  // 2 nhóm (sạp+mẹt ~510 tam giác · sọt/bạt đất/bao tải/ghế ~390) thay 1 nhóm 6 biến thể ~900: mỗi instance chỉ gánh đỉnh suy
+  // biến của nhóm mình (−50% đỉnh, +1 draw call)
+  const gA = L.groundI.filter((it) => it.v <= 1), gB = L.groundI.filter((it) => it.v >= 2).map((it) => ({ ...it, v: it.v - 2 }));
+  if (gA.length) out.push(inst('props_market_ground', G.variants([modelStall(G), modelBaskets(G)]), matMkt, gA, { rMax: NEAR_GROUND, keepBehind: 25, color: (it) => it.col }));
+  if (gB.length) out.push(inst('props_market_ground2', G.variants([modelCrates(G), modelHeap(G), modelSacks(G), modelStool(G)]), matMkt, gB, { rMax: NEAR_GROUND, keepBehind: 25, color: (it) => it.col }));
   // ĐỐNG NÔNG SẢN chồng lên từng vòm hàng của sạp/mẹt/bạt đất (vòm = lõi; xa > 60 m chỉ còn vòm — đống ~4 px) — 1 draw call riêng (không
   // gộp biến thể vào nhóm hàng đất: mọi instance nhóm đó sẽ gánh ~300 đỉnh suy biến), không đổ bóng. Dẫn xuất từ groundI
   // (đã có y mặt đất) → không đổi kết quả đặt chỗ.
