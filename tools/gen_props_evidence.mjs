@@ -115,7 +115,10 @@ for (const e of j) {
   if (/cổng chào[^.;|]{0,60}(ngõ|khu dân cư|lối vào|văn ho[áa]|khung sắt|băng rôn)/.test(all) && !/cổng chào\)?[^.;|]{0,40}(trường|công viên|mầm non)/.test(all)) deco |= 4;
   if (/(lan can|hàng rào|rào)[^.;|]{0,16}(trắng|con tiện)|con tiện trắng|balustrade/.test(all)) deco |= 8;
   if (/hàng rào sắt|rào sắt|hàng rào song sắt/.test(all)) deco |= 16;
-  if (/xe khách[^.;]*(đỗ|đậu|nối)|(đỗ|đậu)[^.;]*xe khách|bến (xe|đỗ) xe khách/.test(all)) deco |= 32;
+  // xe khách LỚN đỗ (441 Bến Bính, 080 dãy xe Cát Bà, 219 giường nằm): "đỗ" phải thuộc CÙNG mệnh đề (≤ 30 ký tự, không qua
+  // dấu phẩy — bản đầu `[^.;]*` bắt "xe khách/xe van trắng …, taxi xanh lá đỗ" ở 014 → xe khách 11 m chắn camera); loại van/
+  // minibus/limousine 16 chỗ (mô hình là xe khách 11,4 m)
+  if (/xe khách(?!\s*\/\s*(van|minibus|xe van|xe buýt nhỏ|bus nhỏ))(?![^.;,|]{0,16}(16 chỗ|limousine|solati|minibus|nhỏ))[^.;,|]{0,30}(đỗ|đậu|nối)|bến (xe|đỗ) xe khách/.test(all)) deco |= 32;
   if (/(ô tô|xe con|xe hơi)[^.;|]{0,24}phủ bạt|bạt phủ (ô tô|xe)/.test(all)) deco |= 64;
   if (/ba gác|xe kéo tay|xe cải tiến/.test(all)) deco |= 128;
   if (/xe đạp[^.;|]{0,24}(dựng|đỗ)|(dựng|đỗ)[^.;|]{0,16}xe đạp/.test(all)) deco |= 256;
