@@ -851,7 +851,7 @@ export function buildStreetLifeMeshes(B, L) {
   const out = [];
   if (L.overI.length) out.push(inst('props_market_over', G.variants([modelUmbrella(G), modelUmbrellaSq(G), modelTarp(G), modelTarpStriped(G)]), matMkt, L.overI, { rMax: NEAR_OVER, keepBehind: 30, color: (it) => it.col }));
   if (L.groundI.length) out.push(inst('props_market_ground', G.variants([modelStall(G), modelBaskets(G), modelCrates(G), modelHeap(G), modelSacks(G), modelStool(G)]), matMkt, L.groundI, { rMax: NEAR_GROUND, keepBehind: 25, color: (it) => it.col }));
-  // ĐỐNG NÔNG SẢN chồng lên từng vòm hàng của sạp/mẹt/bạt đất (vòm = lõi; xa > 90 m chỉ còn vòm) — 1 draw call riêng (không
+  // ĐỐNG NÔNG SẢN chồng lên từng vòm hàng của sạp/mẹt/bạt đất (vòm = lõi; xa > 60 m chỉ còn vòm — đống ~4 px) — 1 draw call riêng (không
   // gộp biến thể vào nhóm hàng đất: mọi instance nhóm đó sẽ gánh ~300 đỉnh suy biến), không đổ bóng. Dẫn xuất từ groundI
   // (đã có y mặt đất) → không đổi kết quả đặt chỗ.
   const pile = [];
@@ -867,7 +867,7 @@ export function buildStreetLifeMeshes(B, L) {
   }
   if (pile.length) {
     const matPile = G.propMaterial({ name: 'produce', palA: PRODUCE_COLS, gate: [0.35, 0.4] });
-    out.push(inst('props_market_produce', modelProduce(G), matPile, pile, { rMax: LITE ? 55 : 90, keepBehind: 15, cast: false, color: (it) => it.col }));
+    out.push(inst('props_market_produce', modelProduce(G), matPile, pile, { rMax: LITE ? 40 : 60, keepBehind: 15, cast: false, color: (it) => it.col }));
   }
   L.stats.produce = pile.length;
   if (L.spillI.length) out.push(inst('props_spill', G.variants([modelRack(G), modelFlowers(G), modelPot(G), modelFurniture(G), modelAltar(G), modelToys(G), modelGoods(G), modelBaGac(G)]), matMkt, L.spillI, { rMax: NEAR_GROUND, keepBehind: 25, color: (it) => it.col }));

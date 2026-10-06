@@ -444,7 +444,7 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     đỗ). Mọi vật: tâm ≥ 2,5 m + bán kính tới camera pano, không trong nhà thật, không trên nhựa phố khác (`onCarriageFast`).
     Người: bán ngồi 75/62/45% đơn vị (mức 3/2/1), khách đứng 60/30/15% + mức 3 thêm khách thứ 2 35% (ngân sách người 1.500 →
     2.000, LITE 550 → 750 — chợ thật đông người). **Đống nông sản** `props_market_produce` (1 draw call riêng, không đổ bóng,
-    ≤ 90 m, LITE 55 m): mỗi vòm hàng của sạp/mẹt/bạt đất (`PRODUCE_SLOTS`, dẫn xuất từ groundI SAU groundAll → không đổi chỗ
+    ≤ 60 m, LITE 40 m — xem Số đo): mỗi vòm hàng của sạp/mẹt/bạt đất (`PRODUCE_SLOTS`, dẫn xuất từ groundI SAU groundAll → không đổi chỗ
     đặt) có thêm 1 đống 9 quả cầu icosa pháp tuyến TRƠN màu instance pha sáng/tối từng quả + 3 quả bảng A (cổng 1 ~35% đống
     hàng trộn) + 3 bó lá dẹt (cổng 2 ~40% đống rau) — vòm trơn một màu nhìn như "bãi slime", đống quả lổn nhổn mới đọc ra
     rau quả; vòm cũ giữ làm lõi + LOD xa. KHÔNG gộp làm biến thể của nhóm hàng đất (mọi instance gánh ~300 đỉnh suy biến).
