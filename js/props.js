@@ -698,7 +698,17 @@ export function buildProps(ctx) {
   // W3-E: KHÔNG GIAN MỞ THẬT (claim park/plaza của world.js + kè hồ Tam Bạc 16 m). `openSpace` của world.js còn gồm các vùng
   // "cấm nhà infill" CÓ nhà thật (Z-TTB1/2/3 phố công sở/bệnh viện/nút Nguyễn Tri Phương, siêu khối Hải quân, chợ Nguyễn
   // Khuyến…) → dùng nó cho luật ô tô/chợ/dây điện W3-E thì xoá sạch ô tô đỗ 2 bên pano_395 (ảnh thật kín xe) và chợ.
-  const openReal = (x, z) => !!claimAt(x, z, ['park', 'plaza']) || lakeSD(x, z) < 16;
+  // lakeSD (đa giác hồ Tam Bạc, khoảng cách CÓ DẤU chính xác) là truy vấn đắt nhất của props (hồ sơ CPU node: ~115 ms tự thân).
+  // `lakeLess(x,z,R)` ≡ lakeSD(x,z) < R nhưng chặn nhanh bằng lưới 8 m nhớ giá trị ở TÂM ô: khoảng cách 1-Lipschitz →
+  // |sd(p) − sd(tâm)| ≤ 4√2 = 5,66 m → chỉ tính chính xác khi tâm ô gần ngưỡng (kết quả y hệt, đã so chữ ký đặt chỗ)
+  const _lk = new Map();
+  const lakeLess = (x, z, R) => {
+    const i = Math.floor(x / 8), j = Math.floor(z / 8), k = (i + 4096) * 8192 + j + 4096;
+    let c = _lk.get(k); if (c === undefined) { c = lakeSD(i * 8 + 4, j * 8 + 4); _lk.set(k, c); }
+    if (c - 5.66 >= R) return false; if (c + 5.66 < R) return true;
+    return lakeSD(x, z) < R;
+  };
+  const openReal = (x, z) => !!claimAt(x, z, ['park', 'plaza']) || lakeLess(x, z, 16);
   // bên phố nhìn ra công viên/quảng trường: từ điểm (px,pz) trên vỉa dò theo pháp tuyến ra phía nhà (nx,nz) tới +18 m — đa giác
   // công viên OSM thường lùi sau dải cỏ/hàng rào (542: claim cách bó vỉa ~16 m); DỪNG khi gặp nhà thật (có dãy nhà đứng trước
   // thì bên này là phố, công viên phía sau không tính)
@@ -749,7 +759,7 @@ export function buildProps(ctx) {
           if (!flat(x, z)) { rej.notFlat++; S.rj[k] = 3; continue; }
           if (fcGrid.hit(x, z) || avoid(x, z) || clearAt(x, z) || claimAt(x, z, CLAIM_KINDS)) { rej.featured++; S.rj[k] = 4; continue; }
           if (inBuilding(x, z)) { rej.building++; S.rj[k] = 5; continue; }
-          if (lakeSD(x, z) < 14) { rej.lake++; S.rj[k] = 6; continue; }   // kè hồ Tam Bạc có đồ riêng (lan can/ghế/đèn đôi)
+          if (lakeLess(x, z, 14)) { rej.lake++; S.rj[k] = 6; continue; }   // kè hồ Tam Bạc có đồ riêng (lan can/ghế/đèn đôi)
           S.ok[k] = 1; stats.valid++;
           S.ev[k] = evAt(x, z);
         }
@@ -787,7 +797,7 @@ export function buildProps(ctx) {
   // vườn hoa / pano nói "đèn cổ điển"; 0 = không phải vùng đèn gang
   const ornateZone = (x, z, e) => {
     if (ctx.square && Math.hypot(x - ctx.square[0], z - ctx.square[1]) < 95) return 5;
-    if (lakeSD(x, z) < 34) return 2;
+    if (lakeLess(x, z, 34)) return 2;
     for (const g of ctx.gardens || []) if (Math.abs(x - g.x) < g.w / 2 + 22 && Math.abs(z - g.z) < g.d / 2 + 22) return 3;
     return e && e[5] === 2 ? 3 : 0;
   };
@@ -871,7 +881,7 @@ export function buildProps(ctx) {
             let x = x0 + S.nx * fl, z = z0 + S.nz * fl;
             if (x * x + z * z > R_MAX * R_MAX) continue;
             if (roadIdx.blocked(x, z, ri, S.si, 0.3) || !flat(x, z) || panoNear(x, z, 3) || avoid(x, z) || inBuilding(x, z)) continue;
-            if (lakeSD(x, z) < 22) continue;          // kè hồ: đèn đôi riêng của promenade
+            if (lakeLess(x, z, 22)) continue;          // kè hồ: đèn đôi riêng của promenade
             const e = evAt(x, z);
             const orn = ornateZone(x, z, e);
             if (!orn && e && !(e[5] & 1) && r.c === 't' && hash3(x, z, 22) < 0.5) continue; // phố t không thấy đèn → thưa
@@ -1298,7 +1308,7 @@ export function buildProps(ctx) {
       // W3-E: bỏ luật cũ "lakeSD > 18" (cấm ô tô trong 18 m quanh MỌI hồ → phố Quang Trung/Nguyễn Đức Cảnh ven hồ trống
       // trơn, pano 005/028/033 thật có ô tô đỗ phía NHÀ). Nay chỉ cấm phía KÈ/promenade (đi ra phía vỉa hè này lại gần hồ
       // hơn) và sát mép nước (< 6 m); cấm cả bên phố mà phía vỉa là công viên/quảng trường/promenade (322, 542, 065).
-      const lakeSide = () => { const lk = lakeSD(x, z); return lk < 6 || (lk < 40 && lakeSD(x + S.nx * 6, z + S.nz * 6) < lk - 1.5); };
+      const lakeSide = () => { if (!lakeLess(x, z, 40)) return false; const lk = lakeSD(x, z); return lk < 6 || (lk < 40 && lakeSD(x + S.nx * 6, z + S.nz * 6) < lk - 1.5); };
       // phía công viên/quảng trường (giữa vỉa, rồi sau mặt tiền tới +18 m — parkBehind)
       const parkSide = () => openReal(x + S.nx * (X.sw * 0.5 + 0.95), z + S.nz * (X.sw * 0.5 + 0.95)) || parkBehind(x, z, S.nx, S.nz, X.fac - lat);
       // thứ tự kiểm: rẻ trước (camera pano, nút giao, vật cản) — lakeSD (đa giác hồ) + openReal là 2 truy vấn đắt nhất
