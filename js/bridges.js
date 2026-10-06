@@ -190,7 +190,7 @@ export function buildBridges(scene, deps) {
   const stats = { decks: 0, deckM: 0, piers: 0, portals: 0, flatRails: 0, tris: 0 };
   const conc = Buf(), concD = Buf(), top = Buf(), rail = Buf(), red = Buf(), cable = Buf(), lamp = Buf(), concBal = Buf();
   const top2 = Buf(), walk = Buf(), balPanel = Buf();   // cầu phố 'deck': lòng 2 chiều, vỉa hè gạch, tấm lan can hoa văn
-  const CONC = shade(0xc9c6bd, 1), CONC_SIDE = shade(0xbab6ac, 1), CONC_UNDER = shade(0x8d8a83, 1), PIER = shade(0xbcb8ae, 1);
+  const CONC = shade(0xc9c6bd, 1), CONC_SIDE = shade(0xbab6ac, 1), CONC_UNDER = shade(0xcdc9bf, 1), PIER = shade(0xbcb8ae, 1);   // mặt dưới SÁNG: pháp tuyến hướng xuống chỉ nhận ánh sáng trời/đất — 0x8d8a83 cũ thành mảng nâu đen (pano_349 h0; thật xám nhạt)
   const RAIL = shade(0x9aa1a3, 1), RED = shade(0xc63a2c, 1), CABLE = shade(0xe2ddd4, 1);
   const panoNear = (x, z, r) => { for (const p of deps.panoCams || []) if ((p[0] - x) ** 2 + (p[1] - z) ** 2 < r * r) return true; return false; };
   const roadAt = (x, z) => (deps.roadSurfaceAt ? deps.roadSurfaceAt(x, z) > 0 : false);
