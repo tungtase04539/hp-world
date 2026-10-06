@@ -1321,8 +1321,8 @@ const SPX = [
   [14, 19, 4.0, 5.5, 8.0, 11.0],     // W3-G me tây / muồng (rain tree — hero pano_001)
   [7.5, 11, 3.4, 4.6, 3.0, 4.6],     // W3-G cắt trụi "bộ xương" (mép tán = chạc cành cưa; tán = tầm cành cụt)
 ];
-const FACADE_CLEAR_STD = 1.5, FACADE_CLEAR = FACADE_CLEAR_STD;   // tán cách mặt tiền ≥ 1,5 m (ép nửa tán phía tường — tán lệch ra lòng đường, không đủ thì thu nhỏ)
-const SQ_MAX_STD = 0.72;    // ép tối đa nửa tán phía tường còn 28% bán kính
+const FACADE_CLEAR = 1.5;   // tán cách mặt tiền ≥ 1,5 m (ép nửa tán phía tường — tán lệch ra lòng đường, không đủ thì thu nhỏ)
+const SQ_MAX = 0.72;        // ép tối đa nửa tán phía tường còn 28% bán kính
 // nghiêng TỰ NHIÊN tối đa (độ) của thân trên đoạn gốc vôi → chạc (cây đứng tự do; cây sát nhà/cây non/cắt cụt: 0)
 const LEAN_NAT_DEG = 5.5;
 // facadeFit: 16 điểm mép tán (dây cung/2 ≤ 0,2R ≤ 1,36 m < 1,45 m → cạnh tường cắt qua mép tán luôn bị bắt), bảng cos/sin dựng 1 lần
@@ -1335,11 +1335,8 @@ const LMW = Object.entries(LM_POLY).filter(([k]) => !LM_OPEN.has(k)).map(([, P])
 // tán (tâm gốc x,z, mép dưới B m, bán kính R m) vướng mặt tiền nào cao hơn mép tán? → {sq (0..SQ_MAX tỉ lệ ép nửa tán
 // phía tường), nx, nz (pháp tuyến tường → lòng đường), R (m), d (m, gốc → tường gần nhất)}.
 // Chỉ tường cao ≥ mép tán − 0,3 m (tán xoè trên mái nhà 1 tầng là bình thường). Gốc nằm TRONG nhà/địa danh → bỏ qua.
-function facadeFit(x, z, B, R, fp, D, CB, big = false) {
+function facadeFit(x, z, B, R, fp, D, CB) {
   const out = { sq: 0, nx: 0, nz: 0, R, d: 1e9 };
-  // W3-G: cây HERO (đa/me cổ thụ — o.big) tán THẬT trùm sát mặt tiền, ban công (pano_088/400): cách tường 0,4 m, ép nửa phía
-  // tường tới 88%, gần như không thu bán kính (tán vươn ra lòng đường) — luật 1,5 m của cây phố từng thu tán đa còn 3,6 m
-  const FACADE_CLEAR = big ? 0.4 : FACADE_CLEAR_STD, SQ_MAX = big ? 0.88 : SQ_MAX_STD;
   if (!fp || !D) return out;
   const S = R + FACADE_CLEAR + 0.5, E = [];
   let best = 1e9, nx = 0, nz = 0;
@@ -1383,7 +1380,7 @@ function facadeFit(x, z, B, R, fp, D, CB, big = false) {
   // thẳng đứng): THÂN GIỮ THẲNG, nửa tán phía tường bị ÉP về trục thân theo pháp tuyến mặt tiền gần nhất — (1−s)·R ≤
   // khoảng trống (best − 1,5 m), s ≤ SQ_MAX (cây sát nhà ở HP bị tỉa phẳng phía nhà, tán vươn ra lòng đường). Không đủ
   // (thân quá sát tường) → thu R. Rồi kiểm MỌI tường trong tầm (góc phố/nhà thứ 2) với hình tán đã ép → thu dần R.
-  const room = best - FACADE_CLEAR, Rmin = Math.max(1.2, R * (big ? 0.8 : 0.42)), tx = -nz, tz = nx;
+  const room = best - FACADE_CLEAR, Rmin = Math.max(1.2, R * 0.42), tx = -nz, tz = nx;
   let Rf = R, s = 1 - room / R;
   if (s > SQ_MAX) { s = SQ_MAX; Rf = Math.max(Rmin, Math.min(R, room / (1 - SQ_MAX))); }
   if (s < 0) s = 0;
@@ -1632,8 +1629,10 @@ export function buildTrees(scene, ctx = {}) {
       continue;
     }
     let R = r.Rr;
-    if (fpD) {
-      const f = facadeFit(r.x, r.z, r.B, R, fpG, fpD, CB, !!r.big);
+    // W3-G: cây HERO (o.big — đa/me cổ thụ đo theo ảnh) KHÔNG né mặt tiền: tán thật trùm qua mái/ban công (pano_088/400);
+    // luật 1,5 m từng thu tán đa còn 3,6 m, rồi ép 88% về phía lòng đường ⇒ tán nằm trên đầu camera, khung pano chỉ thấy thân
+    if (fpD && !r.big) {
+      const f = facadeFit(r.x, r.z, r.B, R, fpG, fpD, CB);
       if (f.sq > 0.005) { r.sq = f.sq; r.snx = f.nx; r.snz = f.nz; fit.squeezed++; fit.maxSq = Math.max(fit.maxSq, f.sq); }
       if (f.R < R - 0.05) fit.shrunk++;
       R = f.R; r.fd = f.d;
