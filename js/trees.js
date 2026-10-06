@@ -866,7 +866,8 @@ function vegAt(x, z, ri = -1, park = false) {
     const lvl = park ? Math.max(panoMax(x, z, 16, 60), dn < 25 ? V[pi + 15] : 0) : V[pi + 15];
     // "một số/vài cây" (3) → 19%, (5) → 45%, "hàng cây/nhiều cây cắt trụi" (7) → 71% (W2-B: 18/40/62%) — pano 10/2024 sau
     // bão Yagi: dải trung tâm (pano_001_h090) gần như TOÀN BỘ trơ cành
-    pollard = lvl ? clamp(-0.2 + lvl * 0.13, 0, 0.8) : pollard * 0.6;
+    // Cây DẢI/VƯỜN mức 7 ("cả dải cắt trụi") → 90%: ảnh 001_h090/400_h270/225 gần như không còn cây tán đầy trong dải (phiên 3)
+    pollard = lvl ? (park && lvl >= 7 ? 0.9 : clamp(-0.2 + lvl * 0.13, 0, 0.8)) : pollard * 0.6;
     polLvl = lvl;
     // W3-G: "HÀNG cây non/mới trồng" (6) → 80% cây non chống cọc (pano_304 nút HVT, kè sông 299/294 sau bão Yagi), "cây non"
     // lẻ (3) → 25% (W2-B: 36% / 18%)
@@ -972,38 +973,36 @@ const HERO_SPOTS = [
   { cam: [295.8, 39.4], h: 180, d: 18.7, lat: -7.2, kind: 'da', H: 17.5, R: 9.5 },   // gốc +21°, ~20 m
   { cam: [-211.7, 114.1], h: 180, d: 21, lat: -6.7, kind: 'me', H: 16.5, R: 10 },    // gốc +18°, ~22 m
 ];
-// chỗ đặt = điểm ĐO TRÊN ẢNH (hướng + cự ly từ camera pano). Điểm đó lọt vào khối nhà (phố trong game hẹp/lệch hơn thật) →
-// KÉO VỀ PHÍA TIM PHỐ của camera tới chỗ trống đầu tiên (≤ 14 m, bước 0,5 m: gốc ra vỉa hè trước mặt tiền, giữ gần đúng
-// hướng nhìn); không được thì chỗ trống gần nhất ≤ 8 m. Trống = không lòng đường (gốc cách mép ≥ 2,2 m — rễ phụ đa ≤ ~1,9 m),
-// không nhà, không camera pano 6 m. KHÔNG đặt theo hố cây của phố: ở 088 ROADS_DT lệch ~45° so với ảnh (thử 2026-10-05:
-// cây sang phải khung); chỗ trống gần nhất thuần tuý thì rơi vào khe giữa 2 nhà SAU mặt tiền (bị che khuất).
+// chỗ đặt: phố/nhà trong game không khớp hẳn ảnh (088: dãy nhà trái cách camera 7-10 m — thật là bãi trống; 400: điểm đo
+// rơi vào KHE SAU một nhà → gốc "trống" nhưng camera không thấy — phiên 3 dò tia footprint: nhà #24545 chắn ở 13 m).
+// → tìm trong nón ±12° quanh hướng đo, cự ly 6..(đo + 8) m, điểm (a) TRỐNG (không lòng đường — gốc cách mép ≥ 2,2 m vì rễ
+// phụ đa ≤ ~1,9 m —, không nhà, không camera pano 6 m, không nước) và (b) THẤY ĐƯỢC từ camera pano (đoạn camera → gốc
+// không cắt footprint nhà nào, bước 0,5 m); chọn điểm GẦN điểm đo nhất. Không có → bỏ (cảnh báo).
 // Trả [[x, z, bán kính cấm cây khác]] cho hàng cây vỉa hè.
 function plantHeroSpots(ctx, RI, fp) {
   const keep = [];
   const free = (x, z) => !RI.nearRoad(x, z, 2.2, 'wh') && !onCarriage(x, z) && !(fp && fp.at(x, z) >= 0) && !nearPano(x, z, 6)
     && !(ctx.isWater && ctx.isWater(x, z));
-  const segNear = (x, z, maxD) => {
-    let best = null, bd = maxD; const ci = Math.floor(x / RI.SC), cj = Math.floor(z / RI.SC), k = Math.ceil(maxD / RI.SC);
-    for (let i = ci - k; i <= ci + k; i++) for (let j = cj - k; j <= cj + k; j++) {
-      const a = RI.sg.get(i * 100003 + j); if (!a) continue;
-      for (const id of a) { const sg = RI.segs[id]; if (!'pstr'.includes(sg.c)) continue; const d = RI.segD(x, z, sg); if (d < bd) { bd = d; best = sg; } }
-    }
-    return best;
+  const seen = (cx, cz, x, z) => {
+    if (!fp) return true;
+    const d = Math.hypot(x - cx, z - cz);
+    for (let t = 0.5; t < d; t += 0.5) if (fp.at(cx + (x - cx) * t / d, cz + (z - cz) * t / d) >= 0) return false;
+    return true;
   };
   for (const S of HERO_SPOTS) {
-    const hr = S.h * Math.PI / 180, fx = Math.sin(hr), fz = -Math.cos(hr), lx = fz, lz = -fx;
-    const x0 = S.cam[0] + fx * S.d + lx * S.lat, z0 = S.cam[1] + fz * S.d + lz * S.lat;
-    let px = null, pz = null;
-    const s0 = segNear(S.cam[0], S.cam[1], 25);
-    if (s0) {
-      const dx = s0.bx - s0.ax, dz = s0.bz - s0.az, L2 = dx * dx + dz * dz || 1, t = ((x0 - s0.ax) * dx + (z0 - s0.az) * dz) / L2;
-      let ux = s0.ax + t * dx - x0, uz = s0.az + t * dz - z0; const ul = Math.hypot(ux, uz);
-      if (ul > 0.5) { ux /= ul; uz /= ul; for (let k = 0; k <= Math.min(14, ul); k += 0.5) { const x = x0 + ux * k, z = z0 + uz * k; if (free(x, z)) { px = x; pz = z; break; } } }
+    const [cx, cz] = S.cam, D0 = Math.hypot(S.d, S.lat), b0 = S.h * Math.PI / 180 - Math.atan2(S.lat, S.d);   // la bàn: trái = −
+    const x0 = cx + Math.sin(b0) * D0, z0 = cz - Math.cos(b0) * D0;
+    let px = null, pz = null, best = 1e9;
+    for (let db = -12; db <= 12; db += 1) {
+      const b = b0 + db * Math.PI / 180, ux = Math.sin(b), uz = -Math.cos(b);
+      for (let t = 6; t <= D0 + 8; t += 0.5) {
+        const x = cx + ux * t, z = cz + uz * t, sc = Math.hypot(x - x0, z - z0);
+        if (sc >= best) continue;
+        if (fp && fp.at(x, z) >= 0) break;          // tia đã vào nhà: xa hơn đều bị che
+        if (free(x, z) && seen(cx, cz, x, z)) { best = sc; px = x; pz = z; }
+      }
     }
-    for (let rr = 0; rr <= 8 && px === null; rr += 0.5) {
-      for (let q = 0; q < (rr ? 16 : 1); q++) { const a = q / 16 * Math.PI * 2, x = x0 + Math.cos(a) * rr, z = z0 + Math.sin(a) * rr; if (free(x, z)) { px = x; pz = z; break; } }
-    }
-    if (px === null) { console.warn('[trees] hero spot không có chỗ trống', S.kind, x0.toFixed(1), z0.toFixed(1)); continue; }
+    if (px === null) { console.warn('[trees] hero spot không có chỗ trống thấy được', S.kind, x0.toFixed(1), z0.toFixed(1)); continue; }
     plant(S.kind, px, pz, { h: S.H, r: S.R, wash: 0, big: 1, src: 3 });
     ctx.addCollider && ctx.addCollider(px, pz, S.kind === 'da' ? 1.9 : 1.0);
     keep.push([px, pz, S.R * 0.75]);
@@ -1517,7 +1516,7 @@ export function buildTrees(scene, ctx = {}) {
     // (phượng allée, xà cừ vườn hoa…) cũng bị cắt khi pano ≤ 60 m nói "cắt cụt/trụi" — trước chỉ cây 'shade/street/park'.
     // W3-G: mức ≥ 5 → phần lớn thành "bộ xương" cắt trụi (LOP); helper 'catcut' trong vùng cắt trụi nặng cũng vậy
     const NOCUT = sp === SP.CAU || sp === SP.DA || sp === SP.NON || sp === SP.CATCUT || sp === SP.LOP || sp === SP.TOPI || sp === SP.ME || !!o.big;
-    if (!heroOk && V.near && V.polLvl > 0 && !NOCUT && hxz(x, z, 5) < V.pollard * 0.85) sp = cutSpecies(x, z, V.polLvl);
+    if (!heroOk && V.near && V.polLvl > 0 && !NOCUT && hxz(x, z, 5) < V.pollard * (park ? 1 : 0.85)) sp = cutSpecies(x, z, V.polLvl);
     else if (sp === SP.CATCUT && e.kind === 'catcut' && V.polLvl >= 5 && hxz(x, z, 64) < 0.6) sp = SP.LOP;
     const kits = SP_KITS[sp];
     const kit = kits[o.variant !== undefined ? o.variant % kits.length : (hxz(x, z, 41) * kits.length) | 0];

@@ -34,8 +34,9 @@ const STREET_RX = /ven phố|vỉa hè|dọc phố|ven đường|hai bên phố|
 // mức cắt cụt của 1 câu: "hàng cây/nhiều cây/toàn bộ … cắt" 7, "một số/vài/một cây" 3, còn lại 5
 // (W3-G: + "đốn tỉa MẠNH", "cây cổ thụ bị cắt", "cây … lớn … cắt trụi/trơ" — pano_019 "cây xà cừ/cây bàng lớn bị cắt cụt ngọn
 // (đốn tỉa mạnh)" từng ra 3 vì "vài cây phượng" ở câu khác)
-const cutLevel = (s) => has(s, /một cây|một gốc/) ? 3 : has(s, /nhiều cây[^;,.]*(cắt|đốn|trụi)|hàng cây[^;,.]*(cắt|đốn|trụi)|toàn bộ|đều bị|(cắt|đốn)[^;.]*hai bên|cây cổ thụ[^;,.]*(cắt|đốn|trụi)|(cắt|đốn|tỉa)[^;,.]*mạnh|cây[^;,.]* lớn[^;,.]*(cắt trụi|trơ|chỉ còn thân)/) ? 7
+const cutLevel = (s) => has(s, /một cây|một gốc|(một số|vài) (cây|gốc)[^;,.]{0,25}(cắt|đốn|trụi)/) ? 3 : has(s, /nhiều cây[^;,.]*(cắt|đốn|trụi)|hàng cây[^;,.]*(cắt|đốn|trụi)|toàn bộ|đều bị|(cắt|đốn)[^;.]*hai bên|cây cổ thụ[^;,.]*(cắt|đốn|trụi)|(cắt|đốn|tỉa)[^;,.]*mạnh|cây[^;,.]* lớn[^;,.]*(cắt trụi|trơ|chỉ còn thân)/) ? 7
   : has(s, /một số|vài/) ? 3 : 5;
+// (phiên 3: "hàng cây cổ thụ … (một số cây bị cắt trụi cành)" — pano_262 — từng ra 7 qua nhánh "hàng cây…cắt": "một số/vài cây … cắt" xét TRƯỚC)
 // cau/cọ: "cọ" KHÔNG được khớp "cọc" (cọc chống cây non!) — bug v1: mọi pano "chống cọc" thành có cau (w=3)
 const PALM_RX = /cau(?![a-zà-ỹđ])|cọ(?![a-zà-ỹđ])|palm|dừa/;
 // phố có VÒM CÂY thật (AUDIT3 FP-7: Lê Lợi, Hạ Lý, Phan Bội Châu, Lý Thường Kiệt, Ký Con) — chỉ nâng pano ĐÃ nói có hàng cây
