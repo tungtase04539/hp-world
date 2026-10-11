@@ -96,7 +96,14 @@ export async function runXsec(argv) {
     rows.push(row);
   }
   const n = rows.length, cnt = (f) => rows.filter(f).length;
+  // SAI SỐ mặt nhà game − Overture trên các hướng có mặt nhà THẬT ≤ 30 m (chữ spec FP-1 "± 1,5 m của Overture"): đo cả 2 chiều —
+  // QUÁ GẦN (< −1,5: nhà lấn về camera) lẫn QUÁ XA (> +1,5: nhà thật bị cắt lùi về facadeLine quá rộng, ô trống giả)
+  const errs = []; for (const r of rows) for (const h of [0, 90, 180, 270]) { const o = r.ov[h]; if (o != null && o <= 30 && !r.inside) errs.push((r.game[h] ?? MAXR) - o); }
+  const pct = (k) => +((100 * k) / Math.max(1, errs.length)).toFixed(1);
   const st = {
+    facadeHeadings: errs.length, within1_5pct: pct(errs.filter((e) => Math.abs(e) <= 1.5).length),
+    tooClose: errs.filter((e) => e < -1.5).length, tooFar: errs.filter((e) => e > 1.5).length, tooFar3: errs.filter((e) => e > 3).length,
+    meanAbsErr: +(errs.reduce((s, e) => s + Math.abs(e), 0) / Math.max(1, errs.length)).toFixed(2),
     cams: n,
     onStreet: cnt((r) => r.ri != null),
     off_gt_1_5: cnt((r) => r.off > 1.5), off_ge_3: cnt((r) => r.off >= 3), outCarriage: cnt((r) => r.outCarr), beyondKerb: cnt((r) => r.beyondKerb),

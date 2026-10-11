@@ -207,7 +207,7 @@ export function chooseWidths(roads, walls, panos = []) {
       let sw = -1;
       if (ov.sw >= 0) sw = ov.sw;
       else if (m && m.n >= 6 && !dual) sw = Math.round(Math.max(1.0, Math.min(SIDEWALK_W[r.c] + 3, (m.W25 - w) / 2)) * 10) / 10;
-      Object.assign(o, { w, sw, src: 'pano' + (dual ? '-dual' : ''), center: !!ov.center });
+      Object.assign(o, { w, sw, src: 'pano' + (dual ? '-dual' : ''), center: !!ov.center, swFixed: ov.sw >= 0 });
       return;
     }
     const tw = parseFloat(r.tags?.width);
@@ -225,7 +225,7 @@ export function chooseWidths(roads, walls, panos = []) {
 // trên tim ĐÃ dịch (lòng trùm footprint Overture ở > 10% trạm = quá rộng/lệch), (ii) lòng + vỉa không vào đa giác địa danh
 // LM_POLY (Bưu điện: lòng rộng mới từng trùm 56 m² nhà thật). Không bao giờ hẹp hơn mặc định cấp.
 export function capWidths(roads, widths, walls, polys = [], panos = []) {
-  const stat = { wall: 0, lm: 0 };
+  const stat = { wall: 0, lm: 0, fl: 0 };
   // camera pano ĐANG trong lòng way (theo bề rộng trước kẹp) → lòng phải còn chứa nó (|d| + 0,9 m nửa thân xe): pano là
   // bằng chứng mạnh hơn tường Overture (phố dài: vài đoạn tường sát tim kéo phân vị xuống — Phan Đình Phùng 12 → 8 m
   // từng đẩy 6 camera ra ngoài bó vỉa)
@@ -247,6 +247,11 @@ export function capWidths(roads, widths, walls, polys = [], panos = []) {
       const near = m.st.map((q) => Math.min(q.W / 2 + q.m, q.W / 2 - q.m));
       const q10 = quant(near, 0.1);
       if (q10 != null && hw > q10 - 0.3) { const h = Math.max(hw0, need[ri], q10 - 0.3); if (h < hw) { sw += hw - h; hw = h; stat.wall++; } }
+      // (iii) MẶT TIỀN ≤ trung vị tường GẦN + 0,5 (≥ mặt tiền cấp; vỉa do ghi đè pano giữ nguyên). Bước (i) chuyển phần lòng
+      // cắt SANG vỉa → mặt tiền vẫn ở W25/2 của tim lệch tâm (ngõ r w5,5 + vỉa 7,8 m: pano_477 tường thật 4-6 m, game 10-15 m —
+      // process_buildings cắt nhà thật LÙI về facadeLine ⇒ "quá xa" 293 → 416 hướng; review W3-A 2026-10-06, thử regenD).
+      const flCap = Math.max(hw0 + SIDEWALK_W[r.c], quant(near, 0.5) + 0.5);
+      if (!o.swFixed && hw + sw > flCap + 0.05) { sw = Math.max(Math.min(sw, SIDEWALK_W[r.c]), flCap - hw); stat.fl++; }
     }
     let dmin = Infinity;
     let rx0 = 1e9, rz0 = 1e9, rx1 = -1e9, rz1 = -1e9; for (const [x, z] of r.pts) { rx0 = Math.min(rx0, x); rx1 = Math.max(rx1, x); rz0 = Math.min(rz0, z); rz1 = Math.max(rz1, z); }

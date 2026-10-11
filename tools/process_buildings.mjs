@@ -864,14 +864,19 @@ function fillGap(s, sg, t0, t1) {
     // trình công cộng/khối lớn có sân trước thật) — kiểm 5 điểm dọc mép sau lô, cách thêm 0,6 m.
     let shallow = false;
     if (lo < 6) {
-      let ok = lo >= 3, nHit = 0;
+      let ok = lo >= 3, nHit = 0, frontReal = false;
       for (let k = 0; k < 5 && ok; k++) {
         const u = uBase + ta + ((k + 0.5) / 5) * (tb - ta);
         const [x, z] = F.world(u, lo + 0.6);
         const j = buildingAt(x, z); if (j < 0) continue;
         nHit++; const o = B[j];
         if (o.civic || o.big || o.tallObs || o.area > 400) ok = false;
+        // Đợt 3 W3-A: nhà THẬT phía sau có cạnh mặt phố ngay ngắn (song song ±25°, ≤ 7,2 m — loại snapFront cũ từng kéo ra) =
+        // nhà lùi THẬT, nay giữ đúng chỗ Overture (SNAP_MAX 1,5) → không dựng "cơi nới" SINH chắn trước nó (FP-1: không mặt
+        // nhà sinh nào gần camera hơn nhà thật; review: lô nông 275 → 1338 khi chặn kéo). Cơi nới chỉ trước nhà lệch góc.
+        else if (!o.synth && o.pts.some((_, q) => frontOf(o.pts, q, j, 7.2))) { ok = false; frontReal = true; }
       }
+      if (frontReal) { stat('gap_veto_shallow_real'); GAPDBG.push([mx, mz, 'shallow']); continue; }
       if (!ok || nHit < 2) { stat('gap_too_shallow'); GAPDBG.push([mx, mz, 'shallow']); continue; }
       shallow = true; stat('gap_shallow_lots');
     }
