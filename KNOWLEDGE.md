@@ -420,7 +420,7 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
-- **2026-10-05/06 (W3-B PARCELS)** [ĐỢT 3 wave 3 — Ô ĐẤT THẬT: khuôn viên tường rào + cổng, đất trống rào tôn, chợ, tỉ lệ cửa
+- **2026-10-05/06/11 (W3-B PARCELS)** [ĐỢT 3 wave 3 — Ô ĐẤT THẬT: khuôn viên tường rào + cổng, đất trống rào tôn, chợ, tỉ lệ cửa
     hàng theo phố, claim quảng trường, Chợ Con — AUDIT3 FP-2]:
     **Vấn đề (AUDIT3 S2 Σ345 + GAP):** generator chỉ biết 1 kiểu ô (dãy nhà ống) → lấp khe/lõi ô bằng nhà ống SINH vào khuôn
     viên biệt thự/cơ quan/trường, sân chợ, lô quây tôn; kéo mặt tiền biệt thự ra sát vỉa hè; công năng trệt chỉ theo cấp phố
@@ -496,6 +496,20 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     chọn bộ không biển; cổng 464/510 đã về ranh đất nhưng 2 ảnh vẫn ~3 m trước cổng vì camera pano lệch tim phố
     (thật: cổng ở BÊN KIA phố — W3-A). Ảnh: scratchpad dot3/W3-B g_00..12.jpg + r2/final_00..12.jpg (REAL|dot3|cuối), grades.txt
     + r2/overrides.txt.
+    **LƯỢT 3 (2026-10-11):** (a) BÃI GIẢI TOẢ Hoàng Diệu: vùng chừa "khuôn viên Cảng vụ" là VÒNG r45 quanh (326, −826) ở CẢ
+    generator lẫn world.js `clearedZone` → giữ nguyên dãy footprint Google cũ + lô sinh phía bắc đường ngay trước pano_019 (thật:
+    bãi gạch vụn nhìn ra cần cẩu cảng) và 1 footprint 3 T "NHÀ THUỐC" nằm TRONG thân ô dựng tay Cảng vụ. Nay generator KHÔNG chừa
+    gì (Cảng vụ = ô dựng tay `compound(326,−826,38×13,−135°)`; −10 nhà, bcmp: không nhà nào khác đổi), world.js chỉ chừa HỘP sân
+    54×27 m (+1 m) của ô đó (gạch vụn/tường dở lan tới sát sân). (b) Bước 11 kiểu nhà: quan sát pano khớp tia tả công trình công
+    cộng/công sở/biệt thự (không kho-xưởng) THẮNG luật "vùng cảng/khối > 2500 m² → SHED" (Trung tâm Hội nghị TP trước pano_020:
+    tân cổ điển Pháp 3 T, OSM 5.359 m², từng là KHO cửa cuốn); công sở/công trình công cộng KIỂU PHÁP (pháp/tân cổ điển/thuộc
+    địa) ≤ 3 T → bộ mô-đun VILLA (cửa chớp/vòm/lan can; trệt G_HOME0/G_CIVIC không dải biển) thay CIVIC. Lý do: bộ trệt CIVIC
+    `G6` của citygen = [G_CIVIC, G_CIVIC, G_GLASS] mà G_GLASS có DẢI BIỂN (SIGN_EXT) → thử CIVIC cho Trung tâm Hội nghị mọc
+    "NHÀ THUỐC/KÍNH MẮT/PHỞ BÒ" (W3-C: công sở/khuôn viên — INFO PK ≠ 0 hoặc STYLE.CIVIC — nên chọn bộ trệt không biển). Đổi 4
+    nhà (`style_port_obs_override` 2, `style_civic_french_villa` 3). (c) ĐÃ CÂN NHẮC, KHÔNG làm: "khép khe < 4 m" (ngõ 1,5-3 m
+    của HP phần lớn KHÔNG có trong OSM — khép sẽ bít ngõ thật; 1/120 pano kiểm toán than khe hẹp: 368), "nhà cổng vòm" bắc qua
+    ngõ (345 — cần mô-đun renderer), tháp xa ngoài bán kính dựng (LOD — renderer/perf), "+1 tầng phố thương mại" (đã đo khớp).
+    __R3_NUMBERS__
     **BẪY:** (a) `\b` của JS không hiểu chữ có dấu ("chợ\b" không bao giờ khớp) → ranh giới tường minh; (b) "tôn" khớp trong
     "bê tông" → `tôn(?!g)`; (c) màu tường rào phải lấy từ CỤM chữ tả tường/rào/trụ/cổng — "chòi gác vàng" từng nhuộm cả rào;
     (d) tường dựng tay trong ô cells nằm ngay mặt phố — phải dò hình học trước khi dựng tường dữ liệu; (e) đo cảnh trước freeze
