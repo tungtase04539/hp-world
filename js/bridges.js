@@ -77,7 +77,7 @@ function toGeo(B) {
   g.setAttribute('uv', new THREE.Float32BufferAttribute(B.u, 2));
   g.setIndex(B.idx);
   // nhả mảng JS nguồn (đã chép sang typed array): closure trả về (keep/promSide…) giữ NGỮ CẢNH hàm dựng — mảng Buf
-  // nằm trong ngữ cảnh đó (hàm con dùng chung) ⇒ không nhả thì ~30 MB heap sống suốt phiên (đo heap sau gc: +54 → …)
+  // nằm trong ngữ cảnh đó (hàm con dùng chung) ⇒ không nhả thì ~30 MB heap sống suốt phiên (heap sau gc so với dot3: +54 → +27 MB)
   B.p = B.n = B.c = B.u = B.idx = [];
   return g;
 }

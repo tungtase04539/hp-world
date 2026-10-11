@@ -467,7 +467,8 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     quan mạng đường OSM ↔ "độ đường" ảnh, mpp 0,67 — georef trong README tile 7 SAI) + cấu trúc pano: polygon OSM sông Tam Bạc
     chạy ĐÈ lòng Phố Tam Bạc (tim phố cách mép nước 2-6 m ở pano_197-203). Đỉnh polygon sông (chia ≤ 3 m) bị đẩy theo pháp
     tuyến phố (song song ≤ 40°, không phải cầu) tới ≥ hw + vỉa hè + 2,5 m; footway=sidewalk ven sông ≥ 3 m. 649 đỉnh, tối đa
-    9,1 m. Đoạn bắc Lạc Long polygon lệch TÂY (ảnh vệ tinh) — chưa sửa (kéo nước vào sẽ ngập footprint Overture bờ tây).
+    9,1 m. Đoạn bắc 221 → 333: mép đông polygon cách kè MỚI (ảnh vệ tinh tile 7, chụp SAU pano — đường kè mới) 15-25 m về tây,
+    nhưng pano 2022-23 (519/336/337/520) cho thấy đúng dải bờ tự phát rộng ~10 m (lán + cây) ⇒ GIỮ polygon, dải đó = 'strip'.
     **(5) BỜ KÈ** (`js/riverbank.js`): (a) `snapBankGrid` — lưới nền local 13,3 m vẽ bờ thành dốc thoải ~5 m (mép nước theo ô,
     "nước phẳng với vỉa hè"): đỉnh ±0,72 ô quanh mép polygon kéo VỀ MÉP (cao độ đất), đỉnh nước kế tiếp DÌM −60 m (tam giác bờ
     gần đứng, phần nhô trên mặt nước ≤ 0,6 m nằm sau tường kè — kéo về "chân kè 3 m" như lưới mịn hồ sinh NÊM dài nhô lên mặt
@@ -478,8 +479,11 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     gờ bê tông — phố s/p sọc đỏ-trắng 1 m như pano_221, t/r xám như 203) + đèn gang 2 bóng 16 m (bóng = sharedMats.lampGlow,
     sáng đêm) + khóm hoa giấy + collider chặn rơi + CÂY NON chống cọc 9 m (world.js veg.plant('non')), phố đó KHÔNG trồng cây
     đường phố cổ thụ cả 2 bên (keepClear), đồ vỉa hè props.js không đặt phía sông (promSide)); 'strip' (Tam Bạc đoạn BẮC Lạc
-    Long → cửa Cấm, z < −600, pano_519/331/336 — LUÔN strip: lan can sắt thấp ở MÉP VỈA HÈ, lán tôn/bạt màu thấp 1,9-2,4 m giữa
-    lan can và kè, GIỮ cổ thụ + xe máy đỗ); 'wild' (không phố, bờ xa > 7 m ngoài đoạn bắc, dưới cầu: chỉ kè). Thuyền gỗ neo bờ
+    Long → cửa Cấm, z < −600, pano_519/331/336 — LUÔN strip: lan can sắt thấp ở MÉP VỈA HÈ (tấm CHUỖI VÒNG TRÒN sẫm alphaTest
+    như ảnh 519 h180/331 h270 + trụ bê tông 6 m + chậu cây), lán tôn/bạt màu thấp 1,9-2,4 m giữa lan can và kè, GIỮ cổ thụ + xe
+    máy đỗ, CÂY LỚN trong dải (bankTrees: hàng ≤ 6 m sau lan can, dải ≥ 8 m thêm hàng thưa phía kè; world.js plant('shade'));
+    hàng rào vòng tay khối B2 "phố thuyền" bỏ khi kit chạy (từng thành 2 hàng rào song song)); 'wild' (không phố, bờ xa > 7 m
+    ngoài đoạn bắc, dưới cầu: chỉ kè). Thuyền gỗ neo bờ
     Tam Bạc đoạn bắc. BẪY: keep/promSide phải giới hạn theo QUÃNG có dải dạo trên đoạn ROADS_DT (keepSegs si → [t0,t1] + 6 m)
     — 1 đoạn dài (Phố Tam Bạc 221 → 335) vừa có dải dạo vừa là dải tự phát; áp cả đoạn từng xoá hàng cổ thụ + xe máy phía sông
     ở pano_336 (12 → 4 cây, 30 → 13 xe trong 22 m).
@@ -490,9 +494,26 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     đường phố (keepClear), KHÔNG đồ vỉa hè props (avoid), và MỌI cây dựng tay/ô/hồ bị `buildTrees` bỏ (hook `ctx.dropAt` —
     trees.js 1 dòng, thống kê fix.deck): cau/cọ + cây non từng đứng XUYÊN mặt Cầu Lạc Long +2 m (pano_074 h0). Nhịp chính HVT
     ~19 m: cây nhỏ dưới gầm vẫn được. riverbank `deckAt` → không lan can/đèn/cây non dưới cầu nâng (roadnet bỏ dải mặt đất
-    của cầu nâng nên `roadSurfaceAt` = 0 ở đó). Lòng 2 NÚT XOẮN (way 'ramp' gần tròn quét ≥ 300°): claimCircle 'park'
-    (r − w/2 − 4 ≈ 55 m) → landuse tô CỎ thay bãi đất be (ảnh 304/349: thảm cỏ + cây bụi cắt tỉa). Texture mặt nhựa cầu 256 ×
-    288 px / (bề rộng × 12 m) = texel ~VUÔNG 4 cm: bản 64 × 256 (16 × 4,7 cm) kéo hạt nhựa thành vệt hướng về camera.
+    của cầu nâng nên `roadSurfaceAt` = 0 ở đó). Lòng 2 NÚT XOẮN (way 'ramp' gần tròn quét ≥ 300°; ảnh vệ tinh real_7: phần lớn
+    là BÃI NHỰA + 1 vườn bán nguyệt phía nam): claimPoly 'park' bán elip 38 × 27 m (dây cung cách tâm 15 m về nam) TRƯỚC, rồi
+    claimCircle 'parking' (r − w/2 − 2) → landuse tô bãi nhựa / cỏ (landuse.js: lớp claim mới 'parking' → PARKING, 1 dòng) thay
+    "bãi trống đất be" + tấm nhựa đen. Texture mặt nhựa cầu 256 × 288 px / (bề rộng × 12 m) = texel ~VUÔNG 4 cm: bản 64 × 256
+    (16 × 4,7 cm) kéo hạt nhựa thành vệt hướng về camera. Mặt DƯỚI mặt cầu bê tông sáng 0xcdc9bf (0x8d8a83 cũ thành mảng đen
+    lơ lửng khi nhìn từ dưới nút xoắn, pano_304 h90).
+    **(8) BÃI BỒI CỬA TAM BẠC** (process_osm §6b3b, AUDIT3 FP-6 "331 (−525,−905)"): ảnh vệ tinh tile 7 — polygon OSM Tam Bạc
+    242027154 phủ CẢ bãi cát + lùm cây rộng 25-60 m giữa lạch nước thật (~36 m, sát bờ tây, tim = waterway 680814260) và kè phố
+    Tam Bạc (pano_331/332/383/384: rào + cây rậm + nhà tôn thấp, KHÔNG thấy nước; game cũ: mặt sông mở 15 m trước camera).
+    Mép đông polygon từ chân bãi (z −830) tới cạnh chung với polygon Cấm được THAY bằng đường bờ bãi `BEACH_SHORE` (11 điểm đo
+    trên tile 7; z < −965 ngoài ảnh = tim lạch + 19 m, khớp đoạn đo) — ghép 1 DẢI LIÊN TỤC các đỉnh (chia ≤ 3 m) phía đông đường
+    bờ, đỉnh gốc ngoài dải giữ y hệt; xuất `BEACHES` (đa giác đất bãi). riverbank.js: mẫu bờ có phía đất trong BEACHES = DỐC CÁT
+    tự nhiên 4,5 m (không tường kè), 'strip' (tìm phố ±3 ô lưới, giới hạn keClear + 75 m): lan can vòng ở mép vỉa hè + lán sát
+    SAU lan can theo hướng phố (22 %) + lùm cây rải trên bãi (lưới 7 m xê dịch, mật độ theo ô 22 m, cách nước ≥ 3,5 m); claimPoly
+    'rough' → landuse tô CỎ DẠI/đất (landuse.js lớp claim 'rough' → ROUGH; claim 'rough' không chặn cây/prop). BẪY: ảnh vệ
+    tinh MỚI hơn pano (kè + đường mới ở cửa sông, dải lán đã dọn) — chấm pano theo trạng thái 2022-23, đo bờ theo vệ tinh.
+    **(9) KHỞI ĐỘNG / BỘ NHỚ**: snapBankGrid lọc thô theo cao độ đỉnh (chỉ đỉnh ≤ 4 ô quanh chỗ đổi khô/ướt mới gọi waterSD:
+    −85 % lần gọi) + chỉ trong R_POLY; giao thông chỉ tra groundHeight ở điểm cạnh CÓ mặt cầu phủ (cạnh 'elev'); cây non lọc
+    collider bằng lưới 4 m theo hộp bao (thay colliders.some × 234 cây); riverbank/bridges nhả mảng JS nguồn sau khi chép sang
+    typed array (closure keep/promSide giữ ngữ cảnh hàm dựng ⇒ không nhả = ~30 MB heap sống suốt phiên).
     **ĐO / KIỂM**: (điền sau)
 
 - **2026-10-04 (W2-F POLISH)** [ĐỢT 3 wave 2 — WebGL1, giải mã RB 1 lần, kho cảng, ĐÊM, giao thông né xe đỗ, dọn code chết, hitch]:
