@@ -435,8 +435,9 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
-- **2026-10-05 (W3-F WATER-BRIDGES)** [ĐỢT 3 wave 3 — AUDIT3 FP-6: cầu HVT theo way OSM (2 nút xoắn ốc), Cầu Lạc Long nâng,
-  bờ kè sông Tam Bạc/Cấm (tường kè, dải dạo, lan can gang, đèn 2 bóng, hoa giấy, cây non, dải bờ tự phát), màu nước]:
+- **2026-10-12 (W3-F WATER-BRIDGES)** [ĐỢT 3 wave 3 — AUDIT3 FP-6: cầu HVT theo way OSM (2 nút xoắn ốc), Cầu Lạc Long nâng,
+  bờ kè sông Tam Bạc/Cấm (tường kè, dải dạo, lan can gang, đèn 2 bóng, hoa giấy, cây non, dải bờ tự phát), bãi bồi cửa Tam Bạc,
+  màu nước]:
     **(1) CẦU HVT THẬT = 2 làn một chiều + 2 NÚT XOẮN ỐC** (OSM: 738297304/930885732 layer 2 nhịp chính x≈−48/−59 z −930→−1880;
     1022715416/1022715417 layer 1 = vòng tròn r≈63 m tâm (17,−930)/(−133,−932); dốc dẫn 743181389/743181388 cùng tên KHÔNG gắn
     bridge). Mô hình cũ = hộp thẳng nối 2 đầu way bắc (75,−898)→(−45,−1883): vòm lệch ~110 m về đông pano_285, tâm vòm ở z −1391
@@ -514,7 +515,17 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     −85 % lần gọi) + chỉ trong R_POLY; giao thông chỉ tra groundHeight ở điểm cạnh CÓ mặt cầu phủ (cạnh 'elev'); cây non lọc
     collider bằng lưới 4 m theo hộp bao (thay colliders.some × 234 cây); riverbank/bridges nhả mảng JS nguồn sau khi chép sang
     typed array (closure keep/promSide giữ ngữ cảnh hàm dựng ⇒ không nhả = ~30 MB heap sống suốt phiên).
-    **ĐO / KIỂM**: (điền sau)
+    **ĐO / KIỂM** (2026-10-12, tier 3, ANGLE AMD Radeon 890M D3D11, A/B CÙNG phiên dot3 :8596 vs nhánh :8506): hpReady TB 3 lần
+    4751 → 4756 ms (không đổi); heap sau gc 385 → 412 MB (+27; trước khi nhả mảng nguồn +54), hình học GPU 254,7 → 277,8 MB
+    (cầu + kè gộp 'mrg' 30 → 51); fps 60 (trần vsync) mọi góc; cam_spawn 387 → 402 calls / 3,83 → 3,93 M tam giác, pano_007_h090
+    505 → 508 / 5,52 → 5,53 M, cam_high_center 392 → 415 / 5,24 → 5,41 M, game_3 348 → 350 / 6,10 → 6,09 M, cam_hvt 633 → 658 /
+    6,88 → 7,01 M. Kit bờ: 5605 mẫu, dải dạo 3,24 km, strip ≈ 0,45 km, bãi 0,37 km, 191 đèn, 235 cây non, ≈ 95 cây lớn, ~100 ms.
+    Chấm pano (REAL | dot3 | nhánh, 4 hướng, ±0,5): 17 pano đích 2,91 → 4,51 (285 1,5 → 5; 304 2 → 4,5; 349 2 → 4,5; 074 2,5 → 5,5;
+    331 3 → 3,8); 8 pano đối chứng 4,56 → 4,56 (lệch điểm ảnh ≤ 7 %, chỉ lá cây lay). Cổng: diag "TẤT CẢ THỰC THỂ OK — 0 lỗi JS"
+    (full, giao thông bất biến 0); lite 3 × 404 = assets_lite/ trống ở máy (môi trường, base y hệt); --gl1 0 lỗi; tour 26 ảnh
+    0 lỗi; waterbfs 5/5; process_osm chạy lại → mapdata y hệt; đi bộ theo xích mặt cầu (surfaceY tham chiếu) sai số 0, không rơi.
+    CÒN: camera/lòng phố pano_331/519 (FP-1), bậc polygon 2 mảnh Tam Bạc ở pano_221 (gờ kè chéo qua bãi cỏ), tháp thang máy
+    HVT là khối kính đơn giản, vòm HVT neo z −1030 (ảnh 285 h270 thấy chân vòm gần hơn ~20 m).
 
 - **2026-10-04 (W2-F POLISH)** [ĐỢT 3 wave 2 — WebGL1, giải mã RB 1 lần, kho cảng, ĐÊM, giao thông né xe đỗ, dọn code chết, hitch]:
     **(1) WebGL1** (three r160 tự lùi WebGL1 khi không có WebGL2): KIỂM bằng `tools/qa/shoot.mjs --gl1` (init script cho
