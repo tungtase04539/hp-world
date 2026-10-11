@@ -1081,8 +1081,8 @@ export function buildRoadNet(ROADS_DT, deps) {
       const wid = deps.widthOf ? deps.widthOf(w.ri, w.c) : (ROADS_DT[w.ri] && ROADS_DT[w.ri].w) || 2 * hw;
       const dual = w.c !== 'p' && dualRun(w, P, cum);
       if (w.c === 'p') pat = MK.CDBL | MK.EDGE | MK.LANES | MK.GUTTER;
-      else if (w.c === 's') pat = wid >= 7.5 ? ((dual ? MK.CDW : MK.CDY) | MK.EDGE | MK.GUTTER) : MK.GUTTER;
-      else if (w.c === 't') pat = wid >= 7.5 ? (dual ? MK.CDW : MK.CDY) : 0;
+      else if (w.c === 's') pat = wid >= 8 ? ((dual ? MK.CDW : MK.CDY) | MK.EDGE | MK.GUTTER) : MK.GUTTER;
+      else if (w.c === 't') pat = wid >= 8 ? (dual ? MK.CDW : MK.CDY) : 0;
       if (dual) stats.marks.dual++;
       // nhãn ảnh gần nhất trên way này (khoảng cách tới đa tuyến đoạn chạy ≤ 150 m; nhãn lan từ dải đối diện +40 m)
       let lab = 0, lbd = 150;

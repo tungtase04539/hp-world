@@ -38,10 +38,11 @@ export function hedgeLeafTexture() {
 }
 
 // paths: [[[x,z],...], ...]; gy(x,z) → cao độ đáy; opt: {h, w, seg, rough (lệch hông/đỉnh m), top (lồi đỉnh m), seed,
-//   base [r,g,b] 0..1 sRGB màu đỉnh, foot (hệ số tối chân 0..1), wild (0 cắt tỉa phẳng … 1 bụi tự nhiên)}
+//   base [r,g,b] 0..1 sRGB màu đỉnh, foot (hệ số tối chân 0..1), wild (0 cắt tỉa phẳng … 1 bụi tự nhiên),
+//   maxHalf (kẹp nửa bề ngang m — bụi dải phân cách không phồng ra ngoài bó vỉa)}
 export function hedgeGeometry(paths, gy, opt = {}) {
   const H = opt.h ?? 0.7, W = opt.w ?? 0.7, SEG = opt.seg ?? 0.8, R = opt.rough ?? 0.05, TOP = opt.top ?? 0.06, seed = opt.seed ?? 1;
-  const wild = opt.wild ?? 0, base = opt.base ?? [0.24, 0.36, 0.17], foot = opt.foot ?? 0.55;
+  const wild = opt.wild ?? 0, base = opt.base ?? [0.24, 0.36, 0.17], foot = opt.foot ?? 0.55, MH = opt.maxHalf ?? Infinity;
   // mặt cắt (ngang, cao) theo tỉ lệ: 0 đáy trái … 6 đáy phải
   const PROF = [[-0.5, 0], [-0.54, 0.5], [-0.44, 0.9], [0, 1.0], [0.44, 0.9], [0.54, 0.5], [0.5, 0]];
   const NP = PROF.length;
@@ -74,7 +75,7 @@ export function hedgeGeometry(paths, gy, opt = {}) {
         const top = py > 0.8, side = py > 0.2 && py < 0.8;
         const jl = (h2(x + k * 1.7, z, seed + 11) - 0.5) * 2 * R * (side ? 1 : 0.5) * (1 + wild);
         const jv = top ? (h2(x, z + k * 2.3, seed + 13) - 0.5) * 2 * R * (1 + 2 * wild) + (k === 3 ? TOP : 0) : 0;
-        const lat = px * ww + Math.sign(px) * jl, yy = y0 + py * hh + jv;
+        const lat = Math.max(-MH, Math.min(MH, px * ww + Math.sign(px) * jl)), yy = y0 + py * hh + jv;
         pos.push(x + nx * lat, yy, z + nz * lat);
         const shade = (foot + (1 - foot) * Math.min(1, py * 1.15)) * tone * (0.92 + 0.16 * h2(x * 3.1 + k, z * 2.9, seed + 17));
         col.push(lin(Math.min(1, base[0] * shade)), lin(Math.min(1, base[1] * shade)), lin(Math.min(1, base[2] * shade)));
