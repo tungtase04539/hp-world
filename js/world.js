@@ -20972,6 +20972,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     // (xanh ô liu xỉn, không xanh neon) có bó vỉa đá, bồn cây tròn PHẲNG + bụi tròn cắt tỉa. Bản cũ: thảm cỏ 0x6fae4e
     // phủ kín ô đất (AUDIT3 PARK "neon lawns", 001 056 225 230 235 400 405 428) + vòm hoa bán cầu hồng/xanh ("toy dome
     // mounds") + lối chữ thập be. Màu cỏ: đo ảnh vệ tinh W2-D cỏ ~(95,105,82); trên phố ô cỏ nắng ~(100-125,115-135,60-80).
+    const _gT0 = performance.now();                    // QA: world.gardenStats.ms (pha furniture)
     const bedRimM = mat(0x9d998f);                     // bó vỉa đá xám bồn/ô cỏ (bản cũ be 0xa89878)
     const plazaTex = makeTex(256, 256, (g2, w, h) => {   // đá granite xám lát 60×60 cm (texture = 2,4 m)
       const N = 4, s2 = w / N;
@@ -21004,6 +21005,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     const rimGeos = [], bedGeos = [], topiGeos = [];
     const hpGy = (x, z) => LAND_H + 0.1;   // chân bụi chìm 2 cm dưới mặt sân lát (+0,12)
     const onPaved = (x, z) => world.roadNet && world.roadNet.surfaceAt && world.roadNet.surfaceAt(x, z) > 0.05;   // lòng/vỉa hè roadnet
+    const onCarr = (x, z) => { const s = world.roadNet && world.roadNet.surfaceAt ? world.roadNet.surfaceAt(x, z) : 0; return s > 0.05 && s < 0.2; };
     const tintGeo = (g2, rgb, seedV, amp) => {   // màu đỉnh tuyến tính × nhiễu tất định theo vị trí đỉnh
       const P = g2.attributes.position, c = new Float32Array(P.count * 3), lin = (v) => Math.pow(v, 2.2);
       for (let i = 0; i < P.count; i++) {
@@ -21165,7 +21167,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
           if (ins < 0) continue;
           for (let t = 2.2; t <= eL - 2.2 + 1e-6; t += 1.0) {
             const px = ax + ex * t + nx * ins, pz = az + ez * t + nz * ins;
-            const bad = gaps.some(([g0, g1]) => t > g0 && t < g1) || !inPoly(px, pz) || onPaved(px, pz) || onCarriageDisc(px, pz, 0.5) || clrNearPano(px, pz, 3.5) || nearOldHedge(px, pz);
+            const bad = gaps.some(([g0, g1]) => t > g0 && t < g1) || !inPoly(px, pz) || onPaved(px, pz) || onCarr(px + nx * 0.55, pz + nz * 0.55) || onCarr(px - nx * 0.55, pz - nz * 0.55) || clrNearPano(px, pz, 3.5) || nearOldHedge(px, pz);   // 2 điểm NGANG thay đĩa 8 điểm (dọc: mẫu kề 1 m) — bớt ~30k surfaceAt
             if (bad) { flush(); continue; }
             cur.push([px, pz]);
           }
@@ -21223,7 +21225,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     if (hedgePaths.length) {
       const hg = hedgeGeometry(hedgePaths, hpGy, { h: 0.72, w: 0.75, seg: 0.8, rough: 0.05, top: 0.06, seed: 5, base: [0.37, 0.51, 0.23], foot: 0.68 });
       const hm = new THREE.Mesh(hg, hedgeMaterial()); hm.castShadow = true; hm.receiveShadow = true; hm.name = 'garden_hedges'; scene.add(hm);
-      world.gardenStats = { hedgeM: hedgePaths.reduce((s2, p2) => s2 + (p2.length - 1), 0), hedgeTris: hg.index.count / 3, parterres: parterres.length, beds: rimGeos.length, topiary: topiGeos.length };
+      world.gardenStats = { hedgeM: hedgePaths.reduce((s2, p2) => s2 + (p2.length - 1), 0), hedgeTris: hg.index.count / 3, parterres: parterres.length, beds: rimGeos.length, topiary: topiGeos.length, paths: pathPos.length / 18, ms: Math.round(performance.now() - _gT0) };
     }
   }
 

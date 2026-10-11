@@ -433,12 +433,12 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     BẪY đã thử và BỎ: dò vạch vàng tự động trên ảnh pano (ngưỡng màu) — vạch sơn mòn nắng (220,183,131) lẫn biển/taxi/tường
     vàng → tách kém (âm/dương chồng nhau); OSM `oneway=yes` KHÔNG suy được "không tim vàng" (LKT/ĐTH/NĐC oneway vẫn kẻ vàng).
     **(2) `js/roadnet.js` vạch tim:** nhãn ảnh gán cho WAY gần nhất (≤ 12 m) rồi LAN dọc way ≤ 150 m (đo tới đa tuyến đoạn
-    chạy) > chữ pano ≤ 14 m > mặc định: p như cũ; s vàng+mép nếu lòng ≥ 7,5 m; t vàng nếu lòng ≥ 7,5 m; r/h không. Bề rộng
+    chạy) > chữ pano ≤ 14 m > mặc định: p như cũ; s vàng+mép nếu lòng ≥ 8 m; t vàng nếu lòng ≥ 8 m; r/h không. Bề rộng
     lòng = `ROADS_DT[ri].w` nếu generator có (W3-A per-way width) — chưa có thì theo cấp (t 8 → vẫn vàng: nhãn mới là thứ bỏ
     vàng ở Hạ Lý/Dư Hàng/Chùa Hàng/Mê Linh/Lê Lợi/Bến Bính/NTP). Nhãn N: p chỉ mép, s chỉ rãnh biên, t/r trơn. ĐƯỜNG ĐÔI (way
     song song cùng chiều |cos|>0,94, khe mép lòng −0,5…8 m ở ≥ 60% mẫu 10 m) → không vàng, vạch trắng đứt (Lê Quang Đạo 216/478).
     **(3) Zebra/đèn:** CHỈ khi có node OSM trong vùng nút (rad + 10 m) hoặc bằng chứng chữ pano ≤ 45 m — mỗi điểm bằng chứng
-    gán cho MỘT nút tốt nhất (tổng hạng nhánh + 2·số nhánh p/s − d/12; số nhánh chỉ còn là "tie-breaker"). Đèn: OSM hoặc (pano
+    gán cho MỘT nút tốt nhất (tổng hạng nhánh + 2·số nhánh p/s − d/3; zebra chỉ nút ≤ rad + 12 m — xem (9a)). Đèn: OSM hoặc (pano
     + ≥ 2 nhánh p/s/t); cụm ≥ 45 m ưu tiên OSM > pano > hạng (nút bị bỏ đèn chỉ giữ zebra nếu có node/chữ zebra). Zebra theo NHÁNH: node OSM gần vị trí vạch (gốc + setback + 2,3 m,
     ≤ 14 m, lệch ngang ≤ hw + 2,5) → nhánh đó; nút có đèn → mọi nhánh phố; node ở tâm/bằng chứng chữ → nhánh p/s/t. Số liệu
     R1750: đèn 131 → 29 (25 OSM + 4 pano), nhánh zebra 750 → 239 (115 OSM, 79 theo đèn, 45 chữ). Chữ pano: mệnh đề
@@ -457,7 +457,7 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     (169,113,90) trên ảnh; lớp 5 = gạch tự chèn "con sâu" XÁM. Canvas caro kè hồ (`sidewalkMaterial`) cùng mẫu; 5 canvas caro
     ô cells (#b8574a/#a8452e/#b24a3a: Thế Lữ, Tam Bạc tsCaroMat, ĐBP, dm7…) → #b8897a/#b38a7b. BẪY chữ pano: mệnh đề "sân/
     quảng trường/trước cổng" là SÂN, không phải vỉa hè phố (pano_167 sân trường đỏ từng lan cả Lê Lợi) → bỏ qua.
-    **(5) Vườn hoa (dải An Biên → Tố Hữu, khối "DẢI VƯỜN HOA" world.js):** ảnh thật sau cải tạo = SÂN LÁT ĐÁ XÁM + hàng cây
+    **(5) Vườn hoa (dải An Biên → Tố Hữu, khối "DẢI VƯỜN HOA" world.js; nền cỏ/sân theo vườn — xem (9e)):** ảnh Tố Hữu = SÂN LÁT ĐÁ XÁM + hàng cây
     + viền bụi cắt tỉa thấp + ô cỏ ô liu xỉn có bó vỉa đá + bồn tròn phẳng/bụi tròn (vệ tinh real_3: tán cây phủ, khoảng hở là
     sân xám). Nay: `garden_plaza` (ExtrudeGeometry cùng cao +0,12 như thảm cỏ cũ — không thêm chỗ chồng lòng đường; texture granite
     60 cm, UV = mét) + ô cỏ 11×11 m trên lưới 17 m (4 góc trong polygon, KHÔNG trên lòng/vỉa hè roadnet, ≥ 9 m camera pano, ~1/5 để
@@ -486,6 +486,24 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     Kè Tam Bạc ô cells `v1caro` cùng mẫu caro bạc màu của `sidewalkMaterial`. **Giao diện roadnet:** code mới dùng
     `wHW(w) = w.hw ?? hwOf(w.c)` (W3-A gán `w.hw` theo `ROADS_DT[i].w` → khi gộp, `hwOf` không còn bị gọi); bề rộng lòng cho
     luật tim đường = `deps.widthOf(ri, c)` nếu world truyền, không thì `ROADS_DT[ri].w`, không thì 2·hw theo cấp.
+    **(9) Sửa theo PHẢN BIỆN (2026-10-12):** (a) chữ pano "vạch qua đường" CHỈ gán cho nút mà pano nằm trong vùng nút
+    + 12 m (≤ 45), điểm = hạng + 2·nPS − d/3 (đèn: vẫn ≤ 45 m, cùng −d/3). BẪY cũ (≤ 45 m, −d/12): chữ của pano_551 rơi vào nút
+    lớn cách 41 m → zebra MA ở 496 h000 và MẤT vạch thật ở 551 (8/24 chữ zebra gán > 25 m). Không có nút → vạch GIỮA KHỐI;
+    chữ tả cả đèn lẫn vạch (526 "gần ngã tư có đèn…, có vạch sang đường") → vạch ở nút đèn đó; có node OSM crossing ≤ 20 m →
+    chữ tả CHÍNH vạch đó (290 ↔ node Thế Lữ 12 m), không thêm; 2 pano ≤ 25 m cùng tả (551 + 393) → 1 vạch ở trung điểm.
+    Kết quả: bỏ 4 nút zebra ma (cạnh 496, 014, 017, 289), vạch giữa khối 116 → 118 (thêm 015, 017, 551/393). (b) Nhãn W còn
+    LAN sang dải đối diện của đường đôi (way phố khác ≤ 20 m, |cos| > 0,94, khe mép lòng −0,5…8 m; cờ `far` → thua nhãn riêng
+    +40 m): Lê Quang Đạo dải xa (ri 400, 360 m, dualRun chỉ 46% vì 2 dải tách ở đầu) hết tim vàng ở 216/478; Hồ Sen (ri 295)
+    theo nhãn 320/323/327 thay chữ "vàng" của 321. (c) gen_roadmarks: "biển (báo) người đi bộ" là bằng chứng zebra (ảnh
+    077/320/349 đều có zebra; 349 nút HVT +2 nút zebra). (d) Luật mặc định tim vàng theo bề rộng: ≥ 8 m như FP-4 (TRƯỚC khi
+    gộp W3-A luật này KHÔNG có tác dụng: ROADS_DT chưa có `.w` → 2·hw = t 8/s 10 m). (e) Vườn hoa: NỀN theo chữ pano quanh
+    vườn (58 pano ≤ 25 m ngoài mép) — An Biên/NV Trỗi/NB Khiêm/Nguyễn Du/Kim Đồng "thảm cỏ + hàng rào cây xén" (ảnh 039 235
+    340 400 043 195) → `garden_lawn` cỏ ô liu lốm đốm (canvas LCG 128 px = 4 m) + `garden_paths` lối chữ thập lát đá 4 m
+    (quad UV = mét, dùng chung plazaM); CHỈ Tố Hữu ("quảng trường rộng" 224/225/545) giữ sân lát + ô cỏ (lệch ±1 m, cạnh
+    9-13 m theo hash — hết lưới đều). Sân lát 176 → 152 (từ trên cao gần trắng). (f) Bụi viền vườn + dm7 sáng hơn
+    (đỉnh (0,37,0,51,0,23), `foot` 0,68 — 225 h090 bụi gần đen); `hedgeGeometry` thêm `maxHalf` (kẹp nửa bề ngang) → bụi
+    dải phân cách LQĐ ≤ 0,7 m trong bó vỉa 1,5 m (không lấn làn xe). (g) Caro lớp 3: viên đỏ (184,138,122) → (176,140,130),
+    xám (170,167,161) — kè Thế Lữ 290 bớt cam-hồng.
     **CHƯA LÀM:** vạch gạch chéo/xương cá ở mũi tách làn (gore, 304 — hình học nút HVT/cầu dẫn thuộc W3-F, camera lệch 11 m
     thuộc W3-A), trời u ám cho pano trời mây, mặt bê tông liền "shared surface" ngõ chợ (W3-E).
     **ĐO / KIỂM (2026-10-11, cùng phiên; base = git archive dot3 :8514, W3-D :8504; Radeon 890M TIER 3):** roadnet R1750
