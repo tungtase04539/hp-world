@@ -420,7 +420,7 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
-- **2026-10-05 (Đ3-W3-D SURFACES)** [ĐỢT 3 wave 3 — BỀ MẶT THEO BẰNG CHỨNG: vạch tim, zebra, đèn tín hiệu, vật liệu vỉa hè,
+- **2026-10-05 → 10-11 (Đ3-W3-D SURFACES)** [ĐỢT 3 wave 3 — BỀ MẶT THEO BẰNG CHỨNG: vạch tim, zebra, đèn tín hiệu, vật liệu vỉa hè,
     vườn hoa, bụi cắt tỉa, trời] (AUDIT3 FP-4: MARK 23 pano, PAVE 20, PARK 17, SKY 6 — mặc định "chỉ thêm" → sai dương tính):
     **(1) Bằng chứng mới — `tools/gen_roadmarks.mjs` → `js/roadmarks.js` (SINH):** giữ `ROAD_MARK_EVIDENCE` (chữ pano), thêm
     `ROAD_MARK_LABELS` = NHÃN NHÌN ẢNH pano thật theo trục đường (`tools/pano_loop/mark_labels.json`, 169 pano trên 72 way s/t:
@@ -439,7 +439,9 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     gán cho MỘT nút tốt nhất (tổng hạng nhánh + 2·số nhánh p/s − d/12; số nhánh chỉ còn là "tie-breaker"). Đèn: OSM hoặc (pano
     + ≥ 2 nhánh p/s/t); cụm ≥ 45 m ưu tiên OSM > pano > hạng (nút bị bỏ đèn chỉ giữ zebra nếu có node/chữ zebra). Zebra theo NHÁNH: node OSM gần vị trí vạch (gốc + setback + 2,3 m,
     ≤ 14 m, lệch ngang ≤ hw + 2,5) → nhánh đó; nút có đèn → mọi nhánh phố; node ở tâm/bằng chứng chữ → nhánh p/s/t. Số liệu
-    R1750: đèn 131 → 31 (25 OSM + 6 pano), nhánh zebra 750 → 245 (115 OSM, 85 theo đèn, 45 chữ). (dot3: 131 nút đèn chỉ 23 có
+    R1750: đèn 131 → 29 (25 OSM + 4 pano), nhánh zebra 750 → 239 (115 OSM, 79 theo đèn, 45 chữ). Chữ pano: mệnh đề
+    tả đèn/zebra Ở XA ("(xa)", "phía xa", "cuối phố", "đằng xa" — `FAR` trong gen_roadmarks, "xa" là TỪ riêng, không khớp "xanh")
+    KHÔNG tính: pano_394 "đèn tín hiệu phía cuối phố" từng dựng đèn + zebra ma ở nút cạnh pano_496 (20 m), 083 "(xa)" tương tự. (dot3: 131 nút đèn chỉ 23 có
     node OSM; 33/42 pano tả "đèn tín hiệu" nằm ≤ 50 m node OSM → OSM HP đáng tin cho đèn.) **VẠCH QUA ĐƯỜNG GIỮA KHỐI** (116):
     node OSM không thuộc nút có zebra (rad + 4) trên lòng phố (≤ hw + 2) hoặc chữ pano "có vạch qua đường" không có nút ≤ 45 m
     → TÁCH dải tại uc + 1,5 m: phần trước ZEB1 với aZeb.y = uc + 2,3 (vạch u ∈ [uc − 1,5; uc + 1,5]), phần sau ZEB0 với
@@ -477,6 +479,8 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     trục → 1 dải bụi chéo dài có "bao" phủ cả lòng phố → `flushClearance` GỠ cả mảnh (tam giác mất, đỉnh còn → bbox vẫn đúng
     mà không thấy gì). Cách làm đúng: độ thụt mỗi cạnh chọn sao cho mép phía phố (−1,3 m) nằm NGOÀI `corridorPen` (clearance)
     + ngoài lòng/vỉa hè roadnet + xa camera pano; xả thành MẨU 2 m hở 1,5 cm (không hàn đỉnh trùng → mảnh nhỏ, bao bám sát).
+    Mọi nơi sinh bụi (dm7 Trần Phú, sân Lê Chân, ĐBP, dải LQĐ) đẩy đường đi vào `world.hedgeRuns`; viền bụi vườn hoa (chạy
+    SAU khối ô) bỏ điểm ≤ 4 m quanh chúng — BẪY đã gặp: 2 hàng bụi song song cách ~2,5 m ở Trần Phú (pano_400 h000; ảnh thật 1 hàng).
     Kè Tam Bạc ô cells `v1caro` cùng mẫu caro bạc màu của `sidewalkMaterial`. **Giao diện roadnet:** code mới dùng
     `wHW(w) = w.hw ?? hwOf(w.c)` (W3-A gán `w.hw` theo `ROADS_DT[i].w` → khi gộp, `hwOf` không còn bị gọi); bề rộng lòng cho
     luật tim đường = `deps.widthOf(ri, c)` nếu world truyền, không thì `ROADS_DT[ri].w`, không thì 2·hw theo cấp.
