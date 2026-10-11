@@ -501,10 +501,27 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     tả (LOGO, BÊN CẠNH, BIỂN, MÁI HIÊN, CHỮ…) + tên phố (PHỐ/ĐƯỜNG/NGÕ…), cắt ở ranh giới từ ≤24, TỰ KIỂM (thoát lỗi nếu còn
     biển mở/kết bằng dấu câu). 954 biển (83 rác) → 1.256 biển (0 rác, 0 thương hiệu theo `isBrand`). `js/brands.js` + MIKADO,
     HARBOUR VIEW, SOLIS HOTEL, ATLANTIC. **QA**: `?labels=0` ẩn nhãn chữ nổi (`sp.userData.worldLabel`) — chỉ cho ảnh so pano.
-    **ĐO** [[MEASURE]]
-    **Chưa làm/để lại**: hero landmark (FP-8 mục 4 — cần Meshy), góc bo cong, mái ngói 1 tầng riêng, nhà trẻ, mái mansard; nhà ô
-    vẫn là hộp canvas (cửa sổ đã đẹp hơn, chưa qua shader atlas phố); 046 UV; CAMNEAR (W3-A) che phần lớn lợi ích ở pano tường
-    sát 2-3 m. Tool QA W3-C (scratchpad): `stats.mjs <port>` (cellSink tex/atlas + fabric + boot), `pick2.mjs` tia dò vật liệu,
+    **(11) BIỂN TÊN THẬT** (world.js): 1.256 biển sạch cần 4 tấm atlas 4096² với 51 hàng × 80 px → 53 hàng × 77 px = 424 biển/
+    tấm, vẫn 3 tấm (đo canvas lúc boot: 1.750 canvas / 182 Mpx = như base).
+    **ĐO** (Radeon 890M, TIER 3, ANGLE D3D11, 1280×634, `&date=2024-10-15`, A/B cùng phiên base dot3 ↔ nhánh; máy dùng chung với
+    4-6 agent → nhiễu ±150 ms mỗi pha boot): (a) ẢNH: 33 pano mục tiêu FP-3/FP-8 chấm REAL|dot3|W3-C 0-10: TB 3,30 → 3,56
+    (+0,26); 8 pano đối chứng 3,12 → 3,19 (+0,06 — 400/414 nhích nhờ biển bảng/chữ biển). (b) KHUNG HÌNH: fps 60 (vsync) mọi view
+    cả 2 bên; draw call +6..+22/view (bản sao material palette/kính, biển dọc/bảng); tam giác bằng nhau (±0,01 M); heap 542 → 508 MB.
+    (c) KHỞI ĐỘNG: perf7 (2 vòng, trước sửa atlas biển) hpReady 4.282 → 4.636 ms; pha cells 768→831, fabric 701→839, landmarks
+    252→363 — phần landmarks là CHỜ vẽ khung (boot.step bắt đầu pha mới rồi mới nhường luồng): CPU profile "(idle)" +181 ms ngay
+    ranh fabric→landmarks, CHƯA rõ nguyên nhân (canvas/atlas worker như base); [[PERF8]]. citygen JS tự đo trong trình duyệt
+    (stats7) 901 vs 753 ms = trong nhiễu; node: renderStyles 30-50 ms + exposedSide ~25 ms. (d) ATLAS: node ổn định 54 → 97 ms
+    (63 → 93 ô), lạnh 177 → 252 ms; worker trong trình duyệt 636 → 629 ms (ngoài luồng chính, về trước khung đầu); cellAtlas 7
+    trang 90 → 110 ms; 181 ảnh lưới cửa sổ vẽ lại; palette guard 101 mesh / 75 material (9 kính). (e) CỔNG: 0 lỗi JS (14 lô
+    chụp full; LITE chỉ 404 `assets_lite/*.glb` — máy không có bản lite; `--gl1` 0 lỗi, webgl2 false), diag "TẤT CẢ THỰC THỂ OK"
+    (bất biến = base), waterbfs 5/5, shopsigns 0 lỗi định dạng / 0 thương hiệu. BẪY QA: `python -m http.server` có hàng đợi
+    listen 5 — máy bận thì Chrome mở loạt module/GLB bị ERR_CONNECTION_REFUSED → "TIMEOUT window.__hp" (3 lô chụp hỏng) → dùng
+    ThreadingHTTPServer với `request_queue_size = 128`.
+    **Chưa làm/để lại**: hero landmark (FP-8 mục 4 — cần Meshy), góc bo cong, mái ngói 1 tầng riêng, nhà trẻ (069), mái mansard;
+    nhà ô vẫn là hộp canvas (cửa sổ đã đẹp hơn, chưa qua shader atlas phố); pano_395 h90/h180 vẫn gần đen = `tb_goldstar` mặt LAM
+    KIM LOẠI tối CỐ Ý (bằng chứng pano_540) nhìn từ mặt khuất nắng ở 2-4 m; 051 khối trường xanh lá (fabric, bão hoà < 0,62) giữ;
+    biển quảng cáo TRÊN MÁI lớn kiểu 327 chưa có (BILL chỉ ~30 nhà); khởi động +~0,1-0,35 s (mục ĐO). CAMNEAR (W3-A) che phần lớn
+    lợi ích ở pano tường sát 2-3 m. Tool QA W3-C (scratchpad): `stats.mjs <port>` (cellSink tex/atlas + fabric + boot), `pick2.mjs` tia dò vật liệu,
     `nodefab/run2.mjs` dựng phố trong node (tam giác/thời gian/phân bố kiểu).
 - **2026-10-04 (W2-F POLISH)** [ĐỢT 3 wave 2 — WebGL1, giải mã RB 1 lần, kho cảng, ĐÊM, giao thông né xe đỗ, dọn code chết, hitch]:
     **(1) WebGL1** (three r160 tự lùi WebGL1 khi không có WebGL2): KIỂM bằng `tools/qa/shoot.mjs --gl1` (init script cho
