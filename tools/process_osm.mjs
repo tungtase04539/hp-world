@@ -669,6 +669,58 @@ const WATER = [];
   console.log(`bờ sông lùi khỏi phố ven sông: ${moved} đỉnh đẩy, đẩy tối đa ${maxPush.toFixed(1)} m`);
 }
 
+// ---------- 6b3b. BÃI BỒI CỬA SÔNG TAM BẠC (Đợt 3 W3-F, AUDIT3 FP-6 "331 (−525, −905)") ----------
+// Polygon OSM sông Tam Bạc (242027154) phủ CẢ bãi cát + cây giữa lòng lạch và kè phố Tam Bạc ở cửa ra sông Cấm (pano_331/332,
+// 383/384). Ảnh vệ tinh tile 7 (georef tự động, xem W3-F KNOWLEDGE): lạch nước thật chỉ rộng ~36 m sát bờ TÂY (tim = way
+// waterway 680814260), phía đông là bãi bồi cát RỘNG 25-60 m có lùm cây lớn; ảnh pano 2022-23 từ phố: hàng rào + cây rậm, KHÔNG
+// thấy nước (game cũ: mặt sông mở 15 m trước camera pano_331). → thay ĐOẠN mép đông của polygon (từ chân bãi z ≈ −830 tới cạnh
+// chung với polygon sông Cấm) bằng đường bờ bãi BEACH_SHORE (đo trên ảnh tile 7; z < −965 ngoài ảnh: tim lạch + 19 m, khớp đoạn
+// đo được) — đầu nam nằm trên mép cũ (kè), đầu bắc nằm trên cạnh chung Tam Bạc/Cấm. Đoạn ghép = mọi đỉnh (đã chia ≤ 3 m) nằm
+// PHÍA ĐÔNG đường bờ trong hộp bãi — 1 dải liên tục trên polygon. Xuất `BEACHES [[[x,z],…]]` = đa giác ĐẤT bãi (đường bờ + mép
+// cũ) cho js/riverbank.js: bờ bãi là dốc cát tự nhiên (không tường kè) + cây lớn rải theo lùm, dải sát phố như 'strip'.
+const BEACHES = [];
+{
+  const BEACH_SHORE = [[-519.5, -830], [-544.1, -839.6], [-564.2, -853.0], [-575.4, -864.2], [-584.3, -879.8], [-593.2, -897.7],
+    [-598.8, -920.0], [-604.4, -942.4], [-611.1, -964.7], [-608.5, -997], [-597.5, -1030]];
+  const BOX = [-625, -470, -1060, -828];   // x0 x1 z0 z1
+  const W = WATER.find((w) => w.n === 'Sông Tam Bạc' && w.pts.some(([x, z]) => x > BOX[0] && x < BOX[1] && z > BOX[2] && z < BOX[3]));
+  // phía của điểm so với đường bờ (đoạn gần nhất): > 0 = phía ĐÔNG (bãi), theo chiều nam → bắc
+  const side = ([x, z]) => {
+    let bd = Infinity, sg = 0;
+    for (let i = 0; i < BEACH_SHORE.length - 1; i++) {
+      const [ax, az] = BEACH_SHORE[i], [bx, bz] = BEACH_SHORE[i + 1], dx = bx - ax, dz = bz - az, l2 = dx * dx + dz * dz;
+      const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / l2)), d = Math.hypot(x - ax - dx * t, z - az - dz * t);
+      if (d < bd) { bd = d; sg = dx * (z - az) - dz * (x - ax); }
+    }
+    return sg;   // đường bờ đi nam → bắc: tích chéo > 0 ⇔ phía ĐÔNG (bãi)
+  };
+  if (W) {
+    const P = [];
+    for (let i = 0; i < W.pts.length; i++) {
+      const a = W.pts[i], b = W.pts[(i + 1) % W.pts.length];
+      P.push([a[0], a[1], 1]);   // [x, z, đỉnh gốc?]
+      const L = Math.hypot(b[0] - a[0], b[1] - a[1]), n = Math.floor(L / 3);
+      if (Math.max(a[0], b[0]) < BOX[0] || Math.min(a[0], b[0]) > BOX[1] || Math.max(a[1], b[1]) < BOX[2] || Math.min(a[1], b[1]) > BOX[3]) continue;
+      for (let k = 1; k <= n; k++) P.push([a[0] + (b[0] - a[0]) * k / (n + 1), a[1] + (b[1] - a[1]) * k / (n + 1), 0]);
+    }
+    const inB = P.map(([x, z]) => x > BOX[0] && x < BOX[1] && z > BOX[2] && z < BOX[3] && side([x, z]) > 0);
+    const idx = inB.map((v, i) => (v ? i : -1)).filter((i) => i >= 0);
+    // dải phải LIÊN TỤC (không vòng qua đỉnh 0): i0..i1
+    const i0 = idx[0], i1 = idx[idx.length - 1];
+    if (idx.length > 3 && i1 - i0 + 1 === idx.length) {
+      // chiều polygon dọc mép đông: P[i0] gần đầu NAM hay đầu BẮC của đường bờ?
+      const dS = (p, q) => Math.hypot(p[0] - q[0], p[1] - q[1]);
+      const shore = dS(P[i0], BEACH_SHORE[0]) < dS(P[i0], BEACH_SHORE[BEACH_SHORE.length - 1]) ? BEACH_SHORE : BEACH_SHORE.slice().reverse();
+      // giữ đỉnh GỐC ngoài dải (điểm chia thêm nằm trên cạnh gốc → bỏ, polygon ngoài dải y hệt cũ) + đường bờ
+      const Q = P.slice(0, i0).filter((p) => p[2]).concat(shore.map((p) => [p[0], p[1], 1]), P.slice(i1 + 1).filter((p) => p[2]));
+      W.pts = Q.map(([x, z]) => [Math.round(x * 10) / 10, Math.round(z * 10) / 10]);
+      const land = simplify(P.slice(i0, i1 + 1).reverse().map(([x, z]) => [x, z]), 1.0);   // mép cũ bắc → nam (điểm chia bỏ bớt)
+      BEACHES.push(shore.concat(land).map(([x, z]) => [Math.round(x * 10) / 10, Math.round(z * 10) / 10]));
+      console.log(`bãi bồi cửa Tam Bạc: thay ${i1 - i0 + 1} đỉnh mép đông bằng ${BEACH_SHORE.length} đỉnh đường bờ`);
+    } else console.log('bãi bồi cửa Tam Bạc: KHÔNG tìm được dải mép liên tục', idx.length, i0, i1);
+  }
+}
+
 // ---------- 6b4. CẦU THEO WAY OSM (Đợt 3 W3-F): BRIDGE_WAYS = mặt cầu có cao độ cho js/bridges.js ----------
 // Cầu Hoàng Văn Thụ THẬT = 2 làn một chiều (bắc 738297304 x≈−48, nam 930885732 x≈−59, layer 2) chạy thẳng z −930 → −1880
 // + HAI NÚT XOẮN ỐC phía Hải Phòng (đông 1022715416 tâm (17,−930), tây 1022715417 tâm (−133,−932), r ≈ 63 m, layer 1)
@@ -920,6 +972,7 @@ export const GARDENS = ${JSON.stringify(GARDENS)};
 export const BUILDINGS = ${JSON.stringify(BUILDINGS)};
 export const WATER = ${JSON.stringify(WATER)};
 export const BRIDGE_WAYS = ${JSON.stringify(BRIDGE_WAYS)};
+export const BEACHES = ${JSON.stringify(BEACHES)};
 `;
 fs.writeFileSync(new URL('../js/mapdata.js', import.meta.url), out);   // relative (portable Win/Linux)
 console.log(`mapdata.js: ${(out.length / 1024).toFixed(0)}KB`);

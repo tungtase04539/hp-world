@@ -20169,6 +20169,13 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
       veg.plant('non', x, z, { pit: 1, wash: 0 }); addCollider(x, z, 0.3); n++;
     }
     console.log('[world] W3-F cây non dải dạo ven sông:', n);
+    // cây LỚN dải bờ tự phát + bãi bồi cửa Tam Bạc (riverbank.bankTrees: [x, z, h, r])
+    let nb = 0;
+    for (const [x, z, h, r] of world.riverbank.bankTrees || []) {
+      if (isWater(x, z) || underDeck(x, z)) continue;
+      veg.plant('shade', x, z, { h, r, pit: 0 }); addCollider(x, z, 0.45); nb++;
+    }
+    console.log('[world] W3-F cây lớn bờ sông/bãi bồi:', nb);
   }
   // W2-B: hàng cây NON chống cọc trên quảng trường lát đá phía nam Nhà hát (pano_541/055/249 — trồng lại sau bão Yagi);
   // hộp = claim 'road9_tay' (khối claims), chừa trục nhìn spawn → Nhà hát + vòng spawn
