@@ -21007,7 +21007,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
       if (seed % 2 === 0) {   // bụi tròn cắt tỉa (ô rô/chuỗi ngọc) ~1,1-1,5 m
         const rr = 0.55 + 0.2 * fracH(Math.sin(bx * 3.3 + bz) * 917.3);
         const ball = new THREE.IcosahedronGeometry(rr, 1); ball.scale(1, 0.85, 1); ball.translate(bx, LAND_H + 0.3 + rr * 0.8, bz);
-        topiGeos.push(tintGeo(ball.toNonIndexed(), [0.22, 0.34, 0.16], seed + 3, 0.3));
+        topiGeos.push(tintGeo(ball, [0.22, 0.34, 0.16], seed + 3, 0.3));   // Icosahedron vốn KHÔNG chỉ mục: toNonIndexed() chỉ console.warn (123 lần ≈ +200 ms dựng khi có DevTools)
       }
     }
     const hedgePaths = [], parterres = [], curbGeos = [];
