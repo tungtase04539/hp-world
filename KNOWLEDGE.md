@@ -469,6 +469,19 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     thống: thiên đỉnh hơi tối/ít xanh, dải thấp TRẮNG SỮA hơn. Sửa CHỈ vòm hiển thị ban ngày (IBL/đèn bán cầu/màu sương giữ
     nguyên): hệ số theo độ cao `LIGHT.skyGradeLo/Hi` trộn theo smoothstep(0,12…0,6, v.y) × trọng số ngày. Trời thật dao động
     rộng (p25 xanh đậm ↔ p75 trắng mù) — 1 hằng số không khớp được mọi ngày; KHÔNG kéo thiên đỉnh sáng (vật lý: thiên đỉnh tối hơn).
+    **(8) Cỏ ô cells / đảo giao thông / mép công viên:** hằng `LAWN_OLIVE = 0x6a7b48` (world.js đầu file) cho MỌI thảm cỏ ô
+    cũ màu neon (0x6f9a4f/0x5a8f43/0x5d8c45/#4e7a3a): đảo `hvt_nonbo`, nút Lạc Long, `parterre_r4`, `garden6`, `civic8`,
+    `lm_ubnd_lawn`, công viên ĐBP (texture đốm nay LCG TẤT ĐỊNH thay Math.random). Đảo `hvt_nonbo` (ảnh 304 h180/349 h90):
+    viền bụi r 10,3 m + 2 dải bụi lượn (`hvt_nonbo_hedge`, 1.614 tam giác). Công viên ĐBP (ảnh 065 h180): `bs_park_dbp_hedge`
+    chạy phía TRONG rào 3 cạnh. **BẪY cellsink:** `sweepAssemblies` (clearance) lấy BAO LỒI từng mảnh liên thông KÈM 2 góc hộp
+    trục → 1 dải bụi chéo dài có "bao" phủ cả lòng phố → `flushClearance` GỠ cả mảnh (tam giác mất, đỉnh còn → bbox vẫn đúng
+    mà không thấy gì). Cách làm đúng: độ thụt mỗi cạnh chọn sao cho mép phía phố (−1,3 m) nằm NGOÀI `corridorPen` (clearance)
+    + ngoài lòng/vỉa hè roadnet + xa camera pano; xả thành MẨU 2 m hở 1,5 cm (không hàn đỉnh trùng → mảnh nhỏ, bao bám sát).
+    Kè Tam Bạc ô cells `v1caro` cùng mẫu caro bạc màu của `sidewalkMaterial`. **Giao diện roadnet:** code mới dùng
+    `wHW(w) = w.hw ?? hwOf(w.c)` (W3-A gán `w.hw` theo `ROADS_DT[i].w` → khi gộp, `hwOf` không còn bị gọi); bề rộng lòng cho
+    luật tim đường = `deps.widthOf(ri, c)` nếu world truyền, không thì `ROADS_DT[ri].w`, không thì 2·hw theo cấp.
+    **CHƯA LÀM:** vạch gạch chéo/xương cá ở mũi tách làn (gore, 304 — hình học nút HVT/cầu dẫn thuộc W3-F, camera lệch 11 m
+    thuộc W3-A), trời u ám cho pano trời mây, mặt bê tông liền "shared surface" ngõ chợ (W3-E).
     **ĐO / KIỂM:** (điền sau)
 - **2026-10-04 (W2-F POLISH)** [ĐỢT 3 wave 2 — WebGL1, giải mã RB 1 lần, kho cảng, ĐÊM, giao thông né xe đỗ, dọn code chết, hitch]:
     **(1) WebGL1** (three r160 tự lùi WebGL1 khi không có WebGL2): KIỂM bằng `tools/qa/shoot.mjs --gl1` (init script cho
