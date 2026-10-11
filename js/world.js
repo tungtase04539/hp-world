@@ -4370,13 +4370,10 @@ const dgRail = (ax, az, bx, bz, h, kind, colHex) => {
     const logo = new THREE.Mesh(new THREE.PlaneGeometry(5, 1.4), dgSign('NGÂN HÀNG', '#0f4c9e', '#ffffff', 64));
     logo.position.set(0, 7 * 3.1 + 1.2, 0); logo.rotation.y = 0; g2.add(logo);
   }
-  // Xổ số Hải Phòng: nhà 3T kem lùi sâu + rào sắt + biển xanh dài trên rào
+  // Xổ số Hải Phòng: nhà 3T kem lùi sâu
+  // (W3-E, AUDIT3 FP-5 "rào bó vỉa giả" 409: rào sắt 20 m + biển xanh trên rào ở z≈-436,8 nằm SÁT BÓ VỈA nam ĐBP, trước
+  // dãy nhà thật — ảnh pano_409 h135/h180 là cửa hàng điện thoại/thời trang + xe máy, không có rào → bỏ rào + biển)
   dgShop(955.6, -426.7, ryS, 16, 10, 3, 3.3, dgFacade('#f2ead0', '#5a6a70', 5, 3), 'dbp_xoso', null, null);
-  dgRail(945.5, -437.1, 966, -436.6, 1.4, 'bar', 0xcfd4d8);
-  {
-    const p = new THREE.Mesh(new THREE.PlaneGeometry(13, 1.1), dgSign('CÔNG TY TNHH MTV XỔ SỐ HẢI PHÒNG', '#0e6aa8', '#ffe082', 34));
-    p.position.set(955.8, groundHeight(955.8, -436.8) + 2.0, -436.8); p.rotation.y = 3.1184; scene.add(p);
-  }
 }
 
 // === (7) TÒA PHÁP CỔ VÀNG ARCADE + dãy nhà cổ Bình Minh Flower/Bánh Cuốn 28
