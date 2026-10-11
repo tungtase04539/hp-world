@@ -488,7 +488,21 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     luật tim đường = `deps.widthOf(ri, c)` nếu world truyền, không thì `ROADS_DT[ri].w`, không thì 2·hw theo cấp.
     **CHƯA LÀM:** vạch gạch chéo/xương cá ở mũi tách làn (gore, 304 — hình học nút HVT/cầu dẫn thuộc W3-F, camera lệch 11 m
     thuộc W3-A), trời u ám cho pano trời mây, mặt bê tông liền "shared surface" ngõ chợ (W3-E).
-    **ĐO / KIỂM:** (điền sau)
+    **ĐO / KIỂM (2026-10-11, cùng phiên; base = git archive dot3 :8514, W3-D :8504; Radeon 890M TIER 3):** roadnet R1750
+    (node): đèn 131 → 29, nhánh zebra 750 → 239, vạch giữa khối 116, tim theo nhãn ảnh 162 đoạn chạy / chữ 13 / mặc định 592,
+    326 đoạn không tim, 61 đoạn đường đôi; dựng 330-400 ms (≈ dot3), 71k tam giác lòng không đổi. CHẤM MẮT (REAL|dot3|W3-D,
+    39 pano × 4 hướng, 1280×634, --traffic off, ?date=2024-10-15): nhóm mục tiêu 31 pano 4,40 → 5,06 (+0,66; riêng danh sách
+    FP-4 24 pano 4,42 → 5,04), đối chứng 8 pano 3,25 → 3,31 (074 +0,5: đèn/zebra ma trên cầu — đối chứng không sạch hẳn).
+    Trời (skycmp 156 khung): dải trên thật (190,204,222) · dot3 (188,199,215) · W3-D (189,201,219); dải 14-24 % thật
+    (184,194,214) · dot3 (200,208,220) · W3-D (196,207,221), bão hoà 0,090 → 0,113 (thật 0,109). PERF (B/A/B/A ×2 vòng):
+    fps chạm vsync 60 cả hai; draw call ≤ dot3 ở 5/6 góc (pano_400 334-357 → 313, game_3 356 → 311-336, spawn 364-387 →
+    352, pano_007 505 → 479); tam giác +0,5-2,5 % (bụi lổn nhổn: dải phân cách LQĐ pano_216 1,34 → 1,37 M; vườn 31,6k tam
+    giác/2,6 km bụi); hpReady 4325 → 4396 ms (nhiễu ±250; pha furniture +49 ms = vườn hoa, freeze +44); heap SAU ép GC (CDP
+    collectGarbage) 378 → 385 MB. BẪY perf đã sửa: `IcosahedronGeometry` vốn KHÔNG chỉ mục → `.toNonIndexed()` chỉ
+    console.warn — 123 bụi tròn = 123 warn ≈ +200-370 ms pha furniture khi có DevTools/Playwright (đo bằng SwiftShader, không
+    cần khoá GPU: tools/qa/shoot.mjs --swiftshader --w 320 --h 180 + console.error tạm). Cổng: 0 lỗi JS (13 khối chụp full,
+    perf ×8, WebGL1 --gl1); lite: 3 × 404 `assets_lite/*.glb` ở CẢ dot3 lẫn W3-D (worktree không có assets_lite — môi trường);
+    diag full 'TẤT CẢ THỰC THỂ OK' (giống dot3); waterbfs 5/5; node --check mọi module sửa; gen_roadmarks chạy lại tất định.
 - **2026-10-04 (W2-F POLISH)** [ĐỢT 3 wave 2 — WebGL1, giải mã RB 1 lần, kho cảng, ĐÊM, giao thông né xe đỗ, dọn code chết, hitch]:
     **(1) WebGL1** (three r160 tự lùi WebGL1 khi không có WebGL2): KIỂM bằng `tools/qa/shoot.mjs --gl1` (init script cho
     `getContext('webgl2')` trả null — cờ Chrome `--disable-es3-apis` KHÔNG có tác dụng ở headless mới: vẫn webgl2:true;
