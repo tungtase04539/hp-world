@@ -3,7 +3,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { makeCellSink, realBuildings } from './cellsink.js';
-import { initClearance, sweepAssemblies, flushClearance, releaseClearance, onCarriageDisc, nearPano as clrNearPano, nudgeDisc as clrNudge } from './clearance.js';   // Đợt 3 W2-A: khoảng trống phố/camera pano
+import { initClearance, sweepAssemblies, flushClearance, releaseClearance, onCarriageDisc, nearPano as clrNearPano, nudgeDisc as clrNudge, corridorPen as clrCorridorPen } from './clearance.js';   // Đợt 3 W2-A: khoảng trống phố/camera pano
 import { FLAG as RB_FLAG } from './buildings_data.js';
 import { registerModel, shrinkTexturesForMobile, assetURL } from './assets.js';
 import { IS_MOBILE, LITE } from './device.js';
@@ -1419,8 +1419,11 @@ export async function buildWorld(scene, prog = () => {}) {
     // tuyến phố (≤ 16 m); không có chỗ → bỏ.
     const { G: _fpG } = realBuildings();
     const _fpAt = (x, z, r) => [[0, 0], [r, 0], [-r, 0], [0, r], [0, -r]].some(([ox, oz]) => _fpG.at(x + ox, z + oz) >= 0);
+    // review r2: chỗ mới cũng KHÔNG được trên vỉa hè (trong facadeLine phố p/s/t/r) — pano_020 h180 đài phun từng đứng giữa vỉa
+    // trước dãy nhà ống. Đài phun thuộc quảng trường/công viên/sảnh, không có chỗ như vậy trong 16 m → bỏ.
+    const _onStreet = (x, z, r) => [[0, 0], [r, 0], [-r, 0], [0, r], [0, -r]].some(([ox, oz]) => clrCorridorPen(x + ox, z + oz, true));
     for (const [x0, z0] of FOUNT) {
-      const nd = clrNudge(x0, z0, 2.1, 16, (px, pz) => !clrNearPano(px, pz, 8) && !isWater(px, pz) && Math.abs(groundHeightNoDeck(px, pz) - LAND_H) < 0.4 && !_fpAt(px, pz, 2.2));
+      const nd = clrNudge(x0, z0, 2.1, 16, (px, pz) => !clrNearPano(px, pz, 8) && !isWater(px, pz) && Math.abs(groundHeightNoDeck(px, pz) - LAND_H) < 0.4 && !_fpAt(px, pz, 2.2) && !_onStreet(px, pz, 2.1));
       if (!nd) continue;
       const [x, z] = nd;
       const gy = groundHeight(x, z); if (gy < LAND_H - 0.5 || isWater(x, z)) continue;
@@ -21273,8 +21276,32 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
   // phân cách Trần Phú/ĐBP (đứng trên nhựa — roadnet không có đảo dải) + 2 là rào sắt ô w1_congso043 ngay MÉP lòng Trần Phú
   // 14 m — vật NHÌN THẤY → người đi xuyên. Vật dựng tay sát mép bó vỉa cũ là thật; mồ côi thì nằm giữa lòng (quét W2-A đã gỡ chủ).
   { const deep = (x, z) => { for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4; if (!onCarriageDisc(x + Math.cos(a) * 0.6, z + Math.sin(a) * 0.6, 0)) return false; } return true; };
-    const gl = []; for (const c of colliders) if (c.r <= 2.2 && c.x < 1e6 && onCarriageDisc(c.x, c.z, 0) && deep(c.x, c.z) && !veg.trunkNear(c.x, c.z, Math.max(0.8, c.r))) { gl.push([+c.x.toFixed(1), +c.z.toFixed(1), c.r]); c.x = 1e7; c.z = 1e7; }
-    world.ghostColliders = gl; }   // QA: [[x, z, r]] đã tách
+    const cand = colliders.filter((c) => c.r <= 2.2 && c.x < 1e6 && onCarriageDisc(c.x, c.z, 0) && deep(c.x, c.z) && !veg.trunkNear(c.x, c.z, Math.max(0.8, c.r)));
+    // review r2: 1/9 ứng viên (442,4; −994) vẫn là vật NHÌN THẤY (sau gộp thành mrg10_0,-3) → tia ngang tầm thân (0,6/1,4 m)
+    // 8 hướng xuyên đĩa collider vào các mesh (không instanced) có cầu bao chạm đĩa; trúng hình → GIỮ collider.
+    let seen = () => false;
+    if (cand.length) {
+      scene.updateMatrixWorld(true);
+      const ms = [], sph = new THREE.Sphere();
+      scene.traverse((o) => {
+        if (!o.isMesh || o.isInstancedMesh || !o.visible || !o.geometry) return;
+        const g = o.geometry; if (!g.boundingSphere) g.computeBoundingSphere();
+        sph.copy(g.boundingSphere).applyMatrix4(o.matrixWorld); if (!(sph.radius < 400)) return;
+        for (const c of cand) if (Math.hypot(sph.center.x - c.x, sph.center.z - c.z) < sph.radius + c.r + 0.5) { ms.push(o); break; }
+      });
+      const rc = new THREE.Raycaster(), O = new THREE.Vector3(), D = new THREE.Vector3();
+      seen = (c) => {
+        if (!ms.length) return false;
+        const y0 = groundHeight(c.x, c.z), R = c.r + 0.3;
+        for (const dy of [0.6, 1.4]) for (let k = 0; k < 8; k++) {
+          const a = k * Math.PI / 4; O.set(c.x + Math.cos(a) * R, y0 + dy, c.z + Math.sin(a) * R); D.set(-Math.cos(a), 0, -Math.sin(a));
+          rc.set(O, D); rc.far = 2 * R; if (rc.intersectObjects(ms, false).length) return true;
+        }
+        return false;
+      };
+    }
+    const gl = [], kept = []; for (const c of cand) { if (seen(c)) { kept.push([+c.x.toFixed(1), +c.z.toFixed(1), c.r]); continue; } gl.push([+c.x.toFixed(1), +c.z.toFixed(1), c.r]); c.x = 1e7; c.z = 1e7; }
+    world.ghostColliders = gl; world.ghostKept = kept; }   // QA: [[x, z, r]] đã tách / giữ vì có hình
   world.treeBloomNear = trees.bloomNear;      // cánh phượng rơi quanh cây đang nở gần người chơi (petals.js)
   loadHeroTrees(trees);  // nạp GLB cây phượng ảnh-thật → LOD gần ≤150 m (bất đồng bộ)
   // ---------- ĐỒ ĐẠC PHỐ (Đợt 3 WP7, js/props.js) ----------

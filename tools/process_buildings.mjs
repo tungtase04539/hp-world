@@ -66,8 +66,11 @@ ROADS_DT.forEach((r, ri) => {
     const [ax, az] = r.pts[i], [bx, bz] = r.pts[i + 1], L = Math.hypot(bx - ax, bz - az);
     if (L < 0.5) continue;
     const ux = (bx - ax) / L, uz = (bz - az) / L;
-    // Đợt 3 W3-A: lòng/mặt tiền RIÊNG từng phố (mapdata ROADS_DT[i].w/.sw — tools/street_fit.mjs), không còn theo cấp
-    SEGS.push({ ri, k: i, ax, az, bx, bz, L, ux, uz, nx: -uz, nz: ux, c: r.c, hw: roadHW(r), fl: facadeLine(r) });
+    // Đợt 3 W3-A: lòng/mặt tiền RIÊNG từng phố (mapdata ROADS_DT[i].w/.sw — tools/street_fit.mjs), không còn theo cấp.
+    // flR = mặt tiền dùng để CẮT nhà THẬT = min(theo phố, theo cấp): mặt tiền theo phố là 1 số cho cả way (phố rộng ở đoạn này
+    // hẹp ở đoạn kia) → cắt nhà thật Overture theo nó từng xoá/cắt lùi nhà đứng đúng chỗ (review r2: drop_road 262 → 317,
+    // pano_222 h180 Overture 7,1 m → game 28,4 m). Nhà SINH vẫn theo fl (mặt tiền phố).
+    SEGS.push({ ri, k: i, ax, az, bx, bz, L, ux, uz, nx: -uz, nz: ux, c: r.c, hw: roadHW(r), fl: facadeLine(r), flR: Math.min(facadeLine(r), facadeLine(r.c)) });
   }
 });
 const segGrid = new Grid(32);
@@ -299,7 +302,7 @@ function corridorClip(b, opts = {}) {
     if (opts.skipRi !== undefined && s.ri === opts.skipRi) continue;
     // đỉnh nào lấn (trong dải t∈[0,1] của đoạn, |v| < fl)?
     let intr = false, sv = 0;
-    for (const [x, z] of P) { const [t, v] = segLocal(s, x, z); if (t >= 0 && t <= 1 && Math.abs(v) < s.fl - 0.05) intr = true; }
+    for (const [x, z] of P) { const [t, v] = segLocal(s, x, z); if (t >= 0 && t <= 1 && Math.abs(v) < s.flR - 0.05) intr = true; }   // chỉ nhà thật đi qua đây
     // đoạn đâm xuyên nhà mà không đỉnh nào lấn: kiểm tâm đoạn ∩ đa giác
     if (!intr) {
       for (const t of [0.25, 0.5, 0.75]) { const x = s.ax + (s.bx - s.ax) * t, z = s.az + (s.bz - s.az) * t; if (pointInPoly(P, x, z)) intr = true; }
@@ -307,7 +310,7 @@ function corridorClip(b, opts = {}) {
     }
     const [cx, cz] = centroid(P); sv = segLocal(s, cx, cz)[1];
     const sg = sv >= 0 ? 1 : -1;
-    const c0 = sg * (s.ax * s.nx + s.az * s.nz) + s.fl;
+    const c0 = sg * (s.ax * s.nx + s.az * s.nz) + s.flR;
     const parts = clipHalf(P, sg * s.nx, sg * s.nz, c0).map((q) => outward(cleanPoly(q))).filter((q) => q.length >= 3);
     parts.sort((p, q) => absArea(q) - absArea(p));
     const keep = parts.length ? absArea(parts[0]) : 0;
@@ -1415,7 +1418,7 @@ function capDist(s, x, z) {
   if (t < 0) return s.k > 0 || ENDCAP[s.ri][0] ? Math.hypot(x - s.ax, z - s.az) : Infinity;
   return s.k + 2 < nPts || ENDCAP[s.ri][1] ? Math.hypot(x - s.bx, z - s.bz) : Infinity;
 }
-function streetIntrusion(P) {
+function streetIntrusion(P, real = false) {
   const bb = bbox(P); let worst = null;
   const S = [];
   for (let k = 0; k < P.length; k++) {
@@ -1424,7 +1427,7 @@ function streetIntrusion(P) {
   }
   segGrid.query([bb[0] - 1, bb[1] - 1, bb[2] + 1, bb[3] + 1], (i) => {
     const s = SEGS[i]; if (!'pstr'.includes(s.c)) return;
-    for (const [x, z] of S) { const pen = s.fl - capDist(s, x, z); if (pen > 0.2 && (!worst || pen > worst.pen)) worst = { s, x, z, pen }; }   // 0,2: chừa 0,1 m cho làm tròn
+    for (const [x, z] of S) { const pen = (real ? s.flR : s.fl) - capDist(s, x, z); if (pen > 0.2 && (!worst || pen > worst.pen)) worst = { s, x, z, pen }; }   // 0,2: chừa 0,1 m cho làm tròn
     // phố đâm xuyên giữa nhà (không mẫu biên nào gần): kiểm điểm giữa đoạn
     if (!worst && pointInPoly(P, (s.ax + s.bx) / 2, (s.az + s.bz) / 2)) worst = { s, x: (s.ax + s.bx) / 2, z: (s.az + s.bz) / 2, pen: s.fl };
   });
@@ -1433,7 +1436,7 @@ function streetIntrusion(P) {
 function streetGuard(b) {
   const A0 = b.area;
   for (let pass = 0; pass < 4; pass++) {
-    const w = streetIntrusion(b.pts); if (!w) return true;
+    const w = streetIntrusion(b.pts, !b.synth); if (!w) return true;
     const s = w.s, P = b.pts, [cx, cz] = centroid(P);
     const t = (w.x - s.ax) * s.ux + (w.z - s.az) * s.uz;
     let nx, nz, qx, qz;
@@ -1444,12 +1447,12 @@ function streetGuard(b) {
       if (L < 0.3) { dx = cx - qx; dz = cz - qz; L = Math.hypot(dx, dz) || 1; }
       nx = dx / L; nz = dz / L;
     }
-    const parts = clipHalf(P, nx, nz, nx * qx + nz * qz + s.fl).map((q) => outward(cleanPoly(q))).filter((q) => q.length >= 3);
+    const parts = clipHalf(P, nx, nz, nx * qx + nz * qz + (b.synth ? s.fl : s.flR)).map((q) => outward(cleanPoly(q))).filter((q) => q.length >= 3);
     parts.sort((p, q) => absArea(q) - absArea(p));
     if (!parts.length || absArea(parts[0]) < Math.max(8, 0.5 * A0)) return false;
     setRectOrPoly(b, parts[0]); b.guard = 1;
   }
-  return !streetIntrusion(b.pts);
+  return !streetIntrusion(b.pts, !b.synth);
 }
 // Camera pano: nhà SINH cách ≥ 3 m (SPEC), nhà thật ≥ 1 m (nới/kéo/nở không được trùm lên camera; nhà thật GỐC chứa
 // camera mà cắt mất > 50% thì giữ nguyên — WP2 deadPano xử lý). Cắt nửa mặt phẳng vuông góc hướng camera → nhà.

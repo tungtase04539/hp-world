@@ -285,7 +285,7 @@ try {
   WD.forEach((o, ri) => { if (W0[ri].w > o.w && o.w > 0) { o.w = W0[ri].w; if (W0[ri].sw >= 0) o.sw = W0[ri].sw; } else if (!(o.w > 0) && W0[ri].w > 0) Object.assign(o, W0[ri]); });
   const cap = capWidths(ROADS_DT, WD, walls1, Object.values(LM_POLY), panos);
   ROADS_DT.forEach((r, ri) => { if (WD[ri].w > 0) { r.w = WD[ri].w; if (WD[ri].sw >= 0) r.sw = WD[ri].sw; } });
-  console.log(`  kẹp bề rộng: tường Overture ${cap.wall} way, mặt tiền ≤ tường gần ${cap.fl} way, địa danh LM_POLY ${cap.lm} way`);
+  console.log(`  kẹp bề rộng: tường Overture ${cap.wall} way, mặt tiền ≤ tường gần ${cap.fl} way, vỉa ≤ cấp+1 ${cap.sw || 0} way, địa danh LM_POLY ${cap.lm} way`);
   const src = {}; WD.forEach((o) => { src[o.src] = (src[o.src] || 0) + 1; });
   console.log(`mặt cắt phố: ${Date.now() - t0} ms; overture ${ov ? ov.n : 0} nhà; nguồn bề rộng ${JSON.stringify(src)}`);
   console.log(`tim theo pano + tường: mỏ neo pano ${fit.anchors} (dịch ≠ 0: ${fit.active}), mỏ neo tường ${fit.wallAnchors}; bỏ ${JSON.stringify(fit.skipped)}; way dời ${fit.moved}:`,

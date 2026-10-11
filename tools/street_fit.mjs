@@ -121,7 +121,7 @@ export function measureWalls(roads, ov, { step = 5, maxRay = 30, rMax = 2000 } =
   return roads.map((r, ri) => {
     if (!STREET[r.c] || !ov) return null;
     if (!r.pts.some(([x, z]) => Math.hypot(x, z) < rMax)) return null;
-    const W = [], st = []; let nSt = 0;
+    const W = [], st = [], one = []; let nSt = 0;
     for (let i = 0; i + 1 < r.pts.length; i++) {
       const [ax, az] = r.pts[i], [bx, bz] = r.pts[i + 1], L = Math.hypot(bx - ax, bz - az); if (L < 1) continue;
       const ux = (bx - ax) / L, uz = (bz - az) / L, nx = -uz, nz = ux;
@@ -130,9 +130,10 @@ export function measureWalls(roads, ov, { step = 5, maxRay = 30, rMax = 2000 } =
         if (idx.nearOther(ri, x, z, 14) < 14 || ov.inside(x, z)) continue;
         const dl = ov.ray(x, z, nx, nz, maxRay), dr = ov.ray(x, z, -nx, -nz, maxRay);
         if (dl != null && dr != null) { W.push(dl + dr); st.push({ x, z, ux, uz, nx, nz, W: dl + dr, m: (dl - dr) / 2 }); }
+        else if (dl != null || dr != null) one.push(dl != null ? dl : dr);   // 1 bên (bên kia công viên/sông/quảng trường) → chỉ dùng cho trần mặt tiền
       }
     }
-    return { nSt, n: W.length, W25: quant(W, 0.25), W50: quant(W, 0.5), st };
+    return { nSt, n: W.length, W25: quant(W, 0.25), W50: quant(W, 0.5), st, one };
   });
 }
 
@@ -243,15 +244,30 @@ export function capWidths(roads, widths, walls, polys = [], panos = []) {
     const hw0 = (ROAD_W[r.c] ?? 5.5) / 2;
     let hw = o.w / 2, sw = o.sw >= 0 ? o.sw : SIDEWALK_W[r.c];
     const m = walls[ri];
-    if (m && m.st && m.st.length >= 6) {
-      const near = m.st.map((q) => Math.min(q.W / 2 + q.m, q.W / 2 - q.m));
+    const near = m && m.st ? m.st.map((q) => Math.min(q.W / 2 + q.m, q.W / 2 - q.m)) : [];
+    if (near.length >= 6) {
       const q10 = quant(near, 0.1);
       if (q10 != null && hw > q10 - 0.3) { const h = Math.max(hw0, need[ri], q10 - 0.3); if (h < hw) { sw += hw - h; hw = h; stat.wall++; } }
-      // (iii) MẶT TIỀN ≤ trung vị tường GẦN + 0,5 (≥ mặt tiền cấp; vỉa do ghi đè pano giữ nguyên). Bước (i) chuyển phần lòng
-      // cắt SANG vỉa → mặt tiền vẫn ở W25/2 của tim lệch tâm (ngõ r w5,5 + vỉa 7,8 m: pano_477 tường thật 4-6 m, game 10-15 m —
-      // process_buildings cắt nhà thật LÙI về facadeLine ⇒ "quá xa" 293 → 416 hướng; review W3-A 2026-10-06, thử regenD).
-      const flCap = Math.max(hw0 + SIDEWALK_W[r.c], quant(near, 0.5) + 0.5);
-      if (!o.swFixed && hw + sw > flCap + 0.05) { sw = Math.max(Math.min(sw, SIDEWALK_W[r.c]), flCap - hw); stat.fl++; }
+    }
+    // (iii) MẶT TIỀN ≤ trung vị tường GẦN + 0,5 (≥ mặt tiền cấp; vỉa do ghi đè pano giữ nguyên). Bước (i) chuyển phần lòng
+    // cắt SANG vỉa → mặt tiền vẫn ở W25/2 của tim lệch tâm (ngõ r w5,5 + vỉa 7,8 m: pano_477 tường thật 4-6 m, game 10-15 m —
+    // process_buildings cắt nhà thật LÙI về facadeLine ⇒ "quá xa" 293 → 416 hướng; review W3-A 2026-10-06, thử regenD).
+    // Mẫu = trạm 2 bên (tường gần hơn) + trạm 1 bên (bên kia trống: công viên/sông) — review r2: chỉ dùng trạm 2 bên thì way
+    // ít trạm 2 bên (Trần Hưng Đạo 535: 2 trạm, tường gần trung vị 10,2 m) bỏ qua trần → mặt tiền 14,5 m, nhà thật bị cắt lùi.
+    // Trần = min(trung vị trạm 2 bên, trung vị 2 bên + 1 bên): trạm 1 bên có thể xa (nhà lùi sau sân/công viên) → không
+    // được NỚI trần đã có từ trạm 2 bên.
+    const near2 = near.concat(m?.one || []);
+    if (!o.swFixed && near2.length >= 6) {
+      let med = quant(near2, 0.5); if (near.length >= 6) med = Math.min(med, quant(near, 0.5));
+      const flCap = Math.max(hw0 + SIDEWALK_W[r.c], med + 0.5);
+      if (hw + sw > flCap + 0.05) { sw = Math.max(Math.min(sw, SIDEWALK_W[r.c]), flCap - hw); stat.fl++; }
+    }
+    // (iv) VỈA ≤ vỉa cấp + 1 m cho ngõ/phố nhánh (r/t) và way lấy bề rộng GỘP THEO TÊN mà < 6 mẫu tường cục bộ (vỉa 5,5-7,8 m
+    // không bằng chứng tại chỗ: Trần Hưng Đạo 201/203, Tôn Đức Thắng, Hoàng Mậu, ngõ Hồ Xuân Hương 229 vỉa 6,2 m — tường thật
+    // 2,5-4 m bị đẩy ra 8,5-14 m, ô tay v2_congso_vang/v4_lejardin_villa đứng 7 m trong vỉa). Phần lùi thêm = SÂN TRƯỚC, không
+    // phải vỉa lát. Ghi đè pano có `sw` giữ nguyên.
+    if (!o.swFixed && sw > SIDEWALK_W[r.c] + 1 && (r.c === 'r' || r.c === 't' || (o.src === 'overture-name' && near2.length < 6))) {
+      sw = SIDEWALK_W[r.c] + 1; stat.sw = (stat.sw || 0) + 1;
     }
     let dmin = Infinity;
     let rx0 = 1e9, rz0 = 1e9, rx1 = -1e9, rz1 = -1e9; for (const [x, z] of r.pts) { rx0 = Math.min(rx0, x); rx1 = Math.max(rx1, x); rz0 = Math.min(rz0, z); rz1 = Math.max(rz1, z); }
