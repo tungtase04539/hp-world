@@ -622,6 +622,13 @@ const WATER = [];
   });
   const inPolyRaw = (x, z, P) => { let c = false; for (let i = 0, j = P.length - 1; i < P.length; j = i++) { const [xi, zi] = P[i], [xj, zj] = P[j]; if ((zi > z) !== (zj > z) && x < (xj - xi) * (z - zi) / (zj - zi) + xi) c = !c; } return c; };
   let moved = 0, maxPush = 0;
+  // r4 (phản biện 331/519/336 "nước ngay sau lan can"): Tam Bạc đoạn BẮC (dải bờ TỰ PHÁT — riverbank 'strip'): pano 2022-23
+  // 336/337/520 cho dải lán + cổ thụ ~8-10 m giữa lan can mép vỉa hè và mặt nước (tim phố → nước 18-19 m trong game), riêng
+  // quanh 519 polygon OSM chỉ cách tim 10,5 m (dải 2 m — không chỗ lán; ảnh 519 h180/h270 lán bạt + cây ngay sau lan can)
+  // → mép nước ≥ clearOf + STRIP_W ở z −620…−800, vuốt 0 → đủ trong z −590…−620 (không bậc mới gần 221) và −800…−830 (chân
+  // bãi bồi §6b3b: đường bờ bãi bắt đầu ĐÚNG trên mép cũ (−519,5, −830) — đẩy tới đó sinh khấc)
+  const STRIP_W = 7;
+  const stripExtra = (n, x, z) => (/Tam Bạc/.test(n) && x < -250 && z < -590 && z > -830 ? STRIP_W * Math.min(1, (-590 - z) / 30, (z + 830) / 30) : 0);
   for (const W of WATER) {
     if (!isRiver(W.n)) continue;
     const P0 = W.pts;
@@ -644,8 +651,10 @@ const WATER = [];
       let tx = pb[0] - pa[0], tz = pb[1] - pa[1]; const tl = Math.hypot(tx, tz) || 1; tx /= tl; tz /= tl;
       const cell = G.get(gk(Math.floor(x / GC), Math.floor(z / GC))); if (!cell) continue;
       let best = null;
+      const xtra = stripExtra(W.n, x, z);
       for (const si of cell) {
-        const [ax, az, bx, bz, need] = segs[si];
+        const [ax, az, bx, bz, need0] = segs[si];
+        const need = need0 + (need0 > FOOT_CLEAR ? xtra : 0);
         const dx = bx - ax, dz = bz - az, L = Math.hypot(dx, dz); if (L < 0.5) continue;
         const ux = dx / L, uz = dz / L;
         if (Math.abs(ux * tx + uz * tz) < Math.cos(40 * Math.PI / 180)) continue;          // không chạy dọc bờ
