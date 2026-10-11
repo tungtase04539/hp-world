@@ -421,7 +421,7 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
-- **2026-10-05/06 (W3-E STREET LIFE)** [ĐỢT 3 wave 3 — AUDIT3 FP-5: CHỢ DÂN SINH, hàng tràn hè theo loại cửa hàng, ô tô/xe máy
+- **2026-10-05/06/11 (W3-E STREET LIFE)** [ĐỢT 3 wave 3 — AUDIT3 FP-5: CHỢ DÂN SINH, hàng tràn hè theo loại cửa hàng, ô tô/xe máy
     đỗ theo bằng chứng, xe khách, xe ba gác, trạm biến áp kiốt, đèn gang 2/5 cầu, cờ treo nhà, băng rôn, cổng chào ngõ]:
     MỚI `js/streetlife.js` (gọi từ `buildProps` — dùng chung lưới ô vỉa hè 3 m `sides`, vật liệu/bộ dựng hình props truyền
     qua `G` → không thêm program shader cho đồ chợ). `tools/gen_props_evidence.mjs` thêm 3 cột (props_evidence.js
@@ -492,6 +492,9 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     hoa — nhóm `props_furniture2` RIÊNG (gộp vào nhóm cột 1.300 instance làm mọi cột gánh đỉnh suy biến); cờ treo nhà (cán
     chếch 30° cắm vào mặt tiền THẬT dò từ facadeLine), băng rôn khẩu hiệu chung căng ngang phố + 2 cọc, cổng chào NGÕ (miệng
     way h/w/r ≤ 40 m, lùi 3,5 m vào ngõ; cổng trường/công viên không tính), xe ba gác đỗ dải đỗ (22 pano).
+    **Rào bó vỉa giả** (FP-5 019/409): `world.js` khối ĐBP đông — bỏ rào sắt 20 m + biển xanh "XỔ SỐ" trên rào ở bó vỉa NAM
+    ĐBP (z≈-436,8, trước dãy nhà thật; ảnh 409 h135/h180 không có rào). 019: rào là hàng rào `compound()` Cảng vụ (world.js
+    ~20307) quây cả dãy nhà INFILL bờ bắc Hoàng Diệu — việc của khối khuôn viên/INFILL (W3-B), CHƯA sửa.
     **Giao diện**: `world.props.stalls` [{x,z,heading,len,hw,kind}] (traffic.js gộp với parkedCars); `parkedCars` thêm xe
     khách (hw 1,3) + xe phủ bạt; `__hpProps.lists` thêm mkOver/mkGround/mkRoad/spill/kioskI/coaches/covered/flagsHouse/
     banners/gates (clearance_page bỏ qua mkRoad/coaches/covered/banners/gates — cố ý trên lòng/treo cao). props.js `XS(c)` =
