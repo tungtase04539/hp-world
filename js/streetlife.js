@@ -11,10 +11,13 @@
 //   • đa giác chợ OSM (PROPS_MARKETS): trong/≤ 12 m → 3, ≤ 40 m → 2, ≤ 80 m → 1; pano ≤ 30 m KHÔNG nhắc chợ/ô/bạt/hàng
 //     → trần 1 (bằng chứng âm thắng); claim ô dựng tay tên `cho_*` (Chợ Tam Bạc, Chợ Con…) → 3
 //   • phố p (đại lộ) trần 1.
-// KHOẢNG TRỐNG: tâm vật ≥ 2,5 m + bán kính vật tới camera pano (spec FP-5); không trong nhà thật/lòng đường KHÁC (miệng
+// KHOẢNG TRỐNG: MÉP THẬT của vật ≥ CLEAR.PANO_R (3 m, hợp đồng W2-A — tools/qa/clearance.mjs đo khoảng cách ngang tới
+// tam giác 0,3-2,6 m; FP-5 nói ~2,5 m nhưng bản 2,5 m + bán kính đoán thấp làm 35 camera mới "gần < 3 m" vì tán ô/bạt)
+// tới camera pano; không trong nhà thật/lòng đường KHÁC (miệng
 // giao lộ); hàng lấn lòng đường CHÍNH chỉ ở mức 3, dải 1,1 m sát bó vỉa, cách nút giao ≥ 4 m — xuất `stallsRoad` để giao
 // thông (traffic.js) lách như xe đỗ.
 import * as THREE from 'three';
+import { CLEAR, panosNear } from './clearance.js';
 
 // ---------------------------------------------------------------------------------------------------------------------
 // MÔ HÌNH (local: +Z = hướng ra LÒNG ĐƯỜNG, X = dọc phố, y = 0 mặt vỉa). G = bộ dựng hình của props.js.
@@ -464,6 +467,9 @@ export function newStreetLifeStats() {
     signSpill: {}, evSpill: 0, plants: 0, flagsHouse: 0, banners: 0, gates: 0, forecourt: 0 };
 }
 // (2) ĐẶT ĐỒ — sau 6.4 (quán/xe đẩy/biển A/thùng rác), TRƯỚC 6.5 (xe máy) → xe máy/ô tô/người né
+// khoảng trống camera pano = hợp đồng W2-A (clearance.js) + 5 cm; bán kính THẬT của mô hình (đơn vị trước co giãn):
+// tán ô tròn R 1,45 / ô vuông 1,63 · nhóm hàng đất theo biến thể [sạp, mẹt, sọt, bạt đất, bao tải, ghế đẩu] (nửa đường chéo khung bao)
+const CAM_R = CLEAR.PANO_R + 0.05, UMB_R = 1.45, UMB_SQ_R = 1.63, GR = [0.78, 1.1, 0.85, 1.05, 0.6, 0.25];
 export function placeStreetLife(P) {
   const { sides, CELL, cellPos, hash3, inBuilding, obst, flat, roadIdx, nearPano, onCarriage, XS, OCC } = P;
   const T0 = performance.now();
@@ -479,9 +485,10 @@ export function placeStreetLife(P) {
   const GTARP = [0x2f6db5, 0x2f6db5, 0xb83a2a, 0x3f8f4a, 0x8a8a88];
   const STOOL = [0xd8322a, 0xd8322a, 0x2a62c4, 0x2a62c4, 0x2f9a4c, 0xe8e2d4];
   const pick = (a, u) => a[Math.min(a.length - 1, (u * a.length) | 0)];
-  // ---- kiểm tra 1 vật: (x,z) tâm, r bán kính, road = được phép ở dải lòng đường sát bó vỉa của CHÍNH phố này ----
+  // ---- kiểm tra 1 vật: (x,z) tâm, r = bán kính THẬT (mép xa nhất của mô hình đã co giãn), road = được phép ở dải lòng
+  //      đường sát bó vỉa của CHÍNH phố này ----
   const okAt = (S, x, z, r, road = false) => {
-    if (nearPano(x, z, 2.5 + r)) return false;
+    if (nearPano(x, z, CAM_R + r)) return false;
     // (không gọi flat(): ô 3 m đã kiểm dốc/nước ở parkingLine lúc lấy mẫu; groundHeightNoDeck+isWater là truy vấn đắt nhất
     //  của vòng chợ — đo hồ sơ CPU node: okAt 36 ms trong 92 ms)
     if (inBuilding(x, z)) return false;
@@ -490,6 +497,15 @@ export function placeStreetLife(P) {
     return true;
   };
   const headRoad = (S) => Math.atan2(-S.nx, -S.nz);   // local +Z → lòng đường
+  // HÌNH CHỮ NHẬT (tâm cx,cz; trục dọc u, ngang n; nửa rộng ha, nửa sâu hb — bạt căng) cách MỌI camera pano ≥ CAM_R:
+  // khoảng cách đúng điểm → hình chữ nhật (bản cũ chỉ thử tâm + mép trước → góc bạt cách camera 1,8 m ở pano_117/156)
+  const rectClear = (cx, cz, ux, uz, nx, nz, ha, hb) => {
+    for (const [px, pz] of panosNear(cx, cz, CAM_R + Math.hypot(ha, hb))) {
+      const a = Math.abs((px - cx) * ux + (pz - cz) * uz) - ha, b = Math.abs((px - cx) * nx + (pz - cz) * nz) - hb;
+      if (Math.hypot(Math.max(a, 0), Math.max(b, 0)) < CAM_R) return false;
+    }
+    return true;
+  };
   // có MẶT TIỀN NHÀ THẬT ngay sau ô (dò facadeLine −0,3 … +2,5 m)? — đồ của nhà (chậu cây, hàng tràn) không đứng giữa khoảng
   // trống (pano_304: chậu cây mọc trên vỉa hè nút giao HVT)
   const hasFacade = (S, k, da = 0) => { const X = XS(S.c), sk = S.off + (k + 0.5) * CELL + da; for (let d = -0.3; d <= 2.5; d += 0.4) if (inBuilding(S.ax + S.ux * sk + S.nx * (X.fac + d), S.az + S.uz * sk + S.nz * (X.fac + d))) return true; return false; };
@@ -521,13 +537,14 @@ export function placeStreetLife(P) {
         const lat = latX ?? (sw >= 2.6 ? X.fac - 1.35 - hu * 0.5 : hw + Math.max(0.3, sw * 0.4));
         const [x, z] = P2(lat, dt);
         const sc = lv === 3 ? 0.95 + hash3(x, z, 305) * 0.3 : 0.85 + hash3(x, z, 305) * 0.3;
-        if (!okAt(S, x, z, 1.3 * sc) || obst.hit(x, z, 0.9)) return false;
-        overI.push({ x, z, heading: hash3(x, z, 306) * 6.28, v: hash3(x, z, 307) < 0.15 ? 1 : 0, col: pick(UMB, hash3(x, z, 308)), sc: [sc, 0.92 + hash3(x, z, 309) * 0.16, sc] });
+        const v = hash3(x, z, 307) < 0.15 ? 1 : 0;   // 1 = ô vuông (nửa đường chéo 1,63 m — góc xoay ngẫu nhiên)
+        if (!okAt(S, x, z, (v ? UMB_SQ_R : UMB_R) * sc) || obst.hit(x, z, 0.9)) return false;
+        overI.push({ x, z, heading: hash3(x, z, 306) * 6.28, v, col: pick(UMB, hash3(x, z, 308)), sc: [sc, 0.92 + hash3(x, z, 309) * 0.16, sc] });
         obst.add(x, z, 0.05); st.umbrellas++; placed++;
         // phố chợ dày: ô thứ 2 chồng mép (rừng ô) trên dải lòng đường
         if (lv === 3 && hash3(x, z, 310) < 0.35) {
           const [x2, z2] = P2(hw - 0.45, dt + 1.95);
-          if (okAt(S, x2, z2, 1.3, true) && !obst.hit(x2, z2, 0.9)) { overI.push({ x: x2, z: z2, heading: hash3(x2, z2, 306) * 6.28, v: 0, col: pick(UMB, hash3(x2, z2, 308)), sc: [sc, 1.05, sc], road: 1 }); obst.add(x2, z2, 0.05); st.umbrellas++; }
+          if (okAt(S, x2, z2, UMB_R * sc, true) && !obst.hit(x2, z2, 0.9)) { overI.push({ x: x2, z: z2, heading: hash3(x2, z2, 306) * 6.28, v: 0, col: pick(UMB, hash3(x2, z2, 308)), sc: [sc, 1.05, sc], road: 1 }); obst.add(x2, z2, 0.05); st.umbrellas++; }
         }
         return true;
       };
@@ -537,7 +554,7 @@ export function placeStreetLife(P) {
         const [xb, zb] = P2(X.fac - 0.05);
         const [xm, zm] = P2(X.fac - depth * 0.5);
         const [xf, zf] = P2(X.fac - depth + 0.05);
-        if (nearPano(xm, zm, 2.5 + wid * 0.5) || nearPano(xf, zf, 2.5 + 0.4) || inBuilding(xm, zm) || inBuilding(xf, zf)
+        if (!rectClear(xm, zm, S.ux, S.uz, S.nx, S.nz, wid / 2, depth / 2 + 0.05) || inBuilding(xm, zm) || inBuilding(xf, zf)
           || obst.hit(xf + S.ux * 1.4, zf + S.uz * 1.4, 0.35) || obst.hit(xf - S.ux * 1.4, zf - S.uz * 1.4, 0.35) || P.onCarriageFast(xm, zm)) return false;
         overI.push({ x: xb, z: zb, heading: H, v: hash3(xb, zb, 314) < 0.35 ? 3 : 2, col: pick(TARP, hash3(xb, zb, 313)), sc: [wid / 3, 1, depth] });
         for (const s2 of [-1, 1]) { const px = xf + S.ux * s2 * (wid / 2 - 0.05), pz = zf + S.uz * s2 * (wid / 2 - 0.05); obst.add(px, pz, 0.12); }   // 2 cọc trước
@@ -563,7 +580,7 @@ export function placeStreetLife(P) {
       const gs = 1.0 + hash3(t, S.ax, 330) * 0.35;   // đống hàng thật to hơn (ảnh: mẹt/đống 0,8-1,2 m)
       {
         const [x, z] = P2(latG, 0.25 + (gu - 0.5) * 0.4);
-        if (okAt(S, x, z, 0.75) && !obst.hit(x, z, 0.55)) {
+        if (okAt(S, x, z, GR[gv] * gs) && !obst.hit(x, z, 0.55)) {
           const tcol = gv === 0 ? pick(GTARP, hash3(x, z, 317)) : gv === 3 ? pick(GTARP, hash3(x, z, 318)) : 0xffffff;
           groundI.push({ x, z, heading: H + (hash3(x, z, 319) - 0.5) * 0.3, v: gv, col: tcol, sc: [gs, gv === 0 ? 1 : gs, gs] });
           obst.add(x, z, 0.6); P.addCollider(x, z, 0.5); st.ground++; placed++;
@@ -571,7 +588,7 @@ export function placeStreetLife(P) {
           if (lv === 3 && sw >= 2.4) {
             const [x3, z3] = P2(X.fac - 0.55, -1.15);
             const v3 = hash3(x3, z3, 331) < 0.45 ? 4 : hash3(x3, z3, 332) < 0.75 ? 1 : 2;
-            if (okAt(S, x3, z3, 0.6) && !obst.hit(x3, z3, 0.45)) { groundI.push({ x: x3, z: z3, heading: H + (hash3(x3, z3, 333) - 0.5) * 0.4, v: v3, col: 0xffffff }); obst.add(x3, z3, 0.5); st.ground++; }
+            if (okAt(S, x3, z3, GR[v3]) && !obst.hit(x3, z3, 0.45)) { groundI.push({ x: x3, z: z3, heading: H + (hash3(x3, z3, 333) - 0.5) * 0.4, v: v3, col: 0xffffff }); obst.add(x3, z3, 0.5); st.ground++; }
           }
           // người bán ngồi ghế đẩu phía mặt tiền, quay ra đường
           if (hash3(x, z, 320) < (lv === 3 ? 0.75 : lv === 2 ? 0.62 : 0.45)) {
@@ -599,7 +616,7 @@ export function placeStreetLife(P) {
       if (lv === 3 && hash3(t, S.az * 1.3, 325) < 0.4) {
         const [x, z] = P2(hw - 0.55, 0.9);
         const rv = hash3(x, z, 326) < 0.5 ? 3 : hash3(x, z, 327) < 0.75 ? 1 : 4;
-        if (okAt(S, x, z, 0.75, true) && !obst.hit(x, z, 0.55)) {
+        if (okAt(S, x, z, GR[rv], true) && !obst.hit(x, z, 0.55)) {
           groundI.push({ x, z, heading: H + Math.PI / 2 + (hash3(x, z, 328) - 0.5) * 0.4, v: rv, col: pick(GTARP, hash3(x, z, 329)), road: 1 });
           obst.add(x, z, 0.6); st.roadStrip++;
           stallsRoad.push({ x, z, heading: Math.atan2(S.ux, S.uz), len: 2.2, hw: 0.6, kind: 'stall' });
@@ -643,7 +660,7 @@ export function placeStreetLife(P) {
       const u = hash3(S.ax + kk * 3.1, S.az + seed, 331);
       const lat = X.fac - 0.55 - (X.sw >= 3 && u < 0.35 ? 0.9 : 0);
       const [x, z] = cellPos(S, kk, lat, (u - 0.5) * 1.2);
-      if (!okAt(S, x, z, 0.7) || obst.hit(x, z, 0.5) || !hasFacade(S, kk)) continue;
+      if (!okAt(S, x, z, cat === 'furn' ? 1.3 : 0.9) || obst.hit(x, z, 0.5) || !hasFacade(S, kk)) continue;
       if (cat === 'fruit') groundI.push({ x, z, heading: H, v: u < 0.5 ? 2 : 1, col: 0xffffff });
       else { const vs = SPILL[cat]; spillI.push({ x, z, heading: H + (u - 0.5) * 0.2, v: vs[(u * vs.length) | 0], col: pick([0xa8552e, 0xa8552e, 0xe8e4dc, 0x6a6e70], hash3(x, z, 332)) }); }
       obst.add(x, z, 0.6); if (cat !== 'plant') P.addCollider(x, z, 0.45);
@@ -662,7 +679,7 @@ export function placeStreetLife(P) {
       const lat = X.fac - 0.95 - r * 2.0;
       for (let a = -2.6 + r * 0.34; a <= 2.6; a += 0.68) {
         const [x, z] = cellPos(S, k, lat, a);
-        if (!okAt(S, x, z, 0.5) || obst.hit(x, z, 0.3) || inBuilding(x - S.nx * 0.95, z - S.nz * 0.95)) continue;
+        if (!okAt(S, x, z, 1.0) || obst.hit(x, z, 0.3) || inBuilding(x - S.nx * 0.95, z - S.nz * 0.95)) continue;
         P.lists.bikeDisplay.push({ x, z, heading: H + (hash3(x, z, 341) - 0.5) * 0.08 });
         obst.add(x, z, 0.3); c++;
       }
@@ -671,7 +688,7 @@ export function placeStreetLife(P) {
       for (const a of [-1.35, 1.35]) {
         const [x, z] = cellPos(S, k, Math.max(X.hw + 0.35, X.fac - 0.95 - (rows - 1) * 2.0 - 1.25), a);
         const sc = 1.05 + hash3(x, z, 342) * 0.2;
-        if (!okAt(S, x, z, 1.3 * sc) || obst.hit(x, z, 0.25)) continue;
+        if (!okAt(S, x, z, UMB_R * sc) || obst.hit(x, z, 0.25)) continue;
         overI.push({ x, z, heading: hash3(x, z, 343) * 6.28, v: 0, col: pick(UMB, hash3(x, z, 344)), sc: [sc, 1.08, sc] });
         obst.add(x, z, 0.05); st.umbrellas++;
       }
@@ -793,7 +810,7 @@ export function placeStreetLife(P) {
         const s = t + dt; if (s < 2 || s > S.L - 2) continue;
         const lat = X.hw - 0.85;
         const x = S.ax + S.ux * s + S.nx * lat, z = S.az + S.uz * s + S.nz * lat;
-        if (nearPano(x, z, 2.5 + 1.6) || roadIdx.nearCross?.(x, z, S.ri, 6, 3) || obst.hit(x, z, 1.4) || inBuilding(x, z)) continue;
+        if (nearPano(x, z, CAM_R + 1.6) || roadIdx.nearCross?.(x, z, S.ri, 6, 3) || obst.hit(x, z, 1.4) || inBuilding(x, z)) continue;
         const hd = Math.atan2(S.ux * (S.side > 0 ? -1 : 1), S.uz * (S.side > 0 ? -1 : 1));   // xuôi chiều làn bên phải
         spillI.push({ x, z, heading: hd, v: 7, col: pick([0x2f5a90, 0x3f7a4a, 0x7a7e82, 0x8a3a2a], hash3(x, z, 411)), road: 1 });
         stallsRoad.push({ x, z, heading: Math.atan2(S.ux, S.uz), len: 2.9, hw: 0.7, kind: 'bagac' });

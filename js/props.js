@@ -709,7 +709,9 @@ export function buildProps(ctx) {
     if (c - 5.66 >= R) return false; if (c + 5.66 < R) return true;
     return lakeSD(x, z) < R;
   };
-  const openReal = (x, z) => !!claimAt(x, z, ['park', 'plaza']) || lakeLess(x, z, 16);
+  // + MẶT NƯỚC bất kỳ (isWater: hồ Sen/sông/kênh ngoài đa giác hồ Tam Bạc của lakeSD) — phố kè nhìn ra nước = promenade,
+  //   không đỗ ô tô/bày chợ phía đó (AUDIT3 PARKVEH 322: xe đỗ sát lan can kè hồ; ảnh thật trống) — gọi SAU 2 kiểm rẻ
+  const openReal = (x, z) => !!claimAt(x, z, ['park', 'plaza']) || lakeLess(x, z, 16) || isWater(x, z);
   // bên phố nhìn ra công viên/quảng trường: từ điểm (px,pz) trên vỉa dò theo pháp tuyến ra phía nhà (nx,nz) tới +18 m — đa giác
   // công viên OSM thường lùi sau dải cỏ/hàng rào (542: claim cách bó vỉa ~16 m); DỪNG khi gặp nhà thật (có dãy nhà đứng trước
   // thì bên này là phố, công viên phía sau không tính)

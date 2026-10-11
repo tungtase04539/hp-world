@@ -357,8 +357,10 @@
     const isRoadK = isRoadK0;
     // (c1) collider tròn nhỏ (cây/cột/đèn/thùng/…)
     const carG = new Map();
-    for (const pc of (world.props && world.props.parkedCars) || []) { const k = Math.floor(pc.x / 8) * 100003 + Math.floor(pc.z / 8); let a = carG.get(k); if (!a) carG.set(k, (a = [])); a.push(pc); }
-    const nearCar = (x, z) => { const ci = Math.floor(x / 8), cj = Math.floor(z / 8); for (let i = ci - 1; i <= ci + 1; i++) for (let j = cj - 1; j <= cj + 1; j++) { const a = carG.get(i * 100003 + j); if (!a) continue; for (const pc of a) if ((pc.x - x) ** 2 + (pc.z - z) ** 2 < 3.5 * 3.5) return true; } return false; };
+    // W3-E: + world.props.stalls (xe ba gác/hàng chợ đỗ dải sát bó vỉa — giao thông lách như xe đỗ); bán kính theo chiều dài
+    //   xe (xe khách 11,4 m: collider ±4 m khỏi tâm — bản cũ 3,5 m cố định đếm nhầm là "vật trên lòng đường")
+    for (const pc of [...((world.props && world.props.parkedCars) || []), ...((world.props && world.props.stalls) || [])]) { const k = Math.floor(pc.x / 8) * 100003 + Math.floor(pc.z / 8); let a = carG.get(k); if (!a) carG.set(k, (a = [])); a.push(pc); }
+    const nearCar = (x, z) => { const ci = Math.floor(x / 8), cj = Math.floor(z / 8); for (let i = ci - 1; i <= ci + 1; i++) for (let j = cj - 1; j <= cj + 1; j++) { const a = carG.get(i * 100003 + j); if (!a) continue; for (const pc of a) { const R = Math.max(3.5, (pc.len || 0) / 2 + 1); if ((pc.x - x) ** 2 + (pc.z - z) ** 2 < R * R) return true; } } return false; };
     for (const c of world.colliders || []) {
       if (c.x > 1e6 || c.r > 3 || nearCar(c.x, c.z)) continue;
       const k = surfCls(c.x, c.z); if (isRoadAt(k, c.x, c.z)) onRoad.push({ src: 'collider', name: 'r' + c.r.toFixed(2), x: +c.x.toFixed(1), z: +c.z.toFixed(1), cls: k });

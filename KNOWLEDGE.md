@@ -441,7 +441,12 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     mái); hàng dưới đất (sạp phủ bạt, mẹt, bạt trải đất, bao tải, sọt) SÁT MẶT TIỀN khi vỉa ≥ 2,6 m (chừa dải bó vỉa cho xe máy
     đỗ — ảnh 184/189), người bán ngồi ghế đẩu sau hàng (ghế = biến thể nhóm hàng, người = kit SIT), khách đứng phía đường;
     mức 3 (40% đơn vị) thêm hàng ở dải 1,1 m lòng đường sát bó vỉa (cách nút giao ≥ 4 m) → `world.props.stalls` (traffic.js lách như xe
-    đỗ). Mọi vật: tâm ≥ 2,5 m + bán kính tới camera pano, không trong nhà thật, không trên nhựa phố khác (`onCarriageFast`).
+    đỗ). Mọi vật: MÉP THẬT ≥ `CLEAR.PANO_R` (3 m, hợp đồng W2-A) + 5 cm tới camera pano — bán kính thật của mô hình đã co
+    giãn (ô tròn 1,45·sc, ô vuông 1,63·sc, hàng đất theo biến thể 0,25-1,1·gs, hàng tràn 0,9/1,3), bạt = khoảng cách ĐÚNG
+    điểm → hình chữ nhật (`rectClear` + `panosNear`). BẪY: bản đầu "tâm ≥ 2,5 m + bán kính" (FP-5 nói ~2,5 m) với bán kính
+    đoán thấp (ô 1,3·sc thay vì 1,45·sc; bạt chỉ thử tâm + mép trước) → `tools/qa/clearance.mjs` "cam vi phạm" 35 → 70
+    (gần < 3 m: 12 → 46, chủ yếu tán ô/bạt chợ 2,3-2,9 m, góc bạt 1,8 m) — LUÔN chạy clearance.mjs A/B khi thêm đồ hè.
+    Không trong nhà thật, không trên nhựa phố khác (`onCarriageFast`).
     Người: bán ngồi 75/62/45% đơn vị (mức 3/2/1), khách đứng 60/30/15% + mức 3 thêm khách thứ 2 35%. Ngân sách người TÁCH 2 NHÓM
     (`pedsMarket` 1.100 / LITE 350 cho người chợ cờ `vendor`/`mk`; `peds` chung 1.100 / LITE 450 như dot3 cho đi bộ + đứng/ngồi
     quán): lấy mẫu chung 1 nhóm (7.500 ứng viên, giữ 26%) làm chợ đông người "ăn" mất người ĐI BỘ cả thành phố (428 → 266);
@@ -467,7 +472,8 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     nút giao HVT (304).
     **Ô tô** (props.js 6.6): bỏ luật `lakeSD > 18` (cấm ô tô 18 m quanh MỌI hồ → Quang Trung/Nguyễn Đức Cảnh trống) → chỉ cấm
     phía kè (đi ra phía vỉa lại gần hồ hơn) + phía vỉa nhìn ra công viên/quảng trường (322/542/065): `parkBehind` dò từ mặt
-    tiền +0…+18 m theo pháp tuyến, gặp claim park/plaza hoặc kè (`openReal` = claimAt park/plaza ∨ lakeSD < 16) → true, gặp
+    tiền +0…+18 m theo pháp tuyến, gặp claim park/plaza hoặc kè/mặt nước (`openReal` = claimAt park/plaza ∨ lakeSD < 16 ∨ isWater — hồ Sen
+    322: xe đỗ sát lan can kè vì lakeSD chỉ là hồ Tam Bạc) → true, gặp
     nhà thật trước → false (đa giác công viên OSM lùi sau dải cỏ: 542 claim cách bó vỉa ~16 m). BẪY: `ctx.openSpace` của
     world.js KHÔNG phải "không gian mở" — nó gồm cả vùng CẤM NHÀ INFILL có nhà thật (Z-TTB1/2/3 phố công sở/bệnh viện/nút
     Nguyễn Tri Phương, siêu khối Hải quân, chợ Nguyễn Khuyến, hành lang cầu Lạc Long…): dùng nó cho luật ô tô thì pano_395
@@ -497,7 +503,8 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     ~20307) quây cả dãy nhà INFILL bờ bắc Hoàng Diệu — việc của khối khuôn viên/INFILL (W3-B), CHƯA sửa.
     **Giao diện**: `world.props.stalls` [{x,z,heading,len,hw,kind}] (traffic.js gộp với parkedCars); `parkedCars` thêm xe
     khách (hw 1,3) + xe phủ bạt; `__hpProps.lists` thêm mkOver/mkGround/mkRoad/spill/kioskI/coaches/covered/flagsHouse/
-    banners/gates (clearance_page bỏ qua mkRoad/coaches/covered/banners/gates — cố ý trên lòng/treo cao). props.js `XS(c)` =
+    banners/gates (clearance_page bỏ qua mkRoad/coaches/covered/banners/gates — cố ý trên lòng/treo cao; collider của
+    `stalls` + xe khách tính như xe đỗ, bán kính len/2 + 1). props.js `XS(c)` =
     MỘT chỗ lấy mặt cắt cho phần W3-E — W3-A (bề rộng theo way) thay hàm này là đủ.
     BẪY QA (Windows): `node tools/qa/gpulock.mjs run -- bash -c "a; b"` TREO — spawnSync shell:true chạy qua cmd.exe, dấu nháy
     bị bỏ → `bash -c bash …` chờ stdin mãi trong khi GIỮ khoá GPU (chặn mọi agent 13 phút). Gói nhiều lệnh vào 1 file .sh rồi
