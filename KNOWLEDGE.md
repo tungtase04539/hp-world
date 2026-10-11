@@ -490,8 +490,10 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     + 12 m (≤ 45), điểm = hạng + 2·nPS − d/3 (đèn: vẫn ≤ 45 m, cùng −d/3). BẪY cũ (≤ 45 m, −d/12): chữ của pano_551 rơi vào nút
     lớn cách 41 m → zebra MA ở 496 h000 và MẤT vạch thật ở 551 (8/24 chữ zebra gán > 25 m). Không có nút → vạch GIỮA KHỐI;
     chữ tả cả đèn lẫn vạch (526 "gần ngã tư có đèn…, có vạch sang đường") → vạch ở nút đèn đó; có node OSM crossing ≤ 20 m →
-    chữ tả CHÍNH vạch đó (290 ↔ node Thế Lữ 12 m), không thêm; 2 pano ≤ 25 m cùng tả (551 + 393) → 1 vạch ở trung điểm.
-    Kết quả: bỏ 4 nút zebra ma (cạnh 496, 014, 017, 289), vạch giữa khối 116 → 118 (thêm 015, 017, 551/393). (b) Nhãn W còn
+    chữ tả CHÍNH vạch đó (290 ↔ node Thế Lữ 12 m), không thêm; nhiều pano ≤ 25 m cùng tả (551 + 393) → 1 vạch ở pano GẦN
+    NÚT nhất (BẪY: lấy trung điểm thì vạch rơi đúng khoảng giữa — chỗ ảnh 551 h000 và 393 h180 đều thấy trống; ảnh 551 h180
+    có vạch ngay trước camera). Kết quả: bỏ 4 nút zebra ma (cạnh 496, 014, 017, 289), vạch giữa khối 116 → 118 (thêm 015,
+    017, 551; bỏ vạch đơn lẻ ở 393). (b) Nhãn W còn
     LAN sang dải đối diện của đường đôi (way phố khác ≤ 20 m, |cos| > 0,94, khe mép lòng −0,5…8 m; cờ `far` → thua nhãn riêng
     +40 m): Lê Quang Đạo dải xa (ri 400, 360 m, dualRun chỉ 46% vì 2 dải tách ở đầu) hết tim vàng ở 216/478; Hồ Sen (ri 295)
     theo nhãn 320/323/327 thay chữ "vàng" của 321. (c) gen_roadmarks: "biển (báo) người đi bộ" là bằng chứng zebra (ảnh

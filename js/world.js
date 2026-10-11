@@ -20986,16 +20986,18 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     }, 'w3d_garden_plaza');
     plazaTex.wrapS = plazaTex.wrapT = THREE.RepeatWrapping; plazaTex.repeat.set(1 / 2.4, 1 / 2.4);
     const plazaM = new THREE.MeshLambertMaterial({ map: plazaTex });
-    // NỀN mỗi vườn theo CHỮ + ẢNH pano quanh nó (audit_enriched, 58 pano ≤ 25 m ngoài mép): An Biên / Nguyễn Văn Trỗi /
-    // Nguyễn Bỉnh Khiêm / Nguyễn Du / Kim Đồng = "thảm cỏ" + "hàng rào cây xén" (ảnh 039 235 340 400 043 195: CỎ xanh xỉn
-    // sau viền bụi, lối lát xám) → THẢM CỎ ô liu lốm đốm + lối chữ thập lát đá xám 4 m; Tố Hữu (224/225/545 "quảng trường
-    // rộng", ảnh 225 h090) → SÂN LÁT + ô cỏ. Phản biện W3-D: bản sân lát cho cả 6 vườn → 400 h000/h270 thấy sân thay cỏ,
-    // nhìn từ trên là mảng xám gần trắng + lưới ô cỏ đều tăm tắp.
-    const PLAZA_GARDENS = new Set(['Tố Hữu']);
+    // NỀN vườn theo CHỮ + ẢNH pano quanh nó (audit_enriched, 58 pano ≤ 25 m ngoài mép): cả 6 vườn chủ yếu "thảm cỏ" +
+    // "hàng rào cây xén" (ảnh 039 223 226 235 340 400 043 195: CỎ sau viền bụi, lối lát xám) → THẢM CỎ lốm đốm + lối chữ
+    // thập lát đá xám 4 m; SÂN LÁT chỉ ở mảng ảnh thấy sân: Tố Hữu quanh 224/225 ("quảng trường rộng", ảnh 224/225 h090 —
+    // 223/226 hai bên lại là cỏ) và mũi bắc Tố Hữu cạnh ĐBP (545 h180 "quảng trường … lát đá"). Mảng sân = đĩa ∩ polygon,
+    // ô 2 m, có ô cỏ bó vỉa lệch. Phản biện W3-D: bản sân lát cho cả 6 vườn → 400 h000/h270 thấy sân thay cỏ, nhìn từ trên
+    // là mảng xám gần trắng + lưới ô cỏ đều tăm tắp.
+    const PLAZA_PATCHES = [[705, -657, 42], [697, -470, 30]];
+    const inPatch = (x, z) => PLAZA_PATCHES.some(([px, pz, r]) => (x - px) ** 2 + (z - pz) ** 2 < r * r);
     const gLawnTex = makeTex(128, 128, (g2, w, h) => {   // cỏ ô liu xỉn lốm đốm TẤT ĐỊNH, 128 px = 4 m
-      g2.fillStyle = '#7c8042'; g2.fillRect(0, 0, w, h);   // đo 400 h270: cỏ thật (106,122,43) vàng hơn — #66773f ra (78,106,41)
+      g2.fillStyle = '#6e7c3e'; g2.fillRect(0, 0, w, h);   // đo nắng: cỏ thật g/r ≈ 1,12 (195 h180 (156,173,82), 043 h270 (126,142,66)); #66773f → 1,18 (xanh quá), #7c8042 → 0,98 (ra nâu khô)
       let sd = 9029; const rnd = () => { sd = (sd * 1103515245 + 12345) & 0x7fffffff; return sd / 0x7fffffff; };
-      for (let i = 0; i < 520; i++) { const l = rnd(); g2.fillStyle = `rgba(${94 + l * 44 | 0},${100 + l * 40 | 0},${48 + l * 22 | 0},0.45)`; g2.fillRect(rnd() * w, rnd() * h, 2 + rnd() * 4, 2 + rnd() * 3); }
+      for (let i = 0; i < 520; i++) { const l = rnd(); g2.fillStyle = `rgba(${88 + l * 44 | 0},${100 + l * 40 | 0},${48 + l * 22 | 0},0.45)`; g2.fillRect(rnd() * w, rnd() * h, 2 + rnd() * 4, 2 + rnd() * 3); }
     }, 'w3d_garden_lawn');
     gLawnTex.wrapS = gLawnTex.wrapT = THREE.RepeatWrapping; gLawnTex.repeat.set(1 / 4, 1 / 4);
     const gLawnM = new THREE.MeshLambertMaterial({ map: gLawnTex });
@@ -21093,9 +21095,8 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
       // W3-D: nền QUẢNG TRƯỜNG ĐÁ XÁM (cùng cao độ thảm cỏ cũ +0,12 — không thêm chỗ chồng lòng đường); UV = toạ độ m
       const lawnGeo = new THREE.ExtrudeGeometry(shape, { depth: 0.12, bevelEnabled: false });
       lawnGeo.rotateX(-Math.PI / 2);
-      const isPlaza = PLAZA_GARDENS.has(g0.n);
-      const lawn = new THREE.Mesh(lawnGeo, isPlaza ? plazaM : gLawnM);
-      lawn.position.y = LAND_H; lawn.receiveShadow = true; lawn.name = isPlaza ? 'garden_plaza' : 'garden_lawn'; scene.add(lawn);
+      const lawn = new THREE.Mesh(lawnGeo, gLawnM);
+      lawn.position.y = LAND_H; lawn.receiveShadow = true; lawn.name = 'garden_lawn'; scene.add(lawn);
       // point-in-polygon (ray cast) để CẮT luống hoa/cây theo đúng hình
       const inPoly = (x, z) => { let c = false; for (let i = 0, j = spoly.length - 1; i < spoly.length; j = i++) { const [xi, zi] = spoly[i], [xj, zj] = spoly[j]; if (((zi > z) !== (zj > z)) && (x < (xj - xi) * (z - zi) / (zj - zi) + xi)) c = !c; } return c; };
       // extent theo TRỤC ô đất (GU dọc / GV ngang) quanh tâm
@@ -21110,21 +21111,31 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
       const isKen = Math.hypot(cx0 - LM.nhaken[0], cz0 - LM.nhaken[1]) < 20;
       if (!isKen) heroBed(bcx, bcz, Math.max(7, Math.min(14, uw * 0.21, vw * 0.21)));
       else addCollider(bcx, bcz, 5);
-      // vườn CỎ: lối chữ thập lát đá 4 m qua tâm (dọc GU và GV), mẩu 2 m chỉ trong polygon và ngoài lòng/vỉa hè roadnet
-      if (!isPlaza) {
+      // lát đá trên nền cỏ (+0,15): lối chữ thập 4 m qua tâm (dọc GU và GV) + mảng SÂN (PLAZA_PATCHES), ô 2 m chỉ trong
+      // polygon và ngoài lòng/vỉa hè roadnet; quad mặt trên UV = mét (chung plazaM)
+      {
         const pY = LAND_H + 0.15;
+        const quad = (c4) => {
+          const cy = (c4[2][0] - c4[0][0]) * (c4[1][1] - c4[0][1]) - (c4[2][1] - c4[0][1]) * (c4[1][0] - c4[0][0]);   // <0: (0,2,1) hướng +Y
+          for (const k of (cy < 0 ? [0, 2, 1, 0, 3, 2] : [0, 1, 2, 0, 2, 3])) { pathPos.push(c4[k][0], pY, c4[k][1]); pathUV.push(c4[k][0], -c4[k][1]); }
+        };
         for (const [along, lo, hi, fix] of [[true, u1, u2, vc], [false, v1, v2, uc]]) {
           for (let t = lo + 1; t < hi - 1; t += 2) {
             const q = (a, b) => (along ? L(a, b) : L(b, a));
             const [mx, mz] = q(t + 1, fix);
-            if (!inPoly(mx, mz) || onPaved(mx, mz)) continue;
-            const c4 = [q(t, fix - 2), q(t + 2.02, fix - 2), q(t + 2.02, fix + 2), q(t, fix + 2)];
-            const cy = (c4[2][0] - c4[0][0]) * (c4[1][1] - c4[0][1]) - (c4[2][1] - c4[0][1]) * (c4[1][0] - c4[0][0]);   // <0: (0,2,1) hướng +Y
-            for (const k of (cy < 0 ? [0, 2, 1, 0, 3, 2] : [0, 1, 2, 0, 2, 3])) { pathPos.push(c4[k][0], pY, c4[k][1]); pathUV.push(c4[k][0], -c4[k][1]); }
+            if (inPatch(mx, mz) || !inPoly(mx, mz) || onPaved(mx, mz)) continue;
+            quad([q(t, fix - 2), q(t + 2.02, fix - 2), q(t + 2.02, fix + 2), q(t, fix + 2)]);
+          }
+        }
+        if (PLAZA_PATCHES.some(([px, pz, r]) => Math.hypot(px - cx0, pz - cz0) < r + Math.hypot(uw, vw) / 2)) {
+          for (let a = u1; a < u2; a += 2) for (let b = v1; b < v2; b += 2) {
+            const [mx, mz] = L(a + 1, b + 1);
+            if (!inPatch(mx, mz) || !inPoly(mx, mz) || onPaved(mx, mz)) continue;
+            quad([L(a, b), L(a + 2.02, b), L(a + 2.02, b + 2.02), L(a, b + 2.02)]);
           }
         }
       }
-      // Ô CỎ chữ nhật 9-13 m có bó vỉa đá trên lưới 17 m (lệch ±2,5 m, cỡ theo hash — hết lưới đều tăm tắp) — CHỈ vườn
+      // Ô CỎ chữ nhật 9-13 m có bó vỉa đá trên lưới 17 m (lệch ±1 m, cỡ theo hash — hết lưới đều tăm tắp) — CHỈ trong mảng
       // SÂN LÁT, trong polygon, không đè lòng/vỉa hè roadnet; ~1/5 ô để trống (ảnh 225: sân rộng giữa các ô cỏ)
       let bi = 3;
       for (let ox = u1 + 8; ox <= u2 - 8; ox += 17) {
@@ -21133,7 +21144,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
           if (Math.hypot(ox - uc, oz - vc) < Math.max(12, uw * 0.12)) continue;         // chừa bồn giữa
           const [wx, wz] = L(ox, oz);
           if (!inPoly(wx, wz)) continue;
-          if (isPlaza) {
+          if (inPatch(wx, wz)) {
             const jx = (fracH(Math.sin(ox * 2.17 + oz * 0.53 + cx0) * 6113.7) - 0.5) * 5, jz = (fracH(Math.sin(ox * 0.61 + oz * 2.29 + cz0) * 5323.1) - 0.5) * 5;
             const hs = 4.5 + 2 * fracH(Math.sin(ox * 1.13 + oz * 0.97 + cz0) * 4421.9), pu = ox + jx * 0.4, pv = oz + jz * 0.4;
             const [px2, pz2] = L(pu, pv), cor = [L(pu - hs, pv - hs), L(pu + hs, pv - hs), L(pu + hs, pv + hs), L(pu - hs, pv + hs)];
