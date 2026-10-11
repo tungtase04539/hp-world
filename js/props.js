@@ -563,6 +563,21 @@ function makeCircleGrid(cell = 8) {
       for (let i = 0; i < a.length; i += 3) { const r = a[i + 2] + pad; if ((a[i] - x) ** 2 + (a[i + 1] - z) ** 2 < r * r) return true; }
       return false;
     },
+    // W3-E: có vòng tròn nào chạm HÌNH CHỮ NHẬT (tâm cx,cz; trục dọc u; nửa dài ha, nửa rộng hb)? — thân ô tô đỗ (hit() chỉ thử
+    // 1 điểm: phản biện W3-E đo 25 xe đỗ trùm hàng chợ lấn lòng đường nằm cách tâm xe 1-2,5 m dọc thân)
+    rectHit(cx, cz, ux, uz, ha, hb) {
+      const R = Math.hypot(ha, hb);
+      for (let i = Math.floor((cx - R) / cell); i <= Math.floor((cx + R) / cell); i++)
+        for (let j = Math.floor((cz - R) / cell); j <= Math.floor((cz + R) / cell); j++) {
+          const a = map.get(key(i, j)); if (!a) continue;
+          for (let q = 0; q < a.length; q += 3) {
+            const dx = a[q] - cx, dz = a[q + 1] - cz;
+            const da = Math.max(0, Math.abs(dx * ux + dz * uz) - ha), db = Math.max(0, Math.abs(dz * ux - dx * uz) - hb);
+            if (da * da + db * db < a[q + 2] * a[q + 2]) return true;
+          }
+        }
+      return false;
+    },
   };
 }
 
@@ -671,7 +686,7 @@ export function buildProps(ctx) {
   // W3-E: pedsMarket = ngân sách RIÊNG người chợ (bán ngồi ghế đẩu/khách đứng trước sạp — chỉ trong ô chợ, xa > 60 m là LOD
   // 0,24k); peds giữ như dot3 cho người đi bộ + đứng/ngồi quán
   const BUDGET = {
-    bikes: LITE ? 5000 : 16000, cars: LITE ? 1400 : 3600, peds: LITE ? 450 : 1100, pedsMarket: LITE ? 350 : 1100,
+    bikes: LITE ? 5000 : 16000, cars: LITE ? 1400 : 3600, peds: LITE ? 450 : 1100, pedsMarket: LITE ? 350 : 1100, pedsSpill: LITE ? 90 : 220,
   };
   const stats = { cells: 0, valid: 0 };
   const rej = { far: 0, junction: 0, notFlat: 0, featured: 0, building: 0, lake: 0 };
@@ -1252,6 +1267,19 @@ export function buildProps(ctx) {
   const CAR_COLS = [0xeeeeec, 0xeeeeec, 0xe4e4e1, 0x16171a, 0x16171a, 0xb4b8bc, 0x8e9398, 0x6c7176, 0x9a1d1d, 0x24406e, 0x6b5a48, 0xcfc4ae];
   const TAXI_COLS = [0xf4f4f0, 0x2f8f4e, 0x3aa35a, 0xe9e9e4, 0x2c5aa0];   // trắng · xanh lá · xanh dương-trắng (taxi HP)
   const CAR_LEN = [4.5, 4.6, 3.9, 3.9, 4.8, 5.25];
+  // hàng chợ lấn dải lòng đường + ba gác (LIFE.stallsRoad, hình chữ nhật dọc phố của chúng) — lưới 16 m; thân xe (tâm, trục u,
+  // nửa dài ha, nửa rộng hb) chạm hình chữ nhật nào (SAT trên 2 trục của xe — đủ vì 2 bên gần như song song)?
+  const STRIP = new Map(), skey = (i, j) => i * 65536 + j;
+  for (const it of LIFE.stallsRoad) { const k = skey(Math.floor(it.x / 16), Math.floor(it.z / 16)); let a = STRIP.get(k); if (!a) STRIP.set(k, (a = [])); a.push(it); }
+  const stripHit = (cx, cz, ux, uz, ha, hb) => {
+    const ci = Math.floor(cx / 16), cj = Math.floor(cz / 16);
+    for (let i = ci - 1; i <= ci + 1; i++) for (let j = cj - 1; j <= cj + 1; j++) for (const it of STRIP.get(skey(i, j)) || []) {
+      const dx = it.x - cx, dz = it.z - cz, su = Math.sin(it.heading), cu = Math.cos(it.heading);
+      const c = Math.abs(su * ux + cu * uz), sn = Math.sqrt(Math.max(0, 1 - c * c));
+      if (Math.abs(dx * ux + dz * uz) < ha + c * it.len / 2 + sn * it.hw && Math.abs(dz * ux - dx * uz) < hb + sn * it.len / 2 + c * it.hw) return true;
+    }
+    return false;
+  };
   // lượt 1: gom ỨNG VIÊN (mọi kiểm tra) · lượt 2: lấy mẫu ĐỀU theo hash nếu vượt ngân sách (không "N đường đầu ăn hết")
   const carCand = [];
   // W3-E: đi dọc TỪNG TUYẾN (byRoad: cùng phố + cùng bên, đoạn nối tiếp) — phần dư bước được MANG sang đoạn kế (trước: mỗi
@@ -1293,7 +1321,9 @@ export function buildProps(ctx) {
       const sc = s + len / 2;
       // xe phải nằm trọn trong đoạn (đầu xe chừa 1 m), trừ khi đoạn kế THẲNG hàng (< 12°): được chồm qua khớp tới 0,3 m cuối
       if (sc > S.L - (straightNext ? 0.3 : len / 2 + 1)) break;
-      const x = S.ax + S.ux * sc + S.nx * lat, z = S.az + S.uz * sc + S.nz * lat;
+      // xe khách rộng 2,5 m (nửa 1,26): tâm lùi curbLine − 1,35 (ở −0,95 thân chồm 0,31 m lên bó vỉa — phản biện W3-E, 441)
+      const latV = mi === 6 ? curbLine(S.c) - 1.35 : lat;
+      const x = S.ax + S.ux * sc + S.nx * latV, z = S.az + S.uz * sc + S.nz * latV;
       // camera pano nằm giữa lòng đường: ô tô đỗ có ĐẦU XE sát camera che gần nửa khung hình mà ảnh thật ở đó trống
       // (đo: van 5,25 m trước pano_102 — tâm 8,5 m nhưng đầu xe ~6 m, ảnh thật không có xe) → kiểm tra viên nang (tâm
       // + 2 đầu xe) quanh 551 điểm chụp: 6,5 m (van/tải 8 m); pano ghi "ô tô đỗ dày/hai bên" (car 2) thì xe đỗ sát
@@ -1321,6 +1351,10 @@ export function buildProps(ctx) {
       // ô tô đỗ chắn làn rẽ ở miệng giao lộ)
       if (!why) for (const dd of [-len / 2 - 0.5, 0, len / 2 + 0.5]) { if (roadIdx.nearCross(x + S.ux * dd, z + S.uz * dd, S.ri, 12, 4.5)) { why = 6; break; } }
       if (!why && obst.hit(x, z, mi === 6 ? 1.2 : 0.9)) why = 7;
+      // phản biện W3-E: cả THÂN xe (không chỉ tâm) — 25 xe đỗ từng trùm hàng chợ lấn lòng đường / cọc bạt / cán ô cách tâm
+      // 1-2,5 m dọc thân (353, 518, 125). Vòng tròn trong obst (cột, gốc cây, cọc) + hình chữ nhật THẬT của hàng lấn lòng đường
+      // và ba gác (obst chỉ ghi 0,6 m cho sạp dài 2,2 m)
+      if (!why && (obst.rectHit(x, z, S.ux, S.uz, len / 2, mi === 6 ? 1.26 : 0.85) || stripHit(x, z, S.ux, S.uz, len / 2 + 0.15, mi === 6 ? 1.3 : 0.95))) why = 7;
       if (!why) why = lakeSide() ? 3 : parkSide() ? 4 : 0;
       let ok = !why;
       if (why) { carRej[why]++; if (carRejPts.length < 60000) carRejPts.push(+x.toFixed(1), +z.toFixed(1), why); }
@@ -1409,12 +1443,14 @@ export function buildProps(ctx) {
   // ngân sách người: lấy mẫu đều TRONG 2 NHÓM (W3-E) — người chợ (bán ngồi ghế đẩu/khách đứng trước sạp, cờ `vendor`/`mk`,
   // dồn ở ~6.000 ô chợ) có ngân sách RIÊNG; nhóm chung (đi bộ + đứng/ngồi quán) giữ ngân sách cũ của dot3. Bản lấy mẫu
   // chung 1 nhóm: 7.500 ứng viên → giữ 26% → người đi bộ cả thành phố tụt 428 → 266 vì chợ đông người
-  const isMk = (p) => !!(p.mk || p.vendor);
-  stats.pedsPre = [walkI.length, standI.length, sitI.length, standI.filter(isMk).length, sitI.filter(isMk).length];
+  // + nhóm 3 (phản biện W3-E): khách ngồi quán đặt theo BIỂN HIỆU/bằng chứng (cờ `sp`, js/streetlife.js) — ~930 ứng viên mới
+  // từng chen vào nhóm chung (người đi bộ 444 → 350)
+  const isMk = (p) => !!(p.mk || p.vendor), isSp = (p) => !!p.sp;
+  stats.pedsPre = [walkI.length, standI.length, sitI.length, standI.filter(isMk).length, sitI.filter(isMk).length, sitI.filter(isSp).length];
   {
-    const nMk = stats.pedsPre[3] + stats.pedsPre[4], nGen = walkI.length + standI.length + sitI.length - nMk;
-    const kGen = Math.min(1, BUDGET.peds / Math.max(1, nGen)), kMk = Math.min(1, BUDGET.pedsMarket / Math.max(1, nMk));
-    if (kGen < 1 || kMk < 1) for (const arr of [walkI, standI, sitI]) { let w = 0; for (const p of arr) if (hash3(p.x, p.z, 124) < (isMk(p) ? kMk : kGen)) arr[w++] = p; arr.length = w; }
+    const nMk = stats.pedsPre[3] + stats.pedsPre[4], nSp = stats.pedsPre[5], nGen = walkI.length + standI.length + sitI.length - nMk - nSp;
+    const kGen = Math.min(1, BUDGET.peds / Math.max(1, nGen)), kMk = Math.min(1, BUDGET.pedsMarket / Math.max(1, nMk)), kSp = Math.min(1, BUDGET.pedsSpill / Math.max(1, nSp));
+    if (kGen < 1 || kMk < 1 || kSp < 1) for (const arr of [walkI, standI, sitI]) { let w = 0; for (const p of arr) if (hash3(p.x, p.z, 124) < (isMk(p) ? kMk : isSp(p) ? kSp : kGen)) arr[w++] = p; arr.length = w; }
   }
   // chân mọi đồ vỉa hè còn lại theo mặt đang vẽ (ô tô: yRoad riêng; dây đèn trang trí: y nền riêng)
   groundAll([...bikeI, stoolI, paraI, cartI, aframeI, binI, hydI, cabI, walkI, standI, sitI,

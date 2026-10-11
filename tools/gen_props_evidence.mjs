@@ -92,9 +92,22 @@ for (const e of j) {
   //      độ tin cậy, không phải chợ thật).
   const mk = all.replace(/(phố|ngõ( \d+)?|đường) chợ con/g, 'phố cc').replace(/chợ sắt/g, 'tttm').replace(/ghép lệch[^.;|]*/g, '');
   let market = 0;
-  if (/chợ dân sinh|chợ cóc|chợ tạm|chợ (rau|cá|hoa|hải sản|quần áo|vải|kim khí|thực phẩm|họp)|phố chợ|khu chợ|dãy chợ|sân chợ|đầu chợ|nhà chợ|ngõ chợ|cổng chợ|cửa ngõ chợ|biến thành chợ|rừng ô|dãy ô\/?dù|(sạp|ô\/?dù|bạt)[^.;|]{0,24}(che|phủ) (kín|gần như)|chợ[^.;|]{0,12}họp|họp chợ/.test(mk)) market = 3;
-  else if (/kín (các )?sạp|sạp[^.;|]{0,30}(kín|tràn|chiếm|dày|san sát|hai bên)|sạp(?! báo| sách| truyện| hàng rong)|quầy chợ|ô\/?dù chợ|dù chợ|giá treo quần áo|bày (hàng|sạp)|hàng ho[áa][^.;|]{0,12}bày|bày[^.;|]{0,12}hàng ho[áa]|lều bạt|quầy (hàng|hoa quả|trái cây)/.test(mk)) market = 2;
-  else if (/hàng rong|gánh hàng|xe đẩy (bánh|hàng)|ô\/?dù bán hàng|dù bán hàng|ô dù (lớn|bán)|sạp báo/.test(mk)) market = 1;
+  // mức 3 = CHỢ THẬT trước camera. Phản biện W3-E: "phố chợ / ngõ chợ / đầu chợ / cổng chợ / khu chợ / chợ tạm / chợ quần áo"
+  // hay được dùng TƯỢNG TRƯNG hoặc chỉ hướng — 090 "đặc trưng phố chợ quần áo", 242 "mang tính phố chợ", 214 "phố chợ buôn bán
+  // dây, lưới", 280 "miệng ngõ chợ", 002/006 "góc chợ dân sinh" (ảnh thật: không sạp/ô dù nào) → cụm YẾU (hoặc cụm mạnh đứng sau
+  // "góc / mang tính / đặc trưng / miệng / cửa ngõ") chỉ lên 3 khi CÙNG MỆNH ĐỀ (giữa . ; |) có ô/dù, sạp, bạt (không "mái bạt"),
+  // mẹt, rổ, rau, hoa quả, trái cây, thùng xốp, hải sản; không thì rơi xuống luật mức 2/1 bên dưới.
+  const MK3_STRONG = /chợ dân sinh|chợ cóc|chợ (rau|cá|hoa|hải sản|thực phẩm|họp)|dãy chợ|sân chợ|nhà chợ|biến thành chợ|rừng ô|dãy ô\/?dù|(sạp|ô\/?dù|bạt)[^.;|]{0,24}(che|phủ) (kín|gần như)|chợ[^.;|]{0,12}họp|họp chợ/;
+  const MK3_WEAK = /phố chợ|khu chợ|đầu chợ|ngõ chợ|cổng chợ|chợ tạm|chợ (quần áo|vải|kim khí)/;
+  const MK3_FIG = /(góc|mang tính|đặc trưng|miệng|cửa ngõ|cạnh|gần|đối diện)( một)?( (khu|dãy))? $/;
+  const MK3_GOODS = /ô\/?dù|(?<!mặc )dù|sạp|(?<!mái )bạt|mẹt|rổ|rau|hoa quả|trái cây|xốp|hải sản|quầy (cá|thịt|rau)/;
+  const mk3 = mk.split(/[.;|]/).some((cl) => [...cl.matchAll(new RegExp(MK3_STRONG.source, 'g'))].some((m) => !MK3_FIG.test(cl.slice(Math.max(0, m.index - 24), m.index)))
+    || ((MK3_WEAK.test(cl) || MK3_STRONG.test(cl)) && MK3_GOODS.test(cl)));
+  if (mk3) market = 3;
+  else if (/kín (các )?sạp|sạp[^.;|]{0,30}(kín|tràn|chiếm|dày|san sát|hai bên)|sạp(?! báo| sách| truyện| hàng rong)|quầy chợ|ô\/?dù chợ|dù chợ|bày sạp|lều bạt|quầy (hàng|hoa quả|trái cây)/.test(mk)) market = 2;
+  // hàng CỦA CỬA HÀNG bày ra hè ("bày hàng", "hàng hoá bày", "giá treo quần áo") — không sạp/quầy/ô dù chợ — là mức 1 + bit hàng tràn
+  // (spill 4/256: giá áo, hàng chồng ở 6.4b), KHÔNG phải phố chợ mức 2 (phản biện W3-E: 242/409/120… thành dãy ô dù + đống rau quả)
+  else if (/hàng rong|gánh hàng|xe đẩy (bánh|hàng)|ô\/?dù bán hàng|dù bán hàng|ô dù (lớn|bán)|sạp báo|giá treo quần áo|bày hàng|hàng ho[áa][^.;|]{0,12}bày|bày[^.;|]{0,12}hàng ho[áa]/.test(mk)) market = 1;
   let sp = 0;
   if (/ô\s?\/\s?dù|dù\s?\/\s?ô|ô dù|dù (che|chợ|bán|đỏ|lớn|màu|xanh|trắng|tím|cam|hồng|cầu vồng|nhiều|quán)/.test(mk)) sp |= 1;
   if (/bạt (che|xanh|sọc|cam|đỏ)|lều bạt|mái bạt|mái hiên bạt|che bạt|lưới che/.test(mk)) sp |= 2;

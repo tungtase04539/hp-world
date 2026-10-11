@@ -360,7 +360,11 @@
     // W3-E: + world.props.stalls (xe ba gác/hàng chợ đỗ dải sát bó vỉa — giao thông lách như xe đỗ); bán kính theo chiều dài
     //   xe (xe khách 11,4 m: collider ±4 m khỏi tâm — bản cũ 3,5 m cố định đếm nhầm là "vật trên lòng đường")
     for (const pc of [...((world.props && world.props.parkedCars) || []), ...((world.props && world.props.stalls) || [])]) { const k = Math.floor(pc.x / 8) * 100003 + Math.floor(pc.z / 8); let a = carG.get(k); if (!a) carG.set(k, (a = [])); a.push(pc); }
-    const nearCar = (x, z) => { const ci = Math.floor(x / 8), cj = Math.floor(z / 8); for (let i = ci - 1; i <= ci + 1; i++) for (let j = cj - 1; j <= cj + 1; j++) { const a = carG.get(i * 100003 + j); if (!a) continue; for (const pc of a) { const R = Math.max(3.5, (pc.len || 0) / 2 + 1); if ((pc.x - x) ** 2 + (pc.z - z) ** 2 < R * R) return true; } } return false; };
+    const nearCar = (x, z) => { const ci = Math.floor(x / 8), cj = Math.floor(z / 8); for (let i = ci - 1; i <= ci + 1; i++) for (let j = cj - 1; j <= cj + 1; j++) { const a = carG.get(i * 100003 + j); if (!a) continue; for (const pc of a) {
+      // xe dài (xe khách 11,4 m): HỘP định hướng của xe (+1 m dọc, +0,6 m ngang) — vòng tròn len/2+1 = 6,7 m từng che mọi collider
+      // nhỏ quanh xe khách khỏi kiểm tra (phản biện W3-E); xe con/hàng chợ giữ vòng 3,5 m như dot3 (A/B so được)
+      if ((pc.len || 0) > 6 && pc.heading !== undefined) { const ux = Math.sin(pc.heading), uz = Math.cos(pc.heading), dx = x - pc.x, dz = z - pc.z; if (Math.abs(dx * ux + dz * uz) < pc.len / 2 + 1 && Math.abs(dz * ux - dx * uz) < (pc.hw || 1.3) + 0.6) return true; continue; }
+      if ((pc.x - x) ** 2 + (pc.z - z) ** 2 < 12.25) return true; } } return false; };
     for (const c of world.colliders || []) {
       if (c.x > 1e6 || c.r > 3 || nearCar(c.x, c.z)) continue;
       const k = surfCls(c.x, c.z); if (isRoadAt(k, c.x, c.z)) onRoad.push({ src: 'collider', name: 'r' + c.r.toFixed(2), x: +c.x.toFixed(1), z: +c.z.toFixed(1), cls: k });

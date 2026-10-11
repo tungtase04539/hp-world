@@ -451,7 +451,10 @@ export function marketLevels(P) {
         if (x < m.bb[0] || x > m.bb[2] || z < m.bb[1] || z > m.bb[3]) continue;
         const d = polyDist(m.poly, x, z); lo = Math.max(lo, d <= 12 ? 3 : d <= 40 ? 2 : d <= 80 ? 1 : 0);
       }
-      if (lo > 1 && e && e[7] === 0 && !(e[8] & 7) && Math.hypot(e[0] - x, e[1] - z) < 30) lo = 1;   // pano gần không thấy chợ
+      // pano gần (< 30 m) không thấy chợ → đa giác OSM không nâng quá mức 1. Phản biện W3-E: bản cũ còn tha khi pano có bit
+      // hàng tràn (spill & 7) — nhưng bit ô dù ở 314/315/252/345/398/400 là "ô/dù hàng quán" / xích lô che ô, KHÔNG phải sạp
+      // chợ (ảnh thật: không chợ) → 315 cách đa giác Chợ Ga 8 m thành phố chợ ô dù
+      if (lo > 1 && e && e[7] === 0 && Math.hypot(e[0] - x, e[1] - z) < 30) lo = 1;
       lv = Math.max(lv, lo);
       if (mClaim) lv = 3;   // ngay trước ô dựng tay tên cho_* (Chợ Tam Bạc, Chợ Con…)
       if (S.c === 'p' && lv > 1) lv = 1;
@@ -660,7 +663,7 @@ export function placeStreetLife(P) {
       const u = hash3(S.ax + kk * 3.1, S.az + seed, 331);
       const lat = X.fac - 0.55 - (X.sw >= 3 && u < 0.35 ? 0.9 : 0);
       const [x, z] = cellPos(S, kk, lat, (u - 0.5) * 1.2);
-      if (!okAt(S, x, z, cat === 'furn' ? 1.3 : 0.9) || obst.hit(x, z, 0.5) || !hasFacade(S, kk)) continue;
+      if (!okAt(S, x, z, cat === 'furn' ? 1.3 : cat === 'fruit' ? GR[u < 0.5 ? 2 : 1] : 0.9) || obst.hit(x, z, 0.5) || !hasFacade(S, kk)) continue;   // trái cây: bán kính THẬT sọt/mẹt
       if (cat === 'fruit') groundI.push({ x, z, heading: H, v: u < 0.5 ? 2 : 1, col: 0xffffff });
       else { const vs = SPILL[cat]; spillI.push({ x, z, heading: H + (u - 0.5) * 0.2, v: vs[(u * vs.length) | 0], col: pick([0xa8552e, 0xa8552e, 0xe8e4dc, 0x6a6e70], hash3(x, z, 332)) }); }
       obst.add(x, z, 0.6); if (cat !== 'plant') P.addCollider(x, z, 0.45);
@@ -697,6 +700,9 @@ export function placeStreetLife(P) {
     return c;
   };
   const evUmb = (S, k) => { const e = S.ev[k]; if (!e || !(e[8] & 1)) return false; const [x, z] = cellPos(S, k, XS(S.c).park); return Math.hypot(e[0] - x, e[1] - z) < 30; };
+  // quán theo biển hiệu/bằng chứng: khách ngồi gắn cờ `sp` → ngân sách người RIÊNG (props.js pedsSpill; phản biện W3-E: chung ngân
+  // sách với người đi bộ thì người đi bộ cả thành phố tụt 444 → 350)
+  const food = (S, k, n, cafe) => { const L = P.lists.sitI, i0 = L.length; P.placeFood(S, k, n, cafe); for (let i = i0; i < L.length; i++) L[i].sp = 1; };
   const doneSign = new Set();
   for (const sg of P.SHOP_SIGNS || []) {
     const cat = signCategory(sg[3]); if (!cat) continue;
@@ -706,8 +712,8 @@ export function placeStreetLife(P) {
     if (S.mk && S.mk[k] >= 2) continue;   // chợ đã phủ
     const h = hash3(sg[0], sg[1], 351);
     let n = 0;
-    if (cat === 'cafe') { if (!(S.occ[k] & (OCC.SHOP | OCC.MKT))) { P.placeFood(S, k, 2 + ((h * 2) | 0), true); n = 1; } }
-    else if (cat === 'food') { if (!(S.occ[k] & (OCC.SHOP | OCC.MKT)) && h < 0.6) { P.placeFood(S, k, 1 + ((h * 3) | 0), false); n = 1; } }
+    if (cat === 'cafe') { if (!(S.occ[k] & (OCC.SHOP | OCC.MKT))) { food(S, k, 2 + ((h * 2) | 0), true); n = 1; } }
+    else if (cat === 'food') { if (!(S.occ[k] & (OCC.SHOP | OCC.MKT)) && h < 0.6) { food(S, k, 1 + ((h * 3) | 0), false); n = 1; } }
     else if (cat === 'bike') n = h < 0.75 ? displayBikes(S, k, evUmb(S, k)) : 0;
     else if (cat === 'furn') n = putSpill(S, k, 'furn', 2 + ((h * 2) | 0), 1);
     else if (cat === 'toys') n = putSpill(S, k, 'toys', 2, 2);
@@ -735,7 +741,7 @@ export function placeStreetLife(P) {
       // pano "xe máy trưng bày dày đặc" (9 pano: 170 Tô Hiệu…) — cửa hàng xe nối nhau: ~45% ô ≤ 25 m (mỗi lần chiếm 3 ô)
       if ((e[8] & 16) && !(S.occ[k] & (OCC.SHOP | OCC.MKT)) && hash3(x, z, 377) < 0.45) { if (displayBikes(S, k, !!(e[8] & 1))) st.evSpill++; }
       // pano thấy dù/bàn ghế quán (spill 8: 267 Trà Cúc dù đỏ, 294, 023) → cụm bàn ghế + dù
-      if ((e[8] & 8) && !(S.occ[k] & (OCC.SHOP | OCC.MKT | OCC.POLE)) && hash3(x, z, 378) < 0.12) { P.placeFood(S, k, 2, true); st.evSpill++; }
+      if ((e[8] & 8) && !(S.occ[k] & (OCC.SHOP | OCC.MKT | OCC.POLE)) && hash3(x, z, 378) < 0.12) { food(S, k, 2, true); st.evSpill++; }
     }
   }
   // ---- chậu cây trước nhà (rất phổ biến; nền thưa, KHÔNG ở đại lộ p) ----
@@ -905,8 +911,11 @@ export function buildStreetLifeMeshes(B, L) {
     bm.onBeforeCompile = (sh) => {
       sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute float aCell;')
         .replace('#include <uv_vertex>', '#include <uv_vertex>\n#ifdef USE_MAP\n vMapUv = vec2(vMapUv.x, (3.0 - aCell + vMapUv.y) * 0.25);\n#endif');
+      // mặt SAU của tấm 2 mặt lật U → chữ đọc xuôi từ cả hai phía (phản biện W3-E: 248 h090 đọc ngược "IHT ỚƠ HNIM…")
+      sh.fragmentShader = sh.fragmentShader.replace('#include <map_fragment>',
+        '#ifdef USE_MAP\n diffuseColor *= texture2D(map, vec2(gl_FrontFacing ? vMapUv.x : 1.0 - vMapUv.x, vMapUv.y));\n#endif');
     };
-    bm.customProgramCacheKey = () => 'hp_props_banner_v1';
+    bm.customProgramCacheKey = () => 'hp_props_banner_v2';
     const bg = new THREE.PlaneGeometry(1, 0.9);   // scale x = bề rộng phố
     // cổng chào: tấm chữ 2 mặt, nhô 0,17 m trước/sau dầm (dầm dày 0,3 m — tấm ở tâm sẽ bị dầm che)
     const list = [...L.banners.map((b) => ({ x: b.x, z: b.z, heading: b.heading, y: b.y, yo: b.yo, cell: b.cell, sc: b.sc })),

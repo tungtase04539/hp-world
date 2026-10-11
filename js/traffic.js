@@ -106,7 +106,7 @@ export function createTraffic(scene, world, opts = {}) {
         if (d > e.hw + 1.2 || d < e.hw - 2.6) continue;                  // tâm xe đỗ phải nằm ở dải sát bó vỉa
         if (Math.hypot(c.x - px, c.z - pz) - d > 0.5) continue;          // chiếu rơi ra ngoài đầu đoạn
         const sc = Math.abs(d - (e.hw - 0.6));                            // tim gần mép bó vỉa của CHÍNH cạnh này nhất
-        if (sc < bd) { bd = sc; best = { ei: a[q], u: e.cum[k] + t * L, sg: lat > 0 ? 1 : -1, inner: d - 0.9 }; }
+        if (sc < bd) { bd = sc; best = { ei: a[q], u: e.cum[k] + t * L, sg: lat > 0 ? 1 : -1, inner: d - (c.hw > 1.2 ? c.hw : 0.9) }; }   // W3-E: xe khách nửa rộng 1,3
       }
       if (!best) continue;
       parkStats.mapped++;
