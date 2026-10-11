@@ -441,8 +441,9 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     quan sát → ~1.470-1.530 nhà); nhà không có quan sát dùng vùng của pano gần nhất ≤90 m làm XÁC SUẤT. Luật sửa dữ liệu: SHED
     ≥3 tầng → CIVIC (≥2.500 m² GLASS, ≥9 TOWER) (pano_230: khách sạn ra tường tôn); TUBE/OLD ≥9 tầng → 65% TOWER / 35% GLASS
     (thay 60% KTT); GLASS ≤6 tầng mặt tiền ≤10,5 m <450 m² → MODERN (lô kính hẹp pano_395/386). KIỂU DỰNG 7..12 = COL, NEO,
-    CONS, MODERN, TOWER, TEN (bộ `U7..U12/G7..G12`). Phân bố: TUBE 29,8 k, OLD 5,7 k, COL 2,0 k, MODERN 1,2 k, CONS 322, VILLA
-    197, SHED 160, TEN 77, GLASS 43… `fabricFacadeOf(b)` chẩn đoán.
+    CONS, MODERN, TOWER, TEN (bộ `U7..U12/G7..G12`). Phân bố (R1600, node): TUBE 30,6 k, OLD 6,0 k, COL 2,2 k, MODERN 1,3 k,
+    CONS 336, VILLA 227, SHED 165, TEN 87, KTT 61, CIVIC 60, GLASS 55, NEO 19, TOWER 16; tuổi 0/1/2/3 = 5,2/18,3/11,1/6,6 k;
+    "nhiều biển lớn" 3.800 nhà. `fabricFacadeOf(b)` chẩn đoán.
     **(3) aFac.z TƯỜNG = kiểu dựng (4 bit) | tuổi<<4 | "nhiều biển lớn"<<6 | "cạnh có ban công 3D"<<7**. BẪY: `groundModule()` JS
     phải khớp shader TỪNG BIT — CONS không có bay "nhà ở" (JS, GL2, GL1); tập 1 phần tử (G5, G9) luôn [0]; `pickU/pickGi` sinh
     bằng `pickChain()`; GL1 regex `U\d+|G\d+|…|XP`.
@@ -461,8 +462,8 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     (f) dải biển HẸP `G_OLD` kéo chữ vừa dải (trước "ƠM VĂN PHÒN"); (g) kind 5 lấy màu biển từ aFac.w + sáng đêm.
     **(6) HÌNH HỌC**: mái hiên TÔN sóng xanh dương (55%, `D_AWN2`, dốc thoải, sâu 1,5-2,2 m) / BẠT (sọc, diềm) — bằng chứng pano
     ép có + chọn vật liệu; BIỂN DỌC 3D (~800, 6 tam giác); BIỂN BẢNG 3D trước ban công (~1.130, 2 tam giác); BIỂN TRÊN MÁI (~30,
-    12 tam giác, nhà 3-9 tầng mặt phố chính, +12% nhà góc); CONS: không ban công/điều hoà/đồ mái. Tam giác phố 1,496 M →
-    [[TRIS]].
+    12 tam giác, nhà 3-9 tầng mặt phố chính, +12% nhà góc); CONS: không ban công/điều hoà/đồ mái. Tam giác phố 1,496 M → 1,486 M
+    (chính 0,895 M + chi tiết 0,590 M; kính/đang xây/tân cổ điển bỏ ban công + điều hoà bù cho biển/mái hiên mới).
     **(7) TEXTURE ATLAS**: material dùng texture CHỜ 4×4; ảnh về thì tạo DataTexture đúng cỡ rồi THAY `material.map` (cùng "có map"
     → không đổi program); `onUpdate` thả bản CPU 24 MB sau upload; `webglcontextlost` → map về texture chờ, `restored` → vẽ lại.
     WebGL1: atlas NPOT → tắt mip, lọc tuyến tính.

@@ -14,12 +14,31 @@ const _hsl = { h: 0, s: 0, l: 0 };
 const L_MIN = 0.3, L_MAX = 0.9;
 // trần bão hoà theo sắc độ h (0..1): ấm (vàng đất/cam) 0,62 — đỏ 0,40 — lạnh (xanh/tím) 0,32
 const sMaxOf = (h) => { const d = h * 360; return d >= 15 && d <= 65 ? 0.62 : (d < 15 || d >= 330) ? 0.4 : 0.32; };
+// tường LẠNH (xanh dương/lá/tím) BÃO HOÀ (s > 0,45 = màu thương hiệu sơn cả mặt nhà) → nâng sáng tối thiểu 0,58: chỉ kẹp bão
+// hoà thì xanh hoàng gia/xanh than (l ~0,4) vẫn ra "khối xanh than" ở mặt khuất nắng (pano_138 UBND, 418 BaoViet — đo after6:
+// tường render (31,39,51)). Nhà sơn xanh ở HP là xanh NHẠT; xanh đậm chỉ ở biển/kính.
+const COOL_LIFT = 0.58;
+const coolLift = (h, s0, l) => (sMaxOf(h) < 0.33 && s0 > 0.45 ? Math.max(l, COOL_LIFT) : l);
 
+// mảng LỚN xám-xanh/xanh than TỐI, ít bão hoà (0x2c3e50, 0x33475a… — "tháp kính"/"đế kính" dựng tay, pano_230 h0/h90, 395)
+// = KÍNH: thành vật liệu kính nhà ô (applyCellGlass: đố theo toạ độ thế giới + phản trời), sáng 0,5 — không còn "khối đen"
+const isDarkGlass = (h, s0, l) => { const d = h * 360; return d >= 180 && d <= 250 && s0 >= 0.15 && s0 <= 0.45 && l < 0.38; };
 function guarded(q, THREE) {
   if (_cache.has(q)) return _cache.get(q);
   let out = q;
   q.color.getHSL(_hsl, THREE.SRGBColorSpace);
-  const s = Math.min(_hsl.s, sMaxOf(_hsl.h)), l = Math.min(L_MAX, Math.max(L_MIN, _hsl.l));
+  if (isDarkGlass(_hsl.h, _hsl.s, _hsl.l)) {
+    out = applyCellGlass(q.clone());
+    out.color.setHSL(_hsl.h, Math.min(_hsl.s, 0.2), 0.5, THREE.SRGBColorSpace);
+    // emissive KHÁC đen (cường độ 0): freezeStatic xếp vào lượt 2 (giữ material + onBeforeCompile); lượt 1 bake màu vào màu
+    // đỉnh rồi gộp chung material trắng → mất shader kính
+    if (out.emissive) { out.emissive.setHex(0xffcc66); out.emissiveIntensity = 0; }
+    out.name = (q.name || 'cellmat') + '_glass';
+    out.userData = { ...q.userData, paletteGuard: true, cellGlass: true };
+    _cache.set(q, out);
+    return out;
+  }
+  const s = Math.min(_hsl.s, sMaxOf(_hsl.h)), l = Math.min(L_MAX, Math.max(L_MIN, coolLift(_hsl.h, _hsl.s, _hsl.l)));
   if (Math.abs(s - _hsl.s) > 0.04 || Math.abs(l - _hsl.l) > 0.04) {
     out = q.clone();
     out.color.setHSL(_hsl.h, s, l, THREE.SRGBColorSpace);
@@ -43,7 +62,8 @@ export function cellCanvasFx(t) {
   const ar = img.width / img.height;
   if (ar > 2.6 || ar < 1 / 2.6) return L < 0.14 ? { filter: 'brightness(1.7) saturate(0.85)' } : null;   // dải dài RẤT tối (mặt "biển" phủ cả nhà)
   // mặt tiền 1 màu BÃO HOÀ (xanh hoàng gia UBND pano_138, đỏ BIDV 046): giảm bão hoà — màu thương hiệu chỉ hợp ở biển
-  const f = L < 0.22 ? 'brightness(1.6) saturate(0.8)' : sat > 0.55 ? 'saturate(0.45) brightness(1.08)' : null;
+  // (sắc LẠNH — lam ≥ đỏ — sáng thêm như coolLift: xanh thương hiệu thành xanh nhạt, không thành xanh than)
+  const f = L < 0.22 ? 'brightness(1.6) saturate(0.8)' : sat > 0.55 ? (c[2] >= c[0] ? 'saturate(0.4) brightness(1.3)' : 'saturate(0.45) brightness(1.08)') : null;
   return f ? { filter: f } : null;
 }
 
@@ -68,7 +88,7 @@ export function guardCellPalette(kept, THREE) {
       if (g !== q) { m.material = g; st.meshes++; }
     });
   }
-  for (const [q, g] of _cache) if (g !== q) st.materials++;
+  for (const [q, g] of _cache) if (g !== q) { st.materials++; if (g.userData.cellGlass) st.glass = (st.glass || 0) + 1; }
   st.newCache = _cache.size - before;
   return st;
 }
@@ -141,14 +161,14 @@ function _rgb(css) {
   return null;   // tên màu / trong suốt → không đụng
 }
 // palette guard màu nền mặt tiền (như guarded(): trần bão hoà theo sắc độ, sáng 0,30..0,90); lMin/lMax để kẹp kính
-function _guardRGB(c, sCap = 1, lMin = L_MIN, lMax = L_MAX) {
+function _guardRGB(c, sCap = 1, lMin = L_MIN, lMax = L_MAX, wall = true) {
   const r = c[0] / 255, gg = c[1] / 255, b = c[2] / 255, mx = Math.max(r, gg, b), mn = Math.min(r, gg, b), l = (mx + mn) / 2;
   let h = 0, sat = 0;
   if (mx > mn) {
     const d = mx - mn; sat = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
     h = mx === r ? (gg - b) / d + (gg < b ? 6 : 0) : mx === gg ? (b - r) / d + 2 : (r - gg) / d + 4; h /= 6;
   }
-  const S = Math.min(sat, sMaxOf(h), sCap), Lc = Math.min(lMax, Math.max(lMin, l));
+  const S = Math.min(sat, sMaxOf(h), sCap), Lc = Math.min(lMax, Math.max(lMin, wall ? coolLift(h, sat, l) : l));
   if (Math.abs(S - sat) < 0.04 && Math.abs(Lc - l) < 0.04) return c;
   const q = Lc < 0.5 ? Lc * (1 + S) : Lc + S - Lc * S, p = 2 * Lc - q;
   const f = (t) => { t = (t + 1) % 1; return t < 1 / 6 ? p + (q - p) * 6 * t : t < 0.5 ? q : t < 2 / 3 ? p + (q - p) * (2 / 3 - t) * 6 : p; };
@@ -156,10 +176,16 @@ function _guardRGB(c, sCap = 1, lMin = L_MIN, lMax = L_MAX) {
 }
 const _css = (a) => `rgb(${Math.round(a[0])},${Math.round(a[1])},${Math.round(a[2])})`;
 const _mix = (a, b, t) => _css([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]);
+// kính thật: xám-xanh dương/xanh lục nhạt — sắc 165-235° giữ bão hoà ≤0,3; sắc khác (tím TPBank pano_354, đỏ, vàng) ≤0,08
+function _glassCap(Wc) {
+  const mx = Math.max(Wc[0], Wc[1], Wc[2]), mn = Math.min(Wc[0], Wc[1], Wc[2]); if (mx === mn) return 0.3;
+  const d = mx - mn, h = 60 * (mx === Wc[0] ? ((Wc[1] - Wc[2]) / d + 6) % 6 : mx === Wc[1] ? (Wc[2] - Wc[0]) / d + 2 : (Wc[0] - Wc[1]) / d + 4);
+  return h >= 165 && h <= 235 ? 0.3 : 0.08;
+}
 function _look(B, Wc) {
   const lum = (0.2126 * Wc[0] + 0.7152 * Wc[1] + 0.0722 * Wc[2]) / 255;
   const shutter = Wc[0] > Wc[2] + 18 && lum < 0.55, light = lum > 0.62;
-  return { shutter, light, frame: light ? _css(Wc) : _mix(B, WHITE, 0.38), mull: light ? _css(Wc) : _mix(FRAME_D, B, 0.35), glassTop: light ? [93, 117, 132] : _guardRGB(Wc, 0.3, 0.12, 0.6) };   // kính: không mang màu tím/xanh đậm của winCss (TPBank 354)
+  return { shutter, light, frame: light ? _css(Wc) : _mix(B, WHITE, 0.38), mull: light ? _css(Wc) : _mix(FRAME_D, B, 0.35), glassTop: light ? [93, 117, 132] : _guardRGB(Wc, _glassCap(Wc), 0.12, 0.6, false) };   // kính: không mang màu tím/xanh đậm của winCss (TPBank 354)
 }
 function _glass(g, L, x0, y0, ww, wh) {
   const gr = g.createLinearGradient(0, y0, 0, y0 + wh);
