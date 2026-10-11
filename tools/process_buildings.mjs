@@ -1515,32 +1515,35 @@ function camGuard(b) {
 //      Review W3-A r2: nhà thật nay cắt theo flR (≤ mặt tiền cấp) → khối nhà trong khuôn viên (Overture lệch 1-2 m) nhô ra trước
 //      tường đã đẩy lùi sau mặt tiền theo phố (pano_224 h180/h270 dãy nhà ống biển quán che tường mỏ neo; ảnh thật: vỉa caro →
 //      tường → nhà công sở PHÍA SAU). Cắt nửa mặt phẳng sau tâm tường + nửa bề dày + 0,3 m (chỉ nhà có tâm chiếu vào đoạn ±1 m,
-//      tâm cách tường ≤ 8 m phía phố — phía bên kia phố không bị đụng); còn < 8 m² → bỏ. Nhà sát sau tường: không mặt tiền buôn bán.
+//      tâm cách tường ≤ 8 m phía phố — phía bên kia phố không bị đụng); còn < 8 m² → bỏ. Nhà TRONG khuôn viên (sau tường ≤ 30 m
+//      hoặc tâm trong CB1) `cbIn`: không mặt tiền buôn bán, nhà ống → công sở/nhà cũ (ảnh 224/225 h270: công sở vàng sau tường;
+//      footprint Overture ở đây từng ra dãy nhà ống biển quán nhô trên đỉnh tường).
 {
   const WS = cbWallSegments(ROADS_DT), M = CB_WALL_TH / 2 + 0.3;
   let nClip = 0, nDrop = 0, nBehind = 0;
   for (const b of B) {
     let bb = bbox(b.pts);
+    { const [cx, cz] = centroid(b.pts); if (pointInPoly(CB1, cx, cz)) b.cbIn = 1; }
     for (const w of WS) {
       if (bb[0] > Math.max(w.ax, w.bx) + 30 || bb[2] < Math.min(w.ax, w.bx) - 30 || bb[1] > Math.max(w.az, w.bz) + 30 || bb[3] < Math.min(w.az, w.bz) - 30) continue;
       const [cx, cz] = centroid(b.pts);
       const t = (cx - w.ax) * w.ux + (cz - w.az) * w.uz; if (t < -1 || t > w.L + 1) continue;
       const c0 = w.ax * w.nx + w.az * w.nz + M;   // giữ n·p ≥ c0 (phía khuôn viên)
       const dc = cx * w.nx + cz * w.nz - c0; if (dc < -8 || dc > 40) continue;
+      if (dc >= -0.5 && dc <= 30) b.cbIn = 1;
       const minD = Math.min(...b.pts.map(([x, z]) => x * w.nx + z * w.nz - c0));
-      if (minD < 1.5) b.cbBehind = 1;
       if (minD >= -0.05) continue;
       const parts = clipHalf(b.pts, w.nx, w.nz, c0).map((q) => outward(cleanPoly(q))).filter((q) => q.length >= 3);
       parts.sort((p, q) => absArea(q) - absArea(p));
       if (!parts.length || absArea(parts[0]) < 8) { b.dead = 'cbwall'; nDrop++; break; }
       setRectOrPoly(b, parts[0]); b.guard = 1; nClip++; bb = bbox(b.pts);
     }
-    if (b.cbBehind && !b.dead) nBehind++;
+    if (b.cbIn && !b.dead) nBehind++;
   }
   B = B.filter((b) => !b.dead);
   grid = rebuildGrid();
-  ST.cbwall_clip = nClip; ST.cbwall_drop = nDrop; ST.cbwall_behind = nBehind;
-  lap(`tường mỏ neo Hải quân: cắt ${nClip}, bỏ ${nDrop}, sát sau tường ${nBehind}`);
+  ST.cbwall_clip = nClip; ST.cbwall_drop = nDrop; ST.cbwall_in = nBehind;
+  lap(`tường mỏ neo Hải quân: cắt ${nClip}, bỏ ${nDrop}, trong khuôn viên ${nBehind}`);
 }
 // 9d. KIỂM HỢP LỆ trên TOẠ ĐỘ ĐÃ LÀM TRÒN như file (đa giác: lưới 0,1 m; chữ nhật: x0/z0 0,1 m, góc u16, w/d cm — y hệt
 //     encodeRB/decodeRB): làm tròn → bỏ đỉnh gai (2 cạnh kề quay ngược > 162°) → cleanPoly → đơn CHẶT (strictSimple),
@@ -1762,6 +1765,7 @@ for (const b of B) {
     style = villaOK && R() < 0.4 ? STYLE.VILLA : R() < 0.45 ? STYLE.OLD : STYLE.TUBE;
   } else style = !b.lot && !b.interior && b.area > 120 && b.area < 400 && mr && mr.w / Math.max(1, mr.d) < 1.5 && R() < 0.05 ? STYLE.VILLA
     : R() < (b.interior ? 0.12 : 0.15) ? STYLE.OLD : STYLE.TUBE;
+  if (b.cbIn && (style === STYLE.TUBE || style === STYLE.VILLA || style === STYLE.KTT)) style = b.area > 150 ? STYLE.CIVIC : STYLE.OLD;   // khuôn viên Hải quân
   // --- tầng ---
   let floors = 0, fixed = false;
   if (b.nfl > 0) { floors = Math.round(b.nfl); fixed = true; }
@@ -1819,7 +1823,7 @@ for (const b of B) {
   let use = INFO.USE_HOME;
   if (style === STYLE.GLASS) use = INFO.USE_OFFICE;
   else if (style === STYLE.CIVIC || style === STYLE.SHED || (style === STYLE.VILLA && R() < 0.6)) use = INFO.USE_GATE;
-  else if (b.cbBehind) use = INFO.USE_HOME;   // sát sau tường mỏ neo Hải quân (khuôn viên kín): không cửa hàng ra phố
+  else if (b.cbIn) use = INFO.USE_HOME;   // trong khuôn viên Hải quân (sau tường mỏ neo): không cửa hàng ra phố
   else if (/cửa hàng|shop|bán|quán|kinh doanh|biển|cửa cuốn|nhà hàng|cà phê|spa|showroom/.test(ouse)) use = INFO.USE_SHOP;
   else if (f0) use = R() < ({ p: 0.88, s: 0.82, t: 0.72, r: 0.5, w: 0.6, h: 0.15 }[f0.s.c] ?? 0.3) ? INFO.USE_SHOP : INFO.USE_HOME;
   const roads = new Set(b.fronts.filter((f) => f.s.c !== 'h').map((f) => f.s.ri));
