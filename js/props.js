@@ -1443,7 +1443,7 @@ export function buildProps(ctx) {
   // ngân sách người: lấy mẫu đều TRONG 2 NHÓM (W3-E) — người chợ (bán ngồi ghế đẩu/khách đứng trước sạp, cờ `vendor`/`mk`,
   // dồn ở ~6.000 ô chợ) có ngân sách RIÊNG; nhóm chung (đi bộ + đứng/ngồi quán) giữ ngân sách cũ của dot3. Bản lấy mẫu
   // chung 1 nhóm: 7.500 ứng viên → giữ 26% → người đi bộ cả thành phố tụt 428 → 266 vì chợ đông người
-  // + nhóm 3 (phản biện W3-E): khách ngồi quán đặt theo BIỂN HIỆU/bằng chứng (cờ `sp`, js/streetlife.js) — ~930 ứng viên mới
+  // + nhóm 3 (phản biện W3-E): khách ngồi quán đặt theo BIỂN HIỆU/bằng chứng (cờ `sp`, js/streetlife.js) — ~670 ứng viên mới
   // từng chen vào nhóm chung (người đi bộ 444 → 350)
   const isMk = (p) => !!(p.mk || p.vendor), isSp = (p) => !!p.sp;
   stats.pedsPre = [walkI.length, standI.length, sitI.length, standI.filter(isMk).length, sitI.filter(isMk).length, sitI.filter(isSp).length];
