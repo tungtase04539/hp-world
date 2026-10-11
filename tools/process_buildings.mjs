@@ -1516,7 +1516,7 @@ function camGuard(b) {
 //      tường đã đẩy lùi sau mặt tiền theo phố (pano_224 h180/h270 dãy nhà ống biển quán che tường mỏ neo; ảnh thật: vỉa caro →
 //      tường → nhà công sở PHÍA SAU). Cắt nửa mặt phẳng sau tâm tường + nửa bề dày + 0,3 m (chỉ nhà có tâm chiếu vào đoạn ±1 m,
 //      tâm cách tường ≤ 8 m phía phố — phía bên kia phố không bị đụng); còn < 8 m² → bỏ. Nhà TRONG khuôn viên (sau tường ≤ 30 m
-//      hoặc tâm trong CB1) `cbIn`: không mặt tiền buôn bán, nhà ống → công sở/nhà cũ (ảnh 224/225 h270: công sở vàng sau tường;
+//      hoặc tâm trong CB1) `cbIn`: không mặt tiền buôn bán, nhà ống/cũ → công sở CIVIC (ảnh 224/225 h270: công sở vàng sau tường;
 //      footprint Overture ở đây từng ra dãy nhà ống biển quán nhô trên đỉnh tường).
 {
   const WS = cbWallSegments(ROADS_DT), M = CB_WALL_TH / 2 + 0.3;
@@ -1765,7 +1765,9 @@ for (const b of B) {
     style = villaOK && R() < 0.4 ? STYLE.VILLA : R() < 0.45 ? STYLE.OLD : STYLE.TUBE;
   } else style = !b.lot && !b.interior && b.area > 120 && b.area < 400 && mr && mr.w / Math.max(1, mr.d) < 1.5 && R() < 0.05 ? STYLE.VILLA
     : R() < (b.interior ? 0.12 : 0.15) ? STYLE.OLD : STYLE.TUBE;
-  if (b.cbIn && (style === STYLE.TUBE || style === STYLE.VILLA || style === STYLE.KTT)) style = b.area > 150 ? STYLE.CIVIC : STYLE.OLD;   // khuôn viên Hải quân
+  // khuôn viên Hải quân: công sở (CIVIC) — nhà ống/cũ có cạnh mặt phố ≥ 3 bay bị citygen vẽ thành DÃY CỬA HÀNG (wideF) bất kể
+  // công năng → biển quán nhô trên đỉnh tường mỏ neo (pano_224/225 h270)
+  if (b.cbIn && (style === STYLE.TUBE || style === STYLE.OLD || style === STYLE.VILLA || style === STYLE.KTT)) style = STYLE.CIVIC;
   // --- tầng ---
   let floors = 0, fixed = false;
   if (b.nfl > 0) { floors = Math.round(b.nfl); fixed = true; }
