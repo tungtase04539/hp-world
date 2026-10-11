@@ -320,6 +320,7 @@ class Geo {
     return g;
   }
 }
+const CARD_TETHER = 1.15;   // phiên 4: tâm thẻ lá kit gần cách điểm cành neo ≤ 1,15 m + 0,4 cạnh (probe thẻ "bay" → 0)
 const FINE_N = 1.5, FINE_S = 0.8;   // W3-G: kit gần thẻ lá ×1,5 số lượng, ×0,8 cạnh (tán mịn hơn, cùng độ phủ)
 const WASH_TOP = 1.3;    // trên mức gốc quét vôi (WASH_H 1,25) — đoạn thân kéo giãn khi nâng tán bắt đầu từ đây
 const _T = new THREE.Vector3(), _N = new THREE.Vector3(), _B = new THREE.Vector3(), _P = new THREE.Vector3(), _U = new THREE.Vector3(0, 1, 0), _X = new THREE.Vector3(1, 0, 0);
@@ -462,15 +463,15 @@ function genKit(d, far, seed) {
     const tipF = far ? 0.58 : 0.76, tipS = far ? 1.0 : 0.72;
     const tipR = tips.map(() => r());     // số ngẫu nhiên riêng từng CHÙM (đầu cành)
     for (let i = 0; i < n; i++) {
-      let px, py, pz, cr = -1;
+      let px, py, pz, cr = -1, tp = null;
       if (!topOnly && tips.length && i < n * tipF) {
-        const ti = i % tips.length, tp = tips[ti], sp = (1.0 + 0.4 * (rx / 5)) * tipS;
+        const ti = i % tips.length, sp = (1.0 + 0.4 * (rx / 5)) * tipS; tp = tips[ti];
         px = tp[0] + (r() + r() - 1) * sp; py = tp[1] + (r() + r() - 1) * sp * 0.6 + 0.3; pz = tp[2] + (r() + r() - 1) * sp;
         cr = tipR[ti];
       } else if (!topOnly && tips.length && !far) {
         // thẻ "lấp tán" bám cành: chùm LỎNG quanh 1 điểm cành (bán kính ×2 chùm thường, hơi lệch xuống trong tán) — không
         // còn thẻ rải trên vỏ ellipsoid xa mọi cành (đỉnh tán từng có thẻ lẻ "bay": pano_386/400)
-        const ti = (r() * tips.length) | 0, tp = tips[ti], sp = (1.0 + 0.4 * (rx / 5)) * tipS * 2.0;
+        const ti = (r() * tips.length) | 0, sp = (1.0 + 0.4 * (rx / 5)) * tipS * 2.0; tp = tips[ti];
         px = tp[0] + (r() + r() - 1) * sp; py = tp[1] + (r() + r() - 1.2) * sp * 0.55; pz = tp[2] + (r() + r() - 1) * sp;
         cr = tipR[ti] * 0.6 + r() * 0.4;
       } else {
@@ -482,6 +483,12 @@ function genKit(d, far, seed) {
       // giữ trong vỏ ellipsoid ×1,0 (trước ×1,08)
       let ex = (px - cx) / rx, ey = (py - cy) / ry, ez = (pz - cz) / rx, e = Math.hypot(ex, ey, ez);
       if (e > 1.0) { const k = 1.0 / e; px = cx + (px - cx) * k; py = cy + (py - cy) * k; pz = cz + (pz - cz) * k; ex *= k; ey *= k; ez *= k; e = 1.0; }
+      // phiên 4: kit GẦN — tâm thẻ cách điểm cành neo ≤ CARD_TETHER (+ 0,4 cạnh nhỏ nhất): tán rộng (me Ø 20 m, đa) có độ
+      // toả chùm ×(1 + 0,4·rx/5) tới 2,6 m mỗi trục → vài thẻ góc cách gỗ > 1,2 m + nửa cạnh (probe: me 4, bàng 1 thẻ "bay")
+      if (tp && !far) {
+        const lim = CARD_TETHER + 0.4 * sMin, dx = px - tp[0], dy = py - tp[1], dz = pz - tp[2], dl = Math.hypot(dx, dy, dz);
+        if (dl > lim) { const k = lim / dl; px = tp[0] + dx * k; py = tp[1] + dy * k; pz = tp[2] + dz * k; ex = (px - cx) / rx; ey = (py - cy) / ry; ez = (pz - cz) / rx; e = Math.hypot(ex, ey, ez); }
+      }
       const [gx, gy, gz] = norm3(ex / rx, ey / ry, ez / rx);
       const [nx, ny, nz] = norm3(gx * 0.6 + (r() - 0.5) * 1.4, gy * 0.6 + (r() - 0.5) * 1.4 + upBias, gz * 0.6 + (r() - 0.5) * 1.4);
       const nl = norm3(gx * 0.7 + nx * 0.12, gy * 0.7 + ny * 0.12 + 0.45, gz * 0.7 + nz * 0.12);
@@ -564,10 +571,15 @@ function genKit(d, far, seed) {
         let px, py, pz, cr = -1;
         // W2-B: chùm lá bàng chặt hơn quanh đầu cành (80%, toả 1,0 m) → tầng lá thành các "đĩa" rời, lộ trời giữa tầng
         // W3-G: số "độ kín" tương quan theo chùm (cây thưa mất nguyên chùm — không còn thẻ lẻ "bay")
-        if (i < n * (far ? 0.7 : 0.8)) { const ti = i % tips.length, tp = tips[ti], sp = far ? 1.3 : 1.35; px = tp[0] + (r() + r() - 1) * sp; py = tp[1] + 0.05 + r() * 0.55; pz = tp[2] + (r() + r() - 1) * sp; cr = tipR[ti]; }
+        let tp = null;
+        if (i < n * (far ? 0.7 : 0.8)) { const ti = i % tips.length, sp = far ? 1.3 : 1.35; tp = tips[ti]; px = tp[0] + (r() + r() - 1) * sp; py = tp[1] + 0.05 + r() * 0.55; pz = tp[2] + (r() + r() - 1) * sp; cr = tipR[ti]; }
         else if (far) { const a = r() * 6.28, rr = Math.sqrt(0.08 + r() * 0.92) * R; px = lx * ty + Math.cos(a) * rr; py = ty + 0.2 + r() * 0.55; pz = lz * ty + Math.sin(a) * rr; }
         else {   // W3-G: lá lấp tầng bám cành (chùm lỏng 1,8 m quanh 1 điểm cành), không rải đều đĩa tầng (thẻ không cành đỡ)
-          const ti = (r() * tips.length) | 0, tp = tips[ti]; px = tp[0] + (r() + r() - 1) * 1.8; py = tp[1] + 0.05 + r() * 0.5; pz = tp[2] + (r() + r() - 1) * 1.8; cr = tipR[ti] * 0.6 + r() * 0.4;
+          const ti = (r() * tips.length) | 0; tp = tips[ti]; px = tp[0] + (r() + r() - 1) * 1.8; py = tp[1] + 0.05 + r() * 0.5; pz = tp[2] + (r() + r() - 1) * 1.8; cr = tipR[ti] * 0.6 + r() * 0.4;
+        }
+        if (tp && !far) {   // phiên 4: neo thẻ ≤ CARD_TETHER + 0,4 cạnh nhỏ nhất quanh điểm cành (như crownCards)
+          const lim = CARD_TETHER + 0.4 * d.cardS[0] * sMul, dx = px - tp[0], dy = py - tp[1], dz = pz - tp[2], dl = Math.hypot(dx, dy, dz);
+          if (dl > lim) { const k = lim / dl; px = tp[0] + dx * k; py = tp[1] + dy * k; pz = tp[2] + dz * k; }
         }
         const rr = Math.hypot(px - lx * ty, pz - lz * ty) / R;
         const [nx, ny, nz] = norm3((r() - 0.5) * (far ? 1.6 : 0.9), far ? 1.0 : 1.7, (r() - 0.5) * (far ? 1.6 : 0.9));
@@ -1557,17 +1569,24 @@ export function buildTrees(scene, ctx = {}) {
     // W3-G: cây kè hồ NGHIÊNG ra mặt nước + thân mảnh (pano_033 "tán rộng nghiêng theo gió", 005) — cả cây nghiêng từ gốc
     // (xoay instance), không phải dời tán (W2-B: dời tán = thân gãy). Chỉ cây ≤ 14 m tới mép nước (lakeSD) và có bằng chứng
     // "nghiêng" ≤ 60 m hoặc 35% theo hash; hướng = −∇lakeSD
-    let tiltX = 0, tiltZ = 0;
+    // + BIẾN THỂ MẢNH "kè hồ" (phiên 4, ảnh 033_h000/005/010): ~60% cây kè ≤ 14 m tới nước là cây thân MẢNH (Ø ~0,3-0,4 m,
+    //   sxz ×0,62 — tán giữ nguyên nhờ cs bù), thấp hơn (×0,88, ≤ 12,5 m), tán nhỏ/thoáng hơn (R ×0,85, kín ≤ 0,55-0,85) và
+    //   LUÔN nghiêng; ~40% còn lại giữ dáng cổ thụ (010: 1 cây lớn tán rộng giữa hàng cây mảnh)
+    let tiltX = 0, tiltZ = 0, slim = 0, fullP = full;
     if (_ctx.lakeSD && !NOCUT && !o.median) {
       const sd = _ctx.lakeSD(x, z);
-      if (sd > 0 && sd < 14 && (V.lean || hxz(x, z, 66) < 0.35)) {
-        const gx = _ctx.lakeSD(x + 1, z) - _ctx.lakeSD(x - 1, z), gz = _ctx.lakeSD(x, z + 1) - _ctx.lakeSD(x, z - 1), gl = Math.hypot(gx, gz);
-        if (gl > 1e-3) { const a = (0.07 + 0.08 * hxz(x, z, 67)) / gl; tiltX = -gx * a; tiltZ = -gz * a; }
+      if (sd > 0 && sd < 14) {
+        slim = hxz(x, z, 68) < 0.6 ? 1 : 0;
+        if (slim) { H = Math.min(H * 0.88, 12.5); Rr *= 0.85; B = Math.min(B, H - 2.6); fullP = Math.min(full, 0.55 + 0.3 * hf); }
+        if (V.lean || slim || hxz(x, z, 66) < 0.35) {
+          const gx = _ctx.lakeSD(x + 1, z) - _ctx.lakeSD(x - 1, z), gz = _ctx.lakeSD(x, z + 1) - _ctx.lakeSD(x, z - 1), gl = Math.hypot(gx, gz);
+          if (gl > 1e-3) { const a = (0.07 + 0.08 * hxz(x, z, 67)) / gl; tiltX = -gx * a; tiltZ = -gz * a; }
+        }
       }
     }
     recs.push({ x, y, z, sp, kit, sy: 1, sxz: 1, yaw: o.yaw ?? hxz(x, z, 44) * Math.PI * 2, lx: (hxz(x, z, 45) - 0.5) * 0.07, lz: (hxz(x, z, 46) - 0.5) * 0.07,
-      rank, wash, pit: o.pit || 0, hero: heroOk ? o.hero : -1, full, H, B, Rr, cut, lift: 0, cs: 1, ox: 0, oz: 0,
-      src: o.src || 0, tun: tun ? 1 : 0, tiltX, tiltZ, big: o.big ? 1 : 0, ev: ev.palm + 2 * ev.young + 4 * ev.topi, park: park ? 1 : 0 });
+      rank, wash, pit: o.pit || 0, hero: heroOk ? o.hero : -1, full: fullP, H, B, Rr, cut, lift: 0, cs: 1, ox: 0, oz: 0,
+      src: o.src || 0, tun: tun ? 1 : 0, tiltX, tiltZ, slim, big: o.big ? 1 : 0, ev: ev.palm + 2 * ev.young + 4 * ev.topi, park: park ? 1 : 0 });
   }
   const N = recs.length, recsMs = performance.now() - t0;
   // ---- atlas + vật liệu (1 material cho MỌI cây gần/xa) ----
@@ -1641,8 +1660,9 @@ export function buildTrees(scene, ctx = {}) {
     r.sy = clamp((r.H - r.B) / Math.max(0.5, k.top - k.base), 0.4, 2.4);
     r.lift = clamp(r.B / r.sy - k.base, -(k.fork - WASH_TOP) * 0.6, 14);
     // bề dày thân theo CHIỀU CAO cây so với kit (không theo độ sâu tán — cây cắt cụt tán nông từng ra thân 1 m)
-    // W3-G: số mũ 0,8 → 0,7 + trần 1,3 (thân xà cừ 20 m từng Ø ~1,3 m ở gốc); cây kè hồ nghiêng: thân mảnh ×0,85
-    r.sxz = clamp((r.H / k.def.H) ** 0.7 * (0.88 + hxz(r.x, r.z, 43) * 0.22), 0.45, 1.18) * (r.tiltX || r.tiltZ ? 0.85 : 1);
+    // W3-G: số mũ 0,8 → 0,7 + trần 1,3 (thân xà cừ 20 m từng Ø ~1,3 m ở gốc); cây kè hồ nghiêng: thân mảnh ×0,85,
+    // biến thể MẢNH kè hồ (r.slim, phiên 4): ×0,62
+    r.sxz = clamp((r.H / k.def.H) ** 0.7 * (0.88 + hxz(r.x, r.z, 43) * 0.22), 0.45, 1.18) * (r.slim ? 0.62 : r.tiltX || r.tiltZ ? 0.85 : 1);
     r.cs = clamp(R / (k.rad * r.sxz), 0.35, 1.9);
     // kit XA (variant 0 của loài, > NEAR_R): sy/nâng/co tán RIÊNG theo số đo kit xa → mép dưới/ngọn/bán kính tán khớp
     // kit gần ở ranh LOD (trước: dùng aShape của kit gần → mép tán nhảy −1..+1,7 m khi đổi LOD). Khớp mép/ngọn THỰC của
