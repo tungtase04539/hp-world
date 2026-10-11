@@ -869,6 +869,13 @@ function vegAt(x, z, ri = -1, park = false) {
   if (pi >= 0) {
     const V = PANO_VEG, o = pi + 2;
     const wp = [V[o], V[o + 1], V[o + 2], V[o + 3], V[o + 4], V[o + 5] * 0.7, 0, V[o + 6] * 0.3];
+    // W3-G phiên 4: "hàng cây tán lớn/bóng mát … và cau/cọ" (cây CHUNG + chỉ cau đích danh — 51 pano): cây chung cũng là bằng
+    // chứng → trọng số = trọng số cau, chia cho xà cừ/bàng/phượng/sấu theo vùng ⇒ cau ~30% (trước 70%: quanh pano_225 33/57 cây là
+    // cau, ảnh thật 223-226 chỉ vài cây cau giữa hàng cây bóng mát; 340 "rợp bóng … cây cọ"). Trừ pano "chỉ cau" (palm 2, đầu cầu 074)
+    if (V[o + 11] && V[o + 5] > 0 && !(wp[0] + wp[1] + wp[2] + wp[3] + wp[4] + wp[7]) && V[pi + 19] !== 2) {
+      const zs = w[0] + w[1] + w[2] + w[3];
+      for (let i = 0; i < 4; i++) wp[i] = V[o + 5] * w[i] / zs;
+    }
     const sp = wp.reduce((a, b) => a + b, 0), sz = w.reduce((a, b) => a + b, 0);
     near = true; cauRaw = V[o + 5];
     if (sp > 0) { w = w.map((v, i) => 0.3 * v / sz + 0.7 * wp[i] / sp); pano = true; }
