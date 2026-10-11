@@ -21268,9 +21268,12 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
   // W3-A: collider NHỎ (cây/cột/đoạn tường, r ≤ 2,2) còn nằm TRÊN LÒNG đường sau cellsink + quét W2-A + dời/bỏ cây = vật cản
   // VÔ HÌNH (chủ đã gỡ/dời/cắt mà collider ở lại — lộ ra khi tim/lòng phố theo phố thật: tường tx_pdp Phan Đình Phùng, cây w1
   // Trần Phú). Tách như trees.js (x = 1e7; colIdx có thể đã dựng). Chạy TRƯỚC props: xe đỗ mép lòng của props là vật cản thật.
-  // GIỮ collider có GỐC CÂY đang vẽ tại chỗ (veg.trunkNear — lưới gốc dựng lại theo vị trí cuối): xà cừ dải phân cách Trần Phú/
-  // ĐBP đứng trên nhựa (roadnet không có đảo dải) — review: 8/19 collider bị tách là cây NHÌN THẤY → người đi xuyên thân cây.
-  { const gl = []; for (const c of colliders) if (c.r <= 2.2 && c.x < 1e6 && onCarriageDisc(c.x, c.z, 0) && !veg.trunkNear(c.x, c.z, Math.max(0.8, c.r))) { gl.push([+c.x.toFixed(1), +c.z.toFixed(1), c.r]); c.x = 1e7; c.z = 1e7; }
+  // CHỈ tách collider nằm SÂU trong lòng (tâm + 8 điểm cách 0,6 m đều trên nhựa) và KHÔNG có gốc cây đang vẽ tại chỗ
+  // (veg.trunkNear — lưới gốc dựng lại theo vị trí cuối). Review 2026-10-06 (raycast quanh 19 collider bị tách): 8 là xà cừ dải
+  // phân cách Trần Phú/ĐBP (đứng trên nhựa — roadnet không có đảo dải) + 2 là rào sắt ô w1_congso043 ngay MÉP lòng Trần Phú
+  // 14 m — vật NHÌN THẤY → người đi xuyên. Vật dựng tay sát mép bó vỉa cũ là thật; mồ côi thì nằm giữa lòng (quét W2-A đã gỡ chủ).
+  { const deep = (x, z) => { for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4; if (!onCarriageDisc(x + Math.cos(a) * 0.6, z + Math.sin(a) * 0.6, 0)) return false; } return true; };
+    const gl = []; for (const c of colliders) if (c.r <= 2.2 && c.x < 1e6 && onCarriageDisc(c.x, c.z, 0) && deep(c.x, c.z) && !veg.trunkNear(c.x, c.z, Math.max(0.8, c.r))) { gl.push([+c.x.toFixed(1), +c.z.toFixed(1), c.r]); c.x = 1e7; c.z = 1e7; }
     world.ghostColliders = gl; }   // QA: [[x, z, r]] đã tách
   world.treeBloomNear = trees.bloomNear;      // cánh phượng rơi quanh cây đang nở gần người chơi (petals.js)
   loadHeroTrees(trees);  // nạp GLB cây phượng ảnh-thật → LOD gần ≤150 m (bất đồng bộ)
