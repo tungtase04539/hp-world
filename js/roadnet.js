@@ -682,14 +682,18 @@ export function buildRoadNet(ROADS_DT, deps) {
     };
     for (const p of OSM_X) add(p, 9, 'osm');
     // chữ pano: có node OSM crossing ≤ 20 m → chữ tả CHÍNH vạch đó (pano_290 ↔ node Thế Lữ cách 12 m), không thêm vạch;
-    // 2 pano cùng tả 1 vạch (≤ 25 m: 551 + 393 Đinh Tiên Hoàng) → 1 vạch ở TRUNG ĐIỂM
+    // nhiều pano ≤ 25 m cùng tả 1 vạch (551 + 393 Đinh Tiên Hoàng) → 1 vạch ở pano GẦN NÚT GIAO nhất (vạch giữa khối hay ở
+    // đầu đoạn gần nút; ảnh thật: vạch ngay trước 551 h180, còn 551 h000/393 h000 trống). KHÔNG lấy trung điểm (rơi vào
+    // khoảng giữa 2 pano — chỗ cả 2 ảnh đều thấy trống).
     const xOsm = ptGrid(OSM_X), pz = [];
+    const dJ = (x, z) => { let d = 1e9; for (const e of JG(x, z, 60)) d = Math.min(d, Math.hypot(e[0] - x, e[1] - z)); return d; };
     for (const m of MARKS) {
       if (!m.unusedZ || xOsm(m[0], m[1], 20).length) continue;
-      const g = pz.find((q) => Math.hypot(q[0] / q[2] - m[0], q[1] / q[2] - m[1]) < 25);
-      if (g) { g[0] += m[0]; g[1] += m[1]; g[2]++; } else pz.push([m[0], m[1], 1]);
+      const g = pz.find((q) => Math.hypot(q[0] - m[0], q[1] - m[1]) < 25);
+      if (!g) pz.push([m[0], m[1], dJ(m[0], m[1])]);
+      else { const d = dJ(m[0], m[1]); if (d < g[2]) { g[0] = m[0]; g[1] = m[1]; g[2] = d; } }
     }
-    for (const q of pz) add([q[0] / q[2], q[1] / q[2]], 15, 'pano');
+    for (const q of pz) add([q[0], q[1]], 15, 'pano');
     for (const m of MARKS) delete m.unusedZ;
   }
   // đường ĐÔI (2 chiều xe là 2 way song song, có/không dải phân cách): mép lòng 2 dải cách nhau 0..8 m dọc ≥ 60% đoạn chạy

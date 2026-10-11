@@ -20993,9 +20993,9 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     // nhìn từ trên là mảng xám gần trắng + lưới ô cỏ đều tăm tắp.
     const PLAZA_GARDENS = new Set(['Tố Hữu']);
     const gLawnTex = makeTex(128, 128, (g2, w, h) => {   // cỏ ô liu xỉn lốm đốm TẤT ĐỊNH, 128 px = 4 m
-      g2.fillStyle = '#66773f'; g2.fillRect(0, 0, w, h);
+      g2.fillStyle = '#7c8042'; g2.fillRect(0, 0, w, h);   // đo 400 h270: cỏ thật (106,122,43) vàng hơn — #66773f ra (78,106,41)
       let sd = 9029; const rnd = () => { sd = (sd * 1103515245 + 12345) & 0x7fffffff; return sd / 0x7fffffff; };
-      for (let i = 0; i < 520; i++) { const l = rnd(); g2.fillStyle = `rgba(${80 + l * 44 | 0},${94 + l * 40 | 0},${48 + l * 22 | 0},0.45)`; g2.fillRect(rnd() * w, rnd() * h, 2 + rnd() * 4, 2 + rnd() * 3); }
+      for (let i = 0; i < 520; i++) { const l = rnd(); g2.fillStyle = `rgba(${94 + l * 44 | 0},${100 + l * 40 | 0},${48 + l * 22 | 0},0.45)`; g2.fillRect(rnd() * w, rnd() * h, 2 + rnd() * 4, 2 + rnd() * 3); }
     }, 'w3d_garden_lawn');
     gLawnTex.wrapS = gLawnTex.wrapT = THREE.RepeatWrapping; gLawnTex.repeat.set(1 / 4, 1 / 4);
     const gLawnM = new THREE.MeshLambertMaterial({ map: gLawnTex });
