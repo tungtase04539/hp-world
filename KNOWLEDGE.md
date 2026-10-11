@@ -427,7 +427,7 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
-- **2026-10-06 (W3-A STREET-GEOMETRY)** [ĐỢT 3 WAVE 3 — MẶT CẮT PHỐ THẬT + TIM ĐƯỜNG KHỚP CAMERA (AUDIT3 FP-1)]:
+- **2026-10-06 + 10-11 (W3-A STREET-GEOMETRY)** [ĐỢT 3 WAVE 3 — MẶT CẮT PHỐ THẬT + TIM ĐƯỜNG KHỚP CAMERA (AUDIT3 FP-1)]:
     **Vấn đề (AUDIT3, 120 pano):** CAMNEAR 44 pano (mặt tiền 1-6 m; camera kẹt trong khối 487/115), điểm TB pano lệch tim
     ≥ 3 m chỉ 3,07; 4 cơ chế cộng dồn: bề rộng lòng CHỈ theo cấp (r 5,5 → mặt tiền 4,75 m), snapFront kéo nhà thật ≤ 7,2 m
     ra facadeLine hẹp đó, tim OSM lệch vết xe Google 3-9 m, guard camera 1 m (thật)/3 m (sinh).
@@ -494,11 +494,32 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     hơn — W3-B/C). Chấm mắt REAL|dot3|W3-A (`comps3/`): 18 pano đích 2,67 → 3,67, đối chứng 10 pano 4,40 → 4,40, 11 pano phụ
     (vỉa rộng/tường mỏ neo/đài phun) 3,82 → 4,50. Perf cùng phiên 4 cặp (views_perf): hpReady +~210 ms (~4%: 5.214 vs 4.091 đỉnh
     ROADS_DT rải đều roadnet/citygen/cellsink/props/trees, không điểm nóng), calls/tris/p95 không đổi (±nhiễu).
+    **PHIÊN 3 (2026-10-11, sửa theo phản biện + đo lại):** (11) `capWidths` (iii): bước kẹp q10 chuyển phần lòng cắt SANG vỉa
+    → mặt tiền vẫn ở W25/2 của tim lệch tâm (14 way r/t vỉa 6-7,8 m: ngõ w5,5 + vỉa 7,8; pano_477 tường thật 4-6 m, game 10-15 m
+    = "quảng trường" lát giả — process_buildings cắt nhà thật LÙI về facadeLine) ⇒ mặt tiền ≤ max(mặt tiền cấp, trung vị tường
+    gần + 0,5) trừ vỉa ghi đè pano (`swFixed`): 50 way, way r/t vỉa ≥ 6 m 14 → 4. (12) process_buildings lô "cơi nới" NÔNG 3-6 m:
+    chặn kéo 7,2 → 1,5 m làm số lô nông 275 → 1.338 (nhà SINH dựng NGAY TRƯỚC nhà thật lùi đúng chỗ Overture — trái mục tiêu
+    FP-1 "không mặt nhà sinh nào gần camera hơn nhà thật") ⇒ nhà thật phía sau có cạnh mặt phố ngay ngắn (frontOf ≤ 7,2 m) →
+    bỏ lô (`gap_veto_shallow_real` 1.490; lô nông còn 147, lô khe 4.825 → 3.683, liền mặt phố sau lấp s 56 → 49,6%: khe thật
+    giữa nhà thật nay để trống — W3-B quyết định lấp theo bằng chứng). (13) tách collider ma: điều kiện SÂU + không gốc cây (8).
+    (14) QA xsec thêm sai số 2 chiều trên hướng có mặt nhà thật ≤ 30 m: `within1_5pct` (chữ spec ±1,5 m), `tooClose`, `tooFar`,
+    `meanAbsErr`. **Số cuối (551 camera, dot3 → W3-A):** trong ±1,5 m Overture 29,2 → 52,2%, quá gần 1.006 → 482, quá xa 293 →
+    396, |sai| TB 4,51 → 3,36 m; ngoài lòng 128 → 19, ngoài bó vỉa 78 → 7, lệch ≥ 3 m 172 → 105, TB 2,37 → 1,92 m; close-real
+    560 → 68, close-synth 541 → 478, near4 59 → 0, camera trong nhà 1 → 0. Clearance trình duyệt: cam vi phạm 35 → 12, gần < 3 m
+    36 → 7, lấp > 40% 181 → 92, trên nhựa 53 → 36, lấn vỉa 72 → 77 (chặn kín 8 → 14). Chấm mắt (`comps5/` REAL|dot3|d901604|
+    cuối): 18 pano đích 2,67 → 3,64, đối chứng 10 pano 4,40 → 4,40, 7 pano phụ 3,29 → 4,36, 8 pano phản biện 3,38 → 3,44
+    (477 hết thoái lui). Perf cùng phiên 3 cặp (cặp thứ 4 nhiễu máy, bỏ): hpReady 4.590 → 4.849 ms (+260, ~5,6%; khởi động
+    ground +61 roadnet, cells +94, final +48 — tuyến tính theo số đỉnh ROADS_DT 4.091 → 5.214), calls 2.573 → 2.570,
+    tris 30,0 → 29,9 M, p95 18,9 → 18,8 ms (vsync 60), heap ±nhiễu. diag full/lite 0 lỗi JS (lite cần GLB assets_lite).
     **BẪY:** (a) tim tường từ 3 trạm đơn lẻ từng kéo Nguyễn Tri Phương 7,4 m (sân lùi 1 bên) → cần ≥ 4 trạm + IQR + kẹp ±3 m;
     (b) kẹp q10 tường cả way dài từng đẩy 6 camera Phan Đình Phùng ra ngoài bó vỉa → luôn giữ "camera đang trong lòng";
     (c) bề rộng 1 giá trị/way: địa danh sát 1 đoạn kéo hẹp CẢ way (Cù Chính Lan 10,8 → 8); (d) world.js cell dựng tay theo trục
     cũ (HB_A… Hai Bà Trưng dời ≤ 3 m) — sweep W2-A (clearance.js theo way) tự lùi nhà lấn hành lang mới; (e) Python ghi file
-    Windows đổi xuống dòng — git autocrlf chuẩn hoá, diff vẫn gọn.
+    Windows đổi xuống dòng — git autocrlf chuẩn hoá, diff vẫn gọn; (f) kẹp LM_POLY bỏ qua "camera đang trong lòng": NHNN cách
+    tim Cù Chính Lan 3 m → cả way về lòng cấp 8 m, 4 camera (068/071/439/528) lệch 3,2-3,85 m nằm sát bó vỉa (vẫn trên nhựa) —
+    cần bề rộng THEO ĐOẠN (đổi hợp đồng w/sw thành mảng theo đỉnh) mới sửa đúng; (g) `tools/tour.mjs` chọn điểm đứng lại MỖI
+    lượt (tia raycast không thấy hết khối nhà) → so tour A/B bằng cùng điểm đứng (shoot.mjs `kind:'cam'`, dist 0,1), đừng so
+    ảnh tour thô.
 
 - **2026-10-04 (W2-F POLISH)** [ĐỢT 3 wave 2 — WebGL1, giải mã RB 1 lần, kho cảng, ĐÊM, giao thông né xe đỗ, dọn code chết, hitch]:
     **(1) WebGL1** (three r160 tự lùi WebGL1 khi không có WebGL2): KIỂM bằng `tools/qa/shoot.mjs --gl1` (init script cho
