@@ -34,7 +34,7 @@ Trò chơi: thế giới 3D Hải Phòng **tỉ lệ 1:1 mét thật** (từ 202
 | `js/citygen.js` | ĐỢT 3: dựng PHỐ NHÀ THẬT từ footprint RB01 (`buildings_real.js`) — 1 quad/cạnh tường + shader atlas, mái/tum/bồn/tôn, ban công/mái hiên/hộp biển/điều hoà 3D (ô gần), va chạm đa giác (`fabricCollide/At/Hit`), `fabricData()` dùng chung (world.js đặt `world.rbData`/`world.rbGrid` cho cây/props/camera). Cờ `FABRIC` (world.js, `?fabric=proc` = phố giả cũ) |
 | `js/facade_atlas.js` (+ `facade_atlas_worker.js`) | Atlas mặt tiền/mái/chi tiết/biển hiệu VN vẽ thủ tục bằng rasterizer phần mềm (8 cột × 12 hàng ô từ W3-C — 2048×3072 / LITE 1024×1536, alpha = mặt nạ), vẽ trong Worker |
 | `js/facade_evidence.js` | SINH bởi `tools/gen_facade_evidence.mjs` từ `audit/audit_enriched.json`: cờ từ vựng mặt tiền từng quan sát pano (thuộc địa, tân cổ điển, kính, đang xây, tập thể, cây leo, cũ/mới, biển lớn, mái hiên tôn/bạt…) + cờ vùng/tuổi từng pano — citygen `renderStyles()` dùng (W3-C) |
-| `js/cellfacade.js` | W3-C: palette guard nhà ô GIỮ LẠI (mảng tường/kính lớn màu đặc → kẹp bão hoà/độ sáng) + `cellCanvasFx` (ảnh mặt tiền canvas tối/một màu bão hoà khi gộp cellAtlas) — gọi trong `cellsink.commitSink` |
+| `js/cellfacade.js` | W3-C nhà ô: `guardCellPalette` (mảng tường/kính lớn màu đặc của vật GIỮ LẠI → kẹp bão hoà theo sắc, nâng sáng tường xanh thương hiệu, mảng xám-xanh tối → kính), `cellCanvasFx` (filter ảnh canvas tối/bão hoà khi gộp cellAtlas), `gridFacadeSpec`/`paintGridFacade` (vẽ lại ~25 helper "nền + lưới cửa sổ" thành khung/kính/cửa chớp — gọi trong `cellsink.materialize`), `applyCellGlass` (shader kính nhà ô: đố theo toạ độ thế giới + phản trời — `sharedMats.window`), `drawFacadeWindows` (facadeTex) |
 | `js/cellsink.js` | "Bồn chứa" khối ô dựng tay (world.js "cells"): che scene/addCollider/FEATURED_CLEAR/makeTex, ở cửa ra gỡ nhà ô trùng footprint THẬT, claim kind `'cell'` cho công trình giữ, xuất `world.cellShops` (nhà bị gỡ) + `world.cellKept` (nhà giữ + bao lồi, để WP2 cắt footprint); bỏ qua nhà `FLAG.SYNTH`; `realBuildings()` = giải mã RB01 dùng chung |
 | `js/brands.js` | Danh sách chặn tên THƯƠNG HIỆU thật (nguồn duy nhất cho `gen_shopsigns.mjs` + lưới an toàn vẽ biển trong cellsink) |
 | `js/assets.js` | Đăng ký + preload + streaming GLB theo khoảng cách |
@@ -506,10 +506,16 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     **ĐO** (Radeon 890M, TIER 3, ANGLE D3D11, 1280×634, `&date=2024-10-15`, A/B cùng phiên base dot3 ↔ nhánh; máy dùng chung với
     4-6 agent → nhiễu ±150 ms mỗi pha boot): (a) ẢNH: 33 pano mục tiêu FP-3/FP-8 chấm REAL|dot3|W3-C 0-10: TB 3,30 → 3,56
     (+0,26); 8 pano đối chứng 3,12 → 3,19 (+0,06 — 400/414 nhích nhờ biển bảng/chữ biển). (b) KHUNG HÌNH: fps 60 (vsync) mọi view
-    cả 2 bên; draw call +6..+22/view (bản sao material palette/kính, biển dọc/bảng); tam giác bằng nhau (±0,01 M); heap 542 → 508 MB.
+    cả 2 bên; draw call −9..+22/view (bản sao material palette/kính, biển dọc/bảng); tam giác bằng nhau (±0,01 M); heap THẤP hơn
+    (perf7 542 → 508, perf8 550 → 454 MB — atlas thả bản CPU).
     (c) KHỞI ĐỘNG: perf7 (2 vòng, trước sửa atlas biển) hpReady 4.282 → 4.636 ms; pha cells 768→831, fabric 701→839, landmarks
-    252→363 — phần landmarks là CHỜ vẽ khung (boot.step bắt đầu pha mới rồi mới nhường luồng): CPU profile "(idle)" +181 ms ngay
-    ranh fabric→landmarks, CHƯA rõ nguyên nhân (canvas/atlas worker như base); [[PERF8]]. citygen JS tự đo trong trình duyệt
+    252→363 — phần landmarks là CHỜ vẽ khung (boot.step bắt đầu pha mới RỒI mới nhường luồng → thời gian chờ khung tính cho pha
+    sau): CPU profile "(idle)" +181 ms ngay ranh fabric→landmarks, JS vùng landmarks 34 vs 31 ms. CHIA ĐÔI (perfvar, cùng phiên,
+    2 vòng): bỏ filter canvas (cellCanvasFx) 410/506, bỏ vẽ lại lưới cửa sổ 441/402, citygen+atlas dot3 491/440 — vẫn cao; chỉ
+    `shopsigns.js` dot3 (954 biển) → 304/264 (base 246/237): NGUYÊN NHÂN = +302 chữ biển tên thật (1.256 biển, gen_shopsigns W3-C)
+    vẽ trên canvas tăng tốc GPU, raster khi khung kế tiếp. Muốn trả lại ~0,1-0,15 s: gen_shopsigns `slice(0, 1)` (1 tên/quan
+    sát) = 911 biển — chưa làm (giữ chất lượng). perf8 (3 vòng, bản cuối): hpReady 4.663 → 4.894 ms (trung vị, bỏ 1 vòng máy
+    nghẽn 6.144) ≈ +230 ms (+5%): landmarks ~245 → ~392, fabric ~719 → ~845, cells ~792 → ~836. citygen JS tự đo trong trình duyệt
     (stats7) 901 vs 753 ms = trong nhiễu; node: renderStyles 30-50 ms + exposedSide ~25 ms. (d) ATLAS: node ổn định 54 → 97 ms
     (63 → 93 ô), lạnh 177 → 252 ms; worker trong trình duyệt 636 → 629 ms (ngoài luồng chính, về trước khung đầu); cellAtlas 7
     trang 90 → 110 ms; 181 ảnh lưới cửa sổ vẽ lại; palette guard 101 mesh / 75 material (9 kính). (e) CỔNG: 0 lỗi JS (14 lô
@@ -520,7 +526,7 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     **Chưa làm/để lại**: hero landmark (FP-8 mục 4 — cần Meshy), góc bo cong, mái ngói 1 tầng riêng, nhà trẻ (069), mái mansard;
     nhà ô vẫn là hộp canvas (cửa sổ đã đẹp hơn, chưa qua shader atlas phố); pano_395 h90/h180 vẫn gần đen = `tb_goldstar` mặt LAM
     KIM LOẠI tối CỐ Ý (bằng chứng pano_540) nhìn từ mặt khuất nắng ở 2-4 m; 051 khối trường xanh lá (fabric, bão hoà < 0,62) giữ;
-    biển quảng cáo TRÊN MÁI lớn kiểu 327 chưa có (BILL chỉ ~30 nhà); khởi động +~0,1-0,35 s (mục ĐO). CAMNEAR (W3-A) che phần lớn
+    biển quảng cáo TRÊN MÁI lớn kiểu 327 chưa có (BILL chỉ ~30 nhà); khởi động +~0,23 s (mục ĐO; ~0,1-0,15 s là do thêm biển tên thật). CAMNEAR (W3-A) che phần lớn
     lợi ích ở pano tường sát 2-3 m. Tool QA W3-C (scratchpad): `stats.mjs <port>` (cellSink tex/atlas + fabric + boot), `pick2.mjs` tia dò vật liệu,
     `nodefab/run2.mjs` dựng phố trong node (tam giác/thời gian/phân bố kiểu).
 - **2026-10-04 (W2-F POLISH)** [ĐỢT 3 wave 2 — WebGL1, giải mã RB 1 lần, kho cảng, ĐÊM, giao thông né xe đỗ, dọn code chết, hitch]:
