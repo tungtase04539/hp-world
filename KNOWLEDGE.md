@@ -441,8 +441,10 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     quan sát → ~1.470-1.530 nhà); nhà không có quan sát dùng vùng của pano gần nhất ≤90 m làm XÁC SUẤT. Luật sửa dữ liệu: SHED
     ≥3 tầng → CIVIC (≥2.500 m² GLASS, ≥9 TOWER) (pano_230: khách sạn ra tường tôn); TUBE/OLD ≥9 tầng → 65% TOWER / 35% GLASS
     (thay 60% KTT); GLASS ≤6 tầng mặt tiền ≤10,5 m <450 m² → MODERN (lô kính hẹp pano_395/386). KIỂU DỰNG 7..12 = COL, NEO,
-    CONS, MODERN, TOWER, TEN (bộ `U7..U12/G7..G12`). Phân bố (R1600, node): TUBE 30,6 k, OLD 6,0 k, COL 2,2 k, MODERN 1,3 k,
-    CONS 336, VILLA 227, SHED 165, TEN 87, KTT 61, CIVIC 60, GLASS 55, NEO 19, TOWER 16; tuổi 0/1/2/3 = 5,2/18,3/11,1/6,6 k;
+    CONS, MODERN, TOWER, TEN (bộ `U7..U12/G7..G12`). Bằng chứng "đang xây" CHỈ áp cho nhà ≤8 tầng mà mô tả không kèm kính/
+    tân cổ điển/cao tầng (bản đầu: tháp 15-20 tầng phủ lưới xanh + gạch cả mặt — nhóm đối chứng pano_285/304 h180 tệ đi).
+    Phân bố (R1600, node): TUBE 30,6 k, OLD 6,0 k, COL 2,3 k, MODERN 1,4 k, CONS 312 (53 do bằng chứng), VILLA 227, SHED 165,
+    TEN 87, KTT 61, CIVIC 60, GLASS 58, NEO 21, TOWER 18; tuổi 0/1/2/3 = 5,2/18,3/11,1/6,6 k;
     "nhiều biển lớn" 3.800 nhà. `fabricFacadeOf(b)` chẩn đoán.
     **(3) aFac.z TƯỜNG = kiểu dựng (4 bit) | tuổi<<4 | "nhiều biển lớn"<<6 | "cạnh có ban công 3D"<<7**. BẪY: `groundModule()` JS
     phải khớp shader TỪNG BIT — CONS không có bay "nhà ở" (JS, GL2, GL1); tập 1 phần tử (G5, G9) luôn [0]; `pickU/pickGi` sinh

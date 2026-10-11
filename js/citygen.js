@@ -820,7 +820,9 @@ function renderStyles(D, CX, CZ) {
     else if (sty === STYLE.GLASS && fl <= 6 && fL <= 10.5 && area < 450) rs = RS.MODERN;
     // (b) bằng chứng trực tiếp (quan sát pano chạm đúng nhà này) thắng
     if (e) {
-      if (e & FEF.CONS) rs = RS.CONS;
+      // ĐANG XÂY chỉ cho nhà ≤ 8 tầng mà mô tả KHÔNG kèm kính/tân cổ điển/cao tầng: quan sát "thi công/giàn giáo" gần tháp
+      // thường là rào/công trình dưới chân — phủ lưới + gạch cả tháp 15-20 tầng là sai rất lộ (nhóm đối chứng pano_285/304 h180)
+      if ((e & FEF.CONS) && fl <= 8 && !(e & (FEF.GLASS | FEF.NEO | FEF.TOWER))) rs = RS.CONS;
       else if ((e & FEF.TEN) && fl >= 3 && fl <= 8) rs = RS.TEN;
       else if ((e & FEF.NEO) && fl <= 6 && (area >= 250 || sty === STYLE.CIVIC || sty === STYLE.VILLA)) rs = RS.NEO;
       else if ((e & FEF.COL) && fl <= 5 && sty !== STYLE.SHED) rs = RS.COL;
