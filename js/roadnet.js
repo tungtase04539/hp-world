@@ -543,23 +543,29 @@ export function buildRoadNet(ROADS_DT, deps) {
     junctions.push(J);
     stats.junctions++;
   }
-  // bằng chứng chữ pano (≤ 45 m) → MỘT nút tốt nhất quanh điểm đó (nhiều nhánh/cấp cao, gần) — số nhánh chỉ là "tie-breaker"
+  // bằng chứng chữ pano → MỘT nút tốt nhất quanh điểm đó (nhiều nhánh/cấp cao, GẦN: −1 điểm mỗi 3 m).
+  //   • đèn (16): nút ≤ 45 m (đèn nhìn thấy từ xa, thường ở nút lớn phía trước);
+  //   • zebra (8): CHỈ nút mà pano nằm trong vùng nút + 12 m (≤ 45) — vạch qua đường được tả là vạch Ở CHỖ camera.
+  //     Không có → m.unusedZ → vạch GIỮA KHỐI trên đoạn phố gần pano (bên dưới). Phản biện W3-D: bản cũ (≤ 45 m, −d/12)
+  //     gán chữ "Vạch qua đường" của pano_551 cho nút lớn cách 41 m → zebra ma ở 496 h000 và MẤT vạch thật ở 551
+  //     (8/24 chữ zebra rơi vào nút > 25 m).
   {
     const JG = new Map();
     for (const J of junctions) { const k = Math.floor(J.x / 50) + ',' + Math.floor(J.z / 50); let l = JG.get(k); if (!l) JG.set(k, l = []); l.push(J); }
     for (const m of MARKS) {
       if (!(m[2] & 24)) continue;
-      let best = null, bs = -1e9;
+      let bS = null, sS = -1e9, bZ = null, sZ = -1e9;
       const ix = Math.floor(m[0] / 50), iz = Math.floor(m[1] / 50);
       for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) for (const J of JG.get((ix + a) + ',' + (iz + b)) || []) {
         const d = Math.hypot(J.x - m[0], J.z - m[1]);
         if (d > 45 || J.degenerate || !(J.nSt >= 3) || !J.inside) continue;
-        const s = J.rankSum + 2 * J.nPS - d / 12;
-        if (s > bs) { bs = s; best = J; }
+        const s = J.rankSum + 2 * J.nPS - d / 3;
+        if ((m[2] & 16) && s > sS) { sS = s; bS = J; }
+        if ((m[2] & 8) && d <= Math.min(45, J.rad + 12) && s > sZ) { sZ = s; bZ = J; }
       }
-      if (!best) { if (m[2] & 8) m.unusedZ = true; continue; }
-      if (m[2] & 16) best.evS = true;
-      if (m[2] & 8) best.evZ = true;
+      if (bS) bS.evS = true;
+      // chữ tả CẢ đèn lẫn vạch ("gần ngã tư có đèn …, có vạch sang đường" — pano_526) → vạch ở nút có đèn đó
+      if (m[2] & 8) { const Z = bZ || bS; if (Z) Z.evZ = true; else m.unusedZ = true; }
     }
   }
   for (const J of junctions) {
@@ -632,9 +638,31 @@ export function buildRoadNet(ROADS_DT, deps) {
     (ways[h.wi].pave ||= []).push(Pv);
   }
   // nhãn ảnh: gán cho WAY gần nhất (camera Street View đi trên lòng đường) — roadnet lan dọc way ≤ 150 m (emitRun)
+  // Nhãn W (trắng đứt = 1 chiều nhiều làn) còn gán cho dải ĐỐI DIỆN của đường đôi: way phố khác có đoạn ≤ 20 m, song song
+  // (|cos| > 0,94), mép lòng cách 0..8 m (cùng tiêu chí dualRun) — camera chỉ đi 1 dải nhưng ảnh thấy cả 2 (phản biện
+  // W3-D: Lê Quang Đạo 216/478 dải xa vẫn tim vàng vì dualRun cả đoạn 360 m chỉ đạt 46%). Nhãn lan có cờ `far` → thua nhãn
+  // riêng của way đó (+40 m khi chọn nhãn gần nhất).
   for (const L of LABELS) {
     const h = nearestStreetSeg(L[0], L[1], 12); if (!h) continue;
     (ways[h.wi].labels ||= []).push(L);
+    if (!(L[2] & 4)) continue;
+    const w0 = ways[h.wi], [ax0, az0] = w0.pts[h.k], [bx0, bz0] = w0.pts[h.k + 1];
+    const l0 = Math.hypot(bx0 - ax0, bz0 - az0); if (l0 < 1) continue;
+    const ux = (bx0 - ax0) / l0, uz = (bz0 - az0) / l0, px = ax0 + (bx0 - ax0) * h.t, pz = az0 + (bz0 - az0) * h.t;
+    const got = new Set([h.wi]);
+    stGrid.near(px, pz, (wj, k) => {
+      if (got.has(wj)) return;
+      const o = ways[wj], [ax, az] = o.pts[k], [bx, bz] = o.pts[k + 1];
+      const dx = bx - ax, dz = bz - az, l = Math.hypot(dx, dz); if (l < 1) return;
+      if (Math.abs((dx * ux + dz * uz) / l) < 0.94) return;
+      const tt = ((px - ax) * dx + (pz - az) * dz) / (l * l); if (tt < 0 || tt > 1) return;
+      const d = Math.hypot(px - ax - dx * tt, pz - az - dz * tt), gap = d - wHW(w0) - wHW(o);
+      if (d > 20 || gap <= -0.5 || gap >= 8) return;
+      got.add(wj);
+      const F = [L[0], L[1], L[2]]; F.far = true;
+      (o.labels ||= []).push(F);
+      stats.labFar = (stats.labFar || 0) + 1;
+    });
   }
   // vạch qua đường giữa khối: node OSM crossing không thuộc vùng nút giao có zebra (rad + 4 m) và nằm trên lòng phố
   // (≤ hw + 2 m); bằng chứng chữ pano "có vạch qua đường" mà không có nút giao nào ≤ 45 m (m.unusedZ) → đoạn phố gần nhất
@@ -653,7 +681,15 @@ export function buildRoadNet(ROADS_DT, deps) {
       L.push({ k: h.k, t: h.t, src });
     };
     for (const p of OSM_X) add(p, 9, 'osm');
-    for (const m of MARKS) if (m.unusedZ) add(m, 15, 'pano');
+    // chữ pano: có node OSM crossing ≤ 20 m → chữ tả CHÍNH vạch đó (pano_290 ↔ node Thế Lữ cách 12 m), không thêm vạch;
+    // 2 pano cùng tả 1 vạch (≤ 25 m: 551 + 393 Đinh Tiên Hoàng) → 1 vạch ở TRUNG ĐIỂM
+    const xOsm = ptGrid(OSM_X), pz = [];
+    for (const m of MARKS) {
+      if (!m.unusedZ || xOsm(m[0], m[1], 20).length) continue;
+      const g = pz.find((q) => Math.hypot(q[0] / q[2] - m[0], q[1] / q[2] - m[1]) < 25);
+      if (g) { g[0] += m[0]; g[1] += m[1]; g[2]++; } else pz.push([m[0], m[1], 1]);
+    }
+    for (const q of pz) add([q[0] / q[2], q[1] / q[2]], 15, 'pano');
     for (const m of MARKS) delete m.unusedZ;
   }
   // đường ĐÔI (2 chiều xe là 2 way song song, có/không dải phân cách): mép lòng 2 dải cách nhau 0..8 m dọc ≥ 60% đoạn chạy
@@ -1048,9 +1084,9 @@ export function buildRoadNet(ROADS_DT, deps) {
       else if (w.c === 's') pat = wid >= 7.5 ? ((dual ? MK.CDW : MK.CDY) | MK.EDGE | MK.GUTTER) : MK.GUTTER;
       else if (w.c === 't') pat = wid >= 7.5 ? (dual ? MK.CDW : MK.CDY) : 0;
       if (dual) stats.marks.dual++;
-      // nhãn ảnh gần nhất trên way này (khoảng cách tới đa tuyến đoạn chạy ≤ 150 m)
+      // nhãn ảnh gần nhất trên way này (khoảng cách tới đa tuyến đoạn chạy ≤ 150 m; nhãn lan từ dải đối diện +40 m)
       let lab = 0, lbd = 150;
-      if (w.labels) for (const Lb of w.labels) { const d = distToPolyline([Lb[0], Lb[1]], P); if (d < lbd) { lbd = d; lab = Lb[2]; } }
+      if (w.labels) for (const Lb of w.labels) { const d = distToPolyline([Lb[0], Lb[1]], P) + (Lb.far ? 40 : 0); if (d < lbd) { lbd = d; lab = Lb[2]; } }
       if (lab) {
         const edge = w.c === 'p' || w.c === 's' ? MK.EDGE | MK.GUTTER : 0;
         if (lab & 32) pat = w.c === 'p' ? MK.EDGE | MK.GUTTER : w.c === 's' ? MK.GUTTER : 0;
