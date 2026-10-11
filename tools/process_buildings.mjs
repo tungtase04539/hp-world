@@ -1818,6 +1818,7 @@ function shopProb(b, f0) {
   const z = zoneAt(mx, mz, nameAt); if (z) p = Math.min(p, ZONES[z].shop);
   return p;
 }
+const OBS_NOT_SHED_RX = /công trình công cộng|hội nghị|tân cổ điển|công sở|trụ sở|cơ quan|biệt thự|nhà hát|bảo tàng|ủy ban|uỷ ban|bưu điện/;
 for (const b of B) {
   const R = rng(hash32(b.id + 'attr'));
   const [cx, cz] = centroid(b.pts);
@@ -1830,12 +1831,24 @@ for (const b of B) {
   // --- kiểu ---
   let style;
   const mr = b.mr || minRect(b.pts);
-  if (/industrial|warehouse/.test(b.cls) || /kho|xưởng/i.test(b.name) || (portZone(cx, cz) && b.area > 250 && !b.lot) || (b.area > 2500 && !b.civic)) style = STYLE.SHED;
-  else if (b.civic && !CIV_TALL.has(b.cls)) style = STYLE.CIVIC;
+  // W3-B: quan sát pano TẢ công trình công cộng / công sở / biệt thự / kiểu Pháp (không phải kho-xưởng) thắng luật "vùng cảng
+  // → kho" (pano_020 h0: Trung tâm Hội nghị TP — tân cổ điển Pháp 3 tầng 70 m, footprint OSM lớn — từng thành KHO cửa cuốn)
+  const obsNotShed = OBS_NOT_SHED_RX.test(ostyle) && !/kho|xưởng/.test(ostyle);
+  // công trình công cộng/công sở KIỂU PHÁP (tân cổ điển/thuộc địa) ≤ 3 tầng theo pano → bộ mô-đun VILLA (cửa chớp, vòm, lan can
+  // con tiện; trệt G_HOME0/G_CIVIC không dải biển); CIVIC giữ cho công sở hiện đại (bộ trệt G6 có G_GLASS mang dải biển).
+  // VILLA trần 3 tầng → chỉ khi quan sát ≤ 3 tầng.
+  const frenchCivic = /pháp|tân cổ điển|thuộc địa/.test(ostyle) && /công sở|trụ sở|cơ quan|ủy ban|uỷ ban|công trình công cộng|hội nghị|bưu điện|bảo tàng|nhà hát/.test(ostyle)
+    && Math.max(0, ...(obs || []).map((o) => +o.floors || 0)) <= 3;
+  if (portZone(cx, cz) && b.area > 250 && !b.lot && obsNotShed && !/industrial|warehouse/.test(b.cls)) stat('style_port_obs_override');
+  if (/industrial|warehouse/.test(b.cls) || /kho|xưởng/i.test(b.name) || (portZone(cx, cz) && b.area > 250 && !b.lot && !obsNotShed) || (b.area > 2500 && !b.civic && !obsNotShed)) style = STYLE.SHED;
+  else if (b.civic && !CIV_TALL.has(b.cls)) { style = frenchCivic ? STYLE.VILLA : STYLE.CIVIC; if (frenchCivic) stat('style_civic_french_villa'); }
   else if (/apartments/.test(b.cls) || /tập thể|chung cư/.test(ostyle)) style = STYLE.KTT;
   else if (CIV_TALL.has(b.cls) || /cao ốc|văn phòng|khách sạn|ngân hàng|tòa nhà|toà nhà|mặt kính|ốp kính|vách kính/.test(ostyle)) style = STYLE.GLASS;
   else if (/biệt thự|villa/.test(ostyle)) style = STYLE.VILLA;
-  else if (/công sở|trụ sở|cơ quan|trường|ủy ban|uỷ ban/.test(ostyle) && b.area > 150) style = STYLE.CIVIC;
+  else if (/công sở|trụ sở|cơ quan|trường|ủy ban|uỷ ban|công trình công cộng|hội nghị/.test(ostyle) && b.area > 150) {
+    style = frenchCivic ? STYLE.VILLA : STYLE.CIVIC;
+    if (style === STYLE.VILLA) stat('style_civic_french_villa');
+  }
   else if (/kho|xưởng/.test(ostyle) && b.area > 120) style = STYLE.SHED;
   else if (/pháp|cũ|cổ|thuộc địa/.test(ostyle)) style = STYLE.OLD;
   else if (!b.lot && !b.interior && b.area > 350 && b.area < 2500 && mr && mr.w / Math.max(1, mr.d) > 2.2 && mr.d > 8 && mr.d < 17) style = R() < 0.6 ? STYLE.KTT : STYLE.TUBE;
