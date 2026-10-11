@@ -19,6 +19,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import * as MD from './mapdata.js';
+import { claimPoly } from './claims.js';
 
 const isRiverName = (n) => /^Sông/.test(n || '');
 // bãi bồi (đất do process_osm §6b3b tách khỏi polygon sông) — import * : mapdata cũ không có export này vẫn chạy
@@ -205,6 +206,8 @@ function ringTexture() {
 export function buildRiverbanks(scene, deps) {
   const t0 = performance.now();
   const { WATER, waterSD, LAND_H = 2, R = 1650 } = deps;
+  // bãi bồi → claim 'rough' (landuse tô CỎ DẠI/đất cát thay màu đỉnh xám "bãi trống"; không chặn cây/prop — chỉ citygen)
+  BEACHES.forEach((B, i) => claimPoly(B, 'rough', 'beach_' + i));
   const TOP = LAND_H + 0.25;                    // mặt dải dạo = mặt vỉa hè (xsection SIDEWALK_TOP)
   const stats = { samples: 0, promM: 0, wildM: 0, lamps: 0, saplings: 0, bloom: 0, colliders: 0 };
   // ---- lưới đoạn phố mặt đất (p/s/t/r) ----
@@ -337,7 +340,7 @@ export function buildRiverbanks(scene, deps) {
     if (mode === 'strip') {
       stats.stripM += s.L;
       stripRail(s);
-      const sh = hash(s.x, s.z, 71) < 0.14 && gapW > 4 ? shack(s, gapW) : null;
+      const sh = hash(s.x, s.z, 71) < (s.beach ? 0.22 : 0.14) && gapW > 4 ? shack(s, gapW) : null;
       // cây lớn trong dải giữa kè và lan can (ảnh 336/337/520/331 h180-h270: tán rợp ngay sau lan can che kín mặt sông):
       // hàng 1 trong 6 m sát lan can; dải rộng ≥ 8 m thêm hàng thưa phía kè (bãi bồi: lùm rải riêng bên dưới)
       if (gapW > 3.6) {
@@ -466,16 +469,23 @@ export function buildRiverbanks(scene, deps) {
   function shack(s, gapW) {
     // thấp (1,9-2,4 m), mái tôn/bạt MÀU (xanh dương, cam, gỉ) nhô 0,6 m về phía phố + diềm bạt rủ — nhìn từ phố thấy MÁI và
     // BẠT sặc sỡ (ảnh 519 h180), không phải bức tường xám
+    // bờ bãi bồi (bờ cách phố tới 65 m): lán dựng SÁT SAU LAN CAN theo hướng phố (ảnh 331/332 h270: dãy nhà tôn thấp dưới
+    // tán cây ngay sau hàng rào), không ở mép nước xa
     const dep = Math.min(gapW - 1.2, 3.6), wid = 2.6 + hash(s.x, s.z, 72) * 2.2, h = 1.9 + hash(s.x, s.z, 73) * 0.5;
-    const cx = s.x + s.nx * (0.3 + dep / 2), cz = s.z + s.nz * (0.3 + dep / 2), ang = Math.atan2(s.tx, s.tz);
+    let cx = s.x + s.nx * (0.3 + dep / 2), cz = s.z + s.nz * (0.3 + dep / 2), ang = Math.atan2(s.tx, s.tz), nx = s.nx, nz = s.nz;
+    if (s.beach) {
+      const r = s.road, dl = Math.hypot(s.x - r.px, s.z - r.pz) || 1, wx = (s.x - r.px) / dl, wz = (s.z - r.pz) / dl;
+      const o = deps.hw(r.c) + deps.sw(r.c) + 0.5 + 1.1 + dep / 2;
+      cx = r.px + wx * o; cz = r.pz + wz * o; ang = Math.atan2(r.ux, r.uz); nx = -wx; nz = -wz;
+    }
     const gy = TOP - 0.25;
     const wallC = [rgb(0xb3ad9f), rgb(0x9aa6ad), rgb(0xbcae90)][Math.floor(hash(s.x, s.z, 74) * 3)];
     box(shackB, cx, gy + h / 2, cz, dep, h, wid, ang, wallC);
     const roofC = [rgb(0x3b78c4), rgb(0xd9772b), rgb(0x9c5a3c), rgb(0x2f8fd0)][Math.floor(hash(s.x, s.z, 75) * 4)];
-    const rx = cx + s.nx * 0.3, rz = cz + s.nz * 0.3;
+    const rx = cx + nx * 0.3, rz = cz + nz * 0.3;
     box(shackB, rx, gy + h + 0.08, rz, dep + 1.2, 0.12, wid + 0.5, ang, roofC);
     // diềm bạt rủ phía phố
-    const fx = cx + s.nx * (dep / 2 + 0.85), fz = cz + s.nz * (dep / 2 + 0.85);
+    const fx = cx + nx * (dep / 2 + 0.85), fz = cz + nz * (dep / 2 + 0.85);
     box(shackB, fx, gy + h - 0.3, fz, 0.05, 0.65, wid + 0.4, ang, hash(s.x, s.z, 77) < 0.5 ? rgb(0x2f7fc1) : rgb(0xe08a3a));
     stats.shacks++;
     shacks.push([cx, cz, Math.max(dep, wid) / 2 + 1.0]);
