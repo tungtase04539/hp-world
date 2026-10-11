@@ -126,7 +126,8 @@ totalEmissiveRadiance *= (1.0 - hpFrame) * (hpPane < 0.3 ? 0.25 : 1.0);`)
 // Trước: ô cửa sổ = HÌNH CHỮ NHẬT ĐẶC màu winCss (thường xanh than '#3f5a6b'/'#274a72') trên ảnh 256 px cho cả mặt nhà
 // 20-40 m → "lỗ vuông đen"/"cửa sổ nhoè" (pano_161 h180, 391, 409, 510, 060). Hơn 20 bản sao helper giống hệt nhau → sửa ở
 // MỘT chỗ: cellsink.materialize chạy hàm vẽ gốc trên ngữ cảnh GHI (gridFacadeSpec); nếu đúng mẫu "nền phủ kín + lưới cửa sổ
-// một màu (chữ nhật/vòm)" thì VẼ LẠI ở 2× độ phân giải bằng paintGridFacade (giữ nguyên vị trí/cỡ từng cửa): khung bao sáng
+// một màu (chữ nhật/vòm)" thì VẼ LẠI cùng cỡ ảnh bằng paintGridFacade (giữ nguyên vị trí/cỡ từng cửa; 2× đã thử — cellAtlas
+// gấp đôi trang, gộp 107 → 535 ms — bỏ): khung bao sáng
 // hơn tường, bóng dưới bệ, vạch sàn mờ; winCss ẤM tối (nâu/vàng đất) → CỬA CHỚP lá sách; còn lại → KÍNH (dải dọc: trên phản
 // trời, dưới tối) + đố chữ thập + vệt bóng chéo; winCss SÁNG (khung trắng trên tường đậm) → khung = winCss, kính xám-xanh.
 // Không khớp mẫu (có chữ, gradient, nét, ≥2 màu, chạm mép — caro/rào/sọc) → vẽ gốc như cũ. Xác định.
