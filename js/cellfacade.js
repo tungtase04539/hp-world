@@ -16,9 +16,12 @@ const L_MIN = 0.3, L_MAX = 0.9;
 const sMaxOf = (h) => { const d = h * 360; return d >= 15 && d <= 65 ? 0.62 : (d < 15 || d >= 330) ? 0.4 : 0.32; };
 // tường LẠNH (xanh dương/lá/tím) BÃO HOÀ (s > 0,45 = màu thương hiệu sơn cả mặt nhà) → nâng sáng tối thiểu 0,58: chỉ kẹp bão
 // hoà thì xanh hoàng gia/xanh than (l ~0,4) vẫn ra "khối xanh than" ở mặt khuất nắng (pano_138 UBND, 418 BaoViet — đo after6:
-// tường render (31,39,51)). Nhà sơn xanh ở HP là xanh NHẠT; xanh đậm chỉ ở biển/kính.
-const COOL_LIFT = 0.58;
-const coolLift = (h, s0, l) => (sMaxOf(h) < 0.33 && s0 > 0.45 ? Math.max(l, COOL_LIFT) : l);
+// tường render (31,39,51)). Nhà sơn xanh ở HP là xanh NHẠT ngả xám; xanh đậm chỉ ở biển/kính. Nâng sáng mà giữ bão hoà 0,32
+// thì ánh trời/tone map lại ra "xanh hoàng gia" (smoke7 138 h90) → tường được nâng còn bão hoà ≤ 0,22.
+const COOL_LIFT = 0.58, COOL_SAT = 0.22;
+const isCoolBrand = (h, s0) => sMaxOf(h) < 0.33 && s0 > 0.45;
+const coolLift = (h, s0, l) => (isCoolBrand(h, s0) ? Math.max(l, COOL_LIFT) : l);
+const sCapOf = (h, s0) => (isCoolBrand(h, s0) ? COOL_SAT : sMaxOf(h));
 
 // mảng LỚN xám-xanh/xanh than TỐI, ít bão hoà (0x2c3e50, 0x33475a… — "tháp kính"/"đế kính" dựng tay, pano_230 h0/h90, 395)
 // = KÍNH: thành vật liệu kính nhà ô (applyCellGlass: đố theo toạ độ thế giới + phản trời), sáng 0,5 — không còn "khối đen"
@@ -38,7 +41,7 @@ function guarded(q, THREE) {
     _cache.set(q, out);
     return out;
   }
-  const s = Math.min(_hsl.s, sMaxOf(_hsl.h)), l = Math.min(L_MAX, Math.max(L_MIN, coolLift(_hsl.h, _hsl.s, _hsl.l)));
+  const s = Math.min(_hsl.s, sCapOf(_hsl.h, _hsl.s)), l = Math.min(L_MAX, Math.max(L_MIN, coolLift(_hsl.h, _hsl.s, _hsl.l)));
   if (Math.abs(s - _hsl.s) > 0.04 || Math.abs(l - _hsl.l) > 0.04) {
     out = q.clone();
     out.color.setHSL(_hsl.h, s, l, THREE.SRGBColorSpace);
@@ -168,7 +171,7 @@ function _guardRGB(c, sCap = 1, lMin = L_MIN, lMax = L_MAX, wall = true) {
     const d = mx - mn; sat = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
     h = mx === r ? (gg - b) / d + (gg < b ? 6 : 0) : mx === gg ? (b - r) / d + 2 : (r - gg) / d + 4; h /= 6;
   }
-  const S = Math.min(sat, sMaxOf(h), sCap), Lc = Math.min(lMax, Math.max(lMin, wall ? coolLift(h, sat, l) : l));
+  const S = Math.min(sat, wall ? sCapOf(h, sat) : sMaxOf(h), sCap), Lc = Math.min(lMax, Math.max(lMin, wall ? coolLift(h, sat, l) : l));
   if (Math.abs(S - sat) < 0.04 && Math.abs(Lc - l) < 0.04) return c;
   const q = Lc < 0.5 ? Lc * (1 + S) : Lc + S - Lc * S, p = 2 * Lc - q;
   const f = (t) => { t = (t + 1) % 1; return t < 1 / 6 ? p + (q - p) * 6 * t : t < 0.5 ? q : t < 2 / 3 ? p + (q - p) * (2 / 3 - t) * 6 : p; };

@@ -478,7 +478,13 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     khung sáng hơn tường, bóng bệ, vạch sàn, winCss ẤM tối → cửa chớp lá sách, còn lại → kính dải dọc + đố chữ thập + vệt bóng;
     màu nền qua palette guard HSL (bão hoà ≤0,40, sáng 0,30-0,90). 181 ảnh. BẪY: thử 2× độ phân giải (512²) → cellAtlas 7 → 15
     trang 2048², gộp 107 → 535 ms — bỏ. (c) `guardCellPalette` (commitSink): mesh màu đặc của vật GIỮ LẠI có hộp ≥3,5×2,5 m →
-    HSL bão hoà ≤0,40, sáng 0,30-0,90 (nhân bản material 1 lần/gốc; KHÔNG đụng material có emissive). `cellCanvasFx` (ảnh canvas
+    HSL kẹp bão hoà THEO SẮC (ấm 15-65° ≤0,62 — ochre HP thật bão hoà ~0,6; đỏ ≤0,40; lạnh ≤0,32), sáng 0,30-0,90; tường LẠNH
+    bão hoà >0,45 (màu thương hiệu sơn cả nhà: UBND 138, BaoViet 418) → sáng ≥0,58 + bão hoà ≤0,22 (`coolLift`; chỉ kẹp bão hoà thì l 0,4 vẫn
+    ra 'khối xanh than' ở mặt khuất nắng — đo render (31,39,51); nâng sáng mà giữ 0,32 thì ánh trời lại ra 'xanh hoàng gia'); mảng xám-xanh TỐI ít bão hoà (180-250°, s 0,15-0,45, l<0,38:
+    'tháp/đế kính' 0x2c3e50/0x33475a — pano_230) → bản sao `applyCellGlass` sáng 0,5. BẪY: material đặc KHÔNG emissive bị
+    freezeStatic lượt 1 BAKE màu vào màu đỉnh rồi gộp chung material trắng → mất onBeforeCompile; bản sao kính đặt emissive
+    0xffcc66 cường độ 0 để rơi vào lượt 2 (giữ material). Kính vẽ canvas: sắc 165-235° bão hoà ≤0,3, sắc khác (tím TPBank 354)
+    ≤0,08. Nhân bản material 1 lần/gốc; KHÔNG đụng material có emissive. `cellCanvasFx` (ảnh canvas
     KHÔNG phải lưới cửa sổ, nền gần đen/bão hoà → filter khi gộp atlas) đọc MÀU NỀN cellsink ghi lúc vẽ (`t.userData.base`) —
     BẪY: bản đầu `drawImage→getImageData 8×8` cho 434 canvas (GPU) = đọc ngược GPU từng ảnh: gộp atlas 107 → 451 ms. Phủ
     'lighten' màu kính lên điểm tối làm cửa chớp nâu thành TÍM — bỏ.
