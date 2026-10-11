@@ -420,7 +420,7 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
-- **2026-10-05/06/11 (W3-B PARCELS)** [ĐỢT 3 wave 3 — Ô ĐẤT THẬT: khuôn viên tường rào + cổng, đất trống rào tôn, chợ, tỉ lệ cửa
+- **2026-10-05/06/11/12 (W3-B PARCELS)** [ĐỢT 3 wave 3 — Ô ĐẤT THẬT: khuôn viên tường rào + cổng, đất trống rào tôn, chợ, tỉ lệ cửa
     hàng theo phố, claim quảng trường, Chợ Con — AUDIT3 FP-2]:
     **Vấn đề (AUDIT3 S2 Σ345 + GAP):** generator chỉ biết 1 kiểu ô (dãy nhà ống) → lấp khe/lõi ô bằng nhà ống SINH vào khuôn
     viên biệt thự/cơ quan/trường, sân chợ, lô quây tôn; kéo mặt tiền biệt thự ra sát vỉa hè; công năng trệt chỉ theo cấp phố
@@ -474,7 +474,7 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     trong bóng 38/255 trong khi mặt tiền nhà cùng hướng 70-115 (ánh sáng vật lý: phía bóng chỉ có trời) → nay 48.
     **(4) world.js:** claim `qt_nhahat` vòng r62 → HỘP (0,70) ±40×±42 (khoảng lát giữa Hoàng Văn Thụ x≈−38 và Đinh Tiên Hoàng x≈36),
     hành lang `hl_quanhoa` ±55 → ±22 (+vòng đầu 22), BỎ `qt_trienlam`; nhà SINH chạm ≤ 6 m quanh nhà ô DANH TÍNH giữ lại bị đánh
-    D.dead trước buildRealFabric (`world.synthNearCellKilled`, 388 nhà); Chợ Con bz 793 → 783 (tâm footprint OSM), ô chợ trùng
+    D.dead trước buildRealFabric (`world.synthNearCellKilled`, 388 nhà; lượt 4: chỉ lô CHỒNG bao hoặc TRƯỚC MẶT — 246); Chợ Con bz 793 → 783 (tâm footprint OSM), ô chợ trùng
     `w2_chocon_market` XOÁ hẳn (giữ ô dù). CỔNG ô dựng tay về RANH ĐẤT: `propLineShift(x, z, front)` (world.js, cạnh import parcels)
     = đẩy cụm cổng ra sau facadeLine + 0,3 m + phần nhô `front`, tính LÚC CHẠY từ `clearance.nearestStreet` (phố có vỉa gần nhất —
     tự khớp khi W3-A đổi tim/bề rộng phố): Ban CHQS (pano_464) và cổng Điện lực Minh Khai (pano_510, từng đứng lấn vỉa 0,7 m).
@@ -522,7 +522,7 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     Bayes theo phố. (b) Giết nhà SINH quanh nhà ô danh tính: chỉ lô CHỒNG bao hoặc nằm TRƯỚC MẶT nhà ô (tia từ tâm + 4 điểm co 50 %
     đi ra xa phố gần nhất — `clearance.nearestStreet` ≤ 30 m — chạm bao trong độ sâu lô + 6 m); láng giềng BÊN CẠNH cùng dãy giữ
     (vòng 6 m cũ giết cả dãy shophouse cạnh khách sạn 521 h315); lô không phố ≤ 30 m (lõi ô) giữ luật vòng 6 m; tra lưới theo bbox
-    lô (trước: chỉ ô của tâm → sót). `world.synthNearCellStats {over, front, core}`. __R4_KILL__ (c) `parcels.collide` bán kính
+    lô (trước: chỉ ô của tâm → sót). `world.synthNearCellStats {over, front, core}`. Lúc chạy: 394 → 246 lô bị giết (chồng bao 201, trước mặt 44, lõi ô 1), 10,9 ms (mảng tem thay Set mỗi lô). (c) `parcels.collide` bán kính
     > 1 m (thuyền 1,6) quét mọi ô chạm đĩa (trước chỉ ô của tâm, lề đăng ký = nửa dày + 1 m). (d) Nhà cổng Điện lực (pano_510) lùi
     THEO cổng (propLineShift dời cổng 1,5 m vào đúng mặt đông nhà cổng → rào bắc chạy trong tường). (e) Generator THIẾU
     `tools/osm_roads_dt.json` / `osm_alleys.json` (gitignore) → DỪNG exit 2 (trước: try/catch im lặng → máy tích hợp sinh dữ liệu
@@ -534,7 +534,15 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     thự mà do lớp đất OSM CAMPUS (khuôn viên Bệnh viện Phụ sản phủ cả mặt tiền khách sạn, `why = 'lu'`, nLu 3/3) — chưa sửa:
     cần lớp bằng chứng "sân trước thoáng" từ pano (khách sạn/văn phòng không rào) đè lớp đất. KHÔNG làm:
     trần vùng → prior Bayes (cố ý theo AUDIT3 ≤ 0,15; nhóm A chấm tốt ở HXH/CCL/ĐTH), chia mesh tường theo ô (thêm draw call > lợi
-    81 k tam giác), bộ trệt không biển cho CIVIC/VILLA/PK ≠ 0 (renderer W3-C — cờ dữ liệu đã có). __R4_NUM__
+    81 k tam giác), bộ trệt không biển cho CIVIC/VILLA/PK ≠ 0 (renderer W3-C — cờ dữ liệu đã có). **Số đo lượt 4:** 44.904 → 44.941 nhà (b64 1.519.544 B), 425 → 406 dãy tường (hàng rào sắt 5,21 km, tường rào 0,35, rào tôn
+    0,81, tường lô 0,38), 197 → 188 cổng; lúc chạy 366 dãy / 158 cổng / 77 k tam giác / ~40-45 ms. PERF A/B giữ khoá 1 lượt (B A B A,
+    24 góc chuẩn, tier 3 Radeon 890M): calls 364 → 368, tam giác 3,85 → 3,89 M, fps 60,2 = 60,2 (vsync), p95 18,6 / 18,4 ms, hpReady
+    4,52 / 4,55 → 4,50 / 4,57 s, bootProfile.fabric 666 / 697 → 710 / 748 ms (tường + lượt giết nhà sinh), 0 lỗi JS; diag 0 lỗi;
+    LITE 3×404 như dot3; waterbfs 5/5; tour 26 ảnh không lỗi JS. CHẤM LẠI so với ảnh phản biện (REAL|dot3|r3|r4, cùng cài đặt chụp):
+    nhóm A (14) 3,64 → 3,71 (355 h270 3 → 4: dãy shophouse + sạp hoa quả về lại; 360 h90 3,5 → 4: hết trụ cổng giữa dãy quán;
+    358 h90 −0,5: mất biệt thự vàng sau rào phía nam ngoài nón 358 h180 — vùng biệt thự mặc định từng phủ); nhóm D (12) 2,71 =
+    (521 h315 +0,5 shophouse bên cạnh về lại; 231 h135 −0,5 lô sinh sát camera về lại — CAMNEAR); nhóm B (15) 4,07 = (cả 15 ảnh
+    chụp lại, khác r3 ≤ 5/255 trừ bóng); đối chứng 3,93 =. Ảnh: scratchpad dot3/W3-B/r4/c1a c1b c2a c2b c3a c3b c4a c4b c_fin c355.
     **BẪY:** (a) `\b` của JS không hiểu chữ có dấu ("chợ\b" không bao giờ khớp) → ranh giới tường minh; (b) "tôn" khớp trong
     "bê tông" → `tôn(?!g)`; (c) màu tường rào phải lấy từ CỤM chữ tả tường/rào/trụ/cổng — "chòi gác vàng" từng nhuộm cả rào;
     (d) tường dựng tay trong ô cells nằm ngay mặt phố — phải dò hình học trước khi dựng tường dữ liệu; (e) đo cảnh trước freeze
