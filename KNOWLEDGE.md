@@ -420,6 +420,107 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-10-11 (W3-G TREES)** [ĐỢT 3 wave 3 — AUDIT3 FP-7 "CÂY THEO BẰNG CHỨNG": mùa hoa tháng 10, cau theo bằng chứng, cắt trụi theo NGỮ CẢNH, mật độ/vòm cây theo đoạn phố, đa/me tây hero, cây cảnh đảo giao thông, thẻ lá không "bay"]
+    (nhánh worktree W3-G trên dot3 bc07df5; 4 phiên 05-11/10 — 2 lần host chết + 1 lần tạm dừng theo chủ dự án, nối tiếp theo PROGRESS.md). File: `js/trees.js` (chính), `tools/gen_treemap.mjs` + `js/treemap.js` (SINH LẠI —
+    `node tools/gen_treemap.mjs`, tất định), `tools/qa/trees.html` (thêm kit topi/me/lop), `js/world.js` 1 dòng (`trees.onHeroSeason(() => loadHeroTrees(trees))`).
+    **TREEMAP v2 (stride 15 → 21, trường cũ giữ nguyên nghĩa):** [15] polS / [16] polP = mức cắt cụt của cây VỈA HÈ vs cây DẢI
+    PHÂN CÁCH/CÔNG VIÊN/VƯỜN HOA/QUẢNG TRƯỜNG — ngữ cảnh theo CÂU (; .): câu chỉ nói công viên → cả câu "park"; câu nói cả
+    hai → theo vế (,), vế không nêu gì thừa hưởng ngữ cảnh nêu trước ("khuôn viên" KHÔNG tính park — sân cơ quan sau rào);
+    [17] tunnel (hàng cây tán lớn "rợp/che kín/vòm" + mật độ 3, hoặc phố Lê Lợi/Hạ Lý/PBC/LTK/Ký Con có hàng cây);
+    [18] topiary (cây cảnh tỉa tròn/cây thế trên ĐẢO GIAO THÔNG/dải phân cách và KHÔNG có hàng cây lớn); [19] palm (1 = tả
+    cây mà không có cau/cọ/dừa, 2 = câu ĐẦU nói cau/cọ, không loài gỗ — đầu cầu pano_074); [20] lean ("nghiêng").
+    Trường cũ [9] pollard = max(polS, polP). Sửa evidence: **"cọ" khớp nhầm "cọc" (chống cọc cây non) → 41 pano từng có
+    cau giả** (regex `cọ(?![a-zà-ỹđ])`); "một cây/một gốc" = mức 3 (một cây lẻ, không phải hàng); "đốn tỉa MẠNH", "cây cổ thụ
+    bị cắt", "cây … lớn … cắt trụi/chỉ còn thân" = 7; mật độ thưa thêm "một số cây/lác đác" (trừ khi có "hàng cây/nhiều
+    <loài>/rợp/hai bên"); "cổ thụ/cây tán" tính là cây chung (pano_259 từng ra thưa); "một số/vài cây … cắt" xét TRƯỚC nhánh
+    "hàng cây … cắt" = mức 3 (pano_262 "hàng cây cổ thụ … (một số cây bị cắt trụi cành)" từng ra 7).
+    **BẰNG CHỨNG THEO ĐOẠN PHỐ (`vegAt(x,z,ri,park)`):** cây vỉa hè lấy pano đứng TRÊN CHÍNH phố đó (cách tim ≤ nửa lòng + 9 m,
+    ≤ 50 m) trước, rồi mới tới pano gần nhất chim bay (`panoOnRoad`, dựng lười theo roadIndex). Cây "park" = kind 'park'/
+    dải phân cách/trong claim 'park' (đa giác PARKS) hoặc cách mép vườn ≤ 12 m (8 hướng × 4/8/12 m, chỉ dò khi có pano polP ≤ 60 m;
+    đa giác PARKS LÙI VÀO so với mép vườn thật: hố cây hè phía vườn cách đa giác 7-11,5 m — 8 m/8 hướng chỉ với ~7,4 m nên hàng
+    bàng/xà cừ hè phía dải 001/400 từng còn tán đầy) → mức cắt = max polP các pano ≤ 60 m (+ polS pano ≤ 25 m). Xác suất cắt: mức
+    3/5/7 → 19/45/71% (W2-B 18/40/62%); cây PARK mức 7 ("cả dải cắt trụi") → 90% (ảnh 001_h090/400_h270/225 gần như không còn cây
+    tán đầy trong dải), loài đích danh của helper trong dải cũng 90% (vỉa hè: ×0,85).
+    **LOÀI MỚI:** LOP "bộ xương" cắt trụi (thân 3,4-3,9 m + 4-5 cành lớn ngóc 25-55° cưa cụt, mỗi cành chẻ 2 nhánh cụt + chồi
+    mảnh, 28-34 thẻ chồi mọc lại 0,6-1 m dọc/đầu cành, độ kín 0,45-1 — cây trơ hẳn lẫn cây đã ra lại chồi: ảnh 056 "cắt tỉa trơ
+    cành" vẫn lưa thưa lá; bản 12-16 thẻ ra "bộ xương" trụi đều; H 7,5-11) — mức ≥ 5: 72% LOP / 28% CATCUT (cụt ngọn); helper 'catcut' ở vùng mức ≥ 5: 60% LOP.
+    TOPI cây cảnh (2 khối cầu lá / cây thế thân cong + 4 đĩa lá; aHt = 0 → co giãn đều, không nâng tán); ME me tây (tán dù
+    Ø 20 m, 8 cành ngang + 6 cành phụ, 170 thẻ). SP_N 9 → 12 (SPX/SP_TINT/KIND_OF/kit xa theo loài tự đủ).
+    **QUY TẮC (buildTrees, áp cho MỌI nguồn cây — helper cells, vườn hoa, OSM…):** (a) cau đích danh mà pano ≤ 35 m tả cây
+    không có cau VÀ không pano ≤ 50 m nhắc cau (`palmUnseen`) → cây bóng mát vùng (hàng cau "công sở" Bảo tàng pano_046);
+    (b) cây non đích danh nơi pano gần nói hàng cây LỚN/vòm, không nhắc cây non → cây bóng mát (239/271/501); (c) cây không ở
+    hố vỉa hè ≤ 35 m pano topiary → TOPI (304); (d) cây vòm (tunnel): u ≥ 0,45, tán ×1,35 (≤ 1,3× SPX max), mép tán −0,7 m,
+    kín 0,82-0,98, không tỉa trơ; (e) "HÀNG cây non" (young 6) → 80% cây non (trước 36%); (f) kè hồ < 16 m tới nước + (pano
+    "nghiêng" hoặc 35%) → cả cây NGHIÊNG 4-9° về phía nước (xoay instance quanh gốc, `tiltX/tiltZ`, thân mảnh ×0,85 — KHÔNG
+    dời tán: W2-B đã chứng minh dời tán = thân gãy).
+    (g) **KÈ HỒ — BIẾN THỂ MẢNH (`r.slim`)**: cây < 16 m tới nước (lakeSD: hàng sát nước 4-5 m + hàng hố bó vỉa phía hồ 12-14,2 m;
+    hè phía nhà bên kia phố ≥ 20 m — ngưỡng 14 m cũ hụt đúng hàng bó vỉa pano_033), không phải loài/cây đích danh: 60% thân MẢNH
+    (sxz ×0,62 → Ø thân ~0,3-0,4 m; tán giữ cỡ nhờ cs bù), thấp hơn (×0,88, ≤ 12,5 m), tán R ×0,85, kín ≤ 0,55-0,85, LUÔN nghiêng
+    ra nước; 40% giữ dáng cổ thụ (ảnh 033_h000/005_h090: hàng cây kè thân mảnh nghiêng gió; 010: vẫn có cổ thụ/đa giữa hàng) —
+    KNOWLEDGE §8b luật 3 "kè hồ rợp cổ thụ" vẫn đúng về ĐỘ PHỦ, không đúng về THÂN (thân to Ø 0,6-0,8 m là sai ở kè hồ).
+    (h) **CÂY CHUNG + CAU** (`vegAt`): pano tả "hàng cây tán lớn/bóng mát … và cau/cọ" (cây chung + CHỈ cau đích danh — 51 pano:
+    223-226, 340, 065, 235, 363…) → cây chung cũng là bằng chứng: trọng số = trọng số cau, chia xà cừ/bàng/phượng/sấu theo vùng ⇒
+    cau ~30% thay vì 70% (quanh pano_225 33/57 cây từng là cau; ảnh 223-226 chỉ vài cây cau giữa cây bóng mát). Trừ pano "chỉ cau"
+    (palm 2). `stats().ev` = {tun, tilt, slim, big} đếm cây theo các luật trên.
+    **TRỒNG DỌC PHỐ:** nhịp ×(0,75-1,25) (trước ±15%) + 9% hố trống; thưa (dens 1) ×3,0 (trước ×2,3) + MỘT BÊN theo khúc 60 m
+    (bên kia giữ 30%); vòm ×0,82; `plant(…, {ri, tun, src})` mang chỉ số phố + cờ vòm sang buildTrees.
+    **HERO ĐÍCH DANH theo ảnh (`HERO_SPOTS`):** đa/si rễ phụ ở pano_088 h180 (−5,2°, ~16 m) và pano_400 h180 (+21°, ~20 m),
+    me tây pano_001 h180 (+18°, ~22 m). Công thức đo: ảnh SV 1912 px FOV ngang ~98° → f ≈ 831 px; góc ngang = atan(dx/831);
+    cự ly = 2,5 m / tan(góc cúi tới gốc). ĐẶT: phố/nhà game không khớp ảnh → tìm trong nón ±12° quanh hướng đo, cự ly 6..(đo+8) m,
+    điểm TRỐNG (gốc cách mép lòng đường ≥ 2,2 m — rễ phụ ≤ ~1,9 m —, không nhà, không camera pano 6 m, không nước) VÀ THẤY ĐƯỢC
+    từ camera pano (đoạn camera → gốc không cắt footprint nào, dò `fp.at` mỗi 0,5 m), gần điểm đo nhất → 088: 10,5 m/+6°,
+    400: 13,5 m/+20°, 001: đúng điểm đo. BẪY: (a) "bám hố cây của phố" SAI ở 088 (ROADS_DT lệch ~45° so với ảnh); (b) "chỗ trống
+    gần nhất" rơi vào KHE SAU một nhà ở 400 (gốc trống nhưng nhà #24545 che ở 13 m → không thấy cây); (c) `THREE.Raycaster` KHÔNG
+    trúng mặt tiền fabric (dò che khuất phải dùng lưới footprint `world.rbGrid.at`, mesh merge nằm layer 1 → `rc.layers.enableAll()`).
+    Cây hero (`o.big`): H/R ĐÚNG số đo (không trộn 50% với cỡ ngẫu nhiên), mép tán = SPX min (4 m), KHÔNG qua facadeFit (tán trùm
+    mái/ban công như ảnh — luật 1,5 m + ép 88% về lòng đường từng đẩy tán đa lên trên đầu camera: khung pano chỉ thấy thân), mọi
+    cây KHÁC (cả helper cells) ≤ 0,6 R bị bỏ (`stats.fix.hero`). Kit đa: tán thấp rộng (cy 8,8, ry 4,0, thân 3,2 m — bản cũ tán
+    5,6-14,8 m × sy 1,45 ⇒ tán hero 7,4-21 m), rễ phụ MẢNH 2-5 cm 1,2-3,2 m quanh gốc (trước tới 6 m × cỡ instance → rễ giữa lòng
+    đường), 55% buông lơ lửng (đầu rễ 0,8-3 m) — rễ to chạm đất hết từng thành "rừng cột".
+    **MÙA HOA:** ngoài mùa phượng/bằng lăng 0,17/0,12 → 0,02 (pano 10/2024 không có hoa đỏ — 340/372/001/042). Hero GLB (luôn
+    đỏ) + cây đôi luôn-nở CHỈ khi tỉ lệ nở ≥ `HERO_SEASON` 0,45 (shader + assign + bloomNear) → 4/10 mặc định: không hero GLB;
+    3 file GLB phượng (~5,5 MB) chỉ TẢI khi vào mùa (`trees.onHeroSeason(fn)`: gọi ngay nếu đang mùa, không thì khi
+    setDate/setSeason/lịch qua ngưỡng) — trước tải + giải mã lúc dựng dù tháng 10 không bao giờ hiện.
+    **THẺ LÁ "BAY" (TREECARD):** thẻ "lấp tán" (¼ số thẻ) trước rải trên vỏ ellipsoid không cành đỡ → nay chùm lỏng (×2) quanh
+    1 điểm cành; vỏ ×1,0 (trước 1,08); bàng: lá lấp tầng bám cành, lá cả giữa cành (P[1]), cành tầng mảnh ×0,75; số "độ kín"
+    của thẻ TƯƠNG QUAN THEO CHÙM (70% chùm + 30% thẻ, tham số `rnd` của card()) → cây thưa mất nguyên chùm. Kit gần thẻ ×1,5
+    số lượng, ×0,8 cạnh (bàng ×1,95) — cùng độ phủ, hạt mịn.
+    Phiên 4 — NEO THẺ (`CARD_TETHER` 1,15 m + 0,4 × cạnh thẻ nhỏ nhất): kit GẦN, tâm thẻ xa điểm cành neo (đầu/giữa cành) quá
+    giới hạn → kéo về điểm neo (crownCards + tầng bàng): tán rộng (me Ø 20 m, đa) toả chùm ×(1 + 0,4·rx/5) tới 2,6 m mỗi trục nên
+    vài thẻ góc còn "bay"; kẹp không tốn r() → mọi thẻ khác giữ nguyên vị trí (tất định). Atlas: chùm lá THÙY (`lobedPts`: 5-6 cụm con lệch tâm) thay đĩa
+    tròn. Thân mảnh hơn: r0 ×~0,75 (xà cừ 0,31/0,34, phượng 0,29/0,30…), loe gốc 1,32 → 1,22, sxz = (H/H_kit)^0,7 ≤ 1,18
+    (trước ^0,8 ≤ 1,5). Gốc quét vôi mặc định 0,55 → 0,35. Lá tối ~7% (b 0,8-1,02).
+    **SỐ ĐO (phiên 4, cùng phiên A/B: base = dot3 bc07df5 từ `git archive` phục vụ cổng riêng; Chrome headless d3d11 Radeon 890M,
+    TIER 3, khoá chất lượng; máy chung 6-8 agent → thời gian dựng/boot nhiễu):** cây 8.886 → 8.497 (LOP 421, TOPI 6, ME 1, đa 3 →
+    6, cau 558 → 451, vòm 977, kè hồ nghiêng 201 / thân mảnh 164). Điều tra theo lớp bằng chứng (cây ≤ 30 m quanh 551 pano,
+    `scratchpad/dot3/W3-G/censusclass.mjs`): pano "thưa" 4,67 → 3,03 cây; "vòm" 11,2 → 12,4 cây (tán TB ≤ 25 m 3,44 → 4,18 m, mép
+    tán 5,29 → 4,90 m); tỉ lệ cây cắt quanh pano nói "cây vỉa hè cắt" (polS ≥ 5) 0,52 → 0,61, quanh pano không nói cắt 0,17 → 0,15;
+    cây dải/vườn cắt trụi: PARK 73%, vỉa hè 20% (base 70% chung); cau quanh pano tả cây không có cau 47 → 32. Thẻ lá "không cành
+    đỡ" (> 1,2 m + nửa cạnh tới đỉnh gỗ gần nhất, kit gần trừ cau/TOPI): 59/827 → 0/1612; thước AUDIT nguyên văn ("ngoài 1,2 ×
+    bán kính tán p85") 143/827 (17%) → 217/1612 (13%) — thước này đếm cả thẻ CÓ cành đỡ ở mép tán rộng, không dùng làm cổng.
+    Phượng nở 4/10: 17% → 2%; hero GLB 4/10 không tải; `?date=2026-06-10`: nở 0,80, tải đủ 3 GLB phượng, 0 lỗi JS.
+    buildTrees (dump liền nhau cùng phiên): 114,6 → 133,8 ms (+19 ms: 3 kit mới + luật bằng chứng); tam giác cây thấy ở spawn
+    0,583 → 0,624 M, draw call cây 21 → 26 (nhóm instanced TOPI/ME/LOP, chỉ vẽ khi có cây trong tầm).
+    Perf std (8 góc, 2 vòng xen kẽ base/new, traffic on): fps 60 (vsync) cả hai; p95 18,3-18,7 → 18,4-19,9 ms; draw call +3..+17
+    (cam_spawn −10); tam giác +0,1..+2% (game_3 −4%); hpReady 4,2/4,8 → 4,8/5,8 s — boot profile: MỌI bước chậm hơn ở lượt new
+    (cells +168, fabric +78, shaders +57 ms… không liên quan cây; bước nature +10 ms) → nhiễu máy chung; heap 591/649 → 465/621 MB
+    (không giải mã 3 GLB phượng hero ngoài mùa).
+    Chấm lại (REAL | dot3 | W3-G, 1280×634, traffic off, 17 pano FP-7 × 2 hướng, người làm tự chấm — thiên vị ±0,5): nhóm đích
+    3,54 → 3,91 (+0,37; tăng ở 22/34 khung, không khung nào giảm: hết phượng đỏ 340/372/001, đa 400/088 + me 001 hiện ra, dải
+    vườn 001/400/056 trơ cành, Cát Cụt/Tô Hiệu thưa, vòm 166/538/496, hết thẻ lá bay 386/538, cau 225/340 về thiểu số, thân
+    mảnh nghiêng kè hồ 033); nhóm đối chứng 8 pano 2,13 → 2,13. Cổng: diag full "TẤT CẢ THỰC THỂ OK — 0 lỗi JS"; diag/ảnh lite
+    chỉ có 404 `assets_lite/*.glb` (bản lite địa danh không có trong worktree/repo — như dot3); waterbfs 5/5.
+    Còn kém: 304 (nút HVT thật gần như trống, game còn hàng cây non/vừa xa), 010 (hàng hố bó vỉa + hàng helper kè hồ = "lưới
+    thân cây" trên promenade — mật độ helper chưa đụng), 033 (tán vẫn to/dày hơn ảnh), bàng sát camera vẫn "tầng que + đĩa lá",
+    400_h180 (gốc đa thấy rõ nhưng tán ra ngoài khung).
+    **BẪY:** (1) treemap stride 21 — mọi chỗ đọc PANO_VEG phải dùng PANO_VEG_STRIDE (chỉ trees.js). (2) Thứ tự trường mới
+    sau trường cũ: o = pi + 2 cho [2..14]; trường mới đọc thẳng V[pi + 15..20]. (3) Probe thẻ lá "bay" đúng nghĩa = khoảng
+    cách tâm thẻ tới đỉnh GỖ gần nhất (> 1,2 m + nửa cạnh); "ngoài vỏ 1,2 × bán kính p85" không phân biệt được (tán rộng
+    luôn có ~15% thẻ ngoài p85). Bỏ qua cau (tàu lá là dải, không phải thẻ) và TOPI (cầu lá không cành). (4) W3-A sẽ đổi
+    PANO_CLEAR/nón nhìn trong ok()/buildTrees — W3-G KHÔNG đụng các dòng đó. W3-F (cây non kè sông) dùng plant('non', …) hoặc
+    cờ evidence; quy tắc (e) "hàng cây non" đã tự áp cho pano 299/294 (kè sông). (5) Thân mảnh = giảm `sxz` (co CẢ cây theo ngang), tán
+    giữ cỡ nhờ `cs = R/(rad·sxz)` — trần cs 1,9: cây tán rất rộng mà sxz quá nhỏ sẽ bị co tán; đừng giảm sxz dưới ~0,4. (6) Luật
+    kè hồ dùng `lakeSD` (LAKE_POLY — hồ Tam Bạc trung tâm); promenade SÔNG Tam Bạc/Thế Lữ là phần W3-F (cây non chống cọc).
 - **2026-10-04 (W2-F POLISH)** [ĐỢT 3 wave 2 — WebGL1, giải mã RB 1 lần, kho cảng, ĐÊM, giao thông né xe đỗ, dọn code chết, hitch]:
     **(1) WebGL1** (three r160 tự lùi WebGL1 khi không có WebGL2): KIỂM bằng `tools/qa/shoot.mjs --gl1` (init script cho
     `getContext('webgl2')` trả null — cờ Chrome `--disable-es3-apis` KHÔNG có tác dụng ở headless mới: vẫn webgl2:true;
