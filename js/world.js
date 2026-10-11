@@ -4203,7 +4203,7 @@ const dgRail = (ax, az, bx, bz, h, kind, colHex) => {
     const cm = new THREE.Mesh(mergeGeometries(curbG), mat(0xb9bdb9));
     cm.receiveShadow = true; cm.name = 'lqd_median_curb'; scene.add(cm);
     const hm = new THREE.Mesh(hedgeGeometry(hedgeG, (x, z) => groundHeight(x, z) + 0.3, { h: 0.85, w: 1.15, seg: 0.7, rough: 0.09, top: 0.08, wild: 0.6, seed: 9, base: [0.38, 0.52, 0.22] }), hedgeMaterial());
-    hm.castShadow = true; hm.name = 'lqd_median_hedge'; scene.add(hm);
+    hm.castShadow = true; hm.name = 'lqd_median_hedge'; scene.add(hm); (world.hedgeRuns ||= []).push(...hedgeG);
   }
 }
 
@@ -7253,7 +7253,7 @@ const bsHipRoof = (W, D, hexa = 0x8a4a34, x = 0, y = 0, z = 0) => {
     }
     if (bits.length) {
       const hm = new THREE.Mesh(hedgeGeometry(bits, (x, z) => groundHeightNoDeck(x, z), { h: 0.9, w: 0.95, seg: 0.8, seed: 13, base: [0.24, 0.36, 0.16] }), hedgeMaterial());
-      hm.receiveShadow = true; hm.name = 'bs_park_dbp_hedge'; g.add(hm);
+      hm.receiveShadow = true; hm.name = 'bs_park_dbp_hedge'; g.add(hm); (world.hedgeRuns ||= []).push(...bits);
     }
   }
   // vỉa hè caro đỏ-xám dọc mép ĐBP (ảnh 363/196)
@@ -10430,7 +10430,7 @@ const dmBox = (cx, cz, ry, W, D, FL, FH, wallMat, name) => {
   plaza.position.set(A[0] + u[0] * L / 2 - nx * 8, LAND_H + 0.03, A[1] + u[1] * L / 2 - nz * 8);
   plaza.receiveShadow = true; plaza.name = 'dm_park_plaza'; scene.add(plaza);
   const addM = (arr, m, nm) => { if (arr.length) { const mesh = new THREE.Mesh(mergeGeometries(arr), m); mesh.castShadow = true; mesh.name = nm; scene.add(mesh); } };
-  if (hedgeG.length) { const hm = new THREE.Mesh(hedgeGeometry(hedgeG, (x, z) => LAND_H + 0.03, { h: 0.72, w: 0.8, seed: 21, base: [0.31, 0.44, 0.20] }), hedgeMaterial()); hm.castShadow = true; hm.name = 'dm_park_hedge'; scene.add(hm); }
+  if (hedgeG.length) { const hm = new THREE.Mesh(hedgeGeometry(hedgeG, (x, z) => LAND_H + 0.03, { h: 0.72, w: 0.8, seed: 21, base: [0.31, 0.44, 0.20] }), hedgeMaterial()); hm.castShadow = true; hm.name = 'dm_park_hedge'; scene.add(hm); (world.hedgeRuns ||= []).push(...hedgeG); }
 }
 
 // === (dm8) DÃY BIỆT THỰ PHÁP 2T Trần Hưng Đạo (pano_535 217.2,-35.6 h270=1; 237/236 h270).
@@ -19303,7 +19303,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
       {   // W3-D: viền bụi cắt tỉa lổn nhổn (js/hedges.js) thay 4 hộp phẳng — 4 cạnh quanh sân tượng
         const ring = [P(-14.5, -12), P(14.5, -12), P(14.5, 12), P(-14.5, 12), P(-14.5, -12)];
         const hm = new THREE.Mesh(hedgeGeometry([ring], () => LAND_H + 0.1, { h: 0.85, w: 1.0, seed: 33, base: [0.23, 0.36, 0.16] }), hedgeMaterial());
-        hm.castShadow = true; hm.name = 'lechan_hedge'; scene.add(hm);
+        hm.castShadow = true; hm.name = 'lechan_hedge'; scene.add(hm); (world.hedgeRuns ||= []).push(ring);
       }
       // cột cờ đỏ phía sau tượng
       for (const b of [-5, 0, 5]) {
@@ -21011,6 +21011,18 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
       }
     }
     const hedgePaths = [], parterres = [], curbGeos = [];
+    // bụi viền đã có từ khối ô (cells: mép công viên Trần Phú dm7, sân tượng Lê Chân, công viên ĐBP…) → viền vườn KHÔNG chạy
+    // song song sát nó (ảnh 400 h000: 1 hàng bụi sau vỉa hè, không phải 2): lưới điểm 1 m của world.hedgeRuns, bán kính 4 m
+    const _hG = new Map();
+    for (const run of world.hedgeRuns || []) for (let i = 0; i + 1 < run.length; i++) {
+      const [ax, az] = run[i], [bx, bz] = run[i + 1], n2 = Math.max(1, Math.ceil(Math.hypot(bx - ax, bz - az)));
+      for (let k = 0; k <= n2; k++) { const x = ax + (bx - ax) * k / n2, z = az + (bz - az) * k / n2, key = Math.floor(x / 8) + ',' + Math.floor(z / 8); let l = _hG.get(key); if (!l) _hG.set(key, l = []); l.push(x, z); }
+    }
+    const nearOldHedge = (x, z, r = 4) => {
+      const ix = Math.floor(x / 8), iz = Math.floor(z / 8);
+      for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) { const l = _hG.get((ix + a) + ',' + (iz + b)); if (l) for (let i = 0; i < l.length; i += 2) if ((l[i] - x) ** 2 + (l[i + 1] - z) ** 2 < r * r) return true; }
+      return false;
+    };
     // MỖI Ô ĐẤT có HƯỚNG RIÊNG (phố cong, ô xéo khác nhau) → KHÔNG dùng 1 góc lưới chung
     // (dùng chung làm vườn xiên so với mép ô). Tính HÌNH CHỮ NHẬT BAO DIỆN TÍCH NHỎ NHẤT của
     // CHÍNH polygon công viên (min-area rect: 1 cạnh trùng cạnh đa giác) → vườn khớp mép ô, cạnh
@@ -21120,7 +21132,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
           if (ins < 0) continue;
           for (let t = 2.2; t <= eL - 2.2 + 1e-6; t += 1.0) {
             const px = ax + ex * t + nx * ins, pz = az + ez * t + nz * ins;
-            const bad = gaps.some(([g0, g1]) => t > g0 && t < g1) || !inPoly(px, pz) || onPaved(px, pz) || onCarriageDisc(px, pz, 0.5) || clrNearPano(px, pz, 3.5);
+            const bad = gaps.some(([g0, g1]) => t > g0 && t < g1) || !inPoly(px, pz) || onPaved(px, pz) || onCarriageDisc(px, pz, 0.5) || clrNearPano(px, pz, 3.5) || nearOldHedge(px, pz);
             if (bad) { flush(); continue; }
             cur.push([px, pz]);
           }
