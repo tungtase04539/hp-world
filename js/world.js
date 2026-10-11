@@ -19625,10 +19625,11 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     });
     world.bridges = br;
     console.log('[world] cầu W3-F:', JSON.stringify(br.stats));
-    // r4 (phản biện obl_hvt_s): nhà ô dựng tay GIỮ nằm TRONG lòng nút xoắn — ảnh vệ tinh tile 7: lòng vòng tây = bãi nhựa +
-    // vườn bán nguyệt, KHÔNG nhà; khối tập thể 5 tầng hvt_tapthe5t + hvt_nonbo là thiết kế quanh cầu HVT cũ (đặt sai chỗ) → gỡ
+    // r4 (phản biện obl_hvt_s): NHÀ ô dựng tay GIỮ nằm TRONG lòng nút xoắn — ảnh vệ tinh tile 7: lòng vòng tây = bãi nhựa +
+    // vườn bán nguyệt, KHÔNG nhà; khối tập thể 5 tầng hvt_tapthe5t (thiết kế quanh cầu HVT cũ) → gỡ. Chỉ khối CAO ≥ 9 m:
+    // hòn non bộ hvt_nonbo (7,5 m) trên đảo vườn là THẬT (pano_304 h180/h270) — giữ
     for (const L of world.helixLoops || []) for (const c of world.cellKept || []) {
-      if (c.removedByLM || c.cx == null || Math.hypot(c.cx - L.cx, c.cz - L.cz) > L.r) continue;
+      if (c.removedByLM || c.cx == null || !(c.h >= 9) || Math.hypot(c.cx - L.cx, c.cz - L.cz) > L.r) continue;
       lmRemoveCell(c.name, 'trong lòng nút xoắn HVT (W3-F)');
     }
   }
