@@ -1932,7 +1932,9 @@ export function buildTrees(scene, ctx = {}) {
   };
   const bySp = {}; for (const r of recs) bySp[SP_NAME[r.sp]] = (bySp[SP_NAME[r.sp]] || 0) + 1;
   const info = {
-    trees: N, fix, fit, cut: recs.reduce((a, r) => a + r.cut, 0), bySpecies: bySp, heroes: heroList.map((l) => l.length), pits: pitIdx.length,
+    trees: N, fix, fit, cut: recs.reduce((a, r) => a + r.cut, 0), bySpecies: bySp,
+    // W3-G: số cây theo luật bằng chứng — vòm (tun), kè hồ nghiêng (tilt) / thân mảnh (slim), hero đích danh (big)
+    ev: { tun: recs.reduce((a, r) => a + r.tun, 0), tilt: recs.reduce((a, r) => a + (r.tiltX || r.tiltZ ? 1 : 0), 0), slim: recs.reduce((a, r) => a + r.slim, 0), big: recs.reduce((a, r) => a + r.big, 0) }, heroes: heroList.map((l) => l.length), pits: pitIdx.length,
     kitTris: nearKits.map((k, i) => k && [SP_NAME[KIT_DEFS[i].sp] + i, k.tris]).filter(Boolean),
     farTris: farKits.map((k, s) => k && [SP_NAME[s], k.tris]).filter(Boolean),
     atlasMs: +atlasMs.toFixed(1), recsMs: +recsMs.toFixed(1), kitMs: +kitMs.toFixed(1), buildMs: +(performance.now() - t0).toFixed(1), drawGroups: groups.length + (pitG ? 1 : 0),
