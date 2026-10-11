@@ -491,7 +491,7 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     ±0,5; bản cuối chấm lại mọi ảnh đổi > 6/255 so với lượt chấm đầu):** 30 pano FP-2 × 2 hướng (60 ảnh) 2,88 → 3,42 (+0,54; 21 tốt
     hơn, 1 kém hơn), nhóm đối chứng 8 pano (15 ảnh) 3,73 → 3,77. Tăng mạnh: 515 h90 3 → 6 (tường mỏ neo liền, hết dãy nhà
     sinh đè), 428 h90 / 405 h0 2 → 5 (sửa claim), 354 h0 2 → 5, 496 h90 3 → 5 (hàng rào + cổng + chòi gác + nhà lùi), 441 h270 / 432 h0 / 547 h90 2 → 4, 460 h0 1 → 3. CHƯA sửa: ảnh do
-    camera/mặt cắt phố (CAMNEAR — W3-A), footprint cũ đã phá dỡ (019, 239), lỗ Overture 469, cao ốc sau tường rào 225; bộ mô-đun trệt NHÀ Ở
+    camera/mặt cắt phố (CAMNEAR — W3-A), footprint cũ đã phá dỡ (239; 019 sửa ở lượt 3), lỗ Overture 469, cao ốc sau tường rào 225; bộ mô-đun trệt NHÀ Ở
     `GH` của citygen có G_SHUT0/1 mang DẢI BIỂN (SIGN_EXT) → nhà ở/biệt thự theo pano (INFO PK ≠ 0, USE_HOME) vẫn có thể mọc biển "SỬA XE MÁY" (506 h270, 547 h270) — việc của renderer mặt tiền (W3-C): với PK ≠ 0
     chọn bộ không biển; cổng 464/510 đã về ranh đất nhưng 2 ảnh vẫn ~3 m trước cổng vì camera pano lệch tim phố
     (thật: cổng ở BÊN KIA phố — W3-A). Ảnh: scratchpad dot3/W3-B g_00..12.jpg + r2/final_00..12.jpg (REAL|dot3|cuối), grades.txt
@@ -506,15 +506,21 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     địa) ≤ 3 T → bộ mô-đun VILLA (cửa chớp/vòm/lan can; trệt G_HOME0/G_CIVIC không dải biển) thay CIVIC. Lý do: bộ trệt CIVIC
     `G6` của citygen = [G_CIVIC, G_CIVIC, G_GLASS] mà G_GLASS có DẢI BIỂN (SIGN_EXT) → thử CIVIC cho Trung tâm Hội nghị mọc
     "NHÀ THUỐC/KÍNH MẮT/PHỞ BÒ" (W3-C: công sở/khuôn viên — INFO PK ≠ 0 hoặc STYLE.CIVIC — nên chọn bộ trệt không biển). Đổi 4
-    nhà (`style_port_obs_override` 2, `style_civic_french_villa` 3). (c) ĐÃ CÂN NHẮC, KHÔNG làm: "khép khe < 4 m" (ngõ 1,5-3 m
+    nhà (`style_port_obs_override` 2, `style_civic_french_villa` 3; 2 trong số đó CHẾT lúc chạy do claim/ô: footprint Nhà hát (0,9) và (−581,−765)). (c) ĐÃ CÂN NHẮC, KHÔNG làm: "khép khe < 4 m" (ngõ 1,5-3 m
     của HP phần lớn KHÔNG có trong OSM — khép sẽ bít ngõ thật; 1/120 pano kiểm toán than khe hẹp: 368), "nhà cổng vòm" bắc qua
     ngõ (345 — cần mô-đun renderer), tháp xa ngoài bán kính dựng (LOD — renderer/perf), "+1 tầng phố thương mại" (đã đo khớp).
-    __R3_NUMBERS__
+    **Số đo lượt 3:** 44.914 → 44.904 nhà, b64 1.518.408 B; CHẤM LẠI: 30 pano FP-2 × 2 hướng 2,88 → 3,45 (22 tốt hơn, 1 kém;
+    019 h0 3 → 5), đối chứng 3,73 → 3,77 (dữ liệu ngoài 2 cụm y hệt — kiểm bằng giải mã so từng nhà); 8 ảnh bằng chứng lượt 3
+    (019 h0/h45/h315, 020 h0/h45, 527, 362, 056) 2,62 → 3,62. PERF A/B giữ KHOÁ GPU 1 lượt liền (B A B A, 24 góc chuẩn, tier 3
+    Radeon 890M): calls 367 → 368, tam giác 3,83 → 3,90 M, fps 60,1/60,2 (vsync), hpReady 4,52/5,29 → 4,76/5,95 s (máy chung 6
+    agent — nhiễu ±0,6 s), 0 lỗi JS; diag 0 lỗi; LITE 3×404 như dot3; waterbfs 5/5; tour 26 ảnh không lỗi JS.
     **BẪY:** (a) `\b` của JS không hiểu chữ có dấu ("chợ\b" không bao giờ khớp) → ranh giới tường minh; (b) "tôn" khớp trong
     "bê tông" → `tôn(?!g)`; (c) màu tường rào phải lấy từ CỤM chữ tả tường/rào/trụ/cổng — "chòi gác vàng" từng nhuộm cả rào;
     (d) tường dựng tay trong ô cells nằm ngay mặt phố — phải dò hình học trước khi dựng tường dữ liệu; (e) đo cảnh trước freeze
     bằng `scene.updateMatrixWorld()` 1 lượt (updateWorldMatrix từng mesh chậm); (f) Bash sandbox chặn mọi lệnh có chữ "ev·al" →
-    gọi tools/qa/clearance.mjs qua wrapper ghép cờ.
+    gọi tools/qa/clearance.mjs qua wrapper ghép cờ; (g) khoá GPU không xếp hàng công bằng: khi 6-7 agent cùng chụp, mỗi lần xin
+    khoá có thể chờ > 60 phút rồi HẾT GIỜ (perf A/B từng mất nửa cặp) → chạy cả cặp B A B A dưới MỘT lần giữ khoá
+    (`node tools/qa/gpulock.mjs run -- bash chuoi.sh`; shoot.mjs bên trong tái nhập khoá con) — vừa nhanh vừa đúng "cùng phiên".
 - **2026-10-04 (W2-F POLISH)** [ĐỢT 3 wave 2 — WebGL1, giải mã RB 1 lần, kho cảng, ĐÊM, giao thông né xe đỗ, dọn code chết, hitch]:
     **(1) WebGL1** (three r160 tự lùi WebGL1 khi không có WebGL2): KIỂM bằng `tools/qa/shoot.mjs --gl1` (init script cho
     `getContext('webgl2')` trả null — cờ Chrome `--disable-es3-apis` KHÔNG có tác dụng ở headless mới: vẫn webgl2:true;
