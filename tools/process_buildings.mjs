@@ -180,9 +180,17 @@ const synBlocked = (x, z) => waterSD(x, z) < 1.5 || inPolyList(PARK_POLYS, x, z)
 // 11 (kiểu/công năng), bước 13 (RB_PARCELS cho js/parcels.js).
 const PEV = makeEvidence(JSON.parse(fs.readFileSync(new URL('../audit/audit_enriched.json', import.meta.url), 'utf8')), PANO_SIDES);
 const PWALLS = new WallSet();
+// đầu vào gitignore (tools/osm_roads_dt.json, tools/osm_alleys.json — chép từ repo chính): THIẾU → DỪNG (trước: try/catch im
+// lặng → máy tích hợp không có file sinh ra dữ liệu KHÁC: không Bayes theo phố/vùng, không veto miệng ngõ, mà không ai biết).
+// Cố ý chạy thiếu: HP_ALLOW_MISSING_INPUTS=1 → cảnh báo to + RB_META.stats.missing_input_* = 1.
+const missingInput = (f, what, e) => {
+  const msg = `tools/${f} không đọc được (${e && e.code || e}) — ${what}. Chép từ repo chính (gitignore).`;
+  if (process.env.HP_ALLOW_MISSING_INPUTS !== '1') { console.error(`\n!!! LỖI: ${msg}\n    (chạy thiếu có chủ ý: HP_ALLOW_MISSING_INPUTS=1)\n`); process.exit(2); }
+  console.warn(`\n!!! CẢNH BÁO: ${msg} DỮ LIỆU SINH RA SẼ KHÁC BẢN COMMIT.\n`); stat('missing_input_' + f.replace(/\W/g, '_'));
+};
 let nameAt = () => null;
 try { nameAt = makeNameIndex(JSON.parse(fs.readFileSync(new URL('./osm_roads_dt.json', import.meta.url), 'utf8')), (lon, lat) => [(lon - LON0) * UX, -(lat - LAT0) * UZ]); }
-catch { console.log('  (không có tools/osm_roads_dt.json — bỏ tỉ lệ cửa hàng theo phố)'); }
+catch (e) { missingInput('osm_roads_dt.json', 'bỏ tỉ lệ cửa hàng theo phố + vùng biệt thự', e); }
 // tỉ lệ mặt tiền bán hàng THEO TÊN PHỐ từ chính 551 pano (quan sát shop/chợ vs nhà ở/khuôn viên, tên phố = way OSM gần pano)
 const STREET_SHOP = new Map();
 for (const p of PEV.panos) {
@@ -912,7 +920,7 @@ try {
       ALLEY.push(s); alleyGrid.insert(ALLEY.length - 1, [Math.min(s[0], s[2]), Math.min(s[1], s[3]), Math.max(s[0], s[2]), Math.max(s[1], s[3])]);
     }
   }
-} catch { console.log('  (không có tools/osm_alleys.json — bỏ miệng ngõ)'); }
+} catch (e) { missingInput('osm_alleys.json', 'bỏ veto miệng ngõ', e); }
 function alleyMouth(Q, ux, uz) {
   const bb = bbox(Q); let hit = false;
   alleyGrid.query(bb, (i) => {

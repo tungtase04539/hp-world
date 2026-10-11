@@ -6473,10 +6473,12 @@ const dlUmb = (x, z, hex) => {
     gate.position.set(gX + 0.05, gy + 0.9, -160); gate.rotation.y = Math.PI / 2; scene.add(gate); // cổng xếp inox
     scene.add(dlFence(gX, -180, gX, -166, 1.6, 0x3a3f45));
     scene.add(dlFence(gX, -154, gX, -140, 1.6, 0x3a3f45));
-    // nhà cổng mái đỏ nhỏ 1T (ảnh: bên phải cổng)
-    const hut = dlBlock(354, -147, Math.PI / 2, 6, 3.4, 5, mat(0xf2ede0), 'dl_dienluc_hut');
+    // nhà cổng mái đỏ nhỏ 1T (ảnh: bên phải cổng). W3-B (review lượt 3): lùi THEO cổng (gX − 358) — cổng lùi 1,5 m về mép sau
+    // vỉa hè từng đứng đúng mặt đông nhà cổng (x 351,5..356,5) → rào phía bắc chạy dọc/trong tường nhà; giữ khe 1,5 m như cũ
+    const hutX = 354 + Math.min(0, gX - 358);
+    const hut = dlBlock(hutX, -147, Math.PI / 2, 6, 3.4, 5, mat(0xf2ede0), 'dl_dienluc_hut');
     dlHip(hut, 6.4, 5.4, 0x9a4034, 0, 3.7, 0);
-    dlDone(hut, 354, -147, 3.5, 12);
+    dlDone(hut, hutX, -147, 3.5, 12);
     FEATURED_CLEAR.push([345, -162, 19]);
   }
   // cao ốc văn phòng kính trắng-xanh bạc hà 4T (510 h90/h45, bờ đông MK)
@@ -17503,9 +17505,12 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     const fabricReject = (x, z) => clearedZone(x, z) || inSuperblock(x, z) || (x > -300 && x < 120 && z > -1045 && z < -845)
       || lakeSD(x, z) < 16 || hoSenSD(x, z) < 10 || _keHo(x, z);
     // W3-B: nhà SINH (FLAG.SYNTH — lô khe/lõi ô ĐOÁN) chạm vùng ≤ 6 m quanh nhà ô DANH TÍNH được giữ (công sở/di sản/tháp/
-    // bespoke — world.cellKept) → bỏ trước khi dựng: dãy shophouse bịa che mặt tiền bảo tàng/Ban CHQS/Điện lực/khu cảng vụ
-    // (AUDIT3 LANDMARK 046/464/510/515, KNOWLEDGE WP1: nhà sinh là phỏng đoán, nhà ô mang danh tính pano). buildRealFabric
-    // tự hạ tường chung của láng giềng nhà bị giết (refreshPartyEdges trên mọi D.dead).
+    // bespoke — world.cellKept) VÀ nằm TRƯỚC mặt nhà ô (giữa nhà ô và phố gần nhất của lô) hoặc chồng lên nó → bỏ trước khi
+    // dựng: dãy shophouse bịa che mặt tiền bảo tàng/Ban CHQS/Điện lực/khu cảng vụ (AUDIT3 LANDMARK 046/464/510/515, KNOWLEDGE
+    // WP1: nhà sinh là phỏng đoán, nhà ô mang danh tính pano). Láng giềng BÊN CẠNH (cùng dãy phố) GIỮ — review lượt 3: vòng 6 m
+    // quanh cả bao giết 394 lô gồm dãy shophouse cạnh khách sạn 521 h315. "Trước mặt" = tia từ tâm lô (và 4 điểm co 50 % về
+    // tâm) đi NGƯỢC phía phố gần nhất (clearance.nearestStreet ≤ 30 m) chạm bao nhà ô trước mép sau lô + 6 m; lô không phố ≤ 30 m (lõi
+    // ô) giữ luật vòng 6 m cũ. buildRealFabric tự hạ tường chung của láng giềng nhà bị giết (refreshPartyEdges trên D.dead).
     { const D0 = fabricData(), CS = 32, G = new Map(), K = (i, j) => i * 100003 + j;
       const idn = (world.cellKept || []).filter((k) => k.kind !== 'house' && k.hull && k.hull.length >= 3);
       for (let c = 0; c < idn.length; c++) { const H = idn[c].hull; let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9; for (const [x, z] of H) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
@@ -17513,19 +17518,37 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
         for (let i = Math.floor((x0 - 6) / CS); i <= Math.floor((x1 + 6) / CS); i++) for (let j = Math.floor((z0 - 6) / CS); j <= Math.floor((z1 + 6) / CS); j++) { const k = K(i, j); let a = G.get(k); if (!a) G.set(k, (a = [])); a.push(c); } }
       const sd = (px, pz, ax, az, bx, bz) => { const dx = bx - ax, dz = bz - az, L2 = dx * dx + dz * dz || 1e-9; let t = ((px - ax) * dx + (pz - az) * dz) / L2; t = t < 0 ? 0 : t > 1 ? 1 : t; return Math.hypot(px - ax - t * dx, pz - az - t * dz); };
       const inH = (H, x, z) => { let c = false; for (let i = 0, j = H.length - 1; i < H.length; j = i++) { const [xi, zi] = H[i], [xj, zj] = H[j]; if ((zi > z) !== (zj > z) && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) c = !c; } return c; };
-      let nK = 0;
+      let nK = 0, nOver = 0, nFront = 0, nCore = 0;
       if (idn.length) for (let b = 0; b < D0.nB; b++) {
         if (D0.dead[b] || !(D0.flags[b] & RB_FLAG.SYNTH)) continue;
         let x = 0, z = 0; const v0 = D0.vStart[b], v1 = D0.vStart[b + 1]; for (let v = v0; v < v1; v++) { x += D0.x[v]; z += D0.z[v]; } x /= v1 - v0; z /= v1 - v0;
-        const a = G.get(K(Math.floor(x / CS), Math.floor(z / CS))); if (!a) continue;
-        let hit = false;
-        for (const c of a) {
-          const it = idn[c]; if (hit || x < it.bb[0] - 8 || x > it.bb[2] + 8 || z < it.bb[1] - 8 || z > it.bb[3] + 8) continue;
-          for (let v = v0; v < v1 && !hit; v++) { const px = D0.x[v], pz = D0.z[v]; if (inH(it.hull, px, pz)) { hit = true; break; } for (let i = 0; i < it.hull.length; i++) { const p = it.hull[i], q = it.hull[(i + 1) % it.hull.length]; if (sd(px, pz, p[0], p[1], q[0], q[1]) < 6) { hit = true; break; } } }
+        // ứng viên: mọi ô lưới chạm bbox lô (trước: chỉ ô của TÂM lô → lô có tâm ngoài vùng đăng ký nhưng đỉnh ≤ 6 m bị sót)
+        let bx0 = 1e9, bz0 = 1e9, bx1 = -1e9, bz1 = -1e9; for (let v = v0; v < v1; v++) { bx0 = Math.min(bx0, D0.x[v]); bx1 = Math.max(bx1, D0.x[v]); bz0 = Math.min(bz0, D0.z[v]); bz1 = Math.max(bz1, D0.z[v]); }
+        const cand = new Set();
+        for (let i = Math.floor(bx0 / CS); i <= Math.floor(bx1 / CS); i++) for (let j = Math.floor(bz0 / CS); j <= Math.floor(bz1 / CS); j++) { const a = G.get(K(i, j)); if (a) for (const c of a) cand.add(c); }
+        if (!cand.size) continue;
+        let hit = false, st;   // st: phố gần nhất của lô (tính lười, 1 lần/lô)
+        for (const c of cand) {
+          const it = idn[c]; if (hit || bx1 < it.bb[0] || bx0 > it.bb[2] || bz1 < it.bb[1] || bz0 > it.bb[3]) continue;
+          const H = it.hull;
+          let near = false, over = false;
+          for (let v = v0; v < v1 && !over; v++) { const px = D0.x[v], pz = D0.z[v]; if (inH(H, px, pz)) { over = true; break; } if (!near) for (let i = 0; i < H.length; i++) { const p = H[i], q = H[(i + 1) % H.length]; if (sd(px, pz, p[0], p[1], q[0], q[1]) < 6) { near = true; break; } } }
+          if (!over) { const fp = []; for (let v = v0; v < v1; v++) fp.push([D0.x[v], D0.z[v]]); for (const [hx, hz] of H) if (inH(fp, hx, hz)) { over = true; break; } }
+          if (over) { hit = true; nOver++; break; }
+          if (!near) continue;
+          if (st === undefined) st = clrNearestStreet(x, z, 30) || null;
+          if (!st) { hit = true; nCore++; break; }                    // lõi ô không phố: luật vòng 6 m cũ
+          // tia ra XA phố (+n: phố → lô) từ tâm + 4 đỉnh co 50 % về tâm; chạm bao nhà ô trong 30 m = lô nằm TRƯỚC mặt nhà ô
+          // tia dài tới mép SAU của lô + 6 m (nhà ô phình ra phía sau dãy không tính là "trước mặt")
+          const P = [[x, z]], nV = v1 - v0;
+          for (let k = 0; k < 4; k++) { const v = v0 + Math.floor((k * nV) / 4); P.push([(x + D0.x[v]) / 2, (z + D0.z[v]) / 2]); }
+          let back = 0; for (let v = v0; v < v1; v++) back = Math.max(back, (D0.x[v] - x) * st.nx + (D0.z[v] - z) * st.nz);
+          for (const [sx, sz] of P) { const tMax = Math.min(30, back - ((sx - x) * st.nx + (sz - z) * st.nz) + 6); for (let t = 0.5; t <= tMax; t += 1) if (inH(H, sx + st.nx * t, sz + st.nz * t)) { hit = true; break; } if (hit) break; }
+          if (hit) { nFront++; break; }
         }
         if (hit) { D0.dead[b] = 1; nK++; }
       }
-      world.synthNearCellKilled = nK; }
+      world.synthNearCellKilled = nK; world.synthNearCellStats = { over: nOver, front: nFront, core: nCore }; }
     _fab = buildRealFabric(scene, { groundHeightNoDeck, landH: LAND_H, reject: fabricReject, maxR: BUILD_RADIUS, facadeMats });
     _fabCollide = _fab.collide;
     world.fabric = _fab;

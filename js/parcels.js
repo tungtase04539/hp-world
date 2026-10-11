@@ -374,8 +374,19 @@ export function buildParcels(scene, ctx = {}) {
         const kk = key(i, j); let a = grid.get(kk); if (!a) grid.set(kk, (a = [])); a.push(k);
       }
   });
+  // đoạn đăng ký với lề nửa dày + 1 m → 1 ô đủ cho bán kính ≤ 1 m (người/xe máy); bán kính lớn hơn (thuyền 1,6…) quét
+  // các ô chạm đĩa p ± (pr + 0,1) (review lượt 3: trước chỉ tra ô của tâm → sót đoạn bên kia biên ô)
+  const _seen = new Set();
+  const cellSegs = (p, pr) => {
+    if (pr <= 1) return grid.get(key(Math.floor(p.x / CS), Math.floor(p.z / CS)));
+    const r = pr + 0.1, i0 = Math.floor((p.x - r) / CS), i1 = Math.floor((p.x + r) / CS), j0 = Math.floor((p.z - r) / CS), j1 = Math.floor((p.z + r) / CS);
+    if (i0 === i1 && j0 === j1) return grid.get(key(i0, j0));
+    _seen.clear(); const L = [];
+    for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) { const a = grid.get(key(i, j)); if (a) for (const k of a) if (!_seen.has(k)) { _seen.add(k); L.push(k); } }
+    return L;
+  };
   out.collide = (p, pr = 0.45) => {
-    const a = grid.get(key(Math.floor(p.x / CS), Math.floor(p.z / CS))); if (!a) return false;
+    const a = cellSegs(p, pr); if (!a || !a.length) return false;
     let hit = false;
     for (const k of a) {
       const s = segs[k], dx = s[2] - s[0], dz = s[3] - s[1], L2 = dx * dx + dz * dz || 1e-9;

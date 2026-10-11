@@ -208,8 +208,11 @@ export function makeEvidence(AUD, PANO_SIDES) {
 // Từ kiểm toán AUDIT3 §4.4 (lô 9-10: phố biệt thự/hành chính, khu đô thị mới đạt 3,0-3,2 điểm; biển hàng dày đặc trên
 // dãy nhà ở là lỗi SIGN/TYPO). Chợ/phố buôn bán: giữ bảng theo cấp phố.
 // (Thế Lữ, Hoàng Văn Thụ, Lý Thường Kiệt KHÔNG vào bảng: pano tả dãy quán/shophouse — để bằng chứng pano theo phố quyết định)
+// (Trần Quang Khải ĐÃ BỎ khỏi bảng — review lượt 3: AUDIT3 không xếp vào vùng biệt thự, classifyObs pano của phố đo 20 shop /
+//  11 nhà ở-khuôn viên = 0,65 cửa hàng; mặc định hàng rào biệt thự rào mất dãy shophouse + sạp hoa quả thật ở 355 h270, cổng
+//  giữa dãy quán ăn 360 h90, rào ngang sân trước khách sạn 355 h225 → để Bayes theo phố (31 quan sát) quyết định)
 export const ZONES = {
-  villa: { names: ['Đinh Tiên Hoàng', 'Hồ Xuân Hương', 'Lê Đại Hành', 'Nguyễn Tri Phương', 'Cù Chính Lan', 'Trần Quang Khải'], shop: 0.2 },
+  villa: { names: ['Đinh Tiên Hoàng', 'Hồ Xuân Hương', 'Lê Đại Hành', 'Nguyễn Tri Phương', 'Cù Chính Lan'], shop: 0.2 },
   newurban: { names: ['Lê Quang Đạo'], shop: 0.3 },
 };
 // ô đa giác vùng (toạ độ game) không gắn được theo tên phố: khu nhà liền kề Ngõ 80 Hạ Lý, dải dân cư mới Hạ Lý
