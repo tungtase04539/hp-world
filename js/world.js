@@ -15,6 +15,7 @@ import {
 } from './terrain.js';
 import { buildBridges, makeDeckIndex } from './bridges.js';   // Đợt 3 W3-F: cầu theo way OSM (HVT xoắn ốc, Lạc Long…)
 import { snapBankGrid, buildRiverbanks } from './riverbank.js';   // Đợt 3 W3-F: bờ kè sông (tường kè, dải dạo, lan can, đèn)
+import { trimRoadEnds, deckRoads } from './roadgraph.js';            // W3-F r4: phố cụt sát đầu cầu nâng + way cầu cho giao thông
 import { LM_SIZE, FACADE_SHORT_SIDE } from './mapdata.js';
 import { makeWaterMaterial } from './water.js';
 import { makeGroundSystem } from './landuse.js';   // Đợt 3 W2-D: mặt đất theo sử dụng đất (raster + shader)
@@ -101,6 +102,36 @@ export function spawnY(x, z) {
   if (_roadSurf && _roadSurf(x, z) > 0 && g > 0.5 && groundRoadDist(x, z) < D.d) return g;   // phố mặt đất dưới, tim gần hơn
   return D.y;
 }
+// ---- W3-F r4 (phản biện): ĐƯỜNG cho roadnet + đồ thị giao thông ----
+// Cầu PHỐ nâng nhẹ (kind 'deck' — Lạc Long): way OSM 232 m gồm cả 2 đầu SÁT ĐẤT (nối phố 187 ở tây, ngã tư phố ven bờ ri 200
+// ở đông). Mặt cầu chỉ ở pts[i0..i1] (process_osm §6b4); roadnet vẽ dải mặt đất phần còn lại (nút giao 2 đầu nguyên vẹn —
+// bản cũ bỏ cả way: nêm vỉa hè chữ V giữa lòng đường ở (−495,−479), lan can chắn ngang ngã tư ri 200).
+const DECK_RI = new Set((BRIDGE_WAYS || []).filter((b) => b.kind === 'deck').flatMap((b) => b.ri));
+const _deckGap = new Map();   // ri → [[ax, az, bx, bz], …] đoạn tim mặt cầu nâng (pts[i0..i1])
+for (const b of BRIDGE_WAYS || []) {
+  if (b.kind !== 'deck') continue;
+  const segs = [];
+  for (let i = b.i0 ?? 0; i < (b.i1 ?? b.pts.length - 1); i++) segs.push([b.pts[i][0], b.pts[i][1], b.pts[i + 1][0], b.pts[i + 1][1]]);
+  for (const ri of b.ri) _deckGap.set(ri, segs);
+}
+// (x,z) trên tim way ri thuộc khoảng mặt cầu nâng? (chiếu vuông góc rơi TRONG 1 đoạn [i0..i1], lệch ngang < 4 m)
+export function deckGapAt(ri, x, z) {
+  const S = _deckGap.get(ri); if (!S) return false;
+  for (const [ax, az, bx, bz] of S) {
+    const dx = bx - ax, dz = bz - az, l2 = dx * dx + dz * dz; if (!l2) continue;
+    const t = ((x - ax) * dx + (z - az) * dz) / l2; if (t < 0 || t > 1) continue;
+    if (Math.hypot(x - ax - dx * t, z - az - dz * t) < 4) return true;
+  }
+  return false;
+}
+// phố MẶT ĐẤT có đầu mút dưới mặt cầu nâng thấp (gầm < ~4 m: mặt cầu > đất + 0,5 và < đất + 5,5) → cắt lùi tới ngoài mép
+// mặt cầu + 0,6 m (Bạch Đằng 51/222 gặp nhau ngay dưới Cầu Lạc Long +2 m, gầm 0,9 m — "đâm vào tấm bê tông")
+const _lowDeck = (x, z) => { const t = DECKS.topAt(x, z, 0.6); if (!(t > -1e9)) return false; const g = groundHeight(x, z); return t > g + 0.5 && t - g < 5.5; };
+const _net = trimRoadEnds(ROADS_DT, _lowDeck, (ri) => ELEVATED_RI.has(ri));
+export const ROADS_NET = _net.roads;
+// đồ thị giao thông: way cầu nâng = tim mặt cầu + cao độ (roadgraph khác tầng không nối, xe theo đúng tầng)
+let _trafficRoads = null;
+export const trafficRoads = () => _trafficRoads || (_trafficRoads = deckRoads(ROADS_NET, BRIDGE_WAYS, { roadTop: 0.11 }));
 
 function clamp(v, a, b) { return Math.min(b, Math.max(a, v)); }
 function smoothstep(a, b, x) {
@@ -589,10 +620,12 @@ export async function buildWorld(scene, prog = () => {}) {
     colliders, updaters, groundHeight, groundHeightNoDeck, isWater, sharedMats,
     vehicleSpawns: [], npcSpots: {}, walkPaths: [],
     surfaceY, spawnY, decks: DECKS,   // W3-F: mặt cầu nâng (xem trên)
+    trafficRoads, roadsTrimmed: _net.trimmed,   // W3-F r4: đường cho đồ thị giao thông (traffic.js)
   };
   // W3-F: ROADS_DT cho các hệ đặt đồ THEO PHỐ MẶT ĐẤT (cây, prop, khoảng trống W2-A): way cầu nâng (ELEVATED_RI) thu về
   // 1 điểm (giữ CHỈ SỐ — SIDEWALK_BY_ROAD/treemap khoá theo ri) → không cây/cột/xe đỗ mọc dưới-xuyên mặt cầu xoắn HVT.
-  const ROADS_GROUND = ROADS_DT.map((r, i) => (ELEVATED_RI.has(i) ? { c: r.c, pts: [r.pts[0]] } : r));
+  // Cầu phố 'deck' (Lạc Long) GIỮ (2 đầu sát đất là phố thật; đoạn nâng: underDeck() bỏ cây/cột dưới mặt cầu).
+  const ROADS_GROUND = ROADS_DT.map((r, i) => (ELEVATED_RI.has(i) && !DECK_RI.has(i) ? { c: r.c, pts: [r.pts[0]] } : r));
   // đẩy điểm ra khỏi vật cản — chỉ mục lưới XÂY 1 LẦN rồi CHÈN TĂNG DẦN (tránh xây lại O(P·C) lúc tải:
   // ~9000 addCollider xen kẽ resolveCollisions khi rải cây → trước đây xây lại toàn map mỗi lần).
   let colIdx = null;
@@ -945,11 +978,13 @@ export async function buildWorld(scene, prog = () => {}) {
     arr.push(g);
   }
   {
-    const net = buildRoadNet(ROADS_DT, {
+    const net = buildRoadNet(ROADS_NET, {
       // W3-F: cầu nâng (HVT nhịp chính + nút xoắn + dốc dẫn) do js/bridges.js dựng trên cao → roadnet BỎ dải mặt đất của
-      // chúng (từng là vòng nhựa nằm đất, pano_304/349); BRIDGES[0] (đoạn thẳng HVT cũ) không còn cắt dải dưới "vòm"
+      // chúng (từng là vòng nhựa nằm đất, pano_304/349); BRIDGES[0] (đoạn thẳng HVT cũ) không còn cắt dải dưới "vòm".
+      // r4: cầu phố 'deck' (Lạc Long) KHÔNG bỏ — chỉ cắt dải ở khoảng mặt cầu nâng (deckGapAt); ROADS_NET = phố cụt đã cắt
+      // khỏi gầm thấp (Bạch Đằng 51/222)
       groundHeightNoDeck, groundHeight, isWater, LAND_H, R: BUILD_RADIUS, T: 450, MEDIANS, bridges: BRIDGES.slice(1),
-      skipWay: (ri) => ELEVATED_RI.has(ri),
+      skipWay: (ri) => ELEVATED_RI.has(ri) && !DECK_RI.has(ri), deckGapAt,
       swTypeOf: (ri) => SIDEWALK_BY_ROAD[ri] || SIDEWALK_DEFAULT, MARKS: ROAD_MARK_EVIDENCE,
     });
     const rmat = makeRoadMaterial(THREE, { size: LITE ? 256 : 512, anisotropy: LITE ? 4 : 8, lite: LITE });
@@ -989,10 +1024,11 @@ export async function buildWorld(scene, prog = () => {}) {
   });
   console.log('[world] W3-F bờ kè sông:', JSON.stringify(world.riverbank.stats));
   // W3-F: claim 'bridge' dưới mặt cầu nâng (hộp ~12 m dọc way, rộng w + 2 m) → citygen giết footprint "nhà" Overture/OSM vốn là
-  // CHÍNH dốc cầu (tấm đen dẹt trên nền đất pano_304/349), cây/prop tra claimAt tránh mọc xuyên mặt cầu
+  // CHÍNH dốc cầu (tấm đen dẹt trên nền đất pano_304/349). Cây/prop KHÔNG tra claim 'bridge' (CLAIM_KINDS/BLOCK không có) —
+  // việc đó do underDeck() (DECKS.topAt) ở khối cây/prop phía sau
   for (const b of BRIDGE_WAYS || []) {
     if (b.kind === 'flat') continue;
-    const P = b.pts;
+    const P = b.kind === 'deck' ? b.pts.slice(b.i0 ?? 0, (b.i1 ?? b.pts.length - 1) + 1) : b.pts;   // cầu phố: chỉ khoảng nâng
     for (let i = 0; i < P.length - 1; i += 4) {
       const j = Math.min(P.length - 1, i + 4), dx = P[j][0] - P[i][0], dz = P[j][1] - P[i][1], L = Math.hypot(dx, dz); if (L < 0.5) continue;
       claimBox((P[i][0] + P[j][0]) / 2, (P[i][1] + P[j][1]) / 2, L / 2 + 0.6, b.w / 2 + 1, Math.atan2(-dz / L, dx / L), 'bridge', 'br_' + b.id);

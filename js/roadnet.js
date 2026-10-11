@@ -194,7 +194,7 @@ export function buildRoadNet(ROADS_DT, deps) {
     const pts = dedupe(r.pts.map(([x, z]) => [x, z])); if (pts.length < 2) return;
     const si = nAll++;
     if (deps.skipWay && deps.skipWay(ri)) return;   // W3-F: cầu nâng (js/bridges.js dựng mặt cầu trên cao)
-    ways.push({ ri, si, c: r.c, pts });
+    ways.push({ ri, si, c: r.c, pts, cut: r.cut || null });   // cut: đầu mút cắt dưới mặt cầu (roadgraph.trimRoadEnds)
   });
   const vkey = (x, z) => Math.round(x * 20) + ',' + Math.round(z * 20);
   // mặt cầu VÒM có mô hình riêng (terrain BRIDGES: HVT, Bính…) — dải đường dưới vòm bị cắt (kiểm giải tích, không gọi địa hình)
@@ -218,6 +218,7 @@ export function buildRoadNet(ROADS_DT, deps) {
       for (const k of [0, w.pts.length - 1]) {
         const E = w.pts[k];
         if (use.get(vkey(E[0], E[1])) > 1) continue;
+        if (w.cut && w.cut[k ? 1 : 0]) continue;      // W3-F: phố cụt sát tường đầu cầu nâng — không kéo sang phố khác
         let bs = Infinity, bw = -1, bi = -1, bt = 0;
         grid.near(E[0], E[1], (wj, j) => {
           if (wj === wi) return;
@@ -886,6 +887,22 @@ export function buildRoadNet(ROADS_DT, deps) {
         const u = L * i / ns, [x, z] = ptAt(u), wet = onArch(x, z);
         if (wet && g0 < 0) g0 = u;
         if ((!wet || i === ns) && g0 >= 0) { const g1 = wet ? L : u; if (g1 - g0 > 8) gaps.push([Math.max(0, g0 - 2), Math.min(L, g1 + 2)]); g0 = -1; }
+      }
+      // W3-F: KHOẢNG MẶT CẦU NÂNG trên chính way này (cầu phố Lạc Long: BRIDGE_WAYS pts[i0..i1]) — deps.deckGapAt(ri,x,z);
+      // biên dò 1 m rồi chia đôi tới ~1 cm: dải mặt đất dừng ĐÚNG chỗ mặt cầu bắt đầu (y hồ sơ = mặt đất, không bậc/không khe)
+      if (deps.deckGapAt) {
+        const inG = (u) => { const [x, z] = ptAt(u); return deps.deckGapAt(w.ri, x, z); };
+        const n1 = Math.max(1, Math.ceil(L));
+        let prev = inG(0), a0 = prev ? 0 : -1;
+        const edge = (lo, hi) => { const vlo = inG(lo); for (let it = 0; it < 8; it++) { const m = (lo + hi) / 2; if (inG(m) === vlo) lo = m; else hi = m; } return (lo + hi) / 2; };
+        for (let i = 1; i <= n1; i++) {
+          const u = L * i / n1, cur = inG(u);
+          if (cur && !prev) a0 = edge(L * (i - 1) / n1, u);
+          if (!cur && prev) { gaps.push([a0, edge(L * (i - 1) / n1, u)]); a0 = -1; }
+          prev = cur;
+        }
+        if (prev && a0 >= 0) gaps.push([a0, L]);
+        gaps.sort((p, q) => p[0] - q[0]);
       }
       if (gaps.length) stats.waterGaps += gaps.length;
     }

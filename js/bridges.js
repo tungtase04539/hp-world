@@ -21,7 +21,9 @@ export function makeDeckIndex(ways) {
   for (const b of ways) {
     if (b.kind === 'flat') continue;
     const P = b.pts, hw = b.w / 2, dy = b.kind === 'deck' ? 0.11 : 0.02;   // mặt nhựa trên cao độ hồ sơ
-    for (let i = 0; i < P.length - 1; i++) segs.push([P[i][0], P[i][1], P[i][2] + dy, P[i + 1][0], P[i + 1][1], P[i + 1][2] + dy, hw]);
+    // cầu phố 'deck': chỉ khoảng nâng pts[i0..i1] (2 đầu sát đất là phố mặt đất của roadnet — không phải "mặt cầu")
+    const i0 = b.kind === 'deck' ? b.i0 ?? 0 : 0, i1 = b.kind === 'deck' ? b.i1 ?? P.length - 1 : P.length - 1;
+    for (let i = i0; i < i1; i++) segs.push([P[i][0], P[i][1], P[i][2] + dy, P[i + 1][0], P[i + 1][1], P[i + 1][2] + dy, hw]);
   }
   const C = 16, G = new Map(), key = (i, j) => (i + 4096) * 8192 + (j + 4096);
   segs.forEach((s, si) => {
@@ -194,7 +196,7 @@ export function buildBridges(scene, deps) {
   const conc = Buf(), concD = Buf(), top = Buf(), rail = Buf(), red = Buf(), cable = Buf(), lamp = Buf(), concBal = Buf();
   const top2 = Buf(), walk = Buf(), balPanel = Buf();   // cầu phố 'deck': lòng 2 chiều, vỉa hè gạch, tấm lan can hoa văn
   const CONC = shade(0xc9c6bd, 1), CONC_SIDE = shade(0xbab6ac, 1), CONC_UNDER = shade(0xcdc9bf, 1), PIER = shade(0xbcb8ae, 1);   // mặt dưới SÁNG: pháp tuyến hướng xuống chỉ nhận ánh sáng trời/đất — 0x8d8a83 cũ thành mảng nâu đen (pano_349 h0; thật xám nhạt)
-  const RAIL = shade(0x9aa1a3, 1), RED = shade(0xc63a2c, 1), CABLE = shade(0xe2ddd4, 1);
+  const RAIL = shade(0x9aa1a3, 1), RED = shade(0xc63a2c, 1), CABLE = shade(0xe2ddd4, 1), CONC_PAR = shade(0xa9a8a2, 1);
   const panoNear = (x, z, r) => { for (const p of deps.panoCams || []) if ((p[0] - x) ** 2 + (p[1] - z) ** 2 < r * r) return true; return false; };
   const roadAt = (x, z) => (deps.roadSurfaceAt ? deps.roadSurfaceAt(x, z) > 0 : false);
   const groundY = (x, z) => Math.max(ghN(x, z), -3);
@@ -211,7 +213,8 @@ export function buildBridges(scene, deps) {
   // ô van (tấm alpha) + tay vịn + trụ vuông 3 m; dầm biên xuống −1 m; trụ vuông trong nước mỗi ~20 m.
   const urbanDecks = [];
   function urbanDeck(b) {
-    const F = framesOf(b.pts), W = b.w / 2, hw = Math.min(deps.hw(b.c), W - 1.5);
+    // r4: chỉ KHOẢNG NÂNG pts[i0..i1] (2 đầu sát đất = dải mặt đất của roadnet, nút giao 2 đầu nguyên vẹn)
+    const F = framesOf(b.pts.slice(b.i0 ?? 0, (b.i1 ?? b.pts.length - 1) + 1)), W = b.w / 2, hw = Math.min(deps.hw(b.c), W - 1.5);
     const RT = 0.11, ST = 0.25, PL = 0.3;
     stats.decks++; urbanDecks.push(b);
     let acc = 0;
@@ -249,11 +252,29 @@ export function buildBridges(scene, deps) {
       const A = F[i], lp = sg * (W - PL / 2);
       box(concBal, A.x + A.nx * lp, A.y + ST + 0.32 + 0.45, A.z + A.nz * lp, 0.3, 0.9, 0.3, Math.atan2(A.tx, A.tz), shade(0xeeebe3, 1));
     }
-    // dầm biên ngoài + mặt dưới
-    sweep(conc, F, [[W, -1.0], [W, ST + 0.32]], CONC_SIDE, false);
-    sweep(conc, F, [[-W, ST + 0.32], [-W, -1.0]], CONC_SIDE, false);
-    sweep(concD, F, [[-W, -1.0], [W, -1.0]], CONC_UNDER, false);
-    // trụ trong nước mỗi ~20 m
+    // dầm biên / TƯỜNG NỀN ĐẮP + mặt dưới (r4, phản biện): đoạn trên ĐẤT là nền đắp đầu cầu (ảnh vệ tinh tile 7: đường dẫn
+    // tây cao giữa 2 phố gom 51/222 mặt đất) → mặt đứng 2 bên xuống TẬN ĐẤT (bản cũ: tấm bê tông lơ lửng, gầm 0,9 m — Bạch
+    // Đằng "đâm" vào tấm); trên NƯỚC: dầm biên sâu theo cao độ (đầu cầu sát đất mỏng dần còn 0,25 m — không cắm xuống
+    // mặt sông) + mặt dưới + MỐ chắn ngang ở chỗ chuyển đất ↔ nước (đầu nền đắp nhìn từ sông).
+    const dep = (y) => Math.min(1.0, 0.25 + Math.max(0, y - LAND_H) * 0.5);
+    const wet = F.map((Fr) => deps.isWater(Fr.x, Fr.z));
+    const bot = (Fr, x, z) => (deps.isWater(x, z) ? Fr.y - dep(Fr.y) : Math.min(Fr.y - dep(Fr.y), groundY(x, z) - 0.3));
+    for (let i = 0; i < F.length - 1; i++) {
+      const A = F[i], Bf = F[i + 1];
+      for (const sg of [-1, 1]) {
+        const ax = A.x + A.nx * sg * W, az = A.z + A.nz * sg * W, bx = Bf.x + Bf.nx * sg * W, bz = Bf.z + Bf.nz * sg * W;
+        const a0 = [ax, bot(A, ax, az), az], b0 = [bx, bot(Bf, bx, bz), bz], a1 = [ax, A.y + ST + 0.32, az], b1 = [bx, Bf.y + ST + 0.32, bz];
+        const nrm = [A.nx * sg, 0, A.nz * sg];
+        if (sg > 0) quad(conc, a0, b0, b1, a1, nrm, CONC_SIDE); else quad(conc, b0, a0, a1, b1, nrm, CONC_SIDE);
+      }
+      if (wet[i] || wet[i + 1]) sweep(concD, [A, Bf].map((Fr) => ({ ...Fr, y: Fr.y - dep(Fr.y) })), [[-W, 0], [W, 0]], CONC_UNDER, false);
+      if (wet[i] !== wet[i + 1]) {   // mố: tường ngang cả bề rộng, từ dưới mặt nước lên đáy dầm, ở khung phía đất
+        const Fl = wet[i] ? Bf : A, top = Fl.y - dep(Fl.y), b0 = LAND_H - 3.2;
+        box(conc, Fl.x, (top + b0) / 2, Fl.z, 2 * W, top - b0, 0.8, Math.atan2(Fl.tx, Fl.tz), CONC_SIDE);
+        stats.abutments = (stats.abutments || 0) + 1;
+      }
+    }
+    // trụ trong nước mỗi ~20 m (đỉnh trụ = đáy dầm)
     let s = 0, next = 10;
     for (let i = 0; i < F.length - 1; i++) {
       const A = F[i], Bf = F[i + 1], L = Math.hypot(Bf.x - A.x, Bf.z - A.z);
@@ -261,7 +282,8 @@ export function buildBridges(scene, deps) {
         const t = (next - s) / L; next += 20;
         const x = A.x + (Bf.x - A.x) * t, z = A.z + (Bf.z - A.z) * t, y = A.y + (Bf.y - A.y) * t;
         if (!deps.isWater(x, z)) continue;
-        box(conc, x, (y - 1.0 - 3) / 2, z, 2 * W * 0.86, y - 1.0 + 3, 1.5, Math.atan2(A.nx, A.nz), PIER);
+        const d = dep(y);
+        box(conc, x, (y - d - 3) / 2, z, 2 * W * 0.86, y - d + 3, 1.5, Math.atan2(A.nx, A.nz), PIER);
         stats.piers++;
       }
       s += L;
@@ -289,8 +311,10 @@ export function buildBridges(scene, deps) {
       const li = sg * (hw - PAR), lo = sg * hw;
       // mặt ngoài (từ đáy dầm lên) → đỉnh gờ → mặt trong (xuống mặt nhựa). sweep: pháp tuyến = hướng đoạn mặt cắt quay
       // CHIỀU KIM ĐỒNG HỒ 90° trong mặt (l phải, y lên) ⇒ mặt cắt đi NGƯỢC chiều kim đồng hồ = pháp tuyến ra ngoài.
-      const prof = sg > 0 ? [[lo, -D], [lo, PH], [li, PH], [li, 0.02]] : [[li, 0.02], [li, PH], [lo, PH], [lo, -D]];
-      sweep(conc, F, prof, CONC, false);
+      // mặt ngoài (dầm biên) sáng CONC; đỉnh gờ + mặt trong xám lạnh hơn CONC_PAR (r4, phản biện: đỉnh/mặt trong cùng màu be
+      // sáng thành "vệt be" loá dọc mép cầu ở pano_285 h90/h270 — gờ chắn bê tông thật xám, mặt trong khuất nắng)
+      if (sg > 0) { sweep(conc, F, [[lo, -D], [lo, PH]], CONC, false); sweep(conc, F, [[lo, PH], [li, PH], [li, 0.02]], CONC_PAR, false); }
+      else { sweep(conc, F, [[li, 0.02], [li, PH], [lo, PH]], CONC_PAR, false); sweep(conc, F, [[lo, PH], [lo, -D]], CONC, false); }
       // tay vịn thép trên gờ: thanh ngang + cột 2,5 m
       const rl = sg * (hw - PAR / 2);
       sweep(rail, F, [[rl - 0.05, PH + 0.42], [rl + 0.05, PH + 0.42], [rl + 0.05, PH + 0.5], [rl - 0.05, PH + 0.5]], RAIL, true);
@@ -550,6 +574,14 @@ export function buildBridges(scene, deps) {
     scene.add(m); stats.tris += (g.index ? g.index.count : g.attributes.position.count) / 3;
   };
   const vc = (hex) => new THREE.MeshLambertMaterial({ color: hex, vertexColors: true });
+  // MẶT DƯỚI cầu (r4, phản biện pano_349 h0/h90/h180: "tấm nâu khaki sẫm"): pháp tuyến hướng XUỐNG chỉ nhận màu ĐẤT của đèn
+  // bán cầu (nhựa/mái tối ~0,15) → nâu đen; bê tông gầm thật xám nhạt (ánh dội từ mặt nước/mặt phố + trời 2 bên). Pháp tuyến
+  // NGANG theo trục cầu → bán cầu 50 % trời + 50 % đất; nắng trực tiếp vẫn bị chính mặt cầu che (bản đồ bóng).
+  for (let q = 0; q + 11 < concD.p.length; q += 12) {
+    let dx = concD.p[q + 3] - concD.p[q], dz = concD.p[q + 5] - concD.p[q + 2], l = Math.hypot(dx, dz);
+    if (l < 1e-6) { dx = 1; dz = 0; l = 1; }
+    for (let k = 0; k < 4; k++) { concD.n[q + k * 3] = dx / l; concD.n[q + k * 3 + 1] = 0; concD.n[q + k * 3 + 2] = dz / l; }
+  }
   addMesh(conc, vc(0xffffff), 'bridge_group_conc');
   addMesh(concD, vc(0xffffff), 'bridge_group_under');
   addMesh(concBal, vc(0xffffff), 'bridge_group_flat');

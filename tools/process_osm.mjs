@@ -809,9 +809,13 @@ const BRIDGE_WAYS = [];
   }
   // --- cầu phố NÂNG NHẸ (kind 'deck'): mặt cầu cao hơn phố 2 bờ — ảnh pano_074 (Cầu Lạc Long): mặt cầu cao ~2 m trên
   //     ngã ba Bạch Đằng ngay dưới (h180), lan can con tiện trắng hoa văn ô van, bó vỉa sơn sọc đỏ-trắng, vỉa hè gạch đỏ.
-  //     Hồ sơ (way OSM dài 232 m, gồm cả đoạn trên đất): đầu TÂY dốc êm (cos) 70 m lên +h; đầu ĐÔNG phẳng mặt đất 32 m
-  //     (đoạn qua nút phố Tam Bạc + vòng xuyến — ảnh vệ tinh: mặt cầu hạ xuống đúng phố ven bờ đông) rồi dốc 35 m.
-  const DECK_RISE = { 'Cầu Lạc Long': { h: 2.0, west: 70, eastFlat: 32, east: 35 } };
+  //     Hồ sơ (way OSM dài 232 m, gồm cả đoạn trên đất — ảnh vệ tinh tile 7: đường dẫn phía TÂY là NỀN ĐẮP cao giữa 2 phố
+  //     gom 51 (bắc) / 222 (nam) mặt đất; pano_074 h270 lan can chạy suốt về tây): phẳng 6 m ở đầu TÂY (nối thẳng phố 187)
+  //     rồi dốc êm (cos) 64 m lên +h; đầu ĐÔNG phẳng mặt đất 44 m (nút giao phố ven bờ đông ri 200 ở quãng ~200 m: miệng
+  //     nút ±11,5 m phải ở MẶT ĐẤT — bản cũ phẳng 32 m ⇒ lan can chắn ngang nút) rồi dốc 35 m.
+  //     i0/i1 = khoảng mặt cầu THẬT SỰ nâng (y > mặt đất): bridges.js chỉ dựng mặt cầu/lan can ở [i0,i1]; roadnet vẽ dải
+  //     mặt đất phần còn lại (nút 2 đầu nguyên vẹn); traffic theo hồ sơ cao độ cả way.
+  const DECK_RISE = { 'Cầu Lạc Long': { h: 2.0, west0: 6, west: 64, eastFlat: 44, east: 35 } };
   for (const w of raw) {
     if (!isBr(w.tags) || !(w.tags.name in DECK_RISE)) continue;
     let pts = resample(w.geometry.map((g) => toXZ(g.lon, g.lat)), 3);
@@ -820,8 +824,11 @@ const BRIDGE_WAYS = [];
     const cum = [0]; for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
     const L = cum[cum.length - 1];
     const ease = (t) => (1 - Math.cos(Math.PI * Math.max(0, Math.min(1, t)))) / 2;
-    BRIDGE_WAYS.push({ id: w.id, n: w.tags.name, c, kind: 'deck', w: r2(widthOf(w.tags, c)), ri: riOf.get(w.id) || [],
-      pts: pts.map(([x, z], i) => { const y = LAND_H + P.h * Math.min(ease(cum[i] / P.west), ease((L - cum[i] - P.eastFlat) / P.east)); return [r2(x), r2(z), r2(y)]; }) });
+    const P3 = pts.map(([x, z], i) => { const y = LAND_H + P.h * Math.min(ease((cum[i] - P.west0) / P.west), ease((L - cum[i] - P.eastFlat) / P.east)); return [r2(x), r2(z), r2(y)]; });
+    let i0 = 0, i1 = P3.length - 1;
+    while (i0 < P3.length - 1 && P3[i0 + 1][2] <= LAND_H) i0++;
+    while (i1 > i0 && P3[i1 - 1][2] <= LAND_H) i1--;
+    BRIDGE_WAYS.push({ id: w.id, n: w.tags.name, c, kind: 'deck', w: r2(widthOf(w.tags, c)), ri: riOf.get(w.id) || [], i0, i1, pts: P3 });
   }
   // --- cầu phẳng khác trong thành phố ---
   for (const w of raw) {
