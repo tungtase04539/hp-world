@@ -140,10 +140,13 @@ function despike(P) {
 }
 // Bãi giải toả Hoàng Diệu (thực địa 10/2024: nhà cũ đã phá — world.js clearedZone): bỏ cả nhà thật lẫn nhà sinh
 const HD_A = [315, -809.5], HD_U = [0.9795, -0.2012], HD_N = [-0.2012, -0.9795];
+// W3-B: KHÔNG còn chừa khuôn viên Cảng vụ ở đây. Trước: VÒNG r45 quanh (326, −826) giữ cả dãy footprint Google cũ + lô
+// sinh phía BẮC Hoàng Diệu (pano_019 h0/h45: thật là bãi giải toả, game là dãy shophouse) và 1 footprint 3 T "NHÀ THUỐC"
+// nằm TRONG thân Cảng vụ. Cảng vụ (thân + sân + rào) là ô DỰNG TAY world.js compound(326, −826, 38×13, −135°) → mọi
+// footprint ở đây là bản trùng/nhà đã phá. world.js clearedZone vẫn chừa HỘP sân ô đó (không rải gạch vụn vào sân).
 function clearedZone(x, z) {
   const dx = x - HD_A[0], dz = z - HD_A[1], along = dx * HD_U[0] + dz * HD_U[1], across = dx * HD_N[0] + dz * HD_N[1];
   if (along < -10 || along > 360 || across < 7 || across > 140) return false;
-  if ((x - 326) ** 2 + (z + 826) ** 2 < 45 * 45) return false;
   if ((x - 636.5) ** 2 + (z + 894.7) ** 2 < 400) return false;
   return true;
 }

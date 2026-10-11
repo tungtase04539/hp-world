@@ -1543,7 +1543,9 @@ export async function buildWorld(scene, prog = () => {}) {
   const clearedZone = (x, z) => {
     const { along, across } = hdAcross(x, z);
     if (along < -10 || along > HD_L || across < 7 || across > 140) return false;
-    if ((x - 326) ** 2 + (z + 826) ** 2 < 45 * 45) return false;   // khuôn viên Cảng vụ giữ nguyên
+    // khuôn viên Cảng vụ giữ nguyên = HỘP sân ô compound(326,−826, 38×13, −135°) +1 m (W3-B: trước là vòng r45 → giữ cả
+    // dãy footprint cũ phía bắc Hoàng Diệu trước pano_019; tools/process_buildings.mjs dùng cùng hộp)
+    { const dx = x - 326, dz = z + 826; if (Math.abs(0.7071 * (dz - dx)) < 28 && Math.abs(0.7071 * (dx + dz)) < 14.5) return false; }
     if ((x - 636.5) ** 2 + (z + 894.7) ** 2 < 400) return false;   // nhà hàng bo cong (lm_drafts) đứng trong bãi
     return true;
   };
