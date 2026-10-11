@@ -576,11 +576,12 @@ export function buildBridges(scene, deps) {
   const vc = (hex) => new THREE.MeshLambertMaterial({ color: hex, vertexColors: true });
   // MẶT DƯỚI cầu (r4, phản biện pano_349 h0/h90/h180: "tấm nâu khaki sẫm"): pháp tuyến hướng XUỐNG chỉ nhận màu ĐẤT của đèn
   // bán cầu (nhựa/mái tối ~0,15) → nâu đen; bê tông gầm thật xám nhạt (ánh dội từ mặt nước/mặt phố + trời 2 bên). Pháp tuyến
-  // NGANG theo trục cầu → bán cầu 50 % trời + 50 % đất; nắng trực tiếp vẫn bị chính mặt cầu che (bản đồ bóng).
+  // (0,6·trục cầu, 0,8, ·) → bán cầu ~80 % trời: thử NGANG (50 %) còn nâu ở đoạn trục quay lưng nắng (349 h180) + sọc bóng
+  // (normal bias ngang); nắng trực tiếp bị chính mặt cầu che (bản đồ bóng — bias đẩy điểm tra LÊN trong mặt cầu).
   for (let q = 0; q + 11 < concD.p.length; q += 12) {
     let dx = concD.p[q + 3] - concD.p[q], dz = concD.p[q + 5] - concD.p[q + 2], l = Math.hypot(dx, dz);
     if (l < 1e-6) { dx = 1; dz = 0; l = 1; }
-    for (let k = 0; k < 4; k++) { concD.n[q + k * 3] = dx / l; concD.n[q + k * 3 + 1] = 0; concD.n[q + k * 3 + 2] = dz / l; }
+    for (let k = 0; k < 4; k++) { concD.n[q + k * 3] = 0.6 * dx / l; concD.n[q + k * 3 + 1] = 0.8; concD.n[q + k * 3 + 2] = 0.6 * dz / l; }
   }
   addMesh(conc, vc(0xffffff), 'bridge_group_conc');
   addMesh(concD, vc(0xffffff), 'bridge_group_under');

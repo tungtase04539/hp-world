@@ -1046,6 +1046,7 @@ export async function buildWorld(scene, prog = () => {}) {
         const garden = []; for (let k = 0; k <= 16; k++) { const a = Math.PI * k / 16; garden.push([cx + 38 * Math.cos(a), cz + 15 + 27 * Math.sin(a)]); }
         claimPoly(garden, 'park', 'loopgarden_' + b.id);
         claimCircle(cx, cz, rm - b.w / 2 - 2, 'parking', 'loop_' + b.id);
+        (world.helixLoops || (world.helixLoops = [])).push({ cx, cz, r: rm - b.w / 2 - 2 });   // r4: gỡ nhà ô trong lòng (dưới)
       }
     }
   }
@@ -19624,6 +19625,12 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     });
     world.bridges = br;
     console.log('[world] cầu W3-F:', JSON.stringify(br.stats));
+    // r4 (phản biện obl_hvt_s): nhà ô dựng tay GIỮ nằm TRONG lòng nút xoắn — ảnh vệ tinh tile 7: lòng vòng tây = bãi nhựa +
+    // vườn bán nguyệt, KHÔNG nhà; khối tập thể 5 tầng hvt_tapthe5t + hvt_nonbo là thiết kế quanh cầu HVT cũ (đặt sai chỗ) → gỡ
+    for (const L of world.helixLoops || []) for (const c of world.cellKept || []) {
+      if (c.removedByLM || c.cx == null || Math.hypot(c.cx - L.cx, c.cz - L.cz) > L.r) continue;
+      lmRemoveCell(c.name, 'trong lòng nút xoắn HVT (W3-F)');
+    }
   }
   {
     const b = BRIDGES[1];

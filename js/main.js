@@ -182,7 +182,13 @@ const { npcs, update: updateNPCs, pushOut: pushOutNPCs } = buildNPCs(scene, worl
 // Va chạm chung cho người & xe: collider thế giới + NPC (collider NPC trước đây push vào world.colliders SAU khi
 // chỉ mục lưới đã dựng → không bao giờ có hiệu lực, npcs.js:99 cũ).
 let _trafficRef = null;   // xe đang chạy cũng là vật cản (gán sau khi tạo giao thông)
-const resolveAll = (p, r = 0.45) => { world.resolveCollisions(p, r); pushOutNPCs(p, r); if (_trafficRef) _trafficRef.pushOut(p, r); };
+// W3-F r4: đang ĐỨNG/CHẠY trên mặt cầu nâng (mặt cầu dưới chân cao hơn đất > 2,5 m — nhịp HVT, nút xoắn) → collider 2D của
+// thế giới/NPC (cây, cột đèn, nhà… ở MẶT ĐẤT dưới gầm) không áp (từng chặn xe/người trên vòng xoắn); xe giao thông lọc theo y.
+const onHighDeck = (p) => p.y != null && world.decks && world.decks.yAt(p.x, p.z, p.y + 0.3) > groundHeight(p.x, p.z) + 2.5;
+const resolveAll = (p, r = 0.45) => {
+  if (!onHighDeck(p)) { world.resolveCollisions(p, r); pushOutNPCs(p, r); }
+  if (_trafficRef) _trafficRef.pushOut(p, r);
+};
 let _vehRefY = () => 2;   // W3-F: gán lại sau khi có pState
 let _vehRefOverride = null;   // W3-F r4: cao độ tham chiếu khi GỌI xe máy (xe mọc trên mặt cầu người đang đứng, không dưới gầm)
 const { vehicles, update: updateVehicle, spawn: spawnVehicle } = createVehicles(
@@ -381,7 +387,7 @@ function freeSpot(x, z, r = 0.45, ref = pState.pos.y) {
   if (!sameLevel(x, z, ref) || !inPlayArea(x, z)) return false;
   if (fp && fp.blocked(x, z)) return false;
   if (world.isFree && !world.isFree(x, z, r)) return false;   // WP2: va chạm đa giác fabric (nếu có)
-  const p = { x, z };
+  const p = { x, z, y: spotY(x, z, ref) };
   resolveAll(p, r);
   return Math.hypot(p.x - x, p.z - z) < 0.05;
 }

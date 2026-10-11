@@ -861,6 +861,7 @@ export function createTraffic(scene, world, opts = {}) {
     for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) {
       const l = hmap.get(hk(p.x + i * HC, p.z + j * HC)); if (!l) continue;
       for (const b of l) {
+        if (p.y != null && b.y != null && Math.abs(b.y - p.y) > 2.5) continue;   // W3-F: khác tầng (mặt cầu nâng / gầm)
         const fx = Math.sin(b.h), fz = Math.cos(b.h);
         const offs = b.type === 'car' ? OFF_CAR : OFF_BIKE;
         const rr = b.type === 'car' ? 0.95 : 0.55;
