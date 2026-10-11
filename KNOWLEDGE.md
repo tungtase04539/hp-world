@@ -483,7 +483,9 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     gỡ 7/29 + 10/41 mảnh (mất đoạn trước pano_515) ⇒ `cbFitFence`: chia ≤ 16 m, đẩy đỉnh ra sau facadeLine(way) + 0,35 (THĐ
     lùi 5-7,8 m — ảnh pano_225 h270: vỉa caro ~12 m trước tường); process_buildings `CB1` mép đông 655/656 theo (lô SINH mọc sau
     tường). (8) Collider nhỏ (r ≤ 2,2) còn TRÊN lòng sau cellsink/W2-A/cây = vật cản VÔ HÌNH (chủ đã gỡ/cắt: tường tx_pdp Phan
-    Đình Phùng, cây w1 Trần Phú) ⇒ tách ngay sau buildTrees, trước props (26 cái, `world.ghostColliders` = danh sách).
+    Đình Phùng, cây w1 Trần Phú) ⇒ tách ngay sau buildTrees, trước props (`world.ghostColliders` = danh sách). Phiên 3: CHỈ
+    tách khi tâm + 8 điểm cách 0,6 m đều trên nhựa VÀ không có gốc cây đang vẽ (`veg.trunkNear`) — bản đầu tách cả 8 xà cừ
+    dải phân cách Trần Phú/ĐBP + rào sắt ô w1_congso043 sát bó vỉa (vật NHÌN THẤY → người đi xuyên).
     (9) process_osm `NO_MEDIAN ['Trần Hưng Đạo']`: tuyến dài nhất tên THĐ là đoạn BẮC-NAM dọc tường Hải quân — pano_222-227
     thật = 1 lòng + tim vàng; world.js dải phân cách bỏ mọi khối/bụi/cây ≤ 5 m quanh camera pano (Trần Phú 232-234 đi trên
     tuyến dải). (10) bồn hoa quảng trường Nhà hát bỏ nếu chạm nhựa (phố vòng nam nay theo cong OSM thật).
