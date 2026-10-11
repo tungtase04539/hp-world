@@ -609,6 +609,8 @@ export function buildRoadNet(ROADS_DT, deps) {
   }
 
   // ---------- 3e) W3-D: bằng chứng theo WAY — nhãn tim đường (nhìn ảnh pano) + vạch qua đường GIỮA KHỐI ----------
+  // nửa lòng của way: w.hw nếu có (W3-A gán bề rộng RIÊNG từng way) — không thì theo cấp. `??` → hwOf không bị gọi khi đã có w.hw
+  const wHW = (w) => w.hw ?? hwOf(w.c);
   const stGrid = buildSegGrid(ways.map((w) => (STREET[w.c] ? w : { pts: [] })), 24);
   // điểm → đoạn phố gần nhất (≤ maxD): {wi, k, t, d}; cùng khoảng cách ưu tiên cấp cao
   const nearestStreetSeg = (x, z, maxD) => {
@@ -643,7 +645,7 @@ export function buildRoadNet(ROADS_DT, deps) {
     const add = (p, maxD, src) => {
       if (nearZebJ(p[0], p[1], 4)) return;
       const h = nearestStreetSeg(p[0], p[1], maxD); if (!h) return;
-      const w = ways[h.wi]; if (src === 'osm' && h.d > hwOf(w.c) + 2) return;
+      const w = ways[h.wi]; if (src === 'osm' && h.d > wHW(w) + 2) return;
       const L = (w.xings ||= []);
       const [ax, az] = w.pts[h.k], [bx, bz] = w.pts[h.k + 1], segL = Math.hypot(bx - ax, bz - az);
       // trùng (≤ 8 m dọc cùng đoạn) → bỏ
@@ -659,7 +661,7 @@ export function buildRoadNet(ROADS_DT, deps) {
   const dualRun = (w, P, cum) => {
     const L = cum[cum.length - 1]; if (L < 20) return false;
     const n = Math.max(3, Math.floor(L / 10)); let hit = 0;
-    const hwA = hwOf(w.c);
+    const hwA = wHW(w);
     for (let i = 0; i <= n; i++) {
       const u = L * i / n; let j = 0; while (j < P.length - 2 && cum[j + 1] < u) j++;
       const sl = Math.max(1e-6, cum[j + 1] - cum[j]), t = (u - cum[j]) / sl;
@@ -672,7 +674,7 @@ export function buildRoadNet(ROADS_DT, deps) {
         const dx = bx - ax, dz = bz - az, l = Math.hypot(dx, dz); if (l < 1) return;
         if (Math.abs((dx * ux + dz * uz) / l) < 0.94) return;
         const tt = ((x - ax) * dx + (z - az) * dz) / (l * l); if (tt < 0 || tt > 1) return;
-        const d = Math.hypot(x - ax - dx * tt, z - az - dz * tt), gap = d - hwA - hwOf(o.c);
+        const d = Math.hypot(x - ax - dx * tt, z - az - dz * tt), gap = d - hwA - wHW(o);
         if (gap > -0.5 && gap < 8) ok = true;
       });
       if (ok) hit++;
