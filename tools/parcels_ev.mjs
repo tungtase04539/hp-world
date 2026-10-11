@@ -42,8 +42,10 @@ export const WALL = { MASONRY: 0, FENCE: 1, HOARD: 2, LOTWALL: 3 };
 // ĐẤT TRỐNG = lô không có nhà (rào tôn/tường lô/bãi/giải toả). "đang xây/thi công/phá dỡ/đổ nát" là NHÀ (vỏ công trình —
 // W3-C), không phải lô trống.
 const RX_VACANT = /đất trống|lô (đất )?trống|lô đất|bãi (đất|trống|phế|san lấp|giải)|giải t[ỏo]a|quây tôn|rào tôn|tôn quây|quây tường|phế (liệu|thải)/;
-const RX_COMPOUND_T = /công sở|trụ sở|cơ quan|trường|bệnh viện|trung tâm y tế|y tế|ủy ban|uỷ ban|ubnd|nhà văn ho[áa]|mầm non|nhà trẻ|bảo tàng|khuôn viên|doanh trại|chỉ huy|công an|quân (đội|sự)|viện|biệt thự|công trình (lớn|công cộng)|nhà khách|hành chính|sau tường rào|sau hàng rào/;
-const RX_STRONG = /biệt thự|trường|bệnh viện|mầm non|nhà trẻ|ủy ban|uỷ ban|ubnd|doanh trại|chỉ huy|công an|y tế|khuôn viên|sau tường rào|sau hàng rào/;
+// "trường" (trường học) KHÔNG tính khi là quảng trường / công trường / thị trường / môi trường (lượt 4: pano_054 Nhà hát "nhìn
+// chính diện quảng trường", 224/426 cao ốc "ven/nền quảng trường", 214 "nhà điều hành công trường" từng thành khuôn viên rào)
+const RX_COMPOUND_T = /công sở|trụ sở|cơ quan|(?<!quảng |công |thị |môi )trường|bệnh viện|trung tâm y tế|y tế|ủy ban|uỷ ban|ubnd|nhà văn ho[áa]|mầm non|nhà trẻ|bảo tàng|khuôn viên|doanh trại|chỉ huy|công an|quân (đội|sự)|viện|biệt thự|công trình (lớn|công cộng)|nhà khách|hành chính|sau tường rào|sau hàng rào/;
+const RX_STRONG = /biệt thự|(?<!quảng |công |thị |môi )trường|bệnh viện|mầm non|nhà trẻ|ủy ban|uỷ ban|ubnd|doanh trại|chỉ huy|công an|y tế|khuôn viên|sau tường rào|sau hàng rào/;
 const RX_WALLWORD = /tường rào|hàng rào|rào sắt|rào sơn|con tiện|cổng|chòi gác|bốt gác|nhà bảo vệ|sân (trước|trong|vườn|cây|rộng)|sân vườn|vườn/;
 const RX_SHOPT = /shophouse|cửa hàng|quán|buôn bán|kinh doanh|tiệm|showroom|nhà hàng|cà phê|cafe|coffee|salon|spa|gara|đại lý|ki-?ốt|sạp|nhà thuốc|ngân hàng|siêu thị|cửa hiệu/;
 const RX_SHOPF = /biển '|biển "|biển hiệu|bày bán|bán (buôn|lẻ|hàng)|cửa hàng|quán|gội đầu|cắt tóc/;
@@ -59,7 +61,10 @@ export function classifyObs(o) {
     r.kind = 'compound';
     r.villa = /biệt thự/.test(s);
     r.civic = !r.villa;
-    r.walled = RX_WALLWORD.test(all) || RX_STRONG.test(s);
+    // loại "mạnh" (trường/bệnh viện/…) ngầm định có tường rào — TRỪ khi kiểu lưỡng lự có "khách sạn" mà không chữ tường/rào/
+    // cổng/sân (pano_356 h270 "toà nhà (bệnh viện/khách sạn)… hàng cọ trước nhà" = khách sạn sân trước THOÁNG ở 355 h225:
+    // rào sắt từng chắn ngang sân) → khuôn viên KHÔNG rào (vẫn chặn nhà ống sinh, không dựng tường)
+    r.walled = RX_WALLWORD.test(all) || (RX_STRONG.test(s) && !/khách sạn/.test(s));
     if (r.walled) r.wall = /hàng rào sắt|rào sắt|con tiện|song sắt|hàng rào (trắng|xanh|đen|trang trí)|tường lửng/.test(all) ? WALL.FENCE
       : /tường rào|tường (vàng|trắng|bao)|phù điêu/.test(all) ? WALL.MASONRY : WALL.FENCE;
   } else if (/cao ốc|cao tầng|văn phòng|tòa nhà|toà nhà|khách sạn/.test(s) && /tường rào|hàng rào|rào sắt/.test(all)) {

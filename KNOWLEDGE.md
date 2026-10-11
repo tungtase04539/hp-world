@@ -437,7 +437,7 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     (`js/landuse_data.js` giải nén trong node) → `LU_VETO` (sân lát/quảng trường, chùa, khuôn viên trường-viện-cơ quan, bãi xe,
     công trường, cỏ, sân thể thao, chợ). Tên phố từ `tools/osm_roads_dt.json` (ROADS_DT không có tên) → tỉ lệ cửa hàng ĐO theo
     phố từ chính 551 pano; bảng VÙNG `ZONES` (biệt thự/hành chính: Đinh Tiên Hoàng, Hồ Xuân Hương, Lê Đại Hành, Nguyễn Tri
-    Phương, Cù Chính Lan, Trần Quang Khải → trần cửa hàng 0,2; đô thị mới Lê Quang Đạo 0,3) + ô đa giác (Ngõ 80 Hạ Lý…).
+    Phương, Cù Chính Lan → trần cửa hàng 0,2; đô thị mới Lê Quang Đạo 0,3 — Trần Quang Khải BỎ ở lượt 4) + ô đa giác (Ngõ 80 Hạ Lý…).
     **(2) GENERATOR `process_buildings.mjs`:** nhà THẬT nằm trong nón khuôn viên: KHÔNG kéo mặt tiền ra vỉa (giữ khoảng lùi thật),
     không chia lô nhà ống, không kéo sâu, kiểu VILLA/CIVIC (mô-đun trệt không cửa hàng), công năng HOME/OFFICE; nhà ở → HOME, cửa
     hàng/chợ → SHOP; không bằng chứng trực tiếp → `shopProb` = bảng cấp phố kéo về tỉ lệ đo theo phố (Bayes k = 4), phố r khu phố cũ
@@ -514,6 +514,27 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     (019 h0/h45/h315, 020 h0/h45, 527, 362, 056) 2,62 → 3,62. PERF A/B giữ KHOÁ GPU 1 lượt liền (B A B A, 24 góc chuẩn, tier 3
     Radeon 890M): calls 367 → 368, tam giác 3,83 → 3,90 M, fps 60,1/60,2 (vsync), hpReady 4,52/5,29 → 4,76/5,95 s (máy chung 6
     agent — nhiễu ±0,6 s), 0 lỗi JS; diag 0 lỗi; LITE 3×404 như dot3; waterbfs 5/5; tour 26 ảnh không lỗi JS.
+    **LƯỢT 4 (2026-10-12, sau phản biện "merge-with-fixes"):** (a) BỎ Trần Quang Khải khỏi `ZONES.villa` (AUDIT3 không xếp
+    vào vùng biệt thự; classifyObs pano của phố = 20 cửa hàng / 11 nhà ở-khuôn viên = 0,65): mặc định "hàng rào biệt thự" cho lô khe
+    không phiếu từng rào mất dãy shophouse + sạp hoa quả thật (355 h270), dựng trụ cổng giữa dãy quán ăn (360 h90), rào ngang sân
+    trước khách sạn (355 h225); nay mặt phố TQK 115 → 141 nhà, tỉ lệ cửa hàng 0,42 → 0,67 (dot3 170 / 0,66), tường dọc phố 537 →
+    253 m (chỉ còn khuôn viên CÓ phiếu nón pano). Bài học: bảng VÙNG chỉ cho phố có bằng chứng (AUDIT3 + tỉ lệ đo) — trần vùng ĐÈ
+    Bayes theo phố. (b) Giết nhà SINH quanh nhà ô danh tính: chỉ lô CHỒNG bao hoặc nằm TRƯỚC MẶT nhà ô (tia từ tâm + 4 điểm co 50 %
+    đi ra xa phố gần nhất — `clearance.nearestStreet` ≤ 30 m — chạm bao trong độ sâu lô + 6 m); láng giềng BÊN CẠNH cùng dãy giữ
+    (vòng 6 m cũ giết cả dãy shophouse cạnh khách sạn 521 h315); lô không phố ≤ 30 m (lõi ô) giữ luật vòng 6 m; tra lưới theo bbox
+    lô (trước: chỉ ô của tâm → sót). `world.synthNearCellStats {over, front, core}`. __R4_KILL__ (c) `parcels.collide` bán kính
+    > 1 m (thuyền 1,6) quét mọi ô chạm đĩa (trước chỉ ô của tâm, lề đăng ký = nửa dày + 1 m). (d) Nhà cổng Điện lực (pano_510) lùi
+    THEO cổng (propLineShift dời cổng 1,5 m vào đúng mặt đông nhà cổng → rào bắc chạy trong tường). (e) Generator THIẾU
+    `tools/osm_roads_dt.json` / `osm_alleys.json` (gitignore) → DỪNG exit 2 (trước: try/catch im lặng → máy tích hợp sinh dữ liệu
+    khác mà không biết); cố ý chạy thiếu: `HP_ALLOW_MISSING_INPUTS=1` (cảnh báo + `RB_META.stats.missing_input_*`). (f) classifyObs:
+    "trường" (trường học) KHÔNG khớp trong quảng trường/công trường/thị trường/môi trường (lookbehind — pano_054 Nhà hát "nhìn
+    chính diện quảng trường", 214 "nhà điều hành công trường", 224/426 cao ốc "ven quảng trường" từng thành khuôn viên rào);
+    loại "mạnh" lưỡng lự có "khách sạn" mà không chữ tường/rào/cổng/sân → khuôn viên KHÔNG rào (356 h270 "bệnh viện/khách
+    sạn"). Đổi 6 nhà + 3 dãy tường (quanh (30,−43) và (−1093,115-132)). Rào sắt trước khách sạn 355 h225 KHÔNG do vùng biệt
+    thự mà do lớp đất OSM CAMPUS (khuôn viên Bệnh viện Phụ sản phủ cả mặt tiền khách sạn, `why = 'lu'`, nLu 3/3) — chưa sửa:
+    cần lớp bằng chứng "sân trước thoáng" từ pano (khách sạn/văn phòng không rào) đè lớp đất. KHÔNG làm:
+    trần vùng → prior Bayes (cố ý theo AUDIT3 ≤ 0,15; nhóm A chấm tốt ở HXH/CCL/ĐTH), chia mesh tường theo ô (thêm draw call > lợi
+    81 k tam giác), bộ trệt không biển cho CIVIC/VILLA/PK ≠ 0 (renderer W3-C — cờ dữ liệu đã có). __R4_NUM__
     **BẪY:** (a) `\b` của JS không hiểu chữ có dấu ("chợ\b" không bao giờ khớp) → ranh giới tường minh; (b) "tôn" khớp trong
     "bê tông" → `tôn(?!g)`; (c) màu tường rào phải lấy từ CỤM chữ tả tường/rào/trụ/cổng — "chòi gác vàng" từng nhuộm cả rào;
     (d) tường dựng tay trong ô cells nằm ngay mặt phố — phải dò hình học trước khi dựng tường dữ liệu; (e) đo cảnh trước freeze
