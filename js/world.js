@@ -17568,7 +17568,9 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
 
   // ---------- BIỂN HIỆU TÊN THẬT từ catalog 551 pano (PANO-LOOP V3: 954 biển, texture-atlas → 3 draw call) ----------
   {
-    const CELL_W = 512, CELL_H = 80, COLS = 8, ROWS = 51, PER = COLS * ROWS;   // 408 biển/atlas 4096²
+    // W3-C: 53 hàng × 77 px (trước 51 × 80) = 424 biển/atlas 4096×4081 — 1.256 biển sạch (gen_shopsigns W3-C, trước 954) vẫn
+    // vừa 3 atlas; 51 hàng thì cần tấm thứ 4 (canvas 4096² + 408 fillText + ~64 MB VRAM, đo A/B: pha fabric chậm thêm)
+    const CELL_W = 512, CELL_H = 77, COLS = 8, ROWS = 53, PER = COLS * ROWS;   // 424 biển/atlas 4096×4081
     const bg = ['#c62828', '#1c56a0', '#1f7a3c', '#d8862a', '#26262c', '#8e2f80'];
     // MOBILE: atlas 4096² ≈ 85MB VRAM/tấm không nén — thu 1/4 cạnh (1024², chữ vẫn đọc được
     // ở cự ly chơi trên màn nhỏ); desktop giữ nguyên 100%
