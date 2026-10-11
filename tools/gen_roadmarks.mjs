@@ -26,7 +26,8 @@ for (const p of A) {
   // zebra / đèn: xét TỪNG MỆNH ĐỀ; mệnh đề tả vật ở XA ("phía xa", "(xa)", "cuối phố", "ngã tư xa") KHÔNG tính (W3-D: bằng chứng
   // gắn cho nút ≤ 45 m quanh camera — pano_394 "đèn tín hiệu phía cuối phố" từng dựng đèn ma ở nút cạnh pano_496, 083 "(xa)")
   const near = (re) => txt.split(/[|;,."\[\]]/).some((c) => re.test(c) && !FAR.test(c));
-  if (near(/vạch (sang|qua) đường|zebra|vạch dành cho người đi bộ|vạch người đi bộ/)) { f |= F.ZEBRA; cnt.z++; }
+  // biển báo người đi bộ (W.224/R.423 xanh) đứng TẠI vạch sang đường (pano_077/320/349 HVT: ảnh đều có zebra)
+  if (near(/vạch (sang|qua) đường|zebra|vạch dành cho người đi bộ|vạch người đi bộ|biển (báo )?người đi bộ/)) { f |= F.ZEBRA; cnt.z++; }
   if (near(/đèn tín hiệu|đèn giao thông|đèn đếm ngược|đồng hồ đếm ngược/)) { f |= F.SIGNAL; cnt.s++; }
   if (f) out.push([Math.round(p.X * 10) / 10, Math.round(p.Z * 10) / 10, f]);
 }
