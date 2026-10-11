@@ -330,9 +330,10 @@ export function buildRiverbanks(scene, deps) {
     // 'strip' = phố chạy dọc nhưng bờ cách xa > 7 m (Tam Bạc đoạn bắc Lạc Long → cửa Cấm, pano_519/336/331): lan can cũ
     // ở MÉP VỈA HÈ, giữa lan can và kè là dải bờ tự phát (lán tôn, bạt) dưới hàng cây cổ thụ — cây đường phố GIỮ.
     const gapW = s.road ? s.road.d - deps.hw(s.road.c) - deps.sw(s.road.c) : 0;
-    // Tam Bạc đoạn BẮC (bắc Lạc Long → cửa Cấm, z < −600): luôn 'strip' — ảnh 519/336/331: hàng cổ thụ + lan can sắt cũ
-    // + dải lán/bạt bên bờ, KHÔNG dải dạo ca-rô (dù bờ gần phố)
-    const north = (/Tam Bạc/.test(s.poly.n) && s.z < -600 && s.x < -250) || s.beach;
+    // Tam Bạc đoạn BẮC (bắc Lạc Long → cửa Cấm, mảnh polygon bắc z < −568 — bậc nối 2 mảnh ở z ≈ −567 ngay pano_221): luôn
+    // 'strip' — ảnh 519/336/331: hàng cổ thụ + lan can sắt cũ + dải lán/bạt bên bờ, KHÔNG dải dạo ca-rô (dù bờ gần phố);
+    // pano_221 h270: dải bụi/cây bắt đầu NGAY sau lan can gang (z −568…−600 từng là 'wild': bãi cỏ trống + gờ kè chéo)
+    const north = (/Tam Bạc/.test(s.poly.n) && s.z < -568 && s.x < -250) || s.beach;
     // bờ xa phố (> 7 m) NGOÀI đoạn bắc Tam Bạc (bờ Cấm cạnh nút HVT, pano_349 h270: bãi bê tông + lan can thấp, không lán) → chỉ kè
     const mode = !s.road || s.bridge ? 'wild' : north ? 'strip' : gapW > 7 ? 'wild' : 'prom';
     // thuyền gỗ neo dọc bờ sông Tam Bạc đoạn bắc (ảnh vệ tinh tile 7: thuyền đậu dày 2 bờ; pano_519 h180)

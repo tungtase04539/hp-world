@@ -479,7 +479,7 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     gờ bê tông — phố s/p sọc đỏ-trắng 1 m như pano_221, t/r xám như 203) + đèn gang 2 bóng 16 m (bóng = sharedMats.lampGlow,
     sáng đêm) + khóm hoa giấy + collider chặn rơi + CÂY NON chống cọc 9 m (world.js veg.plant('non')), phố đó KHÔNG trồng cây
     đường phố cổ thụ cả 2 bên (keepClear), đồ vỉa hè props.js không đặt phía sông (promSide)); 'strip' (Tam Bạc đoạn BẮC Lạc
-    Long → cửa Cấm, z < −600, pano_519/331/336 — LUÔN strip: lan can sắt thấp ở MÉP VỈA HÈ (tấm CHUỖI VÒNG TRÒN sẫm alphaTest
+    Long → cửa Cấm, mảnh polygon bắc z < −568 (bậc nối 2 mảnh ngay pano_221), pano_519/331/336/221 h270 — LUÔN strip: lan can sắt thấp ở MÉP VỈA HÈ (tấm CHUỖI VÒNG TRÒN sẫm alphaTest
     như ảnh 519 h180/331 h270 + trụ bê tông 6 m + chậu cây), lán tôn/bạt màu thấp 1,9-2,4 m giữa lan can và kè, GIỮ cổ thụ + xe
     máy đỗ, CÂY LỚN trong dải (bankTrees: hàng ≤ 6 m sau lan can, dải ≥ 8 m thêm hàng thưa phía kè; world.js plant('shade'));
     hàng rào vòng tay khối B2 "phố thuyền" bỏ khi kit chạy (từng thành 2 hàng rào song song)); 'wild' (không phố, bờ xa > 7 m
