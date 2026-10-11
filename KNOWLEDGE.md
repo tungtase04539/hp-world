@@ -498,12 +498,14 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     +40 m): Lê Quang Đạo dải xa (ri 400, 360 m, dualRun chỉ 46% vì 2 dải tách ở đầu) hết tim vàng ở 216/478; Hồ Sen (ri 295)
     theo nhãn 320/323/327 thay chữ "vàng" của 321. (c) gen_roadmarks: "biển (báo) người đi bộ" là bằng chứng zebra (ảnh
     077/320/349 đều có zebra; 349 nút HVT +2 nút zebra). (d) Luật mặc định tim vàng theo bề rộng: ≥ 8 m như FP-4 (TRƯỚC khi
-    gộp W3-A luật này KHÔNG có tác dụng: ROADS_DT chưa có `.w` → 2·hw = t 8/s 10 m). (e) Vườn hoa: NỀN theo chữ pano quanh
-    vườn (58 pano ≤ 25 m ngoài mép) — An Biên/NV Trỗi/NB Khiêm/Nguyễn Du/Kim Đồng "thảm cỏ + hàng rào cây xén" (ảnh 039 235
-    340 400 043 195) → `garden_lawn` cỏ ô liu lốm đốm (canvas LCG 128 px = 4 m) + `garden_paths` lối chữ thập lát đá 4 m
-    (quad UV = mét, dùng chung plazaM); CHỈ Tố Hữu ("quảng trường rộng" 224/225/545) giữ sân lát + ô cỏ (lệch ±1 m, cạnh
-    9-13 m theo hash — hết lưới đều). Sân lát 176 → 152 (từ trên cao gần trắng). (f) Bụi viền vườn + dm7 sáng hơn
-    (đỉnh (0,37,0,51,0,23), `foot` 0,68 — 225 h090 bụi gần đen); `hedgeGeometry` thêm `maxHalf` (kẹp nửa bề ngang) → bụi
+    gộp W3-A luật này KHÔNG có tác dụng: ROADS_DT chưa có `.w` → 2·hw = t 8/s 10 m).
+    (e) Vườn hoa: NỀN theo chữ + ảnh pano quanh vườn (58 pano ≤ 25 m ngoài mép) — cả 6 vườn chủ yếu "thảm cỏ + hàng rào
+    cây xén" (ảnh 039 223 226 235 340 400 043 195) → `garden_lawn` cỏ lốm đốm (canvas LCG 128 px = 4 m, nền #6e7c3e: đo
+    nắng cỏ thật g/r ≈ 1,12 — #66773f ra 1,18 quá xanh, #7c8042 ra 0,98 nâu khô) + `garden_paths` lối chữ thập lát đá 4 m;
+    SÂN LÁT chỉ ở `PLAZA_PATCHES` (đĩa ∩ polygon, ô 2 m) nơi ảnh thấy sân: Tố Hữu quanh 224/225 (h090 "quảng trường rộng";
+    223/226 hai bên lại là cỏ) và mũi bắc cạnh ĐBP (545 h180); ô cỏ bó vỉa (lệch ±1 m, cạnh 9-13 m theo hash) chỉ trong
+    mảng sân. Quad lát: UV = mét, chung plazaM (freezeStatic gộp lượt 2). Sân lát 176 → 152 (từ trên cao gần trắng).
+    (f) Bụi viền vườn + dm7 sáng hơn (đỉnh (0,37,0,51,0,23), `foot` 0,68 — 225 h090 bụi gần đen); `hedgeGeometry` thêm `maxHalf` (kẹp nửa bề ngang) → bụi
     dải phân cách LQĐ ≤ 0,7 m trong bó vỉa 1,5 m (không lấn làn xe). (g) Caro lớp 3: viên đỏ (184,138,122) → (176,140,130),
     xám (170,167,161) — kè Thế Lữ 290 bớt cam-hồng.
     **CHƯA LÀM:** vạch gạch chéo/xương cá ở mũi tách làn (gore, 304 — hình học nút HVT/cầu dẫn thuộc W3-F, camera lệch 11 m
