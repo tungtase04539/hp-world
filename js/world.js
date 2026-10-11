@@ -49,6 +49,7 @@ import { buildRoadNet } from './roadnet.js';
 import { makeRoadMaterial } from './roadtex.js';
 import { ROAD_MARK_EVIDENCE } from './roadmarks.js';
 import { ROAD_W as XS_ROAD_W, roadHW as XS_HW, facadeLine as XS_FL } from './xsection.js';   // W3-A: XS_HW(way) = nửa lòng RIÊNG từng phố
+import { CB_WALLS, cbFitFence } from './anchorwalls.js';   // W3-A r2: tường mỏ neo Hải quân dùng chung với process_buildings
 
 // Thế giới dựng từ dữ liệu OpenStreetMap thật của Hải Phòng (tỉ lệ 1:10,
 // trung tâm phóng đại 2.2x). Mọi con phố trung tâm là phố thật.
@@ -9427,38 +9428,11 @@ const cbWallMat = (tex, rep) => {
   if (!m) { const t = tex.clone(); t.repeat.set(q, 1); t.needsUpdate = true; m = new THREE.MeshLambertMaterial({ map: t }); _cbWallMats.set(k, m); }
   return m;
 };
-// W3-A: polyline tường đặt tay theo mặt cắt CŨ (vỉa/lòng theo CẤP: facadeLine phố s 8,5 m) → nay lòng + vỉa theo phố thật
-// (xsection theo way: Trần Hưng Đạo vỉa 7,5 m, Lý Tự Trọng lòng 9 m) tường nằm TRONG vỉa hè → quét W2-A gỡ trọn đoạn 80 m
-// (pano_515 h090 mất tường mỏ neo; ảnh thật pano_225 h270: vỉa lát caro rộng ~12 m trước tường). Chia ≤ 16 m rồi đẩy từng
-// đỉnh ra SAU mặt tiền phố p/s/t/r gần nhất (facadeLine(way) + 0,35 nửa bề dày bệ); đỉnh đã đứng sau mặt tiền giữ nguyên.
-const cbFitFence = (P) => {
-  const Q = [];
-  for (let i = 0; i + 1 < P.length; i++) {
-    const [ax, az] = P[i], [bx, bz] = P[i + 1], n = Math.max(1, Math.ceil(Math.hypot(bx - ax, bz - az) / 16));
-    for (let k = 0; k < n; k++) Q.push([ax + (bx - ax) * k / n, az + (bz - az) * k / n]);
-  }
-  Q.push(P[P.length - 1].slice());
-  return Q.map(([x, z]) => {
-    let best = null;
-    for (const r of ROADS_DT) {
-      if (r.c !== 'p' && r.c !== 's' && r.c !== 't' && r.c !== 'r') continue;
-      for (let i = 0; i + 1 < r.pts.length; i++) {
-        const [ax, az] = r.pts[i], [bx, bz] = r.pts[i + 1];
-        if (Math.min(ax, bx) > x + 20 || Math.max(ax, bx) < x - 20 || Math.min(az, bz) > z + 20 || Math.max(az, bz) < z - 20) continue;
-        const dx = bx - ax, dz = bz - az, l2 = dx * dx + dz * dz || 1e-9;
-        const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / l2)), qx = ax + dx * t, qz = az + dz * t, d = Math.hypot(x - qx, z - qz);
-        if (!best || d < best.d) best = { d, qx, qz, r };
-      }
-    }
-    if (!best || best.d < 0.5 || best.d > 18) return [x, z];
-    const need = XS_FL(best.r) + 0.35;
-    if (best.d >= need) return [x, z];
-    return [best.qx + (x - best.qx) * need / best.d, best.qz + (z - best.qz) * need / best.d];
-  });
-};
+// W3-A: polyline tường đặt tay theo mặt cắt CŨ → đẩy ra SAU mặt tiền theo phố thật: js/anchorwalls.js cbFitFence (dùng chung
+// với tools/process_buildings.mjs — nhà thật/sinh trong khuôn viên bị cắt LÙI sau tường, review W3-A r2 pano_224 h270).
 const cbWallRun = (pts0, tex, name) => {
   const H = 2.6, TH = 0.4;
-  const pts = cbFitFence(pts0);
+  const pts = cbFitFence(pts0, ROADS_DT);
   const pillarG = [];
   for (let i = 0; i < pts.length - 1; i++) {
     const [ax, az] = pts[i], [bx, bz] = pts[i + 1];
@@ -9492,11 +9466,11 @@ const cbWallRun = (pts0, tex, name) => {
 {
   const tex = cbAnchorTex();
   // LTT đông (x487→480, z-468→-672) — bờ tây khối, mặt tường quay TÂY ra LTT
-  cbWallRun([[486.6, -468], [484, -540], [481, -620], [479.8, -672]], tex, 'cb_wall_ltt');
+  cbWallRun(CB_WALLS.cb_wall_ltt, tex, 'cb_wall_ltt');
   // ĐBP bắc (x500→644, z-461) — mặt nam khối quay NAM ra ĐBP
-  cbWallRun([[500, -461], [572, -461], [644, -461]], tex, 'cb_wall_dbp');
+  cbWallRun(CB_WALLS.cb_wall_dbp, tex, 'cb_wall_dbp');
   // THĐ tây (x646→653, z-468→-800) — bờ đông khối, mặt quay ĐÔNG ra THĐ (đối diện park#9)
-  cbWallRun([[646.4, -468], [655, -548], [661, -628], [657, -708], [653.7, -800]], tex, 'cb_wall_thd');
+  cbWallRun(CB_WALLS.cb_wall_thd, tex, 'cb_wall_thd');
   // dọn nội khối (đuổi 5 footprint OSM lô nhỏ (575,-581)/(525,-507)/(608,-477)/(520,-476)/(634,-505))
   for (const [cx, cz, r] of [[560, -560, 40], [600, -680, 40], [520, -540, 30], [620, -560, 30]]) FEATURED_CLEAR.push([cx, cz, r]);
 }

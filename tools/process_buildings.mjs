@@ -36,6 +36,7 @@ import { ROADS_DT, PARKS, RAIL, LM } from '../js/mapdata.js';
 import { waterSD } from '../js/terrain.js';
 import { roadHW, facadeLine } from '../js/xsection.js';
 import { LM_POLY } from '../js/landmark_polys.js';
+import { cbWallSegments, CB_WALL_TH } from '../js/anchorwalls.js';
 import { PANO_CAM } from '../js/panoclear.js';
 import { PANO_SIDES } from '../js/panosides.js';
 import { encodeRB, decodeRB, rectOf, EDGE, STYLE, ROOF, FLAG, INFO, ROADC } from '../js/buildings_data.js';
@@ -1510,6 +1511,37 @@ function camGuard(b) {
   ST.street_guard_clip = nG; ST.street_guard_drop = nGD; ST.cam_guard_clip = nC; ST.cam_guard_drop = nCD;
   lap(`chốt hành lang phố: cắt ${nG}, bỏ ${nGD}; camera pano: cắt ${nC}, bỏ ${nCD}`);
 }
+// 9c2. TƯỜNG MỎ NEO Hải quân (js/anchorwalls.js — CÙNG đường khớp world.js dựng): không nhà nào (thật/sinh) đứng TRƯỚC tường.
+//      Review W3-A r2: nhà thật nay cắt theo flR (≤ mặt tiền cấp) → khối nhà trong khuôn viên (Overture lệch 1-2 m) nhô ra trước
+//      tường đã đẩy lùi sau mặt tiền theo phố (pano_224 h180/h270 dãy nhà ống biển quán che tường mỏ neo; ảnh thật: vỉa caro →
+//      tường → nhà công sở PHÍA SAU). Cắt nửa mặt phẳng sau tâm tường + nửa bề dày + 0,3 m (chỉ nhà có tâm chiếu vào đoạn ±1 m,
+//      tâm cách tường ≤ 8 m phía phố — phía bên kia phố không bị đụng); còn < 8 m² → bỏ. Nhà sát sau tường: không mặt tiền buôn bán.
+{
+  const WS = cbWallSegments(ROADS_DT), M = CB_WALL_TH / 2 + 0.3;
+  let nClip = 0, nDrop = 0, nBehind = 0;
+  for (const b of B) {
+    let bb = bbox(b.pts);
+    for (const w of WS) {
+      if (bb[0] > Math.max(w.ax, w.bx) + 30 || bb[2] < Math.min(w.ax, w.bx) - 30 || bb[1] > Math.max(w.az, w.bz) + 30 || bb[3] < Math.min(w.az, w.bz) - 30) continue;
+      const [cx, cz] = centroid(b.pts);
+      const t = (cx - w.ax) * w.ux + (cz - w.az) * w.uz; if (t < -1 || t > w.L + 1) continue;
+      const c0 = w.ax * w.nx + w.az * w.nz + M;   // giữ n·p ≥ c0 (phía khuôn viên)
+      const dc = cx * w.nx + cz * w.nz - c0; if (dc < -8 || dc > 40) continue;
+      const minD = Math.min(...b.pts.map(([x, z]) => x * w.nx + z * w.nz - c0));
+      if (minD < 1.5) b.cbBehind = 1;
+      if (minD >= -0.05) continue;
+      const parts = clipHalf(b.pts, w.nx, w.nz, c0).map((q) => outward(cleanPoly(q))).filter((q) => q.length >= 3);
+      parts.sort((p, q) => absArea(q) - absArea(p));
+      if (!parts.length || absArea(parts[0]) < 8) { b.dead = 'cbwall'; nDrop++; break; }
+      setRectOrPoly(b, parts[0]); b.guard = 1; nClip++; bb = bbox(b.pts);
+    }
+    if (b.cbBehind && !b.dead) nBehind++;
+  }
+  B = B.filter((b) => !b.dead);
+  grid = rebuildGrid();
+  ST.cbwall_clip = nClip; ST.cbwall_drop = nDrop; ST.cbwall_behind = nBehind;
+  lap(`tường mỏ neo Hải quân: cắt ${nClip}, bỏ ${nDrop}, sát sau tường ${nBehind}`);
+}
 // 9d. KIỂM HỢP LỆ trên TOẠ ĐỘ ĐÃ LÀM TRÒN như file (đa giác: lưới 0,1 m; chữ nhật: x0/z0 0,1 m, góc u16, w/d cm — y hệt
 //     encodeRB/decodeRB): làm tròn → bỏ đỉnh gai (2 cạnh kề quay ngược > 162°) → cleanPoly → đơn CHẶT (strictSimple),
 //     tường-ra-ngoài, ≥ 6 m², bề hẹp nhất ≥ 1,2 m; hỏng → bỏ (drop_invalid). Kiểm trên số thực rồi làm tròn ở encode từng
@@ -1787,6 +1819,7 @@ for (const b of B) {
   let use = INFO.USE_HOME;
   if (style === STYLE.GLASS) use = INFO.USE_OFFICE;
   else if (style === STYLE.CIVIC || style === STYLE.SHED || (style === STYLE.VILLA && R() < 0.6)) use = INFO.USE_GATE;
+  else if (b.cbBehind) use = INFO.USE_HOME;   // sát sau tường mỏ neo Hải quân (khuôn viên kín): không cửa hàng ra phố
   else if (/cửa hàng|shop|bán|quán|kinh doanh|biển|cửa cuốn|nhà hàng|cà phê|spa|showroom/.test(ouse)) use = INFO.USE_SHOP;
   else if (f0) use = R() < ({ p: 0.88, s: 0.82, t: 0.72, r: 0.5, w: 0.6, h: 0.15 }[f0.s.c] ?? 0.3) ? INFO.USE_SHOP : INFO.USE_HOME;
   const roads = new Set(b.fronts.filter((f) => f.s.c !== 'h').map((f) => f.s.ri));
