@@ -509,17 +509,19 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     BẪY QA (Windows): `node tools/qa/gpulock.mjs run -- bash -c "a; b"` TREO — spawnSync shell:true chạy qua cmd.exe, dấu nháy
     bị bỏ → `bash -c bash …` chờ stdin mãi trong khi GIỮ khoá GPU (chặn mọi agent 13 phút). Gói nhiều lệnh vào 1 file .sh rồi
     `gpulock.mjs run -- bash file.sh`.
-    **Số đo** (A/B cùng phiên 2026-10-11, TIER 3 Radeon 890M d3d11, máy dùng chung với agent khác; `__hp.tier` 3, `__hp.gpu`
-    ANGLE AMD 890M): 24 góc views_std fps 60,2 = 60,2 (trần vsync), calls 376 → 381, tris 3,97 → 4,05 M (cam_spawn 389 → 365 /
-    3,85 → 3,86 M; pano_007_h090 529 → 541 / 5,53 → 5,72 M; cam_high_center 400 → 403 / 5,25 M; game_3 360 → 365 / 6,09 →
-    6,18 M); 6 góc phố chợ calls 291 → 298, tris 2,53 → 2,74 M (trước 2 bản sửa bẫy "gộp biến thể": 3,02 M). Dựng props
-    trong trình duyệt 325 → 449 ms (shops 66 → 115, inst 43 → 66, cars 21 → 34), hpReady 4.181 → 4.385 ms, heap sau GC ép
-    377 → 387 MB, programs 69 = 69, textures 117 → 120. Đếm (trình duyệt): xe máy 11.354 → 11.216, ô tô 1.667 → 1.753,
-    người đi bộ 444 → 350 (người ngồi quán theo biển hiệu chia ngân sách chung), InstancedMesh 21 → 33. Theo km (lõi/giữa/
-    ngoài, nh_run node): xe máy 172/146/38 → 187/161/51, ô tô 26,7/17,2/3,9 → 22,7/18,4/7,5, ghế đẩu 13,1/11/2,2 → 16,6/12,2/2,2,
-    mái chợ (ô/bạt) 45/36/9,7, hàng đất 83/66/18, hàng tràn hè 10/10,8/2,5, cờ treo nhà 9,3/9,8/1,4. Tam giác thấy được 446 h270:
-    mái chợ 134k, đống nông sản 90k, hàng đất 76k + 65k. Chấm lại (REAL|dot3|W3-E, 4 hướng/pano): 18 pano đích 3,89 → 4,28;
-    8 pano đối chứng 2,375 → 2,5 (cả +0,125 từ 395 — luật ô tô openReal; 7 pano còn lại 0). LITE: 0 lỗi JS ngoài 404
+    **Số đo** (bản cuối dfe6e47, A/B cùng phiên 2026-10-12, TIER 3, `__hp.gpu` ANGLE AMD Radeon 890M d3d11, máy dùng chung với
+    agent khác): 24 góc views_std fps 60,2 = 60,2 (trần vsync), calls 377 → 379, tris 3,95 → 4,01 M (cam_spawn 388 → 365 /
+    3,83 → 3,86 M; pano_007_h090 529 → 542 / 5,53 → 5,72 M; cam_high_center 399 → 403 / 5,25 M; game_3 359 → 365 / 6,09 →
+    6,18 M); 6 góc phố chợ calls 299 → 298, tris 2,53 → 2,73 M (trước 2 bản sửa bẫy "gộp biến thể": 3,02 M). Dựng props
+    trong trình duyệt +125-135 ms (325 → 449 / 427 → 562 ở 2 phiên tải khác nhau), hpReady +100-340 ms (nhiễu), heap sau GC
+    377 → 386 MB, programs 69 = 69. Đếm (trình duyệt): xe máy 11.354 → 11.225, ô tô 1.667 → 1.661, người đi bộ 444 → 350
+    (người ngồi quán theo biển hiệu chia ngân sách chung), InstancedMesh 21 → 33. Theo km (lõi/giữa/ngoài, nh_run node):
+    xe máy 172/146/38 → 188/162/51, ô tô 26,7/17,2/3,9 → 21,8/17,1/6,9, ghế đẩu 13,1/11/2,2 → 16,6/12,2/2,2, mái chợ (ô/bạt)
+    44/35/9,7, hàng đất 81/64/18, hàng tràn hè 10/10,7/2,5, cờ treo nhà 9,3/9,8/1,4. Tam giác thấy được 446 h270: mái chợ
+    134k, đống nông sản 90k, hàng đất 76k + 65k. `tools/qa/clearance.mjs` A/B: gần < 3 m 12 = 12, mọi mesh < 3 m 36 = 36,
+    trên nhựa 53 = 53, lấn phố > 0,2 29 → 35 (ô tô đỗ gần camera hơn theo FP-5 khi pano thấy xe đỗ — đánh đổi CÓ CHỦ Ý với
+    viên nang 6,5-8 m cũ), cam vi phạm 35 → 41. Chấm lại (REAL|dot3|W3-E, 4 hướng/pano): 18 pano đích 3,89 → 4,25; 8 pano
+    đối chứng 2,375 → 2,5 (cả +0,125 từ 395 — luật ô tô openReal; 7 pano còn lại 0). LITE: 0 lỗi JS ngoài 404
     `assets_lite/*.glb` (máy này không có bản lite cục bộ — dot3 y hệt).
     BẪY QA (máy này): `python -m http.server` (hàng chờ listen 5) TỪ CHỐI kết nối khi máy tải nặng → ERR_CONNECTION_REFUSED,
     game không khởi động (TIMEOUT __hp) — dùng server có `request_queue_size` lớn (ThreadingHTTPServer, 256).
