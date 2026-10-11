@@ -437,7 +437,7 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     **(2) BẰNG CHỨNG PANO → KIỂU DỰNG** (`tools/gen_facade_evidence.mjs` → `js/facade_evidence.js` SINH TỰ ĐỘNG, 47 KB): 1.920
     quan sát nhà của `audit_enriched.json` (heading, cờ FEF từ regex có biên từ Unicode `(?<![\p{L}\p{N}])…`) + 551 pano (cờ
     vùng FEZ: khu Pháp/công sở, chợ, phố cũ, đô thị mới, buôn bán; tuổi 0..3). `citygen.renderStyles()` (sau `buildCollision`,
-    ~20-30 ms): mỗi quan sát bắn 3 tia (h−8°, h, h+8°; 2-45 m; 0° = bắc = −z) → nhà ĐẦU TIÊN `fabricAt` chạm nhận cờ (1.360
+    30-50 ms node): mỗi quan sát bắn 3 tia (h−8°, h, h+8°; 2-45 m; 0° = bắc = −z) → nhà ĐẦU TIÊN `fabricAt` chạm nhận cờ (1.360
     quan sát → ~1.470-1.530 nhà); nhà không có quan sát dùng vùng của pano gần nhất ≤90 m làm XÁC SUẤT. Luật sửa dữ liệu: SHED
     ≥3 tầng → CIVIC (≥2.500 m² GLASS, ≥9 TOWER) (pano_230: khách sạn ra tường tôn); TUBE/OLD ≥9 tầng → 65% TOWER / 35% GLASS
     (thay 60% KTT); GLASS ≤6 tầng mặt tiền ≤10,5 m <450 m² → MODERN (lô kính hẹp pano_395/386). KIỂU DỰNG 7..12 = COL, NEO,
@@ -451,8 +451,9 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     đầu mút gần phố cách mép HÀNH LANG đường (lòng + `SIDEWALK_W` theo cấp — `roadGrid` seg[6]) ≤ 3 m và trước mặt tường trống
     (≥2/3 điểm 1,2 m trước tường không thuộc nhà khác) → `rc = 1` trên cạnh không phải mặt phố (bit rc của aFac.y vốn bỏ trống
     ở cạnh hông) → shader bộ `XP` (S_EXP1 xi măng thô + cửa sổ nhỏ + cục nóng, S_WIN, S_BACK, U_AC, S_EXP0 ố, S_PLAIN2, S_EXP2
-    quảng cáo sơn) thay luật cũ "45% nhà: cả mặt hông S_PLAIN0 trơn". ~10.100 cạnh. Lọc trung điểm trước (mút cách trung điểm
-    ≤ L/2) → 9 ms (bản đầu 51 ms). pano_340 h270, 372 h0, 198 h0: tường hông dọc phố có cửa sổ nhỏ/điều hoà/quảng cáo.
+    quảng cáo sơn) thay luật cũ "45% nhà: cả mặt hông S_PLAIN0 trơn". 10.226 cạnh lộ / 118 k lần gọi. Lọc trung điểm trước (mút
+    cách trung điểm ≤ L/2): đo node có đếm giờ từng lần gọi 33-36 ms (gồm chi phí performance.now ×236 k; thực ~20-25 ms).
+    pano_340 h270, 372 h0, 198 h0: tường hông dọc phố có cửa sổ nhỏ/điều hoà/quảng cáo.
     **(5) SHADER PHỐ**: (a) LỚP PHONG HOÁ theo tuổi (vệt ố chảy từ đỉnh tường = value-noise kéo dọc, mảng ẩm, bẩn/rêu chân
     tường) — chỉ tường; (b) PALETTE GUARD bão hoà tường ≤ 0,62; (c) KÍNH PHẢN TRỜI: sau `lights_fragment_end` cộng
     `fabRefl·(0,35+0,65·(1−n·v)^4)·irradiance/π` (kính/hiện đại ×1, cửa sổ thường ×0,4) — theo ánh sáng cảnh (tự tối ban đêm),
