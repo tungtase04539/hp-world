@@ -573,6 +573,17 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     phố 10,5 m (dải 2 m, không chỗ lán; 336/337/520 là 18-19 m) → 16 m, lán + cây sau lan can như ảnh 519 h180/h270.
     KHÔNG làm: giới hạn keep() về phía sông (cây phố là thủ tục nhịp 9 m, không bằng chứng: trả lại cây cổ thụ 473 h90 nhưng
     cũng trả cây sai ở 203 h90 — giữ cả 2 bên).
+    **ĐO / KIỂM r4** (2026-10-12, tier 3, ANGLE Radeon 890M D3D11; máy TẢI NẶNG — hpReady 5-20 s cả 2 bên, chỉ so cùng phiên):
+    heap sau gc 384 → 411 MB, hình học GPU 254,7 → 277,5 MB (= r3); draw call 2 lượt/bên: pano_062_h090 352 → 356, cam_hvt
+    616 → 630, game_3 325 → 327, pano_071_h180 612-671 → 623; game_8 (dot3 182 / 458 — GLB tải không tất định, 1 lượt std
+    nhánh 484 cũng là nhiễu này) → 197-221. Đồ thị 469 nút (495), 0 nút lẫn tầng; probe 8 mẫu × ~250 xe quanh nút HVT: lệch
+    khỏi mặt đường/mặt cầu 0, dưới nước 0 (trước 88-102 / 5-9 mỗi mẫu); xuống xe trên nhịp 20,6 m / vòng 4,9 / 7,7 m đúng
+    tầng, gọi xe trên cầu được; đi bộ & lái xe máy thẳng ra mép vòng xoắn dừng ở mép (y giữ 7,7); người đi bộ trên Lạc Long
+    y = mặt cầu + 0,14. Chấm 17 pano đích 4,51 → 4,59 (304 4,5 → 4,8; 349 4,5 → 5; 285 5 → 5,2; 519 3,5 → 3,8; 336 3,8 → 4);
+    8 đối chứng lệch điểm ảnh ≤ 6,8 % so dot3. Cổng: diag full "TẤT CẢ THỰC THỂ OK — 0 lỗi JS" (bất biến 0, underwater 0),
+    lite 3 × 404 (assets_lite/ trống — môi trường), --gl1 0 lỗi, tour 26 ảnh 0 lỗi, waterbfs 5/5, process_osm tất định.
+    BẪY harness: sau "Bắt đầu" hội thoại hướng dẫn (modal) chặn di chuyển người/xe — probe phải Esc trước khi giữ W (headless:
+    phát KeyboardEvent thẳng lên window).
 
 - **2026-10-04 (W2-F POLISH)** [ĐỢT 3 wave 2 — WebGL1, giải mã RB 1 lần, kho cảng, ĐÊM, giao thông né xe đỗ, dọn code chết, hitch]:
     **(1) WebGL1** (three r160 tự lùi WebGL1 khi không có WebGL2): KIỂM bằng `tools/qa/shoot.mjs --gl1` (init script cho
