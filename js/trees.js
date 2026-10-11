@@ -1574,15 +1574,16 @@ export function buildTrees(scene, ctx = {}) {
     // HẠNG HOA (0..1): cây nở khi hạng < tỉ lệ nở của ngày (uBloom); bằng lăng +2; −1 = luôn nở (cây đôi của hero GLB)
     const rank = heroOk ? -1 : sp === SP.BANGLANG ? 2 + hxz(x, z, 21) : sp === SP.PHUONG ? hxz(x, z, 21) : 3;
     // W3-G: cây kè hồ NGHIÊNG ra mặt nước + thân mảnh (pano_033 "tán rộng nghiêng theo gió", 005) — cả cây nghiêng từ gốc
-    // (xoay instance), không phải dời tán (W2-B: dời tán = thân gãy). Chỉ cây ≤ 14 m tới mép nước (lakeSD) và có bằng chứng
+    // (xoay instance), không phải dời tán (W2-B: dời tán = thân gãy). Chỉ cây < 16 m tới mép nước (lakeSD) và có bằng chứng
     // "nghiêng" ≤ 60 m hoặc 35% theo hash; hướng = −∇lakeSD
-    // + BIẾN THỂ MẢNH "kè hồ" (phiên 4, ảnh 033_h000/005/010): ~60% cây kè ≤ 14 m tới nước là cây thân MẢNH (Ø ~0,3-0,4 m,
+    // + BIẾN THỂ MẢNH "kè hồ" (phiên 4, ảnh 033_h000/005/010): ~60% cây kè < 16 m tới nước là cây thân MẢNH (Ø ~0,3-0,4 m,
     //   sxz ×0,62 — tán giữ nguyên nhờ cs bù), thấp hơn (×0,88, ≤ 12,5 m), tán nhỏ/thoáng hơn (R ×0,85, kín ≤ 0,55-0,85) và
     //   LUÔN nghiêng; ~40% còn lại giữ dáng cổ thụ (010: 1 cây lớn tán rộng giữa hàng cây mảnh)
     let tiltX = 0, tiltZ = 0, slim = 0, fullP = full;
     if (_ctx.lakeSD && !NOCUT && !o.median) {
       const sd = _ctx.lakeSD(x, z);
-      if (sd > 0 && sd < 14) {
+      // 16 m: hàng cây sát nước (sd 4-5) + hàng hố bó vỉa phía hồ (sd 12-14,2 — pano_033 14,2); hè phía nhà bên kia phố ≥ 20 m
+      if (sd > 0 && sd < 16) {
         slim = hxz(x, z, 68) < 0.6 ? 1 : 0;
         if (slim) { H = Math.min(H * 0.88, 12.5); Rr *= 0.85; B = Math.min(B, H - 2.6); fullP = Math.min(full, 0.55 + 0.3 * hf); }
         if (V.lean || slim || hxz(x, z, 66) < 0.35) {
