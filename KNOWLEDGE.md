@@ -561,10 +561,17 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     `r.cut` → roadnet/đồ thị KHÔNG T-snap đầu đã cắt (Bạch Đằng 51 từng bị kéo 5 m sang đầu phố 243 thành chữ V nhọn). Chỉ
     51 và 222 bị cắt (phố cụt sát tường nền đắp, như ngõ cụt).
     (e) **NHỎ**: vòm HVT z0 −1024 → −1012 (pano_285 ở bờ nam z −1000: h270 sườn tây mọc sát mép phải ⇒ chân ≤ ~16 m phía bắc;
-    h90 không thấy sườn đông ⇒ ≥ ~13 m); mặt DƯỚI cầu pháp tuyến NGANG theo trục cầu (hướng xuống = chỉ nhận màu ĐẤT của đèn
-    bán cầu → "tấm nâu khaki sẫm" pano_349); đỉnh gờ + mặt trong gờ HVT xám lạnh 0xa9a8a2 (mặt ngoài giữ sáng — "vệt be" 285
-    h90/h270). KHÔNG làm: giới hạn keep() về phía sông (cây phố là thủ tục nhịp 9 m, không bằng chứng: trả lại cây cổ thụ
-    473 h90 nhưng cũng trả cây sai ở 203 h90 — giữ cả 2 bên).
+    h90 không thấy sườn đông ⇒ ≥ ~13 m); mặt DƯỚI cầu pháp tuyến (0,6·trục, 0,8) — hướng xuống chỉ nhận màu ĐẤT của đèn bán
+    cầu → "tấm nâu khaki sẫm" pano_349; thử NGANG (50 % trời) còn nâu ở đoạn quay lưng nắng + sọc bóng (normal bias ngang);
+    đỉnh gờ + mặt trong gờ HVT xám lạnh 0xa9a8a2 (mặt ngoài giữ sáng — "vệt be" 285 h90/h270). Nhà ô dựng tay GIỮ nằm trong
+    lòng nút xoắn (`world.helixLoops` từ claim lòng vòng; hvt_tapthe5t 5 tầng + hvt_nonbo — thiết kế quanh cầu HVT cũ; ảnh vệ
+    tinh tile 7: lòng vòng tây = bãi nhựa + vườn bán nguyệt) → `lmRemoveCell`. Va chạm 2D (`resolveAll` main.js): đang ở trên
+    mặt cầu cao hơn đất > 2,5 m (`decks.yAt(x,z,y+0,3)`) → bỏ collider thế giới/NPC (cây/cột/nhà dưới gầm từng chặn xe trên
+    vòng xoắn); `traffic.pushOut` bỏ xe lệch tầng > 2,5 m. Tam Bạc đoạn BẮC (dải bờ tự phát): process_osm §6b3 mép nước ≥
+    clearOf + 7 m ở z −620…−800 (vuốt 0 ở −590 và −830 — không khấc mới ở 221 / chân bãi bồi): quanh 519 polygon chỉ cách tim
+    phố 10,5 m (dải 2 m, không chỗ lán; 336/337/520 là 18-19 m) → 16 m, lán + cây sau lan can như ảnh 519 h180/h270.
+    KHÔNG làm: giới hạn keep() về phía sông (cây phố là thủ tục nhịp 9 m, không bằng chứng: trả lại cây cổ thụ 473 h90 nhưng
+    cũng trả cây sai ở 203 h90 — giữ cả 2 bên).
 
 - **2026-10-04 (W2-F POLISH)** [ĐỢT 3 wave 2 — WebGL1, giải mã RB 1 lần, kho cảng, ĐÊM, giao thông né xe đỗ, dọn code chết, hitch]:
     **(1) WebGL1** (three r160 tự lùi WebGL1 khi không có WebGL2): KIỂM bằng `tools/qa/shoot.mjs --gl1` (init script cho
