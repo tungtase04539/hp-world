@@ -42,7 +42,7 @@ import { TIER } from './device.js';
 import { ROADS_DT } from './mapdata.js';
 import { ROAD_HW, roadHW, sidewalkW } from './xsection.js';   // W3-A: lòng/vỉa RIÊNG từng phố (roadGrid)
 import { PANO_CAM } from './panoclear.js';
-import { heroAt, heroProg, heroWall, heroAccent, heroFlags, heroFocus, buildHero, HP, HF, linRGB, liftHex } from './herokit.js';   // W5-A HERO-KIT
+import { heroAt, heroTall, heroProg, heroWall, heroAccent, heroFlags, heroFocus, buildHero, HP, HF, linRGB, liftHex, hexLum } from './herokit.js';   // W5-A HERO-KIT
 
 // Ô CHÍNH 450 m (tường + mái + đồ mái; ~57 ô cho R1750): đo cùng phiên 300/450/600 m — 450 giảm MỘT NỬA draw call của
 // phố (pano_007 58→26, cam_spawn 38→21, kể cả lượt bóng) mà tam giác vẽ chỉ +0,01-0,05 M; 600 không lợi thêm.
@@ -1109,7 +1109,7 @@ function renderStyles(D, CX, CZ) {
     // W5-A HERO-KIT: CHƯƠNG TRÌNH công trình đặc trưng (ảnh pano: ngân hàng/văn phòng kính/khách sạn/showroom/chợ/trường/chùa/
     // hàng cột/cây xăng — js/herokit_data.js) thắng mọi luật trên (bằng chứng cụ thể nhất)
     const hi = heroAt(CX[b], CZ[b]), hp = heroProg(hi);
-    if (hp) { hix[b] = hi; const r = heroRS(hp, rs, fl, area, hi); if (r >= 0) rs = r; sts.hero = (sts.hero || 0) + 1; }
+    if (hp) { hix[b] = hi; const r = heroTall(hp, D.floors[b]) ? -1 : heroRS(hp, rs, fl, area, hi); if (r >= 0) rs = r; sts.hero = (sts.hero || 0) + 1; }
     // (d) tuổi (lớp phong hoá shader): theo kiểu + vùng + bằng chứng cũ/mới + biến thiên theo hạt giống
     let age = (rs === RS.TEN || rs === STYLE.OLD || rs === RS.COL || rs === STYLE.KTT) ? 2
       : (rs === STYLE.GLASS || rs === RS.MODERN || rs === RS.TOWER || rs === RS.HOTEL) ? 0 : 1;
@@ -1240,8 +1240,10 @@ export function buildRealFabric(scene, ctx) {
   // ---------- 2) DỰNG theo ô ----------
   // gen() = toàn bộ hình học (XÁC ĐỊNH từ D + D.dead đã chốt) → gọi lại được khi khôi phục ngữ cảnh WebGL (bản CPU của
   // buffer đã bị giải phóng sau upload, xem RELEASE_CPU bên dưới). (thân hàm giữ thụt lề cũ cho diff gọn)
-  const frontEdges = [];   // [x0,z0,x1,z1,nx,nz,yBase,b] — biển hiệu thật (SHOP_SIGNS) neo vào đây
+  const frontEdges = [];   // [x0,z0,x1,z1,nx,nz,yBase,b,heroProg] — biển hiệu thật (SHOP_SIGNS) neo vào đây
+  const heroSigns = [];    // W5-A: sổ chữ herokit (không lặp cùng chữ trong bán kính — herokit signNear)
   const gen = (st, frontEdges) => {
+    heroSigns.length = 0;
   const tiles = new Map(), dtiles = new Map();
   const tileOf = (cx, cz) => {
     const tx = Math.floor(cx / FAB_TILE), tz = Math.floor(cz / FAB_TILE), k = tx * 4096 + tz;
@@ -1263,8 +1265,9 @@ export function buildRealFabric(scene, ctx) {
     const s = D.vStart[b], n = Math.min(255, D.vStart[b + 1] - s);
     if (n < 3) continue;
     for (let i = 0; i < n; i++) { X[i] = D.x[s + i]; Z[i] = D.z[s + i]; }
-    const HP0 = heroProg(HIX[b]);   // W5-A: nhà chợ ≤ 2 tầng (hội trường mái tôn), cây xăng 1 tầng (ki-ốt dưới mái che)
-    const fl = HP0 === HP.MARKET ? Math.min(2, Math.max(1, D.floors[b])) : HP0 === HP.PETROL ? 1 : Math.max(1, D.floors[b]), H = heightOf(fl);
+    // W5-A: nhà chợ ≤ 2 tầng (hội trường mái tôn), cây xăng 1 tầng (ki-ốt dưới mái che) — CHỈ khi nhà thật thấp (heroTall)
+    const HP0 = heroProg(HIX[b]), hTall = heroTall(HP0, D.floors[b]);
+    const fl = HP0 === HP.MARKET && !hTall ? Math.min(2, Math.max(1, D.floors[b])) : HP0 === HP.PETROL && !hTall ? 1 : Math.max(1, D.floors[b]), H = heightOf(fl);
     const sty = Math.min(6, D.style[b]), roofT = D.roof[b] & 15, roofC = (D.roof[b] >> 4) % ROOF_LIN.length;
     const seed = D.seed[b], s8 = seed & 255;
     let wcol = WALL_LIN[D.wall[b] % WALL_LIN.length]; const rcol = ROOF_LIN[roofC];
@@ -1289,7 +1292,8 @@ export function buildRealFabric(scene, ctx) {
     if ((RSZ[b] & 15) === STYLE.VILLA && (rt === ROOF.FLAT_PARAPET || rt === ROOF.FLAT) && rectness >= 0.85 && n <= 6 && areaPoly < 700 && fl <= 3 && hh(seed, 91) < 0.7) rt = ROOF.HIP_TILE;
     // W5-A HERO-KIT: mái theo chương trình — chợ mái tôn 2 dốc, chùa/cây xăng mái do herokit dựng, trường/công sở mái ngói (ảnh)
     const HI = HIX[b], HPg = heroProg(HI);
-    if (HPg === HP.MARKET && hw >= 1.2 && hw <= 22) rt = ROOF.GABLE_TON;
+    if (hTall) { /* chợ/cây xăng trước nhà cao: giữ mái thật */ }
+    else if (HPg === HP.MARKET && hw >= 1.2 && hw <= 22) rt = ROOF.GABLE_TON;
     else if (HPg === HP.PAGODA || HPg === HP.PETROL) rt = ROOF.FLAT;
     else if (HPg === HP.SCHOOL && (heroFlags(HI) & HF.TILE) && rectness >= 0.85 && n <= 6 && fl <= 5) rt = ROOF.HIP_TILE;
     if (rt === ROOF.HIP_TILE && (rectness < 0.85 || n > 6)) rt = ROOF.GABLE_TON;
@@ -1331,7 +1335,8 @@ export function buildRealFabric(scene, ctx) {
         heroAcc = linRGB(acc);
       } else if (fpMode === 3) { hb[2] = (hb[2] & 0xf8) | 2; fpMode = 2; }   // bảng lớn từng bay không áp lên công trình đặc trưng
       else if (HPg !== HP.MARKET && fpMode !== 1 && fpMode !== 2) { hb[2] = (hb[2] & 0xf8) | 1; fpMode = 1; }   // không màu biển thật: KHÔNG biển (không dải chữ/bảng lớn ngẫu nhiên trên sảnh văn phòng — pano_359 'NHÀ NGHỈ')
-      if (wl >= 0) { heroClad = linRGB(wl); if (!(FPB && FPB.wall)) wcol = linRGB(liftHex(wl, HPg === HP.STORE || HPg === HP.OFFICE ? 0.35 : 0.55)); }
+      // màu tường quan sát TỐI (< 0,25: diềm/ốp tối của trệt, bóng râm) KHÔNG lái màu cả nhà (phản biện W5-A 166: khối đen)
+      if (wl >= 0) { heroClad = linRGB(wl); if (!(FPB && FPB.wall) && hexLum(wl) >= 0.25) wcol = linRGB(liftHex(wl, HPg === HP.STORE || HPg === HP.OFFICE ? 0.35 : 0.55)); }
       M.fpv = hb; if (DT) DT.fpv = hb;
     }
     const bigFlag = (fl >= 5 || (areaPoly >= 600 && fl >= 3) || sty === STYLE.KTT || sty === STYLE.GLASS || sty === STYLE.CIVIC || sty === STYLE.VILLA
@@ -1399,7 +1404,7 @@ export function buildRealFabric(scene, ctx) {
       if (kind === EDGE.FRONT) {
         if (L > fL) { fL = L; fnx = nx; fnz = nz; fAx = ax; fAz = az; fBx = bx; fBz = bz; fRc = rc; }
         hasFront = true;
-        frontEdges.push([ax, az, bx, bz, nx, nz, y0, b]);
+        frontEdges.push([ax, az, bx, bz, nx, nz, y0, b, HPg]);   // [8] W5-A: chương trình hero (world.js: biển thật không đè dải NGÂN HÀNG)
         if (heroFronts && cover === 0) heroFronts.push([ax, az, bx, bz, nx, nz, L, rc]);
         // ---- HỘP BIỂN HIỆU 3D (ô gần): đúng các bay mà shader vẽ dải biển (groundModule khớp bit với GPU) ----
         // Mặt trước = kind 6 → shader vẽ Y HỆT mặt phố phía sau (chữ/màu biển/đèn đêm) nhưng lồi ra 0,22 m; 2 mặt đầu
@@ -1554,7 +1559,7 @@ export function buildRealFabric(scene, ctx) {
       if (fr.length) {
         const r = buildHero({ prog: HPg, flags: heroFlags(HI), focus: heroFocus(HI), M, DT, X, Z, n, y0, H, fl, fronts: fr, wcol, acc: heroAcc, cladCol: heroClad, s8, seed, st, rs,
           gap: streetGap, free: (x, z) => { const o = fabricAt(x, z); return (o < 0 || o === b) && !claimAt(x, z); },
-          obb: { ux, uz, vx, vz, u0, u1, v0, v1 }, hotelCanopy: hotelCan });
+          obb: { ux, uz, vx, vz, u0, u1, v0, v1 }, hotelCanopy: hotelCan, signs: heroSigns });
         st.tris += r.tris; st.detTris += r.detTris; st.heroTris = (st.heroTris || 0) + r.tris + r.detTris;
         if (ctx.heroLog) ctx.heroLog.push([b, HPg, fr.length, +fr[0][6].toFixed(1), +streetGap((fr[0][0] + fr[0][2]) / 2, (fr[0][1] + fr[0][3]) / 2, fr[0][4], fr[0][5]).toFixed(1), r.tris, r.detTris]);
       }

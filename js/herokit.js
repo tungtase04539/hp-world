@@ -78,6 +78,10 @@ export const heroAccent = (i) => (i >= 0 ? HERO[i][4] : -1);
 export const heroFlags = (i) => (i >= 0 ? HERO[i][5] : 0);
 export const heroFocus = (i) => (i >= 0 && HERO[i].length > 7 ? [HERO[i][6] / 10, HERO[i][7] / 10] : null);
 export const heroCount = () => HERO.length;
+// phản biện W5-A: nhà chợ (hội trường mái tôn ≤ 2 tầng) / cây xăng (ki-ốt 1 tầng) chỉ ÉP tầng + kiểu SHED + mái khi footprint
+// THẬT thấp (D.floors ≤ 3 / ≤ 2). Cao hơn = sạp chợ/mái che TRƯỚC nhà nhiều tầng → giữ chiều cao, kiểu, mái; herokit chỉ thêm
+// mái hiên/mái che (pano_006 b4401: nhà 8 tầng từng bị ép thành lán 2 tầng; footprints.topAt/trees vẫn dùng D.floors)
+export const heroTall = (p, floors) => (p === HP.MARKET && floors > 3) || (p === HP.PETROL && floors > 2);
 
 // ---------- màu ----------
 // sRGB 0xRRGGBB → mảng u8 TUYẾN TÍNH như WALL_LIN của citygen (thuộc tính màu đỉnh là tuyến tính)
@@ -85,10 +89,10 @@ export function linRGB(hex) {
   const f = (c) => { const s = c / 255; return Math.round(255 * (s <= 0.04045 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4))); };
   return [f((hex >> 16) & 255), f((hex >> 8) & 255), f(hex & 255)];
 }
-const lum = (hex) => (0.2126 * ((hex >> 16) & 255) + 0.7152 * ((hex >> 8) & 255) + 0.0722 * (hex & 255)) / 255;
+export const hexLum = (hex) => (0.2126 * ((hex >> 16) & 255) + 0.7152 * ((hex >> 8) & 255) + 0.0722 * (hex & 255)) / 255;
 // nâng độ sáng TỐI THIỂU (màu đo trên ảnh gồm bóng râm — W4-A: < 0,55 thành khối đen) giữ sắc độ
 export function liftHex(hex, minL = 0.55) {
-  const l = lum(hex); if (l >= minL || l <= 0) return hex;
+  const l = hexLum(hex); if (l >= minL || l <= 0) return hex;
   const k = minL / l, c = [(hex >> 16) & 255, (hex >> 8) & 255, hex & 255].map((v) => Math.min(255, Math.round(v * k)));
   return (c[0] << 16) | (c[1] << 8) | c[2];
 }
@@ -231,7 +235,8 @@ export function buildHero(c) {
   }
   // ĐOẠN mặt tiền của chương trình: khối gộp dài (ngân hàng trong dãy 60 m) → chỉ đoạn W quanh điểm tiêu
   const sub = (E, W) => {
-    const L = E[6]; if (!E || L <= W) return E;
+    if (!E || E[6] <= W) return E;
+    const L = E[6];
     const ctr = c.at != null && E === fr[0] ? c.at : L / 2, s0 = Math.max(0, Math.min(L - W, ctr - W / 2));
     const [ax, az] = edgeP(E, s0), [bx, bz] = edgeP(E, s0 + W);
     return [ax, az, bx, bz, E[4], E[5], W, E[7]];
@@ -257,6 +262,16 @@ export function buildHero(c) {
   st['hero_' + prog] = (st['hero_' + prog] || 0) + 1;
   void F0; void top;
   return out;
+}
+// SỔ BIỂN CHỮ herokit (c.signs: mảng [x, z, khoá] dùng chung cả lượt dựng, citygen tạo) — chữ chung theo ngành
+// không lặp trong bán kính r (phản biện W5-A: 'THỜI TRANG NỮ' cùng số ĐT trên ≥ 3 nhà một khung hình 166/161/377)
+function signNear(c, x, z, key, r) { const L = c.signs; if (!L) return false; for (const q of L) if (q[2] === key && (q[0] - x) ** 2 + (q[1] - z) ** 2 < r * r) return true; return false; }
+function signReg(c, x, z, key) { if (c.signs) c.signs.push([x, z, key]); }
+// điểm trong đa giác footprint (X,Z,n)
+function inPoly(X, Z, n, x, z) {
+  let ins = false;
+  for (let i = 0, j = n - 1; i < n; j = i++) if ((Z[i] > z) !== (Z[j] > z) && x < ((X[j] - X[i]) * (z - Z[i])) / (Z[j] - Z[i]) + X[i]) ins = !ins;
+  return ins;
 }
 // tiện ích cạnh: điểm dọc cạnh + khoảng lùi
 const edgeP = (E, s) => { const L = E[6]; return [E[0] + ((E[2] - E[0]) / L) * s, E[1] + ((E[3] - E[1]) / L) * s]; };
@@ -311,12 +326,23 @@ function heroBank(c, fr, add) {
   // dải biển 3D nhô 0,35 m ngay trên trệt — MỘT dải liền cả mặt (161 "một băng xanh liên tục", 354 tím)
   const yb = y0 + GROUND_H - 0.15, yt = yb + (fl >= 3 ? 1.25 : 1.0), P = 0.35;
   add(M, box(M, mx + nx * P / 2, mz + nz * P / 2, ex, ez, nx, nz, L / 2 - 0.05, P / 2, yb, yt, DARK, s8, MOD.D_SIGNF, 4 | 8 | 16 | 32));
-  // mặt trước: chữ NGÂN HÀNG theo từng đoạn ≤ 8 m (chữ không kéo dài cả 30 m)
-  const nS = Math.max(1, Math.round(L / 8)), sw = L / nS;
-  for (let k = 0; k < nS; k++) {
-    const s0 = k * sw + 0.02, s1 = (k + 1) * sw - 0.02, [p0x, p0z] = edgeP(E, s0), [p1x, p1z] = edgeP(E, s1);
+  // mặt trước: chữ NGÂN HÀNG MỘT LẦN (tấm ≤ 8 m quanh điểm tiêu ảnh), phần còn lại = diềm TRƠN màu nhấn thật. Phản biện W5-A
+  // pano_354 h180: 'NGÂN HÀNG' lặp 3 lần dọc dải (mỗi 8 m + mỗi nhà của dãy 3 lô ngân hàng liền kề) — giờ ≤ 1 chữ / 30 m
+  let sc = L / 2;
+  if (c.focus) { const [fx, fz] = c.focus; sc = Math.max(0, Math.min(L, (fx - ax) * ex + (fz - az) * ez)); }
+  const sW = Math.min(8, L - 0.1), s0 = Math.max(0.05, Math.min(L - 0.05 - sW, sc - sW / 2)), [scx, scz] = edgeP(E, s0 + sW / 2);
+  const lettered = !signNear(c, scx, scz, 'bank', 30);
+  const plain = (a, b) => {
+    if (b - a < 0.05) return;
+    const [p0x, p0z] = edgeP(E, a), [p1x, p1z] = edgeP(E, b), W = (b - a) / 4, Hh = (yt - yb) / 4;
+    add(M, qN(M, [p0x + nx * P, yb, p0z + nz * P, p1x + nx * P, yb, p1z + nz * P, p1x + nx * P, yt, p1z + nz * P, p0x + nx * P, yt, p0z + nz * P], nx, 0, nz, [0, 0, W, 0, W, Hh, 0, Hh], c.acc || DARK, s8, MOD.D_PLAIN));
+  };
+  if (lettered) {
+    signReg(c, scx, scz, 'bank');
+    const [p0x, p0z] = edgeP(E, s0), [p1x, p1z] = edgeP(E, s0 + sW);
     add(M, signFace(M, p0x + nx * P, p0z + nz * P, p1x + nx * P, p1z + nz * P, nx, nz, yb, yt, 0, s8, 30));
-  }
+    plain(0.02, s0); plain(s0 + sW, L - 0.02);
+  } else plain(0.02, L - 0.02);
   // 2 cột đá vuông sảnh (cao 2 tầng) + dầm đỡ — chỉ khi đủ chỗ lùi; không thì trụ áp tường
   if (L >= 6 && fl >= 2) {
     const g = gapOf(c, E), out = g >= 2.2 ? 1.6 : 0.35, yc = y0 + Math.min(H - 0.3, GROUND_H + FLOOR_H) + 0.1;
@@ -392,21 +418,25 @@ function heroStore(c, fr, add) {
   const E = fr[0]; if (!E || fl < 2) return;
   const [ax, az, bx, bz, nx, nz, L] = E; if (L < 3) return;
   const ex = (bx - ax) / L, ez = (bz - az) / L, mx = (ax + bx) / 2, mz = (az + bz) / 2;
-  // màu ốp: màu TƯỜNG quan sát (siêu thị 414 vàng; showroom xám; thời trang đen) — không nâng sáng (ốp đen là thật)
+  // màu ốp: màu TƯỜNG quan sát (siêu thị 414 vàng; showroom xám; thời trang đen) — không nâng sáng (ốp đen là thật).
+  // Phản biện W5-A (166: cả nhà thành khối đen): ốp CHỈ dải tầng 1 trên trệt kính (ảnh: diềm tối trên showroom kính), không phủ 3 tầng
   const clad = c.cladCol || c.wcol, P = 0.32;
-  const yb = y0 + GROUND_H + 0.05, yt = y0 + Math.min(H + 0.6, GROUND_H + FLOOR_H * Math.min(3, fl - 1) + 0.4);
+  const yb = y0 + GROUND_H + 0.05, yt = y0 + Math.min(H + 0.6, GROUND_H + FLOOR_H + 0.4);
+  if (yt - yb < 1.2) return;
   const W = Math.min(L - 0.3, 24);
   add(M, box(M, mx + nx * P / 2, mz + nz * P / 2, ex, ez, nx, nz, W / 2, P / 2, yb, yt, clad, s8, MOD.D_PLAIN, 63 ^ 2));
-  // dải chữ lớn (nền = màu biển THẬT qua aFp khi có — chế độ 2) ở 1/3 dưới tấm ốp — chữ CHUNG theo NGÀNH ảnh tả: điện máy →
-  // H_SIGN 'SIÊU THỊ ĐIỆN MÁY'; thời trang → PANEL 'THỜI TRANG NỮ'; điện thoại → PANEL 'ĐIỆN THOẠI - LAPTOP'; còn lại (showroom
-  // ô tô, nội thất…) chỉ tấm ốp trơn (r3: 'SIÊU THỊ ĐIỆN MÁY' trên shop thời trang 377/161 là sai)
+  // dải chữ lớn (nền = màu biển THẬT qua aFp khi có — chế độ 2) — chữ CHUNG theo NGÀNH ảnh tả: điện máy → H_SIGN 'SIÊU THỊ ĐIỆN
+  // MÁY'; thời trang → PANEL 'THỜI TRANG NỮ / HÀNG MỚI VỀ'; điện thoại → PANEL 'ĐIỆN THOẠI - LAPTOP'; còn lại (showroom ô tô,
+  // nội thất…) chỉ tấm ốp trơn (r3: 'SIÊU THỊ ĐIỆN MÁY' trên shop thời trang 377/161 là sai). PANEL CẮT bỏ dòng số điện thoại
+  // (v từ 0,54 m của dải 2 m) và mỗi loại chữ ≤ 1 lần / 40 m (phản biện: cùng tấm cùng số ĐT lặp trên 3 nhà liền)
   const kind = c.flags & HF.ELEC ? 1 : c.flags & HF.FASHION ? 2 : c.flags & HF.PHONE ? 3 : 0;
-  if (kind) {
-    const sH = Math.min(kind === 1 ? 1.6 : 2.2, (yt - yb) * (kind === 1 ? 0.4 : 0.55)), sW = Math.min(W - 0.6, kind === 1 ? 12 : sH * 2.1), [p0x, p0z] = edgeP(E, (L - sW) / 2), [p1x, p1z] = edgeP(E, (L + sW) / 2);
-    const q0x = p0x + nx * (P + 0.02), q0z = p0z + nz * (P + 0.02), q1x = p1x + nx * (P + 0.02), q1z = p1z + nz * (P + 0.02), y1 = yb + 0.25;
+  if (kind && !signNear(c, mx, mz, 'store' + kind, 40)) {
+    signReg(c, mx, mz, 'store' + kind);
+    const sH = Math.min(kind === 1 ? 1.6 : 1.9, (yt - yb) * (kind === 1 ? 0.45 : 0.62)), sW = Math.min(W - 0.6, kind === 1 ? 12 : sH * 2.77), [p0x, p0z] = edgeP(E, (L - sW) / 2), [p1x, p1z] = edgeP(E, (L + sW) / 2);
+    const q0x = p0x + nx * (P + 0.02), q0z = p0z + nz * (P + 0.02), q1x = p1x + nx * (P + 0.02), q1z = p1z + nz * (P + 0.02), y1 = yb + Math.max(0.15, (yt - yb - sH) / 2);
     if (kind === 1) add(M, signFace(M, q0x, q0z, q1x, q1z, nx, nz, y1, y1 + sH, 2, s8, 80));
     else {
-      const pi = kind === 2 ? 3 : 0, v0 = (pi & 1) * 0.5 + 0.004, v1 = v0 + 0.492;   // PANEL_W[3] / PANEL_W[0] (facade_atlas.js)
+      const pi = kind === 2 ? 3 : 0, v0 = (pi & 1) * 0.5 + 0.135, v1 = (pi & 1) * 0.5 + 0.496;   // PANEL_W[3] / PANEL_W[0] (facade_atlas.js), bỏ dòng ĐT
       add(M, qN(M, [q0x, y1, q0z, q1x, y1, q1z, q1x, y1 + sH, q1z, q0x, y1 + sH, q0z], nx, 0, nz, [0.004, v0, 0.996, v0, 0.996, v1, 0.004, v1], WHITE, s8, MOD.PANEL0 + (pi >> 1), 120));
     }
   }
@@ -508,7 +538,7 @@ function heroMarket(c, fr, add) {
     const [ax, az, bx, bz, nx, nz, L] = E; if (L < 3) return;
     const g = gapOf(c, E), out = Math.max(1.2, Math.min(2.6, g + 1.2));
     add(M, slopeStrip(M, ax, az, bx, bz, nx, nz, out, y0 + 3.0, y0 + 2.55, blue, s8, MOD.D_AWN2));
-    if (idx === 0 && L >= 4) {   // bảng quảng cáo khổ lớn trên diềm mái (1-3 tấm)
+    if (idx === 0 && L >= 4 && c.fl <= 2) {   // bảng quảng cáo khổ lớn trên diềm mái (1-3 tấm) — chỉ hội trường thấp (không treo lưng chừng nhà cao)
       const ex = (bx - ax) / L, ez = (bz - az) / L, nB = Math.max(1, Math.min(3, Math.floor(L / 7))), bw = Math.min(6.5, L / nB - 0.6);
       for (let k = 0; k < nB; k++) {
         const sm = (L * (k + 0.5)) / nB, [px, pz] = edgeP(E, sm), yb = y0 + Math.max(3.4, H - 0.4), yt = yb + 2.2;
@@ -581,6 +611,9 @@ function heroPetrol(c, fr, add) {
   const W = Math.max(10, Math.min(18, L + 6));
   let D, cxm, czm;
   const [mx, mz] = edgeP(E, L / 2);
+  if (g < 7 && c.fl > 1) return;   // nhà nhiều tầng (heroTall) không có sân trước: mái che chụp lên footprint sẽ cắt ngang tường
+  // chỗ đứng hợp lệ cho trụ/cột bơm: không trong nhà khác (free) và không trong chính ki-ốt (phản biện: cột bơm lọt vào ki-ốt)
+  const ok = (x, z) => c.free(x, z) && !inPoly(c.X, c.Z, c.n, x, z);
   if (g >= 7) { D = Math.min(10, g - 1); cxm = mx + nx * (D / 2 + 0.3); czm = mz + nz * (D / 2 + 0.3); }
   else { const o = c.obb; D = Math.max(7, Math.min(10, o ? Math.min(o.u1 - o.u0, o.v1 - o.v0) + 3 : 8)); cxm = mx - nx * (D / 2 - Math.max(0, g) - 0.3); czm = mz - nz * (D / 2 - Math.max(0, g) - 0.3); }
   const yC = y0 + 5.2;
@@ -593,6 +626,7 @@ function heroPetrol(c, fr, add) {
   // trụ (sọc 2 màu: thân trắng + chân màu nhấn)
   for (const sa of [-1, 1]) for (const sc of [-1, 1]) {
     const qx = cxm + ex * (W / 2 - 1.6) * sa + nx * (D / 2 - 1.2) * sc, qz = czm + ez * (W / 2 - 1.6) * sa + nz * (D / 2 - 1.2) * sc;
+    if (!c.free(qx, qz)) continue;
     add(M, box(M, qx, qz, ex, ez, nx, nz, 0.22, 0.22, y0 - 0.1, yC, white, s8, MOD.D_PLAIN, 1 | 2 | 4 | 8));
     add(M, box(M, qx, qz, ex, ez, nx, nz, 0.24, 0.24, y0 - 0.1, y0 + 1.1, acc, s8, MOD.D_PLAIN, 1 | 2 | 4 | 8 | 16));
   }
@@ -600,6 +634,7 @@ function heroPetrol(c, fr, add) {
   const G = DT || M;
   for (const s of [-1, 1]) {
     const ix = cxm + ex * (W / 4) * s, iz = czm + ez * (W / 4) * s;
+    if (!ok(ix, iz) || !ok(ix + nx * 1.6, iz + nz * 1.6) || !ok(ix - nx * 1.6, iz - nz * 1.6)) continue;
     add(G, box(G, ix, iz, ex, ez, nx, nz, 0.6, 2.2, y0 - 0.05, y0 + 0.18, GRANITE, s8, MOD.D_PLAIN, 1 | 2 | 4 | 8 | 16));
     for (const t of [-1, 1]) {
       const qx = ix + nx * 1.1 * t, qz = iz + nz * 1.1 * t;

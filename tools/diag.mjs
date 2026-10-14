@@ -11,9 +11,11 @@
 //  5. 0 lỗi JS.
 // Thoát mã 1 nếu có vấn đề (dùng được trong CI/pre-push).
 import { openGame, args } from './qa/launch.mjs';
+import { checkHerokit } from './check_herokit.mjs';
 const A = args();
+const hk = await checkHerokit();   // W5-A: dữ liệu hero khớp đúng bản buildings_real (không cần trình duyệt)
 const g = await openGame({ port: A.get('port', '8177'), quality: A.get('quality', 'full') });
-const problems = [];
+const problems = [...hk.problems];
 if (!g.hpReadyMs) problems.push('game không khởi động được');
 else {
   await g.pg.waitForTimeout(+A.get('settle', '4000'));

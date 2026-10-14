@@ -13,6 +13,7 @@ import fs from 'fs';
 import { collectFP, mapFacadeFP, FP_COLS, FP_ENUMS } from './gen_facade_fp.mjs';
 import { RB_B64 } from '../js/buildings_real.js';
 import { decodeRB } from '../js/buildings_data.js';
+import { rbHash } from './check_herokit.mjs';
 
 const A = process.argv.slice(2);
 if (A.length < 2) { console.error('usage: node tools/gen_herokit.mjs <fp_json dir> <fp_plan.json> [--dump out.json]'); process.exit(1); }
@@ -43,6 +44,13 @@ const RX = {
   canopy: /mái che|mái sảnh|mái hiên kính|canopy|porte/i,
   tile: /ngói|tile roof|tiled/i,
   curved: /cong|curved|góc tròn|rounded/i,
+  // phản biện W5-A: ghi chú tả NHÀ BÊN CẠNH trạm xăng ('nhà thấp kem sau trạm xăng') ≠ cây xăng
+  petrolNeighbour: /(sau|cạnh|bên|gần|đối diện|behind|next to|beside|near|opposite|across from)\s+(the\s+|a\s+)?(trạm xăng|cây xăng|cửa hàng xăng|petrol|gas station|fuel station)/i,
+  // sạp/quầy/bạt/ô dù/lưới che TRƯỚC nhà (chợ cóc tràn vỉa hè) ≠ NHÀ chợ: chỉ tính khi ghi chú nói rõ là nhà/hội trường chợ
+  marketStall: /sạp|quầy|bạt|ô dù|lưới|stall|umbrella|tarp|(^|\s)net(ting)?(\s|$)|awning|racks?/i,
+  marketHallStrong: /nhà chợ|nhà lồng|chợ có mái|chợ mái tôn|mái tôn[^,]*chợ|market hall|covered market|market building|(^|\s)shed/i,
+  // ghi chú nói ≥ 3 tầng ('dãy nhà chợ cũ bốn tầng') → không phải hội trường chợ thấp
+  tallNote: /(ba|bốn|năm|sáu|bảy|tám|[3-9])\s*tầng|(three|four|five|six|seven|eight|[3-9])[- ]?stor/i,
 };
 
 const fpDir = A[0], planFile = A[1];
@@ -70,10 +78,13 @@ function obsProg(o, note) {
   const st = o[C.style], g = o[C.ground], w = o[C.windows], fl = o[C.floors];
   const nt = note || '';
   const wallOnly = RX.wallOnly.test(nt) && !RX.pagoda.test(nt.replace(RX.wallOnly, '')) && fl <= 1;
-  if (RX.petrol.test(nt)) return P.petrol;
+  if (RX.petrol.test(nt) && !RX.petrolNeighbour.test(nt) && (fl <= 2 || fl < 0)) return P.petrol;
   if (wallOnly) return 0;   // quan sát tả TƯỜNG RÀO/CỔNG chứ không phải nhà
   if (st === SI.temple || (RX.pagoda.test(nt) && !/tường rào chùa|rào chùa/i.test(nt))) return P.pagoda;
-  if ((st === SI.market && (o[C.roof] === RI.tin || RX.marketHall.test(nt))) || RX.marketHall.test(nt)) return P.market;
+  // NHÀ CHỢ (hội trường mái tôn thấp — citygen ép ≤ 2 tầng): phản biện W5-A — sạp/bạt trước nhà 8 tầng (pano_006 b4401)
+  // hay 'dãy nhà chợ cũ bốn tầng' (353) KHÔNG phải nhà chợ; quan sát ≥ 3 tầng cũng không
+  if (((st === SI.market && o[C.roof] === RI.tin) || RX.marketHall.test(nt))
+    && (!RX.marketStall.test(nt) || RX.marketHallStrong.test(nt)) && !RX.tallNote.test(nt) && (fl <= 2 || fl < 0)) return P.market;
   if (RX.bank.test(nt)) return P.bank;
   if (RX.hotel.test(nt) && !/nhà nghỉ/i.test(nt) && (fl >= 4 || fl < 0)) return P.hotel;
   if (RX.store.test(nt) && (g === GI.glass_store || w === WI.glass_curtain || st === SI.glass_office)) return P.store;
@@ -146,7 +157,9 @@ for (const bi of [...per.keys()].sort((a, b) => a - b)) {
   stat.prog[PROG[best]] = (stat.prog[PROG[best]] || 0) + 1;
 }
 OUT.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
-const meta = { v: 1, generator: 'tools/gen_herokit.mjs', rb: D.nB, obs: FP.obs.length, sameObsAsFacadeFP: sameObs, hits: R.hits.length, n: OUT.length, ...stat };
+// KHOÁ CHỐNG DỮ LIỆU CŨ (phản biện W5-A): số nhà + băm FNV-1a của RB_B64 — tools/check_herokit.mjs (diag gọi) báo lỗi nếu
+// js/buildings_real.js đã sinh lại mà chưa chạy lại tool này (nhà đổi hình mất chương trình KHÔNG lỗi lúc chạy)
+const meta = { v: 2, generator: 'tools/gen_herokit.mjs', rb: D.nB, rbHash: rbHash(RB_B64), obs: FP.obs.length, sameObsAsFacadeFP: sameObs, hits: R.hits.length, n: OUT.length, ...stat };
 const txt = '// js/herokit_data.js — SINH TỰ ĐỘNG bởi tools/gen_herokit.mjs (Đợt 3 W5-A HERO-KIT). ĐỪNG SỬA TAY.\n'
   + '// HERO[i] = [cx·10, cz·10 (tâm diện tích footprint, dm), chương trình (HERO_PROG), màu tường sRGB | −1, màu nhấn (biển) sRGB | −1,\n'
   + '//            cờ: 1 mái ngói · 2 rào/cổng · 4 mái che sảnh · 8 bậc thang · 16 cửa vòm · 32 khối cong · 64 hàng cột · 128 điện máy · 256 thời trang · 512 điện thoại,\n'

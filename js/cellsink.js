@@ -20,7 +20,7 @@ import { claimBox } from './claims.js';
 import { BRAND_MAP, debrand } from './brands.js';
 import { PARKS } from './mapdata.js';
 import { LM_POLY } from './landmark_polys.js';
-import { heroOfPoly, heroProg, heroesNear, heroFamily, heroProgOfName } from './herokit.js';   // Đợt 3 W5-A HERO-KIT
+import { heroOfPoly, heroProg, heroesNear, heroFamily, heroProgOfName, HP } from './herokit.js';   // Đợt 3 W5-A HERO-KIT
 import { guardCellPalette, cellCanvasFx, gridFacadeSpec, paintGridFacade } from './cellfacade.js';   // Đợt 3 W3-C: palette guard nhà ô giữ lại
 import { clearanceReady, samplesFromHulls, evalShift, solveShift, sweepAssemblies, flushClearance, massOnStreet, minWidth, thinMeshOf, trimThinWall, corrCount, nearAnyRoad, nearestPano, CLEAR } from './clearance.js';   // Đợt 3 W2-A
 
@@ -545,6 +545,11 @@ function commitSink(sink, THREE, realScene, realFC, colliders, opts) {
   let nHero = 0; const heroCand = [];
   const heroMemo = new Map();
   const heroB = (b) => { let v = heroMemo.get(b); if (v === undefined) { const r = heroOfPoly(D, b); v = heroProg(r.hi) ? r.area : 0; heroMemo.set(b, v); } return v; };
+  const heroP = (b) => { const r = heroOfPoly(D, b); return heroProg(r.hi); };
+  // phản biện W5-A: KHÔNG gỡ nhà ô (a) CHÙA/đền (tên hoặc chương trình nhà thật = chùa: kit chùa fabric không dựng lại được mái
+  // nhiều tầng ở khổ 2.190 m² — pano_276 tx_chua_hbt thành hội trường thuộc địa vàng), (b) loại 'heritage', (c) phủ nhà hero
+  // ≥ 1.500 m² (chợ Con, khối VIB/kinh158 2.321 m² lấp sân trước) — trừ khi có trong HERO_ALLOW (đã đối chiếu vệ tinh + pano)
+  const HERO_ALLOW = new Set([]);
   // diện tích (xấp xỉ, m²) mỗi nhà thật bị các nhà ô DANH TÍNH còn giữ đè lên — nhà hero mà nhà ô KHÁC (giữ lại) vẫn đè
   // > 15% thì citygen sẽ giết nó theo claim 'cell' ⇒ gỡ nhà ô này chỉ để lại khoảng trống (phản biện r3: pano_510/235 văn phòng
   // b2805 bị biệt thự 'v4_lejardin_villa' đè 20% → 'dl_caooc_mk' phải GIỮ)
@@ -576,9 +581,13 @@ function commitSink(sink, THREE, realScene, realFC, colliders, opts) {
     }
     let blocked = false;
     for (const b of seen) { const own = (it.perB.get(b) || 0) * stepOf(it); if ((coverB.get(b) || 0) - own > 0.15 * heroB(b)) blocked = true; }
-    const ok = hOK && !blocked && (np ? famNear && fracS >= 0.3 : frac >= 0.5);
+    let progMax = 0, pa = -1;   // chương trình nhà hero chiếm nhiều khối đặc nhất (báo cáo + luật chùa)
+    for (const [b, cnt] of it.perB || []) if (heroB(b) && cnt > pa) { pa = cnt; progMax = heroP(b); }
+    let pagoda = np === HP.PAGODA; for (const b of seen) if (heroP(b) === HP.PAGODA) pagoda = true;
+    const keepId = !HERO_ALLOW.has(it.name) && (pagoda || it.kind === 'heritage' || area >= 1500);
+    const ok = hOK && !blocked && !keepId && (np ? famNear && fracS >= 0.3 : frac >= 0.5);
     if (!hit && !ok) continue;
-    heroCand.push([it.name, it.kind, +frac.toFixed(2), n, Math.round(area), +it.height.toFixed(1), [...seen].join('+'), ok ? 1 : 0, Math.round(it.cx), Math.round(it.cz)]);
+    heroCand.push([it.name, it.kind, +frac.toFixed(2), n, Math.round(area), +it.height.toFixed(1), [...seen].join('+'), ok ? 1 : 0, Math.round(it.cx), Math.round(it.cz), progMax, keepId ? 1 : 0]);
     if (!ok) continue;
     it.removed = 'hero'; nHero++;
   }
@@ -978,7 +987,7 @@ function commitSink(sink, THREE, realScene, realFC, colliders, opts) {
     // kinds = TỔNG nhà theo loại (kể cả bản trùng bị gỡ); keptKinds = chỉ nhà GIỮ LẠI (có claim)
     kinds: { civic: cnt((it) => it.bldg && it.kind === 'civic'), tower: cnt((it) => it.bldg && it.kind === 'tower'), heritage: cnt((it) => it.bldg && it.kind === 'heritage'), bespoke: cnt((it) => it.bldg && it.kind === 'bespoke'), house: cnt((it) => it.bldg && it.kind === 'house'),
       tree: cnt((it) => it.kind === 'tree'), open: cnt((it) => it.kind === 'open'), prop: cnt((it) => it.kind === 'prop'), sys: cnt((it) => it.kind === 'sys') },
-    heroCand,   // W5-A: [tên, loại, phần khối đặc trên nhà hero, ô đặc, m² nhà hero, cao, nhà hero, gỡ?, cx, cz]
+    heroCand,   // W5-A: [tên, loại, phần khối đặc trên nhà hero, ô đặc, m² nhà hero, cao, nhà hero, gỡ?, cx, cz, chương trình nhà hero chính, giữ-danh-tính?]
     removed: { total: nRem, overlap: cnt((it) => it.removed === 'overlap'), near: cnt((it) => it.removed === 'near'), park: cnt((it) => it.removed === 'park'), dup: cnt((it) => it.removed === 'dup'), hero: nHero, attached: propsRemoved },
     keptBuildings: bl.filter((it) => !it.removed).length,
     keptKinds: bl.filter((it) => !it.removed).reduce((o, it) => { o[it.kind] = (o[it.kind] || 0) + 1; return o; }, {}),
