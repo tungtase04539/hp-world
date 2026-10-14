@@ -147,6 +147,26 @@ export function buildRoadGraph({ margin = 20, waterStep = 4, snap = 8 } = {}) {
       }
       return 0;
     },
+    // nearest node reachable by a DRY straight line from (x, z) (sampled every 2 m) — a bot placed at a saved position on
+    // a lake shore must not walk across the water to the closest node on the far bank (the server corrects / kicks it;
+    // a real client cannot walk on water). Falls back to nearest() when no dry candidate exists within 400 m.
+    nearestDry(x, z) {
+      const cand = [];
+      const bx = Math.floor(x / BUCKET), bz = Math.floor(z / BUCKET), R = Math.ceil(400 / BUCKET);
+      for (let dx = -R; dx <= R; dx++) for (let dz = -R; dz <= R; dz++) {
+        const b = buckets.get((bx + dx) + ':' + (bz + dz));
+        if (b) for (const i of b) cand.push([Math.hypot(this.x[i] - x, this.z[i] - z), i]);
+      }
+      cand.sort((p, q) => p[0] - q[0]);
+      for (const [d, i] of cand) {
+        if (d > 400) break;
+        const n = Math.max(1, Math.ceil(d / 2));
+        let dry = true;
+        for (let s = 1; s < n && dry; s++) { const f = s / n; if (isWater(x + (this.x[i] - x) * f, z + (this.z[i] - z) * f)) dry = false; }
+        if (dry) return i;
+      }
+      return this.nearest(x, z);
+    },
     // A* shortest path (node list, inclusive) from a to b; null if unreachable
     path(a, b) {
       if (a === b) return [a];
@@ -185,7 +205,8 @@ export class Walker {
     this.g = g; this.rand = rand;
     this.x = x; this.z = z; this.yaw = 0;
     this.prev = -1;
-    this.to = g.nearest(x, z);   // first walk straight to the nearest node (from a sidewalk spawn: a few metres)
+    // first walk straight to the nearest node reachable without crossing water (sidewalk spawn: a few metres)
+    this.to = typeof g.nearestDry === 'function' ? g.nearestDry(x, z) : g.nearest(x, z);
     this.route = null;           // optional list of nodes to follow (A*)
     this.leash = null;           // {x, z, r}: prefer staying within r of (x, z) when wandering
   }

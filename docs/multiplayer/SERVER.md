@@ -548,6 +548,11 @@ suy từ `JWT_PRIVATE_KEY`, `sub` = mã tài khoản.
 - Mã `EVENT.SANCTION` (1 mute, 2 ban, 3 kick, 4 warn) mới là đề xuất — nên thêm hằng vào `protocol.js` (nền móng).
 - Danh sách từ cần người Việt bản ngữ duyệt lại sau buổi chơi thử đầu tiên (xem câu bị đánh dấu trên trang quản trị).
 
+**Sau tích hợp (15/10/2026)**: 3 mục đầu đã xong — gateway nối đủ 8 mục của §3.3 (kiểm bằng `server/test/integ.test.js`
+qua socket thật), Docker đặt `ADMIN_ALLOW_IPS` = gateway mạng `hostlink` cố định + `DATA_DIR` là volume ghi được, và
+`SANCTION_KIND` đã vào `js/shared/protocol.js`. Bảng `netprobe_results` nay luôn có (migration 030) nên trang đọc qua dịch
+vụ `netprobe` của S5. Mục cuối (duyệt danh sách từ) còn mở.
+
 ## 4. Bot & load test (S4, 14/10/2026)
 
 ### 4.1 Cấu trúc `server/bots/`
@@ -639,6 +644,13 @@ snapshot/AOI ghi n/a). Báo cáo đầy đủ trong scratchpad `mp/s4/foundation
 - Resume: bot gửi HELLO{flags RESUME, ticket rỗng, resumeToken} và coi là thành công khi WELCOME có **cùng netId**
   (SYSTEM RESUMED trước đó là tuỳ chọn). Sau resume bot gửi READY lại và chờ keyframe.
 - Bot coi `EVENT CHAT_REJECTED` của bot trung thực là dương tính giả của bộ lọc (báo cáo đếm riêng).
+
+**Sau tích hợp (15/10/2026)**: mọi điểm trên đã có trên máy chủ gộp (miễn giới hạn IP cho loopback/IP riêng, metric
+`hp_snapshot_ms`, `hp_ccu`, `hp_degrade_level`, `hp_queue_length`). Sửa trong harness: `deviceId` = `<tag>-<idx 6 số>`
+(máy chủ đòi 8–64 ký tự) và `--device-tag` để chạy abuse bằng tài khoản mới (tài khoản cũ có thể đang bị khoá chat từ lần
+trước); `Walker` đi tới nút đường gần nhất **không băng qua nước** (`nearestDry`); `chat_bypass` đo bằng tin vọng lại người
+gửi (câu bị che = đã vô hiệu, trùng nguyên văn = lọt); worker con chỉ thoát sau khi tin `final` IPC đã gửi xong (trước đây
+thoát cứng sau 300 ms → mất kết quả cả một worker khi tải nặng). Kết quả đủ 7 kịch bản: §6.5.
 
 ## 5. S5 — Vận hành tự host, netprobe, sổ tay (15/10/2026)
 

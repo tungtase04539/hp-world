@@ -153,7 +153,13 @@ export function register(app) {
     const v = T.verify(ticket);
     if (!v.ok) { authFail(conn, v.reason); return; }
     if (!T.consume(v.nonce, v.exp)) { authFail(conn, AUTH_REASON.REUSED); return; }
-    Q.release(v.nonce);
+    // the ticket's capacity reservation is held until the session exists (or the HELLO fails). Releasing it before the
+    // async player load let /v1/join hand out tickets beyond the cap in the meantime (integration stress run: 2,000
+    // bots → 10 SYSTEM SERVER_FULL at HELLO for holders of valid tickets).
+    try { await admit(conn, v, tier, wv); } finally { Q.release(v.nonce); }
+  }
+
+  async function admit(conn, v, tier, wv) {
     const lim = app.get('ratelimit').http.helloAccount;
     if (!lim.take(v.accountId)) {
       send(conn, encodeSystem(w, SYS.BACKOFF, R.backoffMs(1)));

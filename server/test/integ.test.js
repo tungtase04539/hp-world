@@ -78,6 +78,31 @@ test('admin sanctions reach the live session: mute/warn → EVENT SANCTION, kick
   } finally { await s.app.stop(); }
 });
 
+test('a join ticket keeps its capacity slot until the session exists (no overshoot during the HELLO player load)', async () => {
+  const s = await bootCore({ CAPACITY: '1' });
+  try {
+    const a = await guest(s, 'Mot'), b = await guest(s, 'Hai');
+    const ja = await joinTicket(s, a.accessToken);
+    assert.ok(ja.body.ticket);
+    assert.ok((await joinTicket(s, b.accessToken)).body.queue, 'cap 1, one ticket out → queued');
+    // slow down the HELLO's player load; while it is in flight, B must still be queued
+    const db = s.app.db, one = db.one.bind(db);
+    let release;
+    const gate = new Promise((r) => { release = r; });
+    db.one = async (sql, params) => { if (/c\.appearance, c\.pos_x/.test(sql)) await gate; return one(sql, params); };   // persist.loadPlayer only
+    const { Client } = await import('./core_util.mjs');
+    const c = await Client.open(s.ws + '/play');
+    c.hello(ja.body.ticket);
+    await sleep(150);
+    const jb = await joinTicket(s, b.accessToken);
+    assert.ok(jb.body.queue, 'B is still queued while A\'s HELLO loads: ' + JSON.stringify(jb.body));
+    release(); db.one = one;
+    await c.op(S2C.WELCOME);
+    assert.equal(s.app.get('queue').stats().reserved, 0);
+    c.close();
+  } finally { await s.app.stop(); }
+});
+
 test('owner broadcast / restart notice reach players; self-harm words → SUPPORT_LINE; admin map shows the real position', async () => {
   const s = await bootCore();
   try {

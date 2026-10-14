@@ -10,7 +10,7 @@ import { LogHist, LinHist, rng } from './lib/stats.mjs';
 
 const port = !isMainThread && parentPort
   ? { post: (m) => parentPort.postMessage(m), on: (fn) => parentPort.on('message', fn), kind: 'thread' }
-  : { post: (m) => process.send && process.send(m), on: (fn) => process.on('message', fn), kind: 'fork' };
+  : { post: (m, cb) => (process.send ? process.send(m, cb) : cb && cb()), on: (fn) => process.on('message', fn), kind: 'fork' };
 
 const COUNTERS = ['connectOk', 'connectFail', 'authGuest', 'authRefresh', 'queued', 'resumeAttempt', 'resumeOk', 'resumeFail',
   'rxBytes', 'txBytes', 'msgsIn', 'msgsOut', 'snaps', 'keyframes', 'decodeErrors', 'corrects', 'chatSent', 'chatRecv',
@@ -111,8 +111,10 @@ async function finish() {
     records: bots.map((b) => b.r),
     recv: bots.filter((b) => b.recv && b.recv.length).map((b) => ({ idx: b.s.idx, netId: b.r.netId, recv: b.recv })),
     creds: bots.filter((b) => b.creds && b.creds.refreshToken).map((b) => ({ idx: b.s.idx, ...b.creds })),
-  });
-  if (port.kind === 'fork') setTimeout(() => process.exit(0), 300);
+  }, () => { if (port.kind === 'fork') setTimeout(() => process.exit(0), 50); });
+  // exit only after the (large) final IPC message is flushed: exiting on a fixed 300 ms timer lost a whole worker's
+  // results under load (integration 15/10/2026: reconnect run merged 800 of 1,000 bots). Safety net: 15 s.
+  if (port.kind === 'fork') setTimeout(() => process.exit(0), 15000).unref();
 }
 
 port.on((m) => {
