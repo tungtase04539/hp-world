@@ -2034,12 +2034,16 @@ function applyFP(b, fr) {
   if (fr.roof === FP_ENUMS.roof.indexOf('tile') && b.floors <= 4 && b.roofType !== ROOF.HIP_TILE) { b.roofType = ROOF.HIP_TILE; b.roofColor = [2, 1, 0, 10, 3, 14][hash32(b.id + 'fproof') % 6]; }
   // màu tường ĐO TRÊN ẢNH gồm cả bóng râm/ngược sáng (pano_432 h270: tường "#33302c" → khối đen sì trong game, nơi đèn game
   // tự đổ bóng lần nữa) → nâng độ sáng tương đối tối thiểu 0,55 (giữ sắc độ; 0,42 vẫn xám tối trong bóng game) trừ nhà kính/khách sạn kính
-  // W4-A r2 (phản biện): chặn độ bão hoà HSV S ≤ 0,45 (giữ sắc độ H + độ sáng V) — màu biển/bạt lọt vào làm tường (640/4.311
+  // W4-A r2 (phản biện): chặn độ bão hoà HSV S ≤ 0,3-0,45 theo sắc độ (giữ H + độ sáng V) — màu biển/bạt lọt vào làm tường (640/4.311
   // tường S > 0,45: khối đỏ/cam/tím pano_193/092/446/175/368); tường thật HP (vàng/hồng/xanh ngọc) đều ≤ ~0,45
   if (fr.wall >= 0) {
     const c = [(fr.wall >> 16) & 255, (fr.wall >> 8) & 255, fr.wall & 255], mx = Math.max(...c), mn = Math.min(...c);
-    if (mx > 0 && (mx - mn) / mx > 0.45) {
-      const lo = mx * 0.55, q = c.map((v) => Math.round(mx - ((mx - v) * (mx - lo)) / (mx - mn)));
+    // sắc độ H: đỏ/cam/hồng sẫm (H < 35° hoặc > 300°) và lam/tím (200-300°) là màu BIỂN/BẠT điển hình, tường thật hiếm khi rực
+    // → trần 0,3 / 0,35 (ảnh r2: 368 h90, 446 h270 vẫn khối đỏ ở 0,45); vàng/xanh lá/xanh ngọc giữ 0,45
+    let H = 0; if (mx > mn) { const d = mx - mn; H = mx === c[0] ? ((c[1] - c[2]) / d + 6) % 6 : mx === c[1] ? (c[2] - c[0]) / d + 2 : (c[0] - c[1]) / d + 4; H *= 60; }
+    const sCap = H < 35 || H > 300 ? 0.3 : H >= 200 ? 0.35 : 0.45;
+    if (mx > 0 && (mx - mn) / mx > sCap) {
+      const lo = mx * (1 - sCap), q = c.map((v) => Math.round(mx - ((mx - v) * (mx - lo)) / (mx - mn)));
       fr = { ...fr, wall: (q[0] << 16) | (q[1] << 8) | q[2] }; stat('fp_wall_desat');
     }
   }
