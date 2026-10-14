@@ -1004,7 +1004,10 @@ const HERO_SPOTS = [
 // phụ đa ≤ ~1,9 m —, không nhà, không camera pano 6 m, không nước) và (b) THẤY ĐƯỢC từ camera pano (đoạn camera → gốc
 // không cắt footprint nhà nào, bước 0,5 m); chọn điểm GẦN điểm đo nhất. Không có → bỏ (cảnh báo).
 // Trả [[x, z, bán kính cấm cây khác]] cho hàng cây vỉa hè.
+const HERO_OCC_W = 1.0;
+let _heroDbg = [];
 function plantHeroSpots(ctx, RI, fp, inLM, BLOCK) {
+  _heroDbg = [];
   const keep = [];
   // (review W3-G: + cụm thân Ø ~2,6 m không chạm nhà — 8 điểm vòng 1,5 m —, hành lang keepClear, địa danh + 2,5 m, claim chặn)
   const trunkFree = (x, z) => { if (!fp) return true; for (let q = 0; q < 8; q++) { const a = q * Math.PI / 4; if (fp.at(x + Math.cos(a) * 1.5, z + Math.sin(a) * 1.5) >= 0) return false; } return true; };
@@ -1020,16 +1023,24 @@ function plantHeroSpots(ctx, RI, fp, inLM, BLOCK) {
   for (const S of HERO_SPOTS) {
     const [cx, cz] = S.cam, D0 = Math.hypot(S.d, S.lat), b0 = S.h * Math.PI / 180 - Math.atan2(S.lat, S.d);   // la bàn: trái = −
     const x0 = cx + Math.sin(b0) * D0, z0 = cz - Math.cos(b0) * D0;
-    let px = null, pz = null, best = 1e9;
+    // (review W3-G) điểm = cự ly tới điểm đo + HERO_OCC_W × (tỉ lệ đĩa 0,65 R quanh gốc nằm trong nhà) × R: phố game có dãy nhà
+    // 12-15 m nơi ảnh là bãi trống/góc phố (088/400) → gốc sát nhà thì cành/tán đâm tường dù xoay/ép (heroFit) — ưu tiên chỗ
+    // THOÁNG trong nón đo (ảnh: đa đứng sát bó vỉa, tán vươn ra lòng đường)
+    const occ = (x, z) => { if (!fp) return 0; let n = 0; for (const f of [0.25, 0.45, 0.65]) for (let q = 0; q < 12; q++) { const a = q * Math.PI / 6 + f; if (fp.at(x + Math.cos(a) * f * S.R, z + Math.sin(a) * f * S.R) >= 0) n++; } return n / 36; };
+    let px = null, pz = null, best = 1e9, p0 = null, best0 = 1e9;
     for (let db = -12; db <= 12; db += 1) {
       const b = b0 + db * Math.PI / 180, ux = Math.sin(b), uz = -Math.cos(b);
       for (let t = 6; t <= D0 + 8; t += 0.5) {
-        const x = cx + ux * t, z = cz + uz * t, sc = Math.hypot(x - x0, z - z0);
-        if (sc >= best) continue;
+        const x = cx + ux * t, z = cz + uz * t, d = Math.hypot(x - x0, z - z0);
+        if (d >= best && d >= best0) continue;
         if (fp && fp.at(x, z) >= 0) break;          // tia đã vào nhà: xa hơn đều bị che
-        if (free(x, z) && seen(cx, cz, x, z)) { best = sc; px = x; pz = z; }
+        if (!free(x, z) || !seen(cx, cz, x, z)) continue;
+        const o = occ(x, z), sc = d + HERO_OCC_W * o * S.R;
+        if (sc < best) { best = sc; px = x; pz = z; }
+        if (d < best0) { best0 = d; p0 = [+x.toFixed(2), +z.toFixed(2), +o.toFixed(2)]; }
       }
     }
+    if (px !== null) _heroDbg.push({ kind: S.kind, at: [+px.toFixed(2), +pz.toFixed(2)], occ: +occ(px, pz).toFixed(2), dMeas: +Math.hypot(px - x0, pz - z0).toFixed(1), nearest: p0 });
     if (px === null) { console.warn('[trees] hero spot không có chỗ trống thấy được', S.kind, x0.toFixed(1), z0.toFixed(1)); continue; }
     plant(S.kind, px, pz, { h: S.H, r: S.R, wash: 0, big: 1, src: 3 });
     // collider: props.js chỉ coi collider r ≤ 1,0 là vật cản (xe máy đỗ/quán) — 1 collider r 1,9 cũ bị bỏ qua ⇒ hàng xe máy
@@ -1662,43 +1673,69 @@ export function buildTrees(scene, ctx = {}) {
   const LEAN_T = Math.tan(LEAN_NAT_DEG * Math.PI / 180);
   // W3-G review: cây HERO (r.big — đa/me cổ thụ đo theo ảnh) bỏ facadeFit (tán thật trùm qua mái) nhưng hướng xoay kit
   // từng là hash ngẫu nhiên → cành chính 7,6 m của đa đâm XUYÊN mặt tiền (pano_400_h180: cục điều hoà trên tường hiện
-  // TRƯỚC cành). → dựng điểm mẫu kit gần (cành ×3, lá ×1; bỏ hoa, bỏ phần < 2 m) đúng như shader (tán ×cs, nâng lift,
-  // ×sxz/sy), thử 24 hướng xoay, đếm điểm lọt footprint nhà DƯỚI mái (heightOf + tường chắn mái) → giữ hướng ít va nhất;
-  // còn va → ép nửa tán phía nhà (cơ chế TÁN LỆCH của facadeFit, hướng = ngược trọng tâm điểm va) mức NHỎ NHẤT đủ hết va
-  // (bước 0,08, ≤ SQ_MAX) — không thu R (thu R = tán đa còn 3,6 m, khung pano chỉ thấy thân — phiên 3)
+  // TRƯỚC cành). → dựng điểm mẫu kit gần (≤ 4000 đỉnh; bỏ hoa, bỏ phần < 2 m) đúng như shader (tán ×cs, nâng lift,
+  // ×sxz/sy), đếm điểm lọt footprint nhà DƯỚI mái (heightOf + tường chắn mái): CÀNH va = lỗi (×10), LÁ va = bị tường che
+  // (×1, chỉ xếp hạng). (1) 24 hướng xoay → điểm nhỏ nhất; (2) còn cành va → ép nửa tán phía nhà (TÁN LỆCH của facadeFit,
+  // hướng = ngược trọng tâm điểm va) mức nhỏ nhất hết cành va (bước 0,08, ≤ SQ_MAX); (3) vẫn còn → thu tán ×0,92/bước
+  // tới ≥ 0,6 R (luật 1,5 m cũ thu tán đa về 3,6 m + ép 88% ⇒ khung pano chỉ thấy thân — phiên 3)
   fit.hero = [];
   const heroFit = (r, k) => {
+    const tH = performance.now();
     const A = k.geo.attributes, P = A.position.array, HT = A.aHt.array, KD = A.aKind.array, nv = HT.length;
-    const st = Math.max(1, Math.floor(nv / 4000)), pts = [];
+    const st = Math.max(1, Math.floor(nv / 2500)), pts = [];
+    let nW = 0;
     for (let i = 0; i < nv; i += st) {
       const kd = KD[i]; if (kd > 2.5) continue;
       const cr = HT[i] >= 1.5, m = cr ? r.cs * r.sxz : r.sxz, Y = (P[i * 3 + 1] + r.lift * (cr ? 1 : HT[i])) * r.sy;
       if (Y < 2) continue;
-      pts.push(P[i * 3] * m, Y, P[i * 3 + 2] * m, kd < 1.5 ? 3 : 1, cr ? 1 : 0);
+      pts.push(P[i * 3] * m, Y, P[i * 3 + 2] * m, kd < 1.5 ? 1 : 0, cr ? 1 : 0); if (kd < 1.5) nW++;
     }
-    const roof = (b) => (fpD ? heightOf(fpD.floors[b]) + PARAPET_H : 1e9);
-    const ev = (yaw, nx, nz, sq) => {
-      const c = Math.cos(yaw), sn = Math.sin(yaw); let w = 0, hx = 0, hz = 0;
+    // lưới mái 0,5 m quanh gốc (tra 1 lần — mỗi lần ev chỉ đọc mảng; ~150 lần ev / cây hero): ô = cao mái nhà (−1 = trống)
+    let R0 = 1;
+    for (let i = 0; i < pts.length; i += 5) R0 = Math.max(R0, Math.hypot(pts[i], pts[i + 2]));
+    R0 += 1;
+    const CS = 0.5, GN = Math.ceil(2 * R0 / CS), RG = new Float32Array(GN * GN);
+    for (let gi = 0; gi < GN; gi++) for (let gj = 0; gj < GN; gj++) {
+      const b = fpG.at(r.x - R0 + (gi + 0.5) * CS, r.z - R0 + (gj + 0.5) * CS);
+      RG[gi * GN + gj] = b < 0 ? -1 : fpD ? heightOf(fpD.floors[b]) + PARAPET_H : 1e9;
+    }
+    // w = điểm CÀNH lọt nhà (lỗi thấy rõ: cành đâm vào tường), l = điểm LÁ lọt nhà (bị tường che — chấp nhận được, chỉ xếp hạng)
+    const ev = (yaw, nx, nz, sq, f) => {
+      const c = Math.cos(yaw), sn = Math.sin(yaw); let w = 0, l = 0, hx = 0, hz = 0, wt = 0;
       for (let i = 0; i < pts.length; i += 5) {
-        let X = pts[i] * c + pts[i + 2] * sn, Z = -pts[i] * sn + pts[i + 2] * c;
+        const g = pts[i + 4] ? f : 1;
+        let X = (pts[i] * c + pts[i + 2] * sn) * g, Z = (-pts[i] * sn + pts[i + 2] * c) * g;
         if (sq > 0 && pts[i + 4]) { const d = X * nx + Z * nz; if (d < 0) { X -= nx * d * sq; Z -= nz * d * sq; } }
-        const b = fpG.at(r.x + X, r.z + Z);
-        if (b >= 0 && pts[i + 1] < roof(b)) { const q = pts[i + 3]; w += q; hx += X * q; hz += Z * q; }
+        const gi = Math.floor((X + R0) / CS), gj = Math.floor((Z + R0) / CS);
+        if (gi < 0 || gj < 0 || gi >= GN || gj >= GN) continue;
+        if (pts[i + 1] < RG[gi * GN + gj]) { const q = pts[i + 3] ? 10 : 1; if (pts[i + 3]) { w++; if (!pts[i + 4]) wt++; } else l++; if (pts[i + 4]) { hx += X * q; hz += Z * q; } }
       }
-      return { w, hx, hz };
+      return { w, l, wt, wc: w - wt, hx, hz, sc: 10 * w + l };
     };
-    const y0 = r.yaw, e0 = ev(y0, 0, 0, 0);
+    // 1) yaw: 24 hướng, điểm = 10 × cành + lá
+    const y0 = r.yaw, e0 = ev(y0, 0, 0, 0, 1);
     let by = y0, be = e0;
-    if (e0.w > 0) for (let j = 1; j < 24; j++) { const y = y0 + j * Math.PI / 12, e = ev(y, 0, 0, 0); if (e.w < be.w) { by = y; be = e; } if (!be.w) break; }
+    if (e0.sc > 0) for (let j = 1; j < 24; j++) { const y = y0 + j * Math.PI / 12, e = ev(y, 0, 0, 0, 1); if (e.sc < be.sc) { by = y; be = e; } if (!be.sc) break; }
     r.yaw = by;
-    let sq = 0, nx = 0, nz = 0, e1 = be;
-    if (be.w > 0) {
-      const l = Math.hypot(be.hx, be.hz) || 1; nx = -be.hx / l; nz = -be.hz / l;
-      for (let s2 = 0.08; s2 <= SQ_MAX + 1e-6; s2 += 0.08) { const e = ev(by, nx, nz, s2); if (e.w < e1.w) { e1 = e; sq = s2; } if (!e.w) break; }
+    // 2) còn CÀNH TÁN va (wc — thân/rễ phụ không thuộc tán: ép/thu không đổi được; rễ mảnh lọt tường bị tường che) → ép
+    //    nửa tán phía nhà mức nhỏ nhất hết cành va (không hết → mức ít cành va nhất)
+    //    hướng ép: 16 hướng + hướng ngược trọng tâm điểm va (nhà vây 2 phía → hướng chéo tốt hơn trọng tâm); mức nhỏ trước
+    let sq = 0, nx = 0, nz = 0, e1 = be, f = 1;
+    if (be.wc > 0) {
+      const ln = Math.hypot(be.hx, be.hz) || 1, dirs = [[-be.hx / ln, -be.hz / ln]];
+      for (let q = 0; q < 16; q++) dirs.push([Math.cos(q * Math.PI / 8), Math.sin(q * Math.PI / 8)]);
+      for (let s2 = 0.08; s2 <= SQ_MAX + 1e-6 && e1.wc > 0; s2 += 0.08) for (const [ux, uz] of dirs) {
+        const e = ev(by, ux, uz, s2, 1);
+        if (e.wc < e1.wc || (e.wc === e1.wc && e.sc < e1.sc && sq === s2)) { e1 = e; sq = s2; nx = ux; nz = uz; }
+      }
       if (sq > 0) { r.sq = +sq.toFixed(2); r.snx = nx; r.snz = nz; }
     }
-    fit.hero.push({ sp: SP_NAME[r.sp], x: +r.x.toFixed(1), z: +r.z.toFixed(1), n: pts.length / 5, hit0: e0.w, hitYaw: be.w, hit: e1.w,
-      dyaw: Math.round(((by - y0) * 180 / Math.PI) % 360), sq: r.sq || 0 });
+    // 3) vẫn còn cành va (nhà vây nhiều phía — 088/400: phố game có dãy nhà 12-15 m nơi ảnh là bãi trống) → thu tán từng
+    // bước ×0,92 tới ≥ 0,6 R (không về 3,6 m như luật 1,5 m cũ) cho tới khi hết cành va
+    if (e1.wc > 0) for (let f2 = 0.92; f2 >= 0.6 - 1e-6; f2 -= 0.08) { const e = ev(by, nx, nz, sq, f2); if (e.wc < e1.wc) { e1 = e; f = f2; } if (!e.wc) break; }
+    fit.hero.push({ sp: SP_NAME[r.sp], x: +r.x.toFixed(1), z: +r.z.toFixed(1), nWood: nW, n: pts.length / 5, wood0: e0.w, leaf0: e0.l,
+      woodYaw: be.w, leafYaw: be.l, limb0: e0.wc, limbYaw: be.wc, limb: e1.wc, trunkRoot: e1.wt, leaf: e1.l, dyaw: Math.round(((by - y0) * 180 / Math.PI) % 360), sq: r.sq || 0, f: +f.toFixed(2), ms: +(performance.now() - tH).toFixed(1) });
+    return f;
   };
   for (const r of recs) {
     const k = nearKits[r.kit], kf = farKits[r.sp], cau = r.sp === SP.CAU;
@@ -1730,7 +1767,7 @@ export function buildTrees(scene, ctx = {}) {
     // biến thể MẢNH kè hồ (r.slim, phiên 4): ×0,62
     r.sxz = clamp((r.H / k.def.H) ** 0.7 * (0.88 + hxz(r.x, r.z, 43) * 0.22), 0.45, 1.18) * (r.slim ? 0.62 : r.tiltX || r.tiltZ ? 0.85 : 1);
     r.cs = clamp(R / (k.rad * r.sxz), 0.35, 1.9);
-    if (r.big && fpG) heroFit(r, k);
+    if (r.big && fpG) { const f = heroFit(r, k); if (f < 1) { R *= f; r.cs = clamp(R / (k.rad * r.sxz), 0.35, 1.9); } }
     // kit XA (variant 0 của loài, > NEAR_R): sy/nâng/co tán RIÊNG theo số đo kit xa → mép dưới/ngọn/bán kính tán khớp
     // kit gần ở ranh LOD (trước: dùng aShape của kit gần → mép tán nhảy −1..+1,7 m khi đổi LOD). Khớp mép/ngọn THỰC của
     // kit gần (kể cả khi kẹp sy/nâng — cắt cụt biến thể 1 không hạ tán dưới chạc được), không phải B/H mong muốn
@@ -1999,7 +2036,7 @@ export function buildTrees(scene, ctx = {}) {
   };
   const bySp = {}; for (const r of recs) bySp[SP_NAME[r.sp]] = (bySp[SP_NAME[r.sp]] || 0) + 1;
   const info = {
-    trees: N, fix, fit, cut: recs.reduce((a, r) => a + r.cut, 0), bySpecies: bySp,
+    trees: N, fix, fit, heroSpots: _heroDbg, cut: recs.reduce((a, r) => a + r.cut, 0), bySpecies: bySp,
     // W3-G: số cây theo luật bằng chứng — vòm (tun), kè hồ nghiêng (tilt) / thân mảnh (slim), hero đích danh (big)
     ev: { tun: recs.reduce((a, r) => a + r.tun, 0), tilt: recs.reduce((a, r) => a + (r.tiltX || r.tiltZ ? 1 : 0), 0), slim: recs.reduce((a, r) => a + r.slim, 0), big: recs.reduce((a, r) => a + r.big, 0) }, heroes: heroList.map((l) => l.length), pits: pitIdx.length,
     kitTris: nearKits.map((k, i) => k && [SP_NAME[KIT_DEFS[i].sp] + i, k.tris]).filter(Boolean),
