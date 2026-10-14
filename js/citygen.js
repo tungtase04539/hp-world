@@ -111,7 +111,7 @@ const DAYLIT_GLASS = ['G_GLASS', 'G_SHOW', 'G_STORE0', 'G_STORE1', 'G_STORE2', '
 const DAYLIT_OPEN = ['G_SHOP0', 'G_SHOP1', 'G_SHOP2', 'G_OPEN0', 'G_OPEN1', 'G_OPEN2', 'G_FOOD', 'G_HARD', 'G_MOTO', 'G_HOME2'];
 function dayLitGlsl() {
   const t = (names) => names.filter((k) => MOD[k] !== undefined).map((k) => `abs(m - ${MOD[k]}.0) < 0.5`).join(' || ') || 'false';
-  return `float dayLitOf(float m){ if (${t(DAYLIT_GLASS)}) return 0.16; if (${t(DAYLIT_OPEN)}) return 0.07; return 0.0; }`;
+  return `float dayLitOf(float m){ if (${t(DAYLIT_GLASS)}) return 0.2; if (${t(DAYLIT_OPEN)}) return 0.14; return 0.0; }`;
 }
 const GL1_ARR = /\b(U\d+|G\d+|FG\d+|FU\d+|GH|SD|BK|PT|XP|SIGNC|WALLP)\[([^[\]]*)\]/g;
 const gl1Idx = (src) => src.replace(GL1_ARR, '$1($2)');
@@ -623,7 +623,7 @@ ${gl1 ? GL1_GROUND_MAIN : GL2_GROUND_MAIN}
     float pth = 0.84 - 0.13 * ag;
     float rim = 0.0;
     if (ag > 0.4) { peel = smoothstep(pth, pth + 0.012, pn); rim = smoothstep(pth - 0.035, pth, pn) * (1.0 - peel); }
-    peelC = vec3(0.47, 0.45, 0.41) * (0.8 + 0.4 * vnz(vec2(wx * 5.0, hh * 5.0)));
+    peelC = (h21(vec2(seed, 7.3)) < 0.3 && ag > 0.9 ? vec3(0.36, 0.2, 0.15) : vec3(0.36, 0.34, 0.3)) * (0.8 + 0.4 * vnz(vec2(wx * 5.0, hh * 5.0)));   // xi măng xám ẩm / gạch đỏ (rất cũ)
     weather = 1.0 - ag * (0.42 * streak + 0.28 * blot) - (0.07 + 0.2 * ag) * base - (0.07 + 0.25 * ag) * drip - 0.3 * rim;
     dirt = 1.0 - (0.05 + 0.12 * ag) * base;
     tint = mix(tint, vec3(dot(tint, vec3(0.2126, 0.7152, 0.0722))) * vec3(1.0, 0.98, 0.9), (0.04 + 0.22 * blot) * ag + 0.05 + 0.14 * ag);
@@ -644,7 +644,8 @@ ${gl1 ? GL1_GROUND_MAIN : GL2_GROUND_MAIN}
   fabGlow += (gW / sum) * lit * roomC * (0.18 + tx.rgb * 1.1) + isG * (kW / sum) * lit * (tx.rgb * 0.9 + warm * 0.06);
   // W5-B: trệt KÍNH (showroom/cửa hàng/ngân hàng/sảnh) + cửa hàng MỞ sáng đèn trong CẢ BAN NGÀY (đèn tuýp/LED — pano: nội thất
   // cửa hàng không tối đen như hang) — cộng phát sáng không phụ thuộc đêm, chỉ phần nội thất/kính (kW, gW) của tầng trệt
-  if (isG > 0.5) fabDay = tx.rgb * ((kW + gW) / sum) * dayLitOf(m);
+  if (isG > 0.5) { float dl = dayLitOf(m), tlum = dot(tx.rgb, vec3(0.2126, 0.7152, 0.0722));
+    fabDay = (tx.rgb * dl + vec3(0.30, 0.28, 0.25) * dl * 0.2) * ((kW + gW) / sum) * (1.0 - smoothstep(0.25, 0.7, tlum)); }   // vòng 2: nâng NỀN TỐI, không loá mặt kính đã sáng (147 h270)
   // W5-B: BẠT mái hiên xuyên sáng (mặt dưới bạt nắng chiếu = màu bạt rực nhẹ, không phải mảng tối)
   if (kind == 5 && (abs(m - ${MOD.D_AWN}.0) < 0.5 || abs(m - ${MOD.D_AWN3}.0) < 0.5)) fabDay = col * 0.22;
   // biển bảng lớn / biển dọc (kind 5) sáng đèn đêm, trần độ chói như dải biển
@@ -1505,10 +1506,12 @@ export function buildRealFabric(scene, ctx) {
               : (rs === STYLE.OLD || rs === RS.COL || hh(seed, 23) < 0.45) ? MOD.D_RAIL : MOD.D_BALW;   // W4-A: lan can sắt/bê tông-kính theo ảnh
             const topSkip = hh(seed, 29) < 0.5 ? 1 : 0;   // tầng trên cùng hay là sân thượng lùi → bỏ
             // W5-B: "CHUỒNG CỌP" 3D — lồng sắt nhô 0,6 m ôm cả tầng (vân tay 'cage'; thống kê: tập thể 35%, nhà ống 7%)
-            const cage = fpBalK === FPV.bal.cage || (fpBalK < 0 && ((rs === STYLE.KTT || rs === RS.TEN) ? hh(seed, 25) < 0.35 : tubeLike && hh(seed, 25) < 0.07));
+            // (vòng 2: pano_519 h90 — lồng MỌI tầng của tháp hẹp = "tháp lưới nâu" → lồng theo TỪNG TẦNG: vân tay 75%, thống kê 45%)
+            const cage = fpBalK === FPV.bal.cage || (fpBalK < 0 && ((rs === STYLE.KTT || rs === RS.TEN) ? hh(seed, 25) < 0.25 : tubeLike && hh(seed, 25) < 0.06));
+            const cageP = fpBalK === FPV.bal.cage ? 0.75 : 0.45;
             for (let k = 1; k < fl - (fl > 2 ? topSkip : 0); k++) {
               const ys0 = y0 + heightOf(k) - 0.12, yt = ys0 + 0.15;   // sàn tầng k (tầng trên thứ k)
-              if (cage) {
+              if (cage && hh(seed * 17 + k, 26) < cageP) {
                 const dC = 0.6, yCt = ys0 + FLOOR_H - 0.1, hC = yCt - ys0, ex = dx / L, ez = dz / L;
                 const gx0 = sx0 + nx * dC, gz0 = sz0 + nz * dC, gx1 = sx1 + nx * dC, gz1 = sz1 + nz * dC;
                 quadN(DT, [gx0, ys0, gz0, gx1, ys0, gz1, gx1, yCt, gz1, gx0, yCt, gz0], nx, 0, nz, [0, 0, wl / 4, 0, wl / 4, hC / 3.3, 0, hC / 3.3], wcol, s8, MOD.D_CAGE);
@@ -1582,7 +1585,8 @@ export function buildRealFabric(scene, ctx) {
             const ac = fpAw ? (FPB.awn === FPV.awn.tarp_other ? AWN_OTHER[(hh(seed, 44) * AWN_OTHER.length) | 0] : fpAw[1]) : tin ? AWN_TIN[(hh(seed, 43) * AWN_TIN.length) | 0] : AWN_TARP[(hh(seed, 43) * AWN_TARP.length) | 0];
             const out = tin ? 1.5 + hh(seed, 47) * 0.7 : 1.4 + hh(seed, 47) * 0.5, yT = y0 + (tin ? 2.95 : 2.88), yF = tin ? yT - 0.22 * out : y0 + 2.4, inset = 0.15;
             // W5-B: bạt SỌC chỉ khi vân tay 'tarp_stripe' (thống kê 50%); bạt xanh/đỏ/khác = bạt TRƠN võng (D_AWN3)
-            const stripe = !tin && (fpAw ? FPB.awn === FPV.awn.tarp_stripe : hh(seed, 49) < 0.5);
+            // (vòng 2: pano_120 bạt sọc xanh-trắng thật bị trích là 'tarp_blue' → bạt xanh cũng 60% sọc)
+            const stripe = !tin && (fpAw ? FPB.awn === FPV.awn.tarp_stripe || (FPB.awn === FPV.awn.tarp_blue && hh(seed, 49) < 0.6) : hh(seed, 49) < 0.5);
             const cellA = tin ? MOD.D_AWN2 : stripe ? MOD.D_AWN : MOD.D_AWN3;
             const sx0 = ax + (dx / L) * inset, sz0 = az + (dz / L) * inset, sx1 = bx - (dx / L) * inset, sz1 = bz - (dz / L) * inset;
             const fx0 = sx0 + nx * out, fz0 = sz0 + nz * out, fx1 = sx1 + nx * out, fz1 = sz1 + nz * out;

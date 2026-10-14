@@ -1282,13 +1282,14 @@ export function buildFacadeAtlas(size = 2048, opts = {}) {
   //   [.5,1]×[0,.5] mặt TRÊN hàng bày (nắp thùng, rau quả, rổ)
   //   [0,.5]×[.5,1] TÁN CÂY CẢNH ban công (lá dày nhiều sắc xanh + vài chấm hoa giấy)
   //   [.5,.75]×[.5,1] ĐỒ PHƠI trên dây (khe hở = tối như trong nhà)   [.75,1]×[.5,1] ỐNG THOÁT NƯỚC nhựa xám + đai
+  const MISC_G = [[176, 140, 96], [168, 132, 90], [196, 188, 170], [150, 120, 84], [120, 112, 100], [182, 60, 50], [58, 96, 150], [186, 176, 150], [140, 104, 70], [96, 120, 80]];
   cell('D_MISC', 4, 4, () => {
     // hàng bày — mặt trước (0..2 × 0..2 m của ô)
     interior(0, 0, 2, 2, -12);
     for (let y = 0.02; y < 1.96;) {
       const hRow = R(0.28, 0.5);
-      for (let x = 0.02; x < 1.96;) {
-        const w = Math.min(1.98 - x, R(0.22, 0.6)), c = GOODS[(rnd() * GOODS.length) | 0], k = R(0.55, 0.85), t = rnd();
+      for (let x = 0.02; x < 1.96;) {   // vòng 2: bảng màu TRUNG TÍNH (các-tông/bao tải/rổ nhựa) thay GOODS → hết "giá sách nhiều màu"
+        const w = Math.min(1.98 - x, R(0.3, 0.75)), c = MISC_G[(rnd() * MISC_G.length) | 0], k = R(0.6, 0.9), t = rnd();
         if (t < 0.12) { x += w; continue; }
         const col = [c[0] * k, c[1] * k, c[2] * k];
         rect(x + 0.01, y, x + w - 0.01, y + hRow - 0.02, col, M_KEEP);
@@ -1327,7 +1328,7 @@ export function buildFacadeAtlas(size = 2048, opts = {}) {
     interior(0.3, 0.15, 3.7, 3.05, 4); glass(0.55, 0.85, 2.3, 2.5, 1, 1); frame(0.55, 0.85, 2.3, 2.5, FR_SILVER, 0.05, 2);
     rect(2.55, 0.15, 3.5, 2.6, [92, 74, 58], M_KEEP);   // cửa đi gỗ
     plants(0.3, 3.7, 0.15); laundry(0.35, 3.65, 2.75);
-    const col = rnd() < 0.5 ? [48, 52, 50] : [96, 64, 46];
+    const cr = rnd(), col = cr < 0.4 ? [64, 72, 68] : cr < 0.75 ? [196, 198, 192] : [110, 78, 58];   // xám xanh / sơn trắng / gỉ (vòng 2: bớt nâu tối)
     for (let x = 0.05; x <= 3.96; x += 0.12) vline(x, 0.0, 3.3, 0.024, col, M_KEEP);
     for (const y of [0.05, 1.05, 2.05, 3.2]) hline(y, 0, 4, 0.05, col, M_KEEP);
     rect(0, 3.12, 4, 3.3, [col[0] * 0.9, col[1] * 0.9, col[2] * 0.9], M_KEEP);   // khung đỉnh + mép mái tôn
