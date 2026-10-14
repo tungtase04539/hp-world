@@ -10,3 +10,15 @@
   đã dọn); uWS + ws kiểm cả trong container node:24-trixie-slim.
 - Tài liệu: server/CONTRACT.md, docs/multiplayer/SERVER.md §1, server/.env.example.
 - Còn mở: xem SERVER.md §1.8.
+
+## S2 CORE (tag `s2core`, 15/10/2026) — XONG
+
+- Tài khoản: guest + mã mời + `Nick#1234` + refresh xoay vòng (phát hiện dùng lại) + JWT EdDSA 15' + mã khôi phục 12 ký tự;
+  `/v1/join` vé HMAC 60 s 1 lần + trần CCU + hàng chờ có ETA.
+- WS `/play`: HELLO→WELCOME→READY→keyframe, 1 phiên/tài khoản, resume 60 s (AWAY), RELOAD khi lệch proto, BACKOFF.
+- Mô phỏng 20 Hz, snapshot 10 Hz so le, AOI 128 m (trần 96, ưu tiên, tầng xa, ENTER ≤ 24), NAMES 1 lần, bỏ snapshot khi
+  nghẽn → keyframe, thang L0–L4; kiểm di chuyển (`js/shared/move.js`), điểm → CORRECT/kick; chat SAY 40 m qua `chat.handle`.
+- Lưu nhân vật (bẩn 30 s + khi rớt + khi tắt) + `playtime_daily`.
+- Test: `npm test` 68 xanh (+1 bỏ qua cần Docker); `node test/core_pg.mjs` 12/12 trên Postgres 17 (hpmp-core, 55433, đã dọn).
+- Đo: 1.000 phiên tick p50 3,4 / p99 5,9 ms; 300 dồn 1 điểm p99 8,7 ms, snapshot p95 914 B; 2.000 phiên p99 15,8 ms.
+- Chi tiết: docs/multiplayer/SERVER.md §2.

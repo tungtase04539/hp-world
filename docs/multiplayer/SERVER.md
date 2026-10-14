@@ -140,3 +140,185 @@ Kiểm nhanh: `curl http://127.0.0.1:9100/healthz` → `{"ok":true,"transport":"
 - `TRUST_PROXY=cloudflare` chỉ bật khi cổng game không tới được trừ qua tunnel (compose publish 127.0.0.1).
 - `deploy-pages.yml` dựng commit có cây = HEAD trừ `server/` rồi đẩy lên `gh-pages` (`js/shared/` vẫn lên Pages vì
   client cần).
+
+## 2. S2 CORE — máy chủ game (tài khoản, phiên, mô phỏng, AOI, kiểm di chuyển) — 15/10/2026
+
+### 2.1 Module (`server/src/game/*`, `server/src/api/{auth,join}.js`, `js/shared/move.js`)
+
+| File | Việc | Dịch vụ (`app.get`) |
+|---|---|---|
+| `game/world.js` | bảng thực thể (1 Entity / người chơi), lưới ô 128 m, cấp `netId` (u16, tái dùng an toàn nhờ `gen`), lượng tử hoá 1 lần mỗi STATE được nhận | — (qua `sessions.world`) |
+| `game/session.js` | Session + quản lý phiên: 1 phiên/tài khoản, "limbo" 60 s (avatar ở lại, cờ AWAY), pha snapshot so le, hàng ghi DB, giờ chơi | `sessions` |
+| `game/gateway.js` | WS `/play`: HELLO→WELCOME(+WORLD)→READY, resume, STATE/ACTION/CHAT/REPORT/PING, token bucket, giới hạn IP | `gateway` (handlers cho bench/test) |
+| `game/sim.js` | vòng 20 Hz: snapshot 10 Hz/khách (2 pha), bỏ snapshot khi nghẽn (> 16 KB) → keyframe, NAMES, thang suy giảm, flush 30 s | `sim` |
+| `game/aoi.js` + `encoder.js` | chọn ai thấy ai (trần 96, ENTER ≤ 24/snapshot, ngân sách 1.100 B, bộ tích luỹ ưu tiên, tầng xa) → `SnapshotBuilder` | — |
+| `game/validate.js` | điểm vi phạm → CORRECT/kick, giữ chỗ xe dùng chung | `validate` |
+| `game/degrade.js` | thang L0–L4 theo p99 thời gian tick (cửa sổ 100 tick) | (trong `sim`) |
+| `game/queue.js` | trần CCU (`CAPACITY`, mặc định 1.200) + hàng chờ có vị trí/ETA; vé giữ chỗ 60 s; L4 ngừng nhận | `queue` |
+| `game/tickets.js` | vé vào (HMAC-SHA256, 60 s, dùng 1 lần) | `tickets` (đăng ký trong `api/join.js`) |
+| `game/resume.js` | token resume 16 B (ngẫu nhiên, 1 lần, đổi mỗi WELCOME) + backoff 1-2-4-8 s | `resume` |
+| `game/ratelimit.js` | token bucket, giới hạn theo khoá có bộ nhớ chặn trên, nhóm IPv6 /64, miễn trừ loopback/IP riêng | `ratelimit` |
+| `game/persist.js`, `spawn.js`, `worldclock.js` | ghi nhân vật + `playtime_daily`; chỗ xuất hiện (vị trí đã lưu nếu còn hợp lệ, không thì điểm ít người nhất); ngày/đêm chung + WORLD | `worldclock` |
+| `game/bench.mjs` | đo trong tiến trình (không socket) — xem 2.8 | — |
+| `api/auth.js` | `/v1/auth/guest`, `/refresh`, `/recover`; JWT EdDSA; mã mời; mã khôi phục | `auth` |
+| `api/join.js` | `/v1/join` → vé hoặc hàng chờ | — |
+| `js/shared/move.js` | luật di chuyển THUẦN dùng chung (server, bot, sau này client): đất/nước/cầu/bến, `MoveCheck` | — |
+| `db/migrations/010_game_auth.sql` | chỉ mục (refresh_tokens.expires_at, invites.batch, playtime_daily.day) | — |
+
+### 2.2 HTTP API (JSON, lỗi = `{error: code, ...}`)
+
+| Đường | Vào | Ra (200) | Lỗi |
+|---|---|---|---|
+| `POST /v1/auth/guest` | `{nickname, deviceId, inviteCode, appearance?}` (`deviceId` 8–64 ký tự `[A-Za-z0-9_-]`, `appearance` 16 hex) | `{accessToken, accessExpiresIn: 900, refreshToken, refreshExpiresAt, recoveryCode, account}` | 400 `bad_request` / `device_invalid` / `nickname_invalid {reason}`; 403 `invite_required` / `invite_invalid`; 409 `nickname_taken`; 429 |
+| `POST /v1/auth/refresh` | `{refreshToken}` | như trên trừ `recoveryCode` | 401 `unauthorized` / `refresh_reused`; 403 `banned`; 409 `refresh_race`; 429 |
+| `POST /v1/auth/recover` | `{code, deviceId}` | như refresh | 401 `recovery_invalid`; 403 `banned`; 429 |
+| `POST /v1/join` | `{accessToken, proto, tier, worldVersion?}` | `{wsUrl, ticket, ticketExpiresIn: 60, spawnHint{x,z,yaw,id}, proto, serverTime}` **hoặc** `{queue: {position, etaS, retryAfterS}}` | 409 `proto_mismatch {serverProto}`; 401; 403 `banned`; 429 |
+
+`account = {id, kind, nickname, discriminator, displayName}`, `displayName = "Nick#1234"` (4 số, duy nhất theo
+`lower(nickname)`). Tên kiểm bằng `chat.nicknameCheck` (S3: textfilter + thương hiệu + tên dành riêng + dài 3–16).
+
+- **Access JWT**: EdDSA (Ed25519, `JWT_PRIVATE_KEY`), header `kid = JWT_KID`, `iss hp-world`, `aud hp-world-play`,
+  `sub` = id tài khoản, `dn` = tên hiển thị, `k` = loại, 15 phút. Khoá công khai: `app.get('auth').publicJwk()`.
+- **Refresh**: 256 bit ngẫu nhiên, DB chỉ giữ sha256, **xoay vòng mỗi lần dùng** (`rotated_from`), 180 ngày. Dùng lại
+  token đã xoay: trong 30 s = gửi trùng (`409 refresh_race`, không thu hồi gì); sau 30 s = dấu hiệu bị lộ → thu hồi MỌI
+  refresh token của tài khoản (`401 refresh_reused`). Token bị thu hồi (không có token con) → 401. Token hết hạn > 7 ngày
+  được dọn mỗi giờ.
+- **Mã khôi phục**: 12 ký tự bảng chữ không nhầm `ABCDEFGHJKMNPQRSTUVWXYZ23456789` (không I L O 0 1), hiện **một lần**
+  dạng `XXXX-XXXX-XXXX`, lưu sha256 của mã đã chuẩn hoá (`accounts.recovery_hash`); gõ thường/hoa/có cách đều được; vẫn
+  dùng được về sau (là chìa khoá tài khoản trên máy mới).
+- **Mã mời**: 10 ký tự cùng bảng chữ, dạng `XXXXX-XXXXX`; `invites.code_hash = sha256(normalizeCode(code))`,
+  `normalizeCode` = NFKC → CHỮ HOA → bỏ mọi ký tự ngoài A-Z0-9. Mỗi lần dùng giảm `uses_left` NGUYÊN TỬ trong cùng giao
+  dịch tạo tài khoản. Trang quản trị (S3) tạo lô bằng `createInviteBatch(db, {count, uses, expiresAt, batch, note,
+  createdBy})` (export từ `api/auth.js`; cũng là `app.get('auth').createInviteBatch(opts)`) → trả mã THƯỜNG để hiện 1 lần.
+- **Google (GĐ2)**: chưa có route; `linkIdentity(db, accountId, 'google', sub, email)` là điểm mở rộng "liên kết, không
+  gộp" (trả `{ok: false, conflictAccountId}` khi `sub` đã thuộc tài khoản khác).
+- **Vé**: `"v1." + b64url(accountId 16 B | exp u32 | nonce 8 B | tier u8) + "." + b64url(HMAC-SHA256[0..16])`, 62 ký tự,
+  gửi trong HELLO (không bao giờ trong URL). Vé giữ 1 chỗ trong trần CCU tới khi dùng/hết hạn. Tài khoản đang có phiên
+  (kể cả limbo) luôn được vé (kết nối mới thay kết nối cũ).
+
+### 2.3 Vòng đời WebSocket `/play`
+
+```
+open ─(≤ 10 s; PING được trả lời, tối đa 3.000 PING trước HELLO)─► HELLO{ticket}
+  ├ proto ≠ 1                   → SYSTEM RELOAD(arg = 1) + close 4004
+  ├ vé sai / hết hạn / đã dùng   → SYSTEM AUTH_FAILED(BAD_TICKET 1 | EXPIRED 2 | REUSED 3) + close 4001
+  ├ tài khoản bị cấm             → SYSTEM BANNED(0xFFFFFFFF) + close 4003
+  ├ đã có phiên cùng tài khoản   → socket cũ: SYSTEM DUPLICATE_SESSION + close 4002; giữ netId + vị trí
+  └ WELCOME{netId, serverTime, 20, 10, dayEpoch, 1440, resumeToken, weather, spawn} + WORLD{lịch thời tiết}
+READY ─► avatar vào thế giới; snapshot đầu = KEYFRAME (ENTER rải ≤ 24/snapshot); NAMES cho người mới thấy
+mất kết nối ─► limbo 60 s: avatar ở lại với cờ AWAY (người khác thấy "vắng mặt"); nhân vật được ghi DB ngay
+HELLO{flags = RESUME, resumeToken} trong 60 s ─► WELCOME (token mới) + SYSTEM RESUMED(netId) + KEYFRAME ngay (không cần READY)
+                        token sai / đã dùng / hết hạn → SYSTEM AUTH_FAILED(BAD_RESUME 4) + close 4001
+quá 60 s ─► LEAVE cho người xem, netId được nhả, bus `player:leave`
+```
+
+- Chưa READY sau 180 s → close 4007. Tắt máy chủ → SYSTEM BACKOFF(1–2 s ngẫu nhiên) rồi close 1001.
+- **ACTION** → `EVENT ACTION_RESULT [reqId, code]`; `code` 0 OK, 1 UNSUPPORTED, 2 BUSY (xe đã có người), 3 INVALID,
+  4 DENIED (`ACTION_RESULT` export từ `game/gateway.js`). Đã làm: MOUNT/DISMOUNT (giữ chỗ xe dùng chung theo `target` =
+  vehicleRef ≠ 0), CALL_MOTO, EMOTE, BLOCK_PLAYER/UNBLOCK_PLAYER (`target` = netId; gọi `chat.block(session, accountId)` /
+  `chat.unblock` nếu S3 có, không thì danh sách chặn trong RAM của phiên). Loại khác → UNSUPPORTED.
+- **CHAT** → `chat.handle(session, channel, text)` (S3) → ok: SAY tới mọi người **active trong 40 m** (kể cả người gửi
+  để biết `msgRef`), bỏ người nhận đã chặn người gửi (`chat.blocks(recipientAccountId)`); `shadow` → chỉ người gửi;
+  không ok → `EVENT CHAT_REJECTED [code, retryAfterMs]`. Bus `chat:message {session, channel, text, shadow, flagged,
+  msgRef, x, z, recipients, at}` (S3 dùng `msgRef` làm `chatRef` cho báo cáo). Chặn cứng ở gateway: 2 tin/s, burst 6.
+- **REPORT** → `chat.report(session, targetAccountId, reason, chatRef)` → `EVENT REPORT_RESULT [code]`; netId đã rời
+  vẫn tra được tài khoản trong 10 phút; tự báo mình → SELF; netId lạ → UNKNOWN_TARGET.
+- Bus `sanction {accountId, kind, until}` (S3): `kick` / `ban` → đóng phiên (ban: SYSTEM BANNED(giây còn lại) + 4003),
+  `mute` → SYSTEM MUTED(giây). Thang suy giảm đổi mức → SYSTEM DEGRADE(mức) cho mọi người + bus `degrade`.
+
+### 2.4 Kiểm di chuyển ("client đi trước, server kiểm" — `js/shared/move.js` + `game/validate.js`)
+
+- **Cửa sổ trượt 1 s theo ĐỒNG HỒ CLIENT** (đồng hồ này được kiểm bằng ngân sách thời gian bên dưới): quãng đường thẳng
+  từ mẫu cũ nhất trong 1 s ≤ `1,2 × Σ vmax(chế độ hai đầu đoạn) × Δt + 1 m` (+ 9 m nếu cửa sổ có lên/xuống xe: chỗ xuống
+  xe được tìm tới 8 m). Nhờ dùng đồng hồ client, jitter và gói dồn sau khi rớt sóng **không** bị coi là chạy nhanh.
+- **Dịch chuyển** (cờ cứng, CORRECT ngay): một bước > max(12 m, 3 × giới hạn của chính bước đó).
+- **Ngân sách thời gian** (−100 / +200 ms): `o = giờ server nhận − giờ client` (u16 được mở gói; khoảng trống > 30 s
+  mở theo thời gian thật). 5 s đầu học độ trễ tối thiểu; sau đó mốc `base` chỉ được hạ theo trôi đồng hồ ≤ 2 ms/s;
+  client "đi trước" mốc > 100 ms = vi phạm TIME (mốc hạ xuống 100 ms dưới mẫu đó). Trễ (lag) không bị phạt, nhưng trễ
+  > 200 ms LIÊN TỤC 10 s thì mốc được nâng (mất phần tín dụng thừa) → không "tích thời gian" quá ~10 s để lao đi.
+- **Đĩa chơi**: ngoài `PLAY_RADIUS + 2 m` = vi phạm; ngoài + 50 m = cờ cứng.
+- **Mặt nền**: chế độ trên cạn mà ở trên nước (`isWater` của `js/terrain.js`) chỉ hợp lệ khi trên mặt cầu (mặt cầu địa
+  hình `groundHeight`, hành lang `BRIDGE_WAYS` (nửa bề rộng + 3 m), way `ELEVATED_RI`), trên bến Bến Bính (tính lại đúng
+  như `world.js buildPier`), hoặc trong 1,5 m của đất (mép kè). Thuyền phải ở nước hoặc trong 8 m của nước.
+- **Xe**: xe máy cá nhân (`vehicleRef 0`) đi mọi nơi trên cạn; xích lô / thuyền / xe máy dùng chung (`vehicleRef ≠ 0`)
+  cần giữ chỗ (ACTION MOUNT, hoặc tự giữ ở STATE đầu nếu xe trống; người thứ hai → MODE); ngồi sau (PILLION) cần một
+  người đang lái trong 4 m. Chuyển về chế độ đi bộ thì tự nhả xe.
+- **Điểm**: +1 mỗi STATE vi phạm, +5 cờ cứng, −1/s; > 5 → CORRECT (về vị trí được nhận cuối, `corrEpoch + 1`), > 20 →
+  kick (`KICK_REASON.CHEAT`). STATE mang `corrEpoch` cũ bị bỏ qua; client không áp CORRECT → gửi lại mỗi 3 s, quá 5 lần
+  → kick. STATE vi phạm không được nhận (người khác vẫn thấy vị trí hợp lệ cuối).
+- **Chưa kiểm** (v1): độ cao y, xuyên tường (cần collider export — ARCH §12.4), gia tốc.
+- **Đánh đổi đã đo** (`test/core_move.test.js`): trung thực → 0 CORRECT với jitter 0–300 ms, rớt sóng 1–3 s mỗi 8 s,
+  bufferbloat 800 ms, 2 Hz khi đứng, đổi chế độ + lên/xuống xe, tab ẩn 70 s, đồng hồ lệch 0,1 %. Bufferbloat ≥ 1,5 s kéo
+  dài > 10 s rồi xả trong 1 s có thể tốn **1** CORRECT (giá của trần +200 ms). Hack tốc độ ×1,5 bị CORRECT < 2,5 s;
+  đồng hồ client nhanh ×2 < 8 s, ×1,5 < 12 s, ×1,25 < 45 s (lợi 25 % tốc độ trong khoảng đó).
+
+### 2.5 AOI, snapshot, thang suy giảm
+
+- Ứng viên: 3×3 ô quanh ô (hysteresis 8 m) của người xem, bán kính 160 m (≤ 120 m: 10 Hz; 120–160 m: tầng xa 5 Hz);
+  người đang thấy chỉ rời khi > bán kính + 8 m. Tối đa **96** người thấy cùng lúc: điểm = d² / trọng số² (trọng số 2 cho
+  người đang lái xe), người đang thấy được nhân 0,72 (chống đổi qua lại); ngưỡng = phần tử thứ 96 (quickselect, không
+  sort cả danh sách). ENTER ≤ 24/snapshot (keyframe 96 người rải qua 4 snapshot ≈ 0,4 s). Chỉ gửi UPDATE cho người **có
+  thay đổi** kể từ lần gửi trước (người đứng yên tốn 0 byte); vượt ngân sách 1.100 B / 96 bản ghi → bộ tích luỹ ưu tiên
+  `+= w/(d+10)` mỗi snapshot, gửi điểm cao trước, reset khi gửi.
+- NAMES: mỗi người 1 lần mỗi phiên của người xem (nhớ theo `netId` + `gen`; netId được tái dùng → gửi lại).
+- `bufferedAmount > 16 KB` → bỏ snapshot, lần sau là KEYFRAME (client xoá bảng slot).
+- Thang: L1 (p99 tick > 25 ms) tầng xa 2,5 Hz · L2 (> 35) bán kính 80 m · L3 (> 45) snapshot "mỏng" xen kẽ (bản thân +
+  16 người gần nhất) · L4 (> 50) ngừng nhận phiên mới (hàng chờ). Lên 1 mức sau 2 s liên tục, xuống sau 10 s dưới 70 %
+  ngưỡng. Metric `hp_degrade_level`, `hp_degrade_changes_total`; gửi cảnh báo (S3) khi lên ≥ L2.
+
+### 2.6 Lưu trữ
+
+- Nhân vật (`pos_x/z/y`, `yaw`, `cell`, `version + 1`) ghi khi **bẩn** mỗi 30 s bằng MỘT câu lệnh (`jsonb_to_recordset`),
+  ngay khi rớt kết nối, khi phiên kết thúc và khi tắt máy chủ.
+- Giờ chơi: cộng mỗi giây khi phiên active; mỗi lần ghi cộng phần nguyên vào `accounts.play_seconds` và
+  `playtime_daily(account_id, day)`, `day` = ngày giờ Việt Nam (UTC+7). `session.playSeconds` (chat slow mode) = tổng
+  đời + phiên hiện tại.
+
+### 2.7 Giới hạn tần suất (`game/ratelimit.js LIMITS`, `session.js`, `gateway.js GW`)
+
+| Đối tượng | Giới hạn |
+|---|---|
+| Mỗi phiên | STATE 25/s · ACTION 5/s · CHAT 2/s burst 6 (chính sách thật ở S3) · PING 2/s burst 4 · REPORT 1/10 s; > 500 tin bị bỏ trong 10 s → SYSTEM BACKOFF + close 4006; 10 tin hỏng → 1008 |
+| Tài khoản / thiết bị | guest 5/giờ/thiết bị · recover 5/giờ/thiết bị (+ 300/giờ toàn máy chủ) · join 0,5/s burst 10 · HELLO 1/s burst 10 · refresh 1/s mỗi token |
+| IP (lỏng vì CGNAT) | guest 30/giờ · recover 20/giờ · refresh 10/s · join 50/s · kết nối WS mới 20/s burst 300 · socket chưa HELLO ≤ 64/IP, ≤ 5.000 toàn máy |
+| Miễn trừ theo IP | loopback, 10/8, 172.16/12, 192.168/16, fc00::/7, fe80::/10 (bot cùng máy, đường Docker host); người thật qua tunnel có IP công khai từ `CF-Connecting-IP` |
+
+### 2.8 Số đo (máy chủ dự án, Windows 11, Node 24.15, 15/10/2026)
+
+`node src/game/bench.mjs --n N --hotspot K --dur 30` (chạy dưới `tools/qa/gpulock.mjs`): N phiên đi qua **đường mã thật**
+(HELLO có vé → WELCOME → READY → STATE 15 Hz khi đi / 2 Hz khi đứng → kiểm → AOI → mã hoá snapshot) với kết nối giả chỉ
+đếm byte; vòng 20 Hz chạy thật; bot trung thực 35 % đi bộ, 25 % chạy, 20 % xe máy, 20 % đứng, quanh 8 điểm xuất hiện.
+
+| Kịch bản | tick p50 | tick p99 | tick max | snapshot p50 / p95 / max (B) | byte/s/khách (payload) | CORRECT | RSS |
+|---|---|---|---|---|---|---|---|
+| 1.000 phiên | 3,4 ms | 5,9 ms | 12,1 ms | 170 / 386 / 815 | 2.145 | 0 | 486 MB |
+| 1.000, trong đó 300 dồn trong 30 m (Nhà hát) | 5,6 ms | 8,7 ms | 13,5 ms | 179 / 914 / 1.100 | 3.965 | 0 | 498 MB |
+| 2.000 phiên | 10,0 ms | 15,8 ms | 23,6 ms | 323 / 692 / 1.058 | 3.915 | 0 | 548 MB |
+
+Cả 3 đều ở L0 (không cần giảm tải). Byte/s chưa gồm ~68 B overhead WS+TLS+TCP mỗi tin (× 10/s ≈ + 0,7 KB/s): điểm nóng
+≈ 4,6 KB/s/khách < 12 KB/s. RSS phần lớn là PGlite (WASM) + `mapdata.js`. Chưa gồm socket thật / TLS — S4 đo bằng bot
+qua mạng. (Trước khi tối ưu AOI — sort toàn bộ ứng viên mỗi snapshot — điểm nóng là 16 ms p50.)
+
+### 2.9 Test
+
+- `npm test`: `core_move` (11: trung thực / gian lận / mặt nền / điểm), `core_aoi` (6: trần, ưu tiên, rời/vào lại,
+  tầng xa, mức suy giảm, "gương" client qua 2.000 snapshot ngẫu nhiên), `core_auth` (5), `core_session` (7: WS thật end
+  to end). Toàn bộ `npm test`: 68 xanh + 1 bỏ qua (pg_boot cần Docker).
+- `node test/core_pg.mjs`: chạy `core_auth` + `core_session` trên Docker Postgres 17 (project `hpmp-core`, cổng 55433, tự
+  dọn) — 12/12 xanh.
+- `boot.test.js` (nền móng) sửa tối thiểu: `/v1/auth/*`, `/v1/join` nay trả 4xx thay vì 501; HELLO vé sai → AUTH_FAILED.
+
+### 2.10 Ghi chú cho S3 / S4 / S5 / tích hợp
+
+- `sessions.list()` cho bản đồ admin: `{netId, accountId, displayName, x, z, mode, away, state, connectedS, ip, tier,
+  corrections, points}`; `sessions.kick(accountId, reason)`, `sendSystem`, `broadcastSystem`, `broadcastChat(text)`
+  (CHAT kênh SYSTEM từ netId 0), `flush()`; `sim.stats()`, `sim.forceDegrade(level | -1)`; `queue.stats()`.
+- Bot (S4): STATE phải mang `clientMs = performance.now() & 0xffff` thật và `corrEpoch` theo CORRECT cuối; lên xe dùng
+  chung bằng ACTION MOUNT (`target` = vehicleRef ≠ 0); xe máy cá nhân là `vehicleRef 0`. Cần mã mời (hoặc
+  `INVITE_REQUIRED=false` khi thử tải) — `createInviteBatch` tạo nhanh. Bot chạy cùng máy (loopback) được miễn giới hạn
+  theo IP.
+- Metric mới (tiền tố `hp_`): `ccu`, `sessions_limbo`, `queue_length`, `queue_reserved`, `snapshot_bytes`,
+  `snapshot_ms`, `snapshot_records`, `snapshots_{sent,dropped,keyframe}_total`, `names_sent_total`,
+  `aoi_{capped,deferred}_total`, `degrade_level`, `degrade_changes_total`, `violations_total{reason}`,
+  `corrections_total{reason}`, `kicks_total{reason}`, `rate_dropped_total`, `chat_delivered_total`, `hello_total{r}`,
+  `auth_total{r}`, `join_total{r}`, `persist_flush_ms`, `persist_rows_total`, `session_{join,end}_total`.
