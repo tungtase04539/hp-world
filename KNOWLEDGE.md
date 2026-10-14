@@ -455,6 +455,20 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-10-15 (HEROKIT KHOÁ LẠI — `tools/rekey_herokit.mjs`)** [ghi chú fp_json MẤT ⇒ phân loại hero ĐÓNG BĂNG]:
+    **Sự cố:** 2026-10-15 ~00:12 thư mục scratchpad phiên bị dọn ⇒ mất `keep/fp_json` (3.306 JSON trích xuất ảnh, có GHI CHÚ TỰ DO)
+    + `keep/fp_plan.json`. Quan sát CÓ CẤU TRÚC vẫn còn trong `audit/facade_fp.json` (đã cam kết — vân tay mặt tiền W4-A sinh lại
+    được), nhưng `tools/gen_herokit.mjs` đọc ghi chú (chùa/ngân hàng/khách sạn/điện máy…) ⇒ **`js/herokit_data.js` KHÔNG sinh lại
+    được nữa**; `check_herokit` khoá nó theo đúng bản buildings_real (HERO_META.rbHash) ⇒ trước đây MỌI lần sinh lại buildings_real
+    đều làm gãy hero. **Đường chuẩn từ nay khi buildings_real đổi: `node tools/rekey_herokit.mjs`** (check_herokit báo lỗi trỏ về
+    đây): tìm trong git bản buildings_real có FNV-1a(RB_B64) = HERO_META.rbHash (hoặc `--from <file>`), mỗi hero → nhà cũ (tâm ≤ 0,6 m,
+    luật heroAt) → nhà mới theo HÌNH HỌC: ưu tiên nhà chứa tâm nhà cũ, rồi diện tích chồng lớn nhất (lưới điểm tất định trong nhà cũ),
+    hoà ±1 % → tâm gần nhất; nhận khi chồng ≥ 30 % nhà cũ hoặc ≥ 50 % nhà mới. Không khớp / mơ hồ (2 hero rơi vào 1 nhà mới: giữ hero
+    chồng lớn hơn) / tâm mới trùng nhà khác → BỎ và in ra; giữ nguyên chương trình/màu/cờ/điểm tiêu; HERO_META đổi rb, rbHash, n,
+    prog + `rekey {genRbHash (bản gen_herokit gốc), from, matched, moved, unmatched, ambiguous, collide}`. Tất định (cùng byte). Thử
+    trên buildings_real trước W5-D (ebd3dd3): 393/407 khớp, 11 không khớp, 3 mơ hồ, 0,5 s. **Muốn phân loại MỚI** (thêm nhà hero, sửa
+    nhầm): chạy lại trích xuất ảnh (tools/pano_loop) VÀ CAM KẾT đầu ra (`audit/fp_json/*.json` + `audit/fp_plan.json` — vài MB, đừng
+    để ngoài repo nữa), rồi `gen_facade_fp --collect` + `gen_herokit`. Không bao giờ để đầu vào của bộ sinh chỉ nằm trong %TEMP%.
 - **2026-10-15 (Đ3-W5 SỬA HỒI QUY TÍCH HỢP)** [chấm REAL | dot3 bcdcacc | W5 tích hợp: 088/097/106/166/230/313/331/336/382 tụt 0,2-0,5]:
     **Nguyên nhân + sửa (tại nguồn, không gỡ W5):** (1) **HERO 'cửa hàng'/'khách sạn' trên NHÀ ỐNG** (088 h0 bảng lớn xanh → tấm đen
     trống; 166 h90/h180 ốp đen không chữ + trệt showroom trắng; 313 h90/h180 dãy cửa hàng → tháp RS.HOTEL kính trơn): 94/99 cửa hàng

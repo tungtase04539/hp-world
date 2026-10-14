@@ -1,6 +1,6 @@
 // tools/check_herokit.mjs — KHOÁ CHỐNG DỮ LIỆU HERO CŨ (Đợt 3 W5-A, phản biện): js/herokit_data.js khoá theo TÂM footprint của
-// js/buildings_real.js. Ai sinh lại buildings_real.js (process_buildings / W5-D) mà quên `node tools/gen_herokit.mjs <fp_json>
-// <fp_plan.json>` thì nhà đổi hình MẤT chương trình (hoặc khớp nhầm nhà khác) mà runtime không báo gì → kiểm ở đây:
+// js/buildings_real.js. Ai sinh lại buildings_real.js (process_buildings / W5-D) mà quên `node tools/rekey_herokit.mjs` (hoặc
+// gen_herokit khi có lại fp_json) thì nhà đổi hình MẤT chương trình (hoặc khớp nhầm nhà khác) mà runtime không báo gì → kiểm ở đây:
 //   1. HERO_META.rb == số nhà RB, HERO_META.rbHash == FNV-1a(RB_B64)  (dữ liệu sinh trên ĐÚNG bản buildings_real này)
 //   2. mọi HERO[i] khớp đúng 1 nhà (heroOfPoly, ≤ 0,6 m)
 // usage: node tools/check_herokit.mjs   (thoát 1 nếu lệch) — tools/diag.mjs gọi checkHerokit() trước khi mở trình duyệt.
@@ -14,7 +14,8 @@ export async function checkHerokit() {
   const { HERO, HERO_META } = await import('../js/herokit_data.js');
   const { heroOfPoly } = await import('../js/herokit.js');
   const D = decodeRB(RB_B64), out = [];
-  const fix = ' → chạy lại: node tools/gen_herokit.mjs <keep/fp_json> <keep/fp_plan.json>';
+  // fp_json (ghi chú tự do) đã MẤT 2026-10-15 ⇒ gen_herokit không chạy lại được; đường chuẩn = khoá lại theo hình học footprint
+  const fix = ' → chạy: node tools/rekey_herokit.mjs (khoá lại hero theo footprint mới; gen_herokit chỉ khi có lại fp_json — KNOWLEDGE §10 2026-10-15)';
   if (HERO_META.rb !== D.nB) out.push(`herokit: HERO_META.rb ${HERO_META.rb} ≠ buildings_real ${D.nB} nhà${fix}`);
   const h = rbHash(RB_B64);
   if (HERO_META.rbHash !== h) out.push(`herokit: băm buildings_real ${h} ≠ HERO_META.rbHash ${HERO_META.rbHash}${fix}`);
