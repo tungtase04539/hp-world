@@ -244,19 +244,23 @@ test('filter: view lists, test a sentence, save a list into the data dir, reload
   assert.deepEqual(audit.slice(-2), ['reload', 'reload']);
 });
 
-test('netprobe panel tolerates a missing table, aggregates S5-shaped rows by carrier', async () => {
+// integration: S5's migration 030 creates netprobe_results and its service feeds this route (the generic reader is
+// the fallback without the service — covered below on a scratch table name)
+test('netprobe panel: empty → no rows; S5 rows aggregated by carrier; generic reader tolerates odd tables', async () => {
   const none = await api('GET', '/admin/api/netprobe');
-  assert.equal(none.status, 200); assert.equal(none.json.available, false);
-  await s.app.db.exec(`CREATE TABLE netprobe_results (id bigserial PRIMARY KEY, created_at timestamptz NOT NULL DEFAULT now(), carrier text, net text,
-    median_ms real, p95_ms real, jitter_ms real, loss_pct real)`);
-  await s.app.db.query(`INSERT INTO netprobe_results (carrier, net, median_ms, p95_ms, jitter_ms, loss_pct) VALUES
-    ('A', '4g', 40, 60, 5, 0), ('A', '4g', 60, 90, 7, 2), ('A', 'wifi', 20, 30, 2, 0), ('B', '5g', 30, 45, 3, 0)`);
+  assert.equal(none.status, 200); assert.equal(none.json.rows.length, 0);
+  await s.app.db.query(`INSERT INTO netprobe_results (carrier, net_type, samples, lost, median_ms, p95_ms, jitter_ms, min_ms, max_ms) VALUES
+    ('viettel', '4g', 30, 0, 40, 60, 5, 30, 70), ('viettel', '4g', 30, 1, 60, 90, 7, 40, 99), ('viettel', 'wifi', 30, 0, 20, 30, 2, 15, 35), ('fpt', '5g', 30, 0, 30, 45, 3, 20, 50)`);
   const r = await api('GET', '/admin/api/netprobe');
   assert.equal(r.json.available, true);
-  const a4 = r.json.rows.find((x) => x.carrier === 'A' && x.net === '4g');
-  assert.equal(a4.n, 2); assert.equal(a4.medianMs, 50); assert.equal(a4.lossPct, 1);
+  const a4 = r.json.rows.find((x) => x.carrier === 'viettel' && x.net === '4g');
+  assert.equal(a4.n, 2); assert.equal(a4.medianMs, 50); assert.ok(Math.abs(a4.lossPct - 1.67) < 0.01, String(a4.lossPct));
   assert.equal(r.json.rows.length, 3);
-  await s.app.db.exec('DROP TABLE netprobe_results');
+  assert.ok(r.json.summary.length === 3 && r.json.recent.length === 4);
+  await s.app.db.exec('DELETE FROM netprobe_results');
+  const { netprobeSummary } = await import('../src/admin/netprobe.js');
+  const fake = { query: async (sql) => (/information_schema.tables/.test(sql) ? { rows: [] } : { rows: [] }) };
+  assert.equal((await netprobeSummary(fake)).available, false);
 });
 
 test('audit log covers every action; no secret ever appears in admin responses or the audit table', async () => {
@@ -281,8 +285,11 @@ test('player moderation API: rules + lists public; /me and blocks need a valid a
   assert.equal((await rawRequest(s.game + '/v1/moderation/me', { headers: { authorization: 'Bearer abc.def.ghi' } })).status, 401);
   const me = await makeAccount(s.app.db, 'Toi#0100');
   const other = await makeAccount(s.app.db, 'Ban#0101');
+  // integration: S2's 'auth' service verifies (iss/aud/kid); a bare EdDSA token with the right key is NOT enough
   const key = crypto.createPrivateKey({ key: Buffer.from(s.config.secrets.jwtPrivateKey, 'base64'), format: 'der', type: 'pkcs8' });
-  const jwt = await new SignJWT({}).setProtectedHeader({ alg: 'EdDSA' }).setSubject(me).setIssuedAt().setExpirationTime('5m').sign(key);
+  const bare = await new SignJWT({}).setProtectedHeader({ alg: 'EdDSA' }).setSubject(me).setIssuedAt().setExpirationTime('5m').sign(key);
+  assert.equal((await rawRequest(s.game + '/v1/moderation/me', { headers: { authorization: 'Bearer ' + bare } })).status, 401);
+  const jwt = await s.app.get('auth').issueAccess({ id: me, displayName: 'Toi#0100', kind: 'guest' });
   const wrongKey = crypto.generateKeyPairSync('ed25519').privateKey;
   const forged = await new SignJWT({}).setProtectedHeader({ alg: 'EdDSA' }).setSubject(me).setExpirationTime('5m').sign(wrongKey);
   const auth = { authorization: 'Bearer ' + jwt, 'content-type': 'application/json' };

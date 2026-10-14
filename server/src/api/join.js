@@ -33,7 +33,11 @@ export function register(app) {
     const row = await app.db.one(`SELECT a.status, c.pos_x, c.pos_z, c.yaw FROM accounts a LEFT JOIN characters c ON c.account_id = a.id
         WHERE a.id = $1`, [accountId]);
     if (!row) { m.inc(1, { r: 'unauthorized' }); throw httpError(401, API_ERR.UNAUTHORIZED); }
-    if (row.status !== 'active') { m.inc(1, { r: 'banned' }); throw httpError(403, AUTH_ERR.BANNED); }
+    // permanent bans set accounts.status; timed bans live in S3's sanctions (cached in the chat service)
+    const chat = app.has('chat') ? app.get('chat') : null;
+    if (row.status !== 'active' || (chat && typeof chat.isBanned === 'function' && chat.isBanned(accountId))) {
+      m.inc(1, { r: 'banned' }); throw httpError(403, AUTH_ERR.BANNED);
+    }
 
     const sessions = app.get('sessions');
     const live = sessions.get(accountId);

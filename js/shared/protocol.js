@@ -89,6 +89,11 @@ export const EVENT = Object.freeze({
   SANCTION: 7,          // args: [kind, seconds]
 });
 
+// EVENT ACTION_RESULT args[1] (integration 15/10/2026: moved here from server/src/game/gateway.js)
+export const ACTION_RESULT = Object.freeze({ OK: 0, UNSUPPORTED: 1, BUSY: 2, INVALID: 3, DENIED: 4 });
+// EVENT SANCTION args[0] (args[1] = seconds left; 0xFFFFFFFF = permanent). A shadow mute is never sent to the player.
+export const SANCTION_KIND = Object.freeze({ MUTE: 1, BAN: 2, KICK: 3, WARN: 4 });
+
 export const CHAT_CODE = Object.freeze({
   OK: 0, RATE: 1, DUPLICATE: 2, TOO_LONG: 3, EMPTY: 4, BLOCKED: 5, MUTED: 6, SLOW_MODE: 7, CHANNEL: 8,
 });

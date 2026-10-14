@@ -323,7 +323,21 @@ export function register(app) {
   r.get('/admin/api/audit', async (req) => ({
     rows: (await app.db.query('SELECT id, at, actor, action, target, detail, ip FROM admin_audit ORDER BY id DESC LIMIT $1', [intParam(req.queryObj.limit, 100, 1, 500)])).rows,
   }), A);
-  r.get('/admin/api/netprobe', async (req) => netprobeSummary(app.db, { days: intParam(req.queryObj.days, 14, 1, 365) }), A);
+  // one route for both shapes: the page's {available, rows} (generic table reader) + S5's service {days, summary, recent}
+  r.get('/admin/api/netprobe', async (req) => {
+    // S5's service knows the real table (loss = lost / samples); the generic reader is the fallback without it
+    const days = intParam(req.queryObj.days, 14, 1, 365);
+    if (app.has('netprobe')) {
+      const np = app.get('netprobe');
+      try {
+        const summary = await np.summary({ days });
+        const recent = await np.recent(intParam(req.queryObj.limit, 50, 1, 500));
+        const rows = summary.map((x) => ({ carrier: x.carrier, net: x.netType, n: x.n, medianMs: x.medianMs, p95Ms: x.p95Ms, jitterMs: x.jitterMs, lossPct: x.lossPct, lastAt: x.lastAt }));
+        return { available: true, table: 'netprobe_results', days, rows, summary, recent };
+      } catch (e) { app.log.warn('netprobe summary failed', { err: e.message }); }
+    }
+    return netprobeSummary(app.db, { days });
+  }, A);
   r.get('/admin/api/alerts', () => {
     const al = app.has('alerts') ? app.get('alerts') : null;
     return { enabled: !!al?.enabled, recent: al?.recent ? al.recent() : [] };

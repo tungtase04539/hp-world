@@ -76,7 +76,7 @@ export async function runScenario(opts) {
   for (const s of plan.specs) {
     Object.assign(s, {
       mode, httpUrl, wsUrl, invite: o.invite || process.env.HPMP_BOT_INVITE || null, origin: o.origin || null, tier: 2,
-      deviceId: `${runTag}-${s.idx}`, creds: creds[s.idx] || null,
+      deviceId: `${runTag}-${String(s.idx).padStart(6, "0")}`, creds: creds[s.idx] || null,
     });
   }
 

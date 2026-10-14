@@ -187,10 +187,15 @@ test('chat: SAY within 40 m, shadow-mute, rejected, block list; REPORT', async (
     const D = await connectPlayer(s, 'Phu', { auth: await placed(s, 'Phu', FAR.x, FAR.z) });
     const seen = [];
     s.app.bus.on('chat:message', (e) => seen.push(e));
+    // integration: the real S3 chat service is wired; past its 10-minute slow mode so two lines in a row are allowed
+    s.app.get('sessions').get(A.account.id).playSeconds = 3600;
     A.c.chat('Chào cả nhà');
     const ca = await A.c.op(S2C.CHAT);
     const cb = await B.c.op(S2C.CHAT);
     assert.equal(cb.text, 'Chào cả nhà'); assert.equal(cb.from, A.welcome.netId); assert.equal(cb.msgRef, ca.msgRef);
+    // msgRef is S3's chat-log ref (REPORT.chatRef points back to the logged line, which carries the sender position)
+    const logged = s.app.get('chat').recent({ since: 0 }).find((l) => l.ref === ca.msgRef);
+    assert.ok(logged && logged.text === 'Chào cả nhà' && Math.abs(logged.x - OPERA.x) < 1, JSON.stringify(logged));
     await sleep(200);
     assert.equal(C.c.drain(S2C.CHAT).length, 0, '60 m away: not delivered');
     assert.equal(D.c.drain(S2C.CHAT).length, 0);
@@ -208,10 +213,12 @@ test('chat: SAY within 40 m, shadow-mute, rejected, block list; REPORT', async (
     const rej = await A.c.wait((m) => m.op === S2C.EVENT && m.type === EVENT.CHAT_REJECTED);
     assert.deepEqual(rej.args, [CHAT_CODE.RATE, 1500]);
     chat.handle = orig;
-    // B blocks A (chat service without block API → gateway fallback) → B stops receiving A
+    // B blocks A (persisted through chat.setBlock → social_blocks) → B stops receiving A
     B.c.action(7, ACTION.BLOCK_PLAYER, A.welcome.netId);
     const ar = await B.c.wait((m) => m.op === S2C.EVENT && m.type === EVENT.ACTION_RESULT);
     assert.deepEqual(ar.args, [7, 0]);
+    const blk = await s.app.db.one('SELECT kind FROM social_blocks WHERE account_id = $1 AND target_id = $2', [B.account.id, A.account.id]);
+    assert.equal(blk?.kind, 'block');
     A.c.chat('B không thấy');
     await A.c.op(S2C.CHAT);
     await sleep(200);

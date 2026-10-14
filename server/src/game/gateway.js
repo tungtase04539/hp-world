@@ -12,7 +12,7 @@
 //
 // Service 'gateway' (tests / bench): { handlers: {open, message, close}, stats() }
 import { Writer, decodeC2S, encodePong, encodeSystem, encodeWelcome, encodeWorld, encodeCorrect, encodeEvent, encodeChatS } from '../../../js/shared/codec.js';
-import { C2S, SYS, CLOSE, OP_NAMES, PROTO_VERSION, HELLO_FLAG, AUTH_REASON, KICK_REASON, CORRECT_REASON, ACTION, EVENT, CHAT_CODE, REPORT_CODE, CHANNEL } from '../../../js/shared/protocol.js';
+import { C2S, SYS, CLOSE, OP_NAMES, PROTO_VERSION, HELLO_FLAG, AUTH_REASON, KICK_REASON, CORRECT_REASON, ACTION, EVENT, CHAT_CODE, REPORT_CODE, CHANNEL, ACTION_RESULT, SANCTION_KIND } from '../../../js/shared/protocol.js';
 import { RATE, NET, CHAT, MODE, LAND_H, SFLAG } from '../../../js/shared/constants.js';
 import { vmaxOf } from '../../../js/shared/move.js';
 import { TokenBucket, isExemptIp, ipKey } from './ratelimit.js';
@@ -20,8 +20,8 @@ import { vehicleAllowed, MV_NAMES } from './validate.js';
 import { loadPlayer } from './persist.js';
 import { chooseSpawn } from './spawn.js';
 
-// EVENT ACTION_RESULT args[1]
-export const ACTION_RESULT = Object.freeze({ OK: 0, UNSUPPORTED: 1, BUSY: 2, INVALID: 3, DENIED: 4 });
+// EVENT ACTION_RESULT args[1] — the constant lives in js/shared/protocol.js since the integration (re-exported here)
+export { ACTION_RESULT };
 export const GW = Object.freeze({
   PRE_AUTH_PER_IP: 64,          // sockets that have not sent HELLO yet, per IP (exempt: loopback/private)
   PRE_AUTH_TOTAL: 5000,
@@ -29,7 +29,6 @@ export const GW = Object.freeze({
   PRE_AUTH_PINGS: 3000,         // PINGs allowed before HELLO (then close 1008)
   BAN_FOREVER: 0xffffffff,
 });
-const SANCTION_KICK = new Set(['kick', 'ban']);
 
 export function register(app) {
   const log = app.log.child({ mod: 'gateway' });
@@ -56,6 +55,13 @@ export function register(app) {
     S = app.get('sessions'); V = app.get('validate'); Q = app.get('queue'); R = app.get('resume'); T = app.get('tickets'); W = app.get('worldclock');
   };
   const chat = () => app.get('chat');
+  // S3 temporary / permanent bans (sanctions table, cached in the chat service) → seconds left, 0 = not banned
+  const banSecondsLeft = (accountId) => {
+    const c = app.has('chat') ? chat() : null;
+    if (!c || typeof c.isBanned !== 'function' || !c.isBanned(accountId)) return 0;
+    const until = typeof c.sanctionOf === 'function' ? c.sanctionOf(accountId).ban : null;
+    return until ? Math.max(1, Math.min(GW.BAN_FOREVER - 1, Math.ceil((until - Date.now()) / 1000))) : GW.BAN_FOREVER;
+  };
   const send = (conn, bytes) => { bytesOut.inc(bytes.length); return conn.send(bytes); };
   const now = () => app.nowMs();
 
@@ -164,9 +170,10 @@ export function register(app) {
     }
     if (conn.closed) return;
     if (!p || !p.character) { authFail(conn, AUTH_REASON.BAD_TICKET); return; }
-    if (p.account.status !== 'active') {
+    const banLeft = banSecondsLeft(v.accountId);
+    if (p.account.status !== 'active' || banLeft) {
       mHello.inc(1, { r: 'banned' });
-      send(conn, encodeSystem(w, SYS.BANNED, GW.BAN_FOREVER));
+      send(conn, encodeSystem(w, SYS.BANNED, banLeft || GW.BAN_FOREVER));
       conn.close(CLOSE.BANNED, 'banned');
       return;
     }
@@ -269,16 +276,17 @@ export function register(app) {
         const target = S.world.accountOf(m.target & 0xffff);
         if (!target || target === s.accountId) { actionResult(s, m.reqId, ACTION_RESULT.INVALID); return; }
         const block = m.type === ACTION.BLOCK_PLAYER;
+        // the in-RAM set applies at once (and is the fallback without a persistent block API); S3's chat.setBlock
+        // persists it (social_blocks): arg = 1 → one-way 'mute', otherwise a two-way 'block'
+        if (!s.blocked) s.blocked = new Set();
+        if (block) s.blocked.add(target); else s.blocked.delete(target);
         const c = chat();
-        const fn = block ? c.block : c.unblock;
-        if (typeof fn === 'function') {
-          Promise.resolve(fn.call(c, s, target)).then(
-            () => { if (s.conn) actionResult(s, m.reqId, ACTION_RESULT.OK); },
+        if (typeof c.setBlock === 'function') {
+          Promise.resolve(c.setBlock(s.accountId, target, block, m.arg === 1 ? 'mute' : 'block')).then(
+            (r) => { if (s.conn) actionResult(s, m.reqId, r && r.ok === false ? ACTION_RESULT.DENIED : ACTION_RESULT.OK); },
             (e) => { log.warn('block failed', { err: e }); if (s.conn) actionResult(s, m.reqId, ACTION_RESULT.DENIED); });
           return;
         }
-        if (!s.blocked) s.blocked = new Set();
-        if (block) s.blocked.add(target); else s.blocked.delete(target);
         actionResult(s, m.reqId, ACTION_RESULT.OK);
         return;
       }
@@ -323,10 +331,12 @@ export function register(app) {
       send(s.conn, encodeEvent(w, EVENT.CHAT_REJECTED, [res?.code ?? CHAT_CODE.BLOCKED, res?.retryAfterMs | 0]));
       return;
     }
-    const ref = (msgRef = (msgRef + 1) >>> 0);
+    // msgRef: S3's chat log reference (REPORT.chatRef points back to it); own counter only if the service has none
+    const ref = res.ref > 0 ? res.ref >>> 0 : (msgRef = (msgRef + 1) >>> 0);
     s.lastMsgRef = ref;
     const out = res.deliverText ?? text;
     const n = deliverSay(s, channel === CHANNEL.SAY ? CHANNEL.SAY : channel, out, !!res.shadow, ref);
+    if (res.support) send(s.conn, encodeEvent(w, EVENT.SUPPORT_LINE, []));
     app.bus.emit('chat:message', {
       session: s, channel, text: out, shadow: !!res.shadow, flagged: !!res.flagged, msgRef: ref,
       x: s.entity.x, z: s.entity.z, recipients: n, at: Date.now(),
@@ -435,17 +445,29 @@ export function register(app) {
       }
     });
   });
-  // sanctions from the moderation side (S3): kick / ban close the session, mute informs the player
-  app.bus.on('sanction', ({ accountId, kind, until } = {}) => {
+  // sanctions from the moderation side (S3, SERVER.md §3.3 item 5): kick → SYSTEM KICK(ADMIN) + close 4009;
+  // ban → SYSTEM BANNED(seconds) + close 4003; mute → EVENT SANCTION [MUTE, seconds] (revoked → seconds 0);
+  // warn → EVENT SANCTION [WARN, 0]; shadow → nothing (a shadow mute is never revealed)
+  app.bus.on('sanction', ({ accountId, kind, until, seconds, revoked } = {}) => {
     if (!S || !accountId) return;
-    const left = until ? Math.max(0, Math.round((new Date(until).getTime() - Date.now()) / 1000)) : GW.BAN_FOREVER;
-    if (SANCTION_KICK.has(kind)) {
-      const s = S.get(accountId);
-      if (!s) return;
-      if (kind === 'ban' && s.conn) s.conn.send(encodeSystem(w, SYS.BANNED, left));
+    let left;
+    if (Number.isFinite(seconds) && seconds >= 0) left = Math.min(GW.BAN_FOREVER, Math.round(seconds));
+    else left = until ? Math.max(0, Math.round((new Date(until).getTime() - Date.now()) / 1000)) : GW.BAN_FOREVER;
+    const s = S.get(accountId);
+    if (!s) return;
+    if (kind === 'kick' || kind === 'ban') {
+      if (revoked) return;
+      if (kind === 'ban' && s.conn) s.conn.send(encodeSystem(w, SYS.BANNED, left || GW.BAN_FOREVER));
       S.kick(s, KICK_REASON.ADMIN, kind === 'ban' ? CLOSE.BANNED : CLOSE.KICKED);
-    } else if (kind === 'mute') S.sendSystem(accountId, SYS.MUTED, left);
+    } else if (kind === 'mute' && s.conn) {
+      send(s.conn, encodeEvent(w, EVENT.SANCTION, [SANCTION_KIND.MUTE, revoked ? 0 : Math.min(left, 0x7fffffff)]));
+    } else if (kind === 'warn' && s.conn && !revoked) {
+      send(s.conn, encodeEvent(w, EVENT.SANCTION, [SANCTION_KIND.WARN, 0]));
+    }
   });
+  // owner broadcast (admin page) → S2C CHAT on the SYSTEM channel from netId 0; restart notice → SYSTEM RESTART_IN
+  app.bus.on('admin:broadcast', ({ text, ref } = {}) => { if (S && text) S.broadcastChat(text, CHANNEL.SYSTEM, ref >>> 0); });
+  app.bus.on('admin:restart', ({ seconds } = {}) => { if (S) S.broadcastSystem(SYS.RESTART_IN, Math.max(0, Math.round(Number(seconds) || 0))); });
   // shutdown: tell clients to come back after a short randomised backoff
   app.onStop(() => {
     if (!S) return;

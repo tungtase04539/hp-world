@@ -65,6 +65,10 @@ export class Session {
     this.snapBytes = 0; this.snapCount = 0;
   }
   get netId() { return this.entity ? this.entity.netId : 0; }
+  // position for S3 (chat line x/z, report context within 60 m, admin map) — read from the entity
+  get x() { return this.entity ? this.entity.x : NaN; }
+  get z() { return this.entity ? this.entity.z : NaN; }
+  get mode() { return this.entity ? this.entity.mode : 0; }
   get active() { return this.state === 'active' && !!this.conn; }
 }
 
@@ -180,8 +184,8 @@ export function createSessions({ log, metrics, bus, db, now = () => performance.
       for (const s of byAccount.values()) if (s.conn) { s.conn.send(b); n++; }
       return n;
     },
-    broadcastChat(text, channel = CHANNEL.SYSTEM) {
-      const b = encodeChatS(w, 0, channel, 0, String(text || ''));
+    broadcastChat(text, channel = CHANNEL.SYSTEM, ref = 0) {
+      const b = encodeChatS(w, 0, channel, ref >>> 0, String(text || ''));
       let n = 0;
       for (const s of active) { s.conn.send(b); n++; }
       return n;

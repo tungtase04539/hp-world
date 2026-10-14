@@ -23,7 +23,7 @@ ENV NODE_ENV=production \
 WORKDIR /app/server
 # shared pure modules (no three, no DOM) — copied at build time, never bind-mounted
 COPY js/shared/ /app/js/shared/
-COPY js/terrain.js js/mapdata.js js/brands.js /app/js/
+COPY js/terrain.js js/mapdata.js js/brands.js js/xsection.js /app/js/
 COPY --from=deps /app/server/node_modules ./node_modules
 # server code (+ admin page / chat filter lists when present; see the .dockerignore whitelist)
 COPY server/ ./

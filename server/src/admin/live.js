@@ -13,17 +13,23 @@ export function createLive(app) {
   app.bus.on('degrade', ({ level } = {}) => { degrade = { level: Number(level) || 0, at: new Date().toISOString() }; });
   let last = null;
 
+  // S2's 'sessions'.list() (live + limbo sessions, plain rows with x/z) plus any session announced on the bus that the
+  // list does not contain (deduplicated by accountId / netId)
   function sessions() {
+    let list = null;
     for (const name of ['sessions', 'players']) {
-      if (!app.has(name)) continue;
+      if (list || !app.has(name)) continue;
       const svc = app.get(name);
       for (const fn of ['list', 'all', 'values']) {
         if (typeof svc?.[fn] === 'function') {
-          try { const v = svc[fn](); if (v && typeof v[Symbol.iterator] === 'function') return [...v]; } catch { /* fall back */ }
+          try { const v = svc[fn](); if (v && typeof v[Symbol.iterator] === 'function') { list = [...v]; break; } } catch { /* fall back */ }
         }
       }
     }
-    return [...tracked.values()];
+    if (!list) return [...tracked.values()];
+    const seen = new Set(list.map(key));
+    for (const s of tracked.values()) if (!seen.has(key(s))) list.push(s);
+    return list;
   }
 
   function players(limit = 3000) {

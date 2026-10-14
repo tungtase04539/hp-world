@@ -109,18 +109,21 @@ test('end-to-end vs fake server: smoke (full protocol), reconnect (resume), abus
   }
 });
 
-test('end-to-end vs foundation server: ping-level mode is auto-detected', { timeout: 60000 }, async () => {
+// integration: the merged server implements auth/join, so auto mode selects the full protocol; the invite comes from
+// S2's createInviteBatch (same hash as S3's admin page)
+test('end-to-end vs the merged game server: full mode (invite → guest → join → HELLO → snapshots)', { timeout: 90000 }, async () => {
   const s = await bootTestServer();
   try {
-    const run = await runScenario({ scenario: 'smoke', url: s.game, admin: s.admin, n: 6, dur: 5, out: tmp('found'), quiet: true, workers: 1, scrapeMs: 1000, dropPerMin: 0 });
+    const [invite] = await s.app.get('auth').createInviteBatch({ count: 1, uses: 50, batch: 'bots-test', note: 'test' });
+    const run = await runScenario({ scenario: 'smoke', url: s.game, admin: s.admin, n: 6, dur: 8, out: tmp('real'), quiet: true, workers: 1, scrapeMs: 1000, dropPerMin: 0, invite });
     const r = run.report;
-    assert.equal(r.meta.mode, 'ping');
+    assert.equal(r.meta.mode, 'full');
     assert.equal(r.decode.errors, 0);
-    assert.equal(r.connect.everLive, 6);
-    assert.equal(r.connect.system.NOT_IMPLEMENTED, 6);
-    assert.ok(r.traffic.opsIn.PONG >= 6);
+    assert.equal(r.connect.everLive, 6, JSON.stringify(r.connect));
+    assert.ok((r.traffic.opsIn.SNAPSHOT || 0) > 6 * 20, JSON.stringify(r.traffic.opsIn));
     assert.ok((r.serverCounters['hp_ws_play_messages_in_total{op="STATE"}'] || 0) > 50, JSON.stringify(r.serverCounters));
     assert.ok(r.server.scrapesOk >= 3);
+    assert.equal(s.app.get('sessions').count(), 0, 'bots leave at the end');
   } finally {
     await s.app.stop('test');
   }

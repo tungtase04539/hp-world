@@ -6,7 +6,8 @@
 //                      → stored in netprobe_results (migration 030). No personal data: no IP, no UA, no account.
 //                      Rate limit: per source address 6 / 10 min, global 120 / min.
 //   service 'netprobe' { summary({days}) → rows by carrier × netType, recent(limit), CARRIERS, NET_TYPES }
-//   admin   GET /admin/api/netprobe?days=14 (Bearer ADMIN_TOKEN) → {summary, recent}  (for the S3 admin page)
+//   admin   GET /admin/api/netprobe?days=14 → {available, rows, days, summary, recent} — the route lives in
+//           admin/index.js (S3 security layer) and reads this service
 // Also installs the admin edge guard (admin_edge_guard.js): the admin port refuses tunnel / edge-network traffic.
 import { Writer, decodeC2S, encodePong } from '../../../js/shared/codec.js';
 import { C2S, CLOSE, API_ERR } from '../../../js/shared/protocol.js';
@@ -166,11 +167,8 @@ export function register(app) {
   }
   app.provide('netprobe', { summary, recent, purge, CARRIERS, NET_TYPES, stats: () => ({ open, perIpKeys: perIp.size }) });
 
-  app.admin.get('/admin/api/netprobe', async (req) => ({
-    days: Number(req.queryObj.days) || 14,
-    summary: await summary({ days: req.queryObj.days }),
-    recent: await recent(req.queryObj.limit || 50),
-  }), { auth: 'admin' });
+  // GET /admin/api/netprobe is served by the admin module (server/src/admin/index.js) from this service — one route,
+  // behind the admin port's full security layer (integration 15/10/2026).
 
   app.bus.on('start', () => {
     app.timers.every(6 * 3600_000, 'netprobe_purge', async () => {
