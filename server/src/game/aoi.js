@@ -7,6 +7,7 @@
 // No allocation per snapshot on the hot path (scratch arrays are module-level and grow only).
 import { AOI, MODE_MOUNTED } from '../../../js/shared/constants.js';
 import { SNAPSHOT_HEADER_BYTES, ENTER_RECORD_BYTES, UPDATE_RECORD_BYTES } from '../../../js/shared/codec.js';
+import { neighbors, cellOf } from '../../../js/shared/grid.js';
 
 export const MAX_SLOTS = 255;                 // u8 slot ids on the wire
 export const AOI_CFG = Object.freeze({
@@ -59,8 +60,14 @@ export class AoiState {
     for (let s = MAX_SLOTS - 1; s >= 0; s--) this.free[this.nFree++] = s;   // pop gives 0, 1, 2 …
     this.prio.fill(0);
     this.visible = 0;
+    this.hi = 0;                                 // slots in use are all < hi (free slots are reused lowest-first)
   }
-  _take() { return this.nFree ? this.free[--this.nFree] : -1; }
+  _take() {
+    if (!this.nFree) return -1;
+    const s = this.free[--this.nFree];
+    if (s >= this.hi) this.hi = s + 1;
+    return s;
+  }
   _release(s) {
     const e = this.slotEnt[s];
     if (e) this.entSlot.delete(e);
@@ -90,12 +97,13 @@ let cE = new Array(cap).fill(null);
 let cD = new Float64Array(cap);
 let cS = new Float64Array(cap);       // score (weighted squared distance)
 let cOrd = new Int32Array(cap);
+let cV = new Uint8Array(cap);         // 1 = already visible
+let cT = new Float64Array(cap);       // quickselect scratch
+let cA = new Int32Array(cap), cB = new Int32Array(cap);
 let nC = 0;
 const uSlot = new Int32Array(MAX_SLOTS);
 const uPrio = new Float64Array(MAX_SLOTS);
 const vD = new Float64Array(MAX_SLOTS);
-let ordScore = cS;
-const byScore = (a, b) => ordScore[a] - ordScore[b];
 const byPrioDesc = (a, b) => uPrio[b] - uPrio[a];
 
 function grow() {
@@ -103,8 +111,30 @@ function grow() {
   const e2 = new Array(cap).fill(null); for (let i = 0; i < nC; i++) e2[i] = cE[i];
   const d2 = new Float64Array(cap); d2.set(cD.subarray(0, nC));
   const s2 = new Float64Array(cap); s2.set(cS.subarray(0, nC));
-  cE = e2; cD = d2; cS = s2; cOrd = new Int32Array(cap);
+  const v2 = new Uint8Array(cap); v2.set(cV.subarray(0, nC));
+  cE = e2; cD = d2; cS = s2; cV = v2; cOrd = new Int32Array(cap); cT = new Float64Array(cap);
+  cA = new Int32Array(cap); cB = new Int32Array(cap);
 }
+
+// k-th smallest (0-based) of a[0..n) — iterative quickselect, reorders a
+function kth(a, n, k) {
+  let lo = 0, hi = n - 1;
+  while (hi > lo) {
+    const pv = a[(lo + hi) >> 1];
+    let i = lo, j = hi;
+    while (i <= j) {
+      while (a[i] < pv) i++;
+      while (a[j] > pv) j--;
+      if (i <= j) { const t = a[i]; a[i] = a[j]; a[j] = t; i++; j--; }
+    }
+    if (k <= j) hi = j; else if (k >= i) lo = i; else return a[k];
+  }
+  return a[k];
+}
+const byScoreAsc = (a, b) => cS[a] - cS[b];
+let MARK = 0;                         // per-step token (entities carry _aoiTok/_aoiSlot of the CURRENT step only)
+const NB = new Int32Array(9);
+const byScoreDesc = (a, b) => cS[b] - cS[a];
 
 const weightOf = (e) => (MODE_MOUNTED[e.mode] ? 2 : 1);
 
@@ -123,24 +153,35 @@ export function aoiStep(world, self, st, p, out) {
   const rVis = p.rVis, rKeep = rVis + AOI_CFG.HYST;
   const rVis2 = rVis * rVis, rNear2 = p.rNear * p.rNear;
 
-  // 1. gather candidates within rKeep (visible entities keep their slot up to rVis + HYST)
+  // 1. gather candidates within rKeep (visible entities keep their slot up to rVis + HYST). Visible entities are
+  //    marked with this step's token first, so the gather needs no Map lookup per candidate.
+  const tok = ++MARK;
+  for (let s = 0; s < st.hi; s++) { const e = st.slotEnt[s]; if (e) { e._aoiTok = tok; e._aoiSlot = s; } }
   nC = 0;
-  world.forNear(self.x, self.z, rKeep, (e, d2) => {
-    if (e === self) return false;
-    const s = st.entSlot.get(e);
-    if (s !== undefined) { st.stamp[s] = stamp; st.d2[s] = d2; }
-    else if (d2 > rVis2) return false;
-    if (nC === cap) grow();
-    cE[nC] = e; cD[nC] = d2;
-    const w = weightOf(e);
-    cS[nC] = (d2 / (w * w)) * (s !== undefined ? AOI_CFG.KEEP : 1);
-    nC++;
-    return false;
-  }, self.cell >= 0 ? self.cell : undefined);
+  const nb = NB;
+  const nn = neighbors(self.cell >= 0 ? self.cell : cellOf(self.x, self.z), nb);
+  const sx = self.x, sz = self.z, rKeep2 = rKeep * rKeep, KEEP = AOI_CFG.KEEP;
+  for (let ci = 0; ci < nn; ci++) {
+    const arr = world.cells[nb[ci]];
+    for (let j = 0; j < arr.length; j++) {
+      const e = arr[j];
+      const dx = e.x - sx, dz = e.z - sz;
+      const d2 = dx * dx + dz * dz;
+      if (d2 > rKeep2 || e === self) continue;
+      const vis = e._aoiTok === tok;
+      if (vis) { const s = e._aoiSlot; st.stamp[s] = stamp; st.d2[s] = d2; }
+      else if (d2 > rVis2) continue;
+      if (nC === cap) grow();
+      cE[nC] = e; cD[nC] = d2; cV[nC] = vis ? 1 : 0;
+      const w = MODE_MOUNTED[e.mode] ? 2 : 1;
+      cS[nC] = vis ? (d2 / (w * w)) * KEEP : d2 / (w * w);
+      nC++;
+    }
+  }
   out.candidates = nC;
 
   // 2. leaves: visible entities no longer gathered (out of range, removed from the world)
-  for (let s = 0; s < MAX_SLOTS; s++) {
+  for (let s = 0; s < st.hi; s++) {
     const e = st.slotEnt[s];
     if (e && st.stamp[s] !== stamp) { out.leaves[out.nLeave++] = s; st._release(s); }
   }
@@ -150,41 +191,45 @@ export function aoiStep(world, self, st, p, out) {
   let records = 0;
   const newcomers = nC - st.visible;
   if (newcomers > 0) {
-    for (let i = 0; i < nC; i++) cOrd[i] = i;
-    const ord = cOrd.subarray(0, nC);
-    ordScore = cS;
-    ord.sort(byScore);
-    // desired = first CAPN by score; newcomers inside it may enter; visible outside it may be evicted
+    // threshold = score of the CAPN-th best candidate (quickselect, O(n)); newcomers at or below it may enter,
+    // visible entities above it may be evicted (worst first) to make room — no full sort per snapshot
     const limit = Math.min(CAPN, nC);
-    let enterWant = 0;
-    for (let r = 0; r < limit; r++) if (!st.entSlot.has(cE[ord[r]])) enterWant++;
+    let T = Infinity;
+    if (nC > limit) { for (let i = 0; i < nC; i++) cT[i] = cS[i]; T = kth(cT, nC, limit - 1); }
+    let nA = 0, nB = 0;
+    for (let i = 0; i < nC; i++) {
+      if (cV[i]) { if (cS[i] > T) cB[nB++] = i; }
+      else if (cS[i] <= T) cA[nA++] = i;
+    }
     out.capped = Math.max(0, nC - limit);
-    let enterN = Math.min(enterWant, ENTER_MAX, Math.floor(budget / (ENTER_RECORD_BYTES + 1)));
-    // room: free capacity under the cap, plus evictions of visible entities ranked beyond the cap
-    let room = CAPN - st.visible;
-    if (enterN > room) {
-      // evict from the bottom of the ranking (visible ones beyond `limit`)
-      for (let r = nC - 1; r >= limit && enterN > room; r--) {
-        const e = cE[ord[r]];
-        const s = st.entSlot.get(e);
-        if (s === undefined) continue;
-        out.leaves[out.nLeave++] = s; st._release(s); budget--; room++;
+    let enterN = Math.min(nA, ENTER_MAX, Math.floor(budget / (ENTER_RECORD_BYTES + 1)));
+    if (enterN > 0) {
+      const A = cA.subarray(0, nA);
+      if (nA > 1) A.sort(byScoreAsc);
+      let room = CAPN - st.visible;
+      if (enterN > room && nB > 0) {
+        const Bv = cB.subarray(0, nB);
+        if (nB > 1) Bv.sort(byScoreDesc);
+        for (let r = 0; r < nB && enterN > room; r++) {
+          const s = cE[Bv[r]]._aoiSlot;
+          if (st.slotEnt[s] !== cE[Bv[r]]) continue;
+          out.leaves[out.nLeave++] = s; st._release(s); budget--; room++;
+        }
       }
       if (enterN > room) enterN = Math.max(0, room);
-    }
-    for (let r = 0; r < limit && out.nEnter < enterN; r++) {
-      const ci = ord[r];
-      const e = cE[ci];
-      if (st.entSlot.has(e)) continue;
-      const s = st._take();
-      if (s < 0) break;
-      st.slotEnt[s] = e; st.entSlot.set(e, s); st.visible++;
-      st.stamp[s] = stamp; st.d2[s] = cD[ci]; st.prio[s] = 0;
-      st.sentK1[s] = e.k1; st.sentK2[s] = e.k2;
-      out.enterSlot[out.nEnter] = s; out.enterEnt[out.nEnter] = e; out.nEnter++;
-      budget -= ENTER_RECORD_BYTES; records++;
-      const g = st.namesSent.get(e.netId);
-      if (g !== e.gen) { st.namesSent.set(e.netId, e.gen); st.pendingNames.push(e); }
+      for (let r = 0; r < nA && out.nEnter < enterN; r++) {
+        const ci = A[r];
+        const e = cE[ci];
+        const s = st._take();
+        if (s < 0) break;
+        st.slotEnt[s] = e; st.entSlot.set(e, s); st.visible++;
+        st.stamp[s] = stamp; st.d2[s] = cD[ci]; st.prio[s] = 0;
+        st.sentK1[s] = e.k1; st.sentK2[s] = e.k2;
+        out.enterSlot[out.nEnter] = s; out.enterEnt[out.nEnter] = e; out.nEnter++;
+        budget -= ENTER_RECORD_BYTES; records++;
+        const g = st.namesSent.get(e.netId);
+        if (g !== e.gen) { st.namesSent.set(e.netId, e.gen); st.pendingNames.push(e); }
+      }
     }
   } else {
     out.capped = 0;
@@ -195,12 +240,12 @@ export function aoiStep(world, self, st, p, out) {
   let thinD2 = Infinity;
   if (p.thin && (st.snapCount & 1) === 1 && st.visible > AOI_CFG.L3_NEAR) {
     let n = 0;
-    for (let s = 0; s < MAX_SLOTS; s++) if (st.slotEnt[s]) vD[n++] = st.d2[s];
+    for (let s = 0; s < st.hi; s++) if (st.slotEnt[s]) vD[n++] = st.d2[s];
     const sub = vD.subarray(0, n).sort();
     thinD2 = sub[AOI_CFG.L3_NEAR - 1];
   }
   let nU = 0;
-  for (let s = 0; s < MAX_SLOTS; s++) {
+  for (let s = 0; s < st.hi; s++) {
     const e = st.slotEnt[s];
     if (!e || st.stamp[s] !== stamp) continue;
     if (e.k1 === st.sentK1[s] && e.k2 === st.sentK2[s]) continue;     // unchanged since last sent: nothing to send

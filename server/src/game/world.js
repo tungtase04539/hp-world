@@ -25,6 +25,7 @@ export class Entity {
     this.cell = -1; this.cellIdx = -1;
     this.inWorld = false;
     this.moved = 0;                // monotonically increasing change counter
+    this._aoiTok = 0; this._aoiSlot = -1;   // scratch of the AOI step currently running (aoi.js)
   }
   setPose(x, z, y, yaw, spd, mode, flags) {
     this.x = x; this.z = z; this.y = y; this.yaw = yaw; this.spd = spd; this.mode = mode & 7; this.flags = flags & 31;
