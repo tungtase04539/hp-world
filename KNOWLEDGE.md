@@ -558,7 +558,11 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     gộp nhánh → undefined thay vì SyntaxError liên kết làm trắng trang). (f) phụ: tường theo lớp đất (CAMPUS…) KHÔNG dựng khi nón
     pano tại chỗ tả shop/nhà ở/nhà không-khuôn-viên (`PEV.seenOpenFront`, 51 lô — mặt tiền khách sạn TQK 355); loại "mạnh" ngầm
     định có rào trừ khi chữ tả mặt trước mở (bồn cây/chậu cảnh/thảm/bậc tam cấp/sảnh/lối vào — 051 h45 Khoa Quốc tế BV Phụ Sản);
-    rào tôn/tường lô không dựng khi nhà thật đứng ≤ 3,8 m sau vạch. __R5_NUM__
+    (g) lô khe nhận kiểu khuôn viên do LAN (2 bên ±8 m) / MẶC ĐỊNH vùng biệt thự (không nón tại chỗ) mà KHÔNG có bằng chứng nhà
+    (builtEvidence/obsSupport — lẽ ra bị 'noev' bỏ) → giữ sân, KHÔNG tường/cổng (151 lô; rào biệt thự mặc định từng dựng trong dải
+    công viên trung tâm quanh cây xăng 475, 474 h135, 398 h0 — đất OSM ở đó chỉ là URB). Nhà giữ nguyên 100 %, chỉ đổi tường.
+    Thử KHÔNG được: cắt tường theo nhà thật CUỐI (sau nới/lấp khe) đứng ≤ 1,5 m sau vạch → băm vụn 66 dãy hàng rào ở góc nhà
+    bên cạnh; rào tôn 478 h270 vẫn đứng trước cửa hàng (nhà đó không nằm sau đoạn tường trong dữ liệu sinh) — để lại. __R5_NUM__
     **BẪY:** (a) `\b` của JS không hiểu chữ có dấu ("chợ\b" không bao giờ khớp) → ranh giới tường minh; (b) "tôn" khớp trong
     "bê tông" → `tôn(?!g)`; (c) màu tường rào phải lấy từ CỤM chữ tả tường/rào/trụ/cổng — "chòi gác vàng" từng nhuộm cả rào;
     (d) tường dựng tay trong ô cells nằm ngay mặt phố — phải dò hình học trước khi dựng tường dữ liệu; (e) đo cảnh trước freeze

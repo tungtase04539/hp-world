@@ -58,7 +58,7 @@ export function classifyObs(o) {
   const all = s + ' | ' + f;
   const r = { kind: '', walled: false, wall: -1, civic: false, villa: false, col: -1, gate: /cổng/.test(all), booth: /chòi gác|bốt gác|nhà bảo vệ|thường trực|nhà gác/.test(all) };
   // CÂY XĂNG (nhà điều hành, mái che trụ bơm, "cửa hàng tiện lợi" của trạm): sân trạm là mặt thoáng — KHÔNG phiếu shop (review
-  // lượt 4: "nhà điều hành cây xăng + cửa hàng tiện lợi" khớp 'cửa hàng' → lô sinh 1 tầng dưới mái che Petrolimex pano_475)
+  // lượt 4: "nhà điều hành cây xăng + cửa hàng tiện lợi" khớp 'cửa hàng' → lô sinh 1 tầng dưới mái che trạm xăng pano_475)
   if (RX_FUEL.test(all)) { r.open = true; return r; }
   if (RX_VACANT.test(s) && !/nhà ống|nhà cao tầng|nhà \d|cao ốc|tòa|toà|chung cư|shophouse/.test(s)) { r.kind = 'vacant'; r.wall = /tường|bê tông|gạch/.test(all) && !/tôn(?!g)|container/.test(all) ? WALL.LOTWALL : WALL.HOARD; }
   else if (RX_MARKET.test(s) && !/nhà ống|shophouse/.test(s)) r.kind = 'market';

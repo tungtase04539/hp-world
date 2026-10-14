@@ -43,7 +43,7 @@ import {
   signedArea, absArea, outward, centroid, bbox, pointInPoly, segDist, cleanPoly, isSimple, clipHalf, clipStrip,
   minRect, Grid, overlapArea, hash32, rng, pickW, polyEdgeDist,
 } from './bgeom.mjs';
-import { LU, luAt, LU_VETO, LU_WALL, WALL, RX_FUEL, makeEvidence, makeNameIndex, zoneAt, ZONES, WallSet } from './parcels_ev.mjs';
+import { LU, luAt, LU_VETO, LU_WALL, WALL, RX_FUEL, classifyObs, makeEvidence, makeNameIndex, zoneAt, ZONES, WallSet } from './parcels_ev.mjs';
 
 const T0 = Date.now();
 const ARGV = process.argv.slice(2);
@@ -369,14 +369,14 @@ function classify(b) {
   b.mass = b.src !== 'OSM' && b.src !== 'SYN' && !b.cls && !b.name && b.area > 400 && b.area < 12000 && !portZone(cx, cz);
   // ...trừ khối GỌN (gần chữ nhật, cạnh dài/ngắn < 1,7: dáng cao ốc/khách sạn/chợ) hoặc pano thấy nhà ≥ 6 tầng ở đó
   if (b.mass && mr && b.area > 0.88 * mr.w * mr.d && mr.w / Math.max(1, mr.d) < 1.7 && b.pts.length <= 6) b.mass = false;
-  if (b.tallObs) b.mass = false;
+  if (b.tallObs || b.lowBlock) b.mass = false;
   b.big = !b.mass && (b.area > 1000 || (mr && mr.d > 30));
 }
 // Quan sát pano nhà CAO (≥ 6 tầng, tia tới 80 m) chạm footprint lớn (> 300 m²) → giữ nguyên khối (không chia lô) + số tầng đó
 {
   const g0 = new Grid(16); B.forEach((b, i) => g0.insert(i, (b.bb = bbox(b.pts))));
   const A0 = JSON.parse(fs.readFileSync(new URL('../audit/audit_enriched.json', import.meta.url), 'utf8'));
-  let n = 0, nNo = 0;
+  let n = 0, nNo = 0, nLowBlock = 0;
   const AP = A0.filter((p) => typeof p.X === 'number');
   // MÂU THUẪN (lượt 5, review: tháp kính 13 T "ma" b5277 góc Nguyễn Đức Cảnh × Mê Linh — tia pano_427 h90 đi 73 m chạm footprint
   // mà pano_428 đứng cách 26 m tả nhà 2-4 T ở đúng hướng đó): pano KHÁC gần footprint hơn (≤ 30 m, gần hơn điểm chạm) có quan
@@ -387,14 +387,14 @@ function classify(b) {
       if (q === p0) continue;
       const d = Math.hypot(cx - q.X, cz - q.Z); if (d > 30 || d < 3 || d >= dHit) continue;
       const brg = Math.atan2(cx - q.X, -(cz - q.Z));
-      let low = false, tall = false;
+      let low = null, lowDa = 9, tall = false;
       for (const o of q.buildings || []) {
         const fl = +o.floors || 0; if (!fl) continue;
         let da = Math.abs(brg - ((+o.heading || 0) * Math.PI) / 180) % (2 * Math.PI); if (da > Math.PI) da = 2 * Math.PI - da;
         if (fl >= 6 && da <= 0.7) tall = true;
-        if (fl <= 5 && da <= Math.max(0.44, Math.atan2(Math.max(4, (+o.width_m || 0) / 2), d))) low = true;
+        if (fl <= 5 && da <= Math.max(0.44, Math.atan2(Math.max(4, (+o.width_m || 0) / 2), d)) && da < lowDa) { low = o; lowDa = da; }
       }
-      if (low && !tall) return q.id;
+      if (low && !tall) return { id: q.id, o: low };
     }
     return null;
   };
@@ -409,10 +409,18 @@ function classify(b) {
     }
     if (hit < 0) continue;
     const cq = contradicted(hit, p, Math.hypot(...((c) => [c[0] - p.X, c[1] - p.Z])(centroid(B[hit].pts))));
-    if (cq) { nNo++; if (process.env.HP_DEBUG_TALL) console.log('tallObs contradicted', p.id, Math.round(o.heading), fl + 'F', 'd', dHit.toFixed(0), 'by', cq, 'c', centroid(B[hit].pts).map(Math.round)); continue; }
+    if (cq) {
+      nNo++;
+      // quan sát thấp phủ footprint KHÔNG phải dãy nhà ống (shop/nhà ở/"nhà ống"/"dãy") — vd 269 h90 "khối nhà kiểu vòm cuốn 4 T" —
+      // → giữ NGUYÊN khối (không chia lô như "khối dính"); dãy shophouse (428 h135 "shophouse đồ thờ") → luật khối dính chia lô
+      const ck = classifyObs(cq.o).kind;
+      if (ck !== 'shop' && ck !== 'home' && !/nhà ống|shophouse|dãy nhà|liền kề|nhà phố/.test(String(cq.o.style || '').toLowerCase())) { B[hit].lowBlock = true; nLowBlock++; }
+      if (process.env.HP_DEBUG_TALL) console.log('tallObs contradicted', p.id, Math.round(o.heading), fl + 'F', 'd', dHit.toFixed(0), 'by', cq.id, cq.o.heading, cq.o.floors + 'F', ck || '-', 'c', centroid(B[hit].pts).map(Math.round));
+      continue;
+    }
     B[hit].tallObs = Math.max(B[hit].tallObs || 0, fl); n++;
   }
-  ST.tall_obs_matched = n; ST.tall_obs_contradicted = nNo;
+  ST.tall_obs_matched = n; ST.tall_obs_contradicted = nNo; ST.tall_obs_contradicted_block = nLowBlock;
 }
 for (const b of B) classify(b);
 // W3-B: kiểu ô của từng nhà thật theo nón quan sát pano (tâm nhà) — chỉ áp ở bước 4/11 cho nhà có mặt phố
