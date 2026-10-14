@@ -601,6 +601,66 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     chứng 007/085/143/492 ≤ 5,6 %. diag full/lite OK, waterbfs 5/5, check_assets ĐỦ, check_herokit 401/401. Chấm cặp (tự chấm,
     sau sửa): mục tiêu ~4,3 → ~4,45 — bỏ 2 hồi quy, giữ các cái được 161/354/418/450/377; 157/510/276 giờ = dot3.
 
+- **2026-10-14 (Đ3-W5-B STREETFRONT — mặt phố nhà ống có chiều sâu + phong hoá)** [ĐỢT 3 wave 5; graders: "quá sạch/rực, quá nhiều
+  cửa cuốn đóng, biển loè/sai cỡ, không chiều sâu" ở 248/028/363/102/134/198/005/129/143/147/336/368/120/033/170/244/294/083/023/
+  262/409/290/501/547/111]:
+    **SHADER (`js/citygen.js` makeMaterial, program key `'fabric_v5b2_'`):** (1) **PHONG HOÁ v2** (tường kind ≤ 3 CHỈ nhà ống/phố cũ/KTT/
+    tầng cơi — st ≤ 2 hoặc RS.TEN; Pháp/villa/kính giữ phong hoá + trần bão hoà 0,62 cũ, W5-A sở hữu; theo TUỔI aFac.z
+    bit 4-5 = vân tay old/very_old + vùng): vệt ĐEN CHẢY từ MÉP SÀN mỗi tầng (khoảng cách dưới sàn tầng trên, exp(−d/0,45-1,4 m) ×
+    cột nhiễu — nước mưa tràn sàn ban công/ô văng), MẢNG VỮA BONG (tuổi ≥ 2: ngưỡng nhiễu 0,84 − 0,13·tuổi, lộ xi măng xám ẩm hoặc
+    gạch đỏ 30% nhà rất cũ, viền tối), phai màu sơn về xám ấm (0,05 + 0,14·tuổi) và vệt ố/mảng ẩm cũ đậm hơn ~40%; trần bão hoà
+    tường 0,62 → 0,58 − 0,05·tuổi. (2) **BIỂN PHAI:** signCol thống kê (dải biển trệt, bảng lớn, biển dọc) trần bão hoà
+    tuyến tính 0,64, kéo về xám ấm 0,08 + 0,06·tuổi, trần độ sáng 0,78; chữ ≤ (0,9, 0,88, 0,82); màu biển ĐO TỪ ẢNH (fpSign) chỉ trần sáng 0,86 (ảnh đã là trạng thái phai thật). `world.js` biển tên thật
+    (SHOP_SIGNS canvas): bảng màu nền bớt bão hoà + đáy biển ố 14%. (3) **NỘI THẤT SÁNG BAN NGÀY** `fabDay` (cộng phát sáng KHÔNG
+    nhân đêm): trệt kính (G_GLASS/SHOW/STORE*/SHOP3/ELEC/LOBBY) 0,2, cửa hàng mở 0,14 × tx, CHỈ nâng nền tối (× (1 − smoothstep(0,25,
+    0,7, độ sáng texel)) — vòng 1 làm loá mặt kính đã sáng, pano_147 h270). GLSL `dayLitOf(m)` sinh từ MOD (GL1 dùng chung, không
+    mảng). (4) BẠT mái hiên xuyên sáng: kind 5 + ô D_AWN/D_AWN3 → fabDay = col·0,22. **fabDay CHỈ BAN NGÀY:** emissive =
+    fabGlow·emissive.r + fabDay·(1 − clamp(1,7·emissive.r)) (emissive.r = đêm·0,95 từ daynight → tắt hẳn khi đêm ≥ 0,62). BẪY (review):
+    cộng phát sáng không nhân hệ số ngày → ban đêm/hoàng hôn bị phơi sáng đêm (maxGain 4) khuếch đại = bạt SÁNG TRẮNG dưới trời đen.
+    **ATLAS (`js/facade_atlas.js`, +4 ô SAU D_CORN → 109/112, còn 3 chỗ; chỉ số cũ giữ):** `G_HOME2` nhà MỞ CỬA (cửa xếp dồn 2 mép,
+    phòng khách + xe máy có thân/yên/tay lái + tủ gỗ thấp — BỎ ban thờ: ô đỏ khung vàng đọc ra "ô vuông đỏ" ở 294/501/115), `D_AWN3` bạt TRƠN võng (nhuộm),
+    `D_MISC` 4 vùng con (hàng bày mặt trước / mặt trên — bảng màu TRUNG TÍNH các-tông/bao tải/rổ, tán cây cảnh + hoa giấy, đồ phơi,
+    ống thoát nước), `D_CAGE` "chuồng cọp" (song sắt xám/trắng/gỉ trước cửa sổ + đồ phơi + cây). BẪY: vùng con trong 1 ô KHÔNG lặp
+    được (shader lấy fract(uv) cả ô) → quad dùng vùng con phải ≤ kích thước vùng (hàng bày ≤ 2 m rộng, đồ phơi ≤ 1 m).
+    **BỘ MÔ-ĐUN TRỆT (SETS):** bớt cửa đóng thống kê: G1 G_SHUT0 → G_OPEN0, G_HOME0 → G_HOME2; G2/G12 một G_HOME0 → G_HOME2; GH
+    (ngõ/nhà ở) = [HOME0, HOME2, HOME1, HOME2, SHUT0, GATE, HOME1]; FG6 (vân tay "nhà ở") + G_HOME2. FG3 (vân tay "cửa cuốn") GIỮ —
+    ảnh thật thấy đóng. JS groundModule/GL2/GL1 cùng đọc SETS → vẫn khớp bit với hộp biển 3D.
+    **HÌNH HỌC:** (a) ô mới **`fab_near_<tx>_<tz>`** (NEAR_TILE 300 = DET_TILE, hiện khi camera ≤ NEAR_R 120 m tới mép ô (+ cao độ),
+    KHÔNG đổ bóng, chỉ TIER ≥ 2 — có DT mới có NT): HÀNG BÀY tràn hè trước bay trệt là cửa hàng MỞ (`OPEN_G`, groundModule khớp
+    bit; vân tay shop_open/chợ/quán 80%, nhà KHÔNG vân tay trên phố chính/nhỏ 30%, vân tay khác 0 — review: thùng trước bay đóng/tối;
+    1 khối 0,7-1,5 m × sâu 0,3-0,5 × cao 0,45-0,9 m sát tường một bên cửa, cách 2 đầu mặt tiền ≥ 0,7 m (đạo cụ góc phố), chừa lối vào;
+    mặt trước = hàng NHỎ xếp chồng sáng ×0,85-1,05 + 22% màu bao bì — trước: khối tối + ô màu thô), CÂY CẢNH
+    ban công (`blobN`: mặt trước đa giác 6 đỉnh dáng tán — hộp vuông đọc ra "khối hộp xanh"; cao 1,3-1,85 m vượt lan can; 13 k), giỏ
+    cây treo ngoài lan can (22%), ĐỒ PHƠI sau lan can (30%, 7 k), ỐNG THOÁT NƯỚC dọc mép mặt tiền nhà ống (0,3 + 0,12·tuổi, 11 k; đặt trong khoảng lùi 0,03 m — ở 0,14 m xuyên má bạt/ban công).
+    (b) ô det: **CHUỒNG CỌP 3D** (lồng nhô 0,6 m cả tầng: mặt trước + 2 má D_CAGE + đáy + mái tôn dốc; vân tay 'cage' 75% tầng,
+    thống kê tập thể 25%/nhà ống 6% nhà × 45% tầng — vòng 1 lồng MỌI tầng tháp hẹp = "tháp lưới nâu" pano_519 h90; tầng 1-2 nhà ống fpMode 3 KHÔNG lồng — giữ biển bảng lớn theo ảnh); **MÁ BẠT** 2 đầu
+    mái hiên bạt; bạt SỌC khi vân tay tarp_stripe/tarp_blue/tarp_other (LUÔN — pano_120 sọc xanh-trắng thật bị trích 'tarp_blue',
+    248 h270 sọc → cam trơn là hồi quy), bạt trơn D_AWN3 chỉ tarp_red + 35% nhà thống kê; 'tarp_other' theo bảng 7 màu (be/cam/lục/nâu đỏ/xám/lam/kem — trước cố định xám → mái hiên xám đục); cục nóng
+    điều hoà 0,14/0,21 → 0,18/0,26. (c) `GBuf.quadR` (uv chữ nhật, đỉnh truyền rời) + `boxN` gọi thẳng (thứ tự đỉnh đã CCW từ n =
+    (−e.z, e.x), kiểm tích có hướng) — đo node `--cpu-prof`: chi phí thêm chủ yếu là GC mảng [p…]/[uv…] mỗi quad + cấp GBuf mỗi ô
+    (ô near 200 m = 199 bộ đệm → 300 m = ~105).
+    **KẾT QUẢ (REAL | dot3 bcdcacc | nhánh, 25 pano mục tiêu + 8 đối chứng 060/230/285/395/331/519/115/019 × 4 hướng, tier 3, 890M,
+    :8902/:8912, khoá GPU, traffic off, 1280×634; scratch W5-B/pairs1 (r1), pairs2 (r2)):** thay đổi THẤY ĐƯỢC nhưng NHỎ ở cự ly pano:
+    tường cũ có vệt chảy/mảng bong (134, 198, 248, 102), biển bớt loè (147 VÀNG BẠC/PHỞ BÒ, 409, 143), chuồng cọp (129, 198), hàng
+    bày (120, 248, 331), cây/đồ phơi ban công (102), mái hiên đúng sọc/màu hơn (120, 147). Tự chấm (thang AUDIT4): mục tiêu TB ~5,1 →
+    ~5,25 (+0,1-0,2; ±0,5 nhiễu); đối chứng không đổi (diff ảnh 285/115/019 ≈ 0; 331/395/230 chỉ khác cây đung đưa). Hồi quy đã sửa ở
+    vòng 2: 120 (sọc → trơn), 519 h90 (tháp lưới), 147 h270 (kính loá); 501 h0 cổng xanh → nhà mở cửa (đa dạng, không sai hẳn).
+    **PERF (std 24 khung, 2 lượt xen kẽ dot3 ↔ nhánh, --perf, traffic off):** draw calls/tris theo MIN mỗi khung: tổng 24 khung calls 9.188 → 9.166 (−0,2 %), tris 72,87 → 71,93 M (khác biệt
+    trong nhiễu; từng khung tris ≤ +0,6 %, calls ±8 % ở cả hai phía = nhiễu lượt vẽ); fps 60 (trần) mọi khung; hpReady TB 6.578 → 6.665
+    ms (+0,09 s); bước khởi động fabric 1.271/1.058 → 1.462/1.274 ms (+0,2 s; probe riêng 1.007/1.129 → 1.258/1.420, msGeo +0,1-0,28 s
+    — trước quadR/ô 300 m là +0,25-0,3 s); heap sau ép GC (CDP, 2 lượt xen kẽ) 449/449 → 466/466 MB (+17 MB: ô near ~220 k tam giác +
+    det +32 k tam giác giữ CPU tới khi upload). Thống kê fabric: detTris 557 k → 590 k, nearTris 220 k (chỉ ~2-4 ô near hiện quanh camera).
+    BẪY ĐO: khung game_*/cam_high đôi khi nhảy +50-100% calls/tris NGẪU NHIÊN ở CẢ HAI phía (lượt vẽ phụ) → so A/B lấy MIN mỗi khung
+    qua các lượt, không lấy TB. Cổng: node --check (citygen, facade_atlas, world.js qua .mjs), waterbfs 5/5, check_assets ĐỦ, diag
+    full "TẤT CẢ THỰC THỂ OK — 0 lỗi JS" (overlap 1 ở (259,111) có từ W3), diag lite OK, 0 lỗi JS mọi lượt chụp, --gl1 0 lỗi (8 khung).
+    **SỬA SAU REVIEW (vòng 3, cùng phiên :8902, 132 khung REAL|dot3|nhánh — scratch W5-B/pairs3, fxn.jpg đêm/hoàng hôn):** (i) bạt
+    hết phát sáng ban đêm (120/248 h090 lúc 0,875 và 0,76 = mức dot3); (ii) 120 h180 lại SỌC xanh-trắng như ảnh, 248 h270 sọc;
+    (iii) thùng hàng trước NHÀ NGHỈ/bay cửa cuốn (248) và góc phố cạnh chậu cây (120) biến mất — goods 5.476 → 1.222 khối, nearTris
+    220 k → 186 k; (iv) 115 h090 hết "ô vuông đỏ"; (v) biển đo từ ảnh (147 PHỞ BÒ) giữ màu thật thay vì phai. Đối chứng không đổi
+    ngoài cây đung đưa. Cổng: diag full + lite "TẤT CẢ THỰC THỂ OK — 0 lỗi JS", --gl1 0 lỗi (khớp GL2), waterbfs 5/5, check_assets ĐỦ,
+    0 lỗi JS mọi lượt; probe fabric 1.347/1.180 ms (≈ trước sửa), detTris 589.788.
+    CÒN: tầng trệt vẫn tối/phẳng hơn ảnh (cửa hàng thật sâu, sáng, hàng hoá dày); bậc thềm/khung cửa cuốn 3D, dây điện vào nhà,
+    trụ ngăn lô nhô giữa các nhà ống chưa làm; biển "trên mái/bảng lớn" theo vân tay giữ như W4.
 - **2026-10-14 (Đ3-W4 SỬA HỒI QUY TÍCH HỢP)** [chấm cặp REAL | dot3 c24a52e | tích hợp W4: 5 pano tụt điểm — sửa TẬN GỐC, không gỡ W4]:
     **(1) BẢNG LỚN TỪNG BAY trên toà một chủ** (pano_046 h0/h270 BIDV, 161 h90/h180 ngân hàng "trắng sọc xanh", 515 h0/h270 toà
     thương mại 8 T): chế độ 3 của W4-A (`aFp.z` = 3) dựng ô PANEL chữ cửa hàng NGẪU NHIÊN ở MỌI bay tầng 1(-2) → chồng "NHÀ NGHỈ/
