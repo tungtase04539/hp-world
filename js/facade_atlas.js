@@ -1243,6 +1243,96 @@ export function buildFacadeAtlas(size = 2048, opts = {}) {
     for (let x = 0.03; x < 4; x += 0.14) { rect(x, 0.22, x + 0.07, 0.36, [240, 236, 226], M_WALL); shade(x + 0.07, 0.22, x + 0.12, 0.36, 0.62); }
     shade(0, 0, 4, 0.2, 0.8);
   });
+  // ======================================================================================
+  // W5-B STREETFRONT (Đợt 3 wave 5): mặt phố nhà ống "có người ở" — 4 ô SAU D_CORN (chỉ số ô cũ giữ nguyên; còn 3 chỗ trống).
+  // ======================================================================================
+  cell('G_HOME2', W4, GH, () => {      // nhà ở MỞ CỬA (ban ngày phần lớn nhà ngõ/phố nhỏ mở): cửa xếp sắt dồn 2 bên, thấy phòng khách + xe máy
+    groundWall(0.35); threshold();
+    reveal(0.2, 0.14, 3.8, 2.85);
+    interior(0.2, 0.14, 3.8, 2.85, 10);
+    rect(0.2, 0.14, 3.8, 0.5, [150, 140, 126], M_KEEP); for (let x = 0.2; x < 3.8; x += 0.4) vline(x, 0.14, 0.5, 0.012, [118, 110, 98], M_KEEP);   // sàn gạch men
+    rect(1.3, 1.25, 2.7, 2.25, [96, 64, 40], M_KEEP); rect(1.4, 1.35, 2.6, 2.15, [150, 40, 28], M_KEEP);   // ban thờ / tủ gỗ đỏ cuối phòng
+    rect(1.75, 1.5, 2.25, 1.9, [214, 170, 70], M_KEEP);
+    disc(1.25, 0.36, 0.22, [26, 26, 28], M_KEEP); disc(2.15, 0.36, 0.22, [26, 26, 28], M_KEEP);          // xe máy dựng trong nhà
+    rect(1.15, 0.45, 2.3, 0.92, [CLOTHES[(rnd() * CLOTHES.length) | 0][0], 60, 60], M_KEEP); rect(1.5, 0.9, 1.95, 1.18, [40, 40, 42], M_KEEP);
+    for (const x of [2.7, 3.05]) rect(x, 0.14, x + 0.28, 0.5, rnd() < 0.5 ? [186, 44, 40] : [44, 96, 168], M_KEEP);  // ghế nhựa
+    tubeLight(1.0, 3.0, 2.7);
+    const col = rnd() < 0.5 ? [74, 86, 80] : [96, 72, 54];
+    for (const [a, b] of [[0.2, 0.62], [3.38, 3.8]]) {                                                         // cửa xếp dồn 2 mép
+      rect(a, 0.14, b, 2.85, [col[0] * 0.8, col[1] * 0.8, col[2] * 0.8], M_KEEP);
+      for (let x = a + 0.03; x < b; x += 0.07) vline(x, 0.14, 2.85, 0.025, col, M_KEEP);
+    }
+    hood(0.2, 3.8, 2.95); rect(1.6, 3.35, 2.4, 3.6, [60, 60, 60], M_KEEP);
+  });
+  cell('D_AWN3', 4, 1.6, () => {       // mái hiên BẠT TRƠN (xanh/đỏ/lục theo vân tay — nhuộm): nếp võng theo khung, mép bạc màu, vệt bẩn mưa
+    for (let i = 0; i < C; i++) {
+      const xm = (i + 0.5) / SX, fold = 0.5 + 0.5 * Math.cos((xm / 1.33) * Math.PI * 2);
+      for (let j = 0; j < C; j++) {
+        const ym = (j + 0.5) / SY, p = ((OY + j) * SIZE + OX + i) * 4;
+        const n = (hash3(i, j, 29) - 0.5) * 7 + (vn(xm * 3, ym * 2) - 0.5) * 16;
+        const v = 200 - fold * 26 * (0.4 + 0.6 * ym / 1.6) + n + (ym > 1.45 ? 14 : 0);
+        B[p] = v; B[p + 1] = v; B[p + 2] = v; B[p + 3] = M_WALL;
+      }
+    }
+    for (let k = 0; k < 6; k++) { const x = R(0, 4); softStreak(x, R(0.08, 0.25), 1.6, R(0.6, 1.5), R(0.1, 0.22)); }
+    for (let x = 0; x < 4; x += 1.33) shade(x - 0.03, 0, x + 0.03, 1.6, 0.8);   // thanh khung dưới bạt
+  });
+  // D_MISC: 4 vùng con (u,v ∈ [0,1] của ô — citygen đặt uv vào đúng vùng):
+  //   [0,.5]×[0,.5] mặt trước HÀNG BÀY tràn ra hè (thùng/bao/rổ nhựa/két bia) — cao 1 m thật
+  //   [.5,1]×[0,.5] mặt TRÊN hàng bày (nắp thùng, rau quả, rổ)
+  //   [0,.5]×[.5,1] TÁN CÂY CẢNH ban công (lá dày nhiều sắc xanh + vài chấm hoa giấy)
+  //   [.5,.75]×[.5,1] ĐỒ PHƠI trên dây (khe hở = tối như trong nhà)   [.75,1]×[.5,1] ỐNG THOÁT NƯỚC nhựa xám + đai
+  cell('D_MISC', 4, 4, () => {
+    // hàng bày — mặt trước (0..2 × 0..2 m của ô)
+    interior(0, 0, 2, 2, -12);
+    for (let y = 0.02; y < 1.96;) {
+      const hRow = R(0.28, 0.5);
+      for (let x = 0.02; x < 1.96;) {
+        const w = Math.min(1.98 - x, R(0.22, 0.6)), c = GOODS[(rnd() * GOODS.length) | 0], k = R(0.55, 0.85), t = rnd();
+        if (t < 0.12) { x += w; continue; }
+        const col = [c[0] * k, c[1] * k, c[2] * k];
+        rect(x + 0.01, y, x + w - 0.01, y + hRow - 0.02, col, M_KEEP);
+        if (t < 0.35) { for (let yy = y + 0.05; yy < y + hRow - 0.04; yy += 0.06) hline(yy, x + 0.02, x + w - 0.02, 0.012, [col[0] * 0.7, col[1] * 0.7, col[2] * 0.7], M_KEEP); }   // rổ nhựa/két
+        else if (t < 0.55) { shade(x + 0.01, y, x + w - 0.01, y + 0.06, 0.7); rect(x + w * 0.3, y + hRow * 0.4, x + w * 0.7, y + hRow * 0.6, [230, 226, 214], M_KEEP); }   // thùng các-tông có nhãn
+        else { shade(x + 0.01, y + hRow * 0.6, x + w - 0.01, y + hRow - 0.02, 1.12); }   // bao tải phồng
+        shade(x + w - 0.04, y, x + w - 0.01, y + hRow - 0.02, 0.7);
+        x += w;
+      }
+      y += hRow;
+    }
+    shade(0, 0, 2, 0.08, 0.6);
+    // hàng bày — mặt trên (2..4 × 0..2)
+    rect(2, 0, 4, 2, [110, 100, 88], M_KEEP);
+    for (let k = 0; k < 40; k++) { const x = R(2.02, 3.75), y = R(0.02, 1.75), w = R(0.18, 0.45), h = R(0.15, 0.4), c = GOODS[(rnd() * GOODS.length) | 0], q = R(0.6, 0.95); rect(x, y, Math.min(3.98, x + w), Math.min(1.98, y + h), [c[0] * q, c[1] * q, c[2] * q], M_KEEP); }
+    for (let k = 0; k < 14; k++) disc(R(2.1, 3.9), R(0.1, 1.9), R(0.05, 0.11), rnd() < 0.5 ? [196, 120, 40] : [80, 130, 60], M_KEEP);   // rau quả
+    // tán cây cảnh (0..2 × 2..4)
+    rect(0, 2, 2, 4, [44, 70, 40], M_KEEP);
+    for (let k = 0; k < 260; k++) { const r = R(0.04, 0.14); disc(R(0.02, 1.98), R(2.02, 3.98), r, [R(34, 80), R(70, 132), R(30, 62)], M_KEEP); }
+    for (let k = 0; k < 14; k++) disc(R(0.1, 1.9), R(2.6, 3.95), R(0.03, 0.06), rnd() < 0.6 ? [196, 52, 120] : [230, 120, 150], M_KEEP);   // hoa giấy
+    shade(0, 2, 2, 2.35, 0.75);
+    // đồ phơi (2..3 × 2..4): dây + quần áo, khe = tối
+    rect(2, 2, 3, 4, [46, 42, 38], M_KEEP);
+    hline(3.9, 2, 3, 0.02, [90, 90, 90], M_KEEP);
+    for (let x = 2.02; x < 2.98;) { const w = Math.min(2.98 - x, R(0.12, 0.26)), h = R(0.6, 1.7), c = CLOTHES[(rnd() * CLOTHES.length) | 0], q = R(0.8, 1.0); rect(x, 3.88 - h, x + w, 3.88, [c[0] * q, c[1] * q, c[2] * q], M_KEEP); shade(x + w - 0.02, 3.88 - h, x + w, 3.88, 0.75); x += w + R(0.01, 0.06); }
+    // ống thoát nước (3..4 × 2..4): ống nhựa xám, sáng giữa, tối 2 mép, đai + vệt ố
+    for (let i = PX(3); i < PX(4); i++) {
+      const xm = (i + 0.5) / SX - 3.5, v = 196 - Math.abs(xm) * 2 * 80;
+      for (let j = PY(2); j < PY(4); j++) { const p = ((OY + j) * SIZE + OX + i) * 4, n = (hash3(i, j, 31) - 0.5) * 6; B[p] = v + n; B[p + 1] = v + n; B[p + 2] = v + n + 3; B[p + 3] = M_KEEP; }
+    }
+    for (let y = 2.3; y < 4; y += 0.55) { rect(3, y, 4, y + 0.06, [120, 122, 124], M_KEEP); }
+    for (let k = 0; k < 3; k++) { const x = R(3.1, 3.9); shade(x, 2, x + 0.08, 4, 0.82); }
+  });
+  cell('D_CAGE', W4, UPH, () => {      // "CHUỒNG CỌP" 3D (lồng sắt nhô 0,6 m ôm cả tầng): song sắt + phía sau cửa sổ/đồ phơi/cây (mặt trước + 2 má)
+    WALL(0.5);
+    interior(0.3, 0.15, 3.7, 3.05, 4); glass(0.55, 0.85, 2.3, 2.5, 1, 1); frame(0.55, 0.85, 2.3, 2.5, FR_SILVER, 0.05, 2);
+    rect(2.55, 0.15, 3.5, 2.6, [92, 74, 58], M_KEEP);   // cửa đi gỗ
+    plants(0.3, 3.7, 0.15); laundry(0.35, 3.65, 2.75);
+    const col = rnd() < 0.5 ? [48, 52, 50] : [96, 64, 46];
+    for (let x = 0.05; x <= 3.96; x += 0.12) vline(x, 0.0, 3.3, 0.024, col, M_KEEP);
+    for (const y of [0.05, 1.05, 2.05, 3.2]) hline(y, 0, 4, 0.05, col, M_KEEP);
+    rect(0, 3.12, 4, 3.3, [col[0] * 0.9, col[1] * 0.9, col[2] * 0.9], M_KEEP);   // khung đỉnh + mép mái tôn
+    for (let k = 0; k < 4; k++) { const x = R(0.2, 3.8); shade(x, 0, x + R(0.03, 0.08), R(1.0, 3.1), 0.82); }   // vệt gỉ
+  });
   const ms =typeof performance !== 'undefined' ? performance.now() - t0 : 0;
   const data = B ? new Uint8Array(B.buffer) : null;
   B = null; _layoutOnly = false; for (const k in _bases) delete _bases[k];

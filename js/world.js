@@ -18007,7 +18007,8 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     // W3-C: 53 hàng × 77 px (trước 51 × 80) = 424 biển/atlas 4096×4081 — 1.256 biển sạch (gen_shopsigns W3-C, trước 954) vẫn
     // vừa 3 atlas; 51 hàng thì cần tấm thứ 4 (canvas 4096² + 408 fillText + ~64 MB VRAM, đo A/B: pha fabric chậm thêm)
     const CELL_W = 512, CELL_H = 77, COLS = 8, ROWS = 53, PER = COLS * ROWS;   // 424 biển/atlas 4096×4081
-    const bg = ['#c62828', '#1c56a0', '#1f7a3c', '#d8862a', '#26262c', '#8e2f80'];
+    // W5-B BIỂN PHAI: nền biển thật HP là bạt/alu phai nắng — bảng màu bớt bão hoà + đáy biển ố nhẹ (trước: đỏ/xanh nguyên chất "loè")
+    const bg = ['#a8463e', '#3d5f8f', '#3e6b4b', '#b98a4c', '#3a3a40', '#7a4f76'];
     // MOBILE: atlas 4096² ≈ 85MB VRAM/tấm không nén — thu 1/4 cạnh (1024², chữ vẫn đọc được
     // ở cự ly chơi trên màn nhỏ); desktop giữ nguyên 100%
     const MS = (IS_MOBILE || LITE) ? 0.25 : 1;   // 4096²(85MB/tấm) → 1024²(5MB/tấm) cho MỌI máy yếu
@@ -18065,7 +18066,8 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
       items.forEach(([, , , name], k) => {
         const cx = (k % COLS) * CELL_W, cy = ((k / COLS) | 0) * CELL_H;
         g.fillStyle = bg[(name.length + k) % bg.length]; g.fillRect(cx, cy, CELL_W, CELL_H);
-        g.fillStyle = '#fff';
+        g.fillStyle = 'rgba(20,16,10,0.14)'; g.fillRect(cx, cy + CELL_H * 0.72, CELL_W, CELL_H * 0.28);
+        g.fillStyle = '#f2efe6';
         if (fCur !== F0) { g.font = F0; fCur = F0; }
         const tw = g.measureText(name).width;
         if (tw > TW) { fCur = 'bold ' + Math.max(22, Math.floor(44 * TW / tw)) + 'px system-ui, sans-serif'; g.font = fCur; }
