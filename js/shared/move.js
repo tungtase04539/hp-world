@@ -36,6 +36,7 @@ export const MOVE = Object.freeze({
   TIME_LAG_MS: VALIDATE.TIME_BUDGET_MAX_MS,      // 200: lag credit kept after a sustained lag
   LAG_WINDOW_MS: 10000,                          // a lag must be sustained this long before credit is capped
   DRIFT_MS_PER_S: 2,                             // tolerated clock drift (0.2 %)
+  LEARN_MS: 5000,                                // after a reset the minimum delay is learned freely for 5 s
   WINDOW_MS: VALIDATE.WINDOW_S * 1000,
   SLACK_MUL: VALIDATE.SLACK_MUL,
   SLACK_ADD_M: VALIDATE.SLACK_ADD_M,
@@ -208,17 +209,17 @@ export class MoveCheck {
     this.head = -1; this.count = 0;
     this.ax = x; this.az = z; this.amode = mode; this.aServerMs = serverMs; this.anchored = true;
     this.lastClient16 = -1; this.clientT = 0; this.lastServerMs = serverMs;
-    this.base = NaN; this.baseT = serverMs;
+    this.base = NaN; this.baseT = serverMs; this.learnUntil = 0;
     this.lagMinCur = Infinity; this.lagMinPrev = Infinity; this.lagBucketT = serverMs; this.lagBuckets = 0;
     this.hard = false; this.lastDist = 0; this.lastLimit = 0; this.lastDt = 0;
     this.accepted = 0;
   }
   // after a CORRECT: keep the time base, restart the window from the corrected point at the latest client time
   correctTo(x, z, mode, serverMs) {
-    const t = this.clientT, base = this.base, baseT = this.baseT, l16 = this.lastClient16;
+    const t = this.clientT, base = this.base, baseT = this.baseT, l16 = this.lastClient16, learn = this.learnUntil;
     const lc = this.lagMinCur, lp = this.lagMinPrev, lb = this.lagBucketT, lbn = this.lagBuckets;
     this.reset(x, z, mode, serverMs);
-    this.base = base; this.baseT = baseT; this.lastClient16 = l16; this.clientT = t;
+    this.base = base; this.baseT = baseT; this.lastClient16 = l16; this.clientT = t; this.learnUntil = learn;
     this.lagMinCur = lc; this.lagMinPrev = lp; this.lagBucketT = lb; this.lagBuckets = lbn;
     if (l16 >= 0) { this.anchored = false; this._push(t, x, z, mode, 0); }
   }
@@ -248,14 +249,22 @@ export class MoveCheck {
     }
     this.lastClient16 = clientMs16; this.clientT = ct; this.lastServerMs = serverMs;
     const o = serverMs - ct;
-    if (Number.isNaN(this.base)) { this.base = o; this.baseT = serverMs; this.lagBucketT = serverMs; return true; }
-    // tolerated drift: base sinks slowly
-    const lb = this.base - MOVE.DRIFT_MS_PER_S * (serverMs - this.baseT) / 1000;
+    if (Number.isNaN(this.base)) {
+      this.base = o; this.baseT = serverMs; this.lagBucketT = serverMs; this.learnUntil = serverMs + MOVE.LEARN_MS;
+      return true;
+    }
     let ok = true;
-    if (o < lb - MOVE.TIME_AHEAD_MS) {
-      ok = false;
-      this.base = o; this.baseT = serverMs;     // re-anchor: a further 100 ms lead is needed for the next violation
-    } else if (o < this.base) { this.base = o; this.baseT = serverMs; }
+    if (serverMs < this.learnUntil) {
+      if (o < this.base) this.base = o;           // learning the minimum network delay: follow freely
+    } else {
+      // base follows a falling offset no faster than the tolerated clock drift; a lead beyond that by > 100 ms is a
+      // violation (then re-anchor 100 ms lower: the next violation needs another 200 ms of lead, so the catch-up after a
+      // long bufferbloat costs few points while a fast clock keeps failing)
+      const floor = this.base - (MOVE.DRIFT_MS_PER_S * (serverMs - this.baseT)) / 1000;
+      if (o < floor - MOVE.TIME_AHEAD_MS) { ok = false; this.base = o - MOVE.TIME_AHEAD_MS; }
+      else if (o < this.base) this.base = o > floor ? o : floor;
+    }
+    this.baseT = serverMs;
     // lag cap: rolling minimum over two half-windows (≈ LAG_WINDOW_MS)
     if (o < this.lagMinCur) this.lagMinCur = o;
     if (serverMs - this.lagBucketT >= MOVE.LAG_WINDOW_MS / 2) {

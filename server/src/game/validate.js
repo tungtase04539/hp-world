@@ -35,6 +35,7 @@ export class Validator {
     this.corrections = 0;
     this.accepted = 0;
     this.r = { accepted: false, violation: 0, correct: 0, kick: false, hard: false };
+    this.extraFlags = 0;          // tests: MCF.SKIP_SURFACE
   }
   reset(x, z, mode, now) {
     this.mc.reset(x, z, mode, now);
@@ -50,7 +51,7 @@ export class Validator {
     r.accepted = false; r.violation = 0; r.correct = 0; r.kick = false; r.hard = false;
     this.pending = false; this.resends = 0;
     this._decay(now);
-    const v = this.mc.check(clientMs, x, z, mode, now, vehicleOk ? MCF.VEHICLE_OK : 0);
+    const v = this.mc.check(clientMs, x, z, mode, now, (vehicleOk ? MCF.VEHICLE_OK : 0) | this.extraFlags);
     if (v === MV.OK) { r.accepted = true; this.accepted++; return r; }
     r.violation = v; r.hard = this.mc.hard;
     this.counts[v]++;
