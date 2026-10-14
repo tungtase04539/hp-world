@@ -1303,6 +1303,7 @@ export function plantStreetTrees(ctx) {
   for (let h = 0; h < nHero; h++) { const e = Q[heroCand[h]]; e.o.hero = hxz(e.x, e.z, 33) < 0.4 ? 0 : hxz(e.x, e.z, 33) < 0.72 ? 1 : 2; }
   st.heroes = nHero; st.ms = +(performance.now() - t0).toFixed(1);
   console.log('[trees] trồng dọc phố:', JSON.stringify(st));
+  if (typeof window !== 'undefined') window.__hpTreePlant = st;   // QA (Đ3-W5-C): số cây ngõ/sân vườn/từ chối
   return st;
 }
 

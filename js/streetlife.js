@@ -837,23 +837,32 @@ export function placeStreetLife(P) {
         const e = S.ev[k];
         if (!S.ok[k] || S.fore[k] || !e || !(e[8] & 2048) || (S.mk && S.mk[k] >= 2)) { k++; continue; }
         const [cx, cz] = cellPos(S, k, X.park);
-        if (Math.hypot(e[0] - cx, e[1] - cz) > 30 || hash3(cx, cz, 371) > 0.3) { k++; continue; }
+        if (Math.hypot(e[0] - cx, e[1] - cz) > 30 || hash3(cx, cz, 371) > 0.42) { k++; continue; }
         const n = 3 + ((hash3(cx, cz, 372) * 3) | 0), pRed = (e[8] & 4096) ? 0.85 : 0.2;
         let placed = 0;
         for (let kk = k; kk < Math.min(S.n, k + n); kk++) {
-          if (!S.ok[kk] || S.fore[kk] || (S.occ[kk] & (OCC.SHOP | OCC.POLE | OCC.MKT)) || !hasFacade(S, kk)) continue;
+          // (ô OCC.SHOP vẫn được: bộ bàn ghế quán 6.4 đã có ≤ 1,4 m → tán ô đặt ĐÚNG trên bộ đó, không thêm bàn — pano 267: quán
+          //  trà đã có 2 bộ ghế nhựa + dù nhỏ đúng chỗ hiên dù đỏ thật; xe đẩy/thùng rác/hàng chặn qua obst)
+          if (!S.ok[kk] || S.fore[kk] || (S.occ[kk] & (OCC.POLE | OCC.MKT)) || !hasFacade(S, kk)) continue;
           const latU = Math.max(X.hw + 1.2, Math.min(X.fac - 1.2, X.hw + X.sw * 0.5));
-          const [ux, uz] = cellPos(S, kk, latU, (hash3(S.ax + kk, S.az, 373) - 0.5) * 0.3);
-          const sc = 1.0 + hash3(ux, uz, 374) * 0.18;
-          if (!okAt(S, ux, uz, UMB_SQ_R * sc) || obst.hit(ux, uz, 0.85) || inBuilding(ux, uz)) continue;
-          const rot = hash3(ux, uz, 375) * 6.28;
-          L.stoolI.push({ x: ux, z: uz, heading: rot });
-          const nSit = 1 + ((hash3(ux, uz, 376) * 2.7) | 0), cs = Math.cos(rot), sn = Math.sin(rot);
+          let [ux, uz] = cellPos(S, kk, latU, (hash3(S.ax + kk, S.az, 373) - 0.5) * 0.3);
+          let own = null;
+          for (const it of L.stoolI) if ((it.x - ux) ** 2 + (it.z - uz) ** 2 < 1.96) { own = it; break; }
+          if (own) { ux = own.x; uz = own.z; }
+          // tán 2,6-3,1 m (ảnh 267: dù vuông lớn phủ kín vỉa) — nhưng không chìa qua bó vỉa / chạm mặt tiền
+          const room = Math.min(latU - X.hw, X.fac - latU) - 0.1;
+          const sc = Math.max(0.85, Math.min(1.15 + hash3(ux, uz, 374) * 0.2, room / 1.15));
+          if (!okAt(S, ux, uz, UMB_SQ_R * sc) || (!own && obst.hit(ux, uz, 0.85)) || inBuilding(ux, uz)) continue;
+          if (!own && (S.occ[kk] & OCC.SHOP)) continue;   // ô đồ cửa hàng khác (biển A, chậu, hàng) — không chen bàn mới
+          const rot = own ? own.heading : hash3(ux, uz, 375) * 6.28;
+          if (!own) L.stoolI.push({ x: ux, z: uz, heading: rot });
+          const nSit = own ? 0 : 1 + ((hash3(ux, uz, 376) * 2.7) | 0), cs = Math.cos(rot), sn = Math.sin(rot);
           for (let q = 0; q < nSit; q++) {
             const [sx, sz] = SEATS[(q + ((hash3(ux, uz, 377) * 4) | 0)) % 4];
             const wx = ux + sx * cs + sz * sn, wz = uz - sx * sn + sz * cs;
             L.sitI.push({ x: wx, z: wz, heading: Math.atan2(ux - wx, uz - wz), yo: -0.03, sp: 1 });
           }
+          if (L.paraI) for (const pa of L.paraI) if ((pa.x - ux) ** 2 + (pa.z - uz) ** 2 < 2.25) pa.dead = 1;   // dù nhỏ quán cũ dưới tán lớn → bỏ
           overI.push({ x: ux, z: uz, heading: Math.atan2(S.ux, S.uz), v: 1, col: hash3(ux, uz, 378) < pRed ? pick(RED, hash3(ux, uz, 379)) : pick(MIX, hash3(ux, uz, 379)), sc: [sc, 0.98 + hash3(ux, uz, 380) * 0.08, sc] });
           obst.add(ux, uz, 0.8); S.occ[kk] |= OCC.SHOP; placed++; st.umbrellas++;
         }

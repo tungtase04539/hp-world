@@ -1249,8 +1249,9 @@ export function buildProps(ctx) {
     }
   }
   // W3-E: CHỢ + hàng tràn hè theo biển hiệu/bằng chứng + chậu cây + cờ treo nhà + băng rôn + cổng chào (js/streetlife.js)
-  Object.assign(SL, { placeFood, lists: { sitI, standI, bikeDisplay, stoolI } });   // Đ3-W5-C: + stoolI (bàn ghế hiên quán)
+  Object.assign(SL, { placeFood, lists: { sitI, standI, bikeDisplay, stoolI, paraI } });   // Đ3-W5-C: + stoolI/paraI (hiên quán)
   const LIFE = placeStreetLife(SL);
+  { let w = 0; for (const p of paraI) if (!p.dead) paraI[w++] = p; paraI.length = w; }   // dù nhỏ nằm dưới tán hiên quán
   const tShops = performance.now();
 
   // ---------------------------------------------------------------------------------------------------------------
@@ -1312,7 +1313,7 @@ export function buildProps(ctx) {
   };
   // Đ3-W5-C: CỤM NGƯỜI TĨNH (graders 469/446/460 "phố đông người", AUDIT người thưa): nhóm 2-4 người ĐỨNG nói chuyện sát mặt
   // tiền, hoặc NGỒI ghế nhựa quanh bàn thấp (trà đá/hàng xóm — 30%). Xác suất mỗi ô: pano ≤ 40 m "đông người" (deco 2048) 16%,
-  // pano ≤ 45 m phố xe máy dày/chợ/quán ghế nhựa 5%, lõi < 900 m 1,2%, ngoài 0,4%. Né nhà thật/vật cản/thân xe đã đỗ/ghế quán/
+  // pano ≤ 45 m phố xe máy dày/chợ/quán ghế nhựa 5%, lõi < 900 m 1,2%, ngoài 0,4% (ô "đông người": 30%, đứng cả giữa vỉa). Né nhà thật/vật cản/thân xe đã đỗ/ghế quán/
   // camera pano; ô đồ cửa hàng/cột/ô tô/chợ/lối người đi bộ bỏ qua. Ngân sách RIÊNG (nhóm `cl`, BUDGET.pedsCluster).
   // 2 LƯỢT: crowd = true (TRƯỚC hàng xe máy 6.5 — chỉ ô "đông người": hàng xe né cụm qua bikeObst, ảnh 469: khách đứng giữa
   // các xe đỗ) · crowd = false (sau người đi bộ 6.7 — mọi ô còn lại)
@@ -1324,18 +1325,22 @@ export function buildProps(ctx) {
       for (let k = 0; k < S.n; k++) {
         if (!S.ok[k] || S.fore[k] || (S.occ[k] & (OCC_SHOP | OCC_POLE | OCC_CAR | OCC_MKT | OCC_PED))) continue;
         const hk = hash3(S.ax + k * 2.7, S.az - S.side * 1.3, 131);
-        if (hk > 0.16) continue;   // lọc rẻ trước khi tính toạ độ (35k ô)
+        if (hk > 0.3) continue;   // lọc rẻ trước khi tính toạ độ (35k ô)
         const [px, pz] = cellPos(S, k, X.park);
         let p = Math.hypot(px, pz) < 900 ? 0.012 : 0.004;
         const e = S.ev[k];
         let isCrowd = false;
-        if (e) { const d = Math.hypot(e[0] - px, e[1] - pz); if ((e[9] & 2048) && d < 40) { p = 0.16; isCrowd = true; } else if (d < 45 && (e[2] >= 3 || e[7] >= 1 || (e[6] & 1))) p = 0.05; }
+        if (e) { const d = Math.hypot(e[0] - px, e[1] - pz); if ((e[9] & 2048) && d < 40) { p = 0.3; isCrowd = true; } else if (d < 45 && (e[2] >= 3 || e[7] >= 1 || (e[6] & 1))) p = 0.05; }
         if (isCrowd !== crowd || hk > p || openSpace(px, pz)) continue;
         const hs = hash3(px, pz, 132), sitMode = hs < 0.3 && X.sw >= 2.4;
-        const lat = X.fac - (sitMode ? 1.0 : 0.62 + hash3(px, pz, 133) * 0.3);
-        const [cx, cz] = cellPos(S, k, lat, (hash3(px, pz, 134) - 0.5) * 1.2);
         const R0 = sitMode ? 0.95 : 0.65;
-        if (inBuilding(cx, cz) || obst.hit(cx, cz, R0) || nearPlaced(cx, cz, R0 - 0.2) || bikeObst.hit(cx, cz, R0 - 0.2) || !clearPt(cx, cz, R0 + 0.3)) continue;
+        // chỗ đứng: sát mặt tiền; bị chiếm → giữa vỉa (ô "đông người": khách đứng chen giữa vỉa — ảnh 469/460)
+        let cx = 0, cz = 0, okC = false;
+        for (const lat of [X.fac - (sitMode ? 1.0 : 0.62 + hash3(px, pz, 133) * 0.3), ...(crowd && !sitMode ? [X.hw + X.sw * 0.5] : [])]) {
+          [cx, cz] = cellPos(S, k, lat, (hash3(px, pz, 134) - 0.5) * 1.2);
+          if (!(inBuilding(cx, cz) || obst.hit(cx, cz, R0) || nearPlaced(cx, cz, R0 - 0.2) || bikeObst.hit(cx, cz, R0 - 0.2) || !clearPt(cx, cz, R0 + 0.3))) { okC = true; break; }
+        }
+        if (!okC) continue;
         const n = 2 + ((hash3(px, pz, 135) * 2.4) | 0);
         let c = 0;
         if (sitMode) {
