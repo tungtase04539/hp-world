@@ -658,3 +658,95 @@ thật theo nhà mạng sẽ đến từ `netprobe.html` trên điện thoại.
 - Danh sách lọc chat `server/data/filter/` nằm **trong ảnh**: sửa xong phải `mo-may-chu.ps1` (build lại); container không
   đọc thư mục của máy.
 - Named tunnel chưa kiểm thật (chưa có tên miền); ingress và lệnh đã kiểm bằng `cloudflared tunnel ingress validate/rule`.
+
+## 4. Bot & load test (S4, 14/10/2026)
+
+### 4.1 Cấu trúc `server/bots/`
+
+| File | Vai trò |
+|---|---|
+| `run.mjs` | CLI + `runScenario(opts)`: chia bot cho K tiến trình con (`--proc fork`, mặc định) hoặc worker thread (`--proc thread`), dòng thời gian sự kiện, đọc `/metrics` + `/healthz` mỗi 2 s, CPU cả máy, gộp kết quả → `report.json`, `report.md`, `timeseries.json` |
+| `worker.mjs` | một event loop chạy ~200 bot; nhịp 20 ms; gửi về tiến trình cha mỗi giây: bot sống, delta bộ đếm, CPU (ms), RSS, ELU; cuối: histogram + bản ghi từng bot |
+| `scenarios.mjs` | smoke, ramp, hotspot, stress, reconnect, abuse, netem-lite (bảng 4.3) |
+| `lib/bot.mjs` | MỘT người chơi: **chỉ dùng `js/shared/codec.js`** để mã hoá/giải mã; auth → join → HELLO → WELCOME → READY → STATE 15 Hz (đứng 2 Hz) + PING (2 Hz 10 s đầu rồi 1 Hz, `ClockSync`) + CHAT; xử lý CORRECT (nhận vị trí + corrEpoch), SNAPSHOT (bảng slot, kiểm trần 96, keyframe, slot lạ), NAMES, SYSTEM (BACKOFF/QUEUE/NOT_IMPLEMENTED), EVENT CHAT_REJECTED; resume (HELLO RESUME + resumeToken), backoff 1-2-4-8 s + 0–1 s |
+| `lib/roadgraph.mjs` | đồ thị đường thật từ `ROADS_DT` (bỏ cầu nâng, bỏ đoạn chạm nước — lấy mẫu `isWater` 4 m, bỏ ngoài PLAY_RADIUS−20 m); **nối ngã ba chữ T** (đầu way nằm giữa đoạn way khác, ≤ 8 m) → thành phần lớn nhất ≈ 3.000 nút / ~111 km (không nối chỉ ~47 km); `Walker` đi theo cạnh, A* tới đích; y = `groundHeight` |
+| `lib/abuse.mjs` | 14 lớp tấn công (bảng 4.4) + đo độ trễ phát hiện |
+| `lib/netem.mjs` | trễ 80 ± 30 ms mỗi chiều, FIFO như TCP; "mất gói" 2 % = giữ thêm 200–500 ms (dồn cục) |
+| `lib/metrics.mjs`, `lib/report.mjs`, `lib/stats.mjs` | đọc Prometheus, tiêu chí đạt SPEC §3.4, histogram gộp được (log 2 % / tuyến tính 1 B) |
+| `lib/phrases.mjs` | câu chat sạch (phải luôn lọt), câu lạm dụng/lách lọc (phải bị chặn/che) — dữ liệu test, không số/handle thật |
+| `fakeserver.mjs` | **máy chủ GIẢ có kịch bản** để phát triển harness khi S2/S3 chưa xong: đủ giao thức (auth/join/vé 1 lần/resume/AOI 96 + ≤ 32 ENTER/snapshot/NAMES/CHAT 40 m + lọc thô/CORRECT/xô token/1008/1009/4001/4004/4007) + `/metrics`. KHÔNG phải máy chủ game. |
+
+Bot trung thực: chạy 0,9 × v_max của chế độ; xe máy tăng tốc theo `ACCEL.moto`; đổi sang chế độ chậm hơn thì giảm tốc trước rồi chờ 1,2 s (> cửa sổ kiểm 1 s) mới đổi → không tạo CORRECT giả.
+
+### 4.2 Chạy
+
+```
+node server/bots/run.mjs --scenario smoke --url http://127.0.0.1:9100            # admin mặc định = cổng+1
+node tools/qa/gpulock.mjs run -- node server/bots/run.mjs --scenario ramp --url http://127.0.0.1:9100 \
+     --invite <MÃ-MỜI-NHIỀU-LƯỢT> --creds server/data/bot_creds.json --out <thư-mục>
+```
+Tuỳ chọn: `--n --dur --ramp --mode auto|full|ping --workers|--per-worker 200 --proc fork|thread --seed --origin
+--netem-frac 0.3 --drop-at 60 --reconnect-max 30 --start-spread --drop-per-min --scrape-ms 2000 --strict` (`--strict`:
+exit 1 khi có tiêu chí FAIL). `--mode auto` gọi thử `POST /v1/auth/guest {}`: 501/404 → **ping** (máy chủ nền móng),
+còn lại → **full**. `--creds FILE` lưu refresh token theo số thứ tự bot → lần chạy sau dùng `/v1/auth/refresh` thay vì
+tạo khách mới (refresh xoay vòng, file được ghi lại cuối lần chạy; để file trong `server/data/` — đã gitignore).
+**Mọi lần > 300 bot hoặc > 60 s phải qua GPU lock** (run.mjs cảnh báo khi không thấy `HPWORLD_GPU_LOCK`).
+Máy chủ giả: `node server/bots/fakeserver.mjs --port 9130 --admin-port 9131`. Test: `server/test/bots.test.js`.
+
+### 4.3 Kịch bản (mặc định; ghi đè bằng `--n/--dur/--ramp`)
+
+| Tên | N | Thời lượng | Hành vi | Tiêu chí tự chấm (SPEC §3.4) |
+|---|---|---|---|---|
+| smoke | 50 | 60 s | đường thật: đi 50 % / chạy 25 % / xe máy 25 %, nghỉ 15 %, chat sạch 15–45 s, rớt mạng 0,2/phút | 0 lỗi giải mã; CORRECT trung thực < 2/phút/bot; tick/lắp snapshot p99 < 25 ms; snapshot p95 < 1.100 B; RSS < 1,5 GB |
+| ramp | 1.200 | 600 s | 0 → N trong `--ramp` 300 s rồi giữ | như smoke, đo trên pha giữ |
+| hotspot | 300 | 300 s | đi xe máy theo A* tới `EXTRAS.square`, xuống xe, lang thang bán kính 50 m | bản ghi/snapshot ≤ 96; không client nào > 12 KB/s (đỉnh trung bình 5 s); tick p99 < 40 ms (đo từ giây 150) |
+| stress | 2.000 | 300 s | 0 → N trong 120 s | thang suy giảm tăng từng bậc (`hp_degrade_level`); health OK cuối; có lượt xếp hàng |
+| reconnect | 1.000 | 150 s | vào trong 30 s; giây 60 tất cả rớt (terminate, không close frame), nối lại U(0,5; 30) s bằng HELLO RESUME | 100 % resume đúng netId |
+| abuse | 200 | 60 s | 20 % quan sát viên đứng yên ghi chat nhận được + 14 lớp tấn công (4.4) | mỗi lớp bị chặn/đóng trong 1 s (no_hello: 11 s); speed-hack ≥ 99 %; 0 dòng lách lọc lọt nguyên văn |
+| netem-lite | 300 | 180 s | như smoke; 30 % bot có netem 80 ± 30 ms + 2 % dồn cục | CORRECT trung thực < 2/phút (cả nhóm netem, báo riêng); RTT tách nhóm |
+
+### 4.4 Lớp tấn công (`lib/abuse.mjs`) — tín hiệu được tính là "phát hiện"
+
+bad_opcode / truncated / text_frame (30 tin rác, 10 ms/tin → đóng 1008) · oversize (4 KB → 1009) · flood_ping /
+flood_state / chat_spam (1.000 tin/s → đóng, SYSTEM KICK, CHAT_REJECTED; flood_ping còn tính "PONG < 10 % sau 1 s") ·
+speed_hack (chế độ đi bộ, 9 m/s thẳng → CORRECT/kick) · teleport (nhảy 300 m → CORRECT/kick) · chat_bypass (30 câu
+lách lọc, 1 câu/2,2 s → CHAT_REJECTED; quan sát viên trong 40 m đếm tin lọt nguyên văn / bị che) · forged_ticket (vé
+ngẫu nhiên → AUTH_FAILED/4001) · replayed_ticket (chỉ chế độ full: dùng lại vé đã dùng trên socket thứ hai) ·
+bad_proto (proto 99 → RELOAD/4004) · no_hello (im lặng → đóng 4007 sau 10 s). Độ trễ = byte tấn công đầu tiên → tín hiệu.
+
+### 4.5 Số đo (14–15/10/2026, máy chủ dự án Ryzen AI 9 HX 370 24 luồng, Node 24.15, bot + máy chủ chung máy)
+
+Máy chủ **nền móng** (uWS, PGlite RAM; chỉ PING/STATE ở mức giao thức — chưa có WELCOME/snapshot nên các tiêu chí
+snapshot/AOI ghi n/a). Báo cáo đầy đủ trong scratchpad `mp/s4/foundation_*` (không commit).
+
+| Lần chạy | Bot | Máy chủ | Bot-side |
+|---|---|---|---|
+| smoke 50 × 60 s | 50/50 vào; 0 lỗi giải mã; 9 lần rớt mạng ngẫu nhiên đều nối lại | CPU p50 2,3 % 1 lõi; RSS 320–608 MB (PGlite); tick rỗng 0,01 ms | RTT p50 0,98 / p99 3,6 ms |
+| hotspot 300 × 300 s (GPU lock) | 300/300; 0 lỗi; 832 k STATE + 86 k PING + 1.283 CHAT đã giải mã phía máy chủ (14,6 MB vào) | CPU p50 5,4 % / max 33 % 1 lõi; RSS 333 MB | RTT p50 2,25 / p99 4,3 / max 26 ms; **4,9 % 1 lõi mỗi 100 bot**; 2 tiến trình, RSS tổng 209 MB |
+| ramp 1.200 (60 s lên + 90 s giữ, GPU lock) | 1.200/1.200; 0 lỗi; 1,5 M STATE | CPU p50 14 % / max 61 % 1 lõi; RSS 334 MB | RTT p50 2,7 / p99 4,8 ms; **4,3 % 1 lõi mỗi 100 bot**; 6 tiến trình, RSS tổng 625 MB |
+
+- **Chi phí bot (mức PING/STATE)**: ≈ 4–5 % của 1 lõi / 100 bot (STATE 15 Hz đi + 2 Hz đứng, PING 1 Hz, chat); RAM
+  ≈ **105 MB nền mỗi tiến trình** (V8 + mapdata + terrain + đồ thị) + phần biên không đo được (< 2 MB/100 bot) →
+  1.200 bot ≈ 6 tiến trình ≈ 0,6 GB, ~0,5 lõi. Khi có snapshot thật, giải mã thêm ~10 snapshot/s/bot (ước ×2–3 CPU) —
+  ước 2.000 bot cần ~3 lõi + 1 GB: vẫn để lại ≥ 18 luồng cho máy chủ trên máy này.
+- `hp_eventloop_delay_p99_ms` của máy chủ nền móng **≈ 16,5 ms kể cả khi nhàn rỗi** (Windows: độ phân giải timer
+  ~15,6 ms của `monitorEventLoopDelay`), sát ngưỡng ARCH < 20 ms → nên đo event-loop trên Linux/Docker hoặc đổi tiêu chí
+  thành "p99 − sàn nhàn rỗi".
+- Máy chủ giả (`fakeserver.mjs`) với đủ giao thức: smoke/reconnect/hotspot/netem/abuse đều chạy hết đường mã của bot
+  (WELCOME, keyframe/ENTER/LEAVE/UPDATE, NAMES, CORRECT, resume 100 %, 14 lớp tấn công). Số của máy chủ giả không
+  phải số của máy chủ game.
+
+### 4.6 Ghi chú cho tích hợp (S2/S3/integrator)
+
+- **Mã mời & giới hạn tạo khách**: bot full cần `--invite <mã nhiều lượt>` (hoặc `INVITE_REQUIRED=false` khi load
+  test) và **miễn giới hạn tạo khách / kết nối theo IP cho 127.0.0.1** (ARCH: 30 khách/giờ/IPv4, 10 WS mới/phút/IPv4 —
+  1.200 bot cùng loopback sẽ bị chặn). Dùng `--creds server/data/bot_creds.json` để lần sau chỉ refresh.
+- Metric bot đọc: `hp_sim_tick_ms_p50/p99`, `hp_eventloop_delay_*`, `hp_process_cpu_percent`, `hp_process_rss_bytes`;
+  **S2 cần xuất**: một histogram có `snap` trong tên và đuôi `_ms` (vd `hp_snapshot_assembly_ms`), gauge `hp_ccu`,
+  gauge `hp_degrade_level` (0–4), tuỳ chọn gauge hàng đợi `hp_*queue*_len`. Tên khác → sửa regex trong `lib/metrics.mjs`.
+- `/v1/join` trả `{wsUrl, ticket, spawnHint}` hoặc `{queue: {position, etaS}}` (bot cũng nhận `{position, etaS}` ở cấp
+  ngoài). Bot dùng `--ws` của chính nó (mặc định `ws://<host>/play`), KHÔNG dùng `wsUrl` máy chủ trả (publicWsUrl là
+  URL tunnel).
+- Resume: bot gửi HELLO{flags RESUME, ticket rỗng, resumeToken} và coi là thành công khi WELCOME có **cùng netId**
+  (SYSTEM RESUMED trước đó là tuỳ chọn). Sau resume bot gửi READY lại và chờ keyframe.
+- Bot coi `EVENT CHAT_REJECTED` của bot trung thực là dương tính giả của bộ lọc (báo cáo đếm riêng).
