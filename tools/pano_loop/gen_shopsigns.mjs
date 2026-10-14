@@ -20,7 +20,7 @@ const MAXL = 32, JOINL = 24;
 const DESCR = /(^|\s)(LOGO|BÊN CẠNH|BIỂN|MÁI HIÊN|MÁI CHE|CHỮ|DÒNG CHỮ|KHÔNG RÕ|KHÔNG ĐỌC|MỜ|TRÁI|PHẢI|PHÍA|TẦNG|SỐ NHÀ|ẢNH|HÌNH|BIỂU TƯỢNG)(\s|$)/i;
 const STREET = /^(PHỐ|ĐƯỜNG|NGÕ|NGÁCH|HẺM|P\.|Đ\.)\s/i;
 // khẩu hiệu / khuyến mãi / băng rôn (cả ĐOẠN bị bỏ)
-const SLOGAN = /(^|\s)(VÌ|TỰ HÀO|CHÀO MỪNG|KÍNH CHÀO|MỪNG|MUÔN NĂM|ĐOÀN KẾT|CỘNG HÒA|CỘNG HOÀ|KỶ NIỆM|TIẾT KIỆM|GIẢM GIÁ|KHUYẾN MÃI|KHUYẾN MẠI|SALE|COMING SOON|HÀNG TỐT GIÁ|GIÁ HỜI|UY TÍN|NHẬN SHIP|SHIP ĐI|FREESHIP|MUA \d+ TẶNG)(\s|$)/i;
+const SLOGAN = /(^|\s)(VÌ|TỰ HÀO|CHÀO MỪNG|KÍNH CHÀO|MỪNG|MUÔN NĂM|ĐOÀN KẾT|CỘNG HÒA|CỘNG HOÀ|KỶ NIỆM|TIẾT KIỆM|GIẢM GIÁ|KHUYẾN MÃI|KHUYẾN MẠI|SALE|COMING SOON|HÀNG TỐT GIÁ|GIÁ HỜI|UY TÍN|NHẬN SHIP|SHIP ĐI|FREESHIP|MUA \d+ TẶNG|LÃI SUẤT)(\s|$)|^(OPEN|CLOSED|WELCOME)$/i;
 // địa chỉ: tên phố lấy từ chính catalog ("Phố Quang Trung", "đường Lê Lợi" → tiền tố 2 từ "QUANG TRUNG", "LÊ LỢI")
 const STOPW = new Set(['ĐOẠN', 'ĐANG', 'Ở', 'ĐÔNG', 'ĐI', 'ĐỐI', 'ĐƯỢC', 'GẦN', 'GÓC', 'NGÃ', 'HAI', 'HẢI']);
 const STREETS = new Set();
@@ -36,7 +36,7 @@ function clean(raw) {
   if (isBrand(String(raw).toUpperCase())) raw = debrand(String(raw).toUpperCase());
   // phần MÔ TẢ chữ thường sau tên IN HOA: "CỬA HÀNG ĐÔNG THỦ chuyên cung cấp…" → "CỬA HÀNG ĐÔNG THỦ"
   { const w = String(raw).split(/\s+/); let caps = 0, k = 0;
-    for (; k < w.length; k++) { if (!/\p{L}/u.test(w[k])) continue; if (/\p{Ll}/u.test(w[k])) break; caps++; }
+    for (; k < w.length; k++) { if (!/\p{L}/u.test(w[k])) continue; if (/^[^\p{L}]*\p{Ll}/u.test(w[k])) break; caps++; }   // từ VIẾT THƯỜNG đầu ("chuyên"); "OLD Karaoke" giữ
     if (caps >= 1 && k < w.length) raw = w.slice(0, k).join(' '); }   // tên viết thường/hoa-thường từ đầu ("Phúc") → caps 0, giữ
   const cutName = /\.{2,}|…/.test(raw);
   // SĐT/hotline THẬT trong mô tả biển → bỏ (có thể trùng thuê bao thật; biển chung dùng '0000.xxx.xxx')
@@ -46,6 +46,8 @@ function clean(raw) {
   s = s.replace(/(^|[\s(\-–—,])(ĐC|Đ\/C|ĐỊA CHỈ)\s*[:.]?(?=\s|\d|$).*$/i, ' ');          // "… ĐC: SỐ 24 LÊ ĐẠI HÀNH" → bỏ đuôi
   s = s.replace(/\.{2,}|…/g, ' ').replace(/\s+/g, ' ').trim();
   if (/[()[\]{};]/.test(s)) return null;               // mô tả lẫn ngoặc/chấm phẩy (vd "(CHỮ")
+  if (/[^\p{Script=Latin}\p{N}\p{P}\p{S}\s]/u.test(s)) return null;   // chữ Hán/khác hệ Latin ("北京美容院") — font biển không có
+  if (cutName) s = s.replace(/[\s,]+\p{L}{1,2}$/u, '');   // từ cuối bị "..." cắt cụt ≤2 chữ ("KIM TRANG Ô...", "UBND QUẬN LÊ...")
   if (/^(50%|CHO THUÊ)/i.test(s)) return null;
   const U = s.toUpperCase();
   if (DESCR.test(U) || STREET.test(U)) return null;
@@ -58,6 +60,7 @@ function clean(raw) {
     });
   if (!segs.length) return null;
   let name = segs[0];
+  name = name.replace(/,\s*\p{L}{1,2}$/u, '');          // đuôi nhãn SĐT ", T: 0225…" (số đã bỏ) → bỏ ", T"
   if (name.length > MAXL) return null;                 // không cắt chữ giữa cụm (tên cụt) — bỏ
   for (let i = 1; i < segs.length; i++) { if (segs[i].replace(/[^\p{L}]/gu, '').length < 3) continue; const t = name + ' - ' + segs[i]; if (t.length > JOINL) break; name = t; }
   if (name.replace(/[^\p{L}\p{N}]/gu, '').length < (cutName ? 6 : 3)) return null;   // mảnh tên bị cắt ("GIA...") vô nghĩa
