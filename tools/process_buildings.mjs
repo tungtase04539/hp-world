@@ -45,6 +45,8 @@ import {
   minRect, Grid, overlapArea, hash32, rng, pickW, polyEdgeDist,
 } from './bgeom.mjs';
 import { LU, luAt, LU_VETO, LU_WALL, WALL, RX_FUEL, classifyObs, makeEvidence, makeNameIndex, zoneAt, ZONES, WallSet } from './parcels_ev.mjs';
+import { loadFacadeFP, mapFacadeFP, FP_ENUMS } from './gen_facade_fp.mjs';
+import { WALL_PALETTE } from '../js/buildings_data.js';
 
 const T0 = Date.now();
 const ARGV = process.argv.slice(2);
@@ -1896,6 +1898,20 @@ for (const o of OBS) {
 }
 ST.obs = OBS.length; ST.obs_hit = nObsHit;
 lap(`quan sát pano ghép vào nhà: ${nObsHit}/${OBS.length}`);
+// ------------------------------------------------------------------------------------------------------
+// 10b. VÂN TAY MẶT TIỀN (Đợt 3 W4-A): quan sát TỪNG NHÀ trong ảnh pano thật (audit/facade_fp.json, tools/gen_facade_fp.mjs)
+//      → tia la bàn qua [x0, x1] của nhà trong ảnh → footprint CUỐI chạm đầu tiên. Áp ở bước 11 (applyFP: tầng/kiểu/màu/
+//      công năng) + mục RBF1 trong file (citygen: biển màu thật, mái hiên, ban công, cửa sổ, tầng trệt, phong hoá).
+// ------------------------------------------------------------------------------------------------------
+// W4-A: trọng số < FP_MIN_W (tia xiên/xa, 1 tia) bỏ hẳn; số tầng chỉ áp khi trọng số ≥ FP_FLOORS_W (applyFP, bước 11)
+const FP_MIN_W = 0.03, FP_FLOORS_W = 0.2;
+const FPD = loadFacadeFP();
+if (FPD) {
+  const R = mapFacadeFP(B.map((b) => b.pts), FPD);
+  for (const [bi, r] of R.fp) if (r.w >= FP_MIN_W) B[bi].fpr = r;
+  ST.fp = { ...R.stats, kept: B.filter((b) => b.fpr).length };
+} else { ST.fp = { missing: 1 }; console.log('  (không có audit/facade_fp.json — bỏ vân tay mặt tiền)'); }
+lap(`vân tay mặt tiền: ${ST.fp.kept || 0} nhà`);
 
 // ======================================================================================================
 // 11. THUỘC TÍNH: kiểu, tầng, mái, màu tường, công năng tầng trệt
@@ -1985,6 +2001,82 @@ function shopProb(b, f0) {
   return p;
 }
 const OBS_NOT_SHED_RX = /công trình công cộng|hội nghị|tân cổ điển|công sở|trụ sở|cơ quan|biệt thự|nhà hát|bảo tàng|ủy ban|uỷ ban|bưu điện/;
+// W4-A: áp VÂN TAY (b.fpr, bước 10b) SAU luật thống kê — quan sát thật của CHÍNH nhà này thắng. Số tầng chỉ khi đủ chắc
+// (FP_FLOORS_W) và không phải "nhà kim" (≥ 7 tầng trên nền < max(9·tầng, 120) m²).
+const FPS = (k) => FP_ENUMS.style.indexOf(k);
+const FP_DATA_STYLE = new Map([[FPS('tube'), STYLE.TUBE], [FPS('tube_old'), STYLE.OLD], [FPS('colonial'), STYLE.OLD], [FPS('neoclassical'), STYLE.CIVIC],
+  [FPS('villa'), STYLE.VILLA], [FPS('apartment'), STYLE.KTT], [FPS('glass_office'), STYLE.GLASS], [FPS('hotel_tower'), STYLE.GLASS],
+  [FPS('shed'), STYLE.SHED], [FPS('civic'), STYLE.CIVIC], [FPS('construction'), STYLE.TUBE]]);
+const FPG = (k) => FP_ENUMS.ground.indexOf(k);
+const FP_USE = new Map([[FPG('shop_open'), INFO.USE_SHOP], [FPG('shutter'), INFO.USE_SHOP], [FPG('glass_store'), INFO.USE_SHOP], [FPG('market'), INFO.USE_SHOP],
+  [FPG('restaurant'), INFO.USE_SHOP], [FPG('home'), INFO.USE_HOME], [FPG('gate'), INFO.USE_GATE], [FPG('wall'), INFO.USE_GATE]]);
+const WALL_RGB = WALL_PALETTE.map((h) => [(h >> 16) & 255, (h >> 8) & 255, h & 255]);
+const nearestWall = (c) => { const r = (c >> 16) & 255, g = (c >> 8) & 255, bl = c & 255; let bi = 0, bd = 1e9;
+  WALL_RGB.forEach((p, i) => { const d = 0.3 * (p[0] - r) ** 2 + 0.59 * (p[1] - g) ** 2 + 0.11 * (p[2] - bl) ** 2; if (d < bd) { bd = d; bi = i; } }); return bi; };
+function applyFP(b, fr) {
+  const st0 = b.style, fl0 = b.floors;
+  if (!b.cbIn && FP_DATA_STYLE.has(fr.style)) b.style = FP_DATA_STYLE.get(fr.style);
+  // W4-A r2 (phản biện): tầng chỉ áp khi các quan sát ĐỒNG THUẬN (phần trọng số trong ±1 tầng quanh trung vị ≥ 0,6 —
+  // #13088 "16 vs 1", #2025 "15 vs 3" bị chặn); nhà có số tầng CHẮC (OSM levels/height, tallObs) đổi > 3 tầng cần ≥ 0,75
+  // VÀ ≥ 2 quan sát near/mid (#306 OSM 15 → 5 đồng thuận 0,62: giữ 15); mọi nhà đổi > 3 tầng cần ≥ 2 quan sát near/mid.
+  // (hạ tầng cao ốc khi NHIỀU quan sát gần cùng thấy nhà thấp vẫn ÁP: #590 tallObs 20 → 2 = showroom 2 tầng đứng TRƯỚC khách
+  // sạn ở pano_080 h45 — tallObs khớp nhầm; #7426 25 → 3 phố nhà ống Lạch Tray pano_061 h180)
+  if (fr.floors > 0 && fr.w >= FP_FLOORS_W && !(fr.floors >= 7 && b.area < Math.max(9 * fr.floors, 120))) {
+    const nf = Math.max(1, Math.min(40, b.synth ? Math.min(fr.floors, 9) : fr.floors));
+    const sure = b.nfl > 0 || b.hgt > 0 || b.tallObs > 0, big = Math.abs(nf - b.floors) > 3;
+    if (fr.flAgree < 0.6) stat('fp_floors_disagree');
+    else if (sure && big && !(fr.flAgree >= 0.75 && fr.flNM >= 2)) stat('fp_floors_sure_kept');
+    else if (big && fr.flNM < 2) stat('fp_floors_single_kept');   // đổi > 3 tầng từ ≤ 1 quan sát gần/vừa (#13078 2 → 15 từ 1 quan sát 41 m)
+    else { if (Math.abs(nf - b.floors) >= 4) stat('fp_floors_big'); b.floors = nf; b.fixed = true; b.pano = 1; }
+  }
+  if (b.floors >= 7 && b.roofType !== ROOF.FLAT) b.roofType = ROOF.FLAT_PARAPET;
+  // mái NGÓI thấy được từ phố (nhà Pháp/biệt thự) → mái ngói 4 dốc (renderer tự lùi về mái hồi nếu footprint không vuông vức)
+  if (fr.roof === FP_ENUMS.roof.indexOf('tile') && b.floors <= 4 && b.roofType !== ROOF.HIP_TILE) { b.roofType = ROOF.HIP_TILE; b.roofColor = [2, 1, 0, 10, 3, 14][hash32(b.id + 'fproof') % 6]; }
+  // màu tường ĐO TRÊN ẢNH gồm cả bóng râm/ngược sáng (pano_432 h270: tường "#33302c" → khối đen sì trong game, nơi đèn game
+  // tự đổ bóng lần nữa) → nâng độ sáng tương đối tối thiểu 0,55 (giữ sắc độ; 0,42 vẫn xám tối trong bóng game) trừ nhà kính/khách sạn kính
+  // W4-A r2 (phản biện): chặn độ bão hoà HSV S ≤ 0,3-0,45 theo sắc độ (giữ H + độ sáng V) — màu biển/bạt lọt vào làm tường (640/4.311
+  // tường S > 0,45: khối đỏ/cam/tím pano_193/092/446/175/368); tường thật HP (vàng/hồng/xanh ngọc) đều ≤ ~0,45
+  if (fr.wall >= 0) {
+    const c = [(fr.wall >> 16) & 255, (fr.wall >> 8) & 255, fr.wall & 255], mx = Math.max(...c), mn = Math.min(...c);
+    // sắc độ H: đỏ/cam/hồng sẫm (H < 35° hoặc > 300°) và lam/tím (200-300°) là màu BIỂN/BẠT điển hình, tường thật hiếm khi rực
+    // → trần 0,3 / 0,35 (ảnh r2: 368 h90, 446 h270 vẫn khối đỏ ở 0,45); vàng/xanh lá/xanh ngọc giữ 0,45
+    let H = 0; if (mx > mn) { const d = mx - mn; H = mx === c[0] ? ((c[1] - c[2]) / d + 6) % 6 : mx === c[1] ? (c[2] - c[0]) / d + 2 : (c[0] - c[1]) / d + 4; H *= 60; }
+    const sCap = H < 35 || H > 300 ? 0.3 : H >= 200 ? 0.35 : 0.45;
+    if (mx > 0 && (mx - mn) / mx > sCap) {
+      const lo = mx * (1 - sCap), q = c.map((v) => Math.round(mx - ((mx - v) * (mx - lo)) / (mx - mn)));
+      fr = { ...fr, wall: (q[0] << 16) | (q[1] << 8) | q[2] }; stat('fp_wall_desat');
+    }
+  }
+  if (fr.wall >= 0 && fr.style !== FPS('glass_office') && fr.style !== FPS('hotel_tower')) {
+    const r = (fr.wall >> 16) & 255, g = (fr.wall >> 8) & 255, bl = fr.wall & 255, L = (0.2126 * r + 0.7152 * g + 0.0722 * bl) / 255;
+    if (L < 0.55) {
+      const k = 0.55 / Math.max(L, 0.05), up = (c) => Math.min(255, Math.round(c * k + (L < 0.08 ? 60 : 0)));
+      fr = { ...fr, wall: (up(r) << 16) | (up(g) << 8) | up(bl) }; stat('fp_wall_lifted');
+    }
+  }
+  if (fr.wall >= 0) { b.wall = nearestWall(fr.wall); }
+  // DÃY GỘP (mặt phố dài hơn hẳn bề rộng nhà quan sát: ML gộp nhiều nhà ống thành 1 khối không chia lô được): quan sát chỉ tả
+  // MỘT nhà trong dãy → không ép tầng trệt/biển/mái hiên/ban công/màu cho CẢ dãy (pano_092 h180: 1 cửa cuốn → cả dãy 5 bay
+  // cửa cuốn trơn không biển). Giữ kiểu/tầng/tuổi + màu nền (chỉ số WALL_PALETTE); citygen giữ đa dạng từng bay như cũ.
+  // (nhà KHÔNG có cạnh mặt phố — khối lớn ôm góc phố, citygen tự nâng cạnh hông thành mặt phố — dùng cạnh dài nhất: pano_092 h180)
+  let fLmax = 0; const P = b.pts;
+  for (let k = 0; k < P.length; k++) { if (b.fronts.length && !b.fronts.some((f) => f.k === k)) continue; const a = P[k], c = P[(k + 1) % P.length]; fLmax = Math.max(fLmax, Math.hypot(c[0] - a[0], c[1] - a[1])); }
+  const partial = fr.widthM > 0 && fLmax > Math.max(2 * fr.widthM, fr.widthM + 6);
+  if (partial) { stat('fp_partial'); fr = { ...fr, ground: -1, sign: { size: -1 }, awning: -1, balcony: -1, windows: -1, wall: -1 }; }   // windows −1: không ép 1 bộ FU cho mọi bay của dãy
+  const use = FP_USE.get(fr.ground);
+  if (use !== undefined && !b.cbIn && b.fronts.length) b.info = (b.info & ~INFO.USE_MASK) | (use << INFO.USE_SHIFT);
+  else if (!b.cbIn && b.fronts.length && (fr.style === FPS('glass_office') || fr.style === FPS('hotel_tower')) && fr.ground < 0) b.info = (b.info & ~INFO.USE_MASK) | (INFO.USE_OFFICE << INFO.USE_SHIFT);
+  const rgb = (c) => (c >= 0 ? [(c >> 16) & 255, (c >> 8) & 255, c & 255] : [255, 255, 255]);
+  const [wr, wg, wb] = rgb(fr.wall), sg = fr.sign || { size: -1 };
+  const [br, bg, bb] = sg.bg >= 0 && sg.size > 0 ? rgb(sg.bg) : [255, 255, 255], [fr2, fg2, fb2] = sg.fg >= 0 && sg.size > 0 ? rgb(sg.fg) : [255, 255, 255];
+  // màu 255,255,255 vừa là "trắng" vừa là "không rõ" ở kênh u8 → trắng thật lưu 254 (citygen coi 255×3 = không rõ)
+  const u = (r, g, bl) => (r === 255 && g === 255 && bl === 255 ? [254, 254, 254] : [r, g, bl]);
+  const W = fr.wall >= 0 ? u(wr, wg, wb) : [255, 255, 255], BG = sg.size > 0 && sg.bg >= 0 ? u(br, bg, bb) : [255, 255, 255], FG = sg.size > 0 && sg.fg >= 0 ? u(fr2, fg2, fb2) : [255, 255, 255];
+  b.fp = { wallR: W[0], wallG: W[1], wallB: W[2], bgR: BG[0], bgG: BG[1], bgB: BG[2], fgR: FG[0], fgG: FG[1], fgB: FG[2],
+    style: fr.style, balcony: fr.balcony, windows: fr.windows, ground: fr.ground, size: sg.size, span: sg.span || 0, awning: fr.awning,
+    roof: fr.roof, age: fr.age, floors: fr.floors, conf: Math.min(254, Math.round(fr.w * 40)) };
+  stat('fp_applied'); if (b.style !== st0) stat('fp_style_changed'); if (b.floors !== fl0) stat('fp_floors_changed');
+}
 for (const b of B) {
   const R = rng(hash32(b.id + 'attr'));
   const [cx, cz] = centroid(b.pts);
@@ -2107,6 +2199,7 @@ for (const b of B) {
   b.info = (f0 ? ROADC.indexOf(f0.s.c) : 0) | (roads.size >= 2 ? INFO.CORNER : 0) | (use << INFO.USE_SHIFT) |
     ((pkk === 'compound' ? INFO.PK_COMPOUND : pkk === 'market' ? INFO.PK_MARKET : pkk === 'home' ? INFO.PK_HOME : 0) << INFO.PK_SHIFT);
   if (f0 && !b.synth) stat('use_' + ['home', 'shop', 'office', 'gate'][use]);
+  if (b.fpr) applyFP(b, b.fpr);   // W4-A: vân tay mặt tiền thắng luật thống kê
   b.party0 = party0;
 }
 // làm trơn ±2 tầng giữa nhà sát nhau (không đụng nhà có số tầng chắc chắn: OSM/pano trực tiếp)
@@ -2179,7 +2272,7 @@ for (const b of B) {
     // EDIT: mọi mảnh tách từ footprint gốc (b.parent: lô, khối sau, ô lưới khối dính) cũng là hình học đã sửa
     (!b.synth && (b.parent || b.clipped || b.snapped || b.lot || b.deep || b.cut || b.squared || b.grown || b.grown2 || b.notch || b.closed || b.ovcut || b.guard) ? FLAG.EDIT : 0);
   out.push({ pts: b.pts, rect: b.rect || null, edge: b.edge, cover: b.cover, floors: b.floors, style: b.style, wall: b.wall,
-    roofType: b.roofType, roofColor: b.roofColor, flags, info: b.info, seed: hash32(b.id + 's') & 0xffff });
+    roofType: b.roofType, roofColor: b.roofColor, flags, info: b.info, seed: hash32(b.id + 's') & 0xffff, fp: b.fp || null });
 }
 // ổn định thứ tự: theo ô 64 m rồi id → nhà gần nhau nằm gần nhau trong mảng (WP2 dựng theo ô)
 const key = (b) => { const [cx, cz] = centroid(b.pts); return (Math.floor((cz + 2000) / 64) * 100 + Math.floor((cx + 2000) / 64)); };

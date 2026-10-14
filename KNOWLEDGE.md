@@ -455,6 +455,86 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-10-14 (Đ3-W4-A VÂN TAY MẶT TIỀN)** [ĐỢT 3 wave 4 — mặt tiền theo ĐÚNG từng ngôi nhà trong ảnh pano thật]:
+    **DỮ LIỆU:** agent trích xuất đọc 3.306 ảnh pano cắt (551 pano × 6 hướng gần vuông góc phố, FOV ngang ≈ 98°) → mỗi nhà thấy
+    được: x0..x1 trong ảnh, độ sâu near/mid/far, tầng, màu tường #hex, kiểu (14 loại), ban công, cửa sổ, tầng trệt, biển (nền/chữ/
+    cỡ/số tầng phủ), mái hiên, mái, tuổi. `tools/gen_facade_fp.mjs --collect <fp_json> <fp_plan.json>` gộp thành
+    **`audit/facade_fp.json`** (1,1 MB, 15.934 quan sát, 1 dòng/quan sát, bỏ ghi chú; ảnh/JSON gốc ngoài repo) = ĐẦU VÀO CAM KẾT.
+    Giá trị lệch cột (vd ground = '#2060c0') → −1 (không rõ).
+    **ÁNH XẠ ảnh → nhà (`mapFacadeFP`, tất định, ~0,3 s):** bearing(x) = heading + atan((x − 0,5)·2·tan 49°) (la bàn 0° = −z);
+    3-12 tia rải trong lõi 76% của [x0,x1] từ camera xe → cạnh footprint ĐẦU TIÊN chạm (DDA lưới cạnh 6 m, nhà chặn nhà sau);
+    cửa sổ độ sâu near 0-26 / mid 5-52 / far 15-90 m (đo histogram: near đỉnh 5-15 m, mid 10-20 m — "mid" trong ảnh gần hơn mắt
+    người đoán); không tia nào lọt → lượt 2 nới (0-40/0-70/10-70, trọng số × 0,5: nhà thật sau hàng ki-ốt/cây không có trong RB).
+    Nhà nhận quan sát khi ≥ max(1, 20% K) tia hoặc là nhà nhiều tia nhất; trọng số = độ sâu (1/0,6/0,25) × tỉ lệ tia × (0,35 +
+    0,65·phủ) × (0,8 nếu tầng không chắc). Gộp: rời rạc = phiếu có trọng số; tầng = trung vị trọng số (near/mid trước); màu tường =
+    TB tuyến tính các quan sát cách màu quan sát nặng nhất < 70; biển = quan sát nặng nhất CÓ biển. Kết quả: 4.887 nhà; ngưỡng
+    FP_MIN_W 0,03 → **4.701 nhà có vân tay; độ phủ nhà mặt phố (cạnh FRONT ≤ 40 m quanh camera pano) 70,1 %, ≤ 20 m 92,3 %**
+    (`node tools/gen_facade_fp.mjs` in số này + phân bố). Ngưỡng 0,1 chỉ còn 59,6 % → giữ 0,03 (quan sát yếu vẫn là ảnh thật,
+    hơn đoán thống kê).
+    **PIPELINE:** `tools/process_buildings.mjs` bước **10b** chạy ánh xạ trên hình học CUỐI (sau bước 9, trước thuộc tính) →
+    bước 11 `applyFP` SAU luật thống kê: kiểu dữ liệu (colonial→OLD, neoclassical→CIVIC, hotel/glass→GLASS…; trừ khuôn viên cbIn),
+    tầng (khi trọng số ≥ 0,2, bỏ "nhà kim" ≥ 7 T trên nền < max(9·T, 120) m², nhà SINH ≤ 9; fixed → không làm trơn), mái ngói
+    thấy từ phố → HIP_TILE, màu tường → chỉ số WALL_PALETTE gần nhất (+ RGB thật trong RBF1), công năng trệt (shop/shutter/glass/
+    market/restaurant → SHOP, home → HOME, gate/wall → GATE). 2.435 nhà đổi tầng, 2.304 đổi kiểu. Sinh 2 lần md5 y hệt.
+    Vòng sửa 1 (sau ảnh r1): (a) MÀU ĐO TRÊN ẢNH gồm bóng râm/ngược sáng → 434 tường độ sáng < 0,42 (vd "#33302c") thành khối
+    đen sì (pano_432 h270) ⇒ nâng độ sáng tương đối tối thiểu 0,42 giữ sắc độ (trừ nhà kính/khách sạn); (b) DÃY GỘP: mặt phố dài
+    > max(2·bề rộng quan sát, bề rộng + 6 m) (98 nhà) ⇒ quan sát chỉ tả 1 nhà trong dãy → KHÔNG ép trệt/biển/mái hiên/ban công/
+    màu RGB cho cả dãy (pano_092 h180: 1 cửa cuốn → cả dãy 5 bay cửa cuốn trơn), chỉ giữ kiểu/tầng/tuổi + chỉ số màu nền.
+    Vòng 2: khối KHÔNG có cạnh mặt phố (ôm góc, citygen tự nâng cạnh hông) dùng cạnh dài nhất cho luật dãy gộp (390 nhà);
+    ngưỡng sáng 0,42 → 0,55 (678 tường; 0,42 vẫn xám tối trong bóng game); 97 quan sát/18 ảnh agent ghi LỆCH 1 CỘT từ widthM
+    (widthM = '#hex', wallName = kiểu…) → --collect tự dời lại.
+    **ĐỊNH DẠNG (js/buildings_data.js, CỘNG THÊM):** mục **RBF1** ở ĐUÔI (sau mục chữ nhật): u32 magic | nF | u32 idx[nF] (chỉ số
+    nhà theo thứ tự GIẢI MÃ: đa giác trước, chữ nhật sau) | 20 mảng u8 `FP_FIELDS` (wallRGB, bgRGB, fgRGB, style, balcony, windows,
+    ground, size, span, awning, roof, age, floors, conf; 255 = không rõ; trắng thật lưu 254). decodeRB → `D.fpE` (Int32 nB, −1)
+    + `D.fp`. `FP_ENUMS` dùng chung tool ↔ giải mã. Bộ giải mã cũ bỏ qua byte đuôi. buildings_real.js 1,45 → 1,60 MB base64 (≤ 1,8).
+    **RENDER (js/citygen.js):** thuộc tính đỉnh mới **`aFp` u8×4** (GBuf.fpv đặt 1 lần/nhà, MỌI đỉnh của nhà nhận — kể cả ô det):
+    x,y = nền biển RGB565 | z = chế độ biển (0 không vân tay, 1 KHÔNG biển → dải biển vẽ như tường + không hộp biển 3D, 2 biển màu
+    thật, 3 biển BẢNG LỚN mọi bay tầng 1 (+ tầng 2 nếu phủ 2), 4 biển không rõ → thống kê) + màu chữ 2 bit (trắng/đen/đỏ/vàng) +
+    phủ 2 tầng + "biết màu tường" (tắt nhuộm ngẫu nhiên từng bay của dãy gộp) | w = bộ trệt **FGk** (cửa hàng mở / phố cũ / cửa cuốn
+    / kính / cửa xếp / nhà ở / tường-NEO-COL / chợ / quán ăn) + bộ tầng trên **FUk** (nhôm kính ± ban công sắt/bê tông, chuồng cọp,
+    chớp gỗ, vòm, song sắt, vách kính, cửa sổ nhỏ — chỉ cho kiểu dựng TUBE/OLD/MODERN/KTT/TEN). `groundModule(…, fg)` JS khớp bit
+    với shader (cùng g1; GL1 cùng u1). renderStyles: kiểu dựng theo vân tay (tube→TUBE|MODERN, tube_old→OLD, colonial→COL,
+    neoclassical→NEO, villa, apartment→KTT|TEN, glass→GLASS|MODERN, hotel→TOWER|GLASS, shed, civic, construction→CONS) thắng
+    bằng chứng FE cũ; tuổi = tuổi ảnh; cờ biển lớn = multi/banner. Chi tiết 3D: ban công có/không + lan can sắt/bê tông theo ảnh,
+    mái hiên có/không + tôn/bạt + màu (AWN_FP), biển dọc chỉ khi 'vertical', biển trên mái chỉ (và luôn) khi 'roof', biển bảng lớn
+    trước ban công khi chế độ 3. Nhà không vân tay: y hệt trước. program key 'fabric_v4a_'. Chẩn đoán: `fabricFacadeOf(b).fp`.
+    **BẪY:** (1) trong heredoc của công cụ Bash ở máy này `\\n` bị đổi thành `\n` (xuống dòng thật) → sửa mã có chuỗi `\n` bằng
+    script viết qua Write. (2) const FP_MIN_W phải khai báo TRƯỚC bước 10b (TDZ). (3) RBF1 khoá theo THỨ TỰ GIẢI MÃ → ai sinh lại
+    buildings_real.js bằng generator cũ sẽ MẤT vân tay (không lỗi) — luôn chạy process_buildings bản này.
+    **ĐO / KIỂM** (tier 3, 890M D3D11, :8701, khoá GPU, traffic off, 1280×634): 24 pano liên quan (mật độ vân tay cao nhất
+    trong 120 pano AUDIT4) + 8 đối chứng (060/019/042/230/285/304/074/395) × 4 hướng, 3 lượt (r1/r2/r3), ghép REAL | dot3 (keep/
+    new_c24a52e) | nhánh. Khớp rõ: biển trắng chữ đỏ (102 h180/270), biển đen chữ trắng (262 h90), biển xanh (143 h270, 345 h90,
+    129 h180), bỏ biển bảng lớn giả nơi ảnh không có (102 h90, 111, 129, 377), mái hiên tôn/bạt xanh (102, 106 h0/270, 111 h0/
+    270, 143 h270), tường trắng phố Pháp HVT (253), xanh ngọc (106 h180, 189 h90, 345 h0), hồng (143 h270), biển bảng lớn đỏ thật
+    (464 h90/180, 023 h180 nhiều tầng trắng chữ đỏ); đối chứng 230 h90/180: khách sạn kính (AUDIT4 mức 5 "khối xám ố") giờ là
+    khối kính + trệt kính nhờ vân tay pano lân cận. Đối chứng khác không đổi. Chấm tay (thang AUDIT4) 20 pano xem kỹ: TB ~5,1 → ~5,6.
+    Perf cùng phiên A/B dot3 ↔ nhánh (2 lượt xen kẽ, 1280×720): calls y hệt (pano_007 503, cam_spawn 404, game_3 352,
+    cam_high 397-422 cả hai), tris −0,0…−0,2 % (ít ban công/mái hiên giả); hpReady dot3 7,0/6,9 s ↔ nhánh 5,8/5,4 s (thứ tự chạy,
+    không chậm hơn); heap JS 482/424 ↔ 600/516 MB (dao động GC ±100 MB giữa lượt — aFp 4 B/đỉnh được thả sau upload như mọi
+    thuộc tính phố). Cổng: node --check, waterbfs 5/5, check_assets ĐỦ, diag full "TẤT CẢ THỰC THỂ OK — 0 lỗi JS" (overlap 1 ở
+    (259,111) đã biết), diag lite OK, 0 lỗi JS ở 3×8 lượt chụp.
+    **VÒNG PHẢN BIỆN (merge-with-fixes → r2):** (1) **MÀU TƯỜNG RỰC** — 640/4.311 tường S > 0,45 (khối đỏ/cam/tím 193 h0/h90,
+    092 h0, 446, 175, 368): agent trích lấy màu BIỂN/BẠT làm tường. Sửa: `mapFacadeFP` BỎ quan sát có tường cách nền biển của
+    chính nó < 40 (ΔRGB), tường S > 0,6 trọng số × 0,3 khi chọn màu tham chiếu; `applyFP` trần HSV S theo sắc độ (giữ H, V):
+    đỏ/cam/hồng sẫm (H < 35° | > 300°) 0,3, lam/tím (200-300°) 0,35, vàng/lá/ngọc 0,45 (582 tường hạ) — 207 vàng Pháp giữ,
+    193/092 hết khối đỏ. (2) **ĐANG XÂY MẤT** (106 h90 rào "ĐANG THI CÔNG" → nhà cửa cuốn, 281 h180): citygen renderStyles giữ
+    RS.CONS khi đến từ bằng chứng trực tiếp FEF.CONS (`consEv`) dù vân tay nói 'tube'; tuổi vân tay không đè tuổi 1 của CONS.
+    (3) **TẦNG MÂU THUẪN** (16 vs 1, 15 vs 3): mapFacadeFP ghi `flAgree` (phần trọng số trong ±1 tầng quanh trung vị) + `flNM`
+    (số quan sát near/mid có tầng); applyFP chỉ áp khi flAgree ≥ 0,6 (206 nhà bị chặn); đổi > 3 tầng cần ≥ 2 quan sát near/mid
+    (12 chặn, vd #13078 2 → 15 từ 1 quan sát 41 m); nhà tầng CHẮC (OSM levels/height, tallObs) đổi > 3 cần thêm flAgree ≥ 0,75
+    (4 chặn, vd #306 OSM 15 giữ). Hạ cao ốc khi NHIỀU quan sát gần cùng thấy thấp VẪN áp (#590 tallObs 20 → 2 = showroom 2
+    tầng đứng trước khách sạn ở pano_080 h45; #2025 15 → 3 từ 16 quan sát đồng thuận 0,92). Thống kê ST fp_floors_disagree/
+    _single_kept/_sure_kept/_big (đổi ≥ 4 tầng: 69). Phụ: 'banner' chỉ là bảng lớn nhiều tầng (chế độ 3) khi phủ ≥ 2 tầng
+    (`fpPanel`); bộ trệt FG tắt (gs = 0) cho kiểu NOSIGN (CIVIC/GLASS/SHED) có USE_HOME hoặc ô khuôn viên không phải SHOP (giữ
+    luật rc 3 "trệt không biển" sau tường mỏ neo — JS/GL2/GL1 cùng qua byte aFp); dãy gộp bỏ cả 'windows' (không ép 1 bộ FU cho
+    mọi bay); màu biển lấy từ quan sát nặng nhất có biển CÙNG cỡ đã bỏ phiếu. Sinh 2 lần md5 y hệt (eb0710b4). Ảnh: 16 pano phản
+    biện × 4 hướng + 8 góc phụ, ghép REAL | dot3 | r1 | r2 (scratch W4-A/pairs4, pairs5); diag full/lite 0 lỗi JS.
+    **BẪY thêm:** (4) `git archive` với core.autocrlf=true đổi LF → CRLF ⇒ md5 buildings_real.js khác bản sinh — so tất định
+    bằng chạy process_buildings 2 lần trong CÙNG cây, không so với bản archive.
+    CÒN: (a) dãy gộp/khối ôm góc (390) về thống kê — chưa có vân tay theo TỪNG BAY; (b) độ phủ 70,1 % sát ngưỡng (trích thêm
+    hướng 90/270); (c) bộ trệt FG vẫn có thể sai kiểu công năng (175 h0 mặt tiền ngân hàng thành cửa hàng); (d) quan sát gần
+    "không biển" thắng quan sát xa thấy biển (446 h270); (e) tường có biển phủ kín mặt tiền vẫn hơi đỏ/hồng (446 h270 #e0aa9d,
+    368 h90 nâu gạch) — đúng một phần (ảnh thật biển đỏ phủ kín); (f) camera game ép sát mặt tiền ở vài pano (AUDIT4 D3).
 - **2026-10-14 (Đ3-W3 SỬA HỒI QUY AUDIT4)** [ĐỢT 3 wave 3 — hồi quy mức 3 của AUDIT4 (REAL | dot3 | tích hợp), nhánh tích hợp]:
     **(R1) SÔNG TAM BẠC "MẤT" SAU LAN CAN (198/203/207/212 mức 3, 134 mức 2) — gốc W3-F, KHÔNG phải polygon nước:** đo WATER
     dot3/F/A/tích hợp ở 6 pano: mép nước lệch ≤ 1,5 m, nước vẫn bắt đầu 8-13 m trước camera. Raycast màn hình (probe trên

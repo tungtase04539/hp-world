@@ -25,8 +25,30 @@
 //   u16 cov[nR]                     — edgeCover cạnh k ở bit 4k..4k+3 (bão hoà 15 tầng)
 //   u8 floors, style, wall, roof, flags, info [nR mỗi mảng] — như trên; seed suy từ (x0,z0,ang) lúc giải mã
 // decodeRB() TRẢI các nhà chữ nhật thành đa giác 4 đỉnh nối SAU các nhà đa giác → người dùng D thấy 1 danh sách đồng nhất.
+//
+// MỞ RỘNG v2 (W4-A "VÂN TAY MẶT TIỀN", CỘNG THÊM ở ĐUÔI file — bộ giải mã cũ bỏ qua byte thừa): ngay sau mục chữ nhật (hoặc
+// sau mục đa giác nếu không có mục chữ nhật) có thể có MỤC VÂN TAY: quan sát THẬT từng nhà trong ảnh pano (tools/gen_facade_fp.mjs
+// → tools/process_buildings.mjs bước 10b), chỉ cho nhà có vân tay (~4,7 k):
+//   u32 magic 0x31464252 ('RBF1') | u32 nF
+//   u32 idx[nF]                     — chỉ số nhà THEO THỨ TỰ GIẢI MÃ (đa giác trước, chữ nhật sau), tăng dần
+//   u8 × FP_FIELDS.length mảng [nF] — xem FP_FIELDS (255 = không rõ; màu = sRGB 8 bit/kênh)
+// decodeRB → D.fpE (Int32Array nB: số thứ tự mục vân tay của nhà, −1 = không có) + D.fp = { n, <trường>: Uint8Array(nF) }.
+// Mã enum = chỉ số trong FP_ENUMS (khớp tools/gen_facade_fp.mjs).
 export const RB_MAGIC = 0x31304252;
 export const RBR_MAGIC = 0x31524252;
+export const RBF_MAGIC = 0x31464252;
+export const FP_FIELDS = ['wallR', 'wallG', 'wallB', 'bgR', 'bgG', 'bgB', 'fgR', 'fgG', 'fgB', 'style', 'balcony', 'windows', 'ground',
+  'size', 'span', 'awning', 'roof', 'age', 'floors', 'conf'];
+export const FP_ENUMS = {
+  style: ['tube', 'tube_old', 'colonial', 'neoclassical', 'villa', 'apartment', 'glass_office', 'hotel_tower', 'shed', 'civic', 'construction', 'temple', 'market', 'other'],
+  balcony: ['none', 'iron', 'concrete', 'glass', 'cage', 'mixed'],
+  windows: ['aluminum', 'wood_shutter', 'arched', 'grille', 'glass_curtain', 'small', 'mixed'],
+  ground: ['shop_open', 'shutter', 'glass_store', 'gate', 'home', 'wall', 'market', 'restaurant', 'none'],
+  size: ['none', 'fascia', 'multi', 'vertical', 'roof', 'banner'],
+  awning: ['none', 'blue_tin', 'red_tin', 'tarp_blue', 'tarp_stripe', 'tarp_red', 'tarp_other', 'concrete'],
+  roof: ['flat', 'tile', 'tin', 'unknown'],
+  age: ['new', 'mid', 'old', 'very_old'],
+};
 
 export const EDGE = { SIDE: 0, FRONT: 1, BACK: 2, PARTY: 3 };
 // Kiểu mặt tiền (shader atlas chọn bộ mô-đun theo kiểu)
@@ -92,7 +114,7 @@ function b64ToBytes(b64) {
   return new Uint8Array(Buffer.from(b64, 'base64'));   // node
 }
 
-// Giải mã → {nB, nV, vStart, x, z (Float32 mét), edge, edgeCover, floors, style, wall, roof, flags, info, seed, dead, nPoly}
+// Giải mã → {nB, nV, vStart, x, z (Float32 mét), edge, edgeCover, floors, style, wall, roof, flags, info, seed, dead, nPoly, fpE, fp}
 // (nPoly = số nhà đa giác; các nhà [nPoly, nB) đến từ mục chữ nhật)
 export function decodeRB(bytesOrB64) {
   const u8 = typeof bytesOrB64 === 'string' ? b64ToBytes(bytesOrB64) : bytesOrB64;
@@ -109,7 +131,7 @@ export function decodeRB(bytesOrB64) {
   const coverP = new Uint8Array(buf, off, nVP); off += al(nVP);
   const attrP = []; for (let k = 0; k < 6; k++) { attrP.push(new Uint8Array(buf, off, nP)); off += al(nP); }   // floors style wall roof flags info
   const seedP = new Uint16Array(buf, off, nP); off += al(2 * nP);
-  let nR = 0, R = null;
+  let nR = 0, R = null, endOff = off;
   if (rectOff) {
     if (dv.getUint32(rectOff, true) !== RBR_MAGIC) throw new Error('buildings_real: sai magic mục chữ nhật');
     nR = dv.getUint32(rectOff + 4, true); let o = rectOff + 8;
@@ -122,6 +144,7 @@ export function decodeRB(bytesOrB64) {
     R.ek = new Uint8Array(buf, o, nR); o += al(nR);
     R.cov = new Uint16Array(buf, o, nR); o += al(2 * nR);
     R.attr = []; for (let k = 0; k < 6; k++) { R.attr.push(new Uint8Array(buf, o, nR)); o += al(nR); }
+    endOff = o;
   }
   const nB = nP + nR, nV = nVP + 4 * nR;
   const vStart = new Uint32Array(nB + 1); vStart.set(vStartP);
@@ -150,7 +173,17 @@ export function decodeRB(bytesOrB64) {
     vStart[nB] = nV;
   }
   const [floors, style, wall, roof, flags, info] = A;
-  return { nB, nV, vStart, x, z, edge, edgeCover, floors, style, wall, roof, flags, info, seed, dead: new Uint8Array(nB), nPoly: nP };
+  // mục VÂN TAY (v2, tuỳ chọn) ở đuôi
+  let fpE = null, fp = null;
+  if (endOff + 8 <= u8.byteLength && dv.getUint32(endOff, true) === RBF_MAGIC) {
+    const nF = dv.getUint32(endOff + 4, true); let o = endOff + 8;
+    const idx = new Uint32Array(buf, o, nF); o += 4 * nF;
+    fp = { n: nF, idx };
+    for (const k of FP_FIELDS) { fp[k] = new Uint8Array(buf, o, nF); o += al(nF); }
+    fpE = new Int32Array(nB).fill(-1);
+    for (let i = 0; i < nF; i++) if (idx[i] < nB) fpE[idx[i]] = i;
+  }
+  return { nB, nV, vStart, x, z, edge, edgeCover, floors, style, wall, roof, flags, info, seed, dead: new Uint8Array(nB), nPoly: nP, fpE, fp };
 }
 
 // Mã hoá (dùng trong tools/process_buildings.mjs). B = [{pts:[[x,z],...] (thứ tự tường-ra-ngoài), edge:[], cover:[],
@@ -163,7 +196,17 @@ export function encodeRB(Ball) {
   const al = (n) => (n + 3) & ~3;
   const polySize = 16 + 4 * (nB + 1) + 2 * al(2 * nV) + 2 * al(nV) + 6 * al(nB) + al(2 * nB);
   const rectSize = nR ? 8 + 5 * al(2 * nR) + al(nR) + al(2 * nR) + 6 * al(nR) : 0;
-  const buf = new ArrayBuffer(polySize + rectSize), dv = new DataView(buf);
+  // mục VÂN TAY (b.fp = {trường FP_FIELDS: 0..255}) theo thứ tự giải mã: đa giác (B) rồi chữ nhật (RB)
+  const FPL = []; B.forEach((b, i) => { if (b.fp) FPL.push([i, b.fp]); }); RB.forEach((b, i) => { if (b.fp) FPL.push([nB + i, b.fp]); });
+  const nF = FPL.length, fpSize = nF ? 8 + 4 * nF + FP_FIELDS.length * al(nF) : 0;
+  const buf = new ArrayBuffer(polySize + rectSize + fpSize), dv = new DataView(buf);
+  if (nF) {
+    let o = polySize + rectSize;
+    dv.setUint32(o, RBF_MAGIC, true); dv.setUint32(o + 4, nF, true); o += 8;
+    const idx = new Uint32Array(buf, o, nF); o += 4 * nF;
+    FPL.forEach(([i], k) => { idx[k] = i; });
+    for (const f of FP_FIELDS) { const a = new Uint8Array(buf, o, nF); o += al(nF); FPL.forEach(([, r], k) => { const v = r[f]; a[k] = v == null || v < 0 ? 255 : Math.min(255, v | 0); }); }
+  }
   dv.setUint32(0, RB_MAGIC, true); dv.setUint32(4, nB, true); dv.setUint32(8, nV, true); dv.setUint32(12, nR ? polySize : 0, true);
   let off = 16;
   const vStart = new Uint32Array(buf, off, nB + 1); off += 4 * (nB + 1);
