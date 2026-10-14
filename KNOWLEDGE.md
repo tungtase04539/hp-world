@@ -474,14 +474,15 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     công/điều hoà/biển mái, `bigFlag`, kính phản trời ×1 (glassK). MÁI SẢNH KÍNH 3D (`hotelCanopy`, ô det): tấm 5,5 m × ≤ 20 m ở
     +4,4..4,75 m giữa mặt phố dài nhất ≥ 10 m (10 tam giác). Toàn thành phố chỉ 2 nhà đạt luật (bằng chứng pano là bắt buộc —
     W4-A ánh xạ style "hotel_tower"/"glass_office" của fp_json → `RS.HOTEL`/GLASS). TRỆT HÔNG LỘ (rc 1) của nhà lớn kiểu kính/
-    tháp/khách sạn (st 3/11/13) → `G_LOBBY` thay bộ XP xi măng ố.
+    tháp/khách sạn (st 3/11/13) → `G_LOBBY` thay bộ XP xi măng ố; đêm litP 0,12 như sảnh trước (mặc định 0,58 ⇒ hông tối đen).
     **(3) BỘ CHI TIẾT THUỘC ĐỊA 3D** (`classicKit`, kiểu COL/NEO/VILLA, cạnh MẶT PHỐ không che, L ≥ 3 m, mái không dốc): GỜ PHÀO MÁI
     nhô 0,36 × cao 0,42 m ở đỉnh tường (ô CHÍNH — bóng viền mái thấy từ xa; mặt trước `D_CORN`, đáy/đỉnh/2 đầu `D_PLAIN`; 10 tam
     giác), GỜ TẦNG nhô 0,13 m mỗi sàn (ô det, 4 tam giác/tầng), TRỤ ÁP nhô 0,11 m rộng 0,52 m ở MỌI ranh bay từ trệt+3,8 m tới
     dưới gờ phào (ô det, 6 tam giác; khớp trụ vẽ ở 2 mép bay của U_COL*/U_NEO/U_VILLA*); màu = màu tường sáng hơn 35%. Helper
     `quadN` (quad theo pháp tuyến MONG MUỐN — tự đảo thứ tự đỉnh khi tích có hướng ngược: hết nhầm CCW), `ledge`, `pilaster3`.
     Biệt thự mái bằng gần chữ nhật (≤ 6 đỉnh, ≥ 0,85 OBB, < 700 m², ≤ 3 tầng) → mái NGÓI 4 dốc 70%. Lan can mái COL/NEO/VILLA
-    → `P_COL` 75%. Bộ mô-đun: U4 +U_VILLA2/U_COL2, U7 +U_COL2, G4 +G_VILLA, G7 +G_VILLA, G0 +G_STORE0/2, G3/G10/G11 mặt kính cửa
+    → `P_COL` 75%. Bộ mô-đun: U4 +U_VILLA2/U_COL2, U7 +U_COL2, G4 +G_VILLA (CHỈ G4 — phản biện: G_VILLA trong G7 xoá biển 'VÀNG BẠC' pano_423
+    h0, phố Pháp vẫn là phố buôn bán), G0 +G_STORE0/2, G3/G10/G11 mặt kính cửa
     hàng (đổi độ dài bộ ⇒ hash chọn lại mô-đun trệt toàn bộ nhà kiểu đó — chỉ đổi biển/cửa, không đổi bố cục).
     **(4) NHÀ Ô "HỘP TRƠN"** (`cellfacade.js`): (a) `paintGridFacade` — mặt tiền lưới cửa sổ KIỂU CỔ ĐIỂN (có cửa vòm, hoặc cửa
     CAO h/w ≥ 1,3 trên nền ấm vàng đất/kem 18-70° hay nền sáng, HOẶC ≤ 3 hàng cửa h/w ≥ 0,95 trên nền ấm/trắng l > 0,8 — công thự/biệt thự thấp 496 h90) thêm trụ áp giữa các cột cửa + 2 mép, gờ phào đỉnh răng cưa +
@@ -489,7 +490,8 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     che mất), bệ cửa, chớp lá sách mở 2 bên khi khe ≥ 0,75 bề rộng cửa; nền hiện đại → gờ sàn bê tông sáng + bóng (pano_538,
     157 h0, 423 h180, 051 h90). (b) `applyCellGlass` (khoá 'cellglass_w4c'): TRỆT (≤ 3,6 m trên LAND_H 2) = mặt kính sảnh/cửa hàng
     (nội thất ấm sáng, thanh ngang 2,7 m, chân kính tối); tầng trên = dải SPANDREL đục dưới mỗi băng kính + kính sáng dần lên
-    đỉnh ô (157 h180 VIB: "khối xanh đặc"). (c) `cellCanvasFx`: nền xám than L 0,22-0,32 không chữ → sáng ×1,4.
+    đỉnh ô (157 h180 VIB: "khối xanh đặc"). (c) `cellCanvasFx`: nền xám than L 0,22-0,32 không chữ → sáng ×1,4 (KHÔNG chạm khối 'NHÀ THUỐC' 395 —
+    texture có `signTexts` nên bị bỏ qua).
     CÒN LẠI (ngoài làn): khối nhà ô MÀU ĐẶC không texture (`mrg10_*` sau freezeStatic lượt 1 — vd 180 h270 khối trắng, 019 tường
     kem) không thể tiêm cửa sổ mà không thêm draw call theo màu (lượt 1 nướng màu vào đỉnh + material trắng chung).
     **(5) HỒI QUY pano_115** ("ngõ hẹp thành quảng trường lát"): KHÔNG phải polygon nước/đường — tia dò: nền là `ground_local`/
@@ -498,7 +500,11 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     măng trống + rào tôn = HỘP CAM TRƠN `mat(0xa8886a)`. Ảnh thật h270: lô đất trống, dãy container/lán tôn (xám, mảng đỏ/xanh),
     rào tôn gỉ. Sửa (world.js khối 12b, tối thiểu): claim MỚI 'dirt' (`landuse.js` luCompose → lớp C_DIRT 7; `claimPolys('dirt')`
     vào lastExtra) cho lô, rào tôn SÓNG gỉ (canvas 512×128 gân 6 px + vệt gỉ), 2 container 2,44×2,6×5,9 m + cửa tôn xanh + mái tôn
-    lán, collider. CÒN LẠI (ngoài làn W4-C): khoảng trống lớn phía bắc/nam ngõ là THIẾU footprint (nhà 5 tầng xây sau ảnh
+    lán, 5 collider r 1,3 dọc 2 container. BẪY: lớp C_DIRT (7) gặp mật độ nhà ±40 m cao (ngõ đông) ⇒ shader `luClass` trả `vac`≈0
+    = BÊ TÔNG xám (lớp 7 dùng chung cho công trường OSM cũ nay kín nhà — cố ý), và 4 bit lớp (0..15) đã kín ⇒ không thêm lớp
+    'bãi đất' được. Cách làm: TẤM PHỦ đất nện bám địa hình (`dirt_lot_haly_115`, Plane 7×6 đoạn, +0,05 m, polygonOffset −2,
+    depthWrite false, canvas 512×410 đất + sỏi + vệt bánh xe + vũng, mép alpha gradient mềm — mép vòng tròn lỗ chỗ trông như
+    vết bẩn; 1 draw call). CÒN LẠI (ngoài làn W4-C): khoảng trống lớn phía bắc/nam ngõ là THIẾU footprint (nhà 5 tầng xây sau ảnh
     Overture) — việc của dữ liệu nhà (process_buildings/W4-A).
     **(6) PHƠI SÁNG** (`daynight.js LIGHT.exposure` 0,92 → 1,0; `aerialExposure` 0,82 → 0,754 ⇒ ảnh vệ tinh GIỮ NGUYÊN): đo 132
     cặp REAL|game (33 pano × 4 hướng, sRGB, bỏ bản đồ nhỏ): độ sáng TB thật 120,1 / game 95,5 → 99,4; 1/3 dưới (đất) 118 / 87 → 91;
