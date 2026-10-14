@@ -495,6 +495,7 @@ function commitSink(sink, THREE, realScene, realFC, colliders, opts) {
       if (realB(b)) { hit++; per.set(b, (per.get(b) || 0) + 1); }
     }
     it.frac = tot ? hit / tot : 0;
+    it.perB = per; it.nS = tot;   // W5-A 3c dùng lại (không lấy mẫu lần 2)
     let bb = -1, bn = 0; for (const [b, c] of per) if (c > bn) { bn = c; bb = b; }
     it.realB = bb;
     const H = hull(keys.map((k) => [KX(k) + 0.5, KZ(k) + 0.5]));
@@ -546,22 +547,29 @@ function commitSink(sink, THREE, realScene, realFC, colliders, opts) {
   const heroB = (b) => { let v = heroMemo.get(b); if (v === undefined) { const r = heroOfPoly(D, b); v = heroProg(r.hi) ? r.area : 0; heroMemo.set(b, v); } return v; };
   for (const it of bl) {
     if (it.removed || it.kind === 'house' || it.kind === 'bespoke') continue;
-    const keys = it.keys, n = keys.length, step = Math.max(1, Math.ceil(n / 150));
-    let tot = 0, hit = 0, maxFl = 0, area = 0; const seen = new Set();
-    for (let j = 0; j < n; j += step) {
-      tot++; const b = G.at(KX(keys[j]) + 0.5, KZ(keys[j]) + 0.5);
-      if (!realB(b) || !heroB(b)) continue;
-      hit++; if (!seen.has(b)) { seen.add(b); area += heroB(b); maxFl = Math.max(maxFl, D.floors[b]); }
+    const n = it.keys.length, tot = it.nS || 1;
+    let hit = 0, maxFl = 0, area = 0; const seen = new Set();
+    for (const [b, cnt] of it.perB || []) {
+      if (!heroB(b)) continue;
+      hit += cnt; seen.add(b); area += heroB(b); maxFl = Math.max(maxFl, D.floors[b]);
     }
     // TÊN nhà ô nói công năng (vib/bidv → ngân hàng, chicucthue → công sở, chua → chùa…): chỉ gỡ khi ảnh xác nhận CÙNG họ công
-    // trình trong 35 m (nhà thật đó sẽ dựng thay) — pano_418 'baoviet' (ngân hàng kính xanh) KHÔNG bị thay bằng công sở trắng
+    // trình trong 45 m (nhà thật đó sẽ dựng thay) — pano_418 'baoviet' (ngân hàng kính xanh) KHÔNG bị thay bằng công sở trắng
     // của chi cục thuế bên cạnh; tên không nói gì → cần ≥ 50% khối đặc nằm trên nhà hero
     const np = heroProgOfName(it.name);
-    const fam = np ? heroFamily(np) : 0, famNear = np ? heroesNear(it.cx, it.cz, 35).some((q) => heroFamily(heroProg(q)) === fam) : false;
+    const fam = np ? heroFamily(np) : 0, famNear = np ? heroesNear(it.cx, it.cz, 45).some((q) => heroFamily(heroProg(q)) === fam) : false;
     const frac = hit / tot, hMax = maxFl ? 3.9 + Math.max(0, maxFl - 1) * 3.3 : 15, hOK = it.height <= hMax * 1.6 + 6;
-    // tên nói công năng + nhà thật CÙNG họ trong 35 m = nhà ô là BẢN DỰNG TAY TRÙNG (có khi lệch chỗ: 'chicucthue' đặt đè cây xăng
+    // tên nói công năng + nhà thật CÙNG họ trong 45 m = nhà ô là BẢN DỰNG TAY TRÙNG (có khi lệch chỗ: 'chicucthue' đặt đè cây xăng
     // pano_418, nhà thật chi cục thuế nằm cạnh) → gỡ dù khối đặc không nằm trên nhà hero
-    const ok = hOK && (np ? famNear : frac >= 0.5);
+    // + nhà ô phải đè (≥ 30% khối đặc) lên nhà hero sẽ dựng thay — tính CẢ nhà SINH (FLAG.SYNTH: lô cây xăng 418 là lô sinh) —
+    //   nếu không gỡ nhà ô chỉ để lại khoảng trống (phản biện r3: pano_354 h0 trường 'tb_truong_dth' mất, nhà thật b2025 ở chỗ khác)
+    let fracS = frac;
+    if (np && famNear && frac < 0.3) {
+      const keys = it.keys, step = Math.max(1, Math.ceil(n / 150)); let t2 = 0, h2 = 0;
+      for (let j = 0; j < n; j += step) { t2++; const b = G.at(KX(keys[j]) + 0.5, KZ(keys[j]) + 0.5); if (b >= 0 && heroB(b)) h2++; }
+      fracS = t2 ? h2 / t2 : 0;
+    }
+    const ok = hOK && (np ? famNear && fracS >= 0.3 : frac >= 0.5);
     if (!hit && !ok) continue;
     heroCand.push([it.name, it.kind, +frac.toFixed(2), n, Math.round(area), +it.height.toFixed(1), [...seen].join('+'), ok ? 1 : 0, Math.round(it.cx), Math.round(it.cz)]);
     if (!ok) continue;
