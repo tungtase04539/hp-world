@@ -48,7 +48,25 @@ async function acquireDir(dir, who, timeoutMs) {
   }
 }
 
+// MÁY CHỦ GAME ĐANG PHỤC VỤ NGƯỜI CHƠI (chủ dự án 14/10/2026: "đảm bảo an toàn 100% cho máy tôi"): script
+// server/ops/mo-may-chu.ps1 ghi tệp đánh dấu này và chạm mtime mỗi phút; khi nó còn tươi (< 10 phút) MỌI việc GPU (chụp,
+// đo perf, Chrome 3D) phải CHỜ — màn xanh giữa buổi chơi thử = sập máy chủ. tat-may-chu.ps1 xoá tệp. Bỏ qua (chỉ khi chủ
+// dự án đồng ý): HPWORLD_ALLOW_GPU_WHILE_LIVE=1. Chạy thử server trong lúc phát triển KHÔNG ghi tệp này (chế độ test).
+export const SERVER_LIVE = path.join(os.tmpdir(), 'hpworld_server_live.txt');
+const LIVE_FRESH_MS = 10 * 60 * 1000;
+const serverLive = () => { try { return Date.now() - fs.statSync(SERVER_LIVE).mtimeMs < LIVE_FRESH_MS; } catch { return false; } };
+async function waitServerIdle(who, timeoutMs) {
+  if (process.env.HPWORLD_ALLOW_GPU_WHILE_LIVE === '1' || !serverLive()) return;
+  console.error(`gpulock: máy chủ game đang chạy (${SERVER_LIVE}) — ${who} chờ tới khi tắt máy chủ`);
+  const t0 = Date.now();
+  while (serverLive()) {
+    if (Date.now() - t0 > timeoutMs) throw new Error('gpulock: máy chủ game vẫn chạy — không mở GPU');
+    await new Promise((r) => setTimeout(r, 15000));
+  }
+}
+
 export async function acquireGpu(who = 'unknown', timeoutMs = 3 * 60 * 60 * 1000) {
+  await waitServerIdle(who, timeoutMs);
   // TÁI NHẬP CÓ KIỂM: `gpulock.mjs run -- …` đặt HPWORLD_GPU_LOCK=<pid chủ khoá> cho tiến trình con (xin lại khoá
   // thường sẽ chờ chính tiến trình cha). Chỉ tái nhập khi owner.txt đúng pid đó VÀ còn sống — env cũ/sai thì xin khoá
   // thường. Tái nhập vẫn phải lấy KHOÁ CON `<LOCK>/child`: 2 hậu duệ chạy SONG SONG (`run -- bash -c "a & b"`) không
