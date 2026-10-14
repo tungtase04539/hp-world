@@ -1,0 +1,535 @@
+# chat_ok.txt — câu chat BÌNH THƯỜNG phải được gửi nguyên (action = pass). Một dòng một câu. # = ghi chú.
+# Có dấu, không dấu, teencode vô hại, địa danh, món ăn, nói chuyện trong game. Test: server/test/safety_filter.test.js
+xin chào cả nhà
+chào mọi người nhé
+hello mọi người
+hi ae
+alo alo có ai không
+mình mới vào game
+mình là người mới, chỉ mình với
+bạn ơi đường nào ra Nhà hát lớn
+Nhà hát lớn đẹp quá trời
+ai ở quảng trường không
+tối nay đi dạo hồ Tam Bạc không
+chợ Sắt đông người ghê
+đi ra Cầu Đất uống nước đi
+phố Lạch Tray giờ này tắc đường lắm
+sân Lạch Tray hôm nay có đá bóng không
+mình đang đứng ở ga Hải Phòng
+ra bưu điện thành phố chụp ảnh đi
+chùa Hàng đẹp lắm mọi người ạ
+nhà thờ lớn ở đâu nhỉ
+đi Đồ Sơn tắm biển không
+mùa hè này đi Cát Bà nhé
+Kiến An có xa không
+quận Lê Chân đông vui
+mình hay đi đường Văn Cao
+cầu Rào đông xe quá
+qua cầu Bính sang Thủy Nguyên
+đường Điện Biên Phủ nhiều cây xanh
+hoa phượng đỏ rực cả phố
+tháng năm hoa phượng nở đẹp lắm
+đi ăn bánh đa cua không
+bánh đa cua ở chợ Sắt ngon nhất
+bánh mì cay mười nghìn một ổ
+nem cua bể Hải Phòng là số một
+bún cá cay ăn sáng đi
+sứa đỏ mùa này có chưa
+đi ăn ốc ở phố Văn Cao đi
+ăn các món ngon ở đây đi
+quán ốc này ngon lắm
+trà chanh vỉa hè chill phết
+cà phê muối thử chưa
+uống bia hơi không anh em
+cơm rang dưa bò đi
+ăn cơm chưa bạn
+đói quá đi ăn thôi
+mình vừa ăn phở xong
+phở bò hay phở gà
+bát phở bốn lăm nghìn
+chè Huế ở đâu ngon
+bánh bèo nóng hổi
+cá cơm rim ngon ghê
+mực nướng ngoài bờ biển
+ăn lẩu cua đồng không
+nước chấm này hơi mặn
+mình thích ăn bánh mì
+mua giúp mình chai nước
+khát nước quá
+uống trà đá cho mát
+hôm nay trời nóng thế
+trời mưa to quá
+sắp có bão không mọi người
+gió mạnh ghê
+trời đẹp ghê ra ngoài chơi thôi
+tối rồi đường lên đèn đẹp quá
+sáng sớm phố vắng ghê
+buổi sáng tốt lành
+chúc mọi người buổi tối vui vẻ
+đầu buổi chiều nay có ai online không
+mình online buổi tối thôi
+chúc ngủ ngon cả nhà
+mình đi ngủ đây
+buồn ngủ quá
+ngủ sớm đi mai còn đi học
+mai mình đi làm sớm
+học xong bài rồi mới chơi
+mai kiểm tra toán rồi
+được điểm mười rồi vui quá
+điểm thi cao ghê
+cố lên mọi người
+cảm ơn bạn nhiều nha
+cảm ơn đã chỉ đường
+không có gì đâu
+xin lỗi mình đi nhầm
+mình xin lỗi nha
+bạn tên là gì
+mình tên Tùng
+rất vui được gặp bạn
+gặp lại sau nhé
+tạm biệt mọi người
+bye bye
+hẹn mai chơi tiếp
+đi chơi không
+đi đâu đấy
+bạn đang ở đâu vậy
+chờ mình với
+đợi tí mình ra
+mình tới rồi đây
+đứng yên đó nha
+quay lại đây đi
+đi theo mình
+chạy nhanh lên
+đi bộ cho mát
+lái xe máy chậm thôi
+đi xe máy có nhanh hơn không
+xích lô đi chậm mà vui
+đi thuyền trên sông Cấm đi
+sông Tam Bạc nước trong ghê
+cầu này dài thật
+nhảy lên cầu thang kìa
+ở đây có chỗ ngồi không
+chỗ này đẹp để chụp ảnh
+chụp ảnh cho mình với
+đẹp quá chụp lại thôi
+ảnh này đẹp ghê
+nhìn kìa đẹp chưa
+wow đẹp xỉu
+đỉnh thật sự
+xịn xò quá
+ghê vậy
+vãi chưởng
+vãi thật
+ối giời ơi
+trời ơi
+hay quá
+hay ghê
+haha
+hihi
+kkk
+hehe
+=))
+:v
+^^
+<3
+lol
+gg
+ez
+pro quá
+noob thế
+khum biết luôn
+hong có đâu
+k bt nữa
+ko sao đâu
+đc rồi
+dc ko
+okela
+oke nha
+ok luôn
+uk
+ừ
+ừm
+dạ
+vâng ạ
+z hả
+zậy hả
+thật hả
+ntn vậy
+sao zậy
+j vậy
+mn ơi
+mng đâu hết rồi
+ae vào đây
+hnay vui ghê
+hôm nay vui quá
+vui ghê luôn
+chán quá
+buồn ghê
+mệt quá đi
+mệt muốn chết luôn
+nóng muốn chết
+cười muốn xỉu
+chết cười với ông này
+đói muốn xỉu
+thôi xong
+toang rồi
+căng đấy
+đùa thôi mà
+trêu tí thôi
+bạn hài ghê
+ông này vui tính
+bà này lầy ghê
+lầy lội thật
+trẻ trâu ghê
+crush mình đẹp lắm
+mình thích màu xanh
+áo đẹp thế
+mũ đẹp thế mua ở đâu
+đeo khẩu trang vào
+đeo kính râm cho ngầu
+cái lon bia này của ai
+lon nước ngọt rơi kìa
+con lợn đất của mình
+con chó nhà mình dễ thương lắm
+chó nhà ai chạy ra đường kìa
+con mèo đang ngủ
+có con chim đậu trên cây
+cây này to ghê
+con đường này lớn quá
+thành phố lớn thật
+lớn lên mình muốn làm kiến trúc sư
+du lịch Hải Phòng vui lắm
+dù mưa vẫn đi chơi
+cầm ô đi kẻo mưa
+mang dù đi
+dư tiền thì mua kem
+đủ người rồi đi thôi
+đu dây có sợ không
+dân Hải Phòng nói chuyện thẳng lắm
+người Hải Phòng thân thiện
+đàn ông Hải Phòng ga lăng
+nghe tiếng đàn ở quảng trường
+cô ấy hát hay quá
+anh ấy đàn hay ghê
+nhạc hay quá
+bài này tên gì vậy
+mình thích nghe nhạc
+có ai chơi đàn không
+dài quá đọc không nổi
+đường dài ghê
+chân dài thế
+đi chợ mua rau
+chợ đêm có gì vui
+cho mình hỏi đường ra biển
+cho mình đi cùng với
+cho em xin đường ra ga
+đi đâu cho vui
+mua đồ cho em
+đồ ăn ở đây rẻ
+đồ chơi này hay ghê
+đồ cổ ở phố này nhiều
+phố cổ Hải Phòng
+phở ở đầu ngõ ngon
+điểm hẹn ở công viên
+công viên Lê Chân rộng lắm
+vườn hoa này nhiều hoa
+hoa sữa thơm quá
+mùa thu Hải Phòng mát
+thứ bảy này đi đâu
+chủ nhật mình rảnh
+bảy giờ tối gặp nhé
+tám giờ sáng mai nha
+khoảng chín giờ mình vào
+lúc 19h30 vào game nhé
+từ 19:00 đến 22:00 mình online
+ngày 15/10/2026 khai trương
+giá 45.000 đồng một bát
+chiếc áo này 150k
+vé xe buýt 7 nghìn
+mua 2 lon nước
+3 người nữa là đủ
+có 10 người đang ở quảng trường
+xếp hàng số 5 nha
+tầng 3 có view đẹp
+nhà số 12 màu vàng đẹp
+mình đứng cạnh cột đèn
+đợi ở ngã tư nhé
+rẽ trái ở ngã ba
+đi thẳng rồi rẽ phải
+gần đây có cây xăng không
+bến xe ở đâu nhỉ
+bến phà ở đâu
+ga tàu ở cuối đường
+cảng Hải Phòng to ghê
+tàu thủy to quá
+nhìn thấy cần cẩu ở cảng
+sóng biển đẹp quá
+cát vàng biển xanh
+bãi biển đông người
+đi bơi không
+nước biển mát lắm
+leo núi không mọi người
+lên đồi ngắm hoàng hôn
+hoàng hôn đẹp quá
+bình minh trên biển
+trăng tròn đẹp ghê
+đêm nay nhiều sao
+mưa rồi trú mưa đi
+sấm sét ghê quá
+lạnh quá mặc áo vào
+nóng quá bật quạt lên
+game này đẹp thật
+đồ họa đẹp ghê
+bản đồ to quá
+máy mình hơi lag
+mạng lag quá
+mình rớt mạng tí
+vào lại được rồi
+ping cao quá
+fps thấp ghê
+điện thoại mình nóng ran
+pin sắp hết rồi
+sạc điện thoại đã
+mất điện rồi
+có ai biết làm nhiệm vụ không
+nhiệm vụ này khó ghê
+hoàn thành rồi
+lên cấp rồi
+kiếm tiền trong game thế nào
+giao hàng được bao nhiêu tiền
+mua xe máy ở đâu
+mình muốn mua cái mũ
+đổi áo màu khác đi
+nhảy múa đi mọi người
+vẫy tay chào nè
+ai muốn đi cùng không
+lập nhóm đi
+cùng đi khám phá thành phố
+mình là hướng dẫn viên cho
+theo mình đi tham quan
+đây là nhà hát lớn xây từ thời Pháp
+tòa nhà này cổ lắm
+kiến trúc Pháp đẹp ghê
+lịch sử Hải Phòng hay lắm
+bảo tàng mở cửa không
+thư viện ở đâu
+trường học gần đây
+bệnh viện ở đường nào
+hiệu thuốc ở đâu
+siêu thị gần nhất ở đâu
+chợ Cầu Đất bán gì
+chợ Đổ ở đâu vậy
+chợ Hàng có đồ ăn ngon
+đi chùa cầu may
+lễ hội chọi trâu Đồ Sơn
+năm nay có lễ hội hoa phượng không
+pháo hoa đẹp quá
+chúc mừng sinh nhật bạn
+chúc mừng năm mới
+trung thu vui vẻ
+giáng sinh an lành
+mình yêu Hải Phòng
+Hải Phòng quê mình
+quê mình ở Tiên Lãng
+mình ở Vĩnh Bảo
+an toàn là trên hết
+đi chậm thôi kẻo ngã
+cẩn thận xe kìa
+nhường đường cho người đi bộ
+đội mũ bảo hiểm vào
+mình thích đi dạo đêm
+yên bình ghê
+mọi người dễ thương quá
+cảm ơn cả nhà
+chơi vui nhé
+thôi mình out đây
+mai gặp lại
+cac ban oi vao day
+minh moi vao game
+di choi khong
+an com chua
+toi nay an gi
+di an bun ca khong
+banh da cua ngon lam
+cho minh hoi duong ra cho sat
+cho minh di cung voi
+minh dang o nha hat lon
+dep qua troi
+vui qua
+met qua
+buon ngu qua
+ngu ngon nha
+chuc ngu ngon
+hom nay troi dep
+mua to qua
+lon bia nay cua ai
+con lon dat cua minh
+con cho nha minh de thuong
+dau buoi sang co ai khong
+buoi toi vui ve
+cac em nho hoc bai
+cam on ban
+khong co gi
+ban ten gi
+minh ten Linh
+hen gap lai
+tam biet
+ok ban
+duoc roi
+di thoi
+nhanh len
+cho minh voi
+doi minh voi
+mua do cho em
+do an o day re
+duong nay lon qua
+du lich vui lam
+du mua van di
+dien thoai minh het pin
+mat dien roi
+diem cao qua
+pho co dep
+an pho bo khong
+xe may nhanh ghe
+lai xe cham thoi
+cau nay dai qua
+song dep qua
+bien dep qua
+chup anh cho minh
+anh dep qua
+cam on nhieu
+thoi minh di ngu
+ngu som di
+co len
+gioi qua
+hay qua
+haha vui ghe
+mn oi
+ae dau het roi
+cac ban o dau
+cac anh chi oi giup em voi
+con cac ban dau het roi
+cai lon bia rot roi
+nhu cac ban thay day
+dep nhu tranh
+cao nhu nui
+nhanh nhu gio
+# --- câu dễ bị bắt nhầm (từ vô hại trùng chữ tục khi bỏ dấu)
+dạo này bận quá
+đi đâu đó chơi đi
+đó là chỗ của mình
+cho chó ăn chưa
+con chó con dễ thương ghê
+cái lớn nhất là nhà hát
+cai lon nhat la nha hat
+thằng bạn mình vui tính lắm
+thằng em mình học giỏi
+con em mình đi học rồi
+các con ơi về ăn cơm
+mẹ mình nấu ăn ngon lắm
+bố mình đi làm rồi
+mẹ em gọi rồi em out đây
+mình đi tắm đây
+khôn thế
+dân chơi phố cổ
+hoa dâm bụt nở đỏ
+quả vú sữa ngọt lắm
+tóc tết bím xinh ghê
+sức khỏe là vàng
+đi chích ngừa chưa
+ăn ốc luộc không
+ốc lớn ghê
+oc lon qua
+hiệp sĩ áo đen
+đi khách sạn nghỉ đi
+khách sạn này đẹp
+đổ rác đi bạn ơi
+do rac di ban
+cửa hàng đồ điện ở đâu
+còn điện không
+con dien khong
+đỡ đần bố mẹ
+do dan bo me
+bộ máy chạy êm
+đổ bóng đẹp ghê
+còn mọi người đâu
+con moi nguoi dau
+đồ mới mua đẹp không
+do moi mua dep khong
+đồ ăn mặn quá
+do an man qua
+anh nóng tính quá
+anh nong tinh qua
+ảnh này chụp ở đâu
+còn cam không
+con cam khong
+đội mũ vào
+còn mũ không
+con mu khong
+đá bóng không
+còn bóng không
+con bong khong
+nhà hát ở quận nào
+quận nào đẹp nhất Hải Phòng
+trường nào gần đây
+hẹn gặp ở quảng trường nhé
+gặp mặt ở cổng chợ nha
+ảnh thật đẹp
+tên thật hay
+nhận thưởng nhiệm vụ ở đâu
+cho mình xem cái bản đồ
+cho mình hỏi đường
+cho em hỏi giờ
+mình muốn chơi tiếp
+em muốn đi chợ
+tớ muốn ăn kem
+mình chán quá đi dạo thôi
+mệt muốn chết mà vẫn vui
+cắt tóc chưa
+mua mũ bảo hiểm mới
+lên xe đi
+xin chào Hải Phòng
+mấy giờ rồi
+mấy người đang chơi
+bao nhiêu người online
+bao nhiêu tiền một vé
+mất bao lâu để đi hết
+đầu buổi chiều mình mới vào
+cuối buổi đi ăn chè nhé
+ăn các thứ ở chợ
+như các bạn biết đấy
+con các bạn học giỏi quá
+cái lon nước này của ai
+ngủ dậy chưa
+ngủ trưa xong chơi tiếp
+đeo kính vào cho đỡ chói
+dẻo dai ghê
+đường đèo đẹp
+đi du lịch Cát Bà
+dư dả quá
+đủ rồi đi thôi
+dì mình ở Kiến An
+dĩ nhiên rồi
+điểm danh mọi người
+phố đi bộ đông vui
+quê ngoại mình ở Thủy Nguyên
+chết thật quên mất
+quả cam ngọt ghê
+chim cu gáy sáng sớm
+vũ trụ bao la
+dân tình đông nghịt
+đàn chim bay qua
+đám cưới ở phố bên
+đầm sen đẹp quá
+nên đi sớm
+nến thơm quá
+nền nhà sạch bong
+đều đặn chơi mỗi tối
+que kem ngon ghê
+mỗi người một vé
+mời cả nhà ăn kem
+môi đỏ ghê
+mặn mà quá
+màn đêm buông xuống
+mận ngọt quá
+ánh đèn đẹp
