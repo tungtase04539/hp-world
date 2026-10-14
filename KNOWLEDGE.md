@@ -484,12 +484,14 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     → `P_COL` 75%. Bộ mô-đun: U4 +U_VILLA2/U_COL2, U7 +U_COL2, G4 +G_VILLA, G7 +G_VILLA, G0 +G_STORE0/2, G3/G10/G11 mặt kính cửa
     hàng (đổi độ dài bộ ⇒ hash chọn lại mô-đun trệt toàn bộ nhà kiểu đó — chỉ đổi biển/cửa, không đổi bố cục).
     **(4) NHÀ Ô "HỘP TRƠN"** (`cellfacade.js`): (a) `paintGridFacade` — mặt tiền lưới cửa sổ KIỂU CỔ ĐIỂN (có cửa vòm, hoặc cửa
-    CAO h/w ≥ 1,3 trên nền ấm vàng đất/kem 18-70° hay nền sáng) thêm trụ áp giữa các cột cửa + 2 mép, gờ phào đỉnh răng cưa +
+    CAO h/w ≥ 1,3 trên nền ấm vàng đất/kem 18-70° hay nền sáng, HOẶC ≤ 3 hàng cửa h/w ≥ 0,95 trên nền ấm/trắng l > 0,8 — công thự/biệt thự thấp 496 h90) thêm trụ áp giữa các cột cửa + 2 mép, gờ phào đỉnh răng cưa +
     bóng, gờ tầng, chân tường đậm, MŨ CỬA nằm TRÊN khung (`_win` vẽ khung ra ngoài ô cửa f = 7% — mũ đặt sát ô cửa bị khung
     che mất), bệ cửa, chớp lá sách mở 2 bên khi khe ≥ 0,75 bề rộng cửa; nền hiện đại → gờ sàn bê tông sáng + bóng (pano_538,
     157 h0, 423 h180, 051 h90). (b) `applyCellGlass` (khoá 'cellglass_w4c'): TRỆT (≤ 3,6 m trên LAND_H 2) = mặt kính sảnh/cửa hàng
     (nội thất ấm sáng, thanh ngang 2,7 m, chân kính tối); tầng trên = dải SPANDREL đục dưới mỗi băng kính + kính sáng dần lên
     đỉnh ô (157 h180 VIB: "khối xanh đặc"). (c) `cellCanvasFx`: nền xám than L 0,22-0,32 không chữ → sáng ×1,4.
+    CÒN LẠI (ngoài làn): khối nhà ô MÀU ĐẶC không texture (`mrg10_*` sau freezeStatic lượt 1 — vd 180 h270 khối trắng, 019 tường
+    kem) không thể tiêm cửa sổ mà không thêm draw call theo màu (lượt 1 nướng màu vào đỉnh + material trắng chung).
     **(5) HỒI QUY pano_115** ("ngõ hẹp thành quảng trường lát"): KHÔNG phải polygon nước/đường — tia dò: nền là `ground_local`/
     `ground_lake` (lưới mịn hồ Tam Bạc) tô lớp URB "sân bê tông sát tường" của landuse; nhà góc `goc_haly` + `nhacap4_haly` bị
     cell sink gỡ ('near' nhà thật 20039/2991) mà Overture KHÔNG có footprint ở lô tây ngõ (x −1093..−1111, z −74..−88) ⇒ bãi xi
@@ -503,7 +505,10 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     p95 214 / 190 → 195; p5 36 / 37 → 38 (vùng tối giữ). Phần chênh còn lại do mặt nhựa/vỉa tối hơn bê tông thật + trời thật mù
     sáng (không chỉnh mô hình trời — AUDIT4 D9: trời âm u là điều kiện chụp).
     **(7) ĐO**: node (citygen không GPU): tam giác phố 1,402 M → 1,438 M (chính 844 k → 855 k: gờ phào; chi tiết 558 k → 584 k:
-    gờ tầng + trụ áp + mái sảnh); dựng 0,88 s như cũ; atlas worker 2048×3584 ~120 ms (node). PERF_PLACEHOLDER
+    gờ tầng + trụ áp + mái sảnh); dựng 0,88 s như cũ; atlas worker 2048×3584 ~120 ms (node). PERF A/B CÙNG PHIÊN (ABBA, views_std
+    24 góc, Radeon 890M tier 3, khoá autoQuality): draw call TB 388,2/387,4 (dot3) vs 389,4/385,2 (W4-C) — ±nhiễu; tam giác TB
+    2,986 M → 2,993 M (+0,24%; tệ nhất +0,9% pano_190); hpReady 5,15/4,97 s vs 4,88/4,94 s; heap 389/403 vs 608*/409 MB (* 1 mẫu
+    GC lệch; atlas lớn hơn +14% ≈ +4 MB GPU); fps 60 cả hai; 0 lỗi JS.
     Công cụ (scratch W4-C): `nodefab/probe.mjs` (nhà nhìn thấy từ camera pano theo hướng: kiểu dữ liệu → kiểu dựng, tầng, diện
     tích, cờ bằng chứng), `probe_hray.mjs` (tia ngang từ camera trên trang: mesh/material/texture/uv — nhà ô nằm trong
     `cellAtlasN`), `colstat.py` (thống kê màu REAL|game).

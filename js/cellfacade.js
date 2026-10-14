@@ -308,9 +308,10 @@ function _clusters(vals, tol) {
 function _classicDetail(g, W, H, s, B, L) {
   const hsl = _hue(B), warm = hsl.h >= 18 && hsl.h <= 70 && hsl.s >= 0.12;
   const asp = s.rects.map((r) => r.h / r.w).sort((a, b) => a - b), med = asp[asp.length >> 1];
-  const classic = s.paths.length > 0 || (med >= 1.3 && (warm || hsl.l > 0.72));
-  const light = _mix(B, WHITE, 0.32), lightS = _mix(B, WHITE, 0.5), u = Math.max(1, H / 256);
   const rowsY = _clusters(s.rects.map((r) => r.y), H * 0.02), rowsB = _clusters(s.rects.map((r) => r.y + r.h), H * 0.02);
+  // + công thự/biệt thự THẤP (≤ 3 hàng cửa) nền ấm hoặc TRẮNG với cửa vuông-đứng (496 h90 biệt thự trắng, 161 h180)
+  const classic = s.paths.length > 0 || (med >= 1.3 && (warm || hsl.l > 0.72)) || (rowsY.length <= 3 && med >= 0.95 && (warm || hsl.l > 0.8));
+  const light = _mix(B, WHITE, 0.32), lightS = _mix(B, WHITE, 0.5), u = Math.max(1, H / 256);
   const top = Math.min(...s.rects.map((r) => r.y)), bot = Math.max(...s.rects.map((r) => r.y + r.h));
   if (!classic) {
     // hiện đại: gờ sàn bê tông sáng + bóng dưới giữa các hàng cửa
