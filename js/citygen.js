@@ -53,7 +53,7 @@ const DET_R = LITE_FAB ? 220 : 380;        // bán kính hiện ban công/mái h
 const DET_RMAX = 1650;
 // W5-B: ô NEAR 'fab_near_<tx>_<tz>' (200 m) — đồ nhỏ mặt phố (hàng bày tràn hè, cây cảnh/đồ phơi ban công, ống thoát nước):
 // chỉ hiện trong NEAR_R quanh camera (+ mép ô), KHÔNG đổ bóng (vật nhỏ sát tường — bóng không đáng 1 lượt vẽ bóng/ô); TIER≤1 không có.
-export const NEAR_TILE = 200;
+export const NEAR_TILE = 300;   // = DET_TILE (ít ô hơn: ~105 bộ đệm thay ~200 — đo node: GBuf + GC chiếm phần lớn chi phí dựng thêm)
 const NEAR_R = 120;                     // chỉ dựng chi tiết cho nhà có tâm trong r ≤ 1650 m (nhà ngoài ctx.maxR đã bị bỏ)
 // giải phóng mảng CPU của buffer phố sau upload GPU (dựng lại khi khôi phục ngữ cảnh) — xem cuối buildRealFabric.
 // ?fabfree=0 tắt (đo heap A/B, hoặc khi cần raycast/đọc mảng các mesh fab_* để chẩn đoán).
@@ -712,6 +712,14 @@ class GBuf {
     this.v(p[9], p[10], p[11], nx, ny, nz, uv[6], uv[7], col, f0, f1, f2, f3);
     this.t(a, a + 1, a + 2); this.t(a, a + 2, a + 3);
   }
+  // W5-B: quad uv HÌNH CHỮ NHẬT [u0,v0]-[u1,v1], đỉnh truyền rời (không cấp mảng p/uv mỗi lần — ~60k quad đồ nhỏ mặt phố)
+  quadR(ax, ay, az, bx, by, bz, cx, cy, cz, dx, dy, dz, nx, ny, nz, u0, v0, u1, v1, col, f0, f1, f2, f3) {
+    const a = this.v(ax, ay, az, nx, ny, nz, u0, v0, col, f0, f1, f2, f3);
+    this.v(bx, by, bz, nx, ny, nz, u1, v0, col, f0, f1, f2, f3);
+    this.v(cx, cy, cz, nx, ny, nz, u1, v1, col, f0, f1, f2, f3);
+    this.v(dx, dy, dz, nx, ny, nz, u0, v1, col, f0, f1, f2, f3);
+    this.t(a, a + 1, a + 2); this.t(a, a + 2, a + 3);
+  }
   geometry() {
     if (!this.n) return null;
     const g = new THREE.BufferGeometry();
@@ -761,10 +769,10 @@ function boxN(G, ax, az, ex, ez, nx, nz, s0, s1, o0, o1, yb, yt, uvF, uvT, col, 
   const Cx = ax + ex * s0 + nx * o0, Cz = az + ez * s0 + nz * o0, Dx = ax + ex * s1 + nx * o0, Dz = az + ez * s1 + nz * o0;
   const u0 = uvF[0], v0 = uvF[1], u1 = uvF[2], v1 = uvF[3], us = u0 + Math.min(u1 - u0, (o1 - o0) / 4);
   let t = 2;
-  G.quad([Ax, yb, Az, Bx, yb, Bz, Bx, yt, Bz, Ax, yt, Az], nx, 0, nz, [u0, v0, u1, v0, u1, v1, u0, v1], col, s8, 5, cell, 0);
-  if (uvT) { G.quad([Ax, yt, Az, Bx, yt, Bz, Dx, yt, Dz, Cx, yt, Cz], 0, 1, 0, [uvT[0], uvT[1], uvT[2], uvT[1], uvT[2], uvT[3], uvT[0], uvT[3]], col, s8, 5, cell, 0); t += 2; }
-  if (sides & 1) { G.quad([Cx, yb, Cz, Ax, yb, Az, Ax, yt, Az, Cx, yt, Cz], -ex, 0, -ez, [u0, v0, us, v0, us, v1, u0, v1], col, s8, 5, cell, 0); t += 2; }
-  if (sides & 2) { G.quad([Bx, yb, Bz, Dx, yb, Dz, Dx, yt, Dz, Bx, yt, Bz], ex, 0, ez, [u0, v0, us, v0, us, v1, u0, v1], col, s8, 5, cell, 0); t += 2; }
+  G.quadR(Ax, yb, Az, Bx, yb, Bz, Bx, yt, Bz, Ax, yt, Az, nx, 0, nz, u0, v0, u1, v1, col, s8, 5, cell, 0);
+  if (uvT) { G.quadR(Ax, yt, Az, Bx, yt, Bz, Dx, yt, Dz, Cx, yt, Cz, 0, 1, 0, uvT[0], uvT[1], uvT[2], uvT[3], col, s8, 5, cell, 0); t += 2; }
+  if (sides & 1) { G.quadR(Cx, yb, Cz, Ax, yb, Az, Ax, yt, Az, Cx, yt, Cz, -ex, 0, -ez, u0, v0, us, v1, col, s8, 5, cell, 0); t += 2; }
+  if (sides & 2) { G.quadR(Bx, yb, Bz, Dx, yb, Dz, Dx, yt, Dz, Bx, yt, Bz, ex, 0, ez, u0, v0, us, v1, col, s8, 5, cell, 0); t += 2; }
   return t;
 }
 // W5-B: CÂY CẢNH ban công — mặt trước là đa giác 6 đỉnh dáng TÁN (vai tròn, đỉnh lệch) thay hộp vuông (đọc ra "khối hộp xanh"),
@@ -780,8 +788,8 @@ function blobN(G, ax, az, ex, ez, nx, nz, s0, s1, o0, o1, yb, h, u0, col, s8, ce
   const yS = yb + 0.5 * h, uS = u0 + (o1 - o0) / 4, vS = 0.504 + (0.5 * h) / 4;
   const Ax = ax + ex * s0 + nx * o1, Az = az + ez * s0 + nz * o1, Bx = ax + ex * s1 + nx * o1, Bz = az + ez * s1 + nz * o1;
   const Cx = ax + ex * s0 + nx * o0, Cz = az + ez * s0 + nz * o0, Dx = ax + ex * s1 + nx * o0, Dz = az + ez * s1 + nz * o0;
-  G.quad([Cx, yb, Cz, Ax, yb, Az, Ax, yS, Az, Cx, yS, Cz], -ex, 0, -ez, [u0, 0.504, uS, 0.504, uS, vS, u0, vS], col, s8, 5, cell, 0);
-  G.quad([Bx, yb, Bz, Dx, yb, Dz, Dx, yS, Dz, Bx, yS, Bz], ex, 0, ez, [u0, 0.504, uS, 0.504, uS, vS, u0, vS], col, s8, 5, cell, 0);
+  G.quadR(Cx, yb, Cz, Ax, yb, Az, Ax, yS, Az, Cx, yS, Cz, -ex, 0, -ez, u0, 0.504, uS, vS, col, s8, 5, cell, 0);
+  G.quadR(Bx, yb, Bz, Dx, yb, Dz, Dx, yS, Dz, Bx, yS, Bz, ex, 0, ez, u0, 0.504, uS, vS, col, s8, 5, cell, 0);
   return 8;
 }
 // mô-đun trệt là CỬA HÀNG MỞ (hàng bày tràn ra hè trước cửa)
@@ -1547,13 +1555,13 @@ export function buildRealFabric(scene, ctx) {
                 if (hh(seed * 7 + k, 752) < 0.22) {   // giỏ/chậu cây treo NGOÀI lan can (rủ xuống)
                   const w = 0.6 + hh(seed + k, 754) * 0.6, a0 = inset + hh(seed + k, 756) * Math.max(0, wl - w), yH = yt + rh, u0 = hh(seed + k, 758) * (0.5 - w / 4);
                   const p0x = ax + ex * a0 + nx * (depth + 0.05), p0z = az + ez * a0 + nz * (depth + 0.05), p1x = p0x + ex * w, p1z = p0z + ez * w;
-                  NT.quad([p0x, yH - 0.55, p0z, p1x, yH - 0.55, p1z, p1x, yH + 0.15, p1z, p0x, yH + 0.15, p0z], nx, 0, nz, [u0, 0.7, u0 + w / 4, 0.7, u0 + w / 4, 0.875, u0, 0.875], WHITE, s8, K_DET, MOD.D_MISC, 0);
+                  NT.quadR(p0x, yH - 0.55, p0z, p1x, yH - 0.55, p1z, p1x, yH + 0.15, p1z, p0x, yH + 0.15, p0z, nx, 0, nz, u0, 0.7, u0 + w / 4, 0.875, WHITE, s8, K_DET, MOD.D_MISC, 0);
                   st.nearTris = (st.nearTris || 0) + 2;
                 }
                 if (hh(seed * 11 + k, 760) < 0.3) {   // đồ phơi treo sau lan can (thấy nửa trên qua lan can)
                   const w = 0.75 + hh(seed + k, 762) * 0.22, a0 = inset + hh(seed + k, 764) * Math.max(0, wl - w), od = depth - 0.3, hL = 1.3;
                   const p0x = ax + ex * a0 + nx * od, p0z = az + ez * a0 + nz * od, p1x = p0x + ex * w, p1z = p0z + ez * w;
-                  NT.quad([p0x, ys0 + 0.95, p0z, p1x, ys0 + 0.95, p1z, p1x, ys0 + 0.95 + hL, p1z, p0x, ys0 + 0.95 + hL, p0z], nx, 0, nz, [0.504, 0.996 - hL / 4, 0.504 + w / 4, 0.996 - hL / 4, 0.504 + w / 4, 0.996, 0.504, 0.996], WHITE, s8, K_DET, MOD.D_MISC, 0);
+                  NT.quadR(p0x, ys0 + 0.95, p0z, p1x, ys0 + 0.95, p1z, p1x, ys0 + 0.95 + hL, p1z, p0x, ys0 + 0.95 + hL, p0z, nx, 0, nz, 0.504, 0.996 - hL / 4, 0.504 + w / 4, 0.996, WHITE, s8, K_DET, MOD.D_MISC, 0);
                   st.nearTris = (st.nearTris || 0) + 2; st.laundry = (st.laundry || 0) + 1;
                 }
               }
