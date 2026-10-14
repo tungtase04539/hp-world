@@ -51,6 +51,7 @@ Trò chơi: thế giới 3D Hải Phòng **tỉ lệ 1:1 mét thật** (từ 202
 | `js/treemap.js` | **SINH TỰ ĐỘNG** bởi `tools/gen_treemap.mjs` từ `audit/audit_enriched.json` (thảm cây 551 pano) — KHÔNG sửa tay |
 | `js/roadnet.js` / `js/roadtex.js` / `js/roadmarks.js` | Mạng đường (Đợt 3 WP6): đồ thị nút giao + dải + vỉa hè/bó vỉa theo `xsection.js`; 1 material Phong + DataArrayTexture (worker) + vạch kẻ trong shader; bằng chứng vạch kẻ/đèn từ pano (SINH bởi `tools/gen_roadmarks.mjs`) |
 | `js/xsection.js` | MẶT CẮT PHỐ — nguồn duy nhất cho lòng/bó vỉa/vỉa hè/hố cây/xe đỗ/mặt tiền. Từ Đợt 3 W3-A mọi hàm nhận CẤP hoặc WAY `{c, w?, sw?}` (`roadHW/roadW/sidewalkW/curbLine/facadeLine/treePitLine/parkingLine/furnitureLine`) — truyền WAY để dùng bề rộng thật từng phố (`ROADS_DT[i].w/.sw`, SINH bởi `tools/street_fit.mjs` qua process_osm) |
+| `js/anchorwalls.js` | TƯỜNG RÀO MỎ NEO Hải quân (Đợt 3 W3-A): `CB_WALLS` (polyline LTT/ĐBP/THĐ) + `cbFitFence` (đẩy đỉnh ra sau `facadeLine(way)` + 0,35) + `cbWallSegments` — NGUỒN DUY NHẤT cho world.js `cbWallRun` VÀ `tools/process_buildings.mjs` §9c2 (cắt nhà nhô trước tường, cờ `cbIn` khuôn viên). Không import three. Sửa `CB_WALLS` → chạy lại process_buildings |
 | `js/traffic.js` / `js/vehicles.js` / `js/npc.js` / `js/quests.js`... | Giao thông, xe cưỡi được, NPC, nhiệm vụ |
 | `tools/` | Pipeline dữ liệu + test tự động (xem mục 7, 8) |
 
@@ -299,6 +300,9 @@ node process_osm.mjs     # sinh ../js/mapdata.js + mask_debug.png + log kiểm t
   SỐ way giữ nguyên (lọc độ dài trên bản simplify 6 m cũ). `node process_osm.mjs --fitlog f.json` ghi mỏ neo/dịch từng way.
   Đổi mapdata → CHẠY LẠI `node tools/process_buildings.mjs` (mặt tiền bám facadeLine theo TỪNG way) rồi
   `node tools/qa/clearance.mjs --xsec` (lệch tim camera + mặt nhà game vs Overture, không cần trình duyệt).
+  Nhà THẬT cắt theo `flR = min(facadeLine(way), facadeLine(cấp))` (corridorClip/streetIntrusion/streetGuard: Overture đứng
+  đúng chỗ dù nằm trong vỉa của way rộng), nhà SINH theo `facadeLine(way)`. Sửa `js/anchorwalls.js` (CB_WALLS) → cũng chạy lại
+  process_buildings (nhà sau tường mỏ neo bị cắt + cờ cbIn).
 - `js/roadmarks.js` SINH bởi `node tools/gen_roadmarks.mjs` (chạy từ GỐC repo; đọc `audit/audit_enriched.json`) — không sửa tay.
 - `js/landuse_data.js` (raster sử dụng đất mặt đất, Đợt 3 W2-D) SINH bởi `node tools/gen_landuse.mjs [--ppm xem.ppm]` (chạy từ
   GỐC repo; đọc `tools/osm_landuse.json` = fetch_osm.sh mục 12, + PARKS/LM_POLY/osm_alleys) — không sửa tay. Chạy lại khi
@@ -427,7 +431,7 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
-- **2026-10-06 + 10-11 (W3-A STREET-GEOMETRY)** [ĐỢT 3 WAVE 3 — MẶT CẮT PHỐ THẬT + TIM ĐƯỜNG KHỚP CAMERA (AUDIT3 FP-1)]:
+- **2026-10-06 → 10-14 (W3-A STREET-GEOMETRY, phiên 1-5)** [ĐỢT 3 WAVE 3 — MẶT CẮT PHỐ THẬT + TIM ĐƯỜNG KHỚP CAMERA (AUDIT3 FP-1)]:
     **Vấn đề (AUDIT3, 120 pano):** CAMNEAR 44 pano (mặt tiền 1-6 m; camera kẹt trong khối 487/115), điểm TB pano lệch tim
     ≥ 3 m chỉ 3,07; 4 cơ chế cộng dồn: bề rộng lòng CHỈ theo cấp (r 5,5 → mặt tiền 4,75 m), snapFront kéo nhà thật ≤ 7,2 m
     ra facadeLine hẹp đó, tim OSM lệch vết xe Google 3-9 m, guard camera 1 m (thật)/3 m (sinh).
@@ -496,14 +500,14 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     ROADS_DT rải đều roadnet/citygen/cellsink/props/trees, không điểm nóng), calls/tris/p95 không đổi (±nhiễu).
     **PHIÊN 3 (2026-10-11, sửa theo phản biện + đo lại):** (11) `capWidths` (iii): bước kẹp q10 chuyển phần lòng cắt SANG vỉa
     → mặt tiền vẫn ở W25/2 của tim lệch tâm (14 way r/t vỉa 6-7,8 m: ngõ w5,5 + vỉa 7,8; pano_477 tường thật 4-6 m, game 10-15 m
-    = "quảng trường" lát giả — process_buildings cắt nhà thật LÙI về facadeLine) ⇒ mặt tiền ≤ max(mặt tiền cấp, trung vị tường
+    = "quảng trường" lát giả — process_buildings khi đó cắt nhà thật LÙI về facadeLine(way); từ phiên 4 nhà thật cắt theo flR, (15)) ⇒ mặt tiền ≤ max(mặt tiền cấp, trung vị tường
     gần + 0,5) trừ vỉa ghi đè pano (`swFixed`): 50 way, way r/t vỉa ≥ 6 m 14 → 4. (12) process_buildings lô "cơi nới" NÔNG 3-6 m:
     chặn kéo 7,2 → 1,5 m làm số lô nông 275 → 1.338 (nhà SINH dựng NGAY TRƯỚC nhà thật lùi đúng chỗ Overture — trái mục tiêu
     FP-1 "không mặt nhà sinh nào gần camera hơn nhà thật") ⇒ nhà thật phía sau có cạnh mặt phố ngay ngắn (frontOf ≤ 7,2 m) →
     bỏ lô (`gap_veto_shallow_real` 1.490; lô nông còn 147, lô khe 4.825 → 3.683, liền mặt phố sau lấp s 56 → 49,6%: khe thật
     giữa nhà thật nay để trống — W3-B quyết định lấp theo bằng chứng). (13) tách collider ma: điều kiện SÂU + không gốc cây (8).
     (14) QA xsec thêm sai số 2 chiều trên hướng có mặt nhà thật ≤ 30 m: `within1_5pct` (chữ spec ±1,5 m), `tooClose`, `tooFar`,
-    `meanAbsErr`. **Số cuối (551 camera, dot3 → W3-A):** trong ±1,5 m Overture 29,2 → 52,2%, quá gần 1.006 → 482, quá xa 293 →
+    `meanAbsErr`. **Số phiên 3 (551 camera, dot3 → ad19bfa; số CUỐI ở phiên 4-5 bên dưới):** trong ±1,5 m Overture 29,2 → 52,2%, quá gần 1.006 → 482, quá xa 293 →
     396, |sai| TB 4,51 → 3,36 m; ngoài lòng 128 → 19, ngoài bó vỉa 78 → 7, lệch ≥ 3 m 172 → 105, TB 2,37 → 1,92 m; close-real
     560 → 68, close-synth 541 → 478, near4 59 → 0, camera trong nhà 1 → 0. Clearance trình duyệt: cam vi phạm 35 → 12, gần < 3 m
     36 → 7, lấp > 40% 181 → 92, trên nhựa 53 → 36, lấn vỉa 72 → 77 (chặn kín 8 → 14). Chấm mắt (`comps5/` REAL|dot3|d901604|
@@ -511,6 +515,57 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     (477 hết thoái lui). Perf cùng phiên 3 cặp (cặp thứ 4 nhiễu máy, bỏ): hpReady 4.590 → 4.849 ms (+260, ~5,6%; khởi động
     ground +61 roadnet, cells +94, final +48 — tuyến tính theo số đỉnh ROADS_DT 4.091 → 5.214), calls 2.573 → 2.570,
     tris 30,0 → 29,9 M, p95 18,9 → 18,8 ms (vsync 60), heap ±nhiễu. diag full/lite 0 lỗi JS (lite cần GLB assets_lite).
+    **PHIÊN 4-5 (2026-10-12 + 10-14, phản biện vòng 2 + 3):** (15) process_buildings: nhà THẬT cắt theo `flR = min(facadeLine(way),
+    facadeLine(cấp))` (corridorClip, streetIntrusion, streetGuard) — mặt tiền theo way là MỘT số cho cả way (đoạn rộng kéo cả
+    way) nên footprint Overture đứng đúng chỗ dù nằm trong vỉa của way; nhà SINH vẫn theo facadeLine(way). Hệ quả có chủ đích:
+    xsec `perpBelowDynReal` 3 → 105 và clearance "lấn" +10 camera (139/423/486/490/499/505/507/183/318/539: game = Overture).
+    (16) street_fit `capWidths`: (iii) trần mặt tiền lấy mẫu trạm 2 bên + trạm 1 bên (bên kia công viên/sông; ≥ 6 mẫu; trần =
+    min(trung vị 2 bên, trung vị 2+1 bên)) — way ít trạm 2 bên (THĐ 535: 2 trạm) từng bỏ qua trần → mặt tiền 14,5 m; (iv) vỉa
+    ≤ SIDEWALK_W[c] + 1 cho way r/t và way gộp-theo-tên < 6 mẫu cục bộ (trừ ghi đè pano `swFixed`): 51 way. Tác dụng phụ ĐÃ
+    BIẾT: Lý Tự Trọng 354 (pano_524) và Nguyễn Thượng Hiền 132 (pano_494) có vỉa thật 5-6 m → vỉa 5 → 3 m, lô SINH đứng 4-6 m
+    trước camera (thật 9-12 m). Miễn (iv) cho way `src` pano (thử expD của phản biện) chữa 524 nhưng 113 pano đổi vì lấp khe xáo
+    lại → chưa làm; cần trần theo bằng chứng tường cục bộ. THĐ 203 (gộp tên, 0 trạm 2 bên, ≥ 6 trạm 1 bên) giữ vỉa 7,5 m.
+    (17) MỚI `js/anchorwalls.js` (CB_WALLS + cbFitFence + cbWallSegments) dùng chung world.js `cbWallRun` + process_buildings §9c2:
+    nhà có tâm chiếu vào đoạn tường ±1 m, cách tường ≤ 8 m phía phố bị CẮT nửa mặt phẳng sau tâm tường + nửa bệ + 0,3 m (< 8 m²
+    → bỏ; clip 7, bỏ 0) — footprint Overture trong khuôn viên Hải quân từng nhô RA TRƯỚC tường đã lùi theo phố (pano_224 h270).
+    Nhà sau tường ≤ 30 m hoặc tâm trong CB1 = `cbIn` (57): TUBE/OLD/VILLA/KTT → CIVIC, công năng USE_HOME (phiên 5: kiểm `cbIn`
+    TRƯỚC nhánh CIVIC → GATE; nhánh cũ đặt sau nên không bao giờ chạy).
+    (18) Phiên 5 — BIỂN HÀNG SAU TƯỜNG MỎ NEO (pano_224/225 h270 "BÁNH MÌ / SỬA XE MÁY / ĐIỆN MÁY" trên khối CIVIC trong khuôn
+    viên; phiên 4 đổi kiểu/công năng KHÔNG hết): biển là thuộc tính MÔ-ĐUN trệt (SIGN_EXT), không phải công năng — CIVIC/GATE →
+    rc = cấp phố (frontClass) → bộ G6 có G_GLASS (dải biển, 1/3 bay); USE_HOME → rc 3 → bộ nhà ở GH có G_SHUT0/G_GATE/G_SHUT1
+    (dải biển, 3/7 bay) ⇒ cả hai đều ra biển. citygen `NOSIGN_ST`: bay "nhà ở" khi rc 3 trên CIVIC/GLASS/SHED → G_CIVIC (song sắt
+    + chân đá) / G_WARE — CÙNG luật ở JS `groundModule` + shader GL2 + GL1 (khớp bit hộp biển 3D; đã chụp `--gl1`); rc 3 áp cả
+    cạnh được NÂNG (faceRoad) cho bộ đôi (CIVIC/GLASS/SHED, USE_HOME). Dữ liệu chỉ có bộ đôi này ở nhà cbIn (by_use home 35.716 →
+    35.773, gate 661 → 604) → ngoài khuôn viên không đổi pixel nào (so ảnh S4/S5: chỉ cây đung đưa/bóng). Hợp đồng: kiểu công
+    sở/kính/kho + USE_HOME = "trệt khuôn viên, KHÔNG biển". W3-B định nghĩa INFO bit 6-7 PK_COMPOUND ("không biển hàng") + rc 3 cho
+    cạnh nâng/gộp của khu compound — khi tích hợp giữ MỘT luật compound; NOSIGN_ST tương thích (compound CIVIC/GLASS/SHED rc 3 →
+    không biển). Còn lại: pano_222 h0/h270 dãy nhà ống "BÁNH ĐA CUA" ở đầu bắc tường (ngoài cbIn; thật = công sở vàng có cổng).
+    (19) Đài phun dời bằng clrNudge: chỗ mới KHÔNG được trên vỉa (`_onStreet`: tâm + 4 điểm cách r không lấn hành lang phố
+    `clrCorridorPen`) — pano_020 h180 đài phun từng đứng giữa vỉa; không có chỗ ≤ 16 m → bỏ.
+    (20) Collider ma: phiên 4 thêm kiểm "có hình" (raycast 16 tia/ứng viên) giữ collider có vật nhìn thấy (`world.ghostKept` =
+    [[442,4; −994; 1]] = tường civic8_compound_wall); phản biện đo 76-88 ms khởi động. Phiên 5: MỘT lượt tam giác các mesh gần
+    (tam giác TẦM THÂN y ∈ [nền+0,3; nền+1,5], cách tâm XZ < r+0,3); mesh nhà citygen `fab_*` hỏi `fabricHit` thay vì duyệt tam
+    giác; mặt phẳng sát đất (roads/sidewalk/ground/… như _noCast của freezeStatic) bỏ theo tên; mesh nhỏ (≤ 2000 đỉnh) đặt xa
+    mọi ứng viên > 150 m bỏ khỏi tính cầu bao. Đo cùng phiên (2026-10-14, 890M, máy chia với agent khác; `?`-toggle tạm, đã gỡ):
+    khối mới `world.ghostMs` 16-20 ms, trong đó cầu bao 11-13 ms (`world.ghostMsBS`) là việc DỜI từ freezeStatic (lượt cầu bao
+    "giai đoạn trung tâm" của nó 30-32 → 19-22 ms; 4.587 → 4.155 hình chưa có cầu) ⇒ RÒNG ~5-9 ms; bản raycast cùng phiên 50-95
+    ms (nó tính cầu cho MỌI mesh nên freezeStatic còn 3-4 ms) ⇒ ròng ~50-65 ms. Kết quả y hệt: 8 tách, giữ [442,4; −994]. Mép tán
+    dù cam (ConeGeometry) ở (−883,4; −483) cao nền+1,6 m → không phải vật cản tầm thân (collider bàn đã mất → vẫn tách như phiên 4).
+    **Số CUỐI (551 camera, dot3 → W3-A 9f8cfaa+):** xsec trong ±1,5 m Overture 29,2 → 58,1%, quá gần 1.006 → 493, quá xa 293 →
+    277, |sai| TB 4,51 → 2,98 m; ngoài lòng 128 → 19, ngoài bó vỉa 78 → 7, lệch ≥ 3 m 172 → 105, TB 2,37 → 1,92 m; near4 59 → 0,
+    camera trong nhà 1 → 0; close-real 560 → 66, close-synth 541 → 492; perpBelowDyn synth/real 1/3 → 0/105 (flR, (15)).
+    Clearance trình duyệt (GPU): cam vi phạm 35 → 22 (phiên 3: 12; +10 là "lấn" của nhà thật ở đúng chỗ Overture trong vỉa way —
+    phản biện xem ảnh: trung tính so với dot3), gần < 3 m 36 → 7, lấp > 40% 181 → 99, trên nhựa 53 → 37, lấn vỉa 72 → 86 (chặn
+    kín 8 → 14). Chấm mắt (REAL | dot3 | ad19bfa | 58b582a | cuối; phản biện vòng 3 + tự chấm): 18 pano đích 2,67 → 3,81
+    (ad19bfa) → 3,78 (cuối: +487 4 → 5, −524 4,5 → 4 (iv), −423/331 tái sinh tường trơn), đối chứng 10 pano 3,60 → 3,60;
+    tường mỏ neo 223 h270 4 → 4,5, 225 h180 2,5 → 4, 227 h270 3 → 4,5, 515 3 → 5,5; 224 h270 4,5 (ad19bfa) → 3,5 (58b582a, biển
+    hàng) → 4,5 (cuối: tường + khối công sở trơn như ảnh thật), 225 h270 5 → 4 → 5; ngõ biệt thự Hồ Xuân Hương 270/504 3,5 → 4,5.
+    Perf cùng phiên 5 cặp (2 cặp đảo thứ tự B trước; views_perf, tier 3, 890M, máy chia agent khác): hpReady dot3 5.666/5.607/5.825/
+    5.032/5.728 vs W3-A 5.136/4.457/5.227/5.151/5.041 (trung vị 5.666 → 5.136) — KHÔNG đo được thoái lui (không nhận là nhanh hơn:
+    tổng pha khởi động chỉ lệch ~−150 ms, chủ yếu landmarks/freeze nhiễu; phiên 2-3 đo +210/+260 ms); pha final 800 → 803 ms;
+    calls 2.574 → 2.551, tris 30,0 → 29,7 M, p95 18,7 → 18,7 ms, 60 fps (vsync). diag full/lite 0 lỗi JS ("TẤT CẢ THỰC THỂ OK";
+    lite cần GLB assets_lite ghim 8b8e42c — worktree/checkout chính không có, chép tạm khi đo), waterbfs 5/5, check_assets ĐỦ,
+    tour 26 ảnh 0 lỗi JS, generator tất định (md5 mapdata f19b17b7…, buildings_real 9a24275b… khi chạy lại trên bản git archive).
     **BẪY:** (a) tim tường từ 3 trạm đơn lẻ từng kéo Nguyễn Tri Phương 7,4 m (sân lùi 1 bên) → cần ≥ 4 trạm + IQR + kẹp ±3 m;
     (b) kẹp q10 tường cả way dài từng đẩy 6 camera Phan Đình Phùng ra ngoài bó vỉa → luôn giữ "camera đang trong lòng";
     (c) bề rộng 1 giá trị/way: địa danh sát 1 đoạn kéo hẹp CẢ way (Cù Chính Lan 10,8 → 8); (d) world.js cell dựng tay theo trục
@@ -519,7 +574,12 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     tim Cù Chính Lan 3 m → cả way về lòng cấp 8 m, 4 camera (068/071/439/528) lệch 3,2-3,85 m nằm sát bó vỉa (vẫn trên nhựa) —
     cần bề rộng THEO ĐOẠN (đổi hợp đồng w/sw thành mảng theo đỉnh) mới sửa đúng; (g) `tools/tour.mjs` chọn điểm đứng lại MỖI
     lượt (tia raycast không thấy hết khối nhà) → so tour A/B bằng cùng điểm đứng (shoot.mjs `kind:'cam'`, dist 0,1), đừng so
-    ảnh tour thô.
+    ảnh tour thô; (h) đổi CÔNG NĂNG (use) của nhà không tắt biển: biển do MÔ-ĐUN trệt quyết (SIGN_EXT) và bộ nhà ở GH cũng có
+    cửa cuốn/cửa xếp mang dải biển — muốn "không biển" phải chọn mô-đun (NOSIGN_ST), và đổi luật chọn mô-đun phải đổi CÙNG LÚC JS
+    groundModule + GL2 + GL1; (i) đo 1 khối khởi động: computeBoundingSphere ở chỗ mới có thể chỉ là DỜI việc của freezeStatic (nó
+    bỏ qua hình đã có cầu) — đo cả lượt cầu của freezeStatic/đếm hình chưa có cầu trước khi kết luận; performance.now() không cách
+    ly ~0,1 ms/nấc → cộng dồn hàng nghìn lần đo nhỏ chỉ là ước lượng; Raycaster không BVH duyệt MỌI tam giác mỗi tia (16 tia × 9
+    ứng viên × 54 k tam giác = 50-95 ms).
 
 - **2026-10-04 (W2-F POLISH)** [ĐỢT 3 wave 2 — WebGL1, giải mã RB 1 lần, kho cảng, ĐÊM, giao thông né xe đỗ, dọn code chết, hitch]:
     **(1) WebGL1** (three r160 tự lùi WebGL1 khi không có WebGL2): KIỂM bằng `tools/qa/shoot.mjs --gl1` (init script cho
