@@ -358,9 +358,14 @@ export function buildBridges(scene, deps) {
       // sáng thành "vệt be" loá dọc mép cầu ở pano_285 h90/h270 — gờ chắn bê tông thật xám, mặt trong khuất nắng)
       // Đ3-W5-D: SỌC ĐỎ trên mặt ngoài gờ lan can dốc/nhịp nâng (ảnh pano_304 h0/h90, 349 h0/h90: các nhánh xoắn trắng viền
       // một dải đỏ ~0,6 m chạy dọc mép trên) — dầm biên dưới sọc giữ CONC
+      // chỉ đoạn mặt cầu cao ≥ 3 m trên đất (đoạn dốc sát đất = tường chắn nền đắp, ảnh 349 h90: xám trơn)
       const RS = PH - 0.6;
-      if (sg > 0) { sweep(conc, F, [[lo, -D], [lo, RS]], CONC, false); sweep(conc, F, [[lo, RS], [lo, PH]], RED, false); sweep(conc, F, [[lo, PH], [li, PH], [li, 0.02]], CONC_PAR, false); }
-      else { sweep(conc, F, [[li, 0.02], [li, PH], [lo, PH]], CONC_PAR, false); sweep(conc, F, [[lo, PH], [lo, RS]], RED, false); sweep(conc, F, [[lo, RS], [lo, -D]], CONC, false); }
+      const high = F.map((Fr) => Fr.y - groundY(Fr.x + Fr.nx * lo, Fr.z + Fr.nz * lo) >= 3);
+      const runs = [[], []];   // [thấp, cao]: đoạn khung liên tiếp (chồng 1 khung ở chỗ chuyển)
+      { let cur = null, k = -1; for (let i = 0; i < F.length; i++) { const h = high[i] ? 1 : 0; if (h !== k) { if (cur) cur.push(F[i]); cur = [F[i]]; runs[h].push(cur); k = h; } else cur.push(F[i]); } }
+      const band = (prof) => { for (const R of runs[1]) if (R.length > 1) sweep(conc, R, prof, RED, false); for (const R of runs[0]) if (R.length > 1) sweep(conc, R, prof, CONC, false); };
+      if (sg > 0) { sweep(conc, F, [[lo, -D], [lo, RS]], CONC, false); band([[lo, RS], [lo, PH]]); sweep(conc, F, [[lo, PH], [li, PH], [li, 0.02]], CONC_PAR, false); }
+      else { sweep(conc, F, [[li, 0.02], [li, PH], [lo, PH]], CONC_PAR, false); band([[lo, PH], [lo, RS]]); sweep(conc, F, [[lo, RS], [lo, -D]], CONC, false); }
       // tay vịn thép trên gờ: thanh ngang + cột 2,5 m
       const rl = sg * (hw - PAR / 2);
       const FR = simplifyFrames(F, rl, 0.02);

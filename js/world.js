@@ -53,7 +53,7 @@ function propLineShift(x, z, front = 0.5) {
   const s = clrNearestStreet(x, z, 25); if (!s || !s.street) return [0, 0];
   const k = Math.max(0, s.fl + 0.3 + front - s.d); return [s.nx * k, s.nz * k];
 }
-import { claimPoly, claimBox, claimCircle } from './claims.js';
+import { claimPoly, claimBox, claimCircle, claimAt } from './claims.js';
 import { LM_POLY, LM_CENTROID } from './landmark_polys.js';
 import { buildProps, layRoadSurfaceY } from './props.js';                 // Đợt 3 WP7: đồ đạc phố (xe máy/ô tô/cột điện/đèn/người)
 import { furnitureLine } from './xsection.js';
@@ -19984,6 +19984,9 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
       for (const [dx, dz] of [[0, 0], [1.2, 0], [-1.2, 0], [0, 1.2], [0, -1.2]]) if (paved(x + dx, z + dz)) return false;
       if (deck) { const t = deck.topAt(x, z, 1.5); if (t > -1e9 && t < LAND_H + 5) return false; }
       for (const [cx, cz] of CAMS) if ((cx - x) ** 2 + (cz - z) ** 2 < 16) return false;
+      // lòng nút xoắn = claim 'parking' (bãi NHỰA — W3-F, ảnh 304 h270) trừ vườn bán nguyệt 'park': không trải cỏ lên bãi
+      // (bản đầu không loại → cỏ phủ cả mặt nhựa ở 304 h180/h270)
+      if (claimAt(x, z, ['parking']) && !claimAt(x, z, ['park'])) return false;
       return world.isFree(x, z, 0.9);
     };
     const near = (x, z) => CAMS.some(([cx, cz]) => (cx - x) ** 2 + (cz - z) ** 2 < 3600);
@@ -19996,10 +19999,11 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
         if (!near(x, z) || !okCell(x, z)) continue;
         nCell++;
         // cỏ: 2 tam giác, màu xanh tươi nhiễu nhẹ theo ô
-        const t = 0.9 + 0.2 * hh3(x, z, 3), y = groundHeightNoDeck(x, z) + 0.025, h = S / 2 + 0.05;
-        const c = [L3(0.36 * t), L3(0.52 * t), L3(0.22 * t)];
+        // màu theo ĐỈNH (hash vị trí: đỉnh chung giữa 2 ô cùng màu → không lộ ô vuông), xanh cỏ hơi vàng, không neon
+        const y = groundHeightNoDeck(x, z) + 0.025, h = S / 2 + 0.05;
+        const cv = (vx, vz) => { const t = 0.82 + 0.26 * hh3(Math.round(vx * 4) / 4, Math.round(vz * 4) / 4, 3); return [L3(0.35 * t), L3(0.47 * t), L3(0.21 * t)]; };
         for (const [a, b] of [[[-h, -h], [-h, h]], [[-h, h], [h, h]], [[h, h], [h, -h]], [[h, -h], [-h, -h]]]) {
-          lawnP.push(x, y, z, x + a[0], y, z + a[1], x + b[0], y, z + b[1]); lawnC.push(...c, ...c, ...c);
+          lawnP.push(x, y, z, x + a[0], y, z + a[1], x + b[0], y, z + b[1]); lawnC.push(...cv(x, z), ...cv(x + a[0], z + a[1]), ...cv(x + b[0], z + b[1]));
         }
         // ô mép: hướng tới nhựa gần nhất trong 2,7 m
         let edge = null;
