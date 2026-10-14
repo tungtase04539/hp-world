@@ -1,0 +1,36 @@
+# reserved.txt — tên nhân vật cấm dùng (giả danh quản trị / hệ thống). So khớp bỏ dấu, bỏ ký tự ngăn cách,
+# số thay chữ (4dm1n = admin). Từ ≥ 5 chữ cái: cấm cả khi nằm trong tên ("TheAdmin99"); từ ngắn: cấm khi đứng riêng
+# hoặc đứng đầu tên ("GM Tùng", "Mod1").
+admin
+administrator
+adm
+gm
+mod
+moderator
+quản trị
+quản trị viên
+qtv
+ban quản trị
+bqt
+hệ thống
+chủ server
+chủ sv
+server
+system
+staff
+support
+hỗ trợ
+owner
+dev
+developer
+nhà phát triển
+official
+chính thức
+cskh
+chăm sóc khách hàng
+bot
+npc
+thông báo
+công an
+cảnh sát
+police

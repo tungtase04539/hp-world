@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Quản trị máy chủ</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/admin/static/admin.css">
+<script type="module" src="/admin/static/admin.js"></script>
+</head>
+<body>
+<div id="login" class="login" hidden>
+  <form id="loginForm" class="card login-card" autocomplete="off">
+    <h1>Quản trị máy chủ Hải Phòng 3D</h1>
+    <p class="muted">Dán <b>mã quản trị</b> vào đây. Mã nằm trong tệp <code>server/.env</code>, dòng <code>ADMIN_TOKEN=</code>.
+      Trang này chỉ mở được trên chính máy chủ.</p>
+    <label for="tokenInput">Mã quản trị</label>
+    <input id="tokenInput" type="password" required minlength="24" spellcheck="false" autocomplete="off">
+    <button type="submit" class="primary">Đăng nhập</button>
+    <p id="loginMsg" class="msg" role="alert"></p>
+  </form>
+</div>
+
+<div id="app" hidden>
+  <header class="top">
+    <div class="brand">Hải Phòng 3D <span class="muted">· quản trị</span></div>
+    <div class="chips" id="chips" aria-live="polite"></div>
+    <button id="logoutBtn" class="ghost">Đăng xuất</button>
+  </header>
+  <nav class="tabs" id="tabs" role="tablist">
+    <button data-tab="overview" class="active" role="tab">Tổng quan</button>
+    <button data-tab="reports" role="tab">Báo cáo <span class="badge" id="badgeReports"></span></button>
+    <button data-tab="players" role="tab">Người chơi</button>
+    <button data-tab="invites" role="tab">Mã mời</button>
+    <button data-tab="notify" role="tab">Thông báo</button>
+    <button data-tab="filter" role="tab">Bộ lọc chat</button>
+    <button data-tab="net" role="tab">Mạng</button>
+    <button data-tab="audit" role="tab">Nhật ký</button>
+  </nav>
+
+  <main>
+    <section id="tab-overview" class="tab active">
+      <div class="overview">
+        <div class="card map-card">
+          <div class="card-head"><h2>Bản đồ người chơi</h2><span class="muted small" id="mapInfo">Lăn chuột để phóng to, kéo để di chuyển</span></div>
+          <div class="map-wrap"><canvas id="map"></canvas><div id="mapTip" class="map-tip" hidden></div></div>
+        </div>
+        <div class="card feed-card">
+          <div class="card-head"><h2>Chat trực tiếp</h2>
+            <label class="small"><input type="checkbox" id="feedOnlyFlag"> chỉ dòng bị chặn / đánh dấu</label></div>
+          <div id="feed" class="feed" aria-live="polite"></div>
+          <div class="legend small"><span class="lg flag">đánh dấu</span><span class="lg block">bị chặn</span><span class="lg mask">đã che</span><span class="lg shadow">khoá ẩn</span><span class="lg system">hệ thống</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-reports" class="tab">
+      <div class="toolbar">
+        <select id="reportStatus"><option value="open">Đang chờ xử lý</option><option value="actioned">Đã xử lý</option><option value="dismissed">Đã bỏ qua</option><option value="all">Tất cả</option></select>
+        <button id="reportsRefresh">Tải lại</button>
+        <span class="muted small">Mỗi báo cáo kèm 20 dòng chat xung quanh do máy chủ tự lưu. Một quyết định đóng mọi báo cáo đang chờ về cùng người.</span>
+      </div>
+      <div id="reportList" class="list"></div>
+    </section>
+
+    <section id="tab-players" class="tab">
+      <form id="playerSearch" class="toolbar">
+        <input id="playerQ" placeholder="Tên nhân vật (vd Tung#1234) hoặc mã tài khoản" maxlength="64">
+        <button type="submit" class="primary">Tìm</button>
+        <span class="muted small">Để trống = người đang chơi và người vào trong 24 giờ.</span>
+      </form>
+      <div class="split">
+        <div id="playerList" class="list"></div>
+        <div id="playerDetail" class="card detail"><p class="muted">Chọn một người chơi để xem chi tiết.</p></div>
+      </div>
+    </section>
+
+    <section id="tab-invites" class="tab">
+      <form id="inviteForm" class="card form-grid">
+        <h2>Tạo mã mời</h2>
+        <label>Số mã <input name="count" type="number" min="1" max="500" value="10" required></label>
+        <label>Mỗi mã dùng được <input name="uses" type="number" min="1" max="1000" value="1" required> lần</label>
+        <label>Hết hạn sau <input name="days" type="number" min="0" max="3650" value="30"> ngày (0 = không hết hạn)</label>
+        <label>Ghi chú <input name="note" maxlength="200" placeholder="vd: nhóm bạn lớp 12A"></label>
+        <button type="submit" class="primary">Tạo mã</button>
+      </form>
+      <div id="inviteOut" class="card" hidden>
+        <h2>Mã vừa tạo <span class="muted small">(chỉ hiện MỘT lần — hãy sao chép ngay)</span></h2>
+        <textarea id="inviteCodes" readonly rows="8"></textarea>
+        <button id="copyCodes" class="primary">Sao chép tất cả</button>
+      </div>
+      <div class="card"><h2>Các lô mã</h2><div id="inviteBatches"></div></div>
+    </section>
+
+    <section id="tab-notify" class="tab">
+      <form id="broadcastForm" class="card form-grid">
+        <h2>Gửi thông báo cho mọi người chơi</h2>
+        <textarea name="text" rows="2" maxlength="200" required placeholder="vd: Tối nay 21:00 có sự kiện ở Nhà hát lớn!"></textarea>
+        <button type="submit" class="primary">Gửi thông báo</button>
+      </form>
+      <form id="restartForm" class="card form-grid">
+        <h2>Báo trước khởi động lại</h2>
+        <label>Khởi động lại sau <input name="minutes" type="number" min="1" max="1440" value="5" required> phút</label>
+        <button type="submit">Báo cho người chơi</button>
+        <p class="muted small">Chỉ gửi lời báo. Việc tắt / bật máy chủ làm bằng script "tat-may-chu" / "mo-may-chu".</p>
+      </form>
+      <div class="card"><h2>Cảnh báo về điện thoại (Telegram)</h2><div id="alertsBox"></div></div>
+    </section>
+
+    <section id="tab-filter" class="tab">
+      <div class="card">
+        <div class="card-head"><h2>Bộ lọc chat</h2><span class="muted small" id="filterVersion"></span></div>
+        <form id="filterTest" class="toolbar">
+          <input id="filterTestInput" placeholder="Gõ thử một câu để xem bộ lọc xử lý thế nào" maxlength="300">
+          <button type="submit">Thử</button>
+          <span id="filterTestOut" class="small"></span>
+        </form>
+        <div class="toolbar">
+          <select id="listName"></select>
+          <button id="listSave" class="primary">Lưu danh sách này</button>
+          <button id="filterReload">Nạp lại từ tệp</button>
+          <span id="listMsg" class="small"></span>
+        </div>
+        <textarea id="listText" rows="18" spellcheck="false"></textarea>
+        <p class="muted small">Cú pháp: mỗi dòng một mẫu; viết có dấu khi bản không dấu là từ thường; a/b = một trong hai; _ = một từ bất kỳ; ~ = 0–2 từ bất kỳ; "| mask" để chỉ che. Chi tiết ở đầu tệp README.txt.</p>
+      </div>
+      <div class="card"><h2>Lịch sử nạp danh sách</h2><div id="filterAudit"></div></div>
+    </section>
+
+    <section id="tab-net" class="tab">
+      <div class="card"><div class="card-head"><h2>Đo mạng theo nhà mạng (14 ngày)</h2><button id="netRefresh">Tải lại</button></div><div id="netBox"></div></div>
+    </section>
+
+    <section id="tab-audit" class="tab">
+      <div class="card"><div class="card-head"><h2>Nhật ký thao tác quản trị</h2><button id="auditRefresh">Tải lại</button></div><div id="auditBox"></div></div>
+    </section>
+  </main>
+  <div id="toast" class="toast" role="status" hidden></div>
+</div>
+</body>
+</html>

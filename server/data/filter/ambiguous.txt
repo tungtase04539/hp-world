@@ -1,0 +1,39 @@
+# ambiguous.txt — từ VÔ HẠI (viết có dấu) mà bỏ dấu thì trùng một từ tục. Bộ lọc dùng danh sách này để không bắt
+# nhầm chữ không dấu: "cac" có thể là "các", "lon" là "lon/lớn/lợn", "buoi" là "buổi"…
+# Dấu ! ở cuối = từ RẤT hay gặp: bản không dấu không bao giờ bị bắt, kể cả trong cụm (vd "do cho" = "đồ cho").
+các, cạc
+lon, lớn, lợn, lộn, lởn
+buổi
+du, dù, dư, dữ, dự, dụ, đu, đủ, đú
+đeo, dẻo, đèo, đẽo, dẹo
+đi!, dì, dí, dị, dĩ, đì
+điểm, diễm, điềm
+phố, phở, phó, phổ, pho, phô
+cho!, chợ, chớ, chỗ, chờ, chở, chõ
+ngủ, ngụ, ngừ, ngũ, ngự
+dân, đàn, đan, dán, dần, dặn, đạn, đán, đản
+dài, dại, đại, đài, dai, dãi
+vũ, vụ, vu
+cụt, cút
+nung, nũng, nựng
+đám, dám, đâm, đầm, đậm, dăm, dặm, đảm, đạm, đam, dạm
+bim, bìm
+sức, sực, súc
+hiệp
+chích
+nên, nến, nền, nén
+đều, đểu
+quê, quế, quẻ, que
+mọi
+khua, khứa
+chết, chét
+mà, má, ma, mạ, mã
+khôn
+điện, diện, điền, diễn
+ốc, óc, ọc
+tan, tán, tạn
+cầm, cấm, cám, cam, căm
+mũ, mụ, mủ, mu
+mới!, mời, mỗi, môi, mồi, mối, moi
+mặn!, mạn, màn, mãn, mận, mần, man, mắn
+anh!, ánh, ảnh
