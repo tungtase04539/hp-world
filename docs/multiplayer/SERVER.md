@@ -140,3 +140,37 @@ Kiểm nhanh: `curl http://127.0.0.1:9100/healthz` → `{"ok":true,"transport":"
 - `TRUST_PROXY=cloudflare` chỉ bật khi cổng game không tới được trừ qua tunnel (compose publish 127.0.0.1).
 - `deploy-pages.yml` dựng commit có cây = HEAD trừ `server/` rồi đẩy lên `gh-pages` (`js/shared/` vẫn lên Pages vì
   client cần).
+
+## 4. Bot & load test (S4, 14/10/2026)
+
+### 4.1 Cấu trúc `server/bots/`
+
+| File | Vai trò |
+|---|---|
+| `run.mjs` | CLI + `runScenario(opts)`: chia bot cho K tiến trình con (`--proc fork`, mặc định) hoặc worker thread (`--proc thread`), dòng thời gian sự kiện, đọc `/metrics` + `/healthz` mỗi 2 s, CPU cả máy, gộp kết quả → `report.json`, `report.md`, `timeseries.json` |
+| `worker.mjs` | một event loop chạy ~200 bot; nhịp 20 ms; gửi về tiến trình cha mỗi giây: bot sống, delta bộ đếm, CPU (ms), RSS, ELU; cuối: histogram + bản ghi từng bot |
+| `scenarios.mjs` | smoke, ramp, hotspot, stress, reconnect, abuse, netem-lite (bảng 4.3) |
+| `lib/bot.mjs` | MỘT người chơi: **chỉ dùng `js/shared/codec.js`** để mã hoá/giải mã; auth → join → HELLO → WELCOME → READY → STATE 15 Hz (đứng 2 Hz) + PING (2 Hz 10 s đầu rồi 1 Hz, `ClockSync`) + CHAT; xử lý CORRECT (nhận vị trí + corrEpoch), SNAPSHOT (bảng slot, kiểm trần 96, keyframe, slot lạ), NAMES, SYSTEM (BACKOFF/QUEUE/NOT_IMPLEMENTED), EVENT CHAT_REJECTED; resume (HELLO RESUME + resumeToken), backoff 1-2-4-8 s + 0–1 s |
+| `lib/roadgraph.mjs` | đồ thị đường thật từ `ROADS_DT` (bỏ cầu nâng, bỏ đoạn chạm nước — lấy mẫu `isWater` 4 m, bỏ ngoài PLAY_RADIUS−20 m); **nối ngã ba chữ T** (đầu way nằm giữa đoạn way khác, ≤ 8 m) → thành phần lớn nhất ≈ 3.000 nút / ~111 km (không nối chỉ ~47 km); `Walker` đi theo cạnh, A* tới đích; y = `groundHeight` |
+| `lib/abuse.mjs` | 14 lớp tấn công (bảng 4.4) + đo độ trễ phát hiện |
+| `lib/netem.mjs` | trễ 80 ± 30 ms mỗi chiều, FIFO như TCP; "mất gói" 2 % = giữ thêm 200–500 ms (dồn cục) |
+| `lib/metrics.mjs`, `lib/report.mjs`, `lib/stats.mjs` | đọc Prometheus, tiêu chí đạt SPEC §3.4, histogram gộp được (log 2 % / tuyến tính 1 B) |
+| `lib/phrases.mjs` | câu chat sạch (phải luôn lọt), câu lạm dụng/lách lọc (phải bị chặn/che) — dữ liệu test, không số/handle thật |
+| `fakeserver.mjs` | **máy chủ GIẢ có kịch bản** để phát triển harness khi S2/S3 chưa xong: đủ giao thức (auth/join/vé 1 lần/resume/AOI 96 + ≤ 32 ENTER/snapshot/NAMES/CHAT 40 m + lọc thô/CORRECT/xô token/1008/1009/4001/4004/4007) + `/metrics`. KHÔNG phải máy chủ game. |
+
+Bot trung thực: chạy 0,9 × v_max của chế độ; xe máy tăng tốc theo `ACCEL.moto`; đổi sang chế độ chậm hơn thì giảm tốc trước rồi chờ 1,2 s (> cửa sổ kiểm 1 s) mới đổi → không tạo CORRECT giả.
+
+### 4.2 Chạy
+
+```
+node server/bots/run.mjs --scenario smoke --url http://127.0.0.1:9100            # admin mặc định = cổng+1
+node tools/qa/gpulock.mjs run -- node server/bots/run.mjs --scenario ramp --url http://127.0.0.1:9100 \
+     --invite <MÃ-MỜI-NHIỀU-LƯỢT> --creds server/data/bot_creds.json --out <thư-mục>
+```
+Tuỳ chọn: `--n --dur --ramp --mode auto|full|ping --workers|--per-worker 200 --proc fork|thread --seed --origin
+--netem-frac 0.3 --drop-at 60 --reconnect-max 30 --start-spread --drop-per-min --scrape-ms 2000 --strict` (`--strict`:
+exit 1 khi có tiêu chí FAIL). `--mode auto` gọi thử `POST /v1/auth/guest {}`: 501/404 → **ping** (máy chủ nền móng),
+còn lại → **full**. `--creds FILE` lưu refresh token theo số thứ tự bot → lần chạy sau dùng `/v1/auth/refresh` thay vì
+tạo khách mới (refresh xoay vòng, file được ghi lại cuối lần chạy; để file trong `server/data/` — đã gitignore).
+**Mọi lần > 300 bot hoặc > 60 s phải qua GPU lock** (run.mjs cảnh báo khi không thấy `HPWORLD_GPU_LOCK`).
+Máy chủ giả: `node server/bots/fakeserver.mjs --port 9130 --admin-port 9131`. Test: `server/test/bots.test.js`.
