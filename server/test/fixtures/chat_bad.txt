@@ -358,3 +358,146 @@ flag	ảnh thật của bạn đâu
 flag	tớ muốn chết
 flag	em muốn tự tử
 flag	chả muốn sống nữa
+# --- vòng sửa 1: 142 câu lách lọc MỚI của người kiểm tra an toàn (15/10/2026)
+block	đjt mẹ thằng kia
+block	djt me may nha
+block	đyt mẹ cuộc đời
+block	đ!t m3 m4y
+block	d.i.t m.e m.a.y
+block	đ ị t m ẹ m à y
+block	điiiiiit mẹ mày
+block	ĐỊT MẸ CHÚNG MÀY
+block	đìt mẹ mày
+block	đụ mạ mày
+block	đù mạ nó
+block	đờ cờ mờ thằng này
+block	đê em em
+block	đmcs thằng chó
+block	đcmm luôn
+block	vcllllll thật
+block	vler quá trời
+block	vờ lờ thật sự
+block	ditmethangnay
+block	conkac
+block	con kặc
+block	cak to
+block	kặc
+block	l`ồ`n
+block	lừn
+block	lol mẹ mày
+block	buoj
+block	bùi to
+block	đầu bùi
+block	mặt l0z
+block	ⓓⓜ thằng ngu
+block	𝐝𝐢𝐭 𝐦𝐞 𝐦𝐚𝐲
+block	ｄｉｔ　ｍｅ
+block	đ.ĩ
+block	con đ ĩ
+block	con phò
+block	fvck you
+block	phắc diu
+block	biatch
+block	đ.é.o mẹ
+block	địt‍ mẹ
+block	dịt mẹ
+block	đjt cụ
+block	sεx
+block	seggs không
+block	s.e.x
+block	xếch
+block	chịt nhau đi
+block	phim s e x
+block	ảnh nút
+block	gửi nudes
+block	cho xem vếu
+block	đụ nhau không
+block	xoạc
+block	thổi kèn cho anh
+block	cởi áo ra cho anh xem
+block	nứn quá
+block	zero nine one two three four five six seven eight
+block	091.234.5678 gọi mình
+block	sdt 09l2345678
+block	⓪⑨①②③④⑤⑥⑦⑧
+block	⁰⁹¹²³⁴⁵⁶⁷⁸
+block	0️⃣9️⃣1️⃣2️⃣3️⃣4️⃣5️⃣6️⃣7️⃣8️⃣
+block	o chin mot hai ba bon nam sau bay tam
+block	kh0ng chin 1 2 ba bon 5 sau 7 tam
+block	số mình 09 hai 3 bốn 5 sáu 7 tám 9
+block	hp3d chấm com
+block	hp3d (chấm) net
+block	hp3d[.]com
+block	hp3d dot com
+block	w w w . abc . com
+block	abc。com/qua
+block	abc﹒xyz
+block	abc․com
+block	vào web abc dot net nhận quà
+block	bit ly/abc123
+block	discord gg slash hp3d
+block	vô nhóm tê lê gờ ram
+block	za.lo mình nhé
+block	z@lo 0912
+block	kb zép nha
+block	ib tele
+block	phây búc mình tên Tùng Lâm
+block	＠abc_123
+block	tìm mình trên tóp tóp nha
+block	kênh yt của mình là hp3dvn
+block	dis cord của mình là abc
+block	nạp 100k nhận 500k
+block	bán ních vip giá rẻ
+block	ai mua acc k
+block	free 1000 kc cho ai ib
+block	nhận kim cuong free
+block	gửi mình mã o t p
+block	cho mình xin mk nhé
+block	bank cho mình 50k đi
+block	ck 50k cho mình nha
+block	đầu tư coin lãi 30% 1 tháng
+block	kiếm 500k mỗi ngày tại nhà
+block	mình là admin, cho mình tài khoản để kiểm tra
+block	cày thuê lv giá rẻ
+block	shop bán đồ gem giá rẻ uy tín
+flag	em học lớp mấy rồi
+flag	e bn tuổi
+flag	em mấy tuổi rồi
+flag	nhà e ở đâu
+flag	e ở phường nào
+flag	trường em tên gì
+flag	bố mẹ em có nhà không
+flag	em ở nhà 1 mình à
+flag	gửi anh tấm ảnh đi
+flag	cho a xem mặt em
+flag	bật cam lên cho anh xem
+flag	mai đi chơi với anh không
+flag	đừng nói với bố mẹ nhé
+flag	bí mật của 2 đứa mình thôi
+flag	anh cho em kim cương, em gửi ảnh nhé
+flag	e có ny chưa
+flag	tan học em đi đường nào về
+flag	em đang mặc gì đấy
+flag	xóa tin nhắn này đi nhé
+flag	anh qua đón em nhé
+flag	ra công viên gặp anh
+flag	tớ chỉ muốn chết thôi
+flag	t ko muốn sống nữa
+flag	muon chet qua
+flag	mình sẽ nhảy cầu
+flag	muốn kết thúc tất cả
+flag	không còn lý do để sống
+flag	mình biến mất là xong
+block	bk chó
+block	đồ nam kì
+block	3//
+block	ba sọc
+block	dân thanh hóa toàn trộm
+block	thằng thiểu năng
+block	gay lọ
+block	đồ ô môi
+block	tao giết mày
+block	t đâm chết m
+block	mai tao chờ m ở cổng trường
+block	tao biết nhà mày rồi
+block	mày toi rồi con ạ

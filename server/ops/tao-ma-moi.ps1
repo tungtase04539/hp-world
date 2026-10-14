@@ -19,9 +19,9 @@ $s = Get-HpSettings -TestMode:$TestMode
 Write-Host ''
 Write-Host '=== TẠO MÃ MỜI ===' -ForegroundColor White
 $envv = Read-DotEnv
-if (-not $envv['ADMIN_TOKEN']) { Write-Loi 'Không thấy ADMIN_TOKEN trong server\.env (chạy mo-may-chu.ps1 trước).'; exit 1 }
+if (-not $envv['ADMIN_TOKEN']) { Write-Loi 'Không thấy ADMIN_TOKEN trong server\.env (chạy mo-may-chu.ps1 trước).'; Exit-Ops 1 }
 $h = Get-Health $s.AdminUrl 3
-if (-not $h) { Write-Loi 'Máy chủ chưa mở (trang quản trị không trả lời). Chạy mo-may-chu.ps1 trước.'; exit 1 }
+if (-not $h) { Write-Loi 'Máy chủ chưa mở (trang quản trị không trả lời). Chạy mo-may-chu.ps1 trước.'; Exit-Ops 1 }
 
 $body = @{ count = $SoLuong; uses = $SoLanDung; days = $SoNgay; note = $GhiChu } | ConvertTo-Json -Compress
 $headers = @{ Authorization = ('Bearer ' + $envv['ADMIN_TOKEN']) }
@@ -32,11 +32,11 @@ try {
   if ($code -eq 404 -or $code -eq 501) { Write-Loi 'Phiên bản máy chủ này chưa có chức năng tạo mã mời qua API (POST /admin/api/invites). Dùng trang quản trị.' }
   elseif ($code -eq 401 -or $code -eq 403) { Write-Loi 'Trang quản trị từ chối (sai ADMIN_TOKEN?).' }
   else { Write-Loi ('Không tạo được mã: ' + $_.Exception.Message) }
-  exit 1
+  Exit-Ops 1
 }
 $codes = @()
 if ($res.codes) { $codes = @($res.codes) } elseif ($res.invites) { $codes = @($res.invites | ForEach-Object { if ($_.code) { $_.code } else { $_ } }) }
-if ($codes.Count -eq 0) { Write-Loi 'Máy chủ không trả về mã nào.'; exit 1 }
+if ($codes.Count -eq 0) { Write-Loi 'Máy chủ không trả về mã nào.'; Exit-Ops 1 }
 $dir = Join-Path $script:ServerDir 'data\ma-moi'
 New-Item -ItemType Directory -Force -Path $dir | Out-Null
 $file = Join-Path $dir ('ma-moi-' + (Get-Date).ToString('yyyyMMdd-HHmmss') + '.txt')
@@ -46,4 +46,4 @@ Write-Tot ("Đã tạo {0} mã (dùng {1} lần, hết hạn sau {2} ngày):" -f
 foreach ($c in $codes) { Write-Host ('      ' + $c) -ForegroundColor Green }
 Write-Dong ('Đã lưu vào ' + $file)
 Write-Canh 'Gửi riêng từng mã cho từng người. KHÔNG đăng mã lên nhóm công khai.'
-exit 0
+Exit-Ops 0

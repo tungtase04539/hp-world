@@ -86,11 +86,11 @@ test('tickets: replay, expiry, forgery, missing HELLO data; proto mismatch → R
     const rl = await c4.op(S2C.SYSTEM);
     assert.equal(rl.code, SYS.RELOAD); assert.equal(rl.arg, PROTO_VERSION);
     assert.equal((await c4.closedP).code, CLOSE.PROTO);
-    // PING works before HELLO; in-game messages before HELLO are malformed → 1008 after 10
+    // PING works before HELLO; any in-game message before HELLO closes the socket at once (1008; fixer round 1 SEC-7)
     const c5 = await Client.open(s.ws + '/play');
     c5.ping(1);
     assert.equal((await c5.op(S2C.PONG)).clientTime, 1);
-    for (let i = 0; i < 10; i++) c5.ready();
+    c5.ready();
     assert.equal((await c5.closedP).code, CLOSE.POLICY);
   } finally { await s.app.stop(); }
 });

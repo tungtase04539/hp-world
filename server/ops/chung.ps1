@@ -21,6 +21,20 @@ $script:EnvFile     = Join-Path $script:ServerDir '.env'
 $script:BackupDir   = Join-Path $script:ServerDir 'data\backups'
 $script:AllProfiles = @('--profile', 'tunnel', '--profile', 'quicktunnel', '--profile', 'backup')
 
+# Giữ cửa sổ mở khi script được chạy bằng "nhấp phải → Run with PowerShell" / nhấp đúp (tiến trình cha là Explorer):
+# nếu không, cửa sổ đóng ngay và anh không đọc được kết quả / lỗi / mã mời (vòng sửa 1, SO-9).
+# Không dừng khi chạy trong cửa sổ PowerShell sẵn có, khi HPMP_TEST=1 hoặc HPMP_NO_PAUSE=1 (lịch tự động, kiểm thử).
+function Wait-Dong {
+  if ($env:HPMP_TEST -eq '1' -or $env:HPMP_NO_PAUSE -eq '1') { return }
+  $pn = ''
+  try {
+    $pp = (Get-CimInstance Win32_Process -Filter ("ProcessId=" + $PID) -ErrorAction Stop).ParentProcessId
+    $pn = (Get-Process -Id $pp -ErrorAction Stop).ProcessName
+  } catch { $pn = '' }
+  if ($pn -eq 'explorer') { Write-Host ''; Read-Host 'Nhấn Enter để đóng cửa sổ' | Out-Null }
+}
+function Exit-Ops([int]$code = 0) { Wait-Dong; exit $code }
+
 function Write-Buoc([string]$text)  { Write-Host ''; Write-Host ('>> ' + $text) -ForegroundColor Cyan }
 function Write-Tot([string]$text)   { Write-Host ('   [OK] ' + $text) -ForegroundColor Green }
 function Write-Canh([string]$text)  { Write-Host ('   [CHÚ Ý] ' + $text) -ForegroundColor Yellow }

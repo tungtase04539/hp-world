@@ -12,6 +12,7 @@
 // auth = `Authorization: Bearer <access JWT>` (EdDSA, issued by S2's /v1/auth/*). Verified with S2's service
 // 'auth'.verifyAccess(token) → {accountId} when present, else with jose against the server's own Ed25519 key
 // (claim `sub` = account id). A shadow-muted player is never told (me.shadow is always false).
+import { createKeyedLimiter, ipKey, isExemptIp } from '../game/ratelimit.js';
 import crypto from 'node:crypto';
 import { jwtVerify } from 'jose';
 import { CHAT, NICK } from '../../../js/shared/constants.js';
@@ -46,16 +47,21 @@ export function register(app) {
     } catch { throw httpError(401, API_ERR.UNAUTHORIZED); }
   }
 
-  // tiny per-IP limiter (lenient: VN 4G CGNAT puts many players behind one address)
-  const hits = new Map();
-  const limit = (perMin) => (req) => {
-    const t = Date.now();
-    const k = req.ip + '|' + perMin;
-    const e = hits.get(k);
-    if (!e || t - e.t > 60_000) { hits.set(k, { t, n: 1 }); if (hits.size > 50_000) hits.clear(); return null; }
-    if (++e.n > perMin) return { retryAfterS: Math.ceil((e.t + 60_000 - t) / 1000) };
-    return null;
+  // per-IP limiter (lenient: VN 4G CGNAT puts many players behind one address). Keyed token buckets with bounded
+  // memory (oldest key evicted) — the old Map was CLEARED above 50k keys, so many IPv6 addresses reset everyone's
+  // limits (fixer round 1). IPv6 grouped per /64; loopback / private addresses exempt like the other limiters.
+  const limiters = new Map();
+  const limit = (perMin) => {
+    const l = createKeyedLimiter({ rate: perMin / 60, burst: perMin, max: 50_000 });
+    limiters.set(perMin, l);
+    return (req) => {
+      if (isExemptIp(req.ip)) return null;
+      const k = ipKey(req.ip, 64);
+      if (l.take(k)) return null;
+      return { retryAfterS: Math.max(1, l.retryAfterS(k)) };
+    };
   };
+  app.bus.on('start', () => { app.timers.every(60_000, 'moderation_rl_sweep', () => { for (const l of limiters.values()) l.sweep(); }); });
   const chat = () => app.get('chat');
 
   app.http.get('/v1/chat/rules', () => ({

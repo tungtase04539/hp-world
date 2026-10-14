@@ -9,6 +9,7 @@
 //   admin   GET /admin/api/netprobe?days=14 → {available, rows, days, summary, recent} — the route lives in
 //           admin/index.js (S3 security layer) and reads this service
 // Also installs the admin edge guard (admin_edge_guard.js): the admin port refuses tunnel / edge-network traffic.
+import { ipKey } from '../game/ratelimit.js';
 import { Writer, decodeC2S, encodePong } from '../../../js/shared/codec.js';
 import { C2S, CLOSE, API_ERR } from '../../../js/shared/protocol.js';
 import { installAdminEdgeGuard, cameThroughCloudflare } from './admin_edge_guard.js';
@@ -83,15 +84,16 @@ export function register(app) {
   app.ws.guard(({ path, ip }) => {
     if (path !== '/probe') return null;
     if (open >= PROBE.MAX_CONNS) return { status: 503, reason: 'probe busy' };
-    if ((perIp.get(ip) || 0) >= PROBE.MAX_PER_IP) return { status: 429, reason: 'probe: too many from this address' };
+    if ((perIp.get(ipKey(ip, 48)) || 0) >= PROBE.MAX_PER_IP) return { status: 429, reason: 'probe: too many from this address' };
     return null;
   });
 
   app.ws.route('/probe', {
     open(conn) {
       open++;
-      perIp.set(conn.ip, (perIp.get(conn.ip) || 0) + 1);
-      const st = { n: 0, last: 0, timer: null, counted: true };
+      const k = ipKey(conn.ip, 48);   // IPv6 grouped per /48 (fixer round 1: raw addresses let one host fill the pool)
+      perIp.set(k, (perIp.get(k) || 0) + 1);
+      const st = { n: 0, last: 0, timer: null, counted: true, k };
       conn.data = st;
       st.timer = app.timers.after(PROBE.MAX_LIFE_MS, () => { if (!conn.closed) conn.close(CLOSE.NORMAL, 'probe: done'); });
     },
@@ -114,8 +116,8 @@ export function register(app) {
       st.counted = false;
       st.timer?.();
       open = Math.max(0, open - 1);
-      const n = (perIp.get(conn.ip) || 1) - 1;
-      if (n <= 0) perIp.delete(conn.ip); else perIp.set(conn.ip, n);
+      const n = (perIp.get(st.k) || 1) - 1;
+      if (n <= 0) perIp.delete(st.k); else perIp.set(st.k, n);
     },
   });
 
@@ -123,7 +125,8 @@ export function register(app) {
   const ipLim = makeLimiter(PROBE.POST_PER_IP, PROBE.POST_PER_IP_WINDOW_MS);
   const globalLim = makeLimiter(PROBE.POST_GLOBAL_PER_MIN, 60_000, 1);
   const stored = app.metrics.counter('netprobe_results_total', 'netprobe results stored');
-  const rateLimit = (req) => globalLim.hit('*', Date.now()) || ipLim.hit(req.ip || '?', Date.now());
+  // per address (/64) first, so one address cannot spend the global budget by itself
+  const rateLimit = (req) => ipLim.hit(ipKey(req.ip || '?', 64), Date.now()) || globalLim.hit('*', Date.now());
 
   app.http.post('/v1/netprobe', async (req, res) => {
     const r = validateResult(req.json);

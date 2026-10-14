@@ -383,7 +383,8 @@ export function register(app) {
   // ---- socket handlers ----------------------------------------------------------------------------------------------
   const handlers = {
     open(conn) {
-      const ipk = isExemptIp(conn.ip) ? '' : ipKey(conn.ip);
+      // pre-auth sockets per /48 for IPv6 (one host with a free /48 must not get 65k keys; SEC-7)
+      const ipk = isExemptIp(conn.ip) ? '' : ipKey(conn.ip, 48);
       conn.data = { st: 'hello', bad: 0, t: now(), session: null, kicked: false, ipk, pings: 0 };
       if (ipk) {
         const n = (preAuthByIp.get(ipk) || 0) + 1;
@@ -418,7 +419,9 @@ export function register(app) {
           return;
         default: break;
       }
-      if (!s) { if (d.st === 'hello') bad(conn); return; }   // in-game messages before HELLO / during auth
+      // in-game messages before HELLO: the socket is closed at once (fixer round 1, SEC-7 — a pre-auth socket is only
+      // allowed to PING and send HELLO, so it cannot sit in the pre-auth pool doing anything else)
+      if (!s) { if (d.st === 'hello') { decErr.inc(); conn.close(CLOSE.POLICY, 'hello first'); } return; }
       switch (m.op) {
         case C2S.READY:
           if (s.state === 'welcomed') S.activate(s);

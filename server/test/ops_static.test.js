@@ -31,7 +31,7 @@ function serviceBlocks(text) {
 
 test('compose: every service is hardened (anchor), limited, and never privileged / docker.sock / host network', () => {
   const svcs = serviceBlocks(compose);
-  assert.deepEqual(Object.keys(svcs).sort(), ['backup', 'db', 'game', 'quicktunnel', 'tunnel']);
+  assert.deepEqual(Object.keys(svcs).sort(), ['backup', 'db', 'game', 'portal', 'quicktunnel', 'tunnel']);
   const anchor = compose.slice(compose.indexOf('x-hardening: &hardening'), compose.indexOf('services:'));
   for (const k of ['read_only: true', 'no-new-privileges:true', '- ALL', 'max-size: "10m"', 'max-file: "5"']) assert.ok(anchor.includes(k), k);
   for (const [name, b] of Object.entries(svcs)) {
@@ -52,7 +52,8 @@ test('compose: published ports are 127.0.0.1 only; only the game publishes; the 
   const ports = [...compose.matchAll(/^\s+- "([^"]+):(\d+)"\s*$/gm)].map((m) => m[1]);
   assert.ok(ports.length >= 2);
   for (const p of ports) assert.ok(p.startsWith('127.0.0.1:'), `port ${p} must be 127.0.0.1-only`);
-  for (const n of ['db', 'tunnel', 'quicktunnel', 'backup']) assert.ok(!/\n\s+ports:/.test(svcs[n]), `${n} publishes nothing`);
+  assert.match(svcs.portal, /\n\s+ports:/, 'only the portal publishes (127.0.0.1)');
+  for (const n of ['game', 'db', 'tunnel', 'quicktunnel', 'backup']) assert.ok(!/\n\s+ports:/.test(svcs[n]), `${n} publishes nothing`);
   const binds = [];
   for (const b of Object.values(svcs)) {
     const m = /\n {4}volumes:\n((?: {6}- .*\n?)+)/.exec(b + '\n');
@@ -72,7 +73,13 @@ test('compose: networks — db only on the internal backend, cloudflared only on
   assert.deepEqual(netsOf(svcs.backup), ['backend']);
   assert.deepEqual(netsOf(svcs.tunnel).sort(), ['cfout', 'edge']);
   assert.deepEqual(netsOf(svcs.quicktunnel).sort(), ['cfout', 'edge']);
-  assert.deepEqual(netsOf(svcs.game).sort(), ['backend', 'edge', 'hostlink']);
+  // fixer round 1 (SEC-3): the game is on internal networks only; the portal alone is on the ordinary bridge
+  assert.deepEqual(netsOf(svcs.game).sort(), ['adminlink', 'backend', 'edge']);
+  assert.deepEqual(netsOf(svcs.portal).sort(), ['adminlink', 'hostlink']);
+  assert.match(nets, /adminlink:\n\s+driver: bridge\n\s+internal: true/);
+  assert.match(svcs.game, /ADMIN_ALLOW_IPS: \$\{HPMP_PORTAL_IP:-[\d.]+\}\/32/);
+  assert.match(svcs.portal, /ipv4_address: \$\{HPMP_PORTAL_IP:-[\d.]+\}/);
+  assert.match(svcs.portal, /PORTAL_MAP: "9100=game:9100,9101=game:9101,8443=api\.telegram\.org:443"/);
   assert.match(svcs.game, /ADMIN_DENY_CIDRS: \$\{HPMP_EDGE_SUBNET:-[\d./]+\},\$\{HPMP_BACKEND_SUBNET:-[\d./]+\}/);
   assert.match(svcs.game, /TRUST_PROXY: cloudflare/);
   assert.match(svcs.tunnel, /TUNNEL_TOKEN: \$\{TUNNEL_TOKEN:-\}/);

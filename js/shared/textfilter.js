@@ -198,8 +198,11 @@ function tokenize(display) {
     acc = acc.normalize('NFC');
     toks.push({ acc, start, end, evasive: evasive || conf, conf, star, word, letters: [...acc.replace(/\*/g, '')].length });
   }
-  // join runs of single-letter tokens ("đ m", "c ặ c", "d i t m e")
+  // join runs of single-letter tokens ("đ m", "c ặ c", "d i t m e"). The unjoined stream is kept too (out.split):
+  // patterns that spell a one-letter pronoun ("nhà e ở đâu", "m ở quận nào") are matched against it as well
+  // (fixer round 1, SO-6c: "e ở" used to be joined into one token "eở" and never matched).
   const out = [];
+  let joinedAny = false;
   for (let i = 0; i < toks.length;) {
     if (toks[i].word && toks[i].letters === 1 && !toks[i].star) {
       let j = i;
@@ -208,6 +211,7 @@ function tokenize(display) {
         let acc = '';
         for (let k = i; k <= j; k++) acc += toks[k].acc;
         out.push({ acc: acc.normalize('NFC'), start: toks[i].start, end: toks[j].end, evasive: true, conf: toks.slice(i, j + 1).some((t) => t.conf), star: false, word: true, joined: true });
+        joinedAny = true;
         i = j + 1;
         continue;
       }
@@ -215,12 +219,19 @@ function tokenize(display) {
     out.push(toks[i]);
     i++;
   }
-  for (const t of out) {
-    t.raw = t.acc;   // keeps '*' for starMatch
-    Object.assign(t, analyzeWord(t.acc.replace(/\*/g, '')));
-    if (t.nonstd) t.evasive = true;
-    t.marked = t.hasTone || t.hasQual;
-  }
+  const fin = (arr) => {
+    for (const t of arr) {
+      if (t.base !== undefined) continue;
+      t.raw = t.acc;   // keeps '*' for starMatch
+      Object.assign(t, analyzeWord(t.acc.replace(/\*/g, '')));
+      t.trick = !!t.evasive;   // leet / separators / look-alikes / spaced letters (not just a non-standard spelling)
+      if (t.nonstd) t.evasive = true;
+      t.marked = t.hasTone || t.hasQual;
+    }
+    return arr;
+  };
+  fin(out);
+  out.split = joinedAny ? fin(toks.map((t) => ({ ...t }))) : null;
   return out;
 }
 function hasLetterNear(u, k) {
@@ -294,14 +305,14 @@ function compileList(cat, src, ambiguousKeys, strongKeys) {
 // ---- default lists (generated from server/data/filter/*.txt by server/scripts/filter_sync.mjs — do not edit here) ---
 // BEGIN DEFAULT LISTS
 const DEFAULT_LISTS = {
-  profanity: "# profanity.txt — từ tục nặng → CHẶN. Cú pháp: README.txt\n# --- từ đơn (có dấu: bản không dấu chỉ bị bắt khi có ngữ cảnh / viết lách)\nđịt\nđụ\nlồn\ncặc\nbuồi\nđĩ\nloz\nlìn\n# --- chữ tắt / teencode\ndm\nđmm\ndmm\ndcm\ndkm\ndcmm\ndmml\ncmm\ndmvl\n*ditme\n*ditmie\n*ditmia\n*ditmay\n*ditcon\n*ditbo\n*ditcu\n*dumama\n*dumame\n*dumemay\n*dumay\n*duma\n*dume\n*lonme\n*concac\n*cailon\n*vcl\n*vkl\n*dmm\n*dcm\n*dkm\n*cmm\n*dmvl\n*clgt\n# --- cụm\nđịt mẹ/má/bố/cha/mày/con/cụ/mợ/ông/bà/tổ/nhau\nđụ mẹ/má/mé/mày/nhau\nđờ mờ\nđê mờ\nmẹ mày/mầy\ncon mẹ mày/mầy\nmả mẹ/cha/bố\ntiên sư bố/cha/mày/nhà\nsư bố/cha mày\ntổ cha/sư mày\năn/bú/mút/liếm/sục cặc/buồi/lồn/cứt\nđầu/mặt/óc cặc/buồi/lồn\ncái lồn/cặc/buồi\nnhư lồn/cặc/buồi\ncon lồn/cặc/đĩ\nthằng/con/đồ lol\nđồ/con đĩ/điếm/phò/cave\ncon hoang\nmẹ cha mày\ncút mẹ/cha\nmày là chó\nmày là súc vật\nđồ súc vật\nsúc sinh\nđồ chó đẻ\nđéo/đếch/éo mẹ\nfuck\nfck\nfuk\n*fuck\nmotherfucker\nshit\nbitch\n*bitch\nasshole\ndick\ncunt\npussy\n",
-  mild: "# mild.txt — chửi nhẹ → CHE bằng *** (tin vẫn gửi). Cú pháp: README.txt\n# \"=ngu\" = đúng chữ \"ngu\" không dấu thanh (không bắt \"ngủ\").\nđéo\nđéo biết/hiểu/cần/thèm/quan/có/phải/sợ/muốn/chơi/được/thích/care/nói/nghe/ai\nđếch\nđếu\ncứt\nvl\nvcl\nvkl\nvcđ\nvđ\ncc\ncl\nclm\nclgt\ncmn\ndmcs\nvãi lồn/cứt/đái\nđù má/mé/me\nmẹ kiếp\ncon mẹ nó\nbố mày/mầy\nbố láo\ncha mày\nđồ chó\nthằng chó\nchó má\nđồ chó má\nóc chó\nóc lợn/bò\nnão chó/lợn/tàn\nđồ/thằng/con =ngu\n=ngu như bò/chó/lợn/heo\nmày/mầy =ngu\n=ngu vãi/vl/vcl/thế/thật\nđồ/thằng/con đần\nđồ/thằng/con khốn\nkhốn nạn\ncâm mồm/miệng\nim mồm\ncút đi\ncút xéo\nmất dạy\nvô học\nđồ rác rưởi\nđồ rác\nthiểu năng\nđồ điên\nthằng điên\nđồ thần kinh\nđồ dở hơi\nnhư lol\nstfu\nwtf\ndamn\n",
-  sexual: "# sexual.txt — nội dung tình dục → CHẶN. Cú pháp: README.txt\nsex\nsếch\n*sex\nxxx\njav\nporn\n*porn\nporno\nhentai\nnude\nnudes\nhorny\nboobs\nblowjob\nphim sex/heo/nóng/khiêu\nphim người lớn\nphim cấp ba\nclip/ảnh/hình nóng/nude/sex/khỏa/khoả/lộ\nkhỏa/khoả thân\nlộ hàng\nshow hàng\nchịch\nxoạc nhau\nnện nhau\nlàm tình\nquan hệ tình dục\nquan hệ với anh/em/tao/tớ/mình\ntình dục\ndâm\ndâm dục\ndâm đãng\ndâm ô\nhiếp\nhiếp dâm\nthủ dâm\nthẩm du\nnứng\nnứng quá/vãi/thế/lắm/rồi/vl\nsục cu/cặc/buồi/lồn\nbú cu/vú/lồn/chim/cặc\nvú\nvếu\nbím\ntrym\ndương vật\nâm đạo\nâm vật\ntinh trùng\nxuất tinh\ncương cứng\nlỗ nhị\nhột le\ngái gọi\ngái bán dâm\nbán dâm\nmua dâm\nđi khách\ngạ tình\ngạ gẫm\nkích dục\nđồi trụy\nđồi truỵ\nsờ mó\nsờ ngực/vú/mông/đùi\ncởi đồ/quần/áo ~ cho anh/tao/tớ/mình/a xem\nngủ với anh/tao/tớ/mình/a\nlên giường với\ncho anh/tao/tớ sờ\n",
-  hate: "# hate.txt — miệt thị vùng miền / dân tộc / giới / khuyết tật, đe doạ → CHẶN + hàng chờ. Cú pháp: README.txt\nparky\n*parky\nbắc kỳ/kì chó/rau/mọi\nbọn/lũ/thằng/con/đồ bắc/nam kỳ/kì\nnam kỳ/kì lúa/chó\nbọn/lũ/đồ/thằng 3/ba que\nba que xỏ lá\nbò đỏ\nđu càng\nkhựa\ntàu khựa\nchệt\nthằng/bọn/lũ ba tàu\nbọn/lũ/đồ/thằng mọi\nmọi rợ\nmọi đen\nbọn/lũ/đồ/thằng mán\nmường mán\nđồ/thằng/con người rừng\nnigga\nnigger\n*nigg\npê đê\nbê đê\nxăng pha nhớt\nthằng/đồ bóng\nđồ đồng bóng\nái nam ái nữ\nthằng/đồ què/mù/câm/điếc/tật\nđồ tật nguyền\nđồ/thằng/con tự kỷ/kỉ\nđồ/thằng/con thiểu năng\n# đe doạ\ngiết mày/mầy/m\ngiết chết mày/mầy\nđâm/chém/đập/đánh chết mày/mầy/m\ntao đánh/đâm/chém/đập mày/mầy/m\nđốt nhà mày/mầy\ntìm/biết nhà mày/mầy\nxử mày/mầy\ncho mày/mầy chết\nmày/mầy/m chết đi\nđi chết đi\nchết mẹ mày đi\nđặt bom\n",
-  scam: "# scam.txt — lừa đảo, mua bán tài khoản / tiền, cờ bạc → CHẶN + hàng chờ. Cú pháp: README.txt\n# (link, số điện thoại, số tài khoản dài, nick mạng xã hội đã bị chặn bằng mã)\nnạp thẻ/card/tiền/kc/xu/vàng\nnạp kim cương\nthẻ cào\nmua/bán/đổi thẻ cào/card\nkim cương miễn phí\nfree kim cương/kc/xu/vàng/tiền\nhack kc/tiền/xu/vàng/acc/nick\nhack kim cương\nhack tài khoản\ntool hack\nphần mềm hack\nbán/mua/đổi/thuê/mượn/share/trao acc/nick/tk/hack\nbán/mua/đổi/thuê/mượn/share tài khoản\ncho mượn acc/nick/tk\ncho mượn tài khoản\nacc vip\nchuyển khoản\nck trước\nck cho mình/tao/em/anh/tớ/t/m\nstk\nsố tài khoản\nsố tk\ncho/xin/gửi/đưa stk\nví điện tử\nchuyển/gửi/bắn tiền cho/qua | flag\nchuyển cho mình/tao/tớ/em/anh ~ tiền/nghìn/k/triệu/củ | flag\nđặt cọc\ncọc trước\nthanh toán trước\notp\nmã otp\nmã xác nhận\nmã xác thực\ncho/gửi/đưa/xin ~ pass/mk\ncho/gửi/đưa/xin ~ mật khẩu\nmật khẩu của bạn/cậu/em/anh/mày\ncho/gửi/đưa/xin ~ mã khôi phục\nmã khôi phục của bạn/cậu/em/anh/mày\nđăng nhập hộ/giúp\nbán/mua mã mời\ntrúng thưởng\nquà miễn phí\nlink nhận quà\nkiếm tiền online\nviệc nhẹ lương cao\nlàm việc tại nhà\nđầu tư sinh lời\nlãi suất\nvay tiền\ncho vay\nvay nóng\ntín dụng đen\ntài xỉu\ncá độ\nnhà cái\ncasino\ncờ bạc\nđánh bạc\nlô đề\nsoi cầu\nbao lô\nnổ hũ\nđổi thưởng\ncày thuê\ncày hộ\nbán vàng\nbán đồ game\ngiao dịch ngoài\nuy tín 100\ngiá rẻ uy tín\n",
-  probe: "# probe.txt — dò hỏi thông tin riêng (tuổi, nhà, trường, ảnh, gặp ngoài) → VẪN GỬI + hàng chờ. Cú pháp: README.txt\nbao nhiêu tuổi\nmấy/nhiêu/bn/bnh tuổi\ntuổi con gì\nsinh năm bao/bn/mấy/nào\nhọc lớp mấy/nào/bn\nlớp mấy\nhọc trường nào/gì/đâu\nnhà ở đâu\nnhà bạn/em/cậu/mày/anh/chị/cháu/ông/bà/con/c/e/b/a/m/cô/chú ở đâu\nnhà ở chỗ/khu/phố/quận/phường nào\nsống ở đâu\nbạn/em/cậu/mày/c/e/b/anh/chị/m ở quận/phường/xã/ngõ/hẻm nào\nđịa chỉ nhà\nđịa chỉ của\nnhà số mấy\ngửi/xin/cho/send ~ ảnh/hình/pic/selfie\nảnh thật của\nxem ảnh thật\nmặt thật của\nchụp ảnh gửi\ngọi video\nvideo call\ncall video\ngặp ngoài\ngặp mặt ngoài đời\nhẹn gặp ngoài\ngặp nhau ngoài đời\nngoài đời gặp\nđi chơi riêng\nra ngoài gặp\nsố điện thoại\nsđt\nsdt\nxin số\ncho xin số\ntên thật là/của/bạn/em\ntên đầy đủ\nbố mẹ đi vắng\nở nhà một mình\nở một mình à/không/ko/hả\ncó ai ở nhà\ncó người yêu chưa\n",
-  selfharm: "# selfharm.txt — tự hại → VẪN GỬI + hàng chờ + gửi người chơi lời nhắn đường dây hỗ trợ. Cú pháp: README.txt\ntự tử\ntự sát\ntự vẫn\ntự hại\ntự làm hại\ntao/tôi/mình/em/tớ/anh/t/m/e/chị/cháu muốn chết\nmuốn chết cho xong\nmuốn chết quá\nkhông/ko/k/chẳng/chả muốn sống\nkhông/ko/chẳng thiết sống\nchán sống\nsống làm gì\nsống để làm gì\ncắt/rạch/cứa tay\ncắt/rạch/cứa cổ tay\nnhảy lầu\nnhảy cầu tự tử\nnhảy sông\nuống thuốc ngủ/chuột/sâu\ntreo cổ\nkết thúc cuộc đời\nkết liễu\nmuốn biến mất\nkhông ai cần mình/tôi/em/tớ\nchết cho xong\nchết quách\nchết đi cho rồi\nkill myself\nkms\nsuicide\n",
-  allow: "# allow.txt — cụm từ vô hại hay bị bắt nhầm. Một mẫu bị bắt nằm GỌN trong cụm dưới đây thì được bỏ qua.\n# Viết CÓ DẤU (để bản có dấu tục như \"cặc\" không lọt qua); chữ không dấu ở đây chỉ khớp chữ không dấu.\nquả/hạt/bánh/sữa/dầu/bột/cây óc chó\ncon các bạn/em/anh/chị/cô/chú/bác/ông/bà/cháu/thành/người/nhà/con/cậu/bố/mẹ/cụ/vị\ncái lon/lớn/lợn bia/nước/sữa/này/kia/đó/ấy/của/to/nhỏ/rỗng/đất/con/nhất/hơn/lắm/quá\ncái buổi\nnhư các/buổi\nhẹn gặp lại\ncon lợn/lon\nđầu/cuối/mỗi/một/hai/ba buổi\nmất/đầu/mặt các\năn các món/loại/thứ/kiểu/đồ/bữa/quán/nơi/hàng/bạn/em/anh/chị\nbú các ngón\ncòn/con/đỗ/đó/độ điểm\ncòn/con phở/phố/phó\nmà mẹ/cha/bố/má/mày\nđồ cấm/cầm\ntrứng cút\nvú sữa\nvú em\nbím tóc\ntết/thắt bím\nsục sạo\nxoạc chân\nchim cu\ndâm bụt\nđi khách sạn/hàng\nđổ rác\nđồ điện\ncòn điện/diện/điền/diễn\nđỡ đần\nốc lớn/bò/lợn/to/nhỏ\nbộ máy\nđổ bóng\n",
+  profanity: "# profanity.txt — từ tục nặng → CHẶN. Cú pháp: README.txt\n# --- từ đơn (có dấu: bản không dấu chỉ bị bắt khi có ngữ cảnh / viết lách)\nđịt\nđụ\nlồn\ncặc\nbuồi\nđĩ\nloz\nlìn\n# --- chữ tắt / teencode\ndm\nđmm\ndmm\ndcm\ndkm\ndcmm\ndmml\ncmm\ndmvl\n*ditme\n*ditmie\n*ditmia\n*ditmay\n*ditcon\n*ditbo\n*ditcu\n*dumama\n*dumame\n*dumemay\n*dumay\n*duma\n*dume\n*lonme\n*concac\n*cailon\n*vcl\n*vkl\n*dmm\n*dcm\n*dkm\n*cmm\n*dmvl\n*clgt\n# --- cụm\nđịt mẹ/má/bố/cha/mày/con/cụ/mợ/ông/bà/tổ/nhau\nđụ mẹ/má/mé/mày/nhau\nđờ mờ\nđê mờ\nmẹ mày/mầy\ncon mẹ mày/mầy\nmả mẹ/cha/bố\ntiên sư bố/cha/mày/nhà\nsư bố/cha mày\ntổ cha/sư mày\năn/bú/mút/liếm/sục cặc/buồi/lồn/cứt\nđầu/mặt/óc cặc/buồi/lồn\ncái lồn/cặc/buồi\nnhư lồn/cặc/buồi\ncon lồn/cặc/đĩ\nthằng/con/đồ lol\nđồ/con đĩ/điếm/phò/cave\ncon hoang\nmẹ cha mày\ncút mẹ/cha\nmày là chó\nmày là súc vật\nđồ súc vật\nsúc sinh\nđồ chó đẻ\nđéo/đếch/éo mẹ\nfuck\nfck\nfuk\n*fuck\nmotherfucker\nshit\nbitch\n*bitch\nasshole\ndick\ncunt\npussy\n# --- bổ sung vòng sửa 1 (kiểm thử lách lọc 15/10/2026)\nđù mạ\nđờ cờ mờ\nđê em em\nđê mê mày\nvler\nvờ lờ\ncak\nlừn\nđầu bùi\nbùi to\nfvck\nphắc diu\nphắc kiu\nbiatch\n",
+  mild: "# mild.txt — chửi nhẹ → CHE bằng *** (tin vẫn gửi). Cú pháp: README.txt\n# \"=ngu\" = đúng chữ \"ngu\" không dấu thanh (không bắt \"ngủ\").\nđéo\nđéo biết/hiểu/cần/thèm/quan/có/phải/sợ/muốn/chơi/được/thích/care/nói/nghe/ai\nđếch\nđếu\ncứt\nvl\nvcl\nvkl\nvcđ\ncc\ncl\nclm\nclgt\ncmn\ndmcs\nvãi lồn/cứt/đái\nđù má/mé/me\nmẹ kiếp\ncon mẹ nó\nbố mày/mầy\nbố láo\ncha mày\nđồ chó\nthằng chó\nchó má\nđồ chó má\nóc chó\nóc lợn/bò\nnão chó/lợn/tàn\nđồ/thằng/con =ngu\n=ngu như bò/chó/lợn/heo\nmày/mầy =ngu\n=ngu vãi/vl/vcl/thế/thật\nđồ/thằng/con đần\nđồ/thằng/con khốn\nkhốn nạn\ncâm mồm/miệng\nim mồm\ncút đi\ncút xéo\nmất dạy\nvô học\nđồ rác rưởi\nđồ rác\nthiểu năng\nđồ điên\nthằng điên\nđồ thần kinh\nđồ dở hơi\nnhư lol\nstfu\nwtf\ndamn\n",
+  sexual: "# sexual.txt — nội dung tình dục → CHẶN. Cú pháp: README.txt\nsex\nsếch\n*sex\nxxx\njav\nporn\n*porn\nporno\nhentai\nnude\nnudes\nhorny\nboobs\nblowjob\nphim sex/heo/nóng/khiêu\nphim người lớn\nphim cấp ba\nclip/ảnh/hình nóng/nude/sex/khỏa/khoả/lộ\nkhỏa/khoả thân\nlộ hàng\nshow hàng\nchịch\nxoạc nhau\nnện nhau\nlàm tình\nquan hệ tình dục\nquan hệ với anh/em/tao/tớ/mình\ntình dục\ndâm\ndâm dục\ndâm đãng\ndâm ô\nhiếp\nhiếp dâm\nthủ dâm\nthẩm du\nnứng\nnứng quá/vãi/thế/lắm/rồi/vl\nsục cu/cặc/buồi/lồn\nbú cu/vú/lồn/chim/cặc\nvú\nvếu\nbím\ntrym\ndương vật\nâm đạo\nâm vật\ntinh trùng\nxuất tinh\ncương cứng\nlỗ nhị\nhột le\ngái gọi\ngái bán dâm\nbán dâm\nmua dâm\nđi khách\ngạ tình\ngạ gẫm\nkích dục\nđồi trụy\nđồi truỵ\nsờ mó\nsờ ngực/vú/mông/đùi\ncởi đồ/quần/áo ~ cho anh/tao/tớ/mình/a xem\nngủ với anh/tao/tớ/mình/a\nlên giường với\ncho anh/tao/tớ sờ\n# --- bổ sung vòng sửa 1\nseggs\nxếch\nchịt nhau\nchịt em/anh/tao/mày\nảnh/hình nút\nxoạc\nthổi kèn\nnứn\nnứn quá/vãi/thế/lắm\n",
+  hate: "# hate.txt — miệt thị vùng miền / dân tộc / giới / khuyết tật, đe doạ → CHẶN + hàng chờ. Cú pháp: README.txt\nparky\n*parky\nbắc kỳ/kì chó/rau/mọi\nbọn/lũ/thằng/con/đồ bắc/nam kỳ/kì\nnam kỳ/kì lúa/chó\nbọn/lũ/đồ/thằng 3/ba que\nba que xỏ lá\nbò đỏ\nđu càng\nkhựa\ntàu khựa\nchệt\nthằng/bọn/lũ ba tàu\nbọn/lũ/đồ/thằng mọi\nmọi rợ\nmọi đen\nbọn/lũ/đồ/thằng mán\nmường mán\nđồ/thằng/con người rừng\nnigga\nnigger\n*nigg\npê đê\nbê đê\nxăng pha nhớt\nthằng/đồ bóng\nđồ đồng bóng\nái nam ái nữ\nthằng/đồ què/mù/câm/điếc/tật\nđồ tật nguyền\nđồ/thằng/con tự kỷ/kỉ\nđồ/thằng/con thiểu năng\n# đe doạ\ngiết mày/mầy/m\ngiết chết mày/mầy\nđâm/chém/đập/đánh chết mày/mầy/m\ntao đánh/đâm/chém/đập mày/mầy/m\nđốt nhà mày/mầy\ntìm/biết nhà mày/mầy\nxử mày/mầy\ncho mày/mầy chết\nmày/mầy/m chết đi\nđi chết đi\nchết mẹ mày đi\nđặt bom\n# --- bổ sung vòng sửa 1\nbk chó\nba sọc\ngay lọ\nđồ/thằng/con/bọn ô môi\ndân _ toàn trộm/cướp/lừa/đảo\ndân _ _ toàn trộm/cướp/lừa/đảo\nmày/m toi rồi\n",
+  scam: "# scam.txt — lừa đảo, mua bán tài khoản / tiền, cờ bạc → CHẶN + hàng chờ. Cú pháp: README.txt\n# (link, số điện thoại, số tài khoản dài, nick mạng xã hội đã bị chặn bằng mã)\nnạp thẻ/card/tiền/kc/xu/vàng\nnạp kim cương\nthẻ cào\nmua/bán/đổi thẻ cào/card\nkim cương miễn phí\nfree kim cương/kc/xu/vàng/tiền\nhack kc/tiền/xu/vàng/acc/nick\nhack kim cương\nhack tài khoản\ntool hack\nphần mềm hack\nbán/mua/đổi/thuê/mượn/share/trao acc/nick/tk/hack\nbán/mua/đổi/thuê/mượn/share tài khoản\ncho mượn acc/nick/tk\ncho mượn tài khoản\nacc vip\nchuyển khoản\nck trước\nck cho mình/tao/em/anh/tớ/t/m\nstk\nsố tài khoản\nsố tk\ncho/xin/gửi/đưa stk\nví điện tử\nchuyển/gửi/bắn tiền cho/qua | flag\nchuyển cho mình/tao/tớ/em/anh ~ tiền/nghìn/k/triệu/củ | flag\nđặt cọc\ncọc trước\nthanh toán trước\notp\nmã otp\nmã xác nhận\nmã xác thực\ncho/gửi/đưa/xin ~ pass/mk\ncho/gửi/đưa/xin ~ mật khẩu\nmật khẩu của bạn/cậu/em/anh/mày\ncho/gửi/đưa/xin ~ mã khôi phục\nmã khôi phục của bạn/cậu/em/anh/mày\nđăng nhập hộ/giúp\nbán/mua mã mời\ntrúng thưởng\nquà miễn phí\nlink nhận quà\nkiếm tiền online\nviệc nhẹ lương cao\nlàm việc tại nhà\nđầu tư sinh lời\nlãi suất\nvay tiền\ncho vay\nvay nóng\ntín dụng đen\ntài xỉu\ncá độ\nnhà cái\ncasino\ncờ bạc\nđánh bạc\nlô đề\nsoi cầu\nbao lô\nnổ hũ\nđổi thưởng\ncày thuê\ncày hộ\nbán vàng\nbán đồ game\ngiao dịch ngoài\nuy tín 100\ngiá rẻ uy tín\n# --- bổ sung vòng sửa 1 (số tiền giữa cụm: \"nạp 50k thẻ\")\nnạp ~ thẻ/card/kc/xu/vàng\nnạp ~ nhận\nfree ~ kc/xu/vàng\nfree ~ kim cương\nkim cương ~ free\nkim cương ~ miễn phí\nnhận kim cương\nnhận ~ kc free\nck ~ cho mình/tao/em/anh/tớ/t/m\nbank ~ cho mình/tao/em/anh/tớ\nbán/mua/đổi/thuê ních\nních vip\nđầu tư coin/crypto\nđầu tư tiền ảo\nkiếm ~ mỗi ngày tại nhà\nkiếm tiền ~ mỗi ngày\nmình/tao/tớ/em/anh/tôi là admin/gm/mod/qtv\nmình/tao/tớ/em/anh/tôi là quản trị\n",
+  probe: "# probe.txt — dò hỏi thông tin riêng (tuổi, nhà, trường, ảnh, gặp ngoài) → VẪN GỬI + hàng chờ. Cú pháp: README.txt\nbao nhiêu tuổi\nmấy/nhiêu/bn/bnh tuổi\ntuổi con gì\nsinh năm bao/bn/mấy/nào\nhọc lớp mấy/nào/bn\nlớp mấy\nhọc trường nào/gì/đâu\nnhà ở đâu\nnhà bạn/em/cậu/mày/anh/chị/cháu/ông/bà/con/c/e/b/a/m/cô/chú ở đâu\nnhà ở chỗ/khu/phố/quận/phường nào\nsống ở đâu\nbạn/em/cậu/mày/c/e/b/anh/chị/m ở quận/phường/xã/ngõ/hẻm nào\nđịa chỉ nhà\nđịa chỉ của\nnhà số mấy\ngửi/xin/cho/send ~ ảnh/hình/pic/selfie\nảnh thật của\nxem ảnh thật\nmặt thật của\nchụp ảnh gửi\ngọi video\nvideo call\ncall video\ngặp ngoài\ngặp mặt ngoài đời\nhẹn gặp ngoài\ngặp nhau ngoài đời\nngoài đời gặp\nđi chơi riêng\nra ngoài gặp\nsố điện thoại\nsđt\nsdt\nxin số\ncho xin số\ntên thật là/của/bạn/em\ntên đầy đủ\nbố mẹ đi vắng\nở nhà một mình\nở một mình à/không/ko/hả\ncó ai ở nhà\ncó người yêu chưa\n# --- bổ sung vòng sửa 1 (dụ dỗ trẻ em)\ntrường ~ tên gì\nbố mẹ ~ có nhà không/ko/k\nở nhà 1 mình\nxem mặt em/e/bạn/cậu/con/cháu\nbật cam\nmở cam\nđừng nói với bố/mẹ\nđừng kể với bố/mẹ\nbí mật của ~ đứa mình\nbí mật giữa ~ mình\nxoá/xóa tin nhắn này\ncó ny chưa\nđi đường nào về\nđang mặc gì\nmặc gì đấy/thế/vậy\nanh/chú qua đón em/cháu\nra công viên gặp anh/chú\n",
+  selfharm: "# selfharm.txt — tự hại → VẪN GỬI + hàng chờ + gửi người chơi lời nhắn đường dây hỗ trợ. Cú pháp: README.txt\ntự tử\ntự sát\ntự vẫn\ntự hại\ntự làm hại\ntao/tôi/mình/em/tớ/anh/t/m/e/chị/cháu muốn chết\nmuốn chết cho xong\nmuốn chết quá\nkhông/ko/k/chẳng/chả muốn sống\nkhông/ko/chẳng thiết sống\nchán sống\nsống làm gì\nsống để làm gì\ncắt/rạch/cứa tay\ncắt/rạch/cứa cổ tay\nnhảy lầu\nnhảy cầu tự tử\nnhảy sông\nuống thuốc ngủ/chuột/sâu\ntreo cổ\nkết thúc cuộc đời\nkết liễu\nmuốn biến mất\nkhông ai cần mình/tôi/em/tớ\nchết cho xong\nchết quách\nchết đi cho rồi\nkill myself\nkms\nsuicide\n# --- bổ sung vòng sửa 1 (một từ chen giữa: \"tớ chỉ muốn chết thôi\")\ntao/tôi/mình/em/tớ/anh/t/m/e/chị/cháu chỉ/thật/thực/rất/cũng/vẫn/đang/luôn muốn chết\ntao/tôi/mình/em/tớ/anh/t/m/e/chị/cháu thật/thực sự muốn chết\nmình/tôi/tao/em/tớ sẽ nhảy cầu/lầu/sông\nmuốn kết thúc tất cả\nlý/lí do để sống\nbiến mất là xong\n",
+  allow: "# allow.txt — cụm từ vô hại hay bị bắt nhầm. Một mẫu bị bắt nằm GỌN trong cụm dưới đây thì được bỏ qua.\n# Viết CÓ DẤU (để bản có dấu tục như \"cặc\" không lọt qua); chữ không dấu ở đây chỉ khớp chữ không dấu.\nquả/hạt/bánh/sữa/dầu/bột/cây óc chó\ncon các bạn/em/anh/chị/cô/chú/bác/ông/bà/cháu/thành/người/nhà/con/cậu/bố/mẹ/cụ/vị\ncái lon/lớn/lợn bia/nước/sữa/này/kia/đó/ấy/của/to/nhỏ/rỗng/đất/con/nhất/hơn/lắm/quá\ncái buổi\nnhư các/buổi\nhẹn gặp lại\ncon lợn/lon\nđầu/cuối/mỗi/một/hai/ba buổi\nmất/đầu/mặt các\năn các món/loại/thứ/kiểu/đồ/bữa/quán/nơi/hàng/bạn/em/anh/chị\nbú các ngón\ncòn/con/đỗ/đó/độ điểm\ncòn/con phở/phố/phó\nmà mẹ/cha/bố/má/mày\nđồ cấm/cầm\ntrứng cút\nvú sữa\nvú em\nbím tóc\ntết/thắt bím\nsục sạo\nxoạc chân\nchim cu\ndâm bụt\nđi khách sạn/hàng\nđổ rác\nđồ điện\ncòn điện/diện/điền/diễn\nđỡ đần\nốc lớn/bò/lợn/to/nhỏ\nbộ máy\nđổ bóng\n# --- bổ sung vòng sửa 1 (bắt nhầm lời trẻ em kể chuyện / câu thường)\nức hiếp\nhiếp đáp\nbắt nạt và ức hiếp\nvú nuôi\nbà vú\nđồ bóng đá/chuyền/rổ/bàn/ném\nmẹ/bố/má mày gọi/bảo/đến/đón/về/tìm/kêu/dặn\n",
   ambiguous: "# ambiguous.txt — từ VÔ HẠI (viết có dấu) mà bỏ dấu thì trùng một từ tục. Bộ lọc dùng danh sách này để không bắt\n# nhầm chữ không dấu: \"cac\" có thể là \"các\", \"lon\" là \"lon/lớn/lợn\", \"buoi\" là \"buổi\"…\n# Dấu ! ở cuối = từ RẤT hay gặp: bản không dấu không bao giờ bị bắt, kể cả trong cụm (vd \"do cho\" = \"đồ cho\").\ncác, cạc\nlon, lớn, lợn, lộn, lởn\nbuổi\ndu, dù, dư, dữ, dự, dụ, đu, đủ, đú\nđeo, dẻo, đèo, đẽo, dẹo\nđi!, dì, dí, dị, dĩ, đì\nđiểm, diễm, điềm\nphố, phở, phó, phổ, pho, phô\ncho!, chợ, chớ, chỗ, chờ, chở, chõ\nngủ, ngụ, ngừ, ngũ, ngự\ndân, đàn, đan, dán, dần, dặn, đạn, đán, đản\ndài, dại, đại, đài, dai, dãi\nvũ, vụ, vu\ncụt, cút\nnung, nũng, nựng\nđám, dám, đâm, đầm, đậm, dăm, dặm, đảm, đạm, đam, dạm\nbim, bìm\nsức, sực, súc\nhiệp\nchích\nnên, nến, nền, nén\nđều, đểu\nquê, quế, quẻ, que\nmọi\nkhua, khứa\nchết, chét\nmà, má, ma, mạ, mã\nkhôn\nđiện, diện, điền, diễn\nốc, óc, ọc\ntan, tán, tạn\ncầm, cấm, cám, cam, căm\nmũ, mụ, mủ, mu\nmới!, mời, mỗi, môi, mồi, mối, moi\nmặn!, mạn, màn, mãn, mận, mần, man, mắn\nanh!, ánh, ảnh\n",
   reserved: "# reserved.txt — tên nhân vật cấm dùng (giả danh quản trị / hệ thống). So khớp bỏ dấu, bỏ ký tự ngăn cách,\n# số thay chữ (4dm1n = admin). Từ ≥ 5 chữ cái: cấm cả khi nằm trong tên (\"TheAdmin99\"); từ ngắn: cấm khi đứng riêng\n# hoặc đứng đầu tên (\"GM Tùng\", \"Mod1\").\nadmin\nadministrator\nadm\ngm\nmod\nmoderator\nquản trị\nquản trị viên\nqtv\nban quản trị\nbqt\nhệ thống\nchủ server\nchủ sv\nserver\nsystem\nstaff\nsupport\nhỗ trợ\nowner\ndev\ndeveloper\nnhà phát triển\nofficial\nchính thức\ncskh\nchăm sóc khách hàng\nbot\nnpc\nthông báo\ncông an\ncảnh sát\npolice\n",
 };
@@ -382,7 +393,9 @@ function tokMatch(tok, a, plen, ctx) {
   if (!a.marked) return ctx.allow ? !tok.marked : true;      // allow-list: a bare word matches only bare words
   if (tok.hasTone && collapse1(tok.tones) !== a.tones) return false;
   if (tok.hasQual && tok.qkey !== a.qkey) return false;
-  if (tok.hasTone && !tok.hasQual && a.hasQual) return false;
+  // "dịt" (tone kept, đ → d): an evasion of "địt" unless the toned bare word is itself innocent ("dĩ", "cút")
+  // (fixer round 1, SO-6a: this used to refuse every toned token missing a quality mark)
+  if (tok.hasTone && !tok.hasQual && a.hasQual && (C.innocent.has(tok.qkey + '|' + collapse1(tok.tones)) || C.ambiguousKeys.has(tok.key))) return false;
   const fully = tok.hasTone === a.hasTone && tok.hasQual === a.hasQual;
   if (fully) return true;
   if (tok.evasive) return true;
@@ -415,7 +428,8 @@ function matchAt(toks, i, p, ctx, k = 0) {
     for (let n = pt.min; n <= pt.max; n++) {
       if (i + n > toks.length) break;
       let okSpan = true;
-      for (let q = i; q < i + n; q++) if (!toks[q].word) { okSpan = false; break; }
+      // wildcards span words and plain amounts ("nạp 50k thẻ", "free 1000 kc"; SO-6d), never other symbols
+      for (let q = i; q < i + n; q++) if (!toks[q].word && !/^\d/.test(toks[q].acc)) { okSpan = false; break; }
       if (!okSpan) break;
       const r = matchAt(toks, i + n, p, ctx, k + 1);
       if (r >= 0) return r;
@@ -452,7 +466,7 @@ function findHits(toks, ctx) {
       }
     }
     // infix: long unaccented words containing a strong ASCII pattern ("ditmemay", "vclll")
-    if (!t.hasTone && t.key.length >= 3) {
+    if ((!t.hasTone || t.joined) && t.key.length >= 3) {   // joined spaced letters keep their tones ("đ ị t m ẹ", SO-6b)
       for (const p of C.infix) {
         if (p.infix.some((k) => k.length >= 3 && t.key.length > k.length && t.key.includes(k))) hits.push({ p, i, j: i + 1 });
       }
@@ -508,19 +522,60 @@ function flatForUrl(display) {
   return out.join(' ');
 }
 
-const NUMWORD = { khong: '0', linh: '0', le: '0', mot: '1', mo: '1', hai: '2', ba: '3', bon: '4', tu: '4', nam: '5', lam: '5', sau: '6', bay: '7', tam: '8', chin: '9' };
-function detectPhone(display) {
+// digits written as words: Vietnamese (no diacritics) and English (fixer round 1, SO-2)
+const NUMWORD = { khong: '0', linh: '0', le: '0', mot: '1', mo: '1', hai: '2', ba: '3', bon: '4', tu: '4', nam: '5', lam: '5', sau: '6', bay: '7', tam: '8', chin: '9',
+  zero: '0', oh: '0', one: '1', two: '2', three: '3', four: '4', five: '5', six: '6', seven: '7', eight: '8', nine: '9' };
+// look-alikes inside a token that holds a digit ("l2", "o9l2З4S6789"): o → 0, i l | → 1, z → 2, s → 5, b → 6, g q → 9
+const DIGIT_LIKE = { o: '0', i: '1', l: '1', '|': '1', z: '2', s: '5', b: '6', g: '9', q: '9' };
+const NUMWORD_RE = new RegExp('^(?:' + Object.keys(NUMWORD).sort((a, b) => b.length - a.length).join('|') + ')');
+// a letter run made only of number words ("khong", "ninetwo") → its digits, else null
+function numwordRun(w) {
+  let out = '';
+  for (let r = w; r.length;) {
+    const m = r.match(NUMWORD_RE);
+    if (!m) return null;
+    out += NUMWORD[m[0]]; r = r.slice(m[0].length);
+  }
+  return out;
+}
+// the message with number words / look-alikes turned into digits (for phone and cross-line digit checks)
+function digitize(display) {
   let s = '';
   for (const ch of display) s += fold(ch).s;
   s = stripAll(s);
-  // digits written as words; letter o / O between digits → 0
   s = s.split(' ').map((w) => {
-    if (/\d.*\d/.test(w) && /^[\doil.\-]+$/.test(w)) return w.replace(/o/g, '0').replace(/[il]/g, '1');   // "o9i2"
+    if (/\d/.test(w)) {
+      // a token holding a digit: look-alikes are digits ("o9i2", "09 l2"), glued number words too ("khong9mot2")
+      if (/^[\d.\-|oilzsbgq]+$/.test(w)) return w.replace(/[oilzsbgq|]/g, (c) => DIGIT_LIKE[c]);
+      if (/^[a-z\d]+$/.test(w)) {
+        const parts = w.match(/\d+|[a-z]+/g);
+        let out = '';
+        for (const p of parts) { if (/^\d/.test(p)) out += p; else { const d = numwordRun(p); if (d === null) return w; out += d; } }
+        return out;
+      }
+      return w;
+    }
     const k = w.replace(/[^a-z]/g, '');
-    return k && NUMWORD[k] !== undefined && /^[a-z.,-]*$/.test(w) ? NUMWORD[k] : w;
+    if (k && /^[a-z.,-]*$/.test(w)) { const d = NUMWORD[k] ?? (k.length >= 6 ? numwordRun(k) : null); if (d != null) return d; }
+    return w;
   }).join(' ');
   s = s.replace(/(?<=\d[\s.\-_,]{0,3})[oO](?=[\s.\-_,]{0,3}\d)/g, '0');
-  s = s.replace(/(\d)[\s.\-_,()*+]+(?=\d)/g, '$1');
+  return s.replace(/(\d)[\s.\-_,()*+]+(?=\d)/g, '$1');
+}
+// digits of a digit-heavy line (≥ 3 digits, digits ≥ half of its letters+digits), else '' — the chat service keeps a
+// short per-account buffer of these to catch a phone number split over several messages ("09123" + "45678")
+export function phoneDigits(display) {
+  const s = digitize(display);
+  const d = (s.match(/\d/g) || []).length;
+  const l = (s.match(/\p{L}/gu) || []).length;
+  return d >= 3 && d >= l ? s.replace(/\D/g, '') : '';
+}
+export function isPhoneDigits(d) {
+  const m = String(d).match(/(?:84|0)\d{8,10}/);
+  return !!m && new Set(m[0]).size >= 3;
+}
+function detectPhone(display) {
+  const s = digitize(display);
   const m = s.match(/\+?\d{9,}/g);
   if (!m) return false;
   for (let d of m) {
@@ -536,9 +591,9 @@ function detectPhone(display) {
 const PLATFORMS = ['zalo', 'zl', 'dalo', 'fb', 'facebook', 'face', 'phây', 'fây', 'fbook', 'tele', 'telegram', 'tlg', 'ig', 'insta',
   'instagram', 'tiktok', 'messenger', 'mess', 'snap', 'snapchat', 'discord', 'twitter', 'wechat', 'viber', 'skype', 'kakao',
   'gmail', 'email', 'mail', 'youtube', 'ytb', 'kik', 'whatsapp', 'signal', 'line'];
-const PLATFORM_PAIRS = [['za', 'lo'], ['tik', 'tok'], ['tóp', 'tóp'], ['top', 'top'], ['phây', 'búc'], ['face', 'book'], ['in', 'sta']];
+const PLATFORM_PAIRS = [['za', 'lo'], ['tik', 'tok'], ['tóp', 'tóp'], ['top', 'top'], ['phây', 'búc'], ['face', 'book'], ['in', 'sta'], ['dis', 'cord'], ['tê', 'lê'], ['te', 'le']];
 const CONTACT = ['kb', 'ket', 'add', 'addfr', 'ib', 'inbox', 'nhắn', 'nhan', 'nt', 'liên', 'lien', 'lh', 'follow', 'fl', 'flw', 'xin',
-  'gửi', 'gui', 'id', 'nick', 'nik', 'acc', 'tìm', 'tim', 'sdt', 'sđt', 'link', 'qua', 'là', 'kết', 'sub', 'đăng', 'dang', 'theo', 'vô', 'vào'];
+  'gửi', 'gui', 'id', 'nick', 'nik', 'acc', 'tìm', 'tim', 'sdt', 'sđt', 'link', 'qua', 'là', 'kết', 'sub', 'đăng', 'dang', 'theo', 'vô', 'vào', 'tên', 'nhóm', 'kênh'];
 let PLAT_KEYS = null, CONTACT_KEYS = null;
 function initKeys() {
   PLAT_KEYS = new Set(PLATFORMS.map((w) => analyzeWord(w).key));
@@ -556,6 +611,8 @@ function detectHandle(toks, flat, display) {
       }
     }
     if (!plat) continue;
+    // a disguised platform name ("za.lo", "z@lo", "ph4y") is a contact share by itself (SO-6)
+    if (span === 1 && toks[i].trick && toks[i].key !== 'line') return true;
     // "line" is an English word: needs a contact verb or an id
     for (let k = Math.max(0, i - 3); k < Math.min(toks.length, i + span + 3); k++) {
       if (k >= i && k < i + span) continue;
@@ -602,6 +659,7 @@ export function analyzeChat(text, opts = {}) {
   if (detectPhone(display)) add('phone', 'block', 'phone');
   if (detectHandle(toks, flat, display)) add('handle', 'block', 'handle');
   for (const h of findHits(toks, ctx)) add(h.p.reason, h.p.action, h.p.term, h.i, h.j);
+  if (toks.split) for (const h of findHits(toks.split, ctx)) hits.push({ reason: h.p.reason, action: h.p.action, term: h.p.term, i: h.i, j: h.j, toks: toks.split });
   if (toks.some((tk) => tk.conf && tk.word)) reasons.push('mixed_script');
 
   let action = 'pass', flag = false, support = false;
@@ -613,9 +671,10 @@ export function analyzeChat(text, opts = {}) {
     if (a === 'flag') flag = true;
     if (h.reason === 'self_harm') support = true;
     if (SEV[a] > SEV[action]) action = a;
-    if (a === 'mask' && h.i >= 0) maskSpans.push([toks[h.i].start, toks[h.j - 1].end]);
+    const T = h.toks || toks;
+    if (a === 'mask' && h.i >= 0) maskSpans.push([T[h.i].start, T[h.j - 1].end]);
     if (!reasons.includes(h.reason)) reasons.push(h.reason);
-    if (toks[h.i]?.evasive && !reasons.includes('evasion')) reasons.push('evasion');
+    if (T[h.i]?.evasive && !reasons.includes('evasion')) reasons.push('evasion');
   }
   let out = display;
   if (action === 'mask') {
@@ -628,7 +687,7 @@ export function analyzeChat(text, opts = {}) {
   if (action === 'pass' && flag) action = 'flag';
   if (flag && action !== 'flag') reasons.push('flag');
   const ok = action !== 'block';
-  return res(ok, ok ? out : display, action, { flag, support, hits: hits.map((h) => ({ reason: h.reason, term: h.term })) });
+  return res(ok, ok ? out : display, action, { flag, support, hits: hits.map((h) => ({ reason: h.reason, term: h.term })), digits: phoneDigits(display) });
 }
 
 export function filterChat(text, opts = {}) {
@@ -658,13 +717,21 @@ export function checkNickname(name) {
   if ((t.match(/\p{L}/gu) || []).length < 2) return { ok: false, reason: 'chars' };
   const k = nickKey(t);
   const flatK = k.replace(/ /g, '');
+  // the same without leet (digits stay digits): "BQT01", "Mod1" — a short reserved word glued to digits (fixer round 1)
+  let plain = '';
+  for (const ch of t) plain += fold(ch).s;
+  plain = stripAll(plain).toLowerCase().replace(/[^a-z0-9]+/g, '');
   for (const r of C.reserved) {
     if (!r) continue;
     const rf = r.replace(/ /g, '');
     if (k === r || flatK === rf) return { ok: false, reason: 'reserved' };
     if (rf.length >= 5 && flatK.includes(rf)) return { ok: false, reason: 'reserved' };
-    if (k.startsWith(r + ' ') || new RegExp('^' + rf + '\\d').test(flatK)) return { ok: false, reason: 'reserved' };
+    if (k.startsWith(r + ' ') || new RegExp('^' + rf + '\\d').test(flatK) || new RegExp('^' + rf + '\\d').test(plain)) return { ok: false, reason: 'reserved' };
   }
+  // a platform name glued to digits is a contact handle ("Zalo09123")
+  if (!PLAT_KEYS) initKeys();
+  const pm = plain.match(/^([a-z]+)(\d{3,})/) || plain.match(/([a-z]+)(\d{3,})$/);
+  if (pm && PLAT_KEYS.has(analyzeWord(pm[1]).key)) return { ok: false, reason: 'contact' };
   if (isBrand(t) || isBrand(t.toUpperCase()) || brandWatchHit(t)) return { ok: false, reason: 'brand' };
   if (/\d{7,}/.test(t.replace(/[ _.\-]/g, ''))) return { ok: false, reason: 'contact' };
   const f = analyzeChat(t, { maxChars: 64 });

@@ -70,3 +70,22 @@ bán đồ game
 giao dịch ngoài
 uy tín 100
 giá rẻ uy tín
+# --- bổ sung vòng sửa 1 (số tiền giữa cụm: "nạp 50k thẻ")
+nạp ~ thẻ/card/kc/xu/vàng
+nạp ~ nhận
+free ~ kc/xu/vàng
+free ~ kim cương
+kim cương ~ free
+kim cương ~ miễn phí
+nhận kim cương
+nhận ~ kc free
+ck ~ cho mình/tao/em/anh/tớ/t/m
+bank ~ cho mình/tao/em/anh/tớ
+bán/mua/đổi/thuê ních
+ních vip
+đầu tư coin/crypto
+đầu tư tiền ảo
+kiếm ~ mỗi ngày tại nhà
+kiếm tiền ~ mỗi ngày
+mình/tao/tớ/em/anh/tôi là admin/gm/mod/qtv
+mình/tao/tớ/em/anh/tôi là quản trị

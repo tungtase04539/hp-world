@@ -11,6 +11,7 @@
 // MAX_PER_HOUR (30) overall. Suppressed alerts are counted and summarised in the next message of that kind.
 // Wiring (register): bus 'alert' {kind, text} → send; 'start' → "máy chủ đã chạy" (+ "khởi động lại sau sự cố" when the
 // previous run did not stop cleanly: <dataDir>/run.marker); 'stop' → "máy chủ dừng"; 'degrade' {level ≥ 2} → alert.
+import https from 'node:https';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -34,7 +35,25 @@ export function createAlerts({ config, log, fetch: fetchFn = globalThis.fetch, n
 
   const remember = (e) => { history.push(e); if (history.length > 50) history.shift(); };
 
+  // In Docker the game has no Internet route (SEC-3): TELEGRAM_VIA=host:port sends the HTTPS request through the portal
+  // container's fixed TCP forward to api.telegram.org:443. TLS stays end-to-end (SNI + certificate of api.telegram.org).
+  const via = String(config?.extra?.TELEGRAM_VIA ?? process.env.TELEGRAM_VIA ?? '').trim();
+  function postVia(text) {
+    const [host, port] = via.split(':');
+    const body = JSON.stringify({ chat_id: chatId, text, disable_web_page_preview: true });
+    return new Promise((resolve, reject) => {
+      const req = https.request({
+        host, port: Number(port) || 443, servername: 'api.telegram.org', method: 'POST', path: `/bot${token}/sendMessage`,
+        headers: { host: 'api.telegram.org', 'content-type': 'application/json', 'content-length': Buffer.byteLength(body) },
+        timeout: policy.TIMEOUT_MS,
+      }, (res) => { res.resume(); res.on('end', () => (res.statusCode >= 200 && res.statusCode < 300 ? resolve(true) : reject(new Error(`telegram http ${res.statusCode}`)))); });
+      req.on('timeout', () => req.destroy(new Error('telegram timeout')));
+      req.on('error', reject);
+      req.end(body);
+    });
+  }
   async function post(text) {
+    if (via && fetchFn === globalThis.fetch) return postVia(text);
     const url = `https://api.telegram.org/bot${token}/sendMessage`;
     const res = await fetchFn(url, {
       method: 'POST',

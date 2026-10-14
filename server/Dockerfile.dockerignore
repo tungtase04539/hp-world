@@ -5,6 +5,7 @@
 !server/src/
 !server/ops/container-main.mjs
 !server/ops/healthcheck.mjs
+!server/ops/portal.mjs
 !server/admin/
 !server/data/filter/
 !js/shared/

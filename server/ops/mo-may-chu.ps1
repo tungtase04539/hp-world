@@ -24,11 +24,11 @@ Write-Host '=== MỞ MÁY CHỦ GAME HẢI PHÒNG 3D ===' -ForegroundColor White
 if ($s.Test) { Write-Canh ("CHẾ ĐỘ THỬ: bộ '{0}', cổng {1}/{2}. Không ghi tệp đánh dấu, không mở trình duyệt." -f $s.Project, $s.GamePort, $s.AdminPort) }
 
 Write-Buoc '1/6 Kiểm tra Docker'
-if (-not (Start-DockerIfNeeded)) { Write-Loi 'Docker chưa sẵn sàng. Mở Docker Desktop, đợi biểu tượng cá voi đứng yên rồi chạy lại.'; exit 1 }
+if (-not (Start-DockerIfNeeded)) { Write-Loi 'Docker chưa sẵn sàng. Mở Docker Desktop, đợi biểu tượng cá voi đứng yên rồi chạy lại.'; Exit-Ops 1 }
 Write-Tot 'Docker đang chạy.'
 
 Write-Buoc '2/6 Khoá bí mật (server\.env)'
-if (-not (Initialize-EnvFile)) { exit 1 }
+if (-not (Initialize-EnvFile)) { Exit-Ops 1 }
 $envv = Read-DotEnv
 Write-Tot 'Có đủ khoá bí mật.'
 New-Item -ItemType Directory -Force -Path $script:BackupDir | Out-Null
@@ -44,13 +44,13 @@ $profiles = @()
 if (-not $KhongSaoLuu) { $profiles += @('--profile', 'backup') }
 $upArgs = $profiles + @('up', '-d', '--remove-orphans')
 if (-not $KhongBuild) { $upArgs += '--build' }
-$upArgs += @('game', 'db')
+$upArgs += @('game', 'db', 'portal')
 if (-not $KhongSaoLuu) { $upArgs += 'backup' }
 $code = Invoke-Compose $s $upArgs
-if ($code -ne 0) { Write-Loi 'docker compose báo lỗi (xem dòng phía trên). Thử chạy lại; nếu vẫn lỗi xem VAN_HANH.md mục "Sự cố".'; exit 1 }
+if ($code -ne 0) { Write-Loi 'docker compose báo lỗi (xem dòng phía trên). Thử chạy lại; nếu vẫn lỗi xem VAN_HANH.md mục "Sự cố".'; Exit-Ops 1 }
 
 $h = Wait-Health $s.GameUrl 150
-if (-not $h) { Write-Loi ('Máy chủ game không trả lời ở ' + $s.GameUrl + '/healthz sau 150 giây.'); Write-Dong 'Xem nhật ký:  docker compose -p ' + $s.Project + ' logs game --tail 50'; exit 1 }
+if (-not $h) { Write-Loi ('Máy chủ game không trả lời ở ' + $s.GameUrl + '/healthz sau 150 giây.'); Write-Dong 'Xem nhật ký:  docker compose -p ' + $s.Project + ' logs game --tail 50'; Exit-Ops 1 }
 Write-Tot ("Game chạy: kiểu kết nối {0}, cơ sở dữ liệu {1}, đang chơi {2} người." -f $h.transport, $h.db, $h.ccu)
 
 Write-Buoc '4/6 Giữ máy không ngủ'
@@ -79,7 +79,18 @@ if ($mode -eq 'named') {
   else {
     $tq = Get-Date
     while (-not $publicUrl -and ((Get-Date) - $tq).TotalSeconds -lt 60) { Start-Sleep -Seconds 2; $publicUrl = Get-QuickTunnelUrl $s }
-    if ($publicUrl) { Write-Tot 'Tunnel tạm đang chạy (địa chỉ đổi mỗi lần bật).' } else { Write-Loi 'Chưa lấy được địa chỉ tunnel tạm sau 60 giây — xem: docker compose -p ' + $s.Project + ' --profile quicktunnel logs quicktunnel' }
+    if ($publicUrl) {
+      # Địa chỉ mới cần ~20–60 giây để tên miền có trên Internet. Hỏi DNS CÔNG CỘNG (1.1.1.1), KHÔNG hỏi qua modem:
+      # hỏi modem quá sớm làm nó nhớ "không tồn tại" vài phút (vòng sửa 1, SO-10).
+      Write-Dong 'Đợi địa chỉ tạm có hiệu lực trên Internet (tối đa 90 giây)...'
+      $hostName = ($publicUrl -replace '^https://', '').TrimEnd('/')
+      $dnsOk = $false; $td = Get-Date
+      while (-not $dnsOk -and ((Get-Date) - $td).TotalSeconds -lt 90) {
+        try { $r = Resolve-DnsName -Name $hostName -Server 1.1.1.1 -DnsOnly -Type A -ErrorAction Stop; if ($r) { $dnsOk = $true } } catch { Start-Sleep -Seconds 3 }
+      }
+      if ($dnsOk) { Start-Sleep -Seconds 10; Write-Tot 'Tunnel tạm đang chạy (địa chỉ đổi mỗi lần bật).' }
+      else { Write-Canh 'Tên miền tạm chưa có trên Internet sau 90 giây — đợi thêm 1–2 phút rồi mới mở / gửi địa chỉ.' }
+    } else { Write-Loi 'Chưa lấy được địa chỉ tunnel tạm sau 60 giây — xem: docker compose -p ' + $s.Project + ' --profile quicktunnel logs quicktunnel' }
   }
 } else {
   Write-Dong 'Không bật tunnel: chỉ máy này vào được (thêm -TamThoi để thử qua Internet, hoặc cài tên miền — VAN_HANH.md).'
@@ -94,7 +105,10 @@ if ($publicUrl) {
   Write-Host ''
   Write-Host ('   ĐỊA CHỈ MÁY CHỦ CHO NGƯỜI CHƠI:  ' + $wss) -ForegroundColor Green
   Write-Dong ('   Đo mạng:  netprobe.html?s=' + $wss)
-  if ($mode -eq 'quick') { Write-Canh 'Địa chỉ tạm chỉ dùng để thử; KHÔNG đăng lên mạng xã hội. Tắt máy chủ là địa chỉ mất.' }
+  if ($mode -eq 'quick') {
+    Write-Canh 'Địa chỉ tạm chỉ dùng để thử; KHÔNG đăng lên mạng xã hội. Tắt máy chủ là địa chỉ mất.'
+    Write-Canh 'Nếu máy này báo "không tìm thấy" địa chỉ: đợi 1–2 phút (bộ nhớ DNS của modem) rồi thử lại; người chơi ở mạng khác vào được ngay.'
+  }
 }
 Write-Dong 'Xem tình trạng:  server\ops\trang-thai.ps1     Tắt máy chủ:  server\ops\tat-may-chu.ps1'
 Write-Dong 'Khẩn cấp (ngắt Internet ngay, giữ dữ liệu):  server\ops\khoa-khan-cap.ps1'
@@ -102,4 +116,4 @@ Write-Dong 'Khẩn cấp (ngắt Internet ngay, giữ dữ liệu):  server\ops\
 if (-not $s.Test -and -not $KhongMoTrang) {
   try { Start-Process ($s.AdminUrl + '/admin') | Out-Null } catch { }
 }
-exit 0
+Exit-Ops 0

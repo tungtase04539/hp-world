@@ -14,7 +14,7 @@ $st = @{}
 if (Test-DockerReady) {
   $st = Get-ServiceState $s
   $names = @{ game = 'Game'; db = 'Cơ sở dữ liệu'; backup = 'Sao lưu hằng đêm'; tunnel = 'Tunnel tên miền'; quicktunnel = 'Tunnel tạm' }
-  foreach ($k in @('game', 'db', 'backup', 'tunnel', 'quicktunnel')) {
+  foreach ($k in @('game', 'portal', 'db', 'backup', 'tunnel', 'quicktunnel')) {
     $x = $st[$k]
     if (-not $x) { Write-Dong ("{0}: không chạy" -f $names[$k]); continue }
     $txt = "{0}: {1}" -f $names[$k], $x.State
@@ -92,5 +92,5 @@ if (Test-DockerReady) {
   if ($bad -eq 0) { Write-Tot 'Mọi cổng Docker của máy chủ chỉ mở ở 127.0.0.1. Đường vào từ Internet duy nhất là Cloudflare Tunnel.' }
 }
 Write-Host ''
-if ($bad -gt 0) { exit 2 }
-exit 0
+if ($bad -gt 0) { Exit-Ops 2 }
+Exit-Ops 0

@@ -20,7 +20,7 @@ if (Test-DockerReady) {
   $null = Get-CmdOutput 'docker' (@('compose', '-p', $s.Project, '-f', $script:ComposeFile) + $script:AllProfiles + @('kill', 'tunnel', 'quicktunnel'))
   $downArgs = $script:AllProfiles + @('down', '--timeout', '8', '--remove-orphans')
   if ($XoaDuLieuThu) {
-    if (-not $s.Test) { Write-Loi '-XoaDuLieuThu chỉ dùng với -TestMode (bản thật không bao giờ bị xoá dữ liệu bằng script này).'; exit 1 }
+    if (-not $s.Test) { Write-Loi '-XoaDuLieuThu chỉ dùng với -TestMode (bản thật không bao giờ bị xoá dữ liệu bằng script này).'; Exit-Ops 1 }
     $downArgs += '-v'
   }
   $code = Invoke-Compose $s $downArgs
@@ -51,5 +51,5 @@ if ($left.Count -eq 0) {
 }
 $secs = [math]::Round($sw.Elapsed.TotalSeconds, 1)
 if ($secs -le 10) { Write-Tot ("Tắt xong sau {0} giây." -f $secs) } else { Write-Canh ("Tắt xong sau {0} giây (lâu hơn 10 giây)." -f $secs) }
-if ($left.Count -gt 0) { exit 2 }
-exit 0
+if ($left.Count -gt 0) { Exit-Ops 2 }
+Exit-Ops 0

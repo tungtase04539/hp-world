@@ -9,7 +9,6 @@ vl
 vcl
 vkl
 vcđ
-vđ
 cc
 cl
 clm

@@ -22,7 +22,7 @@
 //
 // Bus: listens to 'player:join' (preload blocks) / 'player:leave'; emits 'sanction' {accountId, kind, until, seconds,
 // reason, source, id, revoked?} (S2: mute → EVENT SANCTION, kick / ban → close the socket) and 'report:new' {report}.
-import { analyzeChat, checkNickname, normalize, setLists, getLists, listsVersion } from '../../../js/shared/textfilter.js';
+import { analyzeChat, checkNickname, normalize, setLists, getLists, listsVersion, isPhoneDigits } from '../../../js/shared/textfilter.js';
 import { CHANNEL, CHAT_CODE, REPORT_CODE, REPORT_REASON } from '../../../js/shared/protocol.js';
 import { CHAT } from '../../../js/shared/constants.js';
 import { Bucket, levenshtein, dupKey, posOf, isUuid, extraEnv } from './util.js';
@@ -85,6 +85,7 @@ export function createChat({ db, log, alerts, metrics, bus, now = () => Date.now
   const sanc = new Map();         // accountId → {mute, shadow, ban} untilMs (Infinity = permanent)
   const blockCache = new Map();   // accountId → Set
   const lastReport = new Map();   // reporter → at
+  const digitBuf = new Map();     // accountId → [{d, at}] digits of recent digit-heavy lines (split phone numbers)
   const lastFlag = new Map();     // accountId → {at, id (open filter report), probe (personal-info hits), cats}
   let flushing = null;
 
@@ -372,6 +373,17 @@ export function createChat({ db, log, alerts, metrics, bus, now = () => Date.now
       if (hist.length > 6) hist.shift();
       recentKeys.set(acc, hist);
 
+      // a phone number split over several lines ("09123" … "45678"): digits of the last ≤ 4 digit-heavy lines within
+      // 60 s are checked together (fixer round 1, SO-2)
+      if (f.digits && f.action !== 'block') {
+        const arr = (digitBuf.get(acc) || []).filter((x) => t - x.at < 60_000).slice(-3);
+        arr.push({ d: f.digits, at: t });
+        if (arr.length >= 2 && isPhoneDigits(arr.map((x) => x.d).join(''))) {
+          digitBuf.delete(acc);
+          f.action = 'block'; f.flag = true;
+          for (const r of ['phone', 'split', 'flag']) if (!f.reasons.includes(r)) f.reasons.push(r);
+        } else digitBuf.set(acc, arr);
+      }
       const pos = posOf(session);
       const shadow = remaining(acc, 'shadow', t) > 0;
       const line = {
@@ -557,6 +569,7 @@ export function createChat({ db, log, alerts, metrics, bus, now = () => Date.now
       for (const [k, b] of buckets) if (t - b.seen > 10 * MIN) buckets.delete(k);
       for (const [k, h] of recentKeys) if (!h.length || t - h[h.length - 1].at > CHAT.DUP_WINDOW_S * 1000) recentKeys.delete(k);
       for (const [k, s] of strikes) if (!s.length || t - s[s.length - 1].at > POLICY.STRIKE_WINDOW_MS) strikes.delete(k);
+      for (const [k, d] of digitBuf) if (!d.length || t - d[d.length - 1].at > 60_000) digitBuf.delete(k);
       for (const [k, v] of lastReport) if (t - v > POLICY.REPORT_DUP_MS) lastReport.delete(k);
       for (const [k, v] of lastFlag) if (t - v.at > POLICY.FLAG_COOLDOWN_MS) lastFlag.delete(k);
       for (const [k, e] of sanc) if (e.mute <= t && e.shadow <= t && e.ban <= t) sanc.delete(k);

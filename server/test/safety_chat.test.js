@@ -98,14 +98,17 @@ test('blocked lines: rejected, logged for the owner, strikes → automatic mute 
   const m = await chat.handle(S, CHANNEL.SAY, 'xin lỗi');
   assert.equal(m.code, CHAT_CODE.MUTED); assert.ok(m.retryAfterMs > 590_000 && m.retryAfterMs <= 600_000);
   // ladder: next automatic sanctions escalate
-  const s2 = await chat.autoSanction(a, 'auto_report', 'test');
+  const s2 = await chat.autoSanction(a, 'auto_filter', 'test');
   assert.equal(s2.kind, 'mute'); assert.equal(s2.seconds, 3600);
-  const s3 = await chat.autoSanction(a, 'auto_report', 'test');
+  const s3 = await chat.autoSanction(a, 'auto_filter', 'test');
   assert.equal(s3.kind, 'mute'); assert.equal(s3.seconds, 86400);
-  const s4 = await chat.autoSanction(a, 'auto_report', 'test');
+  // fixer round 1 (SEC-2/SO-5): reports alone never reach the shadow step — a 24 h mute at most
+  const r4 = await chat.autoSanction(a, 'auto_report', 'test');
+  assert.equal(r4.kind, 'mute'); assert.equal(r4.seconds, 86400);
+  const s4 = await chat.autoSanction(a, 'auto_filter', 'test');
   assert.equal(s4.kind, 'shadow'); assert.equal(s4.seconds, 7 * 86400);
   const rows = (await db.query('SELECT kind, source FROM sanctions WHERE account_id = $1 ORDER BY id', [a])).rows;
-  assert.deepEqual(rows.map((x) => x.kind), ['mute', 'mute', 'mute', 'shadow']);
+  assert.deepEqual(rows.map((x) => x.kind), ['mute', 'mute', 'mute', 'mute', 'shadow']);
   assert.equal(POLICY.LADDER.length, 4);
 });
 
@@ -136,6 +139,8 @@ test('reports: codes, server-side 20-line context around chatRef, 3 distinct rep
   const target = await makeAccount(db, 'Phien#0007');
   const reps = [await makeAccount(db, 'R1#0001'), await makeAccount(db, 'R2#0002'), await makeAccount(db, 'R3#0003')];
   const far = await makeAccount(db, 'Xa#0009');
+  // trusted reporters (fixer round 1): accounts ≥ 1 day old with ≥ 30 min of play
+  await db.query(`UPDATE accounts SET created_at = now() - interval '2 days' WHERE id = ANY($1::uuid[])`, [reps]);
   const T = session(target, 'Phien#0007', { x: 100, z: 100 });
   const F = session(far, 'Xa#0009', { x: 900, z: 900 });
   const R = reps.map((id, i) => session(id, `R${i + 1}#000${i + 1}`, { x: 105, z: 100 }));
@@ -167,7 +172,9 @@ test('reports: codes, server-side 20-line context around chatRef, 3 distinct rep
   now.advance(11_000);
   assert.equal((await chat.report(R[2], target, 99 /* unknown reason → OTHER */, 0)).code, REPORT_CODE.OK);
   assert.equal(chat.isMuted(target), false);
-  const other = session(await makeAccount(db, 'R4#0004'), 'R4#0004');
+  const otherId = await makeAccount(db, 'R4#0004');
+  await db.query(`UPDATE accounts SET created_at = now() - interval '2 days' WHERE id = $1`, [otherId]);
+  const other = session(otherId, 'R4#0004', { x: 110, z: 95 });   // stood near the target, saw its lines
   assert.equal((await chat.report(other, target, REPORT_REASON.SPAM, 0)).code, REPORT_CODE.OK);
   assert.equal(chat.isMuted(target), true);
   const ev = bus.of('sanction').at(-1);
