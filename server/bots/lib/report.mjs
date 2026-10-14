@@ -107,7 +107,7 @@ export function buildReport({ meta, plan, merged, ts, workers, raw }) {
       e.n++;
       if (a.extra?.skipped) { e.skipped++; continue; }
       if (a.t0) e.started++;
-      if (a.detected) { e.detected++; e.lat.push(a.latencyMs); e.via[a.via] = (e.via[a.via] || 0) + 1; if (a.latencyMs <= (k === 'no_hello' ? 11000 : 1000)) e.within1s++; }
+      if (a.detected) { e.detected++; e.lat.push(a.latencyMs); e.via[a.via] = (e.via[a.via] || 0) + 1; if (a.latencyMs <= abuseLimitMs(k)) e.within1s++; }
     }
     for (const k in abuse.classes) {
       const e = abuse.classes[k];
@@ -217,12 +217,17 @@ export function accept(rep, meta) {
   if (s === 'abuse' && rep.abuse) {
     for (const [k, e] of Object.entries(rep.abuse.classes)) {
       if (k === 'speed_hack') out.push(chk('speed-hack phát hiện (%)', e.rate, '>=', 99, ' %'));
-      out.push(chk(`${k}: chặn/đóng trong ${k === 'no_hello' ? '11 s' : '1 s'} (%)`, e.withinLimitRate, '>=', 100, ' %'));
+      out.push(chk(`${k}: chặn/đóng trong ${abuseLimitMs(k) / 1000} s (%)`, e.withinLimitRate, '>=', 100, ' %'));
     }
     if (rep.abuse.chatBypass) out.push(chk('chat lách lọc lọt nguyên văn tới người khác', rep.abuse.chatBypass.leakedVerbatim, '==', 0));
   }
   return out;
 }
+
+// detection deadline per abuse class: 1 s, except no_hello (the 10 s HELLO timeout) and the clock-dilation classes:
+// the time budget forgives up to MOVE.FORGIVE_BURST_MS (2 s) of client-clock lead once per session by design (honest
+// stalled first packets / route changes), so a 3× clock is caught after ~1–1.5 s — the gain is bounded by that budget
+export const abuseLimitMs = (k) => (k === 'no_hello' ? 11000 : k === 'clock_dilation' || k === 'resume_loop' ? 2000 : 1000);
 
 // ---- markdown ---------------------------------------------------------------------------------------------------------
 const fmt = (v, d = 1) => (v == null || (typeof v === 'number' && !Number.isFinite(v)) ? '—' : typeof v === 'number' ? (Number.isInteger(v) ? v.toLocaleString('en-US') : v.toFixed(d)) : String(v));

@@ -11,7 +11,8 @@ một "đường hầm" bảo mật đi từ máy anh ra Internet. Không cần 
 ## 0. Tóm tắt: các "nút bấm"
 
 Mọi script nằm trong thư mục `server\ops\` của dự án. Cách chạy: **nhấp chuột phải vào file → "Run with PowerShell"**.
-Hoặc mở PowerShell trong thư mục dự án rồi dán dòng lệnh ở cột thứ hai.
+Hoặc mở PowerShell trong thư mục dự án rồi dán dòng lệnh ở cột thứ hai. Chạy bằng nhấp chuột phải thì khi xong, cửa sổ
+**dừng lại chờ anh nhấn Enter** để anh đọc được kết quả (trạng thái, lỗi, mã mời) rồi mới đóng.
 
 | Việc | Lệnh | Ghi chú |
 |---|---|---|
@@ -41,8 +42,11 @@ Trang quản trị: **http://127.0.0.1:9101/admin**. Trang này chỉ mở đư�
    sạc)" → chọn **Không làm gì**. Script tự giữ máy không ngủ, nhưng không chặn được việc ngủ khi anh gập nắp máy.
 4. **Windows Update**: xem mục 9.
 5. Lần đầu chạy `mo-may-chu.ps1`, script tự tạo file **`server\.env`**. File này chứa khoá bí mật: mã quản trị, mật khẩu
-   cơ sở dữ liệu, khoá ký vé. **Không gửi file này cho ai, không đưa lên mạng.** Mất file này thì người chơi phải đăng nhập lại.
-   Nên chép một bản vào USB và cất riêng.
+   cơ sở dữ liệu, khoá ký vé, "muối" của mã khôi phục. **Không gửi file này cho ai, không đưa lên mạng.**
+   **Phải chép một bản vào USB và cất riêng.** Mất file này thì: người chơi phải đăng nhập lại; **mọi mã khôi phục cũ hết
+   dùng được** (dòng `RECOVERY_PEPPER`); và mật khẩu cơ sở dữ liệu mới sinh ra không khớp dữ liệu cũ nên máy chủ không mở
+   được — khi đó chép lại file `.env` từ USB. (Không có bản USB: nhờ lập trình viên đặt lại mật khẩu bằng
+   `docker compose -p hpworld -f server\docker-compose.yml exec db psql -U hp -d hp -c "ALTER USER hp PASSWORD '<DB_PASSWORD mới>'"`.)
 
 ---
 
@@ -55,7 +59,7 @@ Trang quản trị: **http://127.0.0.1:9101/admin**. Trang này chỉ mở đư�
    - **Trang quản trị**: `http://127.0.0.1:9101/admin`. Script tự mở trang này.
    - **ĐỊA CHỈ MÁY CHỦ CHO NGƯỜI CHƠI**: chỉ hiện khi đã bật tunnel. Đó là `wss://game.ten-mien-cua-anh.vn` khi đã cài tên
      miền (mục 7), hoặc `wss://...trycloudflare.com` khi dùng `-TamThoi`.
-4. Để cửa sổ đó tự đóng cũng được, máy chủ vẫn chạy nền.
+4. Nhấn Enter để đóng cửa sổ; máy chủ vẫn chạy nền.
 
 Khi máy chủ đang mở, script báo cho các công cụ kiểm tra đồ hoạ biết để chúng **chờ** (xem mục 10).
 
@@ -103,8 +107,18 @@ Trên trang quản trị (`http://127.0.0.1:9101/admin`):
   - **Cấm**: cấm vào game, có ngày hết hạn.
   - **Bỏ qua**: báo cáo sai.
   - **Nhắc nhở**: người chơi nhận một lời nhắc, không bị khoá.
-- Có **3 người khác nhau** cùng báo cáo một người trong 10 phút thì người đó tự bị khoá chat 10 phút. Tái phạm thì khoá
-  1 giờ, rồi 24 giờ, rồi **ẩn tin 7 ngày**. Gửi liên tiếp nhiều câu bị chặn cũng bị tự khoá theo cùng thang này.
+- **Tự khoá vì bị báo cáo** (đã siết lại 15/10 để vài tài khoản "hùa nhau" không khoá oan được người khác): cần **3 người
+  khác nhau** báo cáo cùng một người trong 10 phút, VÀ mỗi báo cáo phải có **bằng chứng** (người bị báo cáo đã thật sự nói
+  gì đó gần người báo cáo trong 10 phút qua), VÀ tài khoản báo cáo phải **cũ hơn 1 ngày, đã chơi ít nhất 30 phút**, VÀ đến
+  từ **3 mạng Internet khác nhau**. Đủ thì khoá chat 10 phút; tái phạm 1 giờ, rồi 24 giờ — **báo cáo không bao giờ tự đẩy
+  lên "ẩn tin"**, việc đó chỉ anh hoặc bộ lọc quyết. Báo cáo không đủ điều kiện **vẫn vào hàng chờ** cho anh xem (có nhãn
+  "không tính tự khoá"). Bấm **Bỏ qua** một báo cáo thì khoá tự động do nó gây ra cũng được gỡ.
+- Gửi liên tiếp nhiều câu bị chặn cũng bị tự khoá (10 phút → 1 giờ → 24 giờ → ẩn tin 7 ngày). Câu có ý **tự hại** thì
+  không bao giờ bị tính lỗi, kể cả khi có chữ tục: người chơi luôn nhận lời nhắn đường dây hỗ trợ.
+- **An toàn trẻ em — xem trước tiên**: các cờ "tự hại" và "dò hỏi thông tin cá nhân" (tuổi, nhà, trường, ảnh, ở nhà một
+  mình…) luôn nằm **đầu danh sách** báo cáo với nhãn đỏ. Một người hỏi nhiều câu như vậy liên tiếp thì các câu được **gộp
+  vào cùng một báo cáo** (nhãn "N lần bị đánh dấu"), và từ câu thứ 2 Telegram báo ngay cho anh. Xử phạt một người vì lý do
+  khác (ví dụ chửi bậy) **không** đóng các cờ an toàn này — anh phải tự xem và đóng.
 - Người bị **cấm** có hạn (ví dụ 1 ngày) bị ngắt ngay và không vào lại được tới khi hết hạn. Cấm vĩnh viễn khoá luôn tài
   khoản. Gỡ xử phạt: tab **Người chơi** → mở người đó → nút **Gỡ**.
 - **Khung chat trực tiếp**: các dòng bị đánh dấu được tô màu.
@@ -127,6 +141,9 @@ hoặc sao lưu lỗi, Telegram báo về điện thoại anh. Cách cài:
 
 ### 7a. Tunnel tạm (thử nhanh, không cần tên miền)
 `mo-may-chu.ps1 -TamThoi` → script in địa chỉ dạng `wss://ab-cd-ef.trycloudflare.com`.
+- Địa chỉ mới cần khoảng **1 phút** để có hiệu lực trên Internet; script tự đợi (tối đa 90 giây) rồi mới in. Nếu chính máy
+  này vẫn báo "không tìm thấy" địa chỉ, đợi thêm 1–2 phút (modem nhà nhớ tạm kết quả cũ) — người chơi ở mạng khác vẫn vào
+  được ngay.
 - Địa chỉ này **đổi mỗi lần bật lại**, nên chỉ dùng để thử với vài người. Không đăng địa chỉ này công khai.
 - Để đo mạng, gửi cho người thử đường link
   `https://tungtase04539.github.io/hp-world/netprobe.html?s=wss://ab-cd-ef.trycloudflare.com` (thay đúng địa chỉ).
@@ -173,8 +190,12 @@ Lưu ý:
 - **Tự động**: khi máy chủ mở, mỗi đêm lúc **3 giờ 15** (giờ Việt Nam) máy chủ tự sao lưu vào `server\data\backups\`.
   Các bản cũ hơn 14 ngày tự bị xoá, nên ổ đĩa không bị đầy.
 - **Sao lưu ngay**: `sao-luu.ps1`. Nên chạy trước khi cập nhật game hoặc trước khi làm việc gì lớn.
-- **Thêm một bản ở nơi khác** (nên làm): mở `server\.env` và thêm dòng `BACKUP_COPY_DIR=D:\SaoLuuHaiPhong3D` (hoặc một thư
-  mục OneDrive). Từ đó mỗi lần sao lưu, script chép thêm một bản sang đó.
+- **Thêm một bản ở nơi khác** (nên làm): mở `server\.env` và thêm dòng `BACKUP_COPY_DIR=E:\SaoLuuHaiPhong3D` (ổ USB hoặc
+  ổ khác của anh). Từ đó mỗi lần sao lưu, script chép thêm một bản sang đó.
+  **Bản sao lưu chứa chat 30 ngày, báo cáo và tài khoản của người chơi — nhiều em còn nhỏ.** Không đặt nó trong thư mục
+  đám mây có chia sẻ (OneDrive/Google Drive dùng chung), không gửi cho ai. Script cảnh báo nếu thư mục chép trông giống
+  thư mục đám mây. (Mã khôi phục trong bản sao lưu đã được "muối" bằng khoá trong `.env`, nên riêng bản sao lưu không đủ để
+  chiếm tài khoản — nhưng chat thì đọc được.)
 - **Lịch của Windows** (lớp thứ hai, không bắt buộc): chạy `cai-lich.ps1` một lần. Windows sẽ chạy `sao-luu.ps1` lúc
   3 giờ 30 mỗi đêm. Gỡ lịch: `cai-lich.ps1 -Go`.
 - Sao lưu lỗi: `trang-thai.ps1` báo **[LỖI]**, và Telegram báo về điện thoại nếu đã cài.
@@ -187,7 +208,13 @@ Lưu ý:
 `-TepSaoLuu "server\data\backups\hp-...dump"` để chọn bản cụ thể.
 - Script hỏi lại. Anh phải gõ **DONG Y** thì script mới chạy tiếp.
 - Script **tự sao lưu dữ liệu hiện tại trước**, để quay lại được nếu chọn nhầm bản.
-- Người chơi bị ngắt khoảng nửa phút. Tiến độ chơi sau thời điểm của bản sao lưu sẽ mất.
+- Người chơi bị ngắt khoảng nửa phút. Tiến độ chơi sau thời điểm của bản sao lưu sẽ mất. **Tài khoản tạo sau thời điểm
+  của bản sao lưu cũng mất**: những người đó cần mã mời mới. Việc khôi phục thật không nằm trong nhật ký quản trị —
+  anh tự ghi lại ngày giờ đã khôi phục.
+
+**Dữ liệu giữ bao lâu:** nhật ký chat 30 ngày (xoá tự động mỗi 6 giờ). Báo cáo đã xử lý / đã bỏ qua: sau 30 ngày bị xoá
+phần chat chép kèm (chỉ còn ai báo cáo ai, lý do, cách xử lý); báo cáo đã bỏ qua bị xoá hẳn sau 90 ngày. Báo cáo đang chờ
+giữ nguyên tới khi anh xử lý. Lịch sử xử phạt và nhật ký quản trị được giữ (cần để biết ai tái phạm và ai đã làm gì).
 
 ## 9. Windows Update: đặt "giờ hoạt động"
 
@@ -196,7 +223,10 @@ Cài đặt → Windows Update → Tuỳ chọn nâng cao → **Giờ hoạt đ�
 trọn giờ chơi thử. Trước buổi chơi lớn, vào Windows Update để cài các bản cập nhật đang chờ và khởi động lại máy sớm.
 **Không tắt Windows Update**: nó vá các lỗ hổng bảo mật.
 
-Sau khi máy khởi động lại, máy chủ **không tự mở**. Anh chạy lại `mo-may-chu.ps1`.
+Sau khi máy khởi động lại, **người chơi không vào được** cho tới khi anh chạy lại `mo-may-chu.ps1`: tunnel và cổng
+`127.0.0.1` (container "portal") không bao giờ tự bật lại (đã sửa 15/10 — trước đó tunnel tự bật lại mà không có tệp đánh
+dấu GPU). Docker có thể tự dựng lại game + cơ sở dữ liệu nếu chúng đang chạy lúc máy tắt đột ngột, nhưng không ai tới
+được chúng. `mo-may-chu.ps1` bật lại đủ mọi thứ, ghi tệp đánh dấu và giữ máy thức.
 
 ## 10. Không chạy kiểm tra đồ hoạ trong giờ chơi
 
@@ -242,14 +272,19 @@ chặn:
    kể cả trang quản trị, bị chặn ngay tại Cloudflare. IP nhà anh không lộ. Tấn công làm nghẽn mạng (DDoS) bị Cloudflare chặn
    phần lớn từ xa.
 3. **Trang quản trị chỉ mở trên máy này**, cần mã dài 32 byte ngẫu nhiên, và từ chối mọi yêu cầu đến từ phía tunnel.
-4. **Máy chủ bị nhốt trong "hộp" Docker**: không có quyền quản trị, không ghi được vào chính nó, không thấy file cá nhân
+4. **Máy chủ không với tới được mạng nhà anh** (thêm 15/10): container game chỉ nằm trong các mạng kín của Docker — nó
+   không ra được Internet, không thấy modem, không thấy các máy khác trong nhà, không thấy các dịch vụ khác đang chạy trên
+   máy anh. Hai cổng `127.0.0.1` và đường gửi Telegram đi qua một container rất nhỏ tên "portal" chỉ chuyển tiếp dữ liệu
+   (không đọc nội dung), và đường ra duy nhất của nó là tới máy chủ Telegram.
+5. **Máy chủ bị nhốt trong "hộp" Docker**: không có quyền quản trị, không ghi được vào chính nó, không thấy file cá nhân
    của anh (Tài liệu, Ảnh...). Thư mục duy nhất của máy anh mà nó được ghi là `server\data\backups` (ngoài ra là hai ổ dữ
    liệu riêng do Docker quản lý: cơ sở dữ liệu và danh sách lọc chat). Máy chủ bị giới hạn tối đa 4 lõi CPU
    và 2 GB RAM, nên dù bị tấn công cũng không làm treo được cả máy.
-5. **Cơ sở dữ liệu nằm trong mạng kín**: không ra được Internet, tunnel cũng không tới được nó.
-6. **Khoá bí mật** chỉ nằm trong `server\.env` trên máy này. Khoá không bao giờ được đưa lên GitHub hay vào trong "hộp" Docker.
-7. **Ổ đĩa không bị đầy**: nhật ký tự xoay vòng, sao lưu tự xoá bản cũ hơn 14 ngày.
-8. **Nút khẩn cấp**: `khoa-khan-cap.ps1` cắt đường vào từ Internet trong 1–2 giây.
+6. **Cơ sở dữ liệu nằm trong mạng kín**: không ra được Internet, tunnel cũng không tới được nó.
+7. **Khoá bí mật** chỉ nằm trong `server\.env` trên máy này. Khoá không bao giờ được đưa lên GitHub hay vào trong "hộp" Docker.
+8. **Ổ đĩa không bị đầy**: nhật ký tự xoay vòng, sao lưu tự xoá bản cũ hơn 14 ngày.
+9. **Nút khẩn cấp**: `khoa-khan-cap.ps1` cắt đường vào từ Internet trong 1–2 giây.
+10. **Không tự mở lại sau khi khởi động lại máy** (mục 9): đường vào từ Internet chỉ bật khi anh chạy `mo-may-chu.ps1`.
 
 **Anh cần luôn bật:** Windows Update, Windows Defender (Bảo mật Windows) và Tường lửa Windows.
 
@@ -264,6 +299,10 @@ chặn:
 - Một cuộc tấn công đủ lớn có thể làm **nghẽn mạng Internet nhà anh** (chậm, rớt mạng). Lúc đó chạy `khoa-khan-cap.ps1`. Máy
   và dữ liệu không bị hại.
 - Mất điện hoặc máy hỏng giữa buổi chơi: mất tối đa tiến độ của khoảng 30 giây cuối. Bản sao lưu đêm vẫn còn.
+- Một người có nhiều địa chỉ mạng (IPv6) có thể giữ hàng nghìn kết nối "chưa đăng nhập" để làm người khác tạm không vào
+  được (mỗi kết nối tự bị cắt sau 10 giây). Đã giới hạn theo dải mạng; nếu thấy trên trang quản trị nhiều người không vào
+  được, chạy `khoa-khan-cap.ps1` rồi mở lại sau ít phút.
+- Trang quản trị nhận yêu cầu từ container "portal" (đường duy nhất từ `127.0.0.1` của máy anh); vẫn cần mã quản trị.
 
 ---
 

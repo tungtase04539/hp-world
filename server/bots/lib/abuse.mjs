@@ -24,6 +24,10 @@ export const ABUSE_CLASSES = {
   flood_state:     { weight: 6 },
   chat_spam:       { weight: 6 },
   speed_hack:      { weight: 40 },
+  // fixer round 1 (NET-1): a fast client clock with positions honest relative to it (time dilation), and the same
+  // combined with a drop + RESUME every 1.5 s (each resume used to re-open a free 5 s learning window)
+  clock_dilation:  { weight: 10, timeoutMs: 8000 },
+  resume_loop:     { weight: 8, needsFull: true, timeoutMs: 10000 },
   teleport:        { weight: 12 },
   chat_bypass:     { weight: 8, timeoutMs: 30000 },
   forged_ticket:   { weight: 6, handshake: true },
@@ -33,7 +37,7 @@ export const ABUSE_CLASSES = {
 };
 // signals that count as "rejected/closed" per class
 const SIG = {
-  close: (cls) => ['bad_opcode', 'truncated', 'text_frame', 'oversize', 'flood_ping', 'flood_state', 'chat_spam', 'speed_hack', 'teleport', 'forged_ticket', 'replayed_ticket', 'bad_proto', 'no_hello'].includes(cls),
+  close: (cls) => ['bad_opcode', 'truncated', 'text_frame', 'oversize', 'flood_ping', 'flood_state', 'chat_spam', 'speed_hack', 'teleport', 'forged_ticket', 'replayed_ticket', 'bad_proto', 'no_hello', 'clock_dilation', 'resume_loop'].includes(cls),
 };
 
 function result(bot, cls) {
@@ -70,7 +74,7 @@ export function installAbuse(bot, cls) {
     if (m.op === S2C.SYSTEM) {
       a.extra['sys' + m.code] = (a.extra['sys' + m.code] || 0) + 1;
       if (m.code === SYS.KICK || m.code === SYS.AUTH_FAILED || m.code === SYS.RELOAD || m.code === SYS.BANNED || m.code === SYS.MUTED) detect(b, 'system' + m.code);
-    } else if (m.op === S2C.CORRECT && (cls === 'speed_hack' || cls === 'teleport')) detect(b, 'correct' + m.reason);
+    } else if (m.op === S2C.CORRECT && (cls === 'speed_hack' || cls === 'teleport' || cls === 'clock_dilation' || cls === 'resume_loop')) detect(b, 'correct' + m.reason);
     else if (m.op === S2C.EVENT && m.type === EVENT.CHAT_REJECTED) {
       if (cls === 'chat_spam') detect(b, 'chat_rejected' + m.args[0]);
       if (cls === 'chat_bypass') {
@@ -164,6 +168,23 @@ function attack(b, cls, a, begin) {
         const v = SPEED.walk * 3;
         bb.x += Math.sin(dir) * v * dt; bb.z += Math.cos(dir) * v * dt; bb.yaw = dir; bb.v = v; bb.mode = MODE.WALK;
         if (now >= bb.nextStateAt) { raw(encodeState(WA, bb.stateMsg({ state: packState(MODE.WALK, 0) }))); bb.nextStateAt = now + 1000 / 15; }
+        return true;
+      };
+      break;
+    }
+    case 'clock_dilation': case 'resume_loop': {
+      // client clock runs RATE× fast; positions advance at 0.95 × run speed of THAT clock (looks honest per client time)
+      const rate = cls === 'clock_dilation' ? 3 : 5;
+      const dir = Math.atan2(-b.x, -b.z);
+      let cl = Math.floor(performance.now() - b.t0), lastDrop = performance.now();
+      a.extra.resumes = 0;
+      b.tickHook = (bb, now, dt) => {
+        if (bb.state !== 'live' || !bb.ws) return true;
+        cl += dt * 1000 * rate;
+        const v = SPEED.run * 0.95 * rate;
+        bb.x += Math.sin(dir) * v * dt; bb.z += Math.cos(dir) * v * dt; bb.yaw = dir; bb.v = v; bb.mode = MODE.RUN;
+        if (now >= bb.nextStateAt) { raw(encodeState(WA, bb.stateMsg({ clientMs: Math.floor(cl) & 0xffff, state: packState(MODE.RUN, 0) }))); bb.nextStateAt = now + 1000 / 15; }
+        if (cls === 'resume_loop' && now - lastDrop > 1500 && !a.detected) { lastDrop = now; if (bb.drop(150)) a.extra.resumes++; }
         return true;
       };
       break;

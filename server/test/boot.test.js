@@ -81,7 +81,8 @@ for (const kind of ['uws', 'ws']) {
 
       // oversize message (> 512 B) is refused by the transport
       const ws2 = await openWs(s.ws + '/play');
-      ws2.send(encodeChat(w, 0, 'x'.repeat(420)));      // 424 B: fine
+      // (fixer round 1: an in-game message before HELLO now closes the socket at once with 1008, so the 424 B CHAT that
+      // used to precede this is no longer sent here — the size limit itself is unchanged)
       ws2.send(Buffer.alloc(600));
       const c2 = await waitClose(ws2);
       assert.ok([1009, 1006].includes(c2.code), `oversize close code ${c2.code}`);
