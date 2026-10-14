@@ -935,3 +935,176 @@ cần đo trên máy chủ Linux riêng (VPS) — số trên đây là cận tr�
 - `server/test/core_move.test.js` có chú thích bị lỗi mã hoá ký tự (mojibake `â†’`) từ trước — vô hại, nên sửa khi S2 mở lại.
 - Harness bot: `stress` có 931 + 695 refresh 401/409 ở lần chạy cũ do bot làm mới token mỗi lần hỏi hàng đợi → nay giữ
   access token 15 phút như client thật; lần chạy cuối 0 lỗi refresh.
+
+---
+
+## 7. Vòng sửa 1 (fixer, 15/10/2026) — 29 phát hiện của 3 người kiểm tra (an ninh, netcode, an toàn + vận hành)
+
+Mỗi mục: nguyên nhân gốc → cách sửa → test hồi quy (`server/test/fix1_regress.test.js`, một test cho mỗi phát hiện, chạy cả
+trong `npm test` lẫn `npm run test:pg`). Các mục cũ ở §2.4, §2.5, §2.7, §3, §5 được thay bằng nội dung dưới đây khi khác.
+
+### 7.1 Ngân sách thời gian mới (NET-1, NET-3, NET-4) — `js/shared/move.js`
+
+Nguyên nhân gốc: (a) 5 s "học" sau mỗi reset cho `base` đi theo offset **không giới hạn**, và RESUME gọi `reset` → mỗi lần
+resume mở lại cửa sổ học (đồng hồ ×30 đi 262 m trong 4,5 s, lặp vô hạn); (b) mỗi vi phạm TIME đặt lại `base` 100 ms dưới
+mẫu gian → đồng hồ nhanh tới ~1,19× không bao giờ bị CORRECT và cộng thêm vào độ nới 1,2×; (c) trần "trễ +200 ms sau 10 s"
+nâng `base` lúc bufferbloat kéo dài, nên khi hàng đợi xả, người chơi trung thực bị chấm như đồng hồ nhanh.
+
+Mô hình mới:
+- Không còn cửa sổ học tự do. Mẫu đầu sau reset (vào mới / takeover = trang mới, gốc đồng hồ mới) đặt `base`.
+- `base` chỉ hạ theo trôi 2 ms/s; phần hạ sâu hơn trừ vào **xô tha thứ** mỗi phiên (`FORGIVE_BURST_MS` 2.000 ms, nạp
+  `FORGIVE_PER_S` 10 ms/s = 1 %). Xô **không** được nạp lại khi reset/RESUME (vòng takeover không lấy thêm được).
+- **Thời gian hiệu dụng** `E = min(C, serverMs − base + 100 ms)` thay cho đồng hồ client trong cửa sổ quãng đường: đồng hồ
+  nhanh không còn mua thêm quãng đường ngoài phần đã tha → nó tự vượt cửa sổ SPEED và bị CORRECT. Đo (`learn_exploit`
+  của người kiểm tra, mô hình chạy ở giới hạn nới): ×1,1 / 1,15 / 1,19 trong 300 s → ≤ 8,6 m/s (trung thực ở giới hạn nới
+  8,4 m/s; trước sửa 9,27 m/s ở ×1,19); ×1,19 trở lên bị CORRECT rồi kick. Đồng hồ ×5 / ×30 ngay sau reset: bị
+  CORRECT/kick, quãng đường ≤ trung thực + phần tha (trước: 262 m / 4,5 s, 0 CORRECT).
+- Điểm TIME vẫn được tính (một lần mỗi 200 ms "đi trước" MỚI, mốc chấm điểm riêng `sbase`) — chỉ để phát hiện; một gói đầu
+  bị kẹt > 2 s của người trung thực tốn vài điểm và tối đa 1 CORRECT, không bao giờ một chuỗi.
+- Trần tín dụng trễ `LAG_BANK_MS` = **2,5 s** (thay +200 ms của SPEC — lệch có chủ ý): bufferbloat 1–2,5 s kéo dài rồi xả
+  không còn bị chấm. "Tích thời gian" bằng đồng hồ chậm rồi nhanh bị chặn ở 2,5 s × vmax một lần, không tăng tốc độ trung
+  bình. Bản mô phỏng `honest_net` của người kiểm tra: 11/11 hồ sơ mạng 0 vi phạm, 0 CORRECT (trước: bloat 2 s → TIME 7,
+  CORRECT 2).
+- RESUME **không** reset bộ kiểm (giữ mốc thời gian, cửa sổ 1 s, xô tha thứ): client phải giữ đồng hồ `clientMs` qua một
+  lần nối lại (cùng trang; bot đã đúng như vậy). RESUME tính vào hạn mức `helloAccount` (1/s, burst 10) như HELLO có vé.
+- Takeover bằng vé (trang mới) bắt đầu ĐÚNG tại avatar đang sống: **không** cộng thưởng mẫu đầu 15 m + 1 s (trước: vòng
+  takeover 0,5 lần/s cộng ~15 m/s). Vào mới (avatar chưa có trong thế giới) giữ thưởng (lệch điểm xuất hiện).
+- Bot: thêm lớp tấn công `clock_dilation` (đồng hồ ×3, vị trí "trung thực" theo đồng hồ đó) và `resume_loop` (×5 + rớt +
+  RESUME mỗi 1,5 s); hạn phát hiện 2 s cho hai lớp này (xô tha thứ 2 s là thiết kế) — `bots/lib/report.mjs abuseLimitMs`.
+
+### 7.2 CORRECT mất khi rớt mạng (NET-2), NAMES sau resume (NET-10), backpressure (NET-11)
+
+- `Validator.reset` không còn được gọi khi RESUME nên `pending` sống qua resume; `attach(resumed)` gửi lại
+  `CORRECT(SERVER_MOVE, epoch hiện tại)` ngay sau `SYSTEM RESUMED` nếu còn chờ. `onStale` khi **không** có gì chờ (lệch
+  trạng thái) cũng gửi lại CORRECT ngay (và đếm như một lần chờ) — không bao giờ đứng hình im lặng.
+- Resume xoá `aoi.namesSent` + `pendingNames`: keyframe resume ENTER lại mọi slot nên mỗi tên được gửi lại một lần
+  (~30 B/người thấy).
+- Bỏ snapshot vì `bufferedAmount > 16 KB` **không** còn ép keyframe (aoiStep không chạy → trạng thái AOI vẫn khớp client;
+  P1 là bản ghi tuyệt đối). Keyframe chỉ còn ở READY và RESUME. Lệch có chủ ý so với SPEC §3.2 ("lần sau là keyframe").
+
+### 7.3 AOI đẳng hướng (NET-5), độ cao (NET-6), ngồi sau (NET-7)
+
+- Ứng viên AOI lấy từ **mọi ô giao với hình vuông [x ± (rKeep + HYST)]** của vị trí thật người xem
+  (`js/shared/grid.js cellsInRange`, ≤ 7×7, thường 4×4) thay cho 3×3 ô quanh ô có trễ (chỉ bảo đảm ~112 m). `world.forNear`
+  (chat 40 m, ngồi sau) dùng cùng cách. Test: thực thể ở R_NEAR − 3 m và R_FAR − 2 m thấy được từ mọi vị trí/hướng.
+- `y` của STATE được **kẹp** trước khi người khác thấy (`move.js clampY`): mặt đất (`groundHeight`, gồm mặt cầu phố) ±
+  1,5 m (+ đỉnh nhảy 0,81 m ở chế độ AIR); trong hành lang cầu / đường trên cao (`onBridge`: BRIDGE_WAYS, ELEVATED_RI — nhịp
+  HVT, nút xoắn) mọi độ cao ≥ đất − 1,5 m (độ cao mặt cầu chưa mô hình hoá trong js/shared); thuyền ≤ 3,5 m. Kẹp, không phạt
+  (không CORRECT oan khi mặt nền client hơi khác); metric `hp_y_clamped_total`. **Gia tốc chưa kiểm** (ARCH §12 mục 3) —
+  header `validate.js` đã sửa cho đúng; cửa sổ 1 s / 300 ms giới hạn phần lợi.
+- Ngồi sau: bán kính = 4 m + vmax(xe) × (tuổi mẫu nhận cuối của người lái + của người ngồi, mỗi cái ≤ 2 s). Tài xế bị kẹt
+  TCP 1,5 s cách 20 m vẫn hợp lệ; tài xế tươi cách 20 m thì không.
+
+### 7.4 Thang suy giảm thấy độ trễ vòng lặp (NET-8) và giá trị số đo (NET-9)
+
+- Giá trị quyết định = max(p90 thời lượng tick, **p90 độ trễ BẮT ĐẦU tick − 16 ms**). `app.timers.loop` truyền `lateMs`;
+  `DegradeLadder.observeLate`. 16 ms = một nhịp timer Windows (vòng 20 Hz rảnh trễ p50 ~7, p99 ~15 ms). Log/metric:
+  `decide`, `tickP90`, `lateP90`. Lệch ARCH §5 (p99 thời lượng tick) có chủ ý, ghi tại đây.
+- Đọc số: trên Windows `event-loop p99` có sàn ~16 ms (độ phân giải timer), nên tiêu chí "< 20 ms" chỉ còn ~4 ms thật. Các
+  "khựng 1 Hz" chỉ xuất hiện khi chạy tải (người kiểm tra: khoảng cách 936 ms lúc tải, 2.860 ms lúc rảnh) → **không** còn
+  coi là nhiễu của máy đã được chứng minh; p99 tick ở 1.200 CCU là cận trên khi bot và máy chủ chung máy, cần đo lại với bot
+  ở máy khác trước khi kết luận (xem 7.9).
+
+### 7.5 Hàng chờ / chỗ giữ (SEC-1 = NET-12)
+
+`queue.reserve` giữ **một** chỗ mỗi tài khoản (vé mới thay vé cũ; `release` theo nonce chỉ xoá nếu còn là chỗ hiện tại);
+chỗ của chính tài khoản được tính là trống khi nó hỏi lại (không tự xếp hàng sau mình). Test: 1 tài khoản hỏi 8–15 vé → 1
+chỗ; tài khoản khác vẫn vào.
+
+### 7.6 An ninh (SEC-2..7)
+
+- **Báo cáo hùa (SEC-2 = SO-5)**: báo cáo `counts` (tính vào tự khoá) chỉ khi có **bằng chứng** (dòng `chatRef` của người bị
+  báo cáo trong 10 phút, hoặc một dòng đã giao, không ẩn, trong 60 m quanh người báo cáo trong 10 phút) VÀ người báo cáo
+  **đáng tin** (tài khoản ≥ 1 ngày, ≥ 30 phút chơi); đếm người khác nhau theo tài khoản VÀ theo IP công khai (/64; IP
+  riêng/loopback không gộp). Mọi báo cáo vẫn vào hàng chờ. Thang tự động từ báo cáo dừng ở mute 24 h (không bao giờ ẩn tin).
+  "Bỏ qua" một báo cáo gỡ luôn khoá tự động mà nó gây ra. Migration `024_report_evidence.sql` (`evidence`, `counts`,
+  `reporter_ip`, `hits`, `purged_at`).
+- **Mạng của container game (SEC-3)**: game chỉ còn trên mạng internal (`edge`, `backend`, `adminlink` mới). Container
+  **portal** (`server/ops/portal.mjs`, cùng ảnh nhưng chỉ chạy bộ chuyển TCP tối giản, read-only, non-root, 1 CPU / 128 MB /
+  64 pid, restart no) là container DUY NHẤT trên `hostlink`: giữ `127.0.0.1:9100/9101` và một lối ra cố định
+  `portal:8443 → api.telegram.org:443`. `ADMIN_ALLOW_IPS = HPMP_PORTAL_IP/32` (địa chỉ cố định trên `adminlink`).
+  Cảnh báo Telegram đi `TELEGRAM_VIA=portal:8443` (https.request với `servername: api.telegram.org`, kiểm chứng chỉ đầu-cuối).
+- **Khôi phục (SEC-4)**: mã sai định dạng bị từ chối TRƯỚC mọi hạn mức; `recoverGlobal` chỉ còn cảnh báo (không chặn);
+  recover/guest theo IP gộp /48.
+- **Mã khôi phục (SEC-5)**: lưu `HMAC-SHA256(RECOVERY_PEPPER, mã)` (`recovery_hash_v = 2`, migration `011_recovery_pepper.sql`);
+  `RECOVERY_PEPPER` là bí mật mới trong `server/.env` (tự sinh; `chung.ps1` kiểm). Dòng cũ (sha256 trần) được nâng cấp ở lần
+  khôi phục thành công kế tiếp. Bản sao lưu chép sang thư mục khác: cảnh báo khi trông giống thư mục đám mây; VAN_HANH §8.
+- **Giữ dữ liệu (SEC-6)**: job purge (6 giờ/lần) xoá `context` (bản chép chat) của báo cáo đã xử lý/bỏ qua quá
+  `CHAT_LOG_DAYS`, xoá báo cáo bỏ qua quá 90 ngày; báo cáo đang mở giữ nguyên.
+- **IPv6 / socket chưa HELLO (SEC-7)**: `ipKey` mở rộng IPv6 đầy đủ (`net.isIPv6` + phân tích; IPv4-mapped → IPv4) rồi
+  gộp theo /64 (mặc định) hoặc /48 (pool socket chưa HELLO, recover, guest, /probe); socket chưa HELLO gửi bất kỳ tin nào
+  ngoài PING/HELLO bị đóng 1008 ngay. **Chưa làm**: "connect token" HMAC trong `Sec-WebSocket-Protocol` để chỉ tài khoản đã
+  đăng nhập mới chiếm được pool — rủi ro còn lại ghi trong VAN_HANH §13.
+- Phụ: giới hạn `/v1/chat/*` dùng token bucket có trần bộ nhớ (trước: `Map.clear()` khi > 50k khoá → reset hạn mức của
+  mọi người); `/probe` và `/v1/netprobe` gộp IP (/48, /64), hạn mức theo IP chạy trước hạn mức toàn máy; router không còn
+  500 khi `%` hỏng; hành động quản trị có thời hạn bắt buộc nhập số ngày (ô trống từng = cấm VĨNH VIỄN).
+
+### 7.7 An toàn trẻ em và bộ lọc (SO-1..7)
+
+- **Dụ dỗ leo thang (SO-1)**: trong 10 phút mỗi tài khoản có MỘT báo cáo lọc đang mở; mọi dòng bị đánh dấu sau đó được
+  **nối vào** (`hits`, lý do, chính dòng đó vào `context`) thay vì bị bỏ. Từ lần dò thông tin cá nhân thứ 2 → cảnh báo
+  Telegram `grooming`. Trang quản trị: nhãn "AN TOÀN TRẺ EM — xem trước", "N lần bị đánh dấu", cờ an toàn luôn xếp đầu.
+- **Số điện thoại lách (SO-2)**: chữ giống số trong token có chữ số (`l2`, `o9l2З4S6789`: o→0, i/l/|→1, z→2, s→5, b→6,
+  g/q→9), số đếm tiếng Anh (`zero … nine`), số đếm dính chữ số (`khong9mot2…`, `0nine1two…`), và **số tách nhiều dòng**:
+  dịch vụ chat giữ chữ số của ≤ 4 dòng "nhiều số" trong 60 s và kiểm chuỗi ghép (`isPhoneDigits`: 0/84 + 8–10 số, ≥ 3 chữ số
+  khác nhau) → chặn + cờ.
+- **Tự hại + chữ tục (SO-3)**: dòng bị chặn vẫn trả `support` → gateway gửi `EVENT SUPPORT_LINE` TRƯỚC `CHAT_REJECTED`;
+  không tính lỗi (strike) cho dòng có ý tự hại.
+- **Xử phạt không đóng cờ an toàn (SO-4)**: hành động trên một báo cáo chỉ đóng các báo cáo NGƯỜI CHƠI đang mở về người đó;
+  báo cáo của bộ lọc (tự hại, dò hỏi…) giữ mở.
+- **Bộ lọc (SO-6, SO-7)**: (a) `dịt` (giữ dấu thanh, đ→d) = lách `địt` trừ khi chính từ có dấu đó vô hại (`dĩ`, `cút`);
+  (b) chữ cách quãng có dấu (`đ ị t m ẹ`) chạy cả so khớp "dính trong từ"; (c) dòng token chưa ghép chữ đơn được so khớp
+  thêm (`nhà e ở đâu`, `m ở quận nào`); (d) `~`/`_` cho phép số tiền chen giữa (`nạp 50k thẻ`, `free 1000 kc`);
+  (e) danh sách: tự hại có từ chen (`tớ chỉ muốn chết`), dụ dỗ (`bật cam`, `đừng nói với bố mẹ`, `bí mật … đứa mình`, `ở nhà
+  1 mình`…), tục/tình dục/miệt thị/lừa đảo/giả danh quản trị theo danh sách người kiểm tra; tên mạng xã hội bị viết lách
+  (`za.lo`, `z@lo`) = chia sẻ liên hệ. Dương tính giả: thêm `allow.txt` (`ức hiếp`, `hiếp đáp`, `vú nuôi`, `bà vú`, `đồ bóng
+  đá/chuyền/rổ`, `mẹ/bố mày gọi/bảo/đón…`), bỏ `vđ` khỏi `mild.txt`. Tên nhân vật: từ cấm ngắn + số (`BQT01`) và tên mạng xã
+  hội + ≥ 3 số (`Zalo09123`) bị từ chối. 142 câu lách + 142 câu vô hại MỚI của người kiểm tra đã nhập vào
+  `test/fixtures/chat_bad.txt` / `chat_ok.txt`. Đo: câu lách mới bắt **96,5 %** (trước 52,8 %), câu vô hại mới dương tính
+  giả **1,4 %** (2 câu bị CHE: `vl` = vật lý, `cl` = chất lượng; trước 5,6 % gồm chặn + cảnh báo `hate`); toàn bộ corpus:
+  bắt 97,7 % (469/480), câu thường qua 99,7 % (672/674). Còn lọt: `kb zép`, `kênh yt … hp3dvn`, `3//`, hẹn gặp ở cổng
+  trường, `mai đi chơi với anh không` (cố ý không bắt: câu rủ chơi thường gặp).
+
+### 7.8 Vận hành (SO-8..10)
+
+- **Không tự bật lại sau khi khởi động lại máy (SO-8)**: `restart: "no"` trong khuôn `x-hardening` (portal, tunnel, quick
+  tunnel, backup); game và db `on-failure:5` (chỉ dựng lại khi sập lúc đang chạy; nếu Docker dựng lại chúng sau khi khởi
+  động lại máy thì không ai tới được vì portal/tunnel không bật). Đường vào luôn qua `mo-may-chu.ps1` (tệp đánh dấu GPU +
+  giữ máy thức).
+- **Cửa sổ script (SO-9)**: `chung.ps1 Wait-Dong/Exit-Ops` — mọi script của chủ dự án dừng chờ Enter khi tiến trình cha là
+  Explorer (nhấp phải → Run with PowerShell); không dừng trong cửa sổ PowerShell sẵn có, `HPMP_TEST=1`, `HPMP_NO_PAUSE=1`.
+- **Tunnel tạm (SO-10)**: sau khi có URL, `mo-may-chu.ps1 -TamThoi` hỏi DNS công cộng `1.1.1.1` (KHÔNG qua modem, để không
+  "đầu độc" bộ nhớ phủ định của modem) tới khi tên phân giải được (≤ 90 s), đợi thêm 10 s rồi mới in địa chỉ.
+
+### 7.9 Số đo vòng sửa 1 (máy chủ dự án, 15/10/2026, cổng 9175/9176, Postgres 17 `127.0.0.1:55441`, bộ `hpmp-fix`)
+
+Máy chủ chạy thẳng trên Windows (uWS) với Postgres 17 Docker, `INVITE_REQUIRED=false`; mọi kịch bản chạy dưới
+`tools/qa/gpulock.mjs`; bot cùng máy (tiến trình con). Báo cáo đầy đủ: scratchpad `mp/fix1/run/*` (không commit).
+
+| Kịch bản / kiểm tra | Đo được (vòng sửa 1) | Kết quả |
+|---|---|---|
+| smoke 50 | 50/50; 0 lỗi giải mã; 0 CORRECT; tick p99 2,75 ms; snapshot p95 71 B; RSS 89 MB; event-loop p99 18,8 ms | ĐẠT |
+| abuse 200 (16 lớp, thêm `clock_dilation`, `resume_loop`) | 16/16 lớp 100 % trong hạn; speed_hack 46/46, p50 462 / max 611 ms; **clock_dilation 11/11 CORRECT, p50 1.376 / max 1.505 ms** (hạn 2 s); **resume_loop 9/9 CORRECT, p50 790 / max 849 ms**; lách lọc: 0 câu lọt nguyên văn | ĐẠT |
+| reconnect 1.000 (resume giữ bộ kiểm) | **1.000/1.000** đúng netId; bắt tay resume p50 4,5 / p95 47,5 / max 267 ms; **0 CORRECT** cho bot trung thực sau resume | ĐẠT |
+| netem-lite 300 | 300/300; 0 CORRECT (90 bot netem: max 0/phút); RTT netem p50 186 / p95 511 ms; resume 36/36 | ĐẠT |
+| ramp 0 → 1.200 + giữ 5 phút | 1.200/1.200 vào; 0 lỗi; **0 CORRECT**; snapshot p95 242 B; RSS 207 MB; resume 186/186; tick p50 18,7 ms, **p99 70–78 ms; event-loop p99 84–229 ms**; thang **L0→L1→L2→L3→L4 (10 s)→L3→L2→L3→L2** — thang giờ THẤY độ trễ vòng lặp (trước: L1–L2 với cùng tải) | ĐẠT trừ tick / event-loop p99 (TRƯỢT như trước, xem 7.4) |
+| e2e của người kiểm tra: đồng hồ ×10 + RESUME lặp (`e2e_learn`) | vòng 0: **18 m trong 4,5 s, 3 CORRECT** rồi bị kick (trước: 262 m, 0 CORRECT, lặp vô hạn) | ĐẠT |
+| e2e: CORRECT mất + RESUME (`e2e_lostcorrect`) | CORRECT được gửi lại (5 lần) rồi kick client không áp dụng (trước: 0 lần, đứng hình vĩnh viễn) | ĐẠT |
+| attack harness (an ninh): 1 tài khoản hỏi /v1/join 15 lần | chỗ giữ **1** (trước 10); tài khoản khác nhận vé | ĐẠT |
+| Docker (bộ `hpmp-fix`, 9175/9176, ảnh build mới) | `mo-may-chu.ps1 -TestMode` 26 s; migration 001, 010, **011**, 020–023, **024**, 030 trên Postgres 17; /healthz qua portal: uws, db ok; 20 bot qua portal 20/20, 0 CORRECT, tick p99 0,93 ms, event-loop p99 5,9 ms | ĐẠT |
+| Docker: container game KHÔNG ra được mạng nhà (SEC-3) | từ game: `host.docker.internal:54321` EAI_AGAIN, `192.168.1.1` ENETUNREACH, gateway hostlink ENETUNREACH, `https://example.com` EAI_AGAIN; `db` tới được; Telegram qua `portal:8443`: HTTP 302, chứng chỉ CN `api.telegram.org`; admin từ mạng `edge` 403, từ máy (qua portal) 401 không token / 200 có token; cổng game `/admin` 404 | ĐẠT |
+| Docker: quick tunnel qua mạng mới + đợi DNS (SO-10) | `-TamThoi` 21 s (DNS 1.1.1.1 có ngay); qua tunnel `/healthz` 200, `/admin` `/metrics` `/admin/api/live` 404; `khoa-khan-cap` 1,9 s; `tat-may-chu -XoaDuLieuThu` 7,3 s, không còn gì nghe 9175/9176 | ĐẠT |
+| Bộ lọc: 142 câu lách MỚI / 142 câu vô hại MỚI của người kiểm tra | bắt 96,5 % (trước 52,8 %); dương tính giả 1,4 % (chỉ CHE, trước 5,6 % gồm chặn) | ĐẠT |
+| `npm test` (PGlite) · `npm run test:pg` (Postgres 17, `hpmp-fix:55441`) | **147 xanh + 1 bỏ qua** (148) · **61/61** (thêm `fix1_regress.test.js`) | ĐẠT |
+
+### 7.10 Còn mở sau vòng sửa 1
+
+- Connect token cho `/play` (SEC-7) — chưa làm; pool socket chưa HELLO vẫn có trần toàn máy 5.000 (giới hạn theo /48).
+- Kiểm gia tốc (ARCH §12 mục 3) — chưa làm; độ cao mặt cầu nâng chưa mô hình hoá trong `js/shared` (cho mọi độ cao trong
+  hành lang cầu).
+- Quick tunnel vẫn chuyển mọi đường dẫn tới `game:9100` (cổng game trả 404 cho /admin, /metrics — đã kiểm); named tunnel có
+  ingress 4 đường dẫn.
+- Mã khôi phục vẫn vĩnh viễn; chưa có "đổi mã + đăng xuất thiết bị khác" sau khi khôi phục.
+- `/v1/chat/filter` vẫn công bố mọi danh sách (cũng có trong repo công khai).
+- Bộ lọc: các câu còn lọt ở 7.7; danh sách cần người Việt bản ngữ duyệt sau buổi đầu.
+- Ramp 1.200 cần đo lại với bot ở máy khác (NET-9) trước khi kết luận về p99 tick.

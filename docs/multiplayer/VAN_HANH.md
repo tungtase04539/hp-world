@@ -121,6 +121,8 @@ Trên trang quản trị (`http://127.0.0.1:9101/admin`):
   khác (ví dụ chửi bậy) **không** đóng các cờ an toàn này — anh phải tự xem và đóng.
 - Người bị **cấm** có hạn (ví dụ 1 ngày) bị ngắt ngay và không vào lại được tới khi hết hạn. Cấm vĩnh viễn khoá luôn tài
   khoản. Gỡ xử phạt: tab **Người chơi** → mở người đó → nút **Gỡ**.
+  Muốn **rút ngắn** một khoá đang có (ví dụ khoá tự động 24 giờ → 10 phút): bấm **Gỡ** trước rồi khoá lại; khoá mới
+  ngắn hơn không thay được khoá dài đang chạy. **Cấm** và **Ẩn tin** bắt buộc nhập số ngày (0 = vĩnh viễn, trang hỏi lại).
 - **Khung chat trực tiếp**: các dòng bị đánh dấu được tô màu.
 - **Thông báo**: gửi một dòng cho mọi người, ví dụ "Máy chủ bảo trì sau 5 phút". Nút **Báo khởi động lại** hiện đồng
   hồ đếm ngược cho mọi người chơi.

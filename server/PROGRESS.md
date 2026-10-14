@@ -70,3 +70,13 @@
   ở 1.200 CCU trên máy này (nhiễu máy + chi phí send của Windows) — SERVER.md §6.4 / §6.6.
 - Dọn: không còn container / volume / ảnh `hpmp-integ*`, không còn gì nghe 9150/9151/55437; `server/.env`, `server/data`
   thử đã xoá.
+
+## Vòng sửa 1 (fixer, 15/10/2026) — XONG
+
+- Sửa 29 phát hiện (an ninh SEC-1..7, netcode NET-1..12, an toàn/vận hành SO-1..10) + phần lớn ghi chú "nice to have";
+  chi tiết từng mục, nguyên nhân gốc và số đo: SERVER.md §7. Client cần biết: CONTRACT.md §7.
+- Test: `test/fix1_regress.test.js` (21 test, một cho mỗi phát hiện); `npm test` 147 xanh + 1 bỏ qua; `npm run test:pg`
+  61/61 (Postgres 17 `hpmp-fix:55441`, đã dọn).
+- Kịch bản bot (GPU lock, 9175/9176): smoke, abuse (16 lớp), reconnect 1.000, netem-lite, ramp 1.200; Docker `hpmp-fix`
+  (portal + mạng internal, quick tunnel, khoá khẩn cấp, tắt). Dọn: không còn container / volume / mạng / ảnh `hpmp-fix*`,
+  không còn gì nghe 9175/9176/55441; `server/.env` và `server/data` thử đã xoá.
