@@ -455,6 +455,39 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-10-14 (Đ3-W4 TÍCH HỢP)** [ĐỢT 3 WAVE 4 — gộp 3 nhánh lên `dot3` (c24a52e) theo thứ tự A → C → B, `--no-ff`]:
+    **Gộp:** W4-A VÂN TAY (`worktree-wf_a4af6823-53d-59`, a926c6d) sạch; W4-C FACADE KIT (`…-53d-2`, 8698668) xung đột 7 khúc
+    trong `js/citygen.js` (KNOWLEDGE tự gộp union); W4-B NATURE-LIFE (`…-53d-1`, 9d77ab4) sạch (props/trees/streetlife/treemap/
+    props_evidence — không chồng file với A/C). **Giải xung đột citygen (giữ ý cả 2 phía):** (1) khối vân tay A (`FP_ENUMS`/
+    `fpRenderStyle`/`fpPanel`/`fpBuild`) + `FIXED_G` có `RS.HOTEL` (C); (2) `NOSIGN_ST` + HOTEL và `NOHOME_ST` (C) + tham số `fg`
+    của `groundModule` (A) — thân hàm: `fg > 0` → bộ FGk TRƯỚC, rồi luật `NOHOME_ST`; (3)(4) shader GL2/GL1: `home = st != CONS &&
+    st != HOTEL && …` (C) rồi `if (fpG > 0.5) m = pickFGi(…)` (A) — JS/GL2/GL1 vẫn khớp bit; (5) program key MỚI `'fabric_v4ac_'`
+    (cả 2 nhánh đổi shader); (6) tuổi: tuổi vân tay (A) RỒI kẹp khách sạn ≤ 1 (C); (7) biển quảng cáo trên mái: luật vân tay (A)
+    nhưng KHÔNG BAO GIỜ trên HOTEL (C) ở cả 2 nhánh điều kiện.
+    **Nghĩa vụ chéo A × C (sửa ở bước gộp):** (a) `fpRenderStyle` 'hotel_tower' → `RS.HOTEL` CHỈ khi ≥ 4 tầng VÀ ≥ 600 m²; còn lại
+    giữ TOWER (≥ 7 T)/GLASS như A — đo: 53 nhà vân tay 'hotel_tower', 46 nhà < 300 m², 31 nhà ≤ 3 T (nhà nghỉ ống hẹp; đổi hết
+    sang khung đá + sảnh kính là sai); (b) KHÁCH SẠN từ bằng chứng FEF của C (pano_359/230) GIỮ khi vân tay chỉ ra GLASS/TOWER/
+    MODERN/NEO/CIVIC (`hotelEv`, `stats.fpHotelKeep`) — nếu không vân tay "neoclassical/glass" của pano_359 lật lại hồi quy wave 3
+    mà C vừa sửa; (c) `fpBuild`: kiểu HOTEL → gs = 0 (không bộ FG; sảnh `G_LOBBY` qua FIXED_G — biển cửa hàng trên sảnh khách sạn sai).
+    **Sinh lại (2 lần, cùng byte; so nội dung bỏ qua CRLF — xem bẫy autocrlf ở mục W4-A):** `gen_facade_fp --collect keep/fp_json
+    keep/fp_plan.json` (3.306 file, 15.934 quan sát) = audit/facade_fp.json đã gộp; `process_buildings` md5 eb0710b4 (= W4-A,
+    43.219 nhà) — C/B không đổi đầu vào của nó; `gen_fp_nature --fp keep/fp_json` (551 pano) → `gen_treemap` → `gen_props_evidence`
+    = bản B. Không commit sinh lại nào (không đổi). process_osm/ROADS_DT không đổi (không nhánh nào chạm đầu vào). gen_landuse không
+    chạy (thiếu tools/osm_landuse.json; nhà RB chỉ dùng cho ảnh --ppm, landuse_data.js không phụ thuộc buildings_real).
+    **Cổng (tier 3, ANGLE Radeon 890M D3D11, :8801):** node --check 18 file (world.js qua bản .mjs) · waterbfs 5/5 · check_assets
+    ĐỦ (8b8e42c) · diag full "TẤT CẢ THỰC THỂ OK — 0 lỗi JS" (overlap 1 ở (259,110) — đã có từ wave 3) · diag lite OK, mọi bất biến
+    0 · mobile OK 0 lỗi · std ×2 + 12 khung kiểm chéo (359/423/106/230/088/023/193/115/538/345/281/224) + cùng 12 khung `--gl1`
+    (webgl2 false): 0 lỗi JS; mặt tiền GL1 = GL2 (nền phẳng ở GL1 là có sẵn từ dot3). Mắt (REAL | dot3 | tích hợp): 359 h0 khung
+    đá + kính (không về NEO be), 230 h90 khách sạn + sảnh kính + mái sảnh, 106 h90 rào "ĐANG THI CÔNG" giữ, 115 h270 bãi đất +
+    container, 224 h270 khuôn viên Hải quân không biển, 088 h90 hàng xe máy dày. 423 h0: 'VÀNG BẠC' của dot3 KHÔNG còn — y hệt ảnh
+    W4-A r3 (vân tay nhà đó: cửa xếp/không biển; ảnh thật cũng không có biển vàng bạc) ⇒ không phải lỗi gộp.
+    **Perf cùng phiên (std 24 khung ×2 xen kẽ, dot3 git archive :8802 ↔ tích hợp :8801, traffic off, pin):** hpReady 5.237/4.993
+    → 5.086/5.145 ms (TB 5,12 s cả hai); calls TB 378,3 → 382,4 (+1,1 %); tris TB 2,865 → 2,990 M (+4,3 %; tệ nhất pano_092 h0
+    +9,1 %, 102 h90 +7,4 % — xe máy dày B + gờ phào/trụ áp C); fps 60 (trần) mọi khung; bước khởi động final 692 → 794 ms (+100:
+    xe máy/người B), freeze 210 → 237, fabric ≈. Heap `usedJSHeapSize` cuối lượt chụp 482/474 → 587/618 MB NHƯNG sau
+    `HeapProfiler.collectGarbage` (CDP, 2 lượt xen kẽ) 427 → 449 MB (+22 MB, +5 %) ⇒ phần lớn là rác chưa thu, không phải giữ lại.
+    BẪY: số heap của shoot.mjs/perf.mjs KHÔNG gom rác trước khi đo — so A/B heap phải ép GC qua CDP.
+
 - **2026-10-14 (Đ3-W4-A VÂN TAY MẶT TIỀN)** [ĐỢT 3 wave 4 — mặt tiền theo ĐÚNG từng ngôi nhà trong ảnh pano thật]:
     **DỮ LIỆU:** agent trích xuất đọc 3.306 ảnh pano cắt (551 pano × 6 hướng gần vuông góc phố, FOV ngang ≈ 98°) → mỗi nhà thấy
     được: x0..x1 trong ảnh, độ sâu near/mid/far, tầng, màu tường #hex, kiểu (14 loại), ban công, cửa sổ, tầng trệt, biển (nền/chữ/
