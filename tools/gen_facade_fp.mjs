@@ -47,7 +47,16 @@ export function collectFP(dir, planFile) {
     const heading = +m[2];
     const B = Array.isArray(j.buildings) ? j.buildings : [];
     if (!B.length) st.empty++;
-    for (const b of B) {
+    for (let b of B) {
+      // ghi LỆCH 1 CỘT từ widthM (97 quan sát/18 ảnh, vd pano_446: widthM = '#b8a890', wallName = 'tube_old', ground = '#2060b0'…)
+      // → dời lại: mất widthM, phần còn lại đúng thứ tự
+      if (typeof b.widthM === 'string' && /^#[0-9a-f]{6}$/i.test(b.widthM.trim())) {
+        const s = b.sign && typeof b.sign === 'object' ? b.sign : {};
+        b = { x0: b.x0, x1: b.x1, depth: b.depth, floors: b.floors, floorsSure: b.floorsSure, widthM: null, wall: b.widthM, style: b.wallName,
+          balcony: b.style, windows: b.balcony, ground: b.windows, sign: { present: s.present, bg: b.ground, fg: s.bg, size: s.fg, floorSpan: s.size },
+          awning: s.floorSpan, roof: b.awning, age: b.roof };
+        st.shiftFixed = (st.shiftFixed || 0) + 1;
+      }
       let x0 = +b.x0, x1 = +b.x1;
       if (!(x0 >= 0 && x1 <= 1.0001 && x1 > x0 + 0.005)) { st.droppedObs++; continue; }
       const sg = b.sign && typeof b.sign === 'object' ? b.sign : {};
