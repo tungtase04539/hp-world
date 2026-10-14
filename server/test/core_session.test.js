@@ -110,6 +110,9 @@ test('one session per account; resume within 60 s keeps netId (AWAY meanwhile); 
     assert.equal(A2.welcome.netId, A.welcome.netId);
     A2.c.ready();
     await A2.c.wait(snapWith((m) => (m.flags & SNAP_FLAG.KEYFRAME) !== 0));
+    // a new page knows no names yet: they are sent again
+    const nm = await A2.c.op(S2C.NAMES);
+    assert.deepEqual(nm.names.map((n) => n.netId), [B.welcome.netId]);
     assert.equal(s.app.get('sessions').load(), 2);
     // network drop → limbo: B sees A as AWAY, then A resumes with its token
     const token = A2.welcome.resumeToken;

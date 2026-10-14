@@ -69,7 +69,7 @@ export class Session {
 }
 
 // deps: object whose (possibly lazy getter) properties resume / vehicles / queue are the other services (optional)
-export function createSessions({ log, metrics, bus, db, now = () => performance.timeOrigin + performance.now(), deps = {} }) {
+export function createSessions({ log, metrics, bus, db, now = () => performance.timeOrigin + performance.now(), deps = {}, tickHz = TICK_HZ, snapHz = SNAP_HZ }) {
   const world = new World();
   const byAccount = new Map();
   const active = [];             // sessions receiving snapshots (swap-remove via s._ai)
@@ -77,7 +77,7 @@ export function createSessions({ log, metrics, bus, db, now = () => performance.
   const ended = [];              // persistence rows of sessions that ended since the last flush
   let phaseRR = 0;
   let flushing = Promise.resolve(0);
-  const div = Math.max(1, Math.round(TICK_HZ / SNAP_HZ));
+  const div = Math.max(1, Math.round(tickHz / snapHz));   // snapshot phases (sim.js uses the same formula)
 
   const mCcu = metrics.gauge('ccu', 'sessions receiving snapshots', () => active.length);
   const mLimbo = metrics.gauge('sessions_limbo', 'sessions waiting for resume (60 s)', () => byAccount.size - active.length);
@@ -119,6 +119,8 @@ export function createSessions({ log, metrics, bus, db, now = () => performance.
       if (last !== s) { active[i] = last; last._ai = i; }
       s._ai = -1;
     },
+    // a NEW client (fresh page, takeover) knows no slots and no names yet; a resumed client keeps both
+    resetView(s) { s.aoi = new AoiState(); },
     // READY / resume: avatar visible, snapshots start with a keyframe
     activate(s) {
       s.state = 'active';
@@ -252,6 +254,7 @@ export function register(app) {
   const has = (n) => (app.has(n) ? app.get(n) : null);
   const sessions = createSessions({
     log: app.log.child({ mod: 'sessions' }), metrics: app.metrics, bus: app.bus, db: app.db, now: app.nowMs,
+    tickHz: app.config.tickHz, snapHz: app.config.snapHz,
     deps: { get resume() { return has('resume'); }, get vehicles() { return has('validate')?.vehicles; }, get queue() { return has('queue'); } },
   });
   app.provide('sessions', sessions);

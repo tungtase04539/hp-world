@@ -15,12 +15,14 @@
 //
 // Time budget model (client clock vs real time, ARCH §12.2): each STATE carries clientMs (u16, wraps). The checker
 // unwraps it to a monotonic client time C and computes the one-way offset o = serverRecvMs − C. For an honest client
-// o = trueOffset + networkDelay ≥ the minimum seen so far (`base`). A client whose clock runs fast (time-dilation
-// speed hack) makes o fall below base: more than TIME_AHEAD_MS (100 ms, = −VALIDATE.TIME_BUDGET_MIN_MS) below →
-// TIME violation. Quartz drift is tolerated (base may sink DRIFT_MS_PER_S without penalty). A client that lags (o
-// above base) is not penalised — bursts after a network stall bring o back to base, never below — but lag credit is
-// capped: when EVERY sample of the last LAG_WINDOW_MS was more than TIME_LAG_MS (200 ms, = VALIDATE.TIME_BUDGET_MAX_MS)
-// above base, base is raised to (that window's minimum − 200 ms). So time cannot be "banked" for more than ~10 s.
+// o = trueOffset + networkDelay ≥ trueOffset + minDelay. During LEARN_MS after a reset `base` follows the minimum of o
+// freely; afterwards base may sink only at the tolerated quartz drift (DRIFT_MS_PER_S). A client whose clock runs fast
+// (time-dilation speed hack) makes o fall continuously: more than TIME_AHEAD_MS (100 ms, = −VALIDATE.TIME_BUDGET_MIN_MS)
+// below the drifting floor → TIME violation, and base is re-anchored 100 ms below that sample (so the next violation
+// needs another 200 ms of lead). A client that lags (o above base) is not penalised — bursts after a network stall
+// bring o back to base, never below — but lag credit is capped: when EVERY sample of the last LAG_WINDOW_MS was more
+// than TIME_LAG_MS (200 ms, = VALIDATE.TIME_BUDGET_MAX_MS) above base, base is raised to (that window's minimum −
+// 200 ms). So time cannot be "banked" for more than ~10 s.
 //
 // Distance window: positions are judged in CLIENT time (validated by the time budget above), so jitter and bursts of
 // delayed packets never look like speed. Over the samples of the last WINDOW_S (1 s) of client time:

@@ -110,6 +110,7 @@ export function register(app) {
     } else {
       s.state = 'welcomed';
       s.welcomedAt = t;
+      S.resetView(s);
       s.corrEpoch = 0; s.lastSeq = -1;
       s.v.reset(e.x, e.z, e.mode, t);
       if (e.inWorld) {   // takeover of a live avatar: AWAY until the new client is READY
