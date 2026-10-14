@@ -14,7 +14,12 @@ import { createTransport, clientIp, loadUws } from '../src/net/transport.js';
 import { openWs, waitClose } from './helpers/client.mjs';
 
 test('config: .env parsing, first-run generation, precedence, validation', () => {
-  assert.deepEqual(parseEnv('# c\nA=1\nexport B = "two words"\nC=x # trailing\nbad line\nD=\'q\''), { A: '1', B: 'two words', C: 'x', D: 'q' });
+  assert.deepEqual(parseEnv('# c\nA=1\nexport B = "two words"\nC=x # trailing\nbad line\nD=\'q\'\nE=    # only a comment'), { A: '1', B: 'two words', C: 'x', D: 'q', E: '' });
+  // .env.example parses to defaults / empty secrets (copying it must not create junk secrets)
+  const ex = parseEnv(fs.readFileSync(new URL('../.env.example', import.meta.url), 'utf8'));
+  for (const k of SECRET_KEYS) assert.equal(ex[k], '', k);
+  const exCfg = loadConfig({ env: {}, envFile: null, overrides: ex });
+  assert.equal(exCfg.game.port, 9100); assert.equal(exCfg.db.driver, 'pglite'); assert.equal(exCfg.transport, 'auto');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hpcfg-'));
   try {
     const f = path.join(dir, '.env');

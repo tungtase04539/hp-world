@@ -19,8 +19,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Push to gh-pages
+        # Bỏ thư mục server/ (máy chủ multiplayer chạy riêng, không phục vụ qua Pages) khỏi bản mirror: dựng một commit
+        # có cây thư mục y hệt HEAD trừ server/, rồi đẩy commit đó lên gh-pages. Mọi thứ khác giữ nguyên.
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git branch -f gh-pages HEAD
-          git push -f origin gh-pages
+          TREE=$(git rev-parse "HEAD^{tree}")
+          if git ls-tree -d --name-only HEAD server | grep -qx server; then
+            git rm -r -q --cached server
+            TREE=$(git write-tree)
+          fi
+          PAGES=$(git commit-tree "$TREE" -p HEAD -m "Pages mirror of ${GITHUB_SHA} (không có server/)")
+          git push -f origin "$PAGES:refs/heads/gh-pages"
