@@ -50,12 +50,17 @@ function modelUmbrella(G, R = 1.45, yRim = 1.85, yTop = 2.2, nSeg = 8) {   // ô
   return G.mergeParts(P);
 }
 // Ô DÙ VUÔNG 4 múi (quán cà phê/sạp) — ~30 tam giác
-function modelUmbrellaSq(G) {
+// Đ3-W5-C: solid = 4 múi CÙNG màu instance + diềm 12 cm (dù quán cà phê/trà một màu — 267 dù đỏ; bản chợ múi xen bảng B
+// đọc thành dù xanh-trắng)
+function modelUmbrellaSq(G, solid = false) {
   const h = 1.15, y = 2.15, yT = 2.5, P = [];
   const c = [[-h, y, -h], [h, y, -h], [h, y, h], [-h, y, h]], A = [0, yT, 0];
-  const t0 = [], t1 = [], u = [];
-  for (let i = 0; i < 4; i++) { const p0 = c[i], p1 = c[(i + 1) % 4]; (i & 1 ? t1 : t0).push([A, p1, p0]); u.push([[0, yT - 0.04, 0], p0, p1]); }
-  P.push(G.finish(tri(t0), 0xffffff, 1), G.finish(tri(t1), 0xffffff, 3), G.finish(tri(u), 0xa8a8a8, 0.6));
+  const t0 = [], t1 = [], u = [], vl = [];
+  for (let i = 0; i < 4; i++) { const p0 = c[i], p1 = c[(i + 1) % 4]; (i & 1 && !solid ? t1 : t0).push([A, p1, p0]); u.push([[0, yT - 0.04, 0], p0, p1]);
+    if (solid) { const b0 = [p0[0], y - 0.12, p0[2]], b1 = [p1[0], y - 0.12, p1[2]]; vl.push([p0, b1, b0], [p0, p1, b1], [p0, b0, b1], [p0, b1, p1]); } }
+  P.push(G.finish(tri(t0), 0xffffff, 1), G.finish(tri(u), 0xa8a8a8, 0.6));
+  if (t1.length) P.push(G.finish(tri(t1), 0xffffff, 3));
+  if (vl.length) P.push(G.finish(tri(vl), 0xe8e8e8, 1));
   P.push(G.finish(G.cyl(0.025, 0.03, yT, 5, 0, yT / 2, 0), 0xd0d0c8));
   return G.mergeParts(P);
 }
@@ -501,7 +506,7 @@ export function placeStreetLife(P) {
   const { sides, CELL, cellPos, hash3, inBuilding, obst, flat, roadIdx, nearPano, onCarriage, XS, OCC } = P;
   const T0 = performance.now();
   const st = P.st;
-  const overI = [];    // ô dù tròn (v0) / ô vuông (v1) / bạt (v2)
+  const overI = [];    // ô dù tròn (v0) / ô vuông (v1) / bạt (v2) / bạt sọc (v3) / ô vuông MỘT MÀU hiên quán (v4 — Đ3-W5-C)
   const groundI = [];  // sạp (0) mẹt (1) sọt (2) bạt đất (3) bao tải (4) ghế đẩu (5)
   const spillI = [];   // giá áo (0) hoa (1) chậu cây (2) nội thất (3) bàn thờ+két (4) đồ chơi (5) hàng chồng (6)
   const stallsRoad = []; // hàng lấn lòng đường (cho traffic.js lách) {x,z,heading,len,hw}
@@ -865,7 +870,7 @@ export function placeStreetLife(P) {
             L.sitI.push({ x: wx, z: wz, heading: Math.atan2(ux - wx, uz - wz), yo: -0.03, sp: 1 });
           }
           if (L.paraI) for (const pa of L.paraI) if ((pa.x - ux) ** 2 + (pa.z - uz) ** 2 < 2.25) pa.dead = 1;   // dù nhỏ quán cũ dưới tán lớn → bỏ
-          overI.push({ x: ux, z: uz, heading: Math.atan2(S.ux, S.uz), v: 1, col: hash3(ux, uz, 378) < pRed ? pick(RED, hash3(ux, uz, 379)) : pick(MIX, hash3(ux, uz, 379)), sc: [sc, 0.98 + hash3(ux, uz, 380) * 0.08, sc] });
+          overI.push({ x: ux, z: uz, heading: Math.atan2(S.ux, S.uz), v: 4, col: hash3(ux, uz, 378) < pRed ? pick(RED, hash3(ux, uz, 379)) : pick(MIX, hash3(ux, uz, 379)), sc: [sc, 0.98 + hash3(ux, uz, 380) * 0.08, sc] });
           obst.add(ux, uz, 0.8); S.occ[kk] |= OCC.SHOP; placed++; st.umbrellas++;
         }
         if (placed) { st.terraces++; st.terraceCells += placed; }
@@ -1032,7 +1037,7 @@ export function buildStreetLifeMeshes(B, L) {
   // A/B pano_446_h090: +17% tam giác trước khi thu)
   const NEAR_OVER = LITE ? 160 : 300, NEAR_GROUND = LITE ? 70 : 80;
   const out = [];
-  if (L.overI.length) out.push(inst('props_market_over', G.variants([modelUmbrella(G), modelUmbrellaSq(G), modelTarp(G), modelTarpStriped(G)]), matMkt, L.overI, { rMax: NEAR_OVER, keepBehind: 30, color: (it) => it.col }));
+  if (L.overI.length) out.push(inst('props_market_over', G.variants([modelUmbrella(G), modelUmbrellaSq(G), modelTarp(G), modelTarpStriped(G), modelUmbrellaSq(G, true)]), matMkt, L.overI, { rMax: NEAR_OVER, keepBehind: 30, color: (it) => it.col }));
   // 2 nhóm (sạp+mẹt ~510 tam giác · sọt/bạt đất/bao tải/ghế ~390) thay 1 nhóm 6 biến thể ~900: mỗi instance chỉ gánh đỉnh suy
   // biến của nhóm mình (−50% đỉnh, +1 draw call)
   const gA = L.groundI.filter((it) => it.v <= 1), gB = L.groundI.filter((it) => it.v >= 2).map((it) => ({ ...it, v: it.v - 2 }));
