@@ -455,6 +455,38 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-10-15 (Đ3-W5 SỬA HỒI QUY TÍCH HỢP)** [chấm REAL | dot3 bcdcacc | W5 tích hợp: 088/097/106/166/230/313/331/336/382 tụt 0,2-0,5]:
+    **Nguyên nhân + sửa (tại nguồn, không gỡ W5):** (1) **HERO 'cửa hàng'/'khách sạn' trên NHÀ ỐNG** (088 h0 bảng lớn xanh → tấm đen
+    trống; 166 h90/h180 ốp đen không chữ + trệt showroom trắng; 313 h90/h180 dãy cửa hàng → tháp RS.HOTEL kính trơn): 94/99 cửa hàng
+    và 37/47 khách sạn của herokit_data là footprint < 200 m² — kit xoá bảng lớn theo ảnh (fpMode 3 → 2), biển từng bay (panel 0),
+    ban công/điều hoà (`detOK`), ép trệt FG14. `citygen.renderStyles`: cửa hàng < 200 m² CHỈ giữ chương trình khi có CHỮ NGÀNH (điện
+    máy/thời trang/điện thoại), ≥ 3 tầng, mỗi loại ≤ 1 / 45 m (sổ `storeLead`, thứ tự b) — còn lại = nhà ống vân tay y dot3 (thống kê
+    `heroStoreTube`); khách sạn < 250 m² KHÔNG thành hero (`hlx` → `buildHero({mini})` chỉ dựng BIỂN DỌC 'KHÁCH SẠN', ≤ 1 / 20 m —
+    `heroHotelMini`). herokit `heroStore`: chữ ngành chỉ nhà ≥ 3 tầng (166 h0: nhà 2 tầng → tấm chữ trên mép mái = "biển trên nóc");
+    ốp TỐI chỉ làm nền cho chữ (không chữ + tối → không ốp). Trệt cửa hàng hero: giữ bộ trệt vân tay (mở/cuốn/nhà ở…), FG14 chỉ khi
+    không có hoặc vân tay 'kính'; FG14 = G_OPEN1/G_STORE0 (bỏ G_SHOW nội thất trắng + G_STORE2 khung poster = "kính trắng ô màu
+    giữ chỗ"; G_ELEC cũng đọc ra ô xanh giữ chỗ — không dùng). Giữ: 414 'SIÊU THỊ ĐIỆN MÁY', 377/147/028 'THỜI TRANG NỮ', 028 h180 lại
+    có bảng lớn 'NỘI THẤT GỖ'. (2) **106 mảng ố nâu/tối** = phong hoá v2 W5-B: mảng vữa bong to bằng cửa sổ (tần số ×0,55) + 30% gạch
+    nâu + vữa xám tối 0,36 → mảng ~1 m (×1,0/×1,35), ngưỡng 0,88 − 0,1·tuổi, vữa xám nhạt pha màu tường (gạch nhạt 15% nhà rất cũ),
+    viền 0,3 → 0,18, blot 0,28 → 0,2 (mức W3-C), streak 0,42 → 0,36. (3) **097 h90 'ô cửa đen'**: SETS W5-B đổi mảng → chỉ số chọn bay
+    lệch, bay thành G_HOME1 (nội thất −4 ≈ đen ở 3 m) → G_HOME1 nội thất +26, tường trong sáng, đèn tuýp; G_HOME2 10 → 30; `dayLitOf`
+    cửa mở 0,14 → 0,3 (+G_HOME1) — chỉ nâng texel tối, tắt khi đêm (đã kiểm --gl1). (4) **230 h180 trụ vuông giữa vỉa hè**: herokit
+    khách sạn đặt trụ ở D − 0,5 với D = g + 2 ⇒ LẤN g + 1,5 m; mái sảnh W4-C (`hotelCanopy`) nay KHÔNG trụ (công-xon như dot3), mái
+    khác trụ ≤ g − 0,4. Program key `fabric_v5fx_`.
+    **CHƯA SỬA (bị chặn):** 331 h90/h180 (mái bạt sọc + quán mở → cửa cuốn xanh: ngõ W5-D dời hình nhà → vân tay quan sát gán lại —
+    b10932 'restaurant/awn 4' → b10944 'shutter/awn 1'), 336 h180/h270 (footprint Google 1 T bờ sông b12354 nay cách camera 4-6 m sau khi
+    ngõ hẹp; quầy/người ở h0 mất vì ngõ 5,5 m), 382 (way 447 — nửa một chiều KHÔNG TÊN chạy từ ngõ Tam Bạc 383/384 SONG SONG Bến Bính
+    576 tới x −228 — nhận ghi đè ngõ 5,5 m của W5-D cả đoạn Bến Bính ⇒ lộ vỉa hè gạch + hàng cây giữa 2 đường nơi ảnh là bãi đất; SỬA ĐÃ
+    THỬ: process_osm SPLIT_WAYS thêm `{ at: [-412, -950], x: -401 }` (cắt theo hoành độ tại nút 576/588 — đoạn đông giữ ri 447, đoạn
+    tây nối cuối ri 1426) → 382 = dot3 (nhà quanh 382 y hệt dot3)). Cả 3 cần SINH LẠI buildings_real ⇒ phải sinh lại herokit_data
+    (rbHash), mà đầu vào `keep/fp_json` + `fp_plan.json` ĐÃ MẤT (thư mục scratchpad phiên bị dọn 2026-10-15 00:12) ⇒ hoàn lại, ghi
+    ở đây để làm khi có lại fp_json. BẪY: `node --check` KHÔNG bắt lỗi khai báo trùng của ES module (citygen bị chú thích nuốt nửa câu
+    lệnh) — kiểm thêm bằng `vm.SourceTextModule` (`node --experimental-vm-modules`) hoặc chụp 1 khung.
+    **Kiểm (tier 3, Radeon 890M D3D11, khoá GPU, 1280×634 traffic off; OLD = git worktree bcdcacc :8802, INT = e1f561e :8803, FIX :8801;
+    playwright-core cài lại ở scratchpad/pw — PW_PATH):** 16 pano × 4 hướng 0 lỗi JS; 088 h0 bảng lớn xanh = dot3; 313 h90/h180 dãy
+    biển cửa hàng = dot3; 166 hết tấm đen trống/biển trên nóc, trệt thành giá quần áo; 106 hết mảng nâu; 230 h180 hết trụ; 097 h90 thấy
+    phòng có xe máy thay ô đen. Cổng: check_herokit 407/407 (52ff1208), check_assets ĐỦ, waterbfs 5/5, diag full "TẤT CẢ THỰC THỂ OK — 0
+    lỗi JS" (overlap 1 cũ (259,110)), diag lite OK mọi bất biến 0, --gl1 3 khung 0 lỗi.
 - **2026-10-14 (Đ3-W5 TÍCH HỢP)** [ĐỢT 3 WAVE 5 — gộp 4 nhánh lên `dot3` (00fd41c = bcdcacc + 2 commit tài liệu) theo thứ tự D → A → B → C, `--no-ff`]:
     **Gộp:** W5-D LANES (`worktree-wf_0dec13b5-96e-4`, b2943af) sạch; W5-A HERO-KIT (`…-96e-1`, 03fa2cb) sạch (citygen/world/
     KNOWLEDGE tự gộp); W5-B STREETFRONT (`…-96e-2`, 0970e0c) xung đột 4 khúc `js/citygen.js` + 1 khúc `js/facade_atlas.js`; W5-C

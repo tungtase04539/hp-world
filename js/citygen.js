@@ -1437,7 +1437,7 @@ export function buildRealFabric(scene, ctx) {
       const hb = (FPB ? FPB.bytes : FP_NONE).slice(), gsH = heroGs(HPg, rs), acc = heroAccent(HI), wl = heroWall(HI);
       // SỬA HỒI QUY W5 (166 h0/h90): cửa hàng có bộ trệt ĐO TỪ ẢNH (vân tay: mở/cuốn/nhà ở…) giữ bộ đó — FG14 showroom chỉ khi ảnh
       // không nói gì (FG14 trên nhà ống = "mặt kính trắng ô màu giữ chỗ")
-      if (gsH && !(HPg === HP.STORE && FPB && FPB.gs && FPB.gs !== 4)) {   // vân tay 'kính' (FG4: G_SHOW trắng) → FG14 hb[3] = (hb[3] & 0xf0) | gsH; fpG = gsH; }
+      if (gsH && !(HPg === HP.STORE && FPB && FPB.gs && FPB.gs !== 4)) { hb[3] = (hb[3] & 0xf0) | gsH; fpG = gsH; }   // vân tay 'kính' (FG4: G_SHOW trắng) → FG14
       if (acc >= 0 && (HPg === HP.BANK || HPg === HP.STORE || HPg === HP.PETROL || HPg === HP.HOTEL)) {
         const r = (acc >> 16) & 255, g = (acc >> 8) & 255, bb = acc & 255, c565 = ((r >> 3) << 11) | ((g >> 2) << 5) | (bb >> 3);
         const fg = 0.2126 * r + 0.7152 * g + 0.0722 * bb > 150 ? 1 : 0;   // nền sáng → chữ đen
