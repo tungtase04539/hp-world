@@ -26,6 +26,7 @@ export const GW = Object.freeze({
   PRE_AUTH_PER_IP: 64,          // sockets that have not sent HELLO yet, per IP (exempt: loopback/private)
   PRE_AUTH_TOTAL: 5000,
   READY_TIMEOUT_MS: 180000,     // WELCOME → READY (world build on a slow phone takes 17–35 s)
+  PRE_AUTH_PINGS: 3000,         // PINGs allowed before HELLO (then close 1008)
   BAN_FOREVER: 0xffffffff,
 });
 const SANCTION_KICK = new Set(['kick', 'ban']);
@@ -347,7 +348,7 @@ export function register(app) {
   const handlers = {
     open(conn) {
       const ipk = isExemptIp(conn.ip) ? '' : ipKey(conn.ip);
-      conn.data = { st: 'hello', bad: 0, t: now(), session: null, kicked: false, ipk, ping: new TokenBucket(RATE.PING[0], RATE.PING[1]) };
+      conn.data = { st: 'hello', bad: 0, t: now(), session: null, kicked: false, ipk, pings: 0 };
       if (ipk) {
         const n = (preAuthByIp.get(ipk) || 0) + 1;
         preAuthByIp.set(ipk, n);
@@ -366,8 +367,13 @@ export function register(app) {
       const s = d.session;
       switch (m.op) {
         case C2S.PING:
-          if ((s ? s.bPing : d.ping).take(performance.now())) send(conn, encodePong(w, m.clientTime, now()));
-          else if (s) rateDrop(conn, s);
+          // before HELLO (clock sync while the world loads, loopback RTT tools): no token bucket, but the socket is
+          // closed after PRE_AUTH_PINGS and anyway by the 10 s HELLO timeout; in a session: RATE.PING bucket
+          if (!s) {
+            if (++d.pings > GW.PRE_AUTH_PINGS) { conn.close(CLOSE.POLICY, 'ping flood'); return; }
+            send(conn, encodePong(w, m.clientTime, now()));
+          } else if (s.bPing.take(performance.now())) send(conn, encodePong(w, m.clientTime, now()));
+          else rateDrop(conn, s);
           return;
         case C2S.HELLO:
           if (d.st !== 'hello') { bad(conn); return; }

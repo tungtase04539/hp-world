@@ -30,10 +30,14 @@ for (const kind of ['uws', 'ws']) {
       assert.match(mt, /hp_process_rss_bytes \d+/);
       assert.match(mt, /hp_sim_tick_ms_count/);
       assert.equal((await fetch(s.game + '/metrics')).status, 404);
-      // stubs answer 501
-      for (const p of ['/v1/auth/guest', '/v1/auth/refresh', '/v1/auth/recover', '/v1/join', '/v1/netprobe']) {
+      // stubs answer 501 (S2 implemented auth/join: an empty body is a 4xx client error there)
+      for (const p of ['/v1/netprobe']) {
         const r = await getJson(s.game + p, { method: 'POST', body: '{}', headers: { 'content-type': 'application/json' } });
         assert.equal(r.status, 501, p); assert.equal(r.body.error, 'not_implemented');
+      }
+      for (const p of ['/v1/auth/guest', '/v1/auth/refresh', '/v1/auth/recover', '/v1/join']) {
+        const r = await getJson(s.game + p, { method: 'POST', body: '{}', headers: { 'content-type': 'application/json' } });
+        assert.ok(r.status >= 400 && r.status < 500, `${p} ${r.status}`);
       }
       // bad JSON → 400, unknown → 404, wrong method → 405
       assert.equal((await getJson(s.game + '/v1/join', { method: 'POST', body: '{nope' })).status, 400);
@@ -67,14 +71,16 @@ for (const kind of ['uws', 'ws']) {
       assert.ok(Math.abs(pong.serverTime - before) < 5000);
       const rtts = await pingRtts(ws, 20);
       assert.ok(rtts.every((x) => x < 1000));
-      // HELLO answered by the stub
+      // HELLO with an invalid ticket → SYSTEM AUTH_FAILED + close 4001 (S2 gateway)
       ws.send(encodeHello(w, { ticket: 't' }));
       const sys = await nextMessage(ws);
-      assert.equal(sys.op, S2C.SYSTEM); assert.equal(sys.code, SYS.NOT_IMPLEMENTED);
-      assert.equal(s.app.ws.connections, 1);
+      assert.equal(sys.op, S2C.SYSTEM); assert.equal(sys.code, SYS.AUTH_FAILED);
+      assert.equal((await waitClose(ws)).code, CLOSE.AUTH);
       // malformed traffic → close 1008
-      for (let i = 0; i < 12; i++) ws.send(Buffer.from([0xee, i]));
-      const c = await waitClose(ws);
+      const wsm = await openWs(s.ws + '/play');
+      assert.equal(s.app.ws.connections, 1);
+      for (let i = 0; i < 12; i++) wsm.send(Buffer.from([0xee, i]));
+      const c = await waitClose(wsm);
       assert.equal(c.code, CLOSE.POLICY);
 
       // oversize message (> 512 B) is refused by the transport

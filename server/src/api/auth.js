@@ -202,10 +202,12 @@ export function register(app) {
     const h = hashToken(tok);
     limit('refreshToken', h.toString('hex'));
     const row = await db.one(`SELECT rt.id, rt.account_id, rt.device_id, rt.expires_at, rt.revoked_at, a.status, a.kind,
-          c.nickname, c.discriminator, c.display_name
+          c.nickname, c.discriminator, c.display_name,
+          EXISTS (SELECT 1 FROM refresh_tokens x WHERE x.rotated_from = rt.id) AS rotated
         FROM refresh_tokens rt JOIN accounts a ON a.id = rt.account_id LEFT JOIN characters c ON c.account_id = a.id
         WHERE rt.token_hash = $1`, [h]);
     if (!row) { m.inc(1, { r: 'refresh_unknown' }); throw httpError(401, API_ERR.UNAUTHORIZED); }
+    if (row.revoked_at && !row.rotated) { m.inc(1, { r: 'refresh_revoked' }); throw httpError(401, API_ERR.UNAUTHORIZED); }
     if (row.revoked_at) {
       if (Date.now() - new Date(row.revoked_at).getTime() < AUTH.REFRESH_RACE_S * 1000) { m.inc(1, { r: 'refresh_race' }); throw httpError(409, AUTH_ERR.REFRESH_RACE); }
       await db.query('UPDATE refresh_tokens SET revoked_at = now() WHERE account_id = $1 AND revoked_at IS NULL', [row.account_id]);
