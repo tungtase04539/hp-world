@@ -37,6 +37,30 @@ export function heroAt(cx, cz) {
   }
   return bi;
 }
+// mọi công trình hero có tâm trong bán kính r quanh (x,z)
+export function heroesNear(x, z, r) {
+  const G = hgrid(), out = [], k = Math.ceil(r / HG);
+  for (let i = Math.floor(x / HG) - k; i <= Math.floor(x / HG) + k; i++) for (let j = Math.floor(z / HG) - k; j <= Math.floor(z / HG) + k; j++) {
+    const l = G.get(i * 65536 + j); if (!l) continue;
+    for (const q of l) if ((HERO[q][0] / 10 - x) ** 2 + (HERO[q][1] / 10 - z) ** 2 <= r * r) out.push(q);
+  }
+  return out;
+}
+// HỌ chương trình (khớp tên nhà ô dựng tay ↔ chương trình ảnh): thương mại hiện đại (ngân hàng/khách sạn/showroom/văn phòng)
+// coi là cùng họ — ảnh thường tả "sảnh kính cột đá" cho cả ngân hàng lẫn văn phòng (pano_157 VIB)
+export const heroFamily = (p) => (p === HP.BANK || p === HP.HOTEL || p === HP.STORE || p === HP.OFFICE ? 100 : p);
+// chương trình suy từ TÊN nhà ô dựng tay (world.js cells) — 0 = tên không nói
+const NAME_PROG = [
+  [HP.PETROL, /xang|petrol|gasstation/],
+  [HP.PAGODA, /chua|(^|_)den(_|$)|(^|_)dinh(_|$)|pagoda/],
+  [HP.MARKET, /(^|_)cho(_|$)|market/],
+  [HP.BANK, /vib|scb|tpbank|bidv|agribank|vietin|vietcom|abbank|baoviet|nganhang|techcom|mbbank|(^|_)acb|shb|hdbank|sacom|vpbank|seabank|lienviet|eximbank|bank/],
+  [HP.HOTEL, /khachsan|hotel|(^|_)ks(_|$)|legend|pullman|hilton|melia|avani|mercure/],
+  [HP.SCHOOL, /truong|mamnon|school|thpt|thcs|tieuhoc|daihoc|ubnd|congso|chicuc|thue|uyban|toaan|congan|benhvien|(^|_)bv(_|$)/],
+  [HP.STORE, /showroom|dienmay|sieuthi|(^|_)mall|store/],
+  [HP.OFFICE, /caooc|toakinh|office|vanphong/],
+];
+export function heroProgOfName(name) { const n = String(name || '').toLowerCase(); for (const [p, re] of NAME_PROG) if (re.test(n)) return p; return 0; }
 // nhà b của bộ giải mã RB (D: vStart/x/z) → chỉ số HERO (tâm diện tích CÙNG công thức với tools/gen_herokit.mjs) + diện tích
 export function heroOfPoly(D, b) {
   const s = D.vStart[b], n = D.vStart[b + 1] - s;
@@ -52,6 +76,7 @@ export const heroProg = (i) => (i >= 0 ? HERO[i][2] : 0);
 export const heroWall = (i) => (i >= 0 ? HERO[i][3] : -1);
 export const heroAccent = (i) => (i >= 0 ? HERO[i][4] : -1);
 export const heroFlags = (i) => (i >= 0 ? HERO[i][5] : 0);
+export const heroFocus = (i) => (i >= 0 && HERO[i].length > 7 ? [HERO[i][6] / 10, HERO[i][7] / 10] : null);
 export const heroCount = () => HERO.length;
 
 // ---------- màu ----------
@@ -190,7 +215,30 @@ export function buildHero(c) {
   const { prog, M, DT, s8, st } = c;
   const out = { tris: 0, detTris: 0 };
   if (!prog) return out;
-  const fr = c.fronts.slice().sort((p, q) => q[6] - p[6]);   // cạnh mặt phố dài nhất trước
+  let fr = c.fronts.slice().sort((p, q) => q[6] - p[6]);   // cạnh mặt phố dài nhất trước
+  // ĐIỂM TIÊU (ảnh thấy đoạn nào của nhà): cạnh gần điểm tiêu nhất lên đầu + vị trí sảnh dọc cạnh (c.at)
+  c.at = null;
+  const minL = { [HP.COLONNADE]: 10, [HP.HOTEL]: 8, [HP.SCHOOL]: 8, [HP.PAGODA]: 8, [HP.OFFICE]: 6, [HP.BANK]: 5 }[prog] || 3;
+  if (c.focus) {
+    const [fx, fz] = c.focus; let bd = 1e9, bi = 0, bs = 0;
+    fr.forEach((E, i) => {
+      const L = E[6], ex = (E[2] - E[0]) / L, ez = (E[3] - E[1]) / L;
+      let t = (fx - E[0]) * ex + (fz - E[1]) * ez; t = Math.max(0, Math.min(L, t));
+      const d = Math.hypot(E[0] + ex * t - fx, E[1] + ez * t - fz) - Math.min(L, 30) * 0.15 + (L < minL ? 10 : 0);   // ưu tiên cạnh đủ dài cho sảnh/hàng cột/cổng
+      if (d < bd) { bd = d; bi = i; bs = t; }
+    });
+    if (bd < 25) { fr = [fr[bi], ...fr.filter((_, i) => i !== bi)]; c.at = bs; }
+  }
+  // ĐOẠN mặt tiền của chương trình: khối gộp dài (ngân hàng trong dãy 60 m) → chỉ đoạn W quanh điểm tiêu
+  const sub = (E, W) => {
+    const L = E[6]; if (!E || L <= W) return E;
+    const ctr = c.at != null && E === fr[0] ? c.at : L / 2, s0 = Math.max(0, Math.min(L - W, ctr - W / 2));
+    const [ax, az] = edgeP(E, s0), [bx, bz] = edgeP(E, s0 + W);
+    return [ax, az, bx, bz, E[4], E[5], W, E[7]];
+  };
+  const SUBW = { [HP.OFFICE]: 30, [HP.BANK]: 22, [HP.HOTEL]: 30, [HP.STORE]: 16, [HP.COLONNADE]: 32, [HP.PETROL]: 14 };
+  if (SUBW[prog] && fr.length) fr = [sub(fr[0], SUBW[prog]), ...fr.slice(1).filter((E) => E[6] <= SUBW[prog] * 1.2)];
+  if (prog === HP.SCHOOL || prog === HP.PAGODA) c.gateAt = c.at;
   const F0 = fr[0];
   const y0 = c.y0, H = c.H, top = y0 + H;
   const add = (G, t) => { if (G === M) out.tris += t; else out.detTris += t; };
@@ -317,8 +365,19 @@ function heroHotel(c, fr, add) {
       }
     }
   }
-  // biển chữ KHÁCH SẠN trên đỉnh mặt phố (tấm đứng 1,4 m trên lan can mái)
-  if (fl >= 4 && L >= 6) {
+  // khách sạn MINI (ống, < 4 tầng hoặc mặt hẹp): BIỂN DỌC "KHÁCH SẠN" (ô BLADE0 dải 0) vuông góc mặt tiền, tầng 1-3
+  if ((fl < 4 || L < 6) && fl >= 2 && L >= 2.5 && L <= 12) {
+    const sx = Math.min(L - 0.3, 0.6), [bx0, bz0] = edgeP(E, sx), yb = y0 + GROUND_H + 0.3, ytB = Math.min(y0 + H - 0.2, yb + Math.min(4.2, (fl - 1) * FLOOR_H));
+    if (ytB - yb > 1.5) {
+      const D0 = 0.12, D1 = 0.12 + Math.min(1.1, (ytB - yb) / 3.4), P = (o2, t2) => [bx0 + ex * t2 + nx * o2, bz0 + ez * t2 + nz * o2];
+      const [ia, iz] = P(D0, 0.06), [oa, oz] = P(D1, 0.06), [jb, jz] = P(D0, -0.06), [ob, obz] = P(D1, -0.06);
+      add(M, qN(M, [oa, yb, oz, ia, yb, iz, ia, ytB, iz, oa, ytB, oz], ex, 0, ez, [0, 0, 0.248, 0, 0.248, 1, 0, 1], WHITE, s8, MOD.BLADE0, 30));
+      add(M, qN(M, [jb, yb, jz, ob, yb, obz, ob, ytB, obz, jb, ytB, jz], -ex, 0, -ez, [0, 0, 0.248, 0, 0.248, 1, 0, 1], WHITE, s8, MOD.BLADE0, 30));
+      add(M, qN(M, [ob, yb, obz, oa, yb, oz, oa, ytB, oz, ob, ytB, obz], nx, 0, nz, [0, 0, 0.05, 0, 0.05, 1, 0, 1], DARK, s8, MOD.D_SIGNF));
+    }
+  }
+  // biển chữ KHÁCH SẠN trên đỉnh mặt phố (tấm đứng 1,4 m trên lan can mái) — tháp ≥ 6 tầng
+  if (fl >= 6 && L >= 6) {
     const W = Math.min(10, L * 0.6), [p0x, p0z] = edgeP(E, (L - W) / 2), [p1x, p1z] = edgeP(E, (L + W) / 2), yb = y0 + H + 1.0, yt = yb + 1.4;
     add(M, signFace(M, p0x - nx * 0.6, p0z - nz * 0.6, p1x - nx * 0.6, p1z - nz * 0.6, nx, nz, yb, yt, 1, s8, 150));
     add(M, box(M, (p0x + p1x) / 2 - nx * 0.7, (p0z + p1z) / 2 - nz * 0.7, ex, ez, nx, nz, W / 2, 0.08, yb, yt, DARK, s8, MOD.D_SIGNF, 2 | 4 | 8 | 16));
@@ -385,7 +444,7 @@ function fenceAndGate(c, E, add, o) {
   const [ax, az, bx, bz, nx, nz, L] = E;
   const g = gapOf(c, E); if (!(g >= 2.5 && g <= 30)) return false;
   const off = g - 0.35, ex = (bx - ax) / L, ez = (bz - az) / L;
-  const s0 = -1.5, s1 = L + 1.5, gateW = 4.2, gc = L / 2;
+  const s0 = -1.5, s1 = L + 1.5, gateW = 4.2, gc = Math.max(gateW / 2 + 1, Math.min(L - gateW / 2 - 1, c.gateAt != null ? c.gateAt : L / 2));
   const P = (s) => [ax + ex * s + nx * off, az + ez * s + nz * off];
   // đoạn rào: tách quanh cổng; bỏ đoạn có nhà khác (kiểm 0,5 m một)
   const segs = [[s0, gc - gateW / 2], [gc + gateW / 2, s1]];
@@ -436,11 +495,11 @@ function heroMarket(c, fr, add) {
   const { M, s8, y0, H } = c;
   const blue = linRGB(0x3a6fb4);
   fr.slice(0, 2).forEach((E, idx) => {
-    const [ax, az, bx, bz, nx, nz, L] = E; if (L < 5) return;
+    const [ax, az, bx, bz, nx, nz, L] = E; if (L < 3) return;
     const g = gapOf(c, E), out = Math.max(1.2, Math.min(2.6, g + 1.2));
     add(M, slopeStrip(M, ax, az, bx, bz, nx, nz, out, y0 + 3.0, y0 + 2.55, blue, s8, MOD.D_AWN2));
-    if (idx === 0 && L >= 8) {   // bảng quảng cáo khổ lớn trên diềm mái (2-3 tấm)
-      const ex = (bx - ax) / L, ez = (bz - az) / L, nB = Math.min(3, Math.floor(L / 7)), bw = Math.min(6.5, L / nB - 0.6);
+    if (idx === 0 && L >= 4) {   // bảng quảng cáo khổ lớn trên diềm mái (1-3 tấm)
+      const ex = (bx - ax) / L, ez = (bz - az) / L, nB = Math.max(1, Math.min(3, Math.floor(L / 7))), bw = Math.min(6.5, L / nB - 0.6);
       for (let k = 0; k < nB; k++) {
         const sm = (L * (k + 0.5)) / nB, [px, pz] = edgeP(E, sm), yb = y0 + Math.max(3.4, H - 0.4), yt = yb + 2.2;
         const si = (hh(c.seed + k, 721) * 4) | 0, v0 = (si & 1) * 0.5 + 0.004, v1 = v0 + 0.492, cell = MOD.BILL0 + (si >> 1);
@@ -491,7 +550,7 @@ function heroPagoda(c, fr, add) {
     const [ax, az, bx, bz, nx, nz, L] = E;
     const g = gapOf(c, E);
     if (g >= 3 && g <= 40) {
-      const ex = (bx - ax) / L, ez = (bz - az) / L, off = g - 0.8, [mx0, mz0] = edgeP(E, L / 2), gx = mx0 + nx * off, gz = mz0 + nz * off;
+      const ex = (bx - ax) / L, ez = (bz - az) / L, off = g - 0.8, [mx0, mz0] = edgeP(E, Math.max(4, Math.min(L - 4, c.gateAt != null ? c.gateAt : L / 2))), gx = mx0 + nx * off, gz = mz0 + nz * off;
       if (c.free(gx, gz)) {
         for (const s of [-3.4, -1.5, 1.5, 3.4]) add(M, box(M, gx + ex * s, gz + ez * s, ex, ez, nx, nz, 0.3, 0.3, y0 - 0.1, y0 + (Math.abs(s) < 2 ? 4.0 : 3.2), YELLOW_P, s8, MOD.D_PLAIN, 1 | 2 | 4 | 8));
         add(M, hipRoof(M, gx, gz, ex, ez, nx, nz, 2.1, 1.0, y0 + 4.0, y0 + 5.1, TILE_PAGODA, s8, MOD.R_TILE, 0.45));

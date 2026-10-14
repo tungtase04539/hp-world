@@ -118,10 +118,15 @@ for (const bi of [...per.keys()].sort((a, b) => a - b)) {
   // quan sát gần nhất của chương trình này phải ≤ 60 m (ảnh "xa" chỉ là hình bóng — không đủ để dựng chi tiết)
   const mine = r.obs.filter((q) => q.p === best);
   if (Math.min(...mine.map((q) => q.d)) > 60) { stat.dropped.far++; continue; }
-  if (AREA[bi] < (best === P.petrol ? 12 : best === P.store || best === P.bank ? 25 : 40)) { stat.dropped.small++; continue; }
-  const walls = [], accents = []; let flags = 0, fl = 0, flw = 0;
+  if (AREA[bi] < (best === P.petrol ? 12 : best === P.store || best === P.bank ? 25 : best === P.school ? 100 : 40)) { stat.dropped.small++; continue; }
+  const walls = [], accents = []; let flags = 0, fl = 0, flw = 0, fx = 0, fz = 0, fw = 0;
   for (const q of mine) {
     const o = FP.obs[q.oi], nt = FP.notes[q.oi] || '';
+    // ĐIỂM TIÊU: nơi tia quan sát (giữa [x0,x1] trong ảnh) chạm mặt nhà — khối gộp lớn (b1471 2.321 m²: ngân hàng + văn phòng +
+    // quán) thì sảnh/mái che/biển đặt ĐÚNG đoạn mặt tiền ảnh thấy, không giữa cạnh dài nhất
+    const pano = FP.panos[o[C.pano]], xm = (o[C.x0] + o[C.x1]) / 2;
+    const brg = ((o[C.heading] + (Math.atan((xm - 0.5) * 2 * Math.tan((49 * Math.PI) / 180)) * 180) / Math.PI) * Math.PI) / 180;
+    fx += (pano[1] + Math.sin(brg) * q.d) * q.w; fz += (pano[2] - Math.cos(brg) * q.d) * q.w; fw += q.w;
     if (o[C.wall] >= 0) walls.push({ c: o[C.wall], w: q.w });
     if (o[C.signPresent] === 1 && o[C.signBg] >= 0) accents.push({ c: o[C.signBg], w: q.w });
     if (o[C.roof] === RI.tile || RX.tile.test(nt)) flags |= 1;
@@ -133,14 +138,15 @@ for (const bi of [...per.keys()].sort((a, b) => a - b)) {
     if (RX.column.test(nt)) flags |= 64;
     if (o[C.floors] > 0) { fl += o[C.floors] * q.w; flw += q.w; }
   }
-  OUT.push([Math.round(CX[bi] * 10), Math.round(CZ[bi] * 10), best, avgCol(walls), avgCol(accents), flags]);
+  OUT.push([Math.round(CX[bi] * 10), Math.round(CZ[bi] * 10), best, avgCol(walls), avgCol(accents), flags, Math.round((fx / fw) * 10), Math.round((fz / fw) * 10)]);
   stat.prog[PROG[best]] = (stat.prog[PROG[best]] || 0) + 1;
 }
 OUT.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
 const meta = { v: 1, generator: 'tools/gen_herokit.mjs', rb: D.nB, obs: FP.obs.length, sameObsAsFacadeFP: sameObs, hits: R.hits.length, n: OUT.length, ...stat };
 const txt = '// js/herokit_data.js — SINH TỰ ĐỘNG bởi tools/gen_herokit.mjs (Đợt 3 W5-A HERO-KIT). ĐỪNG SỬA TAY.\n'
   + '// HERO[i] = [cx·10, cz·10 (tâm diện tích footprint, dm), chương trình (HERO_PROG), màu tường sRGB | −1, màu nhấn (biển) sRGB | −1,\n'
-  + '//            cờ: 1 mái ngói · 2 rào/cổng · 4 mái che sảnh · 8 bậc thang · 16 cửa vòm · 32 khối cong · 64 hàng cột]\n'
+  + '//            cờ: 1 mái ngói · 2 rào/cổng · 4 mái che sảnh · 8 bậc thang · 16 cửa vòm · 32 khối cong · 64 hàng cột,\n'
+  + '//            điểm tiêu x·10, z·10 (nơi tia quan sát chạm mặt nhà: sảnh/mái che/biển đặt ở đoạn mặt tiền đó)]\n'
   + `export const HERO_PROG = ${JSON.stringify(PROG)};\n`
   + `export const HERO_META = ${JSON.stringify(meta)};\n`
   + 'export const HERO = [\n' + OUT.map((r) => JSON.stringify(r)).join(',\n') + '\n];\n';
