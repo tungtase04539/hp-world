@@ -543,8 +543,9 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     **HỢP ĐỒNG MẶT CẮT `XS(S)`** (props.js, truyền vào streetlife): mọi chỗ W3-E lấy mặt cắt bằng `XS(S)` của BÊN PHỐ (không
     `XS(S.c)`, không gọi thẳng curbLine/facadeLine(S.c)) → {hw, sw, curb, park, furn, fac}, nhớ trên `S.xs`. **Bước hợp nhất
     W3-A** (bề rộng riêng từng way, xsection nhận object): đổi THÂN `XS` thành `curbLine(S)/sidewalkW(S)/parkingLine(S)/
-    furnitureLine(S)/facadeLine(S)` (S mang `w/sw` từ ROADS_DT) và giải 5 hunk xung đột props.js (placeFood, vòng thùng rác,
-    vòng hàng xe máy, lat/narrow xe máy, lat ô tô) bằng BẢN W3-E — các dòng đó đã dùng `XS(S)`. xsection dot3 coi object là
+    furnitureLine(S)/facadeLine(S)` (S mang `w/sw` từ ROADS_DT) và giải 6 hunk xung đột props.js (placeFood ×2, vòng thùng
+    rác, vòng hàng xe máy, lat/narrow xe máy, lat ô tô) bằng BẢN W3-E — các dòng đó đã dùng `XS(S)` (đã thử: merge-tree với
+    nhánh W3-A + lấy bản W3-E + đổi thân XS → props.js parse được, 0 lệnh gọi mặt cắt theo `S.c` còn lại). xsection dot3 coi object là
     cấp 'r' (`c in ROAD_W` sai) nên trước hợp nhất thân XS vẫn truyền `S.c`. QA: `__hpProps.carRejPts`/`spans` chỉ giữ khi
     `navigator.webdriver` hoặc `?qa=1` (≤ 180k số trong heap game thật).
     BẪY QA (Windows): `node tools/qa/gpulock.mjs run -- bash -c "a; b"` TREO — spawnSync shell:true chạy qua cmd.exe, dấu nháy
