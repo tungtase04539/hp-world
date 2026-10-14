@@ -96,6 +96,7 @@ export async function runScenario(opts) {
     if (m.type === 'tick') {
       latest.set(m.workerId, m);
       for (const k in m.d) accum[k] = (accum[k] || 0) + m.d[k];
+      accum.cpuMs = (accum.cpuMs || 0) + m.cpuMs;
     } else if (m.type === 'final') {
       finals.push(m);
       if (finals.length === workers.length) finalsResolve();
@@ -152,7 +153,7 @@ export async function runScenario(opts) {
       t: now - t0, ok: s.ok, err: s.err, health: s.health, machineCpu: cpuBusyPct(lastCpu, cpu),
       server: s.m ? pick(s.m) : null,
       bots: {
-        live, waiting, connecting, cpuPct: cpuMs / 10, rssMB: rss / 1048576, elu: latest.size ? elu / latest.size : NaN,
+        live, waiting, connecting, cpuPct: accum.cpuMs != null ? accum.cpuMs / dtS / 10 : cpuMs / 10, rssMB: rss / 1048576, elu: latest.size ? elu / latest.size : NaN,
         rxBps: (accum.rxBytes || 0) / dtS, txBps: (accum.txBytes || 0) / dtS, msgsInPs: (accum.msgsIn || 0) / dtS,
         corrects: accum.corrects || 0, decodeErrors: accum.decodeErrors || 0, connectOk: accum.connectOk || 0, connectFail: accum.connectFail || 0,
       },

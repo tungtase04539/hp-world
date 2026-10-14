@@ -10,3 +10,12 @@
   đã dọn); uWS + ws kiểm cả trong container node:24-trixie-slim.
 - Tài liệu: server/CONTRACT.md, docs/multiplayer/SERVER.md §1, server/.env.example.
 - Còn mở: xem SERVER.md §1.8.
+
+## S4 Bot & load test (14–15/10/2026) — XONG phần harness
+
+- `server/bots/`: run.mjs (7 kịch bản, fork/thread, /metrics, report.json + report.md, --rerender), worker.mjs, lib/{bot,
+  roadgraph, abuse, netem, metrics, report, stats, phrases}, fakeserver.mjs (máy chủ giả đủ giao thức để phát triển).
+- Test: `server/test/bots.test.js` (6 test: histogram, đồ thị đường thật, netem FIFO, kế hoạch kịch bản, e2e máy chủ giả
+  smoke/reconnect/abuse, e2e máy chủ nền móng chế độ ping).
+- Đo trên máy chủ nền móng: smoke 50, hotspot 300 (GPU lock), ramp 1.200 (GPU lock) — SERVER.md §4.5.
+- Còn chờ: chạy đủ 7 kịch bản trên máy chủ đã gộp S2/S3 (integrator), xem SERVER.md §4.6.
