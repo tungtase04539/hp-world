@@ -65,6 +65,8 @@ export const LIGHT = {
   //    lạnh, không xanh lét; tỉ lệ nắng : bán cầu lúc trưa ≈ 3,5 : 0,8 theo SPEC);
   //  - màu sương = chân trời hiển thị khử bão hoà 35% (mù ẩm HP xám trắng).
   skyViewGain: 1.2, skyViewSat: 0.45, skyViewGainLow: 0.76, skyDayEl: [3, 15],
+  // W3-D: vòm hiển thị ban ngày nhân thêm hệ số theo độ cao (dải thấp ≤ ~7° → LO, ≥ ~37° → HI) — xem shader SKY_FS
+  skyGradeLo: [0.84, 0.90, 0.97], skyGradeHi: [1.08, 1.10, 1.18],
   hemiScale: 0.55, hemiSat: 0.25, hazeDesat: 0.35,
   groundAlbedo: [0.17, 0.155, 0.135],   // mặt phố (nhựa/gạch/mái) — màu ánh dội cho hemi.groundColor
   // ĐÊM: trăng (đèn chủ, có bóng mờ) + "nền đêm" (trời có trăng + đèn phố dội lên mù ẩm) cộng vào bán cầu. Chỉ bật
@@ -100,6 +102,8 @@ const SKY_FS = /* glsl */`
   uniform float uSunUp, uMoonUp;
   uniform float uTime, uCloud, uNight, uHaze, uGain, uEnv, uSat;
   varying vec3 vDir;
+  const vec3 SKY_GRADE_LO = vec3(${LIGHT.skyGradeLo.map((x) => x.toFixed(3)).join(', ')});   // W3-D: hệ số dải thấp / cao (ban ngày)
+  const vec3 SKY_GRADE_HI = vec3(${LIGHT.skyGradeHi.map((x) => x.toFixed(3)).join(', ')});
   ${skyGLSL()}
   float hash12(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
   float hash13(vec3 p3) { p3 = fract(p3 * 0.1031); p3 += dot(p3, p3.zyx + 31.32); return fract((p3.x + p3.y) * p3.z); }
@@ -155,6 +159,11 @@ const SKY_FS = /* glsl */`
     col *= uGain;
     col = mix(vec3(dot(col, vec3(0.2126, 0.7152, 0.0722))), col, uSat);
     if (uEnv < 0.5) {
+      // Đợt 3 W3-D — CHỈ vòm HIỂN THỊ ban ngày (IBL/đèn bán cầu/màu sương không đổi): đo 120 pano audit3 × 4 hướng (pixel
+      // trời mịn, 3 dải hàng trên khung): thật dải cao (193,205,224) / dải thấp (189,202,219) — game dot3 (187,199,215) /
+      // (200,208,220): thiên đỉnh game tối & ít xanh hơn, dải thấp TRẮNG SỮA hơn → hệ số theo độ cao: thấp bớt sữa, cao xanh hơn.
+      float dw = clamp((1.0 - uSat) / 0.55, 0.0, 1.0);
+      col *= mix(vec3(1.0), mix(SKY_GRADE_LO, SKY_GRADE_HI, skySmooth(0.12, 0.6, v.y)), dw);
       col = mix(col, uFog, exp(-max(v.y, 0.0) * 10.0) * uHaze);              // dải mù chân trời = màu sương
       col = mix(col, uFog, skySmooth(0.0, -0.05, v.y));
     } else {

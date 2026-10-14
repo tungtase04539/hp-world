@@ -132,28 +132,44 @@ function genLayers(S) {
     for (let i = 0; i < 14; i++) blot(F, S, rnd() * S, rnd() * S, (8 + rnd() * 30) * px, (o, k) => { const m = 1 - 0.12 * k; F[o] *= m; F[o + 1] *= m; F[o + 2] *= m * 0.98; });
     put(L_GACH);
   }
-  // ---- 3: CARO ĐỎ-XÁM (kè hồ Tam Bạc, quảng trường — pano_004: đỏ đất nung trầm chủ đạo, điểm xám) ----
+  // ---- 3: CARO ĐỎ-XÁM (W3-D): viên 40×20 cm (dài dọc phố) xen kẽ ĐỎ HỒNG ĐẤT NUNG BẠC MÀU ↔ XÁM như bàn cờ — đo trên ảnh
+  // pano thật (004/010/028/225/400/405 hướng vỉa hè; tách 2 cụm theo r−g): viên đỏ r−g ≈ 22-47 (vd (151,129,122), (164,119,97),
+  // (207,160,139) nắng), viên xám trung tính. Texture (176,140,130)/(170,167,161) (bản đầu (184,138,122) ra cam-hồng ở kè 290).
+  // Bản cũ đỏ (158,82,58) bão hoà 0,63 chiếm 72% + 16% đỏ sẫm → ảnh game đo (136,53,38) đỏ gạch chói phủ kín (AUDIT3 PAVE
+  // "checker too saturated" 028/198/464); giảm ~35% bão hoà, đỏ:xám = 1:1 theo ô cờ, 4% viên thay lệch màu/vá. ----
   {
     const rnd = mulberry(41);
-    tiles(F, S, 4, rnd, (tx, ty, r) => {
-      const h = Math.sin(tx * 12.9898 + ty * 78.233) * 43758.5453, v = h - Math.floor(h), l = (r() - 0.5) * 18;
-      return v < 0.72 ? [158 + l, 82 + l * 0.6, 58 + l * 0.5] : v < 0.88 ? [142 + l, 70 + l * 0.6, 50 + l * 0.5] : [160 + l, 152 + l, 138 + l];
-    }, 0.6);
-    for (let i = 0; i < 10; i++) blot(F, S, rnd() * S, rnd() * S, (10 + rnd() * 28) * px, (o, k) => { const m = 1 - 0.14 * k; F[o] *= m; F[o + 1] *= m; F[o + 2] *= m; });
+    const COLS = 4, ROWS = 8, bw = S / COLS, bh = S / ROWS, n = fbm(S, [8, 32], [1, 0.6], rnd);
+    const col = [];
+    for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+      const l = (rnd() - 0.5) * 16, red = ((r + c) & 1) === 0, swap = rnd() < 0.04;
+      const isRed = swap ? !red : red;
+      col.push(isRed ? [176 + l, 140 + l * 0.82, 130 + l * 0.8] : [170 + l, 167 + l, 161 + l]);   // phản biện: (184,138,122) ra cam-hồng dưới nắng ấm (290 kè)
+    }
+    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+      const c = Math.floor(x / bw), r = Math.floor(y / bh), fx = (x % bw) / bw, fy = (y % bh) / bh;
+      const e = Math.min(fx * bw, (1 - fx) * bw, fy * bh, (1 - fy) * bh) / bh;   // khoảng cách tới mép viên (theo bề cao viên)
+      const cc = col[r * COLS + c], o = (y * S + x) * 4, nn = (n[y * S + x] - 0.5) * 20 + (rnd() - 0.5) * 12;
+      const k = e < 0.045 ? 0.66 : e < 0.12 ? 0.93 : 1;
+      F[o] = (cc[0] + nn) * k; F[o + 1] = (cc[1] + nn) * k; F[o + 2] = (cc[2] + nn) * k;
+    }
+    for (let i = 0; i < 12; i++) blot(F, S, rnd() * S, rnd() * S, (10 + rnd() * 28) * px, (o, k) => { const m = 1 - 0.12 * k; F[o] *= m; F[o + 1] *= m; F[o + 2] *= m * 0.98; });
     put(L_CARO);
   }
-  // ---- 4: GẠCH ĐỎ ĐẤT NUNG ----
+  // ---- 4: GẠCH ĐỎ ĐẤT NUNG (bạc màu nắng — W3-D giảm bão hoà: (172,88,56) → (172,134,121); (168,104,84)/(176,126,110) vẫn ra cam (169,113,90) trên ảnh pano_115/166) ----
   {
     const rnd = mulberry(53);
-    tiles(F, S, 4, rnd, (tx, ty, r) => { const l = (r() - 0.5) * 30; return [172 + l, 88 + l * 0.6, 56 + l * 0.4]; }, 0.62);
+    tiles(F, S, 4, rnd, (tx, ty, r) => { const l = (r() - 0.5) * 24; return [172 + l, 134 + l * 0.8, 121 + l * 0.75]; }, 0.62);
+    for (let i = 0; i < 10; i++) blot(F, S, rnd() * S, rnd() * S, (10 + rnd() * 26) * px, (o, k) => { const m = 1 - 0.12 * k; F[o] *= m; F[o + 1] *= m; F[o + 2] *= m; });
     put(L_TERRA);
   }
-  // ---- 5: GẠCH CON SÂU / tự chèn (hàng so le đỏ + xám), 1,2 m/ô ----
+  // ---- 5: GẠCH TỰ CHÈN "CON SÂU" XÁM (W3-D: chữ pano "con sâu xám xen bê tông", "lục giác xám" — Mê Linh, Cầu Đất…;
+  // bản cũ đỏ+xám 55/45 → đỏ chỗ ảnh thật xám): hàng so le viên răng cưa, xám bê tông ± ấm nhẹ, 1,2 m/ô ----
   {
     const rnd = mulberry(67);
     const rows = 6, bw = S / 3, bh = S / rows, n = fbm(S, [16, 48], [1, 0.5], rnd);
     const col = [];
-    for (let r = 0; r < rows; r++) for (let c = 0; c < 4; c++) { const l = (rnd() - 0.5) * 20; col.push(rnd() < 0.55 ? [168 + l, 86 + l * 0.6, 56 + l * 0.4] : [150 + l, 145 + l, 134 + l]); }
+    for (let r = 0; r < rows; r++) for (let c = 0; c < 4; c++) { const l = (rnd() - 0.5) * 22, w = rnd() < 0.2 ? 6 : 0; col.push([160 + l + w, 156 + l + w * 0.5, 148 + l]); }
     for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
       const r = Math.floor(y / bh), off = (r % 2) * bw * 0.5, xx = (x + off) % S, c = Math.floor(xx / bw);
       const fx = (xx % bw) / bw, fy = (y % bh) / bh;
@@ -161,9 +177,10 @@ function genLayers(S) {
       const zig = Math.abs(((fx * 6) % 1) - 0.5) * 0.12;
       const e = Math.min(fx * 3, (1 - fx) * 3, fy - zig, 1 - fy - zig);
       const cc = col[(r * 4 + c) % col.length], o = (y * S + x) * 4, nn = (n[y * S + x] - 0.5) * 22 + (rnd() - 0.5) * 14;
-      const k = e < 0.06 ? 0.58 : e < 0.1 ? 0.9 : 1;
+      const k = e < 0.06 ? 0.6 : e < 0.1 ? 0.9 : 1;
       F[o] = (cc[0] + nn) * k; F[o + 1] = (cc[1] + nn) * k; F[o + 2] = (cc[2] + nn) * k;
     }
+    for (let i = 0; i < 12; i++) blot(F, S, rnd() * S, rnd() * S, (8 + rnd() * 26) * px, (o, k) => { const m = 1 - 0.13 * k; F[o] *= m; F[o + 1] *= m; F[o + 2] *= m; });
     put(L_CONSAU);
   }
   // ---- 6: BÓ VỈA bê tông (2 m dọc × 0,5 m: mạch nối mỗi 1 m, mép dưới ố bẩn) ----
@@ -381,8 +398,8 @@ const MAIN = /* glsl */`
 
 // makeRoadMaterial(THREE, {size, anisotropy, lite}) → MeshPhongMaterial dùng chung cho mọi ô 'roads_*' / 'sidewalk_*'
 // Màu tạm mỗi lớp (trước khi Worker sinh xong texture ~100 ms — buildWorld còn chạy nhiều giây nên thực tế không thấy)
-const PLACEHOLDER = [[156, 153, 148, 128], [166, 162, 152, 255], [176, 172, 164, 255], [152, 84, 60, 255], [170, 88, 56, 255],
-  [160, 116, 92, 255], [190, 188, 180, 255], [0, 0, 0, 0], [200, 200, 200, 128]];
+const PLACEHOLDER = [[156, 153, 148, 128], [166, 162, 152, 255], [176, 172, 164, 255], [172, 136, 122, 255], [172, 134, 121, 255],
+  [156, 152, 145, 255], [190, 188, 180, 255], [0, 0, 0, 0], [200, 200, 200, 128]];
 // Sinh texture TRONG WORKER (Blob từ chính mã các hàm ở trên) → không tốn ~100 ms main thread lúc tải; lỗi → sinh đồng bộ.
 function genInWorker(S, done) {
   const fns = [mulberry, vnoise, fbm, blot, crack, tiles, genLayers].map((f) => f.toString()).join('\n');

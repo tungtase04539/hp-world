@@ -319,6 +319,9 @@ node process_osm.mjs     # sinh ../js/mapdata.js + mask_debug.png + log kiểm t
   đúng chỗ dù nằm trong vỉa của way rộng), nhà SINH theo `facadeLine(way)`. Sửa `js/anchorwalls.js` (CB_WALLS) → cũng chạy lại
   process_buildings (nhà sau tường mỏ neo bị cắt + cờ cbIn).
 - `js/roadmarks.js` SINH bởi `node tools/gen_roadmarks.mjs` (chạy từ GỐC repo; đọc `audit/audit_enriched.json`) — không sửa tay.
+- `js/roadmarks.js` SINH bởi `node tools/gen_roadmarks.mjs` (chạy từ GỐC repo; đọc `audit/audit_enriched.json`,
+  `tools/pano_loop/mark_labels.json` (nhãn vạch tim nhìn ảnh — thêm nhãn ở đây), `tools/pano_loop/list_full_551.json`,
+  `tools/osm_crossings.json` = fetch_osm.sh mục 13 (thiếu → giữ mảng OSM cũ)) — không sửa tay.
 - `js/landuse_data.js` (raster sử dụng đất mặt đất, Đợt 3 W2-D) SINH bởi `node tools/gen_landuse.mjs [--ppm xem.ppm]` (chạy từ
   GỐC repo; đọc `tools/osm_landuse.json` = fetch_osm.sh mục 12, + PARKS/LM_POLY/osm_alleys) — không sửa tay. Chạy lại khi
   LM_POLY/PARKS đổi hoặc tải lại OSM; footprint nhà KHÔNG nướng vào file (js/landuse.js tô footprint sống lúc chạy). Đa giác OSM
@@ -968,6 +971,140 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     "TẤT CẢ THỰC THỂ OK — 0 lỗi JS" (bất biến giao thông 0, underwater 0), diag base y hệt; tour 26 ảnh 0 lỗi (ảnh 'bridge' nay
     nhìn thấy nút xoắn + vòm); waterbfs 5/5; process_osm chạy lại → mapdata md5 y hệt (674f1d01…); node --check mọi module.
 
+- **2026-10-05 → 10-14 (Đ3-W3-D SURFACES)** [ĐỢT 3 wave 3 — BỀ MẶT THEO BẰNG CHỨNG: vạch tim, zebra, đèn tín hiệu, vật liệu vỉa hè,
+    vườn hoa, bụi cắt tỉa, trời] (AUDIT3 FP-4: MARK 23 pano, PAVE 20, PARK 17, SKY 6 — mặc định "chỉ thêm" → sai dương tính):
+    **(1) Bằng chứng mới — `tools/gen_roadmarks.mjs` → `js/roadmarks.js` (SINH):** giữ `ROAD_MARK_EVIDENCE` (chữ pano), thêm
+    `ROAD_MARK_LABELS` = NHÃN NHÌN ẢNH pano thật theo trục đường (`tools/pano_loop/mark_labels.json`, 169 pano trên 72 way s/t:
+    Y vàng đứt 98 · D vàng đôi 5 · W vạch trắng 30 · N không vạch 36 — nhìn tờ ảnh 3 pano/way, cách làm ở scratchpad W3-D
+    probe/waysheet.py), `ROAD_PAVE_EVIDENCE` (vật liệu vỉa hè từ chữ `sidewalk` 530 pano: 2 xám 187 · 3 caro đỏ-xám 263 · 4 đỏ 49 · 5 tự chèn xám 31;
+    mệnh đề ĐẦU có vật liệu thắng, bỏ mệnh đề "bó vỉa/viền/bồn cây"), `OSM_SIGNALS` 88 / `OSM_CROSSINGS` 403 (Overpass
+    `fetch_osm.sh` §13 → `tools/osm_crossings.json`, gitignored; thiếu file → generator GIỮ mảng OSM cũ trong roadmarks.js).
+    BẪY đã thử và BỎ: dò vạch vàng tự động trên ảnh pano (ngưỡng màu) — vạch sơn mòn nắng (220,183,131) lẫn biển/taxi/tường
+    vàng → tách kém (âm/dương chồng nhau); OSM `oneway=yes` KHÔNG suy được "không tim vàng" (LKT/ĐTH/NĐC oneway vẫn kẻ vàng).
+    **(2) `js/roadnet.js` vạch tim:** nhãn ảnh gán cho WAY gần nhất (≤ 12 m) rồi LAN dọc way ≤ 150 m (đo tới đa tuyến đoạn
+    chạy) > chữ pano ≤ 14 m > mặc định: p như cũ; s vàng+mép nếu lòng ≥ 8 m; t vàng nếu lòng ≥ 8 m; r/h không. Bề rộng
+    lòng = `ROADS_DT[ri].w` nếu generator có (W3-A per-way width) — chưa có thì theo cấp (t 8 → vẫn vàng: nhãn mới là thứ bỏ
+    vàng ở Hạ Lý/Dư Hàng/Chùa Hàng/Mê Linh/Lê Lợi/Bến Bính/NTP). Nhãn N: p chỉ mép, s chỉ rãnh biên, t/r trơn. ĐƯỜNG ĐÔI (way
+    song song cùng chiều |cos|>0,94, khe mép lòng −0,5…8 m ở ≥ 60% mẫu 10 m) → không vàng, vạch trắng đứt (Lê Quang Đạo 216/478).
+    **(3) Zebra/đèn:** CHỈ khi có node OSM trong vùng nút (rad + 10 m) hoặc bằng chứng chữ pano ≤ 45 m — mỗi điểm bằng chứng
+    gán cho MỘT nút tốt nhất (tổng hạng nhánh + 2·số nhánh p/s − d/3; zebra chỉ nút ≤ rad + 12 m — xem (9a)). Đèn: OSM hoặc (pano
+    + ≥ 2 nhánh p/s/t); cụm ≥ 45 m ưu tiên OSM > pano > hạng (nút bị bỏ đèn chỉ giữ zebra nếu có node/chữ zebra). Zebra theo NHÁNH: node OSM gần vị trí vạch (gốc + setback + 2,3 m,
+    ≤ 14 m, lệch ngang ≤ hw + 2,5) → nhánh đó; nút có đèn → mọi nhánh phố; node ở tâm/bằng chứng chữ → nhánh p/s/t. Số liệu
+    R1750: đèn 131 → 29 (25 OSM + 4 pano), nhánh zebra 750 → 239 (115 OSM, 79 theo đèn, 45 chữ). Chữ pano: mệnh đề
+    tả đèn/zebra Ở XA ("(xa)", "phía xa", "cuối phố", "đằng xa" — `FAR` trong gen_roadmarks, "xa" là TỪ riêng, không khớp "xanh")
+    KHÔNG tính: pano_394 "đèn tín hiệu phía cuối phố" từng dựng đèn + zebra ma ở nút cạnh pano_496 (20 m), 083 "(xa)" tương tự. (dot3: 131 nút đèn chỉ 23 có
+    node OSM; 33/42 pano tả "đèn tín hiệu" nằm ≤ 50 m node OSM → OSM HP đáng tin cho đèn.) **VẠCH QUA ĐƯỜNG GIỮA KHỐI** (114 — xem (9a), (10a)):
+    node OSM không thuộc nút có zebra (rad + 4) trên lòng phố (≤ hw + 2) hoặc chữ pano "có vạch qua đường" không có nút ≤ 45 m
+    → TÁCH dải tại uc + 1,5 m: phần trước ZEB1 với aZeb.y = uc + 2,3 (vạch u ∈ [uc − 1,5; uc + 1,5]), phần sau ZEB0 với
+    aZeb.x = uc − 2,3 (tim đường dừng/tiếp 3,3 m quanh vạch như ở nút) — shader roadtex KHÔNG đổi. `stats` mới: sigOsm/sigEv/
+    zebOsm/zebSig/zebEv/midX/midXs/marks{def,lab,ev,none,dual}/paveEv.
+    **(4) Vỉa hè:** vật liệu theo TỪNG Ô vỉa hè = bằng chứng chữ pano gần nhất đã gán cho cùng way (≤ 120 m), góc nút giao lấy
+    điểm 8 m vào nhánh; `SIDEWALK_BY_ROAD` chỉ còn dự phòng (đo: lệch chữ pano ~45% — 111 pano "caro đỏ-xám" đang vẽ xám, Mê
+    Linh/Tô Hiệu/Hồ Sen xám đang vẽ đỏ; file đó KHÔNG có generator). Texture `roadtex.js`: lớp 3 CARO = viên 40×20 cm (dài dọc
+    phố) xen kẽ đỏ-hồng bạc màu (184,138,122) ↔ xám (166,163,157) như bàn cờ 1:1 (đo ảnh 004/010/028/225/400/405: viên đỏ r−g
+    22-47; bản cũ (158,82,58) 88% đỏ → ảnh game (136,53,38) phủ kín); lớp 4 "gạch đỏ" (172,134,121) — (168,104,84) vẫn ra cam
+    (169,113,90) trên ảnh; lớp 5 = gạch tự chèn "con sâu" XÁM. Canvas caro kè hồ (`sidewalkMaterial`) cùng mẫu; 5 canvas caro
+    ô cells (#b8574a/#a8452e/#b24a3a: Thế Lữ, Tam Bạc tsCaroMat, ĐBP, dm7…) → #b8897a/#b38a7b. BẪY chữ pano: mệnh đề "sân/
+    quảng trường/trước cổng" là SÂN, không phải vỉa hè phố (pano_167 sân trường đỏ từng lan cả Lê Lợi) → bỏ qua.
+    **(5) Vườn hoa (dải An Biên → Tố Hữu, khối "DẢI VƯỜN HOA" world.js; nền cỏ/sân theo vườn — xem (9e)):** ảnh Tố Hữu = SÂN LÁT ĐÁ XÁM + hàng cây
+    + viền bụi cắt tỉa thấp + ô cỏ ô liu xỉn có bó vỉa đá + bồn tròn phẳng/bụi tròn (vệ tinh real_3: tán cây phủ, khoảng hở là
+    sân xám). Nay: `garden_plaza` (ExtrudeGeometry cùng cao +0,12 như thảm cỏ cũ — không thêm chỗ chồng lòng đường; texture granite
+    60 cm, UV = mét) + ô cỏ 11×11 m trên lưới 17 m (4 góc trong polygon, KHÔNG trên lòng/vỉa hè roadnet, ≥ 9 m camera pano, ~1/5 để
+    trống) + bồn tròn gò thấp 0,15 m màu đỉnh lốm đốm (thay vòm bán cầu hồng/xanh) + bụi tròn cắt tỉa ở ½ bồn + VIỀN BỤI dọc mép
+    polygon: mỗi cạnh chọn độ thụt nhỏ nhất 1,6…6 m có ≥ 70% điểm ngoài lòng/vỉa hè (mép polygon nong ×1,14 thường nằm trên vỉa
+    hè), hở lối vào 3 m giữa cạnh > 26 m. Bỏ lối chữ thập be. `world.gardenStats`.
+    **(6) `js/hedges.js` (mới):** bụi cắt tỉa/bụi dải phân cách "lổn nhổn" = quét mặt cắt 7 điểm (đáy · hông phồng · vai · đỉnh)
+    dọc đa tuyến, vòng ~0,8 m, lệch nhiễu hash TẤT ĐỊNH, ~15 tam giác/m, màu đỉnh tối chân/sáng đỉnh + texture lá DataTexture
+    128² dùng chung (nền ≈ 240: texture sRGB nhân TUYẾN TÍNH — nền 196 làm bụi gần đen). Dùng cho viền vườn hoa, dải phân cách
+    Lê Quang Đạo (thay hộp 3,2 m), mép công viên Trần Phú dm7, sân tượng Lê Chân. Material có map → freezeStatic không gộp lượt 1.
+    **(7) Trời:** đo 120 pano audit3 × 4 hướng (probe/skycmp.py: pixel trời mịn, 3 dải hàng trên khung, cùng FOV): thật dải
+    cao (193,205,224) / thấp (189,202,219); dot3 (187,199,215) / (200,208,220) → trung vị trời game ĐÃ gần thật (WP5), lệch hệ
+    thống: thiên đỉnh hơi tối/ít xanh, dải thấp TRẮNG SỮA hơn. Sửa CHỈ vòm hiển thị ban ngày (IBL/đèn bán cầu/màu sương giữ
+    nguyên): hệ số theo độ cao `LIGHT.skyGradeLo/Hi` trộn theo smoothstep(0,12…0,6, v.y) × trọng số ngày. Trời thật dao động
+    rộng (p25 xanh đậm ↔ p75 trắng mù) — 1 hằng số không khớp được mọi ngày; KHÔNG kéo thiên đỉnh sáng (vật lý: thiên đỉnh tối hơn).
+    **(8) Cỏ ô cells / đảo giao thông / mép công viên:** hằng `LAWN_OLIVE = 0x6a7b48` (world.js đầu file) cho MỌI thảm cỏ ô
+    cũ màu neon (0x6f9a4f/0x5a8f43/0x5d8c45/#4e7a3a): đảo `hvt_nonbo`, nút Lạc Long, `parterre_r4`, `garden6`, `civic8`,
+    `lm_ubnd_lawn`, công viên ĐBP (texture đốm nay LCG TẤT ĐỊNH thay Math.random). Đảo `hvt_nonbo` (ảnh 304 h180/349 h90):
+    viền bụi r 10,3 m + 2 dải bụi lượn (`hvt_nonbo_hedge`, 1.614 tam giác). Công viên ĐBP (ảnh 065 h180): `bs_park_dbp_hedge`
+    chạy phía TRONG rào 3 cạnh. **BẪY cellsink:** `sweepAssemblies` (clearance) lấy BAO LỒI từng mảnh liên thông KÈM 2 góc hộp
+    trục → 1 dải bụi chéo dài có "bao" phủ cả lòng phố → `flushClearance` GỠ cả mảnh (tam giác mất, đỉnh còn → bbox vẫn đúng
+    mà không thấy gì). Cách làm đúng: độ thụt mỗi cạnh chọn sao cho mép phía phố (−1,3 m) nằm NGOÀI `corridorPen` (clearance)
+    + ngoài lòng/vỉa hè roadnet + xa camera pano; xả thành MẨU 2 m hở 1,5 cm (không hàn đỉnh trùng → mảnh nhỏ, bao bám sát).
+    Mọi nơi sinh bụi (dm7 Trần Phú, sân Lê Chân, ĐBP, dải LQĐ) đẩy đường đi vào `world.hedgeRuns`; viền bụi vườn hoa (chạy
+    SAU khối ô) bỏ điểm ≤ 4 m quanh chúng — BẪY đã gặp: 2 hàng bụi song song cách ~2,5 m ở Trần Phú (pano_400 h000; ảnh thật 1 hàng).
+    Kè Tam Bạc ô cells `v1caro` cùng mẫu caro bạc màu của `sidewalkMaterial`. **Giao diện roadnet:** code mới dùng
+    `wHW(w) = w.hw ?? hwOf(w.c)` (W3-A gán `w.hw` theo `ROADS_DT[i].w` → khi gộp, `hwOf` không còn bị gọi); bề rộng lòng cho
+    luật tim đường = `deps.widthOf(ri, c)` nếu world truyền, không thì `ROADS_DT[ri].w`, không thì 2·hw theo cấp.
+    **(9) Sửa theo PHẢN BIỆN (2026-10-12):** (a) chữ pano "vạch qua đường" CHỈ gán cho nút mà pano nằm trong vùng nút
+    + 12 m (≤ 45), điểm = hạng + 2·nPS − d/3 (đèn: vẫn ≤ 45 m, cùng −d/3). BẪY cũ (≤ 45 m, −d/12): chữ của pano_551 rơi vào nút
+    lớn cách 41 m → zebra MA ở 496 h000 và MẤT vạch thật ở 551 (8/24 chữ zebra gán > 25 m). Không có nút → vạch GIỮA KHỐI;
+    chữ tả cả đèn lẫn vạch (526 "gần ngã tư có đèn…, có vạch sang đường") → vạch ở nút đèn đó; có node OSM crossing ≤ 20 m →
+    chữ tả CHÍNH vạch đó (290 ↔ node Thế Lữ 12 m), không thêm; nhiều pano ≤ 25 m cùng tả (551 + 393) → 1 vạch ở pano GẦN
+    NÚT nhất (BẪY: lấy trung điểm thì vạch rơi đúng khoảng giữa — chỗ ảnh 551 h000 và 393 h180 đều thấy trống; ảnh 551 h180
+    có vạch ngay trước camera). Kết quả: bỏ 4 nút zebra ma (cạnh 496, 014, 017, 289), vạch giữa khối 116 → 118 (thêm 015,
+    017, 551; bỏ vạch đơn lẻ ở 393). (b) Nhãn W còn
+    LAN sang dải đối diện của đường đôi (way phố khác ≤ 20 m, |cos| > 0,94, khe mép lòng −0,5…8 m; cờ `far` → thua nhãn riêng
+    +40 m): Lê Quang Đạo dải xa (ri 400, 360 m, dualRun chỉ 46% vì 2 dải tách ở đầu) hết tim vàng ở 216/478; Hồ Sen (ri 295)
+    theo nhãn 320/323/327 thay chữ "vàng" của 321. (c) gen_roadmarks: "biển (báo) người đi bộ" là bằng chứng zebra (ảnh
+    077/320/349 đều có zebra; 349 nút HVT +2 nút zebra). (d) Luật mặc định tim vàng theo bề rộng: ≥ 8 m như FP-4 (TRƯỚC khi
+    gộp W3-A luật này KHÔNG có tác dụng: ROADS_DT chưa có `.w` → 2·hw = t 8/s 10 m).
+    (e) Vườn hoa: NỀN theo chữ + ảnh pano quanh vườn (58 pano ≤ 25 m ngoài mép) — cả 6 vườn chủ yếu "thảm cỏ + hàng rào
+    cây xén" (ảnh 039 223 226 235 340 400 043 195) → `garden_lawn` cỏ lốm đốm (canvas LCG 128 px = 4 m, nền #6e7c3e: đo
+    nắng cỏ thật g/r ≈ 1,12 — #66773f ra 1,18 quá xanh, #7c8042 ra 0,98 nâu khô) + `garden_paths` lối chữ thập lát đá 4 m;
+    SÂN LÁT chỉ ở `PLAZA_PATCHES` (đĩa ∩ polygon, ô 2 m) nơi ảnh thấy sân: Tố Hữu quanh 224/225 (h090 "quảng trường rộng";
+    223/226 hai bên lại là cỏ) và mũi bắc cạnh ĐBP (545 h180); ô cỏ bó vỉa (lệch ±1 m, cạnh 9-13 m theo hash) chỉ trong
+    mảng sân. Quad lát: UV = mét, chung plazaM (freezeStatic gộp lượt 2). Sân lát 176 → 152 (từ trên cao gần trắng).
+    (f) Bụi viền vườn + dm7 sáng hơn (đỉnh (0,37,0,51,0,23), `foot` 0,68 — 225 h090 bụi gần đen); `hedgeGeometry` thêm `maxHalf` (kẹp nửa bề ngang) → bụi
+    dải phân cách LQĐ ≤ 0,7 m trong bó vỉa 1,5 m (không lấn làn xe). (g) Caro lớp 3: viên đỏ (184,138,122) → (176,140,130),
+    xám (170,167,161) — kè Thế Lữ 290 bớt cam-hồng.
+    **(10) PHẢN BIỆN VÒNG 2 (2026-10-14):** (a) **Bằng chứng ÂM zebra** — `mark_labels.json` mục `noZebra` (id → ghi chú,
+    CHỈ thêm sau khi nhìn ảnh 8 hướng): 4 pano liền nhau Hoàng Diệu 015-018 đều có chữ "Vạch qua đường" chung chung nhưng ảnh
+    không có vạch nào → gen_roadmarks bỏ cờ ZEBRA → hết 4 vạch giữa khối MA ngay dưới camera (vạch giữa khối 118 → 114).
+    BẪY: chữ `street_furniture` liệt kê vật thể của CẢ pano 360° (có khi là vạch cách xa/khuất), 4 pano liền kề cùng một câu
+    = dấu hiệu chép mô tả → kiểm ảnh trước khi tin. (b) **Vỉa hè PHÍA CÔNG VIÊN** — chữ `sidewalk` hay tả hè phía NHÀ rồi
+    thêm mệnh đề riêng cho phía vườn ("caro đỏ-xám …; phần công viên/quảng trường lát gạch xám" — 222/223/225/226 Tố Hữu;
+    "phía công viên lát gạch xám" 340/521; "… cả hai bên" 400). gen_roadmarks: `ROAD_PAVE_EVIDENCE` thêm phần tử thứ 4 = lớp
+    phía công viên (mệnh đề có `phía|phần|bên|dọc|ven|quanh|mép (dải) công viên|vườn hoa|vườn|quảng trường` + vật liệu, "caro"
+    trơn = 3; "vỉa hè … hai bên" → như lớp chính; không có → 0; 10 xám + 15 caro). roadnet: ô vỉa hè có mép ngoài đẩy ra 1,5 / 4 / 7 m
+    rơi TRONG đa giác `PARKS` (deps.PARKS — đa giác vườn Tố Hữu lùi ~4,6 m sau mép hè) → lớp phía công viên của bằng chứng
+    gần nhất (≤ 150 m) gắn CHÍNH vườn đó (điểm pano ≤ 25 m tới đa giác — mặt lát là của vườn, không của way); không có → mặc
+    định way (`SIDEWALK_BY_ROAD`), KHÔNG lấy chữ phía nhà. Góc nút giao: kiểm điểm giữa mép lưng đẩy xa tâm nút. Đổi đúng 25
+    ô: bờ vườn Tố Hữu 2 phố (ri 6/201) caro → xám, mũi Kim Đồng (202/334) caro → xám, Trần Phú quanh 475 (84) xám → caro;
+    `stats.pavePark/paveParkEv`. (c) Nhãn ảnh vật liệu `mark_labels.json` mục `pave` (id → [lớp, ghi chú]) thắng chữ: 478 'gạch
+    block xám-đỏ' → 2 (ảnh xám), 150 'caro … con sâu' → 5. (d) Vạch chữ giữa khối có nút ≤ 30 m → dời 4 m dọc đoạn VỀ PHÍA
+    nút (551: ảnh h180 thấy vạch 2-6 m phía trước; đặt đúng chân camera thì không hướng nào thấy); xa hơn giữ tại pano.
+    (e) `PLAZA_PATCHES` + [690,−418,24] mũi bắc vườn Kim Đồng (545 h180 ảnh: sân lát + nhà chờ). (f) Gộp nhánh: import
+    `corridorPen as clrCorridorPen` nằm TRONG dòng import clearance (giống hệt W3-A) — dòng import riêng cũ làm cây gộp W3-A+D
+    lỗi "Identifier 'clrCorridorPen' has already been declared" (git merge-tree không báo xung đột).
+    **CHƯA LÀM:** vạch gạch chéo/xương cá ở mũi tách làn (gore, 304 — hình học nút HVT/cầu dẫn thuộc W3-F, camera lệch 11 m
+    thuộc W3-A), trời u ám cho pano trời mây, mặt bê tông liền "shared surface" ngõ chợ (W3-E).
+    **ĐO / KIỂM (2026-10-11, cùng phiên; base = git archive dot3 :8514, W3-D :8504; Radeon 890M TIER 3):** roadnet R1750
+    (node): đèn 131 → 29, nhánh zebra 750 → 239, vạch giữa khối 116, tim theo nhãn ảnh 162 đoạn chạy / chữ 13 / mặc định 592,
+    326 đoạn không tim, 61 đoạn đường đôi; dựng 330-400 ms (≈ dot3), 71k tam giác lòng không đổi. CHẤM MẮT (REAL|dot3|W3-D,
+    39 pano × 4 hướng, 1280×634, --traffic off, ?date=2024-10-15): nhóm mục tiêu 31 pano 4,40 → 5,06 (+0,66; riêng danh sách
+    FP-4 24 pano 4,42 → 5,04), đối chứng 8 pano 3,25 → 3,31 (074 +0,5: đèn/zebra ma trên cầu — đối chứng không sạch hẳn).
+    Trời (skycmp 156 khung): dải trên thật (190,204,222) · dot3 (188,199,215) · W3-D (189,201,219); dải 14-24 % thật
+    (184,194,214) · dot3 (200,208,220) · W3-D (196,207,221), bão hoà 0,090 → 0,113 (thật 0,109). PERF (B/A/B/A ×2 vòng):
+    fps chạm vsync 60 cả hai; draw call ≤ dot3 ở 5/6 góc (pano_400 334-357 → 313, game_3 356 → 311-336, spawn 364-387 →
+    352, pano_007 505 → 479); tam giác +0,5-2,5 % (bụi lổn nhổn: dải phân cách LQĐ pano_216 1,34 → 1,37 M; vườn 31,6k tam
+    giác/2,6 km bụi); hpReady 4325 → 4396 ms (nhiễu ±250; pha furniture +49 ms = vườn hoa, freeze +44); heap SAU ép GC (CDP
+    collectGarbage) 378 → 385 MB. BẪY perf đã sửa: `IcosahedronGeometry` vốn KHÔNG chỉ mục → `.toNonIndexed()` chỉ
+    console.warn — 123 bụi tròn = 123 warn ≈ +200-370 ms pha furniture khi có DevTools/Playwright (đo bằng SwiftShader, không
+    cần khoá GPU: tools/qa/shoot.mjs --swiftshader --w 320 --h 180 + console.error tạm). Cổng: 0 lỗi JS (13 khối chụp full,
+    perf ×8, WebGL1 --gl1); lite: 3 × 404 `assets_lite/*.glb` ở CẢ dot3 lẫn W3-D (worktree không có assets_lite — môi trường);
+    diag full 'TẤT CẢ THỰC THỂ OK' (giống dot3); waterbfs 5/5; node --check mọi module sửa; gen_roadmarks chạy lại tất định.
+    **ĐO / KIỂM vòng 3 (2026-10-14, sau (10); base dot3 :8544, W3-D :8504):** roadnet R1750 (node) đèn 29 (25 OSM + 4), nhánh
+    zebra 239, vạch giữa khối 118 → 114, tim nhãn 164 / chữ 12 / mặc định 591 / không 326 / đôi 61, nhãn W lan 9; ô vỉa hè
+    giáp vườn 399 (82 có bằng chứng phía vườn), dựng 324-339 ms. CHẤM MẮT (REAL|dot3|r2|r3, 79 khung + aerial): 10 pano đích
+    của phản biện 4,20 (dot3) → 5,13 (r2) → 5,20 (478 vỉa hè xám, 225 bờ vườn xám); thêm 017 3,0 → 3,6 (hết zebra ma), 551
+    5,0 → 5,5, 223/224/226 h090 + 043 h270 +0,5, 545 h180 +0,3; đối chứng 6×2 2,87 → 2,92 (= dot3; 150 Cát Cụt xám lại).
+    PERF B/A/B2/A2 cùng phiên: fps chạm vsync 60; lấy min 2 lần mỗi bên (gai streaming ±0,5-0,9 M tam giác xuất hiện ở CẢ
+    hai bên, khác view mỗi lần) → tam giác trung vị +0,46 % (−0,9…+1,1 %), draw call thấp hơn 16/24 góc; pha furniture
+    39/40 → 117/109 ms (vườn hoa), freeze 210/243 → 366/322 (A−B +60…+190 ms qua 5 phiên — thật: gộp tĩnh bụi/cỏ/lối),
+    hpReady nhiễu (5460/5302 → 5417/5550). Cổng: 0 lỗi JS (7 khối chụp, std ×2, --gl1 webgl2:false); lite 3 × 404
+    `assets_lite` như dot3 (môi trường); diag 'TẤT CẢ THỰC THỂ OK — 0 lỗi JS'; waterbfs 5/5; gen tất định. Cảnh báo console
+    (SwiftShader): 64 toNonIndexed = dot3; 'KHR_parallel_shader_compile not supported' 2-14 tuỳ lần đo (1 lần mỗi
+    compileAsync GLB của assets.js — đếm theo số model đã nạp lúc lấy mẫu, W3-D không đụng assets/main).
 - **2026-10-04 (W2-F POLISH)** [ĐỢT 3 wave 2 — WebGL1, giải mã RB 1 lần, kho cảng, ĐÊM, giao thông né xe đỗ, dọn code chết, hitch]:
     **(1) WebGL1** (three r160 tự lùi WebGL1 khi không có WebGL2): KIỂM bằng `tools/qa/shoot.mjs --gl1` (init script cho
     `getContext('webgl2')` trả null — cờ Chrome `--disable-es3-apis` KHÔNG có tác dụng ở headless mới: vẫn webgl2:true;

@@ -181,8 +181,12 @@ export function buildRoadNet(ROADS_DT, deps) {
   const { groundHeightNoDeck: ghN, isWater } = deps;
   const LAND_H = deps.LAND_H ?? 2, R = deps.R ?? 1600, T = deps.T ?? 450;
   const MEDIANS = deps.MEDIANS || [], MARKS = deps.MARKS || [];
+  // W3-D: bằng chứng vạch kẻ — nhãn nhìn ảnh pano (tim Y/D/W/N), node OSM đèn tín hiệu / vạch qua đường (js/roadmarks.js)
+  const LABELS = deps.LABELS || [], OSM_SIG = deps.OSM_SIGNALS || [], OSM_X = deps.OSM_CROSSINGS || [], PAVE = deps.PAVE || [];
+  const PARKS = deps.PARKS || [];   // đa giác công viên/vườn hoa (mapdata PARKS): ô vỉa hè giáp vườn lấy lớp "phía công viên" (PAVE[3])
   const gh = (x, z) => Math.max(ghN(x, z), LAND_H);
-  const stats = { tsnap: 0, tsnapIns: 0, xcross: 0, nodes: 0, junctions: 0, miters: 0, driveways: 0, deadEnds: 0, signals: 0, zebraArms: 0, runs: 0, waterGaps: 0, chordCorners: 0 };
+  const stats = { tsnap: 0, tsnapIns: 0, xcross: 0, nodes: 0, junctions: 0, miters: 0, driveways: 0, deadEnds: 0, signals: 0, zebraArms: 0, runs: 0, waterGaps: 0, chordCorners: 0,
+    sigOsm: 0, sigEv: 0, zebOsm: 0, zebSig: 0, zebEv: 0, midX: 0, marks: { def: 0, lab: 0, ev: 0, none: 0, dual: 0 } };
   const gapQuads = [];   // W2-A: [4 đỉnh XZ của mẩu nhựa khe, mặt nhựa so với nền] × n → surfaceAt (makeQueries)
 
   // ---------- 0) way ----------
@@ -321,16 +325,20 @@ export function buildRoadNet(ROADS_DT, deps) {
   }
 
   // ---------- 3) xử lý nút: phân loại → gom CỤM nút giao gần nhau → hình học góc ----------
-  const MARK_GRID = new Map();
-  for (const m of MARKS) { const k = Math.floor(m[0] / 50) + ',' + Math.floor(m[1] / 50); let l = MARK_GRID.get(k); if (!l) MARK_GRID.set(k, l = []); l.push(m); }
-  const marksNear = (x, z, r) => {
-    const out = [], ix = Math.floor(x / 50), iz = Math.floor(z / 50);
-    for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) {
-      const l = MARK_GRID.get((ix + a) + ',' + (iz + b)); if (!l) continue;
-      for (const m of l) if ((m[0] - x) ** 2 + (m[1] - z) ** 2 < r * r) out.push(m);
-    }
-    return out;
+  // lưới điểm 50 m (bằng chứng pano / node OSM): near(x, z, r ≤ 50) → các điểm trong bán kính r
+  const ptGrid = (list) => {
+    const G = new Map();
+    for (const m of list) { const k = Math.floor(m[0] / 50) + ',' + Math.floor(m[1] / 50); let l = G.get(k); if (!l) G.set(k, l = []); l.push(m); }
+    return (x, z, r) => {
+      const out = [], ix = Math.floor(x / 50), iz = Math.floor(z / 50);
+      for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) {
+        const l = G.get((ix + a) + ',' + (iz + b)); if (!l) continue;
+        for (const m of l) if ((m[0] - x) ** 2 + (m[1] - z) ** 2 < r * r) out.push(m);
+      }
+      return out;
+    };
   };
+  const marksNear = ptGrid(MARKS), sigNear = ptGrid(OSM_SIG), xNear = ptGrid(OSM_X);
   const swSpec = (e, cut, cap) => ({ e, cut, cap });
   // điểm trên đường mép: gốc O (nút của nhánh) + pháp tuyến·off + hướng·t
   const lineAt = (O, nx, nz, off, d, t) => [O[0] + nx * off + d[0] * t, O[1] + nz * off + d[1] * t];
@@ -526,23 +534,56 @@ export function buildRoadNet(ROADS_DT, deps) {
         C.skirt = true;
       }
     }
-    // zebra / đèn tín hiệu: theo số nhánh phố cấp p/s/t + bằng chứng pano (≤ 45 m)
-    const st = arms.filter((a) => STREET[a.c]);
-    const nPS = st.filter((a) => a.c === 'p' || a.c === 's').length, nPST = nPS + st.filter((a) => a.c === 't').length;
-    let evZ = false, evS = false;
-    for (const m of marksNear(cx, cz, 45)) { if (m[2] & 8) evZ = true; if (m[2] & 16) evS = true; }
-    const inside = Math.hypot(cx, cz) < R;
-    J.signal = inside && st.length >= 3 && (nPS >= 2 || (evS && nPST >= 2));
-    J.zebra = inside && st.length >= 3 && (nPST >= 2 || evZ);
-    J.evS = evS;
     for (const a of arms) J.rad = Math.max(J.rad, Math.hypot(a.O[0] - cx, a.O[1] - cz) + Math.max(a.s + a.sw + 1, a.hw + a.sw));
+    // zebra / đèn tín hiệu (W3-D): CHỈ theo BẰNG CHỨNG — node OSM traffic_signals / crossing trong vùng nút (rad + 10 m),
+    // hoặc mô tả pano (≤ 45 m, gán cho 1 nút tốt nhất ở bước sau). Bản cũ bật theo số nhánh (≥ 2 nhánh p/s → đèn, ≥ 2 nhánh
+    // p/s/t → zebra) → AUDIT3: đèn/zebra "ma" ở 056, 180, 363, 377, 496, 083, 092, 212, 391 (131 nút đèn, chỉ 23 có node OSM).
+    const st = arms.filter((a) => STREET[a.c]);
+    J.nSt = st.length;
+    J.nPS = st.filter((a) => a.c === 'p' || a.c === 's').length;
+    J.nPST = J.nPS + st.filter((a) => a.c === 't').length;
+    J.rankSum = arms.reduce((s, a) => s + RANK[a.c], 0);
+    J.inside = Math.hypot(cx, cz) < R;
+    J.osmS = sigNear(cx, cz, Math.min(49, J.rad + 10)).length > 0;
+    J.xPts = xNear(cx, cz, Math.min(49, J.rad + 10));
+    J.evS = false; J.evZ = false;
     junctions.push(J);
     stats.junctions++;
   }
-  // đèn tín hiệu: nút "lớn" cách nhau ≥ 45 m (cụm sát nhau chỉ giữ nút nhiều nhánh/cấp cao hơn; pano có đèn ưu tiên)
+  // bằng chứng chữ pano → MỘT nút tốt nhất quanh điểm đó (nhiều nhánh/cấp cao, GẦN: −1 điểm mỗi 3 m).
+  //   • đèn (16): nút ≤ 45 m (đèn nhìn thấy từ xa, thường ở nút lớn phía trước);
+  //   • zebra (8): CHỈ nút mà pano nằm trong vùng nút + 12 m (≤ 45) — vạch qua đường được tả là vạch Ở CHỖ camera.
+  //     Không có → m.unusedZ → vạch GIỮA KHỐI trên đoạn phố gần pano (bên dưới). Phản biện W3-D: bản cũ (≤ 45 m, −d/12)
+  //     gán chữ "Vạch qua đường" của pano_551 cho nút lớn cách 41 m → zebra ma ở 496 h000 và MẤT vạch thật ở 551
+  //     (8/24 chữ zebra rơi vào nút > 25 m).
+  {
+    const JG = new Map();
+    for (const J of junctions) { const k = Math.floor(J.x / 50) + ',' + Math.floor(J.z / 50); let l = JG.get(k); if (!l) JG.set(k, l = []); l.push(J); }
+    for (const m of MARKS) {
+      if (!(m[2] & 24)) continue;
+      let bS = null, sS = -1e9, bZ = null, sZ = -1e9;
+      const ix = Math.floor(m[0] / 50), iz = Math.floor(m[1] / 50);
+      for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) for (const J of JG.get((ix + a) + ',' + (iz + b)) || []) {
+        const d = Math.hypot(J.x - m[0], J.z - m[1]);
+        if (d > 45 || J.degenerate || !(J.nSt >= 3) || !J.inside) continue;
+        const s = J.rankSum + 2 * J.nPS - d / 3;
+        if ((m[2] & 16) && s > sS) { sS = s; bS = J; }
+        if ((m[2] & 8) && d <= Math.min(45, J.rad + 12) && s > sZ) { sZ = s; bZ = J; }
+      }
+      if (bS) bS.evS = true;
+      // chữ tả CẢ đèn lẫn vạch ("gần ngã tư có đèn …, có vạch sang đường" — pano_526) → vạch ở nút có đèn đó
+      if (m[2] & 8) { const Z = bZ || bS; if (Z) Z.evZ = true; else m.unusedZ = true; }
+    }
+  }
+  for (const J of junctions) {
+    if (J.degenerate || !J.xPts) { J.signal = J.zebra = false; continue; }
+    J.signal = J.inside && J.nSt >= 3 && (J.osmS || (J.evS && J.nPST >= 2));
+    J.zebra = J.inside && J.nSt >= 3 && (J.signal || J.xPts.length > 0 || J.evZ);
+  }
+  // đèn tín hiệu: nút cách nhau ≥ 45 m (cụm sát nhau chỉ giữ 1: OSM > pano > nhiều nhánh/cấp cao)
   {
     const sig = junctions.filter((J) => J.signal);
-    const score = (J) => (J.evS ? 100 : 0) + J.arms.reduce((s, a) => s + RANK[a.c], 0);
+    const score = (J) => (J.osmS ? 200 : 0) + (J.evS ? 100 : 0) + J.rankSum;
     sig.sort((p, q) => score(q) - score(p));
     const kept = [];
     for (const J of sig) {
@@ -550,14 +591,208 @@ export function buildRoadNet(ROADS_DT, deps) {
       kept.push(J);
     }
     stats.signals = kept.length;
+    stats.sigOsm = kept.filter((J) => J.osmS).length; stats.sigEv = kept.length - stats.sigOsm;
+    // nút bị bỏ đèn (cụm < 45 m) chỉ còn zebra nếu có node OSM / bằng chứng chữ zebra
+    for (const J of junctions) if (J.zebra && !J.signal) J.zebra = J.xPts.length > 0 || J.evZ;
   }
+  // zebra theo NHÁNH: node OSM rơi trên nhánh (gần vị trí vạch: gốc + setback + 2,3 m) → nhánh đó; nút có đèn → mọi nhánh
+  // phố (như ảnh thật: ngã tư đèn luôn kẻ đủ); node OSM ở tâm nút / bằng chứng chữ → các nhánh p/s/t
   for (const J of junctions) {
-    for (const a of J.arms) {
-      if (!a.spec || !STREET[a.c] || (a.c === 'r' && !J.signal)) continue;
-      if (J.zebra) { a.spec.zebra = true; stats.zebraArms++; }
-      if (J.signal) a.spec.stop = true;
+    if (!J.zebra) continue;
+    const st = J.arms.filter((a) => a.spec && STREET[a.c]);
+    const hitArm = new Set();
+    for (const p of J.xPts) {
+      let ba = null, bd = 1e9;
+      for (const a of st) {
+        const zx = a.O[0] + a.d[0] * ((a.s ?? 0) + 2.3), zz = a.O[1] + a.d[1] * ((a.s ?? 0) + 2.3);
+        const along = (p[0] - a.O[0]) * a.d[0] + (p[1] - a.O[1]) * a.d[1], lat = Math.abs(-(p[0] - a.O[0]) * a.d[1] + (p[1] - a.O[1]) * a.d[0]);
+        if (along < (a.s ?? 0) - 3 || lat > a.hw + 2.5) continue;
+        const d = Math.hypot(p[0] - zx, p[1] - zz); if (d < bd && d < 14) { bd = d; ba = a; }
+      }
+      if (ba) hitArm.add(ba);
+    }
+    const allPST = J.signal || J.evZ || (J.xPts.length > 0 && hitArm.size === 0);
+    for (const a of st) {
+      const z = hitArm.has(a) || (allPST && (a.c !== 'r' || J.signal));
+      if (!z) continue;
+      a.spec.zebra = true; stats.zebraArms++;
+      if (hitArm.has(a)) stats.zebOsm++; else if (J.signal) stats.zebSig++; else stats.zebEv++;
+    }
+    for (const a of st) if (J.signal) a.spec.stop = true;
+  }
+
+  // ---------- 3e) W3-D: bằng chứng theo WAY — nhãn tim đường (nhìn ảnh pano) + vạch qua đường GIỮA KHỐI ----------
+  // nửa lòng của way: w.hw nếu có (W3-A gán bề rộng RIÊNG từng way) — không thì theo cấp. `??` → hwOf không bị gọi khi đã có w.hw
+  const wHW = (w) => w.hw ?? hwOf(w.c);
+  const stGrid = buildSegGrid(ways.map((w) => (STREET[w.c] ? w : { pts: [] })), 24);
+  // điểm → đoạn phố gần nhất (≤ maxD): {wi, k, t, d}; cùng khoảng cách ưu tiên cấp cao
+  const nearestStreetSeg = (x, z, maxD) => {
+    let best = null, bs = Infinity;
+    stGrid.near(x, z, (wi, k) => {
+      const w = ways[wi], [ax, az] = w.pts[k], [bx, bz] = w.pts[k + 1];
+      const dx = bx - ax, dz = bz - az, l2 = dx * dx + dz * dz; if (l2 < 1e-6) return;
+      let t = ((x - ax) * dx + (z - az) * dz) / l2; t = t < 0 ? 0 : t > 1 ? 1 : t;
+      const d = Math.hypot(x - ax - dx * t, z - az - dz * t); if (d > maxD) return;
+      const sc = d - 0.2 * RANK[w.c];
+      if (sc < bs) { bs = sc; best = { wi, k, t, d }; }
+    });
+    return best;
+  };
+  for (const w of ways) { w.labels = null; w.xings = null; w.pave = null; }
+  // vật liệu vỉa hè theo chữ pano (ROAD_PAVE_EVIDENCE): cùng cách gán way; đoạn chạy/nhánh lấy điểm gần nhất ≤ 120 m
+  for (const Pv of PAVE) {
+    if (!Pv[2]) continue;
+    const h = nearestStreetSeg(Pv[0], Pv[1], 12); if (!h) continue;
+    (ways[h.wi].pave ||= []).push(Pv);
+  }
+  // nhãn ảnh: gán cho WAY gần nhất (camera Street View đi trên lòng đường) — roadnet lan dọc way ≤ 150 m (emitRun)
+  // Nhãn W (trắng đứt = 1 chiều nhiều làn) còn gán cho dải ĐỐI DIỆN của đường đôi: way phố khác có đoạn ≤ 20 m, song song
+  // (|cos| > 0,94), mép lòng cách 0..8 m (cùng tiêu chí dualRun) — camera chỉ đi 1 dải nhưng ảnh thấy cả 2 (phản biện
+  // W3-D: Lê Quang Đạo 216/478 dải xa vẫn tim vàng vì dualRun cả đoạn 360 m chỉ đạt 46%). Nhãn lan có cờ `far` → thua nhãn
+  // riêng của way đó (+40 m khi chọn nhãn gần nhất).
+  for (const L of LABELS) {
+    const h = nearestStreetSeg(L[0], L[1], 12); if (!h) continue;
+    (ways[h.wi].labels ||= []).push(L);
+    if (!(L[2] & 4)) continue;
+    const w0 = ways[h.wi], [ax0, az0] = w0.pts[h.k], [bx0, bz0] = w0.pts[h.k + 1];
+    const l0 = Math.hypot(bx0 - ax0, bz0 - az0); if (l0 < 1) continue;
+    const ux = (bx0 - ax0) / l0, uz = (bz0 - az0) / l0, px = ax0 + (bx0 - ax0) * h.t, pz = az0 + (bz0 - az0) * h.t;
+    const got = new Set([h.wi]);
+    stGrid.near(px, pz, (wj, k) => {
+      if (got.has(wj)) return;
+      const o = ways[wj], [ax, az] = o.pts[k], [bx, bz] = o.pts[k + 1];
+      const dx = bx - ax, dz = bz - az, l = Math.hypot(dx, dz); if (l < 1) return;
+      if (Math.abs((dx * ux + dz * uz) / l) < 0.94) return;
+      const tt = ((px - ax) * dx + (pz - az) * dz) / (l * l); if (tt < 0 || tt > 1) return;
+      const d = Math.hypot(px - ax - dx * tt, pz - az - dz * tt), gap = d - wHW(w0) - wHW(o);
+      if (d > 20 || gap <= -0.5 || gap >= 8) return;
+      got.add(wj);
+      const F = [L[0], L[1], L[2]]; F.far = true;
+      (o.labels ||= []).push(F);
+      stats.labFar = (stats.labFar || 0) + 1;
+    });
+  }
+  // vạch qua đường giữa khối: node OSM crossing không thuộc vùng nút giao có zebra (rad + 4 m) và nằm trên lòng phố
+  // (≤ hw + 2 m); bằng chứng chữ pano "có vạch qua đường" mà không có nút giao nào ≤ 45 m (m.unusedZ) → đoạn phố gần nhất
+  // ≤ 15 m (pano_294 Thế Lữ, pano_079 Bến Bính). Vẽ bằng cách tách dải tại vạch (emitRun) — không cần shader mới.
+  {
+    const JG = ptGrid(junctions.filter((J) => !J.degenerate).map((J) => [J.x, J.z, J]));
+    const nearZebJ = (x, z, pad) => JG(x, z, 49).some((e) => e[2].zebra && Math.hypot(e[0] - x, e[1] - z) < e[2].rad + pad);
+    const add = (p, maxD, src) => {
+      if (nearZebJ(p[0], p[1], 4)) return;
+      const h = nearestStreetSeg(p[0], p[1], maxD); if (!h) return;
+      const w = ways[h.wi]; if (src === 'osm' && h.d > wHW(w) + 2) return;
+      const L = (w.xings ||= []);
+      const [ax, az] = w.pts[h.k], [bx, bz] = w.pts[h.k + 1], segL = Math.hypot(bx - ax, bz - az);
+      // trùng (≤ 8 m dọc cùng đoạn) → bỏ
+      if (L.some((q) => q.k === h.k && Math.abs(q.t - h.t) * segL < 8)) return;
+      L.push({ k: h.k, t: h.t, src });
+    };
+    for (const p of OSM_X) add(p, 9, 'osm');
+    // chữ pano: có node OSM crossing ≤ 20 m → chữ tả CHÍNH vạch đó (pano_290 ↔ node Thế Lữ cách 12 m), không thêm vạch;
+    // nhiều pano ≤ 25 m cùng tả 1 vạch (551 + 393 Đinh Tiên Hoàng) → 1 vạch ở pano GẦN NÚT GIAO nhất (vạch giữa khối hay ở
+    // đầu đoạn gần nút; ảnh thật: vạch ngay trước 551 h180, còn 551 h000/393 h000 trống). KHÔNG lấy trung điểm (rơi vào
+    // khoảng giữa 2 pano — chỗ cả 2 ảnh đều thấy trống).
+    const xOsm = ptGrid(OSM_X), pz = [];
+    const dJ = (x, z) => { let d = 1e9; for (const e of JG(x, z, 60)) d = Math.min(d, Math.hypot(e[0] - x, e[1] - z)); return d; };
+    for (const m of MARKS) {
+      if (!m.unusedZ || xOsm(m[0], m[1], 20).length) continue;
+      const g = pz.find((q) => Math.hypot(q[0] - m[0], q[1] - m[1]) < 25);
+      if (!g) pz.push([m[0], m[1], dJ(m[0], m[1])]);
+      else { const d = dJ(m[0], m[1]); if (d < g[2]) { g[0] = m[0]; g[1] = m[1]; g[2] = d; } }
+    }
+    // nút ≤ 30 m: vạch dời 4 m dọc đoạn VỀ PHÍA nút (đầu khối) — đặt đúng chân camera thì không hướng nào thấy (551: ảnh
+    // h180 thấy vạch cách 2-6 m về phía nút cách 25 m); xa hơn → không biết phía nào, giữ tại pano
+    for (const q of pz) {
+      let x = q[0], z = q[1];
+      const h = q[2] <= 30 && nearestStreetSeg(x, z, 15);
+      if (h) {
+        const w = ways[h.wi], [ax, az] = w.pts[h.k], [bx, bz] = w.pts[h.k + 1], l = Math.hypot(bx - ax, bz - az) || 1;
+        const ux = (bx - ax) / l * 4, uz = (bz - az) / l * 4;
+        if (dJ(x + ux, z + uz) < dJ(x - ux, z - uz)) { x += ux; z += uz; } else { x -= ux; z -= uz; }
+      }
+      add([x, z], 15, 'pano');
+    }
+    for (const m of MARKS) delete m.unusedZ;
+  }
+  // đường ĐÔI (2 chiều xe là 2 way song song, có/không dải phân cách): mép lòng 2 dải cách nhau 0..8 m dọc ≥ 60% đoạn chạy
+  // → mỗi dải là 1 chiều: KHÔNG tim vàng, vạch trắng phân làn (ảnh thật Lê Quang Đạo pano_216/478, cầu HVT)
+  const dualRun = (w, P, cum) => {
+    const L = cum[cum.length - 1]; if (L < 20) return false;
+    const n = Math.max(3, Math.floor(L / 10)); let hit = 0;
+    const hwA = wHW(w);
+    for (let i = 0; i <= n; i++) {
+      const u = L * i / n; let j = 0; while (j < P.length - 2 && cum[j + 1] < u) j++;
+      const sl = Math.max(1e-6, cum[j + 1] - cum[j]), t = (u - cum[j]) / sl;
+      const ux = (P[j + 1][0] - P[j][0]) / sl, uz = (P[j + 1][1] - P[j][1]) / sl;
+      const x = P[j][0] + (P[j + 1][0] - P[j][0]) * t, z = P[j][1] + (P[j + 1][1] - P[j][1]) * t;
+      let ok = false;
+      stGrid.near(x, z, (wj, k) => {
+        if (ok || wj === w.wi0) return;
+        const o = ways[wj], [ax, az] = o.pts[k], [bx, bz] = o.pts[k + 1];
+        const dx = bx - ax, dz = bz - az, l = Math.hypot(dx, dz); if (l < 1) return;
+        if (Math.abs((dx * ux + dz * uz) / l) < 0.94) return;
+        const tt = ((x - ax) * dx + (z - az) * dz) / (l * l); if (tt < 0 || tt > 1) return;
+        const d = Math.hypot(x - ax - dx * tt, z - az - dz * tt), gap = d - hwA - wHW(o);
+        if (gap > -0.5 && gap < 8) ok = true;
+      });
+      if (ok) hit++;
+    }
+    return hit >= 0.6 * (n + 1);
+  };
+
+  // lớp vỉa hè: bằng chứng chữ pano gần nhất trên way (≤ 120 m tới đa tuyến P / tới điểm), không có → SIDEWALK_BY_ROAD
+  // (theo TỪNG Ô vỉa hè: phố dài đổi vật liệu dọc đường như ảnh thật — Mê Linh xám, đoạn công sở caro…)
+  const paveAt = (w, x, z) => {
+    let best = null, bd = 120 * 120;
+    if (w.pave) for (const Pv of w.pave) { const d = (Pv[0] - x) ** 2 + (Pv[1] - z) ** 2; if (d < bd) { bd = d; best = Pv[2]; } }
+    return best;
+  };
+  // PHÍA CÔNG VIÊN (phản biện W3-D vòng 2): chữ pano tả vỉa hè phía NHÀ ("caro đỏ-xám …; phần công viên lát gạch xám") —
+  // lấy cho cả 2 bên làm bờ vườn Tố Hữu 223-226/043 thành caro đỏ (ảnh: đá xám). Ô vỉa hè có mép ngoài (đẩy ra 1,5 / 4 / 7 m)
+  // nằm TRONG đa giác PARKS → lớp "phía công viên" (PAVE[3]) của bằng chứng gần nhất (≤ 150 m) thuộc CHÍNH vườn đó (điểm pano
+  // ≤ 25 m tới đa giác; mặt lát là của vườn, không của way); không có → mặc định của way (SIDEWALK_BY_ROAD), KHÔNG lấy chữ phía nhà.
+  const parkBB = PARKS.map((P) => {
+    let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
+    for (const [x, z] of P) { x0 = Math.min(x0, x); z0 = Math.min(z0, z); x1 = Math.max(x1, x); z1 = Math.max(z1, z); }
+    return [x0, z0, x1, z1];
+  });
+  const inPoly = (P, x, z) => {
+    let c = false;
+    for (let i = 0, j = P.length - 1; i < P.length; j = i++) { const [xi, zi] = P[i], [xj, zj] = P[j]; if ((zi > z) !== (zj > z) && x < (xj - xi) * (z - zi) / (zj - zi) + xi) c = !c; }
+    return c;
+  };
+  const parkAt = (x, z) => {
+    for (let k = 0; k < PARKS.length; k++) { const b = parkBB[k]; if (x < b[0] || x > b[2] || z < b[1] || z > b[3]) continue; if (inPoly(PARKS[k], x, z)) return k; }
+    return -1;
+  };
+  const parkEv = PARKS.map(() => []);
+  for (const Pv of PAVE) {
+    if (!Pv[3]) continue;
+    for (let k = 0; k < PARKS.length; k++) {
+      const b = parkBB[k]; if (Pv[0] < b[0] - 25 || Pv[0] > b[2] + 25 || Pv[1] < b[1] - 25 || Pv[1] > b[3] + 25) continue;
+      if (inPoly(PARKS[k], Pv[0], Pv[1]) || distToPolyline(Pv, PARKS[k]) <= 25) parkEv[k].push(Pv);
     }
   }
+  // lớp ô vỉa hè phía công viên: null = không giáp vườn; -1 = giáp vườn nhưng không có bằng chứng → mặc định way
+  const parkLayer = (mx, mz, ux, uz) => {
+    if (!PARKS.length) return null;
+    let k = -1;
+    for (const r of [1.5, 4, 7]) if ((k = parkAt(mx + ux * r, mz + uz * r)) >= 0) break;   // đa giác vườn Tố Hữu lùi ~4,6 m sau mép hè
+    if (k < 0) return null;
+    let best = -1, bd = 150 * 150;
+    for (const Pv of parkEv[k]) { const d = (Pv[0] - mx) ** 2 + (Pv[1] - mz) ** 2; if (d < bd) { bd = d; best = Pv[3]; } }
+    return best;
+  };
+  const armSwLayer = (a, probe) => {
+    const w = ways[a.wi];
+    if (probe) {
+      const pl = parkLayer(probe[0], probe[1], probe[2], probe[3]);
+      if (pl != null) { stats.pavePark = (stats.pavePark || 0) + 1; return pl > 0 ? pl : SW_LAYER[a.swType] ?? RL.GACH_XAM; }
+    }
+    if (w && w.pave) { const v = paveAt(w, a.O[0] + a.d[0] * 8, a.O[1] + a.d[1] * 8); if (v != null) return v; }
+    return SW_LAYER[a.swType] ?? RL.GACH_XAM;
+  };
 
   stats.tNodes = Math.round(_now() - t0);
   // ---------- 4) phát hình học ----------
@@ -916,20 +1151,41 @@ export function buildRoadNet(ROADS_DT, deps) {
       return out;
     };
     // ---- vạch kẻ theo cấp + bằng chứng pano (≤ 14 m) ----
+    // W3-D: mặc định theo cấp CHỈ còn ở p/s (+ t đủ rộng); NHÃN ẢNH pano trên cùng way (≤ 150 m) quyết định trước,
+    // rồi mới tới chữ mô tả (≤ 14 m). Bản cũ: t luôn vàng đứt, s luôn vàng + mép; bằng chứng chỉ THÊM vạch → AUDIT3 MARK:
+    // tim vàng trên phố hẹp Hạ Lý/Dư Hàng/Mê Linh/Chùa Hàng/Cầu Đất (111 115 129 143 336 345 372 102 106 308), vạch vàng
+    // trên từng chiều của đường đôi (216 478). Bề rộng lòng: `ROADS_DT[ri].w` nếu generator có (W3-A), không thì theo cấp.
     let pat = 0;
     if (street) {
+      const wid = deps.widthOf ? deps.widthOf(w.ri, w.c) : (ROADS_DT[w.ri] && ROADS_DT[w.ri].w) || 2 * hw;
+      const dual = w.c !== 'p' && dualRun(w, P, cum);
       if (w.c === 'p') pat = MK.CDBL | MK.EDGE | MK.LANES | MK.GUTTER;
-      else if (w.c === 's') pat = MK.CDY | MK.EDGE | MK.GUTTER;
-      else if (w.c === 't') pat = MK.CDY;
-      let ev = 0, bx0 = Infinity, bx1 = -Infinity, bz0 = Infinity, bz1 = -Infinity;
-      for (const [x, z] of P) { if (x < bx0) bx0 = x; if (x > bx1) bx1 = x; if (z < bz0) bz0 = z; if (z > bz1) bz1 = z; }
-      for (const m of MARKS) {
-        if (m[0] < bx0 - 14 || m[0] > bx1 + 14 || m[1] < bz0 - 14 || m[1] > bz1 + 14) continue;
-        for (let i = 0; i < P.length - 1; i++) if (segDist(m[0], m[1], P[i][0], P[i][1], P[i + 1][0], P[i + 1][1]) < 14) ev |= m[2];
+      else if (w.c === 's') pat = wid >= 8 ? ((dual ? MK.CDW : MK.CDY) | MK.EDGE | MK.GUTTER) : MK.GUTTER;
+      else if (w.c === 't') pat = wid >= 8 ? (dual ? MK.CDW : MK.CDY) : 0;
+      if (dual) stats.marks.dual++;
+      // nhãn ảnh gần nhất trên way này (khoảng cách tới đa tuyến đoạn chạy ≤ 150 m; nhãn lan từ dải đối diện +40 m)
+      let lab = 0, lbd = 150;
+      if (w.labels) for (const Lb of w.labels) { const d = distToPolyline([Lb[0], Lb[1]], P) + (Lb.far ? 40 : 0); if (d < lbd) { lbd = d; lab = Lb[2]; } }
+      if (lab) {
+        const edge = w.c === 'p' || w.c === 's' ? MK.EDGE | MK.GUTTER : 0;
+        if (lab & 32) pat = w.c === 'p' ? MK.EDGE | MK.GUTTER : w.c === 's' ? MK.GUTTER : 0;
+        else if (lab & 2) pat = MK.CDBL | edge | (w.c === 'p' ? MK.LANES : 0);
+        else if (lab & 1) pat = MK.CDY | edge;
+        else if (lab & 4) pat = MK.CDW | edge;
+        stats.marks.lab++;
+      } else {
+        let ev = 0, bx0 = Infinity, bx1 = -Infinity, bz0 = Infinity, bz1 = -Infinity;
+        for (const [x, z] of P) { if (x < bx0) bx0 = x; if (x > bx1) bx1 = x; if (z < bz0) bz0 = z; if (z > bz1) bz1 = z; }
+        for (const m of MARKS) {
+          if (m[0] < bx0 - 14 || m[0] > bx1 + 14 || m[1] < bz0 - 14 || m[1] > bz1 + 14) continue;
+          for (let i = 0; i < P.length - 1; i++) if (segDist(m[0], m[1], P[i][0], P[i][1], P[i + 1][0], P[i + 1][1]) < 14) ev |= m[2];
+        }
+        if (ev & 7) stats.marks.ev++; else stats.marks.def++;
+        if (ev & 2) pat = (pat & ~(MK.CDY | MK.CDW)) | MK.CDBL;
+        else if ((ev & 1) && !(pat & MK.CDBL)) pat = (pat & ~MK.CDW) | MK.CDY;
+        else if ((ev & 4) && !(pat & (MK.CDBL | MK.CDY))) pat |= MK.CDW;
       }
-      if (ev & 2) pat = (pat & ~(MK.CDY | MK.CDW)) | MK.CDBL;
-      else if ((ev & 1) && !(pat & MK.CDBL)) pat = (pat & ~MK.CDW) | MK.CDY;
-      else if ((ev & 4) && !(pat & (MK.CDBL | MK.CDY))) pat |= MK.CDW;
+      if (!(pat & (MK.CDY | MK.CDBL | MK.CDW))) stats.marks.none++;
     }
     // mặt nhựa nâng theo cấp (+4 mm/cấp): 2 dải chồng nhau (đường đôi/nhánh song song) → dải cấp cao thắng, không z-fight
     // (+1,5 mm cho way lẻ: 2 dải CÙNG cấp chồng nhau — làn nhập/tách nông không chèn nút — không z-fight vạch kẻ ở gần)
@@ -941,24 +1197,46 @@ export function buildRoadNet(ROADS_DT, deps) {
       const zebOK = street && u1 - u0 >= 14;
       // aZeb = u của 2 đầu dải tại NÚT GIAO (vạch kẻ dừng trước nút; nối miter/đường cụt: vạch chạy liền)
       const zeb = [sA.junc ? u0 : -1e4, sB.junc ? u1 : 1e4];
-      const seed = ((w.si * 131 + ka * 17) & 255) << 13;
-      const pr = pat | seed | (zebOK && sA.zebra ? MK.ZEB0 : 0) | (zebOK && sB.zebra ? MK.ZEB1 : 0) |
-        (zebOK && sA.stop ? MK.STOP0 : 0) | (zebOK && sB.stop ? MK.STOP1 : 0);
+      const seed = ((w.si * 131 + ka * 17) & 255) << 13;   // W3-F: si (chỉ số way trước khi bỏ cầu nâng) → seed phố khác giữ nguyên
+      const zFirst = (zebOK && sA.zebra ? MK.ZEB0 : 0) | (zebOK && sA.stop ? MK.STOP0 : 0);
+      const zLast = (zebOK && sB.zebra ? MK.ZEB1 : 0) | (zebOK && sB.stop ? MK.STOP1 : 0);
+      // W3-D: VẠCH QUA ĐƯỜNG GIỮA KHỐI tại u = uc → tách dải ở uc + 1,5: phần trước vẽ zebra ở CUỐI (aZeb.y = uc + 2,3 →
+      // vạch u ∈ [uc − 1,5; uc + 1,5]), phần sau mang ZEB0 với aZeb.x = uc − 2,3 (không vẽ lại, chỉ để tim đường dừng/tiếp
+      // tục cách vạch 3,3 m như ở nút giao). Shader roadtex.js không đổi.
+      const xu = [];
+      if (street && w.xings) {
+        const us = [];
+        for (const q of w.xings) if (q.k >= ka && q.k < kb) { const j = q.k - ka; us.push(cum[j] + q.t * (cum[j + 1] - cum[j])); }
+        us.sort((p1, p2) => p1 - p2);
+        for (const u of us) if (u > u0 + 7 && u < u1 - 7 && (!xu.length || u - xu[xu.length - 1] > 9)) xu.push(u);
+        stats.midX += xu.length;
+        if (xu.length && (stats.midXs ||= []).length < 400) for (const u of xu) { let j = 0; while (j < P.length - 2 && cum[j + 1] < u) j++; const t = (u - cum[j]) / Math.max(1e-6, cum[j + 1] - cum[j]); stats.midXs.push([+(P[j][0] + (P[j + 1][0] - P[j][0]) * t).toFixed(1), +(P[j][1] + (P[j + 1][1] - P[j][1]) * t).toFixed(1)]); }
+      }
+      const spl = xu.map((u) => u + 1.5);
       for (const [a, b, gA, gB] of pieces(u0, u1)) {
-        const S = sections(P, cum, a, b, gA ? null : sA.cut, gB ? null : sB.cut);
-        for (let i = 0; i < S.length - 1; i++) {
-          const S1 = S[i], S2 = S[i + 1];
-          const y1 = S1.h + yR, y2 = S2.h + yR;
-          const p1a = off(S1, -hw), p1b = off(S1, hw), p2a = off(S2, -hw), p2b = off(S2, hw);
-          let pq = pr;
-          if (w.c === 'p' && (pq & (MK.CDBL | MK.CDY | MK.CDW)) && nearMedian((S1.x + S2.x) / 2, (S1.z + S2.z) / 2)) pq &= ~(MK.CDBL | MK.CDY | MK.CDW);
-          emit('roads', [[p1a[0], y1, p1a[1], S1.u, -hw], [p1b[0], y1, p1b[1], S1.u, hw], [p2b[0], y2, p2b[1], S2.u, hw], [p2a[0], y2, p2a[1], S2.u, -hw]],
-            quadTris, [0, 1, 0], [roadLayer, pq, hw], zeb);
-          if (cands.length) gapFill(w, p1a, p1b, p2a, p2b, y1, y2, cands);
-          if (!street) {   // ngõ: gờ 2 bên xuống đất (không có bó vỉa che)
-            for (const sg of [-1, 1]) {
-              const q1 = sg < 0 ? p1a : p1b, q2 = sg < 0 ? p2a : p2b;
-              face('roads', q1, q2, y1, S1.h - 0.05, y2, S2.h - 0.05, S1.mx * sg, S1.mz * sg, S1.u, S2.u, [RL.CURB, MK.FACE, 0]);
+        const subs = []; { let s0 = a; for (let i = 0; i < spl.length; i++) if (spl[i] > s0 + 0.05 && spl[i] < b - 0.05) { subs.push([s0, spl[i]]); s0 = spl[i]; } subs.push([s0, b]); }
+        let Sfirst = null, Slast = null;   // mặt cắt đầu/cuối của cả mẩu (nắp đường cụt)
+        for (const [sa, sb] of subs) {
+          const iP = spl.findIndex((v) => Math.abs(v - sa) < 1e-6), iN = spl.findIndex((v) => Math.abs(v - sb) < 1e-6);
+          const zebS = [iP >= 0 ? xu[iP] - 2.3 : zeb[0], iN >= 0 ? xu[iN] + 2.3 : zeb[1]];
+          const pr = pat | seed | (iP >= 0 ? MK.ZEB0 : zFirst) | (iN >= 0 ? MK.ZEB1 : zLast);
+          const Ss = sections(P, cum, sa, sb, sa === a && !gA ? sA.cut : null, sb === b && !gB ? sB.cut : null);
+          if (!Sfirst) Sfirst = Ss[0];
+          Slast = Ss[Ss.length - 1];
+          for (let i = 0; i < Ss.length - 1; i++) {
+            const S1 = Ss[i], S2 = Ss[i + 1];
+            const y1 = S1.h + yR, y2 = S2.h + yR;
+            const p1a = off(S1, -hw), p1b = off(S1, hw), p2a = off(S2, -hw), p2b = off(S2, hw);
+            let pq = pr;
+            if (w.c === 'p' && (pq & (MK.CDBL | MK.CDY | MK.CDW)) && nearMedian((S1.x + S2.x) / 2, (S1.z + S2.z) / 2)) pq &= ~(MK.CDBL | MK.CDY | MK.CDW);
+            emit('roads', [[p1a[0], y1, p1a[1], S1.u, -hw], [p1b[0], y1, p1b[1], S1.u, hw], [p2b[0], y2, p2b[1], S2.u, hw], [p2a[0], y2, p2a[1], S2.u, -hw]],
+              quadTris, [0, 1, 0], [roadLayer, pq, hw], zebS);
+            if (cands.length) gapFill(w, p1a, p1b, p2a, p2b, y1, y2, cands);
+            if (!street) {   // ngõ: gờ 2 bên xuống đất (không có bó vỉa che)
+              for (const sg of [-1, 1]) {
+                const q1 = sg < 0 ? p1a : p1b, q2 = sg < 0 ? p2a : p2b;
+                face('roads', q1, q2, y1, S1.h - 0.05, y2, S2.h - 0.05, S1.mx * sg, S1.mz * sg, S1.u, S2.u, [RL.CURB, MK.FACE, 0]);
+              }
             }
           }
         }
@@ -966,8 +1244,8 @@ export function buildRoadNet(ROADS_DT, deps) {
           const p1 = off(Sx, -hw), p2 = off(Sx, hw), y = Sx.h + yR;
           face('roads', p1, p2, y, Sx.h - 0.05, y, Sx.h - 0.05, Sx.dx * dirSign, Sx.dz * dirSign, -hw, hw, [RL.CURB, MK.FACE, 0]);
         };
-        if (gA || (a === u0 && sA.capA)) capAt(S[0], -1);
-        if (gB || (b === u1 && sB.capA)) capAt(S[S.length - 1], 1);
+        if (gA || (a === u0 && sA.capA)) capAt(Sfirst, -1);
+        if (gB || (b === u1 && sB.capA)) capAt(Slast, 1);
       }
     }
     // ---- vỉa hè 2 bên ----
@@ -1026,8 +1304,13 @@ export function buildRoadNet(ROADS_DT, deps) {
             const t1 = S1.h + SIDEWALK_TOP, t2 = S2.h + SIDEWALK_TOP;
             const i1 = off(S1, vin), o1 = off(S1, vout), i2 = off(S2, vin), o2 = off(S2, vout);
             const paint = isWater((i1[0] + i2[0]) / 2, (i1[1] + i2[1]) / 2) ? MK.PAINT : 0;   // trên cầu
+            let lay = swLayer;
+            const omx = (o1[0] + o2[0]) / 2, omz = (o1[1] + o2[1]) / 2, oux = omx - (i1[0] + i2[0]) / 2, ouz = omz - (i1[1] + i2[1]) / 2, oul = Math.hypot(oux, ouz) || 1;
+            const pl = parkLayer(omx, omz, oux / oul, ouz / oul);
+            if (pl != null) { if (pl > 0) lay = pl; stats.pavePark = (stats.pavePark || 0) + 1; if (pl > 0) stats.paveParkEv = (stats.paveParkEv || 0) + 1; }
+            else if (w.pave) { const v = paveAt(w, (o1[0] + i2[0]) / 2, (o1[1] + i2[1]) / 2); if (v != null) { lay = v; stats.paveEv = (stats.paveEv || 0) + 1; } }
             emit('sidewalk', [[i1[0], t1, i1[1], S1.u, 0, 0], [o1[0], t1, o1[1], S1.u, sw, sw], [o2[0], t2, o2[1], S2.u, sw, sw], [i2[0], t2, i2[1], S2.u, 0, 0]],
-              quadTris, [0, 1, 0], [swLayer, paint, hw], null);
+              quadTris, [0, 1, 0], [lay, paint, hw], null);
             // mặt đứng bó vỉa (về phía lòng đường) + mép lưng xuống đất
             face('sidewalk', i1, i2, t1, S1.h + ROAD_TOP, t2, S2.h + ROAD_TOP, -S1.mx * sg, -S1.mz * sg, S1.u, S2.u, [RL.CURB, MK.FACE | paint, 0]);
             face('sidewalk', o1, o2, t1, S1.h - 0.05, t2, S2.h - 0.05, S1.mx * sg, S1.mz * sg, S1.u, S2.u, [RL.CURB, MK.FACE | MK.BACK, 0]);
@@ -1092,7 +1375,9 @@ export function buildRoadNet(ROADS_DT, deps) {
         const l = back[back.length - 1]; if (Math.hypot(eB[0] - l[0], eB[1] - l[1]) > 0.01) back.push(eB);
       } else { curb = C.curb; back = C.back; }
       if (!back || back.length < 1 || curb.length < 2) continue;
-      const swL = SW_LAYER[a.swType] ?? RL.GACH_XAM;
+      // mép ngoài góc (giữa polyline lưng) đẩy ra xa tâm nút → kiểm phía công viên
+      const bm = back[back.length >> 1], bdx = bm[0] - J.x, bdz = bm[1] - J.z, bdl = Math.hypot(bdx, bdz) || 1;
+      const swL = armSwLayer(a, [bm[0], bm[1], bdx / bdl, bdz / bdl]);
       const V = [];
       for (const p of curb) V.push([p[0], ys, p[1], p[0], p[1], 0]);
       for (const p of back) V.push([p[0], ys, p[1], p[0], p[1], Math.min(4, distToPolyline(p, curb))]);

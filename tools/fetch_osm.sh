@@ -61,4 +61,8 @@ q '[out:json][timeout:90];(way["natural"="water"](20.845,106.652,20.884,106.712)
 B='20.836,106.659,20.879,106.705'
 q "[out:json][timeout:180];(way[\"landuse\"]($B);rel[\"landuse\"]($B);way[\"amenity\"~\"^(school|kindergarten|college|university|hospital|clinic|parking|marketplace|place_of_worship|townhall|police|fire_station|bus_station|fuel|grave_yard|courthouse|library|community_centre|arts_centre|theatre|cinema|prison|monastery)\$\"]($B);rel[\"amenity\"~\"^(school|kindergarten|college|university|hospital|parking|marketplace|place_of_worship|townhall)\$\"]($B);way[\"leisure\"]($B);rel[\"leisure\"]($B);way[\"natural\"~\"^(scrub|grassland|wood|sand|bare_ground|wetland|heath|scree|shingle)\$\"]($B);way[\"place\"=\"square\"]($B);way[\"highway\"=\"pedestrian\"][\"area\"=\"yes\"]($B);way[\"area:highway\"]($B);way[\"man_made\"~\"^(pier|works|wastewater_plant)\$\"]($B);way[\"military\"]($B);way[\"railway\"=\"platform\"]($B);way[\"tourism\"~\"^(attraction|museum|zoo|theme_park)\$\"]($B);way[\"historic\"]($B););out geom;" osm_landuse.json
 
+# 13. Đèn tín hiệu + vạch qua đường (Đợt 3 W3-D → node tools/gen_roadmarks.mjs ở gốc repo → ../js/roadmarks.js
+#     OSM_SIGNALS/OSM_CROSSINGS): zebra/đèn ở nút giao CHỈ khi có bằng chứng (OSM hoặc pano), không theo số nhánh.
+q '[out:json][timeout:90];(node["highway"~"^(crossing|traffic_signals)$"](20.836,106.652,20.884,106.712);node["crossing"](20.836,106.652,20.884,106.712);way["footway"="crossing"](20.836,106.652,20.884,106.712););out geom;' osm_crossings.json
+
 echo 'Xong. Chạy: node process_osm.mjs'
