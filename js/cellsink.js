@@ -20,6 +20,7 @@ import { claimBox } from './claims.js';
 import { BRAND_MAP, debrand } from './brands.js';
 import { PARKS } from './mapdata.js';
 import { LM_POLY } from './landmark_polys.js';
+import { guardCellPalette, cellCanvasFx, gridFacadeSpec, paintGridFacade } from './cellfacade.js';   // Đợt 3 W3-C: palette guard nhà ô giữ lại
 import { clearanceReady, samplesFromHulls, evalShift, solveShift, sweepAssemblies, flushClearance, massOnStreet, minWidth, thinMeshOf, trimThinWall, corrCount, nearAnyRoad, nearestPano, CLEAR } from './clearance.js';   // Đợt 3 W2-A
 
 const _q = typeof location !== 'undefined' ? new URLSearchParams(location.search) : new URLSearchParams('');
@@ -104,7 +105,7 @@ function recorderCtx(W, H) {
 
 export function makeCellSink(THREE, realScene, realAddCollider, realFC, colliders, outerMakeTex) {
   const recs = [], cols = [], fcs = [];
-  const stats = { t0: performance.now(), texCalls: 0, texNew: 0, texHit: 0, texDrawn: 0, texSkipped: 0, texMs: 0, memoHit: 0, memoMiss: 0, brandHits: [] };
+  const stats = { t0: performance.now(), texCalls: 0, texNew: 0, texHit: 0, texDrawn: 0, texSkipped: 0, texMs: 0, texGrid: 0, memoHit: 0, memoMiss: 0, brandHits: [] };
   const createdTex = new Set();
   let seq = 0;
   const DUMP = CELLSINK_MODE === 'dump';
@@ -169,7 +170,12 @@ export function makeCellSink(THREE, realScene, realAddCollider, realFC, collider
     const L = lazy.get(t); if (!L) return;
     lazy.delete(t);
     const tq = performance.now();
-    runDraw(t, L, t.image.getContext('2d'));
+    // W3-C: mặt tiền "nền phủ kín + lưới cửa sổ 1 màu" (~25 helper xxFacade của world.js) → vẽ lại bằng khung/kính phản
+    // trời/cửa chớp, giữ nguyên vị trí từng cửa + CÙNG cỡ ảnh (js/cellfacade.js gridFacadeSpec/paintGridFacade); mẫu khác →
+    // vẽ gốc. (Thử 2× độ phân giải: 177 ảnh 512² → cellAtlas 7 → 15 trang 2048², gộp 107 → 535 ms — bỏ.)
+    const gf = gridFacadeSpec(L.draw, L.w, L.h);
+    if (gf) { paintGridFacade(t.image.getContext('2d'), L.w, L.h, gf); t.userData.base = gf.base; t.userData.gridFacade = true; stats.texGrid++; }
+    else runDraw(t, L, t.image.getContext('2d'));
     t.needsUpdate = true;
     stats.texDrawn++; stats.texMs += performance.now() - tq;
   };
@@ -893,6 +899,8 @@ function commitSink(sink, THREE, realScene, realFC, colliders, opts) {
   const tA0 = performance.now();
   if (live && opts.atlas !== false) atlas = atlasKept(items.filter((it) => !it.removed && it.kind !== 'sys'), sink.createdTex, THREE);
   if (atlas) atlas.ms = +(performance.now() - tA0).toFixed(1);
+  // W3-C: mảng tường/kính LỚN màu đặc của nhà giữ lại không được tô màu thương hiệu/kính tối cả mặt (js/cellfacade.js)
+  const palette = live ? guardCellPalette(items.filter((it) => !it.removed && it.kind !== 'sys'), THREE) : null;
   const tApply = performance.now();
   // 8) claim cho mọi nhà/công trình GIỮ LẠI
   let nClaims = 0;
@@ -928,8 +936,8 @@ function commitSink(sink, THREE, realScene, realFC, colliders, opts) {
     wings: bl.filter((it) => it.wingOf).map((it) => [it.name, it.wingOf, it.kind]),
     colliders: { cells: cols.length, removed: deadCol.size }, featuredClear: { cells: fcs.length, removed: deadFC.size },
     claims: nClaims, dups, bySection: bySec,
-    tex: { calls: stats.texCalls, created: stats.texNew, keyHit: stats.texHit, drawn: stats.texDrawn, neverDrawn: stats.texSkipped, drawMs: +stats.texMs.toFixed(1), settleMs: +msTex.toFixed(1), kept: keptTex.size, keptBySize: [...keptTex].reduce((o, t) => { const k = t.name || (t.image ? t.image.width + "x" + t.image.height : "?"); o[k] = (o[k] || 0) + 1; return o; }, {}) }, materialsKept: keptMat.size,
-    memo: { hit: stats.memoHit, miss: stats.memoMiss }, atlas, brandHits: stats.brandHits,
+    tex: { calls: stats.texCalls, created: stats.texNew, keyHit: stats.texHit, drawn: stats.texDrawn, grid: stats.texGrid, neverDrawn: stats.texSkipped, drawMs: +stats.texMs.toFixed(1), settleMs: +msTex.toFixed(1), kept: keptTex.size, keptBySize: [...keptTex].reduce((o, t) => { const k = t.name || (t.image ? t.image.width + "x" + t.image.height : "?"); o[k] = (o[k] || 0) + 1; return o; }, {}) }, materialsKept: keptMat.size,
+    memo: { hit: stats.memoHit, miss: stats.memoMiss }, atlas, palette, brandHits: stats.brandHits,
     clear: clr,   // W2-A: {moved:[[tên,loại,[x,z],dx,dz]], removed, stuck, ms}
     shops,
     // nhà ô GIỮ LẠI + bao lồi ô khối đặc (để WP2 CẮT footprint thật theo đa giác thay vì bỏ/giữ cả footprint)
@@ -996,9 +1004,11 @@ function atlasKept(kept, createdTex, THREE) {
     const cv = document.createElement('canvas'); cv.width = AT_PAGE; cv.height = H; p.H = H;
     const g = cv.getContext('2d');
     for (const t of p.items) {
-      const c = texs.get(t);
+      const c = texs.get(t), fx = cellCanvasFx(t);   // W3-C: ảnh canvas nền tối / một màu bão hoà → filter (js/cellfacade.js)
+      if (fx) g.filter = fx.filter;
       g.drawImage(t.image, c.x, c.y, c.w, c.h);                                     // nền ô = ảnh kéo giãn ra viền (chống loang)
       g.drawImage(t.image, c.x + c.G, c.y + c.G, c.w - 2 * c.G, c.h - 2 * c.G);  // ảnh thật 1:1 ở giữa (c.w-2G = w gốc)
+      if (fx) g.filter = 'none';
     }
     const tx = new THREE.CanvasTexture(cv);
     tx.colorSpace = ref.colorSpace; tx.anisotropy = ref.anisotropy; tx.name = 'cellAtlas' + k;

@@ -44,6 +44,7 @@ function nearPanoCam(x, z, r = 5) {
 import { SHOP_SIGNS } from './shopsigns.js';
 // ĐỢT 3 WP2: phố từ footprint THẬT (citygen.js) + sổ vùng giữ chỗ (claims.js) + footprint địa danh (landmark_polys.js)
 import { buildRealFabric, fabricData, fabricHit } from './citygen.js';
+import { applyCellGlass, drawFacadeWindows } from './cellfacade.js';   // Đợt 3 W3-C: kính + mặt tiền vẽ tay của nhà ô
 import { buildParcels } from './parcels.js';   // Đợt 3 W3-B: tường rào/hàng rào/rào tôn + cổng của ô khuôn viên/đất trống
 import { nearestStreet as clrNearestStreet } from './clearance.js';
 // W3-B (AUDIT3 FP-2 mục 6 "cổng về ranh đất"): cổng/rào của ô dựng tay → lùi về MÉP SAU VỈA HÈ (facadeLine + 0,3 m + `front` =
@@ -209,7 +210,9 @@ function localPt(cx, cz, lx, lz, th) {
 
 export const sharedMats = {
   lampGlow: mat(0xfff2b8, { emissive: 0xffdd77, emissiveIntensity: 0 }),
-  window: mat(0x557788, { emissive: 0xffcc66, emissiveIntensity: 0 }),
+  // W3-C: kính nhà ô 0x557788 → 0x7f95a3 (phản trời sáng hơn): mảng kính/cửa sổ nhà ô từng ra "khối xanh than/ô vuông
+  // đen" (pano_138/386/391/409, tia dò: mesh gộp mrgm1 màu 557788 phủ cả mặt nhà). Đêm vẫn do daynight (emissive).
+  window: mat(0x7f95a3, { emissive: 0xffcc66, emissiveIntensity: 0 }),
   trunk: mat(0x6b4a2e),
   leafGreen: mat(0x5cb84e, { flatShading: true }),
   leafGreen2: mat(0x7ecb5e, { flatShading: true }),
@@ -217,6 +220,9 @@ export const sharedMats = {
   flower: mat(0xd8402c, { emissive: 0x8f2416, emissiveIntensity: 0.10, flatShading: true }),
   cloud: new THREE.MeshLambertMaterial({ color: 0xffffff, transparent: true, opacity: 0.92, flatShading: true }),
 };
+// W3-C: kính nhà ô PHẢN TRỜI + lưới ĐỐ KÍNH theo toạ độ thế giới (js/cellfacade.js applyCellGlass): hộp kính đặc dựng tay
+// (dải băng tầng, pod, mặt kính VIB) hết là "khối xanh phẳng" (pano_138/157/386/418). Đêm: emissive do daynight như cũ.
+applyCellGlass(sharedMats.window);
 
 // ---------- Texture thủ tục ----------
 // LITE: hạ độ phân giải MỌI texture thủ tục (đo được: 1.875 texture riêng ≈ 1.6GB RAM texture trên
@@ -1772,6 +1778,25 @@ export async function buildWorld(scene, prog = () => {}) {
     // 2) DÃY SHOWROOM/GARA Ô TÔ phía NAM đường (Toản Auto, Tùng Lâm... — biển đỏ/đen chữ to)
     const SHOWROOMS = ['TOẢN AUTO', 'TÙNG LÂM AUTO', 'LIÊU NHÂN AUTO', 'QUỐC TOÀN', 'BẢO HIỂM Ô TÔ', 'AUTO 568', 'GARA ĐẠI PHÁT', 'SALON Ô TÔ HP'];
     const srBg = ['#b91c1c', '#111318', '#1c56a0', '#b91c1c', '#0f6a38', '#111318', '#b06010', '#1c56a0'];
+    // W3-C vòng 2 (AUDIT3 FP-3 #1 "tường trống ra phố", pano_014 h180 KHUNG CHUẨN): hồi nhà showroom là tường kem TRƠN 14 × 5-7 m
+    // nhìn sát 8-10 m → phủ mặt hông: vệt ố chảy, bẩn chân tường, cửa sổ nhỏ có song + cục nóng (1 hay 2 tầng). Xác định.
+    const hdSide = [1, 2].map((fl) => new THREE.MeshLambertMaterial({ map: makeTex(256, fl === 1 ? 96 : 136, (gc, w, h) => {
+      gc.fillStyle = '#e0dbcf'; gc.fillRect(0, 0, w, h);
+      for (let i = 0; i < 11; i++) {                       // ố chảy từ đỉnh tường / mép sàn
+        const x = (i * 53 + 17) % w, ww = 3 + (i * 7) % 7, L = h * (0.3 + ((i * 29) % 50) / 100);
+        const gr = gc.createLinearGradient(0, 0, 0, L); gr.addColorStop(0, 'rgba(92,82,62,0.22)'); gr.addColorStop(1, 'rgba(92,82,62,0)');
+        gc.fillStyle = gr; gc.fillRect(x, 0, ww, L);
+      }
+      const gb = gc.createLinearGradient(0, h, 0, h * 0.78); gb.addColorStop(0, 'rgba(72,62,46,0.38)'); gb.addColorStop(1, 'rgba(72,62,46,0)');
+      gc.fillStyle = gb; gc.fillRect(0, h * 0.78, w, h * 0.22);
+      for (let f = 0; f < fl; f++) for (const fx of [0.28, 0.7]) {   // cửa sổ nhỏ khung sáng, kính tối, song sắt
+        const cx = w * fx, cy = h - (f + 0.62) * (h / fl) * (fl === 1 ? 0.95 : 1), ww = 26, hh = 20;
+        gc.fillStyle = '#f2efe6'; gc.fillRect(cx - ww / 2 - 3, cy - hh / 2 - 3, ww + 6, hh + 7);
+        gc.fillStyle = '#3d4852'; gc.fillRect(cx - ww / 2, cy - hh / 2, ww, hh);
+        gc.fillStyle = '#5d6b76'; for (let s = 1; s < 5; s++) gc.fillRect(cx - ww / 2 + s * ww / 5 - 1, cy - hh / 2, 2, hh);
+        if (fx > 0.5) { gc.fillStyle = '#d7d6d0'; gc.fillRect(cx + ww / 2 + 6, cy - 2, 20, 13); gc.fillStyle = '#8b8d8c'; gc.beginPath(); gc.arc(cx + ww / 2 + 16, cy + 4.5, 4.5, 0, Math.PI * 2); gc.fill(); }
+      }
+    }) }));
     for (let k = 0; k < SHOWROOMS.length; k++) {
       const al = 42 + k * 41;
       if (al > HD_L - 14) break;
@@ -1782,6 +1807,10 @@ export async function buildWorld(scene, prog = () => {}) {
       const g = new THREE.Group(); g.position.set(x, LAND_H, z); g.rotation.y = ang + Math.PI / 2;
       const body = new THREE.Mesh(new THREE.BoxGeometry(W, H, D), mat(k % 2 ? 0xe8e4da : 0xd8d4c8));
       body.position.y = H / 2; g.add(body);
+      for (const sx of [-1, 1]) {                         // W3-C vòng 2: hồi nhà có cửa sổ/ố thay tường trơn (xem hdSide)
+        const sp = new THREE.Mesh(new THREE.PlaneGeometry(D, H), hdSide[H > 6 ? 1 : 0]);
+        sp.rotation.y = sx * Math.PI / 2; sp.position.set(sx * (W / 2 + 0.02), H / 2, 0); g.add(sp);
+      }
       // mặt kính lớn tầng trệt (quay ra đường = local +Z sau xoay)
       const glass = new THREE.Mesh(new THREE.BoxGeometry(W * 0.86, 3.1, 0.12), sharedMats.window);
       glass.position.set(0, 1.75, D / 2 + 0.05); g.add(glass);
@@ -1876,13 +1905,7 @@ export async function buildWorld(scene, prog = () => {}) {
   {
     // texture mặt tiền lưới cửa sổ trên nền màu tòa nhà
     const facadeTex = (baseCss, winCss, cols, rows) => {
-      const t = makeTex(256, 256, (g, w, h) => {
-        g.fillStyle = baseCss; g.fillRect(0, 0, w, h);
-        const mx = w * 0.12, my = h * 0.12, cw = (w - mx * 2) / cols, ch = (h - my * 2) / rows;
-        for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
-          g.fillStyle = winCss; g.fillRect(mx + c * cw + cw * 0.16, my + r * ch + ch * 0.16, cw * 0.68, ch * 0.66);
-        }
-      });
+      const t = makeTex(512, 512, (g, w, h) => drawFacadeWindows(g, w, h, baseCss, winCss, cols, rows));   // W3-C: như lmFacade
       t.wrapS = t.wrapT = THREE.RepeatWrapping; return new THREE.MeshLambertMaterial({ map: t });
     };
     // hướng mặt tiền: quay về đoạn đường 'p'/'s' gần nhất
@@ -2159,7 +2182,8 @@ const lmTower = (x, z, ry, W, D, FL, FH, wallMat, name) => {
     const ry = 0.777;                           // mặt quay ĐÔNG-NAM về tim nút (53,-459)
     const g = new THREE.Group(); g.position.set(bx, groundHeight(bx, bz), bz); g.rotation.y = ry;
     const W = 20, D = 14, FL = 5, FH = 3.4, H = FL * FH;
-    const body = new THREE.Mesh(new THREE.BoxGeometry(W, H, D), lmFacade('#9e3b30', '#f3e9d8', 6, 5));
+    // W3-C vòng 2 (phản biện: khối BIDV 046 vẫn ĐỎ TƯƠI dưới nắng): đỏ gạch #9e3b30 → gạch nâu đỏ sẫm (ảnh 046 h0/h270)
+    const body = new THREE.Mesh(new THREE.BoxGeometry(W, H, D), lmFacade('#7a463e', '#f3e9d8', 6, 5));
     body.position.y = H / 2; g.add(body);
     // băng kem ngang giữa các tầng (đỏ gạch PHỐI kem theo audit)
     for (const fy of [FH, FH * 3]) {
@@ -8639,12 +8663,15 @@ const tsShop = (bx, bz, ry, W, FL, wallMat, txt, sbg, sfg, opt = {}) => {
       tsBox(g, W + 0.2, 0.5, 0.5, mat(0xfdfbf4), 0, f * 3.3 + 0.55, D / 2 + 0.15);
     }
     // mái hiên TÔN XANH LÁ liên tục + 3 mảng bạt sọc xanh-trắng
-    const hienM = mat(0x2f7d4f);
+    // W3-C vòng 2: ảnh 124_h090 = bạt/tôn XANH DƯƠNG sọc trắng chạy dài (xanh lá chỉ là lưới che đầu đông) → xanh dương
+    const hienM = mat(0x3567a8, { side: THREE.DoubleSide });   // W3-C: nhìn từ dưới (mặt sau) vẫn thấy
     const hien = new THREE.Mesh(new THREE.PlaneGeometry(W * 0.97, 2.1), hienM);
-    hien.position.set(0, 3.1, D / 2 + 1.0); hien.rotation.x = 0.42; g.add(hien);
+    // W3-C (AUDIT3 FP-3 #5, pano_124 h90): rotation.x DƯƠNG dựng tấm gần THẲNG ĐỨNG (mép trên chĩa ra phố) → "tấm xanh chéo"
+    // 60 m trước mặt camera; mái hiên = dốc thoải xuống phía ngoài (−1,15 rad ≈ 24° so với phương ngang)
+    hien.position.set(0, 3.1, D / 2 + 1.0); hien.rotation.x = -1.15; g.add(hien);
     for (const lx of [-21, -3, 16]) {
       const aw = new THREE.Mesh(new THREE.PlaneGeometry(8, 1.9), tsStripe('#2a5fa8', '#f4efe4'));
-      aw.position.set(lx, 2.5, D / 2 + 2.2); aw.rotation.x = 0.5; g.add(aw);
+      aw.material.side = THREE.DoubleSide; aw.position.set(lx, 2.5, D / 2 + 2.2); aw.rotation.x = -1.1; g.add(aw);
     }
     // biển đích danh (ảnh: chữ hồng nền trắng + tím than + xanh lá)
     const S = (txt, bg, fg, lx, w2 = 8, y = 4.6) => {
@@ -8660,7 +8687,7 @@ const tsShop = (bx, bz, ry, W, FL, wallMat, txt, sbg, sfg, opt = {}) => {
       map: makeTex(64, 64, (gc, w2, h2) => { gc.fillStyle = '#3f9457'; gc.fillRect(0, 0, w2, h2); }),
       transparent: true, opacity: 0.75, side: THREE.DoubleSide,
     }));
-    net.position.set(-26, 3.4, D / 2 + 2.6); net.rotation.x = 0.35; g.add(net);
+    net.position.set(-26, 3.9, D / 2 + 2.6); net.rotation.x = -1.2; g.add(net);   // W3-C: lưới che = mái thoải (trước: vách đứng)
     const rackCols = [0xd46a9a, 0xe4dd8a, 0x7aa0c4, 0xc0392b, 0xf0f0f0];
     for (let i = 0; i < 10; i++) {
       const rk = new THREE.Mesh(new THREE.BoxGeometry(2.1, 1.5, 0.5), mat(rackCols[i % 5]));
@@ -11191,10 +11218,19 @@ const treeP = (p, sd, along, scl) => { const [tx, tz] = at(p, sd, along, 0, -1.0
   { const [bx, bz, ry] = at('p141', -1, 2, 11);
     if (lnOK(bx, bz)) { const g = lnMk(bx, bz, ry), W = 11, D = 11, H = 3 * 3.5;
       lnBody(g, W, H, D, lnFacade('#cdb98c', '#7a6a48', 4, 3, true));
-      const ar = []; for (let c = -1.5; c <= 1.5; c++) { const p = new THREE.BoxGeometry(0.5, 3.6, 0.5); p.translate(c * 2.6, 1.8, D / 2 + 0.2); ar.push(p); if (c < 1.5) { const arc = new THREE.TorusGeometry(1.0, 0.18, 6, 10, Math.PI); arc.translate(c * 2.6 + 1.3, 3.6, D / 2 + 0.2); ar.push(arc); } }
+      // W3-C (AUDIT3 FP-3 #5, pano_239 h270): vòm = Ống xuyến (Torus) treo trước tường, đỉnh 4,6 m xuyên lan can → "vòm trắng
+      // rỗng". Nay: tường lưng vòm ĐẶC (hình chữ nhật trừ nửa tròn, đùn 0,4 m) giữa các trụ, đỉnh 3,55 m dưới lan can.
+      const ar = []; for (let c = -1.5; c <= 1.5; c++) { const p = new THREE.BoxGeometry(0.5, 3.6, 0.5); p.translate(c * 2.6, 1.8, D / 2 + 0.2); ar.push(p); }
       for (let bx2 = -W / 2 + 0.6; bx2 < W / 2; bx2 += 0.7) { const bl = new THREE.CylinderGeometry(0.12, 0.12, 0.9, 6); bl.translate(bx2, 3.9, D / 2 + 0.35); ar.push(bl); }
-      g.add(new THREE.Mesh(mergeGeometries(ar), mat(0xe3d8bf)));
-      lnBoard(g, 'CẦM ĐỒ — ANH ĐỨC SƠN', '#c1201a', '#ffe08a', W, D, 3.4, 26); lnHip(g, W, D, 0x7a4a34, H + 0.5); lnFin(g, 'ln_congthu_phap', bx, bz, 6, 12); } }
+      const archM = mat(0xe3d8bf);
+      g.add(new THREE.Mesh(mergeGeometries(ar), archM));
+      const sp = new THREE.Shape(); sp.moveTo(-1.3, 2.5); sp.lineTo(-0.95, 2.5); sp.absarc(0, 2.5, 0.95, Math.PI, 0, true); sp.lineTo(1.3, 2.5); sp.lineTo(1.3, 3.55); sp.lineTo(-1.3, 3.55); sp.closePath();
+      const spG = []; for (let c = -1; c <= 1; c++) { const e = new THREE.ExtrudeGeometry(sp, { depth: 0.4, bevelEnabled: false, curveSegments: 10 }); e.translate(c * 2.6, 0, D / 2); spG.push(e); }
+      g.add(new THREE.Mesh(mergeGeometries(spG), archM));
+      // biển CẦM ĐỒ (pano_141 h0: bảng đỏ lớn trên tầng trệt) treo TRƯỚC dãy vòm (trụ tới D/2+0,45, lan can D/2+0,47) —
+      // ở D/2+0,1 cũ nó nằm SAU lưng vòm đặc, chỉ lộ 1 dải đỏ (phản biện W3-C, crop141)
+      lnBoard(g, 'CẦM ĐỒ — ANH ĐỨC SƠN', '#c1201a', '#ffe08a', W, D, 3.4, 26); g.children[g.children.length - 1].position.z = D / 2 + 0.52;
+      lnHip(g, W, D, 0x7a4a34, H + 0.5); lnFin(g, 'ln_congthu_phap', bx, bz, 6, 12); } }
   // nhà Gốm xanh ngọc BO GÓC 2T (239 h90) — bờ bắc kề đông 239 sd -1
   { const [bx, bz, ry] = at('p239', -1, 6, 9);
     if (lnOK(bx, bz)) { const g = lnMk(bx, bz, ry), W = 8, D = 9, H = 2 * 3.3;
@@ -17851,7 +17887,9 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
 
   // ---------- BIỂN HIỆU TÊN THẬT từ catalog 551 pano (PANO-LOOP V3: 954 biển, texture-atlas → 3 draw call) ----------
   {
-    const CELL_W = 512, CELL_H = 80, COLS = 8, ROWS = 51, PER = COLS * ROWS;   // 408 biển/atlas 4096²
+    // W3-C: 53 hàng × 77 px (trước 51 × 80) = 424 biển/atlas 4096×4081 — 1.256 biển sạch (gen_shopsigns W3-C, trước 954) vẫn
+    // vừa 3 atlas; 51 hàng thì cần tấm thứ 4 (canvas 4096² + 408 fillText + ~64 MB VRAM, đo A/B: pha fabric chậm thêm)
+    const CELL_W = 512, CELL_H = 77, COLS = 8, ROWS = 53, PER = COLS * ROWS;   // 424 biển/atlas 4096×4081
     const bg = ['#c62828', '#1c56a0', '#1f7a3c', '#d8862a', '#26262c', '#8e2f80'];
     // MOBILE: atlas 4096² ≈ 85MB VRAM/tấm không nén — thu 1/4 cạnh (1024², chữ vẫn đọc được
     // ở cự ly chơi trên màn nhỏ); desktop giữ nguyên 100%
@@ -17860,7 +17898,9 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     // gen_shopsigns.mjs; đây là lưới an toàn lúc dựng): biển khớp danh sách → bỏ (cả 2 nhánh FABRIC).
     // (lưới an toàn TẠM cho tới khi WP3 sinh lại js/shopsigns.js theo js/brands.js — nguồn DUY NHẤT; danh sách này phủ đủ
     //  các tên mà BRAND_MAP của WP3 bắt được trong shopsigns.js hiện tại — quét node 2026-10-04)
-    const _BRAND = /\b(HANA|INAX|MB|SSI|DOJI|HABECO|ELISE|CHRISBELLA|KOJI|WINMART|VINMART|VIETTEL|VIETCOMBANK|BIDV|AGRIBANK|TECHCOMBANK|VPBANK|SACOMBANK|PNJ|FPT|PHARMACITY|HIGHLANDS|PETROLIMEX|HONDA|YAMAHA|SAMSUNG|MAY10|SKF|PASSIO|EVN ?NPC|EVN|GAC MOTOR|HAIPHARCO|BESTORE|DEEP C|NORTHFREIGHT|LIEN A|LIPTON|HOEGAARDEN|TOKY ?LIFE|MILANO|HEAD|HDOO|VIETBANK)\b|CO\.?OP|THEGIOIDIDONG|THẾ GIỚI DI ĐỘNG|SEVEN\.?(ART|UOMO)|MEDIPHARCARE|LONG CHÂU|BẢO MIN|BÁCH HO[AÁ] XANH|ĐIỆN MÁY XANH|NGÂN HÀNG Á CHÂU/i;
+    //  W3-C vòng 2: + 8 thương hiệu phản biện bắt được (COCA-COLA, D&G/ARMANI, VINAMILK, APPLE, CASIO, DAVINES, MAGIC MOMENTS,
+    //  PHIBROWS) + DIBAO/CHUNGHO/JARKO/NHAXINH/VINA KTV — bộ sinh giờ còn tự kiểm theo BRAND_WATCH (js/brands.js)
+    const _BRAND = /\b(HANA|INAX|MB|SSI|DOJI|HABECO|ELISE|CHRISBELLA|KOJI|WINMART|VINMART|VIETTEL|VIETCOMBANK|BIDV|AGRIBANK|TECHCOMBANK|VPBANK|SACOMBANK|PNJ|FPT|PHARMACITY|HIGHLANDS|PETROLIMEX|HONDA|YAMAHA|SAMSUNG|MAY10|SKF|PASSIO|EVN ?NPC|EVN|GAC MOTOR|HAIPHARCO|BESTORE|DEEP C|NORTHFREIGHT|LIEN A|LIPTON|HOEGAARDEN|TOKY ?LIFE|MILANO|HEAD|HDOO|VIETBANK|COCA-?\s?COLA|PEPSI|D ?& ?G|DOLCE|ARMANI|VINAMILK|APPLE|CASIO|DAVINES|MAGIC MOMENTS|PHI ?BROWS|DIBAO|CHUNGHO|JARKO|NHAXINH|VINA ?KTV)\b|CO\.?OP|THEGIOIDIDONG|THẾ GIỚI DI ĐỘNG|SEVEN\.?(ART|UOMO)|MEDIPHARCARE|LONG CHÂU|BẢO MIN|BÁCH HO[AÁ] XANH|ĐIỆN MÁY XANH|NGÂN HÀNG Á CHÂU/i;
     // ĐỢT 3 (FABRIC 'real'): NEO biển vào MẶT TIỀN THẬT gần nhất (≤22 m từ điểm pano+14 m) đúng dải biển hiệu tầng trệt
     // (2,95-3,85 m — đè lên biển vẽ trong atlas), quay theo pháp tuyến cạnh; biển trùng chỗ (530/954 trùng toạ độ) rải dọc
     // mặt tiền, không chồng nhau; không có mặt tiền gần → bỏ (hết biển lơ lửng).
@@ -17899,11 +17939,20 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
       const items = SHOP_SIGNS.slice(a * PER, (a + 1) * PER);
       const cv = document.createElement('canvas'); cv.width = COLS * CELL_W * MS; cv.height = Math.ceil(ROWS * CELL_H * MS);
       const g = cv.getContext('2d'); g.scale(MS, MS);
+      // W3-C vòng 2: chữ VỪA Ô bằng CỠ CHỮ (thu đều, measureText), KHÔNG bằng tham số maxWidth của fillText — maxWidth ép
+      // ngang = vẽ chữ qua biến đổi không đều → raster GPU chậm hẳn (đo s4/signbench: 3 tấm 1.151 biển, GPU vẽ+tải ~265 ms
+      // → ~80 ms; dot3 954 biển ~220 ms) — chính là "chờ vẽ khung" ở ranh fabric→landmarks lúc boot; chữ cũng hết méo ngang.
+      // Đặt font LƯỜI (chỉ khi đổi cỡ): gán g.font mỗi biển = parse chuỗi font mỗi lần.
+      const F0 = 'bold 44px system-ui, sans-serif', TW = CELL_W - 30;
+      g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = F0; let fCur = F0;
       items.forEach(([, , , name], k) => {
         const cx = (k % COLS) * CELL_W, cy = ((k / COLS) | 0) * CELL_H;
         g.fillStyle = bg[(name.length + k) % bg.length]; g.fillRect(cx, cy, CELL_W, CELL_H);
-        g.fillStyle = '#fff'; g.font = 'bold 44px system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
-        g.fillText(name, cx + CELL_W / 2, cy + CELL_H / 2 + 2, CELL_W - 30);
+        g.fillStyle = '#fff';
+        if (fCur !== F0) { g.font = F0; fCur = F0; }
+        const tw = g.measureText(name).width;
+        if (tw > TW) { fCur = 'bold ' + Math.max(22, Math.floor(44 * TW / tw)) + 'px system-ui, sans-serif'; g.font = fCur; }
+        g.fillText(name, cx + CELL_W / 2, cy + CELL_H / 2 + 2);
       });
       const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
       const geos = [];
@@ -21634,6 +21683,10 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     const tex = new THREE.CanvasTexture(canvas);
     const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false }));
     sp.scale.set(16, 4, 1);
+    // W3-C (AUDIT3 OTHER): ?labels=0 ẩn nhãn chữ nổi (tên địa danh/NPC) — CHỈ cho ảnh QA so pano (pano_037/428 từng có
+    // nhãn lơ lửng trong khung); người chơi giữ nhãn. sp.userData.worldLabel để tool bật/tắt.
+    sp.userData.worldLabel = true;
+    try { if (new URLSearchParams(location.search).get('labels') === '0') sp.visible = false; } catch (e) { }
     return sp;
   };
 

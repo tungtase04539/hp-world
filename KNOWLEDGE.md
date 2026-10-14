@@ -32,7 +32,9 @@ Trò chơi: thế giới 3D Hải Phòng **tỉ lệ 1:1 mét thật** (từ 202
 | `js/boot.js` | Màn chờ: thanh dựng thế giới theo bước (trọng số = lần khởi động trước, localStorage `hp3d.bootProfile.v1`), nút Bắt đầu khoá tới khi sẵn sàng |
 | `js/world.js` | Dựng toàn bộ thế giới 3D, collider, spawn, `buildWorld(scene)` |
 | `js/citygen.js` | ĐỢT 3: dựng PHỐ NHÀ THẬT từ footprint RB01 (`buildings_real.js`) — 1 quad/cạnh tường + shader atlas, mái/tum/bồn/tôn, ban công/mái hiên/hộp biển/điều hoà 3D (ô gần), va chạm đa giác (`fabricCollide/At/Hit`), `fabricData()` dùng chung (world.js đặt `world.rbData`/`world.rbGrid` cho cây/props/camera). Cờ `FABRIC` (world.js, `?fabric=proc` = phố giả cũ) |
-| `js/facade_atlas.js` (+ `facade_atlas_worker.js`) | Atlas mặt tiền/mái/chi tiết/biển hiệu VN vẽ thủ tục bằng rasterizer phần mềm (8×8 ô, alpha = mặt nạ), vẽ trong Worker |
+| `js/facade_atlas.js` (+ `facade_atlas_worker.js`) | Atlas mặt tiền/mái/chi tiết/biển hiệu VN vẽ thủ tục bằng rasterizer phần mềm (8 cột × 12 hàng ô từ W3-C — 2048×3072 / LITE 1024×1536, alpha = mặt nạ), vẽ trong Worker |
+| `js/facade_evidence.js` | SINH bởi `tools/gen_facade_evidence.mjs` từ `audit/audit_enriched.json`: cờ từ vựng mặt tiền từng quan sát pano (thuộc địa, tân cổ điển, kính, đang xây, tập thể, cây leo, cũ/mới, biển lớn, mái hiên tôn/bạt…) + cờ vùng/tuổi từng pano — citygen `renderStyles()` dùng (W3-C) |
+| `js/cellfacade.js` | W3-C nhà ô: `guardCellPalette` (mảng tường/kính lớn màu đặc của vật GIỮ LẠI → kẹp bão hoà theo sắc, nâng sáng tường xanh thương hiệu, mảng xám-xanh tối → kính), `cellCanvasFx` (filter ảnh canvas tối/bão hoà khi gộp cellAtlas), `gridFacadeSpec`/`paintGridFacade` (vẽ lại ~25 helper "nền + lưới cửa sổ" thành khung/kính/cửa chớp — gọi trong `cellsink.materialize`), `applyCellGlass` (shader kính nhà ô: đố theo toạ độ thế giới + phản trời — `sharedMats.window`), `drawFacadeWindows` (facadeTex) |
 | `js/cellsink.js` | "Bồn chứa" khối ô dựng tay (world.js "cells"): che scene/addCollider/FEATURED_CLEAR/makeTex, ở cửa ra gỡ nhà ô trùng footprint THẬT, claim kind `'cell'` cho công trình giữ, xuất `world.cellShops` (nhà bị gỡ) + `world.cellKept` (nhà giữ + bao lồi, để WP2 cắt footprint); bỏ qua nhà `FLAG.SYNTH`; `realBuildings()` = giải mã RB01 dùng chung |
 | `js/brands.js` | Danh sách chặn tên THƯƠNG HIỆU thật (nguồn duy nhất cho `gen_shopsigns.mjs` + lưới an toàn vẽ biển trong cellsink) |
 | `js/assets.js` | Đăng ký + preload + streaming GLB theo khoảng cách |
@@ -1105,6 +1107,140 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     `assets_lite` như dot3 (môi trường); diag 'TẤT CẢ THỰC THỂ OK — 0 lỗi JS'; waterbfs 5/5; gen tất định. Cảnh báo console
     (SwiftShader): 64 toNonIndexed = dot3; 'KHR_parallel_shader_compile not supported' 2-14 tuỳ lần đo (1 lần mỗi
     compileAsync GLB của assets.js — đếm theo số model đã nạp lúc lấy mẫu, W3-D không đụng assets/main).
+- **2026-10-06 (Đ3-W3-C FACADES; vòng 2 sau phản biện 2026-10-14)** [ĐỢT 3 wave 3 — AUDIT3 FP-3 + FP-8 mục 1-3: hết tường hông trống / khối kính đen / khối một màu / "lỗ vuông đen" nhà ô, từ vựng mặt tiền theo BẰNG CHỨNG pano, biển bảng lớn, mái hiên tôn, chữ biển sạch]:
+    **(1) ATLAS 8×12** (`facade_atlas.js` `ATLAS_ROWS=12`): ảnh 2048×3072 (LITE 1024×1536), ô vẫn 256/128 px; 63 ô cũ GIỮ chỉ số,
+    30 ô mới đặt SAU `G_HARD`: tầng trên `U_COL0/U_COL1` (thuộc địa: trụ áp, gờ, cửa cao chớp lật, cửa vòm ô quạt, ban công
+    sắt hoa văn), `U_NEO` (tân cổ điển trắng: nửa cột 2 mép bay → ghép bay = 1 cột), `U_TEN` (tập thể: lồng gỉ, tôn vá, đồ
+    phơi), `U_CONS/U_NET` (đang xây: khung bê tông, gạch dở, lưới che), `U_CURT2/U_CURT3` (kính PHẢN TRỜI sáng + đố/spandrel;
+    kính sẫm khung trắng), `U_ACP` (ốp alu + băng kính), `U_TOWER`, `U_VINE` (cây leo theo CỤM lá — đĩa to đều = "chấm bi");
+    trệt `G_COL` (vòm gỗ), `G_NEO`, `G_HOARD` (rào tôn "ĐANG THI CÔNG"), `G_SHOW` (showroom kính TRONG), `G_OPEN0/1/2`, `G_FOOD`
+    (quán mở/quần áo/đồ gỗ/quán ăn — pano ban ngày phần lớn MỞ cửa); hồi/hông lộ `S_EXP0/1/2` (ố chảy, xi măng thô + cửa sổ nhỏ
+    + điều hoà, quảng cáo sơn phai); `D_AWN2` (tôn sóng); `PANEL0-4` (biển bảng 4×2 m, 10 mẫu — vòng 2: 6 mẫu lặp lộ ở
+    253/386), `BLADE0-1` (biển dọc chữ xếp dọc),
+    `BILL0-1` (biển trên mái). Helper: `skyGlass`, `glaze` (kính trong phủ nội thất — `G_GLASS` cũ phủ kín → mảng tối),
+    `softStreak` (vệt ố hình chuông — `shade()` chữ nhật ra "mã vạch"). RAINBOW: đồ phơi `R(60,240)`/kênh → bảng màu quần áo
+    THẬT xỉn, thưa; hàng hoá xỉn dạng KHỐI. Mọi ô có `signBand` PHẢI có trong `SIGN_EXT`.
+    **(2) BẰNG CHỨNG PANO → KIỂU DỰNG** (`tools/gen_facade_evidence.mjs` → `js/facade_evidence.js` SINH TỰ ĐỘNG, 47 KB): 1.920
+    quan sát nhà của `audit_enriched.json` (heading, cờ FEF từ regex có biên từ Unicode `(?<![\p{L}\p{N}])…`) + 551 pano (cờ
+    vùng FEZ: khu Pháp/công sở, chợ, phố cũ, đô thị mới, buôn bán; tuổi 0..3). `citygen.renderStyles()` (sau `buildCollision`,
+    30-50 ms node): mỗi quan sát bắn 3 tia (h−8°, h, h+8°; 2-45 m; 0° = bắc = −z) → nhà ĐẦU TIÊN `fabricAt` chạm nhận cờ (1.360
+    quan sát → ~1.470-1.530 nhà); nhà không có quan sát dùng vùng của pano gần nhất ≤90 m làm XÁC SUẤT. Luật sửa dữ liệu: SHED
+    ≥3 tầng → CIVIC (≥2.500 m² GLASS, ≥9 TOWER) (pano_230: khách sạn ra tường tôn); TUBE/OLD ≥9 tầng → 65% TOWER / 35% GLASS
+    (thay 60% KTT); GLASS ≤6 tầng mặt tiền ≤10,5 m <450 m² → MODERN (lô kính hẹp pano_395/386). KIỂU DỰNG 7..12 = COL, NEO,
+    CONS, MODERN, TOWER, TEN (bộ `U7..U12/G7..G12`). Bằng chứng "đang xây" CHỈ áp cho nhà ≤8 tầng mà mô tả không kèm kính/
+    tân cổ điển/cao tầng (bản đầu: tháp 15-20 tầng phủ lưới xanh + gạch cả mặt — nhóm đối chứng pano_285/304 h180 tệ đi).
+    Mặc định ĐANG XÂY ngẫu nhiên (0,8% TUBE/OLD ≤5 tầng) CHỈ ở nơi KHÔNG có pano nào ≤ 90 m (vòng 2 — bản đầu 259/312 nhà
+    CONS là roll ngẫu nhiên, ~50 cái cách camera pano ≤ 40 m mà mô tả không nhắc thi công = trái BẰNG CHỨNG ÂM, AUDIT3 §4.3;
+    nay 50/50 nhà CONS gần camera đều có bằng chứng). Regex bằng chứng (vòng 2): 'cửa chớp/chớp lật/phào' chỉ là COL khi kèm
+    cờ CŨ (nhà ống thường cũng có), BIGSIGN bỏ 'alu|pano' trơn (mô tả ốp alu), AWN không khớp 'mặc dù' (COL 306→296, BIGSIGN 85→83).
+    Phân bố (R1600, node): TUBE 30,6 k, OLD 6,0 k, COL 2,3 k, MODERN 1,4 k, CONS 212 (53 do bằng chứng), VILLA 227, SHED 165,
+    TEN 87, KTT 61, CIVIC 60, GLASS 58, NEO 21, TOWER 18; tuổi 0/1/2/3 = 5,2/18,3/11,1/6,6 k;
+    "nhiều biển lớn" 3.800 nhà. `fabricFacadeOf(b)` chẩn đoán.
+    **(3) aFac.z TƯỜNG = kiểu dựng (4 bit) | tuổi<<4 | "nhiều biển lớn"<<6 | "cạnh có ban công 3D"<<7**. BẪY: `groundModule()` JS
+    phải khớp shader TỪNG BIT — CONS không có bay "nhà ở" (JS, GL2, GL1); tập 1 phần tử (G5, G9) luôn [0]; `pickU/pickGi` sinh
+    bằng `pickChain()`; GL1 regex `U\d+|G\d+|…|XP`.
+    **(4) "KHÔNG TƯỜNG HÔNG TRỐNG"** (FP-3 #1): `exposedSide()` — cạnh SIDE/BACK không được `faceRoad` nâng thành mặt phố mà
+    đầu mút gần phố cách mép HÀNH LANG đường (lòng + `SIDEWALK_W` theo cấp — `roadGrid` seg[6]) ≤ 3 m và trước mặt tường trống
+    (≥2/3 điểm 1,2 m trước tường không thuộc nhà khác) → `rc = 1` trên cạnh không phải mặt phố (bit rc của aFac.y vốn bỏ trống
+    ở cạnh hông) → shader bộ `XP` (S_EXP1 xi măng thô + cửa sổ nhỏ + cục nóng, S_WIN, S_BACK, U_AC, S_EXP0 ố, S_PLAIN2, S_EXP2
+    quảng cáo sơn) thay luật cũ "45% nhà: cả mặt hông S_PLAIN0 trơn". 10.226 cạnh lộ / 118 k lần gọi. Lọc trung điểm trước (mút
+    cách trung điểm ≤ L/2): đo node có đếm giờ từng lần gọi 33-36 ms (gồm chi phí performance.now ×236 k; thực ~20-25 ms).
+    pano_340 h270, 372 h0, 198 h0: tường hông dọc phố có cửa sổ nhỏ/điều hoà/quảng cáo.
+    **(5) SHADER PHỐ**: (a) LỚP PHONG HOÁ theo tuổi (vệt ố chảy từ đỉnh tường = value-noise kéo dọc, mảng ẩm, bẩn/rêu chân
+    tường) — chỉ tường; (b) PALETTE GUARD bão hoà tường ≤ 0,62; (c) KÍNH PHẢN TRỜI: sau `lights_fragment_end` cộng
+    `fabRefl·(0,35+0,65·(1−n·v)^4)·irradiance/π` (kính/hiện đại ×1, cửa sổ thường ×0,4) — theo ánh sáng cảnh (tự tối ban đêm),
+    KHÔNG qua emissive; (d) BIỂN BẢNG LỚN phẳng tầng 1 (35% cả tầng 2) trên phố chính cho TUBE/OLD/GLASS/COL/MODERN (10% bay, nhà
+    cờ "biển lớn" 40%), cạnh có ban công 3D thì không (bị che) — thay bằng biển 3D treo mặt trước ban công; (e) `fabSample`
+    INSET ĐỘNG = max(3 px, nửa vết lấy mẫu + 1) (đệm cố định 3 px: mip cao/anisotropic lấy lẫn ô kề → vệt màu dọc mép bay);
+    (f) dải biển HẸP `G_OLD` kéo chữ vừa dải (trước "ƠM VĂN PHÒN"); (g) kind 5 lấy màu biển từ aFac.w + sáng đêm.
+    **(6) HÌNH HỌC**: mái hiên TÔN sóng xanh dương (55%, `D_AWN2`, dốc thoải, sâu 1,5-2,2 m) / BẠT (sọc, diềm) — bằng chứng pano
+    ép có + chọn vật liệu; BIỂN DỌC 3D (~800, 6 tam giác); BIỂN BẢNG 3D trước ban công (~1.130, 2 tam giác); BIỂN TRÊN MÁI (~30,
+    12 tam giác, nhà 3-9 tầng mặt phố chính, +12% nhà góc; màu nền biển theo hạt giống `hh(seed,505)` — trước aFac.w = 0 →
+    mọi biển mái cùng màu); CONS: không ban công/điều hoà/đồ mái. Tam giác phố 1,496 M → 1,486 M
+    (chính 0,895 M + chi tiết 0,590 M; kính/đang xây/tân cổ điển bỏ ban công + điều hoà bù cho biển/mái hiên mới).
+    **(7) TEXTURE ATLAS**: material dùng texture CHỜ 4×4; ảnh về thì tạo DataTexture đúng cỡ rồi THAY `material.map` (cùng "có map"
+    → không đổi program); `onUpdate` thả bản CPU 24 MB sau upload; `webglcontextlost` → map về texture chờ, `restored` → vẽ lại.
+    WebGL1: atlas NPOT → tắt mip, lọc tuyến tính.
+    **(8) NHÀ Ô (cell)** — 3 lớp, KHÔNG sửa từng ô: (a) KÍNH `sharedMats.window` (dải kính băng tầng lmTower, pod, mặt kính trệt,
+    cả mặt kính VIB pano_157 h180 — hộp màu đặc không UV, mesh gộp mất uv): `cellfacade.applyCellGlass` — 0x557788 → 0x7f95a3 +
+    LƯỚI ĐỐ KÍNH theo toạ độ THẾ GIỚI (varying vHpW; đố đứng 1,6 m, thanh ngang theo sàn 3,3 m từ y 5,9 — không có dưới y 5,5;
+    từng ô kính sáng/tối khác nhau; mờ dần khi lưới < pixel, `fwidth` ⇒ `extensions.derivatives` cho GL1) + phản trời trừ khung;
+    đêm khung không sáng, ~30% ô tối. Khoá program 'cellglass_w3c2'. (b) ~25 helper `xxFacade` (lm/hb/bc/dg/tb/tw/dl/bs/ts/cb/cn/
+    dm/tx/ln/v2-v6/w1/w4/w5/sb/s3/s4…) là BẢN SAO cùng mẫu "nền + ô cửa CHỮ NHẬT ĐẶC winCss" → sửa ở MỘT chỗ: `cellsink.
+    materialize` chạy hàm vẽ gốc trên ngữ cảnh GHI (`gridFacadeSpec`: chỉ fillRect/path cùng 1 màu, nền phủ kín, cửa không chạm
+    mép, ≥2 cửa, diện tích ≤45%, có chữ/gradient/nét/màu thứ 3 → null) rồi VẼ LẠI (`paintGridFacade`) cùng vị trí, cùng cỡ ảnh:
+    khung sáng hơn tường, bóng bệ, vạch sàn, winCss ẤM tối → cửa chớp lá sách, còn lại → kính dải dọc + đố chữ thập + vệt bóng;
+    màu nền qua palette guard HSL (bão hoà ≤0,40, sáng 0,30-0,90). 181 ảnh. BẪY: thử 2× độ phân giải (512²) → cellAtlas 7 → 15
+    trang 2048², gộp 107 → 535 ms — bỏ. (c) `guardCellPalette` (commitSink): mesh màu đặc của vật GIỮ LẠI có hộp ≥3,5×2,5 m →
+    HSL kẹp bão hoà THEO SẮC (ấm 15-65° ≤0,62 — ochre HP thật bão hoà ~0,6; đỏ ≤0,40; lạnh ≤0,32), sáng 0,30-0,90; tường LẠNH
+    bão hoà >0,45 (màu thương hiệu sơn cả nhà: UBND 138, BaoViet 418) → sáng ≥0,58 + bão hoà ≤0,22 (`coolLift`; chỉ kẹp bão hoà thì l 0,4 vẫn
+    ra 'khối xanh than' ở mặt khuất nắng — đo render (31,39,51); nâng sáng mà giữ 0,32 thì ánh trời lại ra 'xanh hoàng gia'); mảng xám-xanh TỐI ít bão hoà (180-250°, s 0,15-0,45, l<0,38:
+    'tháp/đế kính' 0x2c3e50/0x33475a — pano_230) → bản sao `applyCellGlass` sáng 0,5. BẪY: material đặc KHÔNG emissive bị
+    freezeStatic lượt 1 BAKE màu vào màu đỉnh rồi gộp chung material trắng → mất onBeforeCompile; bản sao kính đặt emissive
+    0xffcc66 cường độ 0 để rơi vào lượt 2 (giữ material). Kính vẽ canvas: sắc 165-235° bão hoà ≤0,3, sắc khác (tím TPBank 354)
+    ≤0,08. Nhân bản material 1 lần/gốc; KHÔNG đụng material có emissive. `cellCanvasFx` (ảnh canvas
+    KHÔNG phải lưới cửa sổ, nền gần đen/bão hoà → filter khi gộp atlas) đọc MÀU NỀN cellsink ghi lúc vẽ (`t.userData.base`) —
+    BẪY: bản đầu `drawImage→getImageData 8×8` cho 434 canvas (GPU) = đọc ngược GPU từng ảnh: gộp atlas 107 → 451 ms. Phủ
+    'lighten' màu kính lên điểm tối làm cửa chớp nâu thành TÍM — bỏ. Dải dài RẤT tối có CHỮ (`userData.signTexts`) KHÔNG
+    sáng ×1,7 (biển đen chữ vàng là thật — vòng 2).
+    **(9) HÌNH HỎNG** (FP-3 #5): pano_124 chợ Lan Phong — mái hiên tôn xanh 60 m `rotation.x = +0,42` = tấm gần ĐỨNG (mép trên
+    chĩa ra phố) → "tấm xanh chéo" trước camera; nay −1,15 (dốc 24° xuống phía ngoài) + DoubleSide (nhìn từ dưới là mặt sau),
+    bạt sọc −1,1, lưới che −1,2 (mái thoải). pano_239 công thự Pháp — vòm = TorusGeometry treo trước tường, đỉnh 4,6 m xuyên lan
+    can ("vòm trắng rỗng") → tường lưng vòm ĐẶC (Shape chữ nhật trừ nửa tròn r 0,95, đùn 0,4 m, đỉnh 3,55 m) — ExtrudeGeometry
+    KHÔNG đánh chỉ số → gộp riêng (mergeGeometries không trộn có/không index). pano_230: SHED ≥3 tầng hết tường tôn (mục 2).
+    pano_271 "khối đen": không còn trên dot3 (tia dò chạm cây).
+    **(10) CHỮ BIỂN** (`tools/pano_loop/gen_shopsigns.mjs`, viết lại vòng 2): cặp nháy CHẶT `/'([^']*)'/g`; phần MÔ TẢ chữ
+    thường sau tên IN HOA bỏ ("CỬA HÀNG ĐÔNG THỦ chuyên cung cấp…"; từ Hoa-thường giữ: "OLD Karaoke"); bỏ "..."/"…" (+ từ cuối
+    bị cắt ≤2 chữ), SĐT thật, cụm mô tả (LOGO, BÊN CẠNH, BIỂN, CHỮ…), chữ khác hệ Latin; tách ĐOẠN theo " - ", " – ", " / ",
+    "|", "·": bỏ đoạn ĐỊA CHỈ (số nhà + tên phố — tên phố lấy từ chính catalog "Phố …/đường …"; "ĐC: …", "SỐ 2A …", "LÔ 32 …"),
+    KHẨU HIỆU/KHUYẾN MÃI (VÌ, TỰ HÀO, KÍNH CHÀO, TIẾT KIỆM, GIẢM GIÁ, LÃI SUẤT, '%', OPEN…); đoạn đầu ≤ 32 ký tự giữ NGUYÊN, dài
+    hơn → bỏ cả tên (KHÔNG cắt giữa cụm: bản đầu cắt 390 tên ở 24 ký tự → mảnh "CẢNG VỤ HÀNG HẢI HẢI", "UBND TP HẢI PHÒNG - SỞ");
+    ghép đoạn sau khi tổng ≤ 24. TỰ KIỂM (exit 1): dấu câu đầu/cuối, " - - ", 2 dấu cách, `isBrand` (BRAND_MAP) VÀ `brandWatchHit`
+    (`js/brands.js` `BRAND_WATCH` ~230 thương hiệu nổi tiếng — CHỈ để kiểm, token không mơ hồ). BẪY: "0 thương hiệu theo
+    BRAND_MAP" ≠ sạch — phản biện tìm 8 tên thật lọt (COCA-COLA, D&G/ARMANI, VINAMILK, APPLE, CASIO, DAVINES, MAGIC MOMENTS,
+    PHIBROWS) → BRAND_MAP + lưới `_BRAND` world.js bổ sung (+ DIBAO, CHUNGHO, JARKO, NHAXINH, VINA KTV, SUNHOUSE, FASTER, ROLEX…;
+    'APPLE' giờ khớp mọi vị trí); thương hiệu khớp trên CẢ chuỗi gốc TRƯỚC khi cắt phần chữ thường ("FPT Retail" → "FPT" thì
+    BRAND_MAP hết khớp). 954 biển (83 rác) → 1.154 biển sạch. **QA**: `?labels=0` ẩn nhãn chữ nổi (`sp.userData.worldLabel`).
+    **(11) BIỂN TÊN THẬT** (world.js): 53 hàng × 77 px = 424 biển/tấm 4096×4081, 3 tấm. Chữ VỪA Ô bằng CỠ CHỮ (`measureText`,
+    thu đều, font đặt lười) — KHÔNG dùng tham số maxWidth của `fillText`: ép ngang = vẽ chữ qua biến đổi không đều → raster GPU
+    của canvas tăng tốc chậm hẳn. Đo `signbench` (scratch: 3 tấm, vẽ + texImage2D + readPixels, cùng phiên ×3): dot3 954 biển
+    ép ~227 ms, 1.256 biển ép ~366, 1.151 ép ~285, 1.151 VỪA CỠ ~171-195 (CPU measureText ~80-100 + GPU ~85), không chữ ~78.
+    Đó chính là "chờ vẽ khung" ở ranh fabric→landmarks lúc boot (vòng 1 tưởng do SỐ biển → định cắt còn 911). Chữ hết méo ngang.
+    **(12) NHÀ Ô sửa tay (vòng 2)**: pano_141 h0 (khung chuẩn) dãy vòm ĐẶC mới che biển "CẦM ĐỒ — ANH ĐỨC SƠN" (biển z D/2+0,1
+    sau lưng vòm z ≤ D/2+0,45) → biển treo TRƯỚC (D/2+0,52); dãy showroom Hoàng Diệu (`hd_showroom`) hồi nhà là tường kem TRƠN
+    14 × 5-7 m (pano_014 h180 khung chuẩn, tia dò: `mrg10_*` màu đỉnh 0xe8e4da) → phủ 2 mặt hông (ố chảy, bẩn chân tường, cửa sổ
+    nhỏ song sắt + cục nóng); mái hiên chợ Lan Phong (124 h90) xanh lá → XANH DƯƠNG (ảnh: bạt xanh sọc trắng); BIDV 046 đỏ gạch
+    #9e3b30 → #7a463e (render 167,62,51 → 138,62,50).
+    **ĐO** (Radeon 890M, TIER 3, ANGLE D3D11, 1280×634, `&date=2024-10-15`, A/B cùng phiên base dot3 ↔ nhánh; máy dùng chung với
+    4-6 agent → nhiễu ±150 ms mỗi pha boot): (a) ẢNH: 33 pano mục tiêu FP-3/FP-8 chấm REAL|dot3|W3-C 0-10: TB 3,30 → 3,57
+    (+0,27; bản cuối vòng 2 — chỉ 124 đổi điểm so với vòng 1); 8 pano đối chứng 3,12 → 3,19 (+0,06 — 400/414 nằm trong danh
+    sách SIGNTXT nên nhích nhờ biển). Phản biện chấm độc lập 30 khung: 2,98 → 3,23. (b) KHUNG HÌNH: fps 60 (vsync) mọi view cả 2
+    bên; draw call −4..+22/view; tam giác bằng nhau (node: chính 896.924 → 896.134, chi tiết 599.370 → 592.524). Heap = nhiễu GC
+    (375-643 MB cả 2 bên, KHÔNG kết luận "thấp hơn" như bản vòng 1).
+    (c) KHỞI ĐỘNG — vòng 1 SAI: báo +230 ms; phản biện đo lại cùng phiên 4 lần: hpReady ~5.083 → ~5.555 ms (+470, +9%), pha
+    landmarks 388 → 554 = chờ vẽ khung do chữ biển ép ngang (mục 11), fabric 686 → 849. Vòng 2 (perf9, 3 vòng xen kẽ, bản cuối):
+    hpReady dot3 5.568/5.533/4.908 (TB 5.336) → nhánh 5.245/5.111/4.996 (TB 5.117) = **−220 ms (−4%)**; startReady TB 7.325 →
+    7.172; pha landmarks 349 → 185 (chữ biển vừa cỡ), fabric 760 → 893 (+133: renderStyles ~20-50 ms, exposedSide ~25 ms, hình
+    học biển dọc/bảng/mái, vẽ lại lưới cửa sổ), cells 816 → 854, shaders 476 → 338 (nhiễu/biến thể program — không nhận công).
+    Node `buildRealFabric` (gồm atlas ĐỒNG BỘ, trong trình duyệt là worker): 888-963 → 1.107-1.274 ms. (d) ATLAS: node lạnh
+    ~105 → ~134 ms, ổn định ~55 → ~65 ms (63 → 95 ô); worker trong trình duyệt lần đo cuối 604 → 1.109 ms (1 mẫu, máy tải;
+    vòng 1: 636 → 629) — ngoài luồng chính, về lúc ~2,2 s (< hpReady); cellAtlas 7 trang 95 → 109 ms; 181 ảnh lưới cửa sổ vẽ
+    lại; palette guard 101 mesh / 75 material (9 kính). (e) CỔNG: 0 lỗi JS (15 lô chụp full vòng 2: tgt_0..10, ctl_0..2, rv_0;
+    LITE chỉ 3× 404 `assets_lite/*.glb` — máy không có bản lite; `--gl1` 0 lỗi, webgl2 false, mặt tiền/kính/biển vẽ đúng),
+    diag "TẤT CẢ THỰC THỂ OK" (bất biến = base), waterbfs 5/5, bộ sinh biển tự kiểm 0 lỗi định dạng / 0 thương hiệu (BRAND_MAP
+    + BRAND_WATCH), 2 bộ sinh xác định (chạy lại không đổi byte). BẪY QA: `python -m http.server` có hàng đợi listen 5 — máy bận
+    thì Chrome mở loạt module/GLB bị ERR_CONNECTION_REFUSED → "TIMEOUT window.__hp" → dùng ThreadingHTTPServer
+    `request_queue_size = 128`. BẪY khoá GPU: `gpulock.mjs` thăm dò 3-5 s nên luôn thua agent dùng khoá thăm dò 250 ms (cùng thư
+    mục khoá) → chờ 10-30 phút/lần; gộp 3-4 lô chụp vào MỘT lần giữ khoá; `fastlock … -- bash -c "…"` trên win32 chạy qua
+    cmd.exe → lệnh con không chạy (thoát 0 ngay) — dùng script node gọi spawnSync KHÔNG shell (tham số có '&' cũng an toàn).
+    **Chưa làm/để lại**: hero landmark (FP-8 mục 4 — cần Meshy), góc bo cong, mái ngói 1 tầng riêng, nhà trẻ (069), mái mansard;
+    nhà ô vẫn là hộp canvas (cửa sổ đã đẹp hơn, chưa qua shader atlas phố); pano_395 h90/h180 vẫn gần đen = `tb_goldstar` mặt LAM
+    KIM LOẠI tối CỐ Ý (bằng chứng pano_540) nhìn từ mặt khuất nắng ở 2-4 m; 051 khối trường xanh lá (fabric, bão hoà < 0,62) giữ;
+    418 h180 khối Chi cục Thuế (cửa sổ tối + dải trệt nâu — ảnh thật trệt ốp đá nâu, giữ); ô atlas G_OPEN1/G_SHOP0/G_SHOP1 vẫn
+    như "giá sách" nhiều màu; biển bảng lớn chọn NGẪU NHIÊN (không theo loại cửa hàng thật); biển quảng cáo TRÊN MÁI lớn kiểu 327
+    chưa có (BILL chỉ ~30 nhà); 486 (camera sát 2 m một khối ô — CAMNEAR, W3-A). Tool QA W3-C (scratchpad): `stats.mjs <port>`,
+    `pick2.mjs` tia dò vật liệu, `s4/signbench.mjs` (đo atlas chữ biển trên GPU), `s4/cons467.mjs` (nhà CONS gần camera:
+    bằng chứng/ngẫu nhiên), `nodefab/run2.mjs` dựng phố trong node.
 - **2026-10-04 (W2-F POLISH)** [ĐỢT 3 wave 2 — WebGL1, giải mã RB 1 lần, kho cảng, ĐÊM, giao thông né xe đỗ, dọn code chết, hitch]:
     **(1) WebGL1** (three r160 tự lùi WebGL1 khi không có WebGL2): KIỂM bằng `tools/qa/shoot.mjs --gl1` (init script cho
     `getContext('webgl2')` trả null — cờ Chrome `--disable-es3-apis` KHÔNG có tác dụng ở headless mới: vẫn webgl2:true;
