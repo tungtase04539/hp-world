@@ -266,7 +266,10 @@ export function createTraffic(scene, world, opts = {}) {
       if (ei === a.e && n.out.length > 1) continue;            // không quay đầu (trừ ngõ cụt)
       const e2 = edges[ei];
       const far = d ? e2.a : e2.b;
-      if (!nodeIn[far] && a.type !== 'walk') continue;         // không chạy ra ngoài vùng chơi
+      // không chạy ra ngoài vùng chơi — TRỪ cạnh cầu nâng (W3-F r5): span HVT một chiều có nút xa ở bờ bắc (−46,−1650) ngoài
+      // PLAY_R+30 là lối ra DUY NHẤT ở đỉnh vòng xoắn đông → bản cũ xe hướng bắc bị kill ngay tại (75,−898), span không có xe.
+      // Xe chạy ra xa bị loại bởi cull khoảng cách (RB+40) như mọi xe khác.
+      if (!nodeIn[far] && a.type !== 'walk' && !e2.elev) continue;
       if (!dirOK(a, e2, d)) continue;                          // không đi ngược chiều đường đôi
       if (a.type === 'walk' && e2.elev) continue;                 // W3-F: người đi bộ không lên cầu nâng
       const y2 = edgeY(e2, d, 0);

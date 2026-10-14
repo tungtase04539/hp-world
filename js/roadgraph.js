@@ -317,6 +317,7 @@ export function deckRoads(roads, bridgeWays, { roadTop = 0.11, parapet = 0.42 } 
     if (d(P[0], A) > 4 || d(P[P.length - 1], Z) > 4) return r;      // way ROADS_DT không trùng way cầu → giữ như cũ
     P[0] = [A[0], A[1], P[0][2]]; P[P.length - 1] = [Z[0], Z[1], P[P.length - 1][2]];
     const hw = b.kind === 'deck' ? 0 : b.w / 2 - parapet - 0.1;
-    return { c: r.c, pts: P, kind: b.kind, hw };
+    // giữ MỌI trường khác của way (W3-A thêm bề rộng riêng w/sw — phản biện r2: bản cũ trả {c,pts,kind,hw} làm rơi chúng)
+    return { ...r, pts: P, kind: b.kind, hw };
   });
 }

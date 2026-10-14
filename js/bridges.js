@@ -17,13 +17,13 @@ export const DECK_DEPTH = { span: 1.9, ramp: 1.35 };
 const STEP_UP = 1.2;
 
 export function makeDeckIndex(ways) {
-  const segs = [];   // [ax, az, ay, bx, bz, by, hw]
-  for (const b of ways) {
+  const segs = [];   // [ax, az, ay, bx, bz, by, hw, wi (chỉ số way), span (1: nhịp chính)]
+  for (const [wi, b] of ways.entries()) {
     if (b.kind === 'flat') continue;
     const P = b.pts, hw = b.w / 2, dy = b.kind === 'deck' ? 0.11 : 0.02;   // mặt nhựa trên cao độ hồ sơ
     // cầu phố 'deck': chỉ khoảng nâng pts[i0..i1] (2 đầu sát đất là phố mặt đất của roadnet — không phải "mặt cầu")
     const i0 = b.kind === 'deck' ? b.i0 ?? 0 : 0, i1 = b.kind === 'deck' ? b.i1 ?? P.length - 1 : P.length - 1;
-    for (let i = i0; i < i1; i++) segs.push([P[i][0], P[i][1], P[i][2] + dy, P[i + 1][0], P[i + 1][1], P[i + 1][2] + dy, hw]);
+    for (let i = i0; i < i1; i++) segs.push([P[i][0], P[i][1], P[i][2] + dy, P[i + 1][0], P[i + 1][1], P[i + 1][2] + dy, hw, wi, b.kind === 'span' ? 1 : 0]);
   }
   const C = 16, G = new Map(), key = (i, j) => (i + 4096) * 8192 + (j + 4096);
   segs.forEach((s, si) => {
@@ -43,8 +43,15 @@ export function makeDeckIndex(ways) {
       t = t < 0 ? 0 : t > 1 ? 1 : t;
       const d = Math.hypot(x - s[0] - dx * t, z - s[1] - dz * t);
       if (d > s[6] + pad) continue;
-      cb(s[2] + (s[5] - s[2]) * t, d);
+      cb(s[2] + (s[5] - s[2]) * t, d, si);
     }
+  }
+  // đoạn mặt cầu CÙNG TẦNG yRef (−2 … +STEP_UP) có TIM GẦN nhất (−1: không có) — không lấy "cao nhất": 2 nhịp chồng mép nhau
+  // vài dm (x ≈ −53,5, z −935…−955) cao độ lệch mm → đi sát gờ nhịp này từng bị coi là đứng trên nhịp kia
+  function segAt(x, z, yRef) {
+    let bd = Infinity, bs = -1;
+    each(x, z, 0.15, (y, d, si) => { if (y <= yRef + STEP_UP && y >= yRef - 2 && d < bd) { bd = d; bs = si; } });
+    return bs;
   }
   return {
     segs,
@@ -57,6 +64,14 @@ export function makeDeckIndex(ways) {
     nearestAt(x, z) { let best = -Infinity, bd = Infinity; each(x, z, 0.15, (y, d) => { if (d < bd) { bd = d; best = y; } }); return best; },
     nearestInfo(x, z) { let best = -Infinity, bd = Infinity; each(x, z, 0.15, (y, d) => { if (d < bd) { bd = d; best = y; } }); return { y: best, d: bd }; },
     covers(x, z, pad = 0) { let hit = false; each(x, z, pad, () => { hit = true; }); return hit; },
+    // W3-F r5 (phản biện r2): bước (x0,z0)→(x1,z1) ở tầng yRef VƯỢT GỜ LAN CAN giữa 2 NHỊP CHÍNH (span) khác way — 2 nhịp HVT
+    // một chiều chạm/chồng mép nhau ở x ≈ −53,5 (main.js tắt collider 2D trên cầu cao → từng đi/chạy xe xuyên 2 gờ). Nhịp chỉ
+    // nối đầu-đầu với vòng xoắn/dốc (không bao giờ nhịp-nhịp) → đổi way giữa 2 nhịp luôn là đi NGANG qua gờ. (Thử tiêu chí
+    // "điểm mới nằm cạnh way cũ" chặn nhầm ở chỗ nối dốc ↔ vòng xoắn: vòng cong, dốc rời tiếp tuyến — tools: r5/parapet4.mjs.)
+    crossesParapet(x0, z0, x1, z1, yRef) {
+      const a = segAt(x0, z0, yRef); if (a < 0 || !segs[a][8]) return false;
+      const b = segAt(x1, z1, yRef); return b >= 0 && segs[b][8] === 1 && segs[b][7] !== segs[a][7];
+    },
   };
 }
 
@@ -102,8 +117,31 @@ function sweep(B, frames, prof, col, closed) {
     }
   }
 }
-// hộp đặc (trụ vuông/dầm) quay quanh trục y
-function box(B, cx, cy, cz, sx, sy, sz, rotY, col) {
+// khung rút gọn cho THANH MẢNH chạy dọc cầu (tay vịn): giữ khung mà đường thanh (tim + n·l) lệch dây cung ≥ tol (3D),
+// dây ≤ 16 khung. Nhịp thẳng/dốc đều (span HVT, đường cong đứng bán kính lớn) còn vài khung/50 m; nút xoắn giữ gần đủ.
+// (W3-F r5 perf: 4 sweep tay vịn kín theo khung 3 m = 36k tam giác; freezeStatic tách ô → không chỉ mục ×3 đỉnh)
+function simplifyFrames(F, l, tol) {
+  if (F.length <= 2) return F;
+  const Q = F.map((f) => [f.x + f.nx * l, f.y, f.z + f.nz * l]), keep = [0];
+  let i = 0;
+  while (i < F.length - 1) {
+    let j = i + 1;
+    for (let c = i + 2; c < F.length && c - i <= 16; c++) {
+      const A = Q[i], B = Q[c], dx = B[0] - A[0], dy = B[1] - A[1], dz = B[2] - A[2], L2 = dx * dx + dy * dy + dz * dz || 1;
+      let ok = true;
+      for (let k = i + 1; k < c && ok; k++) {
+        const P = Q[k], t = ((P[0] - A[0]) * dx + (P[1] - A[1]) * dy + (P[2] - A[2]) * dz) / L2;
+        ok = Math.hypot(P[0] - A[0] - dx * t, P[1] - A[1] - dy * t, P[2] - A[2] - dz * t) < tol;
+      }
+      if (!ok) break;
+      j = c;
+    }
+    keep.push(j); i = j;
+  }
+  return keep.map((k) => F[k]);
+}
+// hộp đặc (trụ vuông/dầm) quay quanh trục y; noTop: bỏ mặt trên (cột tay vịn — đỉnh nằm trong thanh vịn)
+function box(B, cx, cy, cz, sx, sy, sz, rotY, col, noTop) {
   const c = Math.cos(rotY), s = Math.sin(rotY);
   const P = (lx, ly, lz) => [cx + lx * c + lz * s, cy + ly, cz - lx * s + lz * c];
   const hx = sx / 2, hy = sy / 2, hz = sz / 2;
@@ -112,7 +150,7 @@ function box(B, cx, cy, cz, sx, sy, sz, rotY, col) {
   quad(B, P(hx, -hy, -hz), P(-hx, -hy, -hz), P(-hx, hy, -hz), P(hx, hy, -hz), N(0, 0, -1), col);
   quad(B, P(hx, -hy, hz), P(hx, -hy, -hz), P(hx, hy, -hz), P(hx, hy, hz), N(1, 0, 0), col);
   quad(B, P(-hx, -hy, -hz), P(-hx, -hy, hz), P(-hx, hy, hz), P(-hx, hy, -hz), N(-1, 0, 0), col);
-  quad(B, P(-hx, hy, hz), P(hx, hy, hz), P(hx, hy, -hz), P(-hx, hy, -hz), N(0, 1, 0), col);
+  if (!noTop) quad(B, P(-hx, hy, hz), P(hx, hy, hz), P(hx, hy, -hz), P(-hx, hy, -hz), N(0, 1, 0), col);
 }
 // trụ tròn (không nắp dưới), n mặt
 function cyl(B, cx, cz, y0, y1, r0, r1, n, col) {
@@ -317,14 +355,15 @@ export function buildBridges(scene, deps) {
       else { sweep(conc, F, [[li, 0.02], [li, PH], [lo, PH]], CONC_PAR, false); sweep(conc, F, [[lo, PH], [lo, -D]], CONC, false); }
       // tay vịn thép trên gờ: thanh ngang + cột 2,5 m
       const rl = sg * (hw - PAR / 2);
-      sweep(rail, F, [[rl - 0.05, PH + 0.42], [rl + 0.05, PH + 0.42], [rl + 0.05, PH + 0.5], [rl - 0.05, PH + 0.5]], RAIL, true);
-      sweep(rail, F, [[rl - 0.03, PH + 0.18], [rl + 0.03, PH + 0.18], [rl + 0.03, PH + 0.23], [rl - 0.03, PH + 0.23]], RAIL, true);
+      const FR = simplifyFrames(F, rl, 0.02);
+      sweep(rail, FR, [[rl - 0.05, PH + 0.42], [rl + 0.05, PH + 0.42], [rl + 0.05, PH + 0.5], [rl - 0.05, PH + 0.5]], RAIL, true);
+      sweep(rail, FR, [[rl - 0.03, PH + 0.18], [rl + 0.03, PH + 0.18], [rl + 0.03, PH + 0.23], [rl - 0.03, PH + 0.23]], RAIL, true);
       let s = 0;
       for (let i = 0; i < F.length - 1; i++) {
         const A = F[i], Bf = F[i + 1], L = Math.hypot(Bf.x - A.x, Bf.z - A.z);
         for (let u = (2.5 - (s % 2.5)) % 2.5; u < L; u += 2.5) {
           const t = u / L, x = A.x + (Bf.x - A.x) * t + A.nx * rl, z = A.z + (Bf.z - A.z) * t + A.nz * rl, y = A.y + (Bf.y - A.y) * t;
-          box(rail, x, y + PH + 0.25, z, 0.07, 0.5, 0.07, Math.atan2(A.tx, A.tz), RAIL);
+          box(rail, x, y + PH + 0.25, z, 0.07, 0.5, 0.07, Math.atan2(A.tx, A.tz), RAIL, true);
         }
         s += L;
       }

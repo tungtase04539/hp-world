@@ -193,7 +193,8 @@ let _vehRefY = () => 2;   // W3-F: gán lại sau khi có pState
 let _vehRefOverride = null;   // W3-F r4: cao độ tham chiếu khi GỌI xe máy (xe mọc trên mặt cầu người đang đứng, không dưới gầm)
 const { vehicles, update: updateVehicle, spawn: spawnVehicle } = createVehicles(
   // W3-F: xe đang lái theo mặt cầu nâng (tham chiếu = cao độ xe); xe đỗ/không lái ở mặt đất (gọi ngay lúc tạo → _vehRefY)
-  scene, (x, z) => surfaceY(x, z, _vehRefY()), groundHeightNoDeck, world.vehicleSpawns, resolveAll, { playRadius: PLAY_RADIUS });
+  scene, (x, z) => surfaceY(x, z, _vehRefY()), groundHeightNoDeck, world.vehicleSpawns, resolveAll, { playRadius: PLAY_RADIUS,
+    moveBlock: (x0, z0, x1, z1, y) => !!(world.decks && world.decks.crossesParapet(x0, z0, x1, z1, y)) });   // W3-F r5: gờ giữa 2 nhịp
 const fp = footprintIndex(world);   // footprint nhà ĐANG VẼ (world.rbData của WP2; chưa có → chỉ địa danh) → camera, người đi bộ, chỗ xuống xe
 const traffic = createTraffic(scene, world, { playRadius: PLAY_RADIUS, footprints: fp });
 _trafficRef = traffic;
@@ -338,7 +339,9 @@ function tryMove(nx, nz) {
   if (s <= 0.32) return false;                    // W3-F: đi được trên mặt cầu nâng qua sông
   // W3-F r4 (phản biện): không BƯỚC HỤT khỏi mép mặt cầu nâng / dốc xoắn trên đất (rơi tự do 5-15 m) — bề mặt mới thấp hơn
   // bề mặt đang đứng > 1,2 m = mép cầu (thành phố phẳng LAND_H: không có bậc thật nào cao thế) → như có lan can
-  return s >= surfaceY(pState.pos.x, pState.pos.z, pState.pos.y) - 1.2;
+  if (s < surfaceY(pState.pos.x, pState.pos.z, pState.pos.y) - 1.2) return false;
+  // W3-F r5: gờ lan can giữa 2 mặt cầu nằm sát nhau (2 nhịp HVT) — collider 2D tắt trên cầu cao (onHighDeck)
+  return !(world.decks && world.decks.crossesParapet(pState.pos.x, pState.pos.z, nx, nz, pState.pos.y));
 }
 
 function updatePlayerOnFoot(dt, time) {

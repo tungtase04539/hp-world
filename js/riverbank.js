@@ -134,6 +134,57 @@ function box(B, cx, cy, cz, sx, sy, sz, rotY, col) {
   quad(B, P(-hx, -hy, -hz), P(-hx, -hy, hz), P(-hx, hy, hz), P(-hx, hy, -hz), N(-1, 0, 0), col);
   quad(B, P(-hx, hy, hz), P(hx, hy, hz), P(hx, hy, -hz), P(-hx, hy, -hz), N(0, 1, 0), col);
 }
+// DẢI LIỀN dọc bờ (W3-F r5, phản biện perf): mẫu 2 m liên tiếp trên CÙNG cạnh polygon thẳng hàng → gộp thành 1 đoạn quét,
+// chỉ thêm khung ở đỉnh polygon (vát góc) / chỗ đổi màu (sọc gờ đỏ-trắng); nắp 2 đầu chỉ ở chỗ đứt. Trước: tường + gờ + bệ +
+// tay vịn = hộp/quad MỖI MẪU (≈ 96k tam giác) — freezeStatic tách ô thành lưới KHÔNG chỉ mục (3 đỉnh/tam giác) ⇒ ~10 MB GPU
+// + thời gian gộp tỉ lệ số tam giác.
+// faces: [{ a:[l,y], b:[l,y], n:[nl,ny], ca?, cb? }] — mặt cắt: l theo pháp tuyến bờ (về phía ĐẤT), y tuyệt đối; n pháp tuyến
+// mặt trong mặt cắt; ca/cb màu 2 mép (mặc định màu đoạn). cap: đa giác mặt cắt (4 điểm) cho nắp đầu/cuối, hoặc null.
+function Run(B, faces, cap) {
+  let F = [], segN = [], segT = [], segC = [];
+  const P = (Fr, p) => [Fr.x + Fr.lx * p[0], p[1], Fr.z + Fr.lz * p[0]];
+  function face4(V, N, C) {   // V: 4 góc theo vòng; đảo thứ tự nếu pháp tuyến hình học ngược N
+    const ux = V[1][0] - V[0][0], uy = V[1][1] - V[0][1], uz = V[1][2] - V[0][2], vx = V[2][0] - V[0][0], vy = V[2][1] - V[0][1], vz = V[2][2] - V[0][2];
+    const gx = uy * vz - uz * vy, gy = uz * vx - ux * vz, gz = ux * vy - uy * vx;
+    if (gx * N[0] + gy * N[1] + gz * N[2] >= 0) quad(B, V[0], V[1], V[2], V[3], N, C);
+    else quad(B, V[3], V[2], V[1], V[0], N, [C[3], C[2], C[1], C[0]]);
+  }
+  function flush() {
+    if (F.length >= 2) {
+      for (let i = 0; i < F.length - 1; i++) {
+        const n = segN[i], c = segC[i];
+        for (const f of faces) {
+          const N = [n[0] * f.n[0], f.n[1], n[1] * f.n[0]], ca = f.ca || c, cb = f.cb || c;
+          face4([P(F[i], f.a), P(F[i + 1], f.a), P(F[i + 1], f.b), P(F[i], f.b)], N, [ca, ca, cb, cb]);
+        }
+      }
+      if (cap) {
+        const e = F.length - 1, t0 = segT[0], t1 = segT[segT.length - 1];
+        face4(cap.map((p) => P(F[0], p)), [-t0[0], 0, -t0[1]], [segC[0], segC[0], segC[0], segC[0]]);
+        face4(cap.map((p) => P(F[e], p)), [t1[0], 0, t1[1]], [segC[e - 1], segC[e - 1], segC[e - 1], segC[e - 1]]);
+      }
+    }
+    F = []; segN = []; segT = []; segC = [];
+  }
+  function add(ax, az, bx, bz, nx, nz, col) {
+    const L = Math.hypot(bx - ax, bz - az); if (L < 1e-4) return;
+    const tx = (bx - ax) / L, tz = (bz - az) / L, last = F[F.length - 1];
+    if (last && Math.abs(last.x - ax) + Math.abs(last.z - az) < 0.02) {
+      const k = segN.length - 1;
+      if (segC[k] === col && segT[k][0] * tx + segT[k][1] * tz > 0.9999999 && segN[k][0] * nx + segN[k][1] * nz > 0.99) { last.x = bx; last.z = bz; return; }
+      const mx = segN[k][0] + nx, mz = segN[k][1] + nz, ml = Math.hypot(mx, mz);
+      if (ml > 0.2) {   // khớp nối: vát góc (mặt cắt giữ bề rộng — hệ số 1/cos, chặn 2)
+        const ux = mx / ml, uz = mz / ml, sc = 1 / Math.max(0.5, ux * nx + uz * nz);
+        last.lx = ux * sc; last.lz = uz * sc;
+        F.push({ x: bx, z: bz, lx: nx, lz: nz }); segN.push([nx, nz]); segT.push([tx, tz]); segC.push(col);
+        return;
+      }
+    }
+    flush();
+    F.push({ x: ax, z: az, lx: nx, lz: nz }, { x: bx, z: bz, lx: nx, lz: nz }); segN.push([nx, nz]); segT.push([tx, tz]); segC.push(col);
+  }
+  return { add, flush };
+}
 function cyl(B, cx, cz, y0, y1, r0, r1, n, col) {
   for (let k = 0; k < n; k++) {
     const a1 = (k / n) * Math.PI * 2, a2 = ((k + 1) / n) * Math.PI * 2, am = (a1 + a2) / 2;
@@ -142,6 +193,17 @@ function cyl(B, cx, cz, y0, y1, r0, r1, n, col) {
       [Math.cos(am), 0, Math.sin(am)], col);
   }
 }
+// pháp tuyến 8 mặt khối lá blob() (bát diện dẹt: 4 đỉnh ngang r, chóp +0,7r, đáy −0,6r) — cặp [mặt trên, mặt dưới] mỗi cạnh
+const BLOB_N = (() => {
+  const P = [[1, 0, 0], [0, 0, 1], [-1, 0, 0], [0, 0, -1]], T = [0, 0.7, 0], D = [0, -0.6, 0], out = [];
+  const nrm = (a, b, c) => {
+    const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+    const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx, l = Math.hypot(nx, ny, nz) || 1;
+    return [nx / l, ny / l, nz / l];
+  };
+  for (let k = 0; k < 4; k++) { const a = P[k], b = P[(k + 1) % 4]; out.push(nrm(b, a, T), nrm(a, b, D)); }
+  return out;
+})();
 const rgb = (hex, f = 1) => { const c = new THREE.Color(hex); return [c.r * f, c.g * f, c.b * f]; };
 const hash = (x, z, s) => { const v = Math.sin(x * 12.9898 + z * 78.233 + s * 37.719) * 43758.5453; return v - Math.floor(v); };
 
@@ -151,7 +213,8 @@ function caroTexture() {
   const g = cv.getContext('2d');
   let s = 7; const rnd = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
   const H = S / 2;
-  const cols = [[138, 100, 90], [126, 123, 117], [126, 123, 117], [138, 100, 90]];   // đỏ-xám bạc màu, tương phản thấp
+  // đỏ-xám bạc màu, tương phản thấp — r5 (phản biện r2: ca-rô đậm/đều hơn gạch thật hồng-xám nhạt ở pano_290/299) nhạt hơn
+  const cols = [[146, 116, 108], [132, 128, 122], [132, 128, 122], [146, 116, 108]];
   for (let j = 0; j < 2; j++) for (let i = 0; i < 2; i++) {
     const [r, gg, b] = cols[j * 2 + i], k = 0.94 + rnd() * 0.1;
     g.fillStyle = `rgb(${r * k | 0},${gg * k | 0},${b * k | 0})`; g.fillRect(i * H, j * H, H, H);
@@ -295,20 +358,17 @@ export function buildRiverbanks(scene, deps) {
   const saplings = [], keepSegs = new Map(), lampGlobes = [];
   let lampAcc = 7, saplAcc = 4, bloomAcc = 11;
   const WF = -0.7;                        // mặt tường kè: 0,7 m về phía nước tính từ mép polygon
+  // dải liền (Run, r5): tường kè (2 dải màu dọc) + gờ đỉnh kè; bệ lan can (sọc đỏ-trắng 1 m ở phố s/p) + tay vịn gang
+  const C_PL = rgb(0xd8d4ca), C_PLR = rgb(0xb33a2e), YP = TOP + 0.02, YH = YP + 1.12;
+  const runWall = Run(wall, [{ a: [WF, TOP], b: [WF, 0.9], n: [-1, 0], ca: C_TOP, cb: C_MID }, { a: [WF, 0.9], b: [WF, -1.4], n: [-1, 0], ca: C_MID, cb: C_LOW }], null);
+  const runCap = Run(cap, [{ a: [WF - 0.05, TOP + 0.02], b: [0.45, TOP + 0.02], n: [0, 1], ca: C_CAP, cb: C_CAP }], null);
+  const boxFaces = (h, y0, y1) => [{ a: [h, y0], b: [h, y1], n: [1, 0] }, { a: [h, y1], b: [-h, y1], n: [0, 1] }, { a: [-h, y1], b: [-h, y0], n: [-1, 0] }];
+  const runPlinth = Run(plinth, boxFaces(0.17, YP, YP + 0.34), [[0.17, YP], [0.17, YP + 0.34], [-0.17, YP + 0.34], [-0.17, YP]]);
+  const runHand = Run(iron, boxFaces(0.045, YH, YH + 0.08), [[0.045, YH], [0.045, YH + 0.08], [-0.045, YH + 0.08], [-0.045, YH]]);
   for (let i = 0; i < S.length; i++) {
     const s = S[i], h = s.L / 2;
     const ax = s.x - s.tx * h, az = s.z - s.tz * h, bx = s.x + s.tx * h, bz = s.z + s.tz * h;
     const off = (x, z, d) => [x + s.nx * d, z + s.nz * d];
-    // tường kè (mặt hướng ra nước = −n)
-    const [w1x, w1z] = off(ax, az, WF), [w2x, w2z] = off(bx, bz, WF);
-    const ny = [-s.nx, 0, -s.nz];
-    // thứ tự để pháp tuyến hình học = −n: (a,top) → (a,bot) → (b,bot) → (b,top) khi (b−a) = t; kiểm dấu
-    const cr = s.tx * (-s.nz) - s.tz * (-s.nx);
-    // màu dọc tường: đỉnh sáng, vệt rêu/ố sát mặt nước
-    const quadV = (yT, yB, cT, cB) => {
-      const a = [w1x, yT, w1z], b = [w1x, yB, w1z], c = [w2x, yB, w2z], d = [w2x, yT, w2z];
-      if (cr > 0) quad(wall, a, b, c, d, ny, [cT, cB, cB, cT]); else quad(wall, d, c, b, a, ny, [cT, cB, cB, cT]);
-    };
     if (s.beach) {
       // bờ BÃI BỒI: dốc cát tự nhiên (không kè) từ mép đất xuống dưới mặt nước 4,5 m ra lòng — che vách đứng của lưới nền nắn
       const [o1x, o1z] = off(ax, az, -4.5), [o2x, o2z] = off(bx, bz, -4.5), yT = LAND_H + 0.01;
@@ -316,15 +376,10 @@ export function buildRiverbanks(scene, deps) {
       const V = [[o1x, -0.7, o1z], [o2x, -0.7, o2z], [bx, yT, bz], [ax, yT, az]], Cc = [C_WET, C_WET, C_SAND, C_SAND];
       if (up) quad(sand, V[0], V[1], V[2], V[3], N, Cc); else quad(sand, V[3], V[2], V[1], V[0], N, [Cc[3], Cc[2], Cc[1], Cc[0]]);
       stats.beachM += s.L;
-    } else quadV(TOP, 0.9, C_TOP, C_MID), quadV(0.9, -1.4, C_MID, C_LOW);
-    // gờ đỉnh kè: từ mặt tường tới +0,45 m trong đất (đỉnh +0,02)
-    if (!s.beach) {
-      const [c1x, c1z] = off(ax, az, WF - 0.05), [c2x, c2z] = off(bx, bz, WF - 0.05), [c3x, c3z] = off(bx, bz, 0.45), [c4x, c4z] = off(ax, az, 0.45);
-      const y = TOP + 0.02;
-      // mặt trên: (a_out → b_out → b_in → a_in) — pháp tuyến lên khi (b−a)×(in−out) có y > 0
-      const up = (s.tx * s.nz - s.tz * s.nx) < 0;
-      if (up) quad(cap, [c1x, y, c1z], [c2x, y, c2z], [c3x, y, c3z], [c4x, y, c4z], [0, 1, 0], C_CAP);
-      else quad(cap, [c4x, y, c4z], [c3x, y, c3z], [c2x, y, c2z], [c1x, y, c1z], [0, 1, 0], C_CAP);
+    } else {
+      // tường kè (mặt hướng ra nước, đỉnh sáng → vệt rêu/ố sát nước) + gờ đỉnh kè từ mặt tường tới +0,45 m trong đất
+      runWall.add(ax, az, bx, bz, s.nx, s.nz, null);
+      runCap.add(ax, az, bx, bz, s.nx, s.nz, null);
     }
     // phân loại bờ: 'prom' = dải dạo sát phố (bờ cách mép vỉa hè ≤ 7 m — Tam Bạc đoạn cong/tây, pano_198-212, 290-299);
     // 'strip' = phố chạy dọc nhưng bờ cách xa > 7 m (Tam Bạc đoạn bắc Lạc Long → cửa Cấm, pano_519/336/331): lan can cũ
@@ -377,14 +432,12 @@ export function buildRiverbanks(scene, deps) {
       const ang = Math.atan2(s.tx, s.tz);
       // gờ: phố s/p (pano_221 Phố Tam Bạc bắc) sơn sọc đỏ-trắng ~1 m; phố t/r (pano_203) xám
       const striped = s.road.c !== 'r' && s.road.c !== 't';
-      for (const hh of [-0.25, 0.25]) {
-        const mx = s.x + s.tx * hh * s.L, mz = s.z + s.tz * hh * s.L;
-        box(plinth, mx, y0 + 0.17, mz, 0.34, 0.34, s.L / 2 + 0.01, ang, striped && hh > 0 ? rgb(0xb33a2e) : rgb(0xd8d4ca));
-      }
+      runPlinth.add(ax, az, s.x, s.z, s.nx, s.nz, C_PL);
+      runPlinth.add(s.x, s.z, bx, bz, s.nx, s.nz, striped ? C_PLR : C_PL);
       // tấm hoa văn (2 mặt cùng 1 quad: material DoubleSide)
       const yb = y0 + 0.36, yt = y0 + 1.12;
       quad(panel, [r1x, yb, r1z], [r2x, yb, r2z], [r2x, yt, r2z], [r1x, yt, r1z], [s.nx, 0, s.nz], [1, 1, 1], [[0, 0], [s.L / 2, 0], [s.L / 2, 1], [0, 1]]);
-      box(iron, (r1x + r2x) / 2, yt + 0.04, (r1z + r2z) / 2, 0.09, 0.08, s.L + 0.02, ang, C_IRON);
+      runHand.add(r1x, r1z, r2x, r2z, s.nx, s.nz, C_IRON);
       if ((i % 2) === 0) box(iron, r1x, y0 + 0.75, r1z, 0.1, 0.8, 0.1, ang, C_IRON);
       if ((i % 2) === 0 && deps.addCollider) { const [qx, qz] = off(s.x, s.z, -0.9); deps.addCollider(qx, qz, 1.0); stats.colliders++; }
     }
@@ -433,6 +486,7 @@ export function buildRiverbanks(scene, deps) {
       stats.bloom++;
     }
   }
+  runWall.flush(); runCap.flush(); runPlinth.flush(); runHand.flush();
   // lùm cây trên BÃI BỒI (ảnh vệ tinh tile 7: lùm cây lớn dày giữa bãi, thưa sát mép nước): lưới 7 m xê dịch, mật độ theo
   // ô 22 m (lùm), cách mép nước ≥ 3,5 m
   for (const B of BEACHES) {
@@ -480,7 +534,8 @@ export function buildRiverbanks(scene, deps) {
       cx = r.px + wx * o; cz = r.pz + wz * o; ang = Math.atan2(r.ux, r.uz); nx = -wx; nz = -wz;
     }
     const gy = TOP - 0.25;
-    const wallC = [rgb(0xb3ad9f), rgb(0x9aa6ad), rgb(0xbcae90)][Math.floor(hash(s.x, s.z, 74) * 3)];
+    // vách: tôn kẽm bạc / tôn gỉ / bạt xanh / ván cũ (r5, phản biện r2: vách xám nhạt đọc thành "hộp bê tông" ở 519/336)
+    const wallC = [rgb(0x8e979b), rgb(0x8a5c40), rgb(0x3f6fa6), rgb(0x9a8a6c)][Math.floor(hash(s.x, s.z, 74) * 4)];
     box(shackB, cx, gy + h / 2, cz, dep, h, wid, ang, wallC);
     const roofC = [rgb(0x3b78c4), rgb(0xd9772b), rgb(0x9c5a3c), rgb(0x2f8fd0)][Math.floor(hash(s.x, s.z, 75) * 4)];
     const rx = cx + nx * 0.3, rz = cz + nz * 0.3;
@@ -511,18 +566,19 @@ export function buildRiverbanks(scene, deps) {
     if (hash(s.x, s.z, 67) < 0.7) box(boatB, cx, 1.05, cz, Wd * 0.9, 0.85, L * 0.32, ang, rgb(hash(s.x, s.z, 68) < 0.5 ? 0x2f6aa8 : 0x6b6a5c));
     stats.boats++;
   }
-  function blob(B, x, y, z, r, col) {   // khối lá/hoa: bát diện dẹt 8 mặt
+  function blob(B, x, y, z, r, col) {   // khối lá/hoa: bát diện dẹt 8 mặt (pháp tuyến mặt không đổi theo r — BLOB_N tính sẵn)
     const P = [[x + r, y, z], [x, y, z + r], [x - r, y, z], [x, y, z - r]], T = [x, y + r * 0.7, z], D = [x, y - r * 0.6, z];
     for (let k = 0; k < 4; k++) {
       const a = P[k], b = P[(k + 1) % 4];
-      triP(B, b, a, T, col); triP(B, a, b, D, col);   // ngược chiều kim đồng hồ nhìn từ NGOÀI
+      triP(B, b, a, T, col, BLOB_N[k * 2]); triP(B, a, b, D, col, BLOB_N[k * 2 + 1]);   // ngược chiều kim đồng hồ nhìn từ NGOÀI
     }
   }
-  function triP(B, a, b, c, col) {
-    const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
-    let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx; const l = Math.hypot(nx, ny, nz) || 1;
+  function triP(B, a, b, c, col, n) {
     const o = B.p.length / 3;
-    for (const v of [a, b, c]) { B.p.push(v[0], v[1], v[2]); B.n.push(nx / l, ny / l, nz / l); B.c.push(col[0], col[1], col[2]); B.u.push(0, 0); }
+    B.p.push(a[0], a[1], a[2], b[0], b[1], b[2], c[0], c[1], c[2]);
+    B.n.push(n[0], n[1], n[2], n[0], n[1], n[2], n[0], n[1], n[2]);
+    B.c.push(col[0], col[1], col[2], col[0], col[1], col[2], col[0], col[1], col[2]);
+    B.u.push(0, 0, 0, 0, 0, 0);
     B.idx.push(o, o + 1, o + 2);
   }
   // ---- ráp mesh ----
@@ -549,7 +605,7 @@ export function buildRiverbanks(scene, deps) {
   if (rp) rp.userData.noMerge = true;
   // bóng đèn (material phát sáng dùng chung của thành phố → sáng về đêm theo daynight)
   if (lampGlobes.length && deps.lampGlow) {
-    const gs = lampGlobes.map(([x, y, z]) => { const g = new THREE.SphereGeometry(0.17, 8, 6); g.translate(x, y, z); return g; });
+    const gs = lampGlobes.map(([x, y, z]) => { const g = new THREE.SphereGeometry(0.17, 8, 4); g.translate(x, y, z); return g; });
     const m = new THREE.Mesh(mergeGeometries(gs), deps.lampGlow); gs.forEach((g) => g.dispose());
     m.name = 'riverbank_globes'; scene.add(m);
   }
