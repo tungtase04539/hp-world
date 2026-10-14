@@ -1,0 +1,238 @@
+# server/docker-compose.yml — S5. Máy chủ game Hải Phòng 3D chạy trên máy của chủ dự án (sau này chuyển nguyên lên VPS).
+#
+# Dùng qua script (khuyên dùng): server/ops/mo-may-chu.ps1 / tat-may-chu.ps1 / trang-thai.ps1 — xem docs/multiplayer/VAN_HANH.md.
+# Tay:  docker compose -p hpworld -f server/docker-compose.yml up -d --build              (game + db)
+#       ... --profile tunnel up -d       (thêm Cloudflare named tunnel, cần TUNNEL_TOKEN trong server/.env)
+#       ... --profile quicktunnel up -d  (tunnel tạm *.trycloudflare.com để thử)
+#       ... --profile backup up -d       (sao lưu Postgres mỗi đêm, giữ 14 ngày, vào server/data/backups)
+# Biến nội suy: lấy từ môi trường rồi tới server/.env (cùng thư mục file này). Bí mật CHỈ nằm trong server/.env.
+#   HPMP_GAME_PORT / HPMP_ADMIN_PORT   cổng trên máy (mặc định 9100 / 9101, CHỈ 127.0.0.1)
+#   HPMP_EDGE_SUBNET / HPMP_BACKEND_SUBNET   dải mạng nội bộ Docker (đổi khi chạy 2 bộ song song)
+#   HPMP_IMAGE                         tên image game (mặc định hpworld-game:local)
+#
+# AN TOÀN (SPEC §4):
+#   - Mọi cổng publish đều 127.0.0.1. Không mở cổng nào ra LAN/Internet. Đường vào duy nhất từ Internet = cloudflared.
+#   - Mạng: hostlink (game, có Internet ra cho cảnh báo Telegram + publish cổng localhost)
+#           edge     (internal, KHÔNG Internet): chỉ game + cloudflared. Cổng admin từ chối mọi nguồn trong dải này.
+#           cfout    (chỉ cloudflared, để ra Internet tới Cloudflare)
+#           backend  (internal, KHÔNG Internet): game + db + backup. cloudflared không tới được db.
+#   - Container: user không phải root, root FS chỉ đọc, tmpfs /tmp, no-new-privileges, cap_drop ALL, giới hạn CPU/RAM/PID,
+#     không docker.sock, không mount thư mục cá nhân. Bind mount DUY NHẤT: server/data/backups (dịch vụ backup ghi).
+#   - Ảnh gốc ghim theo digest. Nhật ký Docker xoay vòng 10 MB × 5.
+
+name: hpworld
+
+x-backup-script: &backup_script |
+  #!/bin/sh
+  # Sao lưu Postgres: pg_dump định dạng custom (-Fc, nén) → /backups/hp-YYYYmmdd-HHMMSS.dump; xoá bản > KEEP_DAYS ngày.
+  # Ghi /backups/last_ok.txt hoặc /backups/last_error.txt để trang-thai.ps1 / sao-luu.ps1 đọc.
+  set -u
+  umask 077
+  dump_once() {
+    ts=$$(date +%Y%m%d-%H%M%S)
+    tmp="/backups/.hp-$$ts.partial"
+    if pg_dump -Fc -Z 6 --no-owner -f "$$tmp" && [ -s "$$tmp" ]; then
+      mv "$$tmp" "/backups/hp-$$ts.dump"
+      echo "$$(date -Iseconds) hp-$$ts.dump $$(wc -c < "/backups/hp-$$ts.dump")" > /backups/last_ok.txt
+      rm -f /backups/last_error.txt
+      find /backups -maxdepth 1 -name 'hp-*.dump' -mtime +"$$KEEP_DAYS" -delete
+      find /backups -maxdepth 1 -name '.hp-*.partial' -mmin +120 -delete
+      echo "backup ok: hp-$$ts.dump"
+      return 0
+    fi
+    rm -f "$$tmp"
+    echo "$$(date -Iseconds) pg_dump failed" > /backups/last_error.txt
+    echo "backup FAILED" >&2
+    return 1
+  }
+  if [ "$${BACKUP_ONCE:-0}" = "1" ]; then dump_once; exit $$?; fi
+  echo "backup service: daily at $$BACKUP_AT ($$TZ), keep $$KEEP_DAYS days"
+  while :; do
+    now=$$(date +%s)
+    next=$$(date -d "today $$BACKUP_AT" +%s)
+    [ "$$next" -le "$$now" ] && next=$$(date -d "tomorrow $$BACKUP_AT" +%s)
+    sleep $$((next - now))
+    dump_once || sleep 600
+  done
+
+x-hardening: &hardening
+  read_only: true
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "5"
+
+services:
+  game:
+    <<: *hardening
+    build:
+      context: ..
+      dockerfile: server/Dockerfile
+    image: ${HPMP_IMAGE:-hpworld-game:local}
+    init: true
+    env_file:
+      - path: .env
+        required: true
+    environment:
+      NODE_ENV: production
+      IN_DOCKER: "true"
+      GAME_HOST: 0.0.0.0
+      GAME_PORT: "9100"
+      ADMIN_HOST: 0.0.0.0
+      ADMIN_PORT: "9101"
+      DB_DRIVER: pg
+      DB_URL: postgres://hp:${DB_PASSWORD:?thiếu DB_PASSWORD trong server/.env}@db:5432/hp
+      DB_POOL_MAX: "10"
+      DATA_DIR: /tmp/hpdata
+      # chỉ tới được cổng game qua 127.0.0.1 hoặc qua tunnel → tin header CF-Connecting-IP của Cloudflare
+      TRUST_PROXY: cloudflare
+      # cổng admin từ chối mọi yêu cầu đến từ mạng edge (cloudflared) và backend
+      ADMIN_DENY_CIDRS: ${HPMP_EDGE_SUBNET:-172.31.91.0/24},${HPMP_BACKEND_SUBNET:-172.31.92.0/24}
+    ports:
+      - "127.0.0.1:${HPMP_GAME_PORT:-9100}:9100"
+      - "127.0.0.1:${HPMP_ADMIN_PORT:-9101}:9101"
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    networks:
+      hostlink:
+        gw_priority: 10
+      edge: {}
+      backend: {}
+    depends_on:
+      db:
+        condition: service_healthy
+    cpus: 4
+    mem_limit: 2g
+    memswap_limit: 2g
+    pids_limit: 512
+    ulimits:
+      nofile: { soft: 16384, hard: 16384 }
+    stop_grace_period: 8s
+
+  db:
+    <<: *hardening
+    image: postgres:17@sha256:2d2b8998d31037bf721cfdf764d76ba74171b4fab3431b7f72c27c56ddbdf9e3
+    user: "999:999"
+    environment:
+      POSTGRES_USER: hp
+      POSTGRES_DB: hp
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?thiếu DB_PASSWORD trong server/.env}
+    command: ["postgres", "-c", "max_connections=40", "-c", "shared_buffers=128MB", "-c", "log_min_duration_statement=500", "-c", "listen_addresses=*"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    tmpfs:
+      - /tmp:size=256m,mode=1777
+      - /var/run/postgresql:size=1m,uid=999,gid=999,mode=0775
+    shm_size: 128m
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hp -d hp -h 127.0.0.1"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+    cpus: 2
+    mem_limit: 1g
+    memswap_limit: 1g
+    pids_limit: 256
+    stop_grace_period: 8s
+
+  # Cloudflare NAMED tunnel (tên miền riêng). Token chỉ nằm trong server/.env (TUNNEL_TOKEN). Ingress khoá cứng bên dưới:
+  # chỉ /play, /probe, /healthz, /v1/* tới game:9100; còn lại 404. Không bao giờ tới cổng admin 9101.
+  tunnel:
+    <<: *hardening
+    profiles: ["tunnel"]
+    # ảnh cloudflared ghim digest + file ingress server/ops/cloudflared/config.yml chép vào lúc build (không bind mount)
+    build:
+      context: ./ops/cloudflared
+    image: ${HPMP_TUNNEL_IMAGE:-hpworld-tunnel:local}
+    command: ["tunnel", "--config", "/etc/cloudflared/config.yml", "--metrics", "127.0.0.1:20241", "run"]
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:-}
+    networks:
+      - edge
+      - cfout
+    depends_on:
+      game:
+        condition: service_healthy
+    cpus: 0.5
+    mem_limit: 256m
+    memswap_limit: 256m
+    pids_limit: 128
+
+  # Tunnel TẠM (địa chỉ ngẫu nhiên *.trycloudflare.com, đổi mỗi lần bật) — để thử, không cần tên miền.
+  quicktunnel:
+    <<: *hardening
+    profiles: ["quicktunnel"]
+    image: cloudflare/cloudflared@sha256:4f6655284ab3d252b7f28fedb19fe6c8fc82ee5b1295c20ac74d475e5398a52d
+    command: ["tunnel", "--metrics", "127.0.0.1:20241", "--url", "http://game:9100"]
+    restart: "no"
+    networks:
+      - edge
+      - cfout
+    depends_on:
+      game:
+        condition: service_healthy
+    cpus: 0.5
+    mem_limit: 256m
+    memswap_limit: 256m
+    pids_limit: 128
+
+  # Sao lưu Postgres mỗi đêm (giờ VN), giữ 14 ngày. BACKUP_ONCE=1 = sao lưu ngay một lần rồi thoát (sao-luu.ps1).
+  backup:
+    <<: *hardening
+    profiles: ["backup"]
+    image: postgres:17@sha256:2d2b8998d31037bf721cfdf764d76ba74171b4fab3431b7f72c27c56ddbdf9e3
+    user: "999:999"
+    init: true
+    entrypoint: ["/bin/sh", "-c"]
+    command: [*backup_script]
+    environment:
+      PGHOST: db
+      PGUSER: hp
+      PGDATABASE: hp
+      PGPASSWORD: ${DB_PASSWORD:?thiếu DB_PASSWORD trong server/.env}
+      BACKUP_AT: ${BACKUP_AT:-03:15}
+      KEEP_DAYS: ${BACKUP_KEEP_DAYS:-14}
+      TZ: Asia/Ho_Chi_Minh
+    volumes:
+      - ./data/backups:/backups
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    networks:
+      - backend
+    depends_on:
+      db:
+        condition: service_healthy
+    cpus: 0.5
+    mem_limit: 256m
+    memswap_limit: 256m
+    pids_limit: 64
+
+networks:
+  hostlink:
+    driver: bridge
+  edge:
+    driver: bridge
+    internal: true
+    ipam:
+      config:
+        - subnet: ${HPMP_EDGE_SUBNET:-172.31.91.0/24}
+  cfout:
+    driver: bridge
+  backend:
+    driver: bridge
+    internal: true
+    ipam:
+      config:
+        - subnet: ${HPMP_BACKEND_SUBNET:-172.31.92.0/24}
+
+volumes:
+  pgdata: {}
