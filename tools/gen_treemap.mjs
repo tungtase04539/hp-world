@@ -2,7 +2,7 @@
 // → js/treemap.js: mỗi pano 1 dòng số nguyên nhỏ cho bộ trồng cây (js/trees.js) tra "loài nào, cắt cụt bao nhiêu,
 // dày/thưa" quanh điểm trồng. Chạy từ GỐC repo: node tools/gen_treemap.mjs
 //
-// Định dạng PANO_VEG (phẳng, 21 số/pano): X, Z (×10, nguyên), rồi:
+// Định dạng PANO_VEG (phẳng, 23 số/pano — Đ3-W5-C: 21 → 23): X, Z (×10, nguyên), rồi:
 //   [2..8]  wXacu, wBang, wPhuong, wSau, wBangLang, wCau, wDa  — trọng số loài (0 = không nhắc tới)
 //   [9]     pollard (0..9 → tỉ lệ cây cắt cụt; = max(polS, polP) — giữ cho tương thích)
 //   [10]    young (cây non chống cọc), [11] density (0 không cây … 3 rợp),
@@ -18,6 +18,10 @@
 //           2 = CHỈ cau/cọ (hàng cau đầu cầu pano_074, không nêu loài cây gỗ nào và không nêu cây bóng mát ở bất kỳ vế nào),
 //           3 = CAU DẪN ĐẦU (vế đầu chỉ cau/cọ, "cây bóng mát/tán rộng" nêu ở vế sau — Hồ Sen 320/322, HVT 217/218/220)
 //   [20]    lean — cây "nghiêng" (ven hồ pano_033: "tán rộng nghiêng theo gió")
+//   ---- Đ3-W5-C (LIFE-GREEN): 23 số/pano ----
+//   [21]    garden — cây trong VƯỜN/SÂN biệt thự/khuôn viên SAU RÀO (538 "cau vua và cây cảnh trong sân biệt thự sau rào", 271/065):
+//           audit vegetation HOẶC fp_json trees ≥ 1 hướng → trees.js trồng cây sân sau tường rào RB_PARCELS dày hơn
+//   [22]    vines — dây leo/giàn hoa/hoa giấy trên tường-ban công (203/184/506) — để dành (chưa dùng ở trees.js)
 // Heuristic từ khoá tiếng Việt — đếm kiểm ở cuối (in ra console), không hoàn hảo nhưng TẤT ĐỊNH.
 import fs from 'fs';
 
@@ -134,7 +138,13 @@ for (const e of src) {
     if (y2 > young) { young = y2; cnt.fpYoung++; }
     if (!lean && fp.lean >= 2) { lean = 1; cnt.fpLean++; }
   }
-  out.push([Math.round(e.X * 10), Math.round(e.Z * 10), ...w, pollard, young, density, wash, generic, thin, polS, polP, tunnel, topiary, palm, lean]);
+  // Đ3-W5-C: vườn/sân sau rào + dây leo (audit vegetation + fp_json trees — tools/fp_nature.json cột garden/vines)
+  let garden = has(v, /vườn (biệt thự|nhà|cây cảnh)|sân (biệt thự|nhà|trường|trong)|trong sân|trong khuôn viên|khuôn viên (biệt thự|cơ quan|trường)|sau (hàng )?(rào|tường|cổng)/) ? 1 : 0;
+  let vines = has(v, /dây leo|cây leo|giàn (cây|hoa|leo)|hoa giấy|bougainvillea|leo tường|leo ban công/) ? 1 : 0;
+  if (fp && fp.garden >= 1) garden = 1;
+  if (fp && fp.vines >= 1) vines = 1;
+  cnt.garden = (cnt.garden || 0) + garden; cnt.vines = (cnt.vines || 0) + vines;
+  out.push([Math.round(e.X * 10), Math.round(e.Z * 10), ...w, pollard, young, density, wash, generic, thin, polS, polP, tunnel, topiary, palm, lean, garden, vines]);
   cnt.n++; if (density === 0) cnt.none++; if (density === 1) cnt.sparse++; if (density === 3) cnt.dense++;
   if (pollard) cnt.pollard++; if (young) cnt.young++; if (wash) cnt.wash++; if (generic) cnt.generic++; if (thin) cnt.thin++;
   if (polS) cnt.polS++; if (polP) cnt.polP++; if (tunnel) cnt.tunnel++; if (topiary) cnt.topiary++; if (palm === 1) cnt.palmNo++; if (palm === 2) cnt.palmOnly++; if (palm === 3) cnt.palmLead++; if (lean) cnt.lean++;
@@ -142,9 +152,9 @@ for (const e of src) {
 }
 const flat = out.flat();
 const txt = '// SINH TỰ ĐỘNG bởi tools/gen_treemap.mjs từ audit/audit_enriched.json — ĐỪNG SỬA TAY.\n'
-  + '// Thảm cây quanh 551 pano thật: 21 số/pano = X·10, Z·10, wXacu, wBang, wPhuong, wSau, wBangLang, wCau, wDa,\n'
-  + '// pollard, young, density(0..3), wash, generic, thin, polS, polP, tunnel, topiary, palm, lean — xem đầu tools/gen_treemap.mjs.\n'
-  + 'export const PANO_VEG_STRIDE = 21;\n'
+  + '// Thảm cây quanh 551 pano thật: 23 số/pano = X·10, Z·10, wXacu, wBang, wPhuong, wSau, wBangLang, wCau, wDa,\n'
+  + '// pollard, young, density(0..3), wash, generic, thin, polS, polP, tunnel, topiary, palm, lean, garden, vines — xem đầu tools/gen_treemap.mjs.\n'
+  + 'export const PANO_VEG_STRIDE = 23;\n'
   + 'export const PANO_VEG = [' + flat.join(',') + '];\n';
 fs.writeFileSync('js/treemap.js', txt);
 console.log('js/treemap.js', txt.length, 'byte', JSON.stringify(cnt));

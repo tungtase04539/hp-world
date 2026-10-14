@@ -7,6 +7,10 @@
 //   young  cây non/mới trồng/chống cọc/khung kiềng · lean cây nghiêng/thân xiên · sparse tán thưa/trụi · dense tán rậm/rợp
 //   bikeDense hàng xe máy đỗ dày/kín/nhiều · bikeFew ít/không xe máy · bikeCover xe máy phủ bạt/áo trùm
 //   goods hàng hoá/sạp bày hè · stools ghế nhựa/bàn ghế quán · plants chậu cây/cây cảnh · wires dây điện chằng chịt/búi
+//   ---- Đ3-W5-C (LIFE-GREEN, thêm CUỐI — bộ đọc tra cột theo TÊN nên cột cũ giữ nguyên) ----
+//   umbRed ô/dù ĐỎ (quán cà phê/trà 267 "ô đỏ lớn che quán") · cafe quán cà phê/trà/bàn ghế ngoài trời · crowd đông người/khách
+//   đông (chợ 446/460, 469 "khách đông vỉa hè") · market chợ/sạp/phố chợ (trường street) · garden cây trong VƯỜN/sân biệt thự/
+//   khuôn viên sau rào (trường trees: 538/271) · vines dây leo/giàn hoa/hoa giấy trên tường-ban công (203/184/506)
 //
 // Chạy (từ gốc repo): node tools/gen_fp_nature.mjs [--fp <thư mục fp_json>]   → ghi tools/fp_nature.json
 // rồi chạy lại: node tools/gen_treemap.mjs && node tools/gen_props_evidence.mjs
@@ -38,6 +42,13 @@ const R = {
   stools: /stools?|plastic chairs?|café tables|cafe tables|ghế nhựa|ghế đẩu|bàn ghế/,
   plants: /potted|plant pots?|pot plants|chậu cây|chậu hoa|cây cảnh|bonsai/,
   wires: /tangled|bundles?|dense wires|messy wires|chằng chịt|búi|rối/,
+  // Đ3-W5-C — "ô/dù đỏ" (không "ô tô đỏ": chữ ô phải đứng trước dù/che/lớn/quán hoặc là "ô đỏ" không kèm tô)
+  umbRed: /(red|đỏ)[^,;.]{0,14}(umbrellas?|parasols?|dù)|(umbrellas?|parasols?)[^,;.]{0,10}red|dù[^,;.]{0,6}đỏ|(?<!xe )ô (lớn )?đỏ/,
+  cafe: /café|cafe|cà phê|coffee|trà (đá|chanh|sữa|cúc)|quán (nước|trà)|outdoor (seating|tables)|terrace|bàn ghế quán|quán vỉa hè|cafe seating/,
+  crowd: /đông người|người đông|khách đông|đông đúc|đông khách|chen chúc|nhiều người|crowd|crowded|many people|lots of people|shoppers|busy with people/,
+  market: /chợ|market|stalls?|sạp/,
+  garden: /vườn|sân (biệt thự|nhà|trường|trong)|trong sân|khuôn viên|sau (hàng )?(rào|tường)|garden|yard|courtyard|behind (the )?(fence|wall|gate)|compound/,
+  vines: /dây leo|cây leo|giàn (cây|hoa|leo)|hoa giấy|bougainvillea|creepers?|vines?|climbing|trailing plants/,
   // phản biện W4-B: "xe máy chạy dày/đông" (pano_177/435 — ngã tư, xe ĐANG CHẠY/dừng đèn đỏ) ≠ hàng xe ĐỖ → mệnh đề nói xe
   // chạy/lưu thông mà không nói đỗ/đậu/dựng thì không tính bikeDense
   // ("xe máy ô tô đông" ở đại lộ 435, "xe máy đông dày trên đường" 172 = dòng xe; "đông" không kèm từ đỗ/vỉa → dòng xe)
@@ -46,7 +57,8 @@ const R = {
 };
 // bikeDense theo MỆNH ĐỀ: bỏ mệnh đề chỉ nói xe đang chạy
 const bikeDenseOf = (S) => S.split(/[,;.]/).some((c) => R.bikeDense.test(c) && (!R.moving.test(c) || R.parked.test(c)));
-const COLS = ['young', 'lean', 'sparse', 'dense', 'bikeDense', 'bikeFew', 'bikeCover', 'goods', 'stools', 'plants', 'wires'];
+const COLS = ['young', 'lean', 'sparse', 'dense', 'bikeDense', 'bikeFew', 'bikeCover', 'goods', 'stools', 'plants', 'wires',
+  'umbRed', 'cafe', 'crowd', 'market', 'garden', 'vines'];
 const per = new Map();
 let files = 0, bad = 0;
 for (const f of fs.readdirSync(DIR).filter((x) => x.endsWith('.json')).sort()) {
@@ -59,7 +71,8 @@ for (const f of fs.readdirSync(DIR).filter((x) => x.endsWith('.json')).sort()) {
   a.n++;
   for (const k of ['young', 'lean', 'sparse', 'dense']) if (R[k].test(T)) a.c[k]++;
   if (bikeDenseOf(S)) a.c.bikeDense++;
-  for (const k of ['bikeFew', 'bikeCover', 'goods', 'stools', 'plants', 'wires']) if (R[k].test(S)) a.c[k]++;
+  for (const k of ['bikeFew', 'bikeCover', 'goods', 'stools', 'plants', 'wires', 'umbRed', 'cafe', 'crowd', 'market']) if (R[k].test(S)) a.c[k]++;
+  for (const k of ['garden', 'vines']) if (R[k].test(T)) a.c[k]++;
 }
 const rows = [];
 for (const [id, a] of [...per.entries()].sort()) {

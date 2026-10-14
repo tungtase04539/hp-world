@@ -12,9 +12,11 @@
 //   spill   bit 1 ô dù bán hàng · 2 bạt/lều bạt · 4 hàng hoá bày lấn hè · 8 dù/bàn ghế quán cà phê · 16 xe máy trưng bày
 //           · 32 nội thất/đồ thờ/két · 64 đồ chơi · 128 trái cây/rau/mẹt rổ · 256 giá treo quần áo/ma-nơ-canh
 //           · 512 chậu cây cảnh · 1024 hoa tươi
+//           · 2048 HIÊN QUÁN cà phê/trà (dãy bàn ghế + ô lớn trên vỉa hè — Đ3-W5-C) · 4096 ô/dù quán màu ĐỎ (267 Trà Cúc)
 //   deco    bit 1 cờ treo nhà/dãy cờ · 2 băng rôn căng ngang phố · 4 cổng chào · 8 lan can/hàng rào trắng con tiện
 //           · 16 hàng rào sắt · 32 xe khách đỗ thành dãy · 64 ô tô phủ bạt · 128 xe ba gác · 256 xe đạp dựng
 //           · 512 trạm biến áp/tủ điện lớn dưới đất · 1024 xe máy phủ bạt/áo trùm (Đ3-W4-B)
+//           · 2048 ĐÔNG NGƯỜI (chợ/quán/vỉa hè đông khách — Đ3-W5-C)
 // Chợ theo OSM (amenity=marketplace, osm_landuse.json — Overpass mục 12 của fetch_osm.sh) NHÚNG SẴN dưới đây
 // (OSM_MARKETS, toạ độ game, làm tròn 0,1 m) để bộ sinh tự đủ (tools/osm_*.json bị gitignore, máy khác có thể thiếu).
 // Làm mới danh sách: node tools/gen_props_evidence.mjs --osm tools/osm_landuse.json  (in ra mảng mới để dán vào đây).
@@ -54,7 +56,7 @@ const low = (s) => (s || '').toString().toLowerCase();
 const rows = [];
 const stat = { bike: [0, 0, 0, 0], car: [0, 0, 0], pole: [0, 0, 0], lamp: [0, 0, 0, 0], clutter: {}, market: [0, 0, 0, 0], spill: {}, deco: {} };
 // Đ3-W4-B: tóm tắt facade fingerprints (tools/gen_fp_nature.mjs) — không có file → như cũ
-const FPN = new Map(), fpStat = { bike: 0, cover: 0, goods: 0, stools: 0, plants: 0, wires: 0 };
+const FPN = new Map(), fpStat = { bike: 0, cover: 0, goods: 0, stools: 0, plants: 0, wires: 0, terrace: 0, red: 0, crowd: 0 };
 try { const J = JSON.parse(fs.readFileSync('tools/fp_nature.json', 'utf8')); const c = J.cols; for (const r of J.rows) FPN.set(r[0], Object.fromEntries(c.map((k, i) => [k, r[i]]))); } catch (e) { /* không có fp */ }
 for (const e of j) {
   if (e.X == null || e.Z == null) continue;
@@ -142,6 +144,10 @@ for (const e of j) {
   // Đ3-W4-B: XE MÁY phủ bạt/áo trùm (004 "có xe phủ bạt trắng", 107, 239 "một chiếc phủ bạt xanh") — "xe máy" đứng trước trong
   // cùng mệnh đề (không qua . ; |): "ô tô con … xe phủ bạt bạc" (445) là ô tô (bit 64), không phải xe máy
   if (/xe máy[^.;|]{0,40}(phủ bạt|trùm bạt|áo trùm|bạt phủ|che bạt)|(phủ bạt|trùm bạt)[^.;|]{0,16}xe máy/.test(all)) deco |= 1024;
+  // Đ3-W5-C: HIÊN QUÁN (spill 8 = audit thấy dù/bàn ghế quán) + Ô ĐỎ + ĐÔNG NGƯỜI (audit; fp nâng ở dưới)
+  if (sp & 8) sp |= 2048;
+  if (/(ô\/?dù|(?<!mặc )dù|(?<!xe )ô (che|lớn))[^.;|]{0,12}đỏ|(dù|ô) đỏ/.test(mk)) sp |= 4096;
+  if (/đông người|người (mua bán |đi bộ )?đông|khách đông|đông khách|đông đúc|chen chúc|nhiều người (đi bộ|mua|qua lại|ngồi)|người mua bán/.test(all)) deco |= 2048;
   // Đ3-W4-B: bằng chứng THEO HƯỚNG từ facade fingerprints (tools/fp_nature.json, trường "street" ~6 ảnh/pano) — CHỈ NÂNG:
   // hàng xe máy dày ≥ 2 hướng → mức 3, ≥ 1 hướng (không hướng nào nói "ít/không xe máy") → ≥ 2; xe máy phủ bạt → deco 1024;
   // hàng hoá bày ≥ 2 → spill 4; ghế nhựa/bàn ghế quán ≥ 2 → clutter 1; chậu cây ≥ 1 → spill 512; dây chằng chịt ≥ 2 (pano
@@ -156,12 +162,16 @@ for (const e of j) {
     if (fp.stools >= 2 && !(cl & 1)) { cl |= 1; fpStat.stools++; }
     if (fp.plants >= 1 && !(sp & 512)) { sp |= 512; fpStat.plants++; }
     if (fp.wires >= 2 && pole === 1) { pole = 2; fpStat.wires++; }
+    // Đ3-W5-C: quán cà phê/trà ≥ 2 hướng + ô đỏ ≥ 1 hướng → hiên quán; ô đỏ ≥ 1 hướng (pano có quán/ô) → màu đỏ; đông người ≥ 1
+    if (!(sp & 2048) && fp.cafe >= 2 && fp.umbRed >= 1) { sp |= 2048; fpStat.terrace++; }
+    if (!(sp & 4096) && fp.umbRed >= 1 && (sp & (1 | 8 | 2048))) { sp |= 4096; fpStat.red++; }
+    if (!(deco & 2048) && fp.crowd >= 1) { deco |= 2048; fpStat.crowd++; }
   }
   rows.push([Math.round(e.X * 10) / 10, Math.round(e.Z * 10) / 10, bike, car, pole, lamp, cl, market, sp, deco]);
   stat.bike[bike]++; stat.car[car]++; stat.pole[pole]++; stat.lamp[lamp]++; stat.market[market]++;
   for (let b = 0; b < 6; b++) if (cl & (1 << b)) stat.clutter[1 << b] = (stat.clutter[1 << b] || 0) + 1;
-  for (let b = 0; b < 11; b++) if (sp & (1 << b)) stat.spill[1 << b] = (stat.spill[1 << b] || 0) + 1;
-  for (let b = 0; b < 11; b++) if (deco & (1 << b)) stat.deco[1 << b] = (stat.deco[1 << b] || 0) + 1;
+  for (let b = 0; b < 13; b++) if (sp & (1 << b)) stat.spill[1 << b] = (stat.spill[1 << b] || 0) + 1;
+  for (let b = 0; b < 12; b++) if (deco & (1 << b)) stat.deco[1 << b] = (stat.deco[1 << b] || 0) + 1;
 }
 const head = `// SINH TỰ ĐỘNG bởi tools/gen_props_evidence.mjs từ ${SRC} — ĐỪNG SỬA TAY.\n` +
   `// [X, Z, bike 0-3, car 0-2, pole 0-2, lamp bits (1 cao áp, 2 cổ điển), clutter bits (1 ghế nhựa, 2 xe đẩy, 4 thùng rác,\n` +
