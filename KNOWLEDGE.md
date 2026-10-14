@@ -321,7 +321,6 @@ node process_osm.mjs     # sinh ../js/mapdata.js + mask_debug.png + log kiểm t
   Nhà THẬT cắt theo `flR = min(facadeLine(way), facadeLine(cấp))` (corridorClip/streetIntrusion/streetGuard: Overture đứng
   đúng chỗ dù nằm trong vỉa của way rộng), nhà SINH theo `facadeLine(way)`. Sửa `js/anchorwalls.js` (CB_WALLS) → cũng chạy lại
   process_buildings (nhà sau tường mỏ neo bị cắt + cờ cbIn).
-- `js/roadmarks.js` SINH bởi `node tools/gen_roadmarks.mjs` (chạy từ GỐC repo; đọc `audit/audit_enriched.json`) — không sửa tay.
 - `js/roadmarks.js` SINH bởi `node tools/gen_roadmarks.mjs` (chạy từ GỐC repo; đọc `audit/audit_enriched.json`,
   `tools/pano_loop/mark_labels.json` (nhãn vạch tim nhìn ảnh — thêm nhãn ở đây), `tools/pano_loop/list_full_551.json`,
   `tools/osm_crossings.json` = fetch_osm.sh mục 13 (thiếu → giữ mảng OSM cũ)) — không sửa tay.
@@ -454,6 +453,46 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-10-14 (Đ3-W3 TÍCH HỢP)** [ĐỢT 3 WAVE 3 — gộp 7 nhánh W3-A…G lên `dot3` (bc07df5), nhánh `worktree-wf_c558a007-52e-1`]:
+    **Gộp (--no-ff, thứ tự A, B, F, D, C, E, G):** A e3a6579 · B 90c12c3 · F 1b16009 · D cc496fa · C 479adc8 · E cad6ba0 · G 9bcabd9.
+    **Xung đột + cách giải (giữ ý CẢ HAI bên):** (B×A) citygen: giữ CẢ luật NOSIGN_ST rc 3 của A lẫn luật PK (bit 6-7) của B;
+    world.js import hợp (fabricHit + parcels + propLineShift); process_buildings giữ `SYN_CAM` 6 của A (B từng lùi về 3) + khối
+    PEV/STREET_SHOP của B; kiểu/công năng: luật `cbIn` của A đứng TRƯỚC luật khuôn viên pano của B → mỗi nhà chỉ theo MỘT luật
+    khuôn viên. (F×A) roadgraph line object = `{c, w, sw, ri, kind, hw, lvl, cutA, pts[x,z,y]}`, cạnh `hw: l.hw (mặt cầu) ||
+    roadHW(l) || 2,75`, `sw: sidewalkW(l)`; roadnet way = `{ri, si, c, pts, cut, hw: roadHW(r), sw: sidewalkW(r)}`; process_osm giữ
+    `id` (F) + ROADS_LEGACY/simplify 3 m (A). **NGHĨA VỤ F (11)(e) đã làm:** riverbank `hw/sw/keClear` và lan can cầu phẳng
+    bridges.js nhận WAY (đoạn mang `w/sw`) — world.js truyền `XS_HW/XS_SW` (nhận cấp HOẶC way); process_osm §6b3 `clearOf(way)` =
+    max(7, roadHW(way) + sidewalkW(way) + 2,5) (cầu phố Bạch Đằng ri 52 w 16,4/sw 5,5: lan can ở 13,7 m = mép vỉa roadnet vẽ, bản
+    theo cấp đặt 10,1 m — giữa vỉa hè). (D×F) dải roadnet tách vạch qua đường giữa khối của D + seed `w.si` của F. (C×A) groundModule
+    JS/GL2/GL1: bộ RS 7-12 + RS.CONS/FIXED_G của C VÀ rc 3 + CIVIC/GLASS/SHED → G_CIVIC/G_WARE của A; luật "cạnh nâng/dãy gộp
+    rc 3" so `NOSIGN_ST(rs)` (styF của C mang tuổi/biển lớn ở bit 4-6 — so styF thô là SAI); **BẪY:** renderStyles của C đổi
+    CIVIC→NEO, GLASS→MODERN/TOWER theo bằng chứng/vùng → nhà khuôn viên Hải quân (dữ liệu CIVIC/GLASS/SHED + USE_HOME) mất luật
+    không biển → nay renderStyles GIỮ chúng trong bộ NOSIGN (TOWER/MODERN → GLASS, còn lại → CIVIC; `stats.nosignKeep`);
+    roadGrid seg[6] (vỉa, exposedSide của C) = `sidewalkW(way)`. (E×A) 6 khúc props.js lấy bản E (công thức đã kiểm của E), thân
+    `XS(S)` đổi sang `roadHW/sidewalkW/curbLine/parkingLine/furnitureLine/facadeLine(S)` (S mang w/sw). (G×F) trees `fix` =
+    `{moved, road, fp, dup, pano, deck, hero}` + HEROQ; cây non dải dạo ven sông (F) trồng `{pit:1, wash:0, exact:1}` (G).
+    KNOWLEDGE (merge=union) có 1 dòng §7 roadmarks bị nhân đôi → bỏ bản cũ.
+    **Sinh lại (chạy 2 lần, cùng byte):** process_osm → mapdata (ROADS_DT 1.425 way, cấp/thứ tự = dot3, y hệt nhánh A; chỉ WATER/
+    BEACHES khác nhánh F do clearOf theo way; 12 BRIDGE_WAYS, đầu mút ROADS_DT ≤ 0,62 m khỏi way cầu → deckRoads vẫn khớp) →
+    process_buildings (43.226 nhà — dot3 46.128, A 44.180, B 45.001; drop_water 86; cbIn 59; RB_PARCELS 356 rào/157 cổng; md5
+    e9cb8163) → gen_facade_evidence / gen_shopsigns / gen_roadmarks (cần tools/osm_crossings.json, chép từ worktree D) /
+    gen_treemap / gen_props_evidence: KHÔNG đổi so với bản gộp. gen_landuse không chạy (tools/osm_landuse.json không có trên
+    máy; không nhánh nào đổi đầu vào của nó).
+    **Cổng (2026-10-14, tier 3, ANGLE Radeon 890M D3D11):** node --check 98 file js/tools OK · waterbfs 5/5 · check_assets ĐỦ ·
+    xsec (dữ liệu) 63,1 % trong ±1,5 m / tooClose 399 / tooFar 279 / sai số TB 2,53 m (nhánh A: 58,1 / 493 / 277 / 2,98) ·
+    clearance trình duyệt (--gpu) cam vi phạm 32 (dot3 cùng phiên 35), gần < 3 m 7 (dot3 36), trên nhựa 39 (53), lấn vỉa 81 (72)
+    · diag full "TẤT CẢ THỰC THỂ OK — 0 lỗi JS" (giao thông: overlap 1 — xem dưới) · diag lite OK 0 lỗi, mọi bất biến 0 · mobile
+    OK 0 lỗi · shoot std ×2 + 12 khung kiểm chéo + --gl1 (webgl2 false): 0 lỗi JS (assets_lite ghim 8b8e42c được giải nén vào
+    worktree nên KHÔNG có 404). Mắt: khuôn viên Hải quân 224/225 h270 không biển (cả GL1), Bạch Đằng/HVT/bờ kè/hero đa đúng.
+    **Perf cùng phiên (std ×2 xen kẽ, dot3 :8602 vs tích hợp :8601):** hpReady 4.327 → 4.949 ms (+622, +14 %); heap 375 → 393 MB;
+    bước khởi động ground 533→694, fabric 696→894, final 474→672, freeze 160→267, furniture 30→72, nature 112→135, landmarks
+    288→180 (C), shaders 375→327; std 24 khung: fps 60,2/60,2 (chạm trần), calls 368 → 381 (+3,5 %), tris 2,87 → 2,98 M (+4 %).
+    Cộng dồn khớp số từng WP (F ~0,17-0,19 s, C fabric +133, D furniture/freeze, B parcels, E/A final) — CHƯA tối ưu ở bước gộp.
+    **Còn lại:** (1) giao thông diag overlap = 1 lặp lại ở (259,110): phố chợ r ri 60 (lòng 5,5 m) có sạp/ô `umb`/`stall` của E
+    lấn dải lòng 2 bên → xe 2 chiều chen nhau ở giữa (tạm thời, 0 ở mẫu sau); dot3 0. (2) Khung `cam_spawn` (khung đầu tiên):
+    phố trước Nhà hát ri 378 nay lòng 14 m, tim dịch ~5 m về phía Nhà hát (W3-A street_fit; nhánh A chụp y hệt) → nửa dưới khung
+    là lòng nhựa thay vì quảng trường. (3) Biển "BOX VIETNAM" (400 h180), "TOP FOOTBALL" (088 h180) từ bộ biển C — nên rà thương
+    hiệu bằng mắt. (4) Mọi known issue của 7 WP giữ nguyên (xem các mục W3-* dưới).
 - **2026-10-06 → 10-14 (W3-A STREET-GEOMETRY, phiên 1-5)** [ĐỢT 3 WAVE 3 — MẶT CẮT PHỐ THẬT + TIM ĐƯỜNG KHỚP CAMERA (AUDIT3 FP-1)]:
     **Vấn đề (AUDIT3, 120 pano):** CAMNEAR 44 pano (mặt tiền 1-6 m; camera kẹt trong khối 487/115), điểm TB pano lệch tim
     ≥ 3 m chỉ 3,07; 4 cơ chế cộng dồn: bề rộng lòng CHỈ theo cấp (r 5,5 → mặt tiền 4,75 m), snapFront kéo nhà thật ≤ 7,2 m
