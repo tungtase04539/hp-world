@@ -755,6 +755,16 @@ export function trunkNear(x, z, r) {
   }
   return false;
 }
+// Đ3-W5-C (phản biện): có gốc cây nào trong HÌNH VUÔNG nửa cạnh h (trục ux,uz / pháp tuyến) quanh (x,z)? — tán ô vuông hiên quán
+// 2,15-2,5 m không được bị thân cây xuyên (props/streetlife: dù vuông v4)
+export function trunkInSq(x, z, ux, uz, h) {
+  const r = h * 1.42, i0 = Math.floor((x - r) / 4), i1 = Math.floor((x + r) / 4), j0 = Math.floor((z - r) / 4), j1 = Math.floor((z + r) / 4);
+  for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) {
+    const a = _trunkGrid.get(i * 100003 + j); if (!a) continue;
+    for (let q = 0; q < a.length; q += 2) { const dx = a[q] - x, dz = a[q + 1] - z; if (Math.abs(dx * ux + dz * uz) < h && Math.abs(dz * ux - dx * uz) < h) return true; }
+  }
+  return false;
+}
 // kind: tên loài | 'shade' | 'street' | 'park'. o: {h (cao m), r (bán kính tán m), bloom (BỎ từ W2-B: hoa theo LỊCH), wash (0/1), pit (0 không,
 // 1 ô vuông), hero (biến thể GLB 0..2), yaw, variant (chỉ số kit trong loài), sz (hệ số cỡ theo cấp phố), full (độ kín tán 0..1),
 // median (1 = cây dải phân cách, miễn kiểm lòng đường), exact (1 = giữ ĐÚNG loài/dáng: bỏ qua luật bằng chứng W3-G — đổi
@@ -1087,6 +1097,26 @@ function plantHeroSpots(ctx, RI, fp, inLM, BLOCK) {
 // trong 45 m quanh pano RỢP (treemap dens 3 + vòm cây/cây bóng mát chung) → cây ở MÉP ngõ (hw + 0,6 m) nơi có KHE trống (sân
 // trước, khe giữa 2 nhà, bờ rào — gốc không vào nhà thật/lòng ngõ/đường khác), nhịp 8,5-12,5 m, 1 bên (40% cả 2 bên), cây VÒM
 // (tán to mép thấp vươn ra ngõ). Ngõ khu dân cư kín nhà thì tự không có chỗ → không trồng.
+// Đ3-W5-C (phản biện): LỐI CỔNG RB_PARCELS — cổng [x,z,góc,rộng,…] (trục tường = (cos góc, sin góc); khe tường cắt lúc chạy)
+// → hành lang lối xe vào: |dọc tường| < rộng/2 + 1,5 m và |sâu| < 8 m cả 2 phía — cây sân/cây ngõ không đứng giữa lối cổng
+let _gateG = null;
+function inGateLane(x, z) {
+  if (!_gateG) {
+    _gateG = new Map();
+    for (const g of (RBM.RB_PARCELS && RBM.RB_PARCELS.gates) || []) {
+      const R = g[3] / 2 + 8.5;
+      for (let i = Math.floor((g[0] - R) / 16); i <= Math.floor((g[0] + R) / 16); i++) for (let j = Math.floor((g[1] - R) / 16); j <= Math.floor((g[1] + R) / 16); j++) {
+        const k = i * 100003 + j; let a = _gateG.get(k); if (!a) _gateG.set(k, (a = [])); a.push(g);
+      }
+    }
+  }
+  const a = _gateG.get(Math.floor(x / 16) * 100003 + Math.floor(z / 16)); if (!a) return false;
+  for (const g of a) {
+    const ux = Math.cos(g[2]), uz = Math.sin(g[2]), dx = x - g[0], dz = z - g[1];
+    if (Math.abs(dx * ux + dz * uz) < g[3] / 2 + 1.5 && Math.abs(dz * ux - dx * uz) < 8) return true;
+  }
+  return false;
+}
 function plantLaneTrees(ctx, RI, fp, inLM, BLOCK, nearProp, blockedByRoad, st) {
   const { ROADS_DT, groundHeightNoDeck, isWater } = ctx;
   const R = ctx.R || 1600, LAND = ctx.landH ?? 2;
@@ -1109,7 +1139,7 @@ function plantLaneTrees(ctx, RI, fp, inLM, BLOCK, nearProp, blockedByRoad, st) {
           if (tx * tx + tz * tz > R * R || nearPano(tx, tz, PANO_CLEAR) || trunkNear(tx, tz, 4.2)) continue;
           if (Math.abs(groundHeightNoDeck(tx, tz) - LAND) > 0.35 || isWater(tx, tz)) continue;
           if (blockedByRoad(tx, tz, ri, i) || onCarriage(tx, tz) || !free(tx, tz)) continue;
-          if (inLM(tx, tz, 2.5) || (ctx.keepClear && ctx.keepClear(tx, tz)) || claimAt(tx, tz, BLOCK) || nearProp(tx, tz)) continue;
+          if (inLM(tx, tz, 2.5) || (ctx.keepClear && ctx.keepClear(tx, tz)) || claimAt(tx, tz, BLOCK) || nearProp(tx, tz) || inGateLane(tx, tz)) continue;
           const { sp } = resolveSpecies(tx, tz, 'shade', -1);
           plant(SP_NAME[sp], tx, tz, { pit: 0, wash: hxz(tx, tz, 405) < 0.3 ? 1 : 0, sz: 0.85, tun: 1, src: 5 });
           ctx.addCollider && ctx.addCollider(tx, tz, 0.5);
@@ -1133,7 +1163,7 @@ function plantYardTrees(ctx, RI, fp, inLM, BLOCK, nearProp, st) {
   const ring = (x, z, r) => { for (let q = 0; q < 6; q++) { const a = q * Math.PI / 3; if (fp.at(x + Math.cos(a) * r, z + Math.sin(a) * r) >= 0) return false; } return true; };
   const yardOk = (x, z) => x * x + z * z < R * R && !nearPano(x, z, PANO_CLEAR) && !trunkNear(x, z, 4.0)
     && Math.abs(groundHeightNoDeck(x, z) - LAND) < 0.35 && !isWater(x, z) && !RI.nearRoad(x, z, 1.5) && !onCarriage(x, z)
-    && fp.at(x, z) < 0 && ring(x, z, 1.4) && !inLM(x, z, 3) && !(ctx.keepClear && ctx.keepClear(x, z)) && !claimAt(x, z, BLOCK) && !nearProp(x, z);
+    && fp.at(x, z) < 0 && ring(x, z, 1.4) && !inLM(x, z, 3) && !(ctx.keepClear && ctx.keepClear(x, z)) && !claimAt(x, z, BLOCK) && !nearProp(x, z) && !inGateLane(x, z);
   let n = 0, nPalm = 0;
   for (const w of PW) {
     if (w[0] === 2 || w[0] === 3) continue;   // rào tôn công trường / tường lô đất trống — không phải sân vườn

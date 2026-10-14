@@ -575,6 +575,7 @@ export function placeStreetLife(P) {
         const sc = lv === 3 ? 0.95 + hash3(x, z, 305) * 0.3 : 0.85 + hash3(x, z, 305) * 0.3;
         const v = hash3(x, z, 307) < 0.15 ? 1 : 0;   // 1 = ô vuông (nửa đường chéo 1,63 m — góc xoay ngẫu nhiên)
         if (!okAt(S, x, z, (v ? UMB_SQ_R : UMB_R) * sc) || obst.hit(x, z, 0.9)) return false;
+        if (P.poleInRect && P.poleInRect(x, z, S.ux, S.uz, UMB_R * sc * 0.8, UMB_R * sc * 0.8)) return false;   // cột điện/đèn xuyên tán (phản biện W5-C)
         overI.push({ x, z, heading: hash3(x, z, 306) * 6.28, v, col: pick(UMB, hash3(x, z, 308)), sc: [sc, 0.92 + hash3(x, z, 309) * 0.16, sc] });
         obst.add(x, z, 0.05); st.umbrellas++; placed++;
         // phố chợ dày: ô thứ 2 chồng mép (rừng ô) trên dải lòng đường
@@ -594,7 +595,8 @@ export function placeStreetLife(P) {
         const [xm, zm] = P2(X.fac - depth * 0.5);
         const [xf, zf] = P2(X.fac - depth + 0.05);
         if (!rectClear(xm, zm, S.ux, S.uz, S.nx, S.nz, wid / 2, depth / 2 + 0.05) || inBuilding(xm, zm) || inBuilding(xf, zf)
-          || obst.hit(xf + S.ux * 1.4, zf + S.uz * 1.4, 0.35) || obst.hit(xf - S.ux * 1.4, zf - S.uz * 1.4, 0.35) || P.onCarriageFast(xm, zm)) return false;
+          || obst.hit(xf + S.ux * 1.4, zf + S.uz * 1.4, 0.35) || obst.hit(xf - S.ux * 1.4, zf - S.uz * 1.4, 0.35) || P.onCarriageFast(xm, zm)
+          || (P.poleInRect && P.poleInRect(xm, zm, S.ux, S.uz, wid / 2, depth / 2))) return false;   // cột xuyên bạt (phản biện W5-C)
         overI.push({ x: xb, z: zb, heading: H, v: hash3(xb, zb, 314) < 0.35 ? 3 : 2, col: pick(TARP, hash3(xb, zb, 313)), sc: [wid / 3, 1, depth] });
         for (const s2 of [-1, 1]) { const px = xf + S.ux * s2 * (wid / 2 - 0.05), pz = zf + S.uz * s2 * (wid / 2 - 0.05); obst.add(px, pz, 0.12); }   // 2 cọc trước
         st.tarps++; placed++;
@@ -858,8 +860,14 @@ export function placeStreetLife(P) {
           if (own) { ux = own.x; uz = own.z; }
           // tán 2,6-3,1 m (ảnh 267: dù vuông lớn phủ kín vỉa) — nhưng không chìa qua bó vỉa / chạm mặt tiền
           const room = Math.min(latU - X.hw, X.fac - latU) - 0.1;
-          const sc = Math.max(0.85, Math.min(1.15 + hash3(ux, uz, 374) * 0.2, room / 1.15));
+          let sc = Math.max(0.85, Math.min(1.15 + hash3(ux, uz, 374) * 0.2, room / 1.15));
           if (!okAt(S, ux, uz, UMB_SQ_R * sc) || (!own && obst.hit(ux, uz, 0.85)) || inBuilding(ux, uz)) continue;
+          // phản biện W5-C: thân cây đường/cột điện-đèn KHÔNG được xuyên tán vuông (nửa cạnh 1,15 × sc, trục theo phố) — kể cả
+          // khi tán đặt trên bộ bàn ghế cũ (own): thu nhỏ tán tới 0,85 rồi mới bỏ ô
+          if (P.tallInSq) {
+            const hit = (s2) => P.tallInSq(ux, uz, S.ux, S.uz, 1.15 * s2);
+            if (hit(sc)) { let s2 = sc; while (s2 > 0.85 && hit(s2)) s2 = Math.max(0.85, s2 - 0.1); if (hit(s2)) { st.terraceTall = (st.terraceTall || 0) + 1; continue; } sc = s2; }
+          }
           if (!own && (S.occ[kk] & OCC.SHOP)) continue;   // ô đồ cửa hàng khác (biển A, chậu, hàng) — không chen bàn mới
           const rot = own ? own.heading : hash3(ux, uz, 375) * 6.28;
           if (!own) L.stoolI.push({ x: ux, z: uz, heading: rot });

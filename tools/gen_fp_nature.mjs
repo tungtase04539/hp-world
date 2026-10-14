@@ -46,8 +46,8 @@ const R = {
   umbRed: /(red|đỏ)[^,;.]{0,14}(umbrellas?|parasols?|dù)|(umbrellas?|parasols?)[^,;.]{0,10}red|dù[^,;.]{0,6}đỏ|(?<!xe )ô (lớn )?đỏ/,
   cafe: /café|cafe|cà phê|coffee|trà (đá|chanh|sữa|cúc)|quán (nước|trà)|outdoor (seating|tables)|terrace|bàn ghế quán|quán vỉa hè|cafe seating/,
   crowd: /đông người|người đông|khách đông|đông đúc|đông khách|chen chúc|nhiều người|crowd|crowded|many people|lots of people|shoppers|busy with people/,
-  market: /chợ|market|stalls?|sạp/,
-  garden: /vườn|sân (biệt thự|nhà|trường|trong)|trong sân|khuôn viên|sau (hàng )?(rào|tường)|garden|yard|courtyard|behind (the )?(fence|wall|gate)|compound/,
+  market: /chợ|\bmarkets?\b|\bstalls?\b|sạp/,
+  garden: /vườn|sân (biệt thự|nhà|trường|trong)|trong sân|khuôn viên|sau (hàng )?(rào|tường)|garden|\b(court)?yards?\b|behind (the )?(fence|wall|gate)|\bcompounds?\b/,
   vines: /dây leo|cây leo|giàn (cây|hoa|leo)|hoa giấy|bougainvillea|creepers?|vines?|climbing|trailing plants/,
   // phản biện W4-B: "xe máy chạy dày/đông" (pano_177/435 — ngã tư, xe ĐANG CHẠY/dừng đèn đỏ) ≠ hàng xe ĐỖ → mệnh đề nói xe
   // chạy/lưu thông mà không nói đỗ/đậu/dựng thì không tính bikeDense
