@@ -30,8 +30,8 @@ for (const kind of ['uws', 'ws']) {
       assert.match(mt, /hp_process_rss_bytes \d+/);
       assert.match(mt, /hp_sim_tick_ms_count/);
       assert.equal((await fetch(s.game + '/metrics')).status, 404);
-      // stubs answer 501
-      for (const p of ['/v1/auth/guest', '/v1/auth/refresh', '/v1/auth/recover', '/v1/join', '/v1/netprobe']) {
+      // stubs answer 501 (/v1/netprobe is implemented by S5: see ops_netprobe.test.js)
+      for (const p of ['/v1/auth/guest', '/v1/auth/refresh', '/v1/auth/recover', '/v1/join']) {
         const r = await getJson(s.game + p, { method: 'POST', body: '{}', headers: { 'content-type': 'application/json' } });
         assert.equal(r.status, 501, p); assert.equal(r.body.error, 'not_implemented');
       }

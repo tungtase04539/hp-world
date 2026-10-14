@@ -173,7 +173,10 @@ function Get-ServiceState([object]$s) {
   $h = @{}
   foreach ($line in ($r.Text -split "`r?`n")) {
     $p = $line.Split('|')
-    if ($p.Count -ge 3 -and $p[0]) { $h[$p[0]] = [pscustomobject]@{ State = $p[1]; Health = $p[2]; Raw = $line } }
+    if ($p.Count -lt 3 -or -not $p[0]) { continue }
+    # một dịch vụ có thể có thêm container chạy-một-lần (docker compose run): giữ container đang chạy
+    if ($h.ContainsKey($p[0]) -and $h[$p[0]].State -eq 'running') { continue }
+    $h[$p[0]] = [pscustomobject]@{ State = $p[1]; Health = $p[2]; Raw = $line }
   }
   return $h
 }

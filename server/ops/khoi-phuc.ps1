@@ -51,7 +51,7 @@ if (-not $KhoiPhucThat) {
   $ready = $false
   for ($i = 0; $i -lt 60; $i++) {
     Start-Sleep -Seconds 1
-    $p = Get-CmdOutput 'docker' @('exec', $name, 'psql', '-U', 'hp', '-d', 'hp', '-tAc', 'select 1')
+    $p = Get-CmdOutput 'docker' @('exec', $name, 'psql', '-h', '127.0.0.1', '-U', 'hp', '-d', 'hp', '-tAc', 'select 1')   # TCP: máy chủ tạm lúc khởi tạo chỉ nghe socket nội bộ
     if ($p.Code -eq 0 -and $p.Text.Trim() -eq '1') { $ready = $true; break }
   }
   if (-not $ready) { Write-Loi 'Cơ sở dữ liệu nháp không khởi động được.'; $null = Get-CmdOutput 'docker' @('rm', '-f', $name); exit 1 }
