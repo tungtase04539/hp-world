@@ -43,7 +43,7 @@ import {
   signedArea, absArea, outward, centroid, bbox, pointInPoly, segDist, cleanPoly, isSimple, clipHalf, clipStrip,
   minRect, Grid, overlapArea, hash32, rng, pickW, polyEdgeDist,
 } from './bgeom.mjs';
-import { LU, luAt, LU_VETO, LU_WALL, WALL, makeEvidence, makeNameIndex, zoneAt, ZONES, WallSet } from './parcels_ev.mjs';
+import { LU, luAt, LU_VETO, LU_WALL, WALL, RX_FUEL, makeEvidence, makeNameIndex, zoneAt, ZONES, WallSet } from './parcels_ev.mjs';
 
 const T0 = Date.now();
 const ARGV = process.argv.slice(2);
@@ -376,19 +376,43 @@ function classify(b) {
 {
   const g0 = new Grid(16); B.forEach((b, i) => g0.insert(i, (b.bb = bbox(b.pts))));
   const A0 = JSON.parse(fs.readFileSync(new URL('../audit/audit_enriched.json', import.meta.url), 'utf8'));
-  let n = 0;
-  for (const p of A0) if (typeof p.X === 'number') for (const o of p.buildings || []) {
+  let n = 0, nNo = 0;
+  const AP = A0.filter((p) => typeof p.X === 'number');
+  // MÂU THUẪN (lượt 5, review: tháp kính 13 T "ma" b5277 góc Nguyễn Đức Cảnh × Mê Linh — tia pano_427 h90 đi 73 m chạm footprint
+  // mà pano_428 đứng cách 26 m tả nhà 2-4 T ở đúng hướng đó): pano KHÁC gần footprint hơn (≤ 30 m, gần hơn điểm chạm) có quan
+  // sát ≤ 5 T với nón (±25°, nới theo bề rộng) phủ tâm footprint và KHÔNG có quan sát ≥ 6 T trong ±40° → bỏ khớp cao tầng
+  const contradicted = (bi, p0, dHit) => {
+    const [cx, cz] = centroid(B[bi].pts);
+    for (const q of AP) {
+      if (q === p0) continue;
+      const d = Math.hypot(cx - q.X, cz - q.Z); if (d > 30 || d < 3 || d >= dHit) continue;
+      const brg = Math.atan2(cx - q.X, -(cz - q.Z));
+      let low = false, tall = false;
+      for (const o of q.buildings || []) {
+        const fl = +o.floors || 0; if (!fl) continue;
+        let da = Math.abs(brg - ((+o.heading || 0) * Math.PI) / 180) % (2 * Math.PI); if (da > Math.PI) da = 2 * Math.PI - da;
+        if (fl >= 6 && da <= 0.7) tall = true;
+        if (fl <= 5 && da <= Math.max(0.44, Math.atan2(Math.max(4, (+o.width_m || 0) / 2), d))) low = true;
+      }
+      if (low && !tall) return q.id;
+    }
+    return null;
+  };
+  for (const p of AP) for (const o of p.buildings || []) {
     const fl = +o.floors || 0; if (fl < 6 || fl > 45) continue;
     const h = ((+o.heading || 0) * Math.PI) / 180, dx = Math.sin(h), dz = -Math.cos(h);
-    let hit = -1;
+    let hit = -1, dHit = 0;
     for (let d = 3; d <= 80 && hit < 0; d += 0.7) {
       const x = p.X + dx * d, z = p.Z + dz * d;
-      g0.query([x, z, x, z], (j) => { if (hit < 0 && pointInPoly(B[j].pts, x, z)) hit = j; });
+      g0.query([x, z, x, z], (j) => { if (hit < 0 && pointInPoly(B[j].pts, x, z)) { hit = j; dHit = d; } });
       if (hit >= 0 && absArea(B[hit].pts) < 300) hit = -2;   // chạm nhà nhỏ trước → che mất cao ốc, thôi
     }
-    if (hit >= 0) { B[hit].tallObs = Math.max(B[hit].tallObs || 0, fl); n++; }
+    if (hit < 0) continue;
+    const cq = contradicted(hit, p, Math.hypot(...((c) => [c[0] - p.X, c[1] - p.Z])(centroid(B[hit].pts))));
+    if (cq) { nNo++; if (process.env.HP_DEBUG_TALL) console.log('tallObs contradicted', p.id, Math.round(o.heading), fl + 'F', 'd', dHit.toFixed(0), 'by', cq, 'c', centroid(B[hit].pts).map(Math.round)); continue; }
+    B[hit].tallObs = Math.max(B[hit].tallObs || 0, fl); n++;
   }
-  ST.tall_obs_matched = n;
+  ST.tall_obs_matched = n; ST.tall_obs_contradicted = nNo;
 }
 for (const b of B) classify(b);
 // W3-B: kiểu ô của từng nhà thật theo nón quan sát pano (tâm nhà) — chỉ áp ở bước 4/11 cho nhà có mặt phố
@@ -456,6 +480,7 @@ function movePts(P, idx, vec, f) {
 }
 
 let nSnap = 0, nSnapPart = 0, snapDist = 0;
+const DBGPV = process.env.DEBUG_PV ? process.env.DEBUG_PV.split(',').map(Number) : null;
 const DBG = process.env.DEBUG_PT ? process.env.DEBUG_PT.split(',').map(Number) : null;
 const dbgNear = (b) => DBG && b.bb && b.bb[0] < DBG[0] + 12 && b.bb[2] > DBG[0] - 12 && b.bb[1] < DBG[1] + 12 && b.bb[3] > DBG[1] - 12;
 function snapFront(bi) {
@@ -825,6 +850,9 @@ for (const [x, z, mask] of PANO_SIDES) {
   if (a && OPEN_RX.test(`${a.area || ''} ${a.summary || ''}`.toLowerCase())) OPENP.push([x, z, mask]);
 }
 ST.open_panos = OPENP.length;
+// pano tả CÂY XĂNG trong khu vực (chữ cấp pano) — pkSupport không mọc lô sinh quanh pano đó (lượt 5; OPEN_RX đầy đủ quá rộng
+// cho việc này: 59 lô shophouse THẬT ở phố buôn bán "ven sông/cạnh công viên/gần chợ" (074/075/027/233…) từng bị chặn oan)
+const FUEL_IDS = new Set(AUD0.filter((p) => typeof p.X === 'number' && RX_FUEL.test(`${p.area || ''} ${p.summary || ''}`.toLowerCase())).map((p) => p.id));
 const openGrid = new Grid(40); OPENP.forEach((p, i) => openGrid.insert(i, [p[0], p[1], p[0], p[1]]));
 function panoOpenVeto(Q) {
   const [cx, cz] = centroid(Q); let v = false;
@@ -873,10 +901,19 @@ function civicFront(F, ua, ub) {
 }
 function parcelVeto(s, sg, ta, tb, F, uBase) {
   const um = uBase + (ta + tb) / 2;
-  let lu = -1, nLu = 0;
-  for (const d of [2, 6, 11]) { const [x, z] = F.world(um, d); const c = luAt(x, z); if (LU_VETO.has(c)) { nLu++; lu = c; } }
+  let lu = -1, nLu = 0, nPub = 0, nGrass = 0;
+  for (const d of [2, 6, 11]) {
+    const [x, z] = F.world(um, d); const c = luAt(x, z);
+    if (LU_VETO.has(c)) { nLu++; lu = c; }
+    if (c === LU.PLAZA || c === LU.PARKING) nPub++; else if (c === LU.GRASS) nGrass++;
+  }
   const [kx, kz] = F.world(um, 6);
   let k = PEV.kindAt(kx, kz);
+  // ĐẤT CÔNG THOÁNG (OSM quảng trường lát / bãi đỗ; cỏ-vườn) phía sau lô: không nhà sinh, KHÔNG tường/rào/sân khuôn viên —
+  // xét TRƯỚC nón khuôn viên / mặc định biệt thự (review lượt 4: rào sắt + cổng 29,5 m bao quảng trường Nhà hát phía Đinh
+  // Tiên Hoàng, pano_055 h180-h270; đất phía sau 100 % PLAZA). Cỏ: trừ khi nón pano TẠI CHỖ tả khuôn viên CÓ rào (sân cỏ
+  // trường/cơ quan sau hàng rào thật).
+  if (nPub >= 2 || (nPub + nGrass >= 2 && !(k.kind === 'compound' && k.walled))) return 'open';
   if (!k.kind) {
     // lô không nằm trong nón quan sát nào: kẹp giữa 2 lô khuôn viên (±8 m dọc phố) → khuôn viên; phố VÙNG biệt thự/hành
     // chính (parcels_ev.ZONES.villa): 1 bên khuôn viên đủ, không bên nào cũng mặc định hàng rào biệt thự (không bịa nhà ống)
@@ -890,9 +927,23 @@ function parcelVeto(s, sg, ta, tb, F, uBase) {
   if (k.kind === 'compound') { why = 'compound'; if (k.walled) { wall = k.wall >= 0 ? k.wall : WALL.FENCE; col = Math.max(0, k.col); } depth = 22; }
   else if (k.kind === 'vacant') { why = 'vacant'; wall = k.wall >= 0 ? k.wall : WALL.HOARD; col = k.col >= 0 ? k.col : 8; depth = 18; }
   else if (k.kind === 'market') { why = 'market'; depth = 12; }
-  else if (nLu >= 2) { why = 'lu'; wall = LU_WALL[lu] ?? -1; col = 0; if (lu === LU.DIRT) [wall, col] = PEV.vacantWallNear(kx, kz); }
+  else if (nLu >= 2) {
+    why = 'lu'; wall = LU_WALL[lu] ?? -1; col = 0; if (lu === LU.DIRT) [wall, col] = PEV.vacantWallNear(kx, kz);
+    // nón pano TẠI CHỖ tả dãy BÁN HÀNG / nhà ở / nhà không-khuôn-viên (khách sạn, văn phòng…) → đa giác OSM khuôn viên (bệnh
+    // viện…) phủ lấn mặt tiền thật: không dựng rào (review lượt 4: rào CAMPUS 55 m cắt ngang mặt tiền khách sạn + cửa hàng
+    // Trần Quang Khải, pano_355 h180-h270)
+    if (wall >= 0 && (k.kind === 'shop' || k.kind === 'home' || PEV.seenOpenFront(kx, kz))) { wall = -1; stat('lu_wall_skip_seen'); }
+  }
   else if (civicFront(F, uBase + ta, uBase + tb)) { why = 'civic'; wall = WALL.FENCE; col = 1; depth = 14; }
+  if (DBGPV && Math.hypot(kx - DBGPV[0], kz - DBGPV[1]) < DBGPV[2]) console.log('  [dbg pv]', kx.toFixed(1), kz.toFixed(1), why, 'wall', wall, 'k', k.kind, k.score && k.score.toFixed(2), 'lu', lu, nLu, nPub, nGrass, JSON.stringify(k.V || {}), (() => { const b = PEV.votes(kx, kz).best; return b ? b.p.id + ' h' + b.o.deg + ' ' + b.o.fl + 'F' : ''; })());
   if (!why) return null;
+  // RÀO TÔN / tường lô trước NHÀ THẬT đứng ngay sau (≤ 3,5 m sau vạch — dãy nhà lùi nhẹ): không dựng (review lượt 4: rào tôn
+  // xám trước dãy shophouse đang buôn bán pano_478 h270) — lô vẫn để trống
+  if (wall === WALL.HOARD || wall === WALL.LOTWALL) {
+    const Q = frameRect(F, uBase + ta, uBase + tb, 0.3, 3.8); let live = 0;
+    grid.query(bbox(Q), (j) => { const o = B[j]; if (!o.dead && !o.synth) live += overlapArea(Q, o.pts, 0.5); });
+    if (live > 0.25 * (tb - ta) * 3.5) { wall = -1; stat('vacant_wall_skip_live'); }
+  }
   const wa = F.world(uBase + ta, 0.3), wb = F.world(uBase + tb, 0.3);
   // tường không được đứng sát camera pano (≥ 3,5 m — như nhà sinh; đoạn vi phạm bỏ hẳn: thành khe/lối vào)
   let camHit = false;
@@ -931,14 +982,30 @@ function alleyMouth(Q, ux, uz) {
   });
   return hit;
 }
+// (lượt 5, review: lô sinh 1 tầng dưới mái che cây xăng pano_475/418) nón quan sát CÂY XĂNG phủ lô, hoặc pano bỏ phiếu MẠNH
+// NHẤT tả khu vực có cây xăng → không đủ bằng chứng mọc nhà sinh trên lỗ footprint
 function pkSupport(F, um) {
   const [x, z] = F.world(um, 6);
-  let nearP = false; PEV.near(x, z, 22, (p) => { if (!nearP && Math.hypot(p.x - x, p.z - z) <= 22) nearP = true; });
+  let nearP = false, fuel = false;
+  PEV.near(x, z, 30, (p) => {
+    const d = Math.hypot(p.x - x, p.z - z); if (d <= 22) nearP = true;
+    if (d < 3 || d > 30 || fuel) return;
+    const brg = Math.atan2(x - p.x, -(z - p.z));
+    for (const o of p.obs) {
+      if (!o.cls.open) continue;
+      let da = Math.abs(brg - o.h) % (2 * Math.PI); if (da > Math.PI) da = 2 * Math.PI - da;
+      if (da <= Math.max(0.6, Math.atan2(Math.max(4, o.w / 2), d))) { fuel = true; break; }
+    }
+  });
   if (!nearP) return false;
+  if (fuel) { stat('gap_pk_fuel_veto'); return false; }
   const k = PEV.kindAt(x, z);
   const ok = (k.kind === 'shop' || k.kind === 'home') && k.score >= 0.3;
-  if (ok) stat('gap_pk_support');
-  return ok;
+  if (!ok) return false;
+  const bp = PEV.votes(x, z).best;
+  if (bp && FUEL_IDS.has(bp.p.id)) { stat('gap_pk_fuel_pano'); return false; }
+  stat('gap_pk_support');
+  return true;
 }
 function fillGap(s, sg, t0, t1) {
   const L = t1 - t0; if (L < 3.5) return;

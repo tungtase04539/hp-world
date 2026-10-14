@@ -47,14 +47,19 @@ const RX_VACANT = /đất trống|lô (đất )?trống|lô đất|bãi (đất|
 const RX_COMPOUND_T = /công sở|trụ sở|cơ quan|(?<!quảng |công |thị |môi )trường|bệnh viện|trung tâm y tế|y tế|ủy ban|uỷ ban|ubnd|nhà văn ho[áa]|mầm non|nhà trẻ|bảo tàng|khuôn viên|doanh trại|chỉ huy|công an|quân (đội|sự)|viện|biệt thự|công trình (lớn|công cộng)|nhà khách|hành chính|sau tường rào|sau hàng rào/;
 const RX_STRONG = /biệt thự|(?<!quảng |công |thị |môi )trường|bệnh viện|mầm non|nhà trẻ|ủy ban|uỷ ban|ubnd|doanh trại|chỉ huy|công an|y tế|khuôn viên|sau tường rào|sau hàng rào/;
 const RX_WALLWORD = /tường rào|hàng rào|rào sắt|rào sơn|con tiện|cổng|chòi gác|bốt gác|nhà bảo vệ|sân (trước|trong|vườn|cây|rộng)|sân vườn|vườn/;
+const RX_OPENFRONT = /bồn cây|chậu (cây|cọ|cảnh|hoa)|thảm|bậc tam cấp|sảnh|lối vào/;
 const RX_SHOPT = /shophouse|cửa hàng|quán|buôn bán|kinh doanh|tiệm|showroom|nhà hàng|cà phê|cafe|coffee|salon|spa|gara|đại lý|ki-?ốt|sạp|nhà thuốc|ngân hàng|siêu thị|cửa hiệu/;
 const RX_SHOPF = /biển '|biển "|biển hiệu|bày bán|bán (buôn|lẻ|hàng)|cửa hàng|quán|gội đầu|cắt tóc/;
 const RX_ROWHOME = /liền kề|nhà ở|nhà dân|nhà cấp (bốn|4)|tập thể|chung cư|nhà riêng/;
+export const RX_FUEL = /cây xăng|trạm xăng|xăng dầu|trụ bơm|bơm xăng|cửa hàng xăng/;
 const RX_MARKET = /(^|[^a-zà-ỹ])(chợ|sạp)([^a-zà-ỹ]|$)/;
 export function classifyObs(o) {
   const s = String(o.style || '').toLowerCase(), f = String(o.features || '').toLowerCase(), c = String(o.color || '').toLowerCase();
   const all = s + ' | ' + f;
   const r = { kind: '', walled: false, wall: -1, civic: false, villa: false, col: -1, gate: /cổng/.test(all), booth: /chòi gác|bốt gác|nhà bảo vệ|thường trực|nhà gác/.test(all) };
+  // CÂY XĂNG (nhà điều hành, mái che trụ bơm, "cửa hàng tiện lợi" của trạm): sân trạm là mặt thoáng — KHÔNG phiếu shop (review
+  // lượt 4: "nhà điều hành cây xăng + cửa hàng tiện lợi" khớp 'cửa hàng' → lô sinh 1 tầng dưới mái che Petrolimex pano_475)
+  if (RX_FUEL.test(all)) { r.open = true; return r; }
   if (RX_VACANT.test(s) && !/nhà ống|nhà cao tầng|nhà \d|cao ốc|tòa|toà|chung cư|shophouse/.test(s)) { r.kind = 'vacant'; r.wall = /tường|bê tông|gạch/.test(all) && !/tôn(?!g)|container/.test(all) ? WALL.LOTWALL : WALL.HOARD; }
   else if (RX_MARKET.test(s) && !/nhà ống|shophouse/.test(s)) r.kind = 'market';
   else if (RX_COMPOUND_T.test(s) && !/shophouse|nhà ống|cửa hàng|nhà phố|liền kề/.test(s) && !(RX_SHOPF.test(f) && !RX_STRONG.test(s) && !/ủy ban|uỷ ban|sở |trụ sở|cơ quan/.test(f))) {
@@ -64,7 +69,9 @@ export function classifyObs(o) {
     // loại "mạnh" (trường/bệnh viện/…) ngầm định có tường rào — TRỪ khi kiểu lưỡng lự có "khách sạn" mà không chữ tường/rào/
     // cổng/sân (pano_356 h270 "toà nhà (bệnh viện/khách sạn)… hàng cọ trước nhà" = khách sạn sân trước THOÁNG ở 355 h225:
     // rào sắt từng chắn ngang sân) → khuôn viên KHÔNG rào (vẫn chặn nhà ống sinh, không dựng tường)
-    r.walled = RX_WALLWORD.test(all) || (RX_STRONG.test(s) && !/khách sạn/.test(s));
+    // (lượt 5) …và trừ khi chữ tả MẶT TRƯỚC MỞ (bồn cây/chậu cảnh/thảm/bậc tam cấp/sảnh/lối vào) mà không chữ tường/rào/cổng:
+    // pano_051 h45 "Khoa Quốc tế BV Phụ Sản… cửa vòm, cột trụ, bồn cây cảnh" = mặt tiền mở ra phố (pano_355 h180-h270)
+    r.walled = RX_WALLWORD.test(all) || (RX_STRONG.test(s) && !/khách sạn/.test(s) && !RX_OPENFRONT.test(f));
     if (r.walled) r.wall = /hàng rào sắt|rào sắt|con tiện|song sắt|hàng rào (trắng|xanh|đen|trang trí)|tường lửng/.test(all) ? WALL.FENCE
       : /tường rào|tường (vàng|trắng|bao)|phù điêu/.test(all) ? WALL.MASONRY : WALL.FENCE;
   } else if (/cao ốc|cao tầng|văn phòng|tòa nhà|toà nhà|khách sạn/.test(s) && /tường rào|hàng rào|rào sắt/.test(all)) {
@@ -206,7 +213,23 @@ export function makeEvidence(AUD, PANO_SIDES) {
     near(x, z, 60, (p) => { if (!p.text.includes('vacant')) return; const d = Math.hypot(p.x - x, p.z - z); if (d < bd) { bd = d; best = p; } });
     return best ? [best.vwall, best.vcol] : [WALL.HOARD, 8];
   }
-  return { panos: P, kindAt, kindAtPoly, votes, near, gateOn, vacantWallNear };
+  // nón quan sát pano (≤ 30 m) phủ điểm tả NHÀ KHÔNG phải khuôn viên (shop/home/kiểu khác: khách sạn, văn phòng…) và không
+  // nón nào tả khuôn viên → mặt tiền thật lộ ra phố (tường theo lớp đất OSM khuôn viên ở đây là đa giác phủ lấn)
+  function seenOpenFront(x, z) {
+    let other = false, comp = false;
+    near(x, z, 30, (p) => {
+      const dx = x - p.x, dz = z - p.z, d = Math.hypot(dx, dz); if (d < 3 || d > 30) return;
+      const brg = Math.atan2(dx, -dz);
+      for (const o of p.obs) {
+        if (o.cls.open || o.cls.kind === 'vacant' || o.cls.kind === 'market') continue;
+        let da = Math.abs(brg - o.h) % (2 * Math.PI); if (da > Math.PI) da = 2 * Math.PI - da;
+        if (da > Math.max(0.44, Math.min(0.9, Math.atan2(Math.max(4, o.w / 2), d)))) continue;
+        if (o.cls.kind === 'compound') comp = true; else other = true;
+      }
+    });
+    return other && !comp;
+  }
+  return { panos: P, kindAt, kindAtPoly, votes, near, gateOn, vacantWallNear, seenOpenFront };
 }
 
 // ---------- VÙNG phố (trần xác suất mặt tiền bán hàng khi KHÔNG có bằng chứng pano trực tiếp) ----------

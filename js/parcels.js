@@ -12,9 +12,13 @@
 // Va chạm: lưới đoạn 24 m → collide(p, r) đẩy điểm ra khỏi tường (world.resolveCollisions bọc thêm ở world.js).
 // Xác định: mọi biến thể theo hash toạ độ.
 import * as THREE from 'three';
-import { RB_PARCELS } from './buildings_real.js';
+// namespace import: thiếu export RB_PARCELS (buildings_real.js của nhánh khác / chưa sinh lại khi gộp) → undefined, không phải
+// SyntaxError lúc liên kết làm trắng cả trang (review lượt 4)
+import * as RBM from './buildings_real.js';
+import { claimAt } from './claims.js';
 
 export const PWALL = { MASONRY: 0, FENCE: 1, HOARD: 2, LOTWALL: 3 };
+const OPEN_CLAIMS = ['plaza', 'park'];
 // màu (sRGB): 0 vàng Hải Phòng, 1 trắng kem, 2 xám bê tông, 3 xanh nhạt, 4 gạch đỏ, 5 tôn xanh dương, 6 tôn xanh lá,
 // 7 tôn đỏ, 8 tôn kẽm xám gỉ
 const COLS = [0xe2c682, 0xe9e5d8, 0xc6c2b8, 0xb3c4ab, 0xb06b55, 0x6a95bf, 0x72a07b, 0xb35444, 0xcfd2cf];
@@ -146,7 +150,7 @@ const lin = (hex, k = 1) => { const c = new THREE.Color(hex).convertSRGBToLinear
 
 export function buildParcels(scene, ctx = {}) {
   const t0 = performance.now();
-  const P = RB_PARCELS || { walls: [], gates: [] };
+  const P = RBM.RB_PARCELS || { walls: [], gates: [] };
   const gh = ctx.groundHeightNoDeck || (() => ctx.landH || 2);
   const D = ctx.D, G = ctx.grid;
   // lưới ô 16 m dùng chung (chỉ mục bbox → danh sách)
@@ -159,7 +163,8 @@ export function buildParcels(scene, ctx = {}) {
   });
   const keptGrid = new Map(); kept.forEach((k, i) => gridAdd(keptGrid, k.x0, k.z0, k.x1, k.z1, i));
   const pip = (R, x, z) => { let c = false; for (let i = 0, j = R.length - 1; i < R.length; j = i++) { const [xi, zi] = R[i], [xj, zj] = R[j]; if ((zi > z) !== (zj > z) && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) c = !c; } return c; };
-  const st = { runs: 0, gates: 0, booths: 0, len: [0, 0, 0, 0], cutLive: 0, cutCell: 0, cutWater: 0, cutThin: 0, thin: 0, tris: 0 };
+  const st = { runs: 0, gates: 0, booths: 0, len: [0, 0, 0, 0], cutLive: 0, cutCell: 0, cutWater: 0, cutThin: 0, cutClaim: 0, cutRoad: 0, thin: 0, tris: 0 };
+  const surf = ctx.surfaceAt || null;
   // ô 16 m có tường dữ liệu đi qua (lọc nhanh khi quét cảnh)
   const wallCells = new Set();
   for (const w of P.walls || []) for (let i = 2; i + 1 < w.length; i += 2) {
@@ -168,7 +173,8 @@ export function buildParcels(scene, ctx = {}) {
     if (i + 3 < w.length) { const L = Math.hypot(w[i + 2] - x, w[i + 3] - z), n = Math.ceil(L / 8); for (let k = 1; k < n; k++) { const xx = x + (w[i + 2] - x) * k / n, zz = z + (w[i + 3] - z) * k / n; wallCells.add(gkey(Math.floor(xx / GCS), Math.floor(zz / GCS))); } }
   }
   // TƯỜNG/RÀO/CỔNG DỰNG TAY đã có (ô cells, khối địa danh W2-E…): mọi mesh MỎNG (bề hẹp ≤ 1,2 m), DÀI (≥ 2,5 m), THẤP (≤ 5 m)
-  // chân sát đất — theo HÌNH HỌC, không theo tên (cb_wall_ltt tường mỏ neo pano_515, lm_ubnd_fence…) → không dựng tường đôi
+  // chân sát đất — theo HÌNH HỌC, không theo tên (cb_wall_ltt tường mỏ neo pano_515…) → không dựng tường đôi. CHỈ thấy mesh đã
+  // có trong scene lúc gọi (world.js ngay sau fabric): rào dựng SAU đó (vd lm_ubnd_fence ~world.js 20.5k) không được quét
   const thin = [], tgrid = new Map();
   const t1 = performance.now();
   if (ctx.scene !== false && wallCells.size) {
@@ -217,6 +223,11 @@ export function buildParcels(scene, ctx = {}) {
     if (ka) for (const i of ka) { const k = kept[i]; if (x >= k.x0 && x <= k.x1 && z >= k.z0 && z <= k.z1 && pip(k.hull, x, z)) { st.cutCell++; return 3; } }
     const g = gh(x, z); if (!(Math.abs(g - LAND) < 1.6)) { st.cutWater++; return 4; }
     if (thin.length && nearThin(x, z, 1.4)) { st.cutThin++; return 5; }
+    // vùng giữ chỗ QUẢNG TRƯỜNG / CÔNG VIÊN lúc chạy (claims.js — bãi Cầu Đất, Lê Chân, road#9, Bến Bính…; generator không
+    // biết) → để thoáng (review lượt 4: rào + cổng dọc bãi đỗ Cầu Đất pano_420)
+    if (claimAt(x, z, OPEN_CLAIMS)) { st.cutClaim++; return 6; }
+    // mặt đường / vỉa hè (đường W3-A đổi sau khi sinh dữ liệu) → bỏ mẫu
+    if (surf && surf(x, z) > 0.12) { st.cutRoad++; return 7; }
     return 0;
   }
   // cổng theo dãy (khe trong tường)

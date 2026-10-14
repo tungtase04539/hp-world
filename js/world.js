@@ -17558,7 +17558,8 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     world.rbData = fabricData(); world.rbGrid = _fab.grid;
     // W3-B Ô ĐẤT: mặt phố của KHUÔN VIÊN (tường rào/hàng rào sắt + cổng) và ĐẤT TRỐNG (rào tôn/tường lô) — generator không
     // còn bịa nhà ống vào đó (tools/parcels_ev.mjs). Cắt theo footprint SỐNG (sau claims) + nhà ô giữ; va chạm bọc resolveCollisions.
-    { const _par = buildParcels(scene, { groundHeightNoDeck, landH: LAND_H, D: world.rbData, grid: world.rbGrid, cellKept: world.cellKept, maxR: BUILD_RADIUS });
+    { const _par = buildParcels(scene, { groundHeightNoDeck, landH: LAND_H, D: world.rbData, grid: world.rbGrid, cellKept: world.cellKept, maxR: BUILD_RADIUS,
+      surfaceAt: world.roadNet && world.roadNet.surfaceAt });
       world.parcels = _par;
       if (_par.segs.length) { const _rc = world.resolveCollisions; world.resolveCollisions = (p, pr = 0.45) => { _rc(p, pr); _par.collide(p, pr); }; } }
   }
