@@ -174,7 +174,14 @@ export function createVehicles(scene, groundHeight, waterHeight, spawns, resolve
   });
 
   function blockedAt(v, nx, nz) {
-    if (v.land) { if (groundHeight(nx, nz) < 0.3) return true; }   // xe không xuống nước
+    if (v.land) {
+      const h = groundHeight(nx, nz);
+      if (h < 0.3) return true;                                      // xe không xuống nước
+      // W3-F r4: không lao khỏi mép mặt cầu nâng/dốc xoắn trên đất (bề mặt mới thấp hơn chỗ đang đứng > 1,2 m = mép cầu;
+      // groundHeight ở đây = world.surfaceY có tham chiếu cao độ xe đang lái — main.js _vehRefY)
+      if (v.mounted && h < v.pos.y - 1.2) return true;
+      if (v.mounted && opts.moveBlock && opts.moveBlock(v.pos.x, v.pos.z, nx, nz, v.pos.y)) return true;   // W3-F r5: gờ giữa 2 nhịp cầu
+    }
     else if (waterHeight(nx, nz) > -0.6) return true;              // thuyền cần nước đủ sâu (bỏ qua mặt cầu)
     return nx < WORLD_BOUNDS.minX + 40 || nx > WORLD_BOUNDS.maxX - 40
       || nz < WORLD_BOUNDS.minZ + 40 || nz > WORLD_BOUNDS.maxZ - 40;

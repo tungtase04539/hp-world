@@ -41,10 +41,12 @@ Trò chơi: thế giới 3D Hải Phòng **tỉ lệ 1:1 mét thật** (từ 202
 | `js/skymodel.js` | Mô hình trời tán xạ Rayleigh+Mie + hướng mặt trời (JS thuần, chạy được trong node) — MỘT nguồn cho vòm/đèn/sương |
 | `js/post.js` | Tone mapping + grade DÙNG CHUNG mọi đường vẽ (CustomToneMapping = ACES + grade), SceneAOPass (MSAA + AO theo depth), FinalPass, `HP_UNLIT_K` |
 | `js/water.js` | Vật liệu nước Standard (IBL trời, Fresnel) + bản đồ bờ/hồ — MỘT nguồn màu nước |
+| `js/bridges.js` | Đợt 3 W3-F: CẦU THEO WAY OSM (mapdata BRIDGE_WAYS) — mặt cầu nâng HVT (nhịp chính + 2 nút xoắn, gờ + tay vịn, đèn, trụ/khung cổng, vòm đỏ trên lòng sông, tháp thang máy), cầu phố Lạc Long (lòng 2 chiều, vỉa hè, lan can con tiện), lan can/dầm/trụ cầu phẳng; `makeDeckIndex` (tra mặt cầu có tham chiếu cao độ; `crossesParapet` gờ giữa 2 nhịp); `simplifyFrames` (tay vịn) |
+| `js/riverbank.js` | Đợt 3 W3-F: BỜ KÈ SÔNG — `snapBankGrid` (nắn lưới nền theo mép sông → bờ dựng đứng), tường kè + gờ, dải dạo ca-rô + lan can gang + đèn 2 bóng + hoa giấy ('prom'), dải bờ tự phát + lán + thuyền ('strip'), cây non chống cọc; `Run()` quét LIỀN theo cạnh polygon (không hộp/mẫu — §10 W3-F (11)) |
 | `js/device.js` | `TIER` + `GFX` (núm chất lượng ánh sáng/hậu kỳ — chỉ theo TIER, không theo cảm ứng) |
 | `js/landmarks.js` | 15 biển thông tin địa danh (vị trí suy ra từ mapdata) |
 | `js/traffic.js` / `js/vehicles.js` / `js/npcs.js` / `js/quests.js`... | Giao thông, xe cưỡi được, NPC, nhiệm vụ |
-| `js/roadgraph.js` | Đồ thị phố thật (nút giao, đường đôi một chiều — thuần JS, chạy được trong node) |
+| `js/roadgraph.js` | Đồ thị phố thật (nút giao, đường đôi một chiều — thuần JS, chạy được trong node); W3-F: TÁCH TẦNG theo cao độ đỉnh p[2] (cầu nâng không nối phố dưới), `edgeY`, `trimRoadEnds` (phố cụt dưới gầm thấp), `deckRoads` (way cầu = tim mặt cầu + cao độ) |
 | `js/models_kit.js` | BỘ MÔ HÌNH NGƯỜI & XE DÙNG CHUNG (wave 2 W2-C): người 7,5 đầu (dáng đi/ngồi trong vertex shader), người lái IK, 3 xe máy, 6 ô tô (thân loft + hốc bánh thật), LOD xa, `kitMaterial` (kênh màu/cổng phụ kiện theo instance), `humanoidGeometry` (SkinnedMesh nhân vật chơi/NPC) — dùng bởi traffic.js, props.js, character.js. Xem trang `tools/qa/models.html` |
 | `js/footprints.js` | Tra cứu footprint nhà thật ĐANG VẼ (world.rbData/rbGrid của WP2, không có thì chỉ địa danh LM_POLY) cho gameplay: camera chống xuyên tường, chỗ xuống xe, người đi bộ |
 | `js/trees.js` | HỆ CÂY instanced (Đợt 3 WP4): `plant/plantLocal` (mọi helper cây chỉ xếp hàng), `plantStreetTrees` (trồng theo dữ liệu dọc phố), `buildTrees` (atlas lá + kit 9 loài + LOD gần/xa/hero GLB) — xem §10 (WP4-trees) |
@@ -89,6 +91,15 @@ Quan hệ dữ liệu: `tools/fetch_osm.sh` → `osm_*.json` → `tools/process_
 - `WATER [{n, pts}]` — **polygon nước THẬT** (natural=water, từ `osm_water_dt.json`, simplify 1.5 m, bỏ ao < 200 m²,
   giữ polygon có đỉnh cách gốc < 2350 m): Sông Cấm, Tam Bạc (2 mảnh), Sông Đào Hạ Lý, hồ Tam Bạc/Sen/Tiên Nga, kênh…
   terrain.js đào nước trong thành phố theo tập này (`waterSD`). 27 polygon / 1260 đỉnh / 21 KB (2026-09).
+  **Đợt 3 W3-F:** polygon SÔNG/KÊNH (tên `Sông…`/`Kênh…`, |x|,|z| < 2000) được ĐẨY mép khỏi phố chạy dọc bờ (góc ≤ 40°,
+  không phải cầu) tới ≥ hw + vỉa hè + 2,5 m (t 9,5 · s 11 · p 12,6 · r ≥ 7) và ≥ 3 m khỏi lối đi lát ven sông OSM
+  (footway=sidewalk) — process_osm §6b3 (OSM vẽ mép sông Tam Bạc ĐÈ lên lòng Phố Tam Bạc: nước sát chân camera pano).
+- `BRIDGE_WAYS [{id, n, c, kind, w, ri:[ROADS_DT idx], pts:[[x,z,y],…], i0?, i1?}]` (Đợt 3 W3-F, §6b4, sau WATER): mặt cầu
+  theo way OSM, mẫu 3 m, y = cao độ hồ sơ. kind `span`/`ramp` (HVT: nhịp chính + 2 nút xoắn + dốc dẫn), `deck` (cầu phố nâng
+  nhẹ: Lạc Long +2 m; way gồm cả 2 đầu SÁT ĐẤT — mặt cầu chỉ ở `pts[i0..i1]`), `flat` (cầu phẳng — mặt đường roadnet ở LAND_H,
+  js/bridges.js chỉ thêm lan can/dầm/trụ). `terrain.ELEVATED_RI` = ri của mọi kind ≠ flat: roadnet KHÔNG vẽ dải mặt đất của
+  span/ramp; way 'deck' roadnet VẼ trừ khoảng [i0,i1] (`deckGapAt`); cây/prop/W2-A dùng `ROADS_GROUND` (world.js: span/ramp
+  thu 1 điểm, 'deck' giữ). Đồ thị giao thông dùng `world.trafficRoads()` (way cầu = tim mặt cầu + cao độ, xem §10 W3-F (10)).
 - `ROADS_DT [{c, pts}]` — c ∈ p(primary/trunk) s(secondary) t(tertiary) r(residential) w(pedestrian).
 - `ROADS_REGION`, `BUILDINGS [{p, a, l}]` (footprint THẬT không phóng, a=diện tích, l=số tầng×10).
 - `LM {key:[x,z]}` tâm công trình thật; `LM_DIR` **vector đơn vị cạnh ĐƠN dài nhất** footprint (KHÔNG phải
@@ -146,6 +157,10 @@ với `ang = atan2(Δx, Δz)` của 2 đầu way thật.
   (`h < 1.9` VÀ (trong polygon nước — cờ `polyWet` của lần gọi NoDeck gần nhất — HOẶC `riverFactorLine > 0.03`)).
 - `groundHeight = max(groundHeightNoDeck, deckHeight)`. **Thuyền dùng NoDeck** để chui gầm cầu;
   xe/người dùng bản có deck. `isWater = NoDeck < 0.25`.
+  **Đợt 3 W3-F:** HVT (BRIDGES[0]) KHÔNG còn trong deckHeight (đoạn thẳng cũ lệch ~110 m). Mặt cầu NÂNG (BRIDGE_WAYS ≠ flat)
+  KHÔNG nằm trong groundHeight (cây/prop/nhà vẫn ở mặt đất dưới cầu) — tra bằng world.js `surfaceY(x, z, yRef)` = max(đất,
+  mặt cầu cao nhất ≤ yRef + 1,2) (người chơi/camera/giao thông giữ đúng tầng; lên cầu bằng dốc) và `spawnY(x, z)` (teleport/
+  pano/spawn: mặt cầu nếu tim cầu GẦN hơn tim phố mặt đất gần nhất). Mặt nhựa = y + 0,02 (span/ramp) / + 0,11 (deck).
 - Đồi (1:1): sống Đồ Sơn `EXTRAS.dsRidge` (cao 62, phạm vi 220→950), đồi Vụng quanh `EXTRAS.baodai`
   (cao 32, 150→700), đồi Thủy Nguyên z<−2500, núi Cát Bà x>30000 theo mask (cao tới 110m).
 - **Kênh Nam Triệu nhân tạo** (1:1): `RIVERS.push({w:1300, pts:[[7600,0],[11000,4100],[15000,7000],[20600,9700]]})`
@@ -397,7 +412,9 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
    phố r/t 380 căn, block_infill CAPB 9500.
 3. Ven hồ Tam Bạc: cây thật là xà cừ/bàng TÁN XANH + cây cắt tỉa, phượng đỏ chỉ điểm xuyết
    (lakeSD<45: phượng 12%); kè hồ thật RỢP cổ thụ — trồng theo chu vi LAKE_POLY mỗi 14m,
-   cách mép nước 4.5m.
+   cách mép nước 4.5m. **CHỈ cho HỒ** (Đợt 3 W3-F, AUDIT3 TREEFORM): dải dạo ven SÔNG Tam Bạc (đoạn cong + đoạn tây —
+   Phố Tam Bạc, Thế Lữ, pano_198/203/207/212/290/294) là CÂY NON chống cọc 3 chân sau bão Yagi, phía nhà KHÔNG cây; đoạn
+   bắc Lạc Long → cửa Cấm (pano_519/331/336) là hàng cổ thụ trên dải bờ tự phát (js/riverbank.js 'prom' vs 'strip').
 4. Biển tên phố đặt ở GIAO LỘ (tâm nhãn OSM có thể rơi giữa đường).
 5. Cụm lỗi lớn nhất còn lại (chưa sửa hết): HOUSE — dãy shophouse phải LIỀN KỀ SÁT VỈA HÈ
    từng lô ~5m (thực địa hiếm khi có khoảng trống); LANDMARK — từng công trình đặc trưng
@@ -743,6 +760,214 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     gọi tools/qa/clearance.mjs qua wrapper ghép cờ; (g) khoá GPU không xếp hàng công bằng: khi 6-7 agent cùng chụp, mỗi lần xin
     khoá có thể chờ > 60 phút rồi HẾT GIỜ (perf A/B từng mất nửa cặp) → chạy cả cặp B A B A dưới MỘT lần giữ khoá
     (`node tools/qa/gpulock.mjs run -- bash chuoi.sh`; shoot.mjs bên trong tái nhập khoá con) — vừa nhanh vừa đúng "cùng phiên".
+- **2026-10-12 (W3-F WATER-BRIDGES)** [ĐỢT 3 wave 3 — AUDIT3 FP-6: cầu HVT theo way OSM (2 nút xoắn ốc), Cầu Lạc Long nâng,
+  bờ kè sông Tam Bạc/Cấm (tường kè, dải dạo, lan can gang, đèn 2 bóng, hoa giấy, cây non, dải bờ tự phát), bãi bồi cửa Tam Bạc,
+  màu nước]:
+    **(1) CẦU HVT THẬT = 2 làn một chiều + 2 NÚT XOẮN ỐC** (OSM: 738297304/930885732 layer 2 nhịp chính x≈−48/−59 z −930→−1880;
+    1022715416/1022715417 layer 1 = vòng tròn r≈63 m tâm (17,−930)/(−133,−932); dốc dẫn 743181389/743181388 cùng tên KHÔNG gắn
+    bridge). Mô hình cũ = hộp thẳng nối 2 đầu way bắc (75,−898)→(−45,−1883): vòm lệch ~110 m về đông pano_285, tâm vòm ở z −1391
+    (trên đất Thủy Nguyên); roadnet vẽ 2 vòng xoắn thành vòng nhựa NẰM ĐẤT ("tấm đen trên nền đất" pano_304/349); terrain
+    deckHeight "phố băng sông = cầu phẳng 2,05" đặt camera pano_285 sát mặt sông. Nay process_osm §6b4 xuất `BRIDGE_WAYS`:
+    xích theo chiều xe (way nối đuôi→đầu ≤ 3 m), dốc ĐỀU từ đầu dốc mặt đất tới đỉnh xoắn (đỉnh đầu của cạnh gốc ≥ 200 m)
+    = 15 m (1,93 %: vòng dưới và nửa vòng trên cách 1 vòng 404 m ⇒ ~7,8-8,2 m; ảnh 304 h90 dốc dưới ~6 m, mặt trên ~14 m);
+    nhịp chính y(z) ease (−930 → 15, −1020 → 19,4, −1110 → 20,6, −1200 → 19,4, −1880 → 2) — 2 làn cùng z cùng cao độ.
+    `js/bridges.js`: mặt cầu (texture nhựa + vạch), gờ bê tông 0,95 m + tay vịn thép 2 tầng + cột 2,5 m, dầm 1,9/1,35 m, mặt
+    dưới, đèn cần vươn 36 m; trụ tròn + xà mũ (nhịp chính 42 m, xoắn 24 m; dời ±3/±6 m khỏi lòng phố mặt đất & camera pano;
+    gầm < 2,2 m bỏ); tầng TRÊN chồng lên tầng dưới → KHUNG CỔNG 2 cột đứng ngoài mép tầng dưới + xà; vòm đỏ network-arch
+    neo đúng lòng sông z −1030…−1200 (tim giữa 2 làn, sườn ±14,5 m nghiêng 0,22, cao 38 m, dây treo đan chéo, giằng đỉnh,
+    trụ chân vòm xuống nước); tháp thang máy khung thép kính cạnh nhịp chính bờ nam (−33,5, −1003) (ảnh 304 h90, 285 h90).
+    **(2) TRA CAO ĐỘ MẶT CẦU CÓ THAM CHIẾU** (world.js): `groundHeight` KHÔNG gồm mặt cầu nâng (cây/prop/nhà vẫn ở mặt đất
+    dưới cầu); `surfaceY(x,z,yRef)` = max(đất, mặt cầu cao nhất ≤ yRef + 1,2) — người chơi (đi bộ, tryMove, camera),
+    tác tử giao thông giữ ĐÚNG TẦNG ở nút xoắn 2 tầng và cầu vượt trên phố (r4: theo CẠNH đồ thị tách tầng — xem (10)); `spawnY(x,z)` (teleport/pano): mặt cầu nếu tim cầu GẦN hơn tim phố mặt đất gần nhất (pano_285 nhịp
+    chính 18,9 m; pano_074 trên Lạc Long; pano_349 phố đất dưới vòng xoắn → đất). BẪY: dùng groundHeight cho người chơi trên
+    nhịp chính = rơi xuống sông (isWater) — mọi hệ di chuyển mới phải gọi surfaceY. roadnet `deps.skipWay(ri)` bỏ dải mặt đất
+    của way cầu nâng; seed vá đường/lệch 1,5 mm theo `si` (chỉ số NẾU không bỏ way) ⇒ mọi phố khác GIỮ y hệt. Cây/prop/W2-A
+    dùng `ROADS_GROUND` (way cầu nâng thu về 1 điểm, giữ chỉ số).
+    **(3) CẦU LẠC LONG = cầu phố nâng nhẹ (kind 'deck')**: ảnh pano_074 h180 — mặt cầu cao ~2 m trên ngã ba Bạch Đằng ngay
+    dưới, bó vỉa sơn sọc đỏ-trắng, vỉa hè gạch đỏ, lan can con tiện trắng hoa văn ô van; tim vàng đôi. Hồ sơ (r4): phẳng 6 m ở
+    đầu tây, dốc 64 m lên +2 m; đầu đông phẳng 44 m (ngã tư phố ven bờ ri 200 ở quãng ~200 m) rồi dốc 35 m; mặt cầu chỉ ở
+    [i0,i1] (5,9 → 187,3 m). Đầu cụt Bạch Đằng 51/222 (−379,−505) cắt lùi khỏi gầm (xem (10)). Cầu phẳng khác (Tam Kỳ, Tam Bạc, Bạch Đằng/Đào Hạ Lý): lan can con
+    tiện + dầm biên + trụ trong nước theo dải roadnet ở LAND_H.
+    **(4) MÉP SÔNG LÙI KHỎI PHỐ VEN SÔNG** (process_osm §6b3): đối chiếu ảnh vệ tinh tile 4/5/7 (georef tự động bằng tương
+    quan mạng đường OSM ↔ "độ đường" ảnh, mpp 0,67 — georef trong README tile 7 SAI) + cấu trúc pano: polygon OSM sông Tam Bạc
+    chạy ĐÈ lòng Phố Tam Bạc (tim phố cách mép nước 2-6 m ở pano_197-203). Đỉnh polygon sông (chia ≤ 3 m) bị đẩy theo pháp
+    tuyến phố (song song ≤ 40°, không phải cầu) tới ≥ hw + vỉa hè + 2,5 m; footway=sidewalk ven sông ≥ 3 m. 649 đỉnh, tối đa
+    9,1 m. Đoạn bắc 221 → 333: mép đông polygon cách kè MỚI (ảnh vệ tinh tile 7, chụp SAU pano — đường kè mới) 15-25 m về tây,
+    nhưng pano 2022-23 (519/336/337/520) cho thấy đúng dải bờ tự phát rộng ~10 m (lán + cây) ⇒ GIỮ polygon, dải đó = 'strip'.
+    **(5) BỜ KÈ** (`js/riverbank.js`): (a) `snapBankGrid` — lưới nền local 13,3 m vẽ bờ thành dốc thoải ~5 m (mép nước theo ô,
+    "nước phẳng với vỉa hè"): đỉnh ±0,72 ô quanh mép polygon kéo VỀ MÉP (cao độ đất), đỉnh nước kế tiếp DÌM −60 m (tam giác bờ
+    gần đứng, phần nhô trên mặt nước ≤ 0,6 m nằm sau tường kè — kéo về "chân kè 3 m" như lưới mịn hồ sinh NÊM dài nhô lên mặt
+    nước vì ô 13,3 m quá thưa), tam giác cả 3 đỉnh cao độ đất mà tâm trong nước → trả đỉnh nước về chỗ cũ; tô lại màu đỉnh; bỏ kênh hẹp (bên kia mép phải còn nước ≥ B+8 m) và CẠNH CHUNG 2 polygon (sau mép phải là đất — nếu không
+    thành gờ đất giữa lòng sông, pano_221 h270). (b) mọi mép sông R ≤ 1640: tường kè đứng 0,7 m ra phía nước từ mặt dạo
+    (LAND_H + 0,25) xuống −1,4 (đỉnh sáng, vệt rêu sát nước) + gờ đỉnh. (c) phân loại theo phố chạy dọc bờ: 'prom' (bờ cách mép
+    vỉa hè ≤ 7 m: dải dạo ca-rô đỏ-xám bạc màu LIỀN từ gờ tới sát bó vỉa + lan can gang xanh (tấm hoa văn alphaTest 1 quad/2 m,
+    gờ bê tông — phố s/p sọc đỏ-trắng 1 m như pano_221, t/r xám như 203) + đèn gang 2 bóng 16 m (bóng = sharedMats.lampGlow,
+    sáng đêm) + khóm hoa giấy + collider chặn rơi + CÂY NON chống cọc 9 m (world.js veg.plant('non')), phố đó KHÔNG trồng cây
+    đường phố cổ thụ cả 2 bên (keepClear), đồ vỉa hè props.js không đặt phía sông (promSide)); 'strip' (Tam Bạc đoạn BẮC Lạc
+    Long → cửa Cấm, mảnh polygon bắc z < −568 (bậc nối 2 mảnh ngay pano_221), pano_519/331/336/221 h270 — LUÔN strip: lan can sắt thấp ở MÉP VỈA HÈ (tấm CHUỖI VÒNG TRÒN sẫm alphaTest
+    như ảnh 519 h180/331 h270 + trụ bê tông 6 m + chậu cây), lán tôn/bạt màu thấp 1,9-2,4 m giữa lan can và kè, GIỮ cổ thụ + xe
+    máy đỗ, CÂY LỚN trong dải (bankTrees: hàng ≤ 6 m sau lan can, dải ≥ 8 m thêm hàng thưa phía kè; world.js plant('shade'));
+    hàng rào vòng tay khối B2 "phố thuyền" bỏ khi kit chạy (từng thành 2 hàng rào song song)); 'wild' (không phố, bờ xa > 7 m
+    ngoài đoạn bắc, dưới cầu: chỉ kè). Thuyền gỗ neo bờ
+    Tam Bạc đoạn bắc. BẪY: keep/promSide phải giới hạn theo QUÃNG có dải dạo trên đoạn ROADS_DT (keepSegs si → [t0,t1] + 6 m)
+    — 1 đoạn dài (Phố Tam Bạc 221 → 335) vừa có dải dạo vừa là dải tự phát; áp cả đoạn từng xoá hàng cổ thụ + xe máy phía sông
+    ở pano_336 (12 → 4 cây, 30 → 13 xe trong 22 m).
+    Khối ô dựng tay TS-11/TS-12 (dải caro + lan can kè Thế Lữ/Phố Tam Bạc theo vị trí cũ) bỏ phần dải/lan can khi kit chạy.
+    **(6) NƯỚC**: sông 0x5c625a → 0x5b5a46 nâu-ô liu (ảnh tầm mắt 203 (80,76,62), 221 (122,114,90), 290 (96,100,79)), nhám
+    0,12 → 0,2 (bớt gương trời xám-trắng nhìn ngang); hồ giữ.
+    **(7) DƯỚI MẶT CẦU NÂNG**: world.js `underDeck(x,z)` = có mặt cầu (`DECKS.topAt(x,z,3)`) cao hơn đất 0,8…16 m → KHÔNG cây
+    đường phố (keepClear), KHÔNG đồ vỉa hè props (avoid), và MỌI cây dựng tay/ô/hồ bị `buildTrees` bỏ (hook `ctx.dropAt` —
+    trees.js 1 dòng, thống kê fix.deck): cau/cọ + cây non từng đứng XUYÊN mặt Cầu Lạc Long +2 m (pano_074 h0). Nhịp chính HVT
+    ~19 m: cây nhỏ dưới gầm vẫn được. riverbank `deckAt` → không lan can/đèn/cây non dưới cầu nâng (roadnet bỏ dải mặt đất
+    của cầu nâng nên `roadSurfaceAt` = 0 ở đó). Lòng 2 NÚT XOẮN (way 'ramp' gần tròn quét ≥ 300°; ảnh vệ tinh real_7: phần lớn
+    là BÃI NHỰA + 1 vườn bán nguyệt phía nam): claimPoly 'park' bán elip 38 × 27 m (dây cung cách tâm 15 m về nam) TRƯỚC, rồi
+    claimCircle 'parking' (r − w/2 − 2) → landuse tô bãi nhựa / cỏ (landuse.js: lớp claim mới 'parking' → PARKING, 1 dòng) thay
+    "bãi trống đất be" + tấm nhựa đen. Texture mặt nhựa cầu 256 × 288 px / (bề rộng × 12 m) = texel ~VUÔNG 4 cm: bản 64 × 256
+    (16 × 4,7 cm) kéo hạt nhựa thành vệt hướng về camera. Mặt DƯỚI mặt cầu bê tông sáng 0xcdc9bf (0x8d8a83 cũ thành mảng đen
+    lơ lửng khi nhìn từ dưới nút xoắn, pano_304 h90).
+    **(8) BÃI BỒI CỬA TAM BẠC** (process_osm §6b3b, AUDIT3 FP-6 "331 (−525,−905)"): ảnh vệ tinh tile 7 — polygon OSM Tam Bạc
+    242027154 phủ CẢ bãi cát + lùm cây rộng 25-60 m giữa lạch nước thật (~36 m, sát bờ tây, tim = waterway 680814260) và kè phố
+    Tam Bạc (pano_331/332/383/384: rào + cây rậm + nhà tôn thấp, KHÔNG thấy nước; game cũ: mặt sông mở 15 m trước camera).
+    Mép đông polygon từ chân bãi (z −830) tới cạnh chung với polygon Cấm được THAY bằng đường bờ bãi `BEACH_SHORE` (11 điểm đo
+    trên tile 7; z < −965 ngoài ảnh = tim lạch + 19 m, khớp đoạn đo) — ghép 1 DẢI LIÊN TỤC các đỉnh (chia ≤ 3 m) phía đông đường
+    bờ, đỉnh gốc ngoài dải giữ y hệt; xuất `BEACHES` (đa giác đất bãi). riverbank.js: mẫu bờ có phía đất trong BEACHES = DỐC CÁT
+    tự nhiên 4,5 m (không tường kè), 'strip' (tìm phố ±3 ô lưới, giới hạn keClear + 75 m): lan can vòng ở mép vỉa hè + lán sát
+    SAU lan can theo hướng phố (22 %) + lùm cây rải trên bãi (lưới 7 m xê dịch, mật độ theo ô 22 m, cách nước ≥ 3,5 m); claimPoly
+    'rough' → landuse tô CỎ DẠI/đất (landuse.js lớp claim 'rough' → ROUGH; claim 'rough' không chặn cây/prop). BẪY: ảnh vệ
+    tinh MỚI hơn pano (kè + đường mới ở cửa sông, dải lán đã dọn) — chấm pano theo trạng thái 2022-23, đo bờ theo vệ tinh.
+    **(9) KHỞI ĐỘNG / BỘ NHỚ**: snapBankGrid lọc thô theo cao độ đỉnh (chỉ đỉnh ≤ 4 ô quanh chỗ đổi khô/ướt mới gọi waterSD:
+    −85 % lần gọi) + chỉ trong R_POLY; giao thông chỉ tra groundHeight ở điểm cạnh CÓ mặt cầu phủ (cạnh 'elev'); cây non lọc
+    collider bằng lưới 4 m theo hộp bao (thay colliders.some × 234 cây); riverbank/bridges nhả mảng JS nguồn sau khi chép sang
+    typed array (closure keep/promSide giữ ngữ cảnh hàm dựng ⇒ không nhả = ~30 MB heap sống suốt phiên).
+    **ĐO / KIỂM** (2026-10-12, tier 3, ANGLE AMD Radeon 890M D3D11, A/B CÙNG phiên dot3 :8596 vs nhánh :8506): hpReady TB 3 lần
+    4751 → 4756 ms — **SAI khi kết luận "không đổi"** (phản biện r2 đo lại cùng phiên: tổng bước khởi động +336 ms full / +384
+    lite: ground +110, freeze +111, landmarks +70; hpReady 3 lần lệch nhau ±300 ms nên KHÔNG dùng hpReady đơn lẻ để kết luận
+    — so TỔNG bootProfile + từng bước, ≥ 2 lượt xen kẽ mỗi bên; số sau r5 ở (11)); heap sau gc 385 → 412 MB (+27; trước khi nhả mảng nguồn +54), hình học GPU 254,7 → 277,8 MB
+    (cầu + kè gộp 'mrg' 30 → 51); fps 60 (trần vsync) mọi góc; cam_spawn 387 → 402 calls / 3,83 → 3,93 M tam giác, pano_007_h090
+    505 → 508 / 5,52 → 5,53 M, cam_high_center 392 → 415 / 5,24 → 5,41 M, game_3 348 → 350 / 6,10 → 6,09 M, cam_hvt 633 → 658 /
+    6,88 → 7,01 M. Kit bờ: 5605 mẫu, dải dạo 3,24 km, strip ≈ 0,45 km, bãi 0,37 km, 191 đèn, 235 cây non, ≈ 95 cây lớn, ~100 ms.
+    Chấm pano (REAL | dot3 | nhánh, 4 hướng, ±0,5): 17 pano đích 2,91 → 4,51 (285 1,5 → 5; 304 2 → 4,5; 349 2 → 4,5; 074 2,5 → 5,5;
+    331 3 → 3,8); 8 pano đối chứng 4,56 → 4,56 (lệch điểm ảnh ≤ 7 %, chỉ lá cây lay). Cổng: diag "TẤT CẢ THỰC THỂ OK — 0 lỗi JS"
+    (full, giao thông bất biến 0); lite 3 × 404 = assets_lite/ trống ở máy (môi trường, base y hệt); --gl1 0 lỗi; tour 26 ảnh
+    0 lỗi; waterbfs 5/5; process_osm chạy lại → mapdata y hệt; đi bộ theo xích mặt cầu (surfaceY tham chiếu) sai số 0, không rơi.
+    CÒN: camera/lòng phố pano_331/519 (FP-1), bậc polygon 2 mảnh Tam Bạc ở pano_221 (gờ kè chéo qua bãi cỏ), tháp thang máy
+    HVT là khối kính đơn giản.
+    **(10) SỬA SAU PHẢN BIỆN (r4)**:
+    (a) **ĐỒ THỊ GIAO THÔNG TÁCH TẦNG** (`js/roadgraph.js`): đỉnh polyline mang cao độ mặt đường p[2] (không có = mặt đất
+    `groundLevel` 2,11); ngã ba T (≤ 6 m), ngã tư chéo và khoá nút (ô 1,5 m) chỉ nối 2 tuyến lệch ≤ `LV_TOL` 1 m — khoá nút
+    = ô + CỤM cao độ (2 tuyến khác tầng có đỉnh trùng ô = 2 nút). Cạnh mang `e.ys` (cao độ từng đỉnh), `e.kind`, `e.ri`, `e.lv`
+    (TB); đường đôi không ghép cạnh lệch tầng > 2 m. BẪY cũ: đồ thị nối MỌI giao cắt 2D → 22 nút nối mặt cầu 6-16 m với phố
+    mặt đất; ở nút HVT 88-102 xe/mẫu chạy "đường cầu" ngay trên đất, 5-9 xe lặn dưới sông Cấm (y −2,9); `traffic.check()`
+    chỉ xét xz nên diag báo 0. Đầu vào = `world.trafficRoads()` = `deckRoads(ROADS_NET, BRIDGE_WAYS)`: way cầu nâng thay
+    polyline ROADS_DT giản lược (dây cung vòng xoắn r 63 m lệch ~3 m khỏi tim mặt cầu) bằng tim mặt cầu mẫu 3 m + cao độ mặt
+    nhựa (y + 0,02 span/ramp, + 0,11 deck), hw = nửa lòng giữa 2 gờ (HVT 5,0 / 4,7, không 6,5 của cấp 'p'); 2 đầu mút gắn đúng
+    toạ độ ROADS_DT. Kết quả: 469 nút (495), 0 nút lẫn tầng, xích HVT sạch đất → dốc → vòng xoắn → nhịp (mỗi nút deg 2).
+    (b) **CAO ĐỘ TÁC TỬ THEO CẠNH** (traffic.js): cạnh có e.ys → `edgeY(e, dir, s)` MỖI khung (không +ROAD_TOP lần 2 — xe từng
+    nổi 0,11 m; không bậc 4 m trên dốc); phố mặt đất → groundHeight (KHÔNG tra mặt cầu theo vị trí: xe dưới gầm vòng xoắn từng
+    "bước lên" dốc thấp ≤ 1,2 m). Cầu HVT (span/ramp) MỘT CHIỀU theo chiều way (xích đúng chiều xe) + cấm người đi bộ; cầu phố
+    'deck' 2 chiều + người đi bộ trên vỉa hè gạch (y = mặt nhựa + CURB_RISE). Bám xe/lách người chơi/overlap bỏ qua cặp lệch
+    tầng > 2,5-3 m; xe đỗ không gán lên cạnh cầu; `check()` thêm `underwater` (xe y < 0,8). chooseNext có lưới an toàn khác
+    tầng 1,2 m.
+    (c) **XUỐNG XE / GỌI XE / MÉP CẦU** (main.js, vehicles.js): `freeSpot/dismount/callMoto` dùng `surfaceY(x,z,ref)` với ref =
+    cao độ xe/người + chỗ phải CÙNG TẦNG (|h − ref| ≤ 1,2) — bản cũ dùng groundHeight (dưới nhịp chính = đáy sông −3): trên cầu
+    không xuống xe được ("⚓ cập bến…"), không gọi xe được ("cần đứng trên bờ"), xuống xe trên dốc xoắn = rơi xuống đất dưới gầm;
+    vehicles.spawn khi gọi xe nhận ref qua `_vehRefOverride`. `tryMove` (đi bộ) và `vehicles.blockedAt` (xe đang lái) TỪ CHỐI
+    bước làm bề mặt thấp hơn chỗ đang đứng > 1,2 m = mép mặt cầu (thành phố phẳng: không có bậc thật nào cao thế).
+    (d) **CẦU LẠC LONG CHỈ KHOẢNG NÂNG**: bằng chứng giữ đường dẫn tây dài trên đất — ảnh vệ tinh tile 7 (dải mặt cầu thẳng giữa
+    2 phố gom mặt đất 51 bắc / 222 nam, 2 dải cây) + pano_074 h270 (lan can chạy suốt về tây). Nhưng: bản cũ bỏ CẢ way 232 m
+    khỏi roadnet → đầu tây (nối phố 187) thành phố cụt có nêm vỉa hè chữ V giữa lòng + cột đèn tín hiệu của nút cũ đứng trên làn
+    cầu; lan can + gờ sọc chắn ngang ngã tư với ri 200 (mặt cầu y 2,0 ở đó); Bạch Đằng 51/222 gặp nhau dưới tấm mặt cầu gầm
+    0,9 m; 100 m tấm lơ lửng trên đất. Nay: process_osm hồ sơ mới + `i0/i1` (mặt cầu bắt đầu/kết thúc đúng chỗ y = mặt đất ⇒
+    mặt nhựa cầu = mặt nhựa phố 2,11, không bậc); roadnet vẽ ri 20 trừ khoảng `deckGapAt(ri,x,z)` (biên dò 1 m + chia đôi ~1 cm);
+    `makeDeckIndex`/claim 'bridge'/urbanDeck chỉ [i0,i1]. Đoạn trên ĐẤT = NỀN ĐẮP: mặt đứng 2 bên xuống tận đất (−0,3), trên
+    nước dầm biên sâu 0,25 → 1 m theo cao độ (đầu cầu thấp không cắm mặt sông) + mặt dưới + MỐ ngang ở chỗ chuyển đất↔nước;
+    trụ trong nước đỉnh = đáy dầm. `roadgraph.trimRoadEnds(ROADS_DT, lowAt)` (world `ROADS_NET`, dùng cho roadnet + đồ thị):
+    phố mặt đất có ĐẦU MÚT dưới mặt cầu gầm thấp (mặt cầu > đất + 0,5 và < đất + 5,5, pad 0,6 m) cắt lùi tới mép mặt cầu; cờ
+    `r.cut` → roadnet/đồ thị KHÔNG T-snap đầu đã cắt (Bạch Đằng 51 từng bị kéo 5 m sang đầu phố 243 thành chữ V nhọn). Chỉ
+    51 và 222 bị cắt (phố cụt sát tường nền đắp, như ngõ cụt).
+    (e) **NHỎ**: vòm HVT z0 −1024 → −1012 (pano_285 ở bờ nam z −1000: h270 sườn tây mọc sát mép phải ⇒ chân ≤ ~16 m phía bắc;
+    h90 không thấy sườn đông ⇒ ≥ ~13 m); mặt DƯỚI cầu pháp tuyến (0,6·trục, 0,8) — hướng xuống chỉ nhận màu ĐẤT của đèn bán
+    cầu → "tấm nâu khaki sẫm" pano_349; thử NGANG (50 % trời) còn nâu ở đoạn quay lưng nắng + sọc bóng (normal bias ngang);
+    đỉnh gờ + mặt trong gờ HVT xám lạnh 0xa9a8a2 (mặt ngoài giữ sáng — "vệt be" 285 h90/h270). NHÀ ô dựng tay GIỮ (cao ≥ 9 m) nằm
+    trong lòng nút xoắn (`world.helixLoops` từ claim lòng vòng; hvt_tapthe5t 5 tầng — thiết kế quanh cầu HVT cũ; ảnh vệ tinh
+    tile 7: lòng vòng tây = bãi nhựa + vườn bán nguyệt) → `lmRemoveCell`. BẪY: hvt_nonbo (kind 'house', 7,5 m) là HÒN NON
+    BỘ trên đảo vườn — THẬT (pano_304 h180/h270), lần gỡ đầu xoá nhầm → chỉ gỡ khối cao. Va chạm 2D (`resolveAll` main.js): đang ở trên
+    mặt cầu cao hơn đất > 2,5 m (`decks.yAt(x,z,y+0,3)`) → bỏ collider thế giới/NPC (cây/cột/nhà dưới gầm từng chặn xe trên
+    vòng xoắn); `traffic.pushOut` bỏ xe lệch tầng > 2,5 m. Tam Bạc đoạn BẮC (dải bờ tự phát): process_osm §6b3 mép nước ≥
+    clearOf + 7 m ở z −620…−800 (vuốt 0 ở −590 và −830 — không khấc mới ở 221 / chân bãi bồi): quanh 519 polygon chỉ cách tim
+    phố 10,5 m (dải 2 m, không chỗ lán; 336/337/520 là 18-19 m) → 16 m, lán + cây sau lan can như ảnh 519 h180/h270.
+    KHÔNG làm: giới hạn keep() về phía sông (cây phố là thủ tục nhịp 9 m, không bằng chứng: trả lại cây cổ thụ 473 h90 nhưng
+    cũng trả cây sai ở 203 h90 — giữ cả 2 bên).
+    **ĐO / KIỂM r4** (2026-10-12, tier 3, ANGLE Radeon 890M D3D11; máy TẢI NẶNG — hpReady 5-20 s cả 2 bên, chỉ so cùng phiên):
+    heap sau gc 384 → 411 MB, hình học GPU 254,7 → 277,5 MB (= r3); draw call 2 lượt/bên: pano_062_h090 352 → 356, cam_hvt
+    616 → 630, game_3 325 → 327, pano_071_h180 612-671 → 623; game_8 (dot3 182 / 458 — GLB tải không tất định, 1 lượt std
+    nhánh 484 cũng là nhiễu này) → 197-221. Đồ thị 469 nút (495), 0 nút lẫn tầng; probe 8 mẫu × ~250 xe quanh nút HVT: lệch
+    khỏi mặt đường/mặt cầu 0, dưới nước 0 (trước 88-102 / 5-9 mỗi mẫu); xuống xe trên nhịp 20,6 m / vòng 4,9 / 7,7 m đúng
+    tầng, gọi xe trên cầu được; đi bộ & lái xe máy thẳng ra mép vòng xoắn dừng ở mép (y giữ 7,7); người đi bộ trên Lạc Long
+    y = mặt cầu + 0,14. Chấm 17 pano đích 4,51 → 4,59 (304 4,5 → 4,8; 349 4,5 → 5; 285 5 → 5,2; 519 3,5 → 3,8; 336 3,8 → 4);
+    8 đối chứng lệch điểm ảnh ≤ 6,8 % so dot3. Cổng: diag full "TẤT CẢ THỰC THỂ OK — 0 lỗi JS" (bất biến 0, underwater 0),
+    lite 3 × 404 (assets_lite/ trống — môi trường), --gl1 0 lỗi, tour 26 ảnh 0 lỗi, waterbfs 5/5, process_osm tất định.
+    BẪY harness: sau "Bắt đầu" hội thoại hướng dẫn (modal) chặn di chuyển người/xe — probe phải Esc trước khi giữ W (headless:
+    phát KeyboardEvent thẳng lên window).
+    **(11) SỬA SAU PHẢN BIỆN r2 (r5, 2026-10-14)**:
+    (a) **XE HƯỚNG BẮC TRÊN NHỊP HVT** (traffic.js chooseNext): nhịp một chiều 738297304 (ri 242 — nhịp pano_285 đứng) có nút xa
+    (−46,−1650) NGOÀI PLAY_R + 30 → luật "không chạy ra ngoài vùng chơi" bỏ LỐI RA DUY NHẤT ở đỉnh vòng xoắn đông (75,−898);
+    cạnh nâng một chiều không quay đầu được → `a.kill` ⇒ mọi xe hướng bắc biến mất ở đỉnh xoắn, nhịp KHÔNG BAO GIỜ có xe. Nay
+    cạnh cầu nâng (`e.elev`) miễn luật đó; xe chạy xa bị cull khoảng cách (RB + 40) như mọi xe. Node (scratch r5/graph_exits.mjs):
+    cạnh nâng mà nút cuối không lối ra 1 → 0; probe: xe trên ri 242 quanh 304: 6-12/mẫu, quanh 285: 12-18 (trước 0); wrongWay,
+    underwater, offRoad 0. BẪY: mọi luật lọc theo vùng chơi trên đồ thị có cạnh một chiều phải kiểm "nút còn lối ra không";
+    probe "lệch mặt đường" chỉ đúng cho tác tử TRONG DRAW_R (260 m) — ngoài đó writeInstances không cập nhật a.y (y cũ, 300-380 m).
+    (b) **KHỞI ĐỘNG / GPU: SỐ TAM GIÁC LÀ CHI PHÍ.** freezeStatic tách mọi mesh bán kính > 0,75·T bằng `splitGeometryByTile` →
+    lưới KHÔNG CHỈ MỤC (3 đỉnh/tam giác) ⇒ byte GPU + thời gian tách/gộp ∝ SỐ TAM GIÁC (chia sẻ đỉnh trong Buf vô ích). Bản r4
+    dựng kè = hộp/quad MỖI MẪU 2 m: kit bờ 181,6k + cầu 108,7k tam giác. riverbank.js `Run(B, faces, cap)`: mẫu liên tiếp CÙNG
+    cạnh polygon (cùng hướng, cùng màu) gộp thành 1 đoạn quét; khung chỉ ở đỉnh polygon (vát góc, hệ số 1/cos chặn 2) và chỗ
+    đổi màu (sọc gờ 1 m); nắp chỉ ở chỗ đứt — tường + gờ kè + bệ + tay vịn 96,7k → 9,4k tam giác (168 cạnh polygon sông trong R,
+    ~77 m/cạnh); bóng đèn cầu 8×4 (31,4k → 18,8k); pháp tuyến khối hoa giấy tính sẵn; quad() 1 lệnh push/thuộc tính ⇒ kit bờ
+    181,6k → 92,7k tam giác, dựng (node, ấm) ~75 → ~45 ms. bridges.js `simplifyFrames(F, l, 0,02)` cho tay vịn (đường cong
+    đứng bán kính lớn: vài khung/50 m; vòng xoắn giữ gần đủ) + cột tay vịn bỏ mặt trên (nằm trong thanh vịn): 108,7k → 77,3k.
+    Phần W3-F trong freeze (node, tách ô T 450 + gộp, ấm): ~45 → ~28 ms. ĐO TRONG TRÌNH DUYỆT (freezeStatic gắn tạm đồng hồ,
+    3 lần): freeze 190-235 ms; tách ô mesh W3-F 40-59 ms cho 155,7k tam giác (mọi mesh tách ô khác của thành phố 26-34 ms cho
+    114k), gộp (mọi ô) 70-101 ms. Mesh vertexColor KHÔNG texture bỏ thuộc tính uv (lượt 1 xoá uv sau khi đã chép). Đã THỬ chia
+    ô sẵn lúc dựng (Buf theo lưới T của freeze): KHÔNG lợi — mesh nhỏ cũng bị chép từng tam giác khi gộp (`toWorld` =
+    splitGeometryByTile(…, Infinity)) ⇒ chi phí freeze ∝ số tam giác × số thuộc tính, không phụ thuộc mesh to/nhỏ. BẪY: ngưỡng
+    "thẳng hàng" để nối mẫu phải ~0,03° (dot > 0,9999999) — 0,57° cho cung polygon cong mờ lệch dây cung ~0,1 m/100 m.
+    (c) **GỜ GIỮA 2 NHỊP** (bridges.js `makeDeckIndex().crossesParapet(x0,z0,x1,z1,yRef)`; main.js tryMove + vehicles.js
+    `opts.moveBlock`): 2 nhịp HVT một chiều chạm/chồng mép (tim cách 10,6-13,3 m, rộng 11) và main.js tắt collider 2D trên cầu
+    cao ⇒ từng đi/chạy xe NGANG qua 2 gờ. Chặn khi mặt cầu CÙNG TẦNG (yRef −2…+1,2) có tim GẦN nhất đổi từ nhịp này sang nhịp
+    kia (chỉ kind 'span' — nhịp chỉ nối đầu-đầu với vòng xoắn/dốc). BẪY đã thử: (1) "mặt cầu cao nhất" thay vì "tim gần nhất"
+    → đi sát gờ ở chỗ 2 nhịp chồng mép (z −930…−955) bị coi là đứng trên nhịp kia; (2) tiêu chí "điểm mới nằm cạnh way cũ" chặn
+    nhầm ở chỗ nối dốc ↔ vòng xoắn (vòng cong, dốc rời tiếp tuyến). Kiểm node (scratch r5/parapet4.mjs): đi theo 2 xích HVT ở
+    tim / ±4,8 / ±5,1 m, 2 chiều — chặn sai 0; probe: đi bộ/chạy xe máy từ nhịp này sang nhịp kia dừng ở x −53,9…−54,1, y giữ.
+    (d) **NHỎ**: vòm z0 −1012 → −1018 (pano_285 h90 hết mẩu sườn đông ở mép trái; h270 sườn tây vẫn mọc ở mép phải); ca-rô
+    nhạt hơn (đỏ 146,116,108 / xám 132,128,122 — ảnh 290/299 hồng-xám bạc); vách lán tôn kẽm/tôn gỉ/bạt xanh/ván cũ (vách xám
+    nhạt đọc thành "hộp bê tông" ở 519/336); biển địa danh 'bridge' neo lại chân nhịp chính thật (−36,−915) thay đầu "hộp
+    thẳng" cũ EXTRAS.bridges[0] (123,−819), diag tiếp cận OK; `deckRoads` trả `{...r, pts, kind, hw}` (giữ mọi trường của way).
+    Nhà thuyền tb_shack khối B2 (thân thuyền + mui bạt, đặt ở điểm nước đầu tiên 14-42 m phía sông) là THUYỀN có chủ ý — giữ.
+    (e) **GHI CHÚ TÍCH HỢP**: (1) W3-A thêm bề rộng riêng từng way (ROADS_DT[i].w/.sw, xsection.roadHW(way)): sau gộp chuyển
+    riverbank hw(c)/sw(c) + process_osm §6b3 clearOf(c) sang bề rộng theo way, giữ w/sw trong line object của roadgraph
+    (dòng `cur = { c, ri, kind, hw, … }`), rồi CHẠY LẠI process_osm (mép kè + mép ngoài ca-rô theo lòng Tam Bạc hẹp mới).
+    (2) `js/buildings_real.js` là file SINH (tools/process_buildings.mjs dùng terrain.waterSD = WATER mới): nhánh KHÔNG sinh lại;
+    sinh lại từ đầu vào W3-F: drop_water 97 → 91, ~12,7k/46k footprint đổi chỗ trong file (chuỗi sinh dịch), 74 → 72 nhà giữa
+    phố ven sông và nước, 5 nhà mới trên bãi bồi bị claim 'rough' giết ⇒ người tích hợp PHẢI chạy lại + kiểm lại. (3) keep() xoá
+    cây cổ thụ có miếu phía nhà ở pano_473 h90/h180 → phối hợp W3-G (cây di sản/hero). (4) KHÔNG làm: lòng 2 vòng xoắn 'parking'
+    trống ở pano_304 h180/h270 (ảnh thật: đường có vạch + dải phân cách), bậc polygon Tam Bạc ở 221 h270 (gờ kè chéo), TIER cho
+    bộ kit bờ (máy yếu), hàng đợi công bằng cho tools/qa/gpulock.mjs (poll 3-5 s thua poll 250 ms của tác tử khác).
+    **ĐO / KIỂM r5** (2026-10-14, tier 3, ANGLE Radeon 890M D3D11, cùng phiên dot3 :8596 vs nhánh :8506, máy chung với các WP
+    khác): (1) CHI PHÍ RIÊNG W3-F đo bằng đồng hồ gắn tạm quanh từng khối (3 lần full, máy rảnh): snapBankGrid 32-44 ms,
+    buildRiverbanks 56-60 ms (r4: 86), buildBridges 41-42 ms (r4: 63), tách ô mesh W3-F trong freeze 35-50 ms (r4 ~2× số tam
+    giác) ⇒ ≈ 0,17-0,19 s luồng chính (r4 ≈ 0,3 s: phản biện đo tổng bước +336 ms); lite: 18 / 57 / 42 / 55 ms (ô freeze 220 m).
+    Khớp A/B cặp chạy lúc máy rảnh (bootB lần 1): tổng bước 3925 → 4043 (+118), ground +81, landmarks +51, freeze +43. Lúc máy
+    bận (các WP khác chạy song song) A/B lệch −430…+700 ms ở cả bước KHÔNG liên quan (final, actors, shaders) — vô dụng: BẪY đo
+    perf trên máy chung → đo chi phí riêng bằng đồng hồ quanh khối + 1 cặp A/B lúc rảnh. (2) heap sau gc 383 → 397-399 MB
+    (+14-16; r4 +27-28), hình học GPU 254,7 → 264,7 MB (+10; r4 +23 — 'mrg' 30,3 → 38,8); fps 59-60 mọi góc (trần vsync);
+    calls/tam giác (2 lượt): cam_hvt 616 → 644 / 6,88 → 6,90 M, pano_285_h000 93 → 90 / 0,71 → 0,59 M, pano_304_h090 282 → 290 /
+    1,56 → 1,47 M, pano_007_h090 505 → 509 / 5,52 → 5,51 M; kit bờ 92,7k + cầu 76,5k tam giác (r4 181,6k + 108,7k). (3) Chấm 17
+    pano đích (REAL | dot3 | r5, 4 hướng): 2,91 → 4,75 (r4 4,69 theo phản biện; 285 5,0 → 5,3 hết mẩu vòm h90, chân vòm h0 như
+    ảnh; 519 3,5 → 3,7, 336 4,0 → 4,2 lán màu tôn/bạt; 290/299 ca-rô nhạt +0,1); 8 đối chứng lệch điểm ảnh ≤ 5,9 % so dot3
+    (lá lay). (4) Cổng: lỗi JS full 0, --gl1 0 (webgl2 false), lite 3 × 404 assets_lite/ (môi trường — base y hệt); diag full
+    "TẤT CẢ THỰC THỂ OK — 0 lỗi JS" (bất biến giao thông 0, underwater 0), diag base y hệt; tour 26 ảnh 0 lỗi (ảnh 'bridge' nay
+    nhìn thấy nút xoắn + vòm); waterbfs 5/5; process_osm chạy lại → mapdata md5 y hệt (674f1d01…); node --check mọi module.
+
 - **2026-10-04 (W2-F POLISH)** [ĐỢT 3 wave 2 — WebGL1, giải mã RB 1 lần, kho cảng, ĐÊM, giao thông né xe đỗ, dọn code chết, hitch]:
     **(1) WebGL1** (three r160 tự lùi WebGL1 khi không có WebGL2): KIỂM bằng `tools/qa/shoot.mjs --gl1` (init script cho
     `getContext('webgl2')` trả null — cờ Chrome `--disable-es3-apis` KHÔNG có tác dụng ở headless mới: vẫn webgl2:true;

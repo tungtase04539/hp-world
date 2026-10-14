@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { installToneMapping, SceneAOPass, FinalPass, AO as AO_CFG, GRADE, timePass } from './post.js';
-import { buildWorld, groundHeight, groundHeightNoDeck, landAt, WORLD_BOUNDS, EXTRAS, BUILD_RADIUS, texCacheStats } from './world.js';
+import { buildWorld, groundHeight, groundHeightNoDeck, landAt, WORLD_BOUNDS, EXTRAS, BUILD_RADIUS, texCacheStats, surfaceY, spawnY } from './world.js';
 import { IS_MOBILE, HAS_TOUCH, TIER, GPU_NAME, QUALITY_PREF, setQualityPref, IGPU_ON_BIG_MACHINE, GFX } from './device.js';
 import { createTraffic } from './traffic.js';
 import { makeHumanoid } from './character.js';
@@ -182,9 +182,19 @@ const { npcs, update: updateNPCs, pushOut: pushOutNPCs } = buildNPCs(scene, worl
 // Va chạm chung cho người & xe: collider thế giới + NPC (collider NPC trước đây push vào world.colliders SAU khi
 // chỉ mục lưới đã dựng → không bao giờ có hiệu lực, npcs.js:99 cũ).
 let _trafficRef = null;   // xe đang chạy cũng là vật cản (gán sau khi tạo giao thông)
-const resolveAll = (p, r = 0.45) => { world.resolveCollisions(p, r); pushOutNPCs(p, r); if (_trafficRef) _trafficRef.pushOut(p, r); };
+// W3-F r4: đang ĐỨNG/CHẠY trên mặt cầu nâng (mặt cầu dưới chân cao hơn đất > 2,5 m — nhịp HVT, nút xoắn) → collider 2D của
+// thế giới/NPC (cây, cột đèn, nhà… ở MẶT ĐẤT dưới gầm) không áp (từng chặn xe/người trên vòng xoắn); xe giao thông lọc theo y.
+const onHighDeck = (p) => p.y != null && world.decks && world.decks.yAt(p.x, p.z, p.y + 0.3) > groundHeight(p.x, p.z) + 2.5;
+const resolveAll = (p, r = 0.45) => {
+  if (!onHighDeck(p)) { world.resolveCollisions(p, r); pushOutNPCs(p, r); }
+  if (_trafficRef) _trafficRef.pushOut(p, r);
+};
+let _vehRefY = () => 2;   // W3-F: gán lại sau khi có pState
+let _vehRefOverride = null;   // W3-F r4: cao độ tham chiếu khi GỌI xe máy (xe mọc trên mặt cầu người đang đứng, không dưới gầm)
 const { vehicles, update: updateVehicle, spawn: spawnVehicle } = createVehicles(
-  scene, groundHeight, groundHeightNoDeck, world.vehicleSpawns, resolveAll, { playRadius: PLAY_RADIUS });
+  // W3-F: xe đang lái theo mặt cầu nâng (tham chiếu = cao độ xe); xe đỗ/không lái ở mặt đất (gọi ngay lúc tạo → _vehRefY)
+  scene, (x, z) => surfaceY(x, z, _vehRefY()), groundHeightNoDeck, world.vehicleSpawns, resolveAll, { playRadius: PLAY_RADIUS,
+    moveBlock: (x0, z0, x1, z1, y) => !!(world.decks && world.decks.crossesParapet(x0, z0, x1, z1, y)) });   // W3-F r5: gờ giữa 2 nhịp
 const fp = footprintIndex(world);   // footprint nhà ĐANG VẼ (world.rbData của WP2; chưa có → chỉ địa danh) → camera, người đi bộ, chỗ xuống xe
 const traffic = createTraffic(scene, world, { playRadius: PLAY_RADIUS, footprints: fp });
 _trafficRef = traffic;
@@ -208,6 +218,7 @@ const pState = {
   onGround: true,
   mounted: null,
 };
+_vehRefY = () => (_vehRefOverride ?? (pState.mounted ? pState.mounted.pos.y : 2));
 player.group.position.copy(pState.pos);
 if (renderer.shadowMap.enabled) {
   player.group.traverse((o) => { if (o.isMesh && !o.material.transparent) { o.castShadow = true; } });
@@ -305,7 +316,7 @@ function updateCamera(dt) {
   if (allow < cam.cur) cam.cur = allow;                               // co NGAY: không bao giờ lọt vào trong nhà
   else cam.cur += (allow - cam.cur) * (1 - Math.exp(-2.5 * dt));      // nhả ra từ từ
   _des.set(_tgtS.x + ux * cam.cur, _tgtS.y + sp * cam.cur, _tgtS.z + uz * cam.cur);
-  const gy = groundHeight(_des.x, _des.z);
+  const gy = surfaceY(_des.x, _des.z, _tgtS.y - 1.5);   // W3-F: mặt cầu nâng (tham chiếu = chân người chơi)
   _des.y = Math.max(_des.y, gy + 1.2, 1.2);
   camera.position.copy(_des);
   camera.lookAt(_tgtS);
@@ -324,7 +335,13 @@ const WALK = 3.0, RUN = 7.0, GRAV = 26, JUMP = 6.5;
 function tryMove(nx, nz) {
   if (nx < WORLD_BOUNDS.minX + 30 || nx > WORLD_BOUNDS.maxX - 30
     || nz < WORLD_BOUNDS.minZ + 30 || nz > WORLD_BOUNDS.maxZ - 30) return false;
-  return groundHeight(nx, nz) > 0.32;
+  const s = surfaceY(nx, nz, pState.pos.y);
+  if (s <= 0.32) return false;                    // W3-F: đi được trên mặt cầu nâng qua sông
+  // W3-F r4 (phản biện): không BƯỚC HỤT khỏi mép mặt cầu nâng / dốc xoắn trên đất (rơi tự do 5-15 m) — bề mặt mới thấp hơn
+  // bề mặt đang đứng > 1,2 m = mép cầu (thành phố phẳng LAND_H: không có bậc thật nào cao thế) → như có lan can
+  if (s < surfaceY(pState.pos.x, pState.pos.z, pState.pos.y) - 1.2) return false;
+  // W3-F r5: gờ lan can giữa 2 mặt cầu nằm sát nhau (2 nhịp HVT) — collider 2D tắt trên cầu cao (onHighDeck)
+  return !(world.decks && world.decks.crossesParapet(pState.pos.x, pState.pos.z, nx, nz, pState.pos.y));
 }
 
 function updatePlayerOnFoot(dt, time) {
@@ -349,7 +366,7 @@ function updatePlayerOnFoot(dt, time) {
     pState.yaw += wrapPI(Math.atan2(dir.x, dir.z) - pState.yaw) * (1 - Math.exp(-10 * dt));
   } else resolveAll(pState.pos, 0.45);
 
-  const gy = groundHeight(pState.pos.x, pState.pos.z);
+  const gy = surfaceY(pState.pos.x, pState.pos.z, pState.pos.y);   // W3-F: giữ tầng mặt cầu đang đứng
   if (consumeJump() && pState.onGround) { pState.vy = JUMP; pState.onGround = false; }
   pState.vy -= GRAV * dt;
   let y = pState.pos.y + pState.vy * dt;
@@ -365,11 +382,15 @@ function updatePlayerOnFoot(dt, time) {
 
 // ============ Lên / xuống phương tiện ============
 // Chỗ đặt người/xe phải: trên cạn, trong vùng chơi, không trong nhà thật/địa danh, không dính collider.
-function freeSpot(x, z, r = 0.45) {
-  if (groundHeight(x, z) <= 0.32 || !inPlayArea(x, z)) return false;
+// W3-F r4 (phản biện): CÓ THAM CHIẾU CAO ĐỘ ref — chỗ phải cùng tầng (mặt cầu nâng HVT/Lạc Long: groundHeight dưới nhịp chính là
+// đáy sông −3 → bản cũ không xuống xe/gọi xe được trên cầu; trên dốc xoắn trên đất xuống xe = rơi xuống đất dưới gầm).
+function spotY(x, z, ref) { return surfaceY(x, z, ref); }
+function sameLevel(x, z, ref) { const h = spotY(x, z, ref); return h > 0.32 && Math.abs(h - ref) <= 1.2; }
+function freeSpot(x, z, r = 0.45, ref = pState.pos.y) {
+  if (!sameLevel(x, z, ref) || !inPlayArea(x, z)) return false;
   if (fp && fp.blocked(x, z)) return false;
   if (world.isFree && !world.isFree(x, z, r)) return false;   // WP2: va chạm đa giác fabric (nếu có)
-  const p = { x, z };
+  const p = { x, z, y: spotY(x, z, ref) };
   resolveAll(p, r);
   return Math.hypot(p.x - x, p.z - z) < 0.05;
 }
@@ -406,15 +427,16 @@ function dismount() {
   const maxR = v.land ? 8 : 3.2;
   const SIDE = [Math.PI / 2, -Math.PI / 2, Math.PI, 0];
   let spot = null;
+  const ref = v.land ? v.pos.y : 2;   // thuyền: mặt đất/bến (không lên mặt cầu cao)
   for (const [nx, nz, d] of spotsAround(v.pos.x, v.pos.z, v.heading, [1.3, 1.9, 2.6], SIDE, maxR)) {
-    if (freeSpot(nx, nz) && (d <= 2.6 || clearPath(v.pos.x, v.pos.z, nx, nz))) { spot = [nx, nz]; break; }
+    if (freeSpot(nx, nz, 0.45, ref) && (d <= 2.6 || clearPath(v.pos.x, v.pos.z, nx, nz))) { spot = [nx, nz]; break; }
   }
   if (!spot) {
     for (const [nx, nz] of spotsAround(v.pos.x, v.pos.z, v.heading, [1.3, 1.9, 2.6], SIDE, maxR)) {
-      if (groundHeight(nx, nz) > 0.32 && inPlayArea(nx, nz)) { spot = [nx, nz]; break; }
+      if (sameLevel(nx, nz, ref) && inPlayArea(nx, nz)) { spot = [nx, nz]; break; }
     }
   }
-  if (!spot && v.land && groundHeight(v.pos.x, v.pos.z) > 0.32) spot = [v.pos.x, v.pos.z];
+  if (!spot && v.land && spotY(v.pos.x, v.pos.z, ref) > 0.32) spot = [v.pos.x, v.pos.z];
   if (!spot) {
     ui.toast(tx({ vi: '⚓ Hãy cập bến hoặc vào gần bờ rồi mới rời thuyền!', en: '⚓ Reach a pier or shallow shore before leaving the boat!' }));
     return false;
@@ -423,7 +445,7 @@ function dismount() {
   pState.mounted = null;
   v.mounted = false;
   v.vel = 0;
-  pState.pos.set(nx, groundHeight(nx, nz), nz);
+  pState.pos.set(nx, spotY(nx, nz, ref), nz);
   pState.vy = 0;
   player.sit(false);
   consumeJump();                                   // Space đã bấm lúc đang lái không được thành cú nhảy
@@ -435,7 +457,7 @@ function dismount() {
 let personalMoto = null;
 function callMoto() {
   if (pState.mounted) { dismount(); return; }   // đang cưỡi → bấm lần nữa để xuống
-  if (groundHeight(pState.pos.x, pState.pos.z) < 0.35) {   // đang trên nước/thuyền
+  if (spotY(pState.pos.x, pState.pos.z, pState.pos.y) < 0.35) {   // đang trên nước/thuyền (mặt cầu nâng = trên cạn)
     ui.toast(tx({ vi: '🏍️ Cần đứng trên bờ mới gọi được xe máy!', en: '🏍️ Stand on land to call a motorbike!' }));
     return;
   }
@@ -444,18 +466,19 @@ function callMoto() {
   let spot = null;
   const px = pState.pos.x, pz = pState.pos.z;
   for (const [x, z, d] of spotsAround(px, pz, pState.yaw, [2.4, 1.6], [0, Math.PI / 2, -Math.PI / 2, Math.PI], 6)) {
-    if (freeSpot(x, z, 0.8) && (d <= 2.4 || clearPath(px, pz, x, z))) { spot = [x, z]; break; }
+    if (freeSpot(x, z, 0.8, pState.pos.y) && (d <= 2.4 || clearPath(px, pz, x, z))) { spot = [x, z]; break; }
   }
-  if (!spot && freeSpot(px, pz, 0.8)) spot = [px, pz];   // chỗ đứng đủ rộng cho xe → xe hiện ngay dưới chân
+  if (!spot && freeSpot(px, pz, 0.8, pState.pos.y)) spot = [px, pz];   // chỗ đứng đủ rộng cho xe → xe hiện ngay dưới chân
   if (!spot) {
     ui.toast(tx({ vi: '🏍️ Chỗ này chật quá — ra chỗ thoáng hơn rồi gọi xe nhé!', en: '🏍️ No room for a motorbike here — step into the open and call again!' }));
     return;
   }
   const [bx, bz] = spot;
   if (!personalMoto) {
-    personalMoto = spawnVehicle('motorbike', bx, bz, pState.yaw);
+    _vehRefOverride = pState.pos.y;   // vehicles.spawn tra cao độ qua _vehRefY → mặt cầu người đang đứng
+    try { personalMoto = spawnVehicle('motorbike', bx, bz, pState.yaw); } finally { _vehRefOverride = null; }
   } else {
-    personalMoto.pos.set(bx, groundHeight(bx, bz), bz);
+    personalMoto.pos.set(bx, spotY(bx, bz, pState.pos.y), bz);
     personalMoto.mesh.position.copy(personalMoto.pos);
     personalMoto.heading = pState.yaw;
     personalMoto.vel = 0;
@@ -911,7 +934,7 @@ window.__hp = {
     if (pState.mounted) { pState.mounted.mounted = false; pState.mounted = null; player.sit(false); }
     x = Math.max(WORLD_BOUNDS.minX + 31, Math.min(WORLD_BOUNDS.maxX - 31, x));   // clamp vào biên đi-được (tránh kẹt ngoài map — tryMove chặn mọi bước khi ở ngoài)
     z = Math.max(WORLD_BOUNDS.minZ + 31, Math.min(WORLD_BOUNDS.maxZ - 31, z));
-    pState.pos.set(x, Math.max(groundHeight(x, z), 0), z);
+    pState.pos.set(x, Math.max(spawnY(x, z), 0), z);   // W3-F: pano trên mặt cầu (285) đứng TRÊN cầu
     pState.vy = 0;
     cam.yaw = camYaw; cam.pitch = pitch; cam.dist = dist; cam.snap = true; cam.lastDrag = performance.now();
     const cp = Math.cos(pitch);

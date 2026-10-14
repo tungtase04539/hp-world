@@ -188,7 +188,13 @@ export function buildRoadNet(ROADS_DT, deps) {
   // ---------- 0) way ----------
   const ways = [];
   // Đợt 3 W3-A: nửa lòng/vỉa hè RIÊNG từng way (mapdata ROADS_DT[i].w/.sw qua xsection.roadHW/sidewalkW; thiếu → theo cấp)
-  ROADS_DT.forEach((r, ri) => { const pts = dedupe(r.pts.map(([x, z]) => [x, z])); if (pts.length >= 2) ways.push({ ri, c: r.c, pts, hw: roadHW(r), sw: sidewalkW(r) }); });
+  let nAll = 0;   // si = chỉ số way NẾU không bỏ cầu nâng → seed vá đường/lệch 1,5 mm của mọi phố khác GIỮ NGUYÊN
+  ROADS_DT.forEach((r, ri) => {
+    const pts = dedupe(r.pts.map(([x, z]) => [x, z])); if (pts.length < 2) return;
+    const si = nAll++;
+    if (deps.skipWay && deps.skipWay(ri)) return;   // W3-F: cầu nâng (js/bridges.js dựng mặt cầu trên cao)
+    ways.push({ ri, si, c: r.c, pts, cut: r.cut || null, hw: roadHW(r), sw: sidewalkW(r) });   // cut: đầu mút cắt dưới mặt cầu (roadgraph.trimRoadEnds)
+  });
   const vkey = (x, z) => Math.round(x * 20) + ',' + Math.round(z * 20);
   // mặt cầu VÒM có mô hình riêng (terrain BRIDGES: HVT, Bính…) — dải đường dưới vòm bị cắt (kiểm giải tích, không gọi địa hình)
   const ARCH = (deps.bridges || []).filter((b) => b.rise > 3);
@@ -211,6 +217,7 @@ export function buildRoadNet(ROADS_DT, deps) {
       for (const k of [0, w.pts.length - 1]) {
         const E = w.pts[k];
         if (use.get(vkey(E[0], E[1])) > 1) continue;
+        if (w.cut && w.cut[k ? 1 : 0]) continue;      // W3-F: phố cụt sát tường đầu cầu nâng — không kéo sang phố khác
         let bs = Infinity, bw = -1, bi = -1, bt = 0;
         grid.near(E[0], E[1], (wj, j) => {
           if (wj === wi) return;
@@ -880,6 +887,22 @@ export function buildRoadNet(ROADS_DT, deps) {
         if (wet && g0 < 0) g0 = u;
         if ((!wet || i === ns) && g0 >= 0) { const g1 = wet ? L : u; if (g1 - g0 > 8) gaps.push([Math.max(0, g0 - 2), Math.min(L, g1 + 2)]); g0 = -1; }
       }
+      // W3-F: KHOẢNG MẶT CẦU NÂNG trên chính way này (cầu phố Lạc Long: BRIDGE_WAYS pts[i0..i1]) — deps.deckGapAt(ri,x,z);
+      // biên dò 1 m rồi chia đôi tới ~1 cm: dải mặt đất dừng ĐÚNG chỗ mặt cầu bắt đầu (y hồ sơ = mặt đất, không bậc/không khe)
+      if (deps.deckGapAt) {
+        const inG = (u) => { const [x, z] = ptAt(u); return deps.deckGapAt(w.ri, x, z); };
+        const n1 = Math.max(1, Math.ceil(L));
+        let prev = inG(0), a0 = prev ? 0 : -1;
+        const edge = (lo, hi) => { const vlo = inG(lo); for (let it = 0; it < 8; it++) { const m = (lo + hi) / 2; if (inG(m) === vlo) lo = m; else hi = m; } return (lo + hi) / 2; };
+        for (let i = 1; i <= n1; i++) {
+          const u = L * i / n1, cur = inG(u);
+          if (cur && !prev) a0 = edge(L * (i - 1) / n1, u);
+          if (!cur && prev) { gaps.push([a0, edge(L * (i - 1) / n1, u)]); a0 = -1; }
+          prev = cur;
+        }
+        if (prev && a0 >= 0) gaps.push([a0, L]);
+        gaps.sort((p, q) => p[0] - q[0]);
+      }
       if (gaps.length) stats.waterGaps += gaps.length;
     }
     const pieces = (u0, u1) => {     // [u0,u1] trừ khoảng nước → [[a,b,capA,capB]]
@@ -910,7 +933,7 @@ export function buildRoadNet(ROADS_DT, deps) {
     }
     // mặt nhựa nâng theo cấp (+4 mm/cấp): 2 dải chồng nhau (đường đôi/nhánh song song) → dải cấp cao thắng, không z-fight
     // (+1,5 mm cho way lẻ: 2 dải CÙNG cấp chồng nhau — làn nhập/tách nông không chèn nút — không z-fight vạch kẻ ở gần)
-    const yR = ROAD_TOP + 0.004 * RANK[w.c] + 0.0015 * (w.wi0 & 1);
+    const yR = ROAD_TOP + 0.004 * RANK[w.c] + 0.0015 * (w.si & 1);
     const cands = street && sw > 0 ? foreignCands(P, w, nA, nB) : [];
     // ---- lòng đường ----
     const u0 = sA.trim, u1 = L - sB.trim;
@@ -918,7 +941,7 @@ export function buildRoadNet(ROADS_DT, deps) {
       const zebOK = street && u1 - u0 >= 14;
       // aZeb = u của 2 đầu dải tại NÚT GIAO (vạch kẻ dừng trước nút; nối miter/đường cụt: vạch chạy liền)
       const zeb = [sA.junc ? u0 : -1e4, sB.junc ? u1 : 1e4];
-      const seed = ((w.wi0 * 131 + ka * 17) & 255) << 13;
+      const seed = ((w.si * 131 + ka * 17) & 255) << 13;
       const pr = pat | seed | (zebOK && sA.zebra ? MK.ZEB0 : 0) | (zebOK && sB.zebra ? MK.ZEB1 : 0) |
         (zebOK && sA.stop ? MK.STOP0 : 0) | (zebOK && sB.stop ? MK.STOP1 : 0);
       for (const [a, b, gA, gB] of pieces(u0, u1)) {

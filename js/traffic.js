@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import { ROADS_DT } from './terrain.js';
 import { TIER } from './device.js';
-import { SIDEWALK_W, ROAD_TOP, SIDEWALK_TOP } from './xsection.js';
-import { buildRoadGraph, edgePoint } from './roadgraph.js';
+import { SIDEWALK_W, ROAD_TOP, SIDEWALK_TOP, CURB_RISE } from './xsection.js';
+import { buildRoadGraph, edgePoint, edgeY } from './roadgraph.js';
 import { motorbikeGeometry, motorbikeFarGeometry, carGeometry, carFarGeometry, CAR_FAR_SCALE, pedestrianGeometry, kitMaterial, kitShadowMaterial, shared,
   contactShadowGeometry, KIT_U, OPT, optWord, BIKE_PAINT, CAR_PAINT, TAXI_PAINT, SHIRT, JACKET } from './models_kit.js';
 
@@ -68,9 +68,22 @@ export function createTraffic(scene, world, opts = {}) {
   const { groundHeight } = world;
   const PLAY_R = opts.playRadius || 1588;
   const fp = opts.footprints || null;
-  const G = buildRoadGraph(ROADS_DT, { radius: PLAY_R, margin: 60 });
+  // W3-F r4 (phản biện): đồ thị theo TẦNG — way cầu nâng = tim mặt cầu + cao độ mặt nhựa (world.trafficRoads: BRIDGE_WAYS),
+  // roadgraph KHÔNG nối 2 tuyến lệch tầng > 1 m (bản cũ: 22 nút nối mặt cầu 6-16 m với phố mặt đất → 88-102 xe/mẫu chạy
+  // "đường cầu" dưới đất ở nút HVT, 5-9 xe lặn dưới sông Cấm y −2,9). Phố cụt dưới gầm thấp đã cắt (world ROADS_NET).
+  const G = buildRoadGraph(world.trafficRoads ? world.trafficRoads() : ROADS_DT, { radius: PLAY_R, margin: 60, groundLevel: 2 + ROAD_TOP });
   const { nodes, edges } = G;
   const nodeIn = nodes.map((n) => Math.hypot(n.x, n.z) <= PLAY_R + 30);
+  // Cao độ tác tử theo CẠNH: cạnh way cầu (e.ys) → edgeY mỗi khung (mặt nhựa thật, không +ROAD_TOP lần 2 — bản cũ xe nổi
+  // 0,11 m; không bậc thang mỗi 4 m trên dốc); phố mặt đất → groundHeight (KHÔNG tra mặt cầu theo vị trí — xe dưới gầm
+  // vòng xoắn từng "bước lên" dốc thấp 1,2 m).
+  // Cầu HVT (span/ramp): người đi bộ không đi (không vỉa hè; làn đi bộ lệch ra ngoài gờ), MỘT CHIỀU theo chiều way OSM
+  // (xích đúng chiều xe, process_osm §6b4). Cầu phố 'deck' (Lạc Long): 2 chiều + vỉa hè gạch → có người đi bộ.
+  for (const e of edges) {
+    e.elev = e.kind === 'span' || e.kind === 'ramp';
+    if (e.elev) { e.oneway = 1; e.partner = 0; }
+  }
+  const levelStats = { lvSkip: G.lvSkip, deckEdges: edges.filter((e) => e.ys).length };
 
   // ---------- Ô TÔ ĐỖ mép đường (js/props.js → world.props.parkedCars, tâm ở curbLine − 0,95; phố r curbLine − 0,05) ----------
   // Đợt 3 wave 2 (W2-F): xe chạy từng xuyên qua xe đỗ (xe máy tới hw − 0,55, ô tô hw − 1,1 ⇒ trùng dải đỗ hw − 0,05…hw − 1,85).
@@ -83,6 +96,7 @@ export function createTraffic(scene, world, opts = {}) {
     if (!list || !list.length) return;
     const CELL = 24, sh = new Map(), key = (i, j) => (i + 4096) * 8192 + (j + 4096);
     edges.forEach((e, ei) => {
+      if (e.ys) return;                                   // W3-F: xe đỗ ở mặt đất không gán lên cạnh way cầu (khác tầng)
       for (let k = 0; k < e.xs.length - 1; k++) {
         const x0 = Math.min(e.xs[k], e.xs[k + 1]) - 8, x1 = Math.max(e.xs[k], e.xs[k + 1]) + 8;
         const z0 = Math.min(e.zs[k], e.zs[k + 1]) - 8, z1 = Math.max(e.zs[k], e.zs[k + 1]) + 8;
@@ -243,6 +257,7 @@ export function createTraffic(scene, world, opts = {}) {
     const e = edges[a.e];
     const nodeId = a.dir ? e.a : e.b;
     const n = nodes[nodeId];
+    const yHere = edgeY(e, a.dir, e.L);   // lưới an toàn khác tầng (đồ thị đã tách tầng — không kỳ vọng chặn gì)
     edgePoint(e, a.dir, e.L, _p);
     let best = null, tot = 0;
     const cands = [];
@@ -251,8 +266,14 @@ export function createTraffic(scene, world, opts = {}) {
       if (ei === a.e && n.out.length > 1) continue;            // không quay đầu (trừ ngõ cụt)
       const e2 = edges[ei];
       const far = d ? e2.a : e2.b;
-      if (!nodeIn[far] && a.type !== 'walk') continue;         // không chạy ra ngoài vùng chơi
+      // không chạy ra ngoài vùng chơi — TRỪ cạnh cầu nâng (W3-F r5): span HVT một chiều có nút xa ở bờ bắc (−46,−1650) ngoài
+      // PLAY_R+30 là lối ra DUY NHẤT ở đỉnh vòng xoắn đông → bản cũ xe hướng bắc bị kill ngay tại (75,−898), span không có xe.
+      // Xe chạy ra xa bị loại bởi cull khoảng cách (RB+40) như mọi xe khác.
+      if (!nodeIn[far] && a.type !== 'walk' && !e2.elev) continue;
       if (!dirOK(a, e2, d)) continue;                          // không đi ngược chiều đường đôi
+      if (a.type === 'walk' && e2.elev) continue;                 // W3-F: người đi bộ không lên cầu nâng
+      const y2 = edgeY(e2, d, 0);
+      if ((yHere ?? 2.11) - (y2 ?? 2.11) > 1.2 || (y2 ?? 2.11) - (yHere ?? 2.11) > 1.2) continue;
       edgePoint(e2, d, 0, _q);
       const cos = _p.tx * _q.tx + _p.tz * _q.tz;
       let w = 0.15 + (cos + 1) * (cos + 1);                     // ưu tiên đi thẳng
@@ -354,9 +375,10 @@ export function createTraffic(scene, world, opts = {}) {
       if (ei === undefined) return false;
       const e = edges[ei];
       if (rnd() * 90 > (dens[e.c] || 0)) continue;              // trọng số mật độ theo cấp phố
+      if (a.type === 'walk' && e.elev) continue;                  // W3-F: không sinh người đi bộ trên cầu nâng
       a.e = ei; a.dir = rnd() < 0.5 ? 0 : 1; a.s = rnd() * e.L;
       if (!dirOK(a, e, a.dir)) a.dir ^= 1;
-      a.prev = null; a.next = null; a.rb = 6; a.prevRb = 0; a.pk = 0;
+      a.prev = null; a.next = null; a.rb = 6; a.prevRb = 0; a.pk = 0; a.y = undefined; a.yx = 1e9;   // W3-F: chỗ mới → cao độ tính lại (writeInstances)
       a.lat01 = rnd(); a.drive01 = rnd();
       if (a.type === 'walk') { a.side = rnd() < 0.5 ? 1 : -1; a.lat01 = 0.35 + rnd() * 0.4; a.walkV = 1.1 + rnd() * 0.5; }
       a.latCur = latFor(a, e);
@@ -457,6 +479,7 @@ export function createTraffic(scene, world, opts = {}) {
       const l = hmap.get(hk(a.x + i * HC, a.z + j * HC)); if (!l) continue;
       for (const b of l) {
         if (b === a) continue;
+        if (a.y != null && b.y != null && Math.abs(b.y - a.y) > 2.5) continue;   // W3-F: xe trên/dưới mặt cầu nâng
         const dx = b.x - a.x, dz = b.z - a.z;
         const ahead = dx * fx + dz * fz; if (ahead <= 0.3 || ahead > look) continue;
         const side = Math.abs(dx * fz - dz * fx);
@@ -506,7 +529,8 @@ export function createTraffic(scene, world, opts = {}) {
   // Áp cho cả tác tử đang "thoát kẹt" (ghostT) — trước đây nhánh đó bỏ qua người chơi, xe chạy xuyên qua người.
   const CLEAR = { bike: 2.0, car: 2.7, walk: 1.0 };      // khoảng cách tâm–người chơi khi lách qua (m)
   const STOPW = { bike: 1.35, car: 2.1, walk: 0.6 };     // hở ngang nhỏ hơn mức này mà vẫn tới gần → dừng
-  function avoidPlayer(a, px, pz) {
+  function avoidPlayer(a, px, pz, py) {
+    if (py != null && a.y != null && Math.abs(py - a.y) > 3) { a.avT = 0; a.blockedT = 0; return 1e9; }   // W3-F: khác tầng
     const fx = Math.sin(a.h), fz = Math.cos(a.h);
     const dx = px - a.x, dz = pz - a.z, ahead = dx * fx + dz * fz;
     const look = a.type === 'car' ? 11 : a.type === 'bike' ? 6.5 : 2.5;
@@ -653,7 +677,9 @@ export function createTraffic(scene, world, opts = {}) {
       const a = agents[j];
       const d2 = (a.x - px) * (a.x - px) + (a.z - pz) * (a.z - pz);
       if (d2 > DRAW_R2) continue;
-      if (!(Math.abs(a.x - a.yx) + Math.abs(a.z - a.yz) < 4)) { a.yx = a.x; a.yz = a.z; a.y = groundHeight(a.x, a.z) + (a.type === 'walk' ? SIDEWALK_TOP : ROAD_TOP); }
+      const ey = edgeY(edges[a.e], a.dir, a.s);
+      if (ey !== null) { a.y = ey + (a.type === 'walk' ? CURB_RISE : 0); a.yx = 1e9; }   // cạnh way cầu: hồ sơ mặt nhựa
+      else if (!(Math.abs(a.x - a.yx) + Math.abs(a.z - a.yz) < 4)) { a.yx = a.x; a.yz = a.z; a.y = groundHeight(a.x, a.z) + (a.type === 'walk' ? SIDEWALK_TOP : ROAD_TOP); }
       let g = a.grp, sx = 1, sy = 1, sz = 1;
       if (a.type !== 'walk') {
         const lim = (a.type === 'bike' ? NEAR_BIKE : NEAR_CAR) - (a.far ? LOD_HYST : 0);
@@ -733,7 +759,7 @@ export function createTraffic(scene, world, opts = {}) {
     }
     if (now - lastHash > 100) {
       lastHash = now; rebuildHash();
-      for (const a of agents) a.lim = Math.min(a.type === 'walk' ? a.walkV : followLimit(a, px, pz), avoidPlayer(a, px, pz));
+      for (const a of agents) a.lim = Math.min(a.type === 'walk' ? a.walkV : followLimit(a, px, pz), avoidPlayer(a, px, pz, playerPos.y));
     }
     // tái sinh xe ra khỏi bóng + bù thiếu (rải đều theo thời gian: ≤ 12 tác tử/khung)
     let budget = 12;
@@ -780,7 +806,7 @@ export function createTraffic(scene, world, opts = {}) {
   //  trong footprint nhà/địa danh; walkOnRoad: người đi bộ trong lòng đường NGOÀI vùng ngã tư (băng qua ngã tư là được);
   //  overlap: 2 xe chồng tâm < 0,9 m (xe máy) / 1,8 m (có ô tô) ngoài ghost; outside: ra ngoài vùng chơi.
   function check() {
-    const r = { vehicles: 0, walkers: 0, wrongSide: 0, offRoad: 0, wrongWay: 0, walkInBuilding: 0, walkOnRoad: 0, overlap: 0, outside: 0, parkHit: 0, examples: [] };
+    const r = { vehicles: 0, walkers: 0, wrongSide: 0, offRoad: 0, wrongWay: 0, walkInBuilding: 0, walkOnRoad: 0, overlap: 0, outside: 0, parkHit: 0, underwater: 0, examples: [] };
     const ex = (k, a) => { if (r.examples.length < 8) r.examples.push([k, Math.round(a.x), Math.round(a.z)]); };
     rebuildHash();
     for (const a of agents) {
@@ -796,6 +822,7 @@ export function createTraffic(scene, world, opts = {}) {
         continue;
       }
       r.vehicles++;
+      if (a.y != null && a.y < 0.8) { r.underwater++; ex('underwater', a); }   // W3-F: dưới mặt đất/sông (đồ thị lẫn tầng)
       if (!dirOK(a, e, a.dir)) { r.wrongWay++; ex('wrongWay', a); }
       if (inJunction) continue;
       if (!e.oneway && Math.abs(a.avoid || 0) < 0.3 && lat < 0.3) { r.wrongSide++; ex('wrongSide', a); }
@@ -806,6 +833,7 @@ export function createTraffic(scene, world, opts = {}) {
         const l = hmap.get(hk(a.x + i * HC, a.z + j * HC)); if (!l) continue;
         for (const b of l) {
           if (b === a || b.ghostT > 0 || b.x < a.x || (b.x === a.x && b.z <= a.z)) continue;   // mỗi cặp 1 lần
+          if (a.y != null && b.y != null && Math.abs(b.y - a.y) > 2.5) continue;           // khác tầng (cầu nâng)
           if (Math.hypot(b.x - a.x, b.z - a.z) < (a.type === 'car' || b.type === 'car' ? 1.8 : 0.9)) { r.overlap++; ex('overlap', a); }
         }
       }
@@ -836,6 +864,7 @@ export function createTraffic(scene, world, opts = {}) {
     for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) {
       const l = hmap.get(hk(p.x + i * HC, p.z + j * HC)); if (!l) continue;
       for (const b of l) {
+        if (p.y != null && b.y != null && Math.abs(b.y - p.y) > 2.5) continue;   // W3-F: khác tầng (mặt cầu nâng / gầm)
         const fx = Math.sin(b.h), fz = Math.cos(b.h);
         const offs = b.type === 'car' ? OFF_CAR : OFF_BIKE;
         const rr = b.type === 'car' ? 0.95 : 0.55;
@@ -850,7 +879,7 @@ export function createTraffic(scene, world, opts = {}) {
 
   console.info('[traffic] đồ thị:', nodes.length, 'nút,', edges.length, 'cạnh,', G.ms, 'ms — bóng', RB, 'm, trần', JSON.stringify(CAP));
   return {
-    update, graph: G, pushOut, setEnabled, setNight, check, agents, parkStats,   // agents: chỉ để chẩn đoán (tool/test), không sửa từ ngoài
+    update, graph: G, pushOut, setEnabled, setNight, check, agents, parkStats, levelStats,   // agents: chỉ để chẩn đoán (tool/test), không sửa từ ngoài
     stats: () => ({ ...stats, groups: Object.fromEntries(Object.entries(groups).map(([k, g]) => [k, g.list.length])) }),
   };
 }

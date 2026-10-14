@@ -15,7 +15,10 @@ import { WATER, waterSD, LAKE_POLY } from './terrain.js';
 //   Ngoài bản đồ / sông vẽ bằng polyline (> 1,95 km, waterSD = "đất" +40) → R = 0 → KHÔNG tô bờ (giữ màu sông).
 //   Giá dựng: lọc thô 32 m (16k lần waterSD) rồi chỉ tính mịn các khối 32 m sát bờ — đo trong KNOWLEDGE §10 (WP5).
 
-export const WATER_COL = { river: 0x5c625a, lake: 0x34443f, shore: 0x6d6a55 };
+// W3-F (AUDIT3 FP-6 "per-water tint"): sông Tam Bạc/Cấm ĐỤC NÂU-Ô LIU — ảnh pano tầm mắt (203 h270 (80,76,62), 221 h180
+// (122,114,90), 290 h180 (96,100,79)); cũ 0x5c625a xám-xanh + nhẵn 0,12 → nhìn ngang thành mặt gương trời xám-trắng.
+// Hồ giữ xanh-xám sẫm. Nhám 0,12 → 0,2 (phản chiếu trời mờ hơn, vẫn có vệt nắng).
+export const WATER_COL = { river: 0x5b5a46, lake: 0x34443f, shore: 0x6c6449 };
 const SHORE_HALF = 2048, SHORE_N = 512, SHORE_STEP = (2 * SHORE_HALF) / SHORE_N;   // 8 m
 const ENC = 127 / 40;          // đơn vị mã / mét
 
@@ -124,7 +127,7 @@ export function makeWaterMaterial(W, D) {
   const normal = makeWaterNormal(W, D);
   const shore = makeShoreTexture();
   const mat = new THREE.MeshStandardMaterial({
-    color: WATER_COL.river, roughness: 0.12, metalness: 0.0,
+    color: WATER_COL.river, roughness: 0.2, metalness: 0.0,
     normalMap: normal, normalScale: new THREE.Vector2(0.15, 0.15),
   });
   mat.name = 'water';

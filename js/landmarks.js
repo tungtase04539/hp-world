@@ -8,7 +8,6 @@ function bridgeEnd(b) {
   const e2 = [b.x - Math.sin(b.ang) * b.half, b.zc - Math.cos(b.ang) * b.half];
   return e1[1] > e2[1] ? e1 : e2;
 }
-const hvtEnd = bridgeEnd(EXTRAS.bridges[0]);
 const binhEnd = bridgeEnd(EXTRAS.bridges[1]);
 
 // vị trí biển chỉ dẫn: cạnh công trình thật (LM = tâm footprint OSM), lệch ra ngoài để không chắn lối
@@ -24,7 +23,10 @@ const P = {
   postoffice: [LM.postoffice[0] + LM_FACE.postoffice[0] * 24, LM.postoffice[1] + LM_FACE.postoffice[1] * 24],
   museum: [LM.museum[0] + LM_FACE.museum[0] * 22, LM.museum[1] + LM_FACE.museum[1] * 22],
   station: [LM.station[0] + 42, LM.station[1] + 8],
-  bridge: [hvtEnd[0] + 22, hvtEnd[1] + 20],
+  // W3-F r5 (phản biện r2): cầu HVT dựng theo way OSM (bridges.js) — chân nhịp chính phía Hải Phòng ở x ≈ −50, z ≈ −905
+  // (giữa 2 nút xoắn); neo cũ theo EXTRAS.bridges[0] (hộp thẳng cũ) lệch ~150 m về đông (123,−819). (−36,−915): đất 2,0,
+  // không mặt phố/không dưới mặt cầu ±3 m, isFree (r5/probe.mjs signCand); diag() kiểm tiếp cận.
+  bridge: [-36, -915],
   binhbridge: [binhEnd[0] + 22, binhEnd[1] + 20],
   port: [LM.port[0] - 340, LM.port[1] + 130],   // vỉa hè gạch xám cạnh đường vào cảng; (-320,+120) cũ bị nhà kho 10 m (mrg10_1,-3) đè (quét raycast Đợt 2)
   doson: [LM.doson[0], LM.doson[1]],
