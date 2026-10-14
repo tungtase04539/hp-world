@@ -1109,7 +1109,7 @@ function renderStyles(D, CX, CZ) {
     // W5-A HERO-KIT: CHƯƠNG TRÌNH công trình đặc trưng (ảnh pano: ngân hàng/văn phòng kính/khách sạn/showroom/chợ/trường/chùa/
     // hàng cột/cây xăng — js/herokit_data.js) thắng mọi luật trên (bằng chứng cụ thể nhất)
     const hi = heroAt(CX[b], CZ[b]), hp = heroProg(hi);
-    if (hp) { hix[b] = hi; const r = heroTall(hp, D.floors[b]) ? -1 : heroRS(hp, rs, fl, area, hi); if (r >= 0) rs = r; sts.hero = (sts.hero || 0) + 1; }
+    if (hp) { hix[b] = hi; const r = heroTall(hp, D.floors[b], D.flags[b]) ? -1 : heroRS(hp, rs, fl, area, hi); if (r >= 0) rs = r; sts.hero = (sts.hero || 0) + 1; }
     // (d) tuổi (lớp phong hoá shader): theo kiểu + vùng + bằng chứng cũ/mới + biến thiên theo hạt giống
     let age = (rs === RS.TEN || rs === STYLE.OLD || rs === RS.COL || rs === STYLE.KTT) ? 2
       : (rs === STYLE.GLASS || rs === RS.MODERN || rs === RS.TOWER || rs === RS.HOTEL) ? 0 : 1;
@@ -1266,8 +1266,9 @@ export function buildRealFabric(scene, ctx) {
     if (n < 3) continue;
     for (let i = 0; i < n; i++) { X[i] = D.x[s + i]; Z[i] = D.z[s + i]; }
     // W5-A: nhà chợ ≤ 2 tầng (hội trường mái tôn), cây xăng 1 tầng (ki-ốt dưới mái che) — CHỈ khi nhà thật thấp (heroTall)
-    const HP0 = heroProg(HIX[b]), hTall = heroTall(HP0, D.floors[b]);
+    const HP0 = heroProg(HIX[b]), hTall = heroTall(HP0, D.floors[b], D.flags[b]);
     const fl = HP0 === HP.MARKET && !hTall ? Math.min(2, Math.max(1, D.floors[b])) : HP0 === HP.PETROL && !hTall ? 1 : Math.max(1, D.floors[b]), H = heightOf(fl);
+    if (HP0 && fl !== D.floors[b] && D.floors[b] > 0) D.floors[b] = fl;   // phản biện W5-A: chiều cao VẼ = D.floors (footprints.topAt, cây, minimap đọc chung rbdata)
     const sty = Math.min(6, D.style[b]), roofT = D.roof[b] & 15, roofC = (D.roof[b] >> 4) % ROOF_LIN.length;
     const seed = D.seed[b], s8 = seed & 255;
     let wcol = WALL_LIN[D.wall[b] % WALL_LIN.length]; const rcol = ROOF_LIN[roofC];

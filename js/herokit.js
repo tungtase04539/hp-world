@@ -95,7 +95,9 @@ export function bankLead(i) {
 // phản biện W5-A: nhà chợ (hội trường mái tôn ≤ 2 tầng) / cây xăng (ki-ốt 1 tầng) chỉ ÉP tầng + kiểu SHED + mái khi footprint
 // THẬT thấp (D.floors ≤ 3 / ≤ 2). Cao hơn = sạp chợ/mái che TRƯỚC nhà nhiều tầng → giữ chiều cao, kiểu, mái; herokit chỉ thêm
 // mái hiên/mái che (pano_006 b4401: nhà 8 tầng từng bị ép thành lán 2 tầng; footprints.topAt/trees vẫn dùng D.floors)
-export const heroTall = (p, floors) => (p === HP.MARKET && floors > 3) || (p === HP.PETROL && floors > 2);
+// Số tầng có BẰNG CHỨNG (cờ RB PANO 16 / EDIT 128) hoặc ≥ 5 mới tính; số tầng MẶC ĐỊNH của footprint MS/Google (pano_418 b14830
+// cây xăng: MS, 3 T không nguồn — ảnh tả trạm xăng 1 tầng) thì ép theo ảnh và citygen GHI LẠI D.floors (rbdata dùng chung).
+export const heroTall = (p, floors, flags = 255) => ((p === HP.MARKET && floors > 3) || (p === HP.PETROL && floors > 2)) && ((flags & (16 | 128)) !== 0 || floors >= 5);
 
 // ---------- màu ----------
 // sRGB 0xRRGGBB → mảng u8 TUYẾN TÍNH như WALL_LIN của citygen (thuộc tính màu đỉnh là tuyến tính)

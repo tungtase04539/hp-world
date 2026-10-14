@@ -518,6 +518,34 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     của footprint gộp b1471 (đúng chỗ biển + sảnh, mặt trên chưa phải vách kính xanh); 395 hội trường cột 'tb_goldstar' là nhà ô
     lệch chỗ (khối đặc chỉ 4% trên nhà thật) — giữ; 510/235 văn phòng xanh bạc hà b2805 bị nhà ô biệt thự 'v4_lejardin_villa' đè
     20% ⇒ vẫn là hộp ô trắng (cần chỉnh claim/nhà ô — ngoài làn).
+    **SỬA SAU PHẢN BIỆN (merge-with-fixes):** (1) **CHỢ/CÂY XĂNG ÉP DẸT nhà nhiều tầng** — gen_herokit coi 'sạp/quầy/bạt/ô dù/
+    lưới/stall/tarp/awning' TRƯỚC nhà là nhà chợ (pano_006 b4401 8 T → lán 2 T trống). Nay `obsProg`: nhà chợ chỉ khi ghi chú tả
+    NHÀ/hội trường (nhà chợ, nhà lồng, chợ mái tôn, market hall, shed…) — từ sạp/bạt chỉ được kèm từ nhà chợ mạnh; quan sát ≥ 3
+    tầng hoặc ghi chú 'ba/bốn… tầng' → không; cây xăng bỏ ghi chú tả nhà BÊN CẠNH ('sau/cạnh/bên… trạm xăng') và quan sát ≥ 3 tầng.
+    Chợ 31 → 4 (chỉ hội trường mái tôn 450), tổng 428 → 401 nhà. citygen `heroTall(p, D.floors, D.flags)` (herokit.js): chợ
+    D.floors > 3 / cây xăng > 2 VÀ số tầng có bằng chứng (cờ RB PANO/EDIT, hoặc ≥ 5) → KHÔNG ép tầng, không kiểu SHED, giữ mái thật
+    (bảng quảng cáo diềm chợ chỉ khi ≤ 2 T, cây xăng nhà cao chỉ dựng mái che khi có sân ≥ 7 m). Số tầng MẶC ĐỊNH không nguồn
+    (pano_418 b14830: footprint MS 3 T, ảnh = trạm xăng) vẫn ép theo ảnh — và citygen GHI LẠI `D.floors[b]` = số tầng vẽ (rbdata
+    dùng chung: footprints.topAt/cây/minimap khớp chiều cao vẽ). (2) **CHÙA mất danh tính** — 3c
+    gỡ 'tx_chua_hbt' (chùa 3 tầng mái dựng tay, 2.190 m²) thay bằng kit chùa fabric = hội trường thuộc địa mái bằng. Nay 3c KHÔNG
+    gỡ: tên/chương trình nhà hero = CHÙA, loại 'heritage', hoặc phủ nhà hero ≥ 1.500 m² (chợ Con, khối VIB/kinh158) trừ khi tên
+    trong `HERO_ALLOW` (đang rỗng — chỉ thêm sau khi đối chiếu vệ tinh + pano). `heroCand` thêm [10] chương trình nhà hero chính,
+    [11] giữ-danh-tính. (3) **'NGÂN HÀNG' lặp** (354 h180: 3 chữ + tấm xanh dưới) — dải 3D chữ MỘT lần (tấm ≤ 8 m quanh điểm tiêu),
+    phần còn lại diềm TRƠN màu nhấn; dãy lô ngân hàng liền kề (≤ 25 m) chỉ lô GIỮA có chữ (`bankLead`); sổ chữ `ctx.signs`
+    (citygen tạo mỗi lượt dựng) chặn trùng 12 m. Tấm xanh là biển THẬT từ SHOP_SIGNS (TPBank → 'NGÂN HÀNG') neo vào cùng mặt tiền:
+    `frontEdges[k][8]` = chương trình hero; world.js bỏ biển 'NGÂN HÀNG' có mặt tiền gần nhất là ngân hàng hero và không neo biển
+    khác lên mặt tiền đó. (4) **DỮ LIỆU CŨ sau khi sinh lại buildings_real** — HERO_META thêm `rbHash` (FNV-1a của RB_B64);
+    `node tools/check_herokit.mjs` (diag.mjs gọi trước khi mở trình duyệt) lỗi khi rb/băm lệch hoặc có HERO không khớp footprint
+    (thử với buildings W5-D: báo 3 lỗi, 21/401 lạc). TÍCH HỢP: sau khi gộp W5-D PHẢI chạy lại gen_herokit + commit. (5) **KHỐI ĐEN +
+    tấm 'THỜI TRANG NỮ' cùng số ĐT lặp** (166/161/377) — ốp cửa hàng chỉ tầng 1 trên trệt (màu ốp tối < 0,25: chỉ diềm 1,9 m);
+    màu tường quan sát tối không lái màu cả nhà (mọi chương trình); PANEL cắt bỏ dòng số ĐT (v từ 0,54 m của dải 2 m); mỗi loại
+    chữ ngành ≤ 1 lần / 40 m. Thêm: cây xăng — trụ/đảo bơm kiểm `free()` + không trong chính ki-ốt; `sub()` kiểm E trước E[6].
+    KIỂM (REAL | dot3 bcdcacc | nhánh, 24 pano × 4 hướng + 8 cam xiên, 1280×634, traffic off, tier 3 Radeon 890M, 0 lỗi JS):
+    006/353/124/486 ≈ dot3 (≤ 2,7 % điểm ảnh; 006 hết lán 2 T), 276 + cam chùa ≈ dot3 (chùa 3 tầng mái giữ), 157 ≈ dot3 (khối
+    VIB giữ), 354 h180 MỘT chữ 'NGÂN HÀNG' giữa dải tím liền, không tấm xanh; 161 h90 dải xanh 1 chữ; 166 không còn khối đen
+    (diềm tối 1 tầng), 'THỜI TRANG NỮ / HÀNG MỚI VỀ' không số ĐT; 418 h90 mái che cây xăng còn; 450 h180 hội trường chợ giữ; đối
+    chứng 007/085/143/492 ≤ 5,6 %. diag full/lite OK, waterbfs 5/5, check_assets ĐỦ, check_herokit 401/401. Chấm cặp (tự chấm,
+    sau sửa): mục tiêu ~4,3 → ~4,45 — bỏ 2 hồi quy, giữ các cái được 161/354/418/450/377; 157/510/276 giờ = dot3.
 
 - **2026-10-14 (Đ3-W4 SỬA HỒI QUY TÍCH HỢP)** [chấm cặp REAL | dot3 c24a52e | tích hợp W4: 5 pano tụt điểm — sửa TẬN GỐC, không gỡ W4]:
     **(1) BẢNG LỚN TỪNG BAY trên toà một chủ** (pano_046 h0/h270 BIDV, 161 h90/h180 ngân hàng "trắng sọc xanh", 515 h0/h270 toà
