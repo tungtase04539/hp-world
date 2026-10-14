@@ -140,6 +140,8 @@ với `ang = atan2(Δx, Δz)` của 2 đầu way thật.
   - **r < R_POLY=1750 (thành phố): POLYGON OSM.** `waterSD(x,z)` = khoảng cách có dấu tới TẬP `WATER`
     (ÂM = trong nước; hồ Tam Bạc dùng `LAKE_POLY` đủ 20 đỉnh thay bản simplify để `waterSD ≡ lakeSD`).
     `sd < 0 → h = lerp(-3, 1.7, smoothstep(-2, 0, sd))` (taluy kè 2 m, đáy −3); `sd ≥ 0 → baseHeight(x,z,1)`
+    **MẶT NƯỚC:** plane toàn cục y 0, RIÊNG sông Tam Bạc nội đô y `waterLevelAt` = `TB_LEVEL` 1,1 · `tbRamp` (mesh 'water' thứ 2,
+    world.js; §10 Đ3-W3 SỬA HỒI QUY AUDIT4) — vật NỔI phải cộng `waterLevelAt`, cao độ lòng sông/isWater KHÔNG đổi.
     = ĐẤT (bỏ hẳn MASK bờ biển 40 m — nó từng làm nước thò sau nhà). KHÔNG còn vá tay nào trong thành phố
     (reclaimPort/PORT_RECLAIM, nắn R3 OLD/NEW_R3_TAIL, HOSEN_POLY vẽ tay, ellipse Quần Ngựa, w38/w48 đã XOÁ).
   - **r ≥ R_POLY_END=1950 (ngoài): POLYLINE + MASK như cũ.** `riverFactorLine` = max theo đoạn sông của
@@ -453,6 +455,37 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-10-14 (Đ3-W3 SỬA HỒI QUY AUDIT4)** [ĐỢT 3 wave 3 — hồi quy mức 3 của AUDIT4 (REAL | dot3 | tích hợp), nhánh tích hợp]:
+    **(R1) SÔNG TAM BẠC "MẤT" SAU LAN CAN (198/203/207/212 mức 3, 134 mức 2) — gốc W3-F, KHÔNG phải polygon nước:** đo WATER
+    dot3/F/A/tích hợp ở 6 pano: mép nước lệch ≤ 1,5 m, nước vẫn bắt đầu 8-13 m trước camera. Raycast màn hình (probe trên
+    trang): "dải be" = TƯỜNG KÈ bờ đối diện (`mrg10_*`, y 0,5-2,6 ở ~74 m) + gờ đỉnh sáng. Hình học: mặt nước toàn cục y 0,
+    dải dạo LAND_H + 0,25 ⇒ tường lộ 2,25 m; mắt pano LAND_H + 2,2, lan can đỉnh +1,14 cách camera 8-13 m ⇒ đường ngắm qua đỉnh
+    lan can chạm nước sau ~60 m ⇒ dải nước còn ~4 px (ảnh 1280×634), tường 0xbdb6a6 nắng chiếu (199,187,164) đọc thành cát.
+    Ảnh thật 212 h0: tường kè đối diện ≈ cao lan can (~1 m), đá xám + ố sẫm, sông ô liu dày trên lan can. **SỬA:** (a) terrain.js
+    `TB_LEVEL = 1,1`, `waterLevelAt(x,z)` (polygon Tam Bạc nội đô = WATER 'Sông Tam Bạc' có |x|,|z| < 2000; vuốt `tbRamp` về 0
+    ở hợp lưu Cấm z −620 → −900 và mảnh tây x −1120 → −1205); world.js lưới 6 m (7,9k tam giác, +1 draw call) phủ polygon + 6 m
+    giấu dưới bờ, y = TB_LEVEL·ramp − 0,1·(1 − ramp) (nơi về 0 nằm DƯỚI mặt phẳng toàn cục → không bậc/nhấp nháy), UV khớp plane
+    toàn cục (gợn liền), tên 'water' (freeze/bóng/farHide chừa như cũ), dập dềnh theo plane. Vật liệu `water_tb` = clone (cùng
+    onBeforeCompile/texture): IBL 0,8 + normalScale 0,35 — thử nhám 0,42 / IBL 0,32 + màu nâu: dải nước thành TẤM PHẲNG xám-be
+    như nền (lại đọc thành đất) ⇒ giữ nhám 0,2, tăng gợn. (b) riverbank.js tường kè xám hơi lục 0x8f9087 → 0x7a7a70 → VỆT TRIỀU
+    sẫm 0x575445 từ 1,05 m → rêu 0x46443a, gờ 0x9d9e95 (bờ Cấm nước y 0: dải sẫm ~1 m trên mặt nước = vệt triều thật).
+    (c) Thứ NỔI cộng `waterLevelAt`: thuyền người chơi (vehicles.js tạo/cập nhật/spawn), thuyền neo dải bờ (riverbank `deps.waterY`),
+    nhà thuyền tb_shack (world.js). KHÔNG đổi groundHeight/isWater (lòng −3) ⇒ waterbfs/giao thông/va chạm như cũ.
+    **(R3) KHỐI NHÀ XÁM 3 TẦNG TRÊN DẢI DẠO (299 h90 mức 3) — gốc W3-F × W3-A ở process_buildings:** footprint MS (−359,−196)
+    nằm NỬA trong polygon sông cũ (dot3/F/A: tâm trong nước → drop_water); tích hợp: §6b3 `clearOf(way)` theo bề rộng RIÊNG
+    phố 243 (w 11, sw 4) đẩy mép sông thêm ~3 m ⇒ tâm lên dải đất mới (vỉa hè + kè) và SỐNG SÓT. Luật mới `drop_bank`
+    (tools/process_buildings.mjs, ngay sau drop_water): tâm cách nước < 12 m, có ĐỈNH chạm nước (waterSD < 0,5), mép nước gần
+    nhất thuộc SÔNG/KÊNH (hồ có ki-ốt riêng — không đụng), có đoạn phố p/s/t/r chạy dọc phía đất (tâm → phố cùng chiều gradient
+    waterSD, cos ≥ 0,7) và khoảng mép lòng phố → mép nước qua tâm < 12 m ⇒ 6 nhà (3 nhà mới của bản tích hợp dọc Thế Lữ/Tam Bạc
+    (−359,−196) (−336,−250) (−320,−337) + (−1309,−84) (−733,−65) (1623,123)). Luật rộng hơn (bỏ điều kiện chạm nước) bắt 19 nhà,
+    nhiều nhà có từ dot3 không ai chê ⇒ bỏ. 43 226 → 43 219 nhà, sinh 2 lần md5 82aa1d20 y hệt.
+    **ĐO / KIỂM** (tier 3, 890M D3D11, :8601, khoá GPU): chụp lại 6 pano × 4 hướng (134/198/203/207/212/299) + 6 pano đối chứng
+    (221/519/331/074/290/336 so audit4): sông hiện lại trên lan can ở mọi hướng nhìn ra sông, 299 h90 dải dạo mở như ảnh thật;
+    221 h180 thêm nước, 074/519/331 không đổi đáng kể; hướng phố lệch điểm ảnh ≤ 0,7 %. Cổng: node --check 97 tệp OK, waterbfs
+    5/5, check_assets ĐỦ, diag full "TẤT CẢ THỰC THỂ OK — 0 lỗi JS" (bất biến như tích hợp: overlap 1 ở (259,110) — đã biết,
+    underwater 0), diag lite OK 0 lỗi, hpReady 4,8 s full.
+    CÒN: màu nước nhìn xiên vẫn xám-bạc hơn ảnh thật (ô liu) — không có phản chiếu bờ; dải dạo Tam Bạc rộng hơn thật ~2-3 m
+    (§6b3 hw + vỉa + 2,5) nên camera xa lan can hơn ảnh thật — chưa đổi (đổi mép nước kéo theo sinh lại toàn chuỗi).
 - **2026-10-14 (Đ3-W3 TÍCH HỢP)** [ĐỢT 3 WAVE 3 — gộp 7 nhánh W3-A…G lên `dot3` (bc07df5), nhánh `worktree-wf_c558a007-52e-1`]:
     **Gộp (--no-ff, thứ tự A, B, F, D, C, E, G):** A e3a6579 · B 90c12c3 · F 1b16009 · D cc496fa · C 479adc8 · E cad6ba0 · G 9bcabd9.
     **Xung đột + cách giải (giữ ý CẢ HAI bên):** (B×A) citygen: giữ CẢ luật NOSIGN_ST rc 3 của A lẫn luật PK (bit 6-7) của B;
