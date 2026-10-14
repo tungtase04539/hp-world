@@ -78,98 +78,111 @@ export async function startServer({ config, env, envFile, overrides, log, featur
   const startedAt = Date.now();
 
   const db = await createDb(config.db, { log: log.child({ mod: 'db' }), metrics });
-  const mig = await migrate(db, { log: log.child({ mod: 'migrate' }) });
-
-  const limits = { maxPayload: NET.MAX_C2S_BYTES, idleTimeout: NET.IDLE_TIMEOUT_S, maxBackpressure: NET.MAX_BACKPRESSURE, bodyLimit: config.httpBodyLimit };
-  const gameT = await createTransport({ kind: config.transport, log: log.child({ mod: 'transport' }), limits, trustProxy: config.trustProxy });
-  const adminT = await createTransport({ kind: gameT.kind, log: log.child({ mod: 'transport-admin' }), limits, trustProxy: 'none' });
-
-  const adminAuth = (req) => {
-    const h = req.headers.authorization || '';
-    const tok = h.startsWith('Bearer ') ? h.slice(7).trim() : '';
-    return safeEqual(tok, config.secrets.adminToken);
-  };
-  const http = createRouter({ log: log.child({ mod: 'http' }), metrics, name: 'game', allowedOrigins: config.allowedOrigins, allowNoOrigin: config.allowNoOrigin, bodyLimit: config.httpBodyLimit });
-  // the admin page is same-origin; cross-origin requests to the admin port are refused
-  const adminHttp = createRouter({ log: log.child({ mod: 'admin-http' }), metrics, name: 'admin', allowedOrigins: [], allowNoOrigin: true, bodyLimit: 256 * 1024, auth: { admin: adminAuth } });
-  gameT.onHttp(http.handle);
-  adminT.onHttp(adminHttp.handle);
-
-  // WebSocket Origin allow-list (browsers always send Origin; bots/native clients send none)
-  gameT.guard((info) => {
-    if (info.origin) return http.isAllowedOrigin(info.origin) ? null : { status: 403, reason: 'origin not allowed' };
-    return config.allowNoOrigin ? null : { status: 403, reason: 'origin required' };
-  });
-
-  const wsConn = metrics.gauge('ws_connections', 'open WebSocket connections (game port)', () => gameT.connections);
-  void wsConn;
-
-  let dbOk = { at: 0, ok: true, ms: 0 };
-  const health = async () => {
-    if (Date.now() - dbOk.at > 1000) {
-      try { const ms = await db.ping(); dbOk = { at: Date.now(), ok: true, ms }; } catch { dbOk = { at: Date.now(), ok: false, ms: -1 }; }
-    }
-    return { ok: dbOk.ok, version: config.version, proto: PROTO_VERSION, transport: gameT.kind, uptimeS: Math.round((Date.now() - startedAt) / 1000), db: dbOk.ok ? 'ok' : 'error', dbMs: Math.round(dbOk.ms * 100) / 100, ccu: gameT.connections, serverTime: nowMs() };
-  };
-  const healthRoute = async (req, res) => { const h = await health(); res.json(h, h.ok ? 200 : 503); };
-  http.get('/healthz', healthRoute);
-  adminHttp.get('/healthz', healthRoute);
-  adminHttp.get('/metrics', (req, res) => res.text(metrics.render(), 200, 'text/plain; version=0.0.4; charset=utf-8'));
-
-  const app = {
-    config, log, metrics, db, bus, timers,
-    http,                 // public router (game port)
-    admin: adminHttp,     // admin router (admin port, localhost-only); opts {auth: 'admin'} = Bearer ADMIN_TOKEN
-    ws: {
-      route: (p, handlers) => gameT.route(p, handlers),
-      guard: (fn) => gameT.guard(fn),
-      get connections() { return gameT.connections; },
-      get kind() { return gameT.kind; },
-    },
-    provide: services.provide, replace: services.replace, get: services.get, has: services.has, services: services.names,
-    onStop: (fn) => { stopHooks.push(fn); },
-    nowMs,
-    startedAt,
-    paths: { serverRoot: config.serverRoot, repoRoot: config.repoRoot, dataDir: config.dataDir },
-    migrations: mig,
-    health,
-    ports: { game: 0, admin: 0 },
-    stop: null,
-  };
-
-  for (const [name, mod] of features) {
-    if (typeof mod.register !== 'function') throw new Error(`feature ${name} has no register(app)`);
-    await mod.register(app);
+  // on a startup failure, release what was opened so far (tests / supervisors must not hang on open handles)
+  const undo = [() => db.close(), () => metrics.stop(), () => timers.clearAll()];
+  try {
+    return await startRest();
+  } catch (e) {
+    for (const f of undo.reverse()) { try { await f(); } catch { /* ignore */ } }
+    throw e;
   }
 
-  app.ports.game = await gameT.listen(config.game.host, ports?.game ?? config.game.port);
-  app.ports.admin = await adminT.listen(config.admin.host, ports?.admin ?? config.admin.port);
+  async function startRest() {
+    const mig = await migrate(db, { log: log.child({ mod: 'migrate' }) });
 
-  let stopping = null;
-  app.stop = (reason = 'stop') => {
-    if (stopping) return stopping;
-    stopping = (async () => {
-      log.info('server stopping', { reason });
-      bus.emit('stop', { reason });
-      for (const fn of stopHooks.slice().reverse()) {
-        try { await fn(); } catch (e) { log.error('stop hook failed', { err: e }); }
+    const limits = { maxPayload: NET.MAX_C2S_BYTES, idleTimeout: NET.IDLE_TIMEOUT_S, maxBackpressure: NET.MAX_BACKPRESSURE, bodyLimit: config.httpBodyLimit };
+    const gameT = await createTransport({ kind: config.transport, log: log.child({ mod: 'transport' }), limits, trustProxy: config.trustProxy });
+    undo.push(() => gameT.close());
+    const adminT = await createTransport({ kind: gameT.kind, log: log.child({ mod: 'transport-admin' }), limits, trustProxy: 'none' });
+    undo.push(() => adminT.close());
+
+    const adminAuth = (req) => {
+      const h = req.headers.authorization || '';
+      const tok = h.startsWith('Bearer ') ? h.slice(7).trim() : '';
+      return safeEqual(tok, config.secrets.adminToken);
+    };
+    const http = createRouter({ log: log.child({ mod: 'http' }), metrics, name: 'game', allowedOrigins: config.allowedOrigins, allowNoOrigin: config.allowNoOrigin, bodyLimit: config.httpBodyLimit });
+    // the admin page is same-origin; cross-origin requests to the admin port are refused
+    const adminHttp = createRouter({ log: log.child({ mod: 'admin-http' }), metrics, name: 'admin', allowedOrigins: [], allowNoOrigin: true, bodyLimit: 256 * 1024, auth: { admin: adminAuth } });
+    gameT.onHttp(http.handle);
+    adminT.onHttp(adminHttp.handle);
+
+    // WebSocket Origin allow-list (browsers always send Origin; bots/native clients send none)
+    gameT.guard((info) => {
+      if (info.origin) return http.isAllowedOrigin(info.origin) ? null : { status: 403, reason: 'origin not allowed' };
+      return config.allowNoOrigin ? null : { status: 403, reason: 'origin required' };
+    });
+
+    const wsConn = metrics.gauge('ws_connections', 'open WebSocket connections (game port)', () => gameT.connections);
+    void wsConn;
+
+    let dbOk = { at: 0, ok: true, ms: 0 };
+    const health = async () => {
+      if (Date.now() - dbOk.at > 1000) {
+        try { const ms = await db.ping(); dbOk = { at: Date.now(), ok: true, ms }; } catch { dbOk = { at: Date.now(), ok: false, ms: -1 }; }
       }
-      timers.clearAll();
-      await gameT.close(1001, 'shutdown');
-      await adminT.close(1001, 'shutdown');
-      metrics.stop();
-      await db.close();
-      log.info('server stopped');
-    })();
-    return stopping;
-  };
+      return { ok: dbOk.ok, version: config.version, proto: PROTO_VERSION, transport: gameT.kind, uptimeS: Math.round((Date.now() - startedAt) / 1000), db: dbOk.ok ? 'ok' : 'error', dbMs: Math.round(dbOk.ms * 100) / 100, ccu: gameT.connections, serverTime: nowMs() };
+    };
+    const healthRoute = async (req, res) => { const h = await health(); res.json(h, h.ok ? 200 : 503); };
+    http.get('/healthz', healthRoute);
+    adminHttp.get('/healthz', healthRoute);
+    adminHttp.get('/metrics', (req, res) => res.text(metrics.render(), 200, 'text/plain; version=0.0.4; charset=utf-8'));
 
-  bus.emit('start', { ports: app.ports });
-  log.info('server started', {
-    transport: gameT.kind, game: `${config.game.host}:${app.ports.game}`, admin: `${config.admin.host}:${app.ports.admin}`,
-    db: config.db.driver, migrations: mig.current, applied: mig.applied, features: features.length, proto: PROTO_VERSION,
-  });
-  return app;
+    const app = {
+      config, log, metrics, db, bus, timers,
+      http,                 // public router (game port)
+      admin: adminHttp,     // admin router (admin port, localhost-only); opts {auth: 'admin'} = Bearer ADMIN_TOKEN
+      ws: {
+        route: (p, handlers) => gameT.route(p, handlers),
+        guard: (fn) => gameT.guard(fn),
+        get connections() { return gameT.connections; },
+        get kind() { return gameT.kind; },
+      },
+      provide: services.provide, replace: services.replace, get: services.get, has: services.has, services: services.names,
+      onStop: (fn) => { stopHooks.push(fn); },
+      nowMs,
+      startedAt,
+      paths: { serverRoot: config.serverRoot, repoRoot: config.repoRoot, dataDir: config.dataDir },
+      migrations: mig,
+      health,
+      ports: { game: 0, admin: 0 },
+      stop: null,
+    };
+
+    for (const [name, mod] of features) {
+      if (typeof mod.register !== 'function') throw new Error(`feature ${name} has no register(app)`);
+      await mod.register(app);
+    }
+
+    app.ports.game = await gameT.listen(config.game.host, ports?.game ?? config.game.port);
+    app.ports.admin = await adminT.listen(config.admin.host, ports?.admin ?? config.admin.port);
+
+    let stopping = null;
+    app.stop = (reason = 'stop') => {
+      if (stopping) return stopping;
+      stopping = (async () => {
+        log.info('server stopping', { reason });
+        bus.emit('stop', { reason });
+        for (const fn of stopHooks.slice().reverse()) {
+          try { await fn(); } catch (e) { log.error('stop hook failed', { err: e }); }
+        }
+        timers.clearAll();
+        await gameT.close(1001, 'shutdown');
+        await adminT.close(1001, 'shutdown');
+        metrics.stop();
+        await db.close();
+        log.info('server stopped');
+      })();
+      return stopping;
+    };
+
+    bus.emit('start', { ports: app.ports });
+    log.info('server started', {
+      transport: gameT.kind, game: `${config.game.host}:${app.ports.game}`, admin: `${config.admin.host}:${app.ports.admin}`,
+      db: config.db.driver, migrations: mig.current, applied: mig.applied, features: features.length, proto: PROTO_VERSION,
+    });
+    return app;
+  }
 }
 
 // ---- CLI ------------------------------------------------------------------------------------------------------------

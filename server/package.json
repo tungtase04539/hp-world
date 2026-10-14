@@ -9,7 +9,7 @@
   },
   "scripts": {
     "start": "node src/main.js",
-    "test": "node --test --test-concurrency=1 test/ ../js/shared/test/",
+    "test": "node --test --test-concurrency=1 \"test/*.test.js\"",
     "test:pg": "node test/pg_run.mjs",
     "bots": "node bots/run.mjs"
   },

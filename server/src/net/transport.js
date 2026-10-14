@@ -127,7 +127,11 @@ function createUwsTransport(uWS, opts) {
     }
     send(bytes) {
       if (this.closed) return 2;
-      try { return this.ws.send(bytes, true, false); } catch { return 2; }
+      let r;
+      try { r = this.ws.send(bytes, true, false); } catch { return 2; }
+      // 2 = dropped over maxBackpressure: make the documented contract hold now (uWS may close lazily)
+      if (r === 2) this.terminate();
+      return r;
     }
     cork(fn) {
       if (this.closed) return;
