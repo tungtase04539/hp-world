@@ -3,7 +3,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { makeCellSink, realBuildings } from './cellsink.js';
-import { initClearance, sweepAssemblies, flushClearance, releaseClearance, onCarriageDisc, nearPano as clrNearPano, nudgeDisc as clrNudge } from './clearance.js';   // Đợt 3 W2-A: khoảng trống phố/camera pano
+import { initClearance, sweepAssemblies, flushClearance, releaseClearance, onCarriageDisc, nearPano as clrNearPano, nudgeDisc as clrNudge, corridorPen as clrCorridorPen } from './clearance.js';   // Đợt 3 W2-A: khoảng trống phố/camera pano
 import { FLAG as RB_FLAG } from './buildings_data.js';
 import { registerModel, shrinkTexturesForMobile, assetURL } from './assets.js';
 import { IS_MOBILE, LITE } from './device.js';
@@ -47,7 +47,6 @@ import { furnitureLine } from './xsection.js';
 // Mạng đường thật (Đợt 3 WP6): đồ thị nút giao + dải + vỉa hè/bó vỉa + vạch kẻ trong shader
 import { buildRoadNet } from './roadnet.js';
 import { hedgeGeometry, hedgeMaterial } from './hedges.js';   // Đợt 3 W3-D: bụi cắt tỉa lổn nhổn (vườn hoa, dải phân cách)
-import { corridorPen as clrCorridorPen } from './clearance.js';   // W3-D: bụi viền công viên ô phải nằm NGOÀI hành lang phố
 // Đợt 3 W3-D: màu THẢM CỎ cell (đảo giao thông, vườn parterre, sân UBND, công viên ĐBP, nút Lạc Long) = xanh ô liu XỈN
 // như ảnh pano 10/2024 (cỏ nắng ~(100-125,115-135,60-80)); bản cũ 0x6f9a4f/0x5a8f43/0x5d8c45/#4e7a3a = "neon lawn" AUDIT3 PARK.
 const LAWN_OLIVE = 0x6a7b48;
