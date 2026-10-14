@@ -1,7 +1,54 @@
 // metrics.js — tiny metrics registry with Prometheus text exposition (served at /metrics on the ADMIN port only).
 // counter / gauge / histogram (fixed buckets + a ring buffer of recent samples for p50/p99 used by the degrade ladder
-// and the admin page). Process metrics: CPU %, RSS, heap, event-loop delay p50/p99. No dependencies.
+// and the admin page). Process metrics: CPU %, RSS, heap, event-loop lag p50/p99/max. No dependencies.
+//
+// Event-loop lag (fixer round 2): hp_eventloop_delay_{p50,p99,max}_ms measure how long an EXTERNAL event waits before
+// the main thread handles it — a tiny worker thread posts its clock every PROBE_MS and the main thread records
+// (receive − send). That is exactly what an inbound WebSocket message experiences. The previous source,
+// perf_hooks.monitorEventLoopDelay, records the interval of a 5 ms timer: it includes the 5 ms itself and, on Windows,
+// the 15.6 ms system timer quantum (an IDLE process reads p50 15.5 ms / p99 16.6 ms, a busy one 2 quanta ≈ 31 ms), so
+// it measured the platform, not the server. It is still exported, minus its resolution, as
+// hp_eventloop_timer_delay_{p50,p99}_ms for comparison.
 import { monitorEventLoopDelay } from 'node:perf_hooks';
+import { Worker } from 'node:worker_threads';
+
+const PROBE_MS = 5;
+const PROBE_SRC = `
+const { parentPort, workerData } = require('node:worker_threads');
+const now = () => { const t = process.hrtime(); return t[0] * 1e3 + t[1] / 1e6; };
+let stopped = false;
+parentPort.on('message', (m) => { if (m === 'stop') { stopped = true; parentPort.close(); } });
+(function tick() { if (stopped) return; parentPort.postMessage(now()); setTimeout(tick, workerData.ms); })();
+`;
+const hrMs = () => { const t = process.hrtime(); return t[0] * 1e3 + t[1] / 1e6; };
+
+// Starts the worker probe; lag samples go to hist (a Histogram) and to st.max (max since the last take).
+export function startLagProbe(hist, { intervalMs = PROBE_MS } = {}) {
+  const st = {
+    max: 0, samples: 0, worker: null,
+    stop() {
+      const w = this.worker;
+      if (!w) return;
+      this.worker = null;
+      try { w.postMessage('stop'); } catch { /* gone */ }
+      w.terminate().catch(() => {});
+    },
+  };
+  try {
+    const w = new Worker(PROBE_SRC, { eval: true, workerData: { ms: intervalMs }, resourceLimits: { maxOldGenerationSizeMb: 16, maxYoungGenerationSizeMb: 4 } });
+    w.unref();
+    w.on('message', (t) => {
+      const lag = hrMs() - t;
+      const v = lag > 0 ? lag : 0;
+      hist.observe(v);
+      if (v > st.max) st.max = v;
+      st.samples++;
+    });
+    w.on('error', () => { st.worker = null; });
+    st.worker = w;
+  } catch { /* no worker threads: the gauges read 0 */ }
+  return st;
+}
 
 const DEFAULT_MS_BUCKETS = [0.5, 1, 2, 5, 10, 15, 20, 25, 35, 45, 50, 75, 100, 250, 500, 1000];
 const esc = (s) => String(s).replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
@@ -118,13 +165,16 @@ export function createMetrics({ prefix = 'hp_', processMetrics = true } = {}) {
       for (const m of items.values()) out[m.name.slice(prefix.length)] = m.json();
       return out;
     },
-    stop() { if (eld) eld.disable(); },
+    stop() { if (eld) eld.disable(); if (probe) probe.stop(); },
   };
 
-  let eld = null;
+  let eld = null, probe = null;
   if (processMetrics) {
-    eld = monitorEventLoopDelay({ resolution: 5 });
+    const RES = 5;
+    eld = monitorEventLoopDelay({ resolution: RES });
     eld.enable();
+    const lagH = metrics.histogram('eventloop_lag_ms', 'delay before the main thread handles an external event (worker probe, ms)', [0.1, 0.25, 0.5, 1, 2, 4, 6, 8, 10, 15, 20, 25, 35, 50, 100, 250], 2048);
+    probe = startLagProbe(lagH);
     let lastCpu = process.cpuUsage(), lastT = performance.now(), cpuPct = 0;
     const sampleCpu = () => {
       const now = performance.now(), c = process.cpuUsage();
@@ -138,14 +188,19 @@ export function createMetrics({ prefix = 'hp_', processMetrics = true } = {}) {
     metrics.gauge('process_cpu_percent', 'CPU of this process, % of one core (since the previous scrape)', sampleCpu);
     metrics.gauge('process_rss_bytes', 'resident set size', () => process.memoryUsage.rss());
     metrics.gauge('process_heap_used_bytes', 'V8 heap used', () => process.memoryUsage().heapUsed);
-    metrics.gauge('eventloop_delay_p50_ms', 'event-loop delay p50 (ms) since the last scrape', () => eld.percentile(50) / 1e6);
-    metrics.gauge('eventloop_delay_p99_ms', 'event-loop delay p99 (ms) since the last scrape', () => {
-      const v = eld.percentile(99) / 1e6;
+    const q = (p) => { const v = lagH.quantile(p); return Number.isFinite(v) ? v : 0; };
+    metrics.gauge('eventloop_delay_p50_ms', 'event-loop lag p50 (ms): wait of an external event, last 2048 probe samples', () => q(0.5));
+    metrics.gauge('eventloop_delay_p99_ms', 'event-loop lag p99 (ms): wait of an external event, last 2048 probe samples', () => q(0.99));
+    metrics.gauge('eventloop_delay_max_ms', 'event-loop lag max (ms) since the last scrape', () => {
+      const v = probe.max;
+      probe.max = 0;        // window = between scrapes of the max gauge
       return v;
     });
-    metrics.gauge('eventloop_delay_max_ms', 'event-loop delay max (ms) since the last scrape', () => {
-      const v = eld.max / 1e6;
-      eld.reset();          // window = between scrapes of the max gauge (rendered after p50/p99)
+    // the old timer-based reading, minus its own resolution (on Windows it still contains the 15.6 ms timer quantum)
+    metrics.gauge('eventloop_timer_delay_p50_ms', 'perf_hooks timer delay p50 minus the 5 ms resolution (platform timer granularity included)', () => Math.max(0, eld.percentile(50) / 1e6 - RES));
+    metrics.gauge('eventloop_timer_delay_p99_ms', 'perf_hooks timer delay p99 minus the 5 ms resolution (platform timer granularity included); window = between scrapes', () => {
+      const v = Math.max(0, eld.percentile(99) / 1e6 - RES);
+      eld.reset();
       return v;
     });
     metrics.gauge('uptime_seconds', 'process uptime', () => process.uptime());

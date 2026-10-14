@@ -178,6 +178,9 @@ export function loadConfig({ env = process.env, envFile = DEFAULT_ENV_FILE, over
     dayLength: g.int('DAY_LENGTH', DAY_LENGTH, 60, 86400),
     tickHz: g.int('TICK_HZ', TICK_HZ, 1, 120),
     snapHz: g.int('SNAP_HZ', SNAP_HZ, 1, 60),
+    // max ms of snapshot work per event-loop turn (the tick yields with setImmediate between slices so inbound STATE /
+    // PING / HTTP never wait behind a whole tick; fixer round 2). 0 = one synchronous pass per tick.
+    tickSliceMs: g.int('TICK_SLICE_MS', 4, 0, 50),
     httpBodyLimit: g.int('HTTP_BODY_LIMIT', 16 * 1024, 256, 1024 * 1024),
     logLevel: g.oneOf('LOG_LEVEL', nodeEnv === 'test' ? 'warn' : 'info', ['debug', 'info', 'warn', 'error', 'silent']),
     logFormat: g.oneOf('LOG_FORMAT', 'json', ['json', 'pretty']),

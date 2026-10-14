@@ -31,6 +31,9 @@ export function pick(m) {
     tickP50: m.hp_sim_tick_ms_p50 ?? NaN, tickP99: m.hp_sim_tick_ms_p99 ?? NaN, tickLateP99: m.hp_sim_tick_late_ms_p99 ?? NaN,
     snapP50, snapP99, snapName: snapName || snapName50,
     elP50: m.hp_eventloop_delay_p50_ms ?? NaN, elP99: m.hp_eventloop_delay_p99_ms ?? NaN, elMax: m.hp_eventloop_delay_max_ms ?? NaN,
+    // fixer round 2: the old timer-based reading (includes the Windows 15.6 ms timer quantum), tick span / overruns
+    elTimerP99: m.hp_eventloop_timer_delay_p99_ms ?? NaN, tickSpanP99: m.hp_sim_tick_span_ms_p99 ?? NaN,
+    tickOverrun: m.hp_sim_tick_overrun_total ?? NaN,
     cpu: m.hp_process_cpu_percent ?? NaN, rss: m.hp_process_rss_bytes ?? NaN, heap: m.hp_process_heap_used_bytes ?? NaN,
     ccu, ccuName, degrade, degName, queue, qName,
     decodeErrorsServer: m.hp_ws_play_decode_errors_total ?? NaN,

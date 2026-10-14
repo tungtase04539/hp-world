@@ -59,6 +59,8 @@ export function buildReport({ meta, plan, merged, ts, workers, raw }) {
     tickP99All: seriesStats(ts, 'tickP99'), tickLateP99: seriesStats(ts, 'tickLateP99', steadyFrom),
     snapP99: seriesStats(ts, 'snapP99', steadyFrom), snapMetric: ts.find((e) => e.server?.snapName)?.server.snapName || null,
     eventLoopP99: seriesStats(ts, 'elP99', steadyFrom), eventLoopMax: seriesStats(ts, 'elMax', steadyFrom),
+    eventLoopTimerP99: seriesStats(ts, 'elTimerP99', steadyFrom), tickSpanP99: seriesStats(ts, 'tickSpanP99', steadyFrom),
+    tickOverruns: (() => { const v = ts.map((e) => e.server?.tickOverrun).filter(Number.isFinite); return v.length ? v[v.length - 1] - v[0] : null; })(),
     cpuPct: seriesStats(ts, 'cpu', steadyFrom), rssMB: seriesStats(ts.map((e) => (e.server ? { ...e, server: { ...e.server, rssMB: e.server.rss / 1048576 } } : e)), 'rssMB'),
     ccu: seriesStats(ts, 'ccu'), ccuMetric: ts.find((e) => e.server?.ccuName)?.server.ccuName || null,
     degradeLevels: [], scrapesOk: ts.filter((e) => e.ok).length, scrapes: ts.length,
@@ -251,7 +253,9 @@ export function renderMd(r) {
   L.push(`| tick sim p99 (cửa sổ trượt, qua các lần đọc) | ${ss(r.server.tickP99, ' ms')} |`);
   L.push(`| tick sim p50 | ${ss(r.server.tickP50, ' ms')} |`);
   L.push(`| lắp snapshot p99 (\`${r.server.snapMetric || 'chưa có metric'}\`) | ${ss(r.server.snapP99, ' ms')} |`);
-  L.push(`| event-loop p99 / max | ${ss(r.server.eventLoopP99, ' ms')} / ${ss(r.server.eventLoopMax, ' ms')} |`);
+  L.push(`| event-loop p99 / max (tin từ ngoài chờ bao lâu) | ${ss(r.server.eventLoopP99, ' ms')} / ${ss(r.server.eventLoopMax, ' ms')} |`);
+  if (r.server.eventLoopTimerP99?.n) L.push(`| event-loop kiểu cũ (đồng hồ 5 ms, gồm lượng tử 15,6 ms của Windows) p99 | ${ss(r.server.eventLoopTimerP99, ' ms')} |`);
+  if (r.server.tickSpanP99?.n) L.push(`| tick chia lát: thời gian thực từ snapshot đầu → cuối p99 · tick phải làm nốt đồng bộ | ${ss(r.server.tickSpanP99, ' ms')} · ${r.server.tickOverruns ?? '—'} |`);
   L.push(`| CPU tiến trình máy chủ (% 1 lõi) | ${ss(r.server.cpuPct, ' %', 1)} |`);
   L.push(`| RSS máy chủ | ${ss(r.server.rssMB, ' MB', 0)} |`);
   L.push(`| CCU (\`${r.server.ccuMetric || '—'}\`) | ${ss(r.server.ccu, '', 0)} |`);

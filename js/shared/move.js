@@ -44,6 +44,8 @@
 //   straight-line distance ≤ SLACK_MUL · Σ segAllow + SLACK_ADD_M (the window starts after the last mount/dismount;
 //   the mount step itself gets + MOUNT_SLACK_M)
 //   segAllow = max(vmax(mode before), vmax(mode after)) · Δt        (vmax = constants.js MODE_VMAX)
+// The same rule is applied over BURST_MS (300 ms) and LONG_MS (4 s) windows, so the additive slack cannot be re-spent
+// every second (sustained ceiling vmax·1.2 + SLACK_ADD_M / 4 s per second).
 // Teleport (hard flag): one step longer than max(TELEPORT_MIN_M, TELEPORT_MUL × that step's own limit).
 import { isWater, groundHeight, groundHeightNoDeck, BRIDGE_WAYS, ROADS_DT, ELEVATED_RI, nearestRiverPoint } from '../terrain.js';
 import { roadHW, sidewalkW } from '../xsection.js';
@@ -60,6 +62,11 @@ export const MOVE = Object.freeze({
   WINDOW_MS: VALIDATE.WINDOW_S * 1000,
   BURST_MS: 300,             // second, short window (same slack): an idle player cannot "bank" 1 s of allowance and
                              // dash at 3× for half a second before the 1 s window overflows (integration 15/10/2026)
+  LONG_MS: 4000,             // third, long window (same slack; fixer round 2, NET-4 residual): SLACK_ADD_M is granted
+                             // once per window, so with only the 1 s window ANY client (true clock or a 1.1× clock)
+                             // could sustain vmax·1.2 + 1 m/s forever (run: 9.4 m/s = 1.34 × vmax). Over 4 s the
+                             // sustained ceiling is vmax·1.2 + 0.25 m/s (run 8.65). Client time, so network jitter never
+                             // counts; it never reaches back across a mount / dismount (like the 1 s window).
   SLACK_MUL: VALIDATE.SLACK_MUL,
   SLACK_ADD_M: VALIDATE.SLACK_ADD_M,
   TELEPORT_MUL: VALIDATE.TELEPORT_MUL,
@@ -73,7 +80,8 @@ export const MOVE = Object.freeze({
   EDGE_TOL_M: 1.5,           // land modes: water within this distance of land is tolerated (bank edges)
   BOAT_SHORE_M: 8,           // boats: land within this distance of water is tolerated (docking at a pier)
   BRIDGE_MARGIN_M: 3,        // bridge corridor = half deck width + this
-  RING: 48,                  // samples kept (> 25 Hz × 1 s)
+  RING: 128,                 // samples kept (≥ LONG_MS at 30 Hz; at a higher STATE rate the long window starts at the
+                             // oldest kept sample — still a valid, shorter window)
 });
 
 // violation codes (match js/shared/protocol.js CORRECT_REASON values)
@@ -392,18 +400,22 @@ export class MoveCheck {
       // step (mountChange → window = that single segment + MOUNT_SLACK_M), and the samples after it are judged against
       // the new mode only. (Integration 15/10/2026: before, a dismount kept +9 m slack and the previous mode's speed in
       // the window for a whole second, so a walk-mode speed hack right after riding went unflagged for ~1.2 s.)
-      let i = this.head, k = 0, ib = this.head;
+      // one walk back: i = oldest sample within WINDOW_MS, ib = within BURST_MS, il = within LONG_MS
+      let i = this.head, k = 0, ib = this.head, il = this.head;
       if (!mountChange) {
         while (k + 1 < this.count) {
-          const j = (i - 1 + n) % n;
-          if (t - this.t[j] > MOVE.WINDOW_MS) break;
-          if (isMountedMode(this.m[j]) !== isMountedMode(this.m[i])) break;
-          i = j; k++;
-          if (t - this.t[j] <= MOVE.BURST_MS) ib = j;
+          const j = (il - 1 + n) % n;
+          const age = t - this.t[j];
+          if (age > MOVE.LONG_MS) break;
+          if (isMountedMode(this.m[j]) !== isMountedMode(this.m[il])) break;
+          il = j; k++;
+          if (age <= MOVE.WINDOW_MS) i = j;
+          if (age <= MOVE.BURST_MS) ib = j;
         }
       }
       const slack = MOVE.SLACK_ADD_M + (mountChange ? MOVE.MOUNT_SLACK_M : 0);
-      if (this._over(i, x, z, segAllow, slack) || (ib !== i && this._over(ib, x, z, segAllow, slack))) return MV.SPEED;
+      if (this._over(i, x, z, segAllow, slack) || (ib !== i && this._over(ib, x, z, segAllow, slack)) ||
+          (il !== i && this._over(il, x, z, segAllow, slack))) return MV.SPEED;
     } else if (step > stepLim) {
       this.lastDist = step; this.lastLimit = stepLim;
       return MV.SPEED;

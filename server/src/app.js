@@ -62,7 +62,9 @@ export function createTimers(log, metrics) {
     // (lateMs = how late this tick started — event-loop pressure the tick's own duration does not show).
     // Records `<name>_ms` (duration) and `<name>_late_ms` (start lateness) histograms. If the loop falls more than
     // `maxCatchUp` ticks behind it skips ahead (counted in `<name>_skipped_total`) instead of spiralling.
-    loop(hz, name, fn, { maxCatchUp = 3 } = {}) {
+    // external: true → the loop does NOT record the synchronous duration of fn; the caller reports each tick's real
+    // work with handle.record(ms) (the sim tick is sliced across several event-loop turns, fixer round 2).
+    loop(hz, name, fn, { maxCatchUp = 3, external = false } = {}) {
       const period = 1000 / hz;
       const dur = metrics.histogram(`${name}_ms`, `${name} duration (ms)`);
       const late = metrics.histogram(`${name}_late_ms`, `${name} start lateness (ms)`);
@@ -80,7 +82,7 @@ export function createTimers(log, metrics) {
           const t0 = performance.now();
           try { fn(tick, t0, t0 - last, lateMs); } catch (e) { log.error('loop tick threw', { name, tick, err: e }); }
           last = t0;
-          dur.observe(performance.now() - t0);
+          if (!external) dur.observe(performance.now() - t0);
           tick++; next += period; n++;
           now = performance.now();
         }
@@ -90,6 +92,7 @@ export function createTimers(log, metrics) {
       const h = {
         cancel: () => { stopped = true; clearTimeout(timer); live.delete(h); },
         get tick() { return tick; },
+        record: (ms) => dur.observe(ms),
         stats: () => ({ p50: dur.quantile(0.5), p99: dur.quantile(0.99), lateP99: late.quantile(0.99), skipped: skipped.get() }),
       };
       track(h);
