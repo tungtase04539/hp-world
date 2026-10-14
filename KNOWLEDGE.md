@@ -475,7 +475,8 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     chỉ phủ YÊN + THÂN SAU (mép 0,42 m), đầu xe LỘ (yếm, cổ lái, ốp đèn, ghi đông + 2 gương, phuộc, chắn bùn, 2 bánh đủ vòng + đùm),
     ~330 tam giác; COVER_COLS bỏ xanh/đỏ rực (xám-xanh nhạt); tần suất: bằng chứng 0,22 → 0,16, không bằng chứng 0,025 → 0,012
     (phố r 0,06 → 0,03) — 088 không có bằng chứng phủ bạt, 166/097 có. **097 h90/h180 bay mở be trống + khối đỏ:** GH chỉ số 6
-    (W5-B G_SHUT1 → G_HOME1) chọn G_HOME1 (nhà b16725 vân tay trệt 'none' → thống kê); G_HOME1 vẽ lại CÓ ĐỒ (tủ gỗ + TV, bàn thờ
+    (W5-B G_SHUT1 → G_HOME1) chọn G_HOME1 (nhà b16725 vân tay trệt 'none' → thống kê) ⇒ GH[6] TRẢ VỀ G_SHUT1 như dot3 (097
+    = cửa cuốn xanh như ảnh/dot3; GH vẫn 2 G_HOME2 + 1 G_HOME1 mở cửa theo ý W5-B); G_HOME1 vẽ lại CÓ ĐỒ (tủ gỗ + TV, bàn thờ
     treo + lịch, ghế nhựa, xe máy ra dáng, cửa lùa song đứng 1/3), G_HOME2 thêm TV/tranh/lịch/ghế/chậu cây; FG5 ('gate' = cửa
     ĐÓNG) chỉ số 1 G_HOME1 → G_GATE. G_ELEC: tranh = nền chuyển màu + máy điện thoại + dải chữ, kệ máy có màn sáng (166 h180 "ô
     xanh giữ chỗ"). Program key `fabric_v5fy_`.

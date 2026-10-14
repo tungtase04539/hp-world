@@ -156,7 +156,7 @@ const SETS = {
   G11: ['G_SHOW', 'G_STORE1', 'G_CIVIC', 'G_STORE0'],
   G12: ['G_HOME0', 'G_HOME1', 'G_SHUT1', 'G_OPEN0', 'G_GATE', 'G_HOME2'],
   G13: ['G_LOBBY'],   // sảnh kính liền (pano_359: biển cửa hàng trên sảnh khách sạn là sai)
-  GH: ['G_HOME0', 'G_HOME2', 'G_HOME1', 'G_HOME2', 'G_SHUT0', 'G_GATE', 'G_HOME1'],   // W5-B: ngõ ban ngày phần lớn MỞ cửa (G_HOME2)   // mặt ngõ/phố nhỏ: nhà ở
+  GH: ['G_HOME0', 'G_HOME2', 'G_HOME1', 'G_HOME2', 'G_SHUT0', 'G_GATE', 'G_SHUT1'],   // W5-B: ngõ ban ngày phần lớn MỞ cửa (G_HOME2); 2026-10-15 chỉ số 6 G_HOME1 → G_SHUT1 như dot3 (097 h90/h180: ảnh cửa cuốn, W5-B đổi chỗ này thành bay mở trống)   // mặt ngõ/phố nhỏ: nhà ở
   // tường hông/sau/chung LỘ (W3-C "không tường trống"): thêm tường hồi ố, xi măng thô có cửa sổ nhỏ + điều hoà, quảng cáo sơn
   SD: ['S_PLAIN0', 'S_EXP0', 'S_PLAIN0', 'S_PLAIN2', 'S_PLAIN1', 'S_WIN', 'S_WIN', 'S_BRICK', 'S_BACK', 'S_EXP1', 'S_EXP0'],
   BK: ['S_BACK', 'S_BACK', 'S_WIN', 'S_PLAIN0', 'S_PLAIN2', 'U_AC', 'U_LOG', 'U_SLIDE1', 'S_EXP1'],
