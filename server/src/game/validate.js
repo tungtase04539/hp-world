@@ -2,7 +2,8 @@
 // js/shared/move.js MoveCheck: time budget [−100, +200] ms, per-mode 1 s sliding-window distance ≤ v_max·1.2 + 1 m,
 // play disc, teleport (> 3 × max step = hard flag), mounted-mode rules (personal moto any time on land; shared
 // vehicles / boats need a claim; boat only on water; pillion next to a rider), on-foot water with bridge tolerance.
-// Violation points: +1 per violating STATE, +5 for a hard flag, −1 per second; > 5 → CORRECT (snap back to the last
+// Violation points: +1 per violating STATE (the k-th consecutive SPEED violation: +min(k, 3)), +5 for a hard flag,
+// −1 per second; > 5 → CORRECT (snap back to the last
 // accepted position, corrEpoch + 1), > 20 → kick. A hard flag corrects immediately. Never a ban for one event.
 // STATEs carrying an old corrEpoch are ignored (the client has not applied the CORRECT yet); a client that keeps
 // ignoring a CORRECT gets it re-sent every 3 s and is kicked after 5 re-sends.
@@ -19,6 +20,7 @@ export const VAL = Object.freeze({
   RESEND_MS: 3000,
   MAX_RESENDS: 5,
   PILLION_R: 4,             // m: a pillion passenger must be this close to a rider
+  SPEED_STREAK_MAX: 3,      // points of the k-th consecutive speed violation = min(k, 3)
 });
 
 // result object reused per call (read immediately)
@@ -27,6 +29,7 @@ export class Validator {
     this.mc = new MoveCheck();
     this.points = 0;
     this.pointsT = 0;
+    this.speedStreak = 0;       // consecutive speed violations (reset by an accepted STATE or a CORRECT)
     this.pending = false;       // a CORRECT is waiting for the client's ack (new corrEpoch)
     this.pendingSince = 0;
     this.resends = 0;
@@ -52,10 +55,16 @@ export class Validator {
     this.pending = false; this.resends = 0;
     this._decay(now);
     const v = this.mc.check(clientMs, x, z, mode, now, (vehicleOk ? MCF.VEHICLE_OK : 0) | this.extraFlags);
-    if (v === MV.OK) { r.accepted = true; this.accepted++; return r; }
+    if (v === MV.OK) { r.accepted = true; this.accepted++; this.speedStreak = 0; return r; }
     r.violation = v; r.hard = this.mc.hard;
     this.counts[v]++;
-    this.points += r.hard ? VAL.POINTS_HARD : 1;
+    // sustained speeding escalates: the k-th CONSECUTIVE speed violation costs min(k, 3) points, so a speed hack is
+    // corrected on its 3rd rejected STATE (≈ 0.2–0.3 s after the window first overflows) instead of the 6th, while an
+    // isolated honest overflow still costs 1 point (integration 15/10/2026: bot abuse T7 "rejected within 1 s")
+    let add = 1;
+    if (v === MV.SPEED) add = Math.min(VAL.SPEED_STREAK_MAX, ++this.speedStreak);
+    else this.speedStreak = 0;
+    this.points += r.hard ? VAL.POINTS_HARD : add;
     if (this.points > VALIDATE.VIOL_KICK) { r.kick = true; return r; }
     if (r.hard || this.points > VALIDATE.VIOL_CORRECT) r.correct = correctReason(v);
     return r;
@@ -63,6 +72,7 @@ export class Validator {
   // the gateway sent a CORRECT: judge the next samples from the corrected point
   corrected(x, z, mode, now) {
     this.mc.correctTo(x, z, mode, now);
+    this.speedStreak = 0;
     this.pending = true; this.pendingSince = now; this.lastResend = now; this.resends = 0;
     this.corrections++;
   }

@@ -113,6 +113,24 @@ maxBackpressure 64 KB. The game port checks `Origin` against `ALLOWED_ORIGINS` (
 - `worldclock` (S2): `{ dayEpoch, dayLength, now(), dayT(now?), weather() }`
 - `sim` (S2): `{ tick, stats() }`
 
+### 3.1 As integrated (15/10/2026) — services actually provided
+
+| service | owner | main methods (full list: `docs/multiplayer/SERVER.md` §2 / §3 / §5) |
+|---|---|---|
+| `sessions` | S2 | `load, count, get(accountId), byNetId, list()` (admin map rows with x/z), `kick, sendSystem, broadcastSystem, broadcastChat(text, channel, ref), flush, world` |
+| `sim` | S2 | `tick, level, stats(), forceDegrade(level \| -1), step(n)` |
+| `queue` · `tickets` · `resume` · `ratelimit` · `validate` · `gateway` · `worldclock` | S2 | see SERVER.md §2.10 |
+| `auth` | S2 | `issueAccess, verifyAccess, publicJwk, createInviteBatch` |
+| `chat` | S3 | contract above + `ref/flagged/support/retryAfterMs` in `handle()`, `isBanned, sanctionOf, setBlock(acc, target, on, 'block'\|'mute'), sanction, revokeSanction, recent, systemLine, …` |
+| `invites` · `alerts` | S3 | `{normalize, hash, generate, createBatch, listBatches}` (same sha256(normalised) as `auth`) · `{enabled, send, recent}` |
+| `netprobe` | S5 | `summary({days}), recent(limit), purge(days), stats()` — read by the ONE admin route `GET /admin/api/netprobe` (admin module) |
+
+Session objects expose `x`, `z`, `mode` getters (from the entity) so S3's chat log / report context / admin map read the
+real position. Gateway ↔ chat wiring follows SERVER.md §3.3 items 1–8 (msgRef = `chat.handle().ref`, SUPPORT_LINE,
+persistent blocks via `setBlock`, sanctions → `EVENT SANCTION` / close 4009 / 4003, timed bans refused at `/v1/join` and
+HELLO, `admin:broadcast` → S2C CHAT SYSTEM, `admin:restart` → SYSTEM RESTART_IN). `ACTION_RESULT` and `SANCTION_KIND`
+now live in `js/shared/protocol.js`.
+
 ## 4. Shared code (`js/shared/`, pure ESM, Node + browser)
 
 - `constants.js` — SPEED/MODE/MODE_VMAX/SFLAG, PLAY_RADIUS 1588, TICK_HZ/SNAP_HZ, AOI, DEGRADE, VALIDATE, CHAT, NICK,

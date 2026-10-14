@@ -92,7 +92,8 @@ services:
       DB_DRIVER: pg
       DB_URL: postgres://hp:${DB_PASSWORD:?thiếu DB_PASSWORD trong server/.env}@db:5432/hp
       DB_POOL_MAX: "10"
-      DATA_DIR: /tmp/hpdata
+      # volume riêng (không phải thư mục của máy): danh sách lọc chat anh sửa trên trang quản trị + run.marker (báo "crash")
+      DATA_DIR: /data
       # chỉ tới được cổng game qua 127.0.0.1 hoặc qua tunnel → tin header CF-Connecting-IP của Cloudflare
       TRUST_PROXY: cloudflare
       # cổng admin từ chối mọi yêu cầu đến từ mạng edge (cloudflared) và backend
@@ -105,6 +106,8 @@ services:
     ports:
       - "127.0.0.1:${HPMP_GAME_PORT:-9100}:9100"
       - "127.0.0.1:${HPMP_ADMIN_PORT:-9101}:9101"
+    volumes:
+      - gamedata:/data
     tmpfs:
       - /tmp:size=64m,mode=1777
     networks:
@@ -250,3 +253,4 @@ networks:
 
 volumes:
   pgdata: {}
+  gamedata: {}

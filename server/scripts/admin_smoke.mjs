@@ -1,4 +1,5 @@
 // node tools/qa/gpulock.mjs run -- node server/scripts/admin_smoke.mjs --out <dir> [--game 9120 --admin 9121]
+//   ... --attach 9151 [--attach-game 9150] [--token-file server/.env]   (page of a running server, e.g. with bots playing)
 // Admin page smoke test in ONE headless Chrome (software rendering, --disable-gpu) driven over the DevTools protocol
 // through --remote-debugging-pipe (no extra port, no extra npm dependency). Boots a throw-away server (PGlite in
 // memory, fresh random secrets), seeds demo players / chat / reports / invites / netprobe rows, logs in through the
@@ -8,6 +9,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { startServer } from '../src/main.js';
 import { loadConfig } from '../src/config.js';
 import { nullLogger } from '../src/log.js';
@@ -17,19 +19,41 @@ import { ROADS_DT } from '../../js/mapdata.js';
 const argv = process.argv.slice(2);
 const arg = (k, d) => { const i = argv.indexOf('--' + k); return i >= 0 ? argv[i + 1] : d; };
 const OUT = path.resolve(arg('out', path.join(os.tmpdir(), 'hp-admin-smoke')));
-const GAME = Number(arg('game', 9120)), ADMIN = Number(arg('admin', 9121));
+// --attach <adminPort> [--attach-game <gamePort>] [--token-file server/.env]: drive the page of an ALREADY RUNNING
+// server instead (integration: the live map with bots playing). Nothing is seeded except one invite batch and a few
+// netprobe rows through the public APIs; thresholds adapt to live data; the XSS probe needs the in-process chat and is
+// skipped (the default self-contained mode covers it).
+const ATTACH = arg('attach', null);
+const GAME = Number(arg(ATTACH ? 'attach-game' : 'game', ATTACH ? Number(ATTACH) - 1 : 9120)), ADMIN = Number(ATTACH || arg('admin', 9121));
 const CHROME = process.env.CHROME_PATH || 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 fs.mkdirSync(OUT, { recursive: true });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const MIN = ATTACH ? { feed: 1, reportsReady: `document.getElementById('reportList').childElementCount >= 1`, players: 5, batches: 2, net: 2 }
+  : { feed: 10, reportsReady: `document.querySelectorAll('#reportList .report').length >= 2`, players: 5, batches: 2, net: 4 };
+let app = null, db = null, chat = null, dataDir = null, mover = null, adminToken = null;
+const sessions = [];
+if (ATTACH) {
+  const envFile = path.resolve(arg('token-file', path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '.env')));
+  adminToken = (fs.readFileSync(envFile, 'utf8').match(/^ADMIN_TOKEN=([^\s#]+)/m) || [])[1];
+  if (!adminToken) throw new Error('ADMIN_TOKEN not found in ' + envFile);
+  const H = { authorization: 'Bearer ' + adminToken, 'content-type': 'application/json' };
+  const inv = await fetch(`http://127.0.0.1:${ADMIN}/admin/api/invites`, { method: 'POST', headers: H, body: JSON.stringify({ count: 3, uses: 1, days: 1, note: 'smoke' }) });
+  if (inv.status !== 200) throw new Error('invite batch: ' + inv.status);
+  const probe = { samples: 30, lost: 0, medianMs: 41, p95Ms: 63, jitterMs: 6, minMs: 30, maxMs: 70 };
+  for (const [carrier, netType, d] of [['viettel', '4g', 0], ['vnpt', 'wifi', -18], ['fpt', 'wifi', -22]]) {
+    await fetch(`http://127.0.0.1:${GAME}/v1/netprobe`, { method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ ...probe, carrier, netType, medianMs: probe.medianMs + d, minMs: probe.minMs + d, p95Ms: probe.p95Ms + d, maxMs: probe.maxMs + d }) });
+  }
+}
 
 // ---- server + demo data ---------------------------------------------------------------------------------------------
-const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'hp-admin-smoke-data-'));
-const config = loadConfig({ env: {}, envFile: null, overrides: { NODE_ENV: 'test', PGLITE_DIR: 'memory', LOG_LEVEL: 'silent', GAME_HOST: '127.0.0.1', ADMIN_HOST: '127.0.0.1', DATA_DIR: dataDir, TRANSPORT: 'ws' } });
-const app = await startServer({ config, log: nullLogger, ports: { game: GAME, admin: ADMIN } });
-const db = app.db, chat = app.get('chat');
+if (!ATTACH) {
+dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'hp-admin-smoke-data-'));
+var config = loadConfig({ env: {}, envFile: null, overrides: { NODE_ENV: 'test', PGLITE_DIR: 'memory', LOG_LEVEL: 'silent', GAME_HOST: '127.0.0.1', ADMIN_HOST: '127.0.0.1', DATA_DIR: dataDir, TRANSPORT: 'ws' } });
+app = await startServer({ config, log: nullLogger, ports: { game: GAME, admin: ADMIN } });
+db = app.db; chat = app.get('chat');
 const NAMES = ['Tùng', 'Linh', 'Hải', 'Mai', 'Đức', 'Lan', 'Minh', 'Hoa', 'Nam', 'Thảo', 'Quân', 'Hương', 'Bình', 'Ngọc', 'Phúc', 'Trang', 'Khoa', 'Yến', 'Sơn', 'Vy',
   'An', 'Huy', 'My', 'Long', 'Tâm', 'Hà', 'Việt', 'Chi', 'Dũng', 'Thu'];
-const sessions = [];
 let rnd = 12345;
 const rand = () => ((rnd = (rnd * 1103515245 + 12345) >>> 0) / 0x100000000);
 for (let i = 0; i < NAMES.length; i++) {
@@ -53,12 +77,15 @@ for (const r of [1, 2, 3]) await chat.report(sessions[r], sessions[6].accountId,
 await chat.report(sessions[4], sessions[8].accountId, REPORT_REASON.SPAM, refs[8]);
 chat.systemLine('Chào mừng tới thử nghiệm kín Hải Phòng 3D!', 'owner');
 await db.query(`INSERT INTO invites (code_hash, batch, uses_left, uses_total, expires_at, note) SELECT decode(md5(g::text), 'hex'), 'lo-demo', 1, 1, now() + interval '30 days', 'nhóm bạn' FROM generate_series(1, 12) g`);
-await db.exec(`CREATE TABLE netprobe_results (id bigserial PRIMARY KEY, created_at timestamptz NOT NULL DEFAULT now(), carrier text, net text, median_ms real, p95_ms real, jitter_ms real, loss_pct real)`);
-await db.query(`INSERT INTO netprobe_results (carrier, net, median_ms, p95_ms, jitter_ms, loss_pct) VALUES
-  ('Nhà mạng A', '4G', 38, 61, 6, 0.5), ('Nhà mạng A', 'Wi-Fi', 21, 33, 3, 0), ('Nhà mạng B', '4G', 44, 80, 9, 1.2), ('Nhà mạng C', 'Wi-Fi', 18, 26, 2, 0), ('Khác', '5G', 29, 41, 4, 0)`);
+// S5's table (migration 030_netprobe.sql)
+await db.query(`INSERT INTO netprobe_results (carrier, net_type, samples, lost, median_ms, p95_ms, jitter_ms, min_ms, max_ms) VALUES
+  ('viettel', '4g', 30, 0, 38, 61, 6, 30, 70), ('viettel', 'wifi', 30, 0, 21, 33, 3, 15, 40), ('vnpt', '4g', 30, 1, 44, 80, 9, 35, 95),
+  ('fpt', 'wifi', 30, 0, 18, 26, 2, 12, 30), ('khac', '5g', 30, 0, 29, 41, 4, 22, 50)`);
 await chat.flush();
+adminToken = config.secrets.adminToken;
 // keep players moving a little so the live map changes
-const mover = setInterval(() => { for (const s of sessions) { s.x += (rand() - 0.5) * 4; s.z += (rand() - 0.5) * 4; } }, 500);
+mover = setInterval(() => { for (const s of sessions) { s.x += (rand() - 0.5) * 4; s.z += (rand() - 0.5) * 4; } }, 500);
+}
 
 // ---- Chrome over the DevTools pipe ------------------------------------------------------------------------------------
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'hp-admin-smoke-chrome-'));
@@ -124,22 +151,22 @@ try {
   // log in through the real form (local test server, ephemeral token generated for this run)
   await evaluate(`(() => { const i = document.getElementById('tokenInput'); i.value = 'sai-ma-quan-tri-0000000000000'; document.getElementById('loginForm').requestSubmit(); })()`);
   await waitFor(`document.getElementById('loginMsg').textContent.length > 0`);
-  await evaluate(`(() => { const i = document.getElementById('tokenInput'); i.value = ${JSON.stringify(config.secrets.adminToken)}; document.getElementById('loginForm').requestSubmit(); })()`);
-  await waitFor(`!document.getElementById('app').hidden && document.querySelectorAll('#feed .line').length >= 10 && document.querySelectorAll('#chips .chip').length >= 6`);
+  await evaluate(`(() => { const i = document.getElementById('tokenInput'); i.value = ${JSON.stringify(adminToken)}; document.getElementById('loginForm').requestSubmit(); })()`);
+  await waitFor(`!document.getElementById('app').hidden && document.querySelectorAll('#feed .line').length >= ${MIN.feed} && document.querySelectorAll('#chips .chip').length >= 6`);
   await sleep(3500);
   await shot('02_tong_quan');
   // zoom the map on the crowd
   await evaluate(`(() => { const c = document.getElementById('map'); const r = c.getBoundingClientRect(); for (let i = 0; i < 9; i++) c.dispatchEvent(new WheelEvent('wheel', { deltaY: -100, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2, bubbles: true, cancelable: true })); })()`);
   await sleep(1800);
   await shot('03_ban_do_phong_to');
-  await tab('reports', `document.querySelectorAll('#reportList .report').length >= 2`);
+  await tab('reports', MIN.reportsReady);
   await shot('04_bao_cao');
-  await tab('players', `document.querySelectorAll('#playerList .prow').length >= 5`);
+  await tab('players', `document.querySelectorAll('#playerList .prow').length >= ${MIN.players}`);
   await evaluate(`[...document.querySelectorAll('#playerList .prow')].find((r) => r.textContent.includes('Minh'))?.click()`);
   await waitFor(`document.querySelector('#playerDetail h2') && document.querySelector('#playerDetail h2').textContent.includes('Minh')`);
   await sleep(300);
   await shot('05_nguoi_choi');
-  await tab('invites', `document.querySelectorAll('#inviteBatches tr').length >= 2`);
+  await tab('invites', `document.querySelectorAll('#inviteBatches tr').length >= ${MIN.batches}`);
   await evaluate(`document.getElementById('inviteForm').requestSubmit()`);
   await waitFor(`!document.getElementById('inviteOut').hidden && document.getElementById('inviteCodes').value.split('\\n').length === 10`);
   await shot('06_ma_moi');
@@ -149,34 +176,42 @@ try {
   await evaluate(`(() => { document.getElementById('filterTestInput').value = 'đẹp vl luôn'; document.getElementById('filterTest').requestSubmit(); })()`);
   await waitFor(`document.getElementById('filterTestOut').textContent.includes('che')`);
   await shot('08_bo_loc');
-  await tab('net', `document.querySelectorAll('#netBox tr').length >= 4`);
+  await tab('net', `document.querySelectorAll('#netBox tr').length >= ${MIN.net}`);
   await shot('09_mang');
   await tab('audit', `document.querySelectorAll('#auditBox tr').length >= 3`);
   await shot('10_nhat_ky');
   // phone width: no horizontal scroll
   await viewport(390, 844, true);
-  await tab('overview', `document.querySelectorAll('#feed .line').length >= 10`);
+  await tab('overview', `document.querySelectorAll('#feed .line').length >= ${MIN.feed}`);
   await sleep(1500);
   const overflow = await evaluate(`document.documentElement.scrollWidth - document.documentElement.clientWidth`);
   if (overflow > 1) problems.push(`horizontal scroll at 390 px: ${overflow}px`);
   await shot('11_dien_thoai');
-  await tab('reports', `document.querySelectorAll('#reportList .report').length >= 2`);
+  await tab('reports', MIN.reportsReady);
   await shot('12_dien_thoai_bao_cao');
-  // XSS probe: a chat line with markup must render as text
-  await chat.handle(sessions[14], CHANNEL.SAY, '<img src=x onerror=alert(1)> <b>đậm</b>');
-  await viewport(1440, 900);
-  await tab('overview', `[...document.querySelectorAll('#feed .line .x')].some((e) => e.textContent.includes('<img src=x'))`);
-  const injected = await evaluate(`document.querySelectorAll('#feed img, #feed b').length`);
-  if (injected) problems.push('chat markup was rendered as HTML');
+  // XSS probe: a chat line with markup must render as text (self-contained mode: needs the in-process chat service)
+  if (!ATTACH) {
+    await chat.handle(sessions[14], CHANNEL.SAY, '<img src=x onerror=alert(1)> <b>đậm</b>');
+    await viewport(1440, 900);
+    await tab('overview', `[...document.querySelectorAll('#feed .line .x')].some((e) => e.textContent.includes('<img src=x'))`);
+    const injected = await evaluate(`document.querySelectorAll('#feed img, #feed b').length`);
+    if (injected) problems.push('chat markup was rendered as HTML');
+  } else {
+    // live map: zoom in on the busiest area once more at desktop width
+    await viewport(1440, 900);
+    await tab('overview', `document.querySelectorAll('#feed .line').length >= ${MIN.feed}`);
+    await sleep(2500);
+    await shot('13_ban_do_bot');
+  }
 } catch (e) {
   problems.push('smoke step failed: ' + e.message);
   try { const { data } = await send('Page.captureScreenshot', { format: 'png' }, sid); fs.writeFileSync(path.join(OUT, 'zz_loi.png'), Buffer.from(data, 'base64')); } catch { /* ignore */ }
 } finally {
-  clearInterval(mover);
+  if (mover) clearInterval(mover);
   try { await send('Browser.close'); } catch { /* ignore */ }
   await new Promise((r) => { if (chrome.exitCode != null) r(); else { chrome.once('exit', r); setTimeout(() => { try { chrome.kill(); } catch { /* */ } r(); }, 5000); } });
-  await app.stop('smoke');
-  for (const d of [profile, dataDir]) { try { fs.rmSync(d, { recursive: true, force: true }); } catch { /* chrome may hold files a moment */ } }
+  if (app) await app.stop('smoke');
+  for (const d of [profile, dataDir].filter(Boolean)) { try { fs.rmSync(d, { recursive: true, force: true }); } catch { /* chrome may hold files a moment */ } }
 }
 const report = { ok: problems.length === 0, problems, screenshots: shots.map((f) => path.basename(f)), out: OUT };
 fs.writeFileSync(path.join(OUT, 'smoke.json'), JSON.stringify(report, null, 2));

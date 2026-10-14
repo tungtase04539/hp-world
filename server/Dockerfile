@@ -31,7 +31,10 @@ COPY server/ ./
 # static import graph; main.js only starts a server when run directly, so importing it has no side effect.
 # Also prints whether uWebSockets.js loads (it must on trixie; otherwise the server uses the ws fallback).
 RUN node --input-type=module -e "await import('/app/server/src/main.js'); const { createRequire } = await import('node:module'); try { createRequire('/app/server/package.json')('uWebSockets.js'); console.log('uWS: OK'); } catch (e) { console.log('uWS: NOT LOADABLE, ws fallback:', e.message); }" \
- && chmod -R a-w /app
+ && chmod -R a-w /app \
+ && mkdir -p /data && chown node:node /data
+# /data = DATA_DIR (compose mounts the named volume "gamedata" here; a fresh volume copies this owner): the owner's
+# chat-filter edits from the admin page and the run marker used for crash alerts survive restarts
 USER node
 EXPOSE 9100 9101
 HEALTHCHECK --interval=15s --timeout=5s --start-period=40s --retries=3 CMD ["node", "/app/server/ops/healthcheck.mjs"]

@@ -135,6 +135,8 @@ test('cheat: speed hacks are corrected quickly', () => {
     const r = drive(f(mult), { durS: 20, delay: (k, t, rr) => 40 + rr() * 100 });
     assert.ok(r.corrections >= 1, `${name}: ${JSON.stringify(r)}`);
     assert.ok(r.firstCorrectS < 2.5, `${name}: first CORRECT after ${r.firstCorrectS} s`);
+    // integration (bot abuse T7: rejected within 1 s): ×2 and faster are corrected in < 1 s (speed streak + 300 ms window)
+    if (mult >= 2) assert.ok(r.firstCorrectS < 1, `${name}: first CORRECT after ${r.firstCorrectS} s (≥ ×2 must be < 1 s)`);
   }
 });
 
@@ -263,9 +265,26 @@ test('validator: points decay; a client ignoring CORRECT is re-sent then kicked;
   const v = new Validator();
   v.reset(0, 0, MODE.WALK, 0);
   // 6 violations in a row â†’ CORRECT on the 6th
+  // (integration 15/10/2026: consecutive SPEED violations escalate 1 + 2 + 3 → CORRECT on the 3rd in a row)
   let r, t = 0;
-  for (let i = 1; i <= 7; i++) { t += 66; r = v.onState(t, i * 1.5, 0, MODE.WALK, t, true); }   // 1st accepted, then 6 violations
+  const seq = [];
+  for (let i = 1; i <= 7; i++) { t += 66; r = v.onState(t, i * 1.5, 0, MODE.WALK, t, true); seq.push(r.correct > 0); }   // 1st accepted, then 6 violations
   assert.ok(r.correct > 0, 'CORRECT after > 5 points');
+  assert.deepEqual(seq.slice(0, 4), [false, false, false, true], 'speed streak: CORRECT on the 3rd consecutive violation');
+  // an isolated violation between accepted samples still costs 1 point
+  const v1 = new Validator();
+  v1.reset(0, 0, MODE.WALK, 0);
+  let t1 = 0;
+  let viol1 = 0, corr1 = 0;
+  for (let i = 1; i <= 40; i++) {
+    t1 += 66;
+    const x = i % 8 === 0 ? i * 0.15 + 3 : i * 0.15;          // every 8th sample jumps 3 m ahead (speed, not teleport)
+    const rr = v1.onState(t1, x, 0, MODE.WALK, t1, true);
+    if (!rr.accepted) viol1++;
+    if (rr.correct) corr1++;
+  }
+  assert.equal(viol1, 5); assert.equal(corr1, 0);
+  assert.ok(v1.pointsNow < 3.5, `isolated violations do not escalate: ${v1.pointsNow}`);   // 5 × 1 point, −1/s
   v.corrected(0, 0, MODE.WALK, t);
   // stale STATEs: resend every 3 s, kick after 5 resends
   const acts = [];
@@ -277,7 +296,7 @@ test('validator: points decay; a client ignoring CORRECT is re-sent then kicked;
   t = 0;
   for (let i = 1; i <= 6; i++) { t += 66; v2.onState(t, i * 1.5, 0, MODE.WALK, t, true); }
   assert.ok(v2.pointsNow >= 3.5);
-  t += 6000;
+  t += 15000;     // 1 + 2 + 3 + 3 + 3 = 12 points (speed streak) → gone after 12 s of clean movement
   v2.onState(t, 0.1, 0, MODE.WALK, t, true);
   assert.equal(v2.pointsNow, 0);
   // > 20 points â†’ kick

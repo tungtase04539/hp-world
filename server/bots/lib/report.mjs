@@ -129,7 +129,12 @@ export function buildReport({ meta, plan, merged, ts, workers, raw }) {
       }
       const sent = byp.reduce((s, r) => s + (r.abuse.extra?.lines?.length || 0), 0);
       const rejected = byp.reduce((s, r) => s + (r.abuse.extra?.rejected || 0), 0);
-      abuse.chatBypass = { abusers: byp.length, linesSent: sent, rejected, rejectedPct: sent ? r1((rejected / sent) * 100, 1) : null, observerReceived: recvFromAbusers, leakedVerbatim: leaked, deliveredMasked: masked, leakSamples, observers: merged.recv.length };
+      // the sender's own echo is what everyone within 40 m received (independent of whether an observer stood nearby)
+      const echoVerbatim = byp.reduce((s, r) => s + (r.abuse.extra?.echoVerbatim || 0), 0);
+      const echoMasked = byp.reduce((s, r) => s + (r.abuse.extra?.echoMasked || 0), 0);
+      for (const r of byp) for (const t of r.abuse.extra?.leakLines || []) if (leakSamples.length < 10 && !leakSamples.includes(t)) leakSamples.push(t);
+      abuse.chatBypass = { abusers: byp.length, linesSent: sent, rejected, rejectedPct: sent ? r1((rejected / sent) * 100, 1) : null, observerReceived: recvFromAbusers,
+        leakedVerbatim: leaked + echoVerbatim, deliveredMasked: masked + echoMasked, leakObserved: leaked, echoVerbatim, echoMasked, leakSamples, observers: merged.recv.length };
     }
   }
 
@@ -292,7 +297,7 @@ export function renderMd(r) {
       L.push(`| ${k} | ${e.n} | ${e.started} | ${e.detected} | ${fmt(e.rate)} | ${fmt(e.withinLimitRate)} % | ${e.latencyMs.n ? `p50 ${fmt(e.latencyMs.p50)} · max ${fmt(e.latencyMs.max)} ms` : '—'} | ${JSON.stringify(e.via)}${e.skipped ? ` (bỏ ${e.skipped})` : ''} |`);
     }
     const cb = r.abuse.chatBypass;
-    if (cb) L.push('', `Lách lọc chat: ${cb.abusers} bot gửi ${cb.linesSent} dòng · bị từ chối ${cb.rejected} (${fmt(cb.rejectedPct)} %) · ${cb.observers} bot quan sát nhận ${cb.observerReceived} tin từ kẻ lách, **lọt nguyên văn ${cb.leakedVerbatim}**, đã che ${cb.deliveredMasked}.`);
+    if (cb) L.push('', `Lách lọc chat: ${cb.abusers} bot gửi ${cb.linesSent} dòng · bị từ chối ${cb.rejected} (${fmt(cb.rejectedPct)} %) · ${cb.observers} bot quan sát nhận ${cb.observerReceived} tin từ kẻ lách; tin vọng lại người gửi (= điều người trong 40 m nhận): nguyên văn ${cb.echoVerbatim ?? 0}, đã che ${cb.echoMasked ?? 0} · **lọt nguyên văn tổng ${cb.leakedVerbatim}**${cb.leakSamples?.length ? " (" + cb.leakSamples.map((x) => JSON.stringify(x)).join(", ") + ")" : ""}, đã che tổng ${cb.deliveredMasked}.`);
     L.push('');
   }
   L.push('## Ghi chú', '');

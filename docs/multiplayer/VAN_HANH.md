@@ -102,10 +102,16 @@ Trên trang quản trị (`http://127.0.0.1:9101/admin`):
   - **Đuổi**: ngắt kết nối ngay.
   - **Cấm**: cấm vào game, có ngày hết hạn.
   - **Bỏ qua**: báo cáo sai.
+  - **Nhắc nhở**: người chơi nhận một lời nhắc, không bị khoá.
 - Có **3 người khác nhau** cùng báo cáo một người trong 10 phút thì người đó tự bị khoá chat 10 phút. Tái phạm thì khoá
-  1 giờ, rồi 24 giờ.
+  1 giờ, rồi 24 giờ, rồi **ẩn tin 7 ngày**. Gửi liên tiếp nhiều câu bị chặn cũng bị tự khoá theo cùng thang này.
+- Người bị **cấm** có hạn (ví dụ 1 ngày) bị ngắt ngay và không vào lại được tới khi hết hạn. Cấm vĩnh viễn khoá luôn tài
+  khoản. Gỡ xử phạt: tab **Người chơi** → mở người đó → nút **Gỡ**.
 - **Khung chat trực tiếp**: các dòng bị đánh dấu được tô màu.
-- **Thông báo**: gửi một dòng cho mọi người, ví dụ "Máy chủ bảo trì sau 5 phút".
+- **Thông báo**: gửi một dòng cho mọi người, ví dụ "Máy chủ bảo trì sau 5 phút". Nút **Báo khởi động lại** hiện đồng
+  hồ đếm ngược cho mọi người chơi.
+- **Bộ lọc chat**: thử một câu xem bị chặn hay không; sửa từng danh sách từ rồi bấm Lưu. Bản sửa được giữ lại cả khi tắt
+  mở máy chủ (nằm trong ổ dữ liệu riêng của Docker, không phải thư mục của anh).
 - Mọi thao tác của anh đều được ghi vào nhật ký quản trị.
 
 **Cảnh báo qua Telegram** (không bắt buộc): khi có báo cáo mới, ai đó bị tự khoá, máy chủ khởi động lại, máy chủ quá tải
@@ -232,7 +238,8 @@ chặn:
    phần lớn từ xa.
 3. **Trang quản trị chỉ mở trên máy này**, cần mã dài 32 byte ngẫu nhiên, và từ chối mọi yêu cầu đến từ phía tunnel.
 4. **Máy chủ bị nhốt trong "hộp" Docker**: không có quyền quản trị, không ghi được vào chính nó, không thấy file cá nhân
-   của anh (Tài liệu, Ảnh...). Thư mục duy nhất nó được ghi là `server\data\backups`. Máy chủ bị giới hạn tối đa 4 lõi CPU
+   của anh (Tài liệu, Ảnh...). Thư mục duy nhất của máy anh mà nó được ghi là `server\data\backups` (ngoài ra là hai ổ dữ
+   liệu riêng do Docker quản lý: cơ sở dữ liệu và danh sách lọc chat). Máy chủ bị giới hạn tối đa 4 lõi CPU
    và 2 GB RAM, nên dù bị tấn công cũng không làm treo được cả máy.
 5. **Cơ sở dữ liệu nằm trong mạng kín**: không ra được Internet, tunnel cũng không tới được nó.
 6. **Khoá bí mật** chỉ nằm trong `server\.env` trên máy này. Khoá không bao giờ được đưa lên GitHub hay vào trong "hộp" Docker.

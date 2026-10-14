@@ -80,6 +80,18 @@ export function installAbuse(bot, cls) {
         if (t !== undefined && performance.now() - t <= 1000) a.extra.rejectedWithin1s = (a.extra.rejectedWithin1s || 0) + 1;
         detect(b, 'chat_rejected' + m.args[0]);
       }
+    } else if (m.op === S2C.CHAT && cls === 'chat_bypass' && m.from === b.r.netId && m.channel === CHANNEL.SAY) {
+      // the server echoes a DELIVERED line to its sender (to learn msgRef) with the text everyone in 40 m receives:
+      // identical to what was sent = the abusive words went through verbatim (leak); different = masked (neutralised)
+      const t = b._bypassSent?.shift();
+      if (a.extra.lines?.includes(m.text)) {
+        a.extra.echoVerbatim = (a.extra.echoVerbatim || 0) + 1;
+        (a.extra.leakLines = a.extra.leakLines || []).push(m.text);
+      } else {
+        a.extra.echoMasked = (a.extra.echoMasked || 0) + 1;
+        if (t !== undefined && performance.now() - t <= 1000) a.extra.rejectedWithin1s = (a.extra.rejectedWithin1s || 0) + 1;
+        detect(b, 'masked');
+      }
     } else if (m.op === S2C.PONG && cls === 'flood_ping') a.extra.pongs = (a.extra.pongs || 0) + 1;
     return false;
   };
