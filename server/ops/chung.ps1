@@ -85,6 +85,8 @@ function Get-CmdOutput([string]$exe, [string[]]$cmdArgs) {
   $psi.FileName = $exe
   $psi.Arguments = ($cmdArgs | ForEach-Object { if ($_ -match '[\s"]') { '"' + ($_ -replace '"', '\"') + '"' } else { $_ } }) -join ' '
   $psi.UseShellExecute = $false
+  # Process.Start dùng thư mục của tiến trình, KHÔNG theo Push-Location → đặt rõ thư mục hiện tại của PowerShell
+  $psi.WorkingDirectory = (Get-Location).ProviderPath
   $psi.RedirectStandardOutput = $true
   $psi.RedirectStandardError = $true
   $psi.CreateNoWindow = $true

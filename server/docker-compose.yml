@@ -8,6 +8,7 @@
 # Biến nội suy: lấy từ môi trường rồi tới server/.env (cùng thư mục file này). Bí mật CHỈ nằm trong server/.env.
 #   HPMP_GAME_PORT / HPMP_ADMIN_PORT   cổng trên máy (mặc định 9100 / 9101, CHỈ 127.0.0.1)
 #   HPMP_EDGE_SUBNET / HPMP_BACKEND_SUBNET   dải mạng nội bộ Docker (đổi khi chạy 2 bộ song song)
+#   HPMP_HOSTLINK_SUBNET / HPMP_HOSTLINK_GATEWAY   dải + gateway mạng hostlink (gateway = nguồn duy nhất mở được admin)
 #   HPMP_IMAGE                         tên image game (mặc định hpworld-game:local)
 #
 # AN TOÀN (SPEC §4):
@@ -96,6 +97,9 @@ services:
       TRUST_PROXY: cloudflare
       # cổng admin từ chối mọi yêu cầu đến từ mạng edge (cloudflared) và backend
       ADMIN_DENY_CIDRS: ${HPMP_EDGE_SUBNET:-172.31.91.0/24},${HPMP_BACKEND_SUBNET:-172.31.92.0/24}
+      # ... và CHỈ nhận từ máy này: yêu cầu tới cổng publish 127.0.0.1 đi vào container từ gateway của mạng hostlink
+      # (lớp IP của S3 mặc định chỉ nhận 127.0.0.1 — trong container đó là chính container)
+      ADMIN_ALLOW_IPS: ${HPMP_HOSTLINK_GATEWAY:-172.31.90.1}/32
       # token tunnel chỉ dành cho container tunnel — xoá khỏi môi trường của game
       TUNNEL_TOKEN: ""
     ports:
@@ -222,8 +226,13 @@ services:
     stop_grace_period: 3s
 
 networks:
+  # dải cố định để biết gateway (= đường vào từ cổng publish 127.0.0.1 của máy) — chỉ gateway này mở được cổng admin
   hostlink:
     driver: bridge
+    ipam:
+      config:
+        - subnet: ${HPMP_HOSTLINK_SUBNET:-172.31.90.0/24}
+          gateway: ${HPMP_HOSTLINK_GATEWAY:-172.31.90.1}
   edge:
     driver: bridge
     internal: true
