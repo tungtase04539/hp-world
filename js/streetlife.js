@@ -674,9 +674,11 @@ export function placeStreetLife(P) {
       const [x, z] = cellPos(S, kk, lat, (u - 0.5) * 1.2);
       if (!okAt(S, x, z, cat === 'furn' ? 1.3 : cat === 'fruit' ? GR[u < 0.5 ? 2 : 1] : 0.9) || obst.hit(x, z, 0.5) || !hasFacade(S, kk)) continue;   // trái cây: bán kính THẬT sọt/mẹt
       if (cat === 'fruit') groundI.push({ x, z, heading: H, v: u < 0.5 ? 2 : 1, col: 0xffffff });
-      else { const vs = SPILL[cat]; spillI.push({ x, z, heading: H + (u - 0.5) * 0.2, v: vs[(u * vs.length) | 0], col: pick([0xa8552e, 0xa8552e, 0xe8e4dc, 0x6a6e70], hash3(x, z, 332)) }); }
+      else { const vs = SPILL[cat]; spillI.push({ x, z, heading: H + (u - 0.5) * 0.2, v: vs[(u * vs.length) | 0], col: pick([0xb08a5c, 0x8a5636, 0xe8e4dc, 0x6a6e70, 0x9a7a58], hash3(x, z, 332)) }); }   // thùng các-tông nâu nhạt/nâu sẫm (r2: nâu cam bão hoà đọc như sofa)
       obst.add(x, z, 0.6); if (cat !== 'plant') P.addCollider(x, z, 0.45);
-      S.occ[kk] |= OCC.SHOP; c++;
+      // hàng SÁT MẶT TIỀN trên vỉa ≥ 2,6 m: ô đánh OCC.MKT (không OCC.SHOP) — xe máy vẫn đỗ ở dải parkingLine trước hàng (né
+      // vật qua obst; phản biện r2 pano_345: hàng xe máy dày của ảnh thật bị thay bằng thùng hàng)
+      S.occ[kk] |= X.sw >= 2.6 && lat > X.fac - 0.6 ? OCC.MKT : OCC.SHOP; c++;
     }
     return c;
   };
