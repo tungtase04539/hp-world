@@ -16,7 +16,7 @@ import { SEC_HEADERS, safeEqual, createIpAllow, createHostAllow, createSessions,
 import { createInviteBatch, listInviteBatches, normalizeInviteCode, hashInviteCode, generateInviteCode } from './invites.js';
 import { createLive } from './live.js';
 import { netprobeSummary } from './netprobe.js';
-import { isUuid } from '../chat/util.js';
+import { isUuid, extraEnv } from '../chat/util.js';
 import { LIST_FILES } from '../chat/lists.js';
 import { fmtDur } from '../chat/index.js';
 
@@ -36,9 +36,8 @@ const ACTIONS = {
 
 export function register(app) {
   const log = app.log.child({ mod: 'admin' });
-  const env = process.env;
-  const ipOk = createIpAllow(env.ADMIN_ALLOW_IPS || '');
-  const hostOk = createHostAllow(env.ADMIN_ALLOW_HOSTS || '');
+  const ipOk = createIpAllow(extraEnv(app, 'ADMIN_ALLOW_IPS'));
+  const hostOk = createHostAllow(extraEnv(app, 'ADMIN_ALLOW_HOSTS'));
   const sessions = createSessions();
   const live = createLive(app);
   const staticDir = path.join(app.config.serverRoot, 'admin');

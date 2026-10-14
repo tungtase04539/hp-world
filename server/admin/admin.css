@@ -17,6 +17,7 @@ html, body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.4
 h1 { font-size: 1.35rem; margin: 0 0 .6rem; }
 h2 { font-size: 1.02rem; margin: 0 0 .6rem; }
 code { background: var(--chip); padding: 0 .3em; border-radius: 4px; }
+a { color: var(--accent); }
 .muted { color: var(--muted); }
 .small { font-size: .85rem; }
 button, input, select, textarea { font: inherit; color: inherit; }
@@ -102,4 +103,7 @@ th { color: var(--muted); font-weight: 600; }
 td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .scroll-x { overflow-x: auto; }
 .toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 8px 16px; border-radius: 10px; max-width: calc(100% - 32px); z-index: 10; }
-@media (max-width: 600px) { main { padding: 10px; } .top { padding: 8px 10px; } .tabs { padding: 6px 10px 0; } }
+@media (max-width: 600px) {
+  main { padding: 10px; } .top { padding: 8px 10px; } .tabs { padding: 6px 10px 0; }
+  .brand { flex: 1; } .chips { order: 3; flex-basis: 100%; } .chip { font-size: .78rem; }
+}

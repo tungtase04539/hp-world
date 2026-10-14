@@ -8,7 +8,7 @@ import { createChat, POLICY } from '../src/chat/index.js';
 import { CHANNEL, CHAT_CODE, REPORT_CODE, REPORT_REASON } from '../../js/shared/protocol.js';
 
 let s, db;
-before(async () => { s = await bootTestServer({ TRANSPORT: 'ws' }); db = s.app.db; });
+before(async () => { s = await bootTestServer({ TRANSPORT: 'ws', ...(process.env.TEST_DB_URL ? { DB_URL: process.env.TEST_DB_URL } : {}) }); db = s.app.db; });
 after(async () => { await s.app.stop('test'); });
 
 async function fresh(extra = {}) {

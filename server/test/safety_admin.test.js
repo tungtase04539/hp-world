@@ -16,7 +16,7 @@ import { CHANNEL, REPORT_REASON } from '../../js/shared/protocol.js';
 let s, dataDir, token, base, host;
 before(async () => {
   dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'hp-s3-admin-'));
-  s = await bootTestServer({ TRANSPORT: 'ws', DATA_DIR: dataDir });
+  s = await bootTestServer({ TRANSPORT: 'ws', ...(process.env.TEST_DB_URL ? { DB_URL: process.env.TEST_DB_URL } : {}), DATA_DIR: dataDir });
   token = s.config.secrets.adminToken;
   base = s.admin;
   host = `127.0.0.1:${s.app.ports.admin}`;

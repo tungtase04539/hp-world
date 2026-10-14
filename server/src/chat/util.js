@@ -1,4 +1,6 @@
 // chat/util.js — small helpers for the chat service: token bucket, bounded Levenshtein, matching key, positions.
+import fs from 'node:fs';
+import { parseEnv, DEFAULT_ENV_FILE } from '../config.js';
 
 // Token bucket: `rate` tokens / s, capacity `burst`. take(now) → 0 when allowed, else ms until the next token.
 export class Bucket {
@@ -51,4 +53,17 @@ export function posOf(s) {
   return null;
 }
 
-export const isUuid = (s) => typeof s === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
+// Extra settings owned by S3 (ADMIN_ALLOW_IPS, ADMIN_ALLOW_HOSTS, CHAT_LOG_DAYS) are not part of the frozen config:
+// read them from the process environment, else from server/.env (same file and syntax as config.js), never in tests.
+let envFileVars = null;
+export function extraEnv(app, name) {
+  if (process.env[name] !== undefined && process.env[name] !== '') return process.env[name];
+  if (app?.config?.env === 'test') return '';
+  if (!envFileVars) {
+    envFileVars = {};
+    try { envFileVars = parseEnv(fs.readFileSync(DEFAULT_ENV_FILE, 'utf8')); } catch { /* no file */ }
+  }
+  return envFileVars[name] || '';
+}
+
+export const isUuid =(s) => typeof s === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);

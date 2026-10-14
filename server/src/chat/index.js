@@ -25,7 +25,7 @@
 import { analyzeChat, checkNickname, normalize, setLists, getLists, listsVersion } from '../../../js/shared/textfilter.js';
 import { CHANNEL, CHAT_CODE, REPORT_CODE, REPORT_REASON } from '../../../js/shared/protocol.js';
 import { CHAT } from '../../../js/shared/constants.js';
-import { Bucket, levenshtein, dupKey, posOf, isUuid } from './util.js';
+import { Bucket, levenshtein, dupKey, posOf, isUuid, extraEnv } from './util.js';
 import { readFilterDir, DEFAULT_FILTER_DIR, LIST_FILES } from './lists.js';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -511,7 +511,7 @@ export function fmtDur(ms) {
 
 export async function register(app) {
   const log = app.log.child({ mod: 'chat' });
-  const days = Number(process.env.CHAT_LOG_DAYS) > 0 ? Number(process.env.CHAT_LOG_DAYS) : POLICY.RETENTION_DAYS;
+  const days = Number(extraEnv(app, 'CHAT_LOG_DAYS')) > 0 ? Number(extraEnv(app, 'CHAT_LOG_DAYS')) : POLICY.RETENTION_DAYS;
   // owner overrides (written by the admin page) live in <dataDir>/filter; the committed lists are the fallback
   const dataFilter = path.join(app.config.dataDir, 'filter');
   const dirs = path.resolve(dataFilter) === path.resolve(DEFAULT_FILTER_DIR) ? [DEFAULT_FILTER_DIR] : [dataFilter, DEFAULT_FILTER_DIR];
