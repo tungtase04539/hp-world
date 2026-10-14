@@ -186,7 +186,8 @@ export async function startServer({ config, env, envFile, overrides, log, featur
 }
 
 // ---- CLI ------------------------------------------------------------------------------------------------------------
-const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+const norm = (p) => (process.platform === 'win32' ? path.resolve(p).toLowerCase() : path.resolve(p));
+const isMain = !!process.argv[1] && norm(process.argv[1]) === norm(fileURLToPath(import.meta.url));
 if (isMain) {
   const created = ensureEnvFile();
   const config = loadConfig();
