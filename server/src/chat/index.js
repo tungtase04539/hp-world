@@ -255,8 +255,8 @@ export function createChat({ db, log, alerts, metrics, bus, now = () => Date.now
     if (!db) return null;
     const ctx = await context(acc, line.ref, null);
     try {
-      const r = await db.one(`INSERT INTO reports (source, target_id, target_name, reason, detail, chat_ref, context)
-        VALUES ('filter', $1, $2, 0, $3, $4, $5) RETURNING id, at`, [acc, session.displayName || null, f.reasons.join(','), line.ref, JSON.stringify(ctx)]);
+      const r = await db.one(`INSERT INTO reports (source, target_id, target_name, reason, detail, chat_ref, context, at)
+        VALUES ('filter', $1, $2, 0, $3, $4, $5, $6) RETURNING id, at`, [acc, session.displayName || null, f.reasons.join(','), line.ref, JSON.stringify(ctx), new Date(t)]);
       m?.reports.inc(1, { source: 'filter' });
       bus?.emit('report:new', { report: { id: r.id, source: 'filter', targetId: acc, targetName: session.displayName, detail: f.reasons.join(',') } });
       if (f.support) alerts?.send('selfharm', `Một người chơi vừa nhắc tới chuyện tự hại trong chat (báo cáo #${r.id}). Hãy xem trang quản trị.`).catch(() => {});
@@ -360,9 +360,9 @@ export function createChat({ db, log, alerts, metrics, bus, now = () => Date.now
       if (!targetName) targetName = (await db.one('SELECT display_name FROM characters WHERE account_id = $1', [targetAccountId]))?.display_name || null;
       let row;
       try {
-        row = await db.one(`INSERT INTO reports (source, reporter_id, reporter_name, target_id, target_name, reason, chat_ref, context)
-          VALUES ('player', $1, $2, $3, $4, $5, $6, $7) RETURNING id, at`,
-        [rep, reporterSession.displayName || null, targetAccountId, targetName, rsn, chatRef ? chatRef >>> 0 : null, JSON.stringify(ctx)]);
+        row = await db.one(`INSERT INTO reports (source, reporter_id, reporter_name, target_id, target_name, reason, chat_ref, context, at)
+          VALUES ('player', $1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, at`,
+        [rep, reporterSession.displayName || null, targetAccountId, targetName, rsn, chatRef ? chatRef >>> 0 : null, JSON.stringify(ctx), new Date(t)]);
       } catch (e) {
         if (/foreign key|violates/i.test(e.message)) return { ok: false, code: REPORT_CODE.UNKNOWN_TARGET };
         throw e;

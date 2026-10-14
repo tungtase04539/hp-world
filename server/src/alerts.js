@@ -75,7 +75,8 @@ export function createAlerts({ config, log, fetch: fetchFn = globalThis.fetch, n
         return true;
       } catch (e) {
         entry.reason = 'error';
-        log?.warn('alert send failed', { kind, err: e.message });   // never log the URL (it holds the bot token)
+        // never log the URL / token (an error message may quote the request URL)
+        log?.warn('alert send failed', { kind, err: String(e?.message || e).split(token).join('[token]').split(chatId).join('[chat]') });
         return false;
       }
     },
