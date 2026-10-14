@@ -455,6 +455,69 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-10-14 (Đ3-W5-A HERO-KIT)** [ĐỢT 3 wave 5 — công trình ĐẶC TRƯNG không phải nhà ống (ngân hàng, văn phòng kính,
+  khách sạn, showroom/siêu thị, cây xăng, nhà chợ, trường/công sở thuộc địa, chùa, hàng cột tân cổ điển) theo ẢNH PANO]:
+    **DỮ LIỆU:** `tools/gen_herokit.mjs <fp_json> <fp_plan.json> [--dump f] [--why x,z,r]` → **`js/herokit_data.js`** (SINH TỰ
+    ĐỘNG, tất định — 2 lần cùng md5). Đọc LẠI fp_json (ghi chú tự do của agent trích xuất KHÔNG có trong audit/facade_fp.json —
+    `collectFP(dir, plan, {notes:true})` của gen_facade_fp thêm `out.notes[i]` song song obs, mặc định không đổi), ánh xạ bằng
+    CHÍNH `mapFacadeFP` (W4-A) trên footprint hiện tại, mỗi quan sát → chương trình theo kiểu + ghi chú (regex Việt CÓ dấu +
+    Anh; BẪY: "đen" ≠ "đền", "nhà nghỉ" ≠ khách sạn, quan sát mở đầu "tường rào/cổng/fence" ≤ 1 tầng = tường, không phải nhà),
+    bỏ phiếu theo trọng số; nhận khi phiếu ≥ 0,05, ≥ 25% tổng phiếu nhà, quan sát gần nhất ≤ 60 m, diện tích ≥ 40 m² (cửa hàng/
+    ngân hàng 25, trường 100 — trường/mầm non trong nhà ống không dựng rào cổng). 428 nhà: văn phòng 110, cửa hàng 97, ngân hàng
+    60, trường/công sở 43, khách sạn 47, chợ 31, hàng cột 26, chùa 12, cây xăng 2. Mỗi dòng: tâm diện tích (dm — KHOÁ khớp lân cận
+    ≤ 0,6 m: ai sinh lại buildings_real.js mà nhà không đổi hình vẫn khớp; nhà đổi hình mất chương trình KHÔNG lỗi → chạy lại tool
+    SAU process_buildings), chương trình, màu tường + màu nhấn (biển) quan sát, cờ (ngói, rào/cổng, mái che, bậc, vòm, cong, hàng
+    cột, ngành cửa hàng điện máy/thời trang/điện thoại), **ĐIỂM TIÊU** = trung bình trọng số chỗ tia quan sát chạm mặt nhà:
+    footprint GỘP lớn (b1471 2.321 m² = ngân hàng + văn phòng + quán ở pano_157) thì sảnh/mái che/biển đặt ĐÚNG đoạn ảnh thấy.
+    **RENDER (`js/herokit.js` + móc trong `js/citygen.js`):** `renderStyles` — chương trình THẮNG mọi luật (kể cả vân tay):
+    văn phòng → GLASS/MODERN (giữ HOTEL/TOWER khung đá W4-C — pano_359), ngân hàng giữ kiểu kính/đá sẵn có, khách sạn → HOTEL
+    (giữ NEO/COL/VILLA), cửa hàng → MODERN/GLASS, hàng cột → NEO, trường/công sở → COL (ngói/vòm/tường ấm) hoặc CIVIC, chợ/cây
+    xăng → SHED, chùa → COL; tuổi ≤ 1 cho văn phòng/ngân hàng/khách sạn/cửa hàng; không bảng chữ cửa hàng ngẫu nhiên. Bộ trệt
+    MỚI qua kênh aFp.w (cùng FG của vân tay, N_FG 11 → 14): FG12 ngân hàng / FG13 sảnh = `G_LOBBY` (KHÔNG dải chữ — r2: G_STORE1
+    vẽ "CÀ PHÊ/NỘI THẤT" dưới biển ngân hàng), FG14 showroom kính. Màu nhấn quan sát → aFp chế độ 2 (biển màu THẬT, chữ trắng/đen
+    theo độ sáng); không màu nhấn → chế độ 1 (không biển — pano_359 r1 hiện "NHÀ NGHỈ" trên sảnh văn phòng). Chợ ≤ 2 tầng, cây
+    xăng 1 tầng; mái: chợ tôn 2 dốc, trường có ngói → 4 dốc ngói, chùa/cây xăng mái do kit. Tắt ban công/mái hiên/điều hoà/biển
+    dọc/đồ trên mái/biển quảng cáo mái cho nhà hero (kit tự dựng). `buildHero` dựng vào CÙNG bộ đệm M (ô chính: hình bóng) / DT
+    (ô gần: đố kính, gờ, song rào, cột bơm) — 0 draw call thêm, ~30 k tam giác cả thành phố. 9 bộ: VĂN PHÒNG (chân granit, đố
+    đứng 3D mỗi ~1,4 m, gờ spandrel mỗi sàn, mái che sảnh kính + bậc), NGÂN HÀNG (dải biển 3D LIỀN màu thật chữ 'NGÂN HÀNG' từng
+    đoạn ≤ 8 m, 2 cột đá rãnh 2 tầng + dầm, mái che màu nhấn), KHÁCH SẠN (gờ khối đế đỉnh tầng 2, mái sảnh xe + cột tròn khi đủ
+    lùi, biển 'KHÁCH SẠN' trên mái tháp ≥ 6 T, biển DỌC 'KHÁCH SẠN' cho khách sạn mini), CỬA HÀNG (tấm ốp phủ tầng trên màu tường
+    quan sát + dải chữ theo NGÀNH: điện máy H_SIGN / thời trang PANEL 'THỜI TRANG NỮ' / điện thoại PANEL 'ĐIỆN THOẠI' / còn lại
+    trơn), HÀNG CỘT (cột tròn 10 cạnh rãnh khổ 2-3 tầng, chân + đầu cột, bệ, dầm, trán tam giác ngói), TRƯỜNG/CÔNG SỞ (rào chân
+    tường + trụ + song sắt + CỔNG trụ lớn mái ngói tại điểm tiêu + cột cờ), CHỢ (mái hiên tôn liền, 1-3 bảng quảng cáo BILL trên
+    diềm), CHÙA (diềm hiên dốc quanh thân + thân tầng trên + mái 4 dốc ĐAO cong + bờ nóc + cổng tam quan), CÂY XĂNG (mái che 2
+    màu trên 4 trụ, chữ 'XĂNG DẦU', đảo bơm). Đồ ĐỨNG trước mặt tiền dùng `streetGap` (citygen: khoảng lùi tới MÉP SAU vỉa hè
+    theo xsection) — không đủ chỗ thì cột áp tường / không trụ — và `free(x,z)` (không nhà khác, không claim) cho rào/cổng/cột cờ.
+    Cạnh dựng = cạnh mặt phố gần điểm tiêu nhất (ưu tiên đủ dài theo chương trình: hàng cột 10 m, khách sạn/trường/chùa 8 m…),
+    đoạn ≤ W quanh điểm tiêu (ngân hàng 22, cửa hàng 16, văn phòng/khách sạn 30, hàng cột 32 m). Atlas +2 ô sau D_CORN (107/112):
+    `H_SIGN` (4 dải chữ chung: NGÂN HÀNG, KHÁCH SẠN, SIÊU THỊ ĐIỆN MÁY, XĂNG DẦU — nền nhuộm màu biển) và `H_FLUTE` (thân cột rãnh).
+    program key 'fabric_v5a_'.
+    **NHÀ Ô DỰNG TAY (`js/cellsink.js` bước 3c):** phần lớn công trình bị chê "hộp phẳng mờ" là nhà ô DANH TÍNH được GIỮ (VIB 157,
+    TPBank 354, chợ Tam Bạc 450, chùa 276, trụ sở 322/166…) — citygen không chạm được. 3c gỡ nhà ô (không 'house'/'bespoke') khi:
+    (a) tên KHÔNG nói công năng → ≥ 50% khối đặc nằm trên nhà thật CÓ chương trình; (b) tên nói công năng (`heroProgOfName`: vib/
+    bidv/…→ ngân hàng, chicucthue/ubnd/truong → công sở, chua → chùa, cho_ → chợ, legend/hotel → khách sạn…) → có nhà hero CÙNG HỌ
+    (ngân hàng/khách sạn/cửa hàng/văn phòng = 1 họ) trong 45 m VÀ ≥ 30% khối đặc trên nhà hero (tính cả nhà SINH — lô cây xăng 418);
+    và luôn: nhà ô không cao vượt (≤ 1,6 × chiều cao nhà thật + 6 m: giữ tháp 66 m 'dl_legend' trên footprint 6 tầng), nhà hero
+    KHÔNG bị nhà ô danh tính khác (còn giữ) đè > 15% (nếu không citygen giết nó theo claim → chỉ còn khoảng trống: r2 pano_510/235
+    văn phòng b2805 bị biệt thự 'v4_lejardin_villa' đè). Báo cáo `cellSinkReport().heroCand` [tên, loại, phần trên hero, ô, m², cao,
+    nhà, gỡ?, cx, cz], `removed.hero`. BẪY: tên nói công năng KHÁC nhà hero dưới nó thì GIỮ ('baoviet' ngân hàng kính trên lô
+    trụ sở thuế 418 — thay bằng công sở trắng là sai). Dùng lại mẫu bước 2 (`it.perB`), không lấy mẫu lần 2.
+    **ĐO:** node (không GPU) fabric 1,438 → ~1,46 M tam giác (+~30 k hero), dựng ~1 s như cũ. PERF CÙNG PHIÊN (ABBA std 24 khung,
+    dot3 git archive :8911 ↔ nhánh :8901, traffic off, tier 3 Radeon 890M): calls TB 384,4 → 378,9 (−1,4 %), tris 2,990 →
+    2,995 M (+0,15 %, tệ nhất pano_092 h0 +0,6 %), fps 60 cả hai, hpReady 5,59/5,19 → 5,32/5,14 s; heap SAU ép GC (CDP, ABBA)
+    449/449 → 450/450 MB; 0 lỗi JS. Ảnh: scratch dot3/W5-A (`base` dot3, `final` nhánh, 26 pano mục tiêu + 8 đối chứng ×4 hướng,
+    ghép `finalpairs`). Chấm cặp (REAL | dot3 | nhánh, tự chấm, 26 pano mục tiêu): 4,31 → 4,61 — rõ nhất 322 (công sở vàng rào +
+    cổng mái ngói + cột cờ, toà hàng cột trắng), 450 (nhà chợ mái tôn + bảng quảng cáo + mái hiên tôn thay mảng màu trừu tượng), 354
+    (dải biển tím 'NGÂN HÀNG' + biển dọc khách sạn), 161 h90 (dải xanh liên tục 'NGÂN HÀNG' như thật), 060 (trường vàng + rào cổng),
+    166/377 (ốp đen 'THỜI TRANG NỮ' cửa hàng thời trang); 8 đối chứng không đổi (sai khác ≤ 10 % điểm ảnh, h270 pano_102 nhà áo
+    cưới có tấm ốp — đúng ngành). Vòng sửa: r1 'NHÀ NGHỈ' trên sảnh 359 (chế độ biển), cột hàng cột 0 tam giác (cạnh điểm tiêu
+    quá ngắn → ưu tiên cạnh đủ dài), chợ không mái hiên (ngưỡng cạnh), 418 'baoviet' bị thay sai (luật tên); r2 510/235 hở trống
+    (luật nhà ô khác đè), 'SIÊU THỊ ĐIỆN MÁY' trên shop thời trang (ngành). CÒN LẠI: chùa 276 — tầng mái nằm trên khung nhìn ở cự
+    li pano (nhà 2-3 tầng, mái bắt đầu ở đỉnh tường) ⇒ nên thêm diềm mái ngói ở MỖI sàn mặt phố; 157 VIB thành khối kính-đá be
+    của footprint gộp b1471 (đúng chỗ biển + sảnh, mặt trên chưa phải vách kính xanh); 395 hội trường cột 'tb_goldstar' là nhà ô
+    lệch chỗ (khối đặc chỉ 4% trên nhà thật) — giữ; 510/235 văn phòng xanh bạc hà b2805 bị nhà ô biệt thự 'v4_lejardin_villa' đè
+    20% ⇒ vẫn là hộp ô trắng (cần chỉnh claim/nhà ô — ngoài làn).
+
 - **2026-10-14 (Đ3-W4 SỬA HỒI QUY TÍCH HỢP)** [chấm cặp REAL | dot3 c24a52e | tích hợp W4: 5 pano tụt điểm — sửa TẬN GỐC, không gỡ W4]:
     **(1) BẢNG LỚN TỪNG BAY trên toà một chủ** (pano_046 h0/h270 BIDV, 161 h90/h180 ngân hàng "trắng sọc xanh", 515 h0/h270 toà
     thương mại 8 T): chế độ 3 của W4-A (`aFp.z` = 3) dựng ô PANEL chữ cửa hàng NGẪU NHIÊN ở MỌI bay tầng 1(-2) → chồng "NHÀ NGHỈ/
