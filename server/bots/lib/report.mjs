@@ -36,12 +36,14 @@ function botSeriesStats(ts, key, from = 0, to = Infinity) {
   return { n: v.length, p50: r1(quantile(v, 0.5), 2), p95: r1(quantile(v, 0.95), 2), max: r1(v.length ? Math.max(...v) : NaN, 2), mean: r1(v.length ? v.reduce((s, x) => s + x, 0) / v.length : NaN, 2) };
 }
 
-export function buildReport({ meta, plan, merged, ts, workers }) {
+export function buildReport({ meta, plan, merged, ts, workers, raw }) {
   const { c, maps, hist, records } = merged;
   const durMs = meta.durS * 1000;
   const steadyFrom = (meta.steadyFromS ?? 0) * 1000;
   const honest = records.filter((r) => !r.abuse);
-  const everLive = records.filter((r) => r.connects > 0).length;
+  const everLive = honest.filter((r) => r.connects > 0).length;
+  const honestReasons = {};
+  for (const r of honest) for (const k in r.correctReasons) honestReasons[k] = (honestReasons[k] || 0) + r.correctReasons[k];
 
   // bandwidth per client
   const avgBps = honest.filter((r) => r.connectedMs >= 5000).map((r) => r.rxBytes / (r.connectedMs / 1000));
@@ -77,7 +79,8 @@ export function buildReport({ meta, plan, merged, ts, workers }) {
   bots.per100 = {
     cpuPctOneCore: liveSteady ? r1((bots.cpuPct.mean / liveSteady) * 100, 2) : null,
     rssMB: meta.n ? r1((bots.rssMB.max / meta.n) * 100, 1) : null,
-    rssMBMarginal: null,
+    rssMBMarginal: meta.botsBaseRssMB != null && meta.n ? r1(((bots.rssMB.max - meta.botsBaseRssMB) / meta.n) * 100, 1) : null,
+    baseRssMBPerWorker: meta.botsBaseRssMB != null ? r1(meta.botsBaseRssMB / Math.max(1, workers.length), 1) : null,
   };
   const cpuSplit = {
     machineBusyPct: { mean: r1(machineCpu.length ? machineCpu.reduce((s, v) => s + v, 0) / machineCpu.length : NaN), max: r1(machineCpu.length ? Math.max(...machineCpu) : NaN) },
@@ -88,7 +91,7 @@ export function buildReport({ meta, plan, merged, ts, workers }) {
   const resume = {
     attempts: c.resumeAttempt || 0, ok: c.resumeOk || 0, fail: c.resumeFail || 0,
     rate: c.resumeAttempt ? r1((c.resumeOk / c.resumeAttempt) * 100, 2) : null,
-    ms: hist.resumeMs?.summary(0) || null,
+    ms: hist.resumeMs?.summary(0) || null, handshakeMs: hist.resumeHsMs?.summary(1) || null,
     botsNetIdChanged: records.filter((r) => r.netIds.length > 1).length,
   };
 
@@ -134,7 +137,7 @@ export function buildReport({ meta, plan, merged, ts, workers }) {
     meta,
     scenario: { name: plan.name, desc: plan.desc, n: plan.n, durS: plan.durS, events: plan.events },
     connect: {
-      bots: records.length, everLive, everLivePct: r1((everLive / Math.max(1, records.length)) * 100, 1),
+      bots: records.length, honestBots: honest.length, everLive, everLivePct: r1((everLive / Math.max(1, honest.length)) * 100, 1),
       connectOk: c.connectOk, connectFail: c.connectFail, queued: c.queued, authGuest: c.authGuest, authRefresh: c.authRefresh,
       connectMs: hist.connectMs?.summary(1), authMs: hist.authMs?.summary(1), joinMs: hist.joinMs?.summary(1), queuePos: hist.queuePos?.summary(),
       closes: maps.closes, system: Object.fromEntries(Object.entries(maps.system).map(([k, v]) => [nameOf(SYS, k), v])), http: maps.http, errors: maps.errors,
@@ -151,16 +154,19 @@ export function buildReport({ meta, plan, merged, ts, workers }) {
       maxVisibleAnyBot: Math.max(0, ...records.map((r) => r.maxVisible)), badSlot: c.badSlot, names: c.names,
     },
     decode: { errors: c.decodeErrors, kinds: maps.decodeErr, textFrames: c.textFrames, serverSide: server.serverDecodeErrors },
-    rtt: hist.rtt?.summary(2),
+    rtt: hist.rtt?.summary(2), rttNetem: hist.rttNetem?.n ? hist.rttNetem.summary(2) : null,
     corrections: {
       honestTotal: totCorr, honestPerBotPerMin: r1(totMin ? totCorr / totMin / Math.max(1, 1) : NaN, 3),
       perBotPerMin: summarize(corrPerMin, 3), botsOver2PerMin: corrPerMin.filter((v) => v >= 2).length,
-      reasons: Object.fromEntries(Object.entries(maps.correctReasons).map(([k, v]) => [nameOf(CORRECT_REASON, k), v])),
+      reasons: Object.fromEntries(Object.entries(honestReasons).map(([k, v]) => [nameOf(CORRECT_REASON, k), v])),
+      reasonsAll: Object.fromEntries(Object.entries(maps.correctReasons).map(([k, v]) => [nameOf(CORRECT_REASON, k), v])),
       netemBots: netemBots.length, netemPerBotPerMin: summarize(netemBots.map((r) => r.corrects / (r.connectedMs / 60000)), 3),
     },
     chat: { sent: c.chatSent, recv: c.chatRecv, rejected: c.chatRejected, rejectedCodes: Object.fromEntries(Object.entries(maps.chatRejected).map(([k, v]) => [nameOf(CHAT_CODE, k), v])), honestRejected: honest.reduce((s, r) => s + r.chatRejected, 0) },
     resume, server, bots, cpuSplit, abuse,
   };
+  rep.serverCounters = {};
+  if (raw?.first && raw?.last) for (const k of Object.keys(raw.last)) if (/_total({|$)/.test(k)) { const d = raw.last[k] - (raw.first[k] || 0); if (d) rep.serverCounters[k] = d; }
   rep.acceptance = accept(rep, meta);
   return rep;
 }
@@ -242,23 +248,29 @@ export function renderMd(r) {
   L.push(`| thang suy giảm | ${r.server.degradeLevels.length ? r.server.degradeLevels.map((d) => `L${d.level}@${d.t}s`).join(' → ') : '— (chưa có hp_degrade_level)'} |`);
   L.push(`| lần đọc metrics OK | ${r.server.scrapesOk}/${r.server.scrapes} |`);
   L.push('');
+  const sc = Object.entries(r.serverCounters || {});
+  if (sc.length) {
+    L.push('Bộ đếm máy chủ tăng trong lần chạy (`*_total`, lần đọc cuối − đầu): ' + sc.slice(0, 40).map(([k, v]) => `\`${k.replace(/^hp_/, '')}\` ${fmt(v)}`).join(' · '), '');
+  }
   L.push('## Chia CPU / RAM (máy chủ và bot chạy chung máy)', '');
   L.push('| | Giá trị |', '|---|---|');
   L.push(`| CPU cả máy bận (tất cả ${r.cpuSplit.cores} luồng) | TB ${fmt(r.cpuSplit.machineBusyPct.mean)} % · max ${fmt(r.cpuSplit.machineBusyPct.max)} % |`);
   L.push(`| tiến trình máy chủ (% của 1 lõi, p50) | ${fmt(r.cpuSplit.serverPctOneCore)} % |`);
   L.push(`| toàn bộ bot (% của 1 lõi, TB) | ${fmt(r.cpuSplit.botsPctOneCore)} % |`);
   L.push(`| bot: CPU mỗi 100 bot đang sống | ${fmt(r.bots.per100.cpuPctOneCore, 2)} % của 1 lõi |`);
-  L.push(`| bot: RSS tổng (max) · mỗi 100 bot | ${fmt(r.bots.rssMB.max, 0)} MB · ${fmt(r.bots.per100.rssMB, 1)} MB |`);
+  L.push(`| bot: RSS tổng (max) · chia đều mỗi 100 bot | ${fmt(r.bots.rssMB.max, 0)} MB · ${fmt(r.bots.per100.rssMB, 1)} MB |`);
+  L.push(`| bot: RSS nền mỗi tiến trình (trước khi có bot) · RSS biên mỗi 100 bot | ${fmt(r.bots.per100.baseRssMBPerWorker, 1)} MB · ${fmt(r.bots.per100.rssMBMarginal, 1)} MB |`);
   L.push(`| bot: event-loop utilisation (TB) | ${fmt(r.bots.elu.mean, 3)} |`);
   L.push(`| bot sống (max / p50) | ${fmt(r.bots.live.max, 0)} / ${fmt(r.bots.live.p50, 0)} |`);
   L.push('');
   L.push('## Phía bot', '');
   L.push('| Chỉ số | Giá trị |', '|---|---|');
-  L.push(`| bot từng vào được | ${r.connect.everLive}/${r.connect.bots} (${fmt(r.connect.everLivePct)} %) |`);
+  L.push(`| bot trung thực từng vào được | ${r.connect.everLive}/${r.connect.honestBots} (${fmt(r.connect.everLivePct)} %) |`);
   L.push(`| kết nối OK / lỗi / xếp hàng | ${fmt(r.connect.connectOk)} / ${fmt(r.connect.connectFail)} / ${fmt(r.connect.queued)} |`);
   L.push(`| thời gian mở WS | ${sm(r.connect.connectMs, ' ms')} |`);
   if (r.connect.authMs?.n) L.push(`| auth / join HTTP | ${sm(r.connect.authMs, ' ms')} / ${sm(r.connect.joinMs, ' ms')} |`);
-  L.push(`| RTT PING→PONG | ${sm(r.rtt, ' ms', 2)} |`);
+  L.push(`| RTT PING→PONG${r.rttNetem ? ' (bot không netem)' : ''} | ${sm(r.rtt, ' ms', 2)} |`);
+  if (r.rttNetem) L.push(`| RTT PING→PONG (bot netem) | ${sm(r.rttNetem, ' ms', 2)} |`);
   L.push(`| băng thông xuống mỗi client (TB) | ${sm(r.traffic.perClientAvgBps, ' B/s', 0)} |`);
   L.push(`| băng thông xuống mỗi client (đỉnh 5 s) | ${sm(r.traffic.perClientPeak5sBps, ' B/s', 0)} · > 12 KB/s: ${r.traffic.clientsOver12KBps} |`);
   L.push(`| snapshot | ${fmt(r.snapshots.count)} (keyframe ${fmt(r.snapshots.keyframes)}) · cỡ ${sm(r.snapshots.bytes, ' B', 0)} |`);
@@ -272,7 +284,7 @@ export function renderMd(r) {
   L.push(`| mã đóng WS | ${JSON.stringify(r.connect.closes)} |`);
   if (Object.keys(r.connect.errors).length) L.push(`| lỗi | ${JSON.stringify(r.connect.errors).slice(0, 400)} |`);
   if (Object.keys(r.connect.http).length) L.push(`| HTTP | ${JSON.stringify(r.connect.http)} |`);
-  L.push(`| resume | thử ${r.resume.attempts} · đúng netId ${r.resume.ok} · hỏng ${r.resume.fail}${r.resume.rate != null ? ` (${r.resume.rate} %)` : ''} · ${sm(r.resume.ms, ' ms', 0)} |`);
+  L.push(`| resume | thử ${r.resume.attempts} · đúng netId ${r.resume.ok} · hỏng ${r.resume.fail}${r.resume.rate != null ? ` (${r.resume.rate} %)` : ''} · từ lúc rớt: ${sm(r.resume.ms, ' ms', 0)} · bắt tay resume: ${sm(r.resume.handshakeMs, ' ms', 1)} |`);
   L.push('');
   if (r.abuse) {
     L.push('## Lạm dụng', '', '| Lớp | n | bắt đầu | phát hiện | % | trong hạn | độ trễ | qua tín hiệu |', '|---|---|---|---|---|---|---|---|');

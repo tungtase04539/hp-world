@@ -21,7 +21,7 @@ function allocate(n, weights) {
 export const SCENARIOS = {
   smoke: {
     desc: '50 bot đi/chạy/xe máy trên đồ thị đường thật, chat sạch, rớt mạng ngẫu nhiên (T0)',
-    n: 50, durS: 60,
+    n: 50, durS: 60, steadyS: 10,
     bot: (i, n, o) => ({ startAt: (i / n) * 5000, behavior: 'road', chat: true, chatEveryS: [15, 45], dropPerMin: o.dropPerMin ?? 0.2 }),
   },
   ramp: {
@@ -31,7 +31,7 @@ export const SCENARIOS = {
   },
   hotspot: {
     desc: '300 bot dồn về quảng trường Nhà hát lớn (EXTRAS.square), đi xe máy tới rồi đi bộ lang thang bán kính 50 m (T2)',
-    n: 300, durS: 300,
+    n: 300, durS: 300, steadyS: 150,
     bot: (i, n) => ({ startAt: (i / n) * 30000, behavior: 'plaza', target: SQUARE, chat: true, chatEveryS: [30, 90], dropPerMin: 0 }),
   },
   stress: {
@@ -62,10 +62,10 @@ export const SCENARIOS = {
   },
   'netem-lite': {
     desc: 'bot thêm trễ 80 ± 30 ms mỗi chiều + "mất gói" 2 % (dồn cục kiểu TCP) trên 30 % bot (T4)',
-    n: 300, durS: 180,
+    n: 300, durS: 180, steadyS: 30,
     bot: (i, n, o) => {
       const frac = o.netemFrac ?? 0.3;
-      const on = (i % 100) < frac * 100;
+      const on = ((i * 37) % 100) < frac * 100;   // spread over the start order
       return { startAt: (i / n) * 20000, behavior: 'road', chat: true, chatEveryS: [30, 90], dropPerMin: 0.05, netem: on ? { delayMs: 80, jitterMs: 30, loss: 0.02 } : null };
     },
   },

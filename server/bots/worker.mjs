@@ -19,8 +19,8 @@ const COUNTERS = ['connectOk', 'connectFail', 'authGuest', 'authRefresh', 'queue
 function makeW() {
   const W = {
     c: Object.fromEntries(COUNTERS.map((k) => [k, 0])),
-    rtt: new LogHist(), connectMs: new LogHist(), authMs: new LogHist(), joinMs: new LogHist(), httpMs: new LogHist(),
-    resumeMs: new LogHist(), queuePos: new LinHist(100000), snapBytes: new LinHist(8192), snapRecords: new LinHist(512),
+    rtt: new LogHist(), rttNetem: new LogHist(), connectMs: new LogHist(), authMs: new LogHist(), joinMs: new LogHist(), httpMs: new LogHist(),
+    resumeMs: new LogHist(), resumeHsMs: new LogHist(), queuePos: new LinHist(100000), snapBytes: new LinHist(8192), snapRecords: new LinHist(512),
     opsIn: {}, http: {}, closes: {}, system: {}, correctReasons: {}, chatRejected: {}, decodeErr: {}, errors: {},
     bump(map, k, n = 1) { map[k] = (map[k] || 0) + n; },
     err(k) { this.errors[k] = (this.errors[k] || 0) + 1; },
@@ -47,7 +47,7 @@ function init(c) {
   last = { ...W.c }; lastCpu = cpuNow(); lastElu = performance.eventLoopUtilization();
   timer = setInterval(loop, c.tickMs || 20);
   secTimer = setInterval(second, 1000);
-  port.post({ type: 'ready', workerId: c.workerId, graphNodes: graph.nodes, graphMs: graph.buildMs });
+  port.post({ type: 'ready', workerId: c.workerId, graphNodes: graph.nodes, graphMs: graph.buildMs, baseRss: process.memoryUsage().rss });
 }
 
 function loop() {
@@ -107,7 +107,7 @@ async function finish() {
     type: 'final', workerId: cfg.workerId,
     c: W.c, opsIn: W.opsIn, http: W.http, closes: W.closes, system: W.system, correctReasons: W.correctReasons,
     chatRejected: W.chatRejected, decodeErr: W.decodeErr, errors: W.errors,
-    hist: { rtt: histo(W.rtt), connectMs: histo(W.connectMs), authMs: histo(W.authMs), joinMs: histo(W.joinMs), httpMs: histo(W.httpMs), resumeMs: histo(W.resumeMs), queuePos: histo(W.queuePos), snapBytes: histo(W.snapBytes), snapRecords: histo(W.snapRecords) },
+    hist: { rtt: histo(W.rtt), rttNetem: histo(W.rttNetem), connectMs: histo(W.connectMs), authMs: histo(W.authMs), joinMs: histo(W.joinMs), httpMs: histo(W.httpMs), resumeMs: histo(W.resumeMs), resumeHsMs: histo(W.resumeHsMs), queuePos: histo(W.queuePos), snapBytes: histo(W.snapBytes), snapRecords: histo(W.snapRecords) },
     records: bots.map((b) => b.r),
     recv: bots.filter((b) => b.recv && b.recv.length).map((b) => ({ idx: b.s.idx, netId: b.r.netId, recv: b.recv })),
     creds: bots.filter((b) => b.creds && b.creds.refreshToken).map((b) => ({ idx: b.s.idx, ...b.creds })),

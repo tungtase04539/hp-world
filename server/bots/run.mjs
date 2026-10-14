@@ -61,7 +61,7 @@ export async function runScenario(opts) {
     dropPerMin: o.dropPerMin != null ? +o.dropPerMin : undefined, netemFrac: o.netemFrac != null ? +o.netemFrac : undefined,
   });
   const sc = SCENARIOS[scenario];
-  const steadyFromS = o.steadyFrom != null ? +o.steadyFrom : (o.ramp != null ? +o.ramp : sc.rampS) ?? Math.min(30, plan.durS * 0.3);
+  const steadyFromS = o.steadyFrom != null ? +o.steadyFrom : o.ramp != null ? +o.ramp : sc.rampS ?? sc.steadyS ?? Math.min(30, plan.durS * 0.3);
   const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
   const out = path.resolve(o.out || path.join(process.cwd(), 'bot-out', `${scenario}-${stamp}`));
   fs.mkdirSync(out, { recursive: true });
@@ -98,7 +98,7 @@ export async function runScenario(opts) {
     } else if (m.type === 'final') {
       finals.push(m);
       if (finals.length === workers.length) finalsResolve();
-    } else if (m.type === 'ready') workers[m.workerId].ready = true;
+    } else if (m.type === 'ready') { workers[m.workerId].ready = true; workers[m.workerId].baseRss = m.baseRss; }
   };
   const workerFile = path.join(HERE, 'worker.mjs');
   for (let w = 0; w < nW; w++) {
@@ -124,6 +124,7 @@ export async function runScenario(opts) {
     scenario, startedAt: new Date().toISOString(), durS: plan.durS, n: plan.n, mode, url: httpUrl, wsUrl, adminUrl, seed,
     proc, workers: nW, cores, node: process.version, cpuModel: os.cpus()[0]?.model, totalMemGB: +(os.totalmem() / 2 ** 30).toFixed(1),
     scrapeMs: +(o.scrapeMs || 2000), steadyFromS, gpuLock: underLock, out,
+    botsBaseRssMB: proc === 'fork' ? +(workers.reduce((s, w) => s + (w.baseRss || 0), 0) / 1048576).toFixed(1) : null,
   };
   log(`[bots] ${scenario}: ${plan.n} bot, ${plan.durS} s, mode=${mode}, ${nW} ${proc} worker(s) → ${httpUrl} · out ${out}`);
 
@@ -134,10 +135,11 @@ export async function runScenario(opts) {
 
   // scrape loop
   const ts = [];
-  let lastCpu = cpuSnapshot(), lastScrapeT = Date.now(), lastLog = 0;
+  let lastCpu = cpuSnapshot(), lastScrapeT = Date.now(), lastLog = 0, rawFirst = null, rawLast = null;
   const parentCpu0 = process.cpuUsage();
   const doScrape = async () => {
     const s = await scrape(adminUrl, httpUrl, o.adminToken);
+    if (s.m) { if (!rawFirst) rawFirst = s.m; rawLast = s.m; }
     const now = Date.now();
     const cpu = cpuSnapshot();
     const dtS = (now - lastScrapeT) / 1000;
@@ -176,7 +178,7 @@ export async function runScenario(opts) {
   meta.finalsReceived = finals.length;
 
   const merged = mergeFinals(finals);
-  const rep = buildReport({ meta, plan, merged, ts, workers });
+  const rep = buildReport({ meta, plan, merged, ts, workers, raw: { first: rawFirst, last: rawLast } });
   fs.writeFileSync(path.join(out, 'report.json'), JSON.stringify(rep, null, 1));
   fs.writeFileSync(path.join(out, 'timeseries.json'), JSON.stringify(ts));
   fs.writeFileSync(path.join(out, 'report.md'), renderMd(rep));

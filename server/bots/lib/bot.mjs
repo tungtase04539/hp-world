@@ -188,7 +188,7 @@ export class Bot {
     const now = performance.now();
     if (this.resuming) {
       const same = m && m.netId === this.r.netId;
-      if (same) { this.r.resumeOk++; W.c.resumeOk++; W.resumeMs.add(now - (this.dropT || this.resumeT0)); }
+      if (same) { this.r.resumeOk++; W.c.resumeOk++; W.resumeMs.add(now - (this.dropT || this.resumeT0)); W.resumeHsMs.add(now - this.resumeT0); }
       else { this.r.resumeFail++; W.c.resumeFail++; }
       this.resuming = false;
     }
@@ -307,7 +307,7 @@ export class Bot {
         if (sent !== undefined) {
           this.pings.delete(m.clientTime);
           const rtt = this.clock.addSample(sent, m.serverTime, performance.now());
-          W.rtt.add(rtt);
+          (this.s.netem ? W.rttNetem : W.rtt).add(rtt);
         }
         break;
       }
