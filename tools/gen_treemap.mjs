@@ -43,6 +43,13 @@ const PALM_RX = /cau(?![a-zà-ỹđ])|cọ(?![a-zà-ỹđ])|palm|dừa/;
 // phố có VÒM CÂY thật (AUDIT3 FP-7: Lê Lợi, Hạ Lý, Phan Bội Châu, Lý Thường Kiệt, Ký Con) — chỉ nâng pano ĐÃ nói có hàng cây
 // (review W3-G: chỉ TÊN PHỐ ở ĐẦU area — "phường Hạ Lý" (Phạm Phú Thứ 098/100), "Ngõ 80 phố Hạ Lý" (530-549) từng bị tính)
 const TUNNEL_STREETS = /^((Đầu|Cuối|Góc) )?([Pp]hố |Đường |P\. )?(Lê Lợi|Hạ Lý|Phan Bội Châu|Lý Thường Kiệt|Ký Con)(?!\p{L})/u;
+// Đ3-W4-B: bằng chứng THEO HƯỚNG từ facade fingerprints (tools/fp_nature.json — tools/gen_fp_nature.mjs; ~6 ảnh mặt tiền/pano,
+// trường "trees"): mô tả audit_enriched (1 câu/pano) bỏ sót cây non chống cọc trồng bù sau bão Yagi — fp: 136 pano nhắc
+// (97 pano ≥ 3 hướng) so với 69 pano của audit. CHỈ NÂNG: young ≥ 2 hướng → 3 (
+// không lên 6 — câu cây thường chép y hệt cho cả 6 hướng); lean ≥ 2 hướng → 1. Không có file → như cũ.
+const FPN = new Map();
+try { const J = JSON.parse(fs.readFileSync('tools/fp_nature.json', 'utf8')); const c = J.cols; for (const r of J.rows) FPN.set(r[0], Object.fromEntries(c.map((k, i) => [k, r[i]]))); } catch (e) { /* không có fp */ }
+cnt.fpYoung = 0; cnt.fpLean = 0;
 for (const e of src) {
   if (typeof e.X !== 'number' || typeof e.Z !== 'number') continue;
   const v = (e.vegetation || '').toLowerCase(), area = e.area || '';
@@ -87,7 +94,7 @@ for (const e of src) {
     if (!polS && !polP) polS = pollard;
     pollard = Math.max(polS, polP);
   }
-  const young = has(v, /cây non|mới trồng|trồng mới|trồng lại|cọc chống|chống cọc|giàn chống|cọc gỗ|cọc tre|kiềng|khung chống|chống (ba|3) chân/) ? (has(v, /hàng cây non|hàng cây mới/) ? 6 : 3) : 0;
+  let young = has(v, /cây non|mới trồng|trồng mới|trồng lại|cọc chống|chống cọc|giàn chống|cọc gỗ|cọc tre|kiềng|khung chống|chống (ba|3) chân/) ? (has(v, /hàng cây non|hàng cây mới/) ? 6 : 3) : 0;
   // --- mật độ ---
   let density = 2;
   if (has(v, /hầu như không có cây|gần như không có cây|không có cây thật|rất ít cây|không có cây xanh|không thấy cây/)) density = 0;
@@ -120,7 +127,13 @@ for (const e of src) {
   // cau, cây bóng mát nêu SAU (trees.js: cây chung nặng 0,5 × cau thay vì 1 × ⇒ cau ~45% thay vì ~30% / 100%)
   const palmLead = has(v, PALM_RX) && w[5] >= 7 && has(first, PALM_RX) && !has(first, /hàng cây|cây (bóng mát|xanh|lớn|tán)|tán rộng/) && !w[0] && !w[1] && !w[2] && !w[3] && !w[4];
   const palm = has(v, PALM_RX) ? (palmLead ? (has(v, /cây bóng mát|cây tán rộng|tán rộng|cây (xanh|thân gỗ) lớn|hàng cây (bóng|tán|lớn)/) ? 3 : 2) : 0) : treeTalk && density > 0 ? 1 : 0;
-  const lean = has(v, /nghiêng/) ? 1 : 0;
+  let lean = has(v, /nghiêng/) ? 1 : 0;
+  const fp = FPN.get(e.id);
+  if (fp && density > 0) {
+    const y2 = fp.young >= 2 ? 3 : 0;   // (agent hay CHÉP cùng 1 câu cây cho mọi hướng: "some young staked trees" ×6 — số hướng KHÔNG đo độ phủ → chỉ mức 3)
+    if (y2 > young) { young = y2; cnt.fpYoung++; }
+    if (!lean && fp.lean >= 2) { lean = 1; cnt.fpLean++; }
+  }
   out.push([Math.round(e.X * 10), Math.round(e.Z * 10), ...w, pollard, young, density, wash, generic, thin, polS, polP, tunnel, topiary, palm, lean]);
   cnt.n++; if (density === 0) cnt.none++; if (density === 1) cnt.sparse++; if (density === 3) cnt.dense++;
   if (pollard) cnt.pollard++; if (young) cnt.young++; if (wash) cnt.wash++; if (generic) cnt.generic++; if (thin) cnt.thin++;

@@ -1194,7 +1194,7 @@ export function buildProps(ctx) {
       const h1 = hash3(x, z, 61), h2 = hash3(x, z, 62), h3 = hash3(x, z, 63);
       const open = openSpace(x, z);
       // quán vỉa hè (ghế nhựa): ~1 cụm/60-80 m nơi pano thấy ghế nhựa; ~1/400 m nơi không có pano (lõi)
-      const pFood = (cl & 1) ? 0.045 : e ? 0.006 : (Math.hypot(x, z) < 900 ? 0.008 : 0.003);
+      const pFood = (cl & 1) ? 0.06 : e ? 0.006 : (Math.hypot(x, z) < 900 ? 0.008 : 0.003);
       if (!open && h1 < pFood) { placeFood(S, k, 2 + ((h2 * 4) | 0)); continue; }
       // xe đẩy hàng rong
       const pCart = (cl & 2) ? 0.03 : 0.004;
@@ -1246,7 +1246,7 @@ export function buildProps(ctx) {
   // Đ3-W4-B (AUDIT4 D5 "hàng xe máy đỗ quá thưa" 023/083/088/336/345/492): đo node (xe ≤ 20 m quanh pano): mức 3 TB 23,8
   // xe (ảnh thật: hàng 10-40 xe kín mặt tiền 2 bên ≈ 50+), mức 2 11,2 → mức 3: khởi hàng 0,3 → 0,5, 4-13 ô (12-39 m); mức 2
   // 0,12 → 0,2, 2-7 ô; mức 1 0,05 → 0,06, 1-3 ô
-  const LEVEL = [[0.012, 1, 2], [0.06, 1, 3], [0.2, 2, 7], [0.5, 4, 13]];
+  const LEVEL = [[0.012, 1, 2], [0.06, 1, 3], [0.28, 3, 9], [0.75, 6, 16]];
   // W4-B: phố xe máy DÀY (mức ≥ 2) — hàng xe đi XUYÊN ô có đồ cửa hàng (quán ghế nhựa, biển chữ A, chậu, hàng tràn, thùng
   // rác…): đo quanh pano_023 (mức 3) các ô OCC_SHOP cắt hàng xe thành khúc 2-6 ô (ảnh thật: xe đỗ liền mạch trước quán,
   // ghế quán sát mặt tiền). Từng chiếc vẫn né vật qua `obst` + `bikeObst` (ghế quán/biển chữ A — không có trong obst để
@@ -1273,7 +1273,7 @@ export function buildProps(ctx) {
       let k1 = k;
       while (k1 < S.n && k1 - k < want && S.ok[k1] && (thru || !(S.occ[k1] & OCC_SHOP)) && !S.fore[k1]) k1++;
       if (k1 > k) { bikeRows.push({ S, k0: k, k1, x, z }); for (let q = k; q < k1; q++) S.occ[q] |= OCC_BIKE; }
-      k = k1 + (lv === 3 && hash3(x, z, 79) < 0.5 ? 0 : 1);
+      k = k1 + (lv === 3 && hash3(x, z, 79) < 0.65 ? 0 : 1);
     }
   }
   // đếm chiếc dự kiến (~ ô×CELL/0.72) → lấy mẫu đều theo hash hàng nếu vượt ngân sách
@@ -1545,9 +1545,12 @@ export function buildProps(ctx) {
   // ---------------------------------------------------------------------------------------------------------------
   for (const S of sides) {
     let k = 0;
+    // W4-B: vỉa ≥ 3,4 m — người đi bộ đi được dải SÁT MẶT TIỀN sau mũi hàng xe máy (mũi xe ở parkingLine + 0,9 m, còn ≥ 0,6 m)
+    // → ô xe máy không chặn lối đi (hàng xe dày hơn từng bớt người đi bộ 404 → 317 trong đo node)
+    const wideW = sidewalkW(S) >= 3.4, BLK = wideW ? (OCC_SHOP | OCC_CAR | OCC_MKT) : (OCC_BIKE | OCC_SHOP | OCC_CAR | OCC_MKT);
     while (k < S.n) {
-      if (!S.ok[k] || S.occ[k] & (OCC_BIKE | OCC_SHOP | OCC_CAR | OCC_MKT)) { k++; continue; }
-      let k1 = k; while (k1 < S.n && S.ok[k1] && !(S.occ[k1] & (OCC_BIKE | OCC_SHOP | OCC_CAR | OCC_MKT))) k1++;
+      if (!S.ok[k] || S.occ[k] & BLK) { k++; continue; }
+      let k1 = k, bikeRun = false; while (k1 < S.n && S.ok[k1] && !(S.occ[k1] & BLK)) { if (S.occ[k1] & OCC_BIKE) bikeRun = true; k1++; }
       const runL = (k1 - k) * CELL;
       const [x, z] = cellPos(S, k, parkingLine(S));
       const r0 = Math.hypot(x, z);
@@ -1555,7 +1558,7 @@ export function buildProps(ctx) {
       if (runL >= 6 && hash3(x, z, 111) < runL * dens && !openSpace(x, z)) {
         const L = Math.min(runL - 2, 8 + hash3(x, z, 112) * 18);
         const sMid = (k + (k1 - k) / 2) * CELL;
-        const lat = sidewalkW(S) >= 2.2 ? parkingLine(S) + (hash3(x, z, 113) - 0.5) * 0.6 : curbLine(S) + sidewalkW(S) * 0.55;
+        const lat = bikeRun ? facadeLine(S) - 0.4 : sidewalkW(S) >= 2.2 ? parkingLine(S) + (hash3(x, z, 113) - 0.5) * 0.6 : curbLine(S) + sidewalkW(S) * 0.55;
         const [wx, wz] = cellPos(S, 0, lat, sMid - 0.5 * CELL);
         walkI.push({ x: wx, z: wz, heading: Math.atan2(S.ux, S.uz), walk: [L, 1.05 + hash3(wx, wz, 114) * 0.45, hash3(wx, wz, 115), 1 + hash3(wx, wz, 116) * 4] });
         for (let q = k; q < k1; q++) S.occ[q] |= OCC_PED;

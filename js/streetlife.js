@@ -599,6 +599,13 @@ export function placeStreetLife(P) {
             const [x3, z3] = P2(X.fac - 0.55, -1.15);
             const v3 = hash3(x3, z3, 331) < 0.45 ? 4 : hash3(x3, z3, 332) < 0.75 ? 1 : 2;
             if (okAt(S, x3, z3, GR[v3]) && !obst.hit(x3, z3, 0.45)) { groundI.push({ x: x3, z: z3, heading: H + (hash3(x3, z3, 333) - 0.5) * 0.4, v: v3, col: 0xffffff }); obst.add(x3, z3, 0.5); st.ground++; }
+            // Đ3-W4-B (AUDIT4 D5 "chợ thưa hàng" 124 mức 4/092/450): món THỨ BA phía kia dọc phố (55%) — ảnh 124/446/184 hàng phủ
+            // kín từ mặt tiền ra mép (sọt/mẹt/bao chồng sát nhau), bản W3-E còn khoảng hè trống giữa các sạp
+            if (hash3(x, z, 336) < 0.55) {
+              const [x4, z4] = P2(X.fac - 0.6 - hash3(x, z, 337) * 0.3, 1.2);
+              const v4 = hash3(x4, z4, 338) < 0.4 ? 2 : hash3(x4, z4, 339) < 0.7 ? 1 : 4;
+              if (okAt(S, x4, z4, GR[v4]) && !obst.hit(x4, z4, 0.45)) { groundI.push({ x: x4, z: z4, heading: H + (hash3(x4, z4, 340) - 0.5) * 0.5, v: v4, col: 0xffffff }); obst.add(x4, z4, 0.5); st.ground++; }
+            }
           }
           // người bán ngồi ghế đẩu phía mặt tiền, quay ra đường
           if (hash3(x, z, 320) < (lv === 3 ? 0.75 : lv === 2 ? 0.62 : 0.45)) {
@@ -749,7 +756,7 @@ export function placeStreetLife(P) {
       if (Math.hypot(e[0] - x, e[1] - z) > 25) continue;
       for (const [bit, cat] of EVC) {
         if (!(e[8] & bit)) continue;
-        if (hash3(x, z, 360 + bit) > (cat === 'plant' ? 0.22 : 0.16)) continue;
+        if (hash3(x, z, 360 + bit) > (cat === 'plant' ? 0.32 : 0.26)) continue;   // W4-B: 0,22/0,16 → 0,32/0,26 (ảnh: hàng bày/chậu cây nối nhau trước cửa)
         if (putSpill(S, k, cat, cat === 'plant' ? 2 : 1, 8 + bit)) st.evSpill++;
         break;
       }
@@ -766,7 +773,7 @@ export function placeStreetLife(P) {
       if (!S.ok[k] || S.fore[k] || (S.occ[k] & (OCC.SHOP | OCC.POLE | OCC.MKT))) continue;
       // băm theo (đầu đoạn, ô) TRƯỚC khi tính toạ độ (35k ô — bớt cấp phát mảng/GC lúc khởi động)
       const hk = hash3(S.ax + k * 3.1, S.az + S.side, 381);
-      if (hk > 0.03) continue;
+      if (hk > 0.04) continue;   // W4-B: 3% → 4% ô (chậu cây trước nhà — ảnh 107/023/345)
       const X = XS(S); const [x, z] = cellPos(S, k, X.fac - 0.5);
       const r0 = Math.hypot(x, z);
       if ((r0 >= 1300 && hk > 0.012) || P.parkBehind(x, z, S.nx, S.nz, 0.5)) continue;

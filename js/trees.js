@@ -1666,7 +1666,7 @@ export function buildTrees(scene, ctx = {}) {
     }
     recs.push({ x, y, z, sp, kit, sy: 1, sxz: 1, yaw: o.yaw ?? hxz(x, z, 44) * Math.PI * 2, lx: (hxz(x, z, 45) - 0.5) * 0.07, lz: (hxz(x, z, 46) - 0.5) * 0.07,
       rank, wash, pit: o.pit || 0, hero: heroOk ? o.hero : -1, full: fullP, H, B, Rr, cut, lift: 0, cs: 1, ox: 0, oz: 0,
-      src: o.src || 0, tun: tun ? 1 : 0, tiltX, tiltZ, slim, big: o.big ? 1 : 0, ev: ev.palm + 2 * ev.young + 4 * ev.topi, park: park ? 1 : 0 });
+      src: o.src || 0, tun: tun ? 1 : 0, tiltX, tiltZ, slim, big: o.big ? 1 : 0, ev: ev.palm + 2 * ev.young + 4 * ev.topi, park: park ? 1 : 0, lean: V.lean && !NOCUT && !o.median ? 1 : 0 });
   }
   const N = recs.length, recsMs = performance.now() - t0;
   // ---- atlas + vật liệu (1 material cho MỌI cây gần/xa) ----
@@ -1845,8 +1845,12 @@ export function buildTrees(scene, ctx = {}) {
       const free = r.fd === undefined || r.fd > R + FACADE_CLEAR + 1;
       const ha = hxz(r.x, r.z, 78);
       r.amp = r.sp === SP.NON ? 0.1 + 0.15 * ha : r.sp === SP.DA || r.sp === SP.ME ? 0.08 + 0.1 * ha : free && !r.sq ? 0.15 + 0.27 * ha : 0.08 + 0.1 * ha;
-      if (r.sq > 0 && !r.tiltX && !r.tiltZ && r.sp !== SP.NON && r.sp !== SP.CATCUT && r.sp !== SP.LOP && hxz(r.x, r.z, 79) < 0.45) {
+      // pano nói cây NGHIÊNG (fp/audit "tilted/thân nghiêng" — r.lean): sát tường 80%; đứng tự do 40% nghiêng hướng ngẫu nhiên 2-4,6°
+      const okT = !r.tiltX && !r.tiltZ && r.sp !== SP.NON && r.sp !== SP.CATCUT && r.sp !== SP.LOP && r.sp !== SP.CAU && r.sp !== SP.TOPI;
+      if (okT && r.sq > 0 && hxz(r.x, r.z, 79) < (r.lean ? 0.8 : 0.45)) {
         const a = 0.03 + 0.05 * hxz(r.x, r.z, 80); r.tiltX = r.snx * a; r.tiltZ = r.snz * a; r.wallTilt = 1;
+      } else if (okT && r.lean && free && hxz(r.x, r.z, 81) < 0.4) {
+        const a = 0.035 + 0.045 * hxz(r.x, r.z, 82), d = hxz(r.x, r.z, 83) * 6.283; r.tiltX = Math.cos(d) * a; r.tiltZ = Math.sin(d) * a; r.wallTilt = 1;
       }
     }
   }

@@ -53,6 +53,9 @@ const j = JSON.parse(fs.readFileSync(SRC, 'utf8'));
 const low = (s) => (s || '').toString().toLowerCase();
 const rows = [];
 const stat = { bike: [0, 0, 0, 0], car: [0, 0, 0], pole: [0, 0, 0], lamp: [0, 0, 0, 0], clutter: {}, market: [0, 0, 0, 0], spill: {}, deco: {} };
+// Đ3-W4-B: tóm tắt facade fingerprints (tools/gen_fp_nature.mjs) — không có file → như cũ
+const FPN = new Map(), fpStat = { bike: 0, cover: 0, goods: 0, stools: 0, plants: 0, wires: 0 };
+try { const J = JSON.parse(fs.readFileSync('tools/fp_nature.json', 'utf8')); const c = J.cols; for (const r of J.rows) FPN.set(r[0], Object.fromEntries(c.map((k, i) => [k, r[i]]))); } catch (e) { /* không có fp */ }
 for (const e of j) {
   if (e.X == null || e.Z == null) continue;
   const veh = low(e.vehicles);
@@ -139,6 +142,21 @@ for (const e of j) {
   // Đ3-W4-B: XE MÁY phủ bạt/áo trùm (004 "có xe phủ bạt trắng", 107, 239 "một chiếc phủ bạt xanh") — "xe máy" đứng trước trong
   // cùng mệnh đề (không qua . ; |): "ô tô con … xe phủ bạt bạc" (445) là ô tô (bit 64), không phải xe máy
   if (/xe máy[^.;|]{0,40}(phủ bạt|trùm bạt|áo trùm|bạt phủ|che bạt)|(phủ bạt|trùm bạt)[^.;|]{0,16}xe máy/.test(all)) deco |= 1024;
+  // Đ3-W4-B: bằng chứng THEO HƯỚNG từ facade fingerprints (tools/fp_nature.json, trường "street" ~6 ảnh/pano) — CHỈ NÂNG:
+  // hàng xe máy dày ≥ 2 hướng → mức 3, ≥ 1 hướng (không hướng nào nói "ít/không xe máy") → ≥ 2; xe máy phủ bạt → deco 1024;
+  // hàng hoá bày ≥ 2 → spill 4; ghế nhựa/bàn ghế quán ≥ 2 → clutter 1; chậu cây ≥ 1 → spill 512; dây chằng chịt ≥ 2 (pano
+  // có cột) → pole 2
+  const fp = FPN.get(e.id);
+  if (fp) {
+    const b0 = bike;
+    if (fp.bikeDense >= 2) bike = 3; else if (fp.bikeDense >= 1 && !fp.bikeFew) bike = Math.max(bike, 2);
+    if (bike !== b0) fpStat.bike++;
+    if (fp.bikeCover >= 1 && !(deco & 1024)) { deco |= 1024; fpStat.cover++; }
+    if (fp.goods >= 2 && !(sp & 4)) { sp |= 4; fpStat.goods++; }
+    if (fp.stools >= 2 && !(cl & 1)) { cl |= 1; fpStat.stools++; }
+    if (fp.plants >= 1 && !(sp & 512)) { sp |= 512; fpStat.plants++; }
+    if (fp.wires >= 2 && pole === 1) { pole = 2; fpStat.wires++; }
+  }
   rows.push([Math.round(e.X * 10) / 10, Math.round(e.Z * 10) / 10, bike, car, pole, lamp, cl, market, sp, deco]);
   stat.bike[bike]++; stat.car[car]++; stat.pole[pole]++; stat.lamp[lamp]++; stat.market[market]++;
   for (let b = 0; b < 6; b++) if (cl & (1 << b)) stat.clutter[1 << b] = (stat.clutter[1 << b] || 0) + 1;
@@ -152,4 +170,4 @@ const body = 'export const PROPS_EVIDENCE = [\n' + rows.map((r) => '[' + r.join(
 const mkt = '// chợ OSM amenity=marketplace (đa giác, toạ độ game) — nhúng trong bộ sinh\n' +
   'export const PROPS_MARKETS = ' + JSON.stringify(OSM_MARKETS.map(([n, g]) => ({ name: n, poly: g }))) + ';\n';
 fs.writeFileSync(OUT, head + body + mkt);
-console.log(OUT, rows.length, 'pano', JSON.stringify(stat));
+console.log(OUT, rows.length, 'pano', JSON.stringify(stat), 'fp', JSON.stringify(fpStat));
