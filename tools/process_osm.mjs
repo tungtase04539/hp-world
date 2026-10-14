@@ -640,7 +640,12 @@ const WATER = [];
   for (const r of ROADS_DT) {
     if (!['p', 's', 't', 'r'].includes(r.c)) continue;
     if (r.tags && r.tags.bridge && r.tags.bridge !== 'no') continue;
-    for (let i = 0; i < r.pts.length - 1; i++) segs.push([...r.pts[i], ...r.pts[i + 1], clearOf(r)]);
+    // Đ3-W5-D: Tam Bạc bắc nay là ngõ 5,5 m + vỉa 1 m (street_fit ghi đè pano) → clearOf co 11 → 7 m. Đoạn 'dải bờ tự phát'
+    // (z < −590, cộng STRIP_W) giữ theo phố hẹp; đoạn nam (đầu nút 221, chế độ 'prom' dải dạo của riverbank) cần thêm 2 m
+    // (mép nước 8,25 m từ tim: dải dạo lát 4,5 m + lan can — ảnh 221 h180) — với 7 m nước tràn sát mép ngõ, lan can đứt
+    // (ảnh thử); trả về khoảng THEO CẤP 11 m thì riverbank xếp 'wild' (dải > 7 m) → mất lan can
+    const clsClear = /Tam Bạc/.test(r.name || '') ? Math.max(7, roadHW(r) + sidewalkW(r) + PROM + 2) : 0;
+    for (let i = 0; i < r.pts.length - 1; i++) segs.push([...r.pts[i], ...r.pts[i + 1], clearOf(r), clsClear]);
   }
   try {
     for (const w of load('osm_alleys.json')) {
@@ -692,7 +697,8 @@ const WATER = [];
       let best = null;
       const xtra = stripExtra(W.n, x, z);
       for (const si of cell) {
-        const [ax, az, bx, bz, need0] = segs[si];
+        const [ax, az, bx, bz, needW, needC = 0] = segs[si];
+        const need0 = z > -590 ? Math.max(needW, needC) : needW;
         const need = need0 + (need0 > FOOT_CLEAR ? xtra : 0);
         const dx = bx - ax, dz = bz - az, L = Math.hypot(dx, dz); if (L < 0.5) continue;
         const ux = dx / L, uz = dz / L;
