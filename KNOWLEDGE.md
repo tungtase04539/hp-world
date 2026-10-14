@@ -544,6 +544,18 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     cần khoá GPU: tools/qa/shoot.mjs --swiftshader --w 320 --h 180 + console.error tạm). Cổng: 0 lỗi JS (13 khối chụp full,
     perf ×8, WebGL1 --gl1); lite: 3 × 404 `assets_lite/*.glb` ở CẢ dot3 lẫn W3-D (worktree không có assets_lite — môi trường);
     diag full 'TẤT CẢ THỰC THỂ OK' (giống dot3); waterbfs 5/5; node --check mọi module sửa; gen_roadmarks chạy lại tất định.
+    **ĐO / KIỂM vòng 3 (2026-10-14, sau (10); base dot3 :8544, W3-D :8504):** roadnet R1750 (node) đèn 29 (25 OSM + 4), nhánh
+    zebra 239, vạch giữa khối 118 → 114, tim nhãn 164 / chữ 12 / mặc định 591 / không 326 / đôi 61, nhãn W lan 9; ô vỉa hè
+    giáp vườn 399 (82 có bằng chứng phía vườn), dựng 324-339 ms. CHẤM MẮT (REAL|dot3|r2|r3, 79 khung + aerial): 10 pano đích
+    của phản biện 4,20 (dot3) → 5,13 (r2) → 5,20 (478 vỉa hè xám, 225 bờ vườn xám); thêm 017 3,0 → 3,6 (hết zebra ma), 551
+    5,0 → 5,5, 223/224/226 h090 + 043 h270 +0,5, 545 h180 +0,3; đối chứng 6×2 2,87 → 2,92 (= dot3; 150 Cát Cụt xám lại).
+    PERF B/A/B2/A2 cùng phiên: fps chạm vsync 60; lấy min 2 lần mỗi bên (gai streaming ±0,5-0,9 M tam giác xuất hiện ở CẢ
+    hai bên, khác view mỗi lần) → tam giác trung vị +0,46 % (−0,9…+1,1 %), draw call thấp hơn 16/24 góc; pha furniture
+    39/40 → 117/109 ms (vườn hoa), freeze 210/243 → 366/322 (A−B +60…+190 ms qua 5 phiên — thật: gộp tĩnh bụi/cỏ/lối),
+    hpReady nhiễu (5460/5302 → 5417/5550). Cổng: 0 lỗi JS (7 khối chụp, std ×2, --gl1 webgl2:false); lite 3 × 404
+    `assets_lite` như dot3 (môi trường); diag 'TẤT CẢ THỰC THỂ OK — 0 lỗi JS'; waterbfs 5/5; gen tất định. Cảnh báo console
+    (SwiftShader): 64 toNonIndexed = dot3; 'KHR_parallel_shader_compile not supported' 2-14 tuỳ lần đo (1 lần mỗi
+    compileAsync GLB của assets.js — đếm theo số model đã nạp lúc lấy mẫu, W3-D không đụng assets/main).
 - **2026-10-04 (W2-F POLISH)** [ĐỢT 3 wave 2 — WebGL1, giải mã RB 1 lần, kho cảng, ĐÊM, giao thông né xe đỗ, dọn code chết, hitch]:
     **(1) WebGL1** (three r160 tự lùi WebGL1 khi không có WebGL2): KIỂM bằng `tools/qa/shoot.mjs --gl1` (init script cho
     `getContext('webgl2')` trả null — cờ Chrome `--disable-es3-apis` KHÔNG có tác dụng ở headless mới: vẫn webgl2:true;
