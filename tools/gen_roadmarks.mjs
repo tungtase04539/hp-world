@@ -81,9 +81,11 @@ function parkPaveClass(t0, main) {
 }
 const pave = [];
 const pc = { 2: 0, 3: 0, 4: 0, 5: 0 }, ppc = { 2: 0, 3: 0, 4: 0, 5: 0 };
+// nhãn NHÌN ẢNH vật liệu vỉa hè (mark_labels.json pave: id → [lớp, ghi chú]) thắng chữ mô tả (478 'block xám-đỏ', 150 'caro … con sâu': ảnh xám)
+const PAVE_LBL = JSON.parse(fs.readFileSync('tools/pano_loop/mark_labels.json', 'utf8')).pave || {};
 for (const p of A) {
   if (!Number.isFinite(p.X) || !Number.isFinite(p.Z)) continue;
-  const c = paveClass(p.sidewalk); if (!c) continue;
+  const c = PAVE_LBL[p.id] ? PAVE_LBL[p.id][0] : paveClass(p.sidewalk); if (!c) continue;
   const k = parkPaveClass(p.sidewalk, c);
   pave.push([Math.round(p.X * 10) / 10, Math.round(p.Z * 10) / 10, c, k]); pc[c]++; if (k) ppc[k]++;
 }

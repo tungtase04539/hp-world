@@ -20992,7 +20992,8 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     // 223/226 hai bên lại là cỏ) và mũi bắc Tố Hữu cạnh ĐBP (545 h180 "quảng trường … lát đá"). Mảng sân = đĩa ∩ polygon,
     // ô 2 m, có ô cỏ bó vỉa lệch. Phản biện W3-D: bản sân lát cho cả 6 vườn → 400 h000/h270 thấy sân thay cỏ, nhìn từ trên
     // là mảng xám gần trắng + lưới ô cỏ đều tăm tắp.
-    const PLAZA_PATCHES = [[705, -657, 42], [697, -470, 30]];
+    // [690,-418,24] = mũi bắc vườn Kim Đồng bên kia ĐBP (545 h180: sân lát + nhà chờ xe buýt, cây thưa — phản biện W3-D vòng 2)
+    const PLAZA_PATCHES = [[705, -657, 42], [697, -470, 30], [690, -418, 24]];
     const inPatch = (x, z) => PLAZA_PATCHES.some(([px, pz, r]) => (x - px) ** 2 + (z - pz) ** 2 < r * r);
     const gLawnTex = makeTex(128, 128, (g2, w, h) => {   // cỏ ô liu xỉn lốm đốm TẤT ĐỊNH, 128 px = 4 m
       g2.fillStyle = '#6e7c3e'; g2.fillRect(0, 0, w, h);   // đo nắng: cỏ thật g/r ≈ 1,12 (195 h180 (156,173,82), 043 h270 (126,142,66)); #66773f → 1,18 (xanh quá), #7c8042 → 0,98 (ra nâu khô)

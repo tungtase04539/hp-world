@@ -71,5 +71,10 @@
     "pano_016": "Hoàng Diệu: 8 hướng không zebra",
     "pano_017": "Hoàng Diệu (trước showroom ô tô): 8 hướng không zebra",
     "pano_018": "Hoàng Diệu: 8 hướng không zebra (chỉ vỉa hè caro đỏ-xám)"
+  },
+  "paveAbout": "NHÃN VẬT LIỆU VỈA HÈ nhìn ảnh (thắng chữ mô tả): lớp 2 gạch/bê tông xám, 3 caro đỏ-xám, 4 gạch đỏ, 5 tự chèn/con sâu xám. Chỉ cho pano mà chữ lệch ảnh (phản biện W3-D vòng 2).",
+  "pave": {
+    "pano_478": [2, "Lê Quang Đạo: chữ 'gạch block xám-đỏ' nhưng ảnh h180/h270 hè gạch xám sáng, không thấy đỏ"],
+    "pano_150": [5, "Cát Cụt: chữ 'caro đỏ-xám và gạch con sâu' nhưng ảnh h000/h180 hè gạch xám mòn (con sâu), không caro đỏ"]
   }
 }
