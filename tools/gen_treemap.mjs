@@ -87,7 +87,7 @@ for (const e of src) {
     if (!polS && !polP) polS = pollard;
     pollard = Math.max(polS, polP);
   }
-  const young = has(v, /cây non|mới trồng|cọc chống|chống cọc|giàn chống|cọc gỗ/) ? (has(v, /hàng cây non|hàng cây mới/) ? 6 : 3) : 0;
+  const young = has(v, /cây non|mới trồng|trồng mới|trồng lại|cọc chống|chống cọc|giàn chống|cọc gỗ|cọc tre|kiềng|khung chống|chống (ba|3) chân/) ? (has(v, /hàng cây non|hàng cây mới/) ? 6 : 3) : 0;
   // --- mật độ ---
   let density = 2;
   if (has(v, /hầu như không có cây|gần như không có cây|không có cây thật|rất ít cây|không có cây xanh|không thấy cây/)) density = 0;

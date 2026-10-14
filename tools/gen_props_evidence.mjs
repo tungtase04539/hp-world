@@ -14,7 +14,7 @@
 //           · 512 chậu cây cảnh · 1024 hoa tươi
 //   deco    bit 1 cờ treo nhà/dãy cờ · 2 băng rôn căng ngang phố · 4 cổng chào · 8 lan can/hàng rào trắng con tiện
 //           · 16 hàng rào sắt · 32 xe khách đỗ thành dãy · 64 ô tô phủ bạt · 128 xe ba gác · 256 xe đạp dựng
-//           · 512 trạm biến áp/tủ điện lớn dưới đất
+//           · 512 trạm biến áp/tủ điện lớn dưới đất · 1024 xe máy phủ bạt/áo trùm (Đ3-W4-B)
 // Chợ theo OSM (amenity=marketplace, osm_landuse.json — Overpass mục 12 của fetch_osm.sh) NHÚNG SẴN dưới đây
 // (OSM_MARKETS, toạ độ game, làm tròn 0,1 m) để bộ sinh tự đủ (tools/osm_*.json bị gitignore, máy khác có thể thiếu).
 // Làm mới danh sách: node tools/gen_props_evidence.mjs --osm tools/osm_landuse.json  (in ra mảng mới để dán vào đây).
@@ -136,11 +136,14 @@ for (const e of j) {
   if (/ba gác|xe kéo tay|xe cải tiến/.test(all)) deco |= 128;
   if (/xe đạp[^.;|]{0,24}(dựng|đỗ)|(dựng|đỗ)[^.;|]{0,16}xe đạp/.test(all)) deco |= 256;
   if (/trạm biến áp[^.;|]{0,30}(vỉa hè|promenade|mặt đất|kiốt|kiosk|hộp)|(tủ điện|trạm điện)[^.;|]{0,12}lớn|(hai|2) (tủ|trạm)/.test(all)) deco |= 512;
+  // Đ3-W4-B: XE MÁY phủ bạt/áo trùm (004 "có xe phủ bạt trắng", 107, 239 "một chiếc phủ bạt xanh") — "xe máy" đứng trước trong
+  // cùng mệnh đề (không qua . ; |): "ô tô con … xe phủ bạt bạc" (445) là ô tô (bit 64), không phải xe máy
+  if (/xe máy[^.;|]{0,40}(phủ bạt|trùm bạt|áo trùm|bạt phủ|che bạt)|(phủ bạt|trùm bạt)[^.;|]{0,16}xe máy/.test(all)) deco |= 1024;
   rows.push([Math.round(e.X * 10) / 10, Math.round(e.Z * 10) / 10, bike, car, pole, lamp, cl, market, sp, deco]);
   stat.bike[bike]++; stat.car[car]++; stat.pole[pole]++; stat.lamp[lamp]++; stat.market[market]++;
   for (let b = 0; b < 6; b++) if (cl & (1 << b)) stat.clutter[1 << b] = (stat.clutter[1 << b] || 0) + 1;
   for (let b = 0; b < 11; b++) if (sp & (1 << b)) stat.spill[1 << b] = (stat.spill[1 << b] || 0) + 1;
-  for (let b = 0; b < 10; b++) if (deco & (1 << b)) stat.deco[1 << b] = (stat.deco[1 << b] || 0) + 1;
+  for (let b = 0; b < 11; b++) if (deco & (1 << b)) stat.deco[1 << b] = (stat.deco[1 << b] || 0) + 1;
 }
 const head = `// SINH TỰ ĐỘNG bởi tools/gen_props_evidence.mjs từ ${SRC} — ĐỪNG SỬA TAY.\n` +
   `// [X, Z, bike 0-3, car 0-2, pole 0-2, lamp bits (1 cao áp, 2 cổ điển), clutter bits (1 ghế nhựa, 2 xe đẩy, 4 thùng rác,\n` +
