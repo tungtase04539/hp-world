@@ -234,7 +234,8 @@ quá 60 s ─► LEAVE cho người xem, netId được nhả, bus `player:leave
   từ mẫu cũ nhất trong 1 s ≤ `1,2 × Σ vmax(chế độ hai đầu đoạn) × Δt + 1 m` (+ 9 m nếu cửa sổ có lên/xuống xe: chỗ xuống
   xe được tìm tới 8 m). Nhờ dùng đồng hồ client, jitter và gói dồn sau khi rớt sóng **không** bị coi là chạy nhanh.
 - **Dịch chuyển** (cờ cứng, CORRECT ngay): một bước > max(12 m, 3 × giới hạn của chính bước đó).
-- **Ngân sách thời gian** (−100 / +200 ms): `o = giờ server nhận − giờ client` (u16 được mở gói; khoảng trống > 30 s
+- **[Đã thay ở vòng sửa 1 — xem §7.1: không còn 5 s học tự do; xô tha thứ 2 s; thời gian hiệu dụng; trần trễ 2,5 s; RESUME
+  giữ bộ kiểm]** **Ngân sách thời gian** (−100 / +200 ms): `o = giờ server nhận − giờ client` (u16 được mở gói; khoảng trống > 30 s
   mở theo thời gian thật). 5 s đầu học độ trễ tối thiểu; sau đó mốc `base` chỉ được hạ theo trôi đồng hồ ≤ 2 ms/s;
   client "đi trước" mốc > 100 ms = vi phạm TIME (mốc hạ xuống 100 ms dưới mẫu đó). Trễ (lag) không bị phạt, nhưng trễ
   > 200 ms LIÊN TỤC 10 s thì mốc được nâng (mất phần tín dụng thừa) → không "tích thời gian" quá ~10 s để lao đi.
@@ -248,7 +249,7 @@ quá 60 s ─► LEAVE cho người xem, netId được nhả, bus `player:leave
 - **Điểm**: +1 mỗi STATE vi phạm, +5 cờ cứng, −1/s; > 5 → CORRECT (về vị trí được nhận cuối, `corrEpoch + 1`), > 20 →
   kick (`KICK_REASON.CHEAT`). STATE mang `corrEpoch` cũ bị bỏ qua; client không áp CORRECT → gửi lại mỗi 3 s, quá 5 lần
   → kick. STATE vi phạm không được nhận (người khác vẫn thấy vị trí hợp lệ cuối).
-- **Chưa kiểm** (v1): độ cao y, xuyên tường (cần collider export — ARCH §12.4), gia tốc.
+- **Chưa kiểm** (v1): xuyên tường (cần collider export — ARCH §12.4), gia tốc. Độ cao y: **kẹp** từ vòng sửa 1 (§7.3).
 - **Đánh đổi đã đo** (`test/core_move.test.js`): trung thực → 0 CORRECT với jitter 0–300 ms, rớt sóng 1–3 s mỗi 8 s,
   bufferbloat 800 ms, 2 Hz khi đứng, đổi chế độ + lên/xuống xe, tab ẩn 70 s, đồng hồ lệch 0,1 %. Bufferbloat ≥ 1,5 s kéo
   dài > 10 s rồi xả trong 1 s có thể tốn **1** CORRECT (giá của trần +200 ms). Hack tốc độ ×1,5 bị CORRECT < 2,5 s;
@@ -256,15 +257,15 @@ quá 60 s ─► LEAVE cho người xem, netId được nhả, bus `player:leave
 
 ### 2.5 AOI, snapshot, thang suy giảm
 
-- Ứng viên: 3×3 ô quanh ô (hysteresis 8 m) của người xem, bán kính 160 m (≤ 120 m: 10 Hz; 120–160 m: tầng xa 5 Hz);
+- Ứng viên (vòng sửa 1, §7.3: mọi ô giao hình vuông ±(bán kính + 8 m) quanh vị trí thật — trước là 3×3 ô): bán kính 160 m (≤ 120 m: 10 Hz; 120–160 m: tầng xa 5 Hz);
   người đang thấy chỉ rời khi > bán kính + 8 m. Tối đa **96** người thấy cùng lúc: điểm = d² / trọng số² (trọng số 2 cho
   người đang lái xe), người đang thấy được nhân 0,72 (chống đổi qua lại); ngưỡng = phần tử thứ 96 (quickselect, không
   sort cả danh sách). ENTER ≤ 24/snapshot (keyframe 96 người rải qua 4 snapshot ≈ 0,4 s). Chỉ gửi UPDATE cho người **có
   thay đổi** kể từ lần gửi trước (người đứng yên tốn 0 byte); vượt ngân sách 1.100 B / 96 bản ghi → bộ tích luỹ ưu tiên
   `+= w/(d+10)` mỗi snapshot, gửi điểm cao trước, reset khi gửi.
 - NAMES: mỗi người 1 lần mỗi phiên của người xem (nhớ theo `netId` + `gen`; netId được tái dùng → gửi lại).
-- `bufferedAmount > 16 KB` → bỏ snapshot, lần sau là KEYFRAME (client xoá bảng slot).
-- Thang: L1 (p99 tick > 25 ms) tầng xa 2,5 Hz · L2 (> 35) bán kính 80 m · L3 (> 45) snapshot "mỏng" xen kẽ (bản thân +
+- `bufferedAmount > 16 KB` → bỏ snapshot (vòng sửa 1, §7.2: KHÔNG còn ép keyframe; delta kế tiếp vẫn đúng).
+- Thang (vòng sửa 1, §7.4: quyết theo max(p90 tick, p90 trễ bắt đầu tick − 16 ms)): L1 (p99 tick > 25 ms) tầng xa 2,5 Hz · L2 (> 35) bán kính 80 m · L3 (> 45) snapshot "mỏng" xen kẽ (bản thân +
   16 người gần nhất) · L4 (> 50) ngừng nhận phiên mới (hàng chờ). Lên 1 mức sau 2 s liên tục, xuống sau 10 s dưới 70 %
   ngưỡng. Metric `hp_degrade_level`, `hp_degrade_changes_total`; gửi cảnh báo (S3) khi lên ≥ L2.
 
@@ -281,8 +282,8 @@ quá 60 s ─► LEAVE cho người xem, netId được nhả, bus `player:leave
 | Đối tượng | Giới hạn |
 |---|---|
 | Mỗi phiên | STATE 25/s · ACTION 5/s · CHAT 2/s burst 6 (chính sách thật ở S3) · PING 2/s burst 4 · REPORT 1/10 s; > 500 tin bị bỏ trong 10 s → SYSTEM BACKOFF + close 4006; 10 tin hỏng → 1008 |
-| Tài khoản / thiết bị | guest 5/giờ/thiết bị · recover 5/giờ/thiết bị (+ 300/giờ toàn máy chủ) · join 0,5/s burst 10 · HELLO 1/s burst 10 · refresh 1/s mỗi token |
-| IP (lỏng vì CGNAT) | guest 30/giờ · recover 20/giờ · refresh 10/s · join 50/s · kết nối WS mới 20/s burst 300 · socket chưa HELLO ≤ 64/IP, ≤ 5.000 toàn máy |
+| Tài khoản / thiết bị | guest 5/giờ/thiết bị · recover 5/giờ/thiết bị (300/giờ toàn máy chủ: chỉ CẢNH BÁO từ vòng sửa 1) · join 0,5/s burst 10 (**1 chỗ giữ/tài khoản**) · HELLO **và RESUME** 1/s burst 10 · refresh 1/s mỗi token |
+| IP (lỏng vì CGNAT) | guest 30/giờ (/48) · recover 20/giờ (/48) · refresh 10/s · join 50/s · kết nối WS mới 20/s burst 300 · socket chưa HELLO ≤ 64/IP (/48 với IPv6), ≤ 5.000 toàn máy; tin đầu không phải PING/HELLO → đóng 1008 ngay |
 | Miễn trừ theo IP | loopback, 10/8, 172.16/12, 192.168/16, fc00::/7, fe80::/10 (bot cùng máy, đường Docker host); người thật qua tunnel có IP công khai từ `CF-Connecting-IP` |
 
 ### 2.8 Số đo (máy chủ dự án, Windows 11, Node 24.15, 15/10/2026)

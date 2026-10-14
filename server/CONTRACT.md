@@ -159,3 +159,19 @@ refresh_tokens, characters, admin_audit, playtime_daily (see the file for column
 `test/helpers/client.mjs`: `bootTestServer(overrides)` → `{app, game, admin, ws, config}` on ephemeral ports;
 `openWs`, `nextMessage`, `pingRtts`, `waitClose`, `getJson`. `npm run test:pg` — same DB tests on Docker Postgres 17
 (env `PG_TEST_PORT`, `PG_TEST_PROJECT`: use YOUR assigned port / compose project).
+
+## 7. Client-visible behaviour changed in fixer round 1 (15/10/2026, SERVER.md §7)
+
+- **RESUME keeps the server's movement checker**: the client must keep the SAME `clientMs` clock (u16 of the page's
+  monotonic clock) across a reconnect + RESUME. A new page (new clock origin) must do `/v1/join` + HELLO{ticket}
+  (takeover), which re-learns the time base. RESUME counts against the per-account HELLO budget (1/s, burst 10).
+- After `SYSTEM RESUMED` the server may send `CORRECT(SERVER_MOVE, current epoch)` (a CORRECT lost with the old socket).
+  A STATE with an epoch the server does not expect is answered with a CORRECT carrying the current epoch.
+- A snapshot dropped for backpressure is NOT followed by a keyframe: the next snapshot is an ordinary delta (P1 records
+  are absolute). Keyframes: after READY and after RESUME only. NAMES are re-sent after RESUME.
+- `y` in STATE is clamped server-side before others see it (ground ± 1.5 m, + jump apex in AIR, any level inside a
+  bridge / elevated-road corridor); no CORRECT for height.
+- Before HELLO only PING and HELLO are allowed; anything else closes the socket at once (1008).
+- Chat: a blocked line containing self-harm words gets `EVENT SUPPORT_LINE` before `EVENT CHAT_REJECTED`.
+- Docker: `ADMIN_ALLOW_IPS` = the portal container's fixed address (`HPMP_PORTAL_IP`); Telegram via `TELEGRAM_VIA`.
+- New secret `RECOVERY_PEPPER` (server/.env, generated); new migrations 011 (recovery_hash_v) and 024 (report evidence).

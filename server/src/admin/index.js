@@ -194,7 +194,13 @@ export function register(app) {
     if (!a) throw httpError(400, 'bad_action');
     if (!isUuid(accountId)) throw httpError(400, 'bad_request');
     let ms = a.ms;
-    if (ms === 'days') { const d = Number(days); ms = d > 0 ? Math.min(d, 3650) * 86400_000 : (a.kind === 'shadow' ? 7 * 86400_000 : null); }
+    // an explicit number of days is required: 0 = permanent; an emptied field used to silently mean a PERMANENT ban
+    // (Number('') = 0) — fixer round 1
+    if (ms === 'days') {
+      if (days === '' || days == null || !Number.isFinite(Number(days)) || Number(days) < 0) throw httpError(400, 'days_required');
+      const d = Number(days);
+      ms = d > 0 ? Math.min(d, 3650) * 86400_000 : null;
+    }
     const s = await chat().sanction({ accountId, kind: a.kind, ms, reason: str(note) || `quản trị: ${action}`, source: 'admin', reportId: reportId || null, actor: req.admin?.actor || 'owner' });
     await audit(req, 'sanction', accountId, { action, kind: a.kind, duration: fmtDur(ms), reportId: reportId || null, note: str(note) });
     return s;

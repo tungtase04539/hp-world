@@ -294,7 +294,10 @@ function actionBar(onAction) {
   const btn = (label, action, cls = '', ask = null) => h('button', { class: cls, onclick: async (ev) => {
     if (ask && !confirm(ask)) return;
     ev.target.disabled = true;
-    try { await onAction(action, Number(days.value)); } finally { ev.target.disabled = false; }
+    const v = String(days.value).trim();
+    if ((action === 'ban' || action === 'shadow') && v === '') { alert('Nhập số ngày (0 = vĩnh viễn).'); ev.target.disabled = false; return; }
+    if ((action === 'ban' || action === 'shadow') && Number(v) === 0 && !confirm(action === 'ban' ? 'CẤM VĨNH VIỄN người này?' : 'Ẩn tin VĨNH VIỄN người này?')) { ev.target.disabled = false; return; }
+    try { await onAction(action, v === '' ? null : Number(v)); } finally { ev.target.disabled = false; }
   } }, label);
   return h('div', { class: 'actions' },
     btn('Khoá chat 10 phút', 'mute10m'), btn('1 giờ', 'mute1h'), btn('24 giờ', 'mute24h'),

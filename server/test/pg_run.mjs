@@ -26,7 +26,7 @@ try {
   const url = `postgres://hp:${password}@127.0.0.1:${port}/hp_test`;
   code = await new Promise((resolve) => {
     // every suite that honours TEST_DB_URL (integration 15/10/2026: + S2 core, S3 safety, cross-module integ)
-    const suites = ['db.test.js', 'pg_boot.test.js', 'core_auth.test.js', 'core_session.test.js', 'integ.test.js', 'safety_chat.test.js', 'safety_admin.test.js'];
+    const suites = ['db.test.js', 'pg_boot.test.js', 'core_auth.test.js', 'core_session.test.js', 'integ.test.js', 'safety_chat.test.js', 'safety_admin.test.js', 'fix1_regress.test.js'];
     const p = spawn(process.execPath, ['--test', '--test-concurrency=1', ...suites.map((f) => path.join(here, f))],
       { env: { ...process.env, TEST_DB_URL: url }, stdio: 'inherit' });
     p.on('exit', (c) => resolve(c ?? 1));

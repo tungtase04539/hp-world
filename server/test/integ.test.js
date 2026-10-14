@@ -57,7 +57,9 @@ test('admin sanctions reach the live session: mute/warn → EVENT SANCTION, kick
     const wa = await A.c.wait((m) => m.op === S2C.EVENT && m.type === EVENT.SANCTION);
     assert.deepEqual(wa.args, [SANCTION_KIND.WARN, 0]);
     // shadow mute is never revealed
-    assert.equal((await admin(s, 'POST', `/admin/api/players/${id}/sanction`, { action: 'shadow' })).status, 200);
+    // fixer round 1: a timed sanction needs an explicit number of days (an empty field used to mean "forever")
+    assert.equal((await admin(s, 'POST', `/admin/api/players/${id}/sanction`, { action: 'shadow' })).status, 400);
+    assert.equal((await admin(s, 'POST', `/admin/api/players/${id}/sanction`, { action: 'shadow', days: 7 })).status, 200);
     await sleep(150);
     assert.equal(A.c.drain(S2C.EVENT).filter((m) => m.type === EVENT.SANCTION).length, 0);
     // kick → SYSTEM KICK(ADMIN) + 4009; the account can come back

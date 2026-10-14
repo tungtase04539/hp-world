@@ -31,7 +31,8 @@ export function originMatcher(list) {
 function compile(path) {
   if (path.endsWith('/*')) {
     const prefix = path.slice(0, -1);
-    return { prefix, match: (p) => (p.startsWith(prefix) ? { '*': decodeURIComponent(p.slice(prefix.length)) } : null) };
+    const dec = (x) => { try { return decodeURIComponent(x); } catch { return x; } };   // malformed '%' → raw, not a 500
+    return { prefix, match: (p) => (p.startsWith(prefix) ? { '*': dec(p.slice(prefix.length)) } : null) };
   }
   const keys = [];
   const re = new RegExp('^' + path.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\/:([A-Za-z_][A-Za-z0-9_]*)/g, (_, k) => { keys.push(k); return '/([^/]+)'; }) + '/?$');

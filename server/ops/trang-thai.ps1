@@ -13,7 +13,7 @@ Write-Buoc 'Các phần của máy chủ'
 $st = @{}
 if (Test-DockerReady) {
   $st = Get-ServiceState $s
-  $names = @{ game = 'Game'; db = 'Cơ sở dữ liệu'; backup = 'Sao lưu hằng đêm'; tunnel = 'Tunnel tên miền'; quicktunnel = 'Tunnel tạm' }
+  $names = @{ game = 'Game'; portal = 'Cổng 127.0.0.1 (portal)'; db = 'Cơ sở dữ liệu'; backup = 'Sao lưu hằng đêm'; tunnel = 'Tunnel tên miền'; quicktunnel = 'Tunnel tạm' }
   foreach ($k in @('game', 'portal', 'db', 'backup', 'tunnel', 'quicktunnel')) {
     $x = $st[$k]
     if (-not $x) { Write-Dong ("{0}: không chạy" -f $names[$k]); continue }
