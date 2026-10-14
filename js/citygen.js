@@ -128,10 +128,15 @@ function ihash(a, b) {
   return h >>> 0;
 }
 const pidx = (h, n) => Math.floor(((h >>> 8) * n) / 16777216);
+// W3-A r3: rc 3 (INFO USE_HOME) trên công sở/kính/kho (CIVIC 6, GLASS 3, SHED 5) = khối trong KHUÔN VIÊN có tường rào (dữ liệu
+// chỉ ghi USE_HOME cho các kiểu này với nhà cbIn sau tường mỏ neo Hải quân — process_buildings) → trệt KHÔNG biển: G_CIVIC
+// (song sắt + chân đá) / G_WARE, thay vì bộ nhà ở GH (G_SHUT0/G_GATE/G_SHUT1 có dải biển — pano_224/225 h270 hiện "BÁNH MÌ",
+// "SỬA XE MÁY" ngay sau tường). JS + GL2 + GL1 cùng luật (khớp bit với hộp biển 3D).
+const NOSIGN_ST = (st) => st === 6 || st === 3 || st === 5;
 function groundModule(s8, bay, wide, rc, st) {
   const gk = wide ? ihash(s8 * 977 + bay, 101) : s8;
   const g1 = ihash(gk, bay * 2 + 1), g2 = ihash(gk, bay * 2 + 2);
-  if ((g2 >>> 8) < HOME_THR[Math.min(3, rc)]) return SETS.GH[pidx(g1, SETS.GH.length)];
+  if ((g2 >>> 8) < HOME_THR[Math.min(3, rc)]) return rc >= 3 && NOSIGN_ST(st) ? (st === 5 ? 'G_WARE' : 'G_CIVIC') : SETS.GH[pidx(g1, SETS.GH.length)];
   const set = SETS['G' + Math.min(6, st)];
   return st === 5 ? set[0] : set[pidx(g1, set.length)];
 }
@@ -213,7 +218,7 @@ float pickGi(int st, uint h){
         uint g1 = ihash(gk, bI * 2u + 1u), g2 = ihash(gk, bI * 2u + 2u);
         uint thr = rc > 2.5 ? ${HOME_THR[3]}u : rc > 1.5 ? ${HOME_THR[2]}u : (rc > 0.5 ? ${HOME_THR[1]}u : ${HOME_THR[0]}u);
         bool home = (g2 >> 8u) < thr;
-        m = home ? GH[pidx(g1, ${ni('GH')})] : pickGi(st, g1);`;
+        m = home ? (rc > 2.5 && (st == 6 || st == 3 || st == 5) ? (st == 5 ? ${MOD.G_WARE}.0 : ${MOD.G_CIVIC}.0) : GH[pidx(g1, ${ni('GH')})]) : pickGi(st, g1);`;
   // GL1: u1 = (g1>>>8)/2^24 từ bảng tra (RGB 24 bit, NEAREST), pidx(g1,n) = int(u1·n)
   const GL1_GROUND = `uniform sampler2D uGMod;
 float pickGi(int st, float u){
@@ -226,7 +231,7 @@ float pickGi(int st, float u){
         float u1 = (gb.r * 65536.0 + gb.g * 256.0 + gb.b) / 16777216.0;
         float rcI = rc > 2.5 ? 3.0 : rc > 1.5 ? 2.0 : (rc > 0.5 ? 1.0 : 0.0);
         bool home = rcI >= floor(gm.a * 255.0 + 0.5);
-        m = home ? GH[int(u1 * ${n('GH')})] : pickGi(st, u1);`;
+        m = home ? (rcI > 2.5 && (st == 6 || st == 3 || st == 5) ? (st == 5 ? ${MOD.G_WARE}.0 : ${MOD.G_CIVIC}.0) : GH[int(u1 * ${n('GH')})]) : pickGi(st, u1);`;
   // WebGL1 (three r160 tự lùi về WebGL1 khi máy không có WebGL2 — vd GPU/driver bị chặn WebGL2): GLSL ES 1.0 không có
   // uint/phép bit, textureGrad, mảng const. Nhánh GL1 cùng thuật toán: mảng → hàm if (gl1Idx), hash nguyên → bảng tra
   // gmodTexture(), textureGrad → texture2DGradEXT (GL_EXT_shader_texture_lod; thiếu thì texture2D — viền mô-đun hơi lộ),
@@ -795,6 +800,8 @@ export function buildRealFabric(scene, ctx) {
       const wideF = kind === EDGE.FRONT && rcP < 0 && nb >= 3 && fl <= 5 && (styF === STYLE.TUBE || styF === STYLE.OLD) ? 16 : 0;
       let rc = rcP >= 0 ? rcP : kind === EDGE.FRONT ? frontClass((ax + bx) / 2, (az + bz) / 2, nx, nz) : 0;
       if (hasInfo && kind === EDGE.FRONT && rcP < 0 && !wideF) { const use = (D.info[b] >> INFO.USE_SHIFT) & 3; if (use === INFO.USE_HOME) rc = 3; else if (use === INFO.USE_SHOP) rc = 0; }
+      // W3-A r3: khối khuôn viên (CIVIC/GLASS/SHED + USE_HOME — chỉ nhà cbIn) → rc 3 cả trên cạnh được NÂNG/dãy gộp → trệt không biển
+      if (hasInfo && kind === EDGE.FRONT && NOSIGN_ST(styF) && ((D.info[b] >> INFO.USE_SHIFT) & 3) === INFO.USE_HOME) rc = 3;
       const kb = kind | bigFlag | wideF | pitchFlag | (rc << 6);
       const ta = Y[i], tb = Y[j];
       const a0 = M.v(ax, y0 + ys, az, nx, 0, nz, 0, ys, wcol, s8, kb, styF, fl);

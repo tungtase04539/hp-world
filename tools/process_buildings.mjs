@@ -1823,9 +1823,12 @@ for (const b of B) {
   // --- công năng tầng trệt ---
   const f0 = b.fronts[0];
   let use = INFO.USE_HOME;
-  if (style === STYLE.GLASS) use = INFO.USE_OFFICE;
+  // trong khuôn viên Hải quân (sau tường mỏ neo, cbIn): USE_HOME TRƯỚC mọi nhánh — CIVIC/GLASS/SHED + USE_HOME chỉ có ở đây và
+  // citygen đọc cặp này thành tầng trệt KHÔNG biển (G_CIVIC/G_WARE; review W3-A r3: nhánh cũ đặt sau CIVIC → không bao giờ chạy,
+  // và CIVIC/GATE vẫn ra G_GLASS có dải biển → "BÁNH MÌ"/"SỬA XE MÁY" sau tường ở pano_224/225 h270)
+  if (b.cbIn) use = INFO.USE_HOME;
+  else if (style === STYLE.GLASS) use = INFO.USE_OFFICE;
   else if (style === STYLE.CIVIC || style === STYLE.SHED || (style === STYLE.VILLA && R() < 0.6)) use = INFO.USE_GATE;
-  else if (b.cbIn) use = INFO.USE_HOME;   // trong khuôn viên Hải quân (sau tường mỏ neo): không cửa hàng ra phố
   else if (/cửa hàng|shop|bán|quán|kinh doanh|biển|cửa cuốn|nhà hàng|cà phê|spa|showroom/.test(ouse)) use = INFO.USE_SHOP;
   else if (f0) use = R() < ({ p: 0.88, s: 0.82, t: 0.72, r: 0.5, w: 0.6, h: 0.15 }[f0.s.c] ?? 0.3) ? INFO.USE_SHOP : INFO.USE_HOME;
   const roads = new Set(b.fronts.filter((f) => f.s.c !== 'h').map((f) => f.s.ri));

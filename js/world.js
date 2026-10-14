@@ -39,7 +39,7 @@ function nearPanoCam(x, z, r = 5) {
 }
 import { SHOP_SIGNS } from './shopsigns.js';
 // ĐỢT 3 WP2: phố từ footprint THẬT (citygen.js) + sổ vùng giữ chỗ (claims.js) + footprint địa danh (landmark_polys.js)
-import { buildRealFabric, fabricData } from './citygen.js';
+import { buildRealFabric, fabricData, fabricHit } from './citygen.js';
 import { claimPoly, claimBox, claimCircle } from './claims.js';
 import { LM_POLY, LM_CENTROID } from './landmark_polys.js';
 import { buildProps, layRoadSurfaceY } from './props.js';                 // Đợt 3 WP7: đồ đạc phố (xe máy/ô tô/cột điện/đèn/người)
@@ -21251,31 +21251,80 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
   // 14 m — vật NHÌN THẤY → người đi xuyên. Vật dựng tay sát mép bó vỉa cũ là thật; mồ côi thì nằm giữa lòng (quét W2-A đã gỡ chủ).
   { const deep = (x, z) => { for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4; if (!onCarriageDisc(x + Math.cos(a) * 0.6, z + Math.sin(a) * 0.6, 0)) return false; } return true; };
     const cand = colliders.filter((c) => c.r <= 2.2 && c.x < 1e6 && onCarriageDisc(c.x, c.z, 0) && deep(c.x, c.z) && !veg.trunkNear(c.x, c.z, Math.max(0.8, c.r)));
-    // review r2: 1/9 ứng viên (442,4; −994) vẫn là vật NHÌN THẤY (sau gộp thành mrg10_0,-3) → tia ngang tầm thân (0,6/1,4 m)
-    // 8 hướng xuyên đĩa collider vào các mesh (không instanced) có cầu bao chạm đĩa; trúng hình → GIỮ collider.
-    let seen = () => false;
+    // review r2: 1/9 ứng viên (442,4; −994) vẫn là vật NHÌN THẤY (tường civic8_compound_wall) → GIỮ collider nếu có tam giác của
+    // mesh (không instanced) ở TẦM THÂN (y ∈ [nền+0,3; nền+1,5] — mép tán dù/mái che ≥ 1,6 m không tính) cách tâm (XZ) < r+0,3.
+    // Review r3: bản raycast (16 tia × ứng viên, mỗi tia duyệt MỌI tam giác mọi mesh gần, sau updateMatrixWorld cả cảnh) tốn
+    // 70-80 ms → nay MỘT lượt tam giác các mesh gần. computeBoundingSphere ở đây là việc DỜI từ freezeStatic (nó tính cầu bao
+    // mọi mesh, bỏ qua mesh đã có) — không cộng thêm vào khởi động; ghostMs = cả khối, ghostMsBS = phần cầu bao dời sang.
+    // Đo cùng phiên (2026-10-14, 890M, máy tải nặng): khối mới 16-20 ms (cầu bao 11-13 ms; lượt cầu của freezeStatic 30-32 → 19-22
+    // ms) → RÒNG ~5-9 ms; bản raycast 50-95 ms. Kết quả như cũ: 8 collider tách, giữ [442,4; −994].
+    const tG = performance.now();
+    let seen = () => false, tBS = 0;
     if (cand.length) {
-      scene.updateMatrixWorld(true);
+      let cx0 = 1e9, cx1 = -1e9, cz0 = 1e9, cz1 = -1e9;
+      for (const c of cand) { cx0 = Math.min(cx0, c.x - c.r); cx1 = Math.max(cx1, c.x + c.r); cz0 = Math.min(cz0, c.z - c.r); cz1 = Math.max(cz1, c.z + c.r); }
+      // nhà citygen (fab_*: ô 450 m, 10 k+ tam giác) → hỏi lưới va chạm footprint (fabricHit) thay vì duyệt tam giác; mặt phẳng sát
+      // đất (lòng/vỉa/vạch/lối/đất — như _noCast của freezeStatic) không bao giờ ở tầm thân → bỏ
+      const FLAT = /^(roads|dashes|paths|rails|railballast|aerial_road_ribbon|caro_do_xam|lake_promenade|hd_cleared)(_|$)|^sidewalk|^ground|^fab_/;
       const ms = [], sph = new THREE.Sphere();
       scene.traverse((o) => {
-        if (!o.isMesh || o.isInstancedMesh || !o.visible || !o.geometry) return;
-        const g = o.geometry; if (!g.boundingSphere) g.computeBoundingSphere();
-        sph.copy(g.boundingSphere).applyMatrix4(o.matrixWorld); if (!(sph.radius < 400)) return;
-        for (const c of cand) if (Math.hypot(sph.center.x - c.x, sph.center.z - c.z) < sph.radius + c.r + 0.5) { ms.push(o); break; }
-      });
-      const rc = new THREE.Raycaster(), O = new THREE.Vector3(), D = new THREE.Vector3();
-      seen = (c) => {
-        if (!ms.length) return false;
-        const y0 = groundHeight(c.x, c.z), R = c.r + 0.3;
-        for (const dy of [0.6, 1.4]) for (let k = 0; k < 8; k++) {
-          const a = k * Math.PI / 4; O.set(c.x + Math.cos(a) * R, y0 + dy, c.z + Math.sin(a) * R); D.set(-Math.cos(a), 0, -Math.sin(a));
-          rc.set(O, D); rc.far = 2 * R; if (rc.intersectObjects(ms, false).length) return true;
+        if (!o.isMesh || o.isInstancedMesh || !o.visible || !o.geometry || !o.geometry.attributes.position || FLAT.test(o.name)) return;
+        const g = o.geometry;
+        o.updateWorldMatrix(true, false);
+        if (!g.boundingSphere) {
+          // ~4,4 k mesh tay nhỏ chưa có cầu bao (~10 ms nếu tính hết): mesh NHỎ (≤ 2000 đỉnh) đặt (gốc) xa mọi ứng viên > 150 m
+          // thì không thể chạm → bỏ, khỏi tính cầu. Mesh ở GỐC (hình học toạ độ thế giới) hoặc lớn → tính cầu như cũ.
+          const e = o.matrixWorld.elements, tx = e[12], tz = e[14];
+          if (g.attributes.position.count <= 2000 && (tx !== 0 || tz !== 0) && cand.every((c) => Math.abs(tx - c.x) > 150 || Math.abs(tz - c.z) > 150)) return;
+          const t0 = performance.now(); g.computeBoundingSphere(); tBS += performance.now() - t0;
         }
-        return false;
+        sph.copy(g.boundingSphere).applyMatrix4(o.matrixWorld); const r = sph.radius; if (!(r < 400)) return;
+        const x = sph.center.x, z = sph.center.z;
+        if (x + r + 0.8 < cx0 || x - r - 0.8 > cx1 || z + r + 0.8 < cz0 || z - r - 0.8 > cz1) return;
+        const near = cand.filter((c) => Math.hypot(x - c.x, z - c.z) < r + c.r + 0.5);
+        if (near.length) ms.push([o, near]);
+      });
+      const hit = new Set(), P = new Float64Array(9);
+      const segD2 = (px, pz, ax, az, bx, bz) => { const dx = bx - ax, dz = bz - az, l2 = dx * dx + dz * dz; let t = l2 > 1e-12 ? ((px - ax) * dx + (pz - az) * dz) / l2 : 0; t = t < 0 ? 0 : t > 1 ? 1 : t; const ex = ax + dx * t - px, ez = az + dz * t - pz; return ex * ex + ez * ez; };
+      const triD2 = (px, pz) => {   // khoảng cách² (XZ) từ điểm tới tam giác chiếu P (0 nếu trong)
+        const d1 = (px - P[3]) * (P[2] - P[5]) - (P[0] - P[3]) * (pz - P[5]), d2 = (px - P[6]) * (P[5] - P[8]) - (P[3] - P[6]) * (pz - P[8]), d3 = (px - P[0]) * (P[8] - P[2]) - (P[6] - P[0]) * (pz - P[2]);
+        if (!((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0))) return 0;
+        return Math.min(segD2(px, pz, P[0], P[2], P[3], P[5]), segD2(px, pz, P[3], P[5], P[6], P[8]), segD2(px, pz, P[6], P[8], P[0], P[2]));
       };
+      const gy = new Map(cand.map((c) => [c, groundHeight(c.x, c.z)]));
+      const box = new THREE.Box3();
+      for (const [o, near] of ms) {
+        // hộp bao thế giới (chỉ cho vài mesh qua lọc cầu: ô fab 450 m có cầu r ≈ 320 m chạm ứng viên ô bên) + lọc tầng y
+        const g = o.geometry; if (!g.boundingBox) g.computeBoundingBox();
+        box.copy(g.boundingBox).applyMatrix4(o.matrixWorld);
+        const todo = near.filter((c) => !hit.has(c) && c.x > box.min.x - c.r - 0.3 && c.x < box.max.x + c.r + 0.3 && c.z > box.min.z - c.r - 0.3 && c.z < box.max.z + c.r + 0.3
+          && box.max.y >= gy.get(c) + 0.3 && box.min.y <= gy.get(c) + 1.5);
+        if (!todo.length) continue;
+        let qx0 = 1e9, qx1 = -1e9, qz0 = 1e9, qz1 = -1e9;
+        for (const c of todo) { qx0 = Math.min(qx0, c.x - c.r - 0.3); qx1 = Math.max(qx1, c.x + c.r + 0.3); qz0 = Math.min(qz0, c.z - c.r - 0.3); qz1 = Math.max(qz1, c.z + c.r + 0.3); }
+        const pa = g.attributes.position, ix = g.index ? g.index.array : null, nT = Math.floor((ix ? ix.length : pa.count) / 3);
+        const raw = !pa.isInterleavedBufferAttribute && pa.itemSize === 3 && !pa.normalized, a = pa.array, e = o.matrixWorld.elements;
+        for (let t = 0; t < nT && todo.length; t++) {
+          let tx0 = 1e9, tx1 = -1e9, tz0 = 1e9, tz1 = -1e9, ty0 = 1e9, ty1 = -1e9;
+          for (let k = 0; k < 3; k++) {
+            const vi = ix ? ix[t * 3 + k] : t * 3 + k;
+            const lx = raw ? a[vi * 3] : pa.getX(vi), ly = raw ? a[vi * 3 + 1] : pa.getY(vi), lz = raw ? a[vi * 3 + 2] : pa.getZ(vi);
+            const x = e[0] * lx + e[4] * ly + e[8] * lz + e[12], y = e[1] * lx + e[5] * ly + e[9] * lz + e[13], z = e[2] * lx + e[6] * ly + e[10] * lz + e[14];
+            P[k * 3] = x; P[k * 3 + 1] = y; P[k * 3 + 2] = z;
+            if (x < tx0) tx0 = x; if (x > tx1) tx1 = x; if (z < tz0) tz0 = z; if (z > tz1) tz1 = z; if (y < ty0) ty0 = y; if (y > ty1) ty1 = y;
+          }
+          if (tx1 < qx0 || tx0 > qx1 || tz1 < qz0 || tz0 > qz1) continue;
+          for (let i = todo.length - 1; i >= 0; i--) {
+            const c = todo[i], g0 = gy.get(c), R = c.r + 0.3;
+            if (ty1 < g0 + 0.3 || ty0 > g0 + 1.5) continue;
+            if (triD2(c.x, c.z) < R * R) { hit.add(c); todo.splice(i, 1); }
+          }
+        }
+      }
+      seen = (c) => hit.has(c) || fabricHit(c.x, c.z, c.r + 0.3);
     }
     const gl = [], kept = []; for (const c of cand) { if (seen(c)) { kept.push([+c.x.toFixed(1), +c.z.toFixed(1), c.r]); continue; } gl.push([+c.x.toFixed(1), +c.z.toFixed(1), c.r]); c.x = 1e7; c.z = 1e7; }
-    world.ghostColliders = gl; world.ghostKept = kept; }   // QA: [[x, z, r]] đã tách / giữ vì có hình
+    world.ghostColliders = gl; world.ghostKept = kept; world.ghostMs = +(performance.now() - tG).toFixed(1); world.ghostMsBS = +tBS.toFixed(1); }   // QA: [[x, z, r]] đã tách / giữ vì có hình; ms lượt kiểm hình
   world.treeBloomNear = trees.bloomNear;      // cánh phượng rơi quanh cây đang nở gần người chơi (petals.js)
   loadHeroTrees(trees);  // nạp GLB cây phượng ảnh-thật → LOD gần ≤150 m (bất đồng bộ)
   // ---------- ĐỒ ĐẠC PHỐ (Đợt 3 WP7, js/props.js) ----------
