@@ -50,12 +50,17 @@ function modelUmbrella(G, R = 1.45, yRim = 1.85, yTop = 2.2, nSeg = 8) {   // ô
   return G.mergeParts(P);
 }
 // Ô DÙ VUÔNG 4 múi (quán cà phê/sạp) — ~30 tam giác
-function modelUmbrellaSq(G) {
+// Đ3-W5-C: solid = 4 múi CÙNG màu instance + diềm 12 cm (dù quán cà phê/trà một màu — 267 dù đỏ; bản chợ múi xen bảng B
+// đọc thành dù xanh-trắng)
+function modelUmbrellaSq(G, solid = false) {
   const h = 1.15, y = 2.15, yT = 2.5, P = [];
   const c = [[-h, y, -h], [h, y, -h], [h, y, h], [-h, y, h]], A = [0, yT, 0];
-  const t0 = [], t1 = [], u = [];
-  for (let i = 0; i < 4; i++) { const p0 = c[i], p1 = c[(i + 1) % 4]; (i & 1 ? t1 : t0).push([A, p1, p0]); u.push([[0, yT - 0.04, 0], p0, p1]); }
-  P.push(G.finish(tri(t0), 0xffffff, 1), G.finish(tri(t1), 0xffffff, 3), G.finish(tri(u), 0xa8a8a8, 0.6));
+  const t0 = [], t1 = [], u = [], vl = [];
+  for (let i = 0; i < 4; i++) { const p0 = c[i], p1 = c[(i + 1) % 4]; (i & 1 && !solid ? t1 : t0).push([A, p1, p0]); u.push([[0, yT - 0.04, 0], p0, p1]);
+    if (solid) { const b0 = [p0[0], y - 0.12, p0[2]], b1 = [p1[0], y - 0.12, p1[2]]; vl.push([p0, b1, b0], [p0, p1, b1], [p0, b0, b1], [p0, b1, p1]); } }
+  P.push(G.finish(tri(t0), 0xffffff, 1), G.finish(tri(u), 0xa8a8a8, 0.6));
+  if (t1.length) P.push(G.finish(tri(t1), 0xffffff, 3));
+  if (vl.length) P.push(G.finish(tri(vl), 0xe8e8e8, 1));
   P.push(G.finish(G.cyl(0.025, 0.03, yT, 5, 0, yT / 2, 0), 0xd0d0c8));
   return G.mergeParts(P);
 }
@@ -334,6 +339,22 @@ export function modelOrnate5Globes(G) {
   for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2; P.push(G.finish(new THREE.IcosahedronGeometry(0.19, 0).translate(Math.cos(a) * 0.62, y + 0.2, Math.sin(a) * 0.62), 0xffffff)); }
   return G.mergeParts(P);
 }
+// Đ3-W5-C: DÂY LEO / GIÀN HOA GIẤY rủ từ ban công-mép tường (203 "khóm hoa giấy hồng", 184 "giàn cây leo trên ban công", 506
+// "giàn hoa giấy tím trên tường biệt thự"): local +Z ra lòng đường (lưng z = 0 áp tường), y = 0 = MÉP TRÊN (instance y = cao
+// ban công), rủ xuống ~2,1 m, rộng ~2,2 m. 11 cụm lá (icosa dẹt theo z, xanh cố định) thưa dần xuống dưới thành 4 tua + 7 chùm
+// hoa (màu instance: hồng sẫm/tím/cam/trắng — hoa giấy) — ~360 tam giác
+function modelVine(G) {
+  const P = [];
+  const leaf = [0x3f6e2c, 0x4a7d33, 0x35602a, 0x56893a];
+  const blob = (r, x, y, z, sz = 0.42) => new THREE.IcosahedronGeometry(r, 0).scale(1, 0.85, sz).translate(x, y, z);
+  const L = [[-0.75, -0.25, 0.42], [0, -0.18, 0.48], [0.72, -0.28, 0.4], [-0.4, -0.62, 0.36], [0.38, -0.6, 0.38],
+    [-0.85, -0.95, 0.26], [-0.1, -1.0, 0.3], [0.62, -1.05, 0.28], [-0.55, -1.45, 0.2], [0.25, -1.55, 0.22], [0.75, -1.75, 0.16]];
+  L.forEach(([x, y, r], i) => P.push(G.finish(blob(r, x, y, r * 0.42), leaf[i % 4])));
+  for (const [x, y0] of [[-0.95, -1.2], [-0.3, -1.6], [0.45, -1.9], [0.95, -1.4]]) P.push(G.finish(G.box(0.05, 0.9, 0.05, x, y0 - 0.2, 0.12, 0, 0, (x > 0 ? -1 : 1) * 0.08), 0x3a6a2a));   // tua rủ
+  const F = [[-0.55, -0.3], [0.2, -0.15], [0.6, -0.55], [-0.2, -0.75], [-0.75, -1.05], [0.35, -1.15], [0.05, -1.5]];
+  F.forEach(([x, y], i) => P.push(G.finish(blob(0.17 + (i % 3) * 0.04, x, y, 0.3 + (i % 2) * 0.08, 0.6), 0xffffff, 1)));
+  return G.mergeParts(P);
+}
 // CỔNG CHÀO khu dân cư (2 trụ + dầm; chữ = tấm băng rôn riêng) — local X = ngang ngõ (scale x = bề rộng/4), +Z ra phố
 function modelGate(G) {
   const P = [];
@@ -490,11 +511,14 @@ export function placeStreetLife(P) {
   const { sides, CELL, cellPos, hash3, inBuilding, obst, flat, roadIdx, nearPano, onCarriage, XS, OCC } = P;
   const T0 = performance.now();
   const st = P.st;
-  const overI = [];    // ô dù tròn (v0) / ô vuông (v1) / bạt (v2)
+  const overI = [];    // ô dù tròn (v0) / ô vuông (v1) / bạt (v2) / bạt sọc (v3) / ô vuông MỘT MÀU hiên quán (v4 — Đ3-W5-C)
   const groundI = [];  // sạp (0) mẹt (1) sọt (2) bạt đất (3) bao tải (4) ghế đẩu (5)
   const spillI = [];   // giá áo (0) hoa (1) chậu cây (2) nội thất (3) bàn thờ+két (4) đồ chơi (5) hàng chồng (6)
   const stallsRoad = []; // hàng lấn lòng đường (cho traffic.js lách) {x,z,heading,len,hw}
   const flagsHouse = [], banners = [], gates = [], posts = [];
+  const mkBikes = [];    // Đ3-W5-C: xe máy đỗ dải lòng sát bó vỉa trong chợ mức 3 {x,z,heading,road:1} — props 6.5 dựng như xe đỗ
+  // Đ3-W5-C: pano ≤ 40 m nói "đông người" (props_evidence deco 2048 — chợ 446/460/124, quán 469)
+  const crowdAt = (S, k) => { const e = S.ev[k]; if (!e || !(e[9] & 2048)) return false; const [x, z] = cellPos(S, k, XS(S).park); return Math.hypot(e[0] - x, e[1] - z) < 40; };
   // màu ô dù chợ (ảnh pano: đỏ, xanh dương, xanh lá, cam, tím, hồng, trắng chấm…) / bạt (xanh dương chiếm đa số)
   const UMB = [0xc8282a, 0xd83a2e, 0x1f5fb0, 0x2c8a4a, 0xe07a1e, 0x7a4aa0, 0xe86a9a, 0xf0f0ea, 0x2a9ac8, 0xd8c020];
   const TARP = [0x2f6db5, 0x2f6db5, 0x3a7cc8, 0x2a5a9a, 0xd9692a, 0x3f8f4a, 0xd8d8d0, 0xb83a2a];
@@ -537,7 +561,8 @@ export function placeStreetLife(P) {
       const lv = S.mk[k];
       if (!lv || !S.ok[k]) { t += 1.5; continue; }
       const u0 = hash3(S.ax + S.ux * t, S.az + S.uz * t, 301);
-      const step = lv === 3 ? 2.1 + u0 * 0.7 : lv === 2 ? 2.8 + u0 * 1.6 : 3;
+      // Đ3-W5-C (graders 124/446/460/184/492 "chợ quá thưa"): mức 3 bước sạp 2,1-2,8 → 1,75-2,35 m (ảnh: sạp/ô nối sát nhau)
+      const step = lv === 3 ? 1.75 + u0 * 0.6 : lv === 2 ? 2.8 + u0 * 1.6 : 3;
       const pOcc = lv === 3 ? 0.95 : lv === 2 ? 0.55 : 0.1;
       if (hash3(S.ax + t, S.az - t, 302) > pOcc) { t += step; continue; }
       const blk = Math.floor(t / 9);
@@ -555,6 +580,7 @@ export function placeStreetLife(P) {
         const sc = lv === 3 ? 0.95 + hash3(x, z, 305) * 0.3 : 0.85 + hash3(x, z, 305) * 0.3;
         const v = hash3(x, z, 307) < 0.15 ? 1 : 0;   // 1 = ô vuông (nửa đường chéo 1,63 m — góc xoay ngẫu nhiên)
         if (!okAt(S, x, z, (v ? UMB_SQ_R : UMB_R) * sc) || obst.hit(x, z, 0.9)) return false;
+        if (P.poleInRect && P.poleInRect(x, z, S.ux, S.uz, UMB_R * sc * 0.8, UMB_R * sc * 0.8)) return false;   // cột điện/đèn xuyên tán (phản biện W5-C)
         overI.push({ x, z, heading: hash3(x, z, 306) * 6.28, v, col: pick(UMB, hash3(x, z, 308)), sc: [sc, 0.92 + hash3(x, z, 309) * 0.16, sc] });
         obst.add(x, z, 0.05); st.umbrellas++; placed++;
         // phố chợ dày: ô thứ 2 chồng mép (rừng ô) trên dải lòng đường
@@ -574,7 +600,8 @@ export function placeStreetLife(P) {
         const [xm, zm] = P2(X.fac - depth * 0.5);
         const [xf, zf] = P2(X.fac - depth + 0.05);
         if (!rectClear(xm, zm, S.ux, S.uz, S.nx, S.nz, wid / 2, depth / 2 + 0.05) || inBuilding(xm, zm) || inBuilding(xf, zf)
-          || obst.hit(xf + S.ux * 1.4, zf + S.uz * 1.4, 0.35) || obst.hit(xf - S.ux * 1.4, zf - S.uz * 1.4, 0.35) || P.onCarriageFast(xm, zm)) return false;
+          || obst.hit(xf + S.ux * 1.4, zf + S.uz * 1.4, 0.35) || obst.hit(xf - S.ux * 1.4, zf - S.uz * 1.4, 0.35) || P.onCarriageFast(xm, zm)
+          || (P.poleInRect && P.poleInRect(xm, zm, S.ux, S.uz, wid / 2, depth / 2))) return false;   // cột xuyên bạt (phản biện W5-C)
         overI.push({ x: xb, z: zb, heading: H, v: hash3(xb, zb, 314) < 0.35 ? 3 : 2, col: pick(TARP, hash3(xb, zb, 313)), sc: [wid / 3, 1, depth] });
         for (const s2 of [-1, 1]) { const px = xf + S.ux * s2 * (wid / 2 - 0.05), pz = zf + S.uz * s2 * (wid / 2 - 0.05); obst.add(px, pz, 0.12); }   // 2 cọc trước
         st.tarps++; placed++;
@@ -616,6 +643,17 @@ export function placeStreetLife(P) {
               if (okAt(S, x4, z4, GR[v4]) && !obst.hit(x4, z4, 0.45)) { groundI.push({ x: x4, z: z4, heading: H + (hash3(x4, z4, 340) - 0.5) * 0.5, v: v4, col: 0xffffff }); obst.add(x4, z4, 0.5); st.ground++; }
             }
           }
+          // Đ3-W5-C: mức 3 VỈA HẸP (< 2,4 m — 446/124/492 vỉa 1,6-2 m): món chính đứng giữa vỉa, dải SÁT MẶT TIỀN trước đây
+          // trống trơn (ảnh thật: bao tải/sọt/mẹt/giá áo xếp sát tường suốt dãy) → 1-2 món nhỏ sát mặt tiền 2 phía dọc phố
+          if (lv === 3 && sw < 2.4 && sw >= 1.4) {
+            for (const [dt, sd] of [[-1.05, 341], [1.1, 342]]) {
+              if (dt > 0 && hash3(x, z, sd) > 0.6) continue;
+              const [xf, zf] = P2(X.fac - 0.42, dt);
+              const vf = hash3(xf, zf, sd + 2) < 0.4 ? 4 : hash3(xf, zf, sd + 3) < 0.6 ? 1 : 2;
+              const gsf = 0.8 + hash3(xf, zf, sd + 4) * 0.15;
+              if (okAt(S, xf, zf, GR[vf] * gsf) && !obst.hit(xf, zf, 0.4)) { groundI.push({ x: xf, z: zf, heading: H + (hash3(xf, zf, sd + 5) - 0.5) * 0.5, v: vf, col: 0xffffff, sc: [gsf, gsf, gsf] }); obst.add(xf, zf, 0.45); st.ground++; st.mkFacade = (st.mkFacade || 0) + 1; }
+            }
+          }
           // người bán ngồi ghế đẩu phía mặt tiền, quay ra đường
           if (hash3(x, z, 320) < (lv === 3 ? 0.75 : lv === 2 ? 0.62 : 0.45)) {
             const vl = Math.min(X.fac - 0.35, latG + 0.8);
@@ -628,14 +666,15 @@ export function placeStreetLife(P) {
           }
           // khách đứng trước sạp (phía lòng đường) — chợ thật đông người (ảnh 446/460: khách chen giữa sạp và mép đường);
           // mức 3 thêm khách thứ 2 lệch dọc phố
-          if (hash3(x, z, 323) < (lv === 3 ? 0.6 : lv === 2 ? 0.3 : 0.15)) {
+          // Đ3-W5-C: mức 3 khách 0,6 → 0,8, khách thứ 2 0,35 → 0,55 (ảnh 446/460: người mua chen kín mép sạp)
+          if (hash3(x, z, 323) < (lv === 3 ? 0.8 : lv === 2 ? 0.36 : 0.15)) {
             const [cx, cz] = P2(Math.max(hw - (lv === 3 ? 0.5 : -0.25), latG - 0.85), -0.3);
             if (okAt(S, cx, cz, 0.3, lv === 3) && !obst.hit(cx, cz, 0.3)) {
               P.lists.standI.push({ x: cx, z: cz, heading: H + Math.PI + (hash3(cx, cz, 324) - 0.5) * 1.2, mk: 1 }); obst.add(cx, cz, 0.25); st.customers++;
               if (lv === 3 && hw - 0.5 > latG - 0.85) stallsRoad.push({ x: cx, z: cz, heading: Math.atan2(S.ux, S.uz), len: 0.6, hw: 0.3, kind: 'ped' });   // khách đứng trên dải lòng đường
             }
           }
-          if (lv === 3 && hash3(x, z, 334) < 0.35) {
+          if (lv === 3 && hash3(x, z, 334) < (crowdAt(S, k) ? 0.75 : 0.55)) {
             const [cx, cz] = P2(Math.max(hw - 0.3, latG - 1.0), 1.0);
             if (okAt(S, cx, cz, 0.3, true) && !obst.hit(cx, cz, 0.35)) {
               P.lists.standI.push({ x: cx, z: cz, heading: H + Math.PI + (hash3(cx, cz, 335) - 0.5) * 2.0, mk: 1 }); obst.add(cx, cz, 0.25); st.customers++;
@@ -644,14 +683,32 @@ export function placeStreetLife(P) {
           }
         }
       }
-      // (3) mức 3: hàng lấn dải 1,1 m lòng đường sát bó vỉa
-      if (lv === 3 && hash3(t, S.az * 1.3, 325) < 0.4) {
+      // (3) mức 3: hàng lấn dải 1,1 m lòng đường sát bó vỉa (Đ3-W5-C: 40 → 55% bước sạp)
+      let stripUsed = false;
+      if (lv === 3 && hash3(t, S.az * 1.3, 325) < 0.55) {
         const [x, z] = P2(hw - 0.55, 0.9);
         const rv = hash3(x, z, 326) < 0.5 ? 3 : hash3(x, z, 327) < 0.75 ? 1 : 4;
         if (okAt(S, x, z, GR[rv], true) && !obst.hit(x, z, 0.55)) {
           groundI.push({ x, z, heading: H + Math.PI / 2 + (hash3(x, z, 328) - 0.5) * 0.4, v: rv, col: pick(GTARP, hash3(x, z, 329)), road: 1 });
-          obst.add(x, z, 0.6); st.roadStrip++;
+          obst.add(x, z, 0.6); st.roadStrip++; stripUsed = true;
           stallsRoad.push({ x, z, heading: Math.atan2(S.ux, S.uz), len: 2.2, hw: 0.6, kind: 'stall' });
+        }
+      }
+      // (4) Đ3-W5-C XE MÁY TRONG CHỢ (graders 446/492/189/124: "chợ đông xe máy" — ảnh thật xe đỗ SÁT MÉP LÒNG ĐƯỜNG trước sạp,
+      //     vỉa đã kín hàng; W4-B ghi "phố chợ vỉa hẹp gần như không xe máy"): ô dải lòng sát bó vỉa CHƯA có hàng → 1 xe đỗ dọc
+      //     mép (lệch ±12° so với trục phố, mũi theo chiều xe chạy bên đó), tâm cách bó vỉa 0,42 m (thân rộng ~0,7 m — gọn hơn sạp
+      //     lấn lòng 1,1 m). Chỉ phố lòng ≥ 5 m (hw ≥ 2,5) để 2 chiều xe vẫn lách (stallsRoad kind 'bike' — traffic.js như xe đỗ).
+      //     Mức 2: chỉ phía mặt tiền có xe vào trong vỉa (dải giữa) — xử lý ở 6.5 props như cũ.
+      if (lv === 3 && !stripUsed && hw >= 2.5 && hash3(t * 1.3, S.ax, 345) < 0.62) {
+        for (const dt of [0.2, -0.75, 1.0]) {
+          const [x, z] = P2(hw - 0.42, dt);
+          if (!okAt(S, x, z, 0.98, true) || obst.hit(x, z, 0.5) || P.inBuilding(x, z)) continue;
+          const dir = S.side > 0 ? -1 : 1;   // xuôi chiều làn bên phải của bên phố này (như ba gác)
+          const hd = Math.atan2(S.ux * dir, S.uz * dir) + (hash3(x, z, 346) - 0.5) * 0.42;
+          mkBikes.push({ x, z, heading: hd, road: 1 });
+          obst.add(x, z, 0.5); st.mkBikes = (st.mkBikes || 0) + 1;
+          stallsRoad.push({ x, z, heading: Math.atan2(S.ux, S.uz), len: 1.9, hw: 0.42, kind: 'bike' });
+          break;
         }
       }
       // ô chợ: OCC.MKT (không OCC.SHOP) — xe máy vẫn được đỗ xen kẽ khe giữa các sạp (ảnh 446/184: xe máy đỗ lẫn trong chợ;
@@ -775,6 +832,65 @@ export function placeStreetLife(P) {
       if ((e[8] & 8) && !(S.occ[k] & (OCC.SHOP | OCC.MKT | OCC.POLE)) && hash3(x, z, 378) < 0.12) { food(S, k, 2, true); st.evSpill++; }
     }
   }
+  // ---- Đ3-W5-C HIÊN QUÁN cà phê/trà (graders 267 "dù đỏ che kín hè trước quán Trà Cúc", 506 "hiên quán dù đỏ", 083 "dãy quán có
+  //      hiên"): pano ≤ 30 m có bit hiên quán (props_evidence spill 2048 = audit dù/bàn ghế quán HOẶC fp_json "cà phê/trà" ≥ 2
+  //      hướng + "ô đỏ") → dãy 3-5 ô liền: mỗi ô 1 Ô VUÔNG LỚN 2,3-2,7 m (cạnh song song mặt tiền → các tán nối nhau thành mái
+  //      hiên như ảnh) + bộ bàn ghế nhựa dưới tán + 1-3 khách ngồi (nhóm ngân sách `sp`). Màu: bit 4096 (ô ĐỎ) → 85% đỏ, còn lại
+  //      kem/xanh lá/xanh dương/đỏ. Vỉa ≥ 2,2 m; ô có mặt tiền nhà thật; không ô chợ/sân trước công trình/ô đồ cửa hàng/cột.
+  {
+    const RED = [0xc8282a, 0xb8231f, 0xd0302a, 0xc02a26], MIX = [0xe8e2d4, 0x2c8a4a, 0x1f5fb0, 0xc8282a, 0xe8e2d4, 0xd8c88a];
+    const SEATS = [[0.52, 0.05], [-0.5, -0.06], [0.04, 0.55], [-0.05, -0.53]];
+    const L = P.lists;
+    st.terraces = 0; st.terraceCells = 0;
+    for (const S of sides) {
+      const X = XS(S); if (X.sw < 2.2) continue;
+      let k = 0;
+      while (k < S.n) {
+        const e = S.ev[k];
+        if (!S.ok[k] || S.fore[k] || !e || !(e[8] & 2048) || (S.mk && S.mk[k] >= 2)) { k++; continue; }
+        const [cx, cz] = cellPos(S, k, X.park);
+        if (Math.hypot(e[0] - cx, e[1] - cz) > 30 || hash3(cx, cz, 371) > 0.42) { k++; continue; }
+        const n = 3 + ((hash3(cx, cz, 372) * 3) | 0), pRed = (e[8] & 4096) ? 0.85 : 0.2;
+        let placed = 0;
+        for (let kk = k; kk < Math.min(S.n, k + n); kk++) {
+          // (ô OCC.SHOP vẫn được: bộ bàn ghế quán 6.4 đã có ≤ 1,4 m → tán ô đặt ĐÚNG trên bộ đó, không thêm bàn — pano 267: quán
+          //  trà đã có 2 bộ ghế nhựa + dù nhỏ đúng chỗ hiên dù đỏ thật; xe đẩy/thùng rác/hàng chặn qua obst)
+          if (!S.ok[kk] || S.fore[kk] || (S.occ[kk] & (OCC.POLE | OCC.MKT))) continue;
+          // mặt tiền: nhà thật HOẶC nhà ô dựng tay giữ lại (claim 'cell' — quán Trà Chanh pano_267 là nhà ô dựng tay)
+          if (!hasFacade(S, kk)) { const [bx, bz] = cellPos(S, kk, X.fac + 1.5); if (!P.claimAt(bx, bz, ['cell'])) continue; }
+          const latU = Math.max(X.hw + 1.2, Math.min(X.fac - 1.2, X.hw + X.sw * 0.5));
+          let [ux, uz] = cellPos(S, kk, latU, (hash3(S.ax + kk, S.az, 373) - 0.5) * 0.3);
+          let own = null;
+          for (const it of L.stoolI) if ((it.x - ux) ** 2 + (it.z - uz) ** 2 < 1.96) { own = it; break; }
+          if (own) { ux = own.x; uz = own.z; }
+          // tán 2,6-3,1 m (ảnh 267: dù vuông lớn phủ kín vỉa) — nhưng không chìa qua bó vỉa / chạm mặt tiền
+          const room = Math.min(latU - X.hw, X.fac - latU) - 0.1;
+          let sc = Math.max(0.85, Math.min(1.15 + hash3(ux, uz, 374) * 0.2, room / 1.15));
+          if (!okAt(S, ux, uz, UMB_SQ_R * sc) || (!own && obst.hit(ux, uz, 0.85)) || inBuilding(ux, uz)) continue;
+          // phản biện W5-C: thân cây đường/cột điện-đèn KHÔNG được xuyên tán vuông (nửa cạnh 1,15 × sc, trục theo phố) — kể cả
+          // khi tán đặt trên bộ bàn ghế cũ (own): thu nhỏ tán tới 0,85 rồi mới bỏ ô
+          if (P.tallInSq) {
+            const hit = (s2) => P.tallInSq(ux, uz, S.ux, S.uz, 1.15 * s2);
+            if (hit(sc)) { let s2 = sc; while (s2 > 0.85 && hit(s2)) s2 = Math.max(0.85, s2 - 0.1); if (hit(s2)) { st.terraceTall = (st.terraceTall || 0) + 1; continue; } sc = s2; }
+          }
+          if (!own && (S.occ[kk] & OCC.SHOP)) continue;   // ô đồ cửa hàng khác (biển A, chậu, hàng) — không chen bàn mới
+          const rot = own ? own.heading : hash3(ux, uz, 375) * 6.28;
+          if (!own) L.stoolI.push({ x: ux, z: uz, heading: rot });
+          const nSit = own ? 0 : 1 + ((hash3(ux, uz, 376) * 2.7) | 0), cs = Math.cos(rot), sn = Math.sin(rot);
+          for (let q = 0; q < nSit; q++) {
+            const [sx, sz] = SEATS[(q + ((hash3(ux, uz, 377) * 4) | 0)) % 4];
+            const wx = ux + sx * cs + sz * sn, wz = uz - sx * sn + sz * cs;
+            L.sitI.push({ x: wx, z: wz, heading: Math.atan2(ux - wx, uz - wz), yo: -0.03, sp: 1 });
+          }
+          if (L.paraI) for (const pa of L.paraI) if ((pa.x - ux) ** 2 + (pa.z - uz) ** 2 < 2.25) pa.dead = 1;   // dù nhỏ quán cũ dưới tán lớn → bỏ
+          overI.push({ x: ux, z: uz, heading: Math.atan2(S.ux, S.uz), v: 4, col: hash3(ux, uz, 378) < pRed ? pick(RED, hash3(ux, uz, 379)) : pick(MIX, hash3(ux, uz, 379)), sc: [sc, 0.98 + hash3(ux, uz, 380) * 0.08, sc] });
+          obst.add(ux, uz, 0.8); S.occ[kk] |= OCC.SHOP; placed++; st.umbrellas++;
+        }
+        if (placed) { st.terraces++; st.terraceCells += placed; }
+        k += n + 1;
+      }
+    }
+  }
   // ---- chậu cây trước nhà (rất phổ biến; nền thưa, KHÔNG ở đại lộ p) ----
   for (const S of sides) {
     if (S.c === 'p') continue;
@@ -814,6 +930,33 @@ export function placeStreetLife(P) {
       st.flagsHouse++;
     }
   }
+  // ---- Đ3-W5-C DÂY LEO / HOA GIẤY trên mặt tiền: pano ≤ 35 m nói dây leo/giàn hoa (props_evidence deco 4096) → ~18% ô có mặt
+  //      tiền thật treo 1 khóm từ mép ban công tầng 2 (y 3,9-4,7 m), 55% hoa giấy (hồng sẫm/tím/cam), còn lại chỉ lá ----
+  const vines = [];
+  for (const S of sides) {
+    const X = XS(S);
+    for (let k = 0; k < S.n; k++) {
+      const e = S.ev[k];
+      if (!S.ok[k] || S.fore[k] || !e || !(e[9] & 4096)) continue;
+      const hv = hash3(S.ax + k * 1.9, S.az + S.side * 2.1, 421); if (hv > 0.18) continue;
+      const da = (hash3(S.ax + k, S.az, 422) - 0.5) * 1.4;
+      const [x0, z0] = cellPos(S, k, X.fac, da);
+      if (Math.hypot(e[0] - x0, e[1] - z0) > 35) continue;
+      let dF = null;
+      for (let d = -0.5; d <= 2.5; d += 0.25) { const [qx, qz] = cellPos(S, k, X.fac + d, da); if (inBuilding(qx, qz)) { dF = d; break; } }
+      if (dF === null) continue;
+      const [x, z] = cellPos(S, k, X.fac + dF - 0.03, da);
+      if (nearPano(x, z, 4)) continue;
+      // phản biện ảnh (203 h90): khóm treo ở 3,9-4,7 m bị mái hiên/bạt tầng trệt che gần hết → treo từ tầng 2-3 theo số tầng THẬT
+      // của nhà (nhà 1 tầng: rủ từ đỉnh tường ~3,4 m, nhỏ), rủ 2,9-4 m, rộng 2,9-4,4 m (ảnh: dây leo phủ cả mảng mặt tiền)
+      const F = P.bldFloors ? P.bldFloors(x - S.nx * 0.3, z - S.nz * 0.3) || P.bldFloors(x + S.nx * 0.3, z + S.nz * 0.3) : 2;
+      const fl = hash3(x, z, 423) < 0.55, big = F >= 2;
+      const yTop = F >= 3 ? 9.2 + hash3(x, z, 424) * 0.6 : F === 2 ? 6.7 + hash3(x, z, 424) * 0.4 : 3.3;
+      vines.push({ x, z, heading: headRoad(S), yo: yTop, col: fl ? pick([0xc8287a, 0xb02a8a, 0xd8508a, 0xe0702a, 0x9a3aa0], hash3(x, z, 425)) : 0x4f8a3a,
+        sc: big ? [1.3 + hash3(x, z, 426) * 0.7, 1.4 + hash3(x, z, 427) * 0.5, 1.1] : [0.8 + hash3(x, z, 426) * 0.4, 0.75, 1] });
+    }
+  }
+  st.vines = vines.length;
   // ---- BĂNG RÔN căng ngang phố + CỔNG CHÀO (pano nhắc) ----
   const evRows = P.evidence || [];
   for (const e of evRows) {
@@ -890,7 +1033,7 @@ export function placeStreetLife(P) {
     }
   }
   st.ms = Math.round(performance.now() - T0);
-  return { overI, groundI, spillI, stallsRoad, flagsHouse, banners, gates, posts, stats: st };
+  return { overI, groundI, spillI, stallsRoad, flagsHouse, banners, gates, posts, mkBikes, vines, stats: st };
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -903,9 +1046,11 @@ export function buildStreetLifeMeshes(B, L) {
     palB: [0xf2f2ee, 0x1f5fb0, 0xf2f2ee, 0xc8282a, 0x2c8a4a, 0xf0f0ea, 0x2a4f9a, 0xe0c020] });
   // hàng dưới đất ≤ 100 m (LITE 70): nhóm 6 biến thể ~900 tam giác/instance (đỉnh suy biến của biến thể khác) — bản ≤ 150 m: 533
   // instance thấy được ở khung chợ 446 = 479k tam giác (+ lượt bóng); hàng 0,5-1 m ở 100 m chỉ còn 3-6 px
-  const NEAR_OVER = LITE ? 160 : 300, NEAR_GROUND = LITE ? 70 : 100;
+  // Đ3-W5-C: chợ mức 3 dày hơn (+15% món) → hàng đất ≤ 100 → 80 m, đống nông sản ≤ 60 → 45 m (ở 80-100 m món 0,5-1 m còn 3-5 px;
+  // A/B pano_446_h090: +17% tam giác trước khi thu)
+  const NEAR_OVER = LITE ? 160 : 300, NEAR_GROUND = LITE ? 70 : 80;
   const out = [];
-  if (L.overI.length) out.push(inst('props_market_over', G.variants([modelUmbrella(G), modelUmbrellaSq(G), modelTarp(G), modelTarpStriped(G)]), matMkt, L.overI, { rMax: NEAR_OVER, keepBehind: 30, color: (it) => it.col }));
+  if (L.overI.length) out.push(inst('props_market_over', G.variants([modelUmbrella(G), modelUmbrellaSq(G), modelTarp(G), modelTarpStriped(G), modelUmbrellaSq(G, true)]), matMkt, L.overI, { rMax: NEAR_OVER, keepBehind: 30, color: (it) => it.col }));
   // 2 nhóm (sạp+mẹt ~510 tam giác · sọt/bạt đất/bao tải/ghế ~390) thay 1 nhóm 6 biến thể ~900: mỗi instance chỉ gánh đỉnh suy
   // biến của nhóm mình (−50% đỉnh, +1 draw call)
   const gA = L.groundI.filter((it) => it.v <= 1), gB = L.groundI.filter((it) => it.v >= 2).map((it) => ({ ...it, v: it.v - 2 }));
@@ -927,10 +1072,12 @@ export function buildStreetLifeMeshes(B, L) {
   }
   if (pile.length) {
     const matPile = G.propMaterial({ name: 'produce', palA: PRODUCE_COLS, gate: [0.35, 0.4] });
-    out.push(inst('props_market_produce', modelProduce(G), matPile, pile, { rMax: LITE ? 40 : 60, keepBehind: 15, cast: false, color: (it) => it.col }));
+    out.push(inst('props_market_produce', modelProduce(G), matPile, pile, { rMax: LITE ? 40 : 45, keepBehind: 15, cast: false, color: (it) => it.col }));
   }
   L.stats.produce = pile.length;
   if (L.spillI.length) out.push(inst('props_spill', G.variants([modelRack(G), modelFlowers(G), modelPot(G), modelFurniture(G), modelAltar(G), modelToys(G), modelGoods(G), modelBaGac(G)]), matMkt, L.spillI, { rMax: NEAR_GROUND, keepBehind: 25, color: (it) => it.col }));
+  // Đ3-W5-C: dây leo/hoa giấy (y = mép trên khóm: chân mặt đất + yo)
+  if (L.vines && L.vines.length) out.push(inst('props_vines', modelVine(G), matMkt, L.vines.map((v) => ({ ...v, y: (v.y || 0) + v.yo, yo: 0 })), { rMax: LITE ? 140 : 220, keepBehind: 25, color: (it) => it.col }));
   if (L.flagsHouse.length) {
     const tex = houseFlagTexture();
     const geo = G.mergeGeometriesRaw(houseFlagGeometry());
