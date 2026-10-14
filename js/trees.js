@@ -22,7 +22,8 @@
 //   plant(kind, x, z, o)          — xếp hàng 1 cây (toạ độ thế giới). kind: 'xacu'|'bang'|'phuong'|'sau'|'banglang'|
 //                                   'cau'|'catcut'|'da'|'non' hoặc 'shade' (cây bóng mát: loài theo pano/vùng) |
 //                                   'street' (mọi loài theo pano/vùng) | 'park'. o: {h, r, wash, pit, hero, yaw,
-//                                   variant, sz, full, median} (xem plant(); o.bloom BỎ từ W2-B — hoa theo lịch).
+//                                   variant, sz, full, median, exact} (xem plant(); o.bloom BỎ từ W2-B — hoa theo lịch;
+//                                   exact:1 = giữ đúng loài/dáng, bỏ qua luật bằng chứng W3-G).
 //                                   KHÔNG tự thêm collider (người gọi giữ addCollider như cũ); buildTrees dời/bỏ cây
 //                                   lọt lòng đường / nhà thật / trùng gốc và dời/tách collider ở đúng (x,z) đó.
 //   plantLocal(parent, lx, lz, kind, o) — cây trong Group (toạ độ local của parent, giải ở buildTrees; parent bị gỡ
@@ -734,7 +735,8 @@ export function trunkNear(x, z, r) {
 }
 // kind: tên loài | 'shade' | 'street' | 'park'. o: {h (cao m), r (bán kính tán m), bloom (BỎ từ W2-B: hoa theo LỊCH), wash (0/1), pit (0 không,
 // 1 ô vuông), hero (biến thể GLB 0..2), yaw, variant (chỉ số kit trong loài), sz (hệ số cỡ theo cấp phố), full (độ kín tán 0..1),
-// median (1 = cây dải phân cách, miễn kiểm lòng đường)}
+// median (1 = cây dải phân cách, miễn kiểm lòng đường), exact (1 = giữ ĐÚNG loài/dáng: bỏ qua luật bằng chứng W3-G — đổi
+// loài cau/non/TOPI, cắt cụt/LOP, vòm cây, nghiêng kè hồ; dùng cho cây trồng CỐ Ý như cây non chống cọc dải dạo ven sông)}
 export function plant(kind, x, z, o = {}) {
   if (!Number.isFinite(x) || !Number.isFinite(z)) return false;
   Q.push({ kind, x, z, o });
@@ -961,6 +963,7 @@ function footprintData(ctx) {
 let _ri = null;
 export function roadIndex(ROADS_DT, R = 1600) {
   if (_ri && _ri.src === ROADS_DT) return _ri;
+  _PR = null;   // bản đồ pano→đoạn phố (panosOnRoad) gắn với chỉ số đoạn của _ri cũ
   const SC = 16, sg = new Map(), segs = [];
   ROADS_DT.forEach((rd, ri) => {
     for (let i = 0; i + 1 < rd.pts.length; i++) {
@@ -1001,10 +1004,13 @@ const HERO_SPOTS = [
 // phụ đa ≤ ~1,9 m —, không nhà, không camera pano 6 m, không nước) và (b) THẤY ĐƯỢC từ camera pano (đoạn camera → gốc
 // không cắt footprint nhà nào, bước 0,5 m); chọn điểm GẦN điểm đo nhất. Không có → bỏ (cảnh báo).
 // Trả [[x, z, bán kính cấm cây khác]] cho hàng cây vỉa hè.
-function plantHeroSpots(ctx, RI, fp) {
+function plantHeroSpots(ctx, RI, fp, inLM, BLOCK) {
   const keep = [];
+  // (review W3-G: + cụm thân Ø ~2,6 m không chạm nhà — 8 điểm vòng 1,5 m —, hành lang keepClear, địa danh + 2,5 m, claim chặn)
+  const trunkFree = (x, z) => { if (!fp) return true; for (let q = 0; q < 8; q++) { const a = q * Math.PI / 4; if (fp.at(x + Math.cos(a) * 1.5, z + Math.sin(a) * 1.5) >= 0) return false; } return true; };
   const free = (x, z) => !RI.nearRoad(x, z, 2.2, 'wh') && !onCarriage(x, z) && !(fp && fp.at(x, z) >= 0) && !nearPano(x, z, 6)
-    && !(ctx.isWater && ctx.isWater(x, z));
+    && !(ctx.isWater && ctx.isWater(x, z)) && trunkFree(x, z) && !(ctx.keepClear && ctx.keepClear(x, z)) && !(inLM && inLM(x, z, 2.5))
+    && !(BLOCK && claimAt(x, z, BLOCK));
   const seen = (cx, cz, x, z) => {
     if (!fp) return true;
     const d = Math.hypot(x - cx, z - cz);
@@ -1026,7 +1032,14 @@ function plantHeroSpots(ctx, RI, fp) {
     }
     if (px === null) { console.warn('[trees] hero spot không có chỗ trống thấy được', S.kind, x0.toFixed(1), z0.toFixed(1)); continue; }
     plant(S.kind, px, pz, { h: S.H, r: S.R, wash: 0, big: 1, src: 3 });
-    ctx.addCollider && ctx.addCollider(px, pz, S.kind === 'da' ? 1.9 : 1.0);
+    // collider: props.js chỉ coi collider r ≤ 1,0 là vật cản (xe máy đỗ/quán) — 1 collider r 1,9 cũ bị bỏ qua ⇒ hàng xe máy
+    // đỗ sát gốc đa 088 (review W3-G). → tâm r 1,0 + vòng 6 × r 0,9 ở 1,3 m (phủ ~2,2 m: cụm thân + thân phụ, như 1,9 cũ);
+    // đa thêm vòng 8 × r 0,5 ở 2,6 m (màn rễ phụ chạm đất 1,2-3,2 m × sxz — xe không đỗ lọt vào, người vẫn len qua khe ~1 m)
+    if (ctx.addCollider) {
+      ctx.addCollider(px, pz, 1.0);
+      for (let q = 0; q < 6; q++) { const a = q / 6 * Math.PI * 2; ctx.addCollider(px + Math.cos(a) * 1.3, pz + Math.sin(a) * 1.3, 0.9); }
+      if (S.kind === 'da') for (let q = 0; q < 8; q++) { const a = (q + 0.5) / 8 * Math.PI * 2; ctx.addCollider(px + Math.cos(a) * 2.6, pz + Math.sin(a) * 2.6, 0.5); }
+    }
     keep.push([px, pz, S.R * 0.75]);
   }
   return keep;
@@ -1100,7 +1113,7 @@ export function plantStreetTrees(ctx) {
   const heroCand = [];
   // W3-G: CÂY HERO đích danh theo ảnh pano (đa cổ thụ rễ phụ pano_088/400, me tây tán dù pano_001) — trồng TRƯỚC hàng cây
   // vỉa hè, cấm cây khác trong bán kính tán của nó
-  const heroKeep = plantHeroSpots(ctx, RI, fp);
+  const heroKeep = plantHeroSpots(ctx, RI, fp, inLM, BLOCK);
   const nearHero = (x, z) => heroKeep.some(([hx, hz, hr]) => (hx - x) ** 2 + (hz - z) ** 2 < hr * hr);
   st.heroSpots = heroKeep.length;
   for (let ri = 0; ri < ROADS_DT.length; ri++) {
@@ -1194,7 +1207,7 @@ export function plantPlazaYoung(ctx) {
     if (RI.nearRoad(x, z, 1.5) || fp.at(x, z) >= 0 || inLMpad(x, z, 3)) continue;
     if (nearPano(x, z, PANO_CLEAR) || trunkNear(x, z, 5) || (ctx.keepClear && ctx.keepClear(x, z))) continue;
     if (cols.some((c) => (c.x - x) ** 2 + (c.z - z) ** 2 < (c.r + 1.0) ** 2)) continue;
-    plant('non', x, z, { pit: 0, wash: 0 });
+    plant('non', x, z, { pit: 0, wash: 0, exact: 1 });
     ctx.addCollider && ctx.addCollider(x, z, 0.3);
     n++;
   }
@@ -1209,6 +1222,9 @@ export function plantPlazaYoung(ctx) {
 // riêng (aInst.x, hash 0..1; bằng lăng +2; −1 = luôn nở: cây đôi của hero GLB) < tỉ lệ; càng sâu dưới ngưỡng càng nhiều chùm hoa
 const U = { uTime: { value: 0 }, uBloom: { value: new THREE.Vector2(1, 1) }, uWind: { value: 1 }, uAtlasPx: { value: ATLAS_S * 4 } };
 const VERT_DECL = 'attribute float aKind;\nattribute float aSway;\nattribute float aHt;\nattribute vec4 aInst;\nattribute vec4 aShape;\nuniform float uTime;\nuniform vec2 uBloom;\nuniform float uWind;\n';
+// hero GLB (phượng Meshy LUÔN đỏ) + cây đôi luôn-nở CHỈ khi đang mùa phượng (tỉ lệ nở ≥ ngưỡng) — W3-G: gắn hero vào lịch
+// (khai báo TRƯỚC VERT_BEGIN: shader nhúng cùng hằng số này — không lệch giữa JS và GLSL)
+const HERO_SEASON = 0.45;
 const VERT_BEGIN = `vec3 transformed = vec3( position );
 #ifdef USE_INSTANCING
   // W2-B BIẾN HÌNH TỪNG CÂY (aShape, đơn vị kit): x = NÂNG tán (thân từ gốc vôi → chạc giãn ra, tán dời lên nguyên khối),
@@ -1228,7 +1244,7 @@ const VERT_BEGIN = `vec3 transformed = vec3( position );
   if ( aKind > 2.5 ) {
     float hpR = aInst.x, hpS = uBloom.x;
     if ( hpR > 1.5 ) { hpR -= 2.0; hpS = uBloom.y; }
-    if ( hpR < -0.5 && hpS < 0.45 ) hpR = 1.0;      // cây đôi hero (luôn nở) CHỈ trong mùa phượng (HERO_SEASON — W3-G)
+    if ( hpR < -0.5 && hpS < ${HERO_SEASON.toFixed(3)} ) hpR = 1.0;      // cây đôi hero (luôn nở) CHỈ trong mùa phượng (HERO_SEASON — W3-G)
     if ( fract( aKind ) * 2.5 >= clamp( ( hpS - hpR ) * 8.0, 0.0, 1.0 ) ) transformed = vec3( 0.0, -3.0, 0.0 );
   }
   // ĐỘ KÍN TÁN từng cây (aInst.w 0..1): thẻ lá/hoa có số ngẫu nhiên riêng (phần lẻ aKind × 2,5) lớn hơn → bỏ
@@ -1311,8 +1327,6 @@ export function bloomShare(doy) {
   const bl = 0.02 + 0.76 * sstep(130, 154, doy) * (1 - sstep(190, 218, doy));
   return [ph, bl];
 }
-// hero GLB (phượng Meshy LUÔN đỏ) + cây đôi luôn-nở CHỈ khi đang mùa phượng (tỉ lệ nở ≥ ngưỡng) — W3-G: gắn hero vào lịch
-const HERO_SEASON = 0.45;
 function parseDateParam() {
   try {
     const q = new URLSearchParams(location.search), v = q.get('date'), mo = q.get('month');
@@ -1527,21 +1541,24 @@ export function buildTrees(scene, ctx = {}) {
     const ev = { palm: 0, young: 0, topi: 0 };
     // W3-G: CAU/CỌ KHÔNG BẰNG CHỨNG (helper cũ đặt đích danh 'cau'): pano ≤ 35 m tả cây không có cau, không pano ≤ 70 m nào
     // có cau → cây bóng mát theo vùng (AUDIT3: cau "mọc" ở 046/056/441)
-    if (sp === SP.CAU && e.kind === 'cau' && !o.median && palmUnseen(x, z)) { sp = resolveSpecies(x, z, 'shade', ri, park).sp; ev.palm = 1; }
+    // W3-G review: o.exact = loài/dáng người gọi đặt CỐ Ý (cây non dải dạo ven sông W3-F, cây non quảng trường) → BỎ QUA
+    // mọi luật bằng chứng đổi loài/cắt/vòm/nghiêng kè (palm→shade, non→shade, →TOPI, →cắt cụt/LOP, tun, tilt)
+    const ex = !!o.exact;
+    if (!ex && sp === SP.CAU && e.kind === 'cau' && !o.median && palmUnseen(x, z)) { sp = resolveSpecies(x, z, 'shade', ri, park).sp; ev.palm = 1; }
     // W3-G: CÂY NON đích danh (helper cells) nơi pano gần nói hàng cây LỚN/RỢP mà không nhắc cây non (239/271/501 "cây cổ thụ")
-    if (sp === SP.NON && e.kind === 'non' && V.near && V.young <= 0.03 && (V.tunnel || V.dens === 3)) { sp = resolveSpecies(x, z, 'shade', ri, park).sp; ev.young = 1; }
+    if (!ex && sp === SP.NON && e.kind === 'non' && V.near && V.young <= 0.03 && (V.tunnel || V.dens === 3)) { sp = resolveSpecies(x, z, 'shade', ri, park).sp; ev.young = 1; }
     // W3-G: ĐẢO GIAO THÔNG có cây cảnh cắt tỉa tròn (pano_304 nút HVT: "topiary và bonsai thế trên đảo & dải phân cách, hàng
     // cây non ven đường") → cây KHÔNG ở hố vỉa hè (đảo, dải, bãi cỏ) ≤ 35 m thành TOPI; cây hố vỉa hè theo pano (cây non)
-    if (!o.pit && sp !== SP.CAU && panoMax(x, z, 18, 35) && sp !== SP.DA && sp !== SP.ME && sp !== SP.TOPI && !o.big) { sp = SP.TOPI; ev.topi = 1; }
+    if (!ex && !o.pit && sp !== SP.CAU && panoMax(x, z, 18, 35) && sp !== SP.DA && sp !== SP.ME && sp !== SP.TOPI && !o.big) { sp = SP.TOPI; ev.topi = 1; }
     // hero GLB (showcase, luôn nở đỏ) chỉ trong HERO_SHOW_R quanh Nhà hát + không chắn khung pano (heroSpotOk) — còn lại: phượng thủ
     // tục nở theo LỊCH như mọi cây (W2-B: trước 57 hero rải cả dải trung tâm + vườn hoa → "vòm đỏ" khắp nơi tháng 10)
     const heroOk = sp === SP.PHUONG && o.hero !== undefined && o.hero >= 0 && Math.hypot(x - OPERA[0], z - OPERA[1]) < HERO_SHOW_R && heroSpotOk(x, z);
     // CẮT CỤT / TỈA TRƠ theo bằng chứng pano (bão Yagi 9/2024 → pano 10/2024): loài đặt đích danh bởi helper cũ
     // (phượng allée, xà cừ vườn hoa…) cũng bị cắt khi pano ≤ 60 m nói "cắt cụt/trụi" — trước chỉ cây 'shade/street/park'.
     // W3-G: mức ≥ 5 → phần lớn thành "bộ xương" cắt trụi (LOP); helper 'catcut' trong vùng cắt trụi nặng cũng vậy
-    const NOCUT = sp === SP.CAU || sp === SP.DA || sp === SP.NON || sp === SP.CATCUT || sp === SP.LOP || sp === SP.TOPI || sp === SP.ME || !!o.big;
+    const NOCUT = sp === SP.CAU || sp === SP.DA || sp === SP.NON || sp === SP.CATCUT || sp === SP.LOP || sp === SP.TOPI || sp === SP.ME || !!o.big || ex;
     if (!heroOk && V.near && V.polLvl > 0 && !NOCUT && hxz(x, z, 5) < V.pollard * (park ? 1 : 0.85)) sp = cutSpecies(x, z, V.polLvl);
-    else if (sp === SP.CATCUT && e.kind === 'catcut' && V.polLvl >= 5 && hxz(x, z, 64) < 0.6) sp = SP.LOP;
+    else if (!ex && sp === SP.CATCUT && e.kind === 'catcut' && V.polLvl >= 5 && hxz(x, z, 64) < 0.6) sp = SP.LOP;
     const kits = SP_KITS[sp];
     const kit = kits[o.variant !== undefined ? o.variant % kits.length : (hxz(x, z, 41) * kits.length) | 0];
     // ---- KÍCH THƯỚC THẬT (m): cao H, mép dưới tán B, bán kính tán R — phân bố lệch về cây nhỏ/vừa (u^1,25) cho đa dạng;
@@ -1643,6 +1660,46 @@ export function buildTrees(scene, ctx = {}) {
     }
   }
   const LEAN_T = Math.tan(LEAN_NAT_DEG * Math.PI / 180);
+  // W3-G review: cây HERO (r.big — đa/me cổ thụ đo theo ảnh) bỏ facadeFit (tán thật trùm qua mái) nhưng hướng xoay kit
+  // từng là hash ngẫu nhiên → cành chính 7,6 m của đa đâm XUYÊN mặt tiền (pano_400_h180: cục điều hoà trên tường hiện
+  // TRƯỚC cành). → dựng điểm mẫu kit gần (cành ×3, lá ×1; bỏ hoa, bỏ phần < 2 m) đúng như shader (tán ×cs, nâng lift,
+  // ×sxz/sy), thử 24 hướng xoay, đếm điểm lọt footprint nhà DƯỚI mái (heightOf + tường chắn mái) → giữ hướng ít va nhất;
+  // còn va → ép nửa tán phía nhà (cơ chế TÁN LỆCH của facadeFit, hướng = ngược trọng tâm điểm va) mức NHỎ NHẤT đủ hết va
+  // (bước 0,08, ≤ SQ_MAX) — không thu R (thu R = tán đa còn 3,6 m, khung pano chỉ thấy thân — phiên 3)
+  fit.hero = [];
+  const heroFit = (r, k) => {
+    const A = k.geo.attributes, P = A.position.array, HT = A.aHt.array, KD = A.aKind.array, nv = HT.length;
+    const st = Math.max(1, Math.floor(nv / 4000)), pts = [];
+    for (let i = 0; i < nv; i += st) {
+      const kd = KD[i]; if (kd > 2.5) continue;
+      const cr = HT[i] >= 1.5, m = cr ? r.cs * r.sxz : r.sxz, Y = (P[i * 3 + 1] + r.lift * (cr ? 1 : HT[i])) * r.sy;
+      if (Y < 2) continue;
+      pts.push(P[i * 3] * m, Y, P[i * 3 + 2] * m, kd < 1.5 ? 3 : 1, cr ? 1 : 0);
+    }
+    const roof = (b) => (fpD ? heightOf(fpD.floors[b]) + PARAPET_H : 1e9);
+    const ev = (yaw, nx, nz, sq) => {
+      const c = Math.cos(yaw), sn = Math.sin(yaw); let w = 0, hx = 0, hz = 0;
+      for (let i = 0; i < pts.length; i += 5) {
+        let X = pts[i] * c + pts[i + 2] * sn, Z = -pts[i] * sn + pts[i + 2] * c;
+        if (sq > 0 && pts[i + 4]) { const d = X * nx + Z * nz; if (d < 0) { X -= nx * d * sq; Z -= nz * d * sq; } }
+        const b = fpG.at(r.x + X, r.z + Z);
+        if (b >= 0 && pts[i + 1] < roof(b)) { const q = pts[i + 3]; w += q; hx += X * q; hz += Z * q; }
+      }
+      return { w, hx, hz };
+    };
+    const y0 = r.yaw, e0 = ev(y0, 0, 0, 0);
+    let by = y0, be = e0;
+    if (e0.w > 0) for (let j = 1; j < 24; j++) { const y = y0 + j * Math.PI / 12, e = ev(y, 0, 0, 0); if (e.w < be.w) { by = y; be = e; } if (!be.w) break; }
+    r.yaw = by;
+    let sq = 0, nx = 0, nz = 0, e1 = be;
+    if (be.w > 0) {
+      const l = Math.hypot(be.hx, be.hz) || 1; nx = -be.hx / l; nz = -be.hz / l;
+      for (let s2 = 0.08; s2 <= SQ_MAX + 1e-6; s2 += 0.08) { const e = ev(by, nx, nz, s2); if (e.w < e1.w) { e1 = e; sq = s2; } if (!e.w) break; }
+      if (sq > 0) { r.sq = +sq.toFixed(2); r.snx = nx; r.snz = nz; }
+    }
+    fit.hero.push({ sp: SP_NAME[r.sp], x: +r.x.toFixed(1), z: +r.z.toFixed(1), n: pts.length / 5, hit0: e0.w, hitYaw: be.w, hit: e1.w,
+      dyaw: Math.round(((by - y0) * 180 / Math.PI) % 360), sq: r.sq || 0 });
+  };
   for (const r of recs) {
     const k = nearKits[r.kit], kf = farKits[r.sp], cau = r.sp === SP.CAU;
     r.sq = 0; r.snx = 0; r.snz = 0; r.zx = 0; r.zz = 0;
@@ -1665,6 +1722,7 @@ export function buildTrees(scene, ctx = {}) {
       if (f.R < R - 0.05) fit.shrunk++;
       R = f.R; r.fd = f.d;
     }
+    if (r.big) r.fd = 0;   // cây hero: không nghiêng tự nhiên (dời tán chưa tính trong heroFit)
     r.sy = clamp((r.H - r.B) / Math.max(0.5, k.top - k.base), 0.4, 2.4);
     r.lift = clamp(r.B / r.sy - k.base, -(k.fork - WASH_TOP) * 0.6, 14);
     // bề dày thân theo CHIỀU CAO cây so với kit (không theo độ sâu tán — cây cắt cụt tán nông từng ra thân 1 m)
@@ -1672,6 +1730,7 @@ export function buildTrees(scene, ctx = {}) {
     // biến thể MẢNH kè hồ (r.slim, phiên 4): ×0,62
     r.sxz = clamp((r.H / k.def.H) ** 0.7 * (0.88 + hxz(r.x, r.z, 43) * 0.22), 0.45, 1.18) * (r.slim ? 0.62 : r.tiltX || r.tiltZ ? 0.85 : 1);
     r.cs = clamp(R / (k.rad * r.sxz), 0.35, 1.9);
+    if (r.big && fpG) heroFit(r, k);
     // kit XA (variant 0 của loài, > NEAR_R): sy/nâng/co tán RIÊNG theo số đo kit xa → mép dưới/ngọn/bán kính tán khớp
     // kit gần ở ranh LOD (trước: dùng aShape của kit gần → mép tán nhảy −1..+1,7 m khi đổi LOD). Khớp mép/ngọn THỰC của
     // kit gần (kể cả khi kẹp sy/nâng — cắt cụt biến thể 1 không hạ tán dưới chạc được), không phải B/H mong muốn

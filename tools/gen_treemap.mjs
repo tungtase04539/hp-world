@@ -40,7 +40,8 @@ const cutLevel = (s) => has(s, /một cây|một gốc|(một số|vài) (cây|g
 // cau/cọ: "cọ" KHÔNG được khớp "cọc" (cọc chống cây non!) — bug v1: mọi pano "chống cọc" thành có cau (w=3)
 const PALM_RX = /cau(?![a-zà-ỹđ])|cọ(?![a-zà-ỹđ])|palm|dừa/;
 // phố có VÒM CÂY thật (AUDIT3 FP-7: Lê Lợi, Hạ Lý, Phan Bội Châu, Lý Thường Kiệt, Ký Con) — chỉ nâng pano ĐÃ nói có hàng cây
-const TUNNEL_STREETS = /Lê Lợi|Hạ Lý|Phan Bội Châu|Lý Thường Kiệt|Ký Con/;
+// (review W3-G: chỉ TÊN PHỐ ở ĐẦU area — "phường Hạ Lý" (Phạm Phú Thứ 098/100), "Ngõ 80 phố Hạ Lý" (530-549) từng bị tính)
+const TUNNEL_STREETS = /^((Đầu|Cuối|Góc) )?([Pp]hố |Đường |P\. )?(Lê Lợi|Hạ Lý|Phan Bội Châu|Lý Thường Kiệt|Ký Con)(?!\p{L})/u;
 for (const e of src) {
   if (typeof e.X !== 'number' || typeof e.Z !== 'number') continue;
   const v = (e.vegetation || '').toLowerCase(), area = e.area || '';
@@ -99,7 +100,9 @@ for (const e of src) {
   // tán thưa (KHÔNG tính "cành khô chất ven đường" — chỉ cụm nói về TÁN/LÁ của cây đứng)
   const thin = has(v, /tán thưa|thưa lá|lá thưa|tán mỏng|trụi lá|tán không đều|lá khô|trơ cành|lưa thưa|xơ xác/) ? 1 : 0;
   // --- W3-G: VÒM CÂY: hàng cây tán lớn rợp / che kín phố (không tính khi pano nói cây thưa/cắt trụi hàng loạt) ---
-  let tunnel = density === 3 && has(v, /rợp|vòm|tán giao|che kín|phủ kín|che phủ|che rợp|che phố|tán dày|bóng dày|bóng râm dày|che bóng gần kín|tán rậm/) ? 1 : 0;
+  // (review W3-G: không tính "cây xanh lớn RẢI RÁC, tán rợp" — pano_130 Phan Bội Châu thật thưa, vòm cây làm tán quá dày;
+  // KHÔNG chặn "vài cây"/"một cây": 551 "…rợp bóng hai bên, vài cây cọ trong sân", 123 "một cây bị cắt cụt ngọn" vẫn là vòm)
+  let tunnel = density === 3 && has(v, /rợp|vòm|tán giao|che kín|phủ kín|che phủ|che rợp|che phố|tán dày|bóng dày|bóng râm dày|che bóng gần kín|tán rậm/) && !has(v, /rải rác|lác đác|lưa thưa/) ? 1 : 0;
   if (!tunnel && density >= 2 && TUNNEL_STREETS.test(area) && has(v, /hàng cây|cây (bóng mát|xanh|thân gỗ) (lớn|tán)|tán (lớn|rộng)/) && !has(v, /rải rác|vài cây|một cây/)) tunnel = 1;
   if (polS >= 7 || thin) tunnel = 0;
   // --- W3-G: cây cảnh cắt tỉa tròn / cây thế trên ĐẢO GIAO THÔNG / dải phân cách (pano_304 nút HVT, 349, 440, 312…) ---
@@ -111,7 +114,10 @@ for (const e of src) {
   // "chỉ cau/cọ" = câu ĐẦU nói cau/cọ (đối tượng chính của khung), không loài gỗ nào được nêu — pano_074 "nhiều cây cọ/cau vua
   // cao dọc đầu cầu, …"; KHÔNG pano_225 "hàng cây tán rộng (…) và cọ/cau vua cao dọc dải phân cách"
   const first = v.split(/[;.,]/)[0];
-  const palm = has(v, PALM_RX) ? (w[5] >= 7 && has(first, PALM_RX) && !has(first, /hàng cây|cây (bóng mát|xanh|lớn|tán)|tán rộng/) && !w[0] && !w[1] && !w[2] && !w[3] && !w[4] ? 2 : 0) : treeTalk && density > 0 ? 1 : 0;
+  // (review W3-G: cây bóng mát nêu ở BẤT KỲ vế nào → không "chỉ cau" — 062/183/217/218/220/320/322/547/549 có "…, cây bóng
+  // mát/tán rộng" sau vế cau; từng ra 100% cau trên cả tuyến, Hồ Sen 320 thành đại lộ cau)
+  const palm = has(v, PALM_RX) ? (w[5] >= 7 && has(first, PALM_RX) && !has(first, /hàng cây|cây (bóng mát|xanh|lớn|tán)|tán rộng/)
+    && !has(v, /cây bóng mát|cây tán rộng|tán rộng|cây (xanh|thân gỗ) lớn|hàng cây (bóng|tán|lớn)/) && !w[0] && !w[1] && !w[2] && !w[3] && !w[4] ? 2 : 0) : treeTalk && density > 0 ? 1 : 0;
   const lean = has(v, /nghiêng/) ? 1 : 0;
   out.push([Math.round(e.X * 10), Math.round(e.Z * 10), ...w, pollard, young, density, wash, generic, thin, polS, polP, tunnel, topiary, palm, lean]);
   cnt.n++; if (density === 0) cnt.none++; if (density === 1) cnt.sparse++; if (density === 3) cnt.dense++;
