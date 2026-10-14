@@ -517,7 +517,7 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     bên này là công viên/quảng trường/nước (`parkBehind` sau mặt tiền) → bỏ cột, TRỪ pano "búi dây dày" (e[4]=2). "Công viên"
     PHẢI kèm trống: claim tròn thô (hành lang Quán Hoa 55 m, chợ Cột Đèn 28 m) phủ cả dãy nhà → chỉ dùng parkBehind thì 7 pano
     dây dày dọc Hoàng Văn Thụ/Quán Hoa mất sạch dây. (363: tuyến dọc vỉa vườn hoa ĐBP Tây → dãy nhà phía nam như ảnh h270.)
-    Cột sát camera pano (< 3,6 m) DỊCH dọc ±2/±4 m thay vì bỏ, và 1 mốc không đặt được (nút giao + camera) thì nhịp trước
+    Cột sát camera pano (< 3,6 m) DỊCH dọc ±2/±4 m (chỗ dịch phải ≥ 6 m mọi camera) thay vì bỏ, và 1 mốc không đặt được (nút giao + camera) thì nhịp trước
     VẮT QUA tới cột kế (≤ 60 m) — bỏ cột = mất CẢ 2 nhịp đúng chỗ camera (092 Hạ Lý: khoảng 23-29 m rơi vào nút giao, hở 53 m
     không dây). Nhịp dây chỉ cấm qua lòng ĐẠI LỘ khác (`roadIdx.wideAt` nửa lòng ≥ 6 m — p; W3-A: way ≥ 12 m) ở ¼ ½ ¾ nhịp +
     khoảng mở (openReal) ở GIỮA nhịp — ngưỡng 4 m (mọi phố t/s) + openReal 3 điểm từng xoá lưới dây THẬT qua nút phố cũ
