@@ -547,7 +547,10 @@ export function placeStreetLife(P) {
         // phố chợ dày: ô thứ 2 chồng mép (rừng ô) trên dải lòng đường
         if (lv === 3 && hash3(x, z, 310) < 0.35) {
           const [x2, z2] = P2(hw - 0.45, dt + 1.95);
-          if (okAt(S, x2, z2, UMB_R * sc, true) && !obst.hit(x2, z2, 0.9)) { overI.push({ x: x2, z: z2, heading: hash3(x2, z2, 306) * 6.28, v: 0, col: pick(UMB, hash3(x2, z2, 308)), sc: [sc, 1.05, sc], road: 1 }); obst.add(x2, z2, 0.05); st.umbrellas++; }
+          if (okAt(S, x2, z2, UMB_R * sc, true) && !obst.hit(x2, z2, 0.9)) {
+            overI.push({ x: x2, z: z2, heading: hash3(x2, z2, 306) * 6.28, v: 0, col: pick(UMB, hash3(x2, z2, 308)), sc: [sc, 1.05, sc], road: 1 }); obst.add(x2, z2, 0.05); st.umbrellas++;
+            stallsRoad.push({ x: x2, z: z2, heading: Math.atan2(S.ux, S.uz), len: 0.8, hw: 0.3, kind: 'umb' });   // cán ô trên dải lòng đường: xe lách (phản biện r2)
+          }
         }
         return true;
       };
@@ -607,11 +610,17 @@ export function placeStreetLife(P) {
           // mức 3 thêm khách thứ 2 lệch dọc phố
           if (hash3(x, z, 323) < (lv === 3 ? 0.6 : lv === 2 ? 0.3 : 0.15)) {
             const [cx, cz] = P2(Math.max(hw - (lv === 3 ? 0.5 : -0.25), latG - 0.85), -0.3);
-            if (okAt(S, cx, cz, 0.3, lv === 3) && !obst.hit(cx, cz, 0.3)) { P.lists.standI.push({ x: cx, z: cz, heading: H + Math.PI + (hash3(cx, cz, 324) - 0.5) * 1.2, mk: 1 }); obst.add(cx, cz, 0.25); st.customers++; }
+            if (okAt(S, cx, cz, 0.3, lv === 3) && !obst.hit(cx, cz, 0.3)) {
+              P.lists.standI.push({ x: cx, z: cz, heading: H + Math.PI + (hash3(cx, cz, 324) - 0.5) * 1.2, mk: 1 }); obst.add(cx, cz, 0.25); st.customers++;
+              if (lv === 3 && hw - 0.5 > latG - 0.85) stallsRoad.push({ x: cx, z: cz, heading: Math.atan2(S.ux, S.uz), len: 0.6, hw: 0.3, kind: 'ped' });   // khách đứng trên dải lòng đường
+            }
           }
           if (lv === 3 && hash3(x, z, 334) < 0.35) {
             const [cx, cz] = P2(Math.max(hw - 0.3, latG - 1.0), 1.0);
-            if (okAt(S, cx, cz, 0.3, true) && !obst.hit(cx, cz, 0.35)) { P.lists.standI.push({ x: cx, z: cz, heading: H + Math.PI + (hash3(cx, cz, 335) - 0.5) * 2.0, mk: 1 }); obst.add(cx, cz, 0.25); st.customers++; }
+            if (okAt(S, cx, cz, 0.3, true) && !obst.hit(cx, cz, 0.35)) {
+              P.lists.standI.push({ x: cx, z: cz, heading: H + Math.PI + (hash3(cx, cz, 335) - 0.5) * 2.0, mk: 1 }); obst.add(cx, cz, 0.25); st.customers++;
+              if (hw - 0.3 > latG - 1.0) stallsRoad.push({ x: cx, z: cz, heading: Math.atan2(S.ux, S.uz), len: 0.6, hw: 0.3, kind: 'ped' });
+            }
           }
         }
       }

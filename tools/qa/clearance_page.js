@@ -359,7 +359,8 @@
     const carG = new Map();
     // W3-E: + world.props.stalls (xe ba gác/hàng chợ đỗ dải sát bó vỉa — giao thông lách như xe đỗ); bán kính theo chiều dài
     //   xe (xe khách 11,4 m: collider ±4 m khỏi tâm — bản cũ 3,5 m cố định đếm nhầm là "vật trên lòng đường")
-    for (const pc of [...((world.props && world.props.parkedCars) || []), ...((world.props && world.props.stalls) || [])]) { const k = Math.floor(pc.x / 8) * 100003 + Math.floor(pc.z / 8); let a = carG.get(k); if (!a) carG.set(k, (a = [])); a.push(pc); }
+    // (cán ô/khách đứng trên dải lòng đường — kind umb/ped, phản biện r2 — chỉ để giao thông lách, không che collider khỏi kiểm tra)
+    for (const pc of [...((world.props && world.props.parkedCars) || []), ...((world.props && world.props.stalls) || []).filter((s) => s.kind !== 'umb' && s.kind !== 'ped')]) { const k = Math.floor(pc.x / 8) * 100003 + Math.floor(pc.z / 8); let a = carG.get(k); if (!a) carG.set(k, (a = [])); a.push(pc); }
     const nearCar = (x, z) => { const ci = Math.floor(x / 8), cj = Math.floor(z / 8); for (let i = ci - 1; i <= ci + 1; i++) for (let j = cj - 1; j <= cj + 1; j++) { const a = carG.get(i * 100003 + j); if (!a) continue; for (const pc of a) {
       // xe dài (xe khách 11,4 m): HỘP định hướng của xe (+1 m dọc, +0,6 m ngang) — vòng tròn len/2+1 = 6,7 m từng che mọi collider
       // nhỏ quanh xe khách khỏi kiểm tra (phản biện W3-E); xe con/hàng chợ giữ vòng 3,5 m như dot3 (A/B so được)

@@ -1341,10 +1341,13 @@ export function buildProps(ctx) {
   const carSides = [];
   for (const list of byRoad.values()) for (let i = 0; i < list.length; i++) {
     const S = list[i], nx2 = list[i + 1];
-    carSides.push([S, i > 0 && list[i - 1].si === S.si - 1, nx2 && nx2.si === S.si + 1 && S.ux * nx2.ux + S.uz * nx2.uz > 0.978]);
+    const pv = i > 0 && list[i - 1].si === S.si - 1 ? list[i - 1] : null;
+    const ang = (A, B) => Math.acos(Math.max(-1, Math.min(1, A.ux * B.ux + A.uz * B.uz)));
+    const nn = nx2 && nx2.si === S.si + 1 ? nx2 : null;
+    carSides.push([S, !!pv, !!nn && S.ux * nn.ux + S.uz * nn.uz > 0.978, pv ? ang(pv, S) : 0, nn ? ang(S, nn) : 0]);
   }
   let carry = 0;
-  for (const [S, cont, straightNext] of carSides) {
+  for (const [S, cont, straightNext, bend, bendNext] of carSides) {
     // mức 0 CÓ pano (ảnh không thấy ô tô đỗ): 0,1 từng cho 68% pano "không ô tô" vẫn có xe ≤ 30 m (đo khớp bằng
     // chứng) → 0,04; mức 0 do KHÔNG có pano (ngoại vi > 900 m): s/t 0,1 → 0,2 (W3-E, FP-5 "nâng nền s/t không bằng chứng").
     // Phố r (W3-E): pano "ô tô đỗ ven đường" 0,1 → 0,4, "đỗ kín hai bên" 0,3 → 0,75 (pano_501/506/496/547/432: phố biệt
@@ -1359,7 +1362,9 @@ export function buildProps(ctx) {
     const roll = S.c === 'r';
     const X = XS(S);
     const lat = roll ? X.curb - 0.05 : X.curb - 0.95;
-    let s = cont ? Math.max(0.3, carry) : 2 + hash3(S.ax, S.az + S.side, 101) * 6;
+    // khúc cua > 12° (phản biện r2: sedan + van chồng thân ở góc trong khúc cua 76° phố r, −439,885): xe đầu đoạn mới lùi
+    // khỏi khớp |lat|·tan(θ/2) + 1 m (phía trong khúc cua 2 đoạn chụm lại)
+    let s = cont ? Math.max(bend > 0.21 ? 1 + Math.abs(lat) * Math.tan(Math.min(bend, 1.4) / 2) : 0.3, carry) : 2 + hash3(S.ax, S.az + S.side, 101) * 6;
     while (s < S.L - 0.5) {
       const x0 = S.ax + S.ux * s, z0 = S.az + S.uz * s;
       const hc = hash3(x0, z0, 102);
@@ -1373,7 +1378,7 @@ export function buildProps(ctx) {
       if (hc >= fillAt(x0, z0)) { s += len + 2 + hash3(x0, z0, 104) * 9; continue; }
       const sc = s + len / 2;
       // xe phải nằm trọn trong đoạn (đầu xe chừa 1 m), trừ khi đoạn kế THẲNG hàng (< 12°): được chồm qua khớp tới 0,3 m cuối
-      if (sc > S.L - (straightNext ? 0.3 : len / 2 + 1)) break;
+      if (sc > S.L - (straightNext ? 0.3 : len / 2 + 1 + (bendNext > 0.21 ? Math.abs(lat) * Math.tan(Math.min(bendNext, 1.4) / 2) : 0))) break;
       // xe khách rộng 2,5 m (nửa 1,26): tâm lùi curbLine − 1,35 (ở −0,95 thân chồm 0,31 m lên bó vỉa — phản biện W3-E, 441)
       const latV = mi === 6 ? X.curb - 1.35 : lat;
       const x = S.ax + S.ux * sc + S.nx * latV, z = S.az + S.uz * sc + S.nz * latV;
