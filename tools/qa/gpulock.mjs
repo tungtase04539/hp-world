@@ -8,10 +8,13 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { spawnSync } from 'child_process';
+import { spawn } from 'child_process';
 
 const LOCK = path.join(os.tmpdir(), 'hpworld_gpu.lock');
-const STALE_MS = 20 * 60 * 1000;     // khoá bỏ quên (tiến trình chết) quá 20 phút thì cướp
+const STALE_MS = 20 * 60 * 1000;     // khoá không có nhịp tim quá 20 phút (chủ treo/chết) thì cướp
+const BEAT_MS = 60 * 1000;           // chủ khoá chạm mtime thư mục khoá mỗi phút (nhịp tim)
+// BÀI HỌC 2026-10-14: bản cũ cướp theo TUỔI khoá (> 20 phút) kể cả khi chủ còn sống → lượt chụp 480 ảnh (~60 phút) bị
+// cướp giữa chừng → 2 Chrome GPU song song (đúng kịch bản BSOD). Nay: chủ còn sống + còn nhịp tim thì KHÔNG bao giờ cướp.
 
 const pidOf = (dir) => { try { return +((fs.readFileSync(path.join(dir, 'owner.txt'), 'utf8').match(/pid=(\d+)/) || [])[1] || 0); } catch { return 0; } };
 const alive = (pid) => { if (!pid) return false; try { process.kill(pid, 0); return true; } catch (err) { return err.code === 'EPERM'; } };
@@ -24,7 +27,9 @@ async function acquireDir(dir, who, timeoutMs) {
       fs.mkdirSync(dir);
       fs.writeFileSync(path.join(dir, 'owner.txt'), `${who} pid=${process.pid} at=${new Date().toISOString()}`);
       let released = false;
-      const release = () => { if (released) return; released = true; try { fs.rmSync(dir, { recursive: true, force: true }); } catch {} };
+      const beat = setInterval(() => { try { const t = new Date(); fs.utimesSync(dir, t, t); } catch {} }, BEAT_MS);
+      beat.unref();
+      const release = () => { if (released) return; released = true; clearInterval(beat); try { fs.rmSync(dir, { recursive: true, force: true }); } catch {} };
       process.on('exit', release);
       for (const s of ['SIGINT', 'SIGTERM']) process.on(s, () => { release(); process.exit(130); });
       return release;
@@ -34,14 +39,34 @@ async function acquireDir(dir, who, timeoutMs) {
       // chủ khoá đã chết (bị kill cứng / harness hết giờ) → cướp NGAY, không đợi 20 phút
       const pid = pidOf(dir);
       if (pid && !alive(pid)) { try { fs.rmSync(dir, { recursive: true, force: true }); } catch {} continue; }
-      try { const st = fs.statSync(dir); if (Date.now() - st.mtimeMs > STALE_MS) { fs.rmSync(dir, { recursive: true, force: true }); continue; } } catch {}
+      // chủ CÒN SỐNG: chỉ cướp khi mất nhịp tim quá 3 giờ (treo thật); bản cũ không có nhịp tim vẫn được giữ trọn lượt chụp dài.
+      // Không đọc được pid (owner.txt hỏng) → cướp sau 20 phút như cũ.
+      try { const st = fs.statSync(dir); const lim = pid && alive(pid) ? 3 * 60 * 60 * 1000 : STALE_MS; if (Date.now() - st.mtimeMs > lim) { fs.rmSync(dir, { recursive: true, force: true }); continue; } } catch {}
       if (Date.now() - t0 > timeoutMs) throw new Error('gpulock: hết thời gian chờ khoá GPU');
       await new Promise((r) => setTimeout(r, 3000 + Math.random() * 2000));
     }
   }
 }
 
-export async function acquireGpu(who = 'unknown', timeoutMs = 60 * 60 * 1000) {
+// MÁY CHỦ GAME ĐANG PHỤC VỤ NGƯỜI CHƠI (chủ dự án 14/10/2026: "đảm bảo an toàn 100% cho máy tôi"): script
+// server/ops/mo-may-chu.ps1 ghi tệp đánh dấu này và chạm mtime mỗi phút; khi nó còn tươi (< 10 phút) MỌI việc GPU (chụp,
+// đo perf, Chrome 3D) phải CHỜ — màn xanh giữa buổi chơi thử = sập máy chủ. tat-may-chu.ps1 xoá tệp. Bỏ qua (chỉ khi chủ
+// dự án đồng ý): HPWORLD_ALLOW_GPU_WHILE_LIVE=1. Chạy thử server trong lúc phát triển KHÔNG ghi tệp này (chế độ test).
+export const SERVER_LIVE = path.join(os.tmpdir(), 'hpworld_server_live.txt');
+const LIVE_FRESH_MS = 10 * 60 * 1000;
+const serverLive = () => { try { return Date.now() - fs.statSync(SERVER_LIVE).mtimeMs < LIVE_FRESH_MS; } catch { return false; } };
+async function waitServerIdle(who, timeoutMs) {
+  if (process.env.HPWORLD_ALLOW_GPU_WHILE_LIVE === '1' || !serverLive()) return;
+  console.error(`gpulock: máy chủ game đang chạy (${SERVER_LIVE}) — ${who} chờ tới khi tắt máy chủ`);
+  const t0 = Date.now();
+  while (serverLive()) {
+    if (Date.now() - t0 > timeoutMs) throw new Error('gpulock: máy chủ game vẫn chạy — không mở GPU');
+    await new Promise((r) => setTimeout(r, 15000));
+  }
+}
+
+export async function acquireGpu(who = 'unknown', timeoutMs = 3 * 60 * 60 * 1000) {
+  await waitServerIdle(who, timeoutMs);
   // TÁI NHẬP CÓ KIỂM: `gpulock.mjs run -- …` đặt HPWORLD_GPU_LOCK=<pid chủ khoá> cho tiến trình con (xin lại khoá
   // thường sẽ chờ chính tiến trình cha). Chỉ tái nhập khi owner.txt đúng pid đó VÀ còn sống — env cũ/sai thì xin khoá
   // thường. Tái nhập vẫn phải lấy KHOÁ CON `<LOCK>/child`: 2 hậu duệ chạy SONG SONG (`run -- bash -c "a & b"`) không
@@ -57,7 +82,9 @@ if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(new URL(im
   if (process.argv[2] !== 'run' || i < 0) { console.error('usage: node tools/qa/gpulock.mjs run -- <cmd> [args]'); process.exit(2); }
   const [cmd, ...args] = process.argv.slice(i + 1);
   const rel = await acquireGpu(`cli ${cmd} ${args.join(' ').slice(0, 80)}`);
-  const r = spawnSync(cmd, args, { stdio: 'inherit', shell: process.platform === 'win32', env: { ...process.env, HPWORLD_GPU_LOCK: String(process.pid) } });
+  // spawn BẤT ĐỒNG BỘ (không spawnSync): vòng sự kiện phải chạy để nhịp tim giữ khoá trong lúc lệnh con chạy lâu
+  const child = spawn(cmd, args, { stdio: 'inherit', shell: process.platform === 'win32', env: { ...process.env, HPWORLD_GPU_LOCK: String(process.pid) } });
+  const code = await new Promise((res) => { child.on('exit', (c) => res(c ?? 1)); child.on('error', () => res(1)); });
   rel();
-  process.exit(r.status ?? 1);
+  process.exit(code);
 }
