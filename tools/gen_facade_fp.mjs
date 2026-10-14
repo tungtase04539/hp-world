@@ -34,12 +34,13 @@ const hexInt = (h) => (typeof h === 'string' && /^#?[0-9a-f]{6}$/i.test(h.trim()
 const enumIdx = (list, v) => { const i = list.indexOf(typeof v === 'string' ? v.trim().toLowerCase() : v); return i; };
 
 // ---------------- GỘP fp_json → audit/facade_fp.json ----------------
-export function collectFP(dir, planFile) {
+// opts.notes (W5-A herokit): trả thêm out.notes[i] = ghi chú tự do của obs[i] (KHÔNG ghi vào facade_fp.json — chỉ tools/gen_herokit.mjs dùng)
+export function collectFP(dir, planFile, opts = {}) {
   const plan = JSON.parse(fs.readFileSync(planFile, 'utf8'));
   const panoIdx = new Map(); const panos = [];
   for (const p of plan) { panoIdx.set(p.id, panos.length); panos.push([p.id, +p.X.toFixed(2), +p.Z.toFixed(2)]); }
   const files = fs.readdirSync(dir).filter((f) => /^pano_\d+_h\d+\.json$/.test(f)).sort();
-  const obs = []; const st = { files: files.length, bad: 0, empty: 0, obs: 0, fixedEnum: 0, droppedObs: 0 };
+  const obs = []; const notes = opts.notes ? [] : null; const st = { files: files.length, bad: 0, empty: 0, obs: 0, fixedEnum: 0, droppedObs: 0 };
   for (const f of files) {
     let j; try { j = JSON.parse(fs.readFileSync(dir + '/' + f, 'utf8')); } catch { st.bad++; continue; }
     const m = f.match(/^(pano_\d+)_h(\d+)\.json$/);
@@ -84,10 +85,11 @@ export function collectFP(dir, planFile) {
         && !b.notes.includes('+') && /biển[^,;+]*trên (mái|nóc)/i.test(b.notes)) { row[C.size] = FP_ENUMS.size.indexOf('roof'); st.roofFromNotes = (st.roofFromNotes || 0) + 1; }
       const sp = Math.round(+sg.floorSpan); row[C.span] = sp >= 0 && sp <= 9 ? sp : -1;
       obs.push(row); st.obs++;
+      if (notes) notes.push(typeof b.notes === 'string' ? b.notes : '');
     }
   }
   return { v: 1, note: 'W4-A: quan sát mặt tiền từng nhà trong ảnh pano thật (tools/gen_facade_fp.mjs --collect). obs[i] theo cols; −1 = không rõ; màu = số nguyên 0xRRGGBB (sRGB).',
-    halfFov: HALF_FOV, enums: FP_ENUMS, cols: FP_COLS, panos, obs, stats: st };
+    halfFov: HALF_FOV, enums: FP_ENUMS, cols: FP_COLS, panos, obs, stats: st, ...(notes ? { notes } : {}) };
 }
 
 export function loadFacadeFP(file = new URL('../audit/facade_fp.json', import.meta.url)) {

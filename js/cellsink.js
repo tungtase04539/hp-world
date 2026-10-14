@@ -20,6 +20,7 @@ import { claimBox } from './claims.js';
 import { BRAND_MAP, debrand } from './brands.js';
 import { PARKS } from './mapdata.js';
 import { LM_POLY } from './landmark_polys.js';
+import { heroOfPoly, heroProg } from './herokit.js';   // Đợt 3 W5-A HERO-KIT
 import { guardCellPalette, cellCanvasFx, gridFacadeSpec, paintGridFacade } from './cellfacade.js';   // Đợt 3 W3-C: palette guard nhà ô giữ lại
 import { clearanceReady, samplesFromHulls, evalShift, solveShift, sweepAssemblies, flushClearance, massOnStreet, minWidth, thinMeshOf, trimThinWall, corrCount, nearAnyRoad, nearestPano, CLEAR } from './clearance.js';   // Đợt 3 W2-A
 
@@ -534,6 +535,19 @@ function commitSink(sink, THREE, realScene, realFC, colliders, opts) {
     for (const k of it.keys) if (inPark(KX(k) + 0.5, KZ(k) + 0.5)) inP++;
     if (inP >= PR.PARK_FRAC * it.keys.length) { it.removed = 'park'; it.parkFrac = +(inP / it.keys.length).toFixed(2); }
   }
+  // 3c) Đợt 3 W5-A HERO-KIT: công trình DANH TÍNH dựng tay (hộp texture canvas — chấm cặp wave 4: "flat/generic/blurry box" ở
+  //     ngân hàng 157/354, văn phòng 510/235, trường 060/051, khách sạn 230…) đè lên nhà THẬT mà ẢNH PANO xác nhận là công trình
+  //     đặc trưng (js/herokit_data.js) → GỠ nhà ô; nhà thật + js/herokit.js dựng thay (khối đúng footprint, mặt tiền atlas sắc,
+  //     hàng cột/mái che/rào cổng/mái chùa 3D). Chỉ khi 1 nhà ô ≈ 1 nhà thật (diện tích khối đặc 0,25-2,5× footprint + 60 m²) —
+  //     không gỡ khuôn viên lớn nhiều khối vì 1 khối có chương trình; không gỡ 'bespoke' (dựng đúng ảnh), không gỡ nhà thường.
+  let nHero = 0;
+  for (const it of bl) {
+    if (it.removed || it.kind === 'house' || it.kind === 'bespoke' || !realB(it.realB) || it.frac < PR.OVERLAP) continue;
+    const { hi, area } = heroOfPoly(D, it.realB); if (!heroProg(hi)) continue;
+    const aCell = it.keys.length;
+    if (aCell > 2.5 * area + 60 || aCell < 0.25 * area) continue;
+    it.removed = 'hero'; it.heroB = it.realB; nHero++;
+  }
   // 4) trùng lặp giữa các nhà còn lại (ưu tiên: danh tính > nhà; khớp nhà thật hơn; chi tiết hơn; vẽ trước)
   const surv = bl.filter((it) => !it.removed);
   const cellOwner = new Map();
@@ -930,7 +944,7 @@ function commitSink(sink, THREE, realScene, realFC, colliders, opts) {
     // kinds = TỔNG nhà theo loại (kể cả bản trùng bị gỡ); keptKinds = chỉ nhà GIỮ LẠI (có claim)
     kinds: { civic: cnt((it) => it.bldg && it.kind === 'civic'), tower: cnt((it) => it.bldg && it.kind === 'tower'), heritage: cnt((it) => it.bldg && it.kind === 'heritage'), bespoke: cnt((it) => it.bldg && it.kind === 'bespoke'), house: cnt((it) => it.bldg && it.kind === 'house'),
       tree: cnt((it) => it.kind === 'tree'), open: cnt((it) => it.kind === 'open'), prop: cnt((it) => it.kind === 'prop'), sys: cnt((it) => it.kind === 'sys') },
-    removed: { total: nRem, overlap: cnt((it) => it.removed === 'overlap'), near: cnt((it) => it.removed === 'near'), park: cnt((it) => it.removed === 'park'), dup: cnt((it) => it.removed === 'dup'), attached: propsRemoved },
+    removed: { total: nRem, overlap: cnt((it) => it.removed === 'overlap'), near: cnt((it) => it.removed === 'near'), park: cnt((it) => it.removed === 'park'), dup: cnt((it) => it.removed === 'dup'), hero: nHero, attached: propsRemoved },
     keptBuildings: bl.filter((it) => !it.removed).length,
     keptKinds: bl.filter((it) => !it.removed).reduce((o, it) => { o[it.kind] = (o[it.kind] || 0) + 1; return o; }, {}),
     wings: bl.filter((it) => it.wingOf).map((it) => [it.name, it.wingOf, it.kind]),
@@ -949,7 +963,7 @@ function commitSink(sink, THREE, realScene, realFC, colliders, opts) {
     attached: items.filter((it) => it.removed === 'attached').map((it) => [it.name || it.o.type, it.host, +it.shape.y0.toFixed(1), it.shape.meshes.length]),
   };
   sink.release();
-  if (typeof console !== 'undefined') console.log(`[cellsink] ${MODE}: ${bl.length} nhà ô → giữ ${_report.keptBuildings}, gỡ ${nRem} (đè ${_report.removed.overlap}, gần ${_report.removed.near}, cỏ ${_report.removed.park}, trùng ${_report.removed.dup}, đồ treo ${propsRemoved}); collider −${deadCol.size}, FC −${deadFC.size}; claim ${nClaims}; khoảng trống: dời ${clr.moved.length}, gỡ ${clr.removed.length}, kẹt ${clr.stuck.length} (${clr.ms} ms); ${_report.ms} ms`);
+  if (typeof console !== 'undefined') console.log(`[cellsink] ${MODE}: ${bl.length} nhà ô → giữ ${_report.keptBuildings}, gỡ ${nRem} (đè ${_report.removed.overlap}, gần ${_report.removed.near}, cỏ ${_report.removed.park}, trùng ${_report.removed.dup}, hero ${nHero}, đồ treo ${propsRemoved}); collider −${deadCol.size}, FC −${deadFC.size}; claim ${nClaims}; khoảng trống: dời ${clr.moved.length}, gỡ ${clr.removed.length}, kẹt ${clr.stuck.length} (${clr.ms} ms); ${_report.ms} ms`);
   return _report;
 }
 const LAND_Y = 2;   // = LAND_H world.js (nền phố phẳng)
