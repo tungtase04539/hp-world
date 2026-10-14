@@ -621,7 +621,10 @@ export function buildFacadeAtlas(size = 2048, opts = {}) {
   });
   cell('G_HOME1', W4, GH, () => {      // nhà ở: cửa lùa sắt hé — thấy xe máy để trong nhà
     groundWall(0.3); threshold();
-    reveal(0.2, 0.14, 3.8, 2.85); interior(0.2, 0.14, 3.8, 2.85, -4);
+    // SỬA HỒI QUY W5 (097 h90: bộ trệt W5-B đổi chỉ số chọn → bay này thành G_HOME1, nội thất −4 = 'ô cửa ĐEN trống' ở 3 m):
+    // nội thất sáng như phòng có đèn tuýp (+26), tường trong sáng nửa trên, tủ/kệ mờ — vẫn tối hơn cửa hàng
+    reveal(0.2, 0.14, 3.8, 2.85); interior(0.2, 0.14, 3.8, 2.85, 26);
+    vgrad(0.2, 1.5, 2.75, 2.85, [100, 96, 88], [126, 120, 108], M_KEEP, 4); rect(0.35, 0.5, 1.2, 1.5, [84, 66, 50], M_KEEP); tubeLight(0.5, 2.5, 2.65);
     disc(1.6, 0.35, 0.22, [30, 30, 30], M_KEEP); disc(2.5, 0.35, 0.22, [30, 30, 30], M_KEEP);
     rect(1.55, 0.45, 2.6, 0.95, [150, 30, 30], M_KEEP); rect(1.9, 0.9, 2.3, 1.2, [40, 40, 40], M_KEEP);
     const col = [150, 156, 160];
@@ -1269,7 +1272,8 @@ export function buildFacadeAtlas(size = 2048, opts = {}) {
   cell('G_HOME2', W4, GH, () => {      // nhà ở MỞ CỬA (ban ngày phần lớn nhà ngõ/phố nhỏ mở): cửa xếp sắt dồn 2 bên, thấy phòng khách + xe máy
     groundWall(0.35); threshold();
     reveal(0.2, 0.14, 3.8, 2.85);
-    interior(0.2, 0.14, 3.8, 2.85, 10);
+    interior(0.2, 0.14, 3.8, 2.85, 30);   // SỬA HỒI QUY W5 (097 h90): 10 → 30 — phòng khách tối gần đen đọc ra "ô cửa đen trống" ở cự li 3 m
+    vgrad(0.2, 1.6, 3.8, 2.85, [96, 92, 84], [124, 118, 106], M_KEEP, 4);   // tường trong sơn sáng (nửa trên), đèn tuýp
     rect(0.2, 0.14, 3.8, 0.5, [150, 140, 126], M_KEEP); for (let x = 0.2; x < 3.8; x += 0.4) vline(x, 0.14, 0.5, 0.012, [118, 110, 98], M_KEEP);   // sàn gạch men
     rect(1.6, 0.5, 2.6, 1.6, [62, 48, 38], M_KEEP); rect(1.66, 1.45, 2.54, 1.52, [80, 62, 48], M_KEEP);   // tủ gỗ thấp cuối phòng (review: ban thờ đỏ khung vàng đọc ra "ô vuông đỏ" — bỏ)
     // xe máy dựng trong nhà: bánh + thân + yên + tay lái (trước: 2 hình tròn đen phẳng)

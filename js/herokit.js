@@ -384,6 +384,8 @@ function heroHotel(c, fr, add) {
   const [ax, az, bx, bz, nx, nz, L] = E;
   const ex = (bx - ax) / L, ez = (bz - az) / L, mx = (ax + bx) / 2, mz = (az + bz) / 2;
   const light = lighten(c.wcol, 0.3);
+  // SỬA HỒI QUY W5: khách sạn MINI (nhà ống < 250 m², citygen hlx) — mặt tiền giữ nhà ống theo vân tay; chỉ BIỂN DỌC
+  if (c.mini) { if (fl >= 2 && L >= 2.5) hotelBlade(c, E, ex, ez, nx, nz, L, add, true); return; }
   // gờ khối đế (đọc ra "podium + tháp"): mọi mặt phố, ở đỉnh tầng 2, nhô 0,6
   if (fl >= 5) for (const F of fr.slice(0, 3)) {
     const [fax, faz, fbx, fbz, fnx, fnz, fL] = F; if (fL < 4) continue;
@@ -399,8 +401,10 @@ function heroHotel(c, fr, add) {
       add(M, box(M, mx + nx * D / 2, mz + nz * D / 2, ex, ez, nx, nz, W / 2, D / 2, yC, yC + 0.4, light, s8, MOD.D_CORN, 1 | 4 | 8 | 16));
       add(M, qN(M, [mx - ex * W / 2, yC, mz - ez * W / 2, mx + ex * W / 2, yC, mz + ez * W / 2, mx + ex * W / 2 + nx * D, yC, mz + ez * W / 2 + nz * D, mx - ex * W / 2 + nx * D, yC, mz - ez * W / 2 + nz * D], 0, -1, 0, [0, 0, W / 4, 0, W / 4, D / 4, 0, D / 4], [232, 232, 228], s8, MOD.D_PLAIN));
     }
-    if (g >= 3.5) {   // trụ chỉ khi mép mái che vẫn trên phần sân trước (không cắm giữa vỉa hè)
-      const Dp = c.hotelCanopy ? Math.min(5.5, D) : D;
+    if (g >= 3.5 && !c.hotelCanopy) {   // W5-fix: mái sảnh W4-C (hotelCanopy) giữ CÔNG-XON như dot3 — khoảng lùi đo theo xsection không thấy quảng trường lát (230 h180 trụ giữa hè, cả khi kẹp g − 0,4). Trụ chỉ khi mép mái che vẫn trên phần sân trước (không cắm giữa vỉa hè)
+      // SỬA HỒI QUY W5 (230 h180: trụ vuông giữa vỉa hè tiền cảnh): mái sâu D = g + 2 ⇒ trụ ở D − 0,5 = g + 1,5 m — LẤN 1,5 m
+      // vào vỉa hè. Trụ đặt tối đa g − 0,4 (trên sân trước), mái che đua phần còn lại qua vỉa hè như thật.
+      const Dp = Math.min(c.hotelCanopy ? Math.min(5.5, D) : D, g + 0.1);
       for (const sg of [-1, 1]) {
         const cx = mx + ex * (W / 2 - 0.6) * sg + nx * (Dp - 0.5), cz = mz + ez * (W / 2 - 0.6) * sg + nz * (Dp - 0.5);
         add(M, column(M, cx, cz, 0.28, y0 - 0.1, y0 + 4.4, 8, STONE, s8, MOD.H_FLUTE));
@@ -408,7 +412,21 @@ function heroHotel(c, fr, add) {
     }
   }
   // khách sạn MINI (ống, < 4 tầng hoặc mặt hẹp): BIỂN DỌC "KHÁCH SẠN" (ô BLADE0 dải 0) vuông góc mặt tiền, tầng 1-3
-  if ((fl < 4 || L < 6) && fl >= 2 && L >= 2.5 && L <= 12) {
+  if ((fl < 4 || L < 6) && fl >= 2 && L >= 2.5 && L <= 12) hotelBlade(c, E, ex, ez, nx, nz, L, add, false);
+  // biển chữ KHÁCH SẠN trên đỉnh mặt phố (tấm đứng 1,4 m trên lan can mái) — tháp ≥ 6 tầng
+  if (fl >= 6 && L >= 6) {
+    const W = Math.min(10, L * 0.6), [p0x, p0z] = edgeP(E, (L - W) / 2), [p1x, p1z] = edgeP(E, (L + W) / 2), yb = y0 + H + 1.0, yt = yb + 1.4;
+    add(M, signFace(M, p0x - nx * 0.6, p0z - nz * 0.6, p1x - nx * 0.6, p1z - nz * 0.6, nx, nz, yb, yt, 1, s8, 150));
+    add(M, box(M, (p0x + p1x) / 2 - nx * 0.7, (p0z + p1z) / 2 - nz * 0.7, ex, ez, nx, nz, W / 2, 0.08, yb, yt, DARK, s8, MOD.D_SIGNF, 2 | 4 | 8 | 16));
+    for (const t of [0.2, 0.8]) { const [qx, qz] = edgeP(E, (L - W) / 2 + W * t); add(M, box(M, qx - nx * 0.7, qz - nz * 0.7, ex, ez, nx, nz, 0.06, 0.06, y0 + H, yb, DARK, s8, MOD.D_SIGNF, 1 | 4 | 8)); }
+  }
+  void DT;
+}
+// biển DỌC 'KHÁCH SẠN' (ô BLADE0 dải 0) vuông góc mặt tiền, tầng 1-3; dedup = khách sạn mini liền kề (313: 3 lô cùng quan sát) chỉ 1 biển / 20 m
+function hotelBlade(c, E, ex, ez, nx, nz, L, add, dedup) {
+  const { M, s8, y0, H, fl } = c;
+  {
+    if (dedup) { const [qx, qz] = edgeP(E, Math.min(L - 0.3, 0.6)); if (signNear(c, qx, qz, 'hotelblade', 20)) return; signReg(c, qx, qz, 'hotelblade'); }
     const sx = Math.min(L - 0.3, 0.6), [bx0, bz0] = edgeP(E, sx), yb = y0 + GROUND_H + 0.3, ytB = Math.min(y0 + H - 0.2, yb + Math.min(4.2, (fl - 1) * FLOOR_H));
     if (ytB - yb > 1.5) {
       const D0 = 0.12, D1 = 0.12 + Math.min(1.1, (ytB - yb) / 3.4), P = (o2, t2) => [bx0 + ex * t2 + nx * o2, bz0 + ez * t2 + nz * o2];
@@ -418,14 +436,6 @@ function heroHotel(c, fr, add) {
       add(M, qN(M, [ob, yb, obz, oa, yb, oz, oa, ytB, oz, ob, ytB, obz], nx, 0, nz, [0, 0, 0.05, 0, 0.05, 1, 0, 1], DARK, s8, MOD.D_SIGNF));
     }
   }
-  // biển chữ KHÁCH SẠN trên đỉnh mặt phố (tấm đứng 1,4 m trên lan can mái) — tháp ≥ 6 tầng
-  if (fl >= 6 && L >= 6) {
-    const W = Math.min(10, L * 0.6), [p0x, p0z] = edgeP(E, (L - W) / 2), [p1x, p1z] = edgeP(E, (L + W) / 2), yb = y0 + H + 1.0, yt = yb + 1.4;
-    add(M, signFace(M, p0x - nx * 0.6, p0z - nz * 0.6, p1x - nx * 0.6, p1z - nz * 0.6, nx, nz, yb, yt, 1, s8, 150));
-    add(M, box(M, (p0x + p1x) / 2 - nx * 0.7, (p0z + p1z) / 2 - nz * 0.7, ex, ez, nx, nz, W / 2, 0.08, yb, yt, DARK, s8, MOD.D_SIGNF, 2 | 4 | 8 | 16));
-    for (const t of [0.2, 0.8]) { const [qx, qz] = edgeP(E, (L - W) / 2 + W * t); add(M, box(M, qx - nx * 0.7, qz - nz * 0.7, ex, ez, nx, nz, 0.06, 0.06, y0 + H, yb, DARK, s8, MOD.D_SIGNF, 1 | 4 | 8)); }
-  }
-  void DT;
 }
 
 // ---------- SIÊU THỊ / SHOWROOM / CỬA HÀNG THỜI TRANG: tấm ỐP biển lớn phủ tầng trên + dải chữ, trệt kính (bộ FG) ----------
@@ -441,13 +451,18 @@ function heroStore(c, fr, add) {
   const yb = y0 + GROUND_H + 0.05, yt = y0 + Math.min(H + 0.6, GROUND_H + (c.cladDark ? 1.95 : FLOOR_H + 0.4));
   if (yt - yb < 1.2) return;
   const W = Math.min(L - 0.3, 24);
+  // SỬA HỒI QUY W5 (088 h0 / 166 h90-h180): ốp TỐI không chữ = "tấm đen trống" (đọc ra thiếu texture) → ốp tối CHỈ làm nền cho
+  // chữ ngành; chữ ngành chỉ trên nhà ≥ 3 tầng (166 h0: nhà 2 tầng → tấm chữ nằm trên mép mái = "biển quảng cáo trên nóc")
+  const kind0 = c.flags & HF.ELEC ? 1 : c.flags & HF.FASHION ? 2 : c.flags & HF.PHONE ? 3 : 0;
+  const lettered = kind0 && fl >= 3 && !signNear(c, mx, mz, 'store' + kind0, 40);
+  if (!lettered && c.cladDark) return;
   add(M, box(M, mx + nx * P / 2, mz + nz * P / 2, ex, ez, nx, nz, W / 2, P / 2, yb, yt, clad, s8, MOD.D_PLAIN, 63 ^ 2));
   // dải chữ lớn (nền = màu biển THẬT qua aFp khi có — chế độ 2) — chữ CHUNG theo NGÀNH ảnh tả: điện máy → H_SIGN 'SIÊU THỊ ĐIỆN
   // MÁY'; thời trang → PANEL 'THỜI TRANG NỮ / HÀNG MỚI VỀ'; điện thoại → PANEL 'ĐIỆN THOẠI - LAPTOP'; còn lại (showroom ô tô,
   // nội thất…) chỉ tấm ốp trơn (r3: 'SIÊU THỊ ĐIỆN MÁY' trên shop thời trang 377/161 là sai). PANEL CẮT bỏ dòng số điện thoại
   // (v từ 0,54 m của dải 2 m) và mỗi loại chữ ≤ 1 lần / 40 m (phản biện: cùng tấm cùng số ĐT lặp trên 3 nhà liền)
-  const kind = c.flags & HF.ELEC ? 1 : c.flags & HF.FASHION ? 2 : c.flags & HF.PHONE ? 3 : 0;
-  if (kind && !signNear(c, mx, mz, 'store' + kind, 40)) {
+  const kind = kind0;
+  if (lettered) {
     signReg(c, mx, mz, 'store' + kind);
     const sH = Math.min(kind === 1 ? 1.6 : 1.9, (yt - yb) * (kind === 1 ? 0.45 : 0.62)), sW = Math.min(W - 0.6, kind === 1 ? 12 : sH * 2.77), [p0x, p0z] = edgeP(E, (L - sW) / 2), [p1x, p1z] = edgeP(E, (L + sW) / 2);
     const q0x = p0x + nx * (P + 0.02), q0z = p0z + nz * (P + 0.02), q1x = p1x + nx * (P + 0.02), q1z = p1z + nz * (P + 0.02), y1 = yb + Math.max(0.15, (yt - yb - sH) / 2);
