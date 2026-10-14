@@ -53,8 +53,11 @@ export const LIGHT = {
   fogNearView: 1.6,          // nấc chất lượng 3 (ẩn ô > 1450 m): 1300 m ≈ 91%
   // Phơi sáng: thích nghi mắt theo độ rọi ngang so với trưa, gain = (trưa/hiện tại)^0,5, TRẦN ×4 (bản đầu ×10 làm
   // chạng vạng/đêm sáng như ngày âm u dưới bầu trời tối — sai thứ tự sáng: trời phải sáng hơn phố lúc chạng vạng).
-  exposure: 0.92, maxGain: 4.0,
-  aerialExposure: 0.82,      // ảnh VỆ TINH: máy ảnh vệ tinh phơi sáng thấp hơn mắt người (Google Earth tối & tương phản hơn)
+  // W4-C: 0,92 → 1,0 — đo 132 cặp ảnh REAL|game (33 pano × 4 hướng, sRGB, bỏ bản đồ nhỏ): độ sáng TB thật 120 vs game 95,
+  // mặt đất (1/3 dưới) 118 vs 83, p95 214 vs 190, p5 bằng nhau (36) → nâng phơi sáng (đường ACES nén vùng sáng, tối giữ).
+  // Vệ tinh giữ NGUYÊN mức cũ: aerialExposure 0,82 → 0,754 (0,92·0,82/1,0).
+  exposure: 1.0, maxGain: 4.0,
+  aerialExposure: 0.754,     // ảnh VỆ TINH: máy ảnh vệ tinh phơi sáng thấp hơn mắt người (Google Earth tối & tương phản hơn)
   // Thang của mô hình trời (skymodel.js) → 3 nơi dùng:
   //  - vòm HIỂN THỊ: BAN NGÀY ×1,2 và bão hoà 45% — trời HP thật MÙ ẨM, xanh nhạt gần trắng: đo 160 ảnh pano ngẫu
   //    nhiên, vùng trời ở độ cao ~30-40° có trung vị sRGB(186,198,211) (p25 174,187,201 / p75 201,209,221); bản đầu

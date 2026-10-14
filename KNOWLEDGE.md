@@ -32,7 +32,7 @@ Trò chơi: thế giới 3D Hải Phòng **tỉ lệ 1:1 mét thật** (từ 202
 | `js/boot.js` | Màn chờ: thanh dựng thế giới theo bước (trọng số = lần khởi động trước, localStorage `hp3d.bootProfile.v1`), nút Bắt đầu khoá tới khi sẵn sàng |
 | `js/world.js` | Dựng toàn bộ thế giới 3D, collider, spawn, `buildWorld(scene)` |
 | `js/citygen.js` | ĐỢT 3: dựng PHỐ NHÀ THẬT từ footprint RB01 (`buildings_real.js`) — 1 quad/cạnh tường + shader atlas, mái/tum/bồn/tôn, ban công/mái hiên/hộp biển/điều hoà 3D (ô gần), va chạm đa giác (`fabricCollide/At/Hit`), `fabricData()` dùng chung (world.js đặt `world.rbData`/`world.rbGrid` cho cây/props/camera). Cờ `FABRIC` (world.js, `?fabric=proc` = phố giả cũ) |
-| `js/facade_atlas.js` (+ `facade_atlas_worker.js`) | Atlas mặt tiền/mái/chi tiết/biển hiệu VN vẽ thủ tục bằng rasterizer phần mềm (8 cột × 12 hàng ô từ W3-C — 2048×3072 / LITE 1024×1536, alpha = mặt nạ), vẽ trong Worker |
+| `js/facade_atlas.js` (+ `facade_atlas_worker.js`) | Atlas mặt tiền/mái/chi tiết/biển hiệu VN vẽ thủ tục bằng rasterizer phần mềm (8 cột × 14 hàng ô từ W4-C — 2048×3584 / LITE 1024×1792, alpha = mặt nạ; 105/112 ô), vẽ trong Worker |
 | `js/facade_evidence.js` | SINH bởi `tools/gen_facade_evidence.mjs` từ `audit/audit_enriched.json`: cờ từ vựng mặt tiền từng quan sát pano (thuộc địa, tân cổ điển, kính, đang xây, tập thể, cây leo, cũ/mới, biển lớn, mái hiên tôn/bạt…) + cờ vùng/tuổi từng pano — citygen `renderStyles()` dùng (W3-C) |
 | `js/cellfacade.js` | W3-C nhà ô: `guardCellPalette` (mảng tường/kính lớn màu đặc của vật GIỮ LẠI → kẹp bão hoà theo sắc, nâng sáng tường xanh thương hiệu, mảng xám-xanh tối → kính), `cellCanvasFx` (filter ảnh canvas tối/bão hoà khi gộp cellAtlas), `gridFacadeSpec`/`paintGridFacade` (vẽ lại ~25 helper "nền + lưới cửa sổ" thành khung/kính/cửa chớp — gọi trong `cellsink.materialize`), `applyCellGlass` (shader kính nhà ô: đố theo toạ độ thế giới + phản trời — `sharedMats.window`), `drawFacadeWindows` (facadeTex) |
 | `js/cellsink.js` | "Bồn chứa" khối ô dựng tay (world.js "cells"): che scene/addCollider/FEATURED_CLEAR/makeTex, ở cửa ra gỡ nhà ô trùng footprint THẬT, claim kind `'cell'` cho công trình giữ, xuất `world.cellShops` (nhà bị gỡ) + `world.cellKept` (nhà giữ + bao lồi, để WP2 cắt footprint); bỏ qua nhà `FLAG.SYNTH`; `realBuildings()` = giải mã RB01 dùng chung |
@@ -535,6 +535,70 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     hướng 90/270); (c) bộ trệt FG vẫn có thể sai kiểu công năng (175 h0 mặt tiền ngân hàng thành cửa hàng); (d) quan sát gần
     "không biển" thắng quan sát xa thấy biển (446 h270); (e) tường có biển phủ kín mặt tiền vẫn hơi đỏ/hồng (446 h270 #e0aa9d,
     368 h90 nâu gạch) — đúng một phần (ảnh thật biển đỏ phủ kín); (f) camera game ép sát mặt tiền ở vài pano (AUDIT4 D3).
+- **2026-10-14 (Đ3-W4-C FACADE KIT & FIXES)** [ĐỢT 3 wave 4 — bộ chi tiết thuộc địa/tân cổ điển/biệt thự, khách sạn/văn phòng,
+  mặt kính cửa hàng, hết "hộp trơn", hồi quy pano_115/359, phơi sáng theo ảnh thật]:
+    **(1) ATLAS 8×14** (`facade_atlas.js` `ATLAS_ROWS` 12 → 14: 2048×3584 / LITE 1024×1792): BẪY ĐẾM Ô — `grep -c "cell('"` ra
+    85 nhưng vòng SIGN/PANEL/BLADE/BILL sinh nhiều ô ⇒ thực có 95/96 ô (chỉ 1 chỗ trống); vượt thì `wallBase` ném "offset is
+    out of bounds". +10 ô SAU BILL (chỉ số cũ giữ): `U_HOTEL` (trụ đá kem 2 mép bay + kính trọn tầng + spandrel đá + tay vịn
+    kính), `G_LOBBY` (sảnh: cột đá vuông, vách kính cao, nội thất ấm sáng, KHÔNG biển), `G_STORE0/1/2` (mặt KÍNH cửa hàng thời
+    trang/điện máy — ma-nơ-canh; NGÂN HÀNG/phòng khám — trụ granite + quầy; điện thoại — poster dán kính; cả 3 có dải biển ⇒
+    có trong `SIGN_EXT`), `U_COL2` (thuộc địa: trụ kẻ mạch, cửa cao trán cong + công-xon, ô lan can con tiện, chớp lật MỞ), `U_VILLA2`
+    (cửa vòm + ban công con tiện + chớp mở), `G_VILLA` (trệt chân đá kẻ mạch ngang, 2 cửa vòm có chớp, không biển), `P_COL` (lan
+    can mái gờ phào răng cưa + con tiện), `D_CORN` (mặt gờ phào 3D). Còn 7 chỗ trống cho W4-A.
+    **(2) KIỂU DỰNG 13 = KHÁCH SẠN/tháp văn phòng** (`RS.HOTEL`; 14, 15 còn trống trong 4 bit aFac.z): `renderStyles` — quan sát
+    pano chạm nhà có "cao tầng" + ("kính" | "tân cổ điển" | "showroom") trên khối ≥ 1.200 m² (không KTT) → HOTEL, xét TRƯỚC luật
+    NEO/GLASS. pano_359 (Pullman, dữ liệu 6 tầng, cờ cao tầng+kính+tân cổ điển): trước ra NEO (mặt tân cổ điển be — hồi quy
+    wave 3), nay kính khung đá; pano_230 (SHED→GLASS cờ cao tầng+kính) trước ra khối xám ố + trệt hông XP, nay kính + sảnh.
+    HOTEL: `NOSIGN_ST` + `NOHOME_ST` (MỚI — kiểu KHÔNG có bay "nhà ở": CONS, HOTEL; JS `groundModule`, GL2, GL1 cùng luật) +
+    `FIXED_G` (G13 = ['G_LOBBY'] — biển cửa hàng trên sảnh khách sạn là sai), tint shader kéo về đá kem 75%, tuổi ≤ 1, không ban
+    công/điều hoà/biển mái, `bigFlag`, kính phản trời ×1 (glassK). MÁI SẢNH KÍNH 3D (`hotelCanopy`, ô det): tấm 5,5 m × ≤ 20 m ở
+    +4,4..4,75 m giữa mặt phố dài nhất ≥ 10 m (10 tam giác). Toàn thành phố chỉ 2 nhà đạt luật (bằng chứng pano là bắt buộc —
+    W4-A ánh xạ style "hotel_tower"/"glass_office" của fp_json → `RS.HOTEL`/GLASS). TRỆT HÔNG LỘ (rc 1) của nhà lớn kiểu kính/
+    tháp/khách sạn (st 3/11/13) → `G_LOBBY` thay bộ XP xi măng ố; đêm litP 0,12 như sảnh trước (mặc định 0,58 ⇒ hông tối đen).
+    **(3) BỘ CHI TIẾT THUỘC ĐỊA 3D** (`classicKit`, kiểu COL/NEO/VILLA, cạnh MẶT PHỐ không che, L ≥ 3 m, mái không dốc): GỜ PHÀO MÁI
+    nhô 0,36 × cao 0,42 m ở đỉnh tường (ô CHÍNH — bóng viền mái thấy từ xa; mặt trước `D_CORN`, đáy/đỉnh/2 đầu `D_PLAIN`; 10 tam
+    giác), GỜ TẦNG nhô 0,13 m mỗi sàn (ô det, 4 tam giác/tầng), TRỤ ÁP nhô 0,11 m rộng 0,52 m ở MỌI ranh bay từ trệt+3,8 m tới
+    dưới gờ phào (ô det, 6 tam giác; khớp trụ vẽ ở 2 mép bay của U_COL*/U_NEO/U_VILLA*); màu = màu tường sáng hơn 35%. Helper
+    `quadN` (quad theo pháp tuyến MONG MUỐN — tự đảo thứ tự đỉnh khi tích có hướng ngược: hết nhầm CCW), `ledge`, `pilaster3`.
+    Biệt thự mái bằng gần chữ nhật (≤ 6 đỉnh, ≥ 0,85 OBB, < 700 m², ≤ 3 tầng) → mái NGÓI 4 dốc 70%. Lan can mái COL/NEO/VILLA
+    → `P_COL` 75%. Bộ mô-đun: U4 +U_VILLA2/U_COL2, U7 +U_COL2, G4 +G_VILLA (CHỈ G4 — phản biện: G_VILLA trong G7 xoá biển 'VÀNG BẠC' pano_423
+    h0, phố Pháp vẫn là phố buôn bán), G0 +G_STORE0/2, G3/G10/G11 mặt kính cửa
+    hàng (đổi độ dài bộ ⇒ hash chọn lại mô-đun trệt toàn bộ nhà kiểu đó — chỉ đổi biển/cửa, không đổi bố cục).
+    **(4) NHÀ Ô "HỘP TRƠN"** (`cellfacade.js`): (a) `paintGridFacade` — mặt tiền lưới cửa sổ KIỂU CỔ ĐIỂN (có cửa vòm, hoặc cửa
+    CAO h/w ≥ 1,3 trên nền ấm vàng đất/kem 18-70° hay nền sáng, HOẶC ≤ 3 hàng cửa h/w ≥ 0,95 trên nền ấm/trắng l > 0,8 — công thự/biệt thự thấp 496 h90) thêm trụ áp giữa các cột cửa + 2 mép, gờ phào đỉnh răng cưa +
+    bóng, gờ tầng, chân tường đậm, MŨ CỬA nằm TRÊN khung (`_win` vẽ khung ra ngoài ô cửa f = 7% — mũ đặt sát ô cửa bị khung
+    che mất), bệ cửa, chớp lá sách mở 2 bên khi khe ≥ 0,75 bề rộng cửa; nền hiện đại → gờ sàn bê tông sáng + bóng (pano_538,
+    157 h0, 423 h180, 051 h90). (b) `applyCellGlass` (khoá 'cellglass_w4c'): TRỆT (≤ 3,6 m trên LAND_H 2) = mặt kính sảnh/cửa hàng
+    (nội thất ấm sáng, thanh ngang 2,7 m, chân kính tối); tầng trên = dải SPANDREL đục dưới mỗi băng kính + kính sáng dần lên
+    đỉnh ô (157 h180 VIB: "khối xanh đặc"). (c) `cellCanvasFx`: nền xám than L 0,22-0,32 không chữ → sáng ×1,4 (KHÔNG chạm khối 'NHÀ THUỐC' 395 —
+    texture có `signTexts` nên bị bỏ qua).
+    CÒN LẠI (ngoài làn): khối nhà ô MÀU ĐẶC không texture (`mrg10_*` sau freezeStatic lượt 1 — vd 180 h270 khối trắng, 019 tường
+    kem) không thể tiêm cửa sổ mà không thêm draw call theo màu (lượt 1 nướng màu vào đỉnh + material trắng chung).
+    **(5) HỒI QUY pano_115** ("ngõ hẹp thành quảng trường lát"): KHÔNG phải polygon nước/đường — tia dò: nền là `ground_local`/
+    `ground_lake` (lưới mịn hồ Tam Bạc) tô lớp URB "sân bê tông sát tường" của landuse; nhà góc `goc_haly` + `nhacap4_haly` bị
+    cell sink gỡ ('near' nhà thật 20039/2991) mà Overture KHÔNG có footprint ở lô tây ngõ (x −1093..−1111, z −74..−88) ⇒ bãi xi
+    măng trống + rào tôn = HỘP CAM TRƠN `mat(0xa8886a)`. Ảnh thật h270: lô đất trống, dãy container/lán tôn (xám, mảng đỏ/xanh),
+    rào tôn gỉ. Sửa (world.js khối 12b, tối thiểu): claim MỚI 'dirt' (`landuse.js` luCompose → lớp C_DIRT 7; `claimPolys('dirt')`
+    vào lastExtra) cho lô, rào tôn SÓNG gỉ (canvas 512×128 gân 6 px + vệt gỉ), 2 container 2,44×2,6×5,9 m + cửa tôn xanh + mái tôn
+    lán, 5 collider r 1,3 dọc 2 container. BẪY: lớp C_DIRT (7) gặp mật độ nhà ±40 m cao (ngõ đông) ⇒ shader `luClass` trả `vac`≈0
+    = BÊ TÔNG xám (lớp 7 dùng chung cho công trường OSM cũ nay kín nhà — cố ý), và 4 bit lớp (0..15) đã kín ⇒ không thêm lớp
+    'bãi đất' được. Cách làm: TẤM PHỦ đất nện bám địa hình (`dirt_lot_haly_115`, Plane 7×6 đoạn, +0,05 m, polygonOffset −2,
+    depthWrite false, canvas 512×410 đất + sỏi + vệt bánh xe + vũng, mép alpha gradient mềm — mép vòng tròn lỗ chỗ trông như
+    vết bẩn; 1 draw call). CÒN LẠI (ngoài làn W4-C): khoảng trống lớn phía bắc/nam ngõ là THIẾU footprint (nhà 5 tầng xây sau ảnh
+    Overture) — việc của dữ liệu nhà (process_buildings/W4-A).
+    **(6) PHƠI SÁNG** (`daynight.js LIGHT.exposure` 0,92 → 1,0; `aerialExposure` 0,82 → 0,754 ⇒ ảnh vệ tinh GIỮ NGUYÊN): đo 132
+    cặp REAL|game (33 pano × 4 hướng, sRGB, bỏ bản đồ nhỏ): độ sáng TB thật 120,1 / game 95,5 → 99,4; 1/3 dưới (đất) 118 / 87 → 91;
+    p95 214 / 190 → 195; p5 36 / 37 → 38 (vùng tối giữ). Phần chênh còn lại do mặt nhựa/vỉa tối hơn bê tông thật + trời thật mù
+    sáng (không chỉnh mô hình trời — AUDIT4 D9: trời âm u là điều kiện chụp).
+    **(7) ĐO**: node (citygen không GPU): tam giác phố 1,402 M → 1,438 M (chính 844 k → 855 k: gờ phào; chi tiết 558 k → 584 k:
+    gờ tầng + trụ áp + mái sảnh); dựng 0,88 s như cũ; atlas worker 2048×3584 ~120 ms (node). PERF A/B CÙNG PHIÊN (ABBA, views_std
+    24 góc, Radeon 890M tier 3, khoá autoQuality): draw call TB 388,2/387,4 (dot3) vs 389,4/385,2 (W4-C) — ±nhiễu; tam giác TB
+    2,986 M → 2,993 M (+0,24%; tệ nhất +0,9% pano_190); hpReady 5,15/4,97 s vs 4,88/4,94 s; heap 389/403 vs 608*/409 MB (* 1 mẫu
+    GC lệch; atlas lớn hơn +14% ≈ +4 MB GPU); fps 60 cả hai; 0 lỗi JS.
+    Công cụ (scratch W4-C): `nodefab/probe.mjs` (nhà nhìn thấy từ camera pano theo hướng: kiểu dữ liệu → kiểu dựng, tầng, diện
+    tích, cờ bằng chứng), `probe_hray.mjs` (tia ngang từ camera trên trang: mesh/material/texture/uv — nhà ô nằm trong
+    `cellAtlasN`), `colstat.py` (thống kê màu REAL|game).
+
 - **2026-10-14 (Đ3-W3 SỬA HỒI QUY AUDIT4)** [ĐỢT 3 wave 3 — hồi quy mức 3 của AUDIT4 (REAL | dot3 | tích hợp), nhánh tích hợp]:
     **(R1) SÔNG TAM BẠC "MẤT" SAU LAN CAN (198/203/207/212 mức 3, 134 mức 2) — gốc W3-F, KHÔNG phải polygon nước:** đo WATER
     dot3/F/A/tích hợp ở 6 pano: mép nước lệch ≤ 1,5 m, nước vẫn bắt đầu 8-13 m trước camera. Raycast màn hình (probe trên

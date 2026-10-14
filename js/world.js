@@ -6373,7 +6373,69 @@ const twBDz = (x) => -470 + 7 * (x + 541) / 561;              // tim Bạch Đ�
     }
     twDone(nc, -1078.5, -80, 6);
     // rào tôn container gỉ quây lô đất trống (tây ngõ)
-    twWall(-1096, -88, -1112, -84.5, 2.6, mat(0xa8886a), 0.15, true, 9);
+    // W4-C (hồi quy pano_115 "ngõ hẹp thành quảng trường lát lớn"): nhà góc trắng/nhà cấp 4 của khối này bị cell sink gỡ
+    // ('near' nhà thật), lô đất trống phía TÂY ngõ (x −1093..−1111, z −74..−87, Overture không có nhà) hiện thành SÂN BÊ TÔNG
+    // trơn (landuse "sát tường") + rào tôn là HỘP CAM TRƠN. Ảnh thật 115 h270: lô đất trống nền đất, dãy CONTAINER/lán tôn
+    // (xám, mảng đỏ/xanh) quay ra ngõ, rào tôn gỉ. → claim 'dirt' (landuse.js lớp C_DIRT; không có footprint trong lô) +
+    // rào tôn SÓNG gỉ + 2 container + mái tôn lán.
+    const corr = (base, rust) => new THREE.MeshLambertMaterial({ map: makeTex(512, 128, (g, w, h) => {
+      g.fillStyle = base; g.fillRect(0, 0, w, h);
+      for (let x = 0; x < w; x += 6) { g.fillStyle = 'rgba(0,0,0,0.22)'; g.fillRect(x, 0, 2, h); g.fillStyle = 'rgba(255,255,255,0.12)'; g.fillRect(x + 3, 0, 1, h); }
+      g.fillStyle = rust;
+      for (let k = 0; k < 26; k++) { const x = (k * 97) % w, ww = 3 + (k * 13) % 9, hh = 20 + (k * 37) % 90; g.globalAlpha = 0.35; g.fillRect(x, h - hh, ww, hh); }
+      g.globalAlpha = 1; g.fillStyle = 'rgba(0,0,0,0.25)'; g.fillRect(0, h - 10, w, 10);
+    }) });
+    claimPoly([[-1093.5, -74], [-1111, -74], [-1111, -86.5], [-1093.5, -88]], 'dirt', 'lot_haly_115');
+    twWall(-1096, -88, -1112, -84.5, 2.6, corr('#8d8f8a', '#7a3f26'), 0.15, true, 9);
+    // nền ĐẤT NỆN phủ lô (lớp C_DIRT của landuse gặp mật độ nhà cao quanh ngõ → shader trả bê tông xám — phản biện W4-C):
+    // tấm phủ bám địa hình, mép rách alpha, vệt bánh xe + sỏi + vũng ẩm (1 vật liệu, 1 draw call)
+    if (twOK(-1102.25, -81)) {
+      const dg = new THREE.PlaneGeometry(17.5, 14, 7, 6); dg.rotateX(-Math.PI / 2); dg.translate(-1102.25, 0, -81);
+      const dp = dg.attributes.position;
+      for (let i = 0; i < dp.count; i++) dp.setY(i, groundHeightNoDeck(dp.getX(i), dp.getZ(i)) + 0.05);
+      dg.computeVertexNormals();
+      const dm = new THREE.MeshLambertMaterial({ transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
+        map: makeTex(512, 410, (g, w, h) => {
+          g.fillStyle = 'rgb(122,104,80)'; g.fillRect(0, 0, w, h);
+          let sd = 7; const rn = () => ((sd = (sd * 16807) % 2147483647) / 2147483647);
+          for (let k = 0; k < 90; k++) {                       // loang đất ẩm/khô
+            const x = rn() * w, y = rn() * h, r = 12 + rn() * 46;
+            g.fillStyle = rn() < 0.5 ? 'rgba(84,70,52,0.22)' : 'rgba(160,142,112,0.2)';
+            g.beginPath(); g.ellipse(x, y, r, r * (0.5 + rn() * 0.5), rn() * 3, 0, 6.3); g.fill();
+          }
+          for (let k = 0; k < 2600; k++) {                     // sỏi/gạch vụn
+            const v = 90 + rn() * 110 | 0; g.fillStyle = rn() < 0.08 ? `rgb(${v + 10},${v * 0.62 | 0},${v * 0.5 | 0})` : `rgb(${v},${v - 6},${v - 16})`;
+            const sz = 1 + rn() * 1.8; g.fillRect(rn() * w, rn() * h, sz, sz);
+          }
+          g.strokeStyle = 'rgba(60,50,38,0.35)'; g.lineWidth = 9;   // vệt bánh xe vào lô
+          for (const o of [-14, 14]) { g.beginPath(); g.moveTo(w, h * 0.55 + o); g.bezierCurveTo(w * 0.6, h * 0.5 + o, w * 0.35, h * 0.62 + o, 0, h * 0.58 + o); g.stroke(); }
+          g.fillStyle = 'rgba(70,72,70,0.45)';                  // vũng nước đọng
+          g.beginPath(); g.ellipse(w * 0.72, h * 0.3, 36, 15, 0.3, 0, 6.3); g.fill();
+          g.globalCompositeOperation = 'destination-out';      // mép rách: hoà dần vào nền phố
+          for (const [x0, y0, x1, y1] of [[0, 0, 0, 44], [0, h, 0, h - 44], [0, 0, 44, 0], [w, 0, w - 44, 0]]) {
+            const gr = g.createLinearGradient(x0, y0, x1, y1); gr.addColorStop(0, 'rgba(0,0,0,1)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+            g.fillStyle = gr; g.fillRect(0, 0, w, h);
+          }
+          for (let k = 0; k < 40; k++) {                       // mép không thẳng: vài vạt lõm mềm
+            const t = rn(), e = k % 4, d = 20 + rn() * 20;
+            const x = e < 2 ? t * w : e === 2 ? 0 : w, y = e === 0 ? 0 : e === 1 ? h : t * h;
+            const gr = g.createRadialGradient(x, y, 0, x, y, d); gr.addColorStop(0, 'rgba(0,0,0,0.7)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+            g.fillStyle = gr; g.fillRect(x - d, y - d, 2 * d, 2 * d);
+          }
+          g.globalCompositeOperation = 'source-over';
+        }, 'dirtlot115') });
+      const dmesh = new THREE.Mesh(dg, dm); dmesh.receiveShadow = true; dmesh.renderOrder = -1; dmesh.name = 'dirt_lot_haly_115'; scene.add(dmesh);
+    }
+    if (twOK(-1102.5, -81)) {
+      const lan = twGrp(-1102.5, -81, 0, 'lan_container_haly');
+      twBox(lan, 2.44, 2.6, 5.9, corr('#9a9c97', '#6e3a24'), 0, 1.3, 3.0);      // container xám
+      twBox(lan, 2.44, 2.6, 5.9, corr('#8a3b2c', '#5e2a1c'), 0, 1.3, -3.0);     // container đỏ gỉ
+      twBox(lan, 0.06, 2.0, 1.9, corr('#2f5fa6', '#2a3f66'), 1.25, 1.0, -1.4);  // cửa tôn xanh
+      const rf = twBox(lan, 4.2, 0.06, 12.6, corr('#7e7f7b', '#5b3424'), 0.6, 2.95, 0);   // mái tôn lán
+      rf.rotation.z = -0.08;
+      twDone(lan, -1102.5, -81, 0);
+      for (let k = 0; k < 5; k++) addCollider(-1102.5, -76.3 - k * 2.35, 1.3);   // 2 container 5,9 m nối dài z −75..−87 (phản biện: 2 collider tròn hở)
+    }
     twTreeAt(-1085, -68, 3.2, 6);
   }
 }
