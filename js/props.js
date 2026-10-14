@@ -1457,6 +1457,16 @@ export function buildProps(ctx) {
     // Đ3-W5-C: 2 DẢI (R.two): dải 1 sát bó vỉa (curb + 0,8, xiên 42-52° — đuôi cách mép ~0,1 m) + dải 2 sát mặt tiền (fac − 0,95,
     // 52-65° — mũi cách tường ~0,2 m); bản 1 dải giữ nguyên (lane 0). Dải 2 lệch pha 0,37 m (hash khác dải 1)
     const LANES = R.two ? [[X.curb + 0.8, 1], [X.fac - 0.95, 2]] : [[narrow ? X.curb + 0.78 : X.park, 0]];
+    // phản biện W5-C: dải 2 (sát mặt tiền) lấp lối đi bộ W4-B (vỉa 3,4-4 m: 2 dải xe chừa < 0,6 m giữa) → hàng 2 dải dài ≥ 12 m
+    // chừa 1 KHE 6,8 m liền (vị trí theo hash hàng) ở dải 2 — đủ 1 quãng đi bộ sát mặt tiền (fit 6.7 cần ≥ 6 m trống)
+    let winA = -1, winB = -1;
+    // — trừ khi khe rơi trong 25 m quanh camera pano bằng chứng (ảnh thật ở đó: 2 dải xe kín — 088/083)
+    if (R.two && (R.k1 - R.k0) * CELL >= 12) {
+      const Lr = (R.k1 - R.k0) * CELL, e = S.ev[R.k0];
+      winA = S.off + R.k0 * CELL + 1 + hash3(R.x, R.z, 1531) * (Lr - 8.8); winB = winA + 6.8;
+      const wm = (winA + winB) / 2, wx = S.ax + S.ux * wm, wz = S.az + S.uz * wm;
+      if (e && Math.hypot(e[0] - wx, e[1] - wz) < 25) winA = winB = -1;
+    }
     for (const [lat, lane] of LANES) {
     const t0 = S.off + R.k0 * CELL + 0.35 + (lane === 2 ? 0.37 : 0);
     // W3-E: hàng = CHUỖI CỤM theo lô nhà (3,2-6 m — mỗi cửa hàng 1 cụm) cách nhau khe lối vào 0,5-0,9 m; mỗi cụm góc
@@ -1464,7 +1474,7 @@ export function buildProps(ctx) {
     // nhau (phản biện WP7: lệch so với xe TRƯỚC giới hạn ±0,1 rad; xe đỗ xiên hẳn ±25° chừa thêm 0,3 m trước và sau).
     // W4-B: KIỂU CỤM (ảnh 345/023/492: góc đỗ lẫn lộn): 66% vuông góc 70-90° · 22% xiên 40-55° (bước dọc ÷ sin góc) ·
     // 12% "lộn xộn" (mỗi xe ±20° quanh 57-80°, bước 0,85-1,0 m, không kẹp theo xe trước)
-    let prevA = null, padNext = 0, cEnd = -1, baseAng = 0, noseIn = true, spacing = 0.72, step = 0, messy = false, skipC = false;
+    let prevA = null, padNext = 0, cEnd = -1, baseAng = 0, noseIn = true, spacing = 0.72, step = 0, messy = false;
     for (let t = t0; t <= t1; t += step) {
       if (t > cEnd) {   // cụm mới
         const hc = hash3(S.ax + S.ux * t, S.az + S.uz * t, 84);
@@ -1472,8 +1482,6 @@ export function buildProps(ctx) {
         cEnd = t + 3.2 + hash3(S.ax + t, S.az, 85) * 2.8;
         const hm = hash3(S.az + t, S.ax, 98);
         messy = !narrow && !lane && hm >= 0.88;
-        // phản biện W5-C: dải 2 (sát mặt tiền) lấp lối đi bộ W4-B → bỏ ~1/3 cụm dải 2 (khe 3-6 m cho người đi bộ sát mặt tiền)
-        skipC = lane === 2 && hash3(S.ax + S.ux * t, S.az + S.uz * t, 1531) < 0.36;
         baseAng = lane === 1 ? 0.74 + hc * 0.16 : lane === 2 ? 0.92 + hc * 0.22
           : narrow ? 0.95 + hc * 0.25 : hm < 0.66 ? 1.22 + hc * 0.35 : hm < 0.88 ? 0.7 + hc * 0.26 : 1.0 + hc * 0.4;   // rad so với trục phố
         noseIn = hash3(R.x + t, R.z, 85) < 0.82;                  // phần lớn mũi vào nhà
@@ -1481,7 +1489,7 @@ export function buildProps(ctx) {
       }
       step = spacing + padNext + (hash3(R.x + t, R.z, 87) < 0.06 ? 0.45 : 0) + (hash3(t, R.z, 94) - 0.5) * 0.08;
       padNext = 0;
-      if (skipC) { prevA = null; continue; }
+      if (lane === 2 && t > winA && t < winB) { prevA = null; continue; }   // khe lối đi bộ (dưới)
       const ha = hash3(S.ax + S.ux * t, S.az + S.uz * t, 89);
       const skew = messy ? 0 : ha > 0.95 ? 0.42 : ha < 0.05 ? -0.42 : 0;
       if (skew && prevA !== null) { t += 0.3; padNext = 0.3; if (t > t1) break; }
@@ -1775,7 +1783,7 @@ export function buildProps(ctx) {
     const kGen = Math.min(1, BUDGET.peds / Math.max(1, nGen)), kMk = Math.min(1, BUDGET.pedsMarket / Math.max(1, nMk)), kSp = Math.min(1, BUDGET.pedsSpill / Math.max(1, nSp)), kCl = Math.min(1, BUDGET.pedsCluster / Math.max(1, nCl));
     // phản biện W4-B: hàng xe máy dày + bỏ lối đi xuyên nhà làm người ĐI BỘ tụt 404 → 288 (ứng viên ngồi quán tăng theo ghế
     // nhựa) → trong nhóm chung người đi bộ được hệ số × 1,25, đứng/ngồi chia phần còn lại (tổng ngân sách người KHÔNG đổi)
-    const nW = walkI.length, kW = Math.min(1, kGen * 1.25), kO = nGen > nW ? Math.max(0, Math.min(1, (kGen * nGen - kW * nW) / (nGen - nW))) : kGen;
+    const nW = walkI.length, kW = Math.min(1, kGen * 1.4), kO = nGen > nW ? Math.max(0, Math.min(1, (kGen * nGen - kW * nW) / (nGen - nW))) : kGen;
     if (kGen < 1 || kMk < 1 || kSp < 1 || kCl < 1) for (const arr of [walkI, standI, sitI]) { const kg = arr === walkI ? kW : kO; let w = 0; for (const p of arr) if ((isCl(p) ? p.cl : hash3(p.x, p.z, 124)) < (isMk(p) ? kMk : isCl(p) ? kCl : isSp(p) ? kSp : kg)) arr[w++] = p; arr.length = w; }
     if (kCl < 1) { let w = 0; for (const p of stoolI) if (!(p.cl && p.cl >= kCl)) stoolI[w++] = p; stoolI.length = w; }   // ghế nhóm bị bỏ đi theo nhóm
   }
