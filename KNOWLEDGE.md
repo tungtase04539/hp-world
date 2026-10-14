@@ -41,8 +41,8 @@ Trò chơi: thế giới 3D Hải Phòng **tỉ lệ 1:1 mét thật** (từ 202
 | `js/skymodel.js` | Mô hình trời tán xạ Rayleigh+Mie + hướng mặt trời (JS thuần, chạy được trong node) — MỘT nguồn cho vòm/đèn/sương |
 | `js/post.js` | Tone mapping + grade DÙNG CHUNG mọi đường vẽ (CustomToneMapping = ACES + grade), SceneAOPass (MSAA + AO theo depth), FinalPass, `HP_UNLIT_K` |
 | `js/water.js` | Vật liệu nước Standard (IBL trời, Fresnel) + bản đồ bờ/hồ — MỘT nguồn màu nước |
-| `js/bridges.js` | Đợt 3 W3-F: CẦU THEO WAY OSM (mapdata BRIDGE_WAYS) — mặt cầu nâng HVT (nhịp chính + 2 nút xoắn, gờ + tay vịn, đèn, trụ/khung cổng, vòm đỏ trên lòng sông, tháp thang máy), cầu phố Lạc Long (lòng 2 chiều, vỉa hè, lan can con tiện), lan can/dầm/trụ cầu phẳng; `makeDeckIndex` (tra mặt cầu có tham chiếu cao độ) |
-| `js/riverbank.js` | Đợt 3 W3-F: BỜ KÈ SÔNG — `snapBankGrid` (nắn lưới nền theo mép sông → bờ dựng đứng), tường kè + gờ, dải dạo ca-rô + lan can gang + đèn 2 bóng + hoa giấy ('prom'), dải bờ tự phát + lán + thuyền ('strip'), cây non chống cọc |
+| `js/bridges.js` | Đợt 3 W3-F: CẦU THEO WAY OSM (mapdata BRIDGE_WAYS) — mặt cầu nâng HVT (nhịp chính + 2 nút xoắn, gờ + tay vịn, đèn, trụ/khung cổng, vòm đỏ trên lòng sông, tháp thang máy), cầu phố Lạc Long (lòng 2 chiều, vỉa hè, lan can con tiện), lan can/dầm/trụ cầu phẳng; `makeDeckIndex` (tra mặt cầu có tham chiếu cao độ; `crossesParapet` gờ giữa 2 nhịp); `simplifyFrames` (tay vịn) |
+| `js/riverbank.js` | Đợt 3 W3-F: BỜ KÈ SÔNG — `snapBankGrid` (nắn lưới nền theo mép sông → bờ dựng đứng), tường kè + gờ, dải dạo ca-rô + lan can gang + đèn 2 bóng + hoa giấy ('prom'), dải bờ tự phát + lán + thuyền ('strip'), cây non chống cọc; `Run()` quét LIỀN theo cạnh polygon (không hộp/mẫu — §10 W3-F (11)) |
 | `js/device.js` | `TIER` + `GFX` (núm chất lượng ánh sáng/hậu kỳ — chỉ theo TIER, không theo cảm ứng) |
 | `js/landmarks.js` | 15 biển thông tin địa danh (vị trí suy ra từ mapdata) |
 | `js/traffic.js` / `js/vehicles.js` / `js/npcs.js` / `js/quests.js`... | Giao thông, xe cưỡi được, NPC, nhiệm vụ |
@@ -517,7 +517,9 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     collider bằng lưới 4 m theo hộp bao (thay colliders.some × 234 cây); riverbank/bridges nhả mảng JS nguồn sau khi chép sang
     typed array (closure keep/promSide giữ ngữ cảnh hàm dựng ⇒ không nhả = ~30 MB heap sống suốt phiên).
     **ĐO / KIỂM** (2026-10-12, tier 3, ANGLE AMD Radeon 890M D3D11, A/B CÙNG phiên dot3 :8596 vs nhánh :8506): hpReady TB 3 lần
-    4751 → 4756 ms (không đổi); heap sau gc 385 → 412 MB (+27; trước khi nhả mảng nguồn +54), hình học GPU 254,7 → 277,8 MB
+    4751 → 4756 ms — **SAI khi kết luận "không đổi"** (phản biện r2 đo lại cùng phiên: tổng bước khởi động +336 ms full / +384
+    lite: ground +110, freeze +111, landmarks +70; hpReady 3 lần lệch nhau ±300 ms nên KHÔNG dùng hpReady đơn lẻ để kết luận
+    — so TỔNG bootProfile + từng bước, ≥ 2 lượt xen kẽ mỗi bên; số sau r5 ở (11)); heap sau gc 385 → 412 MB (+27; trước khi nhả mảng nguồn +54), hình học GPU 254,7 → 277,8 MB
     (cầu + kè gộp 'mrg' 30 → 51); fps 60 (trần vsync) mọi góc; cam_spawn 387 → 402 calls / 3,83 → 3,93 M tam giác, pano_007_h090
     505 → 508 / 5,52 → 5,53 M, cam_high_center 392 → 415 / 5,24 → 5,41 M, game_3 348 → 350 / 6,10 → 6,09 M, cam_hvt 633 → 658 /
     6,88 → 7,01 M. Kit bờ: 5605 mẫu, dải dạo 3,24 km, strip ≈ 0,45 km, bãi 0,37 km, 191 đèn, 235 cây non, ≈ 95 cây lớn, ~100 ms.
@@ -584,6 +586,51 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     lite 3 × 404 (assets_lite/ trống — môi trường), --gl1 0 lỗi, tour 26 ảnh 0 lỗi, waterbfs 5/5, process_osm tất định.
     BẪY harness: sau "Bắt đầu" hội thoại hướng dẫn (modal) chặn di chuyển người/xe — probe phải Esc trước khi giữ W (headless:
     phát KeyboardEvent thẳng lên window).
+    **(11) SỬA SAU PHẢN BIỆN r2 (r5, 2026-10-14)**:
+    (a) **XE HƯỚNG BẮC TRÊN NHỊP HVT** (traffic.js chooseNext): nhịp một chiều 738297304 (ri 242 — nhịp pano_285 đứng) có nút xa
+    (−46,−1650) NGOÀI PLAY_R + 30 → luật "không chạy ra ngoài vùng chơi" bỏ LỐI RA DUY NHẤT ở đỉnh vòng xoắn đông (75,−898);
+    cạnh nâng một chiều không quay đầu được → `a.kill` ⇒ mọi xe hướng bắc biến mất ở đỉnh xoắn, nhịp KHÔNG BAO GIỜ có xe. Nay
+    cạnh cầu nâng (`e.elev`) miễn luật đó; xe chạy xa bị cull khoảng cách (RB + 40) như mọi xe. Node (scratch r5/graph_exits.mjs):
+    cạnh nâng mà nút cuối không lối ra 1 → 0; probe: xe trên ri 242 quanh 304: 6-12/mẫu, quanh 285: 12-18 (trước 0); wrongWay,
+    underwater, offRoad 0. BẪY: mọi luật lọc theo vùng chơi trên đồ thị có cạnh một chiều phải kiểm "nút còn lối ra không";
+    probe "lệch mặt đường" chỉ đúng cho tác tử TRONG DRAW_R (260 m) — ngoài đó writeInstances không cập nhật a.y (y cũ, 300-380 m).
+    (b) **KHỞI ĐỘNG / GPU: SỐ TAM GIÁC LÀ CHI PHÍ.** freezeStatic tách mọi mesh bán kính > 0,75·T bằng `splitGeometryByTile` →
+    lưới KHÔNG CHỈ MỤC (3 đỉnh/tam giác) ⇒ byte GPU + thời gian tách/gộp ∝ SỐ TAM GIÁC (chia sẻ đỉnh trong Buf vô ích). Bản r4
+    dựng kè = hộp/quad MỖI MẪU 2 m: kit bờ 181,6k + cầu 108,7k tam giác. riverbank.js `Run(B, faces, cap)`: mẫu liên tiếp CÙNG
+    cạnh polygon (cùng hướng, cùng màu) gộp thành 1 đoạn quét; khung chỉ ở đỉnh polygon (vát góc, hệ số 1/cos chặn 2) và chỗ
+    đổi màu (sọc gờ 1 m); nắp chỉ ở chỗ đứt — tường + gờ kè + bệ + tay vịn 96,7k → 9,4k tam giác (168 cạnh polygon sông trong R,
+    ~77 m/cạnh); bóng đèn cầu 8×4 (31,4k → 18,8k); pháp tuyến khối hoa giấy tính sẵn; quad() 1 lệnh push/thuộc tính ⇒ kit bờ
+    181,6k → 92,7k tam giác, dựng (node, ấm) ~75 → ~45 ms. bridges.js `simplifyFrames(F, l, 0,02)` cho tay vịn (đường cong
+    đứng bán kính lớn: vài khung/50 m; vòng xoắn giữ gần đủ) + cột tay vịn bỏ mặt trên (nằm trong thanh vịn): 108,7k → 77,3k.
+    Phần W3-F trong freeze (node, tách ô T 450 + gộp, ấm): ~45 → ~28 ms. ĐO TRONG TRÌNH DUYỆT (freezeStatic gắn tạm đồng hồ,
+    3 lần): freeze 190-235 ms; tách ô mesh W3-F 40-59 ms cho 155,7k tam giác (mọi mesh tách ô khác của thành phố 26-34 ms cho
+    114k), gộp (mọi ô) 70-101 ms. Mesh vertexColor KHÔNG texture bỏ thuộc tính uv (lượt 1 xoá uv sau khi đã chép). Đã THỬ chia
+    ô sẵn lúc dựng (Buf theo lưới T của freeze): KHÔNG lợi — mesh nhỏ cũng bị chép từng tam giác khi gộp (`toWorld` =
+    splitGeometryByTile(…, Infinity)) ⇒ chi phí freeze ∝ số tam giác × số thuộc tính, không phụ thuộc mesh to/nhỏ. BẪY: ngưỡng
+    "thẳng hàng" để nối mẫu phải ~0,03° (dot > 0,9999999) — 0,57° cho cung polygon cong mờ lệch dây cung ~0,1 m/100 m.
+    (c) **GỜ GIỮA 2 NHỊP** (bridges.js `makeDeckIndex().crossesParapet(x0,z0,x1,z1,yRef)`; main.js tryMove + vehicles.js
+    `opts.moveBlock`): 2 nhịp HVT một chiều chạm/chồng mép (tim cách 10,6-13,3 m, rộng 11) và main.js tắt collider 2D trên cầu
+    cao ⇒ từng đi/chạy xe NGANG qua 2 gờ. Chặn khi mặt cầu CÙNG TẦNG (yRef −2…+1,2) có tim GẦN nhất đổi từ nhịp này sang nhịp
+    kia (chỉ kind 'span' — nhịp chỉ nối đầu-đầu với vòng xoắn/dốc). BẪY đã thử: (1) "mặt cầu cao nhất" thay vì "tim gần nhất"
+    → đi sát gờ ở chỗ 2 nhịp chồng mép (z −930…−955) bị coi là đứng trên nhịp kia; (2) tiêu chí "điểm mới nằm cạnh way cũ" chặn
+    nhầm ở chỗ nối dốc ↔ vòng xoắn (vòng cong, dốc rời tiếp tuyến). Kiểm node (scratch r5/parapet4.mjs): đi theo 2 xích HVT ở
+    tim / ±4,8 / ±5,1 m, 2 chiều — chặn sai 0; probe: đi bộ/chạy xe máy từ nhịp này sang nhịp kia dừng ở x −53,9…−54,1, y giữ.
+    (d) **NHỎ**: vòm z0 −1012 → −1018 (pano_285 h90 hết mẩu sườn đông ở mép trái; h270 sườn tây vẫn mọc ở mép phải); ca-rô
+    nhạt hơn (đỏ 146,116,108 / xám 132,128,122 — ảnh 290/299 hồng-xám bạc); vách lán tôn kẽm/tôn gỉ/bạt xanh/ván cũ (vách xám
+    nhạt đọc thành "hộp bê tông" ở 519/336); biển địa danh 'bridge' neo lại chân nhịp chính thật (−36,−915) thay đầu "hộp
+    thẳng" cũ EXTRAS.bridges[0] (123,−819), diag tiếp cận OK; `deckRoads` trả `{...r, pts, kind, hw}` (giữ mọi trường của way).
+    Nhà thuyền tb_shack khối B2 (thân thuyền + mui bạt, đặt ở điểm nước đầu tiên 14-42 m phía sông) là THUYỀN có chủ ý — giữ.
+    (e) **GHI CHÚ TÍCH HỢP**: (1) W3-A thêm bề rộng riêng từng way (ROADS_DT[i].w/.sw, xsection.roadHW(way)): sau gộp chuyển
+    riverbank hw(c)/sw(c) + process_osm §6b3 clearOf(c) sang bề rộng theo way, giữ w/sw trong line object của roadgraph
+    (dòng `cur = { c, ri, kind, hw, … }`), rồi CHẠY LẠI process_osm (mép kè + mép ngoài ca-rô theo lòng Tam Bạc hẹp mới).
+    (2) `js/buildings_real.js` là file SINH (tools/process_buildings.mjs dùng terrain.waterSD = WATER mới): nhánh KHÔNG sinh lại;
+    sinh lại từ đầu vào W3-F: drop_water 97 → 91, ~12,7k/46k footprint đổi chỗ trong file (chuỗi sinh dịch), 74 → 72 nhà giữa
+    phố ven sông và nước, 5 nhà mới trên bãi bồi bị claim 'rough' giết ⇒ người tích hợp PHẢI chạy lại + kiểm lại. (3) keep() xoá
+    cây cổ thụ có miếu phía nhà ở pano_473 h90/h180 → phối hợp W3-G (cây di sản/hero). (4) KHÔNG làm: lòng 2 vòng xoắn 'parking'
+    trống ở pano_304 h180/h270 (ảnh thật: đường có vạch + dải phân cách), bậc polygon Tam Bạc ở 221 h270 (gờ kè chéo), TIER cho
+    bộ kit bờ (máy yếu), hàng đợi công bằng cho tools/qa/gpulock.mjs (poll 3-5 s thua poll 250 ms của tác tử khác).
+    **ĐO / KIỂM r5** (2026-10-14, tier 3, ANGLE Radeon 890M D3D11, cùng phiên dot3 :8596 vs nhánh :8506, máy chung với các WP
+    khác — nhiễu ±100 ms/bước): {BOOT}
 
 - **2026-10-04 (W2-F POLISH)** [ĐỢT 3 wave 2 — WebGL1, giải mã RB 1 lần, kho cảng, ĐÊM, giao thông né xe đỗ, dọn code chết, hitch]:
     **(1) WebGL1** (three r160 tự lùi WebGL1 khi không có WebGL2): KIỂM bằng `tools/qa/shoot.mjs --gl1` (init script cho

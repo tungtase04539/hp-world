@@ -87,13 +87,16 @@ function quad(B, a, b, c, d, nrm, col, uv) {   // a,b,c,d theo chiều ngược 
   if (uv) B.u.push(uv[0][0], uv[0][1], uv[1][0], uv[1][1], uv[2][0], uv[2][1], uv[3][0], uv[3][1]); else B.u.push(0, 0, 0, 0, 0, 0, 0, 0);
   B.idx.push(o, o + 1, o + 2, o, o + 2, o + 3);
 }
-function toGeo(B) {
+// withUV = false cho material KHÔNG texture (r5): freezeStatic gộp lượt 1 chép từng tam giác (splitGeometryByTile — kể cả
+// mesh nhỏ, qua toWorld) rồi XOÁ uv — chép uv là phí. (Đã thử CHIA Ô SẴN theo lưới freeze: không lợi gì — mesh nhỏ cũng bị
+// chép từng tam giác khi gộp; chi phí freeze ∝ số tam giác × số thuộc tính.)
+function toGeo(B, withUV = true) {
   if (!B.idx.length) return null;
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(B.p, 3));
   g.setAttribute('normal', new THREE.Float32BufferAttribute(B.n, 3));
   g.setAttribute('color', new THREE.Float32BufferAttribute(B.c, 3));
-  g.setAttribute('uv', new THREE.Float32BufferAttribute(B.u, 2));
+  if (withUV) g.setAttribute('uv', new THREE.Float32BufferAttribute(B.u, 2));
   g.setIndex(B.idx);
   // nhả mảng JS nguồn (đã chép sang typed array): closure trả về (keep/promSide…) giữ NGỮ CẢNH hàm dựng — mảng Buf
   // nằm trong ngữ cảnh đó (hàm con dùng chung) ⇒ không nhả thì ~30 MB heap sống suốt phiên (heap sau gc so với dot3: +54 → +27 MB)
@@ -604,7 +607,7 @@ export function buildBridges(scene, deps) {
 
   // ---- ráp mesh ----
   const addMesh = (B, mat, name) => {
-    let g = toGeo(B);
+    let g = toGeo(B, !!mat.map);
     if (B.geos && B.geos.length) {
       const gs = B.geos.map((x) => { const y = x.index ? x.toNonIndexed() : x; y.deleteAttribute('uv'); return y; });
       const gg = mergeGeometries(gs); B.geos.forEach((x) => x.dispose());
