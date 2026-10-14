@@ -2022,7 +2022,22 @@ function applyFP(b, fr) {
   if (b.floors >= 7 && b.roofType !== ROOF.FLAT) b.roofType = ROOF.FLAT_PARAPET;
   // mái NGÓI thấy được từ phố (nhà Pháp/biệt thự) → mái ngói 4 dốc (renderer tự lùi về mái hồi nếu footprint không vuông vức)
   if (fr.roof === FP_ENUMS.roof.indexOf('tile') && b.floors <= 4 && b.roofType !== ROOF.HIP_TILE) { b.roofType = ROOF.HIP_TILE; b.roofColor = [2, 1, 0, 10, 3, 14][hash32(b.id + 'fproof') % 6]; }
+  // màu tường ĐO TRÊN ẢNH gồm cả bóng râm/ngược sáng (pano_432 h270: tường "#33302c" → khối đen sì trong game, nơi đèn game
+  // tự đổ bóng lần nữa) → nâng độ sáng tương đối tối thiểu 0,42 (giữ sắc độ) trừ nhà kính/khách sạn kính
+  if (fr.wall >= 0 && fr.style !== FPS('glass_office') && fr.style !== FPS('hotel_tower')) {
+    const r = (fr.wall >> 16) & 255, g = (fr.wall >> 8) & 255, bl = fr.wall & 255, L = (0.2126 * r + 0.7152 * g + 0.0722 * bl) / 255;
+    if (L < 0.42) {
+      const k = 0.42 / Math.max(L, 0.05), up = (c) => Math.min(255, Math.round(c * k + (L < 0.08 ? 60 : 0)));
+      fr = { ...fr, wall: (up(r) << 16) | (up(g) << 8) | up(bl) }; stat('fp_wall_lifted');
+    }
+  }
   if (fr.wall >= 0) { b.wall = nearestWall(fr.wall); }
+  // DÃY GỘP (mặt phố dài hơn hẳn bề rộng nhà quan sát: ML gộp nhiều nhà ống thành 1 khối không chia lô được): quan sát chỉ tả
+  // MỘT nhà trong dãy → không ép tầng trệt/biển/mái hiên/ban công/màu cho CẢ dãy (pano_092 h180: 1 cửa cuốn → cả dãy 5 bay
+  // cửa cuốn trơn không biển). Giữ kiểu/tầng/tuổi + màu nền (chỉ số WALL_PALETTE); citygen giữ đa dạng từng bay như cũ.
+  let fLmax = 0; for (const f of b.fronts) { const P = b.pts, a = P[f.k], c = P[(f.k + 1) % P.length]; fLmax = Math.max(fLmax, Math.hypot(c[0] - a[0], c[1] - a[1])); }
+  const partial = fr.widthM > 0 && fLmax > Math.max(2 * fr.widthM, fr.widthM + 6);
+  if (partial) { stat('fp_partial'); fr = { ...fr, ground: -1, sign: { size: -1 }, awning: -1, balcony: -1, wall: -1 }; }
   const use = FP_USE.get(fr.ground);
   if (use !== undefined && !b.cbIn && b.fronts.length) b.info = (b.info & ~INFO.USE_MASK) | (use << INFO.USE_SHIFT);
   else if (!b.cbIn && b.fronts.length && (fr.style === FPS('glass_office') || fr.style === FPS('hotel_tower')) && fr.ground < 0) b.info = (b.info & ~INFO.USE_MASK) | (INFO.USE_OFFICE << INFO.USE_SHIFT);
