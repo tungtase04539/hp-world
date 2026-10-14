@@ -422,7 +422,7 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
-- **2026-10-05 → 10-11 (Đ3-W3-D SURFACES)** [ĐỢT 3 wave 3 — BỀ MẶT THEO BẰNG CHỨNG: vạch tim, zebra, đèn tín hiệu, vật liệu vỉa hè,
+- **2026-10-05 → 10-14 (Đ3-W3-D SURFACES)** [ĐỢT 3 wave 3 — BỀ MẶT THEO BẰNG CHỨNG: vạch tim, zebra, đèn tín hiệu, vật liệu vỉa hè,
     vườn hoa, bụi cắt tỉa, trời] (AUDIT3 FP-4: MARK 23 pano, PAVE 20, PARK 17, SKY 6 — mặc định "chỉ thêm" → sai dương tính):
     **(1) Bằng chứng mới — `tools/gen_roadmarks.mjs` → `js/roadmarks.js` (SINH):** giữ `ROAD_MARK_EVIDENCE` (chữ pano), thêm
     `ROAD_MARK_LABELS` = NHÃN NHÌN ẢNH pano thật theo trục đường (`tools/pano_loop/mark_labels.json`, 169 pano trên 72 way s/t:
@@ -444,7 +444,7 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     R1750: đèn 131 → 29 (25 OSM + 4 pano), nhánh zebra 750 → 239 (115 OSM, 79 theo đèn, 45 chữ). Chữ pano: mệnh đề
     tả đèn/zebra Ở XA ("(xa)", "phía xa", "cuối phố", "đằng xa" — `FAR` trong gen_roadmarks, "xa" là TỪ riêng, không khớp "xanh")
     KHÔNG tính: pano_394 "đèn tín hiệu phía cuối phố" từng dựng đèn + zebra ma ở nút cạnh pano_496 (20 m), 083 "(xa)" tương tự. (dot3: 131 nút đèn chỉ 23 có
-    node OSM; 33/42 pano tả "đèn tín hiệu" nằm ≤ 50 m node OSM → OSM HP đáng tin cho đèn.) **VẠCH QUA ĐƯỜNG GIỮA KHỐI** (116):
+    node OSM; 33/42 pano tả "đèn tín hiệu" nằm ≤ 50 m node OSM → OSM HP đáng tin cho đèn.) **VẠCH QUA ĐƯỜNG GIỮA KHỐI** (114 — xem (9a), (10a)):
     node OSM không thuộc nút có zebra (rad + 4) trên lòng phố (≤ hw + 2) hoặc chữ pano "có vạch qua đường" không có nút ≤ 45 m
     → TÁCH dải tại uc + 1,5 m: phần trước ZEB1 với aZeb.y = uc + 2,3 (vạch u ∈ [uc − 1,5; uc + 1,5]), phần sau ZEB0 với
     aZeb.x = uc − 2,3 (tim đường dừng/tiếp 3,3 m quanh vạch như ở nút) — shader roadtex KHÔNG đổi. `stats` mới: sigOsm/sigEv/
@@ -508,6 +508,25 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     (f) Bụi viền vườn + dm7 sáng hơn (đỉnh (0,37,0,51,0,23), `foot` 0,68 — 225 h090 bụi gần đen); `hedgeGeometry` thêm `maxHalf` (kẹp nửa bề ngang) → bụi
     dải phân cách LQĐ ≤ 0,7 m trong bó vỉa 1,5 m (không lấn làn xe). (g) Caro lớp 3: viên đỏ (184,138,122) → (176,140,130),
     xám (170,167,161) — kè Thế Lữ 290 bớt cam-hồng.
+    **(10) PHẢN BIỆN VÒNG 2 (2026-10-14):** (a) **Bằng chứng ÂM zebra** — `mark_labels.json` mục `noZebra` (id → ghi chú,
+    CHỈ thêm sau khi nhìn ảnh 8 hướng): 4 pano liền nhau Hoàng Diệu 015-018 đều có chữ "Vạch qua đường" chung chung nhưng ảnh
+    không có vạch nào → gen_roadmarks bỏ cờ ZEBRA → hết 4 vạch giữa khối MA ngay dưới camera (vạch giữa khối 118 → 114).
+    BẪY: chữ `street_furniture` liệt kê vật thể của CẢ pano 360° (có khi là vạch cách xa/khuất), 4 pano liền kề cùng một câu
+    = dấu hiệu chép mô tả → kiểm ảnh trước khi tin. (b) **Vỉa hè PHÍA CÔNG VIÊN** — chữ `sidewalk` hay tả hè phía NHÀ rồi
+    thêm mệnh đề riêng cho phía vườn ("caro đỏ-xám …; phần công viên/quảng trường lát gạch xám" — 222/223/225/226 Tố Hữu;
+    "phía công viên lát gạch xám" 340/521; "… cả hai bên" 400). gen_roadmarks: `ROAD_PAVE_EVIDENCE` thêm phần tử thứ 4 = lớp
+    phía công viên (mệnh đề có `phía|phần|bên|dọc|ven|quanh|mép (dải) công viên|vườn hoa|vườn|quảng trường` + vật liệu, "caro"
+    trơn = 3; "vỉa hè … hai bên" → như lớp chính; không có → 0; 10 xám + 15 caro). roadnet: ô vỉa hè có mép ngoài đẩy ra 1,5 / 4 / 7 m
+    rơi TRONG đa giác `PARKS` (deps.PARKS — đa giác vườn Tố Hữu lùi ~4,6 m sau mép hè) → lớp phía công viên của bằng chứng
+    gần nhất (≤ 150 m) gắn CHÍNH vườn đó (điểm pano ≤ 25 m tới đa giác — mặt lát là của vườn, không của way); không có → mặc
+    định way (`SIDEWALK_BY_ROAD`), KHÔNG lấy chữ phía nhà. Góc nút giao: kiểm điểm giữa mép lưng đẩy xa tâm nút. Đổi đúng 25
+    ô: bờ vườn Tố Hữu 2 phố (ri 6/201) caro → xám, mũi Kim Đồng (202/334) caro → xám, Trần Phú quanh 475 (84) xám → caro;
+    `stats.pavePark/paveParkEv`. (c) Nhãn ảnh vật liệu `mark_labels.json` mục `pave` (id → [lớp, ghi chú]) thắng chữ: 478 'gạch
+    block xám-đỏ' → 2 (ảnh xám), 150 'caro … con sâu' → 5. (d) Vạch chữ giữa khối có nút ≤ 30 m → dời 4 m dọc đoạn VỀ PHÍA
+    nút (551: ảnh h180 thấy vạch 2-6 m phía trước; đặt đúng chân camera thì không hướng nào thấy); xa hơn giữ tại pano.
+    (e) `PLAZA_PATCHES` + [690,−418,24] mũi bắc vườn Kim Đồng (545 h180 ảnh: sân lát + nhà chờ). (f) Gộp nhánh: import
+    `corridorPen as clrCorridorPen` nằm TRONG dòng import clearance (giống hệt W3-A) — dòng import riêng cũ làm cây gộp W3-A+D
+    lỗi "Identifier 'clrCorridorPen' has already been declared" (git merge-tree không báo xung đột).
     **CHƯA LÀM:** vạch gạch chéo/xương cá ở mũi tách làn (gore, 304 — hình học nút HVT/cầu dẫn thuộc W3-F, camera lệch 11 m
     thuộc W3-A), trời u ám cho pano trời mây, mặt bê tông liền "shared surface" ngõ chợ (W3-E).
     **ĐO / KIỂM (2026-10-11, cùng phiên; base = git archive dot3 :8514, W3-D :8504; Radeon 890M TIER 3):** roadnet R1750
