@@ -1251,8 +1251,8 @@ export function buildFacadeAtlas(size = 2048, opts = {}) {
     reveal(0.2, 0.14, 3.8, 2.85);
     interior(0.2, 0.14, 3.8, 2.85, 10);
     rect(0.2, 0.14, 3.8, 0.5, [150, 140, 126], M_KEEP); for (let x = 0.2; x < 3.8; x += 0.4) vline(x, 0.14, 0.5, 0.012, [118, 110, 98], M_KEEP);   // sàn gạch men
-    rect(1.3, 1.25, 2.7, 2.25, [96, 64, 40], M_KEEP); rect(1.4, 1.35, 2.6, 2.15, [150, 40, 28], M_KEEP);   // ban thờ / tủ gỗ đỏ cuối phòng
-    rect(1.75, 1.5, 2.25, 1.9, [214, 170, 70], M_KEEP);
+    rect(1.45, 1.45, 2.55, 2.2, [78, 54, 38], M_KEEP); rect(1.55, 1.55, 2.45, 2.1, [104, 46, 34], M_KEEP);   // ban thờ / tủ gỗ cuối phòng (tối, nhỏ — r2: ô đỏ to đọc ra "ô vuông đỏ" từ xa, pano_501)
+    rect(1.88, 1.68, 2.12, 1.92, [150, 120, 64], M_KEEP);
     disc(1.25, 0.36, 0.22, [26, 26, 28], M_KEEP); disc(2.15, 0.36, 0.22, [26, 26, 28], M_KEEP);          // xe máy dựng trong nhà
     rect(1.15, 0.45, 2.3, 0.92, [CLOTHES[(rnd() * CLOTHES.length) | 0][0], 60, 60], M_KEEP); rect(1.5, 0.9, 1.95, 1.18, [40, 40, 42], M_KEEP);
     for (const x of [2.7, 3.05]) rect(x, 0.14, x + 0.28, 0.5, rnd() < 0.5 ? [186, 44, 40] : [44, 96, 168], M_KEEP);  // ghế nhựa
