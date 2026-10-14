@@ -207,3 +207,13 @@ test('degrade ladder: up one level at a time with hold, down with hysteresis, fo
   L.force(-1);
   assert.ok(LADDER.TH[1] === 25 && LADDER.TH[4] === 50);
 });
+
+test('degrade ladder ignores periodic machine stalls (5 % of ticks 6× slower) but reacts to sustained cost', () => {
+  const L = new DegradeLadder();
+  const feed = (pattern, secs) => { for (let s = 0; s < secs; s++) { for (let i = 0; i < 20; i++) L.observe(pattern(i)); L.evaluate(); } };
+  feed((i) => (i === 0 ? 70 : 12), 30);          // one 70 ms tick per second (the owner's PC under load), median 12 ms
+  assert.equal(L.level, 0, `jitter must not degrade (p99 ${L.lastP99}, decision ${L.lastQ})`);
+  assert.ok(L.lastP99 >= 70);
+  feed((i) => (i < 4 ? 40 : 20), 10);             // 20 % of ticks over 35 ms: sustained → engages
+  assert.ok(L.level >= 1, `sustained cost engages (decision ${L.lastQ})`);
+});

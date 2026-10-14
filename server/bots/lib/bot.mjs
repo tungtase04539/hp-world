@@ -93,11 +93,15 @@ export class Bot {
     const W = this.W;
     this.state = 'auth';
     const t0 = performance.now();
-    let access = null;
-    if (this.creds?.refreshToken) {
+    // like a real client: keep the 15-minute access token and re-poll /v1/join with it (queue, reconnects) instead of
+    // rotating the refresh token on every attempt (integration: 800 queued bots refreshed ~160 times/s in `stress`)
+    let access = this.access && this.access.exp - performance.now() > 60000 ? this.access.token : null;
+    const keep = (tok, expS) => { this.access = { token: tok, exp: performance.now() + (Number(expS) || 900) * 1000 }; };
+    if (!access && this.creds?.refreshToken) {
       const r = await this._http('/v1/auth/refresh', { refreshToken: this.creds.refreshToken });
       if (r.status === 200 && r.body.accessToken) {
         access = r.body.accessToken;
+        keep(access, r.body.accessExpiresIn);
         this.creds = { ...this.creds, refreshToken: r.body.refreshToken || this.creds.refreshToken };
         W.c.authRefresh++;
       }
@@ -110,6 +114,7 @@ export class Bot {
         throw Object.assign(new Error(`guest ${r.status} ${r.body.error || ''}`), { code: 'guest_' + r.status, retryAfterS: ra });
       }
       access = r.body.accessToken;
+      keep(access, r.body.accessExpiresIn);
       this.creds = { refreshToken: r.body.refreshToken, deviceId: this.s.deviceId, account: r.body.account?.id ?? null, displayName: r.body.account?.displayName ?? nick };
       W.c.authGuest++;
     }
@@ -127,6 +132,7 @@ export class Bot {
       this.state = 'wait';
       return null;
     }
+    if (j.status === 401) this.access = null;   // stale cached access token → next attempt refreshes
     if (j.status !== 200 || !j.body.ticket) throw Object.assign(new Error(`join ${j.status} ${j.body.error || ''}`), { code: 'join_' + j.status });
     if (j.body.spawnHint) this.spawnHint = j.body.spawnHint;
     this.ticketForReplay = j.body.ticket;

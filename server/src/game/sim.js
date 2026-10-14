@@ -13,7 +13,11 @@ import { encodeFrame, encodeNamesFor } from './encoder.js';
 import { DegradeLadder } from './degrade.js';
 import { SESSION } from './session.js';
 
-const SNAP_BUCKETS = [32, 64, 128, 256, 384, 512, 640, 768, 896, 1024, 1100, 1280, 1536, 2048];
+// Diagnostic: HP_DEBUG_LONG_TICK_MS=30 logs every tick longer than 30 ms with its anatomy (snapshots, ms in AOI vs
+// send) — how the integration found that slow ticks on the owner's PC carry the same work as normal ones.
+const DBG_TICK = Number(process.env.HP_DEBUG_LONG_TICK_MS) || 0;
+const DBG = { send: 0, aoi: 0 };
+const SNAP_BUCKETS =[32, 64, 128, 256, 384, 512, 640, 768, 896, 1024, 1100, 1280, 1536, 2048];
 
 export function createSim({ sessions, metrics, log, bus, now, tickHz = 20, snapHz = 10, onLevel }) {
   const w = new Writer(8192);
@@ -44,7 +48,9 @@ export function createSim({ sessions, metrics, log, bus, now, tickHz = 20, snapH
     if (!conn) return 0;
     if (conn.bufferedAmount() > NET.DROP_SNAPSHOT_BUFFERED) { s.aoi.keyframe = true; mDropped.inc(); return 0; }
     const lv = ladder.level;
+    const ta = DBG_TICK ? performance.now() : 0;
     aoiStep(sessions.world, s.entity, s.aoi, params[lv], frame);
+    if (DBG_TICK) DBG.aoi += performance.now() - ta;
     if (frame.keyframe) mKey.inc();
     if (frame.capped) mCapped.inc(frame.capped);
     if (frame.deferred) mDeferred.inc(frame.deferred);
@@ -53,6 +59,7 @@ export function createSim({ sessions, metrics, log, bus, now, tickHz = 20, snapH
     const n = bytes.length;
     let names = s.aoi.pendingNames.length ? takeNames(s.aoi) : null;
     let total = n;
+    const ts = DBG_TICK ? performance.now() : 0;
     if (!names) conn.send(bytes);
     else {
       conn.cork(() => {
@@ -66,6 +73,7 @@ export function createSim({ sessions, metrics, log, bus, now, tickHz = 20, snapH
         }
       });
     }
+    if (DBG_TICK) DBG.send += performance.now() - ts;
     mSnapBytes.observe(n);
     mSent.inc();
     mOut.inc(total);
@@ -83,6 +91,11 @@ export function createSim({ sessions, metrics, log, bus, now, tickHz = 20, snapH
       if (s.snapPhase === phase) snapshotFor(s);
     }
     const dt = performance.now() - t0;
+    if (DBG_TICK && dt > DBG_TICK) {
+      let nS = 0; for (let i = 0; i < list.length; i++) if (list[i].snapPhase === phase) nS++;
+      log.warn('long tick', { ms: Math.round(dt * 10) / 10, phase, snaps: nS, active: list.length, sendMs: Math.round(DBG.send * 10) / 10, aoiMs: Math.round(DBG.aoi * 10) / 10 });
+    }
+    DBG.send = 0; DBG.aoi = 0;
     mSnapMs.observe(dt);
     tickNo++;
     return dt;
@@ -92,8 +105,8 @@ export function createSim({ sessions, metrics, log, bus, now, tickHz = 20, snapH
     const ch = ladder.evaluate();
     if (!ch) return null;
     mLevelChg.inc(1, { to: String(ch.level) });
-    log.warn('degrade level changed', { level: ch.level, prev: ch.prev, p99: Math.round(ladder.lastP99 * 100) / 100 });
-    bus.emit('degrade', { level: ch.level, prev: ch.prev, p99: ladder.lastP99 });
+    log.warn('degrade level changed', { level: ch.level, prev: ch.prev, p90: Math.round(ladder.lastQ * 100) / 100, p99: Math.round(ladder.lastP99 * 100) / 100 });
+    bus.emit('degrade', { level: ch.level, prev: ch.prev, p90: ladder.lastQ, p99: ladder.lastP99 });
     onLevel?.(ch.level, ch.prev);
     return ch;
   }
@@ -131,7 +144,7 @@ export function register(app) {
       const st = loop ? loop.stats() : null;
       const h = app.metrics.get('snapshot_bytes');
       return {
-        ...(st || {}), level: sim ? sim.level : 0, p99Window: sim ? sim.ladder.lastP99 : 0,
+        ...(st || {}), level: sim ? sim.level : 0, p99Window: sim ? sim.ladder.lastP99 : 0, p90Window: sim ? sim.ladder.lastQ : 0,
         snapshotBytesP50: h ? h.quantile(0.5) : NaN, snapshotBytesP95: h ? h.quantile(0.95) : NaN,
         ccu: app.has('sessions') ? app.get('sessions').count() : 0,
       };
