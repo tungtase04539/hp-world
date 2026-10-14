@@ -543,6 +543,22 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     358 h90 −0,5: mất biệt thự vàng sau rào phía nam ngoài nón 358 h180 — vùng biệt thự mặc định từng phủ); nhóm D (12) 2,71 =
     (521 h315 +0,5 shophouse bên cạnh về lại; 231 h135 −0,5 lô sinh sát camera về lại — CAMNEAR); nhóm B (15) 4,07 = (cả 15 ảnh
     chụp lại, khác r3 ≤ 5/255 trừ bóng); đối chứng 3,93 =. Ảnh: scratchpad dot3/W3-B/r4/c1a c1b c2a c2b c3a c3b c4a c4b c_fin c355.
+    **LƯỢT 5 (2026-10-14, phản biện lượt 4 "merge-with-fixes"):** (a) ĐẤT CÔNG THOÁNG đi TRƯỚC nón khuôn viên / mặc định biệt
+    thự trong `parcelVeto`: ≥ 2/3 điểm thử (2, 6, 11 m sau vạch) là PLAZA/PARKING, hoặc PLAZA/PARKING/GRASS mà nón pano tại chỗ
+    KHÔNG tả khuôn viên có rào → `'open'`: không nhà sinh, không tường, không sân (trước: rào sắt + cổng 29,5 m bao quảng trường Nhà
+    hát phía Đinh Tiên Hoàng, pano_055; ~211 m tường cả TP có PLAZA sau lưng). (b) `js/parcels.js` cắt mẫu tường trong claim
+    `plaza`/`park` lúc chạy (`claimAt` — bãi Cầu Đất, Lê Chân, road#9, Bến Bính, cv_dbp_tay… generator không biết) và trên mặt
+    đường/vỉa hè (`roadNet.surfaceAt > 0,12`, ctx.surfaceAt) — `stats.cutClaim/cutRoad`. (c) CÂY XĂNG: `RX_FUEL` trong classifyObs →
+    `open` (không phiếu; "nhà điều hành cây xăng + cửa hàng tiện lợi" từng khớp 'cửa hàng' → lô sinh 1 tầng dưới mái che pano_475);
+    `pkSupport` từ chối khi nón quan sát cây xăng phủ lô hoặc pano bỏ phiếu mạnh nhất có chữ cây xăng (418). Dùng cả OPEN_RX thì
+    chặn oan 59 lô shophouse ở phố "ven sông / cạnh công viên / gần chợ" (074/075/027/233…) → chỉ chữ cây xăng. (d) THÁP "MA":
+    khớp quan sát cao tầng (tia ≤ 80 m) bị BỎ khi pano khác GẦN footprint hơn (≤ 30 m) có quan sát ≤ 5 T với nón phủ tâm footprint
+    và không quan sát ≥ 6 T trong ±40° (9/56 khớp: b5277 13 T góc Nguyễn Đức Cảnh × Mê Linh từ tia 427 h90 dài 73 m — 428 đứng 24 m
+    thấy nhà 2-4 T; nay khối ML đó chia lô 2-4 T). (e) `import * as RBM from './buildings_real.js'` (thiếu export RB_PARCELS khi
+    gộp nhánh → undefined thay vì SyntaxError liên kết làm trắng trang). (f) phụ: tường theo lớp đất (CAMPUS…) KHÔNG dựng khi nón
+    pano tại chỗ tả shop/nhà ở/nhà không-khuôn-viên (`PEV.seenOpenFront`, 51 lô — mặt tiền khách sạn TQK 355); loại "mạnh" ngầm
+    định có rào trừ khi chữ tả mặt trước mở (bồn cây/chậu cảnh/thảm/bậc tam cấp/sảnh/lối vào — 051 h45 Khoa Quốc tế BV Phụ Sản);
+    rào tôn/tường lô không dựng khi nhà thật đứng ≤ 3,8 m sau vạch. __R5_NUM__
     **BẪY:** (a) `\b` của JS không hiểu chữ có dấu ("chợ\b" không bao giờ khớp) → ranh giới tường minh; (b) "tôn" khớp trong
     "bê tông" → `tôn(?!g)`; (c) màu tường rào phải lấy từ CỤM chữ tả tường/rào/trụ/cổng — "chòi gác vàng" từng nhuộm cả rào;
     (d) tường dựng tay trong ô cells nằm ngay mặt phố — phải dò hình học trước khi dựng tường dữ liệu; (e) đo cảnh trước freeze

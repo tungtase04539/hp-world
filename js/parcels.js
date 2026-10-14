@@ -246,7 +246,7 @@ export function buildParcels(scene, ctx = {}) {
       const [ax, az] = pts[i], [bx, bz] = pts[i + 1], L = Math.hypot(bx - ax, bz - az); if (L < 0.2) continue;
       const ux = (bx - ax) / L, uz = (bz - az) / L, n = Math.max(1, Math.ceil(L / 0.8));
       // điểm thử lùi vào trong 0,15 m (tường đứng trên mép sau vỉa hè; nhà thật sát vạch thì cạnh nhà ở phía trong)
-      const badAt = (s) => { const x = ax + ux * s, z = az + uz * s; return blocked(x - uz * 0.15, z + ux * 0.15) || gateHit(x, z); };
+      const badAt = (s) => { const x = ax + ux * s, z = az + uz * s; return blocked(x - uz * 0.15, z + ux * 0.15) || (surf && surf(x, z) > 0.12 && ++st.cutRoad) || gateHit(x, z); };
       // ranh tốt/xấu giữa 2 mẫu → chia đôi 4 lần (±5 cm): tường áp sát trụ cổng / tường nhà, không hở khe tới 0,8 m
       const edge = (good, bad) => { for (let it = 0; it < 4; it++) { const m = (good + bad) / 2; if (badAt(m)) bad = m; else good = m; } return good; };
       let cur = null, prevS = 0, prevBad = false;

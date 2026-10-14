@@ -899,7 +899,7 @@ function civicFront(F, ua, ub) {
   });
   return hit;
 }
-function parcelVeto(s, sg, ta, tb, F, uBase) {
+function parcelVeto(s, sg, ta, tb, F, uBase, hasEv = null) {
   const um = uBase + (ta + tb) / 2;
   let lu = -1, nLu = 0, nPub = 0, nGrass = 0;
   for (const d of [2, 6, 11]) {
@@ -921,6 +921,10 @@ function parcelVeto(s, sg, ta, tb, F, uBase) {
     const villa = zoneAt(kx, kz, nameAt) === 'villa';
     if ((kl.kind === 'compound' && kr.kind === 'compound') || (villa && (kl.kind === 'compound' || kr.kind === 'compound'))) k = kl.kind === 'compound' ? kl : kr;
     else if (villa && kl.kind !== 'shop' && kr.kind !== 'shop') k = { kind: 'compound', walled: true, wall: WALL.FENCE, col: (hash32(`${s.ri}|${sg}`) & 1) ? 0 : 1, villa: true };
+    // (lượt 5) LAN/MẶC ĐỊNH (không nón tại chỗ) chỉ THAY nhà sinh: lô không có bằng chứng nhà (builtEvidence/obsSupport — lẽ ra
+    // 'noev' bỏ) là đất trống/công viên → KHÔNG tường/cổng, vẫn giữ sân (lõi ô không mọc nhà sinh như lượt 4) (review lượt 4: rào
+    // biệt thự mặc định + cổng trong dải công viên trung tâm quanh cây xăng 475 / 474 h135 / 398 h0 — đất OSM chỉ là URB)
+    if (k.kind && hasEv && !hasEv()) { stat('pk_spread_noev'); k = { ...k, walled: false }; }
     if (k.kind) stat('pk_spread');
   }
   let why = null, wall = -1, col = 0, depth = 0;
@@ -937,13 +941,6 @@ function parcelVeto(s, sg, ta, tb, F, uBase) {
   else if (civicFront(F, uBase + ta, uBase + tb)) { why = 'civic'; wall = WALL.FENCE; col = 1; depth = 14; }
   if (DBGPV && Math.hypot(kx - DBGPV[0], kz - DBGPV[1]) < DBGPV[2]) console.log('  [dbg pv]', kx.toFixed(1), kz.toFixed(1), why, 'wall', wall, 'k', k.kind, k.score && k.score.toFixed(2), 'lu', lu, nLu, nPub, nGrass, JSON.stringify(k.V || {}), (() => { const b = PEV.votes(kx, kz).best; return b ? b.p.id + ' h' + b.o.deg + ' ' + b.o.fl + 'F' : ''; })());
   if (!why) return null;
-  // RÀO TÔN / tường lô trước NHÀ THẬT đứng ngay sau (≤ 3,5 m sau vạch — dãy nhà lùi nhẹ): không dựng (review lượt 4: rào tôn
-  // xám trước dãy shophouse đang buôn bán pano_478 h270) — lô vẫn để trống
-  if (wall === WALL.HOARD || wall === WALL.LOTWALL) {
-    const Q = frameRect(F, uBase + ta, uBase + tb, 0.3, 3.8); let live = 0;
-    grid.query(bbox(Q), (j) => { const o = B[j]; if (!o.dead && !o.synth) live += overlapArea(Q, o.pts, 0.5); });
-    if (live > 0.25 * (tb - ta) * 3.5) { wall = -1; stat('vacant_wall_skip_live'); }
-  }
   const wa = F.world(uBase + ta, 0.3), wb = F.world(uBase + tb, 0.3);
   // tường không được đứng sát camera pano (≥ 3,5 m — như nhà sinh; đoạn vi phạm bỏ hẳn: thành khe/lối vào)
   let camHit = false;
@@ -1027,7 +1024,7 @@ function fillGap(s, sg, t0, t1) {
     // (review: lô sinh trước kho cảng x 1132-1244). Chỉ phía bắc tim Hoàng Diệu — phía nam là phố dân thật.
     if (portGapZone(mx, mz)) { stat('gap_veto_port'); GAPDBG.push([mx, mz, 'port']); continue; }
     if (alleyMouth(frameRect(F, uBase + ta, uBase + tb, 0, 6), s.ux, s.uz)) { stat('gap_veto_alley'); GAPDBG.push([mx, mz, 'alley']); continue; }   // W3-B miệng ngõ
-    { const v = parcelVeto(s, sg, ta, tb, F, uBase); if (v) { stat('gap_veto_' + v); GAPDBG.push([mx, mz, v]); continue; } }   // W3-B
+    { const v = parcelVeto(s, sg, ta, tb, F, uBase, () => builtEvidence(mx, mz, s.ux, s.uz, nx, nz) || obsSupport(frameRect(F, uBase + ta, uBase + tb, 0, 12))); if (v) { stat('gap_veto_' + v); GAPDBG.push([mx, mz, v]); continue; } }   // W3-B
     if (forecourt(frameRect(F, uBase + ta, uBase + tb, 0, 25))) { stat('gap_veto_forecourt'); GAPDBG.push([mx, mz, 'forecourt']); continue; }
     if (panoOpenVeto(frameRect(F, uBase + ta, uBase + tb, 0, 12))) { stat('gap_veto_pano'); GAPDBG.push([mx, mz, 'noev']); continue; }
     if (DBG && Math.hypot(mx - DBG[0], mz - DBG[1]) < 8) console.log('   [dbg gap]', mx.toFixed(1), mz.toFixed(1), s.c, 'ev', builtEvidence(mx, mz, s.ux, s.uz, nx, nz), 'obs', obsSupport(frameRect(F, uBase + ta, uBase + tb, 0, 12)));
