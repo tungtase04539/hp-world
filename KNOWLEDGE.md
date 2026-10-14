@@ -507,6 +507,12 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     BẪY ĐO: khung game_*/cam_high đôi khi nhảy +50-100% calls/tris NGẪU NHIÊN ở CẢ HAI phía (lượt vẽ phụ) → so A/B lấy MIN mỗi khung
     qua các lượt, không lấy TB. Cổng: node --check (citygen, facade_atlas, world.js qua .mjs), waterbfs 5/5, check_assets ĐỦ, diag
     full "TẤT CẢ THỰC THỂ OK — 0 lỗi JS" (overlap 1 ở (259,111) có từ W3), diag lite OK, 0 lỗi JS mọi lượt chụp, --gl1 0 lỗi (8 khung).
+    **SỬA SAU REVIEW (vòng 3, cùng phiên :8902, 132 khung REAL|dot3|nhánh — scratch W5-B/pairs3, fxn.jpg đêm/hoàng hôn):** (i) bạt
+    hết phát sáng ban đêm (120/248 h090 lúc 0,875 và 0,76 = mức dot3); (ii) 120 h180 lại SỌC xanh-trắng như ảnh, 248 h270 sọc;
+    (iii) thùng hàng trước NHÀ NGHỈ/bay cửa cuốn (248) và góc phố cạnh chậu cây (120) biến mất — goods 5.476 → 1.222 khối, nearTris
+    220 k → 186 k; (iv) 115 h090 hết "ô vuông đỏ"; (v) biển đo từ ảnh (147 PHỞ BÒ) giữ màu thật thay vì phai. Đối chứng không đổi
+    ngoài cây đung đưa. Cổng: diag full + lite "TẤT CẢ THỰC THỂ OK — 0 lỗi JS", --gl1 0 lỗi (khớp GL2), waterbfs 5/5, check_assets ĐỦ,
+    0 lỗi JS mọi lượt; probe fabric 1.347/1.180 ms (≈ trước sửa), detTris 589.788.
     CÒN: tầng trệt vẫn tối/phẳng hơn ảnh (cửa hàng thật sâu, sáng, hàng hoá dày); bậc thềm/khung cửa cuốn 3D, dây điện vào nhà,
     trụ ngăn lô nhô giữa các nhà ống chưa làm; biển "trên mái/bảng lớn" theo vân tay giữ như W4.
 - **2026-10-14 (Đ3-W4 SỬA HỒI QUY TÍCH HỢP)** [chấm cặp REAL | dot3 c24a52e | tích hợp W4: 5 pano tụt điểm — sửa TẬN GỐC, không gỡ W4]:
