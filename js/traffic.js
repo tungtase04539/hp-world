@@ -120,7 +120,7 @@ export function createTraffic(scene, world, opts = {}) {
         if (d > e.hw + 1.2 || d < e.hw - 2.6) continue;                  // tâm xe đỗ phải nằm ở dải sát bó vỉa
         if (Math.hypot(c.x - px, c.z - pz) - d > 0.5) continue;          // chiếu rơi ra ngoài đầu đoạn
         const sc = Math.abs(d - (e.hw - 0.6));                            // tim gần mép bó vỉa của CHÍNH cạnh này nhất
-        if (sc < bd) { bd = sc; best = { ei: a[q], u: e.cum[k] + t * L, sg: lat > 0 ? 1 : -1, inner: d - 0.9 }; }
+        if (sc < bd) { bd = sc; best = { ei: a[q], u: e.cum[k] + t * L, sg: lat > 0 ? 1 : -1, inner: d - (c.hw > 1.2 ? c.hw : 0.9) }; }   // W3-E: xe khách nửa rộng 1,3
       }
       if (!best) continue;
       parkStats.mapped++;
@@ -137,7 +137,7 @@ export function createTraffic(scene, world, opts = {}) {
       }
       edges[ei].park = m; parkStats.edges++; parkStats.spans += m.length;
     }
-  })(world.props && world.props.parkedCars);
+  })(world.props && [...(world.props.parkedCars || []), ...(world.props.stalls || [])]);   // W3-E: + hàng chợ lấn dải lòng đường sát bó vỉa
   // độ lệch ngang mục tiêu (hệ tác tử: dương = phải hướng đi) để không đè xe đỗ trong cửa sổ [s, s+look] phía trước
   function parkShift(a, e, lat) {
     if (!e.park || a.type === 'walk' || Math.abs(lat) < 0.05) return 0;
@@ -852,7 +852,7 @@ export function createTraffic(scene, world, opts = {}) {
       for (const c of l) {
         const dx = a.x - c.x, dz = a.z - c.z, sh = Math.sin(c.heading || 0), ch = Math.cos(c.heading || 0);
         const along = dx * sh + dz * ch, across = dx * ch - dz * sh;
-        if (Math.abs(across) < 0.85 + hw && Math.abs(along) < (c.len || 4.4) / 2 + hl) return true;
+        if (Math.abs(across) < (c.hw || 0.85) + hw && Math.abs(along) < (c.len || 4.4) / 2 + hl) return true;   // W3-E: xe khách hw 1,3 · phủ bạt 0,95
       }
     }
     return false;

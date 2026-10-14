@@ -50,6 +50,7 @@ Trò chơi: thế giới 3D Hải Phòng **tỉ lệ 1:1 mét thật** (từ 202
 | `js/traffic.js` / `js/vehicles.js` / `js/npcs.js` / `js/quests.js`... | Giao thông, xe cưỡi được, NPC, nhiệm vụ |
 | `js/roadgraph.js` | Đồ thị phố thật (nút giao, đường đôi một chiều — thuần JS, chạy được trong node); W3-F: TÁCH TẦNG theo cao độ đỉnh p[2] (cầu nâng không nối phố dưới), `edgeY`, `trimRoadEnds` (phố cụt dưới gầm thấp), `deckRoads` (way cầu = tim mặt cầu + cao độ) |
 | `js/models_kit.js` | BỘ MÔ HÌNH NGƯỜI & XE DÙNG CHUNG (wave 2 W2-C): người 7,5 đầu (dáng đi/ngồi trong vertex shader), người lái IK, 3 xe máy, 6 ô tô (thân loft + hốc bánh thật), LOD xa, `kitMaterial` (kênh màu/cổng phụ kiện theo instance), `humanoidGeometry` (SkinnedMesh nhân vật chơi/NPC) — dùng bởi traffic.js, props.js, character.js. Xem trang `tools/qa/models.html` |
+| `js/streetlife.js` | ĐỜI SỐNG PHỐ (Đợt 3 W3-E, gọi từ props.js): chợ dân sinh (ô dù/bạt/sạp/mẹt/người bán), hàng tràn hè theo biển hiệu + bằng chứng pano, chậu cây, cờ treo nhà, băng rôn, cổng chào ngõ, xe ba gác + mô hình xe khách/ô tô phủ bạt/trạm biến áp kiốt/đèn gang 2-5 cầu. Dữ liệu: props_evidence.js cột 7-9 + PROPS_MARKETS (tools/gen_props_evidence.mjs) |
 | `js/footprints.js` | Tra cứu footprint nhà thật ĐANG VẼ (world.rbData/rbGrid của WP2, không có thì chỉ địa danh LM_POLY) cho gameplay: camera chống xuyên tường, chỗ xuống xe, người đi bộ |
 | `js/trees.js` | HỆ CÂY instanced (Đợt 3 WP4): `plant/plantLocal` (mọi helper cây chỉ xếp hàng), `plantStreetTrees` (trồng theo dữ liệu dọc phố), `buildTrees` (atlas lá + kit 9 loài + LOD gần/xa/hero GLB) — xem §10 (WP4-trees) |
 | `js/treemap.js` | **SINH TỰ ĐỘNG** bởi `tools/gen_treemap.mjs` từ `audit/audit_enriched.json` (thảm cây 551 pano) — KHÔNG sửa tay |
@@ -1241,6 +1242,175 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     chưa có (BILL chỉ ~30 nhà); 486 (camera sát 2 m một khối ô — CAMNEAR, W3-A). Tool QA W3-C (scratchpad): `stats.mjs <port>`,
     `pick2.mjs` tia dò vật liệu, `s4/signbench.mjs` (đo atlas chữ biển trên GPU), `s4/cons467.mjs` (nhà CONS gần camera:
     bằng chứng/ngẫu nhiên), `nodefab/run2.mjs` dựng phố trong node.
+- **2026-10-05/06/11/12/14 (W3-E STREET LIFE)** [ĐỢT 3 wave 3 — AUDIT3 FP-5: CHỢ DÂN SINH, hàng tràn hè theo loại cửa hàng, ô tô/xe máy
+    đỗ theo bằng chứng, xe khách, xe ba gác, trạm biến áp kiốt, đèn gang 2/5 cầu, cờ treo nhà, băng rôn, cổng chào ngõ]:
+    MỚI `js/streetlife.js` (gọi từ `buildProps` — dùng chung lưới ô vỉa hè 3 m `sides`, vật liệu/bộ dựng hình props truyền
+    qua `G` → không thêm program shader cho đồ chợ). `tools/gen_props_evidence.mjs` thêm 3 cột (props_evidence.js
+    [..., market 0-3, spill bits, deco bits]) + `PROPS_MARKETS` = đa giác chợ OSM amenity=marketplace NHÚNG SẴN trong bộ sinh
+    (tools/osm_*.json bị gitignore; làm mới: `node tools/gen_props_evidence.mjs --osm tools/osm_landuse.json`).
+    **Mức chợ ô** (`marketLevels`, ngay sau lấy mẫu 6.1): pano ≤ 45 m có market (≥ 30 m bớt 1); đa giác OSM trong/≤ 12 m → 3,
+    ≤ 40 → 2, ≤ 80 → 1, NHƯNG pano ≤ 30 m có market 0 → trần 1 (bằng chứng âm thắng — KỂ CẢ khi pano có bit ô dù/bạt/hàng:
+    phản biện W3-E, bit ô dù ở 314/315/252/345/398/400 là "ô/dù hàng quán"/xích lô che ô → 315 cách đa giác Chợ Ga 330×260 m 8 m
+    từng thành phố chợ ô dù); ô dựng tay tên `cho_*`
+    ngay sau mặt tiền → 3; phố p trần 1; nhìn ra công viên/quảng trường/kè hồ (`parkBehind`, xem Ô tô) → 0. Từ khoá: tên riêng có
+    chữ "chợ" bị xoá
+    trước khi so (phố Chợ Con 455-457 = phố vật liệu xây dựng, Chợ Sắt đang xây, ghi chú "ghép lệch … chợ tam bạc"),
+    "sạp hàng rong/sạp báo" chỉ là mức 1, "sạp … kín/tràn/chiếm" (không có cụm chợ) là mức 2 (189 Dư Hàng: hàng hiên + xe
+    máy, không phải phố ô dù). Mức 3 theo MỆNH ĐỀ (giữa . ; |): cụm MẠNH (chợ dân sinh/cóc/rau/cá/hoa/họp, sân/dãy/nhà chợ, rừng
+    ô, dãy ô dù, sạp/ô/bạt che kín…) là 3 trừ khi ngay trước là "góc / mang tính / đặc trưng / miệng / cửa ngõ / cạnh / gần / đối
+    diện"; cụm YẾU (phố chợ, khu chợ, đầu/ngõ/cổng chợ, chợ tạm, chợ quần áo/vải/kim khí) hoặc cụm mạnh bị rào chỉ là 3 khi CÙNG
+    mệnh đề có ô/dù, sạp, bạt (không "mái bạt"), mẹt, rổ, rau, hoa quả, trái cây, xốp, hải sản, quầy cá/thịt/rau — phản biện W3-E:
+    090 "đặc trưng phố chợ quần áo", 242 "mang tính phố chợ", 214 "phố chợ buôn bán dây, lưới", 280 "miệng ngõ chợ", 002/006 "góc
+    chợ dân sinh" có ảnh thật KHÔNG sạp/ô dù mà game dựng phố chợ ô dù + đống rau quả. Hàng CỦA CỬA HÀNG bày ra hè ("bày hàng",
+    "hàng hoá bày", "giá treo quần áo" — không sạp/quầy/ô dù chợ) là mức 1 + bit hàng tràn, không phải mức 2 (21 pano: 242, 409,
+    120…). Phân bố market 0-3: [413, 50, 52, 36] → [412, 71, 30, 38]; pano có ≥ 6 đồ chợ trong 25 m (node): 154 → 122. **Sân trước** `S.fore` = claim cell/landmark/civic sau mặt tiền 1,5/4/8/12/17 m (dừng khi gặp nhà
+    THẬT — có dãy phố đứng trước thì công trình phía sau không phải sân trước) có tên chùa/đền/đình/nhà thờ/UBND/trường/cổng/…
+    → không xe máy/chợ/quán/đồ hè (chùa Hai Bà Trưng 276: điện lùi ~16 m sau sân lát, xe máy từng dựng kín trước sân).
+    **Đặt chợ**: đi dọc bên phố bước 2,1-2,8 m (mức 3, 95%) / 2,8-4,4 m (mức 2, 55%) / 3 m (mức 1, 10%); khối 9 m chọn chủ đề
+    ô dù/bạt; mỗi đơn vị thử ô (cán lệch 0,75 m khỏi sạp, vỉa ≥ 2,6 m cán giữa vỉa) → vị trí khác → bạt (mức ≥ 2 gần như liền
+    mái); hàng dưới đất (sạp phủ bạt, mẹt, bạt trải đất, bao tải, sọt) SÁT MẶT TIỀN khi vỉa ≥ 2,6 m (chừa dải bó vỉa cho xe máy
+    đỗ — ảnh 184/189), người bán ngồi ghế đẩu sau hàng (ghế = biến thể nhóm hàng, người = kit SIT), khách đứng phía đường;
+    mức 3 (40% đơn vị) thêm hàng ở dải 1,1 m lòng đường sát bó vỉa (cách nút giao ≥ 4 m) → `world.props.stalls` (traffic.js lách như xe
+    đỗ). Mọi vật: MÉP THẬT ≥ `CLEAR.PANO_R` (3 m, hợp đồng W2-A) + 5 cm tới camera pano — bán kính thật của mô hình đã co
+    giãn (ô tròn 1,45·sc, ô vuông 1,63·sc, hàng đất theo biến thể 0,25-1,1·gs, hàng tràn 0,9/1,3), bạt = khoảng cách ĐÚNG
+    điểm → hình chữ nhật (`rectClear` + `panosNear`). BẪY: bản đầu "tâm ≥ 2,5 m + bán kính" (FP-5 nói ~2,5 m) với bán kính
+    đoán thấp (ô 1,3·sc thay vì 1,45·sc; bạt chỉ thử tâm + mép trước) → `tools/qa/clearance.mjs` "cam vi phạm" 35 → 70
+    (gần < 3 m: 12 → 46, chủ yếu tán ô/bạt chợ 2,3-2,9 m, góc bạt 1,8 m) — LUÔN chạy clearance.mjs A/B khi thêm đồ hè.
+    Không trong nhà thật, không trên nhựa phố khác (`onCarriageFast`).
+    Người: bán ngồi 75/62/45% đơn vị (mức 3/2/1), khách đứng 60/30/15% + mức 3 thêm khách thứ 2 35%. Ngân sách người TÁCH 2 NHÓM
+    (`pedsMarket` 1.100 / LITE 350 cho người chợ cờ `vendor`/`mk`; `peds` chung 1.100 / LITE 450 như dot3 cho đi bộ + đứng/ngồi
+    quán): lấy mẫu chung 1 nhóm (7.500 ứng viên, giữ 26%) làm chợ đông người "ăn" mất người ĐI BỘ cả thành phố (428 → 266);
+    tách nhóm → 341. Nhóm 3 `pedsSpill` 220 / LITE 90: khách ngồi quán đặt theo BIỂN HIỆU/bằng chứng (cờ `sp`, ~670 ứng viên) —
+    chung nhóm với người đi bộ thì người đi bộ trình duyệt 444 → 350 (phản biện W3-E). `stats.pedsPre` = ứng viên trước ngân
+    sách [đi, đứng, ngồi, chợ đứng, chợ ngồi, quán theo biển]. **Đống nông sản** `props_market_produce` (1 draw call riêng, không đổ bóng,
+    ≤ 60 m, LITE 40 m — xem Số đo): mỗi vòm hàng của sạp/mẹt/bạt đất (`PRODUCE_SLOTS`, dẫn xuất từ groundI SAU groundAll → không đổi chỗ
+    đặt) có thêm 1 đống 9 quả cầu icosa pháp tuyến TRƠN màu instance pha sáng/tối từng quả + 3 quả bảng A (cổng 1 ~35% đống
+    hàng trộn) + 3 bó lá dẹt (cổng 2 ~40% đống rau) — vòm trơn một màu nhìn như "bãi slime", đống quả lổn nhổn mới đọc ra
+    rau quả; vòm cũ giữ làm lõi + LOD xa. KHÔNG gộp làm biến thể của nhóm hàng đất (mọi instance gánh ~300 đỉnh suy biến).
+    BẪY HIỆU NĂNG "gộp biến thể" (`variants()`: mọi instance chạy đỉnh của MỌI biến thể, biến thể khác bị thu về 0): đo tam giác
+    thấy được ở khung chợ 446 h270 — nhóm hàng đất 6 biến thể ~900 tam giác × 533 instance (≤ 150 m) = 479k (+ lượt bóng) → tách 2
+    nhóm (sạp+mẹt / sọt+bạt đất+bao tải+ghế) và ≤ 100 m; cầu đèn gang 2/5 cầu (35 cột) để RIÊNG `props_lamp_glow2` (gộp vào nhóm
+    kính đèn ~460 instance làm mỗi bóng đèn dây gánh +140 tam giác).
+    BẪY: (a) cán ô vào `obst` với bán kính lớn → mọi sạp ngay dưới ô bị loại (bản đầu: ô không có hàng); (b) hàng giữa vỉa
+    hè → xe máy (parkingLine) bị loại sạch khỏi phố chợ — thật thì xe máy đỗ ngoài, hàng trong; (c) `flat()` (groundHeightNoDeck
+    + isWater) là truy vấn đắt nhất của vòng chợ — ô đã kiểm dốc lúc lấy mẫu, bỏ trong okAt.
+    **Hàng tràn hè** theo chữ biển hiệu thật (SHOP_SIGNS → `signCategory`: cafe/food/furn/bike/toys/fruit/flower/cloth/hard/
+    plant — chỉ chọn đồ, chữ không hiển thị; SHOP_SIGNS đã lọc thương hiệu nên regex chỉ dùng từ chung): quán cà phê = bộ bàn
+    ghế + dù 70%, cửa hàng xe máy = hàng xe MỚI mũi ra đường xếp khít 0,68 m (hàng 2 CHỈ khi vỉa ≥ 3,9 m: xe dài ~1,9 m, bản đầu 2
+    hàng cách 1,05 m xuyên nhau) + 2 ô dù tròn phía đường khi pano "ô/dù bán hàng" (170 Tô Hiệu); pano "xe máy trưng bày" ≤ 25 m:
+    45% ô; nội thất/bàn thờ+két, đồ chơi, giá treo quần áo, xô hoa,
+    hàng chồng; + theo bằng chứng pano (spill bits ≤ 25 m) + chậu cây trước nhà (3% ô lõi). Đồ của nhà (chậu, hàng
+    tràn) CHỈ đặt khi có mặt tiền nhà thật ngay sau ô (`hasFacade`: dò facadeLine −0,3…+2,5 m) — bản đầu có chậu cây giữa vỉa hè
+    nút giao HVT (304).
+    **Ô tô** (props.js 6.6): bỏ luật `lakeSD > 18` (cấm ô tô 18 m quanh MỌI hồ → Quang Trung/Nguyễn Đức Cảnh trống) → chỉ cấm
+    phía kè (đi ra phía vỉa lại gần hồ hơn) + phía vỉa nhìn ra công viên/quảng trường (322/542/065): `parkBehind` dò từ mặt
+    tiền +0…+18 m theo pháp tuyến, gặp claim park/plaza hoặc kè/mặt nước (`openReal` = claimAt park/plaza ∨ lakeSD < 16 ∨ isWater — hồ Sen
+    322: xe đỗ sát lan can kè vì lakeSD chỉ là hồ Tam Bạc) → true, gặp
+    nhà thật trước → false (đa giác công viên OSM lùi sau dải cỏ: 542 claim cách bó vỉa ~16 m). BẪY: `ctx.openSpace` của
+    world.js KHÔNG phải "không gian mở" — nó gồm cả vùng CẤM NHÀ INFILL có nhà thật (Z-TTB1/2/3 phố công sở/bệnh viện/nút
+    Nguyễn Tri Phương, siêu khối Hải quân, chợ Nguyễn Khuyến, hành lang cầu Lạc Long…): dùng nó cho luật ô tô thì pano_395
+    (ảnh thật kín ô tô 2 bên) mất SẠCH xe; luật W3-E (ô tô/chợ/chậu/nhịp dây) dùng `openReal`/`parkBehind`. Mức lấp ô đỗ
+    tính TẠI TỪNG Ô theo pano gần nhất ≤ 60 m (`fillAt`) — trước: pano ở GIỮA đoạn polyline cho cả đoạn (Quang Trung = 1 đoạn
+    thẳng 858 m, pano giữa đoạn "không ô tô" → 0,04 suốt phố; pano_005 ảnh thật 2 xe sát camera). Nút giao: tâm/đầu xe cách LÒNG
+    phố p/s cắt ngang ≥ 12 m, t/r ≥ 6,6 m, ngõ 4,5 m (`roadIdx.nearCross`; 15 m mọi nút bỏ ~25% ô tô lõi); phố r có pano: "đỗ ven đường" 0,4, "kín hai bên"
+    0,75 (trước 0,1/0,3); s/t không pano 0,2; viên nang quanh camera giữ 6,5-8 m CHỈ khi pano không nhắc ô tô đỗ, có thì xe
+    con tâm ≥ 4,5 m/đầu ≥ 3,5 m (AUDIT3: viên nang bỏ chính các xe gần camera); VAN/TẢI chỉ nới (tâm 6,5/đầu 5,5 m) khi pano
+    "ô tô đỗ dày" (car 2), car 1 giữ 8/8 m (phản biện r2: van trắng 102 "taxi đỗ/chạy", tải xanh 276 "ô tô con đỏ đỗ" 4-6 m
+    trước camera mà ảnh thật trống); khúc cua > 12° xe đầu/cuối đoạn lùi |lat|·tan(θ/2) + 1 m khỏi khớp (sedan × van chồng
+    thân góc trong khúc cua 78° phố r); xe khách 11,4 m (pano "xe khách đỗ nối
+    đuôi" ≤ 40 m — 441 Bến Bính; bộ sinh chỉ nhận xe khách LỚN có "đỗ" CÙNG mệnh đề, không qua dấu phẩy, loại van/minibus/
+    limousine 16 chỗ → 8 pano; bản đầu `[^.;]*` bắt "xe khách/xe van …, taxi … đỗ" ở 014 → xe khách 11 m chắn camera), ô tô phủ bạt (bạt bạc) CHỈ phố r 5% / pano "phủ bạt" 35% (bản 6% mọi phố ngoài lõi đặt khối
+    xanh xám sát camera 028 mà ảnh thật là sedan đen). Bước ô đỗ đi dọc TỪNG TUYẾN (cùng phố +
+    cùng bên, đoạn nối tiếp — `byRoad`), phần dư MANG sang đoạn kế, đoạn kế thẳng hàng (< 12°) cho xe chồm qua khớp (trước: mỗi
+    đoạn polyline tự bắt đầu lại ở 2-8 m + chừa 3 m cuối → phố cong ven hồ chia đoạn 10-25 m gần như không có xe — 028/033).
+    Thứ tự kiểm rẻ trước (camera pano → nút giao → vật cản → lakeSD/parkBehind). QA: `__hpProps.carRejPts` [x,z,lý do].
+    Vật cản = CẢ THÂN xe: `obst.rectHit` (vòng tròn cột/gốc cây/cọc bạt/cán ô chạm hình chữ nhật thân xe) + `stripHit` (hình
+    chữ nhật THẬT của hàng chợ lấn lòng đường/ba gác `LIFE.stallsRoad` — obst chỉ ghi 0,6 m cho sạp dài 2,2 m). BẪY: chỉ thử tâm
+    xe (bản đầu) → 25 xe đỗ trùm sạp/đống hàng lấn lòng đường cách tâm 1-2,5 m dọc thân (353, 518, 125); hàng chợ đặt (6.4)
+    TRƯỚC ô tô (6.6) nên ô tô phải né đủ thân. Xe khách (rộng 2,5 m) tâm ở curbLine − 1,35 (ở −0,95 như xe con thân chồm 0,31 m
+    lên bó vỉa — 441); traffic.js `inner = d − hw` cho xe hw > 1,2.
+    **Xe máy**: hàng = chuỗi CỤM theo lô 3,2-6 m cách khe lối vào 0,5-0,9 m, mỗi cụm góc/mũi/khoảng riêng; bảng màu tối
+    (đen/xám/bạc/trắng — ảnh tháng 10); ước lượng ngân sách ×0,5 (thực đo, chú thích 0,8 cũ sai); xe trưng bày cửa hàng xe.
+    **Tiện ích**: cột điện phố cũ (t/r lõi, búi dây) 23-29 m. **Tuyến cột chọn BÊN NHÀ** (phản biện r2): mốc cột rơi vào mặt
+    phố TRỐNG (`bareFront`: không nhà thật 20 m sau mặt tiền, 3 điểm dọc × 6 độ sâu) → sang bên đối diện của CÙNG đoạn
+    (`S.opp`) nếu bên đó có nhà, và Ở LẠI bên đó (trễ, không zic-zắc: 1.088 nhịp chỉ 39 nhịp vắt chéo phố) tới khi bên đó lại
+    trống; bên đổi không đặt được cột → về bên gốc (bản đầu KẸT cả tuyến 500 m Hoàng Văn Thụ không cột). Hai bên đều trống mà
+    bên này là công viên/quảng trường/nước (`parkBehind` sau mặt tiền) → bỏ cột, TRỪ pano "búi dây dày" (e[4]=2). "Công viên"
+    PHẢI kèm trống: claim tròn thô (hành lang Quán Hoa 55 m, chợ Cột Đèn 28 m) phủ cả dãy nhà → chỉ dùng parkBehind thì 7 pano
+    dây dày dọc Hoàng Văn Thụ/Quán Hoa mất sạch dây. (363: tuyến dọc vỉa vườn hoa ĐBP Tây → dãy nhà phía nam như ảnh h270.)
+    Cột sát camera pano (< 3,6 m) DỊCH dọc ±2/±4 m (chỗ dịch phải ≥ 6 m mọi camera) thay vì bỏ, và 1 mốc không đặt được (nút giao + camera) thì nhịp trước
+    VẮT QUA tới cột kế (≤ 60 m) — bỏ cột = mất CẢ 2 nhịp đúng chỗ camera (092 Hạ Lý: khoảng 23-29 m rơi vào nút giao, hở 53 m
+    không dây). Nhịp dây chỉ cấm qua lòng ĐẠI LỘ khác (`roadIdx.wideAt` nửa lòng ≥ 6 m — p; W3-A: way ≥ 12 m) ở ¼ ½ ¾ nhịp +
+    khoảng mở (openReal) ở GIỮA nhịp — ngưỡng 4 m (mọi phố t/s) + openReal 3 điểm từng xoá lưới dây THẬT qua nút phố cũ
+    (457 h270, 469 h0). Dây sang nhà bên kia: phố t/r + phố s khi pano búi dây dày (e[4]=2 — 469/046), phải có nhà bên kia,
+    không qua lòng phố s/p khác (wideAt 5). Đo (node, đoạn dây ≤ 25 m quanh 294 pano "búi dây dày"): trung bình dot3 259 →
+    HEAD r1 280 → 313, pano < 60 đoạn 40 → 41 → 25, pano 0 đoạn 25 → 25 → 21; pano "không cột" giữ ~5. Trạm biến áp
+    kiốt (bằng chứng "trạm biến áp … vỉa hè/hộp", "tủ điện lớn", "hai tủ" — 207/092; nền ~1/1.000 m phố s/t lõi; ≥ 7 m camera — khối
+    xám sát ống kính 276 mà ảnh thật trống; nền KHÔNG trên vỉa phía công viên — 230/542); đèn gang 5 cầu quảng trường Nhà hát / 2 cầu ven hồ / 3 cầu vườn
+    hoa — nhóm `props_furniture2` RIÊNG (gộp vào nhóm cột 1.300 instance làm mọi cột gánh đỉnh suy biến); cờ treo nhà (cán
+    chếch 30° cắm vào mặt tiền THẬT dò từ facadeLine), băng rôn khẩu hiệu chung căng ngang phố + 2 cọc (tấm 2 mặt DoubleSide:
+    fragment shader lật U ở mặt sau `gl_FrontFacing` — không thì nhìn từ một phía chữ đọc NGƯỢC "IHT ỚƠ HNIM…", 248), cổng chào NGÕ (miệng
+    way h/w/r ≤ 40 m, lùi 3,5 m vào ngõ; cổng trường/công viên không tính), xe ba gác đỗ dải đỗ (22 pano).
+    **Rào bó vỉa giả** (FP-5 019/409): `world.js` khối ĐBP đông — bỏ rào sắt 20 m + biển xanh "XỔ SỐ" trên rào ở bó vỉa NAM
+    ĐBP (z≈-436,8, trước dãy nhà thật; ảnh 409 h135/h180 không có rào). 019: rào là hàng rào `compound()` Cảng vụ (world.js
+    ~20307) quây cả dãy nhà INFILL bờ bắc Hoàng Diệu — việc của khối khuôn viên/INFILL (W3-B), CHƯA sửa.
+    **Giao diện**: `world.props.stalls` [{x,z,heading,len,hw,kind}] (traffic.js gộp với parkedCars); `parkedCars` thêm xe
+    khách (hw 1,3) + xe phủ bạt; `__hpProps.lists` thêm mkOver/mkGround/mkRoad/spill/kioskI/coaches/covered/flagsHouse/
+    banners/gates (clearance_page bỏ qua mkRoad/coaches/covered/banners/gates — cố ý trên lòng/treo cao; collider của
+    `stalls` + xe đỗ tính như xe đỗ: vòng 3,5 m như dot3, xe dài > 6 m (xe khách) = HỘP định hướng +1 m dọc/+0,6 m ngang — vòng
+    len/2 + 1 = 6,7 m từng che mọi collider nhỏ quanh xe khách khỏi kiểm tra "trên lòng đường"); `stalls` thêm cán ô dải lòng
+    đường (kind 'umb') + khách đứng trên dải lòng (kind 'ped') để giao thông lách — clearance_page KHÔNG dùng 2 loại này che collider.
+    traffic.js `parkedHit` dùng nửa rộng THẬT `c.hw` (xe khách 1,3 / phủ bạt 0,95; trước cố định 0,85).
+    **HỢP ĐỒNG MẶT CẮT `XS(S)`** (props.js, truyền vào streetlife): mọi chỗ W3-E lấy mặt cắt bằng `XS(S)` của BÊN PHỐ (không
+    `XS(S.c)`, không gọi thẳng curbLine/facadeLine(S.c)) → {hw, sw, curb, park, furn, fac}, nhớ trên `S.xs`. **Bước hợp nhất
+    W3-A** (bề rộng riêng từng way, xsection nhận object): đổi THÂN `XS` thành `curbLine(S)/sidewalkW(S)/parkingLine(S)/
+    furnitureLine(S)/facadeLine(S)` (S mang `w/sw` từ ROADS_DT) và giải 6 hunk xung đột props.js (placeFood ×2, vòng thùng
+    rác, vòng hàng xe máy, lat/narrow xe máy, lat ô tô) bằng BẢN W3-E — các dòng đó đã dùng `XS(S)` (đã thử: merge-tree với
+    nhánh W3-A + lấy bản W3-E + đổi thân XS → props.js parse được, 0 lệnh gọi mặt cắt theo `S.c` còn lại). xsection dot3 coi object là
+    cấp 'r' (`c in ROAD_W` sai) nên trước hợp nhất thân XS vẫn truyền `S.c`. QA: `__hpProps.carRejPts`/`spans` chỉ giữ khi
+    `navigator.webdriver` hoặc `?qa=1` (≤ 180k số trong heap game thật).
+    BẪY QA (Windows): `node tools/qa/gpulock.mjs run -- bash -c "a; b"` TREO — spawnSync shell:true chạy qua cmd.exe, dấu nháy
+    bị bỏ → `bash -c bash …` chờ stdin mãi trong khi GIỮ khoá GPU (chặn mọi agent 13 phút). Gói nhiều lệnh vào 1 file .sh rồi
+    `gpulock.mjs run -- bash file.sh`.
+    **Số đo** (bản cuối dfe6e47, A/B cùng phiên 2026-10-12, TIER 3, `__hp.gpu` ANGLE AMD Radeon 890M d3d11, máy dùng chung với
+    agent khác): 24 góc views_std fps 60,2 = 60,2 (trần vsync), calls 377 → 379, tris 3,95 → 4,01 M (cam_spawn 388 → 365 /
+    3,83 → 3,86 M; pano_007_h090 529 → 542 / 5,53 → 5,72 M; cam_high_center 399 → 403 / 5,25 M; game_3 359 → 365 / 6,09 →
+    6,18 M); 6 góc phố chợ calls 299 → 298, tris 2,53 → 2,73 M (trước 2 bản sửa bẫy "gộp biến thể": 3,02 M). Dựng props
+    trong trình duyệt +125-135 ms (325 → 449 / 427 → 562 ở 2 phiên tải khác nhau), hpReady +100-340 ms (nhiễu), heap sau GC
+    377 → 386 MB, programs 69 = 69. Đếm (trình duyệt): xe máy 11.354 → 11.225, ô tô 1.667 → 1.661, người đi bộ 444 → 350
+    (người ngồi quán theo biển hiệu chia ngân sách chung), InstancedMesh 21 → 33. Theo km (lõi/giữa/ngoài, nh_run node):
+    xe máy 172/146/38 → 188/162/51, ô tô 26,7/17,2/3,9 → 21,8/17,1/6,9, ghế đẩu 13,1/11/2,2 → 16,6/12,2/2,2, mái chợ (ô/bạt)
+    44/35/9,7, hàng đất 81/64/18, hàng tràn hè 10/10,7/2,5, cờ treo nhà 9,3/9,8/1,4. Tam giác thấy được 446 h270: mái chợ
+    134k, đống nông sản 90k, hàng đất 76k + 65k. `tools/qa/clearance.mjs` A/B: gần < 3 m 12 = 12, mọi mesh < 3 m 36 = 36,
+    trên nhựa 53 = 53, lấn phố > 0,2 29 → 35 (ô tô đỗ gần camera hơn theo FP-5 khi pano thấy xe đỗ — đánh đổi CÓ CHỦ Ý với
+    viên nang 6,5-8 m cũ), cam vi phạm 35 → 41. Chấm lại (REAL|dot3|W3-E, 4 hướng/pano): 18 pano đích 3,89 → 4,25; 8 pano
+    đối chứng 2,375 → 2,5 (cả +0,125 từ 395 — luật ô tô openReal; 7 pano còn lại 0). LITE: 0 lỗi JS ngoài 404
+    `assets_lite/*.glb` (máy này không có bản lite cục bộ — dot3 y hệt).
+    **Số đo sau phản biện** (bản sửa 2026-10-12, A/B cùng phiên với dot3, TIER 3, Radeon 890M): 24 góc views_std calls 374 →
+    379, tris 4,04 → 4,09 M (fps trần vsync 59,4 → 59,7); 6 góc chợ: 5 góc calls/tris = bản dfe6e47 (±1 %), 446 h270 +77 calls
+    với khung hình Y HỆT (nhiễu nạp/bóng — probe tam giác props thấy được ở đó GIẢM: mái chợ 126k → 88k, hàng đất 133k → 106k).
+    Dựng props node cùng lượt (dfe6e47 → bản sửa) 549-563 → 570-571 ms (+10-20 ms: thân xe rectHit/stripHit, nhóm người 3);
+    trình duyệt 526 → 731 ms so dot3 (nhiễu máy chung). Heap sau GC 377 → 385 MB, programs 69 = 69. Đếm trình duyệt: người
+    đi bộ 444 → 436 (bản dfe6e47: 350), ô tô 1.667 → 1.610 (−51 so dfe6e47: xe trùm hàng/cọc/cột bị loại), xe khách 5, xe máy
+    11.354 → 11.504; probe trùm xe đỗ × hàng lấn lòng đường 25 → 0. clearance.mjs: gần < 3 m 12 = 12, mọi mesh 36 = 36, trên
+    nhựa 53 = 53, lấn phố > 0,2 29 → 34, cam vi phạm 35 → 40 (6 cam mới đều "lấn 0,2-0,27" do ô tô đỗ gần camera theo FP-5;
+    409 hết vi phạm). Chấm lại: 18 pano đích 3,89 → 4,28 (124 thêm sạp/ô dọc chợ +0,5; còn lại = dfe6e47), 8 đối chứng
+    2,375 → 2,5; nhóm "chợ giả" của phản biện (090, 242, 315, 214, 398, 070; thang điểm phản biện) dot3 3,25 → dfe6e47 2,75
+    → bản sửa 3,17 (090/242/315 hết phố chợ ô dù; 214/398 về như dot3).
+    **Số đo sau phản biện r2** (bản 903f798, A/B cùng phiên 2026-10-14 với dot3, TIER 3, Radeon 890M): 24 góc views_std calls
+    374 → 379, tris 3,95 → 4,00 M (fps trần vsync 60,1 → 60,2; p95 ~18 ms cả hai); 6 góc chợ calls 295 → 303, tris 2,53 → 2,71 M.
+    Khởi động trình duyệt nhiễu nặng (agent khác chạy GPU/CPU song song: lượt probe bản mới ground/cells/fabric cũng +30-50 %)
+    → đo CPU dựng props bằng node A/B HEAD r1 ↔ bản này, 3 lượt xen kẽ: 747/587/580 ↔ 629/566/581 ms (không tăng). Heap sau
+    GC 377 → 389 MB (headless giữ mảng QA spans/carRejPts — game thật không). programs 69 = 69. Đếm trình duyệt: cột điện
+    1.225 → 1.305, nhịp dây 981 → 1.075, đỉnh dây 342k → 387k, ô tô 1.667 → 1.592, xe máy 11.354 → 11.720, người đi bộ 444 → 441,
+    kiốt 36; probe chồng thân xe đỗ 0; diag bất biến giao thông 0 (parkHit dùng nửa rộng thật). Cột ≤ 4,5 m quanh 551 camera:
+    dot3 10, HEAD 10, bản đầu r2 20 (cột DỊCH ±2/±4 m lù lù trước ống kính 060) → dịch phải ≥ 6 m → 13. clearance.mjs: gần
+    < 3 m 12 = 12, mọi mesh 36 = 36, trên nhựa 53 = 53, lấn vỉa 72 = 72, lấn phố > 0,2 29 → 33 (HEAD 34), cam vi phạm 35 → 39
+    (HEAD 40). Chấm lại (REAL|dot3|HEAD|bản này): 18 pano đích 3,89 → 4,28 → 4,33 (092 dây về, 276 hết xe tải); 8 đối chứng
+    2,375 → 2,5 → 2,44 (014 h180: tuyến phố s sang bên nhà vì phía vườn hoa trống — ảnh thật CÓ cột góc vườn: heuristic sai
+    chỗ này); pano phản biện: 363 3 → 3,5 (hết lưới dây h0), 457 3 → 3,5, 469 2,5 → 3, 102 2,5 → 3 (hết van).
+    BẪY QA (máy này): `python -m http.server` (hàng chờ listen 5) TỪ CHỐI kết nối khi máy tải nặng → ERR_CONNECTION_REFUSED,
+    game không khởi động (TIMEOUT __hp) — dùng server có `request_queue_size` lớn (ThreadingHTTPServer, 256).
 - **2026-10-04 (W2-F POLISH)** [ĐỢT 3 wave 2 — WebGL1, giải mã RB 1 lần, kho cảng, ĐÊM, giao thông né xe đỗ, dọn code chết, hitch]:
     **(1) WebGL1** (three r160 tự lùi WebGL1 khi không có WebGL2): KIỂM bằng `tools/qa/shoot.mjs --gl1` (init script cho
     `getContext('webgl2')` trả null — cờ Chrome `--disable-es3-apis` KHÔNG có tác dụng ở headless mới: vẫn webgl2:true;
