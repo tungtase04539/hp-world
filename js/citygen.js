@@ -139,7 +139,7 @@ const SETS = {
   G10: ['G_SHOW', 'G_STORE0', 'G_STORE1', 'G_STORE2', 'G_ELEC', 'G_GLASS', 'G_OPEN1', 'G_STORE0'],   // W4-C: mặt KÍNH cửa hàng/ngân hàng/phòng khám
   G11: ['G_SHOW', 'G_STORE1', 'G_CIVIC', 'G_STORE0'],
   G12: ['G_HOME0', 'G_HOME1', 'G_SHUT1', 'G_OPEN0', 'G_GATE', 'G_HOME0'],
-  G13: ['G_LOBBY', 'G_LOBBY', 'G_LOBBY', 'G_STORE1'],
+  G13: ['G_LOBBY'],   // sảnh kính liền (pano_359: biển cửa hàng trên sảnh khách sạn là sai)
   GH: ['G_HOME0', 'G_HOME0', 'G_HOME1', 'G_HOME1', 'G_SHUT0', 'G_GATE', 'G_SHUT1'],   // mặt ngõ/phố nhỏ: nhà ở
   // tường hông/sau/chung LỘ (W3-C "không tường trống"): thêm tường hồi ố, xi măng thô có cửa sổ nhỏ + điều hoà, quảng cáo sơn
   SD: ['S_PLAIN0', 'S_EXP0', 'S_PLAIN0', 'S_PLAIN2', 'S_PLAIN1', 'S_WIN', 'S_WIN', 'S_BRICK', 'S_BACK', 'S_EXP1', 'S_EXP0'],
@@ -149,7 +149,7 @@ const SETS = {
   // hiếm quảng cáo sơn — KHÔNG bao giờ "trơn cả mặt" (nhà ống HP: tường hồi có ô thoáng/cửa sổ nhỏ/cục nóng)
   XP: ['S_EXP1', 'S_EXP1', 'S_WIN', 'S_WIN', 'S_BACK', 'U_AC', 'S_EXP0', 'S_EXP0', 'S_PLAIN2', 'S_EXP2'],
 };
-const FIXED_G = (st) => st === 5 || st === RS.CONS;   // kho / đang xây: 1 mô-đun trệt cố định, không có bay "nhà ở"
+const FIXED_G = (st) => st === 5 || st === RS.CONS || st === RS.HOTEL;   // kho / đang xây: 1 mô-đun trệt cố định, không có bay "nhà ở"
 // ---- MÔ-ĐUN TẦNG TRỆT theo HASH NGUYÊN — bản JS khớp TỪNG BIT với shader (ihash/pidx/pickGi trong makeMaterial) ----
 // Dùng để biết bay nào là cửa hàng CÓ dải biển (SIGN_EXT) → dựng hộp biển 3D đúng chỗ shader vẽ biển.
 // tỉ lệ "nhà ở" theo mã rc: 0 phố chính p/s/t, 1 phố nhỏ r/w, 2 ngõ h, 3 = WP1 v1 ghi công năng trệt NHÀ Ở (INFO USE_HOME: 100%)
@@ -366,6 +366,7 @@ float fabAO = 1.0;
       if (h21(vec2(bs, 5.5)) > 0.25) tint = WALLP[int(h21(vec2(bs, 9.1)) * 23.99)];
     }
     float pIdx = 0.0;
+    if (st == ${RS.HOTEL}) tint = mix(tint, vec3(0.80, 0.75, 0.64), 0.75);   // W4-C: khách sạn = ốp ĐÁ kem (không theo bảng màu nhà ống)
     if (fl >= floors - 0.01) {
       if (pitched > 0.5) m = SD[0];
       else if (st == 4 || st == 7 || st == 8) m = h21(vec2(bs * 7.1, 3.3)) < 0.75 ? ${MOD.P_COL}.0 : ${MOD.P_BALU}.0;   // W4-C: lan can mái gờ phào + con tiện

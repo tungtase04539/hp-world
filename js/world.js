@@ -6376,7 +6376,7 @@ const twBDz = (x) => -470 + 7 * (x + 541) / 561;              // tim Bạch Đ�
     // W4-C (hồi quy pano_115 "ngõ hẹp thành quảng trường lát lớn"): nhà góc trắng/nhà cấp 4 của khối này bị cell sink gỡ
     // ('near' nhà thật), lô đất trống phía TÂY ngõ (x −1093..−1111, z −74..−87, Overture không có nhà) hiện thành SÂN BÊ TÔNG
     // trơn (landuse "sát tường") + rào tôn là HỘP CAM TRƠN. Ảnh thật 115 h270: lô đất trống nền đất, dãy CONTAINER/lán tôn
-    // (xám, mảng đỏ/xanh) quay ra ngõ, rào tôn gỉ. → claim 'rough' (landuse tô đất + cỏ dại; không có footprint trong lô) +
+    // (xám, mảng đỏ/xanh) quay ra ngõ, rào tôn gỉ. → claim 'dirt' (landuse.js lớp C_DIRT; không có footprint trong lô) +
     // rào tôn SÓNG gỉ + 2 container + mái tôn lán.
     const corr = (base, rust) => new THREE.MeshLambertMaterial({ map: makeTex(512, 128, (g, w, h) => {
       g.fillStyle = base; g.fillRect(0, 0, w, h);
@@ -6385,7 +6385,7 @@ const twBDz = (x) => -470 + 7 * (x + 541) / 561;              // tim Bạch Đ�
       for (let k = 0; k < 26; k++) { const x = (k * 97) % w, ww = 3 + (k * 13) % 9, hh = 20 + (k * 37) % 90; g.globalAlpha = 0.35; g.fillRect(x, h - hh, ww, hh); }
       g.globalAlpha = 1; g.fillStyle = 'rgba(0,0,0,0.25)'; g.fillRect(0, h - 10, w, 10);
     }) });
-    claimPoly([[-1093.5, -74], [-1111, -74], [-1111, -86.5], [-1093.5, -88]], 'rough', 'lot_haly_115');
+    claimPoly([[-1093.5, -74], [-1111, -74], [-1111, -86.5], [-1093.5, -88]], 'dirt', 'lot_haly_115');
     twWall(-1096, -88, -1112, -84.5, 2.6, corr('#8d8f8a', '#7a3f26'), 0.15, true, 9);
     if (twOK(-1102.5, -81)) {
       const lan = twGrp(-1102.5, -81, 0, 'lan_container_haly');

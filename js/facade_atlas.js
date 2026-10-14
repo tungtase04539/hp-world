@@ -1144,8 +1144,8 @@ export function buildFacadeAtlas(size = 2048, opts = {}) {
   });
   const storeFront = (lit) => {        // nền chung mặt kính cửa hàng: trong SÁNG (đèn LED trắng), sàn bóng, khung nhôm đen mảnh
     threshold();
-    vgrad(0.2, 0.14, 3.8, 2.8, [246, 246, 244], [214, 214, 212], M_KEEP, 3);
-    rect(0.2, 0.14, 3.8, 0.42, [222, 220, 216], M_KEEP);
+    vgrad(0.2, 0.14, 3.8, 2.8, [228, 226, 220], [168, 164, 158], M_KEEP, 4);   // trong sáng nhưng có chiều sâu (trắng phẳng = "mảng trống")
+    rect(0.2, 0.14, 3.8, 0.42, [150, 144, 136], M_KEEP); shade(0.2, 2.5, 3.8, 2.8, 0.82);
     for (let x = 0.45; x < 3.7; x += 0.55) rect(x, 2.62, x + 0.3, 2.66, [255, 255, 250], M_KEEP);   // đèn âm trần
     return lit;
   };

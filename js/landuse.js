@@ -54,6 +54,7 @@ export function luCompose(cls, fp, grid, extra = null) {
     for (const P of extra.park || []) fillPoly(P, 8, URB);
     for (const P of extra.parking || []) fillPoly(P, 6, URB);   // W3-F: claim 'parking' (lòng nút xoắn cầu HVT = bãi nhựa)
     for (const P of extra.rough || []) fillPoly(P, 9, -1);      // W3-F: claim 'rough' (bãi bồi cửa Tam Bạc, từng là nước) → cỏ dại/cát
+    for (const P of extra.dirt || []) fillPoly(P, 7, -1);       // W4-C: claim 'dirt' (lô đất trống nền đất, pano_115) → đất
     for (const P of extra.plaza || []) fillPoly(P, 3, URB);
     for (const P of extra.bld || []) fillPoly(P, BLD, -1);
   }
@@ -600,7 +601,7 @@ export function makeGroundSystem(THREE, opt = {}) {
     if (started || !canWork) return; started = true; lastFp = fp;
     tMap = performance.now();
     if (!lastExtra) {
-      lastExtra = { plaza: claimPolys('plaza'), park: claimPolys('park'), parking: claimPolys('parking'), rough: claimPolys('rough'), bld: (ex.cellKept || []).filter((k) => k.hull && k.hull.length >= 3).map((k) => k.hull) };
+      lastExtra = { plaza: claimPolys('plaza'), park: claimPolys('park'), parking: claimPolys('parking'), rough: claimPolys('rough'), dirt: claimPolys('dirt'), bld: (ex.cellKept || []).filter((k) => k.hull && k.hull.length >= 3).map((k) => k.hull) };
       stats.extra = { plaza: lastExtra.plaza.length, park: lastExtra.park.length, parking: lastExtra.parking.length, rough: lastExtra.rough.length, bld: lastExtra.bld.length };
     }
     // sao chép (không chuyển quyền): D vẫn được các hệ khác dùng

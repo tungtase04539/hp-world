@@ -68,7 +68,8 @@ export function cellCanvasFx(t) {
   if (ar > 2.6 || ar < 1 / 2.6) return L < 0.14 && !t.userData.signTexts ? { filter: 'brightness(1.7) saturate(0.85)' } : null;
   // mặt tiền 1 màu BÃO HOÀ (xanh hoàng gia UBND pano_138, đỏ BIDV 046): giảm bão hoà — màu thương hiệu chỉ hợp ở biển
   // (sắc LẠNH — lam ≥ đỏ — sáng thêm như coolLift: xanh thương hiệu thành xanh nhạt, không thành xanh than)
-  const f = L < 0.22 ? 'brightness(1.6) saturate(0.8)' : sat > 0.55 ? (c[2] >= c[0] ? 'saturate(0.4) brightness(1.3)' : 'saturate(0.45) brightness(1.08)') : null;
+  // W4-C: nền XÁM THAN 0,22-0,32 (khối đen 'NHÀ THUỐC' pano_395 h90/h180 — thật: ốp lưới nhôm xám sáng) cũng sáng lên
+  const f = L < 0.22 ? 'brightness(1.6) saturate(0.8)' : (L < 0.32 && !t.userData.signTexts) ? 'brightness(1.4) saturate(0.85)' : sat > 0.55 ? (c[2] >= c[0] ? 'saturate(0.4) brightness(1.3)' : 'saturate(0.45) brightness(1.08)') : null;
   return f ? { filter: f } : null;
 }
 
@@ -133,6 +134,22 @@ float hpFrame = 0.0, hpPane = 0.5;
     hpFrame = max(lu, lv) * fade;
     hpPane = fract(sin(dot(floor(cu), vec2(12.9898, 78.233))) * 43758.5453);
     diffuseColor.rgb *= mix(1.0, 0.86 + 0.28 * hpPane, fade);
+    // W4-C (AUDIT4 "khối kính trơn" 157 h180 VIB, 235, 395): tầng trên = DẢI SPANDREL đục dưới mỗi băng kính (đọc ra từng
+    // sàn) + kính sáng dần lên đỉnh ô (phản trời); TRỆT (≤ 3,6 m trên mặt phố LAND_H 2) = mặt kính cửa hàng/sảnh: nội thất
+    // ẤM sáng, thanh ngang 2,7 m, chân kính tối — thay mảng xanh đặc tới tận đất.
+    float yRel = vHpW.y - 2.0;
+    if (yRel < 3.6) {
+      float tr = 1.0 - smoothstep(0.03, 0.03 + 1.5 * fw.y * ${GLASS_FH.toFixed(2)}, abs(yRel - 2.7));
+      vec3 inter = mix(vec3(0.66, 0.60, 0.50), vec3(0.86, 0.84, 0.80), smoothstep(0.4, 2.6, yRel)) * (0.85 + 0.3 * hpPane);
+      diffuseColor.rgb = mix(diffuseColor.rgb, inter, 0.62 * fade * step(0.15, yRel));
+      diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.16, 0.17, 0.18), step(yRel, 0.15));
+      hpFrame = max(hpFrame, tr * fade);
+    } else if (vHpW.y > ${GLASS_YT.toFixed(2)}) {
+      float sp = 1.0 - smoothstep(0.18, 0.18 + 1.5 * fw.y, fr.y);
+      diffuseColor.rgb *= mix(1.0, 0.82 + 0.3 * fr.y, fade);
+      diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.30, 0.33, 0.36), sp * fade * 0.85);
+      hpFrame = max(hpFrame, sp * fade * 0.6);
+    }
     diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.40, 0.42, 0.44), hpFrame);
   } }`)
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
@@ -143,7 +160,7 @@ totalEmissiveRadiance *= (1.0 - hpFrame) * (hpPane < 0.3 ? 0.25 : 1.0);`)
     reflectedLight.indirectDiffuse += (1.0 - hpFrame) * (0.8 + 0.4 * hpPane) * vec3(0.50, 0.62, 0.78) * (0.45 + 0.55 * pow(1.0 - ndv, 4.0)) * irradiance * RECIPROCAL_PI; }
 #endif`);
   };
-  m.customProgramCacheKey = () => 'cellglass_w3c2';
+  m.customProgramCacheKey = () => 'cellglass_w4c';
   return m;
 }
 
@@ -336,7 +353,7 @@ function _classicDetail(g, W, H, s, B, L) {
   return { shutter, sc, light: lightS, u };
 }
 function _winDeco(g, d, r) {
-  const ext = r.w * 0.12, hh = Math.max(2 * d.u, r.h * 0.07);
+  const ext = r.w * 0.16, hh = Math.max(2.5 * d.u, r.h * 0.085), f = Math.max(0.6, Math.min(r.w, r.h) * 0.07);   // f = khung của _win
   if (d.shutter) {
     const sw = r.w * 0.36;
     for (const x of [r.x - sw - r.w * 0.06, r.x + r.w + r.w * 0.06]) {
@@ -347,10 +364,12 @@ function _winDeco(g, d, r) {
     }
   }
   // mũ cửa (gờ đua) + bóng + bệ cửa
-  g.fillStyle = d.light; g.fillRect(r.x - ext, r.y - hh * 1.6, r.w + 2 * ext, hh);
-  g.fillStyle = 'rgba(0,0,0,0.2)'; g.fillRect(r.x - ext * 0.7, r.y - hh * 0.6, r.w + 1.4 * ext, hh * 0.45);
-  g.fillStyle = d.light; g.fillRect(r.x - ext * 0.5, r.y + r.h + hh * 0.2, r.w + ext, hh * 0.7);
-  g.fillStyle = 'rgba(0,0,0,0.16)'; g.fillRect(r.x - ext * 0.3, r.y + r.h + hh * 0.9, r.w + ext * 0.6, hh * 0.6);
+  const yh = r.y - f - hh * 1.9;                                                   // mũ cửa nằm TRÊN khung (khung che mất bản đầu)
+  g.fillStyle = d.light; g.fillRect(r.x - ext, yh, r.w + 2 * ext, hh);
+  g.fillStyle = 'rgba(255,255,255,0.22)'; g.fillRect(r.x - ext, yh, r.w + 2 * ext, Math.max(1, hh * 0.25));
+  g.fillStyle = 'rgba(0,0,0,0.24)'; g.fillRect(r.x - ext * 0.8, yh + hh, r.w + 1.6 * ext, hh * 0.55);
+  g.fillStyle = d.light; g.fillRect(r.x - ext * 0.5, r.y + r.h + f, r.w + ext, hh * 0.75);
+  g.fillStyle = 'rgba(0,0,0,0.18)'; g.fillRect(r.x - ext * 0.3, r.y + r.h + f + hh * 0.75, r.w + ext * 0.6, hh * 0.6);
 }
 export function paintGridFacade(g, W, H, s) {
   const B = _guardRGB(_rgb(s.base)), Wc = _rgb(s.win), L = _look(B, Wc);
