@@ -2,10 +2,18 @@
 import WebSocket from 'ws';
 import crypto from 'node:crypto';
 import { bootTestServer, getJson } from './helpers/client.mjs';
+import { createDb } from '../src/db/db.js';
 import { Writer, encodeHello, encodeReady, encodeState, encodeChat, encodePing, encodeReport, encodeAction, decodeS2C } from '../../js/shared/codec.js';
 import { S2C, PROTO_VERSION } from '../../js/shared/protocol.js';
 
+// TEST_DB_URL set (node test/core_pg.mjs) → the same tests run on Docker Postgres 17 with a fresh schema per boot
 export async function bootCore(over = {}) {
+  const url = process.env.TEST_DB_URL;
+  if (url) {
+    const db = await createDb({ driver: 'pg', url, poolMax: 2 });
+    try { await db.exec('DROP SCHEMA public CASCADE; CREATE SCHEMA public;'); } finally { await db.close(); }
+    return bootTestServer({ INVITE_REQUIRED: 'false', DB_URL: url, DB_DRIVER: 'pg', ...over });
+  }
   return bootTestServer({ INVITE_REQUIRED: 'false', ...over });
 }
 

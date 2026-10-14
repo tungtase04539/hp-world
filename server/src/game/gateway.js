@@ -287,7 +287,8 @@ export function register(app) {
 
   function isBlocked(recipient, sender) {
     if (recipient.blocked && recipient.blocked.has(sender.accountId)) return true;
-    const b = chat().blocks(recipient.accountId);
+    const c = chat();
+    const b = typeof c.blocks === 'function' ? c.blocks(recipient.accountId) : null;
     return !!(b && b.has(sender.accountId));
   }
   // SAY: everyone active within CHAT.RADIUS (sender included, so it learns msgRef); shadow → sender only
