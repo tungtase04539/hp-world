@@ -17,7 +17,9 @@ export const FEF = {
   AWN: 4096, TOWER: 8192, HOME: 16384,
 };
 const RX = {
-  COL: W('pháp|kiểu pháp|thời pháp|thuộc địa|cửa chớp|chớp lật|cửa vòm|vòm cuốn|phào chỉ|phào|cổ điển kiểu pháp|biệt thự cổ|nhà cổ|kiến trúc cổ'),
+  // W3-C vòng 2 (phản biện): 'cửa chớp|chớp lật|phào' có trên RẤT nhiều nhà ống thường → chỉ là COL khi đi kèm cờ CŨ (OLD)
+  COL: W('pháp|kiểu pháp|thời pháp|thuộc địa|cửa vòm|vòm cuốn|cổ điển kiểu pháp|biệt thự cổ|nhà cổ|kiến trúc cổ'),
+  COLW: W('cửa chớp|chớp lật|phào chỉ|phào'),
   NEO: W('tân cổ điển|cổ điển|hàng cột|cột tròn|cột lớn|cột la mã|cột trắng|mặt tiền cột|colonnade|trán tường'),
   GLASS: W('vách kính|mặt kính|toàn kính|kính xanh|kính đen|kính phản quang|kính cường lực|kính lớn|tường kính|ốp kính|kính màu'),
   SHOW: W('showroom|trưng bày|phòng trưng bày'),
@@ -26,10 +28,10 @@ const RX = {
   VINE: W('cây leo|dây leo|leo kín|phủ cây leo|hoa giấy leo|cây leo phủ|dây leo phủ'),
   OLD: W('cũ|cũ kỹ|ố|ố vàng|ố đen|rêu|rêu mốc|mốc|bong tróc|tróc|xuống cấp|loang|loang lổ|bạc màu|phai màu|lụp xụp|gỉ|han gỉ|nứt'),
   NEW: W('mới|mới xây|mới sơn|hiện đại|sang trọng|cao cấp'),
-  BIGSIGN: W('biển lớn|biển to|biển quảng cáo lớn|biển hiệu lớn|biển bạt lớn|pano|alu|ốp alu|biển che kín|biển chiếm|phủ kín biển|biển nhiều tầng|biển dọc|biển đứng|biển led'),
+  BIGSIGN: W('biển lớn|biển to|biển quảng cáo lớn|biển hiệu lớn|biển bạt lớn|biển che kín|biển chiếm|phủ kín biển|biển nhiều tầng|biển dọc|biển đứng|biển led|pano quảng cáo|biển alu|biển ốp alu'),
   TIN: W('mái hiên tôn|mái tôn|hiên tôn|tôn xanh|tôn che|mái che tôn|tôn sóng'),
   TARP: W('bạt|mái bạt|bạt xanh|bạt sọc|ô che|dù che|mái che bạt'),
-  AWN: W('mái hiên|mái che|hiên|bạt|ô dù|dù'),
+  AWN: W('mái hiên|mái che|hiên|bạt|ô dù|(?<!mặc\s)dù'),   // 'mặc dù' (= although) KHÔNG phải ô dù
   TOWER: W('cao tầng|tòa nhà cao|tháp|chung cư cao|khách sạn cao|tòa văn phòng'),
   HOME: W('nhà ở|nhà dân|để ở|cổng sắt|không biển|không có biển|nhà riêng'),
 };
@@ -49,7 +51,8 @@ for (const p of E) {
   let ageSum = 0, ageN = 0;
   for (const b of p.buildings || []) {
     const t = [b.style, b.color, b.features].filter(Boolean).join(' . ');
-    let f = 0; for (const [k, rx] of Object.entries(RX)) if (rx.test(t)) f |= FEF[k];
+    let f = 0; for (const [k, rx] of Object.entries(RX)) if (FEF[k] && rx.test(t)) f |= FEF[k];
+    if (RX.COLW.test(t) && (f & FEF.OLD) && !(f & FEF.NEW)) f |= FEF.COL;   // chớp/phào + cũ → thuộc địa
     // xung khắc: "mới/hiện đại" lẫn "cũ" → bỏ cả hai (mô tả mập mờ)
     if ((f & FEF.OLD) && (f & FEF.NEW)) f &= ~(FEF.OLD | FEF.NEW);
     const fl = Math.max(0, Math.min(40, Math.round(+b.floors || 0)));

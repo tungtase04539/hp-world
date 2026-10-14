@@ -63,7 +63,9 @@ export function cellCanvasFx(t) {
   const c = _rgb(base); if (!c) return null;
   const L = (0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]) / 255, mx = Math.max(c[0], c[1], c[2]), sat = mx > 0 ? (mx - Math.min(c[0], c[1], c[2])) / mx : 0;
   const ar = img.width / img.height;
-  if (ar > 2.6 || ar < 1 / 2.6) return L < 0.14 ? { filter: 'brightness(1.7) saturate(0.85)' } : null;   // dải dài RẤT tối (mặt "biển" phủ cả nhà)
+  // dải dài RẤT tối (mặt "biển" phủ cả nhà) — trừ BIỂN CÓ CHỮ (t.userData.signTexts, cellsink runDraw): biển đen chữ vàng là
+  // thật, sáng ×1,7 thành xám bạc (phản biện W3-C)
+  if (ar > 2.6 || ar < 1 / 2.6) return L < 0.14 && !t.userData.signTexts ? { filter: 'brightness(1.7) saturate(0.85)' } : null;
   // mặt tiền 1 màu BÃO HOÀ (xanh hoàng gia UBND pano_138, đỏ BIDV 046): giảm bão hoà — màu thương hiệu chỉ hợp ở biển
   // (sắc LẠNH — lam ≥ đỏ — sáng thêm như coolLift: xanh thương hiệu thành xanh nhạt, không thành xanh than)
   const f = L < 0.22 ? 'brightness(1.6) saturate(0.8)' : sat > 0.55 ? (c[2] >= c[0] ? 'saturate(0.4) brightness(1.3)' : 'saturate(0.45) brightness(1.08)') : null;

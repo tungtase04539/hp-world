@@ -341,7 +341,7 @@ export const SIGN_EXT = {
   G_SHOW: SB_FULL, G_OPEN0: SB_FULL, G_OPEN1: SB_FULL, G_OPEN2: SB_FULL, G_FOOD: SB_FULL,
 };
 // W3-C: biển bảng lớn nhiều tầng (PANEL0.. 2 dải 4×2 m/ô), biển dọc (BLADE0.. 4 dải 1×4 m/ô), biển trên mái (BILL0.. 2 dải/ô)
-export const PANEL_CELLS = 3, BLADE_CELLS = 2, BILL_CELLS = 2;
+export const PANEL_CELLS = 5, BLADE_CELLS = 2, BILL_CELLS = 2;   // vòng 2: PANEL 3 → 5 ô (10 mẫu — phản biện: 6 mẫu lặp lộ ở 253/386)
 function signBand(x0 = SB_FULL[0], x1 = SB_FULL[1]) {
   rect(x0, SIGN_Y[0], x1, SIGN_Y[1], [236, 236, 236], M_SIGN);
   rect(x0, SIGN_Y[0], x1, SIGN_Y[0] + 0.05, [70, 70, 72], M_KEEP); rect(x0, SIGN_Y[1] - 0.05, x1, SIGN_Y[1], [70, 70, 72], M_KEEP);
@@ -1063,7 +1063,9 @@ export function buildFacadeAtlas(size = 2048, opts = {}) {
   });
   // ---- BIỂN BẢNG LỚN phủ tầng 1-2 (phố thương mại p/s): 3 ô × 2 dải 4×2 m. Nền M_SIGN (nhuộm màu biển), chữ M_TEXT ----
   const PANEL_W = [['ĐIỆN THOẠI - LAPTOP', 'MUA BÁN - SỬA CHỮA'], ['NỘI THẤT GỖ', 'TỦ BẾP - GIƯỜNG - SOFA'], ['NHA KHOA', 'NIỀNG RĂNG - TRỒNG RĂNG'],
-    ['THỜI TRANG NỮ', 'HÀNG MỚI VỀ'], ['VÀNG BẠC ĐÁ QUÝ', 'MUA BÁN - TRAO ĐỔI'], ['TRUNG TÂM NGOẠI NGỮ', 'TUYỂN SINH CÁC LỚP']];
+    ['THỜI TRANG NỮ', 'HÀNG MỚI VỀ'], ['VÀNG BẠC ĐÁ QUÝ', 'MUA BÁN - TRAO ĐỔI'], ['TRUNG TÂM NGOẠI NGỮ', 'TUYỂN SINH CÁC LỚP'],
+    ['ĐIỆN LẠNH', 'ĐIỀU HÒA - TỦ LẠNH - MÁY GIẶT'], ['CẦM ĐỒ', 'XE MÁY - Ô TÔ - ĐIỆN THOẠI'], ['PHÒNG KHÁM ĐA KHOA', 'KHÁM BỆNH - XÉT NGHIỆM'],
+    ['NHÀ NGHỈ', 'NGHỈ GIỜ - NGHỈ ĐÊM']];
   for (let s = 0; s < PANEL_CELLS; s++) cell('PANEL' + s, 4, 4, () => {
     for (let k = 0; k < 2; k++) {
       const y0 = k * 2.0, w = PANEL_W[s * 2 + k], wi = 40 + s * 2 + k;

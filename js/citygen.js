@@ -1371,7 +1371,7 @@ export function buildRealFabric(scene, ctx) {
       const yRf = y0 + (rt === ROOF.FLAT ? H + 0.25 : H), yb = y0 + H + PARAPET_H + 0.8, yt = yb + Hb;
       const lx = mx - ex * Wb / 2, lz = mz - ez * Wb / 2, rx2 = mx + ex * Wb / 2, rz2 = mz + ez * Wb / 2;
       const si = (hh(seed, 503) * BILL_CELLS * 2) | 0, cellBl = MOD.BILL0 + (si >> 1), v0 = (si & 1) * 0.5 + 0.004, v1 = v0 + 0.492;
-      M.quad([lx, yb, lz, rx2, yb, rz2, rx2, yt, rz2, lx, yt, lz], fnx, 0, fnz, [0.004, v0, 0.996, v0, 0.996, v1, 0.004, v1], WHITE, s8, K_DET, cellBl, 0);
+      M.quad([lx, yb, lz, rx2, yb, rz2, rx2, yt, rz2, lx, yt, lz], fnx, 0, fnz, [0.004, v0, 0.996, v0, 0.996, v1, 0.004, v1], WHITE, s8, K_DET, cellBl, (hh(seed, 505) * 255) | 0);   // màu nền biển theo hạt giống (như blade/panel)
       const bo = 0.12, blx = lx - fnx * bo, blz = lz - fnz * bo, brx = rx2 - fnx * bo, brz = rz2 - fnz * bo;
       M.quad([brx, yb, brz, blx, yb, blz, blx, yt, blz, brx, yt, brz], -fnx, 0, -fnz, [0, 0, 0.05, 0, 0.05, 1, 0, 1], WHITE, s8, K_DET, MOD.D_SIGNF, 0);
       for (const t of [0.22, 0.78]) steelPost(M, lx + (rx2 - lx) * t - fnx * 0.06, lz + (rz2 - lz) * t - fnz * 0.06, yRf, yb, 0.09, fnx, fnz, s8);
