@@ -506,7 +506,8 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     dot3 git archive :8911 ↔ nhánh :8901, traffic off, tier 3 Radeon 890M): calls TB 384,4 → 378,9 (−1,4 %), tris 2,990 →
     2,995 M (+0,15 %, tệ nhất pano_092 h0 +0,6 %), fps 60 cả hai, hpReady 5,59/5,19 → 5,32/5,14 s; heap SAU ép GC (CDP, ABBA)
     449/449 → 450/450 MB; 0 lỗi JS. Ảnh: scratch dot3/W5-A (`base` dot3, `final` nhánh, 26 pano mục tiêu + 8 đối chứng ×4 hướng,
-    ghép `finalpairs`). Chấm cặp (REAL | dot3 | nhánh, tự chấm, 26 pano mục tiêu): 4,31 → 4,61 — rõ nhất 322 (công sở vàng rào +
+    ghép `finalpairs`). Chấm cặp (REAL | dot3 | nhánh, **TỰ CHẤM** của người làm, 26 pano mục tiêu): 4,31 → 4,61 (PHẢN BIỆN độc
+    lập: ~4,3 → 4,4, hồi quy 006 + 276 — xem "SỬA SAU PHẢN BIỆN" dưới) — rõ nhất 322 (công sở vàng rào +
     cổng mái ngói + cột cờ, toà hàng cột trắng), 450 (nhà chợ mái tôn + bảng quảng cáo + mái hiên tôn thay mảng màu trừu tượng), 354
     (dải biển tím 'NGÂN HÀNG' + biển dọc khách sạn), 161 h90 (dải xanh liên tục 'NGÂN HÀNG' như thật), 060 (trường vàng + rào cổng),
     166/377 (ốp đen 'THỜI TRANG NỮ' cửa hàng thời trang); 8 đối chứng không đổi (sai khác ≤ 10 % điểm ảnh, h270 pano_102 nhà áo

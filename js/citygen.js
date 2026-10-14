@@ -1559,7 +1559,7 @@ export function buildRealFabric(scene, ctx) {
       if (fr.length) {
         const r = buildHero({ prog: HPg, flags: heroFlags(HI), focus: heroFocus(HI), M, DT, X, Z, n, y0, H, fl, fronts: fr, wcol, acc: heroAcc, cladCol: heroClad, s8, seed, st, rs,
           gap: streetGap, free: (x, z) => { const o = fabricAt(x, z); return (o < 0 || o === b) && !claimAt(x, z); },
-          obb: { ux, uz, vx, vz, u0, u1, v0, v1 }, hotelCanopy: hotelCan, signs: heroSigns });
+          obb: { ux, uz, vx, vz, u0, u1, v0, v1 }, hotelCanopy: hotelCan, signs: heroSigns, hi: HI, cladDark: heroWall(HI) >= 0 && hexLum(heroWall(HI)) < 0.25 });
         st.tris += r.tris; st.detTris += r.detTris; st.heroTris = (st.heroTris || 0) + r.tris + r.detTris;
         if (ctx.heroLog) ctx.heroLog.push([b, HPg, fr.length, +fr[0][6].toFixed(1), +streetGap((fr[0][0] + fr[0][2]) / 2, (fr[0][1] + fr[0][3]) / 2, fr[0][4], fr[0][5]).toFixed(1), r.tris, r.detTris]);
       }

@@ -78,6 +78,20 @@ export const heroAccent = (i) => (i >= 0 ? HERO[i][4] : -1);
 export const heroFlags = (i) => (i >= 0 ? HERO[i][5] : 0);
 export const heroFocus = (i) => (i >= 0 && HERO[i].length > 7 ? [HERO[i][6] / 10, HERO[i][7] / 10] : null);
 export const heroCount = () => HERO.length;
+// DÃY NGÂN HÀNG liền kề (354: 3 lô 74-92 m² cùng một chi nhánh) → chữ 'NGÂN HÀNG' chỉ ở lô GIỮA dãy (tổng khoảng cách tới các
+// lô ngân hàng ≤ 25 m nhỏ nhất); các lô kia chỉ dải trơn màu nhấn (không 3 chữ liền nhau)
+let _lead = null;
+export function bankLead(i) {
+  if (!_lead) {
+    _lead = new Set();
+    const B = []; for (let k = 0; k < HERO.length; k++) if (HERO[k][2] === HP.BANK) B.push(k);
+    const d = (a, b) => Math.hypot(HERO[a][0] - HERO[b][0], HERO[a][1] - HERO[b][1]) / 10;
+    const nb = (a) => B.filter((b) => b !== a && d(a, b) <= 25);
+    const cen = (a) => nb(a).reduce((t, b) => t + d(a, b), 0);
+    for (const a of B) { const ca = cen(a); if (nb(a).every((b) => ca < cen(b) - 1e-6 || (Math.abs(ca - cen(b)) <= 1e-6 && a < b))) _lead.add(a); }
+  }
+  return _lead.has(i);
+}
 // phản biện W5-A: nhà chợ (hội trường mái tôn ≤ 2 tầng) / cây xăng (ki-ốt 1 tầng) chỉ ÉP tầng + kiểu SHED + mái khi footprint
 // THẬT thấp (D.floors ≤ 3 / ≤ 2). Cao hơn = sạp chợ/mái che TRƯỚC nhà nhiều tầng → giữ chiều cao, kiểu, mái; herokit chỉ thêm
 // mái hiên/mái che (pano_006 b4401: nhà 8 tầng từng bị ép thành lán 2 tầng; footprints.topAt/trees vẫn dùng D.floors)
@@ -331,7 +345,7 @@ function heroBank(c, fr, add) {
   let sc = L / 2;
   if (c.focus) { const [fx, fz] = c.focus; sc = Math.max(0, Math.min(L, (fx - ax) * ex + (fz - az) * ez)); }
   const sW = Math.min(8, L - 0.1), s0 = Math.max(0.05, Math.min(L - 0.05 - sW, sc - sW / 2)), [scx, scz] = edgeP(E, s0 + sW / 2);
-  const lettered = !signNear(c, scx, scz, 'bank', 30);
+  const lettered = (c.hi == null || bankLead(c.hi)) && !signNear(c, scx, scz, 'bank', 12);
   const plain = (a, b) => {
     if (b - a < 0.05) return;
     const [p0x, p0z] = edgeP(E, a), [p1x, p1z] = edgeP(E, b), W = (b - a) / 4, Hh = (yt - yb) / 4;
@@ -421,7 +435,8 @@ function heroStore(c, fr, add) {
   // màu ốp: màu TƯỜNG quan sát (siêu thị 414 vàng; showroom xám; thời trang đen) — không nâng sáng (ốp đen là thật).
   // Phản biện W5-A (166: cả nhà thành khối đen): ốp CHỈ dải tầng 1 trên trệt kính (ảnh: diềm tối trên showroom kính), không phủ 3 tầng
   const clad = c.cladCol || c.wcol, P = 0.32;
-  const yb = y0 + GROUND_H + 0.05, yt = y0 + Math.min(H + 0.6, GROUND_H + FLOOR_H + 0.4);
+  // ốp TỐI (< 0,25) = chỉ DIỀM biển 1,9 m trên trệt kính (166 r1 sửa: cả tầng 1 đen vẫn đọc ra khối đen)
+  const yb = y0 + GROUND_H + 0.05, yt = y0 + Math.min(H + 0.6, GROUND_H + (c.cladDark ? 1.95 : FLOOR_H + 0.4));
   if (yt - yb < 1.2) return;
   const W = Math.min(L - 0.3, 24);
   add(M, box(M, mx + nx * P / 2, mz + nz * P / 2, ex, ez, nx, nz, W / 2, P / 2, yb, yt, clad, s8, MOD.D_PLAIN, 63 ^ 2));
