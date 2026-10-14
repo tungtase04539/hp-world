@@ -195,7 +195,7 @@ function fpRenderStyle(D, e, fl, fL, area) {
   // tích hợp W4 (A × C): 'hotel_tower' trên khối LỚN (≥ 4 T, ≥ 600 m²) → RS.HOTEL (khung đá + sảnh kính W4-C); nhà nghỉ
   // ống hẹp (53 nhà vân tay 'hotel_tower', 46 < 300 m², 31 ≤ 3 T) giữ TOWER/GLASS như W4-A
   if (s === FPV.st.hotel_tower) return fl >= 4 && area >= 600 ? RS.HOTEL : fl >= 7 ? RS.TOWER : STYLE.GLASS;
-  if (s === FPV.st.shed) return STYLE.SHED;
+  if (s === FPV.st.shed) return fl <= 2 ? STYLE.SHED : -1;   // sửa hồi quy W4 (pano_519 h90): lán tạm sát nhà 3 tầng ≠ kho 3 tầng (process_buildings cũng bỏ vân tay đó)
   if (s === FPV.st.civic) return STYLE.CIVIC;
   if (s === FPV.st.construction) return fl <= 8 ? RS.CONS : -1;
   return -1;
@@ -203,6 +203,12 @@ function fpRenderStyle(D, e, fl, fL, area) {
 // biển BẢNG LỚN nhiều tầng (chế độ 3): 'multi', hoặc 'banner' phủ ≥ 2 tầng — banner 1 tầng = biển màu thật thường (phản biện
 // r1: pano_078 h90 biệt thự cổng sắt / 175 h0 mặt tiền ngân hàng nhận bảng 2 tầng + sọc giả)
 const fpPanel = (D, e) => D.fp.size[e] === FPV.size.multi || (D.fp.size[e] === FPV.size.banner && D.fp.span[e] >= 2 && D.fp.span[e] !== 255);
+// sửa hồi quy W4 (pano_046/161/515): bảng lớn TỪNG BAY (mỗi bay 1 ô PANEL chữ cửa hàng ngẫu nhiên, tầng 1-2) là kiểu phố NHÀ ỐNG
+// buôn bán (464/023 — nhiều hộ, mỗi hộ 1 biển). Toà ngân hàng/văn phòng/thương mại/thuộc địa/công sở quan sát "multi/banner" =
+// MỘT dải biển của MỘT chủ (BIDV 046, ngân hàng 161 "trắng sọc xanh", toà thương mại 515) → ra chồng "NHÀ NGHỈ/NHA KHOA/CẦM ĐỒ".
+// Chỉ chế độ 3 khi ảnh nói nhà ống (tube/tube_old) VÀ kiểu dựng là nhà ống (TUBE/OLD/MODERN); còn lại = chế độ 2 (dải biển trệt màu thật)
+const fpPanelOK = (D, e, rs) => fpPanel(D, e) && (D.fp.style[e] === FPV.st.tube || D.fp.style[e] === FPV.st.tube_old)
+  && (rs === STYLE.TUBE || rs === STYLE.OLD || rs === RS.MODERN);
 const FG_TXT = [[255, 255, 255], [30, 30, 30], [190, 30, 30], [240, 190, 40]];   // màu chữ lượng tử 2 bit (khớp fpFg shader)
 // 4 byte aFp + thông tin chi tiết 3D cho nhà b (kiểu dựng rs đã chốt). Trả null nếu không có vân tay.
 function fpBuild(D, b, rs) {
@@ -212,7 +218,7 @@ function fpBuild(D, b, rs) {
   const wallK = known(F.wallR[e], F.wallG[e], F.wallB[e]), bgK = known(F.bgR[e], F.bgG[e], F.bgB[e]);
   let mode = 4;                                                                  // biển không rõ → thống kê
   if (size === FPV.size.none) mode = 1;
-  else if (size !== 255 && bgK) mode = fpPanel(D, e) ? 3 : 2;
+  else if (size !== 255 && bgK) mode = fpPanelOK(D, e, rs) ? 3 : 2;
   const bg565 = bgK ? ((F.bgR[e] >> 3) << 11) | ((F.bgG[e] >> 2) << 5) | (F.bgB[e] >> 3) : 0;
   let fg = 0, bd = 1e9;
   for (let k = 0; k < 4; k++) { const c = FG_TXT[k], d = (c[0] - F.fgR[e]) ** 2 + (c[1] - F.fgG[e]) ** 2 + (c[2] - F.fgB[e]) ** 2; if (d < bd) { bd = d; fg = k; } }
@@ -230,7 +236,7 @@ function fpBuild(D, b, rs) {
     else if (gnd === FPV.gnd.gate) gs = 5;
     else if (gnd === FPV.gnd.home) gs = 6;
     else if (gnd === FPV.gnd.wall) gs = rs === RS.NEO ? 8 : rs === RS.COL ? 9 : 7;
-    else if (gnd === FPV.gnd.market) gs = 10;
+    else if (gnd === FPV.gnd.market) gs = (rs === STYLE.GLASS || rs === RS.TOWER || rs === STYLE.CIVIC || rs === RS.NEO) ? 4 : 10;   // sửa hồi quy W4 (515 h270): toà văn phòng/thương mại "market" = sảnh kính, không sạp chợ
     else if (gnd === FPV.gnd.restaurant) gs = 11;
   }
   let us = 0;
@@ -242,6 +248,10 @@ function fpBuild(D, b, rs) {
     else if (win === FPV.win.grille) us = 7;
     else if (win === FPV.win.glass_curtain) us = 8;
     else if (win === FPV.win.small) us = 9;
+  } else if (rs === STYLE.VILLA && bal === FPV.bal.none && (win === FPV.win.aluminum || win === FPV.win.small || win === FPV.win.grille)) {
+    // sửa hồi quy W4 (pano_533 h180): ảnh nói "villa" KHÔNG ban công, cửa nhôm/nhỏ/song sắt (43 nhà) — bộ tầng trên VILLA thống kê
+    // (ban công vòm + lan can con tiện) dựng thành khối thuộc địa 3 tầng; theo cửa sổ thật: nhôm kính / cửa sổ nhỏ / song sắt
+    us = win === FPV.win.aluminum ? 1 : win === FPV.win.small ? 9 : 7;
   }
   const bytes = [bg565 & 255, bg565 >> 8, mode | (fg << 3) | ((span >= 2 ? 1 : 0) << 5) | ((wallK ? 1 : 0) << 6), gs | (us << 4)];
   const wall = wallK ? lin((F.wallR[e] << 16) | (F.wallG[e] << 8) | F.wallB[e]) : null;
@@ -1087,7 +1097,7 @@ function renderStyles(D, CX, CZ) {
     if (rs === RS.HOTEL) age = Math.min(age, 1);   // W4-C: khách sạn/văn phòng được bảo trì — không ố nặng
     age = Math.max(0, Math.min(3, age));
     let panel = (e & FEF.BIGSIGN) || ((zf & FEZ.COMM) && hh(seed, 311) < 0.3) ? 1 : 0;
-    if (fe >= 0 && D.fp.size[fe] !== 255) panel = fpPanel(D, fe) ? 1 : 0;
+    if (fe >= 0 && D.fp.size[fe] !== 255) panel = fpPanelOK(D, fe, rs) ? 1 : 0;
     rsz[b] = rs | (age << 4) | (panel << 6);
     sts.rs[rs]++; sts.age[age]++; sts.panel += panel;
   }

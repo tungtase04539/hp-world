@@ -77,6 +77,11 @@ export function collectFP(dir, planFile) {
       row[C.signPresent] = sg.present === true ? 1 : sg.present === false ? 0 : -1;
       row[C.signBg] = hexInt(sg.bg); row[C.signFg] = hexInt(sg.fg);
       row[C.size] = enumIdx(FP_ENUMS.size, sg.size);
+      // sửa hồi quy W4 (pano_046 h270): agent ghi 'multi'/'banner' cho biển quảng cáo DỰNG TRÊN MÁI (ghi chú "biển … trên mái")
+      // → citygen dựng bảng lớn MỌI BAY tầng 1-2 thay vì 1 tấm trên mái. Ghi chú nói rõ 1 biển trên mái (không kèm '+' biển khác)
+      // → 'roof' (5 quan sát: 046 h225/270, 068 h90, 177 h0, 401 h0). Ghi chú không vào facade_fp.json nên sửa ở bước gộp
+      if ((row[C.size] === FP_ENUMS.size.indexOf('multi') || row[C.size] === FP_ENUMS.size.indexOf('banner')) && typeof b.notes === 'string'
+        && !b.notes.includes('+') && /biển[^,;+]*trên (mái|nóc)/i.test(b.notes)) { row[C.size] = FP_ENUMS.size.indexOf('roof'); st.roofFromNotes = (st.roofFromNotes || 0) + 1; }
       const sp = Math.round(+sg.floorSpan); row[C.span] = sp >= 0 && sp <= 9 ? sp : -1;
       obs.push(row); st.obs++;
     }

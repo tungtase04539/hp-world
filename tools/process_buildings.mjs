@@ -2015,7 +2015,6 @@ const nearestWall = (c) => { const r = (c >> 16) & 255, g = (c >> 8) & 255, bl =
   WALL_RGB.forEach((p, i) => { const d = 0.3 * (p[0] - r) ** 2 + 0.59 * (p[1] - g) ** 2 + 0.11 * (p[2] - bl) ** 2; if (d < bd) { bd = d; bi = i; } }); return bi; };
 function applyFP(b, fr) {
   const st0 = b.style, fl0 = b.floors;
-  if (!b.cbIn && FP_DATA_STYLE.has(fr.style)) b.style = FP_DATA_STYLE.get(fr.style);
   // W4-A r2 (phản biện): tầng chỉ áp khi các quan sát ĐỒNG THUẬN (phần trọng số trong ±1 tầng quanh trung vị ≥ 0,6 —
   // #13088 "16 vs 1", #2025 "15 vs 3" bị chặn); nhà có số tầng CHẮC (OSM levels/height, tallObs) đổi > 3 tầng cần ≥ 0,75
   // VÀ ≥ 2 quan sát near/mid (#306 OSM 15 → 5 đồng thuận 0,62: giữ 15); mọi nhà đổi > 3 tầng cần ≥ 2 quan sát near/mid.
@@ -2029,6 +2028,11 @@ function applyFP(b, fr) {
     else if (big && fr.flNM < 2) stat('fp_floors_single_kept');   // đổi > 3 tầng từ ≤ 1 quan sát gần/vừa (#13078 2 → 15 từ 1 quan sát 41 m)
     else { if (Math.abs(nf - b.floors) >= 4) stat('fp_floors_big'); b.floors = nf; b.fixed = true; b.pano = 1; }
   }
+  // Sửa hồi quy W4 (pano_519 h90): quan sát 'shed' (lán/quán tạm mái tôn 1 tầng DỰNG SÁT nhà thật) trúng footprint nhà 3 tầng
+  // mà tầng vân tay (1) không áp được → khối 3 tầng màu tôn nâu + kiểu KHO/sạp chợ = "tháp gỗ nâu" thay căn nhà góc trắng.
+  // Lán/kho mà nhà CUỐI vẫn > 2 tầng ⇒ quan sát tả VẬT KHÁC đứng trước nhà → bỏ CẢ vân tay của nhà này (giữ thống kê)
+  if (fr.style === FPS('shed') && b.floors > 2) { stat('fp_shed_tall_dropped'); return; }
+  if (!b.cbIn && FP_DATA_STYLE.has(fr.style)) b.style = FP_DATA_STYLE.get(fr.style);
   if (b.floors >= 7 && b.roofType !== ROOF.FLAT) b.roofType = ROOF.FLAT_PARAPET;
   // mái NGÓI thấy được từ phố (nhà Pháp/biệt thự) → mái ngói 4 dốc (renderer tự lùi về mái hồi nếu footprint không vuông vức)
   if (fr.roof === FP_ENUMS.roof.indexOf('tile') && b.floors <= 4 && b.roofType !== ROOF.HIP_TILE) { b.roofType = ROOF.HIP_TILE; b.roofColor = [2, 1, 0, 10, 3, 14][hash32(b.id + 'fproof') % 6]; }
