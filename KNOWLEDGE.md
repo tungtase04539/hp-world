@@ -630,7 +630,20 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     trống ở pano_304 h180/h270 (ảnh thật: đường có vạch + dải phân cách), bậc polygon Tam Bạc ở 221 h270 (gờ kè chéo), TIER cho
     bộ kit bờ (máy yếu), hàng đợi công bằng cho tools/qa/gpulock.mjs (poll 3-5 s thua poll 250 ms của tác tử khác).
     **ĐO / KIỂM r5** (2026-10-14, tier 3, ANGLE Radeon 890M D3D11, cùng phiên dot3 :8596 vs nhánh :8506, máy chung với các WP
-    khác — nhiễu ±100 ms/bước): {BOOT}
+    khác): (1) CHI PHÍ RIÊNG W3-F đo bằng đồng hồ gắn tạm quanh từng khối (3 lần full, máy rảnh): snapBankGrid 32-44 ms,
+    buildRiverbanks 56-60 ms (r4: 86), buildBridges 41-42 ms (r4: 63), tách ô mesh W3-F trong freeze 35-50 ms (r4 ~2× số tam
+    giác) ⇒ ≈ 0,17-0,19 s luồng chính (r4 ≈ 0,3 s: phản biện đo tổng bước +336 ms); lite: 18 / 57 / 42 / 55 ms (ô freeze 220 m).
+    Khớp A/B cặp chạy lúc máy rảnh (bootB lần 1): tổng bước 3925 → 4043 (+118), ground +81, landmarks +51, freeze +43. Lúc máy
+    bận (các WP khác chạy song song) A/B lệch −430…+700 ms ở cả bước KHÔNG liên quan (final, actors, shaders) — vô dụng: BẪY đo
+    perf trên máy chung → đo chi phí riêng bằng đồng hồ quanh khối + 1 cặp A/B lúc rảnh. (2) heap sau gc 383 → 397-399 MB
+    (+14-16; r4 +27-28), hình học GPU 254,7 → 264,7 MB (+10; r4 +23 — 'mrg' 30,3 → 38,8); fps 59-60 mọi góc (trần vsync);
+    calls/tam giác (2 lượt): cam_hvt 616 → 644 / 6,88 → 6,90 M, pano_285_h000 93 → 90 / 0,71 → 0,59 M, pano_304_h090 282 → 290 /
+    1,56 → 1,47 M, pano_007_h090 505 → 509 / 5,52 → 5,51 M; kit bờ 92,7k + cầu 76,5k tam giác (r4 181,6k + 108,7k). (3) Chấm 17
+    pano đích (REAL | dot3 | r5, 4 hướng): 2,91 → 4,75 (r4 4,69 theo phản biện; 285 5,0 → 5,3 hết mẩu vòm h90, chân vòm h0 như
+    ảnh; 519 3,5 → 3,7, 336 4,0 → 4,2 lán màu tôn/bạt; 290/299 ca-rô nhạt +0,1); 8 đối chứng lệch điểm ảnh ≤ 5,9 % so dot3
+    (lá lay). (4) Cổng: lỗi JS full 0, --gl1 0 (webgl2 false), lite 3 × 404 assets_lite/ (môi trường — base y hệt); diag full
+    "TẤT CẢ THỰC THỂ OK — 0 lỗi JS" (bất biến giao thông 0, underwater 0), diag base y hệt; tour 26 ảnh 0 lỗi (ảnh 'bridge' nay
+    nhìn thấy nút xoắn + vòm); waterbfs 5/5; process_osm chạy lại → mapdata md5 y hệt (674f1d01…); node --check mọi module.
 
 - **2026-10-04 (W2-F POLISH)** [ĐỢT 3 wave 2 — WebGL1, giải mã RB 1 lần, kho cảng, ĐÊM, giao thông né xe đỗ, dọn code chết, hitch]:
     **(1) WebGL1** (three r160 tự lùi WebGL1 khi không có WebGL2): KIỂM bằng `tools/qa/shoot.mjs --gl1` (init script cho
