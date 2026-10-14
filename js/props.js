@@ -762,6 +762,7 @@ export function buildProps(ctx) {
       if (Math.hypot(mx, mz) - L / 2 > R_MAX) continue;
       const ux = (bx - ax) / L, uz = (bz - az) / L;
       const n = Math.floor(L / CELL);
+      let pairS = null;   // W3-E r2: S.opp = bên kia của CÙNG đoạn (cùng ax/ux/off/n, pháp tuyến ngược) — tuyến cột đổi bên
       for (const side of [1, -1]) {
         // pháp tuyến hướng RA vỉa hè bên này: side·(uz, −ux)
         const nx = side * uz, nz = -side * ux;
@@ -782,6 +783,7 @@ export function buildProps(ctx) {
           S.ev[k] = evAt(x, z);
         }
         S.off = off;
+        if (pairS) { S.opp = pairS; pairS.opp = S; } else pairS = S;
         sides.push(S);
       }
     }
@@ -793,9 +795,11 @@ export function buildProps(ctx) {
   // mức mặc định khi không có pano gần: lõi phố cổ dày hơn ngoại vi
   const defLevel = (x, z) => { const r = Math.hypot(x, z); return r < 700 ? 2 : r < 1150 ? 1 : 1; };
   const OCC_POLE = 1, OCC_SHOP = 2, OCC_BIKE = 4, OCC_PED = 8, OCC_CAR = 16, OCC_MKT = 32;
-  // MẶT CẮT theo cấp phố — MỘT chỗ cho các phần W3-E (chợ/hàng hè/xe máy/ô tô): khi W3-A có bề rộng RIÊNG từng way,
-  // thay hàm này bằng bản theo way (S.ri) là đủ.
-  const XS = (c) => ({ hw: ROAD_HW[c] ?? curbLine(c), sw: SIDEWALK_W[c] ?? 0, curb: curbLine(c), park: parkingLine(c), furn: furnitureLine(c), fac: facadeLine(c) });
+  // MẶT CẮT CỦA MỘT BÊN PHỐ S — MỘT chỗ cho mọi phần W3-E (chợ/hàng hè/quán/xe máy/ô tô/xe khách/kiốt): mọi chỗ gọi XS(S)
+  // (KHÔNG XS(S.c)), nhớ trên S (bề rộng của bên phố không đổi). Hợp nhất W3-A (bề rộng RIÊNG từng way: S.w/S.sw, xsection
+  // nhận object {c,w?,sw?}): chỉ đổi THÂN hàm này thành curbLine(S)/sidewalkW(S)/parkingLine(S)/furnitureLine(S)/
+  // facadeLine(S) — mọi hunk xung đột props.js khác lấy bản W3-E. (xsection dot3 coi object là cấp 'r' → giữ S.c ở đây.)
+  const XS = (S) => S.xs || (S.xs = { hw: curbLine(S.c), sw: SIDEWALK_W[S.c] ?? 0, curb: curbLine(S.c), park: parkingLine(S.c), furn: furnitureLine(S.c), fac: facadeLine(S.c) });
   // W3-E: phân loại ô (mức chợ S.mk, sân trước công trình S.fore) — trước mọi đồ hè (js/streetlife.js)
   const slStats = newStreetLifeStats();
   const bikeDisplay = [];
@@ -828,13 +832,43 @@ export function buildProps(ctx) {
     const p0 = r.pts[0];
     const hs = hash3(p0[0], p0[1], 11);
     const powerSide = hs < 0.5 ? 1 : -1;
-    const fl = furnitureLine(r.c);
+    const fl = furnitureLine(r.c), fac = facadeLine(r.c);
+    // vị trí cột ở mốc acc của bên Sx (dải cột furnitureLine) — null nếu không đặt được
+    // W3-E r2: cột sát camera pano (< 3,6 m, W2-A) giờ DỊCH dọc ±2/±4 m thay vì bỏ — bỏ cột = mất CẢ 2 nhịp dây kề đúng chỗ
+    // camera đứng (pano_092 Hạ Lý: ảnh thật búi dây dày, game trống 50 m quanh camera)
+    const tryPole = (Sx, acc) => {
+      let x = Sx.ax + Sx.ux * acc + Sx.nx * fl, z = Sx.az + Sx.uz * acc + Sx.nz * fl;
+      if (!(Sx.n > 0 && x * x + z * z < R_MAX * R_MAX && !roadIdx.blocked(x, z, ri, Sx.si, 0.3) && flat(x, z) && !avoid(x, z) && !inBuilding(x, z))) return null;
+      const x0 = x, z0 = z;
+      for (const sh of [0, 2, -2, 4, -4]) {
+        x = x0 + Sx.ux * sh; z = z0 + Sx.uz * sh;
+        if (sh && (roadIdx.blocked(x, z, ri, Sx.si, 0.3) || !flat(x, z) || avoid(x, z) || inBuilding(x, z))) continue;
+        if (panoNear(x, z, 3)) continue;
+        if (obst.hit(x, z, 0.35)) {               // né thân cây/trụ có sẵn: dịch dọc ±1,5 m
+          let moved = false;
+          for (const dd of [1.5, -1.5, 3, -3]) { const x2 = x + Sx.ux * dd, z2 = z + Sx.uz * dd; if (!obst.hit(x2, z2, 0.35)) { x = x2; z = z2; moved = true; break; } }
+          if (!moved) { if (sh) continue; return null; }
+        }
+        if (clearDisc(x, z, 0.3, 3.3)) return [x, z];   // W2-A: chân cột trên nhựa (khe đường đôi/nút giao) hoặc < 3,6 m camera pano
+        if (!nearPano(x, z, 4)) return null;            // hỏng vì nhựa (không phải camera) → như cũ: bỏ
+      }
+      return null;
+    };
+    // mặt phố trống: không nhà thật trong 20 m sau mặt tiền (dò 3 điểm dọc ±4 m × 6 độ sâu)
+    const bareFront = (Sx, acc) => {
+      for (const da of [-4, 0, 4]) for (const d of [0.8, 3, 6, 10, 15, 20]) {
+        const t = acc + da, q = fac + d;
+        if (inBuilding(Sx.ax + Sx.ux * t + Sx.nx * q, Sx.az + Sx.uz * t + Sx.nz * q)) return false;
+      }
+      return true;
+    };
+    const openPole = (Sx, p) => parkBehind(p[0], p[1], Sx.nx, Sx.nz, fac - fl);   // công viên/quảng trường/nước sau mặt tiền
     // ---- tuyến cột điện ----
     {
       const list = byRoad.get(ri * 2 + (powerSide > 0 ? 1 : 0)) || [];
-      let acc = 6 + hash3(p0[0], p0[1], 12) * 20, prev = null, prevSeg = -9, stepNext = 31;
+      let acc = 6 + hash3(p0[0], p0[1], 12) * 20, prev = null, prevSeg = -9, stepNext = 31, swapped = false, placeFail = false;
       for (const S of list) {
-        if (S.si !== prevSeg + 1) prev = null;
+        if (S.si !== prevSeg + 1) { prev = null; swapped = false; placeFail = false; }
         prevSeg = S.si;
         for (; acc < S.L; acc += stepNext) {
           // khoảng cột: 31-40 m; W3-E: phố cũ chằng chịt dây (lõi ≤ 900 m, phố t/r, pano búi dây hoặc không có pano trong
@@ -845,43 +879,56 @@ export function buildProps(ctx) {
             stepNext = old ? 23 + hash3(ex, ez, 13) * 6 : 31 + hash3(S.ax + acc, S.az, 13) * 9;
           }
           const k = Math.min(S.n - 1, Math.max(0, Math.floor((acc - S.off) / CELL)));
-          let x = S.ax + S.ux * acc + S.nx * fl, z = S.az + S.uz * acc + S.nz * fl;
-          let ok = S.n > 0 && x * x + z * z < R_MAX * R_MAX && !roadIdx.blocked(x, z, ri, S.si, 0.3) && flat(x, z) && !panoNear(x, z, 3) && !avoid(x, z) && !inBuilding(x, z);
-          if (ok && obst.hit(x, z, 0.35)) {           // né thân cây/trụ có sẵn: dịch dọc ±1,5 m
-            ok = false;
-            for (const dd of [1.5, -1.5, 3, -3]) { const x2 = x + S.ux * dd, z2 = z + S.uz * dd; if (!obst.hit(x2, z2, 0.35)) { x = x2; z = z2; ok = true; break; } }
+          // W3-E r2: tuyến cột KHÔNG chạy dọc mặt phố TRỐNG (không nhà thật 20 m sau mặt tiền — bareFront) nhất là khi phía
+          // đó là công viên/quảng trường/mặt nước (pano_363: lưới dây dọc vỉa phía vườn hoa ĐBP mà ảnh thật trống; dây thật ở
+          // dãy nhà bên kia, h270) → tuyến sang bên NHÀ đối diện của cùng đoạn (cột điện để kéo dây vào nhà) và Ở LẠI bên đó
+          // (trễ — không zic-zắc qua phố mỗi nhịp) tới khi bên đó lại trống. Không bên nào có nhà: phía công viên/nước → bỏ
+          // cột (đường xuyên công viên); chỉ trống (bãi đất, khuôn viên lùi sâu) → giữ như cũ. "Công viên" = trống VÀ claim
+          // park/plaza/nước sau mặt tiền (claim tròn thô như hành lang Quán Hoa/chợ Cột Đèn phủ cả dãy nhà → có nhà thì không tính)
+          let Sp = swapped && S.opp ? S.opp : S, pos = tryPole(Sp, acc), cut = false;
+          // bên đã đổi không đặt được cột (cây/vật cản/khe đường đôi suốt dãy) → về bên gốc nếu được (không kẹt cả tuyến)
+          if (!pos && Sp !== S) { const pb = tryPole(S, acc); if (pb && !(bareFront(S, acc) && openPole(S, pb))) { pos = pb; Sp = S; swapped = false; } }
+          if (pos && bareFront(Sp, acc)) {
+            const openA = openPole(Sp, pos);
+            const Sb = Sp === S ? S.opp : S, p2 = Sb ? tryPole(Sb, acc) : null, bareB = p2 ? bareFront(Sb, acc) : true;
+            if (p2 && (!bareB || (openA && !openPole(Sb, p2)))) { pos = p2; Sp = Sb; swapped = !swapped; slStats.poleSwap = (slStats.poleSwap || 0) + 1; }
+            else if (openA) { const ep = evAt(pos[0], pos[1]); if (!(ep && ep[4] === 2)) { pos = null; cut = true; slStats.poleOpen = (slStats.poleOpen || 0) + 1; } }   // pano "búi dây dày" giữ cột
           }
-          if (ok && !clearDisc(x, z, 0.3, 3.3)) ok = false;   // W2-A: chân cột trên nhựa (khe đường đôi/nút giao) hoặc < 3,6 m camera pano
+          // không đặt được cột ở mốc này (nút giao + camera pano cả 2 bên, nhà…) → GIỮ nhịp trước: dây vắt qua tới cột kế
+          // (≤ 60 m, 1 mốc hỏng — dot3 cách cột 31-40 m vô tình vắt qua nút giao Hạ Lý ở pano_092; khoảng 23-29 m của W3-E
+          // rơi đúng nút giao → hở 53 m không dây ngay camera). Bỏ do bằng chứng/công viên → cắt tuyến như cũ
+          if (!pos && !cut && !placeFail && prev) { placeFail = true; continue; }
+          let ok = !!pos;
+          const x = pos ? pos[0] : 0, z = pos ? pos[1] : 0;
           const e = ok ? evAt(x, z) : null;
           if (ok && e && e[4] === 0) ok = false;                         // pano nói không có cột điện
           if (ok && !e && r.c === 'p' && hash3(x, z, 14) < 0.5) ok = false; // đại lộ: phần lớn đã hạ ngầm
-          if (!ok) { prev = null; continue; }
-          const heading = headX(-S.nx, -S.nz);           // local +X → lòng đường (= −n)
+          if (!ok) { prev = null; placeFail = false; continue; }
+          const heading = headX(-Sp.nx, -Sp.nz);         // local +X → lòng đường (= −n)
           const tangle = e ? e[4] : (Math.hypot(x, z) < 900 ? 2 : 1);
           const hT = hash3(x, z, 15);
           let kind = 0;
           if (hT < 0.07 || (e && (e[6] & 16) && hT < 0.16)) kind = 2;      // trạm biến áp treo
           else if ((r.c === 't' || r.c === 'r') && hash3(x, z, 16) < 0.5) kind = 1;   // đèn trên cột điện
-          const P = { x, z, heading, kind, tangle, S, c: r.c };
+          const P = { x, z, heading, kind, tangle, S: Sp, c: r.c, e4: e ? e[4] : -1 };
           (kind === 2 ? trafoI : kind === 1 ? poleLampI : poleI).push(P);
-          if (kind === 1) glassI.push({ x, z, heading, rx: -S.nx, rz: -S.nz, reach: POLE_LAMP_ARM.reach });
+          if (kind === 1) glassI.push({ x, z, heading, rx: -Sp.nx, rz: -Sp.nz, reach: POLE_LAMP_ARM.reach });
           ctx.addCollider(x, z, kind === 2 ? 0.45 : 0.22);
           obst.add(x, z, kind === 2 ? 1.2 : 0.3);
           if (kind === 2 && hash3(x, z, 17) < 0.5) {
-            const cx2 = x - S.nx * 0.9 + S.ux * 1.6, cz2 = z - S.nz * 0.9 + S.uz * 1.6;
+            const cx2 = x - Sp.nx * 0.9 + S.ux * 1.6, cz2 = z - Sp.nz * 0.9 + S.uz * 1.6;
             if (!inBuilding(cx2, cz2)) { cabI.push({ x: cx2, z: cz2, heading, col: 0xcfcab9 }); obst.add(cx2, cz2, 0.6); }
           }
-          // nhịp dây: không giăng qua nút giao/phố rộng khác hay khoảng mở công viên/quảng trường (W3-E, pano_363)
-          if (prev && Math.hypot(prev.x - x, prev.z - z) < 52) {
-            let clearSpan = true;
-            for (const f of [0.25, 0.5, 0.75]) {
-              const mx = prev.x + (x - prev.x) * f, mz = prev.z + (z - prev.z) * f;
-              if (roadIdx.wideAt(mx, mz, ri, 4) || openReal(mx, mz)) { clearSpan = false; break; }
-            }
+          // nhịp dây: không giăng qua nút giao ĐẠI LỘ (nửa lòng ≥ 6 m — p; W3-A: way rộng ≥ 12 m) hay khoảng mở công viên/
+          // quảng trường/nước ở GIỮA nhịp. Phản biện r2: ngưỡng 4 m (mọi phố t/s) + openReal ở 3 điểm từng xoá lưới dây
+          // THẬT qua nút phố cũ (457 h270, 469 h0) — dây thật vắt qua nút giao phố t/s
+          if (prev && Math.hypot(prev.x - x, prev.z - z) < (placeFail ? 60 : 52)) {
+            let clearSpan = !openReal((prev.x + x) / 2, (prev.z + z) / 2);
+            for (const f of [0.25, 0.5, 0.75]) if (clearSpan && roadIdx.wideAt(prev.x + (x - prev.x) * f, prev.z + (z - prev.z) * f, ri, 6)) clearSpan = false;
             if (clearSpan) spans.push([prev, P]);
           }
-          prev = P;
-          if (S.n) S.occ[k] |= OCC_POLE;
+          prev = P; placeFail = false;
+          if (Sp.n) Sp.occ[k] |= OCC_POLE;
         }
         acc -= S.L;
       }
@@ -940,7 +987,7 @@ export function buildProps(ctx) {
   // (pano_207/092: 2 tủ trắng-xám trên promenade) → 1-2 trạm ≤ 35 m; nền lõi ≤ 900 m phố s/t vỉa ≥ 3 m: ~1/700 m
   const kioskI = [];
   for (const S of sides) {
-    const X = XS(S.c);
+    const X = XS(S);
     if (X.sw < 2.4) continue;
     for (let k = 1; k < S.n - 1; k++) {
       if (!S.ok[k] || S.occ[k]) continue;
@@ -953,6 +1000,9 @@ export function buildProps(ctx) {
       const ok = [[-1, -0.6], [1, -0.6], [-1, 0.6], [1, 0.6]].every(([a, b]) => { const qx = x + S.ux * a + S.nx * b, qz = z + S.uz * a + S.nz * b; return !inBuilding(qx, qz) && !onCarriage(qx, qz); });
       // khối 2 m cao: ≥ 7 m camera pano (khối xám sát ống kính pano_276 mà ảnh thật trống) — trừ pano có bằng chứng (≥ 4,2 m)
       if (!ok || obst.hit(x, z, 1.2) || nearPano(x, z, near ? 4.2 : 7) || !flat(x, z)) continue;
+      // nền (không bằng chứng): không trên vỉa phía công viên/quảng trường/promenade (phản biện r2: 230 h0, 542 h270 — trạm
+      // đứng giữa vỉa vườn hoa mà ảnh thật trống). Pano NÓI có trạm (207/092 promenade) vẫn đặt
+      if (!near && parkBehind(x, z, S.nx, S.nz, 0.9)) continue;
       kioskI.push({ x, z, heading: headZ(-S.nx, -S.nz), v: 8, col: pick([0xd8d4c8, 0xc0c4c2, 0xb8c0b4], hash3(x, z, 172)) });
       ctx.addCollider(x, z, 1.0); obst.add(x, z, 1.3); S.occ[k] |= OCC_POLE;
     }
@@ -1008,13 +1058,14 @@ export function buildProps(ctx) {
     for (let i = 0; i < nDrop; i++) {
       const u1 = hash3(P.x + i, P.z, 42), u2 = hash3(P.x, P.z + i, 43), u3 = hash3(P.x + i, P.z + i, 44);
       const along = (u1 - 0.5) * 22;
-      // sang nhà bên kia phố: chỉ phố hẹp t/r (W3-E: phố rộng/nút giao/công viên không có "lưới dây" ngang — pano_363)
-      let cross = u2 < 0.35 && (P.c === 't' || P.c === 'r');
+      // sang nhà bên kia phố: phố hẹp t/r; phố s chỉ khi pano nói búi dây dày (e[4] = 2 — ảnh 469/046 dây vắt ngang ĐBP).
+      // Không qua công viên/nước (phải có nhà bên kia) hay lòng phố s/p khác ở nút giao (W3-E, pano_363)
+      let cross = u2 < 0.35 && (P.c === 't' || P.c === 'r' || (P.c === 's' && P.e4 === 2));
       const lat = (cr) => cr ? -(fl + fl0) : (fl - fl0) - 0.1;   // từ cột → mặt tiền (theo −n là lòng đường)
       if (cross) {
         const mx = P.x + S.ux * along * 0.5 - nxA * lat(true) * 0.5, mz = P.z + S.uz * along * 0.5 - nzA * lat(true) * 0.5;
         const ox = P.x + S.ux * along - nxA * lat(true), oz = P.z + S.uz * along - nzA * lat(true);
-        if (!inBuilding(ox + nxA * 1.2, oz + nzA * 1.2) || roadIdx.wideAt(mx, mz, S.ri, 3) || openReal(ox, oz)) cross = false;   // phải có nhà bên kia
+        if (!inBuilding(ox + nxA * 1.2, oz + nzA * 1.2) || roadIdx.wideAt(mx, mz, S.ri, 5) || openReal(ox, oz)) cross = false;   // phải có nhà bên kia
       }
       const la = lat(cross);
       const tx = P.x + S.ux * along - nxA * la, tz = P.z + S.uz * along - nzA * la;
@@ -1072,13 +1123,13 @@ export function buildProps(ctx) {
   }
   // cafe (W3-E, biển hiệu CÀ PHÊ/TRÀ/GIẢI KHÁT… — pano 267/294/023 thấy dù quán): mỗi bộ bàn ghế 70% có dù
   function placeFood(S, k, nSet, cafe = false) {
-    const sw = SIDEWALK_W[S.c], fl = facadeLine(S.c);
+    const X = XS(S), sw = X.sw, fl = X.fac;
     const lat0 = fl - Math.min(1.1, sw * 0.35);
     for (let j = 0; j < nSet; j++) {
       const kk = k + (j % 2 ? 1 : -1) * Math.ceil(j / 2);
       if (kk < 0 || kk >= S.n || !S.ok[kk] || (S.occ[kk] & (OCC_POLE | OCC_SHOP)) || (S.fore && S.fore[kk])) continue;
       const u = hash3(S.ax + kk, S.az + j, 52);
-      const lat = Math.max(curbLine(S.c) + 0.55, lat0 - u * Math.max(0, sw - 1.6));
+      const lat = Math.max(X.curb + 0.55, lat0 - u * Math.max(0, sw - 1.6));
       const [x, z] = cellPos(S, kk, lat, (u - 0.5) * 1.4);
       if (inBuilding(x, z) || obst.hit(x, z, 0.55) || !clearPt(x, z, 1.6)) continue;   // W2-A: bộ bàn ghế + khách ~1,1 m (+ lề)
       const rot = hash3(x, z, 53) * 6.28;
@@ -1135,7 +1186,7 @@ export function buildProps(ctx) {
     if (S.c === 'r') continue;
     for (let k = 0; k < S.n; k++) {
       if (!S.ok[k] || S.occ[k] & (OCC_SHOP | OCC_POLE) || S.fore[k]) continue;
-      const [x, z] = cellPos(S, k, furnitureLine(S.c) + 0.15);
+      const [x, z] = cellPos(S, k, XS(S).furn + 0.15);
       const e = S.ev[k], cl = e ? e[6] : 0;
       const hb = hash3(x, z, 71);
       if (hb < ((cl & 4) ? 0.06 : 0.03)) {
@@ -1169,7 +1220,7 @@ export function buildProps(ctx) {
     let k = 0;
     while (k < S.n) {
       if (!S.ok[k] || (S.occ[k] & OCC_SHOP) || S.fore[k]) { k++; continue; }
-      const [x, z] = cellPos(S, k, parkingLine(S.c));
+      const [x, z] = cellPos(S, k, XS(S).park);
       const e = S.ev[k];
       let lv = e ? e[2] : defLevel(x, z);
       if (lv > 0 && openSpace(x, z)) lv = 0;
@@ -1201,8 +1252,8 @@ export function buildProps(ctx) {
     const { S } = R;
     if (hash3(R.x, R.z, 83) > keepRow) { for (let q = R.k0; q < R.k1; q++) S.occ[q] &= ~OCC_BIKE; continue; }
     // vỉa ≤ 2 m (phố r: 1,5 m nhánh này / 2,0 m sau WP1) → xe xiên 55-70° sát bó vỉa, không vuông góc chạm mặt tiền
-    const narrow = SIDEWALK_W[S.c] <= 2.0;
-    const lat = narrow ? curbLine(S.c) + 0.78 : parkingLine(S.c);
+    const X = XS(S), narrow = X.sw <= 2.0;
+    const lat = narrow ? X.curb + 0.78 : X.park;
     const t0 = S.off + R.k0 * CELL + 0.35, t1 = S.off + R.k1 * CELL - 0.35;
     // W3-E: hàng = CHUỖI CỤM theo lô nhà (3,2-6 m — mỗi cửa hàng 1 cụm) cách nhau khe lối vào 0,5-0,9 m; mỗi cụm góc
     // nền/mũi ra-vào/khoảng cách riêng (ảnh pano: không phải 1 hàng đều tắp suốt 20 m). Trong cụm: xe KỀ NHAU không xuyên
@@ -1263,7 +1314,9 @@ export function buildProps(ctx) {
   const coachI = [], coveredI = [];          // W3-E: xe khách 11,4 m · ô tô phủ bạt
   // QA (W3-E): lý do loại ứng viên ô tô — 1 xa/dốc · 2 avoid/keepClear · 3 phía kè hồ · 4 phía công viên/quảng trường
   // · 5 sát camera pano · 6 gần nút giao · 7 vật cản (window.__hpProps.carRej / carRejPts [x,z,lý do]…)
+  // carRejPts (≤ 180k số) chỉ giữ khi QA (trình duyệt tự động navigator.webdriver hoặc ?qa=1) — không nằm trong heap game thật
   const carRej = [0, 0, 0, 0, 0, 0, 0, 0], carRejPts = [];
+  const QA_PTS = (() => { try { return navigator.webdriver === true || /[?&]qa=1/.test(location.search); } catch (e) { return false; } })();
   const CAR_COLS = [0xeeeeec, 0xeeeeec, 0xe4e4e1, 0x16171a, 0x16171a, 0xb4b8bc, 0x8e9398, 0x6c7176, 0x9a1d1d, 0x24406e, 0x6b5a48, 0xcfc4ae];
   const TAXI_COLS = [0xf4f4f0, 0x2f8f4e, 0x3aa35a, 0xe9e9e4, 0x2c5aa0];   // trắng · xanh lá · xanh dương-trắng (taxi HP)
   const CAR_LEN = [4.5, 4.6, 3.9, 3.9, 4.8, 5.25];
@@ -1304,8 +1357,8 @@ export function buildProps(ctx) {
       return S.c === 'p' && !(e && e[3] >= 1) ? f * 0.7 : f;   // đại lộ: bớt 30% — trừ khi pano thấy ô tô đỗ
     };
     const roll = S.c === 'r';
-    const lat = roll ? curbLine(S.c) - 0.05 : curbLine(S.c) - 0.95;
-    const X = XS(S.c);
+    const X = XS(S);
+    const lat = roll ? X.curb - 0.05 : X.curb - 0.95;
     let s = cont ? Math.max(0.3, carry) : 2 + hash3(S.ax, S.az + S.side, 101) * 6;
     while (s < S.L - 0.5) {
       const x0 = S.ax + S.ux * s, z0 = S.az + S.uz * s;
@@ -1322,7 +1375,7 @@ export function buildProps(ctx) {
       // xe phải nằm trọn trong đoạn (đầu xe chừa 1 m), trừ khi đoạn kế THẲNG hàng (< 12°): được chồm qua khớp tới 0,3 m cuối
       if (sc > S.L - (straightNext ? 0.3 : len / 2 + 1)) break;
       // xe khách rộng 2,5 m (nửa 1,26): tâm lùi curbLine − 1,35 (ở −0,95 thân chồm 0,31 m lên bó vỉa — phản biện W3-E, 441)
-      const latV = mi === 6 ? curbLine(S.c) - 1.35 : lat;
+      const latV = mi === 6 ? X.curb - 1.35 : lat;
       const x = S.ax + S.ux * sc + S.nx * latV, z = S.az + S.uz * sc + S.nz * latV;
       // camera pano nằm giữa lòng đường: ô tô đỗ có ĐẦU XE sát camera che gần nửa khung hình mà ảnh thật ở đó trống
       // (đo: van 5,25 m trước pano_102 — tâm 8,5 m nhưng đầu xe ~6 m, ảnh thật không có xe) → kiểm tra viên nang (tâm
@@ -1336,8 +1389,10 @@ export function buildProps(ctx) {
       const seen = !!(ec && ec[3] >= 1);
       const coachEv = mi === 6;   // xe khách: CHÍNH là bằng chứng của pano (441 "xe khách đỗ nối đuôi" trước camera)
       // AUDIT3 FP-5 PARKVEH: "viên nang 6,5-8 m quanh MỌI camera pano bỏ chính những xe gần camera nhất" — pano CÓ ô tô đỗ:
-      // xe con tâm ≥ 4,5 m / đầu xe ≥ 3,5 m (đỗ sát cạnh camera như ảnh 005/501/506), van/tải tâm 6,5 / đầu 5,5 m
-      const rp = coachEv ? 5 : mi >= 4 ? (seen ? 5.5 : 8) : (seen ? 3.5 : 6.5), rc = coachEv ? 6 : mi >= 4 ? (seen ? 6.5 : 8) : (seen ? 4.5 : 6.5), hx = S.ux * len / 2, hz = S.uz * len / 2;
+      // xe con tâm ≥ 4,5 m / đầu xe ≥ 3,5 m (đỗ sát cạnh camera như ảnh 005/501/506). VAN/TẢI (khối cao 2,1-2,5 m che nửa
+      // khung): nới 6,5/5,5 m CHỈ khi pano "ô tô đỗ dày" (car 2) — phản biện r2: car 1 "taxi đỗ/chạy" (102) / "ô tô con đỏ
+      // đỗ" (276) từng đặt lại van trắng / tải xanh 4-6 m trước camera mà ảnh thật trống → car 1 giữ luật WP7 8/8 m cho van/tải
+      const rp = coachEv ? 5 : mi >= 4 ? (dense ? 5.5 : 8) : (seen ? 3.5 : 6.5), rc = coachEv ? 6 : mi >= 4 ? (dense ? 6.5 : 8) : (seen ? 4.5 : 6.5), hx = S.ux * len / 2, hz = S.uz * len / 2;
       // W3-E: bỏ luật cũ "lakeSD > 18" (cấm ô tô trong 18 m quanh MỌI hồ → phố Quang Trung/Nguyễn Đức Cảnh ven hồ trống
       // trơn, pano 005/028/033 thật có ô tô đỗ phía NHÀ). Nay chỉ cấm phía KÈ/promenade (đi ra phía vỉa hè này lại gần hồ
       // hơn) và sát mép nước (< 6 m); cấm cả bên phố mà phía vỉa là công viên/quảng trường/promenade (322, 542, 065).
@@ -1357,7 +1412,7 @@ export function buildProps(ctx) {
       if (!why && (obst.rectHit(x, z, S.ux, S.uz, len / 2, mi === 6 ? 1.26 : 0.85) || stripHit(x, z, S.ux, S.uz, len / 2 + 0.15, mi === 6 ? 1.3 : 0.95))) why = 7;
       if (!why) why = lakeSide() ? 3 : parkSide() ? 4 : 0;
       let ok = !why;
-      if (why) { carRej[why]++; if (carRejPts.length < 60000) carRejPts.push(+x.toFixed(1), +z.toFixed(1), why); }
+      if (why) { carRej[why]++; if (QA_PTS && carRejPts.length < 60000) carRejPts.push(+x.toFixed(1), +z.toFixed(1), why); }
       if (ok && mi === 6) for (const dd of [-4, 4]) if (obst.hit(x + S.ux * dd, z + S.uz * dd, 0.9)) { ok = false; break; }
       // phố r: 2 bánh trên vỉa → không đè hàng xe máy / quán / xe đẩy đã đặt trên các ô vỉa hè dọc thân xe
       let k0 = 0, k1 = -1;
@@ -1735,7 +1790,7 @@ export function buildProps(ctx) {
   });
   console.log('[props]', JSON.stringify(stats));
   // móc gỡ lỗi/QA (không dùng trong game): window.__hpProps.sides / .cull()
-  if (typeof window !== 'undefined') window.__hpProps = { stats, sides, carRejPts, cull: () => CULL.map((t) => [t.mesh.name, t.mesh.count, t.n]), bikeRows, lists: { stoolI, cartI, aframeI, walkI, standI, sitI, cars: carI.flat(), bikes: bikeI.flat(), cobraI, ornI, poleI, poleLampI, trafoI, binI,
+  if (typeof window !== 'undefined') window.__hpProps = { stats, sides, carRejPts, spans: QA_PTS ? spans : null, cull: () => CULL.map((t) => [t.mesh.name, t.mesh.count, t.n]), bikeRows, lists: { stoolI, cartI, aframeI, walkI, standI, sitI, cars: carI.flat(), bikes: bikeI.flat(), cobraI, ornI, poleI, poleLampI, trafoI, binI,
     // W3-E (mkRoad = hàng chợ CỐ Ý lấn dải 1,1 m lòng đường sát bó vỉa — clearance_page bỏ qua như ô tô đỗ)
     mkOver: LIFE.overI.filter((g) => !g.road), mkGround: LIFE.groundI.filter((g) => !g.road), mkRoad: [...LIFE.groundI, ...LIFE.overI, ...LIFE.spillI].filter((g) => g.road), spill: LIFE.spillI.filter((g) => !g.road),
     kioskI, coaches: coachI, covered: coveredI, flagsHouse: LIFE.flagsHouse, banners: LIFE.banners, gates: LIFE.gates } };

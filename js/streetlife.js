@@ -409,7 +409,7 @@ export const signCategory = (t) => { const s = String(t || '').toUpperCase(); fo
 // ---------------------------------------------------------------------------------------------------------------------
 // ĐẶT ĐỒ — gọi trong buildProps sau 6.4 (quán/xe đẩy/biển A/thùng rác) và TRƯỚC 6.5 (xe máy) → xe máy/ô tô/người né.
 // P = { sides, CELL, cellPos, hash3, inBuilding, obst, flat, roadIdx, nearPano, onCarriage(Fast), openReal, parkBehind, claimAt,
-//       XS(c) → {hw, sw, curb, park, furn, fac}, OCC, placeFood, lists:{stoolI, paraI, sitI, standI, bikeDisplay},
+//       XS(S) → {hw, sw, curb, park, furn, fac} (mặt cắt của BÊN PHỐ S — W3-A: bề rộng riêng từng way), OCC, placeFood, lists:{stoolI, paraI, sitI, standI, bikeDisplay},
 //       addCollider, R_MAX, SHOP_SIGNS, MARKETS, evidence, ROADS_DT, st }
 // ---------------------------------------------------------------------------------------------------------------------
 // (1) PHÂN LOẠI ô (gọi NGAY sau lấy mẫu 6.1, trước mọi đồ hè): S.mk[k] mức chợ 0-3, S.fore[k] = sân trước công trình
@@ -423,7 +423,7 @@ export function marketLevels(P) {
   const isForecourtName = (n) => /chua|den_|_den|dinh_|nhatho|nha_tho|mieu|pagoda|temple|church|ubnd|congso|cong_so|truso|tru_so|haiquan|benhvien|bv_|truong|school|mamnon|cong_|gate|quanuy|cong_an|congan|toaan|vien_/i.test(n || '');
   const isMarketName = (n) => /(^|_)cho(_|$)/i.test(n || '');
   for (const S of sides) {
-    const X = XS(S.c);
+    const X = XS(S);
     S.mk = new Uint8Array(S.n); S.fore = new Uint8Array(S.n);
     for (let k = 0; k < S.n; k++) {
       if (!S.ok[k]) continue;   // ô bị loại: không đồ hè nào dùng S.fore/S.mk
@@ -511,11 +511,11 @@ export function placeStreetLife(P) {
   };
   // có MẶT TIỀN NHÀ THẬT ngay sau ô (dò facadeLine −0,3 … +2,5 m)? — đồ của nhà (chậu cây, hàng tràn) không đứng giữa khoảng
   // trống (pano_304: chậu cây mọc trên vỉa hè nút giao HVT)
-  const hasFacade = (S, k, da = 0) => { const X = XS(S.c), sk = S.off + (k + 0.5) * CELL + da; for (let d = -0.3; d <= 2.5; d += 0.4) if (inBuilding(S.ax + S.ux * sk + S.nx * (X.fac + d), S.az + S.uz * sk + S.nz * (X.fac + d))) return true; return false; };
+  const hasFacade = (S, k, da = 0) => { const X = XS(S), sk = S.off + (k + 0.5) * CELL + da; for (let d = -0.3; d <= 2.5; d += 0.4) if (inBuilding(S.ax + S.ux * sk + S.nx * (X.fac + d), S.az + S.uz * sk + S.nz * (X.fac + d))) return true; return false; };
   // ---- CHỢ: đi dọc từng bên phố theo bước ô sạp ----
   for (const S of sides) {
     if (!S.mk) continue;
-    const X = XS(S.c), H = headRoad(S);
+    const X = XS(S), H = headRoad(S);
     const sw = X.sw, hw = X.hw;
     let t = S.off + 0.4;
     const tEnd = S.off + S.n * CELL - 0.4;
@@ -637,7 +637,7 @@ export function placeStreetLife(P) {
   const FG = new Map(), fk = (x, z) => Math.floor(x / 8) * 100003 + Math.floor(z / 8);
   const SG = new Set(); for (const sg of P.SHOP_SIGNS || []) { const i = Math.floor(sg[0] / 8), j = Math.floor(sg[1] / 8); for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) SG.add((i + a) * 100003 + j + b); }
   for (const S of sides) {
-    const X = XS(S.c);
+    const X = XS(S);
     for (let k = 0; k < S.n; k++) {
       if (!S.ok[k] || S.fore[k]) continue;
       const [x, z] = cellPos(S, k, X.fac); const key = fk(x, z);
@@ -655,7 +655,7 @@ export function placeStreetLife(P) {
   };
   const SPILL = { cloth: [0], flower: [1], plant: [2], furn: [3, 3, 4], toys: [5], hard: [6], fruit: [-1] };
   const putSpill = (S, k, cat, n, seed) => {
-    const X = XS(S.c), H = headRoad(S);
+    const X = XS(S), H = headRoad(S);
     let c = 0;
     for (let j = 0; j < n * 2 && c < n; j++) {
       const kk = k + (j % 2 ? 1 : -1) * Math.ceil(j / 2);
@@ -675,7 +675,7 @@ export function placeStreetLife(P) {
   // bản đầu đặt 2 hàng cách 1,05 m: bánh trước hàng trong xuyên đuôi hàng ngoài). umb: pano thấy "ô/dù bán hàng" (170 Tô
   // Hiệu: ô dù lớn che dãy xe trưng bày) → 2 ô dù tròn cán sát mép xe phía đường
   const displayBikes = (S, k, umb = false) => {
-    const X = XS(S.c), H = headRoad(S);
+    const X = XS(S), H = headRoad(S);
     const rows = X.sw >= 3.9 ? 2 : 1;
     let c = 0;
     for (let r = 0; r < rows; r++) {
@@ -699,7 +699,7 @@ export function placeStreetLife(P) {
     for (let kk = k - 1; kk <= k + 1; kk++) if (kk >= 0 && kk < S.n) S.occ[kk] |= OCC.SHOP;
     return c;
   };
-  const evUmb = (S, k) => { const e = S.ev[k]; if (!e || !(e[8] & 1)) return false; const [x, z] = cellPos(S, k, XS(S.c).park); return Math.hypot(e[0] - x, e[1] - z) < 30; };
+  const evUmb = (S, k) => { const e = S.ev[k]; if (!e || !(e[8] & 1)) return false; const [x, z] = cellPos(S, k, XS(S).park); return Math.hypot(e[0] - x, e[1] - z) < 30; };
   // quán theo biển hiệu/bằng chứng: khách ngồi gắn cờ `sp` → ngân sách người RIÊNG (props.js pedsSpill; phản biện W3-E: chung ngân
   // sách với người đi bộ thì người đi bộ cả thành phố tụt 444 → 350)
   const food = (S, k, n, cafe) => { const L = P.lists.sitI, i0 = L.length; P.placeFood(S, k, n, cafe); for (let i = i0; i < L.length; i++) L[i].sp = 1; };
@@ -730,7 +730,7 @@ export function placeStreetLife(P) {
     for (let k = 0; k < S.n; k++) {
       if (!S.ok[k] || S.fore[k] || (S.occ[k] & (OCC.SHOP | OCC.MKT))) continue;
       const e = S.ev[k]; if (!e || !e[8]) continue;
-      const X = XS(S.c); const [x, z] = cellPos(S, k, X.park);
+      const X = XS(S); const [x, z] = cellPos(S, k, X.park);
       if (Math.hypot(e[0] - x, e[1] - z) > 25) continue;
       for (const [bit, cat] of EVC) {
         if (!(e[8] & bit)) continue;
@@ -752,7 +752,7 @@ export function placeStreetLife(P) {
       // băm theo (đầu đoạn, ô) TRƯỚC khi tính toạ độ (35k ô — bớt cấp phát mảng/GC lúc khởi động)
       const hk = hash3(S.ax + k * 3.1, S.az + S.side, 381);
       if (hk > 0.03) continue;
-      const X = XS(S.c); const [x, z] = cellPos(S, k, X.fac - 0.5);
+      const X = XS(S); const [x, z] = cellPos(S, k, X.fac - 0.5);
       const r0 = Math.hypot(x, z);
       if ((r0 >= 1300 && hk > 0.012) || P.parkBehind(x, z, S.nx, S.nz, 0.5)) continue;
       if (!okAt(S, x, z, 0.5) || obst.hit(x, z, 0.5) || !hasFacade(S, k)) continue;
@@ -764,7 +764,7 @@ export function placeStreetLife(P) {
   // ---- CỜ TREO NHÀ (pano nhắc cờ đỏ sao vàng: 22% ô ≤ 40 m; nền phố cũ 2,5%) ----
   for (const S of sides) {
     if (S.c === 'p') continue;
-    const X = XS(S.c);
+    const X = XS(S);
     for (let k = 0; k < S.n; k++) {
       if (!S.ok[k] || S.fore[k]) continue;
       const e = S.ev[k], hf = hash3(S.ax + k * 2.3, S.az - S.side, 392);
@@ -796,7 +796,7 @@ export function placeStreetLife(P) {
       const lat = dx * S.nx + dz * S.nz; if (lat * lat < bd) { bd = lat * lat; best = { S, t }; }
     }
     if (!best) continue;
-    const { S, t } = best; const X = XS(S.c);
+    const { S, t } = best; const X = XS(S);
     if (e[9] & 2) {
       for (const dt of [16, -16, 24, -24]) {
         const s = t + dt; if (s < 2 || s > S.L - 2) continue;

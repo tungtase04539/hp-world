@@ -824,7 +824,7 @@ export function createTraffic(scene, world, opts = {}) {
       for (const c of l) {
         const dx = a.x - c.x, dz = a.z - c.z, sh = Math.sin(c.heading || 0), ch = Math.cos(c.heading || 0);
         const along = dx * sh + dz * ch, across = dx * ch - dz * sh;
-        if (Math.abs(across) < 0.85 + hw && Math.abs(along) < (c.len || 4.4) / 2 + hl) return true;
+        if (Math.abs(across) < (c.hw || 0.85) + hw && Math.abs(along) < (c.len || 4.4) / 2 + hl) return true;   // W3-E: xe khách hw 1,3 · phủ bạt 0,95
       }
     }
     return false;
