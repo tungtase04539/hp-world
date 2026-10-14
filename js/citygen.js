@@ -133,7 +133,7 @@ const SETS = {
   G4: ['G_VILLA', 'G_VILLA', 'G_HOME0', 'G_CIVIC'],
   G5: ['G_WARE'],
   G6: ['G_CIVIC', 'G_CIVIC', 'G_GLASS'],
-  G7: ['G_OLD', 'G_OLD', 'G_OLD', 'G_COL', 'G_OPEN0', 'G_OPEN2', 'G_SHOP1', 'G_SHUT1', 'G_VILLA'],   // phố Pháp vẫn là phố buôn bán: cửa vòm gỗ đóng ÍT
+  G7: ['G_OLD', 'G_OLD', 'G_OLD', 'G_COL', 'G_OPEN0', 'G_OPEN2', 'G_SHOP1', 'G_SHUT1'],   // phố Pháp vẫn là phố buôn bán: cửa vòm gỗ đóng ÍT
   G8: ['G_NEO', 'G_NEO', 'G_NEO', 'G_COL'],
   G9: ['G_HOARD'],
   G10: ['G_SHOW', 'G_STORE0', 'G_STORE1', 'G_STORE2', 'G_ELEC', 'G_GLASS', 'G_OPEN1', 'G_STORE0'],   // W4-C: mặt KÍNH cửa hàng/ngân hàng/phòng khám
@@ -396,7 +396,7 @@ ${gl1 ? GL1_GROUND_MAIN : GL2_GROUND_MAIN}
       float r = h21(vec2(seed * 3.7 + fl * 1.31, bay * 0.71 + 0.3)) < 0.8 ? mainR : altR;
       m = (h21(vec2(seed * 2.9 + bay * 0.61, float(kind) + 0.5)) < 0.12) ? SD[0] : pickU(st, r);   // ~12% bay trơn (lõi thang)
     }
-    else if (big > 0.5 && rc > 0.5 && (st == 3 || st == 11 || st == ${RS.HOTEL})) m = ${MOD.G_LOBBY}.0;   // W4-C: trệt hông LỘ của tháp kính/khách sạn = sảnh kính (pano_230: tường xi măng ố)
+    else if (big > 0.5 && rc > 0.5 && (st == 3 || st == 11 || st == ${RS.HOTEL})) { m = ${MOD.G_LOBBY}.0; litP = 0.12; }   // W4-C: trệt hông LỘ của tháp kính/khách sạn = sảnh kính (pano_230: tường xi măng ố); đêm sáng như sảnh trước (phản biện: hông tối)
     else if (rc > 0.5 && st != 5) m = XP[int(h21(vec2(seed * 17.9 + bay * 0.37, fl * 0.61 + 0.3)) * ${n('XP')})];   // W3-C: tường hông/sau LỘ ra phố
     else if (kind == 2) m = BK[int(h21(vec2(seed * 9.7 + bay * 0.53, fl * 0.77 + 0.2)) * ${n('BK')})];
     else {

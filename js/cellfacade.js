@@ -68,7 +68,8 @@ export function cellCanvasFx(t) {
   if (ar > 2.6 || ar < 1 / 2.6) return L < 0.14 && !t.userData.signTexts ? { filter: 'brightness(1.7) saturate(0.85)' } : null;
   // mặt tiền 1 màu BÃO HOÀ (xanh hoàng gia UBND pano_138, đỏ BIDV 046): giảm bão hoà — màu thương hiệu chỉ hợp ở biển
   // (sắc LẠNH — lam ≥ đỏ — sáng thêm như coolLift: xanh thương hiệu thành xanh nhạt, không thành xanh than)
-  // W4-C: nền XÁM THAN 0,22-0,32 (khối đen 'NHÀ THUỐC' pano_395 h90/h180 — thật: ốp lưới nhôm xám sáng) cũng sáng lên
+  // W4-C: nền XÁM THAN 0,22-0,32 KHÔNG có chữ biển cũng sáng ×1,4 (mặt tiền nhà ô than chì sẫm hơn ảnh thật). LƯU Ý: khối
+  // 'NHÀ THUỐC' pano_395 h90/h180 KHÔNG được nâng — texture có signTexts (biển thật) nên quy tắc bỏ qua (phản biện W4-C).
   const f = L < 0.22 ? 'brightness(1.6) saturate(0.8)' : (L < 0.32 && !t.userData.signTexts) ? 'brightness(1.4) saturate(0.85)' : sat > 0.55 ? (c[2] >= c[0] ? 'saturate(0.4) brightness(1.3)' : 'saturate(0.45) brightness(1.08)') : null;
   return f ? { filter: f } : null;
 }

@@ -602,7 +602,7 @@ export function makeGroundSystem(THREE, opt = {}) {
     tMap = performance.now();
     if (!lastExtra) {
       lastExtra = { plaza: claimPolys('plaza'), park: claimPolys('park'), parking: claimPolys('parking'), rough: claimPolys('rough'), dirt: claimPolys('dirt'), bld: (ex.cellKept || []).filter((k) => k.hull && k.hull.length >= 3).map((k) => k.hull) };
-      stats.extra = { plaza: lastExtra.plaza.length, park: lastExtra.park.length, parking: lastExtra.parking.length, rough: lastExtra.rough.length, bld: lastExtra.bld.length };
+      stats.extra = { plaza: lastExtra.plaza.length, park: lastExtra.park.length, parking: lastExtra.parking.length, rough: lastExtra.rough.length, dirt: lastExtra.dirt.length, bld: lastExtra.bld.length };
     }
     // sao chép (không chuyển quyền): D vẫn được các hệ khác dùng
     const f = fp ? { x: fp.x.slice(), z: fp.z.slice(), vStart: fp.vStart.slice(), dead: fp.dead ? fp.dead.slice() : null, nB: fp.nB } : null;
