@@ -13,9 +13,13 @@
 import fs from 'fs';
 import path from 'path';
 
-const DEF = 'C:/Users/Admin/AppData/Local/Temp/claude/C--Users-Admin-hp-world/04e77d80-6633-4919-bfa9-5d86fbe6ae69/scratchpad/dot3/keep/fp_json';
+// thư mục fp_json: --fp <dir> hoặc biến môi trường HP_FP_JSON (fp_json nằm NGOÀI repo — không có mặc định)
 const ai = process.argv.indexOf('--fp');
-const DIR = ai > 0 ? process.argv[ai + 1] : DEF;
+const DIR = ai > 0 ? process.argv[ai + 1] : process.env.HP_FP_JSON;
+if (!DIR || !fs.existsSync(DIR)) {
+  console.error('gen_fp_nature: thiếu thư mục fp_json — chạy: node tools/gen_fp_nature.mjs --fp <thư mục fp_json> (hoặc đặt HP_FP_JSON)' + (DIR ? ' — không thấy: ' + DIR : ''));
+  process.exit(1);
+}
 const OUT = 'tools/fp_nature.json';
 const AUD = JSON.parse(fs.readFileSync('audit/audit_enriched.json', 'utf8'));
 const POS = new Map(AUD.filter((e) => e.X != null).map((e) => [e.id, [e.X, e.Z]]));
@@ -34,7 +38,14 @@ const R = {
   stools: /stools?|plastic chairs?|café tables|cafe tables|ghế nhựa|ghế đẩu|bàn ghế/,
   plants: /potted|plant pots?|pot plants|chậu cây|chậu hoa|cây cảnh|bonsai/,
   wires: /tangled|bundles?|dense wires|messy wires|chằng chịt|búi|rối/,
+  // phản biện W4-B: "xe máy chạy dày/đông" (pano_177/435 — ngã tư, xe ĐANG CHẠY/dừng đèn đỏ) ≠ hàng xe ĐỖ → mệnh đề nói xe
+  // chạy/lưu thông mà không nói đỗ/đậu/dựng thì không tính bikeDense
+  // ("xe máy ô tô đông" ở đại lộ 435, "xe máy đông dày trên đường" 172 = dòng xe; "đông" không kèm từ đỗ/vỉa → dòng xe)
+  moving: /chạy|lưu thông|qua lại|di chuyển|dừng đèn|đèn đỏ|giữa đường|trên đường|lòng đường|ngã tư|đông|moving|riding|fast|traffic|passing|on (the )?road|(in|at) (the )?(junction|intersection|crossing)/,
+  parked: /đỗ|đậu|dựng|vỉa hè|trước (cửa|nhà|quán|tiệm|hiệu)|parked|parking|kerb|curb|sidewalk|pavement/,
 };
+// bikeDense theo MỆNH ĐỀ: bỏ mệnh đề chỉ nói xe đang chạy
+const bikeDenseOf = (S) => S.split(/[,;.]/).some((c) => R.bikeDense.test(c) && (!R.moving.test(c) || R.parked.test(c)));
 const COLS = ['young', 'lean', 'sparse', 'dense', 'bikeDense', 'bikeFew', 'bikeCover', 'goods', 'stools', 'plants', 'wires'];
 const per = new Map();
 let files = 0, bad = 0;
@@ -47,7 +58,8 @@ for (const f of fs.readdirSync(DIR).filter((x) => x.endsWith('.json')).sort()) {
   let a = per.get(id); if (!a) per.set(id, (a = { n: 0, c: Object.fromEntries(COLS.map((k) => [k, 0])) }));
   a.n++;
   for (const k of ['young', 'lean', 'sparse', 'dense']) if (R[k].test(T)) a.c[k]++;
-  for (const k of ['bikeDense', 'bikeFew', 'bikeCover', 'goods', 'stools', 'plants', 'wires']) if (R[k].test(S)) a.c[k]++;
+  if (bikeDenseOf(S)) a.c.bikeDense++;
+  for (const k of ['bikeFew', 'bikeCover', 'goods', 'stools', 'plants', 'wires']) if (R[k].test(S)) a.c[k]++;
 }
 const rows = [];
 for (const [id, a] of [...per.entries()].sort()) {

@@ -1269,6 +1269,44 @@ export function buildProps(ctx) {
   for (const it of stoolI) bikeObst.add(it.x, it.z, 0.75);
   for (const it of aframeI) bikeObst.add(it.x, it.z, 0.35);
   for (const it of paraI) bikeObst.add(it.x, it.z, 0.12);
+  // phản biện W4-B: khách ngồi quán / người đứng cạnh xe đẩy (6.4) — xe máy không đỗ đè lên người (4 → 26 / 8 → 30 ở bản đầu)
+  for (const it of sitI) bikeObst.add(it.x, it.z, 0.3);
+  for (const it of standI) bikeObst.add(it.x, it.z, 0.3);
+  // phản biện W4-B: THÂN XE ĐÃ ĐỖ (hộp định hướng 1,7 × 0,44 m) — dải sát bó vỉa, cụm "lộn xộn", hàng nối liền ở mức 3 từng
+  // xuyên nhau (cặp chồng 539 → 1.468): mọi ứng viên SAT với xe đã đặt trong lưới 2 m; chạm → thử song song xe bị chạm
+  const BHL = 0.85, BHW = 0.22, placedB = new Map(), pbKey = (i, j) => i * 100003 + j;
+  const addPlaced = (x, z, fx, fz) => { const k = pbKey(Math.floor(x / 2), Math.floor(z / 2)); let l = placedB.get(k); if (!l) placedB.set(k, (l = [])); l.push(x, z, fx, fz); };
+  let bikeHit = null;   // [fx,fz] xe đầu tiên bị chạm ở lần tryBike gần nhất
+  // điểm (x,z) bán kính r chạm thân xe đã đỗ (hộp 1,8 × 0,66 m — gồm ghi-đông/gương)? — lối đi bộ sát mặt tiền (6.7)
+  const nearPlaced = (x, z, r) => {
+    const ci = Math.floor(x / 2), cj = Math.floor(z / 2);
+    for (let i = ci - 1; i <= ci + 1; i++) for (let j = cj - 1; j <= cj + 1; j++) {
+      const l = placedB.get(pbKey(i, j)); if (!l) continue;
+      for (let q = 0; q < l.length; q += 4) {
+        const dx = x - l[q], dz = z - l[q + 1], gx = l[q + 2], gz = l[q + 3];
+        if (Math.abs(dx * gx + dz * gz) < 0.9 + r && Math.abs(dx * gz - dz * gx) < 0.33 + r) return true;
+      }
+    }
+    return false;
+  };
+  const hitPlaced = (x, z, fx, fz) => {
+    const ci = Math.floor(x / 2), cj = Math.floor(z / 2);
+    for (let i = ci - 1; i <= ci + 1; i++) for (let j = cj - 1; j <= cj + 1; j++) {
+      const l = placedB.get(pbKey(i, j)); if (!l) continue;
+      for (let q = 0; q < l.length; q += 4) {
+        const dx = l[q] - x, dz = l[q + 1] - z; if (dx * dx + dz * dz > 3.6) continue;
+        const gx = l[q + 2], gz = l[q + 3];
+        let sep = false;
+        for (const [ax, az] of [[fx, fz], [fz, -fx], [gx, gz], [gz, -gx]]) {
+          const ra = Math.abs(fx * ax + fz * az) * BHL + Math.abs(fz * ax - fx * az) * BHW;
+          const rb = Math.abs(gx * ax + gz * az) * BHL + Math.abs(gz * ax - gx * az) * BHW;
+          if (Math.abs(dx * ax + dz * az) > ra + rb) { sep = true; break; }
+        }
+        if (!sep) { bikeHit = [gx, gz]; return true; }
+      }
+    }
+    return false;
+  };
   for (const S of sides) {
     let k = 0;
     while (k < S.n) {
@@ -1307,7 +1345,7 @@ export function buildProps(ctx) {
   // (1 InstancedMesh vật liệu props; LOD xa dùng chung bóng dáng xe máy). Tỉ lệ: pano nói "xe máy … phủ bạt" (deco 1024,
   // ≤ 40 m) 22%, phố r khu dân cư 6%, còn lại 2,5%
   const bikeCov = [];
-  const bikeRej = [0, 0, 0, 0, 0];   // QA: lý do bỏ 1 chiếc — nhà · vật cản · chồm lòng đường · nhựa/camera pano · khe ngẫu nhiên
+  const bikeRej = [0, 0, 0, 0, 0, 0];   // QA: lý do bỏ 1 chiếc — nhà · vật cản · chồm lòng đường · nhựa/camera pano · khe ngẫu nhiên · chạm xe đã đỗ
   stats.bikeRej = bikeRej;
   const COVER_COLS = [0xb9bcbf, 0xb9bcbf, 0xa6aaad, 0xc9cbca, 0x8e9396, 0x3e5f8c, 0x2d4a70, 0x7a2d2a, 0xc6b796, 0x4f5a52];
   // Đ3-W4-B: thử MỘT chiếc tại mốc t với (lat, góc a, mũi vào nhà?) — trả {x,z,fx,fz} hoặc null (cùng bộ kiểm như W3-E)
@@ -1320,6 +1358,8 @@ export function buildProps(ctx) {
     if (obst.hit(x, z, 0.32) || obst.hit(nxp, nzp, 0.22) || obst.hit(txp, tzp, 0.22) || bikeObst.hit(x, z, 0.3) || bikeObst.hit(nxp, nzp, 0.2) || bikeObst.hit(txp, tzp, 0.2)) { bikeRej[1]++; return null; }
     if (roadIdx.carriageGap(narrowL ? x : txp, narrowL ? z : tzp) < (narrowL ? -0.15 : -0.05)) { bikeRej[2]++; return null; }
     if (!clearPt(x, z, 1.6) || onCarriage(nxp, nzp) || onCarriage(txp, tzp)) { bikeRej[3]++; return null; }
+    bikeHit = null;
+    if (hitPlaced(x, z, fx, fz)) { bikeRej[5]++; return null; }
     return { x, z, fx, fz };
   };
   for (const R of bikeRows) {
@@ -1365,6 +1405,12 @@ export function buildProps(ctx) {
       a += skew;
       // mũi/đuôi không vào nhà/vật cản/nhựa (tryBike); dải giữa vỉa bị chiếm → thử dải sát bó vỉa, xe xiên
       let p = tryBike(S, t, lat, a, noseIn, narrow), ac = a;
+      if (!p && bikeHit) {   // chạm thân xe đã đỗ → đỗ SONG SONG xe đó (cùng trục, mũi theo hướng gần nhất) tại cùng mốc
+        const al = bikeHit[0] * S.ux + bikeHit[1] * S.uz, ou = bikeHit[0] * S.nx + bikeHit[1] * S.nz;
+        const ni = ou >= 0, a2 = Math.atan2(Math.abs(ou), al);
+        p = tryBike(S, t, lat, a2, ni, narrow);
+        if (p) ac = a2 + 9;   // ≠ a → xe kế tự do
+      }
       if (!p && curbOK) {
         // xe trước vừa đỗ dải giữa (prevA ≠ null) → lùi thêm 0,35 m (thân xe xiên chồm dọc phố ±0,63 m)
         const tc = t + (prevA !== null ? 0.35 : 0);
@@ -1377,6 +1423,7 @@ export function buildProps(ctx) {
       const { x, z, fx, fz } = p;
       const mu = hash3(x, z, 90);
       const mi = BIKE_ORDER[BIKE_MIX.findIndex((t) => mu < t)];
+      addPlaced(x, z, fx, fz);
       if (hash3(x, z, 99) < pCov) { bikeCov.push({ x, z, heading: headZ(fx, fz), col: pick(COVER_COLS, hash3(x, z, 100)), sc: [1 + (hash3(x, z, 101) - 0.5) * 0.12, 1, 1] }); nBikes++; continue; }
       const lean = hash3(x, z, 91) < 0.62 ? -0.11 - hash3(x, z, 92) * 0.05 : 0;   // chân chống nghiêng
       bikeI[mi].push({ x, z, heading: headZ(fx, fz), lean, col: pick(BIKE_COLS, hash3(x, z, 93)) });
@@ -1569,12 +1616,36 @@ export function buildProps(ctx) {
       const r0 = Math.hypot(x, z);
       const dens = r0 < 700 ? 1 / 34 : r0 < 1150 ? 1 / 60 : 1 / 110;
       if (runL >= 6 && hash3(x, z, 111) < runL * dens && !openSpace(x, z)) {
-        const L = Math.min(runL - 2, 8 + hash3(x, z, 112) * 18);
-        const sMid = (k + (k1 - k) / 2) * CELL;
-        const lat = bikeRun ? facadeLine(S) - 0.4 : sidewalkW(S) >= 2.2 ? parkingLine(S) + (hash3(x, z, 113) - 0.5) * 0.6 : curbLine(S) + sidewalkW(S) * 0.55;
-        const [wx, wz] = cellPos(S, 0, lat, sMid - 0.5 * CELL);
-        walkI.push({ x: wx, z: wz, heading: Math.atan2(S.ux, S.uz), walk: [L, 1.05 + hash3(wx, wz, 114) * 0.45, hash3(wx, wz, 115), 1 + hash3(wx, wz, 116) * 4] });
-        for (let q = k; q < k1; q++) S.occ[q] |= OCC_PED;
+        let L = Math.min(runL - 2, 8 + hash3(x, z, 112) * 18);
+        let sMid = (k + (k1 - k) / 2) * CELL;
+        const lat0 = sidewalkW(S) >= 2.2 ? parkingLine(S) + (hash3(x, z, 113) - 0.5) * 0.6 : curbLine(S) + sidewalkW(S) * 0.55;
+        // phản biện W4-B: lối đi SÁT MẶT TIỀN (facadeLine − 0,4) từng xuyên tường nhà thật chồm qua mặt tiền danh nghĩa
+        // (người đi bộ vào nhà 7/404 → 34/338) → lấy mẫu CẢ QUÃNG đi (±L/2, mỗi 0,5 m, lat và lat ± 0,3) với inBuilding;
+        // thử facadeLine − 0,4 → − 0,25 → − 0,7; vẫn chạm thì rút quãng đi về khúc trống dài nhất (≥ 6 m, quãng ngắn: gần trọn), không có thì bỏ.
+        // Lối thường (không qua hàng xe) cũng kiểm như vậy
+        // + lối qua hàng xe: không chạm thân xe đã đỗ (mũi xe ra tới ~0,9 m sau parkingLine; bản đầu 55/338 người đi xuyên xe)
+        const clearAt = (la, s) => {
+          for (const d of [-0.3, 0, 0.3]) { const [px, pz] = cellPos(S, 0, la + d, s - 0.5 * CELL); if (inBuilding(px, pz)) return false; }
+          if (bikeRun) { const [px, pz] = cellPos(S, 0, la, s - 0.5 * CELL); if (nearPlaced(px, pz, 0.25)) return false; }
+          return true;
+        };
+        const fit = (la) => {   // khúc trống dài nhất quanh sMid trong ±L/2 → [s giữa, dài] hoặc null
+          let best = null, a0 = null; const sA = sMid - L / 2, sB = sMid + L / 2;
+          for (let s = sA; s <= sB + 1e-6; s += 0.5) {
+            const ok = clearAt(la, s);
+            if (ok && a0 === null) a0 = s;
+            if ((!ok || s + 0.5 > sB + 1e-6) && a0 !== null) { const e = ok ? s : s - 0.5; if (!best || e - a0 > best[1]) best = [(a0 + e) / 2, e - a0]; a0 = null; }
+          }
+          return best;
+        };
+        let lat = lat0, seg = null;
+        for (const la of bikeRun ? [facadeLine(S) - 0.4, facadeLine(S) - 0.25, facadeLine(S) - 0.7] : [lat0]) { const f = fit(la); if (f && (!seg || f[1] > seg[1] + 0.25)) { seg = f; lat = la; } if (seg && seg[1] >= L - 0.01) break; }
+        if (seg && seg[1] >= Math.max(3.5, Math.min(6, L - 0.6))) {
+          if (seg[1] < L - 0.01) { sMid = seg[0]; L = seg[1]; }
+          const [wx, wz] = cellPos(S, 0, lat, sMid - 0.5 * CELL);
+          walkI.push({ x: wx, z: wz, heading: Math.atan2(S.ux, S.uz), walk: [L, 1.05 + hash3(wx, wz, 114) * 0.45, hash3(wx, wz, 115), 1 + hash3(wx, wz, 116) * 4] });
+          for (let q = k; q < k1; q++) S.occ[q] |= OCC_PED;
+        }
       }
       k = k1 + 1;
     }
@@ -1598,7 +1669,10 @@ export function buildProps(ctx) {
   {
     const nMk = stats.pedsPre[3] + stats.pedsPre[4], nSp = stats.pedsPre[5], nGen = walkI.length + standI.length + sitI.length - nMk - nSp;
     const kGen = Math.min(1, BUDGET.peds / Math.max(1, nGen)), kMk = Math.min(1, BUDGET.pedsMarket / Math.max(1, nMk)), kSp = Math.min(1, BUDGET.pedsSpill / Math.max(1, nSp));
-    if (kGen < 1 || kMk < 1 || kSp < 1) for (const arr of [walkI, standI, sitI]) { let w = 0; for (const p of arr) if (hash3(p.x, p.z, 124) < (isMk(p) ? kMk : isSp(p) ? kSp : kGen)) arr[w++] = p; arr.length = w; }
+    // phản biện W4-B: hàng xe máy dày + bỏ lối đi xuyên nhà làm người ĐI BỘ tụt 404 → 288 (ứng viên ngồi quán tăng theo ghế
+    // nhựa) → trong nhóm chung người đi bộ được hệ số × 1,25, đứng/ngồi chia phần còn lại (tổng ngân sách người KHÔNG đổi)
+    const nW = walkI.length, kW = Math.min(1, kGen * 1.25), kO = nGen > nW ? Math.max(0, Math.min(1, (kGen * nGen - kW * nW) / (nGen - nW))) : kGen;
+    if (kGen < 1 || kMk < 1 || kSp < 1) for (const arr of [walkI, standI, sitI]) { const kg = arr === walkI ? kW : kO; let w = 0; for (const p of arr) if (hash3(p.x, p.z, 124) < (isMk(p) ? kMk : isSp(p) ? kSp : kg)) arr[w++] = p; arr.length = w; }
   }
   // chân mọi đồ vỉa hè còn lại theo mặt đang vẽ (ô tô: yRoad riêng; dây đèn trang trí: y nền riêng)
   groundAll([...bikeI, bikeCov, stoolI, paraI, cartI, aframeI, binI, hydI, cabI, walkI, standI, sitI,
