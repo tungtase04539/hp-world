@@ -20401,7 +20401,8 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     };
     for (const [x, z] of SP) {
       if (isWater(x, z) || colNear(x, z)) continue;
-      veg.plant('non', x, z, { pit: 1, wash: 0 }); addCollider(x, z, 0.3); n++;
+      // tích hợp W3 (W3-G `exact`): cây non GIỮ là cây non — luật bằng chứng (b) không đổi thành cây bóng mát lớn
+      veg.plant('non', x, z, { pit: 1, wash: 0, exact: 1 }); addCollider(x, z, 0.3); n++;
     }
     console.log('[world] W3-F cây non dải dạo ven sông:', n);
     // cây LỚN dải bờ tự phát + bãi bồi cửa Tam Bạc (riverbank.bankTrees: [x, z, h, r])
@@ -21776,7 +21777,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     const gl = [], kept = []; for (const c of cand) { if (seen(c)) { kept.push([+c.x.toFixed(1), +c.z.toFixed(1), c.r]); continue; } gl.push([+c.x.toFixed(1), +c.z.toFixed(1), c.r]); c.x = 1e7; c.z = 1e7; }
     world.ghostColliders = gl; world.ghostKept = kept; world.ghostMs = +(performance.now() - tG).toFixed(1); world.ghostMsBS = +tBS.toFixed(1); }   // QA: [[x, z, r]] đã tách / giữ vì có hình; ms lượt kiểm hình
   world.treeBloomNear = trees.bloomNear;      // cánh phượng rơi quanh cây đang nở gần người chơi (petals.js)
-  loadHeroTrees(trees);  // nạp GLB cây phượng ảnh-thật → LOD gần ≤150 m (bất đồng bộ)
+  trees.onHeroSeason(() => loadHeroTrees(trees));  // nạp GLB cây phượng ảnh-thật → LOD gần ≤150 m (bất đồng bộ) — W3-G: CHỈ khi vào mùa phượng
   // ---------- ĐỒ ĐẠC PHỐ (Đợt 3 WP7, js/props.js) ----------
   // Chạy SAU mọi cây (kể cả dải vườn hoa) + công trình + nhà thật + điểm xe/NPC mặc định (né collider nhỏ r≤1 m,
   // claims/FEATURED_CLEAR, footprint thật, keepClear) và NGAY TRƯỚC flushTrees/freezeStatic (InstancedMesh của props
