@@ -215,6 +215,11 @@ kiệm điện. Khi chạy `tat-may-chu.ps1`, tiến trình này dừng và máy
   `powershell.exe`.
 - Máy này ngắt mạng khi ngủ. Nếu máy vẫn ngủ thì người chơi bị ngắt. Hãy kiểm tra lại mục 1 (cắm sạc, gập nắp máy).
 
+**Trong giờ chơi đông người (khuyên làm, anh tự chỉnh):** Cài đặt → Hệ thống → Nguồn → Chế độ nguồn: **Hiệu suất tốt
+nhất**, và tắt các ứng dụng chạy nền nặng (game, phần mềm điều khiển máy từ xa, phát video). Khi thử tải trên máy này,
+máy có những "khựng" ngắn khoảng 1 lần mỗi giây kể cả khi không chạy máy chủ; lúc đông (trên ~800 người) các khựng đó
+làm máy chủ tưởng là quá tải và tự giảm chất lượng. Với vài chục người chơi của buổi thử kín thì không ảnh hưởng.
+
 ## 12. Đo mạng người chơi (netprobe)
 
 Gửi cho người thử đường link `https://tungtase04539.github.io/hp-world/netprobe.html?s=<địa chỉ máy chủ>`. Người thử

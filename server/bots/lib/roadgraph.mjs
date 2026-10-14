@@ -158,8 +158,11 @@ export function buildRoadGraph({ margin = 20, waterStep = 4, snap = 8 } = {}) {
         if (b) for (const i of b) cand.push([Math.hypot(this.x[i] - x, this.z[i] - z), i]);
       }
       cand.sort((p, q) => p[0] - q[0]);
+      // bounded cost: at most the 24 nearest nodes are tried (a position with water all around, e.g. a pier, would
+      // otherwise test every node within 400 m × up to 200 isWater samples and stall a whole bot worker)
+      let tries = 0;
       for (const [d, i] of cand) {
-        if (d > 400) break;
+        if (d > 400 || ++tries > 24) break;
         const n = Math.max(1, Math.ceil(d / 2));
         let dry = true;
         for (let s = 1; s < n && dry; s++) { const f = s / n; if (isWater(x + (this.x[i] - x) * f, z + (this.z[i] - z) * f)) dry = false; }
