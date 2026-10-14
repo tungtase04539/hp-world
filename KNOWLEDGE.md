@@ -422,7 +422,7 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
-- **2026-10-06 (Đ3-W3-C FACADES)** [ĐỢT 3 wave 3 — AUDIT3 FP-3 + FP-8 mục 1-3: hết tường hông trống / khối kính đen / khối một màu / "lỗ vuông đen" nhà ô, từ vựng mặt tiền theo BẰNG CHỨNG pano, biển bảng lớn, mái hiên tôn, chữ biển sạch]:
+- **2026-10-06 (Đ3-W3-C FACADES; vòng 2 sau phản biện 2026-10-14)** [ĐỢT 3 wave 3 — AUDIT3 FP-3 + FP-8 mục 1-3: hết tường hông trống / khối kính đen / khối một màu / "lỗ vuông đen" nhà ô, từ vựng mặt tiền theo BẰNG CHỨNG pano, biển bảng lớn, mái hiên tôn, chữ biển sạch]:
     **(1) ATLAS 8×12** (`facade_atlas.js` `ATLAS_ROWS=12`): ảnh 2048×3072 (LITE 1024×1536), ô vẫn 256/128 px; 63 ô cũ GIỮ chỉ số,
     30 ô mới đặt SAU `G_HARD`: tầng trên `U_COL0/U_COL1` (thuộc địa: trụ áp, gờ, cửa cao chớp lật, cửa vòm ô quạt, ban công
     sắt hoa văn), `U_NEO` (tân cổ điển trắng: nửa cột 2 mép bay → ghép bay = 1 cột), `U_TEN` (tập thể: lồng gỉ, tôn vá, đồ
@@ -527,31 +527,35 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     nhỏ song sắt + cục nóng); mái hiên chợ Lan Phong (124 h90) xanh lá → XANH DƯƠNG (ảnh: bạt xanh sọc trắng); BIDV 046 đỏ gạch
     #9e3b30 → #7a463e (render 167,62,51 → 138,62,50).
     **ĐO** (Radeon 890M, TIER 3, ANGLE D3D11, 1280×634, `&date=2024-10-15`, A/B cùng phiên base dot3 ↔ nhánh; máy dùng chung với
-    4-6 agent → nhiễu ±150 ms mỗi pha boot): (a) ẢNH: 33 pano mục tiêu FP-3/FP-8 chấm REAL|dot3|W3-C 0-10: TB 3,30 → 3,56
-    (+0,26); 8 pano đối chứng 3,12 → 3,19 (+0,06 — 400/414 nhích nhờ biển bảng/chữ biển). (b) KHUNG HÌNH: fps 60 (vsync) mọi view
-    cả 2 bên; draw call −9..+22/view (bản sao material palette/kính, biển dọc/bảng); tam giác bằng nhau (±0,01 M); heap THẤP hơn
-    (perf7 542 → 508, perf8 550 → 454 MB — atlas thả bản CPU).
-    (c) KHỞI ĐỘNG: perf7 (2 vòng, trước sửa atlas biển) hpReady 4.282 → 4.636 ms; pha cells 768→831, fabric 701→839, landmarks
-    252→363 — phần landmarks là CHỜ vẽ khung (boot.step bắt đầu pha mới RỒI mới nhường luồng → thời gian chờ khung tính cho pha
-    sau): CPU profile "(idle)" +181 ms ngay ranh fabric→landmarks, JS vùng landmarks 34 vs 31 ms. CHIA ĐÔI (perfvar, cùng phiên,
-    2 vòng): bỏ filter canvas (cellCanvasFx) 410/506, bỏ vẽ lại lưới cửa sổ 441/402, citygen+atlas dot3 491/440 — vẫn cao; chỉ
-    `shopsigns.js` dot3 (954 biển) → 304/264 (base 246/237): NGUYÊN NHÂN = +302 chữ biển tên thật (1.256 biển, gen_shopsigns W3-C)
-    vẽ trên canvas tăng tốc GPU, raster khi khung kế tiếp. Muốn trả lại ~0,1-0,15 s: gen_shopsigns `slice(0, 1)` (1 tên/quan
-    sát) = 911 biển — chưa làm (giữ chất lượng). perf8 (3 vòng, bản cuối): hpReady 4.663 → 4.894 ms (trung vị, bỏ 1 vòng máy
-    nghẽn 6.144) ≈ +230 ms (+5%): landmarks ~245 → ~392, fabric ~719 → ~845, cells ~792 → ~836. citygen JS tự đo trong trình duyệt
-    (stats7) 901 vs 753 ms = trong nhiễu; node: renderStyles 30-50 ms + exposedSide ~25 ms. (d) ATLAS: node ổn định 54 → 97 ms
-    (63 → 93 ô), lạnh 177 → 252 ms; worker trong trình duyệt 636 → 629 ms (ngoài luồng chính, về trước khung đầu); cellAtlas 7
-    trang 90 → 110 ms; 181 ảnh lưới cửa sổ vẽ lại; palette guard 101 mesh / 75 material (9 kính). (e) CỔNG: 0 lỗi JS (14 lô
-    chụp full; LITE chỉ 404 `assets_lite/*.glb` — máy không có bản lite; `--gl1` 0 lỗi, webgl2 false), diag "TẤT CẢ THỰC THỂ OK"
-    (bất biến = base), waterbfs 5/5, shopsigns 0 lỗi định dạng / 0 thương hiệu. BẪY QA: `python -m http.server` có hàng đợi
-    listen 5 — máy bận thì Chrome mở loạt module/GLB bị ERR_CONNECTION_REFUSED → "TIMEOUT window.__hp" (3 lô chụp hỏng) → dùng
-    ThreadingHTTPServer với `request_queue_size = 128`.
+    4-6 agent → nhiễu ±150 ms mỗi pha boot): (a) ẢNH: 33 pano mục tiêu FP-3/FP-8 chấm REAL|dot3|W3-C 0-10: TB 3,30 → 3,57
+    (+0,27; bản cuối vòng 2 — chỉ 124 đổi điểm so với vòng 1); 8 pano đối chứng 3,12 → 3,19 (+0,06 — 400/414 nằm trong danh
+    sách SIGNTXT nên nhích nhờ biển). Phản biện chấm độc lập 30 khung: 2,98 → 3,23. (b) KHUNG HÌNH: fps 60 (vsync) mọi view cả 2
+    bên; draw call −4..+22/view; tam giác bằng nhau (node: chính 896.924 → 896.134, chi tiết 599.370 → 592.524). Heap = nhiễu GC
+    (375-643 MB cả 2 bên, KHÔNG kết luận "thấp hơn" như bản vòng 1).
+    (c) KHỞI ĐỘNG — vòng 1 SAI: báo +230 ms; phản biện đo lại cùng phiên 4 lần: hpReady ~5.083 → ~5.555 ms (+470, +9%), pha
+    landmarks 388 → 554 = chờ vẽ khung do chữ biển ép ngang (mục 11), fabric 686 → 849. Vòng 2 (perf9, 3 vòng xen kẽ, bản cuối):
+    hpReady dot3 5.568/5.533/4.908 (TB 5.336) → nhánh 5.245/5.111/4.996 (TB 5.117) = **−220 ms (−4%)**; startReady TB 7.325 →
+    7.172; pha landmarks 349 → 185 (chữ biển vừa cỡ), fabric 760 → 893 (+133: renderStyles ~20-50 ms, exposedSide ~25 ms, hình
+    học biển dọc/bảng/mái, vẽ lại lưới cửa sổ), cells 816 → 854, shaders 476 → 338 (nhiễu/biến thể program — không nhận công).
+    Node `buildRealFabric` (gồm atlas ĐỒNG BỘ, trong trình duyệt là worker): 888-963 → 1.107-1.274 ms. (d) ATLAS: node lạnh
+    ~105 → ~134 ms, ổn định ~55 → ~65 ms (63 → 95 ô); worker trong trình duyệt lần đo cuối 604 → 1.109 ms (1 mẫu, máy tải;
+    vòng 1: 636 → 629) — ngoài luồng chính, về lúc ~2,2 s (< hpReady); cellAtlas 7 trang 95 → 109 ms; 181 ảnh lưới cửa sổ vẽ
+    lại; palette guard 101 mesh / 75 material (9 kính). (e) CỔNG: 0 lỗi JS (15 lô chụp full vòng 2: tgt_0..10, ctl_0..2, rv_0;
+    LITE chỉ 3× 404 `assets_lite/*.glb` — máy không có bản lite; `--gl1` 0 lỗi, webgl2 false, mặt tiền/kính/biển vẽ đúng),
+    diag "TẤT CẢ THỰC THỂ OK" (bất biến = base), waterbfs 5/5, bộ sinh biển tự kiểm 0 lỗi định dạng / 0 thương hiệu (BRAND_MAP
+    + BRAND_WATCH), 2 bộ sinh xác định (chạy lại không đổi byte). BẪY QA: `python -m http.server` có hàng đợi listen 5 — máy bận
+    thì Chrome mở loạt module/GLB bị ERR_CONNECTION_REFUSED → "TIMEOUT window.__hp" → dùng ThreadingHTTPServer
+    `request_queue_size = 128`. BẪY khoá GPU: `gpulock.mjs` thăm dò 3-5 s nên luôn thua agent dùng khoá thăm dò 250 ms (cùng thư
+    mục khoá) → chờ 10-30 phút/lần; gộp 3-4 lô chụp vào MỘT lần giữ khoá; `fastlock … -- bash -c "…"` trên win32 chạy qua
+    cmd.exe → lệnh con không chạy (thoát 0 ngay) — dùng script node gọi spawnSync KHÔNG shell (tham số có '&' cũng an toàn).
     **Chưa làm/để lại**: hero landmark (FP-8 mục 4 — cần Meshy), góc bo cong, mái ngói 1 tầng riêng, nhà trẻ (069), mái mansard;
     nhà ô vẫn là hộp canvas (cửa sổ đã đẹp hơn, chưa qua shader atlas phố); pano_395 h90/h180 vẫn gần đen = `tb_goldstar` mặt LAM
     KIM LOẠI tối CỐ Ý (bằng chứng pano_540) nhìn từ mặt khuất nắng ở 2-4 m; 051 khối trường xanh lá (fabric, bão hoà < 0,62) giữ;
-    biển quảng cáo TRÊN MÁI lớn kiểu 327 chưa có (BILL chỉ ~30 nhà); khởi động +~0,23 s (mục ĐO; ~0,1-0,15 s là do thêm biển tên thật). CAMNEAR (W3-A) che phần lớn
-    lợi ích ở pano tường sát 2-3 m. Tool QA W3-C (scratchpad): `stats.mjs <port>` (cellSink tex/atlas + fabric + boot), `pick2.mjs` tia dò vật liệu,
-    `nodefab/run2.mjs` dựng phố trong node (tam giác/thời gian/phân bố kiểu).
+    418 h180 khối Chi cục Thuế (cửa sổ tối + dải trệt nâu — ảnh thật trệt ốp đá nâu, giữ); ô atlas G_OPEN1/G_SHOP0/G_SHOP1 vẫn
+    như "giá sách" nhiều màu; biển bảng lớn chọn NGẪU NHIÊN (không theo loại cửa hàng thật); biển quảng cáo TRÊN MÁI lớn kiểu 327
+    chưa có (BILL chỉ ~30 nhà); 486 (camera sát 2 m một khối ô — CAMNEAR, W3-A). Tool QA W3-C (scratchpad): `stats.mjs <port>`,
+    `pick2.mjs` tia dò vật liệu, `s4/signbench.mjs` (đo atlas chữ biển trên GPU), `s4/cons467.mjs` (nhà CONS gần camera:
+    bằng chứng/ngẫu nhiên), `nodefab/run2.mjs` dựng phố trong node.
 - **2026-10-04 (W2-F POLISH)** [ĐỢT 3 wave 2 — WebGL1, giải mã RB 1 lần, kho cảng, ĐÊM, giao thông né xe đỗ, dọn code chết, hitch]:
     **(1) WebGL1** (three r160 tự lùi WebGL1 khi không có WebGL2): KIỂM bằng `tools/qa/shoot.mjs --gl1` (init script cho
     `getContext('webgl2')` trả null — cờ Chrome `--disable-es3-apis` KHÔNG có tác dụng ở headless mới: vẫn webgl2:true;
