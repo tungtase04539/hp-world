@@ -1185,6 +1185,9 @@ export function buildRoadNet(ROADS_DT, deps) {
         else if ((ev & 1) && !(pat & MK.CDBL)) pat = (pat & ~MK.CDW) | MK.CDY;
         else if ((ev & 4) && !(pat & (MK.CDBL | MK.CDY))) pat |= MK.CDW;
       }
+      // Đ3-W5-D: lòng < 6 m (ngõ Tam Bạc bắc 5,5 m — ghi đè pano street_fit) không có vạch tim/làn: nhãn ảnh lan ≤ 150 m từ
+      // đầu nút rộng (221) từng kẻ tim vàng giữa ngõ (ảnh 520/336: mặt ngõ trơn)
+      if (wid < 6) pat &= ~(MK.CDY | MK.CDBL | MK.CDW | MK.LANES);
       if (!(pat & (MK.CDY | MK.CDBL | MK.CDW))) stats.marks.none++;
     }
     // mặt nhựa nâng theo cấp (+4 mm/cấp): 2 dải chồng nhau (đường đôi/nhánh song song) → dải cấp cao thắng, không z-fight
