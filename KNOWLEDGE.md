@@ -490,6 +490,16 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     xanh giữ chỗ"). Program key `fabric_v5fy_`.
     **Sinh lại (2 lần, md5 nội dung LF):** mapdata f4b5f010 (1427 way: 1425/1426 nối cuối, chỉ số cũ giữ), buildings_real f5368062
     (43.372 nhà, rbHash 900eb8db), `rekey_herokit` 407/407 khớp (0 dời tâm, 0 bỏ) → herokit_data b5254901; check_herokit OK.
+    **Kiểm (tier 3, Radeon 890M D3D11, khoá GPU; OLD = git worktree bcdcacc :8802, NEW :8801; ảnh bền ở
+    C:/Users/Admin/hp-world-work/w5finish/{old,new,pairs}):** 20 pano × 4 hướng (331 336 382 088 166 097 106 230 313 + đối chứng 414
+    377 161 354 359 147 028 446 519 221 115) 0 lỗi JS — 382 = dot3 (hết vỉa gạch/hàng cây/vạch mép); 336 h0/h90 tạp hoá kệ hàng,
+    h180/h270 bờ sông thoáng; 331 h90/h180 mái bạt sọc + quán mở; 097 h90/h180 cửa cuốn xanh = dot3; 088/166 xe phủ bạt ra dáng
+    xe (đầu lộ) / ít hơn; 221 h0 hết vạch tim (ảnh thật không vạch). Cổng: node --check + vm.SourceTextModule các file đổi, waterbfs
+    5/5, check_assets ĐỦ (8b8e42c), check_herokit 407/407 (900eb8db), diag full "TẤT CẢ THỰC THỂ OK — 0 lỗi JS" (overlap 1 cũ
+    (259,111)), diag lite OK mọi bất biến 0, mobile OK 0 lỗi, tour 26 ảnh 0 lỗi. **Perf cùng phiên (máy có workflow khác chạy tải):**
+    khởi động 3 vòng xen kẽ hpReady 6810 → 7528 ms, startReady 8982 → 10021 ms (bước tăng = fabric/landmarks/final của W5 A-D như
+    mục tích hợp, không phải bản sửa này); std 24 khung (traffic on): tris tổng 76,06 → 78,00 M (+2,6 %, tệ nhất pano_092 h0 +8,3 %),
+    calls TB 398,5 → 396,2, fps tối thiểu 60/59,9, heap 407 → 456 MB.
 - **2026-10-15 (HEROKIT KHOÁ LẠI — `tools/rekey_herokit.mjs`)** [ghi chú fp_json MẤT ⇒ phân loại hero ĐÓNG BĂNG]:
     **Sự cố:** 2026-10-15 ~00:12 thư mục scratchpad phiên bị dọn ⇒ mất `keep/fp_json` (3.306 JSON trích xuất ảnh, có GHI CHÚ TỰ DO)
     + `keep/fp_plan.json`. Quan sát CÓ CẤU TRÚC vẫn còn trong `audit/facade_fp.json` (đã cam kết — vân tay mặt tiền W4-A sinh lại
