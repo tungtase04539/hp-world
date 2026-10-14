@@ -64,5 +64,12 @@
     "pano_545": "Y",
     "pano_077": "N", "pano_381": "N",
     "pano_064": "N", "pano_065": "N"
+  },
+  "noZebraAbout": "BẰNG CHỨNG ÂM zebra (Đợt 3 W3-D phản biện vòng 2, 2026-10-14): pano có chữ mô tả 'Vạch qua đường' chung chung nhưng ẢNH THẬT 8 hướng KHÔNG thấy vạch qua đường nào quanh camera. tools/gen_roadmarks.mjs bỏ cờ ZEBRA (8) của các pano này → roadnet không dựng vạch giữa khối ma. Chỉ thêm sau khi nhìn ảnh audit/550_pano_dai_trung_tam_hai_phong/pano_<id>_h*_p0.jpg.",
+  "noZebra": {
+    "pano_015": "Hoàng Diệu: 8 hướng chỉ tim vàng đứt + mép trắng, không zebra",
+    "pano_016": "Hoàng Diệu: 8 hướng không zebra",
+    "pano_017": "Hoàng Diệu (trước showroom ô tô): 8 hướng không zebra",
+    "pano_018": "Hoàng Diệu: 8 hướng không zebra (chỉ vỉa hè caro đỏ-xám)"
   }
 }

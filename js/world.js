@@ -896,6 +896,7 @@ export async function buildWorld(scene, prog = () => {}) {
       groundHeightNoDeck, groundHeight, isWater, LAND_H, R: BUILD_RADIUS, T: 450, MEDIANS, bridges: BRIDGES,
       swTypeOf: (ri) => SIDEWALK_BY_ROAD[ri] || SIDEWALK_DEFAULT, MARKS: ROAD_MARK_EVIDENCE,
       LABELS: ROAD_MARK_LABELS, OSM_SIGNALS, OSM_CROSSINGS, PAVE: ROAD_PAVE_EVIDENCE,   // W3-D: vạch/zebra/đèn/vật liệu vỉa hè theo BẰNG CHỨNG
+      PARKS,   // W3-D: ô vỉa hè giáp vườn hoa lấy lớp 'phía công viên' (không lấy chữ phía nhà)
     });
     const rmat = makeRoadMaterial(THREE, { size: LITE ? 256 : 512, anisotropy: LITE ? 4 : 8, lite: LITE });
     let tris = 0;

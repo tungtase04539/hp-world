@@ -185,6 +185,7 @@ export function buildRoadNet(ROADS_DT, deps) {
   const MEDIANS = deps.MEDIANS || [], MARKS = deps.MARKS || [];
   // W3-D: bằng chứng vạch kẻ — nhãn nhìn ảnh pano (tim Y/D/W/N), node OSM đèn tín hiệu / vạch qua đường (js/roadmarks.js)
   const LABELS = deps.LABELS || [], OSM_SIG = deps.OSM_SIGNALS || [], OSM_X = deps.OSM_CROSSINGS || [], PAVE = deps.PAVE || [];
+  const PARKS = deps.PARKS || [];   // đa giác công viên/vườn hoa (mapdata PARKS): ô vỉa hè giáp vườn lấy lớp "phía công viên" (PAVE[3])
   const gh = (x, z) => Math.max(ghN(x, z), LAND_H);
   const stats = { tsnap: 0, tsnapIns: 0, xcross: 0, nodes: 0, junctions: 0, miters: 0, driveways: 0, deadEnds: 0, signals: 0, zebraArms: 0, runs: 0, waterGaps: 0, chordCorners: 0,
     sigOsm: 0, sigEv: 0, zebOsm: 0, zebSig: 0, zebEv: 0, midX: 0, marks: { def: 0, lab: 0, ev: 0, none: 0, dual: 0 } };
@@ -634,6 +635,7 @@ export function buildRoadNet(ROADS_DT, deps) {
   for (const w of ways) { w.labels = null; w.xings = null; w.pave = null; }
   // vật liệu vỉa hè theo chữ pano (ROAD_PAVE_EVIDENCE): cùng cách gán way; đoạn chạy/nhánh lấy điểm gần nhất ≤ 120 m
   for (const Pv of PAVE) {
+    if (!Pv[2]) continue;
     const h = nearestStreetSeg(Pv[0], Pv[1], 12); if (!h) continue;
     (ways[h.wi].pave ||= []).push(Pv);
   }
@@ -693,7 +695,18 @@ export function buildRoadNet(ROADS_DT, deps) {
       if (!g) pz.push([m[0], m[1], dJ(m[0], m[1])]);
       else { const d = dJ(m[0], m[1]); if (d < g[2]) { g[0] = m[0]; g[1] = m[1]; g[2] = d; } }
     }
-    for (const q of pz) add([q[0], q[1]], 15, 'pano');
+    // nút ≤ 30 m: vạch dời 4 m dọc đoạn VỀ PHÍA nút (đầu khối) — đặt đúng chân camera thì không hướng nào thấy (551: ảnh
+    // h180 thấy vạch cách 2-6 m về phía nút cách 25 m); xa hơn → không biết phía nào, giữ tại pano
+    for (const q of pz) {
+      let x = q[0], z = q[1];
+      const h = q[2] <= 30 && nearestStreetSeg(x, z, 15);
+      if (h) {
+        const w = ways[h.wi], [ax, az] = w.pts[h.k], [bx, bz] = w.pts[h.k + 1], l = Math.hypot(bx - ax, bz - az) || 1;
+        const ux = (bx - ax) / l * 4, uz = (bz - az) / l * 4;
+        if (dJ(x + ux, z + uz) < dJ(x - ux, z - uz)) { x += ux; z += uz; } else { x -= ux; z -= uz; }
+      }
+      add([x, z], 15, 'pano');
+    }
     for (const m of MARKS) delete m.unusedZ;
   }
   // đường ĐÔI (2 chiều xe là 2 way song song, có/không dải phân cách): mép lòng 2 dải cách nhau 0..8 m dọc ≥ 60% đoạn chạy
@@ -729,8 +742,48 @@ export function buildRoadNet(ROADS_DT, deps) {
     if (w.pave) for (const Pv of w.pave) { const d = (Pv[0] - x) ** 2 + (Pv[1] - z) ** 2; if (d < bd) { bd = d; best = Pv[2]; } }
     return best;
   };
-  const armSwLayer = (a) => {
+  // PHÍA CÔNG VIÊN (phản biện W3-D vòng 2): chữ pano tả vỉa hè phía NHÀ ("caro đỏ-xám …; phần công viên lát gạch xám") —
+  // lấy cho cả 2 bên làm bờ vườn Tố Hữu 223-226/043 thành caro đỏ (ảnh: đá xám). Ô vỉa hè có mép ngoài (đẩy ra 1,5 / 4 / 7 m)
+  // nằm TRONG đa giác PARKS → lớp "phía công viên" (PAVE[3]) của bằng chứng gần nhất (≤ 150 m) thuộc CHÍNH vườn đó (điểm pano
+  // ≤ 25 m tới đa giác; mặt lát là của vườn, không của way); không có → mặc định của way (SIDEWALK_BY_ROAD), KHÔNG lấy chữ phía nhà.
+  const parkBB = PARKS.map((P) => {
+    let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
+    for (const [x, z] of P) { x0 = Math.min(x0, x); z0 = Math.min(z0, z); x1 = Math.max(x1, x); z1 = Math.max(z1, z); }
+    return [x0, z0, x1, z1];
+  });
+  const inPoly = (P, x, z) => {
+    let c = false;
+    for (let i = 0, j = P.length - 1; i < P.length; j = i++) { const [xi, zi] = P[i], [xj, zj] = P[j]; if ((zi > z) !== (zj > z) && x < (xj - xi) * (z - zi) / (zj - zi) + xi) c = !c; }
+    return c;
+  };
+  const parkAt = (x, z) => {
+    for (let k = 0; k < PARKS.length; k++) { const b = parkBB[k]; if (x < b[0] || x > b[2] || z < b[1] || z > b[3]) continue; if (inPoly(PARKS[k], x, z)) return k; }
+    return -1;
+  };
+  const parkEv = PARKS.map(() => []);
+  for (const Pv of PAVE) {
+    if (!Pv[3]) continue;
+    for (let k = 0; k < PARKS.length; k++) {
+      const b = parkBB[k]; if (Pv[0] < b[0] - 25 || Pv[0] > b[2] + 25 || Pv[1] < b[1] - 25 || Pv[1] > b[3] + 25) continue;
+      if (inPoly(PARKS[k], Pv[0], Pv[1]) || distToPolyline(Pv, PARKS[k]) <= 25) parkEv[k].push(Pv);
+    }
+  }
+  // lớp ô vỉa hè phía công viên: null = không giáp vườn; -1 = giáp vườn nhưng không có bằng chứng → mặc định way
+  const parkLayer = (mx, mz, ux, uz) => {
+    if (!PARKS.length) return null;
+    let k = -1;
+    for (const r of [1.5, 4, 7]) if ((k = parkAt(mx + ux * r, mz + uz * r)) >= 0) break;   // đa giác vườn Tố Hữu lùi ~4,6 m sau mép hè
+    if (k < 0) return null;
+    let best = -1, bd = 150 * 150;
+    for (const Pv of parkEv[k]) { const d = (Pv[0] - mx) ** 2 + (Pv[1] - mz) ** 2; if (d < bd) { bd = d; best = Pv[3]; } }
+    return best;
+  };
+  const armSwLayer = (a, probe) => {
     const w = ways[a.wi];
+    if (probe) {
+      const pl = parkLayer(probe[0], probe[1], probe[2], probe[3]);
+      if (pl != null) { stats.pavePark = (stats.pavePark || 0) + 1; return pl > 0 ? pl : SW_LAYER[a.swType] ?? RL.GACH_XAM; }
+    }
     if (w && w.pave) { const v = paveAt(w, a.O[0] + a.d[0] * 8, a.O[1] + a.d[1] * 8); if (v != null) return v; }
     return SW_LAYER[a.swType] ?? RL.GACH_XAM;
   };
@@ -1230,7 +1283,10 @@ export function buildRoadNet(ROADS_DT, deps) {
             const i1 = off(S1, vin), o1 = off(S1, vout), i2 = off(S2, vin), o2 = off(S2, vout);
             const paint = isWater((i1[0] + i2[0]) / 2, (i1[1] + i2[1]) / 2) ? MK.PAINT : 0;   // trên cầu
             let lay = swLayer;
-            if (w.pave) { const v = paveAt(w, (o1[0] + i2[0]) / 2, (o1[1] + i2[1]) / 2); if (v != null) { lay = v; stats.paveEv = (stats.paveEv || 0) + 1; } }
+            const omx = (o1[0] + o2[0]) / 2, omz = (o1[1] + o2[1]) / 2, oux = omx - (i1[0] + i2[0]) / 2, ouz = omz - (i1[1] + i2[1]) / 2, oul = Math.hypot(oux, ouz) || 1;
+            const pl = parkLayer(omx, omz, oux / oul, ouz / oul);
+            if (pl != null) { if (pl > 0) lay = pl; stats.pavePark = (stats.pavePark || 0) + 1; if (pl > 0) stats.paveParkEv = (stats.paveParkEv || 0) + 1; }
+            else if (w.pave) { const v = paveAt(w, (o1[0] + i2[0]) / 2, (o1[1] + i2[1]) / 2); if (v != null) { lay = v; stats.paveEv = (stats.paveEv || 0) + 1; } }
             emit('sidewalk', [[i1[0], t1, i1[1], S1.u, 0, 0], [o1[0], t1, o1[1], S1.u, sw, sw], [o2[0], t2, o2[1], S2.u, sw, sw], [i2[0], t2, i2[1], S2.u, 0, 0]],
               quadTris, [0, 1, 0], [lay, paint, hw], null);
             // mặt đứng bó vỉa (về phía lòng đường) + mép lưng xuống đất
@@ -1297,7 +1353,9 @@ export function buildRoadNet(ROADS_DT, deps) {
         const l = back[back.length - 1]; if (Math.hypot(eB[0] - l[0], eB[1] - l[1]) > 0.01) back.push(eB);
       } else { curb = C.curb; back = C.back; }
       if (!back || back.length < 1 || curb.length < 2) continue;
-      const swL = armSwLayer(a);
+      // mép ngoài góc (giữa polyline lưng) đẩy ra xa tâm nút → kiểm phía công viên
+      const bm = back[back.length >> 1], bdx = bm[0] - J.x, bdz = bm[1] - J.z, bdl = Math.hypot(bdx, bdz) || 1;
+      const swL = armSwLayer(a, [bm[0], bm[1], bdx / bdl, bdz / bdl]);
       const V = [];
       for (const p of curb) V.push([p[0], ys, p[1], p[0], p[1], 0]);
       for (const p of back) V.push([p[0], ys, p[1], p[0], p[1], Math.min(4, distToPolyline(p, curb))]);

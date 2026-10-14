@@ -1,7 +1,8 @@
 // tools/gen_roadmarks.mjs — BẰNG CHỨNG vạch kẻ đường / zebra / đèn tín hiệu → js/roadmarks.js (SINH TỰ ĐỘNG, đừng sửa tay).
 // Chạy từ gốc repo: `node tools/gen_roadmarks.mjs`. 3 nguồn:
 //  (1) ROAD_MARK_EVIDENCE — mô tả chữ 551 pano (audit/audit_enriched.json): tim vàng/đôi/trắng, có zebra, có đèn tín hiệu.
-//  (2) ROAD_MARK_LABELS (Đợt 3 W3-D) — nhãn NHÌN ẢNH pano thật theo trục đường (tools/pano_loop/mark_labels.json):
+//  (2) ROAD_MARK_LABELS (Đợt 3 W3-D) — nhãn NHÌN ẢNH pano thật theo trục đường (tools/pano_loop/mark_labels.json;
+//      mục `noZebra` = pano ảnh KHÔNG có vạch qua đường dù chữ có → bỏ cờ ZEBRA của (1)):
 //      Y tim vàng đứt | D vàng đôi | W vạch trắng (không vàng) | N KHÔNG vạch tim → bằng chứng ÂM (mặc định theo cấp đường
 //      từng vẽ tim vàng cả phố ngõ hẹp Hạ Lý/Dư Hàng/Mê Linh… — AUDIT3 MARK).
 //  (3) OSM_SIGNALS / OSM_CROSSINGS (Đợt 3 W3-D) — node highway=traffic_signals, highway=crossing/crossing=*, way
@@ -15,7 +16,10 @@ const FIELDS = ['summary', 'area', 'sidewalk', 'vehicles', 'street_furniture', '
 const F = { YELLOW: 1, DOUBLE_YELLOW: 2, WHITE_CENTER: 4, ZEBRA: 8, SIGNAL: 16 };
 const FAR = /(^|[\s(])xa($|[\s),])|cuối phố|đằng xa/;   // "xa" là TỪ riêng (không khớp "xanh")
 const out = [];
-const cnt = { y: 0, dy: 0, w: 0, z: 0, s: 0 };
+const cnt = { y: 0, dy: 0, w: 0, z: 0, s: 0, noZ: 0 };
+// bằng chứng ÂM zebra nhìn ảnh (mark_labels.json noZebra): chữ 'Vạch qua đường' chung chung của 4 pano liền nhau Hoàng Diệu
+// 015-018 (ảnh không có vạch) từng dựng 4 vạch giữa khối ma ngay dưới camera (phản biện W3-D vòng 2)
+const NOZ = new Set(Object.keys(JSON.parse(fs.readFileSync('tools/pano_loop/mark_labels.json', 'utf8')).noZebra || {}));
 for (const p of A) {
   if (!Number.isFinite(p.X) || !Number.isFinite(p.Z)) continue;
   const txt = FIELDS.map((k) => (typeof p[k] === 'string' ? p[k] : JSON.stringify(p[k] || ''))).join(' | ').toLowerCase();
@@ -27,7 +31,9 @@ for (const p of A) {
   // gắn cho nút ≤ 45 m quanh camera — pano_394 "đèn tín hiệu phía cuối phố" từng dựng đèn ma ở nút cạnh pano_496, 083 "(xa)")
   const near = (re) => txt.split(/[|;,."\[\]]/).some((c) => re.test(c) && !FAR.test(c));
   // biển báo người đi bộ (W.224/R.423 xanh) đứng TẠI vạch sang đường (pano_077/320/349 HVT: ảnh đều có zebra)
-  if (near(/vạch (sang|qua) đường|zebra|vạch dành cho người đi bộ|vạch người đi bộ|biển (báo )?người đi bộ/)) { f |= F.ZEBRA; cnt.z++; }
+  if (near(/vạch (sang|qua) đường|zebra|vạch dành cho người đi bộ|vạch người đi bộ|biển (báo )?người đi bộ/)) {
+    if (NOZ.has(p.id)) cnt.noZ++; else { f |= F.ZEBRA; cnt.z++; }
+  }
   if (near(/đèn tín hiệu|đèn giao thông|đèn đếm ngược|đồng hồ đếm ngược/)) { f |= F.SIGNAL; cnt.s++; }
   if (f) out.push([Math.round(p.X * 10) / 10, Math.round(p.Z * 10) / 10, f]);
 }
@@ -52,12 +58,34 @@ function paveClass(t0) {
   }
   return 0;
 }
+// ---- (1c) VỈA HÈ PHÍA CÔNG VIÊN (phản biện W3-D vòng 2): chữ pano hay tả RIÊNG mặt lát phía vườn hoa ("…caro đỏ-xám …;
+// phần công viên lát gạch xám" — 222/223/225/226 Tố Hữu) → lớp riêng cho ô vỉa hè giáp đa giác PARKS (roadnet.js). Bản cũ
+// lấy mệnh đề đầu cho CẢ 2 bên → bờ vườn Tố Hữu thành caro đỏ (ảnh: đá xám). "cả hai bên" (400 Trần Phú) → như lớp chính;
+// mệnh đề tả hè DỌC/VEN/QUANH công viên (040, 152, 195, 543, 544) → lớp của chính mệnh đề đó. Không có → 0 (roadnet giữ
+// mặc định của way cho phía vườn, không lấy chữ của phía nhà).
+const PARKREF = /(phía|phần|bên|dọc|ven|quanh|mép)( theo)?( mép)?( dải)? (công viên|vườn hoa|vườn|quảng trường)/;
+function matClass(s) {
+  const red = /đỏ|terracotta|hồng|đất nung|nâu/.test(s), grey = /xám|ghi/.test(s), conc = /bê tông|xi măng|đá tấm|granite/.test(s);
+  const mix = /caro|ô cờ|bàn cờ|kẻ ô|xen kẽ|xen|pha|phối/.test(s), hex = /lục giác|con sâu|tự chèn|block/.test(s);
+  if (red && (grey || mix)) return 3;
+  if (red) return 4;
+  if (hex) return 5;
+  if (grey || conc) return 2;
+  if (/caro|ô cờ|bàn cờ/.test(s)) return 3;   // "gạch caro" trơn ở Hải Phòng = caro đỏ-xám
+  return 0;
+}
+function parkPaveClass(t0, main) {
+  const t = (t0 || '').toLowerCase().replace(/(bó vỉa|viền|bồn cây|bồn gốc)[^,.;()]*/g, ' ');
+  for (const s of t.split(/[;.]/).map((q) => q.trim()).filter(Boolean)) if (PARKREF.test(s)) { const c = matClass(s); if (c) return c; }
+  return /(vỉa hè|hè)[^;.]*hai bên/.test(t) && !/không có vỉa hè/.test(t) ? main : 0;   // 'hai bên là lan can' (cầu vượt) không tính
+}
 const pave = [];
-const pc = { 2: 0, 3: 0, 4: 0, 5: 0 };
+const pc = { 2: 0, 3: 0, 4: 0, 5: 0 }, ppc = { 2: 0, 3: 0, 4: 0, 5: 0 };
 for (const p of A) {
   if (!Number.isFinite(p.X) || !Number.isFinite(p.Z)) continue;
   const c = paveClass(p.sidewalk); if (!c) continue;
-  pave.push([Math.round(p.X * 10) / 10, Math.round(p.Z * 10) / 10, c]); pc[c]++;
+  const k = parkPaveClass(p.sidewalk, c);
+  pave.push([Math.round(p.X * 10) / 10, Math.round(p.Z * 10) / 10, c, k]); pc[c]++; if (k) ppc[k]++;
 }
 
 // ---- (2) nhãn nhìn ảnh ----
@@ -111,11 +139,11 @@ const src = `// SINH TỰ ĐỘNG bởi tools/gen_roadmarks.mjs — ĐỪNG SỬ
 export const ROAD_MARK_EVIDENCE = ${JSON.stringify(out)};
 // ROAD_MARK_LABELS [X, Z, mã] (NHÌN ẢNH pano thật, tools/pano_loop/mark_labels.json): 1 tim vàng đứt, 2 vàng đôi, 4 vạch trắng, 32 KHÔNG vạch tim.
 export const ROAD_MARK_LABELS = ${JSON.stringify(labels)};
-// ROAD_PAVE_EVIDENCE [X, Z, lớp] vật liệu vỉa hè từ chữ pano: 2 gạch/bê tông xám, 3 caro đỏ-xám, 4 gạch đỏ, 5 tự chèn/lục giác xám.
+// ROAD_PAVE_EVIDENCE [X, Z, lớp, lớp phía công viên] vật liệu vỉa hè từ chữ pano: 2 gạch/bê tông xám, 3 caro đỏ-xám, 4 gạch đỏ, 5 tự chèn/lục giác xám; lớp phía công viên 0 = chữ không tả.
 export const ROAD_PAVE_EVIDENCE = ${JSON.stringify(pave)};
 // OSM_SIGNALS [x, z] node đèn tín hiệu; OSM_CROSSINGS [x, z] vạch qua đường (node crossing / giữa way footway=crossing). Toạ độ game (m).
 export const OSM_SIGNALS = ${JSON.stringify(osmSig)};
 export const OSM_CROSSINGS = ${JSON.stringify(osmX)};
 `;
 fs.writeFileSync('js/roadmarks.js', src);
-console.log('roadmarks:', out.length, 'pano có bằng chứng chữ', cnt, '| vỉa hè', pave.length, pc, '| nhãn ảnh', labels.length, lc, '| OSM tín hiệu', osmSig.length, 'vạch qua đường', osmX.length);
+console.log('roadmarks:', out.length, 'pano có bằng chứng chữ', cnt, '| vỉa hè', pave.length, pc, 'phía công viên', ppc, '| nhãn ảnh', labels.length, lc, '| OSM tín hiệu', osmSig.length, 'vạch qua đường', osmX.length);
