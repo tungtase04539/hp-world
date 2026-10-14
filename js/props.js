@@ -845,7 +845,9 @@ export function buildProps(ctx) {
         const x0 = x, z0 = z;
         for (const sh of [0, 2, -2, 4, -4]) {
           x = x0 + Sx.ux * sh; z = z0 + Sx.uz * sh;
-          if (sh && (roadIdx.blocked(x, z, ri, Sx.si, 0.3) || !flat(x, z) || avoid(x, z) || inBuilding(x, z))) continue;
+          // cột DỊCH phải cách MỌI camera pano ≥ 6 m (dịch để giữ nhịp dây, không để dựng cột lù lù 3,6-4 m trước ống kính —
+          // bản đầu: cột ≤ 4,5 m quanh 551 camera 10 → 20, pano_060 cột to choán 2 hướng)
+          if (sh && (roadIdx.blocked(x, z, ri, Sx.si, 0.3) || !flat(x, z) || avoid(x, z) || inBuilding(x, z) || nearPano(x, z, 6))) continue;
           if (panoNear(x, z, 3)) continue;
           if (obst.hit(x, z, 0.35)) {               // né thân cây/trụ có sẵn: dịch dọc ±1,5 m
             let moved = false;
