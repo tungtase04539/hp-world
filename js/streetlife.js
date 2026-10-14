@@ -196,12 +196,16 @@ function modelFlowers(G) {
   }
   return G.mergeParts(P);
 }
-// CHẬU CÂY CẢNH (chậu đất nung/sứ + bụi) — ~50 tam giác
+// CHẬU CÂY CẢNH (chậu đất nung/sứ + bụi) — Đ3-W4-B: chậu TRÒN có vành + bụi lá nhiều cụm lệch (7 cụm icosa, 4 sắc lá) +
+// vài lá dựng — bản cũ (1 khối icosa thô trên hộp) đọc thành "nón xanh nhựa" (AUDIT4 R6 pano_134) — ~270 tam giác (nhóm
+// biến thể props_spill: MỌI instance gánh đỉnh của mọi biến thể → giữ icosa thô, nhiều cụm nhỏ)
 function modelPot(G) {
   const P = [];
-  P.push(G.finish(G.taper(0.42, 0.42, 0.5, 0.5, 0.4, 0, 0, 0), 0xffffff, 1));   // chậu: màu instance (đất nung/sứ/xám)
-  P.push(G.finish(new THREE.IcosahedronGeometry(0.42, 0).scale(1, 1.15, 1).translate(0, 0.78, 0), 0x3f7a32));
-  P.push(G.finish(new THREE.IcosahedronGeometry(0.26, 0).translate(0.15, 1.12, -0.05), 0x4c8a3a));
+  P.push(G.finish(G.cyl(0.25, 0.19, 0.42, 10, 0, 0.21, 0), 0xffffff, 1));    // chậu: màu instance (đất nung/sứ/xám)
+  P.push(G.finish(G.cyl(0.275, 0.275, 0.06, 10, 0, 0.42, 0), 0xffffff, 0.85)); // vành chậu
+  const B = [[0.02, 0.78, 0.03, 0.17, 0x41782f], [0, 0.72, 0, 0.3, 0x3a6e2e], [0.17, 0.62, 0.1, 0.22, 0x4a7f36], [-0.16, 0.66, -0.06, 0.23, 0x35632a], [0.05, 0.95, -0.12, 0.2, 0x4f8a3c], [-0.08, 0.9, 0.14, 0.19, 0x3f7432], [0.2, 0.86, -0.16, 0.15, 0x5a9444]];
+  for (const [x, y, z, r, c] of B) P.push(G.finish(new THREE.IcosahedronGeometry(r, 0).scale(1, 0.85, 1).translate(x, y, z), c));
+  for (let i = 0; i < 4; i++) { const a = i * 1.57 + 0.4; P.push(G.finish(G.box(0.06, 0.42, 0.012, Math.cos(a) * 0.12, 1.02, Math.sin(a) * 0.12, Math.sin(a) * 0.35, a, Math.cos(a) * 0.35), 0x467c34)); }
   return G.mergeParts(P);
 }
 // NỘI THẤT GỖ bày hè: tủ + bàn + 2 ghế — ~72 tam giác
