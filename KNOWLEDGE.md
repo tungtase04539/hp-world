@@ -455,6 +455,30 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-10-14 (Đ3-W4 SỬA HỒI QUY TÍCH HỢP)** [chấm cặp REAL | dot3 c24a52e | tích hợp W4: 5 pano tụt điểm — sửa TẬN GỐC, không gỡ W4]:
+    **(1) BẢNG LỚN TỪNG BAY trên toà một chủ** (pano_046 h0/h270 BIDV, 161 h90/h180 ngân hàng "trắng sọc xanh", 515 h0/h270 toà
+    thương mại 8 T): chế độ 3 của W4-A (`aFp.z` = 3) dựng ô PANEL chữ cửa hàng NGẪU NHIÊN ở MỌI bay tầng 1(-2) → chồng "NHÀ NGHỈ/
+    NHA KHOA/CẦM ĐỒ/THỜI TRANG NỮ" lên ngân hàng/văn phòng. Đó là kiểu phố NHÀ ỐNG nhiều hộ (464, 023 — đúng); ảnh "multi/banner"
+    trên toà kính/thuộc địa/công sở = MỘT dải biển của MỘT chủ. Sửa `js/citygen.js` `fpPanelOK(D, e, rs)`: chế độ 3 CHỈ khi vân tay
+    'tube'/'tube_old' VÀ kiểu dựng TUBE/OLD/MODERN; còn lại chế độ 2 (dải biển trệt MÀU THẬT, 1 dải liền) — `fpBuild` + bit biển lớn
+    của renderStyles cùng luật. 274 nhà chế độ 3 → còn ~207 (tube 182 + tube_old 25, trừ nhà có kiểu dựng khác).
+    **(2) BIỂN TRÊN MÁI ghi nhầm 'multi'** (046 h270 nhà góc đỏ: "biển quảng cáo lớn trên mái" → bảng mọi bay tầng 1-2):
+    `tools/gen_facade_fp.mjs --collect` đổi 'multi'/'banner' → 'roof' khi ghi chú (không vào facade_fp.json) nói `biển … trên mái|nóc`
+    và không kèm '+' biển khác (5 quan sát: 046 h225/270, 068 h90, 177 h0, 401 h0; stats.roofFromNotes). 'roof' → biển trên mái +
+    dải trệt màu thật (luật W4-A sẵn có).
+    **(3) LÁN TẠM trúng nhà 3 tầng** (519 h90: "quán tạm mái tôn sát tường" khớp footprint căn góc 3 T, tầng vân tay 1 bị chặn →
+    kiểu SHED + tường nâu tôn + trệt sạp chợ = "tháp gỗ nâu"): `process_buildings` `applyFP` — quan sát 'shed' mà nhà CUỐI > 2 tầng
+    ⇒ quan sát tả VẬT KHÁC đứng trước nhà → BỎ cả vân tay nhà đó (`fp_shed_tall_dropped` 28; 4.701 → 4.673 nhà có vân tay; độ phủ
+    mặt phố ≤ 40 m 70,1 → 69,8 %, ≤ 20 m 92,3 → 91,9 %); kiểu dữ liệu theo vân tay áp SAU quyết định tầng; citygen `fpRenderStyle`
+    'shed' → SHED chỉ khi ≤ 2 tầng.
+    **(4) "villa" KHÔNG ban công** (533 h180: tường vàng trơn cửa sổ song sắt hẹp → khối thuộc địa 3 T ban công vòm): `fpBuild` bộ tầng
+    trên FU cho VILLA khi ảnh nói balcony none + cửa nhôm/nhỏ/song sắt (FU1/FU9/FU7, 43 nhà); villa có ban công/cửa vòm/chớp gỗ giữ bộ
+    W4-C. **(5)** trệt 'market' trên GLASS/TOWER/CIVIC/NEO → bộ FG4 kính (515 h270: sảnh toà thương mại thành sạp hàng).
+    Sinh lại: collect → process_buildings 2 lần cùng md5 (38f584da). Ảnh (tier 3, 890M, :8801, khoá GPU, traffic off, 1280×634):
+    keep/w4_fix (5 pano × 4 hướng + đối chứng 464 h90/h180, 023 h180 — bảng lớn nhà ống GIỮ nguyên; 068/177/401), ghép keep/
+    pairs4fix. Kết quả: 046/161/515 hết chồng bảng (dải màu thật); 519 h90 về căn góc như dot3; 533 h180 hết ban công vòm (vẫn 3 T
+    theo 3 quan sát đồng thuận — ảnh thật trông 1 tầng cao, chưa sửa). Cổng: node --check, waterbfs 5/5, check_assets ĐỦ, diag full
+    "TẤT CẢ THỰC THỂ OK — 0 lỗi JS" (overlap 1 ở (259,110) có từ W3), diag lite OK, 0 lỗi JS khi chụp.
 - **2026-10-14 (Đ3-W4 TÍCH HỢP)** [ĐỢT 3 WAVE 4 — gộp 3 nhánh lên `dot3` (c24a52e) theo thứ tự A → C → B, `--no-ff`]:
     **Gộp:** W4-A VÂN TAY (`worktree-wf_a4af6823-53d-59`, a926c6d) sạch; W4-C FACADE KIT (`…-53d-2`, 8698668) xung đột 7 khúc
     trong `js/citygen.js` (KNOWLEDGE tự gộp union); W4-B NATURE-LIFE (`…-53d-1`, 9d77ab4) sạch (props/trees/streetlife/treemap/
