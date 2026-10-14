@@ -455,6 +455,57 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-10-14 (Đ3-W4-B NATURE-LIFE)** [ĐỢT 3 wave 4 — AUDIT4 D4 "cây đồng loạt" + D5 "hàng xe máy quá thưa / chợ thưa hàng": dáng tán RIÊNG từng cây, xe máy đỗ dày theo bằng chứng, xe phủ bạt, cây non khung kiềng, bằng chứng facade fingerprints]:
+    (nhánh worktree `worktree-wf_a4af6823-53d-1` trên dot3 c24a52e). File: `js/props.js`, `js/trees.js`, `js/streetlife.js` (tỉ lệ
+    hàng tràn/chậu, món hàng chợ thứ 3, mô hình chậu cây), MỚI `tools/gen_fp_nature.mjs` + `tools/fp_nature.json` (ảnh chụp dữ liệu),
+    `tools/gen_treemap.mjs` + `tools/gen_props_evidence.mjs` (đọc fp_nature) → SINH LẠI `js/treemap.js`, `js/props_evidence.js`.
+    **BẰNG CHỨNG FACADE FINGERPRINTS (`tools/gen_fp_nature.mjs`):** fp_json (W4-A, ~6 ảnh mặt tiền/pano, trường "trees"/"street",
+    Việt HOẶC Anh) nằm NGOÀI repo → bộ sinh đếm số HƯỚNG nhắc từng dấu hiệu (cây non/chống cọc/kiềng, nghiêng, tán thưa/rậm, hàng
+    xe máy dày, ít xe máy, xe máy phủ bạt, hàng hoá, ghế quán, chậu cây, dây chằng chịt) → `tools/fp_nature.json` (366 pano lúc chạy,
+    fp_json còn đang về: chạy lại `node tools/gen_fp_nature.mjs [--fp <dir>]` rồi 2 bộ sinh kia). CHỈ NÂNG bằng chứng audit:
+    treemap young ≥ 2 hướng → 3, lean ≥ 2 → 1 (young 72 → 145 pano, lean 6 → 77); props_evidence xe máy dày ≥ 2 hướng → mức 3 (≥ 1 và
+    không hướng nào "ít xe" → ≥ 2), phủ bạt → deco bit MỚI 1024 (regex audit "xe máy … phủ bạt" 17 pano + fp → 38), hàng hoá ≥ 2 →
+    spill 4, ghế quán ≥ 2 → clutter 1, chậu ≥ 1 → spill 512, dây ≥ 2 (pano có cột) → pole 2. **BẪY:** agent trích xuất hay CHÉP Y
+    HỆT câu cây cho cả 6 hướng ("some young staked trees" ×6 ở 028/083/475) — số hướng KHÔNG đo độ phủ ⇒ fp không bao giờ đẩy young
+    lên 6 ("hàng cây non" 80%): bản thử ≥ 4 hướng → 6 biến 81 pano thành 80% cây non (028 kè hồ thật toàn cây lớn nghiêng).
+    **XE MÁY ĐỖ (props.js 6.5):** đo node (`scratchpad/dot3/W4-B/nh_run.mjs --bikestat`: xe ≤ 20 m quanh pano theo mức bằng chứng):
+    dot3 mức 3 TB 23,8 / mức 2 11,2 (ảnh thật 023/088/345: hàng 10-40 xe kín mặt tiền). (1) `LEVEL` mức 2 [0,28 khởi hàng, 3-9 ô],
+    mức 3 [0,75, 6-16 ô], mức 3 nối hàng liền 65% (không chừa ô); (2) mức ≥ 2: hàng xe đi XUYÊN ô OCC_SHOP (ghế quán/biển A/chậu/
+    hàng tràn cắt hàng thành khúc 2-6 ô) — từng chiếc vẫn né `obst` + lưới RIÊNG `bikeObst` (ghế quán 0,75 m/biển A/cán dù — KHÔNG
+    thêm vào obst để không đổi chỗ đặt ô tô/chợ); (3) dải giữa bị chiếm → thử DẢI SÁT BÓ VỈA (curb + 0,82, xiên 40-52°, vỉa ≥ 2,2 m;
+    xe trước ở dải giữa → lùi 0,35 m vì thân xiên chồm dọc ±0,63 m) — `stats.bikeCurb`; (4) KIỂU CỤM: 66% vuông góc 70-90°, 22% xiên
+    40-55° (bước dọc ÷ sin góc), 12% lộn xộn ±20° (không kẹp theo xe trước); (5) XE PHỦ BẠT `bikeCov` (mô hình loft chữ U ngược: gù
+    tay lái/gương 1,1 m, yên 0,87, võng sàn, mép bạt 0,33 m lộ 2 bánh, nếp nhăn, mép sẫm — ~250 tam giác; 1 InstancedMesh
+    `props_bike_cov` vật liệu props, LOD xa dùng chung bóng dáng xe máy): pano phủ bạt ≤ 40 m 22%, phố r 6%, còn lại 2,5%; (6) ngân
+    sách 16k/5k → 30k/8k (LITE). Người đi bộ: vỉa ≥ 3,4 m đi dải sát mặt tiền SAU mũi hàng xe (ô xe máy không chặn lối) — hàng xe dày
+    từng bớt người đi bộ 404 → 317. Kết quả node: xe máy 14,2k → 28,4k (1,3k phủ bạt), mức 3 23,8 → 43,0, mức 2 11,2 → 27,5; dựng props
+    node 645 → 665 ms. QA: `stats.bikeRej` [nhà, vật cản, chồm lòng, nhựa/camera, khe ngẫu nhiên], `__hpProps.lists.bikesCov`.
+    **BẪY:** hình cầu (SphereGeometry) biến dạng thành túi trùm xe ra "củ lạc/khúc xương" (2 đầu phình, cực cầu có vết nứt pháp tuyến) —
+    dùng loft mặt cắt + nắp quạt; thứ tự đỉnh quad phải (a, b+1, a+1)(a, b, b+1) khi vòng chạy θ π→0 và mặt cắt tăng theo +Z.
+    **CÂY (trees.js):** (1) DÁNG TÁN RIÊNG trong shader (VERT_BEGIN, cả lượt bóng): biên độ hpAmp mã hoá trong `aInst.y = vôi + 2·q`
+    (q = biên độ×32, 0..15; ô vỏ/vôi đọc `mod(aInst.y, 2.0)`) → bán kính tán ×(1 + A·(0,55 cos(φ−p) + 0,35 cos(2φ+1,7p) + 0,22 cos(3φ+2,3p)))
+    + mặt tán nghiêng lệch (y += 0,32·A·r·cos(φ−1,31p)), p = pha aInst.z; chỉ đỉnh aHt ≥ 1,5 (tán + cành tán), trường TRƠN → thẻ lá
+    theo cành. A: cây tự do 0,15-0,42, sát tường 0,12-0,26, cây non 0,1-0,25, đa/me 0,08-0,18, hero 0 (heroFit không tính biến dạng),
+    cau/TOPI 0. (2) Số ngẫu nhiên thẻ lá XOAY VÒNG theo cây `fract(r + fract(aInst.z·0,618))` → 2 cây cùng kit cùng độ kín thủng CHỖ
+    KHÁC (giữ tương quan theo chùm). (3) Độ kín HAI ĐỈNH: 16% cây thưa 0,40-0,55, 14% (pano "rợp" 30%) dày 0,93-1. (4) Cây bị ép tán
+    sát tường NGHIÊNG CẢ CÂY ra lòng đường 1,7-4,6° (45%; pano "nghiêng" 80%) + cây tự do ở pano "nghiêng" 40% nghiêng hướng ngẫu nhiên
+    (`r.wallTilt`, `stats().ev.wallTilt/amp`). (5) Trồng dọc phố: nhịp × nhiễu giá trị trơn theo khúc 40 m (0,72-1,28) + 6% CẶP cây
+    4,4-5 m + hố lệch ngang −0,12..+0,22 m. (6) Kit MỚI cây non trong KHUNG KIỀNG 4 cọc + 2 tầng giằng + dây buộc (`stakes: 'frame'`,
+    thêm CUỐI `KIT_DEFS` — giữ chỉ số kit cũ); "cây non" lẻ 0,25 → 0,38; regex young + trồng mới/lại, cọc tre, kiềng, khung chống.
+    **ĐỒ HÈ (streetlife.js):** hàng tràn theo bằng chứng ≤ 25 m 16/22% → 26/32% ô, chậu cây trước nhà 3 → 4% ô, chợ mức 3 thêm món
+    thứ 3 (55%); props.js quán ghế nhựa theo bằng chứng 0,045 → 0,06. Chậu cây: chậu TRÒN có vành + bụi 7 cụm icosa 4 sắc + lá dựng
+    (bản cũ hộp + 1 icosa thô = "nón xanh nhựa", AUDIT4 R6) — giữ icosa thô vì nhóm biến thể `props_spill` bắt mọi instance gánh đỉnh mọi biến thể.
+    **SỐ ĐO (A/B cùng phiên, base = dot3 c24a52e git archive :8712 ↔ :8702, xen kẽ 2 vòng, keep/views_ab4.json, TIER 3, ANGLE Radeon
+    890M D3D11):** hpReady 5.124 → 5.007 ms (nhiễu, bước nature 143 → 141, furniture 75 → 71); heap 465 → 487 MB (nhiễu ±40);
+    fps 60 (vsync) cả hai; calls 1.739 → 1.747 (+0,5%); tris 13,30 → 13,81 M (+3,9%: pano_102 +6,8%, cam_spawn +4,7%, pano_007 +3,2%,
+    high +2,4% — xe máy gần ~0,9k tam giác/xe). Ảnh (REAL | dot3 | W4-B, 1280×634, traffic off, 22 pano đích + 8 đối chứng × 4 hướng,
+    0 lỗi JS mọi lô; dot3 = keep/new_c24a52e, người làm tự chấm ±0,5): 22 pano đích 5,07 → 5,27 (+0,5 ở 023/083/088/345/124/189/386/001/056 — hàng xe dọc mặt tiền như ảnh, tán đa dạng/rợp hơn; 492/446/184/450 phố chợ không đổi); 8 đối chứng (010/042/060/074/230/285/359/395) không đổi (cây xê dịch do nhịp mới).
+    **Cổng:** node --check OK, waterbfs 5/5, check_assets ĐỦ, diag full "TẤT CẢ THỰC THỂ OK — 0 lỗi JS" (bất biến: overlap 1 ở (259,111) — có từ bản tích hợp W3), diag lite OK 0 lỗi, mọi bất biến 0.
+    **CÒN:** phố chợ vỉa hẹp (492/446/184) vẫn gần như không xe máy — hàng chợ chiếm giữa vỉa, ảnh thật xe đỗ ở MÉP LÒNG ĐƯỜNG (cần
+    đưa xe vào `LIFE.stallsRoad` cho giao thông lách — chưa làm, rủi ro bất biến giao thông); dải dạo ven sông (336 h180/h270) không xe
+    máy (openSpace ⇒ mức 0) trong khi ảnh thật xe đỗ dọc lan can; vài phố dân cư mức 2 nay dày hơn ảnh (308 h0); nhịp cây mới đổi chỗ
+    cây gần camera (083 h0 thân cây to sát trái, 345 h180 mất 1 cây).
+
 - **2026-10-14 (Đ3-W3 SỬA HỒI QUY AUDIT4)** [ĐỢT 3 wave 3 — hồi quy mức 3 của AUDIT4 (REAL | dot3 | tích hợp), nhánh tích hợp]:
     **(R1) SÔNG TAM BẠC "MẤT" SAU LAN CAN (198/203/207/212 mức 3, 134 mức 2) — gốc W3-F, KHÔNG phải polygon nước:** đo WATER
     dot3/F/A/tích hợp ở 6 pano: mép nước lệch ≤ 1,5 m, nước vẫn bắt đầu 8-13 m trước camera. Raycast màn hình (probe trên
