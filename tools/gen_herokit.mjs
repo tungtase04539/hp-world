@@ -136,6 +136,10 @@ for (const bi of [...per.keys()].sort((a, b) => a - b)) {
     if (o[C.windows] === WI.arched) flags |= 16;
     if (RX.curved.test(nt)) flags |= 32;
     if (RX.column.test(nt)) flags |= 64;
+    // loại cửa hàng (chữ biển herokit CHUNG theo ngành, không thương hiệu): 128 điện máy/siêu thị · 256 thời trang/giày · 512 điện thoại
+    if (/điện máy|siêu thị|electronics|supermarket|superstore/i.test(nt)) flags |= 128;
+    else if (/thời trang|fashion|giày|shoe|boutique|quần áo|clothes|salon/i.test(nt)) flags |= 256;
+    else if (/điện thoại|phone|mobile/i.test(nt)) flags |= 512;
     if (o[C.floors] > 0) { fl += o[C.floors] * q.w; flw += q.w; }
   }
   OUT.push([Math.round(CX[bi] * 10), Math.round(CZ[bi] * 10), best, avgCol(walls), avgCol(accents), flags, Math.round((fx / fw) * 10), Math.round((fz / fw) * 10)]);
@@ -145,7 +149,7 @@ OUT.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
 const meta = { v: 1, generator: 'tools/gen_herokit.mjs', rb: D.nB, obs: FP.obs.length, sameObsAsFacadeFP: sameObs, hits: R.hits.length, n: OUT.length, ...stat };
 const txt = '// js/herokit_data.js — SINH TỰ ĐỘNG bởi tools/gen_herokit.mjs (Đợt 3 W5-A HERO-KIT). ĐỪNG SỬA TAY.\n'
   + '// HERO[i] = [cx·10, cz·10 (tâm diện tích footprint, dm), chương trình (HERO_PROG), màu tường sRGB | −1, màu nhấn (biển) sRGB | −1,\n'
-  + '//            cờ: 1 mái ngói · 2 rào/cổng · 4 mái che sảnh · 8 bậc thang · 16 cửa vòm · 32 khối cong · 64 hàng cột,\n'
+  + '//            cờ: 1 mái ngói · 2 rào/cổng · 4 mái che sảnh · 8 bậc thang · 16 cửa vòm · 32 khối cong · 64 hàng cột · 128 điện máy · 256 thời trang · 512 điện thoại,\n'
   + '//            điểm tiêu x·10, z·10 (nơi tia quan sát chạm mặt nhà: sảnh/mái che/biển đặt ở đoạn mặt tiền đó)]\n'
   + `export const HERO_PROG = ${JSON.stringify(PROG)};\n`
   + `export const HERO_META = ${JSON.stringify(meta)};\n`

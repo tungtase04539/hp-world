@@ -14,7 +14,7 @@ import { GROUND_H, FLOOR_H, heightOf } from './buildings_data.js';
 
 // chương trình (khớp HERO_PROG của tools/gen_herokit.mjs)
 export const HP = { NONE: 0, PAGODA: 1, PETROL: 2, MARKET: 3, SCHOOL: 4, BANK: 5, HOTEL: 6, STORE: 7, OFFICE: 8, COLONNADE: 9 };
-export const HF = { TILE: 1, FENCE: 2, CANOPY: 4, STAIRS: 8, ARCH: 16, CURVED: 32, COLUMNS: 64 };
+export const HF = { TILE: 1, FENCE: 2, CANOPY: 4, STAIRS: 8, ARCH: 16, CURVED: 32, COLUMNS: 64, ELEC: 128, FASHION: 256, PHONE: 512 };
 
 // ---------- tra cứu theo tâm footprint ----------
 const HG = 4;
@@ -397,9 +397,19 @@ function heroStore(c, fr, add) {
   const yb = y0 + GROUND_H + 0.05, yt = y0 + Math.min(H + 0.6, GROUND_H + FLOOR_H * Math.min(3, fl - 1) + 0.4);
   const W = Math.min(L - 0.3, 24);
   add(M, box(M, mx + nx * P / 2, mz + nz * P / 2, ex, ez, nx, nz, W / 2, P / 2, yb, yt, clad, s8, MOD.D_PLAIN, 63 ^ 2));
-  // dải chữ lớn (nền = màu biển THẬT qua aFp khi có — chế độ 2) ở 1/3 dưới tấm ốp
-  const sH = Math.min(1.6, (yt - yb) * 0.4), sW = Math.min(W - 0.6, 12), [p0x, p0z] = edgeP(E, (L - sW) / 2), [p1x, p1z] = edgeP(E, (L + sW) / 2);
-  add(M, signFace(M, p0x + nx * (P + 0.02), p0z + nz * (P + 0.02), p1x + nx * (P + 0.02), p1z + nz * (P + 0.02), nx, nz, yb + 0.25, yb + 0.25 + sH, 2, s8, 80));
+  // dải chữ lớn (nền = màu biển THẬT qua aFp khi có — chế độ 2) ở 1/3 dưới tấm ốp — chữ CHUNG theo NGÀNH ảnh tả: điện máy →
+  // H_SIGN 'SIÊU THỊ ĐIỆN MÁY'; thời trang → PANEL 'THỜI TRANG NỮ'; điện thoại → PANEL 'ĐIỆN THOẠI - LAPTOP'; còn lại (showroom
+  // ô tô, nội thất…) chỉ tấm ốp trơn (r3: 'SIÊU THỊ ĐIỆN MÁY' trên shop thời trang 377/161 là sai)
+  const kind = c.flags & HF.ELEC ? 1 : c.flags & HF.FASHION ? 2 : c.flags & HF.PHONE ? 3 : 0;
+  if (kind) {
+    const sH = Math.min(kind === 1 ? 1.6 : 2.2, (yt - yb) * (kind === 1 ? 0.4 : 0.55)), sW = Math.min(W - 0.6, kind === 1 ? 12 : sH * 2.1), [p0x, p0z] = edgeP(E, (L - sW) / 2), [p1x, p1z] = edgeP(E, (L + sW) / 2);
+    const q0x = p0x + nx * (P + 0.02), q0z = p0z + nz * (P + 0.02), q1x = p1x + nx * (P + 0.02), q1z = p1z + nz * (P + 0.02), y1 = yb + 0.25;
+    if (kind === 1) add(M, signFace(M, q0x, q0z, q1x, q1z, nx, nz, y1, y1 + sH, 2, s8, 80));
+    else {
+      const pi = kind === 2 ? 3 : 0, v0 = (pi & 1) * 0.5 + 0.004, v1 = v0 + 0.492;   // PANEL_W[3] / PANEL_W[0] (facade_atlas.js)
+      add(M, qN(M, [q0x, y1, q0z, q1x, y1, q1z, q1x, y1 + sH, q1z, q0x, y1 + sH, q0z], nx, 0, nz, [0.004, v0, 0.996, v0, 0.996, v1, 0.004, v1], WHITE, s8, MOD.PANEL0 + (pi >> 1), 120));
+    }
+  }
 }
 
 // ---------- HÀNG CỘT TÂN CỔ ĐIỂN: cột tròn khổ lớn 2-3 tầng, bệ, dầm, trán tam giác ----------

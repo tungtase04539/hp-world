@@ -545,6 +545,11 @@ function commitSink(sink, THREE, realScene, realFC, colliders, opts) {
   let nHero = 0; const heroCand = [];
   const heroMemo = new Map();
   const heroB = (b) => { let v = heroMemo.get(b); if (v === undefined) { const r = heroOfPoly(D, b); v = heroProg(r.hi) ? r.area : 0; heroMemo.set(b, v); } return v; };
+  // diện tích (xấp xỉ, m²) mỗi nhà thật bị các nhà ô DANH TÍNH còn giữ đè lên — nhà hero mà nhà ô KHÁC (giữ lại) vẫn đè
+  // > 15% thì citygen sẽ giết nó theo claim 'cell' ⇒ gỡ nhà ô này chỉ để lại khoảng trống (phản biện r3: pano_510/235 văn phòng
+  // b2805 bị biệt thự 'v4_lejardin_villa' đè 20% → 'dl_caooc_mk' phải GIỮ)
+  const coverB = new Map(), stepOf = (it) => Math.max(1, Math.ceil(it.keys.length / 150));
+  for (const o of bl) if (!o.removed && o.kind !== 'house' && o.perB) for (const [b, c] of o.perB) coverB.set(b, (coverB.get(b) || 0) + c * stepOf(o));
   for (const it of bl) {
     if (it.removed || it.kind === 'house' || it.kind === 'bespoke') continue;
     const n = it.keys.length, tot = it.nS || 1;
@@ -569,7 +574,9 @@ function commitSink(sink, THREE, realScene, realFC, colliders, opts) {
       for (let j = 0; j < n; j += step) { t2++; const b = G.at(KX(keys[j]) + 0.5, KZ(keys[j]) + 0.5); if (b >= 0 && heroB(b)) h2++; }
       fracS = t2 ? h2 / t2 : 0;
     }
-    const ok = hOK && (np ? famNear && fracS >= 0.3 : frac >= 0.5);
+    let blocked = false;
+    for (const b of seen) { const own = (it.perB.get(b) || 0) * stepOf(it); if ((coverB.get(b) || 0) - own > 0.15 * heroB(b)) blocked = true; }
+    const ok = hOK && !blocked && (np ? famNear && fracS >= 0.3 : frac >= 0.5);
     if (!hit && !ok) continue;
     heroCand.push([it.name, it.kind, +frac.toFixed(2), n, Math.round(area), +it.height.toFixed(1), [...seen].join('+'), ok ? 1 : 0, Math.round(it.cx), Math.round(it.cz)]);
     if (!ok) continue;
