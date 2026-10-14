@@ -140,3 +140,114 @@ Kiểm nhanh: `curl http://127.0.0.1:9100/healthz` → `{"ok":true,"transport":"
 - `TRUST_PROXY=cloudflare` chỉ bật khi cổng game không tới được trừ qua tunnel (compose publish 127.0.0.1).
 - `deploy-pages.yml` dựng commit có cây = HEAD trừ `server/` rồi đẩy lên `gh-pages` (`js/shared/` vẫn lên Pages vì
   client cần).
+
+
+## 5. S5 — Vận hành tự host, netprobe, sổ tay (15/10/2026)
+
+Sổ tay cho chủ dự án (không thuật ngữ): `docs/multiplayer/VAN_HANH.md`. Mục này là ghi chú kỹ thuật.
+
+### 5.1 Docker
+
+- **Ảnh game** (`server/Dockerfile`, context = gốc repo): `node:24-trixie-slim@sha256:173f1258…` (glibc 2.41 → uWS
+  v20.71.0 nạp được; bookworm thì lặng lẽ lùi về `ws`). `npm ci --omit=dev --ignore-scripts`. Chỉ chép theo whitelist
+  `server/Dockerfile.dockerignore`: `server/{src,admin,data/filter,package*.json}`, `js/shared/`, `js/terrain.js`,
+  `js/mapdata.js`, `js/brands.js`. Bước build `import('/app/server/src/main.js')` liên kết toàn bộ đồ thị import → **thiếu
+  file là build đỏ**, không phải lỗi lúc khởi động; build cũng in `uWS: OK`. Test `ops_static.test.js` lần theo import từ
+  `main.js` và báo đỏ nếu một file `js/` được import mà chưa whitelist: **S2/S3 import thêm `js/*.js` → thêm 1 dòng vào
+  Dockerfile + .dockerignore.** Ảnh 150 MB.
+- **Điểm vào trong container**: `server/ops/container-main.mjs` — như CLI của `main.js` nhưng `loadConfig({envFile:null})`
+  và **không gọi `ensureEnvFile()`** (root FS chỉ đọc; bí mật đến từ `env_file: .env` của compose). `NODE_ENV=production`
+  thiếu bí mật → từ chối chạy. HEALTHCHECK = `ops/healthcheck.mjs` (GET /healthz, 3 s).
+- **Compose** (`server/docker-compose.yml`, project mặc định `hpworld`, cổng 9100/9101):
+
+| dịch vụ | mạng | cổng host | giới hạn | ghi chú |
+|---|---|---|---|---|
+| game | hostlink, edge, backend | `127.0.0.1:${HPMP_GAME_PORT:-9100}`→9100, `127.0.0.1:${HPMP_ADMIN_PORT:-9101}`→9101 | 4 CPU, 2 GB, 512 pid, nofile 16k | TRUST_PROXY=cloudflare, ADMIN_DENY_CIDRS=edge+backend, TUNNEL_TOKEN bị xoá khỏi env |
+| db | backend | — | 2 CPU, 1 GB, 256 pid | postgres:17 ghim digest, chạy user 999 (không cần cap), tmpfs /var/run/postgresql |
+| tunnel (profile) | edge, cfout | — | 0,5 CPU, 256 MB | ảnh `server/ops/cloudflared/` = cloudflared 2026.7.2 ghim digest + `config.yml` chép vào |
+| quicktunnel (profile) | edge, cfout | — | 0,5 CPU, 256 MB | `tunnel --url http://game:9100` |
+| backup (profile) | backend | — | 0,5 CPU, 256 MB | pg_dump -Fc mỗi đêm 03:15 giờ VN, giữ 14 ngày; `BACKUP_ONCE=1` = một lần |
+
+  Mọi dịch vụ dùng anchor `x-hardening`: `read_only`, `no-new-privileges`, `cap_drop: [ALL]`, `restart: unless-stopped`,
+  log json-file 10m × 5. Không docker.sock / privileged / host network. **Bind mount duy nhất** `./data/backups` (dịch vụ
+  backup). `edge` và `backend` là `internal: true` (không Internet); cloudflared ra Internet qua mạng riêng `cfout`.
+  Kiểm bằng container node trên mạng `hpmp-ops_edge`: `game:9100/healthz` 200, `game:9101/healthz` và `/metrics` **403**,
+  `db:5432` không phân giải được, `1.1.1.1` ENETUNREACH.
+- **`configs: content:` của compose không dùng được với `read_only: true`** ("`file` is the sole supported option") → ingress
+  cloudflared được chép vào một ảnh dẫn xuất nhỏ; script backup nằm inline trong `entrypoint sh -c` (anchor
+  `x-backup-script`, `$$` thoát nội suy). Script backup có `trap … TERM` + `sleep & wait`; thiếu nó `docker stop` chờ hết
+  8 s (đo: tắt cả bộ 15,8 s → sau khi sửa 6,6 s).
+- **Ingress tunnel** (`server/ops/cloudflared/config.yml`): `^/(play|probe|healthz)$` và `^/v1/` → `http://game:9100`, còn
+  lại `http_status:404`. Kiểm bằng `cloudflared tunnel ingress rule` trong ảnh: /admin, /admin/api/status, /metrics, /, /v1,
+  /playx, /healthz/x → 404. Tunnel phải là loại **quản lý cục bộ** (tạo bằng CLI), chạy bằng `cloudflared tunnel token
+  <tên>` → `TUNNEL_TOKEN`; tunnel tạo trên dashboard bỏ qua file ingress này.
+
+### 5.2 Cổng admin không bao giờ tới được từ tunnel (`server/src/api/admin_edge_guard.js`)
+
+Middleware `app.admin.use()` (cài trong `api/netprobe.js`) trả 403 khi: có header Cloudflare (`cf-connecting-ip`, `cf-ray`,
+`cf-warp-tag-id`, `cf-ipcountry`, `cdn-loop: cloudflare`); hoặc IP socket nằm trong `ADMIN_DENY_CIDRS`; hoặc
+`ADMIN_ALLOW_CIDRS` khác rỗng mà IP không nằm trong đó. CIDR sai → khởi động lỗi (không âm thầm tắt lớp bảo vệ). Nguồn
+cấu hình: tham số > `app.config.adminDenyCidrs/adminAllowCidrs` (nếu integrator thêm) > `process.env`. Đây là lớp chồng
+thêm lên ingress 404 + Bearer token + publish 127.0.0.1.
+
+### 5.3 netprobe
+
+- **WS `/probe`**: chỉ PONG cho PING, tin khác → 1008. Giới hạn: ≤ 256 socket toàn cục (503), ≤ 8 mỗi địa chỉ (429; nới vì
+  CGNAT), ≤ 64 PING mỗi socket, PING cách nhau ≥ 80 ms (4006), socket tự đóng sau 60 s.
+- **POST `/v1/netprobe`** `{carrier, netType, device?, samples, lost, medianMs, p95Ms, jitterMs, minMs, maxMs}`: kiểm miền
+  giá trị và min ≤ median ≤ p95 ≤ max; 6 lần / 10 phút mỗi địa chỉ, 120 / phút toàn cục, body 2 KB. Bảng
+  `netprobe_results` (migration `030_netprobe.sql`) **không lưu IP, user-agent hay tài khoản**; `via` = tunnel/local (từ
+  header Cloudflare). Giữ 90 ngày (job dọn mỗi 6 giờ).
+- Dịch vụ `netprobe` `{summary({days}), recent(limit), purge(days), stats()}`; admin `GET /admin/api/netprobe?days=14`
+  (Bearer) → `{summary: [{carrier, netType, n, medianMs, p95Ms, jitterMs, lossPct, lastAt}], recent}` cho trang quản trị S3.
+- **`netprobe.html`** (gốc repo, Pages): import `js/shared/codec.js`, `protocol.js`, `clock.js`. Địa chỉ máy chủ: `?s=` >
+  `<meta name="hp-server">` > localStorage. **Chỉ nhận `wss://`** (`ws://` chỉ cho localhost; IP trần bị từ chối). 3 PING
+  làm nóng + 30 PING cách 220 ms, timeout 2 s; trung vị/p95/dao động/min/max/% mất; chọn nhà mạng + loại mạng (`?c=`/`?n=`
+  điền sẵn) → tự POST. `?auto=1` chạy ngay; `window.__probe` cho kiểm thử tự động.
+
+### 5.4 Script vận hành (`server/ops/*.ps1`, PowerShell 5.1, UTF-8 BOM, không cần quyền admin)
+
+`chung.ps1` (dùng chung) · `mo-may-chu` · `tat-may-chu` · `trang-thai` · `khoa-khan-cap` · `sao-luu` · `khoi-phuc` (mặc
+định diễn tập trên container nháp `--network none`; `-KhoiPhucThat` tự sao lưu trước, DROP/CREATE, `pg_restore` qua stdin
+bằng `cmd /c <` vì `docker cp` không ghi được vào tmpfs / root FS chỉ đọc) · `tao-ma-moi` · `cai-lich` (cung cấp, không
+chạy) · `giu-may-thuc` (tiến trình nền `SetThreadExecutionState(ES_CONTINUOUS|ES_SYSTEM_REQUIRED)`; bản thật chạm
+`%TEMP%\hpworld_server_live.txt` mỗi 60 s).
+**Chế độ thử** (`-TestMode` / `HPMP_TEST=1`): không ghi/xoá tệp đánh dấu, không mở trình duyệt, và **bắt buộc**
+`HPMP_PROJECT/HPMP_GAME_PORT/HPMP_ADMIN_PORT` khác bản thật (hpworld/9100/9101), không thì dừng. Biến khác:
+`HPMP_EDGE_SUBNET`, `HPMP_BACKEND_SUBNET`, `HPMP_IMAGE`, `HPMP_TUNNEL_IMAGE`.
+Lưu ý PowerShell: biến không phân biệt hoa thường (`$S` ≡ `$s`); lệnh native ghi stderr → không dùng
+`$ErrorActionPreference='Stop'`; `Get-CmdOutput` dùng `ProcessStartInfo` để đọc stdout+stderr UTF-8 sạch.
+
+### 5.5 Số đo (máy chủ dự án, 14–15/10/2026, bộ thử `hpmp-ops`, cổng 9140/9141)
+
+| Hạng mục | Kết quả |
+|---|---|
+| `docker compose up` (game + db) → /healthz | `transport: uws`, `db: ok`, migrations 001 + 030 áp dụng; mở lại (ảnh có sẵn) 9–11 s |
+| Container game | `ReadonlyRootfs=true`, `CapDrop=[ALL]`, `no-new-privileges`, user `node`, 4 CPU / 2 GiB / 512 pid, 0 mount; db 1 mount (volume) |
+| `tat-may-chu.ps1` (game + db + backup) | **6,6 s** (trước khi sửa trap backup: 15,8 s); sau đó không còn gì nghe trên 9140/9141 |
+| `khoa-khan-cap.ps1` | 2,0–2,6 s; ngay sau đó địa chỉ tunnel trả 502 |
+| Giữ máy thức | đang chạy: `CallNtPowerInformation(SystemExecutionState)` = 0x3 (`ES_SYSTEM_REQUIRED` bật); sau khi tắt: 0x0, không còn tiến trình. `powercfg /requests` cần quyền admin, phiên này không có |
+| Sao lưu một lần | 23 KB, < 2 s; chép sang thư mục thứ hai OK |
+| Diễn tập khôi phục | 3,9–4,0 s, 9 bảng, số dòng khớp |
+| Khôi phục thật | 9 s; netprobe_results 2 → 1 dòng đúng bản sao lưu; game khoẻ lại |
+| Quick tunnel (cloudflared trong container), PING `/probe` qua `wss://*.trycloudflare.com`, 3 × 30 tuần tự | **p50 54,6 ms**, p95 57,8, p99 61,1, max 61,1, dao động 1,4, mất 0/90 |
+| 8 socket song song × 30 PING | p50 54,7, p95 58,0, max 64,1 ms, mất 0/240 |
+| `/play` PING qua tunnel | p50 54,5 ms (10 mẫu) |
+| Cùng PING qua 127.0.0.1:9140 (Docker Desktop) | p50 1,8 ms, p95 2,5 ms |
+| Đường đi qua tunnel | `/healthz` 200, `POST /v1/netprobe` 200; `/admin`, `/admin/api/status`, `/metrics`, `/` → 404 |
+| `netprobe.html` trong 1 Chrome headless (khoá GPU, `--disable-gpu`, origin Pages giả lập bằng chặn request) | 30/30, trung vị 53,9 ms, p95 56,4, POST 200, 0 lỗi JS |
+| `npm audit --omit=dev` | 0 lỗ hổng |
+
+RTT qua tunnel đo **từ chính máy chủ** (ra mép Cloudflare rồi vòng về nhà) — là cận dưới cho người chơi ở Việt Nam; số
+thật theo nhà mạng sẽ đến từ `netprobe.html` trên điện thoại.
+
+### 5.6 Còn mở / cho integrator
+
+- `admin_edge_guard` đọc `process.env.ADMIN_DENY_CIDRS` vì `config.js` thuộc Foundation; integrator có thể đưa vào
+  `config` (`adminDenyCidrs`) hoặc `main.js`.
+- `boot.test.js` (Foundation): đã bỏ `/v1/netprobe` khỏi danh sách stub 501.
+- `tao-ma-moi.ps1` gọi `POST /admin/api/invites {count, uses, days, note}` → chờ `{codes:[...]}` (hoặc `{invites:[{code}]}`)
+  — đường của S3; khác tên thì sửa một dòng.
+- Danh sách lọc chat `server/data/filter/` nằm **trong ảnh**: sửa xong phải `mo-may-chu.ps1` (build lại); container không
+  đọc thư mục của máy.
+- Named tunnel chưa kiểm thật (chưa có tên miền); ingress và lệnh đã kiểm bằng `cloudflared tunnel ingress validate/rule`.

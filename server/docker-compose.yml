@@ -28,6 +28,8 @@ x-backup-script: &backup_script |
   # Ghi /backups/last_ok.txt hoặc /backups/last_error.txt để trang-thai.ps1 / sao-luu.ps1 đọc.
   set -u
   umask 077
+  # dừng ngay khi Docker gửi SIGTERM (sleep chạy nền + wait để trap chạy liền)
+  trap 'exit 0' TERM INT
   dump_once() {
     ts=$$(date +%Y%m%d-%H%M%S)
     tmp="/backups/.hp-$$ts.partial"
@@ -51,8 +53,8 @@ x-backup-script: &backup_script |
     now=$$(date +%s)
     next=$$(date -d "today $$BACKUP_AT" +%s)
     [ "$$next" -le "$$now" ] && next=$$(date -d "tomorrow $$BACKUP_AT" +%s)
-    sleep $$((next - now))
-    dump_once || sleep 600
+    sleep $$((next - now)) & wait $$!
+    dump_once || { sleep 600 & wait $$!; }
   done
 
 x-hardening: &hardening
@@ -217,6 +219,7 @@ services:
     mem_limit: 256m
     memswap_limit: 256m
     pids_limit: 64
+    stop_grace_period: 3s
 
 networks:
   hostlink:

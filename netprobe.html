@@ -7,6 +7,7 @@
 <!-- Địa chỉ máy chủ mặc định (wss://tên-miền). Để trống = người dùng nhập, hoặc mở trang với ?s=wss://... -->
 <meta name="hp-server" content="">
 <meta name="robots" content="noindex">
+<link rel="icon" href="data:,">
 <style>
   :root {
     --bg: #f4f1ea; --card: #fffdf8; --ink: #1f2328; --muted: #5d6670; --line: #e2dccf;
@@ -246,7 +247,7 @@ async function run() {
   $('rMax').textContent = st.maxMs.toFixed(0); $('rLoss').textContent = `${Math.round((st.lost / st.samples) * 100)}%`;
   $('result').hidden = false; drawSpark(rtts);
   setStatus('Xong.');
-  const result = { ...st, clockOffsetMs: Math.round(clock.offset) };
+  const result = { ...st };
   window.__probe = { result, sent: null };
 
   if (!state.carrier || !state.net) { $('sent').textContent = 'Chọn nhà mạng và loại mạng ở trên rồi bấm đo lại để gửi kết quả cho người tổ chức.'; }
