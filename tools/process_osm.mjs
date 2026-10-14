@@ -225,15 +225,22 @@ const CLS = { trunk: 'p', primary: 'p', secondary: 's', tertiary: 't', residenti
 const isCentralRoad = (pts) => pts.some(([x, z]) => Math.hypot(x, z - 9) < 1600);
 const dtRoads = load('osm_roads_dt.json');
 const ROADS_DT = [];
+// ROADS_LEGACY = hình học CŨ (simplify 6 m) CHỈ để tính mặt tiền địa danh LM_FACE (nearestRoadFace) — giữ hướng địa danh
+// đã căn tay không đổi khi ROADS_DT được làm mịn + dịch tim (Đợt 3 W3-A). Cùng bộ lọc → cùng thứ tự/chỉ số.
+const ROADS_LEGACY = [];
 for (const w of dtRoads) {
   const c = CLS[w.tags?.highway];
   if (!c || !w.geometry) continue;
-  const pts = rnd(simplify(subdiv(w.geometry, 150), 6));
-  if (pts.length < 2) continue;
-  const len = plLen(pts);
-  if (c === 'r' && len < 260 && !isCentralRoad(pts)) continue;   // giữ phố nhỏ trong lõi
+  const pts0 = rnd(simplify(subdiv(w.geometry, 150), 6));
+  if (pts0.length < 2) continue;
+  const len = plLen(pts0);
+  if (c === 'r' && len < 260 && !isCentralRoad(pts0)) continue;   // giữ phố nhỏ trong lõi
   if (c === 'w' && len < 150) continue;
-  ROADS_DT.push({ c, pts, name: w.tags?.name || '' });
+  // Đợt 3 W3-A: simplify 6 → 3 m (phố cong như Tam Bạc/Bến Bính lệch tới 5 m khỏi OSM gốc; +18% đỉnh). Bộ lọc độ dài
+  // vẫn tính trên bản 6 m ở trên → TẬP way + THỨ TỰ ROADS_DT giữ nguyên (SIDEWALK_BY_ROAD… khoá theo chỉ số).
+  const pts = rnd(simplify(subdiv(w.geometry, 150), 3));
+  ROADS_DT.push({ c, pts, name: w.tags?.name || '', tags: w.tags || {} });
+  ROADS_LEGACY.push({ c, pts: pts0, name: w.tags?.name || '' });
 }
 console.log(`roads downtown: ${ROADS_DT.length}`);
 
@@ -249,11 +256,41 @@ try {
     if (pts.length < 2) continue;
     if (!isCentralRoad(pts)) continue;          // giai đoạn trung tâm: chỉ giữ hẻm trong lõi
     if (plLen(pts) < 28) continue;              // mẩu vụn (lối rẽ vào 1 nhà) bỏ
-    ROADS_DT.push({ c: 'h', pts, name: '' });
+    ROADS_DT.push({ c: 'h', pts, name: '', tags: w.tags || {} });
+    ROADS_LEGACY.push({ c: 'h', pts, name: '' });
     nH++;
   }
   console.log(`ngõ/hẻm lõi (h): ${nH}`);
 } catch (e) { console.log('(không có osm_alleys.json — bỏ qua hẻm)'); }
+
+// ---------- 3c. MẶT CẮT PHỐ THẬT + TIM KHỚP VẾT XE PANO (Đợt 3 W3-A, tools/street_fit.mjs) ----------
+// Bề rộng lòng/vỉa MỖI WAY (ghi đè pano → tag width → tường Overture 2 bên → gộp theo tên → mặc định cấp) và dịch tim
+// theo 551 camera pano (camera phải nằm TRONG lòng). Cần tools/ov_buildings.csv (gitignore; thiếu → chỉ dịch tim, bề rộng
+// theo ghi đè/cấp). Log: `node process_osm.mjs --fitlog <file.json>`.
+{
+  const { loadOverture, measureWalls, chooseWidths, fitToPanos, capWidths } = await import('./street_fit.mjs');
+  const { LM_POLY } = await import('../js/landmark_polys.js');
+  const t0 = Date.now();
+  const ov = loadOverture(new URL('./ov_buildings.csv', import.meta.url));
+  if (!ov) console.log('  (không có ov_buildings.csv — bề rộng phố chỉ theo ghi đè pano/cấp)');
+  const panos = JSON.parse(fs.readFileSync(new URL('./pano_loop/list_full_551.json', import.meta.url), 'utf8')).map((e) => [e.X, e.Z, e.id]);
+  const walls0 = measureWalls(ROADS_DT, ov);
+  const W0 = chooseWidths(ROADS_DT, walls0, panos);
+  const argv = process.argv.slice(2), fitlog = argv.includes('--fitlog') ? argv[argv.indexOf('--fitlog') + 1] : null;
+  const fit = fitToPanos(ROADS_DT, panos, W0, walls0, { log: fitlog });
+  // đo lại tường trên tim ĐÃ dịch (way từng chạy xuyên nhà thiếu trạm hợp lệ) rồi chốt bề rộng
+  const walls1 = measureWalls(ROADS_DT, ov);
+  const WD = chooseWidths(ROADS_DT, walls1, panos);
+  // không để lòng HẸP hơn lúc khớp tim (mỏ neo pano đã tính "camera trong lòng" theo W0) → lấy bề rộng lớn hơn của 2 lượt
+  WD.forEach((o, ri) => { if (W0[ri].w > o.w && o.w > 0) { o.w = W0[ri].w; if (W0[ri].sw >= 0) o.sw = W0[ri].sw; } else if (!(o.w > 0) && W0[ri].w > 0) Object.assign(o, W0[ri]); });
+  const cap = capWidths(ROADS_DT, WD, walls1, Object.values(LM_POLY), panos);
+  ROADS_DT.forEach((r, ri) => { if (WD[ri].w > 0) { r.w = WD[ri].w; if (WD[ri].sw >= 0) r.sw = WD[ri].sw; } });
+  console.log(`  kẹp bề rộng: tường Overture ${cap.wall} way, mặt tiền ≤ tường gần ${cap.fl} way, vỉa ≤ cấp+1 ${cap.sw || 0} way, địa danh LM_POLY ${cap.lm} way`);
+  const src = {}; WD.forEach((o) => { src[o.src] = (src[o.src] || 0) + 1; });
+  console.log(`mặt cắt phố: ${Date.now() - t0} ms; overture ${ov ? ov.n : 0} nhà; nguồn bề rộng ${JSON.stringify(src)}`);
+  console.log(`tim theo pano + tường: mỏ neo pano ${fit.anchors} (dịch ≠ 0: ${fit.active}), mỏ neo tường ${fit.wallAnchors}; bỏ ${JSON.stringify(fit.skipped)}; way dời ${fit.moved}:`,
+    fit.perWay.slice(0, 16).map((o) => `${o.ri}${o.c} ${o.name || '-'} ${o.maxD}`).join(' | '));
+}
 // in vài phố lớn để đặt tuyến xe máy
 const named = {};
 for (const r of ROADS_DT) if (r.name && (r.c === 's' || r.c === 'p' || r.c === 't')) {
@@ -412,7 +449,7 @@ LM.bridge_binh = [EXTRAS.bridges[1].x, EXTRAS.bridges[1].zc + EXTRAS.bridges[1].
 // streetName: chỉ xét phố mang tên đó (mọi cấp, kể cả ngõ r); mặc định phố lớn p/s/t.
 function nearestRoadFace(cx, cz, streetName) {
   let best = null, bd = 1e18;
-  for (const r of ROADS_DT) {
+  for (const r of ROADS_LEGACY) {   // hình học cũ — hướng địa danh không đổi theo W3-A
     if (streetName ? r.name !== streetName : (r.c !== 'p' && r.c !== 's' && r.c !== 't')) continue;
     for (let i = 0; i < r.pts.length - 1; i++) {
       const [ax, az] = r.pts[i], [bx, bz] = r.pts[i + 1];
@@ -655,7 +692,12 @@ console.log('INTERSECTIONS:', INTERSECTIONS.length);
 
 // MEDIANS: tuyến dài nhất của các đại lộ có dải phân cách thật
 const MEDIANS = [];
+// Đợt 3 W3-A (AUDIT3 XSEC/CAMOBS): tuyến dài nhất mang tên 'Trần Hưng Đạo' là đoạn BẮC-NAM x≈650-670 dọc tường mỏ neo
+// Hải quân (z −880…−450) — ảnh thật pano_222/223/224/225/226/227 đều là MỘT lòng + tim vàng, KHÔNG dải phân cách; bồn/cây
+// dải giả đứng 1,5-3 m trước camera (QA clearance). Tên nào ở đây → không xuất dải phân cách.
+const NO_MEDIAN = ['Trần Hưng Đạo'];
 for (const nm of ['Trần Hưng Đạo', 'Trần Phú', 'Điện Biên Phủ']) {
+  if (NO_MEDIAN.includes(nm)) continue;
   const key = Object.keys(streetAgg).find((k) => k.includes(nm));
   if (key) MEDIANS.push(streetAgg[key].best.map(([x, z]) => [Math.round(x), Math.round(z)]));
 }
@@ -701,7 +743,7 @@ export const WORLD = ${JSON.stringify(WORLD)};
 export const DT_BOX = ${JSON.stringify(dtBox)};
 export const MASK = { w: ${MW}, h: ${MH}, cell: ${CELL}, b64: '${maskB64}' };
 export const RIVERS = ${JSON.stringify(RIVERS)};
-export const ROADS_DT = ${JSON.stringify(ROADS_DT.map(({ c, pts }) => ({ c, pts })))};
+export const ROADS_DT = ${JSON.stringify(ROADS_DT.map(({ c, pts, w, sw }) => (w > 0 ? (sw >= 0 ? { c, pts, w, sw } : { c, pts, w }) : { c, pts })))};
 export const ROADS_REGION = ${JSON.stringify(ROADS_REGION.map(({ pts }) => ({ pts })))};
 export const LM = ${JSON.stringify(LM)};
 export const LM_DIR = ${JSON.stringify(LM_DIR)};

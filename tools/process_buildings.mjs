@@ -34,8 +34,9 @@
 import fs from 'fs';
 import { ROADS_DT, PARKS, RAIL, LM } from '../js/mapdata.js';
 import { waterSD } from '../js/terrain.js';
-import { ROAD_HW, facadeLine } from '../js/xsection.js';
+import { roadHW, facadeLine } from '../js/xsection.js';
 import { LM_POLY } from '../js/landmark_polys.js';
+import { cbWallSegments, CB_WALL_TH } from '../js/anchorwalls.js';
 import { PANO_CAM } from '../js/panoclear.js';
 import { PANO_SIDES } from '../js/panosides.js';
 import { encodeRB, decodeRB, rectOf, EDGE, STYLE, ROOF, FLAG, INFO, ROADC } from '../js/buildings_data.js';
@@ -66,7 +67,11 @@ ROADS_DT.forEach((r, ri) => {
     const [ax, az] = r.pts[i], [bx, bz] = r.pts[i + 1], L = Math.hypot(bx - ax, bz - az);
     if (L < 0.5) continue;
     const ux = (bx - ax) / L, uz = (bz - az) / L;
-    SEGS.push({ ri, k: i, ax, az, bx, bz, L, ux, uz, nx: -uz, nz: ux, c: r.c, hw: ROAD_HW[r.c] ?? 2.75, fl: facadeLine(r.c) });
+    // Đợt 3 W3-A: lòng/mặt tiền RIÊNG từng phố (mapdata ROADS_DT[i].w/.sw — tools/street_fit.mjs), không còn theo cấp.
+    // flR = mặt tiền dùng để CẮT nhà THẬT = min(theo phố, theo cấp): mặt tiền theo phố là 1 số cho cả way (phố rộng ở đoạn này
+    // hẹp ở đoạn kia) → cắt nhà thật Overture theo nó từng xoá/cắt lùi nhà đứng đúng chỗ (review r2: drop_road 262 → 317,
+    // pano_222 h180 Overture 7,1 m → game 28,4 m). Nhà SINH vẫn theo fl (mặt tiền phố).
+    SEGS.push({ ri, k: i, ax, az, bx, bz, L, ux, uz, nx: -uz, nz: ux, c: r.c, hw: roadHW(r), fl: facadeLine(r), flR: Math.min(facadeLine(r), facadeLine(r.c)) });
   }
 });
 const segGrid = new Grid(32);
@@ -147,7 +152,10 @@ function clearedZone(x, z) {
   return true;
 }
 // Siêu khối Hải quân/Cảng + nút giao cầu HVT: CHỈ cấm nhà SINH (nhà thật để WP2 claim quyết định)
-const CB1 = [[487, -468], [648, -468], [653, -800], [560, -800], [560, -682], [486, -672]];
+// Đợt 3 W3-A: mép TÂY tới sát lòng Lý Tự Trọng (x 480): tim mới cách tường mỏ neo ~8 m → dải 2-3 m trước tường từng mọc lô SINH;
+// mép ĐÔNG x 655-656: tường mỏ neo Trần Hưng Đạo nay đặt sau mặt tiền theo phố (world.js cbFitFence, x ≈ 650-654) → lô SINH
+// (shophouse biển BÁNH ĐA CUA) từng mọc NGAY sau tường, trong khuôn viên Hải quân (pano_225 h270)
+const CB1 = [[480, -468], [655, -468], [656, -800], [560, -800], [560, -682], [480, -672]];
 const noSynZone = (x, z) => clearedZone(x, z) || pointInPoly(CB1, x, z) || (x > -300 && x < 120 && z > -1045 && z < -845);
 // camera pano: lưới 8 m
 const camGrid = new Grid(8); PANO_CAM.forEach(([x, z], i) => camGrid.insert(i, [x, z, x, z]));
@@ -168,8 +176,10 @@ for (const r of RAIL) for (let i = 0; i + 1 < r.pts.length; i++) {
 const railGrid = new Grid(32); RAILS.forEach((r, i) => railGrid.insert(i, [Math.min(r[0], r[2]) - r[4], Math.min(r[1], r[3]) - r[4], Math.max(r[0], r[2]) + r[4], Math.max(r[1], r[3]) + r[4]]));
 function nearRail(x, z) { let h = false; railGrid.query([x, z, x, z], (i) => { const r = RAILS[i]; if (!h && segDist(x, z, r[0], r[1], r[2], r[3]) < r[4]) h = true; }); return h; }
 // Không được dựng nhà SINH tại điểm này
+// Đợt 3 W3-A: nhà SINH cách camera pano ≥ 6 m (trước 3 m — AUDIT3 CAMNEAR: tường SYNTH 3,1 m ở pano_501, 3,9 m ở 460)
+const SYN_CAM = 6;
 const synBlocked = (x, z) => waterSD(x, z) < 1.5 || inPolyList(PARK_POLYS, x, z) || inPolyList(LM_POLYS, x, z, 3) || noSynZone(x, z) || nearRail(x, z) ||
-  nearCam(x, z, 3) || Math.hypot(x, z) > R_SYN;
+  nearCam(x, z, SYN_CAM) || Math.hypot(x, z) > R_SYN;
 
 
 // ======================================================================================================
@@ -293,7 +303,7 @@ function corridorClip(b, opts = {}) {
     if (opts.skipRi !== undefined && s.ri === opts.skipRi) continue;
     // đỉnh nào lấn (trong dải t∈[0,1] của đoạn, |v| < fl)?
     let intr = false, sv = 0;
-    for (const [x, z] of P) { const [t, v] = segLocal(s, x, z); if (t >= 0 && t <= 1 && Math.abs(v) < s.fl - 0.05) intr = true; }
+    for (const [x, z] of P) { const [t, v] = segLocal(s, x, z); if (t >= 0 && t <= 1 && Math.abs(v) < s.flR - 0.05) intr = true; }   // chỉ nhà thật đi qua đây
     // đoạn đâm xuyên nhà mà không đỉnh nào lấn: kiểm tâm đoạn ∩ đa giác
     if (!intr) {
       for (const t of [0.25, 0.5, 0.75]) { const x = s.ax + (s.bx - s.ax) * t, z = s.az + (s.bz - s.az) * t; if (pointInPoly(P, x, z)) intr = true; }
@@ -301,7 +311,7 @@ function corridorClip(b, opts = {}) {
     }
     const [cx, cz] = centroid(P); sv = segLocal(s, cx, cz)[1];
     const sg = sv >= 0 ? 1 : -1;
-    const c0 = sg * (s.ax * s.nx + s.az * s.nz) + s.fl;
+    const c0 = sg * (s.ax * s.nx + s.az * s.nz) + s.flR;
     const parts = clipHalf(P, sg * s.nx, sg * s.nz, c0).map((q) => outward(cleanPoly(q))).filter((q) => q.length >= 3);
     parts.sort((p, q) => absArea(q) - absArea(p));
     const keep = parts.length ? absArea(parts[0]) : 0;
@@ -425,6 +435,10 @@ function movePts(P, idx, vec, f) {
   return P.map((p, i) => (idx.has(i) ? [p[0] + vec.get(i)[0] * f, p[1] + vec.get(i)[1] * f] : p));
 }
 
+// Đợt 3 W3-A: kéo mặt tiền tối đa 1,5 m RA phố (trước 7,2 m — facadeLine theo cấp hẹp hơn phố thật nên nhà thật bị kéo
+// 3-7 m vào lòng phố thật: AUDIT3 CAMNEAR pano_441 3,4 vs 9,5 m Overture). Nay facadeLine theo từng phố ≈ tường Overture
+// → chỉ còn bù co ML ~1 m.
+const SNAP_MAX = 1.5;
 let nSnap = 0, nSnapPart = 0, snapDist = 0;
 const DBG = process.env.DEBUG_PT ? process.env.DEBUG_PT.split(',').map(Number) : null;
 const dbgNear = (b) => DBG && b.bb && b.bb[0] < DBG[0] + 12 && b.bb[2] > DBG[0] - 12 && b.bb[1] < DBG[1] + 12 && b.bb[3] > DBG[1] - 12;
@@ -434,7 +448,7 @@ function snapFront(bi) {
   if (b.civic || b.big) { if (dbg) dbg('civic/big', b.civic, b.big); return; }
   const P = b.pts; const n = P.length;
   const fronts = [];
-  for (let k = 0; k < n; k++) { const f = frontOf(P, k, bi, 7.2, dbg); if (f) fronts.push({ k, ...f }); }
+  for (let k = 0; k < n; k++) { const f = frontOf(P, k, bi, SNAP_MAX, dbg); if (f) fronts.push({ k, ...f }); }
   if (!fronts.length) { if (dbg) dbg('no front'); return; }
   b.hadFront = 1;
   // vector dời mỗi đỉnh: tới facadeLine của đoạn (đỉnh thuộc 2 cạnh mặt phố khác phố → giao 2 đường)
@@ -457,11 +471,15 @@ function snapFront(bi) {
   }
   if (!vec.size) return;
   const idx = new Set(vec.keys());
+  // Đợt 3 W3-A: camera pano trong 15 m — mặt tiền KHÔNG được tiến gần camera hơn footprint Overture gốc (camera truth)
+  const bbP = bbox(P), cams = [];
+  camGrid.query([bbP[0] - 15, bbP[1] - 15, bbP[2] + 15, bbP[3] + 15], (i) => { const [x, z] = PANO_CAM[i]; cams.push([x, z, pointInPoly(P, x, z) ? 0 : polyEdgeDist(P, x, z)]); });
   // thử f = 1, nếu vướng thì chia đôi dần
   let lo = 0, hi = 1, ok = null;
   const test = (fr) => {
     const Q = movePts(P, idx, vec, fr);
     if (!isSimple(Q) || signedArea(Q) >= 0) return null;
+    for (const [x, z, d0] of cams) if (pointInPoly(Q, x, z) || polyEdgeDist(Q, x, z) < d0 - 0.05) return null;
     // vùng quét = Q trừ P ≈ kiểm từng tứ giác (cạnh cũ → cạnh mới) của các cạnh mặt phố
     for (const f of fronts) {
       const i0 = f.k, i1 = (f.k + 1) % n;
@@ -850,14 +868,19 @@ function fillGap(s, sg, t0, t1) {
     // trình công cộng/khối lớn có sân trước thật) — kiểm 5 điểm dọc mép sau lô, cách thêm 0,6 m.
     let shallow = false;
     if (lo < 6) {
-      let ok = lo >= 3, nHit = 0;
+      let ok = lo >= 3, nHit = 0, frontReal = false;
       for (let k = 0; k < 5 && ok; k++) {
         const u = uBase + ta + ((k + 0.5) / 5) * (tb - ta);
         const [x, z] = F.world(u, lo + 0.6);
         const j = buildingAt(x, z); if (j < 0) continue;
         nHit++; const o = B[j];
         if (o.civic || o.big || o.tallObs || o.area > 400) ok = false;
+        // Đợt 3 W3-A: nhà THẬT phía sau có cạnh mặt phố ngay ngắn (song song ±25°, ≤ 7,2 m — loại snapFront cũ từng kéo ra) =
+        // nhà lùi THẬT, nay giữ đúng chỗ Overture (SNAP_MAX 1,5) → không dựng "cơi nới" SINH chắn trước nó (FP-1: không mặt
+        // nhà sinh nào gần camera hơn nhà thật; review: lô nông 275 → 1338 khi chặn kéo). Cơi nới chỉ trước nhà lệch góc.
+        else if (!o.synth && o.pts.some((_, q) => frontOf(o.pts, q, j, 7.2))) { ok = false; frontReal = true; }
       }
+      if (frontReal) { stat('gap_veto_shallow_real'); GAPDBG.push([mx, mz, 'shallow']); continue; }
       if (!ok || nHit < 2) { stat('gap_too_shallow'); GAPDBG.push([mx, mz, 'shallow']); continue; }
       shallow = true; stat('gap_shallow_lots');
     }
@@ -1396,7 +1419,7 @@ function capDist(s, x, z) {
   if (t < 0) return s.k > 0 || ENDCAP[s.ri][0] ? Math.hypot(x - s.ax, z - s.az) : Infinity;
   return s.k + 2 < nPts || ENDCAP[s.ri][1] ? Math.hypot(x - s.bx, z - s.bz) : Infinity;
 }
-function streetIntrusion(P) {
+function streetIntrusion(P, real = false) {
   const bb = bbox(P); let worst = null;
   const S = [];
   for (let k = 0; k < P.length; k++) {
@@ -1405,7 +1428,7 @@ function streetIntrusion(P) {
   }
   segGrid.query([bb[0] - 1, bb[1] - 1, bb[2] + 1, bb[3] + 1], (i) => {
     const s = SEGS[i]; if (!'pstr'.includes(s.c)) return;
-    for (const [x, z] of S) { const pen = s.fl - capDist(s, x, z); if (pen > 0.2 && (!worst || pen > worst.pen)) worst = { s, x, z, pen }; }   // 0,2: chừa 0,1 m cho làm tròn
+    for (const [x, z] of S) { const pen = (real ? s.flR : s.fl) - capDist(s, x, z); if (pen > 0.2 && (!worst || pen > worst.pen)) worst = { s, x, z, pen }; }   // 0,2: chừa 0,1 m cho làm tròn
     // phố đâm xuyên giữa nhà (không mẫu biên nào gần): kiểm điểm giữa đoạn
     if (!worst && pointInPoly(P, (s.ax + s.bx) / 2, (s.az + s.bz) / 2)) worst = { s, x: (s.ax + s.bx) / 2, z: (s.az + s.bz) / 2, pen: s.fl };
   });
@@ -1414,7 +1437,7 @@ function streetIntrusion(P) {
 function streetGuard(b) {
   const A0 = b.area;
   for (let pass = 0; pass < 4; pass++) {
-    const w = streetIntrusion(b.pts); if (!w) return true;
+    const w = streetIntrusion(b.pts, !b.synth); if (!w) return true;
     const s = w.s, P = b.pts, [cx, cz] = centroid(P);
     const t = (w.x - s.ax) * s.ux + (w.z - s.az) * s.uz;
     let nx, nz, qx, qz;
@@ -1425,12 +1448,12 @@ function streetGuard(b) {
       if (L < 0.3) { dx = cx - qx; dz = cz - qz; L = Math.hypot(dx, dz) || 1; }
       nx = dx / L; nz = dz / L;
     }
-    const parts = clipHalf(P, nx, nz, nx * qx + nz * qz + s.fl).map((q) => outward(cleanPoly(q))).filter((q) => q.length >= 3);
+    const parts = clipHalf(P, nx, nz, nx * qx + nz * qz + (b.synth ? s.fl : s.flR)).map((q) => outward(cleanPoly(q))).filter((q) => q.length >= 3);
     parts.sort((p, q) => absArea(q) - absArea(p));
     if (!parts.length || absArea(parts[0]) < Math.max(8, 0.5 * A0)) return false;
     setRectOrPoly(b, parts[0]); b.guard = 1;
   }
-  return !streetIntrusion(b.pts);
+  return !streetIntrusion(b.pts, !b.synth);
 }
 // Camera pano: nhà SINH cách ≥ 3 m (SPEC), nhà thật ≥ 1 m (nới/kéo/nở không được trùm lên camera; nhà thật GỐC chứa
 // camera mà cắt mất > 50% thì giữ nguyên — WP2 deadPano xử lý). Cắt nửa mặt phẳng vuông góc hướng camera → nhà.
@@ -1443,8 +1466,10 @@ function nearestOnPoly(P, x, z) {
   }
   return best;
 }
+// Đợt 3 W3-A: nhà SINH ≥ 6 m (SYN_CAM), nhà thật đã sửa ≥ 3 m (trước 3 / 1 m). Nhà thật mà cắt mất > 50% → giữ nguyên hình
+// gốc (camera đứng sát nhà thật = thật).
 function camGuard(b) {
-  const need = (b.synth ? 3 : 1) + 0.1, P0 = b.pts, A0 = b.area, R0 = b.rect;   // +0,1 m cho làm tròn toạ độ
+  const need = (b.synth ? SYN_CAM : 3) + 0.1, P0 = b.pts, A0 = b.area, R0 = b.rect;   // +0,1 m cho làm tròn toạ độ
   for (let pass = 0; pass < 3; pass++) {
     const P = b.pts, bb = bbox(P); let hit = null;
     camGrid.query([bb[0] - need, bb[1] - need, bb[2] + need, bb[3] + need], (i) => {
@@ -1485,6 +1510,40 @@ function camGuard(b) {
   grid = rebuildGrid();
   ST.street_guard_clip = nG; ST.street_guard_drop = nGD; ST.cam_guard_clip = nC; ST.cam_guard_drop = nCD;
   lap(`chốt hành lang phố: cắt ${nG}, bỏ ${nGD}; camera pano: cắt ${nC}, bỏ ${nCD}`);
+}
+// 9c2. TƯỜNG MỎ NEO Hải quân (js/anchorwalls.js — CÙNG đường khớp world.js dựng): không nhà nào (thật/sinh) đứng TRƯỚC tường.
+//      Review W3-A r2: nhà thật nay cắt theo flR (≤ mặt tiền cấp) → khối nhà trong khuôn viên (Overture lệch 1-2 m) nhô ra trước
+//      tường đã đẩy lùi sau mặt tiền theo phố (pano_224 h180/h270 dãy nhà ống biển quán che tường mỏ neo; ảnh thật: vỉa caro →
+//      tường → nhà công sở PHÍA SAU). Cắt nửa mặt phẳng sau tâm tường + nửa bề dày + 0,3 m (chỉ nhà có tâm chiếu vào đoạn ±1 m,
+//      tâm cách tường ≤ 8 m phía phố — phía bên kia phố không bị đụng); còn < 8 m² → bỏ. Nhà TRONG khuôn viên (sau tường ≤ 30 m
+//      hoặc tâm trong CB1) `cbIn`: không mặt tiền buôn bán, nhà ống/cũ → công sở CIVIC (ảnh 224/225 h270: công sở vàng sau tường;
+//      footprint Overture ở đây từng ra dãy nhà ống biển quán nhô trên đỉnh tường).
+{
+  const WS = cbWallSegments(ROADS_DT), M = CB_WALL_TH / 2 + 0.3;
+  let nClip = 0, nDrop = 0, nBehind = 0;
+  for (const b of B) {
+    let bb = bbox(b.pts);
+    { const [cx, cz] = centroid(b.pts); if (pointInPoly(CB1, cx, cz)) b.cbIn = 1; }
+    for (const w of WS) {
+      if (bb[0] > Math.max(w.ax, w.bx) + 30 || bb[2] < Math.min(w.ax, w.bx) - 30 || bb[1] > Math.max(w.az, w.bz) + 30 || bb[3] < Math.min(w.az, w.bz) - 30) continue;
+      const [cx, cz] = centroid(b.pts);
+      const t = (cx - w.ax) * w.ux + (cz - w.az) * w.uz; if (t < -1 || t > w.L + 1) continue;
+      const c0 = w.ax * w.nx + w.az * w.nz + M;   // giữ n·p ≥ c0 (phía khuôn viên)
+      const dc = cx * w.nx + cz * w.nz - c0; if (dc < -8 || dc > 40) continue;
+      if (dc >= -0.5 && dc <= 30) b.cbIn = 1;
+      const minD = Math.min(...b.pts.map(([x, z]) => x * w.nx + z * w.nz - c0));
+      if (minD >= -0.05) continue;
+      const parts = clipHalf(b.pts, w.nx, w.nz, c0).map((q) => outward(cleanPoly(q))).filter((q) => q.length >= 3);
+      parts.sort((p, q) => absArea(q) - absArea(p));
+      if (!parts.length || absArea(parts[0]) < 8) { b.dead = 'cbwall'; nDrop++; break; }
+      setRectOrPoly(b, parts[0]); b.guard = 1; nClip++; bb = bbox(b.pts);
+    }
+    if (b.cbIn && !b.dead) nBehind++;
+  }
+  B = B.filter((b) => !b.dead);
+  grid = rebuildGrid();
+  ST.cbwall_clip = nClip; ST.cbwall_drop = nDrop; ST.cbwall_in = nBehind;
+  lap(`tường mỏ neo Hải quân: cắt ${nClip}, bỏ ${nDrop}, trong khuôn viên ${nBehind}`);
 }
 // 9d. KIỂM HỢP LỆ trên TOẠ ĐỘ ĐÃ LÀM TRÒN như file (đa giác: lưới 0,1 m; chữ nhật: x0/z0 0,1 m, góc u16, w/d cm — y hệt
 //     encodeRB/decodeRB): làm tròn → bỏ đỉnh gai (2 cạnh kề quay ngược > 162°) → cleanPoly → đơn CHẶT (strictSimple),
@@ -1706,6 +1765,9 @@ for (const b of B) {
     style = villaOK && R() < 0.4 ? STYLE.VILLA : R() < 0.45 ? STYLE.OLD : STYLE.TUBE;
   } else style = !b.lot && !b.interior && b.area > 120 && b.area < 400 && mr && mr.w / Math.max(1, mr.d) < 1.5 && R() < 0.05 ? STYLE.VILLA
     : R() < (b.interior ? 0.12 : 0.15) ? STYLE.OLD : STYLE.TUBE;
+  // khuôn viên Hải quân: công sở (CIVIC) — nhà ống/cũ có cạnh mặt phố ≥ 3 bay bị citygen vẽ thành DÃY CỬA HÀNG (wideF) bất kể
+  // công năng → biển quán nhô trên đỉnh tường mỏ neo (pano_224/225 h270)
+  if (b.cbIn && (style === STYLE.TUBE || style === STYLE.OLD || style === STYLE.VILLA || style === STYLE.KTT)) style = STYLE.CIVIC;
   // --- tầng ---
   let floors = 0, fixed = false;
   if (b.nfl > 0) { floors = Math.round(b.nfl); fixed = true; }
@@ -1761,7 +1823,11 @@ for (const b of B) {
   // --- công năng tầng trệt ---
   const f0 = b.fronts[0];
   let use = INFO.USE_HOME;
-  if (style === STYLE.GLASS) use = INFO.USE_OFFICE;
+  // trong khuôn viên Hải quân (sau tường mỏ neo, cbIn): USE_HOME TRƯỚC mọi nhánh — CIVIC/GLASS/SHED + USE_HOME chỉ có ở đây và
+  // citygen đọc cặp này thành tầng trệt KHÔNG biển (G_CIVIC/G_WARE; review W3-A r3: nhánh cũ đặt sau CIVIC → không bao giờ chạy,
+  // và CIVIC/GATE vẫn ra G_GLASS có dải biển → "BÁNH MÌ"/"SỬA XE MÁY" sau tường ở pano_224/225 h270)
+  if (b.cbIn) use = INFO.USE_HOME;
+  else if (style === STYLE.GLASS) use = INFO.USE_OFFICE;
   else if (style === STYLE.CIVIC || style === STYLE.SHED || (style === STYLE.VILLA && R() < 0.6)) use = INFO.USE_GATE;
   else if (/cửa hàng|shop|bán|quán|kinh doanh|biển|cửa cuốn|nhà hàng|cà phê|spa|showroom/.test(ouse)) use = INFO.USE_SHOP;
   else if (f0) use = R() < ({ p: 0.88, s: 0.82, t: 0.72, r: 0.5, w: 0.6, h: 0.15 }[f0.s.c] ?? 0.3) ? INFO.USE_SHOP : INFO.USE_HOME;

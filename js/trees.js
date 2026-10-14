@@ -35,7 +35,7 @@ import * as THREE from 'three';
 import { TIER } from './device.js';
 import { PANO_VEG, PANO_VEG_STRIDE } from './treemap.js';
 import { PANO_CAM } from './panoclear.js';
-import { ROAD_HW, treePitLine, SIDEWALK_TOP } from './xsection.js';
+import { ROAD_HW, treePitLine, SIDEWALK_TOP, roadHW } from './xsection.js';
 export { treePitLine };   // world.js dùng qua veg.treePitLine (khỏi thêm import xsection vào world.js — tránh xung đột gộp)
 import { LM_POLY, LM_CENTROID } from './landmark_polys.js';
 import { claimAt, claimsAll } from './claims.js';
@@ -622,7 +622,10 @@ export function plantLocal(parent, lx, lz, kind, o = {}) { Q.push({ kind, parent
 // PANO_CLEAR 4,5 m: camera pano thật đứng trên LÒNG ĐƯỜNG (xe chụp đi giữa làn) → quanh nó không có gốc cây; trước 3 m
 // thì 68 camera có cây < 4 m, tán bàng/xà cừ che kín nửa trên khung (pano_019/008). Áp cho MỌI cây trừ dải phân cách
 // (o.median).
-const PANO_CLEAR = 4.5;
+// Đợt 3 W3-A (AUDIT3 FP-1.6 CAMOBS: thân cây 2-4 m trước ống kính pano_010/033): 4,5 → 6 m. Pano chụp 8 hướng → nón ±45°
+// của 4 hướng chấm = MỌI hướng ⇒ bán kính. Lề phố nay rộng theo phố thật (xsection theo way) nên hố cây đa số ≥ 6 m khỏi
+// camera giữa lòng — chỉ cây sát camera lệch làn/miệng ngõ bị bỏ.
+const PANO_CLEAR = 6;
 // HERO GLB (W2-B): chỉ là "tủ kính" quanh Nhà hát (≤ HERO_SHOW_R) — "thành phố hoa phượng đỏ" — và mỗi lúc chỉ vẽ
 // HERO_MAX cây GLB gần camera nhất trong HERO_R (trước: 57 hero cả dải trung tâm, ≤ 8 cùng lúc → 1,19 M tam giác)
 const OPERA = LM_CENTROID.opera, HERO_SHOW_R = 120, HERO_MAX = 3;
@@ -771,7 +774,7 @@ export function roadIndex(ROADS_DT, R = 1600) {
     for (let i = 0; i + 1 < rd.pts.length; i++) {
       const [ax, az] = rd.pts[i], [bx, bz] = rd.pts[i + 1];
       if (Math.min(Math.hypot(ax, az), Math.hypot(bx, bz)) > R + 80) continue;
-      const hw = ROAD_HW[rd.c] ?? 2.75, s = { ax, az, bx, bz, ri, si: i, hw, c: rd.c, m: MARGIN[rd.c] ?? 0.8 };
+      const hw = roadHW(rd), s = { ax, az, bx, bz, ri, si: i, hw, c: rd.c, w: rd.w, sw: rd.sw, m: MARGIN[rd.c] ?? 0.8 };   // W3-A: lòng riêng từng phố
       const pad = hw + 3, id = segs.length; segs.push(s);
       for (let gi = Math.floor((Math.min(ax, bx) - pad) / SC); gi <= Math.floor((Math.max(ax, bx) + pad) / SC); gi++)
         for (let gj = Math.floor((Math.min(az, bz) - pad) / SC); gj <= Math.floor((Math.max(az, bz) + pad) / SC); gj++) {
@@ -847,7 +850,7 @@ export function plantStreetTrees(ctx) {
     if (trunkNear(x, z, 4.2)) return rej('spacing');
     if (Math.abs(groundHeightNoDeck(x, z) - LAND) > 0.35 || isWater(x, z)) return rej('ground');
     if (blockedByRoad(x, z, ri, si) || onCarriage(x, z)) return rej('road');   // W2-A: + nhựa khe đường đôi/nút giao (roadNet)
-    if (nearNode(x, z, (ROAD_HW[c] ?? 2.75) + 4.5)) return rej('junction');
+    if (nearNode(x, z, (ROADS_DT[ri] ? roadHW(ROADS_DT[ri]) : ROAD_HW[c] ?? 2.75) + 4.5)) return rej('junction');
     if (fp.at(x, z) >= 0) return rej('building');
     if (inLM(x, z, 2.5)) return rej('landmark');
     if (ctx.keepClear && ctx.keepClear(x, z)) return rej('keep');
@@ -860,7 +863,7 @@ export function plantStreetTrees(ctx) {
     const rd = ROADS_DT[ri], c = rd.c;
     if (c !== 'p' && c !== 's' && c !== 't' && c !== 'r') continue;
     // nhịp hố cây ~9-10 m (pano: hàng cây phố HP cách nhau 8-12 m); cây phố nhỏ thấp/hẹp tán hơn đại lộ
-    const off = treePitLine(c), base = c === 'r' ? 11 : c === 't' ? 9.4 : 9.0, sz = c === 'p' ? 1 : c === 's' ? 0.94 : c === 't' ? 0.86 : 0.8;
+    const off = treePitLine(rd), base = c === 'r' ? 11 : c === 't' ? 9.4 : 9.0, sz = c === 'p' ? 1 : c === 's' ? 0.94 : c === 't' ? 0.86 : 0.8;
     for (const side of [-1, 1]) {
       let acc = 3 + hash3(ri, side + 5, 17) * base;      // lệch pha từng bên
       for (let i = 0; i + 1 < rd.pts.length; i++) {
@@ -1228,7 +1231,7 @@ export function buildTrees(scene, ctx = {}) {
         const dx = s.bx - s.ax, dz = s.bz - s.az, L2 = dx * dx + dz * dz || 1;
         const t = clamp(((x - s.ax) * dx + (z - s.az) * dz) / L2, 0, 1), qx = s.ax + t * dx, qz = s.az + t * dz, d = Math.hypot(x - qx, z - qz);
         if ('psrt'.includes(s.c) && d >= 0.5) {
-          const off = treePitLine(s.c), nx = qx + (x - qx) / d * off, nz = qz + (z - qz) / d * off;
+          const off = treePitLine(s), nx = qx + (x - qx) / d * off, nz = qz + (z - qz) / d * off;
           if (!roadHit(nx, nz) && !onCarriage(nx, nz) && (e.parent || fpG.at(nx, nz) < 0) && !nearPano(nx, nz, PANO_CLEAR) && !smallColNear(nx, nz, e.parent ? null : colAt(x, z))) {
             if (!e.parent) { movedCols = colAt(x, z); for (const c of movedCols) { c.x = nx; c.z = nz; } }
             x = nx; z = nz; y = undefined; fix.moved++;

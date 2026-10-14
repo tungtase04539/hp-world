@@ -10,7 +10,7 @@
 //  4. đỉnh thuộc ≥ 2 polyline hoặc là đầu mút = NÚT; đoạn polyline giữa 2 nút liên tiếp = CẠNH (2 chiều).
 // Toạ độ theo quy ước game (+x đông, +z NAM, mét). Làn: xe chạy bên PHẢI hướng đi — vector phải của hướng
 // t = (tx, tz) là (−tz, tx) (kiểm: đi về bắc t=(0,−1) → phải = (1,0) = đông).
-import { ROAD_HW } from './xsection.js';
+import { ROAD_HW, roadHW, sidewalkW } from './xsection.js';
 
 const DRIVE = { p: 1, s: 1, t: 1, r: 1 };
 const Q = 1.5;   // lượng tử gom đỉnh (m)
@@ -27,7 +27,7 @@ export function buildRoadGraph(roads, { radius = 1600, margin = 80 } = {}) {
       const a = r.pts[i], b = r.pts[i + 1];
       const inA = a[0] * a[0] + a[1] * a[1] <= R2, inB = b[0] * b[0] + b[1] * b[1] <= R2;
       if (!inA && !inB) { cur = null; continue; }
-      if (!cur) { cur = { c: r.c, pts: [[a[0], a[1]]] }; lines.push(cur); }
+      if (!cur) { cur = { c: r.c, w: r.w, sw: r.sw, pts: [[a[0], a[1]]] }; lines.push(cur); }   // W3-A: giữ lòng/vỉa riêng phố
       cur.pts.push([b[0], b[1]]);
     }
   }
@@ -141,7 +141,7 @@ export function buildRoadGraph(roads, { radius = 1600, margin = 80 } = {}) {
       if (L < 1) continue;
       const ei = edges.length;
       const mx = (xs[0] + xs[P.length - 1]) / 2, mz = (zs[0] + zs[P.length - 1]) / 2;
-      edges.push({ a, b, xs, zs, cum, L, c: l.c, hw: ROAD_HW[l.c] || 2.75, mx, mz });
+      edges.push({ a, b, xs, zs, cum, L, c: l.c, hw: roadHW(l) || 2.75, sw: sidewalkW(l), mx, mz });
       nodes[a].out.push(ei * 2);       // cạnh ei theo chiều a→b
       nodes[b].out.push(ei * 2 + 1);   // chiều b→a
     }
