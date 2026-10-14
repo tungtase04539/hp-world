@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { shrinkTexturesForMobile } from './assets.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
-import { WORLD_BOUNDS } from './terrain.js';
+import { WORLD_BOUNDS, waterLevelAt } from './terrain.js';
 
 function mat(color) { return new THREE.MeshLambertMaterial({ color }); }
 
@@ -163,7 +163,7 @@ export function createVehicles(scene, groundHeight, waterHeight, spawns, resolve
     .map((s) => ({ ...TEMPLATES[s.type], type: s.type, x: s.x, z: s.z, heading: s.heading || 0 }));
   const vehicles = defs.map((d) => {
     const built = d.maker();
-    built.mesh.position.set(d.x, d.land ? groundHeight(d.x, d.z) : 0.1, d.z);
+    built.mesh.position.set(d.x, d.land ? groundHeight(d.x, d.z) : waterLevelAt(d.x, d.z) + 0.1, d.z);
     built.mesh.rotation.y = d.heading;
     scene.add(built.mesh);
     return {
@@ -233,7 +233,7 @@ export function createVehicles(scene, groundHeight, waterHeight, spawns, resolve
       v.mesh.rotation.set(0, v.heading, 0);
       v.mesh.rotateZ(v.lean);     // roll quanh trục Z LOCAL (= hướng tiến) → nghiêng đúng
     } else {
-      v.pos.y = Math.sin(time * 1.3) * 0.1;
+      v.pos.y = waterLevelAt(v.pos.x, v.pos.z) + Math.sin(time * 1.3) * 0.1;   // Tam Bạc nâng (terrain.js TB_LEVEL)
       v.mesh.rotation.set(Math.sin(time * 1.1) * 0.03, v.heading, Math.sin(time * 0.9) * 0.04);
       if (v.flag) v.flag.rotation.y = Math.sin(time * 5) * 0.3;
     }
@@ -245,7 +245,7 @@ export function createVehicles(scene, groundHeight, waterHeight, spawns, resolve
     const t = TEMPLATES[type];
     if (!t) return null;
     const built = t.maker();
-    const y = t.land ? groundHeight(x, z) : 0.1;
+    const y = t.land ? groundHeight(x, z) : waterLevelAt(x, z) + 0.1;
     built.mesh.position.set(x, y, z);
     built.mesh.rotation.y = heading;
     scene.add(built.mesh);

@@ -271,7 +271,8 @@ function ringTexture() {
 
 // ---------------------------------------------------------------------------------------------------------------
 // deps: { WATER, waterSD, roads (ROADS_DT mặt đất), hw(x), sw(x) (x = way/đoạn {c, w?, sw?} hoặc cấp — W3-A), roadSurfaceAt, LAND_H, R, lampGlow (material đèn), addCollider,
-//         panoCams, keClear(x) (khoảng kè W3-F: hw + vỉa hè + 2,5), deckAt(x,z) (có mặt cầu nâng phủ — không lan can/đèn dưới cầu) }
+//         panoCams, keClear(x) (khoảng kè W3-F: hw + vỉa hè + 2,5), deckAt(x,z) (có mặt cầu nâng phủ — không lan can/đèn dưới cầu),
+//         waterY(x,z) (cao độ mặt nước — Tam Bạc nâng, terrain.waterLevelAt; thiếu = 0) }
 export function buildRiverbanks(scene, deps) {
   const t0 = performance.now();
   const { WATER, waterSD, LAND_H = 2, R = 1650 } = deps;
@@ -355,7 +356,11 @@ export function buildRiverbanks(scene, deps) {
   const shackB = Buf(), boatB = Buf(), ringPanel = Buf(), sand = Buf();
   stats.stripM = 0; stats.stripN = 0; stats.shacks = 0; stats.boats = 0; stats.beachM = 0;
   const shacks = [], bankTrees = [], treeGrid = new Map();
-  const C_TOP = rgb(0xbdb6a6), C_MID = rgb(0x968e7c), C_LOW = rgb(0x5d5a48), C_CAP = rgb(0xc9c3b4);
+  // Sửa hồi quy AUDIT4 R1: tường kè be sáng 0xbdb6a6 + nắng → bờ đối diện đọc thành "dải cát be" thay mặt sông (203/212).
+  // Ảnh thật 212 h0: đá xám hơi lục (130-160), nửa dưới ố sẫm ô liu (80-100) + vệt thoát nước. Mặt nước Tam Bạc nâng
+  // (terrain.js TB_LEVEL 1,1) → tường lộ ~1,15 m: xám nhạt trên → xám giữa → VỆT TRIỀU sẫm từ ~1,05 → rêu sẫm dưới
+  // (bờ Cấm nước y 0: dải sẫm 1 m trên mặt nước = vệt triều thật).
+  const C_TOP = rgb(0x8f9087), C_MID = rgb(0x7a7a70), C_TIDE = rgb(0x575445), C_LOW = rgb(0x46443a), C_CAP = rgb(0x9d9e95);
   const C_SAND = rgb(0x9d8f72), C_WET = rgb(0x5f5848);
   const C_IRON = rgb(0x2c4a3a), C_LAMP = rgb(0x1f2a26);
   // keepSegs: si → [t0, t1] quãng (m dọc đoạn phố) CÓ dải dạo — keep/promSide chỉ tác dụng trong quãng đó (+6 m): 1 đoạn
@@ -366,7 +371,7 @@ export function buildRiverbanks(scene, deps) {
   const WF = -0.7;                        // mặt tường kè: 0,7 m về phía nước tính từ mép polygon
   // dải liền (Run, r5): tường kè (2 dải màu dọc) + gờ đỉnh kè; bệ lan can (sọc đỏ-trắng 1 m ở phố s/p) + tay vịn gang
   const C_PL = rgb(0xd8d4ca), C_PLR = rgb(0xb33a2e), YP = TOP + 0.02, YH = YP + 1.12;
-  const runWall = Run(wall, [{ a: [WF, TOP], b: [WF, 0.9], n: [-1, 0], ca: C_TOP, cb: C_MID }, { a: [WF, 0.9], b: [WF, -1.4], n: [-1, 0], ca: C_MID, cb: C_LOW }], null);
+  const runWall = Run(wall, [{ a: [WF, TOP], b: [WF, 1.65], n: [-1, 0], ca: C_TOP, cb: C_MID }, { a: [WF, 1.65], b: [WF, 1.05], n: [-1, 0], ca: C_MID, cb: C_TIDE }, { a: [WF, 1.05], b: [WF, -1.4], n: [-1, 0], ca: C_TIDE, cb: C_LOW }], null);
   const runCap = Run(cap, [{ a: [WF - 0.05, TOP + 0.02], b: [0.45, TOP + 0.02], n: [0, 1], ca: C_CAP, cb: C_CAP }], null);
   const boxFaces = (h, y0, y1) => [{ a: [h, y0], b: [h, y1], n: [1, 0] }, { a: [h, y1], b: [-h, y1], n: [0, 1] }, { a: [-h, y1], b: [-h, y0], n: [-1, 0] }];
   const runPlinth = Run(plinth, boxFaces(0.17, YP, YP + 0.34), [[0.17, YP], [0.17, YP + 0.34], [-0.17, YP + 0.34], [-0.17, YP]]);
@@ -567,9 +572,10 @@ export function buildRiverbanks(scene, deps) {
     const L = 6.5 + hash(s.x, s.z, 62) * 3, Wd = 1.7 + hash(s.x, s.z, 63) * 0.5, off = 1.8 + Wd / 2 + hash(s.x, s.z, 64) * 1.2;
     const cx = s.x - s.nx * off, cz = s.z - s.nz * off, ang = Math.atan2(s.tx, s.tz) + (hash(s.x, s.z, 65) - 0.5) * 0.12;
     const hull = rgb(hash(s.x, s.z, 66) < 0.5 ? 0x4a3a2c : 0x3d5560);
-    box(boatB, cx, 0.25, cz, Wd, 0.75, L * 0.7, ang, hull);
-    for (const sg of [-1, 1]) box(boatB, cx + s.tx * sg * L * 0.4, 0.35, cz + s.tz * sg * L * 0.4, Wd * 0.55, 0.6, L * 0.18, ang, hull);
-    if (hash(s.x, s.z, 67) < 0.7) box(boatB, cx, 1.05, cz, Wd * 0.9, 0.85, L * 0.32, ang, rgb(hash(s.x, s.z, 68) < 0.5 ? 0x2f6aa8 : 0x6b6a5c));
+    const wy = deps.waterY ? deps.waterY(cx, cz) : 0;   // mặt nước Tam Bạc nâng (terrain.js waterLevelAt)
+    box(boatB, cx, wy + 0.25, cz, Wd, 0.75, L * 0.7, ang, hull);
+    for (const sg of [-1, 1]) box(boatB, cx + s.tx * sg * L * 0.4, wy + 0.35, cz + s.tz * sg * L * 0.4, Wd * 0.55, 0.6, L * 0.18, ang, hull);
+    if (hash(s.x, s.z, 67) < 0.7) box(boatB, cx, wy + 1.05, cz, Wd * 0.9, 0.85, L * 0.32, ang, rgb(hash(s.x, s.z, 68) < 0.5 ? 0x2f6aa8 : 0x6b6a5c));
     stats.boats++;
   }
   function blob(B, x, y, z, r, col) {   // khối lá/hoa: bát diện dẹt 8 mặt (pháp tuyến mặt không đổi theo r — BLOB_N tính sẵn)

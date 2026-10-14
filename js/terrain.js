@@ -337,6 +337,27 @@ export function groundHeight(x, z) {
 
 export function isWater(x, z) { return groundHeightNoDeck(x, z) < 0.25; }
 
+// ===== MẶT NƯỚC SÔNG TAM BẠC NÂNG (sửa hồi quy AUDIT4 R1, pano 198/203/207/212/134) =====
+// W3-F dựng kè đứng + dải dạo (mặt LAND_H + 0,25) + lan can 1,12 m dọc Tam Bạc. Mặt nước toàn cục y = 0 ⇒ tường kè lộ
+// 2,25 m; từ camera pano (mắt LAND_H + 2,2, cách lan can 8-13 m) đường ngắm qua đỉnh lan can chỉ chạm nước sau ~60 m
+// ⇒ gần như KHÔNG thấy sông, bờ kè đối diện (tường sáng) đọc thành "dải cát be" (AUDIT4: 5 phát hiện mức 3). Ảnh thật
+// 203/207/212/198: mặt nước ~1-1,2 m dưới dải dạo (212 h0: tường kè đối diện ≈ cao lan can ~1 m), sông là dải ô liu
+// dày phía trên lan can. Thử 0,8: dải nước mới ~11 px (ảnh 1280×634) — vẫn mỏng hơn ảnh thật → 1,1 (tường lộ 1,15 m). Sửa tại nguồn: mặt nước
+// RIÊNG cho polygon Tam Bạc nội đô (world.js mesh 'water' thứ 2, cùng vật liệu), cao TB_LEVEL; vuốt về 0 ở hợp lưu sông
+// Cấm (bắc, z −620 → −900) và chỗ nối mảnh Tam Bạc tây (x −1120 → −1205) — dốc ≤ 0,3 %, không thấy bậc.
+// Mọi thứ NỔI trên Tam Bạc (thuyền người chơi vehicles.js, thuyền neo riverbank.js, nhà thuyền tb_shack) cộng waterLevelAt.
+// KHÔNG đổi groundHeight/isWater (lòng sông vẫn −3; nước "sâu" hơn 0,8 m) → waterbfs/giao thông/va chạm y như cũ.
+export const TB_LEVEL = 1.1;
+export const TB_POLY = (WATER.find((w) => w.n === 'Sông Tam Bạc' && w.pts.every(([x, z]) => Math.abs(x) < 2000 && Math.abs(z) < 2000)) || {}).pts || null;
+const TB_BB = TB_POLY ? TB_POLY.reduce((b, [x, z]) => [Math.min(b[0], x), Math.min(b[1], z), Math.max(b[2], x), Math.max(b[3], z)], [1e9, 1e9, -1e9, -1e9]) : null;
+export const TB_BOX = TB_BB;
+export function tbRamp(x, z) { return smoothstep(-900, -620, z) * smoothstep(-1205, -1120, x); }
+// cao độ mặt nước tại (x,z): Tam Bạc nội đô = TB_LEVEL · vuốt, mọi nơi khác 0 (mặt phẳng nước toàn cục)
+export function waterLevelAt(x, z) {
+  if (!TB_POLY || x < TB_BB[0] || x > TB_BB[2] || z < TB_BB[1] || z > TB_BB[3]) return 0;
+  return inPoly(x, z, TB_POLY) ? TB_LEVEL * tbRamp(x, z) : 0;
+}
+
 // điểm trên sông Cấm gần x nhất (đặt cảng, bến)
 export function nearestRiverPoint(x0, minW = 50) {
   let best = null, bd = Infinity;

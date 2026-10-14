@@ -32,7 +32,7 @@
 //  12. loại cạnh: PARTY (+ edgeCover = tầng thấp nhất nhà che), FRONT, BACK, SIDE
 // Toàn bộ ngẫu nhiên theo seed (hash id / toạ độ). Ngân sách: ≤ 1,8 MB base64, giải mã < 60 ms.
 import fs from 'fs';
-import { ROADS_DT, PARKS, RAIL, LM } from '../js/mapdata.js';
+import { ROADS_DT, PARKS, RAIL, LM, WATER } from '../js/mapdata.js';
 import { waterSD } from '../js/terrain.js';
 import { roadHW, facadeLine } from '../js/xsection.js';
 import { LM_POLY } from '../js/landmark_polys.js';
@@ -259,11 +259,38 @@ function waterFrac(P) {
   }
   return n ? w / n : 0;
 }
+// Sửa hồi quy AUDIT4 (pano_299 h90): DẢI BỜ giữa phố ven nước và mép nước. W3-F §6b3 (process_osm) ĐẨY mép sông ≥ hw +
+// vỉa hè + 2,5 m khỏi phố chạy dọc bờ → dải đất mới = vỉa hè + kè + dải dạo (riverbank.js vẽ ca-rô + lan can LIỀN). Footprint
+// ML/Google từng nằm nửa trong nước cũ (drop_water) nay có tâm trên dải đó và SỐNG SÓT → khối nhà xám 3 tầng chắn dải dạo
+// (ảnh thật: dải dạo + sông mở). Luật: tâm nhà cách nước < 12 m, có đoạn phố p/s/t/r chạy dọc phía ĐẤT (hướng tâm → phố
+// cùng chiều gradient waterSD, cos ≥ 0,7), có đỉnh chạm nước (waterSD < 0,5 — nhà đè lên kè) và khoảng mép lòng phố → mép nước qua tâm < BANK_GAP m (không đủ chỗ vỉa hè + nhà).
+const BANK_GAP = 12;
+const RIVER_POLYS = WATER.filter((w) => /^(Sông|Kênh)/.test(w.n || ''));
+function bankStrip(P) {
+  const [cx, cz] = centroid(P), sd = waterSD(cx, cz);
+  if (sd >= 12) return false;
+  if (!P.some(([x, z]) => waterSD(x, z) < 0.5)) return false;   // chỉ nhà CHẠM/chìa ra nước (đè lên tường kè + dải dạo)
+  const gx = waterSD(cx + 1, cz) - waterSD(cx - 1, cz), gz = waterSD(cx, cz + 1) - waterSD(cx, cz - 1), gl = Math.hypot(gx, gz);
+  if (gl < 1e-6) return false;
+  // chỉ SÔNG/KÊNH (mép bị §6b3 đẩy) — hồ có kè/ki-ốt riêng, không đụng
+  const qx = cx - (gx / gl) * (sd + 1.5), qz = cz - (gz / gl) * (sd + 1.5);
+  if (!RIVER_POLYS.some((w) => pointInPoly(w.pts, qx, qz))) return false;
+  let hit = false;
+  segGrid.query([cx - 30, cz - 30, cx + 30, cz + 30], (i) => {
+    if (hit) return; const s = SEGS[i]; if (!'pstr'.includes(s.c)) return;
+    const [t, v] = segLocal(s, cx, cz); if (t < 0 || t > 1) return;
+    const sg = v >= 0 ? -1 : 1;   // hướng từ tâm nhà → tim phố
+    if ((sg * s.nx * gx + sg * s.nz * gz) / gl < 0.7) return;
+    if (Math.abs(v) - s.hw + sd < BANK_GAP) hit = true;
+  });
+  return hit;
+}
 B = B.filter((b) => {
   if (b.pts.length < 3 || absArea(b.pts) < 8) { stat('drop_small'); return false; }
   if (!isSimple(b.pts)) { stat('drop_nonsimple'); return false; }
   const [cx, cz] = centroid(b.pts);
   if (waterSD(cx, cz) < 0 || waterFrac(b.pts) > 0.5) { stat('drop_water'); return false; }
+  if (bankStrip(b.pts)) { stat('drop_bank'); if (process.env.BANK_DBG) console.log('drop_bank', b.src || '', cx.toFixed(1), cz.toFixed(1), absArea(b.pts).toFixed(0)); return false; }
   if (clearedZone(cx, cz)) { stat('drop_cleared'); return false; }
   return true;
 });

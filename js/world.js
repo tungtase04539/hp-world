@@ -11,7 +11,7 @@ import {
   WORLD_BOUNDS, LM, LM_DIR, LM_FACE, EXTRAS, TREES, PARKS, RAIL, DT_BOX, ROADS_DT, BRIDGES, BUILDINGS,
   groundHeight, groundHeightNoDeck, isWater, landAt, riverFactor,
   nearestRiverPoint, findShore, addPier, LAKE_POLY, lakeSD, HOSEN_POLY, hoSenSD,
-  BRIDGE_WAYS, ELEVATED_RI, waterSD, WATER, R_POLY,
+  BRIDGE_WAYS, ELEVATED_RI, waterSD, WATER, R_POLY, TB_POLY, TB_BOX, TB_LEVEL, tbRamp, waterLevelAt,
 } from './terrain.js';
 import { buildBridges, makeDeckIndex } from './bridges.js';   // Đợt 3 W3-F: cầu theo way OSM (HVT xoắn ốc, Lạc Long…)
 import { snapBankGrid, buildRiverbanks } from './riverbank.js';   // Đợt 3 W3-F: bờ kè sông (tường kè, dải dạo, lan can, đèn)
@@ -979,8 +979,66 @@ export async function buildWorld(scene, prog = () => {}) {
   scene.add(water);
   world.waterMat = waterMat;
   water.userData.dyn = true;
+  // MẶT NƯỚC SÔNG TAM BẠC NÂNG (terrain.js TB_LEVEL — sửa hồi quy AUDIT4 R1): lưới 6 m phủ polygon Tam Bạc nội đô + 6 m
+  // chìa vào bờ (giấu dưới đất LAND_H/tường kè), y = TB_LEVEL · tbRamp; nơi vuốt về 0 hạ thêm −0,1 m để mặt phẳng toàn cục
+  // (y 0) phủ lên — không bậc, không nhấp nháy. UV khớp plane toàn cục (gợn normal map liền), CÙNG vật liệu.
+  let tbWater = null;
+  if (TB_POLY) {
+    const ST = 6, PAD = 12, [bx1, bz1, bx2, bz2] = TB_BOX;
+    const nx = Math.ceil((bx2 - bx1 + 2 * PAD) / ST), nz = Math.ceil((bz2 - bz1 + 2 * PAD) / ST);
+    const x0 = bx1 - PAD, z0 = bz1 - PAD;
+    const segD = (x, z) => {   // khoảng cách tới biên polygon Tam Bạc
+      let bd = 1e9;
+      for (let i = 0, j = TB_POLY.length - 1; i < TB_POLY.length; j = i++) {
+        const [ax, az] = TB_POLY[j], [bx, bz] = TB_POLY[i], dx = bx - ax, dz = bz - az, L2 = dx * dx + dz * dz || 1;
+        const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / L2)), d = Math.hypot(x - ax - t * dx, z - az - t * dz);
+        if (d < bd) bd = d;
+      }
+      return bd;
+    };
+    const keep = new Uint8Array((nx + 1) * (nz + 1));
+    for (let j = 0; j <= nz; j++) for (let i = 0; i <= nx; i++) {
+      const x = x0 + i * ST, z = z0 + j * ST;
+      if (waterSD(x, z) > ST) continue;                                  // lọc thô (lưới waterSD nhanh)
+      if (waterLevelAt(x, z) > 0 || segD(x, z) < ST) keep[j * (nx + 1) + i] = 1;
+    }
+    const pos = [], uv = [], idx = [], vid = new Int32Array((nx + 1) * (nz + 1)).fill(-1);
+    const vtx = (i, j) => {
+      const k = j * (nx + 1) + i; if (vid[k] >= 0) return vid[k];
+      const x = x0 + i * ST, z = z0 + j * ST, r = tbRamp(x, z);
+      pos.push(x, TB_LEVEL * r - 0.1 * (1 - r), z); uv.push(0.5 + (x - CX) / W, 0.5 + (CZ - z) / D);
+      return (vid[k] = pos.length / 3 - 1);
+    };
+    for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
+      const k = j * (nx + 1) + i;
+      if (!(keep[k] || keep[k + 1] || keep[k + nx + 1] || keep[k + nx + 2])) continue;
+      const a = vtx(i, j), b = vtx(i + 1, j), c = vtx(i, j + 1), d = vtx(i + 1, j + 1);
+      idx.push(a, c, b, b, c, d);   // ngược chiều kim đồng hồ nhìn từ trên (pháp tuyến +y)
+    }
+    if (idx.length) {
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+      g.setIndex(idx); g.computeVertexNormals(); g.computeBoundingSphere();
+      // vật liệu RIÊNG (cùng shader/texture/gợn): nhìn xiên ở tầm mắt, sông Tam Bạc đục là dải NÂU-Ô LIU còn gợn (ảnh 212 h0
+      // ~(120,110,80)), không phải gương trời xám-trắng (đo sau nâng, vật liệu chung: (154,152,146)). Nhám 0,42 thử: mất gợn,
+      // thành tấm xám phẳng như nền bê tông → giữ nhám ~0,2, giảm IBL 0,6 + màu nền nâu-ô liu sáng hơn chút (0x6a6548).
+      const tbMat = waterMat.clone();
+      tbMat.onBeforeCompile = waterMat.onBeforeCompile; tbMat.userData = waterMat.userData;
+      tbMat.roughness = 0.2; tbMat.envMapIntensity = 0.8; tbMat.normalScale.set(0.35, 0.35); tbMat.name = 'water_tb';
+      tbWater = new THREE.Mesh(g, tbMat);
+      tbWater.name = 'water';            // freezeStatic/bóng/farHide chừa 'water' như mặt phẳng toàn cục
+      tbWater.receiveShadow = true;
+      tbWater.userData.dyn = true; tbWater.userData.tbLevel = TB_LEVEL;
+      scene.add(tbWater);
+      world.tbWater = tbWater;
+    }
+  }
   // gợn trôi chậm (~0.15 m/s, ô 9 m); offset quấn về [0,1) — RepeatWrapping nên mép quấn liền
-  updaters.push((dt, time) => { water.position.y = Math.sin(time * 0.8) * 0.06; waterNormal.offset.set((time * 0.017) % 1, (time * 0.011) % 1); });
+  updaters.push((dt, time) => {
+    water.position.y = Math.sin(time * 0.8) * 0.06; waterNormal.offset.set((time * 0.017) % 1, (time * 0.011) % 1);
+    if (tbWater) tbWater.position.y = water.position.y;
+  });
 
   // ---------- MẠNG ĐƯỜNG THẬT (Đợt 3 WP6: js/roadnet.js + js/roadtex.js) ----------
   // Thay hộp 30 m (layRoad) bằng: đồ thị nút giao THẬT (nối lại đỉnh chung bị simplify mất), dải lòng đường (ribbon)
@@ -1043,7 +1101,7 @@ export async function buildWorld(scene, prog = () => {}) {
     // tích hợp W3 (W3-A × W3-F): hw/sw/keClear nhận WAY (đoạn mang {c, w?, sw?}) hoặc cấp → bề rộng RIÊNG từng phố như roadnet
     hw: (x) => XS_HW(x), sw: (x) => XS_SW(x), keClear: (x) => Math.max(7, XS_HW(x) + XS_SW(x) + 2.5),
     roadSurfaceAt: world.roadNet && world.roadNet.surfaceAt, lampGlow: sharedMats.lampGlow, addCollider, panoCams: PANO_CAM,
-    deckAt: (x, z) => DECKS.covers(x, z, 1.5),
+    deckAt: (x, z) => DECKS.covers(x, z, 1.5), waterY: waterLevelAt,
   });
   console.log('[world] W3-F bờ kè sông:', JSON.stringify(world.riverbank.stats));
   // W3-F: claim 'bridge' dưới mặt cầu nâng (hộp ~12 m dọc way, rộng w + 2 m) → citygen giết footprint "nhà" Overture/OSM vốn là
@@ -3540,7 +3598,7 @@ const bcPalm = (parent, lx, lz, h = 9) => {   // Đợt 3 WP4: cau vua instanced
         let sxp = null, szp = null, sh = 0;
         for (let off = 14; off <= 42; off += 1.5) {
           const tx = px + wx * off, tz = pz + wz * off, hh = groundHeightNoDeck(tx, tz);
-          if (hh < 1.75 && hh > -1.4) { sxp = tx; szp = tz; sh = Math.max(hh, 0.1); break; }
+          if (hh < 1.75 && hh > -1.4) { sxp = tx; szp = tz; sh = Math.max(hh, waterLevelAt(tx, tz) + 0.1); break; }   // nổi trên mặt Tam Bạc nâng
         }
         if (sxp !== null) {
           const sg = new THREE.Group(); sg.name = 'tb_shack'; sg.position.set(sxp, sh, szp);
