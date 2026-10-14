@@ -23,7 +23,7 @@ Ký hiệu: **[ƯT]** = ước tính, phải đo lại bằng thử nghiệm tr�
 | # | Vấn đề | Đề xuất (chọn) | Phương án khác | Vì sao |
 |---|---|---|---|---|
 | 1 | Máy chủ game viết bằng gì | **Tự viết bằng JavaScript (Node.js), dùng chung mã với game hiện tại** | Colyseus (khung có sẵn); Cloudflare Durable Objects (không phải tự quản máy) | Không sản phẩm nào có sẵn kiểu "một thành phố liền mạch 1.000 người". Dùng chung mã thì máy chủ tính đất, nước, cầu giống hệt trò chơi. Vài nền tảng game đã đóng cửa trong năm 2026, nên tự giữ mã và chỉ thuê máy thường là an toàn hơn. |
-| 2 | Đặt máy chủ ở đâu | **Singapore** (Vultr / DigitalOcean / Hetzner, CPU riêng), có Cloudflare đứng trước | **Hà Nội** (Viettel IDC, BizFly) nếu đo thấy mạng ra quốc tế xấu, hoặc nếu luật yêu cầu dữ liệu ở trong nước | Từ Hải Phòng tới Singapore mất 50–75 ms, chơi tốt. Rủi ro là cáp biển hỏng (tháng 8/2026 mất 30% dung lượng). Vì vậy đo thật 2 tuần rồi mới chốt. |
+| 2 | Đặt máy chủ ở đâu | **Thử nghiệm kín: chạy ngay trên máy của chủ dự án** (mục 2b). Khi cần chạy 24/7 hoặc đông người: **Singapore** (Vultr / DigitalOcean / Hetzner, CPU riêng), có Cloudflare đứng trước | **Hà Nội** (Viettel IDC, BizFly) nếu đo thấy mạng ra quốc tế xấu, hoặc nếu luật yêu cầu dữ liệu ở trong nước | Từ Hải Phòng tới Singapore mất 50–75 ms, chơi tốt. Rủi ro là cáp biển hỏng (tháng 8/2026 mất 30% dung lượng). Vì vậy đo thật 2 tuần rồi mới chốt. |
 | 3 | Ai quyết cái gì | **Máy chủ quyết mọi thứ có giá trị**: tiền, đồ, chỉ số sinh tồn, nghề, nhiệm vụ. Di chuyển thì trò chơi tự đi trước cho mượt, máy chủ kiểm và kéo lại nếu gian lận | Máy chủ mô phỏng cả di chuyển (cần khi có đua xe ăn thưởng hoặc đánh nhau, hiện chưa có) | Trình duyệt sửa được hết, nên không tin trình duyệt về tiền. Di chuyển kiểu "đi trước, kiểm sau" mượt với người chơi thật và rẻ. |
 | 4 | Mở rộng | **1 máy chạy tới khoảng 3.000 người.** Chia thành phố thành nhiều vùng trên nhiều máy **chỉ khi** đỉnh thật vượt 1.500 người trong 2 tuần | Làm sẵn nhiều máy từ đầu | Chia vùng là phần khó nhất (3 tháng công). Chưa có người thật thì chưa làm. Mã viết sẵn "khe cắm" để chia sau không phải viết lại. |
 | 5 | Đăng nhập | **Khách = tài khoản lưu trên máy chủ** (gõ biệt danh) + **Liên kết Google** + **mã khôi phục 12 ký tự** cho ai không dùng Google | Xác thực số điện thoại, nếu luật sư yêu cầu | Tiến trình nằm ở máy chủ từ đầu nên không ai sửa được. Có mã khôi phục vì iPhone tự xoá dữ liệu trang web sau 7 ngày không mở, và Google chặn đăng nhập trong trình duyệt của Zalo/Facebook. |
@@ -31,8 +31,24 @@ Ký hiệu: **[ƯT]** = ước tính, phải đo lại bằng thử nghiệm tr�
 | 7 | Tệp mô hình 3D nặng | **Chuyển lên Cloudflare R2** (gần như miễn phí băng thông) | Giữ GitHub + jsDelivr | GitHub Pages giới hạn 1 GB, trang hiện đã 1,77 GB; mỗi người chơi mới tải 100–270 MB. Phải làm trước khi mời quá 200 người. |
 | 8 | Phạm vi sinh tồn bản đầu | **4 chỉ số: Đói, Khát, Thể lực, Sức khỏe, cộng Tiền.** Thân nhiệt và độ ướt đi cùng thời tiết ở giai đoạn sau. Sạch sẽ và Tinh thần làm cuối | Làm cả 7 chỉ số ngay | Bảy chỉ số cùng lúc thì quá nhiều cho người mới và cho đội nhỏ. |
 | 9 | Người chơi chạm nhau | **Không va chạm, không đánh nhau, không cướp** | Có PvP | Đông người thì phá đám là vấn đề số 1. Không có công cụ phá thì không phải xử lý. |
-| 10 | Chat | Khách và tài khoản dưới 16 tuổi: **chỉ câu chat nhanh + biểu cảm**. Chat gõ tự do trong 40 m cho tài khoản đã liên kết. Không có chat toàn server | Mở chat tự do cho khách sau 10 phút chơi | An toàn trẻ em và chống spam. Chủ dự án chốt ở câu hỏi số 3. |
+| 10 | Chat | **Chủ dự án chốt (14/10/2026): chat gõ tự do cho mọi người trong 40 m, kiểm soát chặt**: lọc tiếng Việt (bỏ dấu, teencode), chặn link/số điện thoại/nick mạng xã hội/lừa đảo, giới hạn tần suất, báo cáo + tự khoá chat khi 3 người báo, khoá chat ẩn cho người tái phạm, chủ dự án duyệt trực tiếp trên trang quản trị. Không có chat toàn server | Chỉ chat nhanh cho khách | Thử nghiệm kín theo lời mời nên người chơi đã được chọn lọc; kiểm soát chặt thay cho cấm. |
 | 11 | Khi máy chủ sập | Trò chơi **vẫn chơi một mình được** (chế độ "Khám phá", không có tiền, không lưu nghề) | Báo lỗi và không cho chơi | Không làm hỏng trải nghiệm hiện có. |
+
+## 2b. Giai đoạn thử nghiệm: máy chủ chạy ngay trên máy của chủ dự án (chốt 14/10/2026)
+
+Máy hiện tại (AMD Ryzen AI 9 HX 370, 12 lõi / 24 luồng, 31 GB RAM, Docker có sẵn) **dư sức** làm máy chủ game cho thử nghiệm kín. Theo ước tính, máy chủ chỉ cần 1–2 lõi cho 1.000 người. Giới hạn thật không nằm ở CPU mà ở **mạng gia đình** và việc **máy phải luôn bật**.
+
+| Hạng mục | Cách làm |
+|---|---|
+| Kết nối ra Internet | **Cloudflare Tunnel** (`cloudflared` đã cài sẵn). Không cần mở cổng modem, **giấu IP nhà**, có sẵn `wss://` bảo mật, chạy được cả khi nhà mạng dùng CGNAT. Miễn phí. Cần 1 tên miền trên Cloudflare (khoảng 300.000 đ/năm). Khi thử nhanh thì dùng địa chỉ tạm `trycloudflare.com`. |
+| Cô lập | Máy chủ game + Postgres chạy trong **Docker**. Chỉ cổng game đi qua tunnel; không mở cổng nào khác; container không đọc được tệp cá nhân. Trang quản trị chỉ mở trên chính máy này (`localhost`). |
+| Băng thông lên | Khoảng 3–5 KB/giây mỗi người: 50 người ≈ 2 Mbps, 200 người ≈ 8 Mbps, 1.000 người ≈ 30–40 Mbps. Cáp quang gia đình gánh tốt vài trăm người. **Trang game và mô hình 3D vẫn tải từ GitHub Pages/jsDelivr, không tải từ máy nhà** (mỗi người mới tải 100–270 MB). |
+| Độ trễ | Người chơi ở Việt Nam → Cloudflare → máy nhà, nhiều khả năng **nhanh hơn Singapore**. Đo bằng trang `netprobe.html` trên điện thoại các nhà mạng. |
+| Chi phí | Máy chủ 0 đ. Điện laptop khoảng 50–90 W, chỉ đáng kể nếu bật 24/7 (khoảng 150.000–250.000 đ/tháng). Nằm trong ngân sách 1 triệu đ/tháng. |
+| Phải lưu ý | (1) Máy **không được ngủ**: chế độ chờ của máy này tự ngắt mạng ("Standby S0 — Network Disconnected"), nên khi mở server phải cắm sạc và tắt ngủ (script "Mở máy chủ" tự giữ máy thức). (2) **Không chạy kiểm tra đồ hoạ nặng trong giờ chơi thử**: máy từng sập màn xanh khi mở nhiều Chrome 3D; công cụ kiểm tra dùng chung khoá `gpulock`. (3) Windows Update có thể tự khởi động lại: đặt "giờ hoạt động" buổi tối. (4) Sao lưu Postgres mỗi đêm ra ổ khác/đám mây. (5) Điều khoản dịch vụ Internet gia đình thường không dành cho máy chủ công cộng; thử nghiệm kín, ít người thì không đáng lo. |
+| Khi nào chuyển lên VPS | Cần chạy 24/7, hoặc thường xuyên trên ~200–300 người cùng lúc, hoặc anh cần dùng máy cho việc khác. Mọi thứ chạy trong Docker nên chuyển = chạy cùng cấu hình trên VPS + khôi phục bản sao lưu + đổi đích tunnel (khoảng 1 giờ). |
+
+Hệ quả: **Giai đoạn 0 gần như không tốn tiền** (không cần thuê 3 máy đo); bước đo độ trễ Singapore/Hà Nội chỉ làm khi sắp chuyển lên VPS.
 
 ---
 
@@ -268,6 +284,14 @@ Tỷ giá 26.000 đồng/USD. Giá máy Vultr Singapore đọc ngày 14/10/2026.
 3. **Chat cho khách và trẻ em:** chỉ cho chat nhanh/biểu cảm (an toàn, đề xuất), hay mở chat gõ tự do cho khách sau 10 phút chơi?
 4. **Người vận hành:** ai nhận cảnh báo khi máy chủ sập buổi tối, và ai làm kiểm duyệt chat khi có từ khoảng 300 người online? Có mời sử gia hoặc Bảo tàng Hải Phòng duyệt tuyến lịch sử không?
 5. **Kéo người chơi:** có kế hoạch nào (trường học, cộng đồng người Hải Phòng, ra mắt dịp 13/5 hoặc Lễ hội Hoa Phượng Đỏ) và mốc thời gian không? Câu trả lời quyết định khi nào thuê máy lớn và khi nào cần Giai đoạn 6.
+
+
+**Trả lời của chủ dự án (14/10/2026):**
+1. Chỉ **thử nghiệm kín, phi thương mại** → chưa thuê luật sư; giữ chế độ **chỉ vào bằng mã mời**; xem lại pháp lý trước khi mở công khai.
+2. Khởi động với **1 triệu đ/tháng** là hợp lý → giai đoạn thử nghiệm chạy máy chủ trên máy của chủ dự án (mục 2b), chi phí gần như 0.
+3. **Chat gõ tự do nhưng kiểm soát chặt chẽ** (xem quyết định số 10).
+4. **Người vận hành là chủ dự án**: cảnh báo (Telegram, tuỳ chọn) và trang quản trị đều cho chủ dự án; trang quản trị chạy trên chính máy chủ.
+5. Kế hoạch kéo người chơi: **chủ dự án đã có**.
 
 Các điểm còn lại đã chọn mặc định, đổi được sau mà không ảnh hưởng kiến trúc: ngày game giữ 24 phút thật; giá đồ ăn gần giá thật (bát phở 45.000₫), thu nhập nén gấp 3–5 lần đời thực; bão dùng tên hư cấu "bão số N"; chỉ số đóng băng khi offline; không PvP; không "lớp" chia người ở điểm nóng trừ khi anh đồng ý.
 
