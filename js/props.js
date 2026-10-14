@@ -723,7 +723,8 @@ export function buildProps(ctx) {
   // W3-E: pedsMarket = ngân sách RIÊNG người chợ (bán ngồi ghế đẩu/khách đứng trước sạp — chỉ trong ô chợ, xa > 60 m là LOD
   // 0,24k); peds giữ như dot3 cho người đi bộ + đứng/ngồi quán
   const BUDGET = {
-    bikes: LITE ? 8000 : 30000, cars: LITE ? 1400 : 3600, peds: LITE ? 450 : 1100, pedsMarket: LITE ? 350 : 1100, pedsSpill: LITE ? 120 : 380,   // Đ3-W5-C: 90/220 → 120/380 (+ khách hiên quán)
+    bikes: LITE ? 8000 : 30000, cars: LITE ? 1400 : 3600, peds: LITE ? 450 : 1100, pedsMarket: LITE ? 500 : 1800,   // Đ3-W5-C: 350/1100 → 500/1800 (chợ mức 3 dày hơn: ~2,9k ứng viên, bản cũ giữ ~38%)
+    pedsSpill: LITE ? 120 : 380,   // Đ3-W5-C: 90/220 → 120/380 (+ khách hiên quán)
     // Đ3-W5-C: + khách ngồi HIÊN QUÁN (nhóm sp) và CỤM NGƯỜI đứng/ngồi trước nhà (nhóm cl — ngân sách riêng, không ăn người đi bộ)
     pedsCluster: LITE ? 160 : 520,
   };
@@ -1309,6 +1310,57 @@ export function buildProps(ctx) {
     }
     return false;
   };
+  // Đ3-W5-C: CỤM NGƯỜI TĨNH (graders 469/446/460 "phố đông người", AUDIT người thưa): nhóm 2-4 người ĐỨNG nói chuyện sát mặt
+  // tiền, hoặc NGỒI ghế nhựa quanh bàn thấp (trà đá/hàng xóm — 30%). Xác suất mỗi ô: pano ≤ 40 m "đông người" (deco 2048) 16%,
+  // pano ≤ 45 m phố xe máy dày/chợ/quán ghế nhựa 5%, lõi < 900 m 1,2%, ngoài 0,4%. Né nhà thật/vật cản/thân xe đã đỗ/ghế quán/
+  // camera pano; ô đồ cửa hàng/cột/ô tô/chợ/lối người đi bộ bỏ qua. Ngân sách RIÊNG (nhóm `cl`, BUDGET.pedsCluster).
+  // 2 LƯỢT: crowd = true (TRƯỚC hàng xe máy 6.5 — chỉ ô "đông người": hàng xe né cụm qua bikeObst, ảnh 469: khách đứng giữa
+  // các xe đỗ) · crowd = false (sau người đi bộ 6.7 — mọi ô còn lại)
+  function placeClusters(crowd) {
+    const SEATS = [[0.52, 0.05], [-0.5, -0.06], [0.04, 0.55], [-0.05, -0.53]];
+    let nCl = 0;
+    for (const S of sides) {
+      const X = XS(S); if (X.sw < 1.8) continue;
+      for (let k = 0; k < S.n; k++) {
+        if (!S.ok[k] || S.fore[k] || (S.occ[k] & (OCC_SHOP | OCC_POLE | OCC_CAR | OCC_MKT | OCC_PED))) continue;
+        const hk = hash3(S.ax + k * 2.7, S.az - S.side * 1.3, 131);
+        if (hk > 0.16) continue;   // lọc rẻ trước khi tính toạ độ (35k ô)
+        const [px, pz] = cellPos(S, k, X.park);
+        let p = Math.hypot(px, pz) < 900 ? 0.012 : 0.004;
+        const e = S.ev[k];
+        let isCrowd = false;
+        if (e) { const d = Math.hypot(e[0] - px, e[1] - pz); if ((e[9] & 2048) && d < 40) { p = 0.16; isCrowd = true; } else if (d < 45 && (e[2] >= 3 || e[7] >= 1 || (e[6] & 1))) p = 0.05; }
+        if (isCrowd !== crowd || hk > p || openSpace(px, pz)) continue;
+        const hs = hash3(px, pz, 132), sitMode = hs < 0.3 && X.sw >= 2.4;
+        const lat = X.fac - (sitMode ? 1.0 : 0.62 + hash3(px, pz, 133) * 0.3);
+        const [cx, cz] = cellPos(S, k, lat, (hash3(px, pz, 134) - 0.5) * 1.2);
+        const R0 = sitMode ? 0.95 : 0.65;
+        if (inBuilding(cx, cz) || obst.hit(cx, cz, R0) || nearPlaced(cx, cz, R0 - 0.2) || bikeObst.hit(cx, cz, R0 - 0.2) || !clearPt(cx, cz, R0 + 0.3)) continue;
+        const n = 2 + ((hash3(px, pz, 135) * 2.4) | 0);
+        let c = 0;
+        if (sitMode) {
+          const rot = hash3(cx, cz, 136) * 6.28, cs = Math.cos(rot), sn = Math.sin(rot);
+          stoolI.push({ x: cx, z: cz, heading: rot });
+          for (let q = 0; q < n; q++) {
+            const [sx, sz] = SEATS[q % 4], wx = cx + sx * cs + sz * sn, wz = cz - sx * sn + sz * cs;
+            if (inBuilding(wx, wz)) continue;
+            sitI.push({ x: wx, z: wz, heading: headZ(cx - wx, cz - wz), yo: -0.03, cl: 1 }); c++;
+          }
+        } else {
+          const a0 = hash3(cx, cz, 137) * 6.28;
+          for (let q = 0; q < n; q++) {
+            const a = a0 + (q / n) * 6.28 + (hash3(cx + q, cz, 138) - 0.5) * 0.5, r = 0.42 + hash3(cx, cz + q, 139) * 0.14;
+            const wx = cx + Math.cos(a) * r, wz = cz + Math.sin(a) * r;
+            if (inBuilding(wx, wz) || nearPlaced(wx, wz, 0.2)) continue;
+            standI.push({ x: wx, z: wz, heading: headZ(cx - wx, cz - wz) + (hash3(wx, wz, 140) - 0.5) * 0.6, cl: 1 }); c++;
+          }
+        }
+        if (c) { obst.add(cx, cz, R0); bikeObst.add(cx, cz, R0); S.occ[k] |= OCC_PED; nCl += c; }
+      }
+    }
+    stats.pedsCluster = (stats.pedsCluster || 0) + nCl;
+  }
+  placeClusters(true);   // lượt 1: ô "đông người" trước hàng xe máy
   for (const S of sides) {
     let k = 0;
     while (k < S.n) {
@@ -1628,7 +1680,7 @@ export function buildProps(ctx) {
     let k = 0;
     // W4-B: vỉa ≥ 3,4 m — người đi bộ đi được dải SÁT MẶT TIỀN sau mũi hàng xe máy (mũi xe ở parkingLine + 0,9 m, còn ≥ 0,6 m)
     // → ô xe máy không chặn lối đi (hàng xe dày hơn từng bớt người đi bộ 404 → 317 trong đo node)
-    const wideW = sidewalkW(S) >= 3.4, BLK = wideW ? (OCC_SHOP | OCC_CAR | OCC_MKT) : (OCC_BIKE | OCC_SHOP | OCC_CAR | OCC_MKT);
+    const wideW = sidewalkW(S) >= 3.4, BLK = (wideW ? (OCC_SHOP | OCC_CAR | OCC_MKT) : (OCC_BIKE | OCC_SHOP | OCC_CAR | OCC_MKT)) | OCC_PED;   // Đ3-W5-C: + OCC_PED (cụm người lượt 1 đặt trước 6.7)
     while (k < S.n) {
       if (!S.ok[k] || S.occ[k] & BLK) { k++; continue; }
       let k1 = k, bikeRun = false; while (k1 < S.n && S.ok[k1] && !(S.occ[k1] & BLK)) { if (S.occ[k1] & OCC_BIKE) bikeRun = true; k1++; }
@@ -1680,53 +1732,7 @@ export function buildProps(ctx) {
     if (inBuilding(x, z) || obst.hit(x, z, 0.3)) continue;
     standI.push({ x, z, heading: Math.atan2(-S.nx, -S.nz) + (hash3(x, z, 123) - 0.5) * 2.4 });
   }
-  // Đ3-W5-C: CỤM NGƯỜI TĨNH (graders 469/446/460 "phố đông người", AUDIT người thưa): nhóm 2-4 người ĐỨNG nói chuyện sát mặt
-  // tiền, hoặc NGỒI ghế nhựa quanh bàn thấp (trà đá/hàng xóm — 30%). Xác suất mỗi ô: pano ≤ 40 m "đông người" (deco 2048) 16%,
-  // pano ≤ 45 m phố xe máy dày/chợ/quán ghế nhựa 5%, lõi < 900 m 1,2%, ngoài 0,4%. Né nhà thật/vật cản/thân xe đã đỗ/ghế quán/
-  // camera pano; ô đồ cửa hàng/cột/ô tô/chợ/lối người đi bộ bỏ qua. Ngân sách RIÊNG (nhóm `cl`, BUDGET.pedsCluster).
-  {
-    const SEATS = [[0.52, 0.05], [-0.5, -0.06], [0.04, 0.55], [-0.05, -0.53]];
-    let nCl = 0;
-    for (const S of sides) {
-      const X = XS(S); if (X.sw < 1.8) continue;
-      for (let k = 0; k < S.n; k++) {
-        if (!S.ok[k] || S.fore[k] || (S.occ[k] & (OCC_SHOP | OCC_POLE | OCC_CAR | OCC_MKT | OCC_PED))) continue;
-        const hk = hash3(S.ax + k * 2.7, S.az - S.side * 1.3, 131);
-        if (hk > 0.16) continue;   // lọc rẻ trước khi tính toạ độ (35k ô)
-        const [px, pz] = cellPos(S, k, X.park);
-        let p = Math.hypot(px, pz) < 900 ? 0.012 : 0.004;
-        const e = S.ev[k];
-        if (e) { const d = Math.hypot(e[0] - px, e[1] - pz); if ((e[9] & 2048) && d < 40) p = 0.16; else if (d < 45 && (e[2] >= 3 || e[7] >= 1 || (e[6] & 1))) p = 0.05; }
-        if (hk > p || openSpace(px, pz)) continue;
-        const hs = hash3(px, pz, 132), sitMode = hs < 0.3 && X.sw >= 2.4;
-        const lat = X.fac - (sitMode ? 1.0 : 0.62 + hash3(px, pz, 133) * 0.3);
-        const [cx, cz] = cellPos(S, k, lat, (hash3(px, pz, 134) - 0.5) * 1.2);
-        const R0 = sitMode ? 0.95 : 0.65;
-        if (inBuilding(cx, cz) || obst.hit(cx, cz, R0) || nearPlaced(cx, cz, R0 - 0.2) || bikeObst.hit(cx, cz, R0 - 0.2) || !clearPt(cx, cz, R0 + 0.3)) continue;
-        const n = 2 + ((hash3(px, pz, 135) * 2.4) | 0);
-        let c = 0;
-        if (sitMode) {
-          const rot = hash3(cx, cz, 136) * 6.28, cs = Math.cos(rot), sn = Math.sin(rot);
-          stoolI.push({ x: cx, z: cz, heading: rot });
-          for (let q = 0; q < n; q++) {
-            const [sx, sz] = SEATS[q % 4], wx = cx + sx * cs + sz * sn, wz = cz - sx * sn + sz * cs;
-            if (inBuilding(wx, wz)) continue;
-            sitI.push({ x: wx, z: wz, heading: headZ(cx - wx, cz - wz), yo: -0.03, cl: 1 }); c++;
-          }
-        } else {
-          const a0 = hash3(cx, cz, 137) * 6.28;
-          for (let q = 0; q < n; q++) {
-            const a = a0 + (q / n) * 6.28 + (hash3(cx + q, cz, 138) - 0.5) * 0.5, r = 0.42 + hash3(cx, cz + q, 139) * 0.14;
-            const wx = cx + Math.cos(a) * r, wz = cz + Math.sin(a) * r;
-            if (inBuilding(wx, wz) || nearPlaced(wx, wz, 0.2)) continue;
-            standI.push({ x: wx, z: wz, heading: headZ(cx - wx, cz - wz) + (hash3(wx, wz, 140) - 0.5) * 0.6, cl: 1 }); c++;
-          }
-        }
-        if (c) { obst.add(cx, cz, R0); S.occ[k] |= OCC_PED; nCl += c; }
-      }
-    }
-    stats.pedsCluster = nCl;
-  }
+  placeClusters(false);   // Đ3-W5-C: cụm người tĩnh còn lại (sau người đi bộ)
   // ngân sách người: lấy mẫu đều TRONG 2 NHÓM (W3-E) — người chợ (bán ngồi ghế đẩu/khách đứng trước sạp, cờ `vendor`/`mk`,
   // dồn ở ~6.000 ô chợ) có ngân sách RIÊNG; nhóm chung (đi bộ + đứng/ngồi quán) giữ ngân sách cũ của dot3. Bản lấy mẫu
   // chung 1 nhóm: 7.500 ứng viên → giữ 26% → người đi bộ cả thành phố tụt 428 → 266 vì chợ đông người

@@ -43,6 +43,7 @@ import { claimAt, claimsAll } from './claims.js';
 import { rbData, rbGrid } from './rbdata.js';   // footprint thật giải mã 1 lần cho cả trang (W2-F)
 import { heightOf, PARAPET_H } from './buildings_data.js';
 import { onCarriage } from './clearance.js';   // Đợt 3 W2-A: lòng đường thật (roadNet.surfaceAt, biết khe đường đôi)
+import * as RBM from './buildings_real.js';   // Đ3-W5-C: RB_PARCELS (tường rào/hàng rào sắt — cây sân vườn); namespace: thiếu export → undefined
 
 // W3-G: + TOPI (cây cảnh CẮT TỈA TRÒN / cây thế trên đảo giao thông — pano_304), ME (me tây/muồng — cây "rain tree" tán dù
 // rất rộng, hero pano_001), LOP (cây CẮT TRỤI kiểu "bộ xương": thân cao + cành lớn bị cưa cụt + chồi lưa thưa — dải vườn
@@ -418,6 +419,10 @@ const KIT_DEFS = [
   // CÂY NON TRỒNG BÙ sau bão Yagi trong KHUNG KIỀNG 4 cọc + 2 tầng thanh giằng (pano_055/056 "cây chống kiềng cọc", 249 "khung
   // chống", 345 "cây mới trồng có cọc chống"): thân mảnh cao hơn, tán thưa lệch, ít cành
   { sp: SP.NON, form: 'round', H: 5.4, trunkH: 2.7, r0: 0.065, r1: 0.045, lean: 0.03, limbs: 3, limbAng: [0.35, 0.65], limbLen: 1.25, sub: 1, cy: 4.1, rx: 1.15, ry: 1.25, cards: 15, cardsFar: 12, cardS: [0.75, 1.15], cells: [CELL.SAU, CELL.SHOOT], bark: [0.86, 0.82, 0.76], up: 0.25, stakes: 'frame' },
+  // ---- Đ3-W5-C (thêm CUỐI) ----
+  // GỐC CƯA TRỤI "CỘT" (graders 152/225/400 — dải Trần Phú/Hoàng Diệu sau bão Yagi: thân to xù xì 4-5 m, vài mẩu cành cưa cụt
+  // ngắn 0,7-1,4 m ngóc lên, chồi non lưa thưa ở mặt cắt): thân dày hơn hẳn 2 kit cắt cụt cũ, cành cụt ngắn
+  { sp: SP.CATCUT, form: 'pollard', H: 6.4, trunkH: 4.3, r0: 0.36, r1: 0.29, lean: 0.05, stubs: 4, stubLen: [0.7, 1.4], shoots: 4, cardS: [0.7, 1.15], cells: [CELL.SHOOT], bark: [0.84, 0.8, 0.75] },
 ];
 const SP_KITS = Array.from({ length: SP_N }, () => []);
 KIT_DEFS.forEach((d, i) => SP_KITS[d.sp].push(i));
@@ -942,7 +947,9 @@ function pickW(w, h) {
   return 0;
 }
 // loài cây CẮT theo mức bằng chứng: mức ≥ 5 → phần lớn "bộ xương" cắt trụi (LOP), còn lại cắt cụt ngọn (CATCUT)
-const cutSpecies = (x, z, lvl) => (lvl >= 5 && hxz(x, z, 64) < 0.72 ? SP.LOP : SP.CATCUT);
+// Đ3-W5-C: mức 7 ("cả dải/hàng cây cắt trụi" — 152/225/400) → 50% "bộ xương" LOP / 50% gốc cưa cụt CATCUT (có kit "cột" thân to)
+//   — ảnh thật dải Trần Phú/Hoàng Diệu: đa số là gốc thân to cành cưa NGẮN, ít cây còn cành chẻ dài
+const cutSpecies = (x, z, lvl) => (lvl >= 5 && hxz(x, z, 64) < (lvl >= 7 ? 0.5 : 0.72) ? SP.LOP : SP.CATCUT);
 // loài cụ thể cho 1 cây: mode 'street' (hè phố: cau chỉ khi pano nói rõ "hàng cau") | 'park' (công viên/vườn hoa:
 // cau theo pano) | 'shade' (cây bóng mát — không phượng/cau/bằng lăng)
 function resolveSpecies(x, z, mode, ri = -1, park = false) {
@@ -1076,6 +1083,87 @@ function plantHeroSpots(ctx, RI, fp, inLM, BLOCK) {
   }
   return keep;
 }
+// ---- Đ3-W5-C: CÂY NGÕ RỢP (graders 519 "cây xanh lớn rợp bóng dọc ngõ", 331/111): ngõ h (không vỉa hè — mặt tiền sát mép ngõ)
+// trong 45 m quanh pano RỢP (treemap dens 3 + vòm cây/cây bóng mát chung) → cây ở MÉP ngõ (hw + 0,6 m) nơi có KHE trống (sân
+// trước, khe giữa 2 nhà, bờ rào — gốc không vào nhà thật/lòng ngõ/đường khác), nhịp 8,5-12,5 m, 1 bên (40% cả 2 bên), cây VÒM
+// (tán to mép thấp vươn ra ngõ). Ngõ khu dân cư kín nhà thì tự không có chỗ → không trồng.
+function plantLaneTrees(ctx, RI, fp, inLM, BLOCK, nearProp, blockedByRoad, st) {
+  const { ROADS_DT, groundHeightNoDeck, isWater } = ctx;
+  const R = ctx.R || 1600, LAND = ctx.landH ?? 2;
+  const free = (x, z) => fp.at(x, z) < 0 && fp.at(x + 0.8, z) < 0 && fp.at(x - 0.8, z) < 0 && fp.at(x, z + 0.8) < 0 && fp.at(x, z - 0.8) < 0;
+  let n = 0;
+  for (let ri = 0; ri < ROADS_DT.length; ri++) {
+    const rd = ROADS_DT[ri]; if (rd.c !== 'h' || rd.pts.length < 2) continue;
+    const off = roadHW(rd) + 0.6;
+    for (let i = 0; i + 1 < rd.pts.length; i++) {
+      const [x1, z1] = rd.pts[i], [x2, z2] = rd.pts[i + 1], L = Math.hypot(x2 - x1, z2 - z1);
+      if (L < 3 || Math.min(Math.hypot(x1, z1), Math.hypot(x2, z2)) > R) continue;
+      const ux = (x2 - x1) / L, uz = (z2 - z1) / L;
+      for (let s = 1.5 + hash3(ri, i, 401) * 5; s < L - 1.5; s += 8.5 + hxz(x1 + ux * s, z1 + uz * s, 402) * 4) {
+        const mx = x1 + ux * s, mz = z1 + uz * s;
+        const pi = panoVeg(mx, mz, 45);
+        if (pi < 0 || PANO_VEG[pi + 11] < 3 || !(PANO_VEG[pi + 17] || PANO_VEG[pi + 13])) continue;
+        const side = hxz(mx, mz, 403) < 0.5 ? -1 : 1;
+        for (const sd of hxz(mx, mz, 404) < 0.4 ? [side, -side] : [side]) {
+          const tx = mx - uz * sd * off, tz = mz + ux * sd * off;
+          if (tx * tx + tz * tz > R * R || nearPano(tx, tz, PANO_CLEAR) || trunkNear(tx, tz, 4.2)) continue;
+          if (Math.abs(groundHeightNoDeck(tx, tz) - LAND) > 0.35 || isWater(tx, tz)) continue;
+          if (blockedByRoad(tx, tz, ri, i) || onCarriage(tx, tz) || !free(tx, tz)) continue;
+          if (inLM(tx, tz, 2.5) || (ctx.keepClear && ctx.keepClear(tx, tz)) || claimAt(tx, tz, BLOCK) || nearProp(tx, tz)) continue;
+          const { sp } = resolveSpecies(tx, tz, 'shade', -1);
+          plant(SP_NAME[sp], tx, tz, { pit: 0, wash: hxz(tx, tz, 405) < 0.3 ? 1 : 0, sz: 0.85, tun: 1, src: 5 });
+          ctx.addCollider && ctx.addCollider(tx, tz, 0.5);
+          n++;
+        }
+      }
+    }
+  }
+  st.lane = n;
+}
+// ---- Đ3-W5-C: CÂY SÂN VƯỜN sau tường rào/hàng rào sắt (graders 538/271 "vườn biệt thự sau rào: cau vua + cây tán lớn", AUDIT
+// sân khuôn viên trống trơn): dọc mọi polyline RB_PARCELS kiểu tường rào xây (0) / hàng rào sắt (1) — sân ở bên TRÁI hướng
+// polyline (pháp tuyến vào trong (−uz, ux), hợp đồng js/parcels.js) — thử gốc sâu 3,2 / 4,6 / 2,4 m sau rào; nhịp theo pano
+// ≤ 60 m: có nhắc vườn/sân sau rào (treemap garden) 6,5 m, rợp 9, thường 12, thưa 18, "không cây" bỏ; không pano 14 m. Gốc
+// không vào nhà thật (vòng 1,4 m), không trên đường (mọi cấp, + 1,5 m), không camera pano/địa danh/claim khuôn viên dựng tay.
+// Loài: sân VƯỜN → 30% cau vua (luật cau-không-bằng-chứng của buildTrees vẫn áp), 15% phượng, còn lại cây bóng mát theo pano.
+function plantYardTrees(ctx, RI, fp, inLM, BLOCK, nearProp, st) {
+  const PW = RBM.RB_PARCELS && RBM.RB_PARCELS.walls; if (!PW) return;
+  const { groundHeightNoDeck, isWater } = ctx;
+  const R = ctx.R || 1600, LAND = ctx.landH ?? 2;
+  const ring = (x, z, r) => { for (let q = 0; q < 6; q++) { const a = q * Math.PI / 3; if (fp.at(x + Math.cos(a) * r, z + Math.sin(a) * r) >= 0) return false; } return true; };
+  const yardOk = (x, z) => x * x + z * z < R * R && !nearPano(x, z, PANO_CLEAR) && !trunkNear(x, z, 4.0)
+    && Math.abs(groundHeightNoDeck(x, z) - LAND) < 0.35 && !isWater(x, z) && !RI.nearRoad(x, z, 1.5) && !onCarriage(x, z)
+    && fp.at(x, z) < 0 && ring(x, z, 1.4) && !inLM(x, z, 3) && !(ctx.keepClear && ctx.keepClear(x, z)) && !claimAt(x, z, BLOCK) && !nearProp(x, z);
+  let n = 0, nPalm = 0;
+  for (const w of PW) {
+    if (w[0] === 2 || w[0] === 3) continue;   // rào tôn công trường / tường lô đất trống — không phải sân vườn
+    for (let i = 2; i + 3 < w.length; i += 2) {
+      const ax = w[i], az = w[i + 1], bx = w[i + 2], bz = w[i + 3], L = Math.hypot(bx - ax, bz - az);
+      if (L < 2 || Math.min(Math.hypot(ax, az), Math.hypot(bx, bz)) > R) continue;
+      const ux = (bx - ax) / L, uz = (bz - az) / L, nx = -uz, nz = ux;
+      let s = 1.2 + hash3(Math.round(ax), Math.round(az), 411) * 4;
+      while (s < L - 0.8) {
+        const mx = ax + ux * s, mz = az + uz * s;
+        const pi = panoVeg(mx, mz, 60), dens = pi >= 0 ? PANO_VEG[pi + 11] : -1, gard = pi >= 0 && panoMax(mx, mz, 21, 60) > 0;
+        const step = dens === 0 ? 0 : gard ? 6.5 : dens === 3 ? 9 : dens === 2 ? 12 : dens === 1 ? 18 : 14;
+        if (!step) { s += 10; continue; }
+        for (const d of [3.2, 4.6, 2.4]) {
+          const tx = mx + nx * d, tz = mz + nz * d;
+          if (!yardOk(tx, tz)) continue;
+          const hs = hxz(tx, tz, 413);
+          let kind = 'shade';
+          if (gard && hs < 0.3) { kind = 'cau'; nPalm++; } else if (hs < 0.45) kind = 'phuong';
+          plant(kind, tx, tz, kind === 'cau' ? { h: 9 + hxz(tx, tz, 414) * 4, src: 6 } : { wash: hxz(tx, tz, 415) < 0.25 ? 1 : 0, src: 6 });
+          ctx.addCollider && ctx.addCollider(tx, tz, kind === 'cau' ? 0.4 : 0.5);
+          n++;
+          break;
+        }
+        s += step * (0.8 + 0.4 * hxz(mx, mz, 412));
+      }
+    }
+  }
+  st.yard = n; st.yardPalm = nPalm;
+}
 // ctx: { ROADS_DT, groundHeightNoDeck, isWater, addCollider, colliders, lakeSD, hdTreeBelt, R, landH, fpGrid?, keepClear? }
 //   fpGrid: lưới footprint dùng chung (makeFootprintGrid — nhà `D.dead` bị bỏ qua); thiếu thì tự giải RB_B64.
 //   keepClear(x,z) → true = cấm trồng (hành lang nhìn địa danh, vd trục spawn → Nhà hát).
@@ -1183,7 +1271,9 @@ export function plantStreetTrees(ctx) {
           // 3 rợp (×0,9), VÒM CÂY (tunnel) ×0,82. Phố r: chỉ trồng nơi pano nói có cây.
           if (V.dens === 0) { acc += step; rej('pano-none'); continue; }
           if (V.tunnel) step *= 0.82; else if (V.dens === 1) step *= 3.0; else if (V.dens === 3) step *= 0.9;
-          if (c === 'r' && (!V.near || V.dens < 2 || hxz(tx, tz, 12) < 0.3)) { acc += step; rej('r-nodata'); continue; }
+          // Đ3-W5-C (graders 331/519/111/386/455 "ngõ/phố nhỏ rợp bóng"): phố r có pano nói RỢP (dens 3) hoặc vòm cây → trồng ĐỦ
+          // (bản cũ bỏ ngẫu nhiên 30% mọi phố r)
+          if (c === 'r' && (!V.near || V.dens < 2 || (V.dens < 3 && !V.tunnel && hxz(tx, tz, 12) < 0.3))) { acc += step; rej('r-nodata'); continue; }
           if (!V.tunnel && hj > 0.91) { acc += step; rej('gap'); continue; }
           // phố THƯA: phần lớn chỉ 1 bên có cây (bên chọn theo hash từng khúc 60 m; bên kia giữ 30%) — 175/276/281
           if (V.dens === 1 && side !== (hash3(ri, Math.floor((arc0 + acc) / 60), 19) < 0.5 ? -1 : 1) && hxz(tx, tz, 14) > 0.3) { acc += step; rej('one-side'); continue; }
@@ -1191,7 +1281,8 @@ export function plantStreetTrees(ctx) {
           if (ok(tx, tz, ri, i, c)) {
             const { sp } = resolveSpecies(tx, tz, 'street', ri);
             const q = Q.length;   // (hoa: theo LỊCH ở buildTrees — hạng hash so với tỉ lệ nở của ngày)
-            plant(SP_NAME[sp], tx, tz, { pit: c === 'r' ? 0 : 1, wash: hxz(tx, tz, 22) < V.wash ? 1 : 0, sz, ri, tun: V.tunnel ? 1 : 0, src: 1 });
+            // Đ3-W5-C: phố r RỢP (dens 3) → cây VÒM (tán to, mép thấp, vươn ra lòng — phố r 5-6 m: 2 hàng tán giao nhau)
+            plant(SP_NAME[sp], tx, tz, { pit: c === 'r' ? 0 : 1, wash: hxz(tx, tz, 22) < V.wash ? 1 : 0, sz, ri, tun: V.tunnel || (c === 'r' && V.dens === 3) ? 1 : 0, src: 1 });
             ctx.addCollider && ctx.addCollider(tx, tz, sp === SP.CAU ? 0.45 : 0.55);
             st.planted++;
             // hero GLB: chỉ "tủ kính" quanh Nhà hát (W2-B — trước cả dải trung tâm ≤ 160 m)
@@ -1203,6 +1294,9 @@ export function plantStreetTrees(ctx) {
       }
     }
   }
+  // Đ3-W5-C: CÂY NGÕ RỢP + CÂY SÂN VƯỜN sau tường rào (cùng bộ kiểm `ok`-tương đương; sau hàng cây phố → né gốc đã trồng)
+  plantLaneTrees(ctx, RI, fp, inLM, BLOCK, nearProp, blockedByRoad, st);
+  plantYardTrees(ctx, RI, fp, inLM, BLOCK, nearProp, st);
   // HERO (GLB phượng Meshy) cho dải trung tâm: chọn đều theo hash (KHÔNG "N cây đầu tiên theo thứ tự ROADS_DT")
   heroCand.sort((a, b) => hxz(Q[a].x, Q[a].z, 31) - hxz(Q[b].x, Q[b].z, 31));
   const nHero = Math.min(heroCand.length, ctx.heroMax ?? 8);
