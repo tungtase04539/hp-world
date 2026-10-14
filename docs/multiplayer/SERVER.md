@@ -3,6 +3,8 @@
 Tài liệu kỹ thuật của thư mục `server/` và `js/shared/`. Mỗi gói việc (S2 game, S3 chat/quản trị, S4 bot, S5 vận hành)
 **thêm một mục riêng** ở cuối file này. Kế hoạch: `KE_HOACH.md` (thắng khi khác `ARCH.md`). Hợp đồng module:
 `server/CONTRACT.md`. Hướng dẫn cho chủ dự án (không thuật ngữ): `VAN_HANH.md` (S5).
+**Đọc §6 trước** (tích hợp 15/10/2026): kiến trúc cuối, bảng giao thức, các mối nối giữa gói, số đo đủ 7 kịch bản bot
+so với mục tiêu, việc còn mở. §1–§5 là ghi chép của từng gói lúc làm (mô tả "stub"/số test ở §1 là trạng thái nền móng).
 
 ## 1. Nền móng (Foundation, 14/10/2026)
 
@@ -775,3 +777,160 @@ thật theo nhà mạng sẽ đến từ `netprobe.html` trên điện thoại.
 - `chung.ps1 Get-CmdOutput`: `ProcessStartInfo` không theo `Push-Location` → tạo `server/.env` lần đầu hỏng khi chạy
   script từ thư mục khác `server/`; nay đặt `WorkingDirectory` rõ.
 - `tao-ma-moi.ps1` ↔ `POST /admin/api/invites` khớp (`{codes:[...]}`).
+
+## 6. Tích hợp (integrator, 15/10/2026) — kiến trúc cuối, giao thức, số đo, việc còn mở
+
+Nhánh tích hợp gộp `--no-ff` theo thứ tự S2 core → S3 safety → S5 ops → S4 bots (trên nền móng `9c80c1a`). Xung đột chỉ ở
+tài liệu (`SERVER.md`, `PROGRESS.md`: giữ cả hai phía) và `server/test/boot.test.js` (S2 và S5 cùng bỏ stub 501: nay
+không còn stub nào — `/v1/auth/*`, `/v1/join`, `/v1/netprobe` với thân rỗng đều 4xx).
+
+### 6.1 Kiến trúc cuối
+
+```
+Internet ─► Cloudflare (TLS wss://, chặn DDoS lớn, ẩn IP nhà)
+              │  tunnel (cloudflared TRONG container, mạng edge internal)
+              ▼   ingress: chỉ /play /probe /healthz /v1/*  → còn lại 404
+ ┌──────────── game (1 tiến trình Node 24, uWS; container read-only, non-root, 4 CPU / 2 GB) ─────────────┐
+ │ cổng 9100: router HTTP (/v1/auth/guest|refresh|recover, /v1/join, /v1/netprobe, /v1/chat/*,           │
+ │            /v1/moderation/*, /healthz) · WS /play (gateway) · WS /probe (netprobe)                     │
+ │ vòng 20 Hz: sim → AOI (lưới 128 m, trần 96) → SnapshotBuilder → send (10 Hz/khách, 2 pha)              │
+ │ STATE → validate (js/shared/move.js) · CHAT → chat (textfilter) → SAY 40 m · REPORT → reports          │
+ │ bus: player:join/leave, chat:message, sanction, admin:broadcast/restart, degrade, alert                │
+ │ cổng 9101 (admin): IP allow (gateway hostlink /32) + deny (edge, backend) + Host + Origin + token/cookie│
+ └───────┬──────────────────────────────────────────────────────────────────────────────────────────────┘
+         │ mạng backend (internal)                      cổng publish CHỈ 127.0.0.1:9100 / :9101 (chủ dự án)
+         ▼
+   db: Postgres 17 (volume pgdata) ◄── backup (profile, pg_dump đêm, ./data/backups — bind mount duy nhất)
+   game: volume gamedata (/data: danh sách lọc chủ dự án sửa, run.marker)
+```
+
+Luồng người chơi: `POST /v1/auth/guest` (mã mời) → access JWT 15' + refresh xoay vòng → `POST /v1/join` → vé HMAC 60 s
+(hoặc hàng chờ) → WS `/play` HELLO{vé} → WELCOME + WORLD → READY → KEYFRAME rồi snapshot 10 Hz; STATE 15 Hz đi / 2 Hz
+đứng; PING mỗi giây; rớt mạng → HELLO{RESUME} trong 60 s giữ netId.
+
+### 6.2 Mối nối đã làm khi tích hợp (hợp đồng được hoà giải)
+
+| Chỗ nối | Cách làm |
+|---|---|
+| CHAT msgRef | gateway dùng `chat.handle().ref` (ref nhật ký chat của S3) làm `msgRef` S2C CHAT → `REPORT.chatRef` trỏ đúng dòng; bộ đếm riêng chỉ khi dịch vụ không có ref |
+| Tự hại | `r.support` → `EVENT SUPPORT_LINE` cho người gửi (+ báo cáo nguồn `filter` của S3) |
+| Chặn / tắt tiếng | ACTION BLOCK/UNBLOCK_PLAYER → `chat.setBlock(acc, target, on, arg = 1 ? 'mute' : 'block')` (bền, `social_blocks`) + tập trong RAM để có hiệu lực ngay |
+| Xử phạt (bus `sanction`) | kick → SYSTEM KICK(ADMIN) + 4009 · ban → SYSTEM BANNED(giây) + 4003 · mute → `EVENT SANCTION [1, giây]` (gỡ → `[1, 0]`) · warn → `[4, 0]` · shadow → không gửi gì |
+| Cấm có hạn | `/v1/join` → 403 `banned` và HELLO → SYSTEM BANNED khi `chat.isBanned()` (cấm vĩnh viễn vẫn qua `accounts.status`) |
+| Phát thanh / khởi động lại | `admin:broadcast {text, ref}` → S2C CHAT kênh SYSTEM từ netId 0 (`sessions.broadcastChat(text, channel, ref)`); `admin:restart {seconds}` → SYSTEM RESTART_IN |
+| Vị trí phiên | `Session` có getter `x / z / mode` (từ entity) → dòng chat có toạ độ, ngữ cảnh báo cáo trong 60 m, bản đồ admin đúng |
+| Bản đồ admin | `live.sessions()` = `sessions.list()` của S2 ∪ phiên báo qua bus (khử trùng theo accountId) |
+| Mã mời | `auth.createInviteBatch` (S2) và `invites.createBatch` (S3) cùng `sha256(NFKC → HOA → A-Z0-9)`; test `integ.test.js` tạo mã bằng trang admin rồi đăng ký bằng API |
+| Netprobe admin | MỘT route `GET /admin/api/netprobe` (module admin, sau lớp an ninh S3) đọc dịch vụ `netprobe` của S5 → `{available, rows, summary, recent}` |
+| Hằng số giao thức | `ACTION_RESULT` (0 OK · 1 UNSUPPORTED · 2 BUSY · 3 INVALID · 4 DENIED) và `SANCTION_KIND` (1 MUTE · 2 BAN · 3 KICK · 4 WARN) chuyển vào `js/shared/protocol.js` (gateway re-export) |
+| Docker | `js/xsection.js` (move.js import) vào ảnh; `ADMIN_ALLOW_IPS` = gateway `hostlink` cố định; `DATA_DIR` = volume `gamedata` |
+| Kiểm di chuyển | xem 6.4 (bắt speed-hack < 1 s) |
+| Bot | `deviceId` ≥ 8 ký tự (máy chủ thật đòi `[A-Za-z0-9_-]{8,64}`); đi thẳng tới nút đường gần nhất KHÔNG băng qua nước; đo "lách lọc chat" bằng tin vọng lại người gửi; test e2e bot chạy chế độ full trên máy chủ gộp |
+
+### 6.3 Bảng giao thức (proto 1 — bố cục byte: `js/shared/codec.js`, kích thước: §1.3)
+
+| Hướng | Op | Tin | Ghi chú |
+|---|---|---|---|
+| C→S | 0x01 | HELLO {proto, flags, ticket \| resumeToken, tier, worldVersion} | tin đầu tiên, ≤ 10 s; vé không bao giờ trong URL |
+| C→S | 0x02 | READY | sau khi dựng xong thế giới (≤ 180 s) |
+| C→S | 0x10 | STATE {seq, clientMs u16, corrEpoch, x, z, y, yaw, vx, vz, mode+flags, vehicleRef} | 15 Hz đi / 2 Hz đứng; 25/s tối đa |
+| C→S | 0x11 | ACTION {reqId, type, target, arg} | → EVENT ACTION_RESULT [reqId, code] |
+| C→S | 0x12 | CHAT {channel, text ≤ 140} | chỉ SAY; 2/s burst 6 ở gateway, chính sách thật ở S3 |
+| C→S | 0x13 | PING {clientTime} | 2/s burst 4 (trước HELLO ≤ 3.000) |
+| C→S | 0x14 | REPORT {targetNetId, reason, chatRef} | 1 / 10 s |
+| S→C | 0x81 | WELCOME {netId, serverTime, 20, 10, dayEpoch, 1440, resumeToken, weather, spawn} | |
+| S→C | 0x82 | SNAPSHOT {tick, flags KEYFRAME/DEGRADED, ack, self, ENTER ≤ 24, UPDATE, LEAVE} | ≤ 96 bản ghi, ≤ 1.100 B |
+| S→C | 0x83 | NAMES | 1 lần / người / phiên của người xem |
+| S→C | 0x84 | EVENT {type, args i32[≤ 8]} | ACTION_RESULT 1 · CHAT_REJECTED 2 · REPORT_RESULT 3 · SUPPORT_LINE 4 · PLAYER_AWAY 5 · WEATHER_WARN 6 · SANCTION 7 |
+| S→C | 0x85 | STATS {mask, value/rate…, money} | có trong codec, máy chủ GĐ1 chưa gửi (sinh tồn = GĐ sau) |
+| S→C | 0x86 | CHAT {from, channel, msgRef, text} | from 0 + kênh SYSTEM = chủ dự án |
+| S→C | 0x87 | SYSTEM {code, arg} | KICK 1 · RESTART_IN 2 · QUEUE_POS 3 · RELOAD 4 · BACKOFF 5 · BANNED 6 · MUTED 7 · SERVER_FULL 8 · DUPLICATE_SESSION 9 · AUTH_FAILED 10 · RESUMED 11 · DEGRADE 12 |
+| S→C | 0x88 | PONG {clientTime, serverTime} | |
+| S→C | 0x89 | CORRECT {x, z, y, yaw, epoch, reason} | lý do: SPEED 1 · TIME 2 · WATER 3 · OUT_OF_BOUNDS 4 · TELEPORT 5 · MODE 6 · SERVER_MOVE 8 |
+| S→C | 0x8a | WORLD {lịch thời tiết} | |
+
+Mã đóng WS: 1008 tin hỏng · 1009 quá cỡ · 4001 vé/resume sai · 4002 phiên trùng · 4003 cấm · 4004 lệch proto · 4005 đầy ·
+4006 spam · 4007 không HELLO/READY · 4009 bị đuổi · 1001 tắt máy chủ (sau SYSTEM BACKOFF). Lỗi HTTP: `API_ERR` +
+`AUTH_ERR` (§2.2).
+
+### 6.4 Sửa khi chạy kịch bản (nguyên nhân gốc, không nới ngưỡng)
+
+1. **Speed-hack bị CORRECT sau ~1 s (p50 980 ms, max 1,5 s → 54 % trong 1 s)**. Gốc: (a) điểm +1 mỗi STATE vi phạm, cần
+   > 5 → 6 STATE vi phạm (0,4–0,6 s) SAU khi cửa sổ 1 s tràn; (b) người đứng yên "để dành" 1 s phụ cấp tốc độ trong cửa sổ
+   nên kẻ gian chạy 3× được ~0,5 s trước khi cửa sổ tràn; (c) cửa sổ chứa một lần lên/xuống xe giữ +9 m và tốc độ xe
+   máy suốt 1 s sau khi xuống xe. Sửa: (a) vi phạm SPEED liên tiếp thứ k cộng min(k, 3) điểm (1 + 2 + 3 → CORRECT ở STATE
+   vi phạm thứ 3; vi phạm lẻ vẫn 1 điểm); (b) thêm cửa sổ ngắn 300 ms cùng độ nới (1,2× + 1 m); (c) cửa sổ không vắt
+   qua lần lên/xuống xe (bước lên/xuống xe được xét riêng với +9 m). Mô phỏng (`speedsim`): 3× đi bộ từ đứng yên
+   0,77 → 0,48 s, ngay sau xe máy 1,26 → 0,53 s. Mọi test "trung thực" của `core_move` (jitter 0–300 ms, rớt sóng,
+   bufferbloat, tab ẩn 70 s, đổi chế độ/lên xuống xe) vẫn 0 CORRECT; thêm test ×2 trở lên < 1 s.
+2. **Bot trung thực bị WATER-kick**: bot đặt ở vị trí đã lưu sát bờ hồ đi thẳng tới nút đường gần nhất ở bờ bên kia →
+   lội qua hồ (lỗi bot, client thật không đi trên nước). `Walker` nay chọn nút gần nhất nối bằng đường thẳng KHÔNG chạm
+   nước (`nearestDry`).
+3. **Đo lách lọc chat**: "observers 0" — không bot quan sát nào đứng trong 40 m nên "lọt 0" là vô nghĩa; và câu bị CHE
+   (mask) không được tính là đã chặn. Nay đo bằng tin vọng lại chính người gửi (= đúng điều mọi người trong 40 m nhận):
+   trùng nguyên văn = lọt, khác = đã che (đã vô hiệu). Lần chạy chuẩn: 0 lọt nguyên văn.
+4. **Stress 2.000: 10 người có vé hợp lệ bị SYSTEM SERVER_FULL lúc HELLO**. Gốc: gateway nhả chỗ giữ của vé NGAY khi
+   nhận HELLO rồi mới `await` nạp nhân vật từ DB; trong lúc đó `/v1/join` thấy thêm chỗ trống và phát vé vượt trần.
+   Sửa: chỗ giữ được nhả trong `finally` SAU khi phiên đã tạo (hoặc HELLO thất bại). Test `integ.test.js` (trần 1, chặn
+   lần nạp nhân vật giữa chừng → người thứ hai vẫn phải xếp hàng).
+5. **Kịch bản reconnect gộp 800/1.000 bot** (2 trong 4 lần chạy đủ cỡ): một worker bot (200 bot) đứng hình sau
+   `dropAll`. Hai nguyên nhân trong harness: worker `process.exit` cứng 300 ms sau tin `final` IPC (tin chưa gửi xong thì
+   mất) → nay thoát trong callback của `process.send`; và `nearestDry` (mục 2) thử MỌI nút trong 400 m khi bot đứng nơi
+   nước bao quanh → nay tối đa 24 nút (3.000 điểm ngẫu nhiên: tệ nhất 4 ms). Chạy lại: 1.000/1.000 resume, 5/5 worker.
+6. **Thang suy giảm lên L4 (từ chối người chơi) ở 600–900 CCU** dù tick p50 chỉ 8–13 ms. Đo: (a) đầu dò `jitter.mjs`
+   (vòng JS cố định 5 ms mỗi 50 ms, KHÔNG có máy chủ) trên máy chủ dự án thấy lát chậm 2–4× đều đặn ~1 lần/giây (khoảng
+   cách trung vị 932–993 ms); (b) chẩn đoán `HP_DEBUG_LONG_TICK_MS=30` cho thấy tick dài mang ĐÚNG lượng việc như tick
+   thường (≈ 560 snapshot) nhưng mọi thao tác chậm 3–6× (send 85 µs thay 14 µs, AOI 30–50 µs thay 4 µs), cách nhau
+   ~950 ms; vẫn thế khi ghim máy chủ / bot vào lõi riêng, khi dùng PGlite thay Postgres, và cả trong container Linux;
+   (c) GC không phải thủ phạm (`--trace-gc`: scavenge p99 2 ms, mark-compact max 4,6 ms, heap ~30 MB). p99 trên 100 tick
+   (5 s) vì thế đo nhiễu của máy chứ không đo tải máy chủ. Sửa: thang quyết theo **p90** (cùng ngưỡng 25/35/45/50 ms;
+   p99 vẫn xuất `hp_sim_tick_ms_p99` và `lastP99`). Test: 1 tick 70 ms mỗi giây (p50 12 ms) → giữ L0; 20 % tick > 35 ms →
+   lên. Kết quả: ramp 1.200 vào đủ 100 % (trước: 74–76 %), không còn L4 ở 1.200 CCU.
+7. **Chi phí gửi trên Windows** (không sửa được trong mã, ghi lại): profile `--cpu-prof` ramp 1.200 → `send` của uWS
+   chiếm 72 % thời gian tick (AOI 17 %). Đo riêng (`sendbench.mjs`, 600 socket, 160 B): **Windows 14–18 µs/lần gửi**
+   (`ws` cũng 16 µs), **Linux trong container 3,5 µs**. Bản thật chạy trong Docker (Linux) nên phần này nhẹ hơn ~4×;
+   thêm luồng gửi riêng (uWS đa luồng) là việc của giai đoạn sau nếu cần > 1.000 CCU trên một máy.
+
+### 6.5 Số đo — kịch bản → mục tiêu SPEC §3.4 so với đo được (máy chủ dự án, 15/10/2026)
+
+Máy: Ryzen AI 9 HX 370 (24 luồng), 31 GB, Windows 11, Node 24.15; máy chủ gộp chạy **thẳng trên Windows** (uWS,
+Postgres 17 trong Docker `127.0.0.1:55437`, `INVITE_REQUIRED=false`) trừ khi ghi "Docker"; bot chạy cùng máy (tiến trình
+con, ~7–9 % một lõi / 100 bot). Mọi lần > 300 bot hoặc > 60 s chạy dưới `tools/qa/gpulock.mjs`. Báo cáo đầy đủ
+(`report.md/json`) trong scratchpad `mp/integ/run/*` (không commit). Máy đồng thời chạy luồng việc đồ hoạ và ứng dụng
+khác của chủ dự án → số tick phụ thuộc giờ đo (cùng kịch bản ramp: p50 12–19 ms tuỳ lúc).
+
+| Kịch bản | Mục tiêu | Đo được | Kết quả |
+|---|---|---|---|
+| smoke 50 × 60 s | 0 lỗi giải mã, CORRECT trung thực < 2/phút | 50/50 vào; 0 lỗi; 0 CORRECT; tick p50 0,8 / p99 2,5 ms; snapshot p95 35 B; RSS 89 MB; RTT p50 1,4 ms; event-loop p99 17,8 ms (sàn timer Windows ~16 ms) | ĐẠT |
+| ramp 0 → 1.200 (5 phút) + giữ 5 phút | tick p99 < 25 ms; snapshot p95 < 1.100 B; RSS < 1,5 GB; CORRECT < 2/phút; 0 lỗi giải mã | 1.200/1.200 vào (100 %); 0 lỗi; **0 CORRECT**; snapshot p95 278 B (max 680, trần 96 không vượt); RSS 243 MB; xuống mỗi khách TB p50 1,4 KB/s (đỉnh 5 s max 3,7 KB/s); resume ngẫu nhiên 192/192. **tick p50 19 ms, p99 69–73 ms; event-loop p99 89–141 ms**; thang L0→L1→L2→L1 (không L4) | ĐẠT trừ **tick p99 / event-loop p99 (TRƯỢT)** — xem 6.4 mục 6–7 |
+| ramp 1.200 — **Docker** (đường bản thật: container Linux, uWS, Postgres container) | như trên | 1.200/1.200 (100 %); 0 lỗi; 0 CORRECT; snapshot p95 548 B (max 1.067); RSS 211 MB; đỉnh 5 s max 7,4 KB/s; tick p50 16 ms, **p99 80–83 ms**; thang tới L2 (không L4). Lần chạy trước (thang p99 cũ, máy rảnh hơn): p50 8 ms, p99 47 ms, L4 ở 880 CCU → lý do mục 6.4.6 | TRƯỢT tick p99 (nhiễu máy) |
+| hotspot 300 ở quảng trường Nhà hát | trần 96 giữ; không khách > 12 KB/s | bản ghi/snapshot p50 85, **max 96**; đỉnh 5 s max **9,0 KB/s**, 0 khách > 12 KB/s; tick p50 6,4 / p99 12,8 ms; 0 CORRECT (sau sửa 6.4.2) | ĐẠT |
+| stress 2.000 (1,7 × trần) | thang lên đúng thứ tự; không sập; hàng đợi chạy | thang 1→0→1→2 (từng bậc); /healthz ok cuối; 1.200 vào (đúng trần), 800 xếp hàng (6.743 lượt hỏi), **0 SERVER_FULL** (sau sửa 6.4.4; trước: 10); 0 CORRECT; RSS 272 MB | ĐẠT |
+| reconnect 1.000 (rớt cùng lúc, nối lại 0,5–30 s) | 100 % giữ đúng netId | **1.000/1.000** resume cùng netId; bắt tay resume p50 4,5 / p95 31 / max 126 ms | ĐẠT |
+| abuse 200 (14 lớp tấn công + 40 quan sát) | mỗi lớp bị chặn/đóng ≤ 1 s; speed-hack ≥ 99 % | 14/14 lớp 100 % trong hạn: bad_opcode/truncated/text_frame → 1008 (~155 ms), oversize → đóng (1 ms), flood_ping/flood_state → 4006 (0,7–0,8 s), chat_spam → CHAT_REJECTED (26 ms), **speed_hack 100 % phát hiện, p50 453 / max 555 ms** (trước sửa 6.4.1: max 1,5 s), teleport → CORRECT (1 ms), vé giả / vé dùng lại → AUTH_FAILED, proto 99 → RELOAD, không HELLO → đóng ở 10,1 s; lách lọc chat: **0 câu lọt nguyên văn**, câu không bị chặn thì bị che | ĐẠT |
+| netem-lite 300 (30 % bot +80 ± 30 ms, mất 2 %) | CORRECT trung thực < 2/phút | 300/300; 0 CORRECT (cả bot netem); RTT bot netem p50 186 / p95 511 ms; snapshot max 1.094 B; tick p99 12,5 ms; resume 39/39 | ĐẠT |
+| Quick tunnel (20 bot qua `wss://*.trycloudflare.com`, container cloudflared) | chạy được, ghi RTT | 20/20 vào; 0 lỗi; 0 CORRECT; **RTT PING p50 57,9 / p95 62,7 / p99 66,5 ms**; mở WS p50 159 ms; auth p50 83 ms; join p50 75 ms; qua tunnel `/healthz` 200, `/admin` và `/metrics` 404; tunnel bật 90 s rồi tắt; URL không ghi lại | ĐẠT |
+| Docker: compose up → /healthz, migration, phiên bot | | `uWS: OK` lúc build; migration 001, 010, 020–023, 030 áp dụng trên Postgres 17; /healthz `transport uws, db ok`; 20 bot qua container: 20/20, 0 lỗi, event-loop p99 **5,9 ms** (Linux); admin từ máy 200 (token) / 401 (không), từ mạng `edge` và từ container khác trên `hostlink` **403**; `trang-thai.ps1` báo mọi cổng chỉ 127.0.0.1; `tao-ma-moi.ps1` tạo mã OK; `tat-may-chu.ps1` 6–8 s | ĐẠT |
+| Trang quản trị trong 1 Chrome (khoá GPU) khi 250 bot đang chơi (Docker) | ảnh chụp, 0 lỗi | 13 ảnh (đăng nhập sai/đúng, tổng quan + bản đồ 250 chấm, báo cáo, người chơi, mã mời, thông báo, bộ lọc, mạng, nhật ký, điện thoại 390 px), **0 lỗi JS / console / CSP**, không cuộn ngang | ĐẠT |
+| `npm test` (PGlite) · `npm run test:pg` (Postgres 17) | xanh | **126 xanh + 1 bỏ qua** (pg_boot cần Docker) · **40/40** (db, pg_boot, core_auth, core_session, integ, safety_chat, safety_admin) | ĐẠT |
+
+**Đọc bảng tick**: trên máy này p99 của tick và event-loop bị chi phối bởi (1) "khựng" ~1 Hz của chính máy (6.4.6) và
+(2) chi phí `send()` của Windows (6.4.7). Tải thật của máy chủ thấy ở p50 (8–19 ms / 50 ms ngân sách ở 1.200 CCU) và CPU
+tiến trình (55–70 % một lõi). Buổi thử kín (vài chục người) cách xa mức này; muốn khẳng định 1.000+ CCU với p99 < 25 ms
+cần đo trên máy chủ Linux riêng (VPS) — số trên đây là cận trên của máy chủ cùng máy với bot.
+
+### 6.6 Việc còn mở (cho chủ dự án / giai đoạn sau)
+
+- **Tick p99 < 25 ms ở 1.200 CCU chưa đạt trên máy này** (6.5). Hướng: đo trên VPS Linux; nếu cần > 1.000 CCU trên một
+  máy: tách gửi snapshot sang luồng uWS riêng (`uWS.App` mỗi luồng + phân phiên), hoặc giảm số lần `send` (gộp NAMES đã
+  làm; snapshot rỗng của người đứng yên một mình có thể giảm còn 2 Hz).
+- **Chất lượng khi đông người mới**: tài khoản mới đều xuất hiện ở 8 điểm → cụm dày lúc mở cửa (reconnect 1.000 tài khoản
+  mới: AOI chạm trần 96 ở nhiều điểm cùng lúc). Có thể rải điểm xuất hiện rộng hơn khi đông.
+- `ADMIN_DENY_CIDRS` / `ADMIN_ALLOW_CIDRS` (S5) và `ADMIN_ALLOW_IPS` / `ADMIN_ALLOW_HOSTS` / `CHAT_LOG_DAYS` (S3) vẫn đọc
+  từ `process.env` (config.js của nền móng chưa có khoá) — hoạt động đúng trong Docker và khi chạy tay; chuyển vào
+  `config.js` khi nền móng mở lại.
+- Danh sách từ của bộ lọc chat cần người Việt bản ngữ duyệt sau buổi đầu (§3.9).
+- Named tunnel (tên miền riêng) chưa thử thật — chưa có tên miền (§5.6).
+- `server/test/core_move.test.js` có chú thích bị lỗi mã hoá ký tự (mojibake `â†’`) từ trước — vô hại, nên sửa khi S2 mở lại.
+- Harness bot: `stress` có 931 + 695 refresh 401/409 ở lần chạy cũ do bot làm mới token mỗi lần hỏi hàng đợi → nay giữ
+  access token 15 phút như client thật; lần chạy cuối 0 lỗi refresh.

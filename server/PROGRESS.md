@@ -53,3 +53,20 @@
   smoke/reconnect/abuse, e2e máy chủ nền móng chế độ ping).
 - Đo trên máy chủ nền móng: smoke 50, hotspot 300 (GPU lock), ramp 1.200 (GPU lock) — SERVER.md §4.5.
 - Còn chờ: chạy đủ 7 kịch bản trên máy chủ đã gộp S2/S3 (integrator), xem SERVER.md §4.6.
+
+## Tích hợp (integrator, nhánh worktree-wf_5a0111aa-fcc-6, 15/10/2026) — XONG
+
+- Gộp `--no-ff` S2 → S3 → S5 → S4 trên nền móng `9c80c1a`; xung đột chỉ ở tài liệu + `boot.test.js` (không còn stub 501).
+- Nối gateway ↔ chat (msgRef, SUPPORT_LINE, chặn bền, xử phạt kick/ban/mute/warn/shadow, cấm có hạn ở join + HELLO,
+  phát thanh + báo khởi động lại), vị trí phiên cho S3, bản đồ admin, MỘT route netprobe admin, `ACTION_RESULT` +
+  `SANCTION_KIND` vào `protocol.js`; Docker: `xsection.js` vào ảnh, `ADMIN_ALLOW_IPS` = gateway `hostlink` cố định,
+  `DATA_DIR` = volume `gamedata`; `chung.ps1` sửa thư mục làm việc khi tạo `.env`.
+- Sửa theo kết quả chạy bot (nguyên nhân gốc): speed-hack bị CORRECT < 1 s; vé giữ chỗ tới khi phiên tạo xong (hết
+  SERVER_FULL); thang suy giảm quyết theo p90 (p99 đo nhiễu ~1 Hz của máy); harness bot (deviceId, không lội nước,
+  worker không mất kết quả / không treo, giữ access token, đo lách lọc bằng tin vọng).
+- Test: `npm test` 126 xanh + 1 bỏ qua; `npm run test:pg` 40/40 (Postgres 17, `hpmp-integ-pg:55437`, đã dọn);
+  `server/test/integ.test.js` (5) mới.
+- Đủ 7 kịch bản bot + Docker + quick tunnel + trang admin trong 1 Chrome: SERVER.md §6.5. Còn trượt: tick/event-loop p99
+  ở 1.200 CCU trên máy này (nhiễu máy + chi phí send của Windows) — SERVER.md §6.4 / §6.6.
+- Dọn: không còn container / volume / ảnh `hpmp-integ*`, không còn gì nghe 9150/9151/55437; `server/.env`, `server/data`
+  thử đã xoá.
