@@ -576,6 +576,18 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     409 hết vi phạm). Chấm lại: 18 pano đích 3,89 → 4,28 (124 thêm sạp/ô dọc chợ +0,5; còn lại = dfe6e47), 8 đối chứng
     2,375 → 2,5; nhóm "chợ giả" của phản biện (090, 242, 315, 214, 398, 070; thang điểm phản biện) dot3 3,25 → dfe6e47 2,75
     → bản sửa 3,17 (090/242/315 hết phố chợ ô dù; 214/398 về như dot3).
+    **Số đo sau phản biện r2** (bản 903f798, A/B cùng phiên 2026-10-14 với dot3, TIER 3, Radeon 890M): 24 góc views_std calls
+    374 → 379, tris 3,95 → 4,00 M (fps trần vsync 60,1 → 60,2; p95 ~18 ms cả hai); 6 góc chợ calls 295 → 303, tris 2,53 → 2,71 M.
+    Khởi động trình duyệt nhiễu nặng (agent khác chạy GPU/CPU song song: lượt probe bản mới ground/cells/fabric cũng +30-50 %)
+    → đo CPU dựng props bằng node A/B HEAD r1 ↔ bản này, 3 lượt xen kẽ: 747/587/580 ↔ 629/566/581 ms (không tăng). Heap sau
+    GC 377 → 389 MB (headless giữ mảng QA spans/carRejPts — game thật không). programs 69 = 69. Đếm trình duyệt: cột điện
+    1.225 → 1.305, nhịp dây 981 → 1.075, đỉnh dây 342k → 387k, ô tô 1.667 → 1.592, xe máy 11.354 → 11.720, người đi bộ 444 → 441,
+    kiốt 36; probe chồng thân xe đỗ 0; diag bất biến giao thông 0 (parkHit dùng nửa rộng thật). Cột ≤ 4,5 m quanh 551 camera:
+    dot3 10, HEAD 10, bản đầu r2 20 (cột DỊCH ±2/±4 m lù lù trước ống kính 060) → dịch phải ≥ 6 m → 13. clearance.mjs: gần
+    < 3 m 12 = 12, mọi mesh 36 = 36, trên nhựa 53 = 53, lấn vỉa 72 = 72, lấn phố > 0,2 29 → 33 (HEAD 34), cam vi phạm 35 → 39
+    (HEAD 40). Chấm lại (REAL|dot3|HEAD|bản này): 18 pano đích 3,89 → 4,28 → 4,33 (092 dây về, 276 hết xe tải); 8 đối chứng
+    2,375 → 2,5 → 2,44 (014 h180: tuyến phố s sang bên nhà vì phía vườn hoa trống — ảnh thật CÓ cột góc vườn: heuristic sai
+    chỗ này); pano phản biện: 363 3 → 3,5 (hết lưới dây h0), 457 3 → 3,5, 469 2,5 → 3, 102 2,5 → 3 (hết van).
     BẪY QA (máy này): `python -m http.server` (hàng chờ listen 5) TỪ CHỐI kết nối khi máy tải nặng → ERR_CONNECTION_REFUSED,
     game không khởi động (TIMEOUT __hp) — dùng server có `request_queue_size` lớn (ThreadingHTTPServer, 256).
 - **2026-10-04 (W2-F POLISH)** [ĐỢT 3 wave 2 — WebGL1, giải mã RB 1 lần, kho cảng, ĐÊM, giao thông né xe đỗ, dọn code chết, hitch]:
