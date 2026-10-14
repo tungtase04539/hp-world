@@ -1,7 +1,7 @@
 // server/bots/lib/roadgraph.mjs — walkable graph from the real street network (js/mapdata.js ROADS_DT) for the bots.
 // Nodes = way vertices merged at 0.5 m; edges = consecutive vertices of a way. Dropped: elevated bridge ways (deck
 // height ≠ ground), any segment that touches water (sampled every 4 m with js/terrain.js isWater) and anything outside
-// PLAY_RADIUS − 40 m. Only the largest connected component is kept so every bot can reach every node.
+// PLAY_RADIUS − 20 m (= SPAWN_MAX_R). Only the largest connected component is kept so every bot can reach every node.
 // Walker: follows edges, picks a random next edge at junctions (no U-turn unless a dead end), optional A* goal.
 import { ROADS_DT, ELEVATED_RI, isWater, groundHeight, EXTRAS } from '../../../js/terrain.js';
 import { PLAY_RADIUS } from '../../../js/shared/constants.js';
@@ -11,7 +11,7 @@ const BUCKET = 32;
 
 let cached = null;
 
-export function buildRoadGraph({ margin = 40, waterStep = 4, snap = 8 } = {}) {
+export function buildRoadGraph({ margin = 20, waterStep = 4, snap = 8 } = {}) {
   if (cached) return cached;
   const t0 = performance.now();
   const rMax = PLAY_RADIUS - margin;

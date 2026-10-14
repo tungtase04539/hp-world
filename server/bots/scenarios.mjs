@@ -42,8 +42,8 @@ export const SCENARIOS = {
   reconnect: {
     desc: '1.000 bot vào trong 30 s; ở giây 60 tất cả rớt mạng cùng lúc và nối lại trong 0,5–30 s (resume) (T5)',
     n: 1000, durS: 150,
-    bot: (i, n) => ({ startAt: (i / n) * 30000, behavior: 'road', chat: false, dropPerMin: 0 }),
-    events: (o) => [{ at: (o.dropAtS ?? 60) * 1000, kind: 'dropAll', minMs: 500, maxMs: 30000 }],
+    bot: (i, n, o) => ({ startAt: (i / n) * (o.startSpreadS ?? 30) * 1000, behavior: 'road', chat: false, dropPerMin: 0 }),
+    events: (o) => [{ at: (o.dropAtS ?? 60) * 1000, kind: 'dropAll', minMs: 500, maxMs: (o.reconnectMaxS ?? 30) * 1000 }],
   },
   abuse: {
     desc: 'gói sai, quá cỡ, spam 1.000 tin/s, speed-hack, teleport, vé giả/vé dùng lại, lách bộ lọc chat (T7)',
@@ -52,7 +52,7 @@ export const SCENARIOS = {
       const cls = plan[i];
       if (cls === 'observer') return { startAt: (i / n) * 3000, behavior: 'idle', chat: false, recordChat: true, dropPerMin: 0 };
       const quiet = cls === 'chat_bypass' || ABUSE_CLASSES[cls]?.handshake;
-      return { startAt: 5000 + (i / n) * 10000, behavior: quiet ? 'idle' : 'road', abuse: cls, chat: false, dropPerMin: 0 };
+      return { startAt: 4000 + (i / n) * (o.startSpreadS ?? 10) * 1000, behavior: quiet ? 'idle' : 'road', abuse: cls, chat: false, dropPerMin: 0 };
     },
     plan: (n, o) => {
       const nObs = Math.max(4, Math.round(n * 0.2));

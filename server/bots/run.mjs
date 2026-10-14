@@ -59,6 +59,7 @@ export async function runScenario(opts) {
     n: o.n != null ? +o.n : undefined, durS: o.dur != null ? +o.dur : undefined, mode,
     rampS: o.ramp != null ? +o.ramp : undefined, dropAtS: o.dropAt != null ? +o.dropAt : undefined,
     dropPerMin: o.dropPerMin != null ? +o.dropPerMin : undefined, netemFrac: o.netemFrac != null ? +o.netemFrac : undefined,
+    reconnectMaxS: o.reconnectMax != null ? +o.reconnectMax : undefined, startSpreadS: o.startSpread != null ? +o.startSpread : undefined,
   });
   const sc = SCENARIOS[scenario];
   const steadyFromS = o.steadyFrom != null ? +o.steadyFrom : o.ramp != null ? +o.ramp : sc.rampS ?? sc.steadyS ?? Math.min(30, plan.durS * 0.3);
@@ -107,7 +108,8 @@ export async function runScenario(opts) {
       const cp = fork(workerFile, [], { stdio: ['ignore', 'inherit', 'inherit', 'ipc'], execArgv: [] });
       cp.on('message', onMsg);
       cp.on('exit', (code) => { if (code && !workers[w].finalSeen) log(`[bots] worker ${w} exited ${code}`); });
-      workers.push({ id: w, send: (m) => { try { cp.send(m); } catch { /* gone */ } }, kill: () => { try { cp.kill(); } catch { /* ignore */ } }, ready: false });
+      cp.on('error', (e) => { if (!workers[w].finalSeen) log(`[bots] worker ${w} ipc error ${e.code || e.message}`); });
+      workers.push({ id: w, send: (m) => { try { if (cp.connected) cp.send(m); } catch { /* gone */ } }, kill: () => { try { cp.kill(); } catch { /* ignore */ } }, ready: false });
       cp.send({ type: 'init', cfg });
     } else {
       const wt = new Worker(workerFile);
