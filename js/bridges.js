@@ -356,8 +356,18 @@ export function buildBridges(scene, deps) {
       // CHIỀU KIM ĐỒNG HỒ 90° trong mặt (l phải, y lên) ⇒ mặt cắt đi NGƯỢC chiều kim đồng hồ = pháp tuyến ra ngoài.
       // mặt ngoài (dầm biên) sáng CONC; đỉnh gờ + mặt trong xám lạnh hơn CONC_PAR (r4, phản biện: đỉnh/mặt trong cùng màu be
       // sáng thành "vệt be" loá dọc mép cầu ở pano_285 h90/h270 — gờ chắn bê tông thật xám, mặt trong khuất nắng)
-      if (sg > 0) { sweep(conc, F, [[lo, -D], [lo, PH]], CONC, false); sweep(conc, F, [[lo, PH], [li, PH], [li, 0.02]], CONC_PAR, false); }
-      else { sweep(conc, F, [[li, 0.02], [li, PH], [lo, PH]], CONC_PAR, false); sweep(conc, F, [[lo, PH], [lo, -D]], CONC, false); }
+      // Đ3-W5-D: SỌC ĐỎ ~0,6 m trên mặt ngoài gờ lan can NHỊP CHÍNH/DẪN (ảnh pano_304 h0/h90: dầm nhịp dẫn cầu HVT viền đỏ
+      // chạy dọc mép trên) — dầm biên dưới sọc giữ CONC
+      // chỉ đoạn mặt cầu cao ≥ 3 m trên đất (đoạn dốc sát đất = tường chắn nền đắp, ảnh 349 h90: xám trơn)
+      const RS = PH - 0.6;
+      // + CHỈ nhịp chính/dẫn 'span' (ảnh 217 h0/h90/h270, 349: các nhánh xoắn 'ramp' trắng-xám TRƠN; sọc đỏ thấy ở 304 h90 là
+      // dầm nhịp dẫn cầu chính)
+      const high = F.map((Fr) => b.kind === 'span' && Fr.y - groundY(Fr.x + Fr.nx * lo, Fr.z + Fr.nz * lo) >= 3);
+      const runs = [[], []];   // [thấp, cao]: đoạn khung liên tiếp (chồng 1 khung ở chỗ chuyển)
+      { let cur = null, k = -1; for (let i = 0; i < F.length; i++) { const h = high[i] ? 1 : 0; if (h !== k) { if (cur) cur.push(F[i]); cur = [F[i]]; runs[h].push(cur); k = h; } else cur.push(F[i]); } }
+      const band = (prof) => { for (const R of runs[1]) if (R.length > 1) sweep(conc, R, prof, RED, false); for (const R of runs[0]) if (R.length > 1) sweep(conc, R, prof, CONC, false); };
+      if (sg > 0) { sweep(conc, F, [[lo, -D], [lo, RS]], CONC, false); band([[lo, RS], [lo, PH]]); sweep(conc, F, [[lo, PH], [li, PH], [li, 0.02]], CONC_PAR, false); }
+      else { sweep(conc, F, [[li, 0.02], [li, PH], [lo, PH]], CONC_PAR, false); band([[lo, PH], [lo, RS]]); sweep(conc, F, [[lo, RS], [lo, -D]], CONC, false); }
       // tay vịn thép trên gờ: thanh ngang + cột 2,5 m
       const rl = sg * (hw - PAR / 2);
       const FR = simplifyFrames(F, rl, 0.02);
@@ -471,27 +481,42 @@ export function buildBridges(scene, deps) {
     const A0 = mid(arch.z0), A1 = mid(arch.z1);
     if (A0 && A1) {
       const ax = A1[0] - A0[0], az = arch.z1 - arch.z0, AL = Math.hypot(ax, az), ux = ax / AL, uz = az / AL, nx = -uz, nz = ux;
-      const RIB = 16, H = arch.h || 38, TILT = 0.24, N = 36;
-      const ribPt = (sg, t) => {   // t 0..1 dọc vòm
+      const RIB = 16, H = arch.h || 38, TILT = 0.24;
+      // Đ3-W5-D: SƯỜN VÒM = GIÀN MẮT CÁO (ảnh pano_285 h0/h270, 304 h0: mỗi sườn là giàn thép đỏ 2 biên trên/dưới cách ~3-4 m +
+      // thanh xiên tam giác + thanh đứng, 2 sườn nghiêng vào nhau nối bằng giằng ngang/chéo ở đoạn đỉnh) thay HỘP ĐẶC 1,8 × 2,4 m
+      // (đọc thành "dải đỏ trơn"). Biên dưới = cùng đường cong hạ DEP·bao (bao → 0 ở 2 chân: 2 biên chụm vào gối), cùng mặt
+      // phẳng nghiêng TILT. ~350 thanh hộp ≈ 4,2k tam giác (cũ ~0,9k), 1 draw call (gộp như cũ).
+      const DEP = 3.6, NT = 40;
+      const env = (t) => Math.min(1, t / 0.07, (1 - t) / 0.07);
+      const chordPt = (sg, t, lower) => {
         const along = t * AL, yb = A0[1] + (A1[1] - A0[1]) * t;
-        const hh = Math.sin(t * Math.PI) * H;
+        const hh = Math.sin(t * Math.PI) * H - (lower ? DEP * env(t) : 0);
         const lat = sg * (RIB - Math.sin(TILT) * hh);
         return [A0[0] + ux * along + nx * lat, yb + 0.5 + hh * Math.cos(TILT), arch.z0 + uz * along + nz * lat];
       };
-      for (const sg of [-1, 1]) {
-        // sườn vòm: hộp 1,8 × 2,4 m dọc đường cong
-        for (let k = 0; k < N; k++) {
-          const p1 = ribPt(sg, k / N), p2 = ribPt(sg, (k + 1) / N);
-          const dx = p2[0] - p1[0], dy = p2[1] - p1[1], dz = p2[2] - p1[2], L = Math.hypot(dx, dy, dz);
-          const g = new THREE.BoxGeometry(1.8, 2.4, L + 0.25);
-          const m = new THREE.Matrix4().lookAt(new THREE.Vector3(0, 0, 0), new THREE.Vector3(dx, dy, dz), new THREE.Vector3(0, 1, 0));
-          m.setPosition((p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2, (p1[2] + p2[2]) / 2);
-          g.applyMatrix4(m);
-          red.geos = red.geos || []; red.geos.push(g);
+      red.geos = red.geos || [];
+      const member = (p1, p2, w, h) => {
+        const dx = p2[0] - p1[0], dy = p2[1] - p1[1], dz = p2[2] - p1[2], L = Math.hypot(dx, dy, dz); if (L < 0.05) return;
+        const g = new THREE.BoxGeometry(w, h, L + Math.min(w, h) * 0.5);
+        const m = new THREE.Matrix4().lookAt(new THREE.Vector3(0, 0, 0), new THREE.Vector3(dx, dy, dz), Math.abs(dy) > 0.98 * L ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0));
+        m.setPosition((p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2, (p1[2] + p2[2]) / 2);
+        g.applyMatrix4(m); red.geos.push(g);
+      };
+      const TOP = [[], []], BOT = [[], []];
+      for (const [si, sg] of [[0, -1], [1, 1]]) {
+        for (let k = 0; k <= NT; k++) { TOP[si].push(chordPt(sg, k / NT, false)); BOT[si].push(chordPt(sg, k / NT, true)); }
+        for (let k = 0; k < NT; k++) {
+          member(TOP[si][k], TOP[si][k + 1], 1.15, 1.3);                       // biên trên
+          member(BOT[si][k], BOT[si][k + 1], 1.0, 1.1);                        // biên dưới
+          if (env(k / NT) > 0.35 && k > 0) member(BOT[si][k], TOP[si][k], 0.42, 0.42);   // thanh đứng
+          const kk = k + 1;                                                    // thanh xiên tam giác (Warren, đổi chiều mỗi khoang)
+          if (env(Math.min(k, kk) / NT) > 0.2 || env(Math.max(k, kk) / NT) > 0.2) {
+            if (k % 2 === 0) member(BOT[si][k], TOP[si][kk], 0.38, 0.38); else member(TOP[si][k], BOT[si][kk], 0.38, 0.38);
+          }
         }
-        // dây treo đan chéo (network arch): chân dây lệch dọc ±0,08 nhịp
-        for (let k = 2; k <= N - 2; k += 2) {
-          const t = k / N, top2 = ribPt(sg, t);
+        // dây treo đan chéo (network arch): neo ở BIÊN DƯỚI, chân dây lệch dọc ±0,08 nhịp
+        for (let k = 2; k <= NT - 2; k += 2) {
+          const t = k / NT, top2 = BOT[si][k];
           for (const dd of [-0.08, 0.08]) {
             const tf = t + dd; if (tf < 0.03 || tf > 0.97) continue;
             const along = tf * AL, yb = A0[1] + (A1[1] - A0[1]) * tf + 0.9;
@@ -504,14 +529,13 @@ export function buildBridges(scene, deps) {
           }
         }
       }
-      // giằng ngang giữa 2 sườn ở đỉnh
-      for (const t of [0.3, 0.4, 0.5, 0.6, 0.7]) {
-        const p1 = ribPt(-1, t), p2 = ribPt(1, t);
-        const dx = p2[0] - p1[0], dy = p2[1] - p1[1], dz = p2[2] - p1[2], L = Math.hypot(dx, dy, dz);
-        const g = new THREE.BoxGeometry(1.0, 1.0, L);
-        const m = new THREE.Matrix4().lookAt(new THREE.Vector3(0, 0, 0), new THREE.Vector3(dx, dy, dz), new THREE.Vector3(0, 1, 0));
-        m.setPosition((p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2, (p1[2] + p2[2]) / 2);
-        g.applyMatrix4(m); red.geos.push(g);
+      // giằng giữa 2 sườn ở đoạn đỉnh: thanh ngang ở biên trên + biên dưới mỗi 2 khoang, chéo chữ X giữa các thanh ngang (mặt trên)
+      let prevK = -1;
+      for (let k = Math.ceil(NT * 0.24); k <= Math.floor(NT * 0.76); k += 2) {
+        member(TOP[0][k], TOP[1][k], 0.8, 0.8);
+        member(BOT[0][k], BOT[1][k], 0.6, 0.6);
+        if (prevK >= 0) { member(TOP[0][prevK], TOP[1][k], 0.45, 0.45); member(TOP[1][prevK], TOP[0][k], 0.45, 0.45); }
+        prevK = k;
       }
       // trụ chân vòm (2 trụ lớn mỗi đầu, xuống nước)
       for (const [P, z] of [[A0, arch.z0], [A1, arch.z1]]) {

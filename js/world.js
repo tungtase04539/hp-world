@@ -53,7 +53,7 @@ function propLineShift(x, z, front = 0.5) {
   const s = clrNearestStreet(x, z, 25); if (!s || !s.street) return [0, 0];
   const k = Math.max(0, s.fl + 0.3 + front - s.d); return [s.nx * k, s.nz * k];
 }
-import { claimPoly, claimBox, claimCircle } from './claims.js';
+import { claimPoly, claimBox, claimCircle, claimAt } from './claims.js';
 import { LM_POLY, LM_CENTROID } from './landmark_polys.js';
 import { buildProps, layRoadSurfaceY } from './props.js';                 // Đợt 3 WP7: đồ đạc phố (xe máy/ô tô/cột điện/đèn/người)
 import { furnitureLine } from './xsection.js';
@@ -1763,7 +1763,7 @@ export async function buildWorld(scene, prog = () => {}) {
     if (along < -10 || along > HD_L || across < 7 || across > 140) return false;
     // khuôn viên Cảng vụ giữ nguyên = HỘP sân ô compound(326,−826, 38×13, −135°) +1 m (W3-B: trước là vòng r45 → giữ cả
     // dãy footprint cũ phía bắc Hoàng Diệu trước pano_019; generator process_buildings.mjs nay không chừa gì: Cảng vụ = ô dựng tay)
-    { const dx = x - 326, dz = z + 826; if (Math.abs(0.7071 * (dz - dx)) < 28 && Math.abs(0.7071 * (dx + dz)) < 14.5) return false; }
+    // (Đ3-W5-D: bỏ chừa khuôn viên "Cảng vụ" (326, −826) — ô đó là bãi giải toả thật, xem chỗ compound() bị bỏ)
     if ((x - 636.5) ** 2 + (z + 894.7) ** 2 < 400) return false;   // nhà hàng bo cong (lm_drafts) đứng trong bãi
     return true;
   };
@@ -3758,16 +3758,14 @@ const bcPalm = (parent, lx, lz, h = 9) => {   // Đợt 3 WP4: cau vua instanced
       const pg = new THREE.Group(); pg.position.set(-601.8, gy, pz);
       bcPalm(pg, 0, 0, 9.5); g.add(pg);
     }
-    const tp = new THREE.Group(); tp.position.set(-621, groundHeight(-621, -310), -310); tp.rotation.y = Math.PI / 2;
-    const tw = new THREE.Mesh(new THREE.BoxGeometry(24, 15.5, 10), bcFacade('#9fb6c4', '#3f4a52', 8, 5));
-    tw.position.y = 7.75; tp.add(tw);
-    const troof = new THREE.Mesh(new THREE.BoxGeometry(25, 0.5, 11), mat(0x2f6d5a));
-    troof.position.y = 15.9; tp.add(troof);
-    g.add(tp);
+    // Đ3-W5-D: BỎ "khối tập thể 5T" 24 × 10 m ở (−621, −310) xoay 90° — nó nằm NGANG ngõ 90 Hạ Lý (way h 608, z ≈ −308):
+    // ảnh 533 h270 ngõ chạy tiếp về tây giữa lán mái tôn xanh + ô tô đỗ, game là bức tường trắng 5 tầng chắn ngõ cách 14 m
+    // (+ collider r 12,5 m giữa ngõ). Khối 5T thật (548 h0 "khối sẫm 5T sau") đã có trong footprint thật phía bắc ngõ.
+    // FEATURED_CLEAR (−621, −310) giữ nguyên (thứ tự; ngõ thoáng).
     g.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
     scene.add(g);
     addCollider(-600, -308, 2.2); addCollider(-600, -316, 2.2); addCollider(-605.5, -324, 3.4);
-    addCollider(-601.6, -298.5, 1.4); addCollider(-621, -310, 12.5);
+    addCollider(-601.6, -298.5, 1.4);
     FEATURED_CLEAR.push([-606, -310, 20]); FEATURED_CLEAR.push([-621, -310, 16]);
   }
 }
@@ -4115,15 +4113,35 @@ const bcPalm = (parent, lx, lz, h = 9) => {   // Đợt 3 WP4: cau vua instanced
     const g = new THREE.Group(); g.position.set(ix, groundHeight(ix, iz), iz);
     const curb = new THREE.Mesh(new THREE.CylinderGeometry(12, 12, 0.35, 22), mat(0x8d8a82)); curb.position.y = 0.18; g.add(curb);
     const grass = new THREE.Mesh(new THREE.CylinderGeometry(11.2, 11.2, 0.35, 22), mat(LAWN_OLIVE)); grass.position.y = 0.24; g.add(grass);
-    const rockM = mat(0x8d8a82, { flatShading: true });
+    // Đ3-W5-D: núi đá = cụm KHỐI ĐÁ GỒ GHỀ (ảnh 304 h180/h270: hòn non bộ xám sẫm lởm chởm, hốc tối, rêu/cây bám) thay 7 hình
+    // nón 5 cạnh nhẵn (đọc thành "chóp xám"). Mỗi khối = icosahedron chia 2 lần, kéo dài đứng, đỉnh dời theo nhiễu hash TẤT ĐỊNH
+    // của toạ độ gốc (đỉnh trùng nhau dời cùng) → mặt phẳng gãy; màu đỉnh: xám đá, hốc/chân tối hơn, mảng rêu xanh. ~2,9k tam giác.
+    const rockM = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
     const rocks = [];
-    for (let i = 0; i < 7; i++) {                            // cụm núi đá vươn cao ~7-8m
-      const h = [7.5, 6, 5, 4, 3.2, 2.6, 2][i], r = 1.5 - i * 0.12;
-      const rk = new THREE.ConeGeometry(r + 0.9, h, 5);
-      rk.translate(-1.8 + (i % 3) * 1.7, h / 2 + 0.4, -1.4 + Math.floor(i / 3) * 1.6);
+    const fr2 = (v) => v - Math.floor(v), hs = (x, y, z, k) => fr2(Math.sin(x * 12.99 + y * 78.23 + z * 37.72 + k * 11.3) * 43758.55);
+    const L2 = (c) => (c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
+    const PEAKS = [[-1.0, -0.6, 1.9, 7.6], [0.9, -1.4, 1.6, 6.2], [-2.4, 0.9, 1.5, 5.0], [1.6, 1.0, 1.4, 4.4], [0.1, 1.9, 1.2, 3.4], [-2.6, -1.9, 1.1, 2.9], [2.7, -0.2, 1.0, 2.4], [-0.4, 0.5, 2.6, 2.2]];
+    PEAKS.forEach(([px, pz, r, h], i) => {
+      const rk = new THREE.IcosahedronGeometry(1, 2), P = rk.attributes.position, col = [];
+      for (let v = 0; v < P.count; v++) {
+        const x0 = P.getX(v), y0 = P.getY(v), z0 = P.getZ(v), q = (n) => Math.round(n * 1000) / 1000;
+        const n1 = hs(q(x0), q(y0), q(z0), i), n2 = hs(q(z0), q(x0), q(y0), i + 7);
+        const rr = r * (0.72 + 0.5 * n1) * (y0 > 0 ? 1 - 0.55 * y0 : 1);          // thon dần lên đỉnh, gờ lồi lõm
+        const yy = (y0 * 0.5 + 0.5) * h * (0.9 + 0.2 * n2);
+        P.setXYZ(v, px + x0 * rr, Math.max(0, yy) + 0.35, pz + z0 * rr);
+        const dark = 0.55 + 0.45 * Math.min(1, yy / h + 0.25) * (0.75 + 0.5 * n2);
+        const moss = n1 > 0.82 && y0 < 0.6;
+        const c = moss ? [0.33, 0.42, 0.24] : [0.47 * dark, 0.46 * dark, 0.43 * dark];
+        col.push(L2(c[0]), L2(c[1]), L2(c[2]));
+      }
+      rk.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+      rk.deleteAttribute('uv'); rk.computeVertexNormals();
       rocks.push(rk);
+    });
+    const rm = new THREE.Mesh(mergeGeometries(rocks), rockM); rm.castShadow = true; rm.receiveShadow = true; g.add(rm);
+    for (const [bx, by, bz, br] of [[1.4, 3.6, -0.8, 0.55], [-1.9, 2.8, 0.3, 0.5], [0.4, 5.1, -0.3, 0.42], [2.2, 1.9, 0.9, 0.6]]) {   // cây bám đá
+      const tp = new THREE.Mesh(new THREE.SphereGeometry(br, 6, 5), sharedMats.leafDark); tp.position.set(bx, by, bz); tp.castShadow = true; g.add(tp);
     }
-    const rm = new THREE.Mesh(mergeGeometries(rocks), rockM); rm.castShadow = true; g.add(rm);
     for (let i = 0; i < 8; i++) {                            // topiary tròn quanh viền
       const a = i * Math.PI / 4, tx = Math.cos(a) * 8.2, tz = Math.sin(a) * 8.2;
       const tp = new THREE.Mesh(new THREE.SphereGeometry(0.85 + (i % 3) * 0.2, 7, 6), sharedMats.leafDark);
@@ -4439,15 +4457,18 @@ const dgRail = (ax, az, bx, bz, h, kind, colHex) => {
     if (!dgOK((ax + bx) / 2, (az + bz) / 2)) continue;
     const L = Math.hypot(bx - ax, bz - az), ux = (bx - ax) / L, uz = (bz - az) / L;
     const th = Math.atan2(-uz, ux), gy = groundHeight((ax + bx) / 2, (az + bz) / 2);
-    const curb = new THREE.BoxGeometry(L, 0.32, 1.5); curb.rotateY(th);
-    curb.translate((ax + bx) / 2, gy + 0.16, (az + bz) / 2); curbG.push(curb);
+    // Đ3-W5-D: bó vỉa dải 0,32 → 0,2 m (ảnh 216/478 h0: gờ bê tông thấp ngang bó vỉa phố, bụi mọc ngay trên)
+    const curb = new THREE.BoxGeometry(L, 0.2, 1.5); curb.rotateY(th);
+    curb.translate((ax + bx) / 2, gy + 0.1, (az + bz) / 2); curbG.push(curb);
     // W3-D: BỤI DÀY LIỀN (ảnh 216/478/215 h000: chuỗi ngọc/ô rô lổn nhổn phủ kín dải, không phải hộp 3,2 m xếp hàng)
     hedgeG.push([[ax + ux * 1.2, az + uz * 1.2], [bx - ux * 1.2, bz - uz * 1.2]]);
   }
   if (curbG.length) {
     const cm = new THREE.Mesh(mergeGeometries(curbG), mat(0xb9bdb9));
     cm.receiveShadow = true; cm.name = 'lqd_median_curb'; scene.add(cm);
-    const hm = new THREE.Mesh(hedgeGeometry(hedgeG, (x, z) => groundHeight(x, z) + 0.3, { h: 0.85, w: 1.15, seg: 0.7, rough: 0.09, top: 0.08, wild: 0.6, seed: 9, base: [0.38, 0.52, 0.22], maxHalf: 0.7 }), hedgeMaterial());
+    // Đ3-W5-D (chấm W4: "median hedge too tall/blobby" 216/478): thật bụi cắt tỉa cao ~0,55-0,65 m trên gờ, mặt trên PHẲNG hơi
+    // gợn, xanh tươi hơn; bản cũ gờ 0,32 + bụi 0,85 × (1 ± 0,21) wild 0,6 = tường xanh lổn nhổn ~1,3 m ngang tầm mắt camera
+    const hm = new THREE.Mesh(hedgeGeometry(hedgeG, (x, z) => groundHeight(x, z) + 0.18, { h: 0.6, w: 1.05, seg: 0.7, rough: 0.05, top: 0.04, wild: 0.25, seed: 9, base: [0.42, 0.57, 0.25], maxHalf: 0.66 }), hedgeMaterial());
     hm.castShadow = true; hm.name = 'lqd_median_hedge'; scene.add(hm); (world.hedgeRuns ||= []).push(...hedgeG);
   }
 }
@@ -19944,6 +19965,89 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
       lmRemoveCell(c.name, 'trong lòng nút xoắn HVT (W3-F)');
     }
   }
+  // Đ3-W5-D: CÂY CẢNH ĐẢO GIAO THÔNG NÚT CẦU HVT (chấm W4: 349 "manicured low hedges + bonsai medians", 304 h270, 217 h90).
+  // Ảnh 349 h090/h180, 304 h180/h270: đảo/dải dưới nhánh xoắn = THẢM CỎ xanh tươi cắt sát + VIỀN BỤI cắt tỉa thấp chạy dọc mép
+  // bó vỉa + rải thưa tùng/la hán xén tầng (bonsai "mây") và bụi tròn; game: đất ô liu trống. Lưới 2,5 m trong hộp nút HVT,
+  // ≤ 60 m quanh camera pano mặt đất: ô cách nhựa/vỉa ≥ 1,2 m (roadnet.surfaceAt 5 điểm), đất khô LAND_H, không nhà/collider,
+  // gầm cầu ≥ 5 m (hoặc không cầu), cách camera ≥ 4 m. Mỗi ô: tấm CỎ 2,5 m (+0,025, polygonOffset âm — trên ground_local);
+  // ô MÉP (nhựa trong 2,7 m theo 8 hướng) → đoạn bụi 2,6 m song song mép (các đoạn kề nhau nối thành viền); ô trong: 4% tùng
+  // xén tầng, 5% bụi tròn (hash TẤT ĐỊNH). Bản đầu (45% hàng bụi + 12% bụi tròn) phủ kín nút thành "biển bụi" (ảnh quick1 304
+  // h180) — thật chủ yếu là CỎ. 4 mesh gộp (cỏ + bụi viền + lá + thân) ≈ +4 draw call.
+  {
+    const surf = world.roadNet ? world.roadNet.surfaceAt : null;
+    const deck = world.bridges && world.bridges.index;
+    const CAMS = PANO_CAM.filter(([x, z]) => x > -300 && x < 120 && z > -1045 && z < -845 && !(deck && deck.topAt(x, z) > LAND_H + 2));
+    const fr3 = (v) => v - Math.floor(v), hh3 = (x, z, k) => fr3(Math.sin(x * 12.9898 + z * 78.233 + k * 37.719) * 43758.5453);
+    const paved = (x, z) => !!surf && surf(x, z) > 0;
+    const okCell = (x, z) => {
+      if (Math.abs(groundHeightNoDeck(x, z) - LAND_H) > 0.35 || isWater(x, z)) return false;
+      for (const [dx, dz] of [[0, 0], [1.2, 0], [-1.2, 0], [0, 1.2], [0, -1.2]]) if (paved(x + dx, z + dz)) return false;
+      if (deck) { const t = deck.topAt(x, z, 1.5); if (t > -1e9 && t < LAND_H + 5) return false; }
+      for (const [cx, cz] of CAMS) if ((cx - x) ** 2 + (cz - z) ** 2 < 16) return false;
+      // lòng nút xoắn = claim 'parking' (bãi NHỰA — W3-F, ảnh 304 h270) trừ vườn bán nguyệt 'park': không trải cỏ lên bãi
+      // (bản đầu không loại → cỏ phủ cả mặt nhựa ở 304 h180/h270)
+      if (claimAt(x, z, ['parking']) && !claimAt(x, z, ['park'])) return false;
+      return world.isFree(x, z, 0.9);
+    };
+    const near = (x, z) => CAMS.some(([cx, cz]) => (cx - x) ** 2 + (cz - z) ** 2 < 3600);
+    const D8 = [[1, 0], [0.7071, 0.7071], [0, 1], [-0.7071, 0.7071], [-1, 0], [-0.7071, -0.7071], [0, -1], [0.7071, -0.7071]];
+    const S = 2.5, greenG = [], woodG = [], paths = [], lawnP = [], lawnC = [];
+    const L3 = (c) => (c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
+    let nTop = 0, nBall = 0, nCell = 0;
+    if (surf && CAMS.length) {
+      for (let z = -1045; z <= -845; z += S) for (let x = -300; x <= 120; x += S) {
+        if (!near(x, z) || !okCell(x, z)) continue;
+        nCell++;
+        // cỏ: 2 tam giác, màu xanh tươi nhiễu nhẹ theo ô
+        // màu theo ĐỈNH (hash vị trí: đỉnh chung giữa 2 ô cùng màu → không lộ ô vuông), xanh cỏ hơi vàng, không neon
+        const y = groundHeightNoDeck(x, z) + 0.025, h = S / 2 + 0.05;
+        const cv = (vx, vz) => { const t = 0.82 + 0.26 * hh3(Math.round(vx * 4) / 4, Math.round(vz * 4) / 4, 3); return [L3(0.35 * t), L3(0.47 * t), L3(0.21 * t)]; };
+        for (const [a, b] of [[[-h, -h], [-h, h]], [[-h, h], [h, h]], [[h, h], [h, -h]], [[h, -h], [-h, -h]]]) {
+          lawnP.push(x, y, z, x + a[0], y, z + a[1], x + b[0], y, z + b[1]); lawnC.push(...cv(x, z), ...cv(x + a[0], z + a[1]), ...cv(x + b[0], z + b[1]));
+        }
+        // ô mép: hướng tới nhựa gần nhất trong 2,7 m
+        let edge = null;
+        for (const [dx, dz] of D8) { for (const r of [1.9, 2.7]) if (paved(x + dx * r, z + dz * r)) { edge = edge || [dx, dz]; break; } }
+        if (edge) {
+          const ex = -edge[1], ez = edge[0], o = 0.5;   // song song mép, lùi 0,5 m về phía mép
+          paths.push([[x - ex * 1.3 + edge[0] * o, z - ez * 1.3 + edge[1] * o], [x + ex * 1.3 + edge[0] * o, z + ez * 1.3 + edge[1] * o]]);
+          continue;
+        }
+        const r = hh3(x, z, 5);
+        const jx = x + (hh3(x, z, 6) - 0.5) * 1.2, jz = z + (hh3(x, z, 7) - 0.5) * 1.2, gy = groundHeightNoDeck(jx, jz);
+        if (r < 0.04) {   // tùng xén tầng: thân nghiêng nhẹ + 3-4 tán dẹt
+          const H = 1.6 + hh3(x, z, 8) * 1.4, lean = (hh3(x, z, 9) - 0.5) * 0.5, a = hh3(x, z, 10) * Math.PI * 2;
+          const tr = new THREE.CylinderGeometry(0.07, 0.13, H, 5); tr.rotateZ(lean); tr.rotateY(a); tr.translate(jx, gy + H / 2, jz); woodG.push(tr.toNonIndexed()); tr.dispose();
+          const np = 3 + (hh3(x, z, 11) > 0.5 ? 1 : 0);
+          for (let k = 0; k < np; k++) {
+            const tt = 0.45 + 0.55 * k / (np - 1), rr = 0.75 - 0.35 * k / (np - 1) + hh3(x, z, 12 + k) * 0.2, ang = a + k * 2.1;
+            const off = k === np - 1 ? 0 : 0.45;
+            const pad = new THREE.IcosahedronGeometry(rr, 1); pad.scale(1, 0.42, 1);
+            pad.translate(jx + Math.cos(ang) * off + Math.sin(lean) * H * tt * Math.cos(a), gy + H * tt + 0.15, jz + Math.sin(ang) * off + Math.sin(lean) * H * tt * Math.sin(a)); greenG.push(pad);
+          }
+          addCollider(jx, jz, 0.35); nTop++;
+        } else if (r < 0.09) {   // bụi tròn cắt tỉa
+          const rr = 0.4 + hh3(x, z, 13) * 0.3, ball = new THREE.IcosahedronGeometry(rr, 1); ball.scale(1, 0.85, 1); ball.translate(jx, gy + rr * 0.8, jz); greenG.push(ball); nBall++;
+        }
+      }
+      if (lawnP.length) {
+        const lg = new THREE.BufferGeometry();
+        lg.setAttribute('position', new THREE.Float32BufferAttribute(lawnP, 3));
+        lg.setAttribute('color', new THREE.Float32BufferAttribute(lawnC, 3));
+        lg.setAttribute('normal', new THREE.Float32BufferAttribute(new Float32Array(lawnP.length).map((_, i) => (i % 3 === 1 ? 1 : 0)), 3));
+        const lm = new THREE.MeshLambertMaterial({ vertexColors: true, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 });
+        const m = new THREE.Mesh(lg, lm); m.receiveShadow = true; m.name = 'hvt_island_lawn'; scene.add(m);
+      }
+      if (paths.length) {
+        const hm = new THREE.Mesh(hedgeGeometry(paths, (x, z) => groundHeightNoDeck(x, z) + 0.03, { h: 0.55, w: 1.0, seg: 0.9, rough: 0.05, top: 0.04, wild: 0.2, seed: 57, base: [0.30, 0.45, 0.19], foot: 0.6 }), hedgeMaterial());
+        hm.castShadow = true; hm.receiveShadow = true; hm.name = 'hvt_island_hedge'; scene.add(hm);
+        (world.hedgeRuns ||= []).push(...paths);
+      }
+      addMerged(greenG.map((g2) => (g2.index ? g2.toNonIndexed() : g2)), mat(0x4b6d2c), 'hvt_island_topiary');
+      addMerged(woodG, mat(0x6a5238), 'hvt_island_topiary_wood');
+    }
+    console.log('[world] W5-D cây cảnh nút HVT: camera', CAMS.length, 'ô cỏ', nCell, 'đoạn bụi viền', paths.length, 'tùng', nTop, 'bụi tròn', nBall);
+  }
   {
     const b = BRIDGES[1];
     const g = bridgeGroup(b);
@@ -20770,8 +20874,10 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
       g.position.set(cx, groundHeight(cx, cz), cz); g.rotation.y = rotY; scene.add(g);
       addCollider(cx, cz, Math.max(YW, YD) * 0.5);
     };
-    // Cảng vụ HP (pano_019 h315): 3 tầng vàng kem ~38m mái xanh, mặt tiền quay ĐN (135°) về phố Hoàng Diệu
-    compound(326, -826, 38, 13, 3, 0xead9a8, 0x3f6e50, -135 * Math.PI / 180);
+    // Đ3-W5-D: BỎ "Cảng vụ" compound(326, −826, 38×13, 3 T, mái xanh). Ảnh pano_019 h0/h45/h315 + 020 h0 (10/2024): tòa vàng
+    // 3 T cột trắng mà V4 tưởng là Cảng vụ là TRUNG TÂM HỘI NGHỊ THÀNH PHỐ ở bên KIA phố ngang (footprint OSM, tây x ≈ 300);
+    // ô đông phố ngang trước 019 là BÃI GIẢI TỎA gạch vụn + vài cây cắt trụi → hộp 38 m trơn (mặt hông không cửa) từng là
+    // "tường kem trống" chắn nửa khung 019 h0/h270. Bãi do clearedZone (vùng giải toả) phủ; FEATURED_CLEAR giữ nguyên (thứ tự).
 
     // FUNZ/quán trà (pano_010 h0, ~156 Quang Trung): 3 tầng mặt tiền ĐEN + gân hồng, quay Nam về pano
     // (band trên cùng TỪNG trùm kín mái → nhìn từ trên là ô hồng lạc tông; mặt tiền từng trống trơn)

@@ -455,6 +455,60 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-10-14 (Đ3-W5-D LANES & STRUCTURE)** [ĐỢT 3 wave 5 — ngõ hẹp vẽ thành phố rộng/bãi trống, khối chắn ngõ, dải phân cách, nút cầu HVT]:
+    **(1) TAM BẠC BẮC = NGÕ 5,5 m (331/332/333/335/336/519/520/383/384):** OSM gắn 'Phố Tam Bạc' (way 322/588) là `secondary` →
+    ghi đè cũ `{re: /^Phố Tam Bạc$/, c: 'r'}` KHÔNG BAO GIỜ khớp ⇒ lòng cấp s 10 m + vỉa 3,5 m, mặt tiền 8,5 m từ tim; nhà sinh
+    còn bị SYN_CAM 6 m quanh camera xoá ⇒ ảnh 519 h0/h90 "bãi trống trước camera". `tools/street_fit.mjs` WIDTH_OVERRIDES thêm
+    `{re: /.*/, c: 's', panos: [331…337, 519, 520, 383, 384], w: 5.5, sw: 1.0, center: true}` (re `.*` vì nửa một chiều 447
+    không tên; `panos` giới hạn đúng way gần nhất các camera đó). `center` = tim TẠI camera + không mỏ neo tường; luật mỏ neo
+    'isolated>6' nới tới 10 m cho way `center` (không thì 331/332/383 đòi dời 7,6-9,1 m → bị bỏ → mỏ neo tường kéo ngõ ra XA
+    camera 9 m). Kết quả: camera 331-337/519/520/384 cách tim 0-0,3 m; góc 3 way (−533, −900) dời ~9 m về vết xe.
+    **(2) NHÀ SÁT NGÕ (process_buildings):** `NARROW_CAMS` = camera nằm trong lòng way có facadeLine ≤ 4,5 m → nhà SINH chỉ cần
+    cách ≥ 3,2 m (`camNeed(i)`, áp cả synBlocked lẫn camGuard); camera khác giữ 6 m (AUDIT3 CAMNEAR). Lấp khe chạy cả dọc NGÕ h
+    trong 30 m quanh các camera đó (nhánh đông "P. Tam Bạc" ở 519 h90 là way service OSM, khối giữa 2 ngõ không có footprint
+    Overture → lõi ô veto 'near'). **BẰNG CHỨNG ẢNH cho lô khe** `fpGapSupport(Q)`: lô bị veto 'noev' được dựng khi một pano
+    ≤ 40 m CHỤP THẤY nhà ở MỌI điểm kiểm Q = [mép trước + 2 m, TÂM lô] (audit/facade_fp.json, lõi 76 % [x0,x1]) với khoảng cách
+    HỢP ĐỘ SÂU (near 2-22 m, mid 10-40 m), KHÔNG quan sát nào của pano đó phủ điểm ấy phản bác (near kiểu other/market/
+    construction = rào, ki-ốt; mid/far khi điểm < 10 m = camera nhìn XUYÊN tới nhà xa), tia camera → lô không xuyên nhà đã có,
+    và lô không nằm ±25° trục phố p/s/t/r của camera khi phố còn chạy tiếp quá lô (phố cụt chữ T trước lô thì giữ — 115).
+    BẪY (phản biện): bản đầu chỉ kiểm 1 điểm mép trước + nhận mid 6-40 m ⇒ 265 lô, 109 h180 dựng lô 6 T cách 13 m giữa khung
+    (quan sát near "7 T" phủ rộng x 0-0,4 khung h180, khung h135 cùng pano thấy near 'other' = rào tôn của bãi đất trống). Nay
+    154 lô. Ví dụ 115 h180: góc đông-nam ngã tư Hạ Lý (Overture trống, ảnh nhà 5 T) hết "quảng trường". **Lô khe NGÕ HẸP** (way
+    mặt tiền ≤ 4,5 m, ≤ 40 m quanh NARROW_CAMS) thêm 2 veto: `riverSide` (nước trong 70 m theo pháp tuyến ra ngoài —
+    phía sông là dải bờ tự phát, không dãy nhà) và `narrowLaneContra` (camera ngõ ≤ 30 m nhìn hướng đó chỉ thấy lán/nhà mid-far,
+    không nhà near nào: 331 h270-h315 toàn 'shed' ⇒ hộp 1 T cửa sổ cách 10 m bên trái 331 h0 bị bỏ).
+    **(3) MẶT NƯỚC/VẠCH + TÁCH WAY:** bề rộng street_fit là MỘT giá trị/way — way 962470755 (ri 322) chạy từ ngõ 5,5 m tới tận
+    đầu nút 221 (lòng thật ~7 m + dải dạo + lan can) ⇒ ghi đè kéo tới nút, mép lòng cắt chéo dải dạo 221 h180. process_osm §3b2
+    `SPLIT_WAYS` tách way tại z −590 TRƯỚC street_fit: phần bắc giữ chỉ số, khúc nam NỐI CUỐI ROADS_DT (ri 1425, sau ngõ h,
+    id `962470755:s`) ⇒ chỉ số mọi way cũ không đổi (SIDEWALK_BY_ROAD khoá chỉ số), khúc nam theo bề rộng cấp như dot3. Bản đầu
+    bù bằng 'clsClear' (mép nước 8,25 m z > −590) — ĐÃ GỠ, không cần nữa. roadnet: lòng < 6 m bỏ vạch tim/làn — luật TOÀN CỤC
+    (mọi way hẹp, không chỉ Tam Bạc). street_fit: nới 'isolated>6' → 10 m áp cho MỌI ghi đè `center` (cả Lý Tự Trọng 515/516 —
+    ROADS_DT ở đó không đổi).
+    **(4) KHỐI SAI CHỖ (world.js):** bỏ `compound(326, −826)` "Cảng vụ" (hộp 38 × 13 m trơn = "tường kem" 019 h0/h270; ảnh 019/020:
+    tòa vàng cột trắng là Trung tâm Hội nghị TP ở bên kia phố ngang, ô này là bãi giải toả) + chừa của nó trong clearedZone;
+    bỏ "tập thể 5T" 24 × 10 m ô B4 (−621, −310) nằm NGANG ngõ 90 Hạ Lý (533 h270) + collider r 12,5. FEATURED_CLEAR giữ nguyên
+    (thứ tự). **(5) DẢI PHÂN CÁCH Lê Quang Đạo (216/478):** gờ 0,32 → 0,2 m, bụi 0,85 m wild 0,6 → 0,6 m wild 0,25 sáng hơn.
+    **(6) NÚT CẦU HVT:** `js/bridges.js` sườn vòm = GIÀN (2 biên trên/dưới cách 3,6 m · thanh đứng · xiên Warren · giằng ngang +
+    chéo X đoạn đỉnh, ~4,2k tam giác, cùng 1 draw call) thay hộp đặc; sọc đỏ 0,6 m mặt ngoài gờ lan can CHỈ nhịp 'span' cao
+    ≥ 3 m (ảnh 217/349: nhánh xoắn 'ramp' trắng trơn). world.js B12 hòn non bộ = 8 khối icosahedron gồ ghề màu đỉnh (hốc tối,
+    rêu) thay 7 nón; khối mới sau buildBridges: CỎ xanh (tấm 2,5 m +0,025, polygonOffset âm, màu theo hash ĐỈNH) + bụi viền
+    dọc mép nhựa + 4 % tùng xén tầng + 5 % bụi tròn trên ô đất trống ≤ 60 m quanh camera mặt đất trong hộp nút, trừ claim
+    'parking' (lòng nút xoắn = bãi nhựa W3-F). BẪY: bản đầu 45 % hàng bụi + không loại 'parking' → "biển bụi" phủ cả bãi nhựa.
+    **(7) XE KHÁCH (079 h180, streetlife.js modelCoach):** thân dưới màu instance + diềm/nóc trắng + 7 trụ cửa sổ.
+    **SINH LẠI (tất định, chạy 2 lần cùng byte):** process_osm (ROADS_DT 11 way đổi: 200/322/335/395/447/588 + 5 ngõ h nối, +1
+    khúc tách cuối mảng; WATER Tam Bạc; BEACHES mép đất theo phố) → process_buildings (43.376 nhà sau sửa phản biện).
+    **CHẤM CẶP (REAL | dot3 bcdcacc | W5-D, 1280 × 634, traffic off, tier 3 Radeon 890M, khoá GPU; ảnh scratchpad dot3/W5-D/pairs):**
+    24 pano liên quan TB 3,67 → 4,38 (+0,71); 8 đối chứng (001/007/023/042/055/102/170/230) ảnh y hệt → 4,63 → 4,63 (0). Tăng rõ: 519 3 → 5, 333
+    4 → 5,5, 019 2,5 → 4,5, 384 3 → 4,5, 109 2,5 → 3,5 (hết quảng trường), 115/349/533/331/332 +1. Không đổi: 520/522/167/193/334/221 (221 h180: dải dạo cắt chéo, lan can bắt đầu xa hơn — còn lỗi nhỏ; h0 thật là tường thấp cũ, game nhà).
+    **PERF cùng phiên (std 24 khung × 2 xen kẽ dot3 :8914 ↔ W5-D :8904):** calls 390,3 → 391,9 (+0,4 %), tris 3,110 → 3,147 M
+    (+1,2 %; tệ nhất pano_092 h0 +4,7 %), fps 60; startReady 7,13 → 7,29 s (+0,16 s); heap sau ép GC (CDP) 446 → 455 MB.
+    **Cổng:** node --check (world.js qua .mjs, bridges/roadnet/streetlife/tools), waterbfs 5/5, check_assets ĐỦ, diag full "TẤT CẢ THỰC THỂ OK — 0 lỗi JS" (overlap 1 ở (259,110) có từ W3),
+    diag lite OK, mọi bất biến 0, 0 lỗi JS mọi lượt chụp.
+    **SỬA SAU PHẢN BIỆN (merge-with-fixes; ảnh REAL | dot3 | W5-D v1 | v2, scratchpad dot3/W5-D/r2/pairs):** 221 h180 dải dạo +
+    lan can liền như dot3 (3,5 → 4); 221 h0 phố rộng + dãy vòm vàng như dot3 (còn 1 lô 1 T ở 30°); 331 h0 hết hộp 1 T bên sông
+    (3 → 3,5; bên phải vẫn mở); 109 h180 hết lô 6 T — giữa khung mở, nhà xa phía sau, villa phải (2 → 3,5); 115 h180 GIỮ nhà góc;
+    519/333/384/520/334 giữ như v1; đối chứng có dữ liệu đổi (069/415/100/085/235/374/130/265 + 533) như v1. Cổng: waterbfs 5/5,
+    check_assets ĐỦ, diag full "TẤT CẢ THỰC THỂ OK — 0 lỗi JS" (overlap 1 cũ (259,111)), diag lite OK, 0 lỗi JS lượt chụp.
 - **2026-10-14 (Đ3-W4 SỬA HỒI QUY TÍCH HỢP)** [chấm cặp REAL | dot3 c24a52e | tích hợp W4: 5 pano tụt điểm — sửa TẬN GỐC, không gỡ W4]:
     **(1) BẢNG LỚN TỪNG BAY trên toà một chủ** (pano_046 h0/h270 BIDV, 161 h90/h180 ngân hàng "trắng sọc xanh", 515 h0/h270 toà
     thương mại 8 T): chế độ 3 của W4-A (`aFp.z` = 3) dựng ô PANEL chữ cửa hàng NGẪU NHIÊN ở MỌI bay tầng 1(-2) → chồng "NHÀ NGHỈ/

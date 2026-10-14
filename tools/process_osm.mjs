@@ -263,6 +263,28 @@ try {
   console.log(`ngõ/hẻm lõi (h): ${nH}`);
 } catch (e) { console.log('(không có osm_alleys.json — bỏ qua hẻm)'); }
 
+// ---------- 3b2. TÁCH WAY theo mặt cắt thật (Đ3-W5-D sửa phản biện) ----------
+// Bề rộng street_fit là MỘT giá trị mỗi way. Way 962470755 'Phố Tam Bạc' chạy từ ngõ ven sông 5,5 m (331-520) tới tận
+// đầu nút 221 (Nguyễn Tri Phương, lòng thật ~7 m + dải dạo lát + lan can — ảnh 221 h0/h180): ghi đè ngõ 5,5 m kéo tới nút
+// → mép lòng cắt chéo dải dạo, lan can lùi xa (review 221 h180). Tách tại z = −590 (cùng ranh 'dải bờ tự phát'/'prom' của
+// §6b3): phần BẮC giữ chỉ số cũ, khúc NAM nối vào CUỐI ROADS_DT (sau ngõ h) ⇒ chỉ số mọi way cũ KHÔNG đổi (SIDEWALK_BY_ROAD…
+// khoá theo chỉ số); khúc nam theo bề rộng thường (Overture/cấp — như dot3) vì 221 không nằm trong ghi đè ngõ hẹp.
+const SPLIT_WAYS = [{ id: 962470755, z: -590 }];
+for (const S of SPLIT_WAYS) {
+  const ri = ROADS_DT.findIndex((r) => r.id === S.id); if (ri < 0) { console.log(`  tách way ${S.id}: không thấy`); continue; }
+  const r = ROADS_DT[ri], P = r.pts;
+  const k = P.findIndex((p, i) => i > 0 && (P[i - 1][1] - S.z) * (p[1] - S.z) <= 0);
+  if (k < 1) { console.log(`  tách way ${S.id}: không cắt z ${S.z}`); continue; }
+  const a = P[k - 1], b = P[k], t = (S.z - a[1]) / (b[1] - a[1] || 1);
+  const m = rnd([[a[0] + (b[0] - a[0]) * t, S.z]])[0];
+  const head = [...P.slice(0, k), m], tail = [m, ...P.slice(k)];
+  if (Math.hypot(head[head.length - 1][0] - head[head.length - 2][0], head[head.length - 1][1] - head[head.length - 2][1]) < 0.5) head.splice(head.length - 2, 1);
+  if (Math.hypot(tail[1][0] - tail[0][0], tail[1][1] - tail[0][1]) < 0.5) tail.splice(1, 1);
+  r.pts = head;
+  ROADS_DT.push({ c: r.c, pts: tail, name: r.name, id: `${S.id}:s`, tags: r.tags });
+  console.log(`  tách way ${S.id} (ri ${ri}) tại z ${S.z}: bắc ${head.length} đỉnh, nam → ri ${ROADS_DT.length - 1} (${tail.length} đỉnh)`);
+}
+
 // ---------- 3c. MẶT CẮT PHỐ THẬT + TIM KHỚP VẾT XE PANO (Đợt 3 W3-A, tools/street_fit.mjs) ----------
 // Bề rộng lòng/vỉa MỖI WAY (ghi đè pano → tag width → tường Overture 2 bên → gộp theo tên → mặc định cấp) và dịch tim
 // theo 551 camera pano (camera phải nằm TRONG lòng). Cần tools/ov_buildings.csv (gitignore; thiếu → chỉ dịch tim, bề rộng
