@@ -455,6 +455,41 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-10-14 (Đ3-W5 TÍCH HỢP)** [ĐỢT 3 WAVE 5 — gộp 4 nhánh lên `dot3` (00fd41c = bcdcacc + 2 commit tài liệu) theo thứ tự D → A → B → C, `--no-ff`]:
+    **Gộp:** W5-D LANES (`worktree-wf_0dec13b5-96e-4`, b2943af) sạch; W5-A HERO-KIT (`…-96e-1`, 03fa2cb) sạch (citygen/world/
+    KNOWLEDGE tự gộp); W5-B STREETFRONT (`…-96e-2`, 0970e0c) xung đột 4 khúc `js/citygen.js` + 1 khúc `js/facade_atlas.js`; W5-C
+    LIFE-GREEN (`…-96e-3`, ec85eb7) sạch (`streetlife.js` D + C tự gộp; props/trees/bộ sinh không chồng ai). Bốn mục §10 (D, A, B,
+    C) giữ nguyên bên dưới. **Giải xung đột (giữ ý cả 2 phía):** (1) program key MỚI `'fabric_v5ab_'` (A `fabric_v5a_` + B
+    `fabric_v5b2_` cùng đổi shader); (2) `gen()`: `heroSigns.length = 0` (A) + `ntiles` (B); (3) `let fpG/fpMode` (A gán lại trong
+    nhánh hero) + `NT.fpv = M.fpv` (B) — VÀ trong nhánh hero `NT.fpv = hb` (nghĩa vụ chéo B ghi trong báo cáo: ô gần dùng cùng aFp
+    hero, không thì đồ ô gần của nhà hero đọc vân tay cũ); (4) cục nóng: mật độ B (0,26/0,18) + điều kiện `!HPg` của A;
+    (5) facade_atlas: ô A (H_SIGN, H_FLUTE) RỒI ô B (G_HOME2, D_AWN3, D_MISC, D_CAGE) = 111/112 ô (ATLAS_ROWS 14, còn 1 chỗ; mọi
+    chỗ dùng tra theo TÊN `MOD.X`, không chỉ số cứng). **Nghĩa vụ chéo A × B sửa ở bước gộp:** hàng bày tràn hè (goods) và ống
+    thoát nước mái (ô NEAR của B) thêm `!HPg` — hero tự dựng mặt trệt/chi tiết (luật A: không ban công/mái hiên/cục nóng thống kê
+    trên hero). Màu nhấn hero (A, `aFp` chế độ 2) ⇒ `fpSign` = true trong shader ⇒ KHÔNG qua phai màu biển thống kê của B (mối lo
+    trong báo cáo B đã tự thoả).
+    **Sinh lại (2 lần mỗi bộ, md5 nội dung LF — bẫy autocrlf: so `tr -d '\r'`):** `gen_facade_fp --collect keep/fp_json keep/fp_plan.json`
+    → audit/facade_fp.json a70dfba4 = không đổi (A chỉ thêm tuỳ chọn notes); `process_osm` (từ tools/) → mapdata 30993c5b ×2 = bản D
+    (ROADS_DT 1426 way: chỉ mục cũ giữ nguyên, D nối 1 đoạn `962470755:s` ở cuối ri 1425); `process_buildings` → buildings_real
+    7c77e98d ×2 = bản D (43.376 nhà); **`gen_herokit keep/fp_json keep/fp_plan.json` → herokit_data 971226df ×2: 407 hero** (office 112,
+    store 99, bank 61, hotel 47, school 42, colonnade 28, pagoda 12, market 4, petrol 2; HERO_META rb 43376, rbHash 52ff1208) —
+    trước khi sinh lại `check_herokit` báo đúng 3 lỗi (rb, băm, 20/401 lạc), sau: **407/407 khớp**; `gen_fp_nature --fp keep/fp_json`
+    → `gen_treemap` → `gen_props_evidence`: fp_nature 651085d1, treemap 402a2d2d, props_evidence 8dd5256a ×2 = bản C. Chỉ
+    herokit_data đổi (commit riêng).
+    **Cổng (tier 3, ANGLE Radeon 890M D3D11, :8801, khoá GPU):** node --check 23 file · waterbfs 5/5 · check_assets ĐỦ (8b8e42c) ·
+    check_herokit 407/407 · diag full "TẤT CẢ THỰC THỂ OK — 0 lỗi JS" (overlap 1 ở (258,110) — có từ W3) · diag lite OK, mọi bất biến
+    0 · mobile OK 0 lỗi · ĐÊM (time 0,875 + hoàng hôn 0,76, 248 h90/h270, 120 h90/h180) bạt mái hiên TỐI = dot3 (lỗi review W5-B
+    không quay lại sau gộp), cả `--gl1` (webgl2 false, 0 lỗi) · 16 khung REAL | dot3 | tích hợp (354/166/161/221/331/109/267/446/088/
+    120/248/519/304/418/450/276) 0 lỗi JS: dải NGÂN HÀNG 1 lần (354), chợ + bạt sọc + người (446), 519 h90 = ảnh r2 của D, 166 h180
+    không khối đen.
+    **Perf cùng phiên (dot3 bcdcacc `git worktree` tạm :8802 ↔ tích hợp :8801, có assets_lite cả 2):** std 24 khung ×2 xen kẽ
+    (traffic on): calls TB 392,9 → 393,1, tổng-min calls −0,9 %, tris tổng-min 74,60 → 77,92 M (**+4,5 %**; tệ nhất game_8 +9,8 %,
+    pano_092 h0 +8,2 %, game_6 +7,8 % — xe máy 2 hàng/cụm người C + chi tiết gần B + hero A), fps 60 mọi khung. hpReady lượt std
+    5152/5951 → 6528/6832 ms nhưng máy đang tải (workflow khác) ⇒ đo lại KHỞI ĐỘNG riêng 3 vòng xen kẽ 1 khung: hpReady TB 5144 →
+    5502 ms (**+0,36 s**), startReady 6723 → 7099 ms (+0,38 s); bản tích hợp phục vụ từ checkout scratchpad (:8803) 5535 ms ⇒ không
+    phải do vị trí thư mục. Bước tăng: fabric 952 → 1125 ms (A + B), landmarks 185 → 271 (D: dàn vòm HVT/ramp/núi đá), final
+    795 → 907 (C), còn lại ≈. Heap sau ép GC (CDP, ABBA) 449 → 480 MB (+31 MB, +7 %). Mỗi WP trong ngân sách riêng; cộng dồn 4 WP
+    +0,36 s / +4,5 % tris — ghi nhận, chưa tối ưu (việc của đợt perf sau chất lượng).
 - **2026-10-14 (Đ3-W5-D LANES & STRUCTURE)** [ĐỢT 3 wave 5 — ngõ hẹp vẽ thành phố rộng/bãi trống, khối chắn ngõ, dải phân cách, nút cầu HVT]:
     **(1) TAM BẠC BẮC = NGÕ 5,5 m (331/332/333/335/336/519/520/383/384):** OSM gắn 'Phố Tam Bạc' (way 322/588) là `secondary` →
     ghi đè cũ `{re: /^Phố Tam Bạc$/, c: 'r'}` KHÔNG BAO GIỜ khớp ⇒ lòng cấp s 10 m + vỉa 3,5 m, mặt tiền 8,5 m từ tim; nhà sinh
