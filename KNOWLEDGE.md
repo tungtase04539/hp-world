@@ -421,7 +421,7 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
 - **2026-10-11 (W3-G TREES)** [ĐỢT 3 wave 3 — AUDIT3 FP-7 "CÂY THEO BẰNG CHỨNG": mùa hoa tháng 10, cau theo bằng chứng, cắt trụi theo NGỮ CẢNH, mật độ/vòm cây theo đoạn phố, đa/me tây hero, cây cảnh đảo giao thông, thẻ lá không "bay"]
-    (nhánh worktree W3-G trên dot3 bc07df5; 4 phiên 05-11/10 — 2 lần host chết + 1 lần tạm dừng theo chủ dự án, nối tiếp theo PROGRESS.md). File: `js/trees.js` (chính), `tools/gen_treemap.mjs` + `js/treemap.js` (SINH LẠI —
+    (nhánh worktree W3-G trên dot3 bc07df5; 5 phiên 05-14/10 — phiên 5 = sửa sau review — 2 lần host chết + 1 lần tạm dừng theo chủ dự án, nối tiếp theo PROGRESS.md). File: `js/trees.js` (chính), `tools/gen_treemap.mjs` + `js/treemap.js` (SINH LẠI —
     `node tools/gen_treemap.mjs`, tất định), `tools/qa/trees.html` (thêm kit topi/me/lop), `js/world.js` 1 dòng (`trees.onHeroSeason(() => loadHeroTrees(trees))`).
     **TREEMAP v2 (stride 15 → 21, trường cũ giữ nguyên nghĩa):** [15] polS / [16] polP = mức cắt cụt của cây VỈA HÈ vs cây DẢI
     PHÂN CÁCH/CÔNG VIÊN/VƯỜN HOA/QUẢNG TRƯỜNG — ngữ cảnh theo CÂU (; .): câu chỉ nói công viên → cả câu "park"; câu nói cả
@@ -517,10 +517,47 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     sau trường cũ: o = pi + 2 cho [2..14]; trường mới đọc thẳng V[pi + 15..20]. (3) Probe thẻ lá "bay" đúng nghĩa = khoảng
     cách tâm thẻ tới đỉnh GỖ gần nhất (> 1,2 m + nửa cạnh); "ngoài vỏ 1,2 × bán kính p85" không phân biệt được (tán rộng
     luôn có ~15% thẻ ngoài p85). Bỏ qua cau (tàu lá là dải, không phải thẻ) và TOPI (cầu lá không cành). (4) W3-A sẽ đổi
-    PANO_CLEAR/nón nhìn trong ok()/buildTrees — W3-G KHÔNG đụng các dòng đó. W3-F (cây non kè sông) dùng plant('non', …) hoặc
-    cờ evidence; quy tắc (e) "hàng cây non" đã tự áp cho pano 299/294 (kè sông). (5) Thân mảnh = giảm `sxz` (co CẢ cây theo ngang), tán
+    PANO_CLEAR/nón nhìn trong ok()/buildTrees — W3-G KHÔNG đụng các dòng đó. W3-F (cây non kè sông) PHẢI dùng plant('non', x, z, {pit: 1,
+    wash: 0, exact: 1}) — không có exact, luật (b) biến cây non thành cổ thụ (xem phiên 5); quy tắc (e) "hàng cây non" đã tự áp cho pano 299/294 (kè sông). (5) Thân mảnh = giảm `sxz` (co CẢ cây theo ngang), tán
     giữ cỡ nhờ `cs = R/(rad·sxz)` — trần cs 1,9: cây tán rất rộng mà sxz quá nhỏ sẽ bị co tán; đừng giảm sxz dưới ~0,4. (6) Luật
     kè hồ dùng `lakeSD` (LAKE_POLY — hồ Tam Bạc trung tâm); promenade SÔNG Tam Bạc/Thế Lữ là phần W3-F (cây non chống cọc).
+    **Phiên 5 (14/10, sửa sau review "merge-with-fixes"):** (1) `plant(kind, x, z, {exact: 1})` = giữ ĐÚNG loài/dáng người
+    gọi đặt: bỏ qua MỌI luật bằng chứng (cau→bóng mát, non→bóng mát, →TOPI, →cắt cụt/LOP, vòm, nghiêng/mảnh kè hồ — `exact` nằm
+    trong NOCUT). LÝ DO: pano sông 201/221/295/331-337/383/418/519/520 có young 0 + dens 3 (+ tunnel) → luật (b) từng biến ~235 cây
+    non chống cọc dải dạo W3-F thành cổ thụ (tái lỗi AUDIT3 TREEFORM). TÍCH HỢP W3-F: `veg.plant('non', x, z, {pit: 1, wash: 0,
+    exact: 1})` (cây non dải dạo); cây lớn bờ sông `plant('shade', …)` để nguyên nếu muốn cắt cụt/vòm theo pano, thêm `exact: 1`
+    nếu không. `plantPlazaYoung` cũng truyền `exact: 1` (9 cây non quảng trường Nhà hát từng bị đổi thành bàng).
+    (2) **`heroFit` — cây hero không đâm tường**: cây `o.big` vẫn bỏ facadeFit nhưng yaw không còn ngẫu nhiên. Điểm mẫu kit gần
+    (≤ ~2000 đỉnh, bỏ hoa, bỏ phần < 2 m) biến hình ĐÚNG như shader (tán ×cs, +lift, ×sxz/sy) rồi tra LƯỚI MÁI 0,5 m dựng 1 lần
+    quanh gốc (`fpG.at` → `heightOf(floors) + PARAPET_H`; tra trực tiếp mỗi lần ev tốn ~35 ms/cây, lưới ~5 ms): điểm lọt nhà dưới
+    mái = va. Phân 3 loại: CÀNH TÁN (lỗi thấy rõ — cành đâm tường, cục điều hoà hiện trước cành), THÂN/RỄ PHỤ (không thuộc tán:
+    ép/thu không đổi được; rễ mảnh 2-5 cm lọt tường bị tường che), LÁ (bị tường che). Bước: (a) 24 yaw, điểm = 10 × cành + lá;
+    (b) còn cành TÁN va → ép nửa tán (TÁN LỆCH) — dò 17 hướng (16 + ngược trọng tâm điểm va; nhà vây 2 phía thì hướng chéo tốt hơn
+    trọng tâm) × mức 0,08..SQ_MAX, mức nhỏ nhất hết va; (c) vẫn còn → thu tán ×0,92/bước tới ≥ 0,6 R. Hero không nghiêng tự nhiên.
+    Kết quả: cành tán va 142 → 10 (088), 146 → 5 (400) / ~600 điểm cành tán; ép 0,72, tán ×0,6 / ×0,68 (đa 088 R 8,5 → 5,1 m;
+    400 9,5 → 6,5 m); me tây 001 không va. `stats().fit.hero` = [{limb0, limbYaw, limb, trunkRoot, leaf, dyaw, sq, f, ms}].
+    BẪY: phố game có dãy nhà 12-15 m nơi ảnh là bãi trống/góc phố (088/400) — không yaw/ép nào hết va khi nhà vây > 180°; muốn tán
+    đa đủ R thật phải sửa nhà (không phải việc của cây).
+    (3) **Chỗ hero** (`plantHeroSpots`): + cụm thân không chạm nhà (8 điểm vòng 1,5 m), `keepClear`, địa danh + 2,5 m, claim
+    landmark/civic/cell; điểm = cự ly tới điểm đo + `HERO_OCC_W` (1,0) × tỉ lệ đĩa 0,65 R trong nhà × R (088: 0,36 → 0,33, 400:
+    0,36 → 0,25 — nón đo không có chỗ thoáng hơn). `stats().heroSpots`. (4) **COLLIDER HERO**: props.js chỉ nhận collider r ≤ 1,0
+    làm vật cản → r 1,9 cũ bị bỏ qua (hàng xe máy đỗ sát gốc đa 088). Nay tâm r 1,0 + 6 × r 0,9 trên vòng 1,3 m (+ đa: 8 × r 0,5
+    trên vòng 2,6 m — màn rễ chạm đất); ảnh 088_h180: hàng xe dừng cách gốc.
+    (5) **TREEMAP**: palm 2 ("chỉ cau") chỉ khi KHÔNG vế nào nói cây bóng mát/tán rộng/cây xanh lớn (074 giữ 2); palm 3 = "CAU DẪN
+    ĐẦU" (vế đầu chỉ cau, cây bóng mát nêu sau: 062/183/217/218/220/320/322/547/549) → vegAt cây chung nặng 0,5 × cau ⇒ cau ~45%
+    (trước 100% — Hồ Sen 320 thành đại lộ cau; ảnh thật 320 gần như KHÔNG cây — lỗi MẬT ĐỘ, chưa sửa). TUNNEL_STREETS chỉ khớp TÊN
+    PHỐ ĐẦU `area` (`^((Đầu|Cuối|Góc) )?([Pp]hố |Đường |P\. )?<tên>`) — "phường Hạ Lý", "Ngõ 80 phố Hạ Lý", "góc giao phố Lý Thường
+    Kiệt", "khu Hạ Lý" từng bật vòm (098/100/101/213/252/262/414/530-532/547/549 → 0); nhánh vòm thứ nhất chặn "rải rác/lác đác/
+    lưa thưa" (130 "cây xanh lớn rải rác, tán rợp" → 0), KHÔNG chặn "vài cây/một cây" (551 "vài cây cọ trong sân", 123 "một cây bị
+    cắt cụt ngọn" vẫn là vòm thật). (6) `HERO_SEASON` khai báo trước VERT_BEGIN và nhúng vào GLSL (`${HERO_SEASON.toFixed(3)}`);
+    `roadIndex()` dựng lại → `_PR = null` (bản đồ pano→đoạn phố gắn chỉ số đoạn cũ).
+    SỐ ĐO phiên 5 (cùng phiên, base dot3 bc07df5 xen kẽ): cây 8.886 → 8.458 (cau 558 → 375, non 419 → 456, vòm 858); buildTrees
+    107/113 → 141 ms (+~30 ms: heroFit ~10 ms, phần còn lại như phiên 4; lượt đo thứ 2 238 ms = máy chung, mọi bước ×1,7 kể cả kit
+    không đổi); tam giác cây ở spawn 0,583 → 0,606 M, draw call cây 21 → 26. Perf std (8 góc, traffic on, 2 vòng): fps 60 (vsync);
+    p95 ±0,6 ms; draw call −11..+4; tam giác −0,1..+1,5%; game_3 đo lại riêng 2 vòng: 335 = 335 call, −4,6% tam giác (1 lượt
+    perf 747 call là nhiễu). diag full 0 lỗi JS, bất biến giao thông 0; diag lite: chỉ 404 `assets_lite/*.glb` (1 lượt có parkHit
+    1 — chạy lại 2 lần = 0, base cũng 0: mẫu giao thông ngẫu nhiên); tour 26 ảnh 0 lỗi JS; waterbfs 5/5; mùa 06-10 tải 3 GLB, 4/10 0.
+    Chấm lại 34 khung đích: khung đổi rõ chỉ ở hero (088/400 — hết cành đâm tường/xe sát gốc, tán nhỏ hơn) → điểm giữ 3,91.
 - **2026-10-04 (W2-F POLISH)** [ĐỢT 3 wave 2 — WebGL1, giải mã RB 1 lần, kho cảng, ĐÊM, giao thông né xe đỗ, dọn code chết, hitch]:
     **(1) WebGL1** (three r160 tự lùi WebGL1 khi không có WebGL2): KIỂM bằng `tools/qa/shoot.mjs --gl1` (init script cho
     `getContext('webgl2')` trả null — cờ Chrome `--disable-es3-apis` KHÔNG có tác dụng ở headless mới: vẫn webgl2:true;
