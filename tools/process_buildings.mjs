@@ -839,6 +839,7 @@ function sideSamples(s, sg) {
   return out;
 }
 const FRONTDBG = [];
+function riverSide(x, z, nx, nz) { for (let d = 0; d <= 70; d += 5) if (waterSD(x + nx * d, z + nz * d) < 1) return true; return false; }
 function waterfront(x, z, nx, nz) { for (const d of [0, 4, 9, 14, 19, 24]) if (waterSD(x + nx * d, z + nz * d) < 1) return true; return false; }
 function frontageStats(tag) {
   const res = {};
@@ -1085,36 +1086,88 @@ const FPGAP = (() => {
   const F = loadFacadeFP(); if (!F) return null;
   const byP = new Map(), T = Math.tan((F.halfFov || 49) * Math.PI / 180);
   const ci = Object.fromEntries(F.cols.map((k, i) => [k, i])), stx = F.enums.style;
-  const bad = new Set([stx.indexOf('market'), stx.indexOf('construction')]);
+  const bad = new Set([stx.indexOf('market'), stx.indexOf('construction'), stx.indexOf('other')]);
+  const shed = stx.indexOf('shed');
   for (const o of F.obs) {
-    const dep = o[ci.depth]; if (dep !== 0 && dep !== 1) continue;
-    if (bad.has(o[ci.style])) continue;
+    const dep = o[ci.depth];
+    const kind = bad.has(o[ci.style]) ? 2 : o[ci.style] === shed ? 1 : 0;   // 0 nhà, 1 lán, 2 sạp/công trường/khác (rào, ki-ốt…)
     const x0 = o[ci.x0], x1 = o[ci.x1], m = 0.12 * (x1 - x0);
     const br = (x) => (o[ci.heading] + Math.atan((x - 0.5) * 2 * T) * 180 / Math.PI);
     const l = byP.get(o[ci.pano]) || byP.set(o[ci.pano], []).get(o[ci.pano]);
-    l.push([br(x0 + m), br(x1 - m), dep]);
+    l.push([br(x0 + m), br(x1 - m), dep, kind]);
   }
   return { panos: F.panos, byP };
 })();
-function fpGapSupport(x, z) {
+// Phản biện W5-D (109 h180: lô 6 T cách 13 m giữa khung, ảnh thật là bãi đất rào tôn — 1 quan sát near "7 T" phủ rộng
+// x 0-0,4 khung h180 trong khi khung h135 CÙNG pano thấy near 'other' 1 T = rào): một pano ủng hộ lô khi MỌI điểm kiểm
+// (mép trước + tâm lô) đều được một quan sát nhà/lán phủ VỚI KHOẢNG CÁCH HỢP ĐỘ SÂU (near 2-22 m; mid 10-40 m — mid gần hơn
+// 10 m nghĩa là camera nhìn XUYÊN chỗ đó tới nhà xa) VÀ không quan sát nào của pano đó phủ điểm ấy mà phản bác: near kiểu
+// 'other'/sạp/công trường (rào, ki-ốt), hoặc mid/far khi điểm < 10 m (khoảng trống trước nhà xa). Thêm: lô nằm trong ±FP_AXIS°
+// quanh trục phố của camera (cuối tầm nhìn dọc phố) không nhận bằng chứng vân tay.
+const FP_AXIS = 25;
+const camAxis = (() => { const m = new Map(); return (px, pz) => {
+  const key = px + ',' + pz; if (m.has(key)) return m.get(key);
+  let best = null;
+  segGrid.query([px - 10, pz - 10, px + 10, pz + 10], (k) => { const q = SEGS[k]; if (q.c === 'h') return; const d = segDist(px, pz, q.ax, q.az, q.bx, q.bz); if (d < 10 && (!best || d < best.d)) best = { d, ux: q.ux, uz: q.uz, ri: q.ri }; });
+  if (best) best.pts = SEGS.filter((q) => q.ri === best.ri).flatMap((q) => [[q.ax, q.az], [q.bx, q.bz]]);
+  m.set(key, best); return best; }; })();
+const FPDBG = process.env.FPDBG ? process.env.FPDBG.split(',').map(Number) : null;
+function fpPointOK(L, px, pz, x, z) {
+  const d = Math.hypot(x - px, z - pz); if (d > 40 || d < 2) return false;
+  const bt = Math.atan2(x - px, -(z - pz)) * 180 / Math.PI;
+  let sup = false;
+  for (const [b0, b1, dep, kind] of L) {
+    let u = bt; while (u < b0 - 180) u += 360; while (u > b0 + 180) u -= 360;
+    if (u < b0 || u > b1) continue;
+    if (dep === 0 && kind === 2) return false;          // near rào/ki-ốt/sạp
+    if (dep >= 1 && d < 10) return false;               // nhìn xuyên tới nhà xa
+    if (kind !== 2 && (dep === 0 ? d <= 22 : dep === 1 && d >= 10)) sup = true;
+  }
+  return sup;
+}
+function fpGapSupport(Q) {
   if (!FPGAP) return false;
+  const [x, z] = Q[0];
   for (const [pi, L] of FPGAP.byP) {
     const P = FPGAP.panos[pi], px = P[1], pz = P[2], d = Math.hypot(x - px, z - pz);
     if (d > 40 || d < 2) continue;
-    let bt = Math.atan2(x - px, -(z - pz)) * 180 / Math.PI;
-    let hit = false;
-    for (const [b0, b1, dep] of L) {
-      if (dep === 0 ? d > 22 : d < 6) continue;
-      let u = bt; while (u < b0 - 180) u += 360; while (u > b0 + 180) u -= 360;
-      if (u >= b0 && u <= b1) { hit = true; break; }
-    }
-    if (!hit) continue;
+    if (FPDBG && Math.hypot(x - FPDBG[0], z - FPDBG[1]) < (FPDBG[2] || 40)) console.log('   [fp try]', x.toFixed(1), z.toFixed(1), P[0], Q.map(([qx, qz]) => fpPointOK(L, px, pz, qx, qz) + '@' + Math.hypot(qx - px, qz - pz).toFixed(1) + '/' + ((Math.atan2(qx - px, -(qz - pz)) * 180 / Math.PI + 360) % 360).toFixed(0)).join(' '));
+    if (!Q.every(([qx, qz]) => fpPointOK(L, px, pz, qx, qz))) continue;
+    const ax = camAxis(px, pz);
+    // trên trục phố camera VÀ phố còn chạy tiếp quá lô (đỉnh way chiếu ≥ khoảng cách lô − 2 m) ⇒ lô chắn tầm nhìn dọc phố.
+    // Phố CỤT tại nút chữ T trước lô (115 h180: nhà góc đông-nam đối diện đầu phố) thì lô đóng khung thật → giữ.
+    if (ax && Q.some(([qx, qz]) => { const dd = Math.hypot(qx - px, qz - pz) || 1, c = ((qx - px) * ax.ux + (qz - pz) * ax.uz) / dd;
+      if (Math.abs(c) <= Math.cos(FP_AXIS * Math.PI / 180)) return false;
+      const sg = Math.sign(c); if (FPDBG && Math.hypot(qx - FPDBG[0], qz - FPDBG[1]) < (FPDBG[2] || 40)) console.log('   [fp axis]', ax.ri, ax.ux.toFixed(2), ax.uz.toFixed(2), c.toFixed(2)); return ax.pts.some(([vx, vz]) => sg * ((vx - px) * ax.ux + (vz - pz) * ax.uz) >= dd * Math.abs(c) - 2); })) { stat('gap_fp_axis'); continue; }
     let occl = false;
     const ux = (x - px) / d, uz = (z - pz) / d;
-    for (let t = 2; t < d - 2.5 && !occl; t += 1) if (occupiedAt(px + ux * t, pz + uz * t)) occl = true;
-    if (!occl) { stat('gap_fp_support'); return true; }
+    for (let t = 2; t < d - 2.5 && !occl; t += 1) if (occupiedAt(px + ux * t, pz + uz * t)) { occl = true; if (FPDBG && Math.hypot(x - FPDBG[0], z - FPDBG[1]) < (FPDBG[2] || 40)) { const j = buildingAt(px + ux * t, pz + uz * t); console.log('   [fp occl] t', t, B[j].id, B[j].src, centroid(B[j].pts).map(Math.round)); } }
+    if (!occl) {
+      stat('gap_fp_support');
+      if (FPDBG && Math.hypot(x - FPDBG[0], z - FPDBG[1]) < (FPDBG[2] || 40)) console.log('   [fp gap]', x.toFixed(1), z.toFixed(1), P[0], 'd', d.toFixed(1), 'brg', ((Math.atan2(x - px, -(z - pz)) * 180 / Math.PI + 360) % 360).toFixed(0));
+      return true;
+    }
   }
   return false;
+}
+// Đ3-W5-D (phản biện 331 h0): lô khe dọc NGÕ HẸP quanh camera NARROW_CAMS chỉ dựng khi ảnh của chính camera ngõ đó (≤ 30 m)
+// KHÔNG phản bác: nếu hướng tới lô được quan sát nhưng chỉ thấy lán (shed) hoặc nhà ở độ sâu mid/far (rào + cây + lán lùi sau
+// — 331 h270-h315) mà không có quan sát NHÀ near nào ⇒ mép ngõ bên đó không phải dãy nhà ⇒ bỏ. Không có quan sát nào → như cũ.
+function narrowLaneContra(x, z) {
+  if (!FPGAP) return false;
+  let other = false;
+  for (const [pi, L] of FPGAP.byP) {
+    const P = FPGAP.panos[pi], px = P[1], pz = P[2], d = Math.hypot(x - px, z - pz);
+    if (d > 30 || d < 1 || !nearNarrowCam(px, pz, 1.5)) continue;
+    const bt = Math.atan2(x - px, -(z - pz)) * 180 / Math.PI;
+    for (const [b0, b1, dep, kind] of L) {
+      let u = bt; while (u < b0 - 180) u += 360; while (u > b0 + 180) u -= 360;
+      if (u < b0 || u > b1) continue;
+      if (dep === 0 && kind === 0) return false;
+      other = true;
+    }
+  }
+  return other;
 }
 function fillGap(s, sg, t0, t1) {
   const L = t1 - t0; if (L < 3.5) return;
@@ -1131,6 +1184,13 @@ function fillGap(s, sg, t0, t1) {
     const D = 12 + R() * 6;
     const mx = s.ax + s.ux * (ta + tb) / 2 + nx * s.fl, mz = s.az + s.uz * (ta + tb) / 2 + nz * s.fl;
     if (waterfront(mx, mz, nx, nz)) { stat('gap_veto_water'); GAPDBG.push([mx, mz, 'water']); continue; }
+    // Đ3-W5-D (phản biện 331 h0): phía SÔNG của ngõ hẹp ven sông (way mặt tiền ≤ NARROW_FL quanh camera NARROW_CAMS) là dải
+    // bờ tự phát — rào thấp, cây, lán (riverbank 'strip' của world.js; vân tay 331 h270-h315 toàn 'shed' xa), KHÔNG dãy nhà:
+    // lô sinh ở mặt tiền 3,75 m bên đó = hộp 1 T có cửa sổ cách camera 10 m. Nước trong 70 m theo pháp tuyến ra ngoài ⇒ bỏ.
+    if (s.fl <= NARROW_FL && nearNarrowCam(mx, mz, 40)) {
+      if (riverSide(mx, mz, nx, nz)) { stat('gap_veto_narrow_river'); GAPDBG.push([mx, mz, 'water']); continue; }
+      if (narrowLaneContra(mx + nx * 2, mz + nz * 2)) { stat('gap_veto_narrow_seen'); GAPDBG.push([mx, mz, 'noev']); continue; }
+    }
     if (parkfront(mx, mz, nx, nz)) { stat('gap_veto_park'); GAPDBG.push([mx, mz, 'park']); continue; }
     // cảng/kho phía BẮC Hoàng Diệu (bờ sông Cấm): mặt đường trước kho là bãi/cổng/tường rào, không phải dãy nhà ống
     // (review: lô sinh trước kho cảng x 1132-1244). Chỉ phía bắc tim Hoàng Diệu — phía nam là phố dân thật.
@@ -1139,8 +1199,8 @@ function fillGap(s, sg, t0, t1) {
     { const v = parcelVeto(s, sg, ta, tb, F, uBase, () => builtEvidence(mx, mz, s.ux, s.uz, nx, nz) || obsSupport(frameRect(F, uBase + ta, uBase + tb, 0, 12))); if (v) { stat('gap_veto_' + v); GAPDBG.push([mx, mz, v]); continue; } }   // W3-B
     if (forecourt(frameRect(F, uBase + ta, uBase + tb, 0, 25))) { stat('gap_veto_forecourt'); GAPDBG.push([mx, mz, 'forecourt']); continue; }
     if (panoOpenVeto(frameRect(F, uBase + ta, uBase + tb, 0, 12))) { stat('gap_veto_pano'); GAPDBG.push([mx, mz, 'noev']); continue; }
-    if (DBG && Math.hypot(mx - DBG[0], mz - DBG[1]) < 8) console.log('   [dbg gap]', mx.toFixed(1), mz.toFixed(1), s.c, 'ev', builtEvidence(mx, mz, s.ux, s.uz, nx, nz), 'obs', obsSupport(frameRect(F, uBase + ta, uBase + tb, 0, 12)));
-    if (!builtEvidence(mx, mz, s.ux, s.uz, nx, nz) && !obsSupport(frameRect(F, uBase + ta, uBase + tb, 0, 12)) && !pkSupport(F, uBase + (ta + tb) / 2) && !fpGapSupport(mx + nx * 2, mz + nz * 2)) { stat('gap_veto_noev'); GAPDBG.push([mx, mz, 'noev']); continue; }
+    if (DBG && Math.hypot(mx - DBG[0], mz - DBG[1]) < 8) console.log('   [dbg gap]', mx.toFixed(1), mz.toFixed(1), s.c, 'ri', s.ri, 'fl', s.fl, 'n', nx.toFixed(2), nz.toFixed(2), 'river', riverSide(mx, mz, nx, nz), 'ncam', nearNarrowCam(mx, mz, 40), 'ev', builtEvidence(mx, mz, s.ux, s.uz, nx, nz), 'obs', obsSupport(frameRect(F, uBase + ta, uBase + tb, 0, 12)));
+    if (!builtEvidence(mx, mz, s.ux, s.uz, nx, nz) && !obsSupport(frameRect(F, uBase + ta, uBase + tb, 0, 12)) && !pkSupport(F, uBase + (ta + tb) / 2) && !fpGapSupport([[mx + nx * 2, mz + nz * 2], centroid(frameRect(F, uBase + ta, uBase + tb, 0, D))])) { stat('gap_veto_noev'); GAPDBG.push([mx, mz, 'noev']); continue; }
     const rect = (d) => frameRect(F, uBase + ta, uBase + tb, 0, d);
     let lo = 0, hi = D;
     const okD = (d) => { const Q = rect(d); if (!sweepFree(Q, -1, { corr: true, zones: true })) return false;

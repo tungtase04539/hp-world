@@ -263,6 +263,28 @@ try {
   console.log(`ngõ/hẻm lõi (h): ${nH}`);
 } catch (e) { console.log('(không có osm_alleys.json — bỏ qua hẻm)'); }
 
+// ---------- 3b2. TÁCH WAY theo mặt cắt thật (Đ3-W5-D sửa phản biện) ----------
+// Bề rộng street_fit là MỘT giá trị mỗi way. Way 962470755 'Phố Tam Bạc' chạy từ ngõ ven sông 5,5 m (331-520) tới tận
+// đầu nút 221 (Nguyễn Tri Phương, lòng thật ~7 m + dải dạo lát + lan can — ảnh 221 h0/h180): ghi đè ngõ 5,5 m kéo tới nút
+// → mép lòng cắt chéo dải dạo, lan can lùi xa (review 221 h180). Tách tại z = −590 (cùng ranh 'dải bờ tự phát'/'prom' của
+// §6b3): phần BẮC giữ chỉ số cũ, khúc NAM nối vào CUỐI ROADS_DT (sau ngõ h) ⇒ chỉ số mọi way cũ KHÔNG đổi (SIDEWALK_BY_ROAD…
+// khoá theo chỉ số); khúc nam theo bề rộng thường (Overture/cấp — như dot3) vì 221 không nằm trong ghi đè ngõ hẹp.
+const SPLIT_WAYS = [{ id: 962470755, z: -590 }];
+for (const S of SPLIT_WAYS) {
+  const ri = ROADS_DT.findIndex((r) => r.id === S.id); if (ri < 0) { console.log(`  tách way ${S.id}: không thấy`); continue; }
+  const r = ROADS_DT[ri], P = r.pts;
+  const k = P.findIndex((p, i) => i > 0 && (P[i - 1][1] - S.z) * (p[1] - S.z) <= 0);
+  if (k < 1) { console.log(`  tách way ${S.id}: không cắt z ${S.z}`); continue; }
+  const a = P[k - 1], b = P[k], t = (S.z - a[1]) / (b[1] - a[1] || 1);
+  const m = rnd([[a[0] + (b[0] - a[0]) * t, S.z]])[0];
+  const head = [...P.slice(0, k), m], tail = [m, ...P.slice(k)];
+  if (Math.hypot(head[head.length - 1][0] - head[head.length - 2][0], head[head.length - 1][1] - head[head.length - 2][1]) < 0.5) head.splice(head.length - 2, 1);
+  if (Math.hypot(tail[1][0] - tail[0][0], tail[1][1] - tail[0][1]) < 0.5) tail.splice(1, 1);
+  r.pts = head;
+  ROADS_DT.push({ c: r.c, pts: tail, name: r.name, id: `${S.id}:s`, tags: r.tags });
+  console.log(`  tách way ${S.id} (ri ${ri}) tại z ${S.z}: bắc ${head.length} đỉnh, nam → ri ${ROADS_DT.length - 1} (${tail.length} đỉnh)`);
+}
+
 // ---------- 3c. MẶT CẮT PHỐ THẬT + TIM KHỚP VẾT XE PANO (Đợt 3 W3-A, tools/street_fit.mjs) ----------
 // Bề rộng lòng/vỉa MỖI WAY (ghi đè pano → tag width → tường Overture 2 bên → gộp theo tên → mặc định cấp) và dịch tim
 // theo 551 camera pano (camera phải nằm TRONG lòng). Cần tools/ov_buildings.csv (gitignore; thiếu → chỉ dịch tim, bề rộng
@@ -640,12 +662,7 @@ const WATER = [];
   for (const r of ROADS_DT) {
     if (!['p', 's', 't', 'r'].includes(r.c)) continue;
     if (r.tags && r.tags.bridge && r.tags.bridge !== 'no') continue;
-    // Đ3-W5-D: Tam Bạc bắc nay là ngõ 5,5 m + vỉa 1 m (street_fit ghi đè pano) → clearOf co 11 → 7 m. Đoạn 'dải bờ tự phát'
-    // (z < −590, cộng STRIP_W) giữ theo phố hẹp; đoạn nam (đầu nút 221, chế độ 'prom' dải dạo của riverbank) cần thêm 2 m
-    // (mép nước 8,25 m từ tim: dải dạo lát 4,5 m + lan can — ảnh 221 h180) — với 7 m nước tràn sát mép ngõ, lan can đứt
-    // (ảnh thử); trả về khoảng THEO CẤP 11 m thì riverbank xếp 'wild' (dải > 7 m) → mất lan can
-    const clsClear = /Tam Bạc/.test(r.name || '') ? Math.max(7, roadHW(r) + sidewalkW(r) + PROM + 2) : 0;
-    for (let i = 0; i < r.pts.length - 1; i++) segs.push([...r.pts[i], ...r.pts[i + 1], clearOf(r), clsClear]);
+    for (let i = 0; i < r.pts.length - 1; i++) segs.push([...r.pts[i], ...r.pts[i + 1], clearOf(r)]);
   }
   try {
     for (const w of load('osm_alleys.json')) {
@@ -697,8 +714,7 @@ const WATER = [];
       let best = null;
       const xtra = stripExtra(W.n, x, z);
       for (const si of cell) {
-        const [ax, az, bx, bz, needW, needC = 0] = segs[si];
-        const need0 = z > -590 ? Math.max(needW, needC) : needW;
+        const [ax, az, bx, bz, need0] = segs[si];
         const need = need0 + (need0 > FOOT_CLEAR ? xtra : 0);
         const dx = bx - ax, dz = bz - az, L = Math.hypot(dx, dz); if (L < 0.5) continue;
         const ux = dx / L, uz = dz / L;
