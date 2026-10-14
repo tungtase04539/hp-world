@@ -3758,16 +3758,14 @@ const bcPalm = (parent, lx, lz, h = 9) => {   // Đợt 3 WP4: cau vua instanced
       const pg = new THREE.Group(); pg.position.set(-601.8, gy, pz);
       bcPalm(pg, 0, 0, 9.5); g.add(pg);
     }
-    const tp = new THREE.Group(); tp.position.set(-621, groundHeight(-621, -310), -310); tp.rotation.y = Math.PI / 2;
-    const tw = new THREE.Mesh(new THREE.BoxGeometry(24, 15.5, 10), bcFacade('#9fb6c4', '#3f4a52', 8, 5));
-    tw.position.y = 7.75; tp.add(tw);
-    const troof = new THREE.Mesh(new THREE.BoxGeometry(25, 0.5, 11), mat(0x2f6d5a));
-    troof.position.y = 15.9; tp.add(troof);
-    g.add(tp);
+    // Đ3-W5-D: BỎ "khối tập thể 5T" 24 × 10 m ở (−621, −310) xoay 90° — nó nằm NGANG ngõ 90 Hạ Lý (way h 608, z ≈ −308):
+    // ảnh 533 h270 ngõ chạy tiếp về tây giữa lán mái tôn xanh + ô tô đỗ, game là bức tường trắng 5 tầng chắn ngõ cách 14 m
+    // (+ collider r 12,5 m giữa ngõ). Khối 5T thật (548 h0 "khối sẫm 5T sau") đã có trong footprint thật phía bắc ngõ.
+    // FEATURED_CLEAR (−621, −310) giữ nguyên (thứ tự; ngõ thoáng).
     g.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
     scene.add(g);
     addCollider(-600, -308, 2.2); addCollider(-600, -316, 2.2); addCollider(-605.5, -324, 3.4);
-    addCollider(-601.6, -298.5, 1.4); addCollider(-621, -310, 12.5);
+    addCollider(-601.6, -298.5, 1.4);
     FEATURED_CLEAR.push([-606, -310, 20]); FEATURED_CLEAR.push([-621, -310, 16]);
   }
 }

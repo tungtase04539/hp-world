@@ -281,13 +281,18 @@ export function modelCoveredCar(G) {
   return G.mergeParts(P);
 }
 // XE KHÁCH 29-45 chỗ (local +Z = mũi): thân, dải kính, kính lái, 6 bánh, sọc sơn (màu instance) — ~120 tam giác
+// Đ3-W5-D (chấm W4 pano_079 h180 "white box bus"): thân dưới SƠN MÀU instance (xe buýt/xe khách thật sơn cả mảng dưới cửa
+// sổ — ảnh 079 h180 xe buýt đỏ-trắng), nóc + diềm trắng, dải kính có TRỤ cửa sổ (không còn băng đen liền một khối), hốc bánh tối
 export function modelCoach(G) {
   const P = [], L = 11.4;
-  P.push(G.finish(G.box(2.48, 2.55, L, 0, 1.75, 0), 0xf2f2ef));
-  P.push(G.finish(G.box(2.5, 0.9, L - 1.4, 0, 2.25, -0.3), 0x26313b));                       // dải kính hông
-  P.push(G.finish(G.box(2.3, 1.15, 0.06, 0, 2.15, L / 2 + 0.01, -0.12, 0, 0), 0x2a3640));     // kính lái
-  P.push(G.finish(G.box(2.52, 0.32, L - 0.6, 0, 1.35, 0), 0xffffff, 1));                       // sọc sơn hãng (màu instance)
-  P.push(G.finish(G.box(2.46, 0.5, L - 0.2, 0, 0.62, 0), 0x6a6f74));                            // gầm/khoang hành lý
+  P.push(G.finish(G.box(2.48, 1.25, L, 0, 1.12, 0), 0xffffff, 1));                             // thân dưới (màu instance)
+  P.push(G.finish(G.box(2.48, 0.32, L, 0, 2.9, 0), 0xeeeeea));                                  // diềm trên + nóc
+  P.push(G.finish(G.box(2.3, 0.18, L - 1.2, 0, 3.14, -0.2), 0xd6d8d6));                         // hộp điều hoà nóc
+  P.push(G.finish(G.box(2.5, 0.98, L - 1.4, 0, 2.24, -0.3), 0x26313b));                       // dải kính hông
+  for (let k = 0; k < 7; k++) P.push(G.finish(G.box(2.53, 0.98, 0.12, 0, 2.24, -L / 2 + 0.95 + k * (L - 1.9) / 6), 0xe8e8e4));   // trụ cửa sổ
+  P.push(G.finish(G.box(2.3, 1.2, 0.06, 0, 2.2, L / 2 + 0.01, -0.12, 0, 0), 0x2a3640));       // kính lái
+  P.push(G.finish(G.box(2.52, 0.12, L - 0.6, 0, 1.72, 0), 0xf4f4f0));                          // chỉ trắng dưới kính
+  P.push(G.finish(G.box(2.46, 0.5, L - 0.2, 0, 0.62, 0), 0x4a4f54));                            // gầm/khoang hành lý
   for (const z of [3.6, -2.6, -3.9]) for (const s of [-1, 1]) P.push(G.finish(G.cyl(0.5, 0.5, 0.3, 10, s * 1.08, 0.5, z, 'x'), 0x19191b));
   P.push(G.finish(G.box(2.2, 0.25, 0.05, 0, 0.75, L / 2 + 0.02), 0xd8d8d0));                    // cản trước
   return G.mergeParts(P);
