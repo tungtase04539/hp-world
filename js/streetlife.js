@@ -843,7 +843,9 @@ export function placeStreetLife(P) {
         for (let kk = k; kk < Math.min(S.n, k + n); kk++) {
           // (ô OCC.SHOP vẫn được: bộ bàn ghế quán 6.4 đã có ≤ 1,4 m → tán ô đặt ĐÚNG trên bộ đó, không thêm bàn — pano 267: quán
           //  trà đã có 2 bộ ghế nhựa + dù nhỏ đúng chỗ hiên dù đỏ thật; xe đẩy/thùng rác/hàng chặn qua obst)
-          if (!S.ok[kk] || S.fore[kk] || (S.occ[kk] & (OCC.POLE | OCC.MKT)) || !hasFacade(S, kk)) continue;
+          if (!S.ok[kk] || S.fore[kk] || (S.occ[kk] & (OCC.POLE | OCC.MKT))) continue;
+          // mặt tiền: nhà thật HOẶC nhà ô dựng tay giữ lại (claim 'cell' — quán Trà Chanh pano_267 là nhà ô dựng tay)
+          if (!hasFacade(S, kk)) { const [bx, bz] = cellPos(S, kk, X.fac + 1.5); if (!P.claimAt(bx, bz, ['cell'])) continue; }
           const latU = Math.max(X.hw + 1.2, Math.min(X.fac - 1.2, X.hw + X.sw * 0.5));
           let [ux, uz] = cellPos(S, kk, latU, (hash3(S.ax + kk, S.az, 373) - 0.5) * 0.3);
           let own = null;
@@ -927,9 +929,13 @@ export function placeStreetLife(P) {
       if (dF === null) continue;
       const [x, z] = cellPos(S, k, X.fac + dF - 0.03, da);
       if (nearPano(x, z, 4)) continue;
-      const fl = hash3(x, z, 423) < 0.55;
-      vines.push({ x, z, heading: headRoad(S), yo: 3.9 + hash3(x, z, 424) * 0.8, col: fl ? pick([0xc8287a, 0xb02a8a, 0xd8508a, 0xe0702a, 0x9a3aa0], hash3(x, z, 425)) : 0x4f8a3a,
-        sc: [0.8 + hash3(x, z, 426) * 0.5, 0.75 + hash3(x, z, 427) * 0.45, 1] });
+      // phản biện ảnh (203 h90): khóm treo ở 3,9-4,7 m bị mái hiên/bạt tầng trệt che gần hết → treo từ tầng 2-3 theo số tầng THẬT
+      // của nhà (nhà 1 tầng: rủ từ đỉnh tường ~3,4 m, nhỏ), rủ 2,9-4 m, rộng 2,9-4,4 m (ảnh: dây leo phủ cả mảng mặt tiền)
+      const F = P.bldFloors ? P.bldFloors(x - S.nx * 0.3, z - S.nz * 0.3) || P.bldFloors(x + S.nx * 0.3, z + S.nz * 0.3) : 2;
+      const fl = hash3(x, z, 423) < 0.55, big = F >= 2;
+      const yTop = F >= 3 ? 9.2 + hash3(x, z, 424) * 0.6 : F === 2 ? 6.7 + hash3(x, z, 424) * 0.4 : 3.3;
+      vines.push({ x, z, heading: headRoad(S), yo: yTop, col: fl ? pick([0xc8287a, 0xb02a8a, 0xd8508a, 0xe0702a, 0x9a3aa0], hash3(x, z, 425)) : 0x4f8a3a,
+        sc: big ? [1.3 + hash3(x, z, 426) * 0.7, 1.4 + hash3(x, z, 427) * 0.5, 1.1] : [0.8 + hash3(x, z, 426) * 0.4, 0.75, 1] });
     }
   }
   st.vines = vines.length;
@@ -1022,7 +1028,9 @@ export function buildStreetLifeMeshes(B, L) {
     palB: [0xf2f2ee, 0x1f5fb0, 0xf2f2ee, 0xc8282a, 0x2c8a4a, 0xf0f0ea, 0x2a4f9a, 0xe0c020] });
   // hàng dưới đất ≤ 100 m (LITE 70): nhóm 6 biến thể ~900 tam giác/instance (đỉnh suy biến của biến thể khác) — bản ≤ 150 m: 533
   // instance thấy được ở khung chợ 446 = 479k tam giác (+ lượt bóng); hàng 0,5-1 m ở 100 m chỉ còn 3-6 px
-  const NEAR_OVER = LITE ? 160 : 300, NEAR_GROUND = LITE ? 70 : 100;
+  // Đ3-W5-C: chợ mức 3 dày hơn (+15% món) → hàng đất ≤ 100 → 80 m, đống nông sản ≤ 60 → 45 m (ở 80-100 m món 0,5-1 m còn 3-5 px;
+  // A/B pano_446_h090: +17% tam giác trước khi thu)
+  const NEAR_OVER = LITE ? 160 : 300, NEAR_GROUND = LITE ? 70 : 80;
   const out = [];
   if (L.overI.length) out.push(inst('props_market_over', G.variants([modelUmbrella(G), modelUmbrellaSq(G), modelTarp(G), modelTarpStriped(G)]), matMkt, L.overI, { rMax: NEAR_OVER, keepBehind: 30, color: (it) => it.col }));
   // 2 nhóm (sạp+mẹt ~510 tam giác · sọt/bạt đất/bao tải/ghế ~390) thay 1 nhóm 6 biến thể ~900: mỗi instance chỉ gánh đỉnh suy
@@ -1046,7 +1054,7 @@ export function buildStreetLifeMeshes(B, L) {
   }
   if (pile.length) {
     const matPile = G.propMaterial({ name: 'produce', palA: PRODUCE_COLS, gate: [0.35, 0.4] });
-    out.push(inst('props_market_produce', modelProduce(G), matPile, pile, { rMax: LITE ? 40 : 60, keepBehind: 15, cast: false, color: (it) => it.col }));
+    out.push(inst('props_market_produce', modelProduce(G), matPile, pile, { rMax: LITE ? 40 : 45, keepBehind: 15, cast: false, color: (it) => it.col }));
   }
   L.stats.produce = pile.length;
   if (L.spillI.length) out.push(inst('props_spill', G.variants([modelRack(G), modelFlowers(G), modelPot(G), modelFurniture(G), modelAltar(G), modelToys(G), modelGoods(G), modelBaGac(G)]), matMkt, L.spillI, { rMax: NEAR_GROUND, keepBehind: 25, color: (it) => it.col }));

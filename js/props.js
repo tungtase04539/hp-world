@@ -848,6 +848,7 @@ export function buildProps(ctx) {
     sides, CELL, cellPos, hash3, evAt, inBuilding, obst, flat, roadIdx, nearPano, onCarriage, onCarriageFast, openReal, parkBehind, claimAt, XS,
     OCC: { POLE: OCC_POLE, SHOP: OCC_SHOP, BIKE: OCC_BIKE, PED: OCC_PED, CAR: OCC_CAR, MKT: OCC_MKT }, addCollider: ctx.addCollider, R_MAX,
     SHOP_SIGNS, MARKETS: PROPS_MARKETS, evidence: PROPS_EVIDENCE, st: slStats, LITE, ROADS_DT,
+    bldFloors: fp ? (x, z) => { const b = fp.grid.at(x, z); return b >= 0 ? fp.D.floors[b] : 0; } : null,   // Đ3-W5-C (dây leo theo số tầng)
   };
   marketLevels(SL);
 
