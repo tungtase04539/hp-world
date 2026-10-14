@@ -461,8 +461,8 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     `tools/gen_treemap.mjs` + `tools/gen_props_evidence.mjs` (đọc fp_nature) → SINH LẠI `js/treemap.js`, `js/props_evidence.js`.
     **BẰNG CHỨNG FACADE FINGERPRINTS (`tools/gen_fp_nature.mjs`):** fp_json (W4-A, ~6 ảnh mặt tiền/pano, trường "trees"/"street",
     Việt HOẶC Anh) nằm NGOÀI repo → bộ sinh đếm số HƯỚNG nhắc từng dấu hiệu (cây non/chống cọc/kiềng, nghiêng, tán thưa/rậm, hàng
-    xe máy dày, ít xe máy, xe máy phủ bạt, hàng hoá, ghế quán, chậu cây, dây chằng chịt) → `tools/fp_nature.json` (366 pano lúc chạy,
-    fp_json còn đang về: chạy lại `node tools/gen_fp_nature.mjs [--fp <dir>]` rồi 2 bộ sinh kia). CHỈ NÂNG bằng chứng audit:
+    xe máy dày, ít xe máy, xe máy phủ bạt, hàng hoá, ghế quán, chậu cây, dây chằng chịt) → `tools/fp_nature.json` (551 pano sau sửa phản biện;
+    chạy lại `node tools/gen_fp_nature.mjs --fp <dir fp_json>` rồi 2 bộ sinh kia). CHỈ NÂNG bằng chứng audit:
     treemap young ≥ 2 hướng → 3, lean ≥ 2 → 1 (young 72 → 145 pano, lean 6 → 77); props_evidence xe máy dày ≥ 2 hướng → mức 3 (≥ 1 và
     không hướng nào "ít xe" → ≥ 2), phủ bạt → deco bit MỚI 1024 (regex audit "xe máy … phủ bạt" 17 pano + fp → 38), hàng hoá ≥ 2 →
     spill 4, ghế quán ≥ 2 → clutter 1, chậu ≥ 1 → spill 512, dây ≥ 2 (pano có cột) → pole 2. **BẪY:** agent trích xuất hay CHÉP Y
@@ -505,6 +505,29 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     đưa xe vào `LIFE.stallsRoad` cho giao thông lách — chưa làm, rủi ro bất biến giao thông); dải dạo ven sông (336 h180/h270) không xe
     máy (openSpace ⇒ mức 0) trong khi ảnh thật xe đỗ dọc lan can; vài phố dân cư mức 2 nay dày hơn ảnh (308 h0); nhịp cây mới đổi chỗ
     cây gần camera (083 h0 thân cây to sát trái, 345 h180 mất 1 cây).
+    **SỬA SAU PHẢN BIỆN (merge-with-fixes):** đo bằng harness node (`scratchpad/dot3/W4-B/fix/nh.mjs --clash --clash2 --walkbld`;
+    lối đi người đi bộ = ±L/2 quanh tâm như shader `KIT_WALK_PATH`, KHÔNG phải 0..L). (1) NGƯỜI ĐI BỘ XUYÊN NHÀ (lối sát mặt tiền
+    facadeLine − 0,4 cách mặt tiền danh nghĩa 0,4 m, footprint thật chồm qua): dot3 7/404 → bản đầu 34/338 → **0/350**: lấy mẫu CẢ
+    quãng đi mỗi 0,5 m tại lat và lat ± 0,3 với `inBuilding` + (lối qua hàng xe) điểm cách thân xe đã đỗ (hộp 1,8 × 0,66 + 0,25)
+    → thử facadeLine − 0,4 / − 0,25 / − 0,7, vẫn chạm thì rút về khúc trống dài nhất (≥ min(6, L − 0,6), ≥ 3,5 m), không thì bỏ;
+    lối thường cũng kiểm. Người đi XUYÊN xe đỗ (đo ±L/2): dot3 1 → bản đầu 55 → 0. Ngân sách người nhóm chung: người đi bộ ×1,25
+    hệ số giữ, đứng/ngồi chia phần còn lại (TỔNG không đổi) → người đi bộ 288 → 350 (dot3 404). (2) XE MÁY XUYÊN NHAU: lưới `placedB`
+    (ô 2 m) mọi xe đã đặt; `tryBike` SAT hộp 1,7 × 0,44 m với xe trong 1,9 m (`bikeRej[5]`), chạm → thử lại SONG SONG xe bị chạm cùng
+    mốc t (giữ mật độ). Cặp chồng: dot3 539 → bản đầu 1.468 → **85** (còn lại quanh xe trưng bày `bikeDisplay`, không qua lưới); xe
+    27,9k (bản đầu 28,4k), mức 3 41,8 / mức 2 27,0 xe ≤ 20 m. Khách ngồi/đứng (6.4) vào `bikeObst` r 0,3 → chồng sâu = dot3.
+    (3) fp_nature `bikeDense` THEO MỆNH ĐỀ (, ; .): bỏ mệnh đề nói xe ĐANG CHẠY/ở ngã tư/"đông" (chạy|lưu thông|qua lại|di chuyển|
+    dừng đèn|đèn đỏ|giữa/trên/lòng đường|ngã tư|đông|moving|riding|fast|traffic|passing|on road|at/in junction/intersection) trừ khi
+    cùng mệnh đề có đỗ|đậu|dựng|vỉa hè|trước cửa/nhà/quán|parked|kerb|sidewalk|pavement. "xe máy ô tô đông" (đại lộ 435), "xe máy
+    chạy dày" (ngã tư 177), "Many motorbikes at junction" (154) là DÒNG XE. 435/154/020 về 0; 177 → 2 (1 hướng "xe máy đỗ dày trước
+    tiện lợi"); 146/428/172/254 giữ (chữ "parked row/đậu dày vỉa hè" rõ). Chạy lại trên fp_json ĐỦ (551 pano, 3.303 ảnh); `--fp
+    <dir>` hoặc `HP_FP_JSON` BẮT BUỘC (không còn đường dẫn Temp mặc định). (4) DÁNG TÁN: thẻ lá/hoa có thuộc tính MỚI `aPiv` (tâm thẻ
+    − đỉnh; cành/thân 0, Geo.pv) → trường thùy tính tại TÂM THẺ và thẻ được TỊNH TIẾN nguyên khối (bản đầu nhân xz từng đỉnh ×0,53-1,47
+    = kéo dẹt thẻ); cây tự do A 0,15-0,30 và ≤ (fd − FACADE_CLEAR − R − dời tán)/(1,12 R). **BẪY:** "phiến lá dẹt" ở 088 h90 trái
+    KHÔNG do biến dạng (bản sửa y hệt) — đó là kit BÀNG (form tier, thẻ nằm ngang theo tầng) nhìn từ dưới, nay đứng gần camera do
+    nhịp cây mới. (5) Bạt xe phủ bỏ xanh đậm/đỏ đô/xanh rêu tối (đọc thành "đống đen" trong bóng 492 h0) → bạc/xanh nhạt/đỏ nhạt.
+    Perf A/B (dot3 :8712 ↔ :8702, 2 vòng + 1 vòng mới kiểm, keep/views_ab4.json): tris 13,30 → 13,80 M (+3,8%), calls ≈ (1.764 →
+    1.747-1.772), fps 60, hpReady 6,30 → 6,47 s (máy chậm hơn phiên trước cả 2 bên). 1 vòng mới pano_007 lệch 615 calls/4,46 M (vòng
+    lặp lại 505/3,60) — nhiễu chụp, lặp lại trước khi kết luận. diag full lần 1 overlap 2 ((48,59) thoáng qua) → lần 2 overlap 1 (259,110 cũ).
 
 - **2026-10-14 (Đ3-W3 SỬA HỒI QUY AUDIT4)** [ĐỢT 3 wave 3 — hồi quy mức 3 của AUDIT4 (REAL | dot3 | tích hợp), nhánh tích hợp]:
     **(R1) SÔNG TAM BẠC "MẤT" SAU LAN CAN (198/203/207/212 mức 3, 134 mức 2) — gốc W3-F, KHÔNG phải polygon nước:** đo WATER

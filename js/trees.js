@@ -296,9 +296,10 @@ function buildAtlasCanvas() {
 class Geo {
   // crown: đỉnh đang thêm thuộc TÁN (cành + lá + hoa + rễ phụ) hay THÂN — shader W2-B co tán theo chiều ngang chỉ với
   // đỉnh tán (aHt + 2), thân giữ nguyên bề dày
-  constructor() { this.p = []; this.n = []; this.uv = []; this.c = []; this.k = []; this.s = []; this.i = []; this.cr = []; this.nv = 0; this.crown = false; }
+  // pv: TÂM THẺ − đỉnh (thẻ lá/hoa; 0 với cành/thân) — shader W4-B dời thẻ NGUYÊN KHỐI theo trường thùy tán tại tâm thẻ
+  constructor() { this.p = []; this.n = []; this.uv = []; this.c = []; this.k = []; this.s = []; this.i = []; this.cr = []; this.pv = []; this.nv = 0; this.crown = false; }
   v(x, y, z, nx, ny, nz, u, v, cr, cg, cb, kind, sway) {
-    this.p.push(x, y, z); this.n.push(nx, ny, nz); this.uv.push(u, v); this.c.push(cr, cg, cb); this.k.push(kind); this.s.push(sway); this.cr.push(this.crown ? 1 : 0);
+    this.p.push(x, y, z); this.n.push(nx, ny, nz); this.uv.push(u, v); this.c.push(cr, cg, cb); this.k.push(kind); this.s.push(sway); this.cr.push(this.crown ? 1 : 0); this.pv.push(0, 0, 0);
     return this.nv++;
   }
   t(a, b, c) { this.i.push(a, b, c); }
@@ -316,6 +317,7 @@ class Geo {
     // đỉnh TÁN = 3 (nâng/dời TRỌN khối, kể cả thẻ lá thấp hơn chạc); đỉnh THÂN = dốc 0..1 theo cao
     for (let i = 0; i < this.nv; i++) ht[i] = !Number.isFinite(fork) ? 0 : this.cr[i] ? 3 : clamp((this.p[i * 3 + 1] - WASH_TOP) / span, 0, 1);
     g.setAttribute('aHt', new THREE.Float32BufferAttribute(ht, 1));
+    g.setAttribute('aPiv', new THREE.Float32BufferAttribute(this.pv, 3));
     g.setIndex(this.nv > 65535 ? new THREE.Uint32BufferAttribute(this.i, 1) : new THREE.Uint16BufferAttribute(this.i, 1));
     g.computeBoundingBox(); g.computeBoundingSphere();
     return g;
@@ -376,6 +378,7 @@ function card(G, px, py, pz, nx, ny, nz, size, rect, rot, kind, ao, nl, sway, as
     G.v(px + _T.x * hw * a + _B.x * hh * b, py + _T.y * hw * a + _B.y * hh * b, pz + _T.z * hw * a + _B.z * hh * b,
       nl[0], nl[1], nl[2], u, v, ao, ao, ao, kr, sway);
   }
+  for (let q = base; q < base + 4; q++) { G.pv[q * 3] = px - G.p[q * 3]; G.pv[q * 3 + 1] = py - G.p[q * 3 + 1]; G.pv[q * 3 + 2] = pz - G.p[q * 3 + 2]; }
   G.t(base, base + 1, base + 2); G.t(base, base + 2, base + 3);
 }
 const norm3 = (x, y, z) => { const l = Math.hypot(x, y, z) || 1; return [x / l, y / l, z / l]; };
@@ -1260,7 +1263,7 @@ export function plantPlazaYoung(ctx) {
 // uBloom = (tỉ lệ phượng đang nở, tỉ lệ bằng lăng đang nở) theo LỊCH trong game (bloomShare) — cây nở khi hạng hoa
 // riêng (aInst.x, hash 0..1; bằng lăng +2; −1 = luôn nở: cây đôi của hero GLB) < tỉ lệ; càng sâu dưới ngưỡng càng nhiều chùm hoa
 const U = { uTime: { value: 0 }, uBloom: { value: new THREE.Vector2(1, 1) }, uWind: { value: 1 }, uAtlasPx: { value: ATLAS_S * 4 } };
-const VERT_DECL = 'attribute float aKind;\nattribute float aSway;\nattribute float aHt;\nattribute vec4 aInst;\nattribute vec4 aShape;\nuniform float uTime;\nuniform vec2 uBloom;\nuniform float uWind;\n';
+const VERT_DECL = 'attribute float aKind;\nattribute float aSway;\nattribute float aHt;\nattribute vec3 aPiv;\nattribute vec4 aInst;\nattribute vec4 aShape;\nuniform float uTime;\nuniform vec2 uBloom;\nuniform float uWind;\n';
 // hero GLB (phượng Meshy LUÔN đỏ) + cây đôi luôn-nở CHỈ khi đang mùa phượng (tỉ lệ nở ≥ ngưỡng) — W3-G: gắn hero vào lịch
 // (khai báo TRƯỚC VERT_BEGIN: shader nhúng cùng hằng số này — không lệch giữa JS và GLSL)
 const HERO_SEASON = 0.45;
@@ -1275,10 +1278,13 @@ const VERT_BEGIN = `vec3 transformed = vec3( position );
   // Đ3-W4-B DÁNG TÁN RIÊNG TỪNG CÂY (AUDIT4 D4 "cây đồng loạt/giống hệt"): biên độ hpAmp (0..0,47, mã hoá trong aInst.y =
   // vôi + 2·q) → bán kính tán điều biến theo phương vị bằng 3 sóng (1/2/3 thùy, pha theo aInst.z) + mặt tán nghiêng lệch
   // (một phía cao hơn). Trường biến dạng TRƠN theo vị trí → cành và chùm thẻ lá đi cùng nhau (không tách thẻ khỏi cành).
+  // Phản biện W4-B: trường tính tại TÂM THẺ (aPiv = tâm − đỉnh; cành/thân aPiv = 0 → đúng tại đỉnh) và DỜI cả thẻ (tịnh
+  // tiến) — bản đầu nhân xz từng đỉnh ×0,53-1,47 làm thẻ lá gần bị kéo dẹt thành "phiến lá" ngang (088 h90)
   float hpAmp = floor( aInst.y * 0.5 ) * 0.03125;
   if ( hpAmp > 0.0 && hpCr > 0.5 ) {
-    float hpPh = aInst.z, hpA = atan( transformed.z, transformed.x ), hpRr = length( transformed.xz );
-    transformed.xz *= 1.0 + hpAmp * ( 0.55 * cos( hpA - hpPh ) + 0.35 * cos( 2.0 * hpA + hpPh * 1.7 ) + 0.22 * cos( 3.0 * hpA + hpPh * 2.3 ) );
+    vec3 hpP = transformed + aPiv;
+    float hpPh = aInst.z, hpA = atan( hpP.z, hpP.x + 1e-6 ), hpRr = length( hpP.xz );
+    transformed.xz += hpP.xz * ( hpAmp * ( 0.55 * cos( hpA - hpPh ) + 0.35 * cos( 2.0 * hpA + hpPh * 1.7 ) + 0.22 * cos( 3.0 * hpA + hpPh * 2.3 ) ) );
     transformed.y += hpAmp * 0.32 * hpRr * cos( hpA - hpPh * 1.31 );
   }
   transformed.xz *= mix( 1.0, abs( aShape.y ), hpCr );
@@ -1844,7 +1850,10 @@ export function buildTrees(scene, ctx = {}) {
     if (!r.big) {
       const free = r.fd === undefined || r.fd > R + FACADE_CLEAR + 1;
       const ha = hxz(r.x, r.z, 78);
-      r.amp = r.sp === SP.NON ? 0.1 + 0.15 * ha : r.sp === SP.DA || r.sp === SP.ME ? 0.08 + 0.1 * ha : free && !r.sq ? 0.15 + 0.27 * ha : 0.12 + 0.14 * ha;
+      // phản biện W4-B: cây tự do 0,15-0,30 (bản đầu 0,42) và KHÔNG đẩy tâm thẻ quá mặt tiền: R·(1 + 1,12·amp) + dời tán +
+      // FACADE_CLEAR ≤ fd (1,12 = tổng 3 sóng)
+      const ampFree = r.fd === undefined ? 1 : Math.max(0.05, (r.fd - FACADE_CLEAR - R - Math.hypot(ox, oz)) / (1.12 * R));
+      r.amp = r.sp === SP.NON ? 0.1 + 0.15 * ha : r.sp === SP.DA || r.sp === SP.ME ? 0.08 + 0.1 * ha : free && !r.sq ? Math.min(0.15 + 0.15 * ha, ampFree) : 0.12 + 0.14 * ha;
       // pano nói cây NGHIÊNG (fp/audit "tilted/thân nghiêng" — r.lean): sát tường 80%; đứng tự do 40% nghiêng hướng ngẫu nhiên 2-4,6°
       const okT = !r.tiltX && !r.tiltZ && r.sp !== SP.NON && r.sp !== SP.CATCUT && r.sp !== SP.LOP && r.sp !== SP.CAU && r.sp !== SP.TOPI;
       if (okT && r.sq > 0 && hxz(r.x, r.z, 79) < (r.lean ? 0.8 : 0.45)) {
@@ -1926,7 +1935,7 @@ export function buildTrees(scene, ctx = {}) {
     const cc = [0.74, 0.72, 0.68];
     box(-o, o, -o, -o + w, -0.05, top, cc); box(-o, o, o - w, o, -0.05, top, cc); box(-o, -o + w, -o + w, o - w, -0.05, top, cc); box(o - w, o, -o + w, o - w, -0.05, top, cc);
     { const base = G.nv, s = o - w, c = [0.3, 0.24, 0.19]; for (const [x, z] of [[-s, -s], [s, -s], [s, s], [-s, s]]) G.v(x, soil, z, 0, 1, 0, 0, 0, c[0], c[1], c[2], 0, 0); G.t(base, base + 2, base + 1); G.t(base, base + 3, base + 2); }
-    const pg = G.build(); pg.deleteAttribute('uv'); pg.deleteAttribute('aKind'); pg.deleteAttribute('aSway'); pg.deleteAttribute('aHt');
+    const pg = G.build(); pg.deleteAttribute('uv'); pg.deleteAttribute('aKind'); pg.deleteAttribute('aSway'); pg.deleteAttribute('aHt'); pg.deleteAttribute('aPiv');
     const pmesh = new THREE.InstancedMesh(pg, new THREE.MeshLambertMaterial({ vertexColors: true }), pitIdx.length);
     pmesh.count = 0; pmesh.name = 'tree_pits'; pmesh.castShadow = false; pmesh.receiveShadow = true;
     pmesh.userData.noCull = true; pmesh.userData.noMerge = true; pmesh.boundingSphere = new THREE.Sphere(new THREE.Vector3(), -1);

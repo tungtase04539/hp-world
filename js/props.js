@@ -1347,7 +1347,7 @@ export function buildProps(ctx) {
   const bikeCov = [];
   const bikeRej = [0, 0, 0, 0, 0, 0];   // QA: lý do bỏ 1 chiếc — nhà · vật cản · chồm lòng đường · nhựa/camera pano · khe ngẫu nhiên · chạm xe đã đỗ
   stats.bikeRej = bikeRej;
-  const COVER_COLS = [0xb9bcbf, 0xb9bcbf, 0xa6aaad, 0xc9cbca, 0x8e9396, 0x3e5f8c, 0x2d4a70, 0x7a2d2a, 0xc6b796, 0x4f5a52];
+  const COVER_COLS = [0xb9bcbf, 0xb9bcbf, 0xa6aaad, 0xc9cbca, 0x9a9fa2, 0x7590b4, 0x5f7ea6, 0x9c5e55, 0xc6b796, 0xaab0b2];   // phản biện W4-B: bạt tối (xanh đậm/đỏ đô) đọc thành "đống đen" trong bóng (492 h0) → sáng/nhạt hơn
   // Đ3-W4-B: thử MỘT chiếc tại mốc t với (lat, góc a, mũi vào nhà?) — trả {x,z,fx,fz} hoặc null (cùng bộ kiểm như W3-E)
   const tryBike = (S, t, lat, a, noseIn, narrowL) => {
     const x = S.ax + S.ux * t + S.nx * lat, z = S.az + S.uz * t + S.nz * lat;
