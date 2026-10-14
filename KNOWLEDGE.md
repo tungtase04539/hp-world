@@ -420,7 +420,7 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
-- **2026-10-05/06/11/12 (W3-B PARCELS)** [ĐỢT 3 wave 3 — Ô ĐẤT THẬT: khuôn viên tường rào + cổng, đất trống rào tôn, chợ, tỉ lệ cửa
+- **2026-10-05/06/11/12/14 (W3-B PARCELS)** [ĐỢT 3 wave 3 — Ô ĐẤT THẬT: khuôn viên tường rào + cổng, đất trống rào tôn, chợ, tỉ lệ cửa
     hàng theo phố, claim quảng trường, Chợ Con — AUDIT3 FP-2]:
     **Vấn đề (AUDIT3 S2 Σ345 + GAP):** generator chỉ biết 1 kiểu ô (dãy nhà ống) → lấp khe/lõi ô bằng nhà ống SINH vào khuôn
     viên biệt thự/cơ quan/trường, sân chợ, lô quây tôn; kéo mặt tiền biệt thự ra sát vỉa hè; công năng trệt chỉ theo cấp phố
@@ -562,7 +562,19 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     (builtEvidence/obsSupport — lẽ ra bị 'noev' bỏ) → giữ sân, KHÔNG tường/cổng (151 lô; rào biệt thự mặc định từng dựng trong dải
     công viên trung tâm quanh cây xăng 475, 474 h135, 398 h0 — đất OSM ở đó chỉ là URB). Nhà giữ nguyên 100 %, chỉ đổi tường.
     Thử KHÔNG được: cắt tường theo nhà thật CUỐI (sau nới/lấp khe) đứng ≤ 1,5 m sau vạch → băm vụn 66 dãy hàng rào ở góc nhà
-    bên cạnh; rào tôn 478 h270 vẫn đứng trước cửa hàng (nhà đó không nằm sau đoạn tường trong dữ liệu sinh) — để lại. __R5_NUM__
+    bên cạnh; rào tôn 478 h270 vẫn đứng trước cửa hàng (nhà đó không nằm sau đoạn tường trong dữ liệu sinh) — để lại. (h) khớp
+    cao tầng bị bác bởi quan sát thấp KHÔNG phải nhà ống/shop (269 h90 "khối vòm cuốn 4 T") → giữ NGUYÊN khối (`b.lowBlock`, không
+    chia lô "khối dính"); bởi shophouse (428 h135) → chia lô như thường. **Số đo lượt 5:** 44.941 → 45.001 nhà (b64 1.521.532 B),
+    406 → 366 dãy tường (hàng rào sắt 5,21 → 4,19 km, tường rào 0,35, rào tôn 0,81 → 0,76, tường lô 0,38 → 0,35), 188 → 158 cổng;
+    khớp cao tầng 56 → 47 (9 bác, 4 giữ khối); lúc chạy 366 → 314 dãy / 158 → 120 cổng / 77 → 60 k tam giác / 43 ms; tường trong
+    claim quảng trường-công viên 122 đoạn (~295 m) → 0, trên mặt đường 11 → 0, sát camera pano < 3 m 0. PERF A/B giữ khoá 1 lượt
+    (B A B A, 24 góc chuẩn, tier 3 Radeon 890M): calls 371 → 370, tam giác 3,85 → 3,88 M, fps 60,2 = 60,2 (vsync), hpReady
+    5,04/4,87 → 4,45/4,33 s (nhiễu máy chung), bootProfile.fabric 749/660 → 766/708 ms, 0 lỗi JS; diag 0 lỗi; LITE 3×404 như dot3;
+    waterbfs 5/5; tour 26 ảnh không lỗi JS (giống r4). CHẤM LẠI (REAL|dot3|r4|r5, cùng cài đặt chụp với phản biện): nhóm I
+    (quảng trường + cây xăng, 6) r4 2,25 → r5 3,58 (= dot3: 055 h180/h225/h270 và 420 h90/h135/h180 thoáng lại, 475 h90/h135 hết
+    lô "BÁNH ĐA CUA"); nhóm F (biệt thự mặc định + công viên, 11) 2,82 → ~3,14 (dot3 3,09; mất +0,5 rào công viên 064/065 của r4);
+    nhóm B (15) giữ 3,97 (428 h90/h135: dãy shophouse 2-4 T thay tháp kính); nhóm A (14) ~3,63 (355 h270 hết rào CAMPUS bên trái);
+    cam_high_center hết tháp kính 13 T. Ảnh: scratchpad dot3/W3-B/r5/fA fA2 fB1 fB2 fI fF c3c c4a.jpg.
     **BẪY:** (a) `\b` của JS không hiểu chữ có dấu ("chợ\b" không bao giờ khớp) → ranh giới tường minh; (b) "tôn" khớp trong
     "bê tông" → `tôn(?!g)`; (c) màu tường rào phải lấy từ CỤM chữ tả tường/rào/trụ/cổng — "chòi gác vàng" từng nhuộm cả rào;
     (d) tường dựng tay trong ô cells nằm ngay mặt phố — phải dò hình học trước khi dựng tường dữ liệu; (e) đo cảnh trước freeze
