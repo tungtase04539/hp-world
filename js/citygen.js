@@ -1600,9 +1600,9 @@ export function buildRealFabric(scene, ctx) {
             const tin = fpAw ? fpAw[0] : (ev & FEF.TIN) ? true : (ev & FEF.TARP) ? false : hh(seed, 45) < 0.55;
             const ac = fpAw ? (FPB.awn === FPV.awn.tarp_other ? AWN_OTHER[(hh(seed, 44) * AWN_OTHER.length) | 0] : fpAw[1]) : tin ? AWN_TIN[(hh(seed, 43) * AWN_TIN.length) | 0] : AWN_TARP[(hh(seed, 43) * AWN_TARP.length) | 0];
             const out = tin ? 1.5 + hh(seed, 47) * 0.7 : 1.4 + hh(seed, 47) * 0.5, yT = y0 + (tin ? 2.95 : 2.88), yF = tin ? yT - 0.22 * out : y0 + 2.4, inset = 0.15;
-            // W5-B: bạt TRƠN võng (D_AWN3) chỉ cho vân tay 'tarp_red' + nửa 'tarp_other' + 35% nhà thống kê; 'tarp_stripe'/'tarp_blue'
-            // LUÔN sọc (review: pano_120 bạt sọc xanh-trắng thật bị trích là 'tarp_blue' — 40% trơn làm mất sọc ở h180)
-            const stripe = !tin && (fpAw ? FPB.awn === FPV.awn.tarp_stripe || FPB.awn === FPV.awn.tarp_blue || (FPB.awn === FPV.awn.tarp_other && hh(seed, 49) < 0.5) : hh(seed, 49) < 0.65);
+            // W5-B: bạt TRƠN võng (D_AWN3) chỉ cho vân tay 'tarp_red' + 35% nhà thống kê; 'tarp_stripe'/'tarp_blue'/'tarp_other' LUÔN sọc
+            // như dot3 (review: pano_120 bạt sọc xanh-trắng thật bị trích là 'tarp_blue'; 248 h270 sọc → bạt cam trơn)
+            const stripe = !tin && (fpAw ? FPB.awn === FPV.awn.tarp_stripe || FPB.awn === FPV.awn.tarp_blue || FPB.awn === FPV.awn.tarp_other : hh(seed, 49) < 0.65);
             const cellA = tin ? MOD.D_AWN2 : stripe ? MOD.D_AWN : MOD.D_AWN3;
             const sx0 = ax + (dx / L) * inset, sz0 = az + (dz / L) * inset, sx1 = bx - (dx / L) * inset, sz1 = bz - (dz / L) * inset;
             const fx0 = sx0 + nx * out, fz0 = sz0 + nz * out, fx1 = sx1 + nx * out, fz1 = sz1 + nz * out;

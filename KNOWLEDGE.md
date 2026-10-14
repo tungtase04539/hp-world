@@ -458,18 +458,21 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 - **2026-10-14 (Đ3-W5-B STREETFRONT — mặt phố nhà ống có chiều sâu + phong hoá)** [ĐỢT 3 wave 5; graders: "quá sạch/rực, quá nhiều
   cửa cuốn đóng, biển loè/sai cỡ, không chiều sâu" ở 248/028/363/102/134/198/005/129/143/147/336/368/120/033/170/244/294/083/023/
   262/409/290/501/547/111]:
-    **SHADER (`js/citygen.js` makeMaterial, program key `'fabric_v5b_'`):** (1) **PHONG HOÁ v2** (tường kind ≤ 3, theo TUỔI aFac.z
+    **SHADER (`js/citygen.js` makeMaterial, program key `'fabric_v5b2_'`):** (1) **PHONG HOÁ v2** (tường kind ≤ 3 CHỈ nhà ống/phố cũ/KTT/
+    tầng cơi — st ≤ 2 hoặc RS.TEN; Pháp/villa/kính giữ phong hoá + trần bão hoà 0,62 cũ, W5-A sở hữu; theo TUỔI aFac.z
     bit 4-5 = vân tay old/very_old + vùng): vệt ĐEN CHẢY từ MÉP SÀN mỗi tầng (khoảng cách dưới sàn tầng trên, exp(−d/0,45-1,4 m) ×
     cột nhiễu — nước mưa tràn sàn ban công/ô văng), MẢNG VỮA BONG (tuổi ≥ 2: ngưỡng nhiễu 0,84 − 0,13·tuổi, lộ xi măng xám ẩm hoặc
     gạch đỏ 30% nhà rất cũ, viền tối), phai màu sơn về xám ấm (0,05 + 0,14·tuổi) và vệt ố/mảng ẩm cũ đậm hơn ~40%; trần bão hoà
-    tường 0,62 → 0,58 − 0,05·tuổi. (2) **BIỂN PHAI:** mọi signCol (dải biển trệt, bảng lớn, biển dọc, màu vân tay) trần bão hoà
-    tuyến tính 0,64, kéo về xám ấm 0,08 + 0,06·tuổi, trần độ sáng 0,78; chữ ≤ (0,9, 0,88, 0,82). `world.js` biển tên thật
+    tường 0,62 → 0,58 − 0,05·tuổi. (2) **BIỂN PHAI:** signCol thống kê (dải biển trệt, bảng lớn, biển dọc) trần bão hoà
+    tuyến tính 0,64, kéo về xám ấm 0,08 + 0,06·tuổi, trần độ sáng 0,78; chữ ≤ (0,9, 0,88, 0,82); màu biển ĐO TỪ ẢNH (fpSign) chỉ trần sáng 0,86 (ảnh đã là trạng thái phai thật). `world.js` biển tên thật
     (SHOP_SIGNS canvas): bảng màu nền bớt bão hoà + đáy biển ố 14%. (3) **NỘI THẤT SÁNG BAN NGÀY** `fabDay` (cộng phát sáng KHÔNG
     nhân đêm): trệt kính (G_GLASS/SHOW/STORE*/SHOP3/ELEC/LOBBY) 0,2, cửa hàng mở 0,14 × tx, CHỈ nâng nền tối (× (1 − smoothstep(0,25,
     0,7, độ sáng texel)) — vòng 1 làm loá mặt kính đã sáng, pano_147 h270). GLSL `dayLitOf(m)` sinh từ MOD (GL1 dùng chung, không
-    mảng). (4) BẠT mái hiên xuyên sáng: kind 5 + ô D_AWN/D_AWN3 → fabDay = col·0,22.
+    mảng). (4) BẠT mái hiên xuyên sáng: kind 5 + ô D_AWN/D_AWN3 → fabDay = col·0,22. **fabDay CHỈ BAN NGÀY:** emissive =
+    fabGlow·emissive.r + fabDay·(1 − clamp(1,7·emissive.r)) (emissive.r = đêm·0,95 từ daynight → tắt hẳn khi đêm ≥ 0,62). BẪY (review):
+    cộng phát sáng không nhân hệ số ngày → ban đêm/hoàng hôn bị phơi sáng đêm (maxGain 4) khuếch đại = bạt SÁNG TRẮNG dưới trời đen.
     **ATLAS (`js/facade_atlas.js`, +4 ô SAU D_CORN → 109/112, còn 3 chỗ; chỉ số cũ giữ):** `G_HOME2` nhà MỞ CỬA (cửa xếp dồn 2 mép,
-    phòng khách + xe máy + ban thờ tối nhỏ — vòng 2 thu nhỏ, ô đỏ to đọc ra "ô vuông đỏ" ở 294/501), `D_AWN3` bạt TRƠN võng (nhuộm),
+    phòng khách + xe máy có thân/yên/tay lái + tủ gỗ thấp — BỎ ban thờ: ô đỏ khung vàng đọc ra "ô vuông đỏ" ở 294/501/115), `D_AWN3` bạt TRƠN võng (nhuộm),
     `D_MISC` 4 vùng con (hàng bày mặt trước / mặt trên — bảng màu TRUNG TÍNH các-tông/bao tải/rổ, tán cây cảnh + hoa giấy, đồ phơi,
     ống thoát nước), `D_CAGE` "chuồng cọp" (song sắt xám/trắng/gỉ trước cửa sổ + đồ phơi + cây). BẪY: vùng con trong 1 ô KHÔNG lặp
     được (shader lấy fract(uv) cả ô) → quad dùng vùng con phải ≤ kích thước vùng (hàng bày ≤ 2 m rộng, đồ phơi ≤ 1 m).
@@ -478,13 +481,15 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     ảnh thật thấy đóng. JS groundModule/GL2/GL1 cùng đọc SETS → vẫn khớp bit với hộp biển 3D.
     **HÌNH HỌC:** (a) ô mới **`fab_near_<tx>_<tz>`** (NEAR_TILE 300 = DET_TILE, hiện khi camera ≤ NEAR_R 120 m tới mép ô (+ cao độ),
     KHÔNG đổ bóng, chỉ TIER ≥ 2 — có DT mới có NT): HÀNG BÀY tràn hè trước bay trệt là cửa hàng MỞ (`OPEN_G`, groundModule khớp
-    bit; vân tay shop_open/chợ/quán 80%, thống kê 50%; 1 khối 0,8-1,8 m sát tường một bên cửa, chừa lối vào; 5,5 k khối), CÂY CẢNH
+    bit; vân tay shop_open/chợ/quán 80%, nhà KHÔNG vân tay trên phố chính/nhỏ 30%, vân tay khác 0 — review: thùng trước bay đóng/tối;
+    1 khối 0,7-1,5 m × sâu 0,3-0,5 × cao 0,45-0,9 m sát tường một bên cửa, cách 2 đầu mặt tiền ≥ 0,7 m (đạo cụ góc phố), chừa lối vào;
+    mặt trước = hàng NHỎ xếp chồng sáng ×0,85-1,05 + 22% màu bao bì — trước: khối tối + ô màu thô), CÂY CẢNH
     ban công (`blobN`: mặt trước đa giác 6 đỉnh dáng tán — hộp vuông đọc ra "khối hộp xanh"; cao 1,3-1,85 m vượt lan can; 13 k), giỏ
-    cây treo ngoài lan can (22%), ĐỒ PHƠI sau lan can (30%, 7 k), ỐNG THOÁT NƯỚC dọc mép mặt tiền nhà ống (0,3 + 0,12·tuổi, 11 k).
+    cây treo ngoài lan can (22%), ĐỒ PHƠI sau lan can (30%, 7 k), ỐNG THOÁT NƯỚC dọc mép mặt tiền nhà ống (0,3 + 0,12·tuổi, 11 k; đặt trong khoảng lùi 0,03 m — ở 0,14 m xuyên má bạt/ban công).
     (b) ô det: **CHUỒNG CỌP 3D** (lồng nhô 0,6 m cả tầng: mặt trước + 2 má D_CAGE + đáy + mái tôn dốc; vân tay 'cage' 75% tầng,
-    thống kê tập thể 25%/nhà ống 6% nhà × 45% tầng — vòng 1 lồng MỌI tầng tháp hẹp = "tháp lưới nâu" pano_519 h90); **MÁ BẠT** 2 đầu
-    mái hiên bạt; bạt SỌC khi vân tay tarp_stripe hoặc tarp_blue 60% (pano_120: sọc xanh-trắng thật bị trích 'tarp_blue'), còn lại
-    bạt trơn D_AWN3; 'tarp_other' theo bảng 7 màu (be/cam/lục/nâu đỏ/xám/lam/kem — trước cố định xám → mái hiên xám đục); cục nóng
+    thống kê tập thể 25%/nhà ống 6% nhà × 45% tầng — vòng 1 lồng MỌI tầng tháp hẹp = "tháp lưới nâu" pano_519 h90; tầng 1-2 nhà ống fpMode 3 KHÔNG lồng — giữ biển bảng lớn theo ảnh); **MÁ BẠT** 2 đầu
+    mái hiên bạt; bạt SỌC khi vân tay tarp_stripe/tarp_blue/tarp_other (LUÔN — pano_120 sọc xanh-trắng thật bị trích 'tarp_blue',
+    248 h270 sọc → cam trơn là hồi quy), bạt trơn D_AWN3 chỉ tarp_red + 35% nhà thống kê; 'tarp_other' theo bảng 7 màu (be/cam/lục/nâu đỏ/xám/lam/kem — trước cố định xám → mái hiên xám đục); cục nóng
     điều hoà 0,14/0,21 → 0,18/0,26. (c) `GBuf.quadR` (uv chữ nhật, đỉnh truyền rời) + `boxN` gọi thẳng (thứ tự đỉnh đã CCW từ n =
     (−e.z, e.x), kiểm tích có hướng) — đo node `--cpu-prof`: chi phí thêm chủ yếu là GC mảng [p…]/[uv…] mỗi quad + cấp GBuf mỗi ô
     (ô near 200 m = 199 bộ đệm → 300 m = ~105).
