@@ -748,7 +748,8 @@ export function buildProps(ctx) {
     pedsCluster: LITE ? 160 : 520,
   };
   const stats = { cells: 0, valid: 0 };
-  const rej = { far: 0, junction: 0, notFlat: 0, featured: 0, building: 0, lake: 0 };
+  const rej = { far: 0, junction: 0, notFlat: 0, featured: 0, building: 0, lake: 0, verge: 0 };
+  const vergeAt = typeof ctx.vergeAt === 'function' ? ctx.vergeAt : null;   // Đ3-W5 r2: lề bãi đỗ dải bờ (riverbank.js)
   stats.reject = rej;
   const roadIdx = makeRoadIndex(ROADS_DT, ROAD_HW, SIDEWALK_W);
   const evAt = makeEvidence();
@@ -825,13 +826,22 @@ export function buildProps(ctx) {
       for (const side of [1, -1]) {
         // pháp tuyến hướng RA vỉa hè bên này: side·(uz, −ux)
         const nx = side * uz, nz = -side * ux;
-        // rj[k]: lý do loại ô (QA qua window.__hpProps.sides): 1 xa · 2 giao lộ · 3 dốc/nước · 4 công trình/claim · 5 nhà thật · 6 kè hồ
+        // rj[k]: lý do loại ô (QA qua window.__hpProps.sides): 1 xa · 2 giao lộ · 3 dốc/nước · 4 công trình/claim · 5 nhà thật · 6 kè hồ · 7 lề bãi đỗ hẹp
         const S = { ri, si, c: r.c, w: r.w, sw: r.sw, side, ax, az, ux, uz, nx, nz, L, n, ok: new Uint8Array(n), occ: new Uint8Array(n), rj: new Uint8Array(n), ev: new Array(n) };
         const off = (L - n * CELL) / 2;
+        // Đ3-W5 r2: LỀ BÃI ĐỖ trước lan can dải bờ (riverbank STRIP_VERGE, pano_336) — bên phố có lề → vỉa của BÊN NÀY rộng
+        // thêm bề lề (dải đỗ xe lùi ra lề); ô nào lề tại dải đỗ < 3 m (quãng vuốt) → bỏ ô (xe không chồm lên/qua lan can)
+        let vS = 0, pkS = pk;
+        if (vergeAt) {
+          const lv = roadHW(r) + sidewalkW(r) + 1.0;
+          for (let k = 0; k < n; k++) { const s = off + (k + 0.5) * CELL; vS = Math.max(vS, vergeAt(ax + ux * s + nx * lv, az + uz * s + nz * lv)); }
+          if (vS > 0) { S.sw = sidewalkW(r) + vS; S.verge = vS; pkS = parkingLine(S); stats.vergeSides = (stats.vergeSides || 0) + 1; }
+        }
         for (let k = 0; k < n; k++) {
           const s = off + (k + 0.5) * CELL;
-          const x = ax + ux * s + nx * pk, z = az + uz * s + nz * pk;
+          const x = ax + ux * s + nx * pkS, z = az + uz * s + nz * pkS;
           stats.cells++;
+          if (vS > 0 && vergeAt(x, z) < 3) { rej.verge++; S.rj[k] = 7; continue; }
           if (x * x + z * z > R_MAX * R_MAX) { rej.far++; S.rj[k] = 1; continue; }
           if (roadIdx.blocked(x, z, ri, si)) { rej.junction++; S.rj[k] = 2; continue; }
           if (!flat(x, z)) { rej.notFlat++; S.rj[k] = 3; continue; }

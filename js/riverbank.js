@@ -353,7 +353,19 @@ export function buildRiverbanks(scene, deps) {
   for (let i = 1; i < S.length - 1; i++) if (!S[i].road && S[i - 1].road && S[i + 1].road && S[i - 1].poly === S[i + 1].poly) S[i].road = S[i - 1].road;
 
   const wall = Buf(), cap = Buf(), pave = Buf(), plinth = Buf(), iron = Buf(), panel = Buf(), lamp = Buf(), bloom = Buf();
-  const shackB = Buf(), boatB = Buf(), ringPanel = Buf(), sand = Buf();
+  const shackB = Buf(), boatB = Buf(), ringPanel = Buf(), sand = Buf(), vergeB = Buf();
+  // LỀ BÃI ĐỖ trước lan can dải bờ tự phát (Đ3-W5 sửa r2, pano_336): ảnh 336 h0/h180/h270 — giữa mép ngõ 5,5 m (W5-D) và lan
+  // can là lề bê tông ~4 m có cổ thụ + 2 hàng xe máy đỗ (h270 ~15 chiếc) + ô tô đỗ (h0), lan can ~8 m từ tim ngõ; dot3 (vỉa
+  // 3,5 m, lan can 9 m) gần đúng phía sông. 335/337/519/520 (ảnh) lan can/lán SÁT mép ngõ ⇒ chỉ quanh 336: đủ bề rộng trong
+  // r0, vuốt về 0 ở r1 (theo điểm trên tim phố). Chỉ ngõ hẹp (vỉa < 2 m) — phố vỉa rộng đã có chỗ đỗ.
+  const STRIP_VERGE = [{ x: -400.7, z: -688.1, w: 4.0, r0: 15, r1: 23 }];
+  const vergeOf = (x, z) => {
+    let v = 0;
+    for (const g of STRIP_VERGE) { const d = Math.hypot(x - g.x, z - g.z); if (d < g.r1) v = Math.max(v, g.w * Math.min(1, (g.r1 - d) / (g.r1 - g.r0))); }
+    return v;
+  };
+  const C_VG1 = rgb(0x8e8b83), C_VG2 = rgb(0x7f7c74);
+  const vergeQ = [];   // mặt lề đã dựng (4 đỉnh XZ + bề rộng) → vergeAt(x,z) cho props.js (xe máy đỗ trên lề)
   stats.stripM = 0; stats.stripN = 0; stats.shacks = 0; stats.boats = 0; stats.beachM = 0;
   const shacks = [], bankTrees = [], treeGrid = new Map();
   // Sửa hồi quy AUDIT4 R1: tường kè be sáng 0xbdb6a6 + nắng → bờ đối diện đọc thành "dải cát be" thay mặt sông (203/212).
@@ -406,12 +418,13 @@ export function buildRiverbanks(scene, deps) {
     if (mode !== 'prom' && north && hash(s.x, s.z, 61) < 0.2) boat(s);
     if (mode === 'strip') {
       stats.stripM += s.L;
-      stripRail(s);
-      const sh = hash(s.x, s.z, 71) < (s.beach ? 0.22 : 0.14) && gapW > 4 ? shack(s, gapW) : null;
+      // lề bãi đỗ trước lan can (STRIP_VERGE, chỉ 336): lán/cây chỉ trong phần dải CÒN LẠI sau lan can đã dời
+      const gapR = gapW - stripRail(s);
+      const sh = hash(s.x, s.z, 71) < (s.beach ? 0.22 : 0.14) && gapR > 4 ? shack(s, gapR) : null;
       // cây lớn trong dải giữa kè và lan can (ảnh 336/337/520/331 h180-h270: tán rợp ngay sau lan can che kín mặt sông):
       // hàng 1 trong 6 m sát lan can; dải rộng ≥ 8 m thêm hàng thưa phía kè (bãi bồi: lùm rải riêng bên dưới)
-      if (gapW > 3.6) {
-        const lo = sh ? sh.d + 1.2 : 1.6, hi = gapW - 2.0;
+      if (gapR > 3.6) {
+        const lo = sh ? sh.d + 1.2 : 1.6, hi = gapR - 2.0;
         if (hi > lo && hash(s.x, s.z, 111) < 0.2) { const d = hi - Math.min(6, hi - lo) * hash(s.x, s.z, 114); bankTree(s.x + s.nx * d, s.z + s.nz * d, hash(s.x, s.z, 115)); }
         if (!s.beach && hi - lo >= 8 && hash(s.x, s.z, 112) < 0.1) { const d = lo + (hi - 6 - lo) * hash(s.x, s.z, 113); bankTree(s.x + s.nx * d, s.z + s.nz * d, hash(s.x, s.z, 116)); }
       }
@@ -511,15 +524,33 @@ export function buildRiverbanks(scene, deps) {
     }
   }
   stats.bankTrees = bankTrees.length;
-  // lan can dải bờ tự phát: song sắt sẫm thấp trên gờ, chạy THEO PHỐ ở mép vỉa hè (+0,5 m)
+  // lan can dải bờ tự phát: song sắt sẫm thấp trên gờ, chạy THEO PHỐ ở mép vỉa hè (+0,5 m) — trong STRIP_VERGE lùi thêm
+  // bề rộng lề (2 đầu mẩu tính riêng → lan can liền, vát chéo ở quãng chuyển) + mặt bê tông lề từ mép vỉa tới chân lan can.
+  // Trả bề rộng lề ở tâm mẩu (0 ngoài STRIP_VERGE).
   function stripRail(s) {
     const r = s.road, dl = Math.hypot(s.x - r.px, s.z - r.pz) || 1, wx = (s.x - r.px) / dl, wz = (s.z - r.pz) / dl;
-    const off = deps.hw(r) + deps.sw(r) + 0.5, cx = r.px + wx * off, cz = r.pz + wz * off, ang = Math.atan2(r.ux, r.uz);
+    const base = deps.hw(r) + deps.sw(r), narrow = deps.sw(r) < 2, h = s.L / 2 + 0.02;
+    const pax = r.px - r.ux * h, paz = r.pz - r.uz * h, pbx = r.px + r.ux * h, pbz = r.pz + r.uz * h;
+    const va = narrow ? vergeOf(pax, paz) : 0, vb = narrow ? vergeOf(pbx, pbz) : 0;
+    const oa = base + 0.5 + va, ob = base + 0.5 + vb;
+    const Ax = pax + wx * oa, Az = paz + wz * oa, Bx = pbx + wx * ob, Bz = pbz + wz * ob;
+    const cx = (Ax + Bx) / 2, cz = (Az + Bz) / 2, len = Math.hypot(Bx - Ax, Bz - Az), ang = Math.atan2(Bx - Ax, Bz - Az);
     const y0 = TOP - 0.2;
-    box(plinth, cx, y0 + 0.2, cz, 0.3, 0.4, s.L + 0.05, ang, rgb(0xb9b3a5));
-    const ex = r.ux * (s.L / 2 + 0.02), ez = r.uz * (s.L / 2 + 0.02), yb = y0 + 0.4, yt = y0 + 1.1;
-    quad(ringPanel, [cx - ex, yb, cz - ez], [cx + ex, yb, cz + ez], [cx + ex, yt, cz + ez], [cx - ex, yt, cz - ez], [wx, 0, wz], [1, 1, 1], [[0, 0], [s.L / 2, 0], [s.L / 2, 1], [0, 1]]);
-    box(iron, cx, yt + 0.03, cz, 0.07, 0.06, s.L + 0.05, ang, rgb(0x2a2f2b));
+    box(plinth, cx, y0 + 0.2, cz, 0.3, 0.4, len + 0.01, ang, rgb(0xb9b3a5));
+    const yb = y0 + 0.4, yt = y0 + 1.1;
+    quad(ringPanel, [Ax, yb, Az], [Bx, yb, Bz], [Bx, yt, Bz], [Ax, yt, Az], [wx, 0, wz], [1, 1, 1], [[0, 0], [len / 2, 0], [len / 2, 1], [0, 1]]);
+    box(iron, cx, yt + 0.03, cz, 0.07, 0.06, len + 0.01, ang, rgb(0x2a2f2b));
+    if (va > 0 || vb > 0) {
+      // mặt lề: bê tông cũ xám ở cao độ đất (+3 cm; bậc xuống từ vỉa 0,25 như ảnh 336 h270) — đồ props đứng mặt đất (+1,2 cm)
+      const yv = LAND_H + 0.03, P1 = [pax + wx * base, yv, paz + wz * base], P2 = [pbx + wx * base, yv, pbz + wz * base];
+      const P3 = [pbx + wx * (ob - 0.35), yv, pbz + wz * (ob - 0.35)], P4 = [pax + wx * (oa - 0.35), yv, paz + wz * (oa - 0.35)];
+      const cA = hash(pax, paz, 141) < 0.5 ? C_VG1 : C_VG2, cB = hash(pbx, pbz, 141) < 0.5 ? C_VG1 : C_VG2;
+      const up = (P2[2] - P1[2]) * (P3[0] - P1[0]) - (P2[0] - P1[0]) * (P3[2] - P1[2]) > 0;
+      if (up) quad(vergeB, P1, P2, P3, P4, [0, 1, 0], [cA, cB, cB, cA]); else quad(vergeB, P4, P3, P2, P1, [0, 1, 0], [cA, cB, cB, cA]);
+      const q = [[P1[0], P1[2]], [P2[0], P2[2]], [P3[0], P3[2]], [P4[0], P4[2]]], v = (va + vb) / 2;
+      vergeQ.push({ q, v, x0: Math.min(P1[0], P2[0], P3[0], P4[0]), x1: Math.max(P1[0], P2[0], P3[0], P4[0]), z0: Math.min(P1[2], P2[2], P3[2], P4[2]), z1: Math.max(P1[2], P2[2], P3[2], P4[2]) });
+      stats.vergeM = (stats.vergeM || 0) + s.L;
+    }
     const k = stats.stripN++;
     // trụ bê tông mỗi ~6 m; chậu cây cảnh dọc chân lan can phía vỉa hè (ảnh 519 h180: chậu xi măng + cây bụi)
     if (k % 3 === 0) box(plinth, cx, y0 + 0.62, cz, 0.3, 1.24, 0.3, ang, rgb(0xa9a497));
@@ -530,6 +561,7 @@ export function buildRiverbanks(scene, deps) {
         0.2 + hash(s.x, s.z, 97 + q) * 0.15, rgb(hash(s.x, s.z, 102 + q) < 0.5 ? 0x3d6a2c : 0x507f36));
     }
     if (deps.addCollider && (k % 2) === 0) deps.addCollider(cx + wx * 0.8, cz + wz * 0.8, 0.9);
+    return (va + vb) / 2;
   }
   // lán tôn/bạt tự phát giữa lan can và kè (ảnh pano_519 h180: mái tôn xanh, bạt cam/xanh, thấp ~2,4 m)
   function shack(s, gapW) {
@@ -608,6 +640,7 @@ export function buildRiverbanks(scene, deps) {
   add(bloom, vc(), 'riverbank_bloom');
   add(shackB, vc(), 'riverbank_shacks');
   add(sand, vc(), 'riverbank_beach', false);
+  add(vergeB, vc(), 'riverbank_verge', false);
   const bm = add(boatB, vc(), 'riverbank_boats'); if (bm) bm.castShadow = true;
   add(pave, new THREE.MeshLambertMaterial({ map: caroTexture() }), 'riverbank_promenade');
   // tấm hoa văn: alphaTest, 2 mặt; KHÔNG transparent (gộp được) — bóng: customDepth không cần (tắt cast)
@@ -656,5 +689,15 @@ export function buildRiverbanks(scene, deps) {
   S.length = 0;   // mẫu bờ không còn dùng (closure keep/promSide giữ ngữ cảnh hàm)
   stats.promM = Math.round(stats.promM); stats.wildM = Math.round(stats.wildM); stats.stripM = Math.round(stats.stripM);
   stats.ms = Math.round(performance.now() - t0);
-  return { stats, saplings, bankTrees, keep, promSide };   // (không trả mesh — xem bridges.js)
+  // vergeAt(x,z): bề rộng lề bãi đỗ (STRIP_VERGE) nếu điểm nằm trên mặt lề đã dựng, không thì 0 (props.js: bên phố có lề → vỉa
+  // rộng thêm, xe máy đỗ trên lề)
+  let vx0 = Infinity, vx1 = -Infinity, vz0 = Infinity, vz1 = -Infinity;
+  for (const g of vergeQ) { vx0 = Math.min(vx0, g.x0); vx1 = Math.max(vx1, g.x1); vz0 = Math.min(vz0, g.z0); vz1 = Math.max(vz1, g.z1); }
+  const vergeAt = (x, z) => {
+    if (x < vx0 || x > vx1 || z < vz0 || z > vz1) return 0;
+    for (const g of vergeQ) if (x >= g.x0 && x <= g.x1 && z >= g.z0 && z <= g.z1 && inPoly(x, z, g.q)) return g.v;
+    return 0;
+  };
+  if (stats.vergeM) stats.vergeM = Math.round(stats.vergeM);
+  return { stats, saplings, bankTrees, keep, promSide, vergeAt };   // (không trả mesh — xem bridges.js)
 }

@@ -22018,6 +22018,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     featuredClear: FEATURED_CLEAR, reserved: propReserved, openSpace, nearPanoCam,
     avoid: (x, z) => clearedZone(x, z) || inSuperblock(x, z) || (world.riverbank ? world.riverbank.promSide(x, z) : false) || underDeck(x, z),   // W3-F: dải dạo ven sông trống; không cột/xe đỗ xuyên mặt cầu nâng thấp
     gardens: GARDENS, square: EXTRAS.square,
+    vergeAt: world.riverbank ? world.riverbank.vergeAt : null,   // Đ3-W5 r2: lề bãi đỗ trước lan can dải bờ (pano_336) → xe máy đỗ trên lề
     footprints: world.rbGrid ? { D: world.rbData, grid: world.rbGrid } : null,   // WP2: footprint đã đánh D.dead (claims) → khỏi giải mã lần 2
     // chân prop chạm MẶT ĐANG VẼ: WP6 roadnet (vỉa mọi cấp +0,25) nếu đã gộp, không thì mặt layRoad cũ (vỉa p/s/t +0,18,
     // phố r không vỉa → nền +0,012). Hằng +0,25 cũ làm prop lơ lửng 7-24 cm (phản biện WP7).

@@ -455,6 +455,24 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-10-15 (Đ3-W5 SỬA HỒI QUY r2: pano_336 — LỀ BÃI ĐỖ trước lan can dải bờ)** [chấm 2 người: 336 OLD 5,15 → NEW 4,75]:
+    **Nguyên nhân:** W5-D thu Tam Bạc bắc về ngõ 5,5 m + vỉa 1 m ⇒ `riverbank.stripRail` đặt lan can ở hw + sw + 0,5 = 4,25 m từ
+    tim ⇒ phía sông 336 h180/h270 còn vỉa 1 m sát lan can, mất hàng cổ thụ + 2 hàng xe máy đỗ (ảnh: lề bê tông ~4 m, h270 ~15 xe,
+    h0 ô tô đỗ, lan can ~8 m từ tim; dot3 vỉa 3,5 m → lan can 9 m nên gần đúng). Ảnh 335/337/519/520: lan can/lán SÁT mép ngõ ⇒
+    KHÔNG nới cả đoạn (không gỡ ngõ W5-D). **Sửa:** `riverbank.js` STRIP_VERGE `[{pano_336 (−400,7, −688,1), w 4, r0 15, r1 23}]`
+    (chỉ ngõ vỉa < 2 m): lan can lùi thêm bề lề, 2 đầu mỗi mẩu tính riêng (liền, vát chéo ở quãng vuốt); mặt lề bê tông xám
+    (`riverbank_verge`, cao độ đất + 3 cm — đồ props đứng mặt đất, không đổi surfaceY); lán/cây bờ chỉ trong phần dải còn lại sau lan
+    can; trả `vergeAt(x,z)` → `props.js` (ctx.vergeAt từ world.js): bên phố có lề ⇒ `S.sw` += lề (dải đỗ xe lùi ra lề, vỉa ≥ 3,4 m
+    ⇒ 2 dải xe như ảnh), ô có lề tại dải đỗ < 3 m bị bỏ (`rej.verge`, rj 7 — xe không chồm qua lan can). Phụ: bố trí quán/người
+    đổi ⇒ 336 h0/h90 có ô dù + khách ngồi trước tạp hoá (như ảnh). Không sinh lại dữ liệu (mapdata/buildings_real/herokit giữ).
+    **Kiểm (tier 3 Radeon 890M D3D11, khoá GPU, 1280×634 traffic off; OLD = ảnh dot3 bcdcacc cũ ở w5finish/old):**
+    `w5finish/new2` + `pairs2` (336 + đối chứng 519 331 221 088): 336 h180/h270 lan can ~8 m, cổ thụ + 2 hàng xe trên lề; 519/
+    331/221/088 = bản r1 (chỉ người đi bộ lệch). Cổng: node --check + vm.SourceTextModule (riverbank/props/world), waterbfs 5/5,
+    check_assets ĐỦ (8b8e42c), check_herokit 407/407 (900eb8db), diag full "TẤT CẢ THỰC THỂ OK — 0 lỗi JS" (overlap 1 cũ (259,111)),
+    diag lite OK bất biến 0, mobile OK 0 lỗi, tour 26 ảnh 0 lỗi (postoffice chọn điểm đứng khác — tìm điểm theo tia, giao thông
+    không tất định). Perf std 24 khung traffic on, 2 vòng xen kẽ r1 1a27b06 ↔ bản này: tris 81,31/83,26 → 79,87/82,54 M, calls TB
+    395,4/413,0 → 395,0/408,8, fps thấp nhất 57-58 cả hai, hpReady 7955/7918 → 7363/8042 ms ⇒ không đổi trong nhiễu.
+
 - **2026-10-15 (QA BỀN: `tools/qa/audit_views.mjs` + thư mục ngoài %TEMP%)** [scratchpad phiên bị dọn 2026-10-15 ⇒ mất ảnh/khung chấm]:
     `node tools/qa/audit_views.mjs <out.json> <id…|ids.json>` → views cho `shoot.mjs --views`: 4 hướng 0/90/180/270 mỗi pano, đứng
     ĐÚNG vị trí xe Street View (X, Z từ audit/pano_index.json 420 + pano_index2.json 131 = 551), kind 'pano' (teleport pitch 0,02,
