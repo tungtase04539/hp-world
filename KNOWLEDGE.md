@@ -364,6 +364,18 @@ node tools/qa/clearance.mjs --port 8177 --out <x.json> [--src] [--eval f.js] [--
   0x133 ba lần, 2026-10-04). Script tự viết mở Chrome: bọc `node tools/qa/gpulock.mjs run -- node x.mjs` (tiến trình
   con nhận `HPWORLD_GPU_LOCK=<pid chủ khoá>` → acquireGpu tái nhập chỉ khi pid đó đúng là chủ khoá còn sống, và vẫn
   lấy KHOÁ CON `<lock>/child` — hậu duệ chạy song song vẫn xếp hàng, không tự chờ chính mình) hoặc `acquireGpu()`.
+  **Từ 2026-10-15:** chủ khoá chạm mtime thư mục khoá mỗi 60 s (nhịp tim); chủ CÒN SỐNG không bao giờ bị cướp khoá trừ khi
+  mất nhịp tim > 3 giờ (bản cũ cướp theo tuổi khoá 20 phút → lượt chụp 480 ảnh ~60 phút bị cướp giữa chừng = 2 Chrome GPU);
+  `run --` dùng spawn bất đồng bộ (spawnSync chặn vòng sự kiện → không có nhịp tim). Khi MÁY CHỦ GAME đang phục vụ người chơi
+  (tệp `%TEMP%\hpworld_server_live.txt` còn tươi < 10 phút, do `server/ops/mo-may-chu.ps1` ghi), MỌI việc GPU tự CHỜ — màn
+  xanh giữa buổi chơi = sập máy chủ (bỏ qua chỉ khi chủ dự án đồng ý: `HPWORLD_ALLOW_GPU_WHILE_LIVE=1`). Bộ canh thứ hai
+  `tools/qa/gpu_watchdog.ps1` (kill Chrome headless GPU thừa; chạy nền lại sau mỗi lần khởi động máy, log ở
+  `%LOCALAPPDATA%\hpworld\`).
+- **DỮ LIỆU BỀN KHÔNG ĐỂ Ở THƯ MỤC TẠM (bài học 2026-10-15):** thư mục scratchpad của phiên Claude (trong %TEMP%) bị xoá sạch
+  lúc 00:12 → mất 3.306 tệp ghi chú trích từ ảnh pano (fp_json) mà `tools/gen_herokit.mjs` cần → herokit chỉ còn đường
+  `tools/rekey_herokit.mjs`. Mọi đầu ra tốn công tạo lại (trích xuất bằng agent, spec, công cụ QA) phải COMMIT vào repo
+  (audit/, tools/qa/, docs/); ảnh QA lớn để ở `C:/Users/Admin/hp-world-work/`. Công cụ chấm cặp: `tools/qa/make_pairs3.py`,
+  `tools/qa/audit_ids.json` (120 pano), `tools/qa/audit_views.mjs` (sinh views cho shoot.mjs).
 - **BẪY A/B (đo sai cả 1 WP):** bản base phục vụ từ checkout thiếu `assets_lite/` → mọi request bản lite 404 →
   assets.js vẽ GLB ĐẦY ĐỦ ở mọi khoảng cách (+1-2,5 M tam giác, −5..−9 fps ở góc phố có địa danh xa) → bản "sau" có
   lite trông như "nhanh hơn". Base và after PHẢI cùng có assets/ + assets_lite/ (hard-link như SPEC Đợt 3 §2 bước 1;
