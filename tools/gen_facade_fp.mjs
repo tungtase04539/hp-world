@@ -96,6 +96,25 @@ export function loadFacadeFP(file = new URL('../audit/facade_fp.json', import.me
   try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch (e) { return null; }
 }
 
+// ---------------- GHIM QUAN SÁT (duyệt ảnh) ----------------
+// Một số nhà nhận nhiều quan sát CÙNG pano mâu thuẫn (khung xiên ở mép ảnh thấy nhà bên cạnh) và phiếu gần HOÀ — dịch footprint
+// ~1 m là lật kết quả. FP_PIN = quan sát đã đối chiếu ảnh thật là ĐÚNG cho nhà nó chạm → trọng số × w. Khoá theo (pano, hướng,
+// x0, x1) của dòng trong audit/facade_fp.json; chỉ THÊM khi có ảnh chứng minh, ghi lý do.
+export const FP_PIN = [
+  // 2026-10-15: 331 h90 phải = quán mở + mái bạt SỌC (ảnh thật, như dot3 bcdcacc). Ngõ 5,5 m W5-D đưa mặt lô ra sát ngõ ~1 m ⇒
+  // tia h135 x 0,6-0,72 ('shutter', thật là nhà phía nam) nay chạm lô này ⇒ phiếu tầng trệt shutter 1,256 > restaurant 1,236.
+  { pano: 'pano_331', heading: 90, x0: 0.58, x1: 1, w: 2 },
+];
+function pinWeights(FP) {
+  const m = new Map();
+  FP_PIN.forEach((p) => {
+    const pk = FP.panos.findIndex((q) => q[0] === p.pano); let n = 0;
+    FP.obs.forEach((o, oi) => { if (o[C.pano] === pk && o[C.heading] === p.heading && Math.abs(o[C.x0] - p.x0) < 1e-6 && Math.abs(o[C.x1] - p.x1) < 1e-6) { m.set(oi, p.w); n++; } });
+    if (n !== 1) console.warn(`FP_PIN ${p.pano} h${p.heading} x${p.x0}-${p.x1}: khớp ${n} quan sát (cần đúng 1)`);
+  });
+  return m;
+}
+
 // ---------------- ÁNH XẠ quan sát → footprint ----------------
 // polys: mảng đa giác [[x,z],...] (chỉ số = chỉ số nhà). Trả { fp: Map(bi → bản ghi gộp), stats, hits: [...] }.
 export function mapFacadeFP(polys, FP, opts = {}) {
@@ -160,6 +179,7 @@ export function mapFacadeFP(polys, FP, opts = {}) {
   const st = { obs: 0, assigned: 0, noHit: 0, depthReject: 0, camInside: 0, perObsBuildings: 0 };
   const hits = opts.keepHits ? [] : null;
   const camSkip = new Map();
+  const PIN = pinWeights(FP);
   for (let oi = 0; oi < FP.obs.length; oi++) {
     const o = FP.obs[oi]; st.obs++;
     const pano = FP.panos[o[C.pano]]; const px = pano[1], pz = pano[2];
@@ -198,7 +218,7 @@ export function mapFacadeFP(polys, FP, opts = {}) {
       wHit += (span * 2 * TAN * dMed) / K;   // ~ khoảng giữa 2 tia ở độ sâu đó (xấp xỉ)
       let eL = 0; for (const ei of c.ei) { const e = E[ei]; eL = Math.max(eL, Math.hypot(e[2] - e[0], e[3] - e[1])); }
       const cover = Math.min(1, wHit / Math.max(1, eL));
-      const w = relax * DEPTH_W[dIdx] * (c.n / K) * (0.35 + 0.65 * cover) * (o[C.sure] === 0 ? 0.8 : 1);
+      const w = relax * DEPTH_W[dIdx] * (c.n / K) * (0.35 + 0.65 * cover) * (o[C.sure] === 0 ? 0.8 : 1) * (PIN.get(oi) || 1);
       let L = per.get(bi); if (!L) per.set(bi, (L = []));
       L.push({ oi, w, d: dMed, cover });
       st.perObsBuildings++; any = true;

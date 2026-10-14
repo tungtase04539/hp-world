@@ -354,16 +354,17 @@ function modelOrnateGlobes() {
   return mergeParts(P);
 }
 
-// ---------- XE MÁY PHỦ BẠT / ÁO TRÙM (Đ3-W4-B — ảnh 004/107/239/492) ----------
-// local +Z = mũi. Một "túi" trùm: mặt cắt hông gần thẳng đứng, đỉnh tròn, gù tay lái + gương (s ≈ 0,55-0,8), yên phẳng,
-// võng ở sàn để chân; mép bạt cách đất 0,32 m (lộ nửa dưới 2 bánh); nếp nhăn = nhiễu theo đỉnh. ~270 tam giác.
+// ---------- XE MÁY PHỦ BẠT / ÁO TRÙM (Đ3-W4-B — ảnh 004/107/239/492; sửa 2026-10-15 — ảnh 097 h180) ----------
+// local +Z = mũi. Áo trùm CHỈ phủ YÊN + THÂN SAU (ảnh thật: tấm áo bạc/xám phủ yên, rủ hai bên tới nửa bánh sau; đầu xe —
+// tay lái, gương, đèn, phuộc, bánh trước — LỘ RA). Bản W4-B trùm cả đầu (gù tay lái) mép 0,33 m ⇒ ở 5-15 m đọc thành "túi"
+// xanh/xám không hình (088 h90, 166 h90/h180). Mặt cắt chữ U ngược (siêu elip) loft dọc trục; mép bạt 0,42 m (lộ gần hết 2
+// bánh); nếp nhăn = nhiễu theo đỉnh. ~330 tam giác.
 function modelCoveredBike() {
-  // LOFT các mặt cắt chữ U ngược (siêu elip: hông gần đứng, nóc tròn) dọc trục xe; 2 nắp đầu/đuôi quạt về tâm
   const key = (K, s) => { for (let i = 1; i < K.length; i++) if (s <= K[i][0]) { const [a, va] = K[i - 1], [b, vb] = K[i]; const t = (s - a) / (b - a); return va + (vb - va) * t * t * (3 - 2 * t); } return K[K.length - 1][1]; };
-  // nóc: đuôi 0,74 → yên 0,86-0,88 → võng sàn để chân 0,78 → gù tay lái/gương 1,08-1,12 → đầu đèn 0,9; bề ngang: tay lái 0,38
-  const TOP = [[-0.95, 0.72], [-0.75, 0.84], [-0.1, 0.88], [0.22, 0.79], [0.48, 1.06], [0.66, 1.12], [0.86, 1.02], [0.98, 0.86]];
-  const WID = [[-0.95, 0.17], [-0.75, 0.24], [0, 0.27], [0.36, 0.27], [0.58, 0.38], [0.74, 0.33], [0.98, 0.18]];
-  const Zs = [-0.95, -0.88, -0.7, -0.45, -0.15, 0.12, 0.3, 0.46, 0.6, 0.74, 0.86, 0.94, 0.98], M = 11, BOT = 0.33;
+  // nóc: đuôi 0,70 → yên 0,86-0,88 → mép trước áo (sau sàn để chân) 0,78; bề ngang ≤ 0,25
+  const TOP = [[-0.95, 0.7], [-0.78, 0.82], [-0.2, 0.88], [0.12, 0.86], [0.3, 0.78]];
+  const WID = [[-0.95, 0.16], [-0.75, 0.23], [0, 0.25], [0.3, 0.21]];
+  const Zs = [-0.95, -0.88, -0.7, -0.45, -0.15, 0.08, 0.22, 0.3], M = 11, BOT = 0.42;
   const pos = [], idx = [];
   let nz = 0;
   const wr = (a, b) => { const n = Math.sin(a * 12.9898 + b * 78.233) * 43758.5453; return (n - Math.floor(n) - 0.5) * 0.03; };   // nếp nhăn
@@ -377,7 +378,7 @@ function modelCoveredBike() {
     nz++;
   }
   for (let i = 0; i + 1 < nz; i++) for (let j = 0; j + 1 < M; j++) { const a = i * M + j, b = a + M; idx.push(a, b + 1, a + 1, a, b, b + 1); }   // pháp tuyến hướng RA
-  for (const [ii, fl] of [[0, true], [nz - 1, false]]) {   // nắp đuôi/đầu
+  for (const [ii, fl] of [[0, true], [nz - 1, false]]) {   // nắp đuôi/đầu áo
     const c0 = pos.length / 3, z = Zs[ii]; pos.push(0, BOT + (key(TOP, z) - BOT) * 0.45, z + (fl ? -0.02 : 0.02));
     for (let j = 0; j + 1 < M; j++) { const a = ii * M + j; if (fl) idx.push(c0, a, a + 1); else idx.push(c0, a + 1, a); }
   }
@@ -386,9 +387,26 @@ function modelCoveredBike() {
   g.computeVertexNormals();
   const gc = finish(g, 0xffffff, 1);
   // mép bạt sẫm hơn (bẩn/bóng dưới gầm)
-  { const p = gc.attributes.position, c = gc.attributes.color; for (let i = 0; i < p.count; i++) { const k = p.getY(i) < BOT + 0.14 ? 0.72 : 1; c.setXYZ(i, c.getX(i) * k, c.getY(i) * k, c.getZ(i) * k); } }
+  { const p = gc.attributes.position, c = gc.attributes.color; for (let i = 0; i < p.count; i++) { const k = p.getY(i) < BOT + 0.12 ? 0.74 : 1; c.setXYZ(i, c.getX(i) * k, c.getY(i) * k, c.getZ(i) * k); } }
   const P = [gc];
-  for (const z of [0.63, -0.6]) P.push(finish(cyl(0.27, 0.27, 0.11, 10, 0, 0.27, z, 'x'), 0x17171a));   // 2 bánh (nửa dưới lộ ra)
+  const DK = 0x2c2e32, BLK = 0x141416, PL = 0x4a4d53;
+  // ĐẦU XE LỘ: sàn để chân, yếm (ốp chắn gió chân), cổ lái, ốp đèn + mặt đèn, ghi đông + tay nắm, 2 gương, phuộc, chắn bùn
+  P.push(finish(box(0.24, 0.05, 0.36, 0, 0.32, 0.46), DK));
+  P.push(finish(box(0.34, 0.5, 0.07, 0, 0.62, 0.64, -0.28, 0, 0), PL));
+  P.push(finish(beam([0, 0.6, 0.68], [0, 0.98, 0.74], 0.07, 0.07), DK));
+  P.push(finish(box(0.24, 0.13, 0.16, 0, 0.99, 0.78), PL));
+  P.push(finish(box(0.15, 0.08, 0.03, 0, 0.98, 0.87), 0xd6d4c8));
+  P.push(finish(box(0.68, 0.035, 0.035, 0, 1.04, 0.72), BLK));
+  for (const sx of [-1, 1]) {
+    P.push(finish(beam([sx * 0.22, 1.05, 0.72], [sx * 0.27, 1.24, 0.69], 0.02, 0.02), BLK));
+    P.push(finish(box(0.1, 0.06, 0.02, sx * 0.28, 1.27, 0.69), BLK));
+    P.push(finish(beam([sx * 0.06, 0.62, 0.74], [sx * 0.06, 0.27, 0.68], 0.035, 0.035), 0x7c7f84));
+  }
+  P.push(finish(box(0.12, 0.04, 0.34, 0, 0.57, 0.68, 0.18, 0, 0), DK));
+  for (const z of [0.68, -0.6]) {   // 2 bánh ĐỦ vòng + đùm
+    P.push(finish(cyl(0.27, 0.27, 0.09, 12, 0, 0.27, z, 'x'), BLK));
+    P.push(finish(cyl(0.1, 0.1, 0.1, 8, 0, 0.27, z, 'x'), 0x8a8c90));
+  }
   return mergeParts(P);
 }
 // ---------- ĐỒ LẶT VẶT ----------
@@ -1428,7 +1446,7 @@ export function buildProps(ctx) {
   const bikeCov = [];
   const bikeRej = [0, 0, 0, 0, 0, 0];   // QA: lý do bỏ 1 chiếc — nhà · vật cản · chồm lòng đường · nhựa/camera pano · khe ngẫu nhiên · chạm xe đã đỗ
   stats.bikeRej = bikeRej;
-  const COVER_COLS = [0xb9bcbf, 0xb9bcbf, 0xa6aaad, 0xc9cbca, 0x9a9fa2, 0x7590b4, 0x5f7ea6, 0x9c5e55, 0xc6b796, 0xaab0b2];   // phản biện W4-B: bạt tối (xanh đậm/đỏ đô) đọc thành "đống đen" trong bóng (492 h0) → sáng/nhạt hơn
+  const COVER_COLS = [0xb9bcbf, 0xb9bcbf, 0xa6aaad, 0xc9cbca, 0x9a9fa2, 0x8d97a3, 0x7f8a97, 0x8e6f6a, 0xb8ae98, 0xaab0b2];   // phản biện W4-B: bạt tối (xanh đậm/đỏ đô) đọc thành "đống đen" trong bóng (492 h0) → sáng/nhạt hơn
   // Đ3-W4-B: thử MỘT chiếc tại mốc t với (lat, góc a, mũi vào nhà?) — trả {x,z,fx,fz} hoặc null (cùng bộ kiểm như W3-E)
   const tryBike = (S, t, lat, a, noseIn, narrowL) => {
     const x = S.ax + S.ux * t + S.nx * lat, z = S.az + S.uz * t + S.nz * lat;
@@ -1452,7 +1470,7 @@ export function buildProps(ctx) {
     // máy đỗ ngoài, hàng trong) — chỉ vỉa ≥ 2,2 m
     const latC = X.curb + 0.82, curbOK = !narrow && X.sw >= 2.2;
     const e0 = R.ev || S.ev[R.k0];
-    const pCov = (e0 && (e0[9] & 1024) && Math.hypot(e0[0] - R.x, e0[1] - R.z) < 40) ? 0.22 : S.c === 'r' ? 0.06 : 0.025;
+    const pCov = (e0 && (e0[9] & 1024) && Math.hypot(e0[0] - R.x, e0[1] - R.z) < 40) ? 0.16 : S.c === 'r' ? 0.03 : 0.012;
     const t1 = S.off + R.k1 * CELL - 0.35;
     // Đ3-W5-C: 2 DẢI (R.two): dải 1 sát bó vỉa (curb + 0,8, xiên 42-52° — đuôi cách mép ~0,1 m) + dải 2 sát mặt tiền (fac − 0,95,
     // 52-65° — mũi cách tường ~0,2 m); bản 1 dải giữ nguyên (lane 0). Dải 2 lệch pha 0,37 m (hash khác dải 1)

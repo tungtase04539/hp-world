@@ -455,6 +455,32 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-10-15 (Đ3-W5 SỬA NỐT HỒI QUY BỊ CHẶN: 382/336/331 + xe phủ bạt + bay mở trống)** [sinh lại tất định, hero khoá lại bằng rekey]:
+    **382:** `process_osm` SPLIT_WAYS thêm `{ id: 1208204466, x: −401 }` (cắt theo HOÀNH ĐỘ; nửa ĐẦU = đông/Bến Bính giữ ri 447 →
+    bề rộng cấp như dot3; nửa tây nối cuối ri 1426 vẫn là way gần nhất của 383/384 ⇒ giữ ngõ 5,5 m). Đuôi tách mang `sp` = ri gốc
+    (XUẤT ra mapdata `ROADS_DT[i].sp`); `roadnet` gộp NHÃN VẠCH ảnh của các nửa cùng gốc như trước khi tách (không có: nửa đông mất
+    nhãn 'không vạch tim' của 384 → vạch mép trắng trên bãi đất 382 h0/h90; khúc nam 962470755 cũng lại hưởng nhãn như dot3).
+    **336 (h180/h270 khối nhà trắng 1 tầng chắn bờ sông):** footprint Google 5 × 15 m nằm trong DẢI BỜ giữa ngõ 5,5 m và sông
+    (riverbank.js mode 'strip' — lan can ở mép vỉa ngõ, lán/bạt THẤP + cổ thụ do riverbank tự dựng); trước W5-D lòng cấp s 10 m
+    cắt mất phần lớn (dot3: hộp 4 × 7 m cách 14 m). `bankStrip` không bắt (không đỉnh chạm nước, dải > 12 m) ⇒ luật mới
+    `narrowBankStrip` (process_buildings, `drop_bank_narrow`): nguồn KHÔNG OSM, tâm cách sông/kênh < 12 m, có đoạn ngõ HẸP (mặt
+    tiền ≤ NARROW_FL) chạy dọc phía đất (cos ≥ 0,7), mép lòng → nước qua tâm < 20 m, trong 40 m quanh camera NARROW_CAMS — bỏ 3 nhà
+    (336, (−425,−963) 39 m², (−353,−595) 11 m²); lán thật xa ngõ (331 h270, 21-33 m) giữ. **336 h0/h90 (sát 4-5 m, ảnh là tạp hoá
+    mở):** FG1 ('shop_open') chỉ số 2 G_SHOP2 (QUÁN ĂN tối + bảng thực đơn = đọc ra cửa cuốn đen) → G_SHOP0 tạp hoá (quán ăn có
+    FG11). **331 (mái bạt sọc + quán mở → cửa cuốn):** cùng 1 nhà (chỉ số đổi b10932 → b10942); mặt lô ra sát ngõ ~1 m nên tia h135 x
+    0,6-0,72 ('shutter', thật là nhà phía nam) chạm lô ⇒ phiếu trệt shutter 1,256 > restaurant 1,236 (gần HOÀ). `gen_facade_fp`
+    **FP_PIN** = quan sát đã đối chiếu ảnh thật, trọng số × w (khoá theo pano/hướng/x0/x1, cảnh báo nếu không khớp đúng 1 dòng):
+    `pano_331 h90 x 0,58-1` × 2 ⇒ ground restaurant, awning 4 (sọc) như dot3. FG11 (quán ăn) chỉ số 2 G_OPEN2 (đồ gỗ/tủ thờ ĐỎ =
+    "tấm đỏ" 331 h90) → G_OPEN0 quán cà phê/ăn mở. **Xe phủ bạt (088 h90, 166 h90/h180 "túi" xanh/xám):** `modelCoveredBike` áo
+    chỉ phủ YÊN + THÂN SAU (mép 0,42 m), đầu xe LỘ (yếm, cổ lái, ốp đèn, ghi đông + 2 gương, phuộc, chắn bùn, 2 bánh đủ vòng + đùm),
+    ~330 tam giác; COVER_COLS bỏ xanh/đỏ rực (xám-xanh nhạt); tần suất: bằng chứng 0,22 → 0,16, không bằng chứng 0,025 → 0,012
+    (phố r 0,06 → 0,03) — 088 không có bằng chứng phủ bạt, 166/097 có. **097 h90/h180 bay mở be trống + khối đỏ:** GH chỉ số 6
+    (W5-B G_SHUT1 → G_HOME1) chọn G_HOME1 (nhà b16725 vân tay trệt 'none' → thống kê); G_HOME1 vẽ lại CÓ ĐỒ (tủ gỗ + TV, bàn thờ
+    treo + lịch, ghế nhựa, xe máy ra dáng, cửa lùa song đứng 1/3), G_HOME2 thêm TV/tranh/lịch/ghế/chậu cây; FG5 ('gate' = cửa
+    ĐÓNG) chỉ số 1 G_HOME1 → G_GATE. G_ELEC: tranh = nền chuyển màu + máy điện thoại + dải chữ, kệ máy có màn sáng (166 h180 "ô
+    xanh giữ chỗ"). Program key `fabric_v5fy_`.
+    **Sinh lại (2 lần, md5 nội dung LF):** mapdata f4b5f010 (1427 way: 1425/1426 nối cuối, chỉ số cũ giữ), buildings_real f5368062
+    (43.372 nhà, rbHash 900eb8db), `rekey_herokit` 407/407 khớp (0 dời tâm, 0 bỏ) → herokit_data b5254901; check_herokit OK.
 - **2026-10-15 (HEROKIT KHOÁ LẠI — `tools/rekey_herokit.mjs`)** [ghi chú fp_json MẤT ⇒ phân loại hero ĐÓNG BĂNG]:
     **Sự cố:** 2026-10-15 ~00:12 thư mục scratchpad phiên bị dọn ⇒ mất `keep/fp_json` (3.306 JSON trích xuất ảnh, có GHI CHÚ TỰ DO)
     + `keep/fp_plan.json`. Quan sát CÓ CẤU TRÚC vẫn còn trong `audit/facade_fp.json` (đã cam kết — vân tay mặt tiền W4-A sinh lại

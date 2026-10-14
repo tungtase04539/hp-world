@@ -672,6 +672,17 @@ export function buildRoadNet(ROADS_DT, deps) {
       stats.labFar = (stats.labFar || 0) + 1;
     });
   }
+  // way TÁCH ở process_osm (SPLIT_WAYS: mapdata ROADS_DT[ri].sp = chỉ số way gốc) dùng CHUNG nhãn ảnh với nửa kia như khi còn là
+  // 1 way (382: nửa đông Bến Bính không có camera riêng, trước khi tách hưởng nhãn 'không vạch tim' của 384 ≤ 150 m)
+  {
+    const grp = new Map();
+    ways.forEach((w) => { const r = ROADS_DT[w.ri]; const g = r && r.sp >= 0 ? r.sp : w.ri; if (!grp.has(g)) grp.set(g, []); grp.get(g).push(w); });
+    for (const list of grp.values()) {
+      if (list.length < 2 || !list.some((w) => ROADS_DT[w.ri].sp >= 0)) continue;
+      const all = list.flatMap((w) => w.labels || []);
+      if (all.length) for (const w of list) w.labels = all.slice();
+    }
+  }
   // vạch qua đường giữa khối: node OSM crossing không thuộc vùng nút giao có zebra (rad + 4 m) và nằm trên lòng phố
   // (≤ hw + 2 m); bằng chứng chữ pano "có vạch qua đường" mà không có nút giao nào ≤ 45 m (m.unusedZ) → đoạn phố gần nhất
   // ≤ 15 m (pano_294 Thế Lữ, pano_079 Bến Bính). Vẽ bằng cách tách dải tại vạch (emitRun) — không cần shader mới.

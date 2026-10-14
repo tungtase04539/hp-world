@@ -269,20 +269,28 @@ try {
 // → mép lòng cắt chéo dải dạo, lan can lùi xa (review 221 h180). Tách tại z = −590 (cùng ranh 'dải bờ tự phát'/'prom' của
 // §6b3): phần BẮC giữ chỉ số cũ, khúc NAM nối vào CUỐI ROADS_DT (sau ngõ h) ⇒ chỉ số mọi way cũ KHÔNG đổi (SIDEWALK_BY_ROAD…
 // khoá theo chỉ số); khúc nam theo bề rộng thường (Overture/cấp — như dot3) vì 221 không nằm trong ghi đè ngõ hẹp.
-const SPLIT_WAYS = [{ id: 962470755, z: -590 }];
+// 2026-10-15 (sửa hồi quy 382): way 1208204466 — nửa một chiều KHÔNG TÊN 'secondary' chạy từ ngõ Tam Bạc (383/384, nút −536,
+// −904) SONG SONG Bến Bính tới x −228 — là way gần nhất của camera 383/384 nên nhận NGUYÊN ghi đè ngõ 5,5 m (street_fit
+// WIDTH_OVERRIDES `panos`) cả đoạn Bến Bính ⇒ 382 lộ vỉa hè gạch + hàng cây giữa 2 đường nơi ảnh là bãi đất. Tách theo HOÀNH ĐỘ
+// x −401 (ngay đông nút 576/588 ở (−412, −950)): đoạn ĐÔNG (Bến Bính, đầu way) giữ chỉ số cũ ri 447 + bề rộng cấp như dot3; đoạn
+// TÂY (ngõ 383/384) nối cuối ROADS_DT (ri 1426, sau khúc nam 962470755) và vẫn là way gần nhất của 383/384 ⇒ giữ ngõ 5,5 m.
+// { id, z } cắt theo tung độ, { id, x } theo hoành độ; phần ĐẦU way (P[0]…) giữ chỉ số, phần sau nối cuối (mang `sp` = chỉ số
+// way gốc, xuất ra mapdata — roadnet gộp NHÃN VẠCH ảnh của 2 nửa: 382 Bến Bính mất nhãn 'không vạch tim' của 384 khi tách →
+// vạch mép trắng trên bãi đất). THỨ TỰ mảng = thứ tự chỉ số nối thêm — chỉ được THÊM ở cuối.
+const SPLIT_WAYS = [{ id: 962470755, z: -590 }, { id: 1208204466, x: -401 }];
 for (const S of SPLIT_WAYS) {
   const ri = ROADS_DT.findIndex((r) => r.id === S.id); if (ri < 0) { console.log(`  tách way ${S.id}: không thấy`); continue; }
-  const r = ROADS_DT[ri], P = r.pts;
-  const k = P.findIndex((p, i) => i > 0 && (P[i - 1][1] - S.z) * (p[1] - S.z) <= 0);
-  if (k < 1) { console.log(`  tách way ${S.id}: không cắt z ${S.z}`); continue; }
-  const a = P[k - 1], b = P[k], t = (S.z - a[1]) / (b[1] - a[1] || 1);
-  const m = rnd([[a[0] + (b[0] - a[0]) * t, S.z]])[0];
+  const r = ROADS_DT[ri], P = r.pts, ax = S.x != null ? 0 : 1, v = S.x != null ? S.x : S.z;
+  const k = P.findIndex((p, i) => i > 0 && (P[i - 1][ax] - v) * (p[ax] - v) <= 0);
+  if (k < 1) { console.log(`  tách way ${S.id}: không cắt ${ax ? 'z' : 'x'} ${v}`); continue; }
+  const a = P[k - 1], b = P[k], t = (v - a[ax]) / (b[ax] - a[ax] || 1);
+  const m = rnd([ax ? [a[0] + (b[0] - a[0]) * t, v] : [v, a[1] + (b[1] - a[1]) * t]])[0];
   const head = [...P.slice(0, k), m], tail = [m, ...P.slice(k)];
   if (Math.hypot(head[head.length - 1][0] - head[head.length - 2][0], head[head.length - 1][1] - head[head.length - 2][1]) < 0.5) head.splice(head.length - 2, 1);
   if (Math.hypot(tail[1][0] - tail[0][0], tail[1][1] - tail[0][1]) < 0.5) tail.splice(1, 1);
   r.pts = head;
-  ROADS_DT.push({ c: r.c, pts: tail, name: r.name, id: `${S.id}:s`, tags: r.tags });
-  console.log(`  tách way ${S.id} (ri ${ri}) tại z ${S.z}: bắc ${head.length} đỉnh, nam → ri ${ROADS_DT.length - 1} (${tail.length} đỉnh)`);
+  ROADS_DT.push({ c: r.c, pts: tail, name: r.name, id: `${S.id}:s`, tags: r.tags, sp: ri });   // sp = chỉ số way gốc (xuất ra mapdata: roadnet dùng chung NHÃN VẠCH ảnh của 2 nửa như trước khi tách)
+  console.log(`  tách way ${S.id} (ri ${ri}) tại ${ax ? 'z' : 'x'} ${v}: đầu ${head.length} đỉnh, sau → ri ${ROADS_DT.length - 1} (${tail.length} đỉnh)`);
 }
 
 // ---------- 3c. MẶT CẮT PHỐ THẬT + TIM KHỚP VẾT XE PANO (Đợt 3 W3-A, tools/street_fit.mjs) ----------
@@ -1036,7 +1044,7 @@ export const WORLD = ${JSON.stringify(WORLD)};
 export const DT_BOX = ${JSON.stringify(dtBox)};
 export const MASK = { w: ${MW}, h: ${MH}, cell: ${CELL}, b64: '${maskB64}' };
 export const RIVERS = ${JSON.stringify(RIVERS)};
-export const ROADS_DT = ${JSON.stringify(ROADS_DT.map(({ c, pts, w, sw }) => (w > 0 ? (sw >= 0 ? { c, pts, w, sw } : { c, pts, w }) : { c, pts })))};
+export const ROADS_DT = ${JSON.stringify(ROADS_DT.map(({ c, pts, w, sw, sp }) => ({ ...(w > 0 ? (sw >= 0 ? { c, pts, w, sw } : { c, pts, w }) : { c, pts }), ...(sp >= 0 ? { sp } : {}) })))};
 export const ROADS_REGION = ${JSON.stringify(ROADS_REGION.map(({ pts }) => ({ pts })))};
 export const LM = ${JSON.stringify(LM)};
 export const LM_DIR = ${JSON.stringify(LM_DIR)};

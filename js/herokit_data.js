@@ -2,8 +2,9 @@
 // HERO[i] = [cx·10, cz·10 (tâm diện tích footprint, dm), chương trình (HERO_PROG), màu tường sRGB | −1, màu nhấn (biển) sRGB | −1,
 //            cờ: 1 mái ngói · 2 rào/cổng · 4 mái che sảnh · 8 bậc thang · 16 cửa vòm · 32 khối cong · 64 hàng cột · 128 điện máy · 256 thời trang · 512 điện thoại,
 //            điểm tiêu x·10, z·10 (nơi tia quan sát chạm mặt nhà: sảnh/mái che/biển đặt ở đoạn mặt tiền đó)]
+// KHOÁ LẠI bởi tools/rekey_herokit.mjs (phân loại đóng băng — ghi chú fp_json đã mất 2026-10-15; HERO_META.rekey).
 export const HERO_PROG = ["none","pagoda","petrol","market","school","bank","hotel","store","office","colonnade"];
-export const HERO_META = {"v":2,"generator":"tools/gen_herokit.mjs","rb":43376,"rbHash":"52ff1208","obs":15934,"sameObsAsFacadeFP":true,"hits":19124,"n":407,"prog":{"hotel":47,"colonnade":28,"school":42,"office":112,"store":99,"bank":61,"market":4,"pagoda":12,"petrol":2},"dropped":{"weak":115,"minority":238,"small":127,"far":17}};
+export const HERO_META = {"v":2,"generator":"tools/gen_herokit.mjs","rb":43372,"rbHash":"900eb8db","obs":15934,"sameObsAsFacadeFP":true,"hits":19124,"n":407,"prog":{"colonnade":28,"office":112,"bank":61,"hotel":47,"petrol":2,"pagoda":12,"store":99,"school":42,"market":4},"dropped":{"weak":115,"minority":238,"small":127,"far":17},"rekey":{"tool":"tools/rekey_herokit.mjs","genRbHash":"52ff1208","from":"52ff1208","matched":407,"moved":0,"unmatched":0,"ambiguous":0,"collide":0}};
 export const HERO = [
 [-10385,1802,9,15525590,15921906,64,-10361,1874],
 [-9828,4029,8,11120048,2771610,0,-9935,3836],

@@ -619,16 +619,32 @@ export function buildFacadeAtlas(size = 2048, opts = {}) {
     }
     hood(0.3, 3.7, 3.0); rect(1.6, 3.35, 2.4, 3.6, [60, 60, 60], M_KEEP);   // biển số nhà nhỏ
   });
-  cell('G_HOME1', W4, GH, () => {      // nhà ở: cửa lùa sắt hé — thấy xe máy để trong nhà
+  cell('G_HOME1', W4, GH, () => {      // nhà ở: cửa lùa sắt hé — thấy phòng khách + xe máy để trong nhà
     groundWall(0.3); threshold();
     // SỬA HỒI QUY W5 (097 h90: bộ trệt W5-B đổi chỉ số chọn → bay này thành G_HOME1, nội thất −4 = 'ô cửa ĐEN trống' ở 3 m):
-    // nội thất sáng như phòng có đèn tuýp (+26), tường trong sáng nửa trên, tủ/kệ mờ — vẫn tối hơn cửa hàng
-    reveal(0.2, 0.14, 3.8, 2.85); interior(0.2, 0.14, 3.8, 2.85, 26);
-    vgrad(0.2, 1.5, 2.75, 2.85, [100, 96, 88], [126, 120, 108], M_KEEP, 4); rect(0.35, 0.5, 1.2, 1.5, [84, 66, 50], M_KEEP); tubeLight(0.5, 2.5, 2.65);
-    disc(1.6, 0.35, 0.22, [30, 30, 30], M_KEEP); disc(2.5, 0.35, 0.22, [30, 30, 30], M_KEEP);
-    rect(1.55, 0.45, 2.6, 0.95, [150, 30, 30], M_KEEP); rect(1.9, 0.9, 2.3, 1.2, [40, 40, 40], M_KEEP);
+    // nội thất sáng như phòng có đèn tuýp, tường trong sáng nửa trên. 2026-10-15 (097/336 h90): bản +26 chỉ có 1 khối đỏ
+    // giữa nền be trống = "xe đẩy đỏ lẻ loi trong khoảng không" ⇒ phòng CÓ ĐỒ: tủ gỗ + TV, bàn thờ treo đỏ + lịch, ghế nhựa,
+    // xe máy ra dáng (2 bánh + đùm, yếm, yên, ghi đông, đèn), cửa lùa sắt kéo 1/3 (song đứng)
+    reveal(0.2, 0.14, 3.8, 2.85); interior(0.2, 0.14, 3.8, 2.85, 16);
+    vgrad(0.2, 1.5, 2.45, 2.85, [96, 92, 84], [118, 112, 100], M_KEEP, 4); tubeLight(0.6, 1.8, 2.66);
+    // tủ gỗ thấp + TV + bàn thờ treo + lịch
+    rect(0.3, 0.14, 1.3, 1.05, [92, 64, 44], M_KEEP); vline(0.8, 0.2, 1.0, 0.02, [60, 40, 28], M_KEEP); hline(0.6, 0.32, 1.28, 0.02, [60, 40, 28], M_KEEP);
+    rect(0.45, 1.05, 1.15, 1.48, [26, 26, 28], M_KEEP); rect(0.5, 1.1, 1.1, 1.43, [52, 58, 66], M_KEEP);
+    rect(0.35, 2.2, 1.15, 2.3, [140, 36, 30], M_KEEP); rect(0.45, 2.3, 1.05, 2.5, [168, 52, 38], M_KEEP); rect(0.68, 2.33, 0.82, 2.46, [214, 176, 80], M_KEEP);
+    rect(1.45, 1.75, 1.75, 2.2, [228, 224, 214], M_KEEP); rect(1.45, 2.05, 1.75, 2.2, [176, 42, 36], M_KEEP);
+    // ghế nhựa đỏ/xanh
+    rect(0.25, 0.14, 0.3, 0.55, [40, 70, 150], M_KEEP);
+    // xe máy (nghiêng nhìn ngang, mũi trái): bánh + đùm, sàn, yếm, thân sau, yên, ghi đông, đèn
+    for (const cx of [1.62, 2.38]) { disc(cx, 0.36, 0.23, [24, 24, 26], M_KEEP); disc(cx, 0.36, 0.09, [138, 140, 144], M_KEEP); }
+    rect(1.78, 0.42, 2.12, 0.5, [36, 36, 38], M_KEEP);
+    rect(1.62, 0.5, 1.8, 1.08, [128, 30, 30], M_KEEP);
+    rect(2.05, 0.55, 2.6, 0.86, [128, 30, 30], M_KEEP); rect(2.5, 0.6, 2.62, 0.74, [200, 60, 40], M_KEEP);
+    rect(1.98, 0.86, 2.52, 0.96, [22, 22, 24], M_KEEP);
+    rect(1.5, 1.1, 1.86, 1.15, [22, 22, 24], M_KEEP); rect(1.52, 0.98, 1.64, 1.1, [226, 222, 200], M_KEEP);
+    // cửa lùa sắt kéo về phải (1/3 bay), song đứng
     const col = [150, 156, 160];
-    rect(2.75, 0.14, 3.8, 2.85, col, M_KEEP); for (let y = 0.3; y < 2.8; y += 0.3) hline(y, 2.78, 3.77, 0.03, [110, 114, 118], M_KEEP);
+    rect(2.75, 0.14, 3.8, 2.85, col, M_KEEP); for (let x = 2.8; x < 3.78; x += 0.14) vline(x, 0.16, 2.83, 0.025, [112, 116, 120], M_KEEP);
+    hline(1.45, 2.76, 3.79, 0.04, [118, 122, 126], M_KEEP);
     hood(0.2, 3.8, 2.95);
   });
   cell('G_OLD', W4, GH, () => {        // phố cũ: cửa gỗ pa-nô cao + ô thoáng vòm, ố nặng, bảng nhỏ
@@ -815,8 +831,15 @@ export function buildFacadeAtlas(size = 2048, opts = {}) {
   cell('G_ELEC', W4, GH, () => {       // điện thoại/điện máy: nội thất trắng sáng, tủ kính trưng bày, tranh quảng cáo chung
     groundWall(0.1); threshold();
     vgrad(0.15, 0.14, 3.85, 2.8, [226, 228, 230], [190, 192, 194], M_KEEP, 3);
-    for (const [x0, x1] of [[0.25, 1.05], [2.95, 3.75]]) { rect(x0, 1.3, x1, 2.45, [R(40, 200), R(80, 160), R(120, 220)], M_KEEP); rect(x0 + 0.08, 1.38, x1 - 0.08, 1.75, [245, 245, 245], M_KEEP); }   // tranh
-    for (let y = 1.5; y < 2.4; y += 0.3) { rect(1.2, y, 2.8, y + 0.03, [250, 250, 250], M_KEEP); for (let x = 1.25; x < 2.75; x += 0.16) rect(x, y + 0.03, x + 0.09, y + 0.2, [30 + R(0, 40), 32, 36], M_KEEP); }   // kệ máy
+    // tranh quảng cáo: nền chuyển màu + máy điện thoại (vỏ tối, màn sáng) + dải chữ — 2026-10-15 (166 h180: tranh màu phẳng +
+    // ô trắng = "ô xanh giữ chỗ")
+    for (const [x0, x1] of [[0.25, 1.05], [2.95, 3.75]]) {
+      const c = [R(40, 160), R(70, 140), R(110, 200)];
+      vgrad(x0, 1.3, x1, 2.45, [c[0] * 0.55, c[1] * 0.55, c[2] * 0.6], c, M_KEEP, 4);
+      const px = (x0 + x1) / 2; rect(px - 0.17, 1.62, px + 0.17, 2.36, [22, 22, 26], M_KEEP); rect(px - 0.14, 1.67, px + 0.14, 2.31, [R(150, 210), R(170, 220), 236], M_KEEP);
+      rect(x0 + 0.06, 1.36, x1 - 0.06, 1.52, [244, 242, 236], M_KEEP); hline(1.44, x0 + 0.12, x1 - 0.2, 0.035, [c[0] * 0.5, c[1] * 0.5, c[2] * 0.5], M_KEEP);
+    }
+    for (let y = 1.5; y < 2.4; y += 0.3) { rect(1.2, y, 2.8, y + 0.03, [250, 250, 250], M_KEEP); for (let x = 1.25; x < 2.75; x += 0.16) { rect(x, y + 0.03, x + 0.09, y + 0.2, [30 + R(0, 40), 32, 36], M_KEEP); rect(x + 0.015, y + 0.06, x + 0.075, y + 0.17, [R(90, 170), R(120, 190), R(160, 220)], M_KEEP); } }   // kệ máy (màn sáng)
     rect(0.3, 0.14, 3.7, 1.0, [150, 156, 162], M_KEEP); glass(0.35, 0.45, 3.65, 0.95, 0, -1); frame(0.3, 0.4, 3.7, 1.0, FR_SILVER, 0.04, 3);   // tủ kính
     for (let x = 0.5; x < 3.5; x += 0.3) rect(x, 0.5, x + 0.12, 0.62, [24, 26, 30], M_KEEP);
     tubeLight(0.3, 3.7, 2.68); tubeLight(0.3, 3.7, 2.55); signBand();
@@ -1282,6 +1305,12 @@ export function buildFacadeAtlas(size = 2048, opts = {}) {
     rect(1.35, 0.42, 2.05, 0.7, mb, M_KEEP); rect(1.45, 0.7, 1.95, 0.82, [34, 32, 30], M_KEEP); rect(2.0, 0.42, 2.12, 1.0, [60, 60, 62], M_KEEP); rect(1.95, 0.98, 2.3, 1.03, [50, 50, 52], M_KEEP);
     for (const x of [2.7, 3.05]) rect(x, 0.14, x + 0.28, 0.5, rnd() < 0.5 ? [186, 44, 40] : [44, 96, 168], M_KEEP);  // ghế nhựa
     tubeLight(1.0, 3.0, 2.7);
+    // 2026-10-15 (336 h90: tường trong be trống + 1 xe = "khoảng không"): đồ phòng khách — TV trên tủ, tranh/lịch treo, ghế gỗ dài, chậu cây
+    rect(1.82, 1.6, 2.38, 1.95, [24, 24, 26], M_KEEP); rect(1.86, 1.64, 2.34, 1.91, [56, 62, 70], M_KEEP);
+    rect(0.85, 1.95, 1.4, 2.35, [70, 52, 36], M_KEEP); rect(0.9, 2.0, 1.35, 2.3, [120, 138, 110], M_KEEP);
+    rect(2.75, 1.8, 3.05, 2.25, [228, 224, 214], M_KEEP); rect(2.75, 2.1, 3.05, 2.25, [176, 42, 36], M_KEEP);
+    rect(0.7, 0.5, 1.05, 0.9, [92, 64, 44], M_KEEP); rect(0.7, 0.5, 1.05, 0.58, [70, 48, 32], M_KEEP);
+    rect(3.0, 0.5, 3.25, 0.75, [120, 84, 60], M_KEEP); disc(3.12, 0.95, 0.2, [62, 104, 58], M_KEEP);
     const col = rnd() < 0.5 ? [74, 86, 80] : [96, 72, 54];
     for (const [a, b] of [[0.2, 0.62], [3.38, 3.8]]) {                                                         // cửa xếp dồn 2 mép
       rect(a, 0.14, b, 2.85, [col[0] * 0.8, col[1] * 0.8, col[2] * 0.8], M_KEEP);

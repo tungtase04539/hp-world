@@ -304,12 +304,42 @@ function bankStrip(P) {
   });
   return hit;
 }
+// 2026-10-15 (sửa hồi quy 336 h180/h270): DẢI BỜ NGÕ HẸP ven sông (Tam Bạc bắc — riverbank.js mode 'strip': lan can ở mép vỉa
+// ngõ, giữa lan can và kè là dải bờ tự phát: hàng cổ thụ + lán/bạt THẤP do riverbank.js tự dựng). Footprint ML (Google/MS) ở đó
+// là mái bạt/tán cây/sạp — bankStrip không bắt vì không đỉnh nào chạm nước và dải rộng > 12 m. Trước W5-D lòng phố cấp s 10 m +
+// vỉa 3,5 m cắt mất phần lớn (dot3: hộp 4 × 7 m cách camera 14 m); ngõ 5,5 m nay để nguyên 5 × 15 m cách 336 ~8 m = khối nhà
+// trắng 1 tầng chắn h180/h270 (ảnh thật: lan can + cây + sông, sạp bạt thấp dưới mép). Luật: nguồn KHÔNG phải OSM, tâm cách nước
+// < 12 m (sông/kênh), có đoạn ngõ HẸP (mặt tiền ≤ NARROW_FL) chạy dọc phía đất (cos ≥ 0,7) với mép lòng → mép nước qua tâm
+// < NARROW_BANK_GAP, trong 40 m quanh camera NARROW_CAMS (lán thật xa ngõ > 20 m — 331 h270 — giữ).
+const NARROW_BANK_GAP = 20;
+function narrowBankStrip(b) {
+  if (b.src === 'OSM') return false;
+  const P = b.pts, [cx, cz] = centroid(P), sd = waterSD(cx, cz);
+  if (sd >= 12 || sd < 0) return false;
+  const gx = waterSD(cx + 1, cz) - waterSD(cx - 1, cz), gz = waterSD(cx, cz + 1) - waterSD(cx, cz - 1), gl = Math.hypot(gx, gz);
+  if (gl < 1e-6) return false;
+  const qx = cx - (gx / gl) * (sd + 1.5), qz = cz - (gz / gl) * (sd + 1.5);
+  if (!RIVER_POLYS.some((w) => pointInPoly(w.pts, qx, qz))) return false;
+  let near = false;
+  camGrid.query([cx - 40, cz - 40, cx + 40, cz + 40], (i) => { if (!near && NARROW_CAMS.has(i) && Math.hypot(PANO_CAM[i][0] - cx, PANO_CAM[i][1] - cz) < 40) near = true; });
+  if (!near) return false;
+  let hit = false;
+  segGrid.query([cx - 30, cz - 30, cx + 30, cz + 30], (i) => {
+    if (hit) return; const s = SEGS[i]; if (!'pstr'.includes(s.c) || s.fl > NARROW_FL) return;
+    const [t, v] = segLocal(s, cx, cz); if (t < 0 || t > 1) return;
+    const sg = v >= 0 ? -1 : 1;
+    if ((sg * s.nx * gx + sg * s.nz * gz) / gl < 0.7) return;
+    if (Math.abs(v) - s.hw + sd < NARROW_BANK_GAP) hit = true;
+  });
+  return hit;
+}
 B = B.filter((b) => {
   if (b.pts.length < 3 || absArea(b.pts) < 8) { stat('drop_small'); return false; }
   if (!isSimple(b.pts)) { stat('drop_nonsimple'); return false; }
   const [cx, cz] = centroid(b.pts);
   if (waterSD(cx, cz) < 0 || waterFrac(b.pts) > 0.5) { stat('drop_water'); return false; }
   if (bankStrip(b.pts)) { stat('drop_bank'); if (process.env.BANK_DBG) console.log('drop_bank', b.src || '', cx.toFixed(1), cz.toFixed(1), absArea(b.pts).toFixed(0)); return false; }
+  if (narrowBankStrip(b)) { stat('drop_bank_narrow'); if (process.env.BANK_DBG) console.log('drop_bank_narrow', b.src || '', cx.toFixed(1), cz.toFixed(1), absArea(b.pts).toFixed(0)); return false; }
   if (clearedZone(cx, cz)) { stat('drop_cleared'); return false; }
   return true;
 });

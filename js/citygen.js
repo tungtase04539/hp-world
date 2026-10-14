@@ -166,17 +166,17 @@ const SETS = {
   XP: ['S_EXP1', 'S_EXP1', 'S_WIN', 'S_WIN', 'S_BACK', 'U_AC', 'S_EXP0', 'S_EXP0', 'S_PLAIN2', 'S_EXP2'],
   // W4-A VÂN TAY: bộ mô-đun THEO QUAN SÁT THẬT của từng nhà (D.fp, mục RBF1) — FGk tầng trệt (fpGround), FUk tầng trên
   // (fpUpper). aFp.w = FG (4 bit) | FU << 4; 0 = theo thống kê như cũ.
-  FG1: ['G_SHOP0', 'G_SHOP1', 'G_SHOP2', 'G_SHOP3', 'G_MOTO', 'G_ELEC', 'G_HARD', 'G_OPEN0', 'G_OPEN1', 'G_OPEN2'],   // cửa hàng mở
+  FG1: ['G_SHOP0', 'G_SHOP1', 'G_SHOP0', 'G_SHOP3', 'G_MOTO', 'G_ELEC', 'G_HARD', 'G_OPEN0', 'G_OPEN1', 'G_OPEN2'],   // cửa hàng mở — 2026-10-15 (336 h0): G_SHOP2 (quán ăn tối, bảng thực đơn) → G_SHOP0 tạp hoá: ảnh 'shop_open' là cửa hàng bày hàng, quán ăn có FG11 riêng
   FG2: ['G_OLD', 'G_OPEN0', 'G_SHOP1', 'G_OPEN2', 'G_OLD', 'G_COL'],                                                 // cửa hàng mở, phố cũ/Pháp
   FG3: ['G_SHUT0', 'G_SHUT1', 'G_SHUT0'],                                                                             // cửa cuốn
   FG4: ['G_GLASS', 'G_SHOW', 'G_SHOW', 'G_SHOP3'],                                                                     // cửa kính/showroom
-  FG5: ['G_GATE', 'G_HOME1', 'G_HOME0'],                                                                               // cửa xếp/cổng sắt
+  FG5: ['G_GATE', 'G_GATE', 'G_HOME0'],                                                                                // cửa xếp/cổng sắt — 2026-10-15 (097 h90): ảnh nói cửa ĐÓNG (xếp/cổng) ⇒ không bay mở G_HOME1
   FG6: ['G_HOME0', 'G_HOME1', 'G_HOME2'],                                                                              // nhà ở
   FG7: ['G_CIVIC'],                                                                                                    // tường/cửa sổ song sắt
   FG8: ['G_NEO'],                                                                                                      // tường — tân cổ điển
   FG9: ['G_COL'],                                                                                                      // tường — Pháp
   FG10: ['G_OPEN0', 'G_OPEN2', 'G_FOOD', 'G_SHOP0', 'G_OPEN1'],                                                        // chợ/sạp
-  FG11: ['G_FOOD', 'G_SHOP2', 'G_OPEN2', 'G_FOOD'],                                                                    // quán ăn/cà phê
+  FG11: ['G_FOOD', 'G_SHOP2', 'G_OPEN0', 'G_FOOD'],                                                                    // quán ăn/cà phê — 2026-10-15 (331 h90/h180): G_OPEN2 (đồ gỗ/tủ thờ ĐỎ) ≠ quán ăn → G_OPEN0 quán cà phê/ăn mở
   FU1: ['U_SLIDE0', 'U_SLIDE0', 'U_SLIDE1', 'U_TILE', 'U_AC'],          // nhôm kính
   FU2: ['U_BALC0', 'U_BALC1', 'U_SLIDE0', 'U_BALC0'],                   // nhôm kính + ban công sắt
   FU3: ['U_BALC1', 'U_LOG', 'U_SLIDE0', 'U_BALC1'],                     // nhôm kính + ban công bê tông
@@ -673,7 +673,7 @@ ${gl1 ? GL1_GROUND_MAIN : GL2_GROUND_MAIN}
 #endif`)
       .replace('#include <aomap_fragment>', 'reflectedLight.indirectDiffuse *= fabAO; reflectedLight.directDiffuse *= mix(1.0, fabAO, 0.35);');
   };
-  m.customProgramCacheKey = () => 'fabric_v5fx_' + size;   // sửa hồi quy W5 (phong hoá + sáng cửa mở) — trước 'fabric_v5ab_'; tích hợp W5: A (fabric_v5a_) + B (fabric_v5b2_) cùng đổi shader → khoá MỚI
+  m.customProgramCacheKey = () => 'fabric_v5fy_' + size;   // 2026-10-15 FG5 bỏ G_HOME1 (trước 'fabric_v5fx_'); sửa hồi quy W5 (phong hoá + sáng cửa mở) — trước 'fabric_v5ab_'; tích hợp W5: A (fabric_v5a_) + B (fabric_v5b2_) cùng đổi shader → khoá MỚI
   _mat = m;
   return m;
 }
