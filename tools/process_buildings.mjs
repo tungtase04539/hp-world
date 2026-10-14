@@ -1076,6 +1076,46 @@ function pkSupport(F, um) {
   stat('gap_pk_support');
   return true;
 }
+// Đ3-W5-D: BẰNG CHỨNG NHÀ TỪ VÂN TAY ẢNH (audit/facade_fp.json, W4-A): lô khe không có footprint thật quanh (veto 'noev')
+// nhưng một pano ≤ 40 m CHỤP THẤY nhà đúng hướng đó (quan sát near/mid, lõi 76% [x0,x1] của nhà trong ảnh, khoảng cách hợp độ
+// sâu: near 2-22 m, mid 6-40 m) và tia camera → lô KHÔNG xuyên nhà nào đã có (nhà đã có = chính nhà được quan sát) ⇒ đủ bằng
+// chứng. Ví dụ pano_115 h180: góc đông-nam ngã tư Hạ Lý — ảnh thật nhà phố trắng 5 T + mái hiên xanh, Overture trống → game
+// từng là "quảng trường" trống. Bỏ kiểu market/construction (sạp/công trường không phải nhà).
+const FPGAP = (() => {
+  const F = loadFacadeFP(); if (!F) return null;
+  const byP = new Map(), T = Math.tan((F.halfFov || 49) * Math.PI / 180);
+  const ci = Object.fromEntries(F.cols.map((k, i) => [k, i])), stx = F.enums.style;
+  const bad = new Set([stx.indexOf('market'), stx.indexOf('construction')]);
+  for (const o of F.obs) {
+    const dep = o[ci.depth]; if (dep !== 0 && dep !== 1) continue;
+    if (bad.has(o[ci.style])) continue;
+    const x0 = o[ci.x0], x1 = o[ci.x1], m = 0.12 * (x1 - x0);
+    const br = (x) => (o[ci.heading] + Math.atan((x - 0.5) * 2 * T) * 180 / Math.PI);
+    const l = byP.get(o[ci.pano]) || byP.set(o[ci.pano], []).get(o[ci.pano]);
+    l.push([br(x0 + m), br(x1 - m), dep]);
+  }
+  return { panos: F.panos, byP };
+})();
+function fpGapSupport(x, z) {
+  if (!FPGAP) return false;
+  for (const [pi, L] of FPGAP.byP) {
+    const P = FPGAP.panos[pi], px = P[1], pz = P[2], d = Math.hypot(x - px, z - pz);
+    if (d > 40 || d < 2) continue;
+    let bt = Math.atan2(x - px, -(z - pz)) * 180 / Math.PI;
+    let hit = false;
+    for (const [b0, b1, dep] of L) {
+      if (dep === 0 ? d > 22 : d < 6) continue;
+      let u = bt; while (u < b0 - 180) u += 360; while (u > b0 + 180) u -= 360;
+      if (u >= b0 && u <= b1) { hit = true; break; }
+    }
+    if (!hit) continue;
+    let occl = false;
+    const ux = (x - px) / d, uz = (z - pz) / d;
+    for (let t = 2; t < d - 2.5 && !occl; t += 1) if (occupiedAt(px + ux * t, pz + uz * t)) occl = true;
+    if (!occl) { stat('gap_fp_support'); return true; }
+  }
+  return false;
+}
 function fillGap(s, sg, t0, t1) {
   const L = t1 - t0; if (L < 3.5) return;
   const R = rng(hash32(`gap${s.ri}_${s.k}_${sg}_${Math.round(t0 * 10)}`));
@@ -1100,7 +1140,7 @@ function fillGap(s, sg, t0, t1) {
     if (forecourt(frameRect(F, uBase + ta, uBase + tb, 0, 25))) { stat('gap_veto_forecourt'); GAPDBG.push([mx, mz, 'forecourt']); continue; }
     if (panoOpenVeto(frameRect(F, uBase + ta, uBase + tb, 0, 12))) { stat('gap_veto_pano'); GAPDBG.push([mx, mz, 'noev']); continue; }
     if (DBG && Math.hypot(mx - DBG[0], mz - DBG[1]) < 8) console.log('   [dbg gap]', mx.toFixed(1), mz.toFixed(1), s.c, 'ev', builtEvidence(mx, mz, s.ux, s.uz, nx, nz), 'obs', obsSupport(frameRect(F, uBase + ta, uBase + tb, 0, 12)));
-    if (!builtEvidence(mx, mz, s.ux, s.uz, nx, nz) && !obsSupport(frameRect(F, uBase + ta, uBase + tb, 0, 12)) && !pkSupport(F, uBase + (ta + tb) / 2)) { stat('gap_veto_noev'); GAPDBG.push([mx, mz, 'noev']); continue; }
+    if (!builtEvidence(mx, mz, s.ux, s.uz, nx, nz) && !obsSupport(frameRect(F, uBase + ta, uBase + tb, 0, 12)) && !pkSupport(F, uBase + (ta + tb) / 2) && !fpGapSupport(mx + nx * 2, mz + nz * 2)) { stat('gap_veto_noev'); GAPDBG.push([mx, mz, 'noev']); continue; }
     const rect = (d) => frameRect(F, uBase + ta, uBase + tb, 0, d);
     let lo = 0, hi = D;
     const okD = (d) => { const Q = rect(d); if (!sweepFree(Q, -1, { corr: true, zones: true })) return false;
@@ -1135,8 +1175,14 @@ function fillGap(s, sg, t0, t1) {
     B.push(nb); grid.insert(B.length - 1, (nb.bb = bbox(Q))); nGapLots++;
   }
 }
+// Đ3-W5-D: NGÕ h quanh camera NGÕ HẸP (NARROW_CAMS, ≤ 30 m): Tam Bạc bắc rẽ nhánh vào các ngõ 'service' OSM (pano_519 h90:
+// "P. Tam Bạc" nhánh đông, nhà 2 bên sát mép) nhưng khối giữa 2 ngõ KHÔNG có footprint Overture nào → lõi ô bị veto 'near'
+// (không nhà thật quanh) và lấp khe chỉ chạy dọc p/s/t/r ⇒ ô trống trơn ngay cạnh camera. Cho lấp khe chạy cả dọc ngõ h
+// ở đó (vẫn qua mọi veto: nước, công viên, miệng ngõ, ô đất, sân trước, pano mở, BẰNG CHỨNG nhà).
+const nearNarrowCam = (x, z, r) => { let h = false; camGrid.query([x - r, z - r, x + r, z + r], (i) => { if (!h && NARROW_CAMS.has(i) && Math.hypot(PANO_CAM[i][0] - x, PANO_CAM[i][1] - z) < r) h = true; }); return h; };
 for (let si = 0; si < SEGS.length; si++) {
-  const s = SEGS[si]; if (!['p', 's', 't', 'r'].includes(s.c)) continue;
+  const s = SEGS[si];
+  if (!['p', 's', 't', 'r'].includes(s.c) && !(s.c === 'h' && nearNarrowCam((s.ax + s.bx) / 2, (s.az + s.bz) / 2, 30 + s.L / 2))) continue;
   for (const sg of [1, -1]) {
     let run = [];
     const flush = () => { if (run.length * 0.5 >= 3.5) fillGap(s, sg, run[0].t, run[run.length - 1].t + 0.5); run = []; };

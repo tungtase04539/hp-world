@@ -19967,6 +19967,69 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
       lmRemoveCell(c.name, 'trong lòng nút xoắn HVT (W3-F)');
     }
   }
+  // Đ3-W5-D: CÂY CẢNH ĐẢO GIAO THÔNG NÚT CẦU HVT (chấm W4: 349 "manicured low hedges + bonsai medians", 304 h270, 217 h90).
+  // Ảnh 349 h090/h180, 304 h270: các đảo/dải dưới nhánh xoắn phủ BỤI CẮT TỈA thấp thành mảng xanh sẫm + tùng/la hán xén tầng
+  // (bonsai "mây") + bụi tròn; game: bãi cỏ ô liu trống + vài cây bóng mát. Lưới 2,5 m trong hộp nút HVT, ≤ 60 m quanh camera
+  // pano mặt đất: ô cách nhựa/vỉa ≥ 1,2 m (roadnet.surfaceAt 5 điểm), đất khô LAND_H, không nhà/collider, gầm cầu ≥ 5 m (hoặc
+  // không cầu), cách camera ≥ 4 m. Chọn theo hash TẤT ĐỊNH: 45% hàng bụi (ô liền theo hàng → 1 dải hedgeGeometry rộng 2,2 m
+  // ⇒ các hàng 2,5 m chồng mép thành mảng), 9% tùng xén tầng, 12% bụi tròn. 3 mesh gộp (hedge + lá + thân) ≈ +3 draw call.
+  {
+    const surf = world.roadNet ? world.roadNet.surfaceAt : null;
+    const deck = world.bridges && world.bridges.index;
+    const CAMS = PANO_CAM.filter(([x, z]) => x > -300 && x < 120 && z > -1045 && z < -845 && !(deck && deck.topAt(x, z) > LAND_H + 2));
+    const fr3 = (v) => v - Math.floor(v), hh3 = (x, z, k) => fr3(Math.sin(x * 12.9898 + z * 78.233 + k * 37.719) * 43758.5453);
+    const paved = (x, z) => !!surf && surf(x, z) > 0;
+    const okCell = (x, z) => {
+      if (Math.abs(groundHeightNoDeck(x, z) - LAND_H) > 0.35 || isWater(x, z)) return false;
+      for (const [dx, dz] of [[0, 0], [1.2, 0], [-1.2, 0], [0, 1.2], [0, -1.2]]) if (paved(x + dx, z + dz)) return false;
+      if (deck) { const t = deck.topAt(x, z, 1.5); if (t > -1e9 && t < LAND_H + 5) return false; }
+      for (const [cx, cz] of CAMS) if ((cx - x) ** 2 + (cz - z) ** 2 < 16) return false;
+      return world.isFree(x, z, 0.9);
+    };
+    const near = (x, z) => CAMS.some(([cx, cz]) => (cx - x) ** 2 + (cz - z) ** 2 < 3600);
+    const S = 2.5, rows = new Map(), greenG = [], woodG = [], ballG = [];
+    let nTop = 0, nBall = 0, nHedgeCells = 0;
+    if (surf && CAMS.length) {
+      for (let z = -1045; z <= -845; z += S) for (let x = -300; x <= 120; x += S) {
+        if (!near(x, z) || !okCell(x, z)) continue;
+        const r = hh3(x, z, 5);
+        if (r < 0.45) { (rows.get(z) || rows.set(z, []).get(z)).push(x); nHedgeCells++; continue; }
+        const jx = x + (hh3(x, z, 6) - 0.5) * 1.2, jz = z + (hh3(x, z, 7) - 0.5) * 1.2, gy = groundHeightNoDeck(jx, jz);
+        if (r < 0.54) {   // tùng xén tầng: thân nghiêng nhẹ + 3-4 tán dẹt
+          const H = 1.6 + hh3(x, z, 8) * 1.4, lean = (hh3(x, z, 9) - 0.5) * 0.5, a = hh3(x, z, 10) * Math.PI * 2;
+          const tr = new THREE.CylinderGeometry(0.07, 0.13, H, 5); tr.rotateZ(lean); tr.rotateY(a); tr.translate(jx, gy + H / 2, jz); woodG.push(tr.toNonIndexed());
+          const np = 3 + (hh3(x, z, 11) > 0.5 ? 1 : 0);
+          for (let k = 0; k < np; k++) {
+            const t = 0.45 + 0.55 * k / (np - 1), rr = 0.75 - 0.35 * k / (np - 1) + hh3(x, z, 12 + k) * 0.2, ang = a + k * 2.1;
+            const off = k === np - 1 ? 0 : 0.45;
+            const pad = new THREE.IcosahedronGeometry(rr, 1); pad.scale(1, 0.42, 1);
+            pad.translate(jx + Math.cos(ang) * off + Math.sin(lean) * H * t * Math.cos(a), gy + H * t + 0.15, jz + Math.sin(ang) * off + Math.sin(lean) * H * t * Math.sin(a)); greenG.push(pad);
+          }
+          addCollider(jx, jz, 0.35); nTop++;
+        } else if (r < 0.66) {   // bụi tròn cắt tỉa
+          const rr = 0.45 + hh3(x, z, 13) * 0.4, ball = new THREE.IcosahedronGeometry(rr, 1); ball.scale(1, 0.85, 1); ball.translate(jx, gy + rr * 0.8, jz); ballG.push(ball); nBall++;
+        }
+      }
+      // hàng bụi: ô liền nhau trên cùng hàng z → 1 đoạn (đầu/cuối co 0,4 m)
+      const paths = [];
+      for (const [z, xs] of rows) {
+        xs.sort((a, b) => a - b);
+        let a0 = xs[0], prev = xs[0];
+        const push = (u, v) => { if (v - u >= 0) paths.push([[u - S / 2 + 0.4, z], [v + S / 2 - 0.4, z]]); };
+        for (let i = 1; i < xs.length; i++) { if (xs[i] - prev > S + 0.01) { push(a0, prev); a0 = xs[i]; } prev = xs[i]; }
+        push(a0, prev);
+      }
+      if (paths.length) {
+        const hm = new THREE.Mesh(hedgeGeometry(paths, (x, z) => groundHeightNoDeck(x, z) + 0.02, { h: 0.62, w: 2.25, seg: 0.9, rough: 0.07, top: 0.05, wild: 0.35, seed: 57, base: [0.30, 0.45, 0.19], foot: 0.6 }), hedgeMaterial());
+        hm.castShadow = true; hm.receiveShadow = true; hm.name = 'hvt_island_hedge'; scene.add(hm);
+        (world.hedgeRuns ||= []).push(...paths);
+      }
+      const topM = mat(0x4b6d2c);
+      addMerged([...greenG, ...ballG].map((g2) => (g2.index ? g2.toNonIndexed() : g2)), topM, 'hvt_island_topiary');
+      addMerged(woodG, mat(0x6a5238), 'hvt_island_topiary_wood');
+    }
+    console.log('[world] W5-D cây cảnh nút HVT: camera', CAMS.length, 'ô bụi', nHedgeCells, 'tùng', nTop, 'bụi tròn', nBall);
+  }
   {
     const b = BRIDGES[1];
     const g = bridgeGroup(b);
