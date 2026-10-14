@@ -58,7 +58,8 @@ export function createTimers(log, metrics) {
       track(h);
       return h.cancel;
     },
-    // Drift-compensated fixed-rate loop (e.g. the 20 Hz sim). fn(tick, nowMs, dtMs) is synchronous.
+    // Drift-compensated fixed-rate loop (e.g. the 20 Hz sim). fn(tick, nowMs, dtMs, lateMs) is synchronous
+    // (lateMs = how late this tick started — event-loop pressure the tick's own duration does not show).
     // Records `<name>_ms` (duration) and `<name>_late_ms` (start lateness) histograms. If the loop falls more than
     // `maxCatchUp` ticks behind it skips ahead (counted in `<name>_skipped_total`) instead of spiralling.
     loop(hz, name, fn, { maxCatchUp = 3 } = {}) {
@@ -74,9 +75,10 @@ export function createTimers(log, metrics) {
         if (behind > maxCatchUp) { skipped.inc(behind); next += behind * period; behind = 0; }
         let n = 0;
         while (now >= next && n <= maxCatchUp && !stopped) {
-          late.observe(now - next);
+          const lateMs = now - next;
+          late.observe(lateMs);
           const t0 = performance.now();
-          try { fn(tick, t0, t0 - last); } catch (e) { log.error('loop tick threw', { name, tick, err: e }); }
+          try { fn(tick, t0, t0 - last, lateMs); } catch (e) { log.error('loop tick threw', { name, tick, err: e }); }
           last = t0;
           dur.observe(performance.now() - t0);
           tick++; next += period; n++;

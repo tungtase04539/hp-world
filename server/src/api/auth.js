@@ -14,8 +14,11 @@
 // - Refresh: 256-bit random (base64url, 43 chars), only sha256 stored, rotated on every use (rotated_from chain),
 //   180 days. Re-using a rotated token revokes every refresh token of the account (theft signal), except within
 //   REFRESH_RACE_S of the rotation (double-submit) → 409 refresh_race.
-// - Recovery code: 12 chars from an unambiguous alphabet (no I L O 0 1), shown ONCE as XXXX-XXXX-XXXX, only sha256 of
-//   the normalised code stored (accounts.recovery_hash). It stays valid (it is the key to the account on a new device).
+// - Recovery code: 12 chars from an unambiguous alphabet (no I L O 0 1), shown ONCE as XXXX-XXXX-XXXX, only
+//   HMAC-SHA256(RECOVERY_PEPPER, normalised code) stored (accounts.recovery_hash, recovery_hash_v = 2). The pepper is a
+//   secret in server/.env, never in the DB, so a leaked dump alone cannot be brute-forced offline (fixer round 1,
+//   SEC-5). Legacy v1 rows (plain sha256) are upgraded on their next successful recovery. It stays valid (it is the key
+//   to the account on a new device).
 // - Invite codes (closed test): sha256 of the normalised code in invites.code_hash; each use decrements uses_left
 //   atomically inside the account-creation transaction. Helpers for the admin page (S3): generateInviteCode,
 //   normalizeCode, hashCode, createInviteBatch.
@@ -62,6 +65,8 @@ export const formatCode = (c, group = 4) => c.match(new RegExp(`.{1,${group}}`, 
 export const generateInviteCode = () => formatCode(randomCode(AUTH.INVITE_LEN), 5);
 export const generateRecoveryCode = () => formatCode(randomCode(AUTH.RECOVERY_LEN), 4);
 export const hashToken = (t) => sha256(String(t));
+// peppered recovery-code hash (v2)
+export const recoveryHasher = (pepper) => (code) => crypto.createHmac('sha256', String(pepper)).update(normalizeCode(code)).digest();
 
 // Create `count` invite codes. Returns the PLAIN codes (show once; only hashes are stored).
 export async function createInviteBatch(db, { count = 1, uses = 1, expiresAt = null, batch = null, note = null, createdBy = 'admin' } = {}) {
@@ -138,6 +143,7 @@ export function register(app) {
   };
   const str = (v, max) => (typeof v === 'string' && v.length <= max ? v : null);
   const newRefresh = auth.newRefresh;
+  const recoveryHash = recoveryHasher(config.secrets.recoveryPepper);
 
   // ---- POST /v1/auth/guest ----------------------------------------------------------------------------------------
   app.http.post('/v1/auth/guest', async (req) => {
@@ -169,8 +175,8 @@ export function register(app) {
             if (!inv) throw httpError(403, API_ERR.INVITE_INVALID);
             inviteId = inv.id;
           }
-          const acc = await q.one(`INSERT INTO accounts (kind, invite_id, recovery_hash, last_seen) VALUES ('guest', $1, $2, now())
-              RETURNING id, kind`, [inviteId, hashCode(recovery)]);
+          const acc = await q.one(`INSERT INTO accounts (kind, invite_id, recovery_hash, recovery_hash_v, last_seen) VALUES ('guest', $1, $2, 2, now())
+              RETURNING id, kind`, [inviteId, recoveryHash(recovery)]);
           await q.query(`INSERT INTO identities (provider, subject, account_id) VALUES ('device', $1, $2) ON CONFLICT DO NOTHING`, [deviceId, acc.id]);
           const taken = await q.query('SELECT discriminator FROM characters WHERE lower(nickname) = lower($1)', [nickname]);
           if (taken.rows.length >= 10000) throw httpError(409, AUTH_ERR.NICK_TAKEN);
@@ -232,12 +238,22 @@ export function register(app) {
     const code = normalizeCode(str(req.json?.code, 64) || '');
     const deviceId = str(req.json?.deviceId, 64);
     if (!deviceId || !DEVICE_RE.test(deviceId)) throw httpError(400, AUTH_ERR.DEVICE_INVALID);
+    // malformed codes are refused before any accounting; the server-wide counter only ALERTS (fixer round 1, SEC-4: a
+    // refusing global bucket let ~10 addresses lock every player out of recovery). Per IP (/48) + per device hold.
+    if (code.length !== AUTH.RECOVERY_LEN || /[^A-Z0-9]/.test(code)) { m.inc(1, { r: 'recover_bad' }); throw httpError(401, AUTH_ERR.RECOVERY_INVALID); }
     limit('recoverDevice', deviceId);
-    limit('recoverGlobal', 'all');
-    if (code.length !== AUTH.RECOVERY_LEN) { m.inc(1, { r: 'recover_bad' }); throw httpError(401, AUTH_ERR.RECOVERY_INVALID); }
-    const row = await db.one(`SELECT a.id, a.kind, a.status, c.nickname, c.discriminator, c.display_name
-        FROM accounts a LEFT JOIN characters c ON c.account_id = a.id WHERE a.recovery_hash = $1`, [hashCode(code)]);
+    if (rl().checkHttp('recoverGlobal', 'all')) {
+      m.inc(1, { r: 'recover_flood' });
+      if (app.has('alerts')) app.get('alerts').send('recover_flood', 'Có rất nhiều lần thử mã khôi phục sai trong giờ qua (có thể bị dò mã). Máy chủ vẫn chạy bình thường.').catch(() => {});
+    }
+    const hv2 = recoveryHash(code), hv1 = hashCode(code);
+    const row = await db.one(`SELECT a.id, a.kind, a.status, a.recovery_hash_v, c.nickname, c.discriminator, c.display_name
+        FROM accounts a LEFT JOIN characters c ON c.account_id = a.id
+        WHERE a.recovery_hash = $1 OR (a.recovery_hash = $2 AND a.recovery_hash_v = 1)`, [hv2, hv1]);
     if (!row) { m.inc(1, { r: 'recover_bad' }); throw httpError(401, AUTH_ERR.RECOVERY_INVALID); }
+    // legacy unpeppered hash → upgrade on the first successful use
+    if (row.recovery_hash_v === 1) await db.query('UPDATE accounts SET recovery_hash = $2, recovery_hash_v = 2 WHERE id = $1', [row.id, hv2]);
+    delete row.recovery_hash_v;
     if (row.status !== 'active') throw httpError(403, AUTH_ERR.BANNED);
     const refresh = await db.tx(async (q) => {
       await q.query(`INSERT INTO identities (provider, subject, account_id) VALUES ('device', $1, $2) ON CONFLICT DO NOTHING`, [deviceId, row.id]);

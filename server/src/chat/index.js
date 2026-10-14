@@ -27,6 +27,7 @@ import { CHANNEL, CHAT_CODE, REPORT_CODE, REPORT_REASON } from '../../../js/shar
 import { CHAT } from '../../../js/shared/constants.js';
 import { Bucket, levenshtein, dupKey, posOf, isUuid, extraEnv } from './util.js';
 import { readFilterDir, DEFAULT_FILTER_DIR, LIST_FILES } from './lists.js';
+import { ipKey, isExemptIp } from '../game/ratelimit.js';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -51,8 +52,21 @@ export const POLICY = Object.freeze({
   CONTEXT_LINES: CHAT.CONTEXT_LINES,
   CONTEXT_RADIUS_M: 60,
   CONTEXT_WINDOW_MS: 15 * MIN,
-  FLAG_COOLDOWN_MS: 10 * MIN,      // at most one filter-flag report per account per 10 min
+  FLAG_COOLDOWN_MS: 10 * MIN,      // one filter-flag report per account per 10 min; later hits are APPENDED to it
+  GROOMING_ALERT_HITS: 2,          // personal-info probing hits by one account in the cooldown window → owner alert
+  // a player report counts toward the automatic mute only with evidence + a trusted reporter (fixer round 1, SEC-2/SO-5):
+  //   evidence  the target said something the reporter could have seen in the last EVIDENCE_MS (the chatRef line, or a
+  //             delivered line within EVIDENCE_RADIUS_M of the reporter)
+  //   trusted   the reporter's account is ≥ REPORTER_MIN_AGE_MS old with ≥ REPORTER_MIN_PLAY_S of play
+  //   distinct  reporters are counted by account AND by public IP (/64 for IPv6)
+  // Every report still reaches the owner's queue. Report-driven sanctions never go beyond a 24 h mute (shadow = owner
+  // or filter only).
+  EVIDENCE_MS: 10 * MIN,
+  EVIDENCE_RADIUS_M: 60,
+  REPORTER_MIN_AGE_MS: DAY,
+  REPORTER_MIN_PLAY_S: 30 * 60,
   RETENTION_DAYS: 30,
+  DISMISSED_KEEP_DAYS: 90,         // dismissed reports are deleted after this (resolved ones lose their chat copy at RETENTION_DAYS)
   FLUSH_MS: 1000,
 });
 
@@ -71,7 +85,7 @@ export function createChat({ db, log, alerts, metrics, bus, now = () => Date.now
   const sanc = new Map();         // accountId → {mute, shadow, ban} untilMs (Infinity = permanent)
   const blockCache = new Map();   // accountId → Set
   const lastReport = new Map();   // reporter → at
-  const lastFlag = new Map();     // accountId → at
+  const lastFlag = new Map();     // accountId → {at, id (open filter report), probe (personal-info hits), cats}
   let flushing = null;
 
   const m = metrics ? {
@@ -231,7 +245,11 @@ export function createChat({ db, log, alerts, metrics, bus, now = () => Date.now
       n = (await db.one(`SELECT count(*)::int AS n FROM sanctions WHERE account_id = $1 AND kind IN ('mute','shadow')
         AND revoked_at IS NULL AND starts_at > now() - make_interval(days => $2)`, [accountId, POLICY.LADDER_LOOKBACK_DAYS])).n;
     }
-    const step = POLICY.LADDER[Math.min(n, POLICY.LADDER.length - 1)];
+    let idx = Math.min(n, POLICY.LADDER.length - 1);
+    // reports alone (which a few colluding accounts can file) never escalate to the shadow mute: that step stays with
+    // the owner and the filter (SEC-2 / SO-5)
+    if (source === 'auto_report') while (idx > 0 && POLICY.LADDER[idx].kind === 'shadow') idx--;
+    const step = POLICY.LADDER[idx];
     const s = await sanction({ accountId, kind: step.kind, ms: step.ms, reason, source, reportId, actor: 'system' });
     const label = step.kind === 'shadow' ? 'khoá chat ẩn' : 'khoá chat';
     alerts?.send('automute', `Tự động ${label} ${fmtDur(step.ms)} một người chơi (${reason}). Xem trang quản trị.`).catch(() => {});
@@ -246,23 +264,58 @@ export function createChat({ db, log, alerts, metrics, bus, now = () => Date.now
   }
 
   // filter flag → owner queue (report with source 'filter')
+  // Within FLAG_COOLDOWN_MS one account gets ONE open filter report; every later flagged line is appended to it (hit
+  // count, reasons, the line itself) instead of being dropped — a grooming escalation (age → address → photo → home
+  // alone) shows up in full in the owner's queue (fixer round 1, SO-1). Self-harm always gets its own report + alert.
+  const lineJson = (l, who) => ({ ref: l.ref, at: new Date(l.at).toISOString(), name: l.name, accountId: l.accountId, text: l.text,
+    raw: l.raw || undefined, action: l.action, reasons: l.reasons?.length ? l.reasons : undefined, who, mark: true });
   async function flagReport(session, line, f) {
     const acc = session.accountId;
     const t = now();
-    const last = lastFlag.get(acc);
-    if (last && t - last < POLICY.FLAG_COOLDOWN_MS && !f.support) return null;
-    lastFlag.set(acc, t);
+    const probe = f.reasons.includes('personal_info');
+    let st = lastFlag.get(acc);
+    if (st && t - st.at >= POLICY.FLAG_COOLDOWN_MS) st = null;
     if (!db) return null;
+    if (st && st.id && !f.support) {
+      st.probe += probe ? 1 : 0;
+      for (const r of f.reasons) st.cats.add(r);
+      try {
+        await db.query(`UPDATE reports SET hits = hits + 1, detail = $2, context = context || $3::jsonb WHERE id = $1`,
+          [st.id, [...st.cats].join(','), JSON.stringify([lineJson(line, 'target')])]);
+      } catch (e) { log?.warn('flag append failed', { err: e.message }); }
+      if (probe && st.probe >= POLICY.GROOMING_ALERT_HITS && !st.alerted) {
+        st.alerted = true;
+        alerts?.send('grooming', `Một người chơi hỏi thông tin cá nhân nhiều lần liên tiếp (tuổi / nhà / ảnh…) — báo cáo #${st.id}. Hãy xem ngay trang quản trị.`).catch(() => {});
+      }
+      return st.id;
+    }
     const ctx = await context(acc, line.ref, null);
     try {
       const r = await db.one(`INSERT INTO reports (source, target_id, target_name, reason, detail, chat_ref, context, at)
         VALUES ('filter', $1, $2, 0, $3, $4, $5, $6) RETURNING id, at`, [acc, session.displayName || null, f.reasons.join(','), line.ref, JSON.stringify(ctx), new Date(t)]);
       m?.reports.inc(1, { source: 'filter' });
       bus?.emit('report:new', { report: { id: r.id, source: 'filter', targetId: acc, targetName: session.displayName, detail: f.reasons.join(',') } });
+      if (!f.support) lastFlag.set(acc, { at: t, id: r.id, probe: probe ? 1 : 0, cats: new Set(f.reasons), alerted: false });
+      else if (!st) lastFlag.set(acc, { at: t, id: null, probe: 0, cats: new Set(), alerted: false });
       if (f.support) alerts?.send('selfharm', `Một người chơi vừa nhắc tới chuyện tự hại trong chat (báo cáo #${r.id}). Hãy xem trang quản trị.`).catch(() => {});
       else if (f.reasons.includes('hate')) alerts?.send('flag', `Chat có lời miệt thị / đe doạ bị chặn (báo cáo #${r.id}).`).catch(() => {});
       return r.id;
     } catch (e) { log?.warn('flag report failed', { err: e.message }); return null; }
+  }
+
+  // did the target say something (delivered, not shadow) that this reporter could have seen? (SEC-2 / SO-5)
+  async function hasEvidence(targetId, chatRef, reporterSession, t) {
+    const fresh = (l) => l && l.accountId === targetId && t - l.at <= POLICY.EVIDENCE_MS && l.action !== 'block' && !l.shadow;
+    if (chatRef && fresh(await lineByRef(chatRef))) return true;
+    const p = posOf(reporterSession);
+    if (!p) return false;
+    const R2 = POLICY.EVIDENCE_RADIUS_M ** 2;
+    for (let i = ring.length - 1; i >= 0; i--) {
+      const l = ring[i];
+      if (t - l.at > POLICY.EVIDENCE_MS) break;
+      if (fresh(l) && Number.isFinite(l.x) && (l.x - p.x) ** 2 + (l.z - p.z) ** 2 <= R2) return true;
+    }
+    return false;
   }
 
   // ---- blocks -------------------------------------------------------------------------------------------------------
@@ -329,14 +382,15 @@ export function createChat({ db, log, alerts, metrics, bus, now = () => Date.now
       record(line);
       m?.msgs.inc(1, { action: f.action });
       if (f.action === 'block') {
+        // a distressed player who swears ('đm tao muốn chết') still gets the support line and no strike (SO-3)
         const heavy = f.reasons.some((r) => r === 'hate' || r === 'sexual' || r === 'scam');
-        const total = addStrike(acc, heavy ? 2 : 1, t);
+        const total = f.support ? 0 : addStrike(acc, heavy ? 2 : 1, t);
         if (f.flag) flagReport(session, line, f).catch(() => {});
         if (total >= POLICY.STRIKE_LIMIT && remaining(acc, 'mute', t) === 0) {
           strikes.delete(acc);
           autoSanction(acc, 'auto_filter', 'nhiều tin nhắn bị chặn liên tiếp').catch((e) => log?.warn('auto sanction failed', { err: e.message }));
         }
-        return reject('blocked', CHAT_CODE.BLOCKED, 0, { ref: line.ref, flagged: f.flag, reasons: f.reasons });
+        return reject('blocked', CHAT_CODE.BLOCKED, 0, { ref: line.ref, flagged: f.flag, support: !!f.support, reasons: f.reasons });
       }
       if (f.flag) flagReport(session, line, f).catch(() => {});
       return { ok: true, deliverText: f.text, shadow, reason: null, code: CHAT_CODE.OK, ref: line.ref, flagged: f.flag, support: f.support, retryAfterMs: 0 };
@@ -358,11 +412,17 @@ export function createChat({ db, log, alerts, metrics, bus, now = () => Date.now
       const ctx = await context(targetAccountId, chatRef >>> 0, rep);
       let targetName = ctx.find((l) => l.who === 'target')?.name || null;
       if (!targetName) targetName = (await db.one('SELECT display_name FROM characters WHERE account_id = $1', [targetAccountId]))?.display_name || null;
+      const evidence = await hasEvidence(targetAccountId, chatRef >>> 0, reporterSession, t);
+      const ra = await db.one('SELECT created_at, play_seconds FROM accounts WHERE id = $1', [rep]);
+      const play = Math.max(Number(ra?.play_seconds) || 0, Number(reporterSession.playSeconds) || 0);
+      const trusted = !!ra && t - new Date(ra.created_at).getTime() >= POLICY.REPORTER_MIN_AGE_MS && play >= POLICY.REPORTER_MIN_PLAY_S;
+      const ip = reporterSession.ip && !isExemptIp(reporterSession.ip) ? ipKey(reporterSession.ip) : null;
       let row;
       try {
-        row = await db.one(`INSERT INTO reports (source, reporter_id, reporter_name, target_id, target_name, reason, chat_ref, context, at)
-          VALUES ('player', $1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, at`,
-        [rep, reporterSession.displayName || null, targetAccountId, targetName, rsn, chatRef ? chatRef >>> 0 : null, JSON.stringify(ctx), new Date(t)]);
+        row = await db.one(`INSERT INTO reports (source, reporter_id, reporter_name, target_id, target_name, reason, chat_ref, context, at, evidence, counts, reporter_ip)
+          VALUES ('player', $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id, at`,
+        [rep, reporterSession.displayName || null, targetAccountId, targetName, rsn, chatRef ? chatRef >>> 0 : null, JSON.stringify(ctx), new Date(t),
+          evidence, evidence && trusted, ip]);
       } catch (e) {
         if (/foreign key|violates/i.test(e.message)) return { ok: false, code: REPORT_CODE.UNKNOWN_TARGET };
         throw e;
@@ -370,9 +430,11 @@ export function createChat({ db, log, alerts, metrics, bus, now = () => Date.now
       m?.reports.inc(1, { source: 'player' });
       bus?.emit('report:new', { report: { id: row.id, source: 'player', reporterId: rep, targetId: targetAccountId, targetName, reason: rsn } });
       alerts?.send('report', `Báo cáo mới #${row.id}: ${reporterSession.displayName || 'người chơi'} báo cáo ${targetName || 'một người chơi'} (${REASON_VI[rsn]}).`).catch(() => {});
-      // ≥ 3 distinct reporters in 10 min → automatic mute (ladder)
-      const n = (await db.one(`SELECT count(DISTINCT reporter_id)::int AS n FROM reports WHERE target_id = $1 AND source = 'player'
-        AND status <> 'dismissed' AND at > $2`, [targetAccountId, new Date(t - POLICY.REPORT_WINDOW_MS)])).n;
+      // ≥ 3 distinct trusted reporters with evidence (distinct accounts AND distinct public IPs) in 10 min → automatic mute
+      const c = await db.one(`SELECT count(DISTINCT reporter_id)::int AS n, count(DISTINCT COALESCE(reporter_ip, reporter_id::text))::int AS nip
+        FROM reports WHERE target_id = $1 AND source = 'player' AND counts AND status <> 'dismissed' AND at > $2`,
+      [targetAccountId, new Date(t - POLICY.REPORT_WINDOW_MS)]);
+      const n = Math.min(c.n, c.nip);
       if (n >= POLICY.REPORT_THRESHOLD && remaining(targetAccountId, 'mute') === 0 && remaining(targetAccountId, 'shadow') === 0) {
         await autoSanction(targetAccountId, 'auto_report', `${n} người báo cáo trong 10 phút`, row.id);
       }
@@ -467,10 +529,17 @@ export function createChat({ db, log, alerts, metrics, bus, now = () => Date.now
     },
     listsVersion,
     getLists,
+    // retention (SPEC §3.3 "chat log 30 days", SEC-6): chat_log rows, AND the chat copies inside reports — a resolved
+    // report loses its context lines (bystanders' text, names, account ids) after `days`; dismissed reports are deleted
+    // after DISMISSED_KEEP_DAYS. Open reports keep their context until the owner decides.
     async purge(days = retentionDays) {
       if (!db) return 0;
       const r = await db.query('DELETE FROM chat_log WHERE at < now() - make_interval(days => $1)', [days]);
       if (r.rowCount) log?.info('chat_log purged', { rows: r.rowCount, days });
+      const c = await db.query(`UPDATE reports SET context = '[]'::jsonb, purged_at = now() WHERE status <> 'open' AND purged_at IS NULL
+        AND at < now() - make_interval(days => $1)`, [days]);
+      const d = await db.query(`DELETE FROM reports WHERE status = 'dismissed' AND at < now() - make_interval(days => $1)`, [Math.max(days, POLICY.DISMISSED_KEEP_DAYS)]);
+      if (c.rowCount || d.rowCount) log?.info('reports purged', { contextCleared: c.rowCount, deleted: d.rowCount, days });
       return r.rowCount || 0;
     },
     flush,
@@ -489,7 +558,7 @@ export function createChat({ db, log, alerts, metrics, bus, now = () => Date.now
       for (const [k, h] of recentKeys) if (!h.length || t - h[h.length - 1].at > CHAT.DUP_WINDOW_S * 1000) recentKeys.delete(k);
       for (const [k, s] of strikes) if (!s.length || t - s[s.length - 1].at > POLICY.STRIKE_WINDOW_MS) strikes.delete(k);
       for (const [k, v] of lastReport) if (t - v > POLICY.REPORT_DUP_MS) lastReport.delete(k);
-      for (const [k, v] of lastFlag) if (t - v > POLICY.FLAG_COOLDOWN_MS) lastFlag.delete(k);
+      for (const [k, v] of lastFlag) if (t - v.at > POLICY.FLAG_COOLDOWN_MS) lastFlag.delete(k);
       for (const [k, e] of sanc) if (e.mute <= t && e.shadow <= t && e.ban <= t) sanc.delete(k);
     },
     stats() {

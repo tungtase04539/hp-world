@@ -7,7 +7,7 @@
 // No allocation per snapshot on the hot path (scratch arrays are module-level and grow only).
 import { AOI, MODE_MOUNTED } from '../../../js/shared/constants.js';
 import { SNAPSHOT_HEADER_BYTES, ENTER_RECORD_BYTES, UPDATE_RECORD_BYTES } from '../../../js/shared/codec.js';
-import { neighbors, cellOf } from '../../../js/shared/grid.js';
+import { cellsInRange } from '../../../js/shared/grid.js';
 
 export const MAX_SLOTS = 255;                 // u8 slot ids on the wire
 export const AOI_CFG = Object.freeze({
@@ -133,7 +133,7 @@ function kth(a, n, k) {
 }
 const byScoreAsc = (a, b) => cS[a] - cS[b];
 let MARK = 0;                         // per-step token (entities carry _aoiTok/_aoiSlot of the CURRENT step only)
-const NB = new Int32Array(9);
+const NB = new Int32Array(49);
 const byScoreDesc = (a, b) => cS[b] - cS[a];
 
 const weightOf = (e) => (MODE_MOUNTED[e.mode] ? 2 : 1);
@@ -159,7 +159,7 @@ export function aoiStep(world, self, st, p, out) {
   for (let s = 0; s < st.hi; s++) { const e = st.slotEnt[s]; if (e) { e._aoiTok = tok; e._aoiSlot = s; } }
   nC = 0;
   const nb = NB;
-  const nn = neighbors(self.cell >= 0 ? self.cell : cellOf(self.x, self.z), nb);
+  const nn = cellsInRange(self.x, self.z, rKeep, nb);   // isotropic (NET-5), not the 3×3 of the hysteretic cell
   const sx = self.x, sz = self.z, rKeep2 = rKeep * rKeep, KEEP = AOI_CFG.KEEP;
   for (let ci = 0; ci < nn; ci++) {
     const arr = world.cells[nb[ci]];

@@ -46,6 +46,21 @@ export function neighbors(id, out) {
   }
   return n;
 }
+// Every cell that can hold an entity within r metres of (x, z), entities being filed with HYST m of cell hysteresis
+// (cellWithHysteresis): the cells overlapping the square [x − r − hyst, x + r + hyst]². Written into `out` (length ≥
+// 49; at most 7 × 7 cells), returns the count. Isotropic, unlike the 3 × 3 neighbourhood of the observer's (hysteretic)
+// cell, which only guaranteed ≈ CELL − 2·HYST = 112 m (fixer round 1, NET-5: an entity 117 m away could be invisible
+// while the far ring reaches 168 m).
+export function cellsInRange(x, z, r, out, hyst = AOI.HYST) {
+  const R = r + hyst;
+  let x0 = cellX(x - R), x1 = cellX(x + R), z0 = cellZ(z - R), z1 = cellZ(z + R);
+  if (x1 - x0 > 6) { const c = cellX(x); x0 = Math.max(0, c - 3); x1 = Math.min(N - 1, c + 3); }
+  if (z1 - z0 > 6) { const c = cellZ(z); z0 = Math.max(0, c - 3); z1 = Math.min(N - 1, c + 3); }
+  let n = 0;
+  for (let cz = z0; cz <= z1; cz++) for (let cx = x0; cx <= x1; cx++) out[n++] = cz * N + cx;
+  return n;
+}
+
 // true when cells a and b are in each other's 3 × 3 neighbourhood
 export function areNeighbors(a, b) {
   return Math.abs((a % N) - (b % N)) <= 1 && Math.abs(((a / N) | 0) - ((b / N) | 0)) <= 1;

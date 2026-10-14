@@ -120,7 +120,7 @@ function Start-DockerIfNeeded([int]$timeoutSec = 180) {
 function Initialize-EnvFile {
   if (Test-Path -LiteralPath $script:EnvFile) {
     $e = Read-DotEnv
-    if ($e['ADMIN_TOKEN'] -and $e['DB_PASSWORD'] -and $e['JWT_PRIVATE_KEY'] -and $e['TICKET_HMAC_KEY']) { return $true }
+    if ($e['ADMIN_TOKEN'] -and $e['DB_PASSWORD'] -and $e['JWT_PRIVATE_KEY'] -and $e['TICKET_HMAC_KEY'] -and $e['RECOVERY_PEPPER']) { return $true }
   }
   if (-not (Get-Command node -ErrorAction SilentlyContinue)) { Write-Loi 'Cần Node.js 24 để tạo khoá bí mật lần đầu (https://nodejs.org).'; return $false }
   Push-Location $script:ServerDir

@@ -182,8 +182,10 @@ export function register(app) {
     const params = [intParam(req.queryObj.limit, 50, 1, 200)];
     let where = '';
     if (st !== 'all') { if (!['open', 'actioned', 'dismissed'].includes(st)) throw httpError(400, 'bad_request'); params.push(st); where = 'WHERE r.status = $2'; }
-    const rows = (await app.db.query(`SELECT r.*, (SELECT count(*)::int FROM reports x WHERE x.target_id = r.target_id AND x.status = 'open') AS open_on_target
-      FROM reports r ${where} ORDER BY r.at DESC LIMIT $1`, params)).rows;
+    // child-safety flags (self-harm, personal-info probing) always sort first (SO-4)
+    const rows = (await app.db.query(`SELECT r.*, (SELECT count(*)::int FROM reports x WHERE x.target_id = r.target_id AND x.status = 'open') AS open_on_target,
+        (r.source = 'filter' AND (r.detail LIKE '%self_harm%' OR r.detail LIKE '%personal_info%')) AS safety
+      FROM reports r ${where} ORDER BY (r.status = 'open' AND r.source = 'filter' AND (r.detail LIKE '%self_harm%' OR r.detail LIKE '%personal_info%')) DESC, r.at DESC LIMIT $1`, params)).rows;
     return { reports: rows.map((x) => ({ ...x, sanction: chat().sanctionOf(x.target_id) })) };
   }, A);
 
@@ -205,13 +207,17 @@ export function register(app) {
     if (!rep) throw httpError(404, 'not_found');
     if (b.action === 'dismiss') {
       await app.db.query(`UPDATE reports SET status = 'dismissed', resolved_at = now(), resolved_by = $2, resolution = $3 WHERE id = $1`, [id, req.admin.actor, str(b.note) || 'bỏ qua']);
-      await audit(req, 'report_dismiss', id, { note: str(b.note) });
-      return { ok: true };
+      // dismissing a report also lifts the automatic mute it triggered (a brigade must not outlive the owner's "no")
+      const auto = (await app.db.query(`SELECT id FROM sanctions WHERE report_id = $1 AND source = 'auto_report' AND revoked_at IS NULL`, [id])).rows;
+      for (const x of auto) await chat().revokeSanction(x.id, req.admin.actor || 'owner');
+      await audit(req, 'report_dismiss', id, { note: str(b.note), revokedAuto: auto.map((x) => x.id) });
+      return { ok: true, revoked: auto.length };
     }
     const s = await applyAction(req, rep.target_id, b.action, { days: b.days, note: b.note, reportId: id });
-    // the same decision closes every open report on that player
+    // the same decision closes the other open PLAYER reports on that player; filter flags (self-harm, personal-info
+    // probing, …) stay open — muting a child for swearing must not bury the child's self-harm flag (SO-4)
     const upd = await app.db.query(`UPDATE reports SET status = 'actioned', resolved_at = now(), resolved_by = $2, resolution = $3
-      WHERE (id = $1 OR (target_id = $4 AND status = 'open'))`, [id, req.admin.actor, b.action, rep.target_id]);
+      WHERE (id = $1 OR (target_id = $4 AND status = 'open' AND source = 'player'))`, [id, req.admin.actor, b.action, rep.target_id]);
     return { ok: true, sanction: s, closed: upd.rowCount };
   }, A);
 

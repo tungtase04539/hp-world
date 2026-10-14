@@ -16,7 +16,7 @@ const PKG = JSON.parse(fs.readFileSync(path.join(SERVER_ROOT, 'package.json'), '
 export const VERSION = PKG.version;
 
 // Keys generated on first run (secrets). Optional integrations stay empty until the owner fills them.
-export const SECRET_KEYS = ['JWT_PRIVATE_KEY', 'JWT_KID', 'TICKET_HMAC_KEY', 'ADMIN_TOKEN', 'DB_PASSWORD'];
+export const SECRET_KEYS = ['JWT_PRIVATE_KEY', 'JWT_KID', 'TICKET_HMAC_KEY', 'ADMIN_TOKEN', 'DB_PASSWORD', 'RECOVERY_PEPPER'];
 export const OPTIONAL_SECRET_KEYS = ['TELEGRAM_BOT_TOKEN', 'TELEGRAM_CHAT_ID', 'TURNSTILE_SECRET', 'TUNNEL_TOKEN'];
 
 // ---- .env parsing ---------------------------------------------------------------------------------------------------
@@ -46,6 +46,7 @@ export function generateSecrets() {
     TICKET_HMAC_KEY: b64url(crypto.randomBytes(32)),
     ADMIN_TOKEN: b64url(crypto.randomBytes(32)),
     DB_PASSWORD: b64url(crypto.randomBytes(24)),
+    RECOVERY_PEPPER: b64url(crypto.randomBytes(32)),
   };
 }
 
@@ -136,6 +137,7 @@ export function loadConfig({ env = process.env, envFile = DEFAULT_ENV_FILE, over
     ticketHmacKey: g.str('TICKET_HMAC_KEY'),
     adminToken: g.str('ADMIN_TOKEN'),
     dbPassword: g.str('DB_PASSWORD'),
+    recoveryPepper: g.str('RECOVERY_PEPPER'),
     telegramBotToken: g.str('TELEGRAM_BOT_TOKEN', ''),
     telegramChatId: g.str('TELEGRAM_CHAT_ID', ''),
     turnstileSecret: g.str('TURNSTILE_SECRET', ''),

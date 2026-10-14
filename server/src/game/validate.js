@@ -1,17 +1,23 @@
-// game/validate.js — OWNER: S2. Movement validation (ARCH §12 items 2, 3, 5, 6; SPEC §3.2) on top of the pure checker
+// game/validate.js — OWNER: S2. Movement validation (ARCH §12 items 2, 5, 6 and the height part of item 3; SPEC §3.2)
+// on top of the pure checker
 // js/shared/move.js MoveCheck: time budget [−100, +200] ms, per-mode 1 s sliding-window distance ≤ v_max·1.2 + 1 m,
 // play disc, teleport (> 3 × max step = hard flag), mounted-mode rules (personal moto any time on land; shared
 // vehicles / boats need a claim; boat only on water; pillion next to a rider), on-foot water with bridge tolerance.
+// Height: y is clamped into the plausible band (move.js clampY) before anyone sees it. NOT implemented: the
+// acceleration limit of item 3 (mounted acceleration ≤ vehicle accel × 1.5) — the 1 s / 300 ms speed windows bound
+// what an acceleration hack can gain.
 // Violation points: +1 per violating STATE (the k-th consecutive SPEED violation: +min(k, 3)), +5 for a hard flag,
 // −1 per second; > 5 → CORRECT (snap back to the last
 // accepted position, corrEpoch + 1), > 20 → kick. A hard flag corrects immediately. Never a ban for one event.
 // STATEs carrying an old corrEpoch are ignored (the client has not applied the CORRECT yet); a client that keeps
-// ignoring a CORRECT gets it re-sent every 3 s and is kicked after 5 re-sends.
+// ignoring a CORRECT gets it re-sent every 3 s and is kicked after 5 re-sends. A pending CORRECT survives RESUME (the
+// gateway re-sends it after RESUMED), and a stale epoch with nothing pending (state lost somewhere) is healed by a
+// re-send too — never a silent freeze (fixer round 1, NET-2).
 //
 // Service 'validate':
 //   createValidator() → Validator   (one per session; game/gateway.js drives it)
 //   vehicles: {claim(session, ref) → bool, release(session), holder(ref) → session|null, size}
-import { MoveCheck, MV, MCF, isMountedMode } from '../../../js/shared/move.js';
+import { MoveCheck, MV, MCF, isMountedMode, vmaxOf } from '../../../js/shared/move.js';
 import { MODE, VALIDATE } from '../../../js/shared/constants.js';
 import { CORRECT_REASON } from '../../../js/shared/protocol.js';
 
@@ -19,7 +25,9 @@ export const VAL = Object.freeze({
   POINTS_HARD: 5,
   RESEND_MS: 3000,
   MAX_RESENDS: 5,
-  PILLION_R: 4,             // m: a pillion passenger must be this close to a rider
+  PILLION_R: 4,             // m: a pillion passenger must be this close to a rider …
+  PILLION_STALE_MAX_S: 2,   // … plus vmax × (age of both last accepted samples, ≤ 2 s): a stalled driver (TCP hiccup)
+                            //   freezes on the server while the honest passenger keeps moving (NET-7)
   SPEED_STREAK_MAX: 3,      // points of the k-th consecutive speed violation = min(k, 3)
 });
 
@@ -40,8 +48,10 @@ export class Validator {
     this.r = { accepted: false, violation: 0, correct: 0, kick: false, hard: false };
     this.extraFlags = 0;          // tests: MCF.SKIP_SURFACE
   }
-  reset(x, z, mode, now) {
-    this.mc.reset(x, z, mode, now);
+  // fresh session or ticket takeover (the new client starts at corrEpoch 0, so nothing can be pending).
+  // bonus: see MoveCheck.reset (fresh spawn only). RESUME does NOT reset (time base, window and pending CORRECT kept).
+  reset(x, z, mode, now, bonus = true) {
+    this.mc.reset(x, z, mode, now, bonus);
     this.pending = false; this.resends = 0;
   }
   _decay(now) {
@@ -78,7 +88,10 @@ export class Validator {
   }
   // a STATE with an old corrEpoch arrived → 'resend' | 'kick' | null
   onStale(now) {
-    if (!this.pending) return null;
+    if (!this.pending) {   // desync with nothing pending (e.g. state lost across a reconnect): re-send at once
+      this.pending = true; this.pendingSince = now; this.lastResend = now; this.resends = 0;
+      return 'resend';
+    }
     if (now - this.lastResend < VAL.RESEND_MS) return null;
     this.lastResend = now;
     if (++this.resends > VAL.MAX_RESENDS) return 'kick';
@@ -124,16 +137,23 @@ export function createVehicles() {
 }
 
 // Is `mode` with `ref` allowed for this session right now? Claims shared vehicles implicitly (first rider wins).
-export function vehicleAllowed(vehicles, world, session, mode, ref) {
+export function vehicleAllowed(vehicles, world, session, mode, ref, now = 0) {
   if (!isMountedMode(mode)) { if (session.vehicleRef) vehicles.release(session); return true; }
   if (mode === MODE.MOTO && !ref) { if (session.vehicleRef) vehicles.release(session); return true; }   // personal moto
   if (mode === MODE.PILLION) {
+    // the passenger's last accepted position vs each rider's last accepted position: both may be stale (a TCP stall on
+    // either side), so the radius grows with their ages at the rider's speed
     let ok = false;
     const self = session.entity;
-    world.forNear(self.x, self.z, VAL.PILLION_R, (e) => {
-      if (e !== self && (e.mode === MODE.MOTO || e.mode === MODE.CYCLO)) { ok = true; return true; }
+    const age = (s) => (s && s.lastAcceptT && now ? Math.min(VAL.PILLION_STALE_MAX_S, Math.max(0, (now - s.lastAcceptT) / 1000)) : 0);
+    const own = age(session);
+    const rMax = VAL.PILLION_R + vmaxOf(MODE.MOTO) * 2 * VAL.PILLION_STALE_MAX_S;
+    world.forNear(self.x, self.z, rMax, (e, d2) => {
+      if (e === self || !(e.mode === MODE.MOTO || e.mode === MODE.CYCLO)) return false;
+      const r = VAL.PILLION_R + vmaxOf(e.mode) * (own + age(e.session));
+      if (d2 <= r * r) { ok = true; return true; }
       return false;
-    }, self.cell >= 0 ? self.cell : undefined);
+    });
     return ok;
   }
   if (!ref) return false;

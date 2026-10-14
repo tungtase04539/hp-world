@@ -46,7 +46,11 @@ export function createSim({ sessions, metrics, log, bus, now, tickHz = 20, snapH
   function snapshotFor(s) {
     const conn = s.conn;
     if (!conn) return 0;
-    if (conn.bufferedAmount() > NET.DROP_SNAPSHOT_BUFFERED) { s.aoi.keyframe = true; mDropped.inc(); return 0; }
+    // backpressure: skip this snapshot. NO keyframe afterwards (fixer round 1, NET-11): aoiStep did not run, so the
+    // per-client AOI state still matches what the client has (P1 records are absolute) and the next normal delta is
+    // correct; a keyframe would clear every slot and re-enter at most ENTER_MAX per snapshot exactly on the congested
+    // link. Keyframes stay for READY and RESUME only.
+    if (conn.bufferedAmount() > NET.DROP_SNAPSHOT_BUFFERED) { mDropped.inc(); return 0; }
     const lv = ladder.level;
     const ta = DBG_TICK ? performance.now() : 0;
     aoiStep(sessions.world, s.entity, s.aoi, params[lv], frame);
@@ -105,7 +109,7 @@ export function createSim({ sessions, metrics, log, bus, now, tickHz = 20, snapH
     const ch = ladder.evaluate();
     if (!ch) return null;
     mLevelChg.inc(1, { to: String(ch.level) });
-    log.warn('degrade level changed', { level: ch.level, prev: ch.prev, p90: Math.round(ladder.lastQ * 100) / 100, p99: Math.round(ladder.lastP99 * 100) / 100 });
+    log.warn('degrade level changed', { level: ch.level, prev: ch.prev, decide: Math.round(ladder.lastQ * 100) / 100, tickP90: Math.round(ladder.lastTickQ * 100) / 100, lateP90: Math.round(ladder.lastLateQ * 100) / 100, p99: Math.round(ladder.lastP99 * 100) / 100 });
     bus.emit('degrade', { level: ch.level, prev: ch.prev, p90: ladder.lastQ, p99: ladder.lastP99 });
     onLevel?.(ch.level, ch.prev);
     return ch;
@@ -144,7 +148,7 @@ export function register(app) {
       const st = loop ? loop.stats() : null;
       const h = app.metrics.get('snapshot_bytes');
       return {
-        ...(st || {}), level: sim ? sim.level : 0, p99Window: sim ? sim.ladder.lastP99 : 0, p90Window: sim ? sim.ladder.lastQ : 0,
+        ...(st || {}), level: sim ? sim.level : 0, p99Window: sim ? sim.ladder.lastP99 : 0, p90Window: sim ? sim.ladder.lastQ : 0, tickP90Window: sim ? sim.ladder.lastTickQ : 0, lateP90Window: sim ? sim.ladder.lastLateQ : 0,
         snapshotBytesP50: h ? h.quantile(0.5) : NaN, snapshotBytesP95: h ? h.quantile(0.95) : NaN,
         ccu: app.has('sessions') ? app.get('sessions').count() : 0,
       };
@@ -160,8 +164,9 @@ export function register(app) {
     const s = get();
     const sessions = app.get('sessions');
     lastSec = performance.now();
-    loop = app.timers.loop(app.config.tickHz, 'sim_tick', () => {
+    loop = app.timers.loop(app.config.tickHz, 'sim_tick', (tick, now, dt, lateMs) => {
       const t0 = performance.now();
+      if (Number.isFinite(lateMs)) s.ladder.observeLate(lateMs);
       s.tick();
       const t1 = performance.now();
       if (t1 - lastSec >= 1000) {

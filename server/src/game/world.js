@@ -1,7 +1,7 @@
 // game/world.js — OWNER: S2. The entity table of the single-process world (ARCH §3.3 stage A): one Entity per player
 // (visible to others once READY), the 128 m cell grid used by AOI and SAY chat, and netId allocation.
 // Pure module (no app, no I/O) so the AOI / snapshot code can be unit-tested and benchmarked without sockets.
-import { CELL_COUNT, cellOf, cellWithHysteresis, neighbors } from '../../../js/shared/grid.js';
+import { CELL_COUNT, cellOf, cellWithHysteresis, cellsInRange } from '../../../js/shared/grid.js';
 import { qPos, qY, qYaw, qSpd, packState } from '../../../js/shared/quant.js';
 import { MODE, AOI } from '../../../js/shared/constants.js';
 import { APPEARANCE_BYTES } from '../../../js/shared/codec.js';
@@ -48,7 +48,7 @@ export class World {
     this.count = 0;               // entities in the grid
     this.nextNetId = 1 + Math.floor(Math.random() * 1000);
     this.recent = new Map();      // netId → {accountId, until} of entities that left (REPORT after they leave)
-    this._nb = new Int32Array(9);
+    this._nb = new Int32Array(49);
   }
   allocNetId() {
     for (let i = 0; i < 65535; i++) {
@@ -109,10 +109,12 @@ export class World {
     e.cellIdx = to.length;
     to.push(e);
   }
-  // visit every entity in the 3×3 neighbourhood of `cell` within radius r of (x, z); fn(e, d2) returning true stops
-  forNear(x, z, r, fn, cell = cellOf(x, z)) {
+  // visit every entity within radius r of (x, z) (cells overlapping the disc + hysteresis, NET-5); fn(e, d2) returning
+  // true stops. `cell` is accepted for compatibility and ignored.
+  forNear(x, z, r, fn, cell) {
+    void cell;
     const nb = this._nb;
-    const n = neighbors(cell, nb);
+    const n = cellsInRange(x, z, r, nb);
     const r2 = r * r;
     for (let i = 0; i < n; i++) {
       const arr = this.cells[nb[i]];

@@ -2,7 +2,7 @@
 // Primary limits are per CONNECTION / ACCOUNT / DEVICE. Per-IP limits are deliberately lenient: Vietnamese 4G CGNAT
 // puts thousands of players behind one IPv4. Loopback and private addresses are exempt from per-IP limits (local
 // bots, the Docker host path); real players arrive through the Cloudflare tunnel with CF-Connecting-IP (public IPs).
-// IPv6 addresses are grouped by /64.
+// IPv6 addresses are grouped by /64 (/48 for the recovery limiter and the pre-auth socket pool — SEC-4/SEC-7).
 //
 // Service 'ratelimit':
 //   bucket(rate, burst, now?) → TokenBucket {take(now, n = 1) → bool, retryAfterMs(now, n = 1)}
@@ -10,6 +10,8 @@
 //   ipKey(ip) → string, isExemptIp(ip) → bool
 //   http.<name>  ready-made keyed limiters used by api/auth.js and api/join.js (see LIMITS)
 //   checkHttp(name, key) → null | {retryAfterS}   (for router opts.rateLimit / handlers)
+
+import net from 'node:net';
 
 export class TokenBucket {
   constructor(rate, burst, now = performance.now()) { this.rate = rate; this.burst = burst; this.tokens = burst; this.last = now; }
@@ -60,16 +62,52 @@ export function createKeyedLimiter({ rate, burst, max = 100000 }) {
   };
 }
 
-export function ipKey(ip) {
-  const s = String(ip || '');
-  if (s.includes(':')) {
-    const parts = s.split(':');
-    // expand '::' roughly: keep the first 4 hextets as the /64
-    const head = s.split('::')[0].split(':').filter(Boolean);
-    const full = head.length >= 4 ? head.slice(0, 4) : parts.slice(0, 4);
-    return full.join(':').toLowerCase() + '::/64';
+// Full IPv6 expansion ('2001:db8::1' → 8 hextets; IPv4-mapped '::ffff:1.2.3.4' → the IPv4 address). Returns null when
+// the string is not an IPv6 address. (Fixer round 1, SEC-7: the old split on '::' mis-grouped compressed addresses —
+// '2001:db8::1' and '2001:db8::2' got different /64 keys.)
+export function expandIPv6(ip) {
+  let s = String(ip || '').toLowerCase();
+  const pct = s.indexOf('%'); if (pct >= 0) s = s.slice(0, pct);          // zone id
+  if (s.startsWith('[') && s.endsWith(']')) s = s.slice(1, -1);
+  if (!net.isIPv6(s)) return null;
+  let tail = [];
+  const v4 = s.match(/(\d+\.\d+\.\d+\.\d+)$/);
+  if (v4) {
+    const p = v4[1].split('.').map(Number);
+    tail = [((p[0] << 8) | p[1]).toString(16), ((p[2] << 8) | p[3]).toString(16)];
+    s = s.slice(0, -v4[1].length).replace(/:$/, '') || ':';
+    if (s.endsWith(':') && !s.endsWith('::')) s = s.slice(0, -1);
   }
-  return s;
+  const [a, b] = s.split('::');
+  const head = a ? a.split(':').filter(Boolean) : [];
+  const rest = b !== undefined ? (b ? b.split(':').filter(Boolean) : []) : null;
+  const want = 8 - tail.length;
+  let groups;
+  if (rest === null) groups = head;
+  else groups = [...head, ...new Array(Math.max(0, want - head.length - rest.length)).fill('0'), ...rest];
+  groups = [...groups, ...tail];
+  if (groups.length !== 8) return null;
+  return groups.map((g) => parseInt(g, 16) & 0xffff);
+}
+
+// Rate-limit key for an address: IPv4 as is; IPv4-mapped IPv6 → the IPv4; IPv6 grouped by a prefix (default /64 —
+// one subscriber; /48 for the global-cap pools, where one host with a free /48 must not get 65k keys).
+export function ipKey(ip, bits = 64) {
+  const s = String(ip || '');
+  if (!s.includes(':')) return s;
+  const g = expandIPv6(s);
+  if (!g) return s.toLowerCase();
+  if (g[0] === 0 && g[1] === 0 && g[2] === 0 && g[3] === 0 && g[4] === 0 && g[5] === 0xffff) {
+    return `${g[6] >> 8}.${g[6] & 255}.${g[7] >> 8}.${g[7] & 255}`;
+  }
+  const n = Math.max(16, Math.min(128, bits | 0));
+  const out = [];
+  for (let i = 0; i < 8; i++) {
+    const keep = Math.max(0, Math.min(16, n - i * 16));
+    if (keep <= 0) break;
+    out.push((keep === 16 ? g[i] : g[i] & (0xffff << (16 - keep)) & 0xffff).toString(16));
+  }
+  return out.join(':') + '::/' + n;
 }
 
 export function isExemptIp(ip) {
@@ -90,12 +128,15 @@ export const LIMITS = Object.freeze({
   refreshToken: [1, 5],           // per refresh-token hash (hammering one token)
   recoverIp: [20 / H, 10],        // recovery attempts per IP
   recoverDevice: [5 / H, 5],      // … per device
-  recoverGlobal: [300 / H, 100],  // … for the whole server (brute-force ceiling)
+  recoverGlobal: [300 / H, 100],  // … whole server: ALERT ONLY (never refuses — SEC-4; codes are 59-bit + peppered)
   joinAccount: [0.5, 10],         // /v1/join per account (queue polling ≥ 2 s apart)
   joinIp: [50, 300],              // /v1/join per IP
   wsNewIp: [20, 300],             // new WebSocket connections per IP
   helloAccount: [1, 10],          // HELLO attempts per account (reconnect storms)
 });
+
+// IPv6 prefix per limiter (default 64)
+export const LIMIT_IP_BITS = Object.freeze({ recoverIp: 48, guestIp: 48 });
 
 export function register(app) {
   const http = {};
@@ -109,7 +150,7 @@ export function register(app) {
     checkHttp(name, key, { ip = false, now = Date.now() } = {}) {
       if (ip && isExemptIp(key)) return null;
       const l = http[name];
-      const k = ip ? ipKey(key) : key;
+      const k = ip ? ipKey(key, LIMIT_IP_BITS[name] || 64) : key;
       if (l.take(k, now)) return null;
       return { retryAfterS: Math.max(1, l.retryAfterS(k, now)) };
     },

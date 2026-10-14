@@ -14,7 +14,7 @@
 import { Writer, decodeC2S, encodePong, encodeSystem, encodeWelcome, encodeWorld, encodeCorrect, encodeEvent, encodeChatS } from '../../../js/shared/codec.js';
 import { C2S, SYS, CLOSE, OP_NAMES, PROTO_VERSION, HELLO_FLAG, AUTH_REASON, KICK_REASON, CORRECT_REASON, ACTION, EVENT, CHAT_CODE, REPORT_CODE, CHANNEL, ACTION_RESULT, SANCTION_KIND } from '../../../js/shared/protocol.js';
 import { RATE, NET, CHAT, MODE, LAND_H, SFLAG } from '../../../js/shared/constants.js';
-import { vmaxOf } from '../../../js/shared/move.js';
+import { vmaxOf, clampY } from '../../../js/shared/move.js';
 import { TokenBucket, isExemptIp, ipKey } from './ratelimit.js';
 import { vehicleAllowed, MV_NAMES } from './validate.js';
 import { loadPlayer } from './persist.js';
@@ -49,6 +49,7 @@ export function register(app) {
   const mKick = metrics.counter('kicks_total', 'sessions kicked by reason');
   const mRate = metrics.counter('rate_dropped_total', 'messages dropped by per-session rate limits');
   const mChat = metrics.counter('chat_delivered_total', 'SAY chat deliveries (recipients)');
+  const mYClamp = metrics.counter('y_clamped_total', 'accepted STATEs whose height was clamped (hover / sink)');
 
   let S, V, Q, R, T, W;   // services, resolved on 'start' (registered after this module or before)
   const resolve = () => {
@@ -106,19 +107,25 @@ export function register(app) {
     }));
     send(conn, encodeWorld(w, W.world(t)));
     if (resumed) {
-      // the client keeps its world; the time base is re-learned (its worker may have restarted), the first STATE is
-      // judged from the last accepted position with the real time elapsed since then
-      s.v.reset(e.x, e.z, e.mode, s.lastAcceptT || t);
+      // the client keeps its world AND its clock: the validator is kept as it is (time base, 1 s window, forgiveness,
+      // pending CORRECT). Re-learning the time base on every RESUME opened a free clock-dilation window per reconnect
+      // (fixer round 1, NET-1). A CORRECT lost with the dying socket is re-sent right after RESUMED (NET-2).
       s.lastSeq = -1;
+      // NAMES queued on the dying socket may never have arrived: the resume keyframe re-enters every visible slot, so
+      // forgetting what was "sent" re-queues each name once (~30 B per visible player, NET-10)
+      if (s.aoi) { s.aoi.namesSent.clear(); s.aoi.pendingNames.length = 0; }
       send(conn, encodeSystem(w, SYS.RESUMED, e.netId));
       S.activate(s);
+      if (s.v.pending) sendCorrect(s, CORRECT_REASON.SERVER_MOVE, false);
       mHello.inc(1, { r: 'resumed' });
     } else {
       s.state = 'welcomed';
       s.welcomedAt = t;
       S.resetView(s);
       s.corrEpoch = 0; s.lastSeq = -1;
-      s.v.reset(e.x, e.z, e.mode, t);
+      // a takeover starts exactly at the live avatar: no first-sample bonus (15 m + 1 s per takeover was a speed boost
+      // when repeated, NET-1); a fresh spawn keeps it (spawn jitter)
+      s.v.reset(e.x, e.z, e.mode, t, !e.inWorld);
       if (e.inWorld) {   // takeover of a live avatar: AWAY until the new client is READY
         S.unsetActive(s);
         if (!(e.flags & SFLAG.AWAY)) { e.flags |= SFLAG.AWAY; e.requant(); }
@@ -137,6 +144,13 @@ export function register(app) {
     if (flags & HELLO_FLAG.RESUME) {
       const s = R.take(rt);
       if (s && s.state !== 'closed') {
+        // RESUME counts against the same per-account HELLO budget as a ticket HELLO (reconnect loops, NET-1)
+        if (!app.get('ratelimit').http.helloAccount.take(s.accountId)) {
+          send(conn, encodeSystem(w, SYS.BACKOFF, R.backoffMs(1)));
+          conn.close(CLOSE.RATE, 'rate');
+          mHello.inc(1, { r: 'rate' });
+          return;
+        }
         if (s.conn && s.conn !== conn) {     // half-open old socket: replace it
           const old = s.conn;
           S.unsetActive(s);
@@ -215,7 +229,7 @@ export function register(app) {
     e.name = c.displayName;
     if (c.appearance && c.appearance.length === 8) e.appearance.set(c.appearance);
     const sp = chooseSpawn(S.world, c.x == null ? null : { x: c.x, z: c.z, yaw: c.yaw });
-    e.setPose(sp.x, sp.z, sp.id === 'saved' && Number.isFinite(c.y) ? c.y : LAND_H, sp.yaw, 0, MODE.WALK, 0);
+    e.setPose(sp.x, sp.z, sp.id === 'saved' && Number.isFinite(c.y) ? clampY(sp.x, sp.z, c.y, MODE.WALK) : LAND_H, sp.yaw, 0, MODE.WALK, 0);
     mHello.inc(1, { r: 'ok' });
     attach(conn, s, { resumed: false });
   }
@@ -241,14 +255,16 @@ export function register(app) {
       return;
     }
     const mode = m.mode;
-    const vOk = vehicleAllowed(V.vehicles, S.world, s, mode, m.vehicleRef);
+    const vOk = vehicleAllowed(V.vehicles, S.world, s, mode, m.vehicleRef, t);
     const r = s.v.onState(m.clientMs, m.x, m.z, mode, t, vOk);
     if (r.accepted) {
       const e = s.entity;
       let spd = Math.sqrt(m.vx * m.vx + m.vz * m.vz);
       const cap = vmaxOf(mode) * 1.25;
       if (spd > cap) spd = cap;
-      e.setPose(m.x, m.z, m.y, m.yaw, spd, mode, m.flags);
+      const y = clampY(m.x, m.z, m.y, mode);
+      if (y !== m.y) mYClamp.inc();
+      e.setPose(m.x, m.z, y, m.yaw, spd, mode, m.flags);
       S.world.relocate(e);
       s.dirty = true;
       s.lastAcceptT = t;
@@ -334,6 +350,8 @@ export function register(app) {
     try { res = await chat().handle(s, channel, text); } catch (e) { log.error('chat.handle threw', { err: e }); return; }
     if (s.state !== 'active' || !s.conn) return;
     if (!res || !res.ok) {
+      // a blocked line can still carry self-harm words: the support line comes first (SO-3)
+      if (res && res.support) send(s.conn, encodeEvent(w, EVENT.SUPPORT_LINE, []));
       send(s.conn, encodeEvent(w, EVENT.CHAT_REJECTED, [res?.code ?? CHAT_CODE.BLOCKED, res?.retryAfterMs | 0]));
       return;
     }

@@ -15,14 +15,29 @@
 //
 // Time budget model (client clock vs real time, ARCH §12.2): each STATE carries clientMs (u16, wraps). The checker
 // unwraps it to a monotonic client time C and computes the one-way offset o = serverRecvMs − C. For an honest client
-// o = trueOffset + networkDelay ≥ trueOffset + minDelay. During LEARN_MS after a reset `base` follows the minimum of o
-// freely; afterwards base may sink only at the tolerated quartz drift (DRIFT_MS_PER_S). A client whose clock runs fast
-// (time-dilation speed hack) makes o fall continuously: more than TIME_AHEAD_MS (100 ms, = −VALIDATE.TIME_BUDGET_MIN_MS)
-// below the drifting floor → TIME violation, and base is re-anchored 100 ms below that sample (so the next violation
-// needs another 200 ms of lead). A client that lags (o above base) is not penalised — bursts after a network stall
-// bring o back to base, never below — but lag credit is capped: when EVERY sample of the last LAG_WINDOW_MS was more
-// than TIME_LAG_MS (200 ms, = VALIDATE.TIME_BUDGET_MAX_MS) above base, base is raised to (that window's minimum −
-// 200 ms). So time cannot be "banked" for more than ~10 s.
+// o = trueOffset + networkDelay ≥ trueOffset + minDelay, so o never falls (much) below its running minimum `base`.
+// A client whose clock runs fast (time-dilation speed hack) makes o fall continuously.
+//   * The first sample after a reset (fresh join / ticket takeover — a new page has a new clock origin) sets base.
+//     There is NO free learning window any more (fixer round 1, NET-1: during the old 5 s learning window base followed
+//     o without limit, so a 30× clock was never flagged after a join / resume).
+//   * base may sink at the tolerated quartz drift (DRIFT_MS_PER_S). A deeper drop of o below base is charged to a
+//     per-session FORGIVENESS bucket (FORGIVE_BURST_MS, refilled at FORGIVE_PER_S): honest one-off drops — the first
+//     packets of a connection were slow (TCP / 4G RRC warm-up), a route change — are absorbed silently. The bucket
+//     survives resets (takeover) and RESUME, so repeated reconnects cannot refill it.
+//   * Beyond the bucket, base does NOT follow the lead (NET-4: base used to re-anchor 100 ms below every violating
+//     sample, which forgave any clock up to ~1.19× and let it add to the distance slack). Distances are judged in
+//     EFFECTIVE client time E = min(C, serverMs − base + TIME_AHEAD_MS): a fast clock earns no distance allowance beyond
+//     the forgiven amount, so a dilated client simply out-runs its allowance and is caught by the SPEED window.
+//   * A lead beyond the bucket + TIME_AHEAD_MS is also scored as a TIME violation, once per 200 ms of NEW lead (a
+//     separate scoring floor re-anchors 100 ms below the violating sample) — detection only; an honest client whose
+//     very first packet was stalled for > 2 s gets a few points and at most one CORRECT, never a stream of them.
+//   * Lag (o above base) is not penalised — bursts after a network stall bring o back to base, never below — but lag
+//     credit ("banking" time with a slow clock to cash it in later) is capped: when EVERY sample of the last
+//     LAG_WINDOW_MS was more than LAG_BANK_MS above base, base is raised to (that window's minimum − LAG_BANK_MS).
+//     LAG_BANK_MS is 2.5 s, not the SPEC's +200 ms (NET-3: with 200 ms an honest phone recovering from a sustained
+//     1–3 s bufferbloat was scored as a fast clock and rubber-banded). A banked burst is bounded by 2.5 s × vmax and
+//     cannot raise the average speed.
+//   * RESUME keeps the whole checker (time base, window, bucket): the client keeps its clock across a reconnect.
 //
 // Distance window: positions are judged in CLIENT time (validated by the time budget above), so jitter and bursts of
 // delayed packets never look like speed. Over the samples of the last WINDOW_S (1 s) of client time:
@@ -32,14 +47,16 @@
 // Teleport (hard flag): one step longer than max(TELEPORT_MIN_M, TELEPORT_MUL × that step's own limit).
 import { isWater, groundHeight, groundHeightNoDeck, BRIDGE_WAYS, ROADS_DT, ELEVATED_RI, nearestRiverPoint } from '../terrain.js';
 import { roadHW, sidewalkW } from '../xsection.js';
-import { MODE, MODE_VMAX, MODE_MOUNTED, PLAY_RADIUS, VALIDATE, LAND_H } from './constants.js';
+import { MODE, MODE_VMAX, MODE_MOUNTED, PLAY_RADIUS, VALIDATE, LAND_H, JUMP_APEX } from './constants.js';
 
 export const MOVE = Object.freeze({
   TIME_AHEAD_MS: -VALIDATE.TIME_BUDGET_MIN_MS,   // 100: client clock may lead real time by this much
-  TIME_LAG_MS: VALIDATE.TIME_BUDGET_MAX_MS,      // 200: lag credit kept after a sustained lag
+  TIME_LAG_MS: VALIDATE.TIME_BUDGET_MAX_MS,      // 200: the SPEC's lag budget (superseded by LAG_BANK_MS, NET-3)
+  LAG_BANK_MS: 2500,                             // lag credit kept after a sustained lag
   LAG_WINDOW_MS: 10000,                          // a lag must be sustained this long before credit is capped
   DRIFT_MS_PER_S: 2,                             // tolerated clock drift (0.2 %)
-  LEARN_MS: 5000,                                // after a reset the minimum delay is learned freely for 5 s
+  FORGIVE_BURST_MS: 2000,                        // offset drops absorbed without a violation (per session) …
+  FORGIVE_PER_S: 10,                             // … refilled at this rate (1 % of real time)
   WINDOW_MS: VALIDATE.WINDOW_S * 1000,
   BURST_MS: 300,             // second, short window (same slack): an idle player cannot "bank" 1 s of allowance and
                              // dash at 3× for half a second before the 1 s window overflows (integration 15/10/2026)
@@ -179,6 +196,27 @@ export function waterOk(x, z) {
   return isWater(x, z) || ringAny(x, z, MOVE.BOAT_SHORE_M * 0.5, isWater) || ringAny(x, z, MOVE.BOAT_SHORE_M, isWater);
 }
 
+// Height (ARCH §12 item 3, fixer round 1 NET-6): the client's y is CLAMPED into the plausible band before other
+// players see it — ground (terrain incl. street decks) ± Y_TOL_M (+ JUMP_APEX in the AIR mode); anywhere inside a
+// bridge / elevated-road corridor (BRIDGE_WAYS, ELEVATED_RI: HVT spans, spiral ramps) any level above ground − Y_TOL_M
+// (deck heights are not modelled in js/shared); boats at most Y_TOL_M above city level. Clamping instead of a violation:
+// no false CORRECT for an honest client whose local surface differs slightly, while a hover hack shows nobody a
+// floating avatar. Returns the clamped y (NaN / non-finite → ground).
+export const Y_MAX = 63.75;   // quantisation ceiling (js/shared/quant.js)
+export function clampY(x, z, y, mode) {
+  const tol = VALIDATE.Y_TOL_M;
+  mode &= 7;
+  if (mode === MODE.BOAT) { const hi = LAND_H + tol; return Number.isFinite(y) ? (y > hi ? hi : y < 0 ? 0 : y) : 0; }
+  const g = groundHeight(x, z);
+  const lo = Math.max(0, g - tol);
+  if (!Number.isFinite(y)) return g;
+  if (y < lo) return lo;
+  const hi = g + tol + (mode === MODE.AIR ? JUMP_APEX : 0);
+  if (y <= hi) return y;
+  if (onBridge(x, z)) return y > Y_MAX ? Y_MAX : y;
+  return hi;
+}
+
 // metres allowed between two samples dtS apart (before the window slack)
 export function stepAllowance(modeA, modeB, dtS) {
   const v = Math.max(vmaxOf(modeA), vmaxOf(modeB));
@@ -190,7 +228,9 @@ export function stepAllowance(modeA, modeB, dtS) {
 // =====================================================================================================================
 // usage:
 //   const mc = new MoveCheck();
-//   mc.reset(x, z, mode, serverMs)                  anchor (spawn / correction / takeover); time base re-learned
+//   mc.reset(x, z, mode, serverMs, bonus = true)    anchor (spawn / takeover); time base re-learned. bonus: the first
+//                                                   sample gets FIRST_RADIUS_M + FIRST_RTT_S (fresh spawn only — a
+//                                                   takeover starts exactly at the live avatar, NET-1)
 //   const r = mc.check(clientMs16, x, z, mode, serverMs, flags)
 //       flags: bit 1 = vehicleOk (the server confirmed the mounted vehicle), bit 2 = skipSurface (tests)
 //       r === MV.OK → sample accepted and recorded; else violation code (sample NOT recorded); mc.hard is true for
@@ -210,23 +250,25 @@ export class MoveCheck {
     this.reset(0, 0, MODE.WALK, 0);
   }
   // Anchor at a server-chosen position. The next sample is judged against it with real (server) elapsed time.
-  reset(x, z, mode, serverMs) {
-    this.head = -1; this.count = 0;
+  reset(x, z, mode, serverMs, bonus = true) {
+    this.head = -1; this.count = 0; this.bonus = !!bonus;
     this.ax = x; this.az = z; this.amode = mode; this.aServerMs = serverMs; this.anchored = true;
-    this.lastClient16 = -1; this.clientT = 0; this.lastServerMs = serverMs;
-    this.base = NaN; this.baseT = serverMs; this.learnUntil = 0;
+    this.lastClient16 = -1; this.clientT = 0; this.effT = 0; this.lastServerMs = serverMs;
+    this.base = NaN; this.sbase = NaN; this.baseT = serverMs;
     this.lagMinCur = Infinity; this.lagMinPrev = Infinity; this.lagBucketT = serverMs; this.lagBuckets = 0;
+    // the forgiveness bucket survives resets (ticket takeover): only the first reset fills it
+    if (this.forgive === undefined) { this.forgive = MOVE.FORGIVE_BURST_MS; this.forgiveT = serverMs; }
     this.hard = false; this.lastDist = 0; this.lastLimit = 0; this.lastDt = 0;
     this.accepted = 0;
   }
   // after a CORRECT: keep the time base, restart the window from the corrected point at the latest client time
   correctTo(x, z, mode, serverMs) {
-    const t = this.clientT, base = this.base, baseT = this.baseT, l16 = this.lastClient16, learn = this.learnUntil;
+    const t = this.clientT, e = this.effT, base = this.base, sbase = this.sbase, baseT = this.baseT, l16 = this.lastClient16, ls = this.lastServerMs;
     const lc = this.lagMinCur, lp = this.lagMinPrev, lb = this.lagBucketT, lbn = this.lagBuckets;
-    this.reset(x, z, mode, serverMs);
-    this.base = base; this.baseT = baseT; this.lastClient16 = l16; this.clientT = t; this.learnUntil = learn;
+    this.reset(x, z, mode, serverMs, false);
+    this.base = base; this.sbase = sbase; this.baseT = baseT; this.lastClient16 = l16; this.clientT = t; this.effT = e; this.lastServerMs = ls;
     this.lagMinCur = lc; this.lagMinPrev = lp; this.lagBucketT = lb; this.lagBuckets = lbn;
-    if (l16 >= 0) { this.anchored = false; this._push(t, x, z, mode, 0); }
+    if (l16 >= 0) { this.anchored = false; this._push(e, x, z, mode, 0); }
   }
   get lastX() { return this.count ? this.x[this.head] : this.ax; }
   get lastZ() { return this.count ? this.z[this.head] : this.az; }
@@ -251,7 +293,7 @@ export class MoveCheck {
     return true;
   }
 
-  // ---- time budget: returns true when the sample's client time is plausible -----------------------------------------
+  // ---- time budget: returns true when the sample's client time is plausible; sets clientT and effT -----------------
   _time(clientMs16, serverMs) {
     // unwrap the u16 client clock; long gaps are resolved with the real elapsed time
     let ct;
@@ -263,39 +305,53 @@ export class MoveCheck {
       ct = this.clientT + d;
     }
     this.lastClient16 = clientMs16; this.clientT = ct; this.lastServerMs = serverMs;
+    if (serverMs > this.forgiveT) {   // forgiveness refill (real time)
+      this.forgive = Math.min(MOVE.FORGIVE_BURST_MS, this.forgive + (MOVE.FORGIVE_PER_S * (serverMs - this.forgiveT)) / 1000);
+      this.forgiveT = serverMs;
+    }
     const o = serverMs - ct;
     if (Number.isNaN(this.base)) {
-      this.base = o; this.baseT = serverMs; this.lagBucketT = serverMs; this.learnUntil = serverMs + MOVE.LEARN_MS;
+      this.base = o; this.sbase = o; this.baseT = serverMs; this.lagBucketT = serverMs;
+      this.effT = ct;
       return true;
     }
     let ok = true;
-    if (serverMs < this.learnUntil) {
-      if (o < this.base) this.base = o;           // learning the minimum network delay: follow freely
-    } else {
-      // base follows a falling offset no faster than the tolerated clock drift; a lead beyond that by > 100 ms is a
-      // violation (then re-anchor 100 ms lower: the next violation needs another 200 ms of lead, so the catch-up after a
-      // long bufferbloat costs few points while a fast clock keeps failing)
-      const floor = this.base - (MOVE.DRIFT_MS_PER_S * (serverMs - this.baseT)) / 1000;
-      if (o < floor - MOVE.TIME_AHEAD_MS) { ok = false; this.base = o - MOVE.TIME_AHEAD_MS; }
-      else if (o < this.base) this.base = o > floor ? o : floor;
-    }
+    // base follows a falling offset no faster than the tolerated clock drift; a deeper drop is charged to the
+    // forgiveness bucket; base never follows a lead beyond that (so effT below never runs ahead of real time)
+    const drift = (MOVE.DRIFT_MS_PER_S * Math.max(0, serverMs - this.baseT)) / 1000;
+    const floor = this.base - drift;
+    if (o < floor) {
+      let nb = floor;
+      const excess = floor - o - MOVE.TIME_AHEAD_MS;
+      if (excess > 0) { const f = Math.min(this.forgive, excess); this.forgive -= f; nb = floor - f; }
+      this.base = nb;
+    } else if (o < this.base) this.base = o;
+    // scoring: a lead beyond base − TIME_AHEAD_MS is a TIME violation once per 200 ms of NEW lead (sbase re-anchors
+    // 100 ms below the violating sample). Points are only the detection signal: the distance window runs on effT,
+    // which a fast clock cannot advance, so the lead itself buys nothing.
+    const sfloor = Math.min(this.sbase - drift, this.base);
+    if (o < this.base - MOVE.TIME_AHEAD_MS) {
+      if (o < sfloor - MOVE.TIME_AHEAD_MS) { ok = false; this.sbase = o - MOVE.TIME_AHEAD_MS; } else this.sbase = sfloor;
+    } else this.sbase = this.base;
     this.baseT = serverMs;
     // lag cap: rolling minimum over two half-windows (≈ LAG_WINDOW_MS)
     if (o < this.lagMinCur) this.lagMinCur = o;
     if (serverMs - this.lagBucketT >= MOVE.LAG_WINDOW_MS / 2) {
       const winMin = Math.min(this.lagMinPrev, this.lagMinCur);
       this.lagMinPrev = this.lagMinCur; this.lagMinCur = Infinity; this.lagBucketT = serverMs; this.lagBuckets++;
-      if (this.lagBuckets >= 2 && winMin - this.base > MOVE.TIME_LAG_MS) {
-        this.base = winMin - MOVE.TIME_LAG_MS; this.baseT = serverMs;
-      }
+      if (this.lagBuckets >= 2 && winMin - this.base > MOVE.LAG_BANK_MS) { this.base = winMin - MOVE.LAG_BANK_MS; this.sbase = this.base; }
     }
+    // effective client time for the distance window: never ahead of real time by more than TIME_AHEAD_MS
+    const lim = serverMs - this.base + MOVE.TIME_AHEAD_MS;
+    const e = ct < lim ? ct : lim;
+    if (e > this.effT) this.effT = e;
     return ok;
   }
 
   check(clientMs16, x, z, mode, serverMs, flags = 0) {
     this.hard = false; this.lastDist = 0; this.lastLimit = 0;
     const timeOk = this._time(clientMs16 & 0xffff, serverMs);
-    const t = this.clientT;
+    const t = this.effT;
     mode &= 7;
 
     // play disc
@@ -311,7 +367,7 @@ export class MoveCheck {
     let px, pz, pmode, dt;
     if (this.count === 0) {
       px = this.ax; pz = this.az; pmode = this.amode;
-      dt = Math.min(MOVE.MAX_GAP_S, Math.max(0, (serverMs - this.aServerMs) / 1000) + MOVE.FIRST_RTT_S);
+      dt = Math.min(MOVE.MAX_GAP_S, Math.max(0, (serverMs - this.aServerMs) / 1000) + (this.bonus ? MOVE.FIRST_RTT_S : 0));
     } else {
       px = this.x[this.head]; pz = this.z[this.head]; pmode = this.m[this.head];
       dt = Math.min(MOVE.MAX_GAP_S, Math.max(0, (t - this.t[this.head]) / 1000));
@@ -321,9 +377,10 @@ export class MoveCheck {
     const segAllow = stepAllowance(pmode, mode, dt);
     const mountChange = isMountedMode(pmode) !== isMountedMode(mode);
     let stepLim = segAllow * MOVE.SLACK_MUL + MOVE.SLACK_ADD_M + (mountChange ? MOVE.MOUNT_SLACK_M : 0);
-    if (this.count === 0) stepLim += MOVE.FIRST_RADIUS_M;
+    const first = this.count === 0 && this.bonus ? MOVE.FIRST_RADIUS_M : 0;
+    stepLim += first;
     this.lastDt = dt;
-    if (step > Math.max(MOVE.TELEPORT_MIN_M + (this.count === 0 ? MOVE.FIRST_RADIUS_M : 0), MOVE.TELEPORT_MUL * stepLim)) {
+    if (step > Math.max(MOVE.TELEPORT_MIN_M + first, MOVE.TELEPORT_MUL * stepLim)) {
       this.hard = true; this.lastDist = step; this.lastLimit = stepLim;
       return MV.TELEPORT;
     }
