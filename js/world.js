@@ -8414,7 +8414,8 @@ const tsShop = (bx, bz, ry, W, FL, wallMat, txt, sbg, sfg, opt = {}) => {
       tsBox(g, W + 0.2, 0.5, 0.5, mat(0xfdfbf4), 0, f * 3.3 + 0.55, D / 2 + 0.15);
     }
     // mái hiên TÔN XANH LÁ liên tục + 3 mảng bạt sọc xanh-trắng
-    const hienM = mat(0x2f7d4f, { side: THREE.DoubleSide });   // W3-C: nhìn từ dưới (mặt sau) vẫn thấy
+    // W3-C vòng 2: ảnh 124_h090 = bạt/tôn XANH DƯƠNG sọc trắng chạy dài (xanh lá chỉ là lưới che đầu đông) → xanh dương
+    const hienM = mat(0x3567a8, { side: THREE.DoubleSide });   // W3-C: nhìn từ dưới (mặt sau) vẫn thấy
     const hien = new THREE.Mesh(new THREE.PlaneGeometry(W * 0.97, 2.1), hienM);
     // W3-C (AUDIT3 FP-3 #5, pano_124 h90): rotation.x DƯƠNG dựng tấm gần THẲNG ĐỨNG (mép trên chĩa ra phố) → "tấm xanh chéo"
     // 60 m trước mặt camera; mái hiên = dốc thoải xuống phía ngoài (−1,15 rad ≈ 24° so với phương ngang)
@@ -17623,11 +17624,20 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
       const items = SHOP_SIGNS.slice(a * PER, (a + 1) * PER);
       const cv = document.createElement('canvas'); cv.width = COLS * CELL_W * MS; cv.height = Math.ceil(ROWS * CELL_H * MS);
       const g = cv.getContext('2d'); g.scale(MS, MS);
+      // W3-C vòng 2: chữ VỪA Ô bằng CỠ CHỮ (thu đều, measureText), KHÔNG bằng tham số maxWidth của fillText — maxWidth ép
+      // ngang = vẽ chữ qua biến đổi không đều → raster GPU chậm hẳn (đo s4/signbench: 3 tấm 1.151 biển, GPU vẽ+tải ~265 ms
+      // → ~80 ms; dot3 954 biển ~220 ms) — chính là "chờ vẽ khung" ở ranh fabric→landmarks lúc boot; chữ cũng hết méo ngang.
+      // Đặt font LƯỜI (chỉ khi đổi cỡ): gán g.font mỗi biển = parse chuỗi font mỗi lần.
+      const F0 = 'bold 44px system-ui, sans-serif', TW = CELL_W - 30;
+      g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = F0; let fCur = F0;
       items.forEach(([, , , name], k) => {
         const cx = (k % COLS) * CELL_W, cy = ((k / COLS) | 0) * CELL_H;
         g.fillStyle = bg[(name.length + k) % bg.length]; g.fillRect(cx, cy, CELL_W, CELL_H);
-        g.fillStyle = '#fff'; g.font = 'bold 44px system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
-        g.fillText(name, cx + CELL_W / 2, cy + CELL_H / 2 + 2, CELL_W - 30);
+        g.fillStyle = '#fff';
+        if (fCur !== F0) { g.font = F0; fCur = F0; }
+        const tw = g.measureText(name).width;
+        if (tw > TW) { fCur = 'bold ' + Math.max(22, Math.floor(44 * TW / tw)) + 'px system-ui, sans-serif'; g.font = fCur; }
+        g.fillText(name, cx + CELL_W / 2, cy + CELL_H / 2 + 2);
       });
       const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
       const geos = [];
