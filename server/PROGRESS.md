@@ -33,3 +33,14 @@
 - Test: `npm test` 71 xanh (32 test S3); `node test/safety_pg_run.mjs` 20/20 trên Postgres 17 (hpmp-safety:55434, đã
   dọn); smoke trang quản trị 1 Chrome dưới khoá GPU: 12 ảnh, 0 lỗi.
 - Còn mở: docs/multiplayer/SERVER.md §3.9 (nối gateway S2, ADMIN_ALLOW_IPS trong Docker S5, mã EVENT.SANCTION).
+
+## S5 Vận hành tự host + netprobe (tag `s5ops`, 15/10/2026) — XONG
+
+- Docker: `server/Dockerfile` (node:24-trixie-slim ghim digest, uWS nạp được trong container, non-root, root FS chỉ đọc,
+  kiểm import lúc build), `server/docker-compose.yml` (game + db + profile tunnel/quicktunnel/backup; mạng edge/backend
+  internal; mọi cổng 127.0.0.1; cap_drop ALL; giới hạn CPU/RAM/PID; log xoay vòng), ingress tunnel chỉ 4 đường.
+- Script `server/ops/*.ps1` (PowerShell 5.1, tiếng Việt): mở/tắt/trạng thái/sao lưu/khôi phục (diễn tập + thật)/mã mời/
+  lịch/khẩn cấp/giữ máy thức — chạy thật trên máy này ở chế độ thử (bộ hpmp-ops, cổng 9140/9141).
+- netprobe: WS /probe có giới hạn, POST /v1/netprobe + migration 030, admin `/admin/api/netprobe`, `netprobe.html`.
+- Bảo vệ cổng admin khỏi tunnel/edge (`api/admin_edge_guard.js`).
+- Tài liệu: `docs/multiplayer/VAN_HANH.md` (chủ dự án), SERVER.md §5 (kỹ thuật + số đo).

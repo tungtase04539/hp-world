@@ -1,0 +1,18 @@
+# server/Dockerfile.dockerignore — whitelist for the build context (= repo root). Everything is excluded except:
+*
+!server/package.json
+!server/package-lock.json
+!server/src/
+!server/ops/container-main.mjs
+!server/ops/healthcheck.mjs
+!server/admin/
+!server/data/filter/
+!js/shared/
+!js/terrain.js
+!js/mapdata.js
+!js/brands.js
+# never, even inside a whitelisted folder
+**/node_modules
+**/.env
+**/*.pem
+**/*.key
