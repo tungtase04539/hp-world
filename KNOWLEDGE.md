@@ -455,6 +455,14 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-10-15 (QA BỀN: `tools/qa/audit_views.mjs` + thư mục ngoài %TEMP%)** [scratchpad phiên bị dọn 2026-10-15 ⇒ mất ảnh/khung chấm]:
+    `node tools/qa/audit_views.mjs <out.json> <id…|ids.json>` → views cho `shoot.mjs --views`: 4 hướng 0/90/180/270 mỗi pano, đứng
+    ĐÚNG vị trí xe Street View (X, Z từ audit/pano_index.json 420 + pano_index2.json 131 = 551), kind 'pano' (teleport pitch 0,02,
+    dist 0,1), id `<pano>_hHHH` khớp tên ảnh của `tools/qa/make_pairs3.py`; ghi kèm `<out>_ids.json` cho make_pairs3. Quy trình
+    so OLD/NEW: OLD = `git worktree add --detach <dir> <sha>` + HARD-LINK GLB assets/ + assets_lite/ (`ln`, không chép 330 MB),
+    `python -m http.server` cổng riêng; chụp `shoot.mjs --w 1280 --h 634 --settle 12000 --traffic off` (tự xin khoá GPU) → make_pairs3
+    → NHÌN từng ảnh ghép. Đầu ra bền: `C:/Users/Admin/hp-world-work/<đợt>/` (ngoài %TEMP%, không bị dọn); xong thì `git worktree
+    remove` bản tạm.
 - **2026-10-15 (Đ3-W5 SỬA NỐT HỒI QUY BỊ CHẶN: 382/336/331 + xe phủ bạt + bay mở trống)** [sinh lại tất định, hero khoá lại bằng rekey]:
     **382:** `process_osm` SPLIT_WAYS thêm `{ id: 1208204466, x: −401 }` (cắt theo HOÀNH ĐỘ; nửa ĐẦU = đông/Bến Bính giữ ri 447 →
     bề rộng cấp như dot3; nửa tây nối cuối ri 1426 vẫn là way gần nhất của 383/384 ⇒ giữ ngõ 5,5 m). Đuôi tách mang `sp` = ri gốc
