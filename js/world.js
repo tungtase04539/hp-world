@@ -1614,6 +1614,25 @@ export async function buildWorld(scene, prog = () => {}) {
     // 2) DÃY SHOWROOM/GARA Ô TÔ phía NAM đường (Toản Auto, Tùng Lâm... — biển đỏ/đen chữ to)
     const SHOWROOMS = ['TOẢN AUTO', 'TÙNG LÂM AUTO', 'LIÊU NHÂN AUTO', 'QUỐC TOÀN', 'BẢO HIỂM Ô TÔ', 'AUTO 568', 'GARA ĐẠI PHÁT', 'SALON Ô TÔ HP'];
     const srBg = ['#b91c1c', '#111318', '#1c56a0', '#b91c1c', '#0f6a38', '#111318', '#b06010', '#1c56a0'];
+    // W3-C vòng 2 (AUDIT3 FP-3 #1 "tường trống ra phố", pano_014 h180 KHUNG CHUẨN): hồi nhà showroom là tường kem TRƠN 14 × 5-7 m
+    // nhìn sát 8-10 m → phủ mặt hông: vệt ố chảy, bẩn chân tường, cửa sổ nhỏ có song + cục nóng (1 hay 2 tầng). Xác định.
+    const hdSide = [1, 2].map((fl) => new THREE.MeshLambertMaterial({ map: makeTex(256, fl === 1 ? 96 : 136, (gc, w, h) => {
+      gc.fillStyle = '#e0dbcf'; gc.fillRect(0, 0, w, h);
+      for (let i = 0; i < 11; i++) {                       // ố chảy từ đỉnh tường / mép sàn
+        const x = (i * 53 + 17) % w, ww = 3 + (i * 7) % 7, L = h * (0.3 + ((i * 29) % 50) / 100);
+        const gr = gc.createLinearGradient(0, 0, 0, L); gr.addColorStop(0, 'rgba(92,82,62,0.22)'); gr.addColorStop(1, 'rgba(92,82,62,0)');
+        gc.fillStyle = gr; gc.fillRect(x, 0, ww, L);
+      }
+      const gb = gc.createLinearGradient(0, h, 0, h * 0.78); gb.addColorStop(0, 'rgba(72,62,46,0.38)'); gb.addColorStop(1, 'rgba(72,62,46,0)');
+      gc.fillStyle = gb; gc.fillRect(0, h * 0.78, w, h * 0.22);
+      for (let f = 0; f < fl; f++) for (const fx of [0.28, 0.7]) {   // cửa sổ nhỏ khung sáng, kính tối, song sắt
+        const cx = w * fx, cy = h - (f + 0.62) * (h / fl) * (fl === 1 ? 0.95 : 1), ww = 26, hh = 20;
+        gc.fillStyle = '#f2efe6'; gc.fillRect(cx - ww / 2 - 3, cy - hh / 2 - 3, ww + 6, hh + 7);
+        gc.fillStyle = '#3d4852'; gc.fillRect(cx - ww / 2, cy - hh / 2, ww, hh);
+        gc.fillStyle = '#5d6b76'; for (let s = 1; s < 5; s++) gc.fillRect(cx - ww / 2 + s * ww / 5 - 1, cy - hh / 2, 2, hh);
+        if (fx > 0.5) { gc.fillStyle = '#d7d6d0'; gc.fillRect(cx + ww / 2 + 6, cy - 2, 20, 13); gc.fillStyle = '#8b8d8c'; gc.beginPath(); gc.arc(cx + ww / 2 + 16, cy + 4.5, 4.5, 0, Math.PI * 2); gc.fill(); }
+      }
+    }) }));
     for (let k = 0; k < SHOWROOMS.length; k++) {
       const al = 42 + k * 41;
       if (al > HD_L - 14) break;
@@ -1624,6 +1643,10 @@ export async function buildWorld(scene, prog = () => {}) {
       const g = new THREE.Group(); g.position.set(x, LAND_H, z); g.rotation.y = ang + Math.PI / 2;
       const body = new THREE.Mesh(new THREE.BoxGeometry(W, H, D), mat(k % 2 ? 0xe8e4da : 0xd8d4c8));
       body.position.y = H / 2; g.add(body);
+      for (const sx of [-1, 1]) {                         // W3-C vòng 2: hồi nhà có cửa sổ/ố thay tường trơn (xem hdSide)
+        const sp = new THREE.Mesh(new THREE.PlaneGeometry(D, H), hdSide[H > 6 ? 1 : 0]);
+        sp.rotation.y = sx * Math.PI / 2; sp.position.set(sx * (W / 2 + 0.02), H / 2, 0); g.add(sp);
+      }
       // mặt kính lớn tầng trệt (quay ra đường = local +Z sau xoay)
       const glass = new THREE.Mesh(new THREE.BoxGeometry(W * 0.86, 3.1, 0.12), sharedMats.window);
       glass.position.set(0, 1.75, D / 2 + 0.05); g.add(glass);
@@ -1995,7 +2018,8 @@ const lmTower = (x, z, ry, W, D, FL, FH, wallMat, name) => {
     const ry = 0.777;                           // mặt quay ĐÔNG-NAM về tim nút (53,-459)
     const g = new THREE.Group(); g.position.set(bx, groundHeight(bx, bz), bz); g.rotation.y = ry;
     const W = 20, D = 14, FL = 5, FH = 3.4, H = FL * FH;
-    const body = new THREE.Mesh(new THREE.BoxGeometry(W, H, D), lmFacade('#9e3b30', '#f3e9d8', 6, 5));
+    // W3-C vòng 2 (phản biện: khối BIDV 046 vẫn ĐỎ TƯƠI dưới nắng): đỏ gạch #9e3b30 → gạch nâu đỏ sẫm (ảnh 046 h0/h270)
+    const body = new THREE.Mesh(new THREE.BoxGeometry(W, H, D), lmFacade('#7a463e', '#f3e9d8', 6, 5));
     body.position.y = H / 2; g.add(body);
     // băng kem ngang giữa các tầng (đỏ gạch PHỐI kem theo audit)
     for (const fy of [FH, FH * 3]) {
