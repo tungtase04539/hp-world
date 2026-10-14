@@ -15,7 +15,8 @@
 //   [17]    tunnel — VÒM CÂY (hàng cây tán lớn rợp/che kín phố: Lê Lợi, Phan Bội Châu, Ký Con…) → tán to, mép tán thấp, dày
 //   [18]    topiary — cây cảnh CẮT TỈA TRÒN / cây thế trên ĐẢO GIAO THÔNG / dải phân cách (pano_304) → không cây cổ thụ ở đó
 //   [19]    palm — 0 không rõ, 1 = mô tả cây KHÔNG nhắc cau/cọ (→ không trồng cau theo mặc định quanh đây),
-//           2 = CHỈ cau/cọ (hàng cau đầu cầu pano_074, không nêu loài cây gỗ nào)
+//           2 = CHỈ cau/cọ (hàng cau đầu cầu pano_074, không nêu loài cây gỗ nào và không nêu cây bóng mát ở bất kỳ vế nào),
+//           3 = CAU DẪN ĐẦU (vế đầu chỉ cau/cọ, "cây bóng mát/tán rộng" nêu ở vế sau — Hồ Sen 320/322, HVT 217/218/220)
 //   [20]    lean — cây "nghiêng" (ven hồ pano_033: "tán rộng nghiêng theo gió")
 // Heuristic từ khoá tiếng Việt — đếm kiểm ở cuối (in ra console), không hoàn hảo nhưng TẤT ĐỊNH.
 import fs from 'fs';
@@ -24,7 +25,7 @@ const src = JSON.parse(fs.readFileSync('audit/audit_enriched.json', 'utf8'));
 const has = (s, re) => re.test(s);
 const out = [];
 const cnt = { n: 0, none: 0, sparse: 0, dense: 0, pollard: 0, young: 0, wash: 0, sp: [0, 0, 0, 0, 0, 0, 0], generic: 0, thin: 0,
-  polS: 0, polP: 0, tunnel: 0, topiary: 0, palmNo: 0, palmOnly: 0, lean: 0 };
+  polS: 0, polP: 0, tunnel: 0, topiary: 0, palmNo: 0, palmOnly: 0, palmLead: 0, lean: 0 };
 // từ khoá cắt cụt (sau bão Yagi 9/2024 rất phổ biến trên pano 10/2024)
 const CUT_RX = /cắt cụt|cắt trụi|trụi cành|đốn tỉa|trơ cành|cắt tỉa|chỉ còn thân|cụt ngọn|trơ thân|thân trơ|cắt ngọn|cắt tán|khô trơ|cưa cụt|tỉa cụt|trụi lá|cành gãy|thân trụi|cắt cành|đốn/;
 // ngữ cảnh DẢI PHÂN CÁCH / CÔNG VIÊN của 1 câu (cây trong đó khác cây vỉa hè: pano_001/152/056/428)
@@ -115,14 +116,15 @@ for (const e of src) {
   // cao dọc đầu cầu, …"; KHÔNG pano_225 "hàng cây tán rộng (…) và cọ/cau vua cao dọc dải phân cách"
   const first = v.split(/[;.,]/)[0];
   // (review W3-G: cây bóng mát nêu ở BẤT KỲ vế nào → không "chỉ cau" — 062/183/217/218/220/320/322/547/549 có "…, cây bóng
-  // mát/tán rộng" sau vế cau; từng ra 100% cau trên cả tuyến, Hồ Sen 320 thành đại lộ cau)
-  const palm = has(v, PALM_RX) ? (w[5] >= 7 && has(first, PALM_RX) && !has(first, /hàng cây|cây (bóng mát|xanh|lớn|tán)|tán rộng/)
-    && !has(v, /cây bóng mát|cây tán rộng|tán rộng|cây (xanh|thân gỗ) lớn|hàng cây (bóng|tán|lớn)/) && !w[0] && !w[1] && !w[2] && !w[3] && !w[4] ? 2 : 0) : treeTalk && density > 0 ? 1 : 0;
+  // mát/tán rộng" sau vế cau; từng ra 100% cau trên cả tuyến, Hồ Sen 320 thành đại lộ cau) → 3 = "CAU DẪN ĐẦU": vế đầu chỉ
+  // cau, cây bóng mát nêu SAU (trees.js: cây chung nặng 0,5 × cau thay vì 1 × ⇒ cau ~45% thay vì ~30% / 100%)
+  const palmLead = has(v, PALM_RX) && w[5] >= 7 && has(first, PALM_RX) && !has(first, /hàng cây|cây (bóng mát|xanh|lớn|tán)|tán rộng/) && !w[0] && !w[1] && !w[2] && !w[3] && !w[4];
+  const palm = has(v, PALM_RX) ? (palmLead ? (has(v, /cây bóng mát|cây tán rộng|tán rộng|cây (xanh|thân gỗ) lớn|hàng cây (bóng|tán|lớn)/) ? 3 : 2) : 0) : treeTalk && density > 0 ? 1 : 0;
   const lean = has(v, /nghiêng/) ? 1 : 0;
   out.push([Math.round(e.X * 10), Math.round(e.Z * 10), ...w, pollard, young, density, wash, generic, thin, polS, polP, tunnel, topiary, palm, lean]);
   cnt.n++; if (density === 0) cnt.none++; if (density === 1) cnt.sparse++; if (density === 3) cnt.dense++;
   if (pollard) cnt.pollard++; if (young) cnt.young++; if (wash) cnt.wash++; if (generic) cnt.generic++; if (thin) cnt.thin++;
-  if (polS) cnt.polS++; if (polP) cnt.polP++; if (tunnel) cnt.tunnel++; if (topiary) cnt.topiary++; if (palm === 1) cnt.palmNo++; if (palm === 2) cnt.palmOnly++; if (lean) cnt.lean++;
+  if (polS) cnt.polS++; if (polP) cnt.polP++; if (tunnel) cnt.tunnel++; if (topiary) cnt.topiary++; if (palm === 1) cnt.palmNo++; if (palm === 2) cnt.palmOnly++; if (palm === 3) cnt.palmLead++; if (lean) cnt.lean++;
   w.forEach((x, i) => { if (x) cnt.sp[i]++; });
 }
 const flat = out.flat();
