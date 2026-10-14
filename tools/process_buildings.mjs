@@ -184,8 +184,25 @@ function nearRail(x, z) { let h = false; railGrid.query([x, z, x, z], (i) => { c
 // Không được dựng nhà SINH tại điểm này
 // Đợt 3 W3-A: nhà SINH cách camera pano ≥ 6 m (trước 3 m — AUDIT3 CAMNEAR: tường SYNTH 3,1 m ở pano_501, 3,9 m ở 460)
 const SYN_CAM = 6;
+// Đ3-W5-D NGÕ HẸP: camera đứng TRONG lòng một way hẹp (mặt tiền theo phố ≤ NARROW_FL — vd Tam Bạc bắc 5,5 + vỉa 1 m, ghi đè
+// street_fit) thì nhà hai bên ngõ THẬT cách camera 2,5-4 m (ảnh 519/333/335 h0-h90: cửa nhà sát mép ngõ). SYN_CAM 6 m quanh
+// camera xoá 12 m mặt ngõ + miệng ngõ 2 bên ⇒ cả ô giữa 2 ngõ h trống trơn (519 h0/h90 = bãi trống). Với camera đó nhà SINH
+// chỉ cần ≥ NARROW_CAM (lô khe đặt ở facadeLine ≈ 3,75 m từ tim). Camera khác giữ 6 m (AUDIT3 CAMNEAR 501/460).
+const NARROW_FL = 4.5, NARROW_CAM = 3.2;
+const NARROW_CAMS = new Set();
+PANO_CAM.forEach(([x, z], i) => {
+  let best = null;
+  segGrid.query([x - 8, z - 8, x + 8, z + 8], (k) => { const s = SEGS[k]; const d = segDist(x, z, s.ax, s.az, s.bx, s.bz); if (!best || d < best.d) best = { d, s }; });
+  if (best && best.s.fl <= NARROW_FL && best.d <= best.s.hw && ['p', 's', 't', 'r'].includes(best.s.c)) NARROW_CAMS.add(i);
+});
+const camNeed = (i) => (NARROW_CAMS.has(i) ? NARROW_CAM : SYN_CAM);
+function nearCamSyn(x, z) {
+  let h = false;
+  camGrid.query([x - SYN_CAM, z - SYN_CAM, x + SYN_CAM, z + SYN_CAM], (i) => { if (!h && Math.hypot(PANO_CAM[i][0] - x, PANO_CAM[i][1] - z) < camNeed(i)) h = true; });
+  return h;
+}
 const synBlocked = (x, z) => waterSD(x, z) < 1.5 || inPolyList(PARK_POLYS, x, z) || inPolyList(LM_POLYS, x, z, 3) || noSynZone(x, z) || nearRail(x, z) ||
-  nearCam(x, z, SYN_CAM) || Math.hypot(x, z) > R_SYN;
+  nearCamSyn(x, z) || Math.hypot(x, z) > R_SYN;
 // W3-B Ô ĐẤT (tools/parcels_ev.mjs): bằng chứng kiểu ô từ pano (khuôn viên/nhà ở/cửa hàng/đất trống/chợ theo NÓN nhìn của
 // từng quan sát) + lớp sử dụng đất OSM (js/landuse_data.js) + tên phố (OSM thô) → bỏ phiếu theo phố. Dùng ở: bước 4 (không
 // kéo mặt tiền nhà khuôn viên ra vỉa hè), bước 7 (veto lô khe + TƯỜNG RÀO/RÀO TÔN), bước 8 (sân khuôn viên + đất cấm), bước
@@ -1704,14 +1721,15 @@ function camGuard(b) {
     const P = b.pts, bb = bbox(P); let hit = null;
     camGrid.query([bb[0] - need, bb[1] - need, bb[2] + need, bb[3] + need], (i) => {
       const [x, z] = PANO_CAM[i], inside = pointInPoly(P, x, z), d = inside ? -1 : polyEdgeDist(P, x, z);
-      if (d < need - 0.05 && (!hit || d < hit.d)) hit = { x, z, d, inside };
+      const ni = b.synth ? camNeed(i) + 0.1 : need;   // W5-D: camera trong ngõ hẹp → nhà sinh chỉ cần ≥ NARROW_CAM
+      if (d < ni - 0.05 && (!hit || d < hit.d)) hit = { x, z, d, inside, ni };
     });
     if (!hit) return true;
     let [tx, tz] = hit.inside ? centroid(P) : nearestOnPoly(P, hit.x, hit.z);
     let L = Math.hypot(tx - hit.x, tz - hit.z);
     if (L < 0.05) { [tx, tz] = centroid(P); L = Math.hypot(tx - hit.x, tz - hit.z) || 1; }
     const nx = (tx - hit.x) / L, nz = (tz - hit.z) / L;
-    const parts = clipHalf(P, nx, nz, nx * hit.x + nz * hit.z + need).map((q) => outward(cleanPoly(q))).filter((q) => q.length >= 3);
+    const parts = clipHalf(P, nx, nz, nx * hit.x + nz * hit.z + hit.ni).map((q) => outward(cleanPoly(q))).filter((q) => q.length >= 3);
     parts.sort((p, q) => absArea(q) - absArea(p));
     if (!parts.length || absArea(parts[0]) < Math.max(8, 0.5 * A0)) {
       if (b.synth) return false;

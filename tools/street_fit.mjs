@@ -51,6 +51,13 @@ export const WIDTH_OVERRIDES = [
   { re: /Hạ Lý/, w: 6, why: 'pano_102-115/445: phố chợ 5-6 m' },
   { re: /Chu Văn An/, w: 6.5, why: 'pano_486-488: ~6-7 m (audit 5,5)' },
   { re: /^Phố Tam Bạc$/, c: 'r', w: 4.5, why: 'pano_519/336: ngõ ven sông ~4,5 m' },
+  // Đ3-W5-D: Tam Bạc đoạn BẮC (way 322/588 'Phố Tam Bạc' + nửa một chiều 447 không tên) là đường SECONDARY trong OSM nên ghi
+  // đè 'r' ở trên KHÔNG BAO GIỜ khớp → lòng cấp s 10 m + vỉa 3,5 m (mặt tiền 8,5 m từ tim): ảnh 331/332/333/335/336/519 h0-h90
+  // nhà đứng NGAY mép ngõ ~5 m, không vỉa hè (bậc thềm/sân xi măng ≤ 1 m), cửa nhà cách camera 2-4 m. `any`: khớp mọi tên
+  // (447 không tên) nhưng CHỈ way gần nhất của các camera liệt kê. 221 (đầu nút Nguyễn Tri Phương, lòng ~7 m) KHÔNG liệt kê.
+  // `center`: tim ĐẶT TẠI camera (lòng 5,5 m: xe Google chạy giữa ngõ) + không mỏ neo tường — không có nó, a = hw − 1,25 nhỏ
+  // → 331/332/383 đòi dời > 6 m (tim tường Overture 1 bên sông) → bị bỏ 'isolated>6' rồi mỏ neo tường kéo ngõ RA XA camera 9 m.
+  { re: /.*/, c: 's', panos: ['pano_331', 'pano_332', 'pano_333', 'pano_334', 'pano_335', 'pano_336', 'pano_337', 'pano_519', 'pano_520', 'pano_383', 'pano_384'], w: 5.5, sw: 1.0, center: true, why: 'W5-D: Tam Bạc bắc — ngõ ven sông ~5-6 m, nhà sát mép (331/519)' },
 ];
 
 function parseCSVLine(L) {
@@ -365,7 +372,7 @@ export function fitToPanos(roads, panos, widths, walls, { Ra = 45, Rb = 12, maxS
       else if (Math.sign(B.v) !== Math.sign(A.v) && Math.abs(B.v) > 1) con++;
     }
     if (con > pro) A.drop = 'contradicted';
-    else if (!pro && !con && Math.abs(A.D) > 6) A.drop = 'isolated>6';
+    else if (!pro && !con && Math.abs(A.D) > (widths[A.ri].center ? 10 : 6)) A.drop = 'isolated>6';   // W5-D: way 'center' (ghi đè pano: tim TẠI camera) tin tới 10 m
   }
   // MỎ NEO TƯỜNG (không có pano): mỗi 10 m dọc way p/s/t/r (không phải đường đôi) nơi tim tường Overture tin được, cách
   // mỏ neo pano cùng way > 30 m: D = tim tường kẹp ±wallCap m, trọng số 0,6 → mặt tiền 2 bên đối xứng như thật.

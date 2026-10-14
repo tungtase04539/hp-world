@@ -1763,7 +1763,7 @@ export async function buildWorld(scene, prog = () => {}) {
     if (along < -10 || along > HD_L || across < 7 || across > 140) return false;
     // khuôn viên Cảng vụ giữ nguyên = HỘP sân ô compound(326,−826, 38×13, −135°) +1 m (W3-B: trước là vòng r45 → giữ cả
     // dãy footprint cũ phía bắc Hoàng Diệu trước pano_019; generator process_buildings.mjs nay không chừa gì: Cảng vụ = ô dựng tay)
-    { const dx = x - 326, dz = z + 826; if (Math.abs(0.7071 * (dz - dx)) < 28 && Math.abs(0.7071 * (dx + dz)) < 14.5) return false; }
+    // (Đ3-W5-D: bỏ chừa khuôn viên "Cảng vụ" (326, −826) — ô đó là bãi giải toả thật, xem chỗ compound() bị bỏ)
     if ((x - 636.5) ** 2 + (z + 894.7) ** 2 < 400) return false;   // nhà hàng bo cong (lm_drafts) đứng trong bãi
     return true;
   };
@@ -4115,15 +4115,35 @@ const bcPalm = (parent, lx, lz, h = 9) => {   // Đợt 3 WP4: cau vua instanced
     const g = new THREE.Group(); g.position.set(ix, groundHeight(ix, iz), iz);
     const curb = new THREE.Mesh(new THREE.CylinderGeometry(12, 12, 0.35, 22), mat(0x8d8a82)); curb.position.y = 0.18; g.add(curb);
     const grass = new THREE.Mesh(new THREE.CylinderGeometry(11.2, 11.2, 0.35, 22), mat(LAWN_OLIVE)); grass.position.y = 0.24; g.add(grass);
-    const rockM = mat(0x8d8a82, { flatShading: true });
+    // Đ3-W5-D: núi đá = cụm KHỐI ĐÁ GỒ GHỀ (ảnh 304 h180/h270: hòn non bộ xám sẫm lởm chởm, hốc tối, rêu/cây bám) thay 7 hình
+    // nón 5 cạnh nhẵn (đọc thành "chóp xám"). Mỗi khối = icosahedron chia 2 lần, kéo dài đứng, đỉnh dời theo nhiễu hash TẤT ĐỊNH
+    // của toạ độ gốc (đỉnh trùng nhau dời cùng) → mặt phẳng gãy; màu đỉnh: xám đá, hốc/chân tối hơn, mảng rêu xanh. ~2,9k tam giác.
+    const rockM = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
     const rocks = [];
-    for (let i = 0; i < 7; i++) {                            // cụm núi đá vươn cao ~7-8m
-      const h = [7.5, 6, 5, 4, 3.2, 2.6, 2][i], r = 1.5 - i * 0.12;
-      const rk = new THREE.ConeGeometry(r + 0.9, h, 5);
-      rk.translate(-1.8 + (i % 3) * 1.7, h / 2 + 0.4, -1.4 + Math.floor(i / 3) * 1.6);
+    const fr2 = (v) => v - Math.floor(v), hs = (x, y, z, k) => fr2(Math.sin(x * 12.99 + y * 78.23 + z * 37.72 + k * 11.3) * 43758.55);
+    const L2 = (c) => (c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
+    const PEAKS = [[-1.0, -0.6, 1.9, 7.6], [0.9, -1.4, 1.6, 6.2], [-2.4, 0.9, 1.5, 5.0], [1.6, 1.0, 1.4, 4.4], [0.1, 1.9, 1.2, 3.4], [-2.6, -1.9, 1.1, 2.9], [2.7, -0.2, 1.0, 2.4], [-0.4, 0.5, 2.6, 2.2]];
+    PEAKS.forEach(([px, pz, r, h], i) => {
+      const rk = new THREE.IcosahedronGeometry(1, 2), P = rk.attributes.position, col = [];
+      for (let v = 0; v < P.count; v++) {
+        const x0 = P.getX(v), y0 = P.getY(v), z0 = P.getZ(v), q = (n) => Math.round(n * 1000) / 1000;
+        const n1 = hs(q(x0), q(y0), q(z0), i), n2 = hs(q(z0), q(x0), q(y0), i + 7);
+        const rr = r * (0.72 + 0.5 * n1) * (y0 > 0 ? 1 - 0.55 * y0 : 1);          // thon dần lên đỉnh, gờ lồi lõm
+        const yy = (y0 * 0.5 + 0.5) * h * (0.9 + 0.2 * n2);
+        P.setXYZ(v, px + x0 * rr, Math.max(0, yy) + 0.35, pz + z0 * rr);
+        const dark = 0.55 + 0.45 * Math.min(1, yy / h + 0.25) * (0.75 + 0.5 * n2);
+        const moss = n1 > 0.82 && y0 < 0.6;
+        const c = moss ? [0.33, 0.42, 0.24] : [0.47 * dark, 0.46 * dark, 0.43 * dark];
+        col.push(L2(c[0]), L2(c[1]), L2(c[2]));
+      }
+      rk.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+      rk.deleteAttribute('uv'); rk.computeVertexNormals();
       rocks.push(rk);
+    });
+    const rm = new THREE.Mesh(mergeGeometries(rocks), rockM); rm.castShadow = true; rm.receiveShadow = true; g.add(rm);
+    for (const [bx, by, bz, br] of [[1.4, 3.6, -0.8, 0.55], [-1.9, 2.8, 0.3, 0.5], [0.4, 5.1, -0.3, 0.42], [2.2, 1.9, 0.9, 0.6]]) {   // cây bám đá
+      const tp = new THREE.Mesh(new THREE.SphereGeometry(br, 6, 5), sharedMats.leafDark); tp.position.set(bx, by, bz); tp.castShadow = true; g.add(tp);
     }
-    const rm = new THREE.Mesh(mergeGeometries(rocks), rockM); rm.castShadow = true; g.add(rm);
     for (let i = 0; i < 8; i++) {                            // topiary tròn quanh viền
       const a = i * Math.PI / 4, tx = Math.cos(a) * 8.2, tz = Math.sin(a) * 8.2;
       const tp = new THREE.Mesh(new THREE.SphereGeometry(0.85 + (i % 3) * 0.2, 7, 6), sharedMats.leafDark);
@@ -4439,15 +4459,18 @@ const dgRail = (ax, az, bx, bz, h, kind, colHex) => {
     if (!dgOK((ax + bx) / 2, (az + bz) / 2)) continue;
     const L = Math.hypot(bx - ax, bz - az), ux = (bx - ax) / L, uz = (bz - az) / L;
     const th = Math.atan2(-uz, ux), gy = groundHeight((ax + bx) / 2, (az + bz) / 2);
-    const curb = new THREE.BoxGeometry(L, 0.32, 1.5); curb.rotateY(th);
-    curb.translate((ax + bx) / 2, gy + 0.16, (az + bz) / 2); curbG.push(curb);
+    // Đ3-W5-D: bó vỉa dải 0,32 → 0,2 m (ảnh 216/478 h0: gờ bê tông thấp ngang bó vỉa phố, bụi mọc ngay trên)
+    const curb = new THREE.BoxGeometry(L, 0.2, 1.5); curb.rotateY(th);
+    curb.translate((ax + bx) / 2, gy + 0.1, (az + bz) / 2); curbG.push(curb);
     // W3-D: BỤI DÀY LIỀN (ảnh 216/478/215 h000: chuỗi ngọc/ô rô lổn nhổn phủ kín dải, không phải hộp 3,2 m xếp hàng)
     hedgeG.push([[ax + ux * 1.2, az + uz * 1.2], [bx - ux * 1.2, bz - uz * 1.2]]);
   }
   if (curbG.length) {
     const cm = new THREE.Mesh(mergeGeometries(curbG), mat(0xb9bdb9));
     cm.receiveShadow = true; cm.name = 'lqd_median_curb'; scene.add(cm);
-    const hm = new THREE.Mesh(hedgeGeometry(hedgeG, (x, z) => groundHeight(x, z) + 0.3, { h: 0.85, w: 1.15, seg: 0.7, rough: 0.09, top: 0.08, wild: 0.6, seed: 9, base: [0.38, 0.52, 0.22], maxHalf: 0.7 }), hedgeMaterial());
+    // Đ3-W5-D (chấm W4: "median hedge too tall/blobby" 216/478): thật bụi cắt tỉa cao ~0,55-0,65 m trên gờ, mặt trên PHẲNG hơi
+    // gợn, xanh tươi hơn; bản cũ gờ 0,32 + bụi 0,85 × (1 ± 0,21) wild 0,6 = tường xanh lổn nhổn ~1,3 m ngang tầm mắt camera
+    const hm = new THREE.Mesh(hedgeGeometry(hedgeG, (x, z) => groundHeight(x, z) + 0.18, { h: 0.6, w: 1.05, seg: 0.7, rough: 0.05, top: 0.04, wild: 0.25, seed: 9, base: [0.42, 0.57, 0.25], maxHalf: 0.66 }), hedgeMaterial());
     hm.castShadow = true; hm.name = 'lqd_median_hedge'; scene.add(hm); (world.hedgeRuns ||= []).push(...hedgeG);
   }
 }
@@ -20770,8 +20793,10 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
       g.position.set(cx, groundHeight(cx, cz), cz); g.rotation.y = rotY; scene.add(g);
       addCollider(cx, cz, Math.max(YW, YD) * 0.5);
     };
-    // Cảng vụ HP (pano_019 h315): 3 tầng vàng kem ~38m mái xanh, mặt tiền quay ĐN (135°) về phố Hoàng Diệu
-    compound(326, -826, 38, 13, 3, 0xead9a8, 0x3f6e50, -135 * Math.PI / 180);
+    // Đ3-W5-D: BỎ "Cảng vụ" compound(326, −826, 38×13, 3 T, mái xanh). Ảnh pano_019 h0/h45/h315 + 020 h0 (10/2024): tòa vàng
+    // 3 T cột trắng mà V4 tưởng là Cảng vụ là TRUNG TÂM HỘI NGHỊ THÀNH PHỐ ở bên KIA phố ngang (footprint OSM, tây x ≈ 300);
+    // ô đông phố ngang trước 019 là BÃI GIẢI TỎA gạch vụn + vài cây cắt trụi → hộp 38 m trơn (mặt hông không cửa) từng là
+    // "tường kem trống" chắn nửa khung 019 h0/h270. Bãi do clearedZone (vùng giải toả) phủ; FEATURED_CLEAR giữ nguyên (thứ tự).
 
     // FUNZ/quán trà (pano_010 h0, ~156 Quang Trung): 3 tầng mặt tiền ĐEN + gân hồng, quay Nam về pano
     // (band trên cùng TỪNG trùm kín mái → nhìn từ trên là ô hồng lạc tông; mặt tiền từng trống trơn)
