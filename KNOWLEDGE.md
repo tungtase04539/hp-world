@@ -508,6 +508,22 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
     (dải sát bó vỉa vướng hố cây/cột); cây dải phố cạnh vườn 225 h180 vẫn tán xanh (luật W3-G tách polS/polP — chưa đổi); vườn biệt thự
     chưa có cây bụi/cây cảnh thấp (chỉ cây gỗ + cau); dây leo chưa phủ được mảng mặt tiền lớn như 203.
     **Cổng:** node --check OK, waterbfs 5/5, check_assets ĐỦ, diag full/lite: diag full "TẤT CẢ THỰC THỂ OK — 0 lỗi JS" (bất biến: overlap 1 ở (259,111) — có từ tích hợp W3), diag lite OK 0 lỗi mọi bất biến 0; 0 lỗi JS mọi lô chụp/đo.
+    **SỬA SAU PHẢN BIỆN (merge-with-fixes):** (1) cây sân/cây ngõ (src 6/5) từng đứng GIỮA LỐI CỔNG RB_PARCELS (khe tường cắt lúc chạy,
+    85 cây trong hành lang cổng) → `trees.js inGateLane(x,z)`: cổng [x,z,góc,rộng] (trục tường (cos góc, sin góc)) — loại khi |dọc
+    tường| < rộng/2 + 1,5 m VÀ |sâu| < 8 m (cả 2 phía); áp trong plantYardTrees + plantLaneTrees → 0 cây trong lối; còn 14 cây ĐỨNG CẠNH
+    cổng (dọc tường 4,3-6 m, sâu 2,4-3,2 m — như cây hai bên cổng thật). (2) tán dù VUÔNG hiên quán (v4, 2,15-2,5 m) bị thân cây đường
+    xuyên (25/419; nhánh `own` — tán trên bộ bàn ghế cũ — bỏ qua obst) → `trees.js` export `trunkInSq(x,z,ux,uz,h)` (gốc cây trong hình
+    vuông xoay theo trục phố) + `props.js` `SL.poleInRect` (lưới cột điện/đèn/trạm/kiốt 6.2) / `SL.tallInSq` (cả hai, pad 0,3 m); terrace:
+    trúng → thu tán sc tới 0,85, vẫn trúng → bỏ ô (CẢ ô own; stats.life.terraceTall = 19) → 0/400 tán bị thân xuyên; ô/bạt CHỢ thêm
+    `poleInRect` (ô: 0,8 × bán kính, bạt: chữ nhật rộng × sâu) → cột trong tán chợ 15 → 2. (3) người ĐI BỘ tụt 391 → 350 (dải xe 2 sát
+    mặt tiền lấp lối W4-B): bỏ 1/3 cụm ngẫu nhiên KHÔNG giúp (khe 3-6 m < quãng fit 6 m; 367 người, 088 mất 1/3 xe: 63 → 41) → mỗi hàng
+    2 dải dài ≥ 12 m chừa MỘT KHE 6,8 m liền ở dải 2 (vị trí hash hàng, seed 1531) — TRỪ khi khe rơi trong 25 m quanh camera pano bằng
+    chứng (ảnh thật ở đó kín 2 dải: 088/083 giữ 63 xe/20 m) + lối đi giữa 2 dải (bó vỉa + 1,8 m, vỉa rộng) + hệ số người đi bộ trong
+    nhóm chung × 1,25 → × 1,4 (tổng ngân sách người không đổi) → walkI 418 (base 391), xe 23,2k → 22,8k, chồng xe/người 1 (= base).
+    (4) cụm người tĩnh lấy mẫu ngân sách THEO NHÓM (`cl` = hash tâm nhóm ∈ (0,1], ghế nhóm bỏ cùng nhóm, ghế không ai ngồi bỏ) → người
+    đứng lẻ trong cụm 42/422 → 4/385. (5) regex fp_nature `(court)?yards?|compounds?`, `markets?|stalls?` (shipyard/
+    supermarket) — dữ liệu sinh ra KHÔNG đổi. A/B cùng phiên (review/probe, 2×2 xen kẽ): hpReady 5233 → 5359 ms (+0,13 s), 0 lỗi JS.
+    Ảnh REAL | dot3 | W5-C r1 | r4: `scratchpad/dot3/W5-C/pairs_r4` (267/088/184/446/538/271/519 + đối chứng 010/230).
 - **2026-10-14 (Đ3-W4 SỬA HỒI QUY TÍCH HỢP)** [chấm cặp REAL | dot3 c24a52e | tích hợp W4: 5 pano tụt điểm — sửa TẬN GỐC, không gỡ W4]:
     **(1) BẢNG LỚN TỪNG BAY trên toà một chủ** (pano_046 h0/h270 BIDV, 161 h90/h180 ngân hàng "trắng sọc xanh", 515 h0/h270 toà
     thương mại 8 T): chế độ 3 của W4-A (`aFp.z` = 3) dựng ô PANEL chữ cửa hàng NGẪU NHIÊN ở MỌI bay tầng 1(-2) → chồng "NHÀ NGHỈ/
