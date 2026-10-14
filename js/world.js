@@ -18050,7 +18050,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
           for (let j = Math.floor(Math.min(e[1], e[3]) / CS); j <= Math.floor(Math.max(e[1], e[3]) / CS); j++) { const kk = gk(i, j); let l = G.get(kk); if (!l) G.set(kk, l = []); l.push(k); }
       });
       const occ = new Map();
-      _anchor = SHOP_SIGNS.map(([x, z]) => {
+      _anchor = SHOP_SIGNS.map(([x, z, , name]) => {
         const cand = [], seen = new Set();
         for (let i = Math.floor((x - 22) / CS); i <= Math.floor((x + 22) / CS); i++) for (let j = Math.floor((z - 22) / CS); j <= Math.floor((z + 22) / CS); j++) {
           const l = G.get(gk(i, j)); if (!l) continue;
@@ -18059,8 +18059,11 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
             const d = Math.hypot(x - e[0] - dx * t, z - e[1] - dz * t); if (d < 22) cand.push([d, k, t * Math.sqrt(L2)]); }
         }
         cand.sort((p, q) => p[0] - q[0]);
+        // W5-A HERO-KIT: mặt tiền NGÂN HÀNG (FE[k][8] = 5) đã có dải 3D 'NGÂN HÀNG' màu thật — biển thật cùng chữ trên đó là bản
+        // sao (phản biện pano_354 h180: tấm xanh 'NGÂN HÀNG' ngay dưới dải) → bỏ; biển khác không neo lên dải đó
+        if (cand.length && FE[cand[0][1]][8] === 5 && /NGÂN HÀNG/.test(name || '')) return null;
         for (let c = 0; c < Math.min(4, cand.length); c++) {
-          const [, k, s0] = cand[c], e = FE[k], L = Math.hypot(e[2] - e[0], e[3] - e[1]); if (L < 2.6) continue;
+          const [, k, s0] = cand[c], e = FE[k], L = Math.hypot(e[2] - e[0], e[3] - e[1]); if (L < 2.6 || e[8] === 5) continue;
           const w = Math.min(4.2, L - 0.3); let list = occ.get(k); if (!list) occ.set(k, list = []);
           for (let o = 0; o < 8; o++) {
             const s = s0 + (o % 2 ? 1 : -1) * Math.ceil(o / 2) * (w + 0.2), lo = Math.max(0.15, Math.min(L - 0.15 - w, s - w / 2));

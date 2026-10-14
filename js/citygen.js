@@ -42,6 +42,7 @@ import { TIER } from './device.js';
 import { ROADS_DT } from './mapdata.js';
 import { ROAD_HW, roadHW, sidewalkW } from './xsection.js';   // W3-A: lòng/vỉa RIÊNG từng phố (roadGrid)
 import { PANO_CAM } from './panoclear.js';
+import { heroAt, heroTall, heroProg, heroWall, heroAccent, heroFlags, heroFocus, buildHero, HP, HF, linRGB, liftHex, hexLum } from './herokit.js';   // W5-A HERO-KIT
 
 // Ô CHÍNH 450 m (tường + mái + đồ mái; ~57 ô cho R1750): đo cùng phiên 300/450/600 m — 450 giảm MỘT NỬA draw call của
 // phố (pano_007 58→26, cam_spawn 38→21, kể cả lượt bóng) mà tam giác vẽ chỉ +0,01-0,05 M; 600 không lợi thêm.
@@ -172,8 +173,12 @@ const SETS = {
   FU7: ['U_CAGE', 'U_SLIDE1', 'U_KTT0', 'U_CAGE'],                      // song sắt
   FU8: ['U_CURT2', 'U_ACP', 'U_CURT3', 'U_CURT2'],                      // vách kính
   FU9: ['U_AC', 'U_SLIDE1', 'U_KTT0', 'U_AC', 'U_TILE'],                // cửa sổ nhỏ
+  // W5-A HERO-KIT: bộ trệt theo CHƯƠNG TRÌNH công trình đặc trưng (js/herokit.js) — cùng kênh aFp.w (4 bit) với vân tay
+  FG12: ['G_LOBBY'],                                                    // ngân hàng: sảnh kính trụ đá, KHÔNG dải chữ cửa hàng (biển 3D 'NGÂN HÀNG' của herokit)
+  FG13: ['G_LOBBY'],                                                    // sảnh văn phòng / khách sạn / hàng cột
+  FG14: ['G_SHOW', 'G_STORE0', 'G_STORE2', 'G_STORE0'],                 // showroom / siêu thị / thời trang: kính cả mặt
 };
-const N_FG = 11, N_FU = 9;
+const N_FG = 14, N_FU = 9;
 // ---------- W4-A VÂN TAY MẶT TIỀN: D.fp (mục RBF1 của buildings_real.js) → kiểu dựng/tuổi/biển/bộ mô-đun/màu TỪNG NHÀ ----------
 // Nhà không có vân tay (D.fpE[b] < 0) giữ nguyên hành vi thống kê cũ. 255 = trường không rõ.
 const FP_NONE = [0, 0, 0, 0];
@@ -621,7 +626,7 @@ ${gl1 ? GL1_GROUND_MAIN : GL2_GROUND_MAIN}
 #endif`)
       .replace('#include <aomap_fragment>', 'reflectedLight.indirectDiffuse *= fabAO; reflectedLight.directDiffuse *= mix(1.0, fabAO, 0.35);');
   };
-  m.customProgramCacheKey = () => 'fabric_v4ac_' + size;
+  m.customProgramCacheKey = () => 'fabric_v5a_' + size;
   _mat = m;
   return m;
 }
@@ -835,6 +840,22 @@ function frontClass(mx, mz, nx, nz) {
   }
   return cls;
 }
+// W5-A HERO-KIT: KHOẢNG LÙI từ điểm mặt tiền (mx,mz) theo pháp tuyến (nx,nz) tới MÉP SAU VỈA HÈ (lòng + vỉa của phố đó,
+// xsection) của đường gần nhất phía trước — đồ đứng trước nhà (cột, trụ mái che, rào, cổng) chỉ dựng trong khoảng này.
+// Infinity = không có đường trong 40 m.
+function streetGap(mx, mz, nx, nz) {
+  const G = roadGrid();
+  for (let d = 0.25; d <= 40; d += 0.5) {
+    const px = mx + nx * d, pz = mz + nz * d, l = G.get(Math.floor(px / RG) * 65536 + Math.floor(pz / RG));
+    if (!l) continue;
+    for (const s of l) {
+      const dx = s[2] - s[0], dz = s[3] - s[1], L2 = dx * dx + dz * dz || 1e-9, lim = s[4] + s[6];
+      let t = ((px - s[0]) * dx + (pz - s[1]) * dz) / L2; t = t < 0 ? 0 : t > 1 ? 1 : t;
+      if ((px - s[0] - dx * t) ** 2 + (pz - s[1] - dz * t) ** 2 < lim * lim) return d - 0.25;
+    }
+  }
+  return Infinity;
+}
 // Cạnh SIDE/BACK của nhà LÙI khỏi phố (dữ liệu chỉ gắn FRONT khi lòng đường cách ≤ ~6,5 m sau mặt tiền chuẩn) mà nhìn thẳng
 // ra một lòng đường trong 26 m KHÔNG bị nhà khác che → coi là MẶT PHỐ (cửa hàng/cửa nhà + cửa sổ thay vì tường hông trơn:
 // pano_085 Lạch Tray — dãy nhà lùi 10-20 m quay tường trống ra phố). Trả cấp đường (0/1/2) hoặc −1. Cần lưới va chạm (fabricAt).
@@ -999,7 +1020,7 @@ export function fabricAt(x, z) {
 // Gọi SAU buildCollision (cần fabricAt). Trả { rsz: aFac.z tường mỗi nhà, ev: cờ FEF bằng chứng trực tiếp, stats }.
 // Xác định: chỉ hash(seed nhà) — A/B ảnh so được.
 function renderStyles(D, CX, CZ) {
-  const nB = D.nB, rsz = new Uint8Array(nB), ev = new Uint16Array(nB);
+  const nB = D.nB, rsz = new Uint8Array(nB), ev = new Uint16Array(nB), hix = new Int32Array(nB).fill(-1);
   const sts = { obs: 0, evHit: 0, rs: new Array(NRS).fill(0), age: [0, 0, 0, 0], panel: 0, nosignKeep: 0 };
   // 1) tia nhìn từ camera pano theo hướng quan sát (h−8°, h, h+8°; 2-45 m) → nhà ĐẦU TIÊN chạm mang cờ quan sát.
   //    hướng pano: 0° = bắc = −z, 90° = đông = +x
@@ -1085,6 +1106,10 @@ function renderStyles(D, CX, CZ) {
     // phải GIỮ kiểu dựng thuộc NOSIGN_ST, nếu không groundModule/shader mất luật "rc 3 → trệt không biển" (CIVIC→NEO,
     // GLASS→MODERN/TOWER ở (a)-(c) ⇒ lại hiện "BÁNH MÌ"/"SỬA XE MÁY" sau tường mỏ neo pano_224/225 h270)
     if (NOSIGN_ST(sty) && !NOSIGN_ST(rs) && D.info && ((D.info[b] >> INFO.USE_SHIFT) & 3) === INFO.USE_HOME) { rs = (rs === RS.TOWER || rs === RS.MODERN) ? STYLE.GLASS : STYLE.CIVIC; sts.nosignKeep++; }
+    // W5-A HERO-KIT: CHƯƠNG TRÌNH công trình đặc trưng (ảnh pano: ngân hàng/văn phòng kính/khách sạn/showroom/chợ/trường/chùa/
+    // hàng cột/cây xăng — js/herokit_data.js) thắng mọi luật trên (bằng chứng cụ thể nhất)
+    const hi = heroAt(CX[b], CZ[b]), hp = heroProg(hi);
+    if (hp) { hix[b] = hi; const r = heroTall(hp, D.floors[b], D.flags[b]) ? -1 : heroRS(hp, rs, fl, area, hi); if (r >= 0) rs = r; sts.hero = (sts.hero || 0) + 1; }
     // (d) tuổi (lớp phong hoá shader): theo kiểu + vùng + bằng chứng cũ/mới + biến thiên theo hạt giống
     let age = (rs === RS.TEN || rs === STYLE.OLD || rs === RS.COL || rs === STYLE.KTT) ? 2
       : (rs === STYLE.GLASS || rs === RS.MODERN || rs === RS.TOWER || rs === RS.HOTEL) ? 0 : 1;
@@ -1095,13 +1120,45 @@ function renderStyles(D, CX, CZ) {
     if (rs === RS.CONS) age = 1;
     if (fe >= 0 && D.fp.age[fe] <= 3 && rs !== RS.CONS) age = D.fp.age[fe];   // W4-A: tuổi/phong hoá theo ảnh thật (đang xây giữ 1)
     if (rs === RS.HOTEL) age = Math.min(age, 1);   // W4-C: khách sạn/văn phòng được bảo trì — không ố nặng
+    if (hp === HP.OFFICE || hp === HP.BANK || hp === HP.HOTEL || hp === HP.STORE) age = Math.min(age, 1);   // W5-A
     age = Math.max(0, Math.min(3, age));
     let panel = (e & FEF.BIGSIGN) || ((zf & FEZ.COMM) && hh(seed, 311) < 0.3) ? 1 : 0;
     if (fe >= 0 && D.fp.size[fe] !== 255) panel = fpPanelOK(D, fe, rs) ? 1 : 0;
+    if (hp) panel = 0;   // W5-A: công trình đặc trưng không mang bảng chữ cửa hàng ngẫu nhiên từng bay
     rsz[b] = rs | (age << 4) | (panel << 6);
     sts.rs[rs]++; sts.age[age]++; sts.panel += panel;
   }
-  return { rsz, ev, stats: sts };
+  return { rsz, ev, hix, stats: sts };
+}
+// ---------- W5-A HERO-KIT: kiểu dựng + bộ trệt theo chương trình (js/herokit.js); −1 / 0 = giữ ----------
+const warmHex = (h) => { if (h < 0) return false; const r = (h >> 16) & 255, g = (h >> 8) & 255, b = h & 255, mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+  if (mx - mn < 0.18 * mx) return false; const hue = mx === r ? ((g - b) / (mx - mn)) * 60 : mx === g ? (2 + (b - r) / (mx - mn)) * 60 : (4 + (r - g) / (mx - mn)) * 60; return hue >= 22 && hue <= 62; };
+function heroRS(p, rs, fl, area, hi) {
+  switch (p) {
+    case HP.PAGODA: return RS.COL;                                         // tường vàng + cửa vòm (thân chùa); mái do herokit
+    case HP.PETROL: return STYLE.SHED;                                     // ki-ốt 1 tầng dưới mái che
+    case HP.MARKET: return STYLE.SHED;                                     // nhà chợ mái tôn (gen: ≤ 2 tầng)
+    case HP.SCHOOL: return (heroFlags(hi) & (HF.TILE | HF.ARCH)) || warmHex(heroWall(hi)) ? (fl <= 5 ? RS.COL : STYLE.CIVIC) : STYLE.CIVIC;
+    case HP.BANK: return (rs === STYLE.GLASS || rs === RS.MODERN || rs === RS.TOWER || rs === RS.HOTEL || rs === RS.NEO || rs === RS.COL || rs === STYLE.CIVIC) ? -1
+      : (fl <= 4 && area < 450 ? RS.MODERN : STYLE.GLASS);
+    case HP.HOTEL: return (rs === RS.NEO || rs === RS.COL || rs === STYLE.VILLA) ? -1 : fl >= 4 ? RS.HOTEL : -1;
+    case HP.STORE: return fl <= 5 && area < 500 ? RS.MODERN : STYLE.GLASS;
+    case HP.OFFICE: return rs === RS.HOTEL || rs === RS.TOWER ? -1 : fl <= 3 && area < 300 ? RS.MODERN : STYLE.GLASS;   // khung đá W4-C giữ (pano_359)
+    case HP.COLONNADE: return RS.NEO;
+  }
+  return -1;
+}
+function heroGs(p, rs) {
+  switch (p) {
+    case HP.PAGODA: return 9;                           // G_COL (tường + cửa)
+    case HP.MARKET: return 10;                          // sạp chợ
+    case HP.SCHOOL: return rs === RS.COL ? 9 : 7;       // tường Pháp / song sắt chân đá — không biển cửa hàng
+    case HP.BANK: return 12;
+    case HP.HOTEL: return rs === RS.HOTEL ? 0 : 13;     // RS.HOTEL: FIXED_G sảnh sẵn
+    case HP.STORE: return 14;
+    case HP.OFFICE: case HP.COLONNADE: return 13;
+  }
+  return 0;
 }
 
 // ======================================================================================
@@ -1172,7 +1229,7 @@ export function buildRealFabric(scene, ctx) {
     const r = refreshPartyEdges(D, grid, killed); st.partyDemoted = r.demoted; st.partyLowered = r.lowered; }
   buildCollision(D);   // lưới va chạm ngay sau khi chốt D.dead — faceRoad (bên dưới) cần fabricAt
   const tRs0 = performance.now();
-  const RV = renderStyles(D, CX, CZ), RSZ = RV.rsz, EVB = RV.ev;   // W3-C: kiểu dựng/tuổi/biển lớn từng nhà
+  const RV = renderStyles(D, CX, CZ), RSZ = RV.rsz, EVB = RV.ev, HIX = RV.hix;   // W3-C: kiểu dựng/tuổi/biển lớn từng nhà (+ W5-A chương trình hero)
   _rsz = RSZ; _evb = EVB;
   st.facade = { obs: RV.stats.obs, evHit: RV.stats.evHit, rs: RV.stats.rs.join(','), age: RV.stats.age.join(','), panel: RV.stats.panel, ms: Math.round(performance.now() - tRs0) };
   const tClaims = performance.now() - T0 - tDecode;
@@ -1183,8 +1240,10 @@ export function buildRealFabric(scene, ctx) {
   // ---------- 2) DỰNG theo ô ----------
   // gen() = toàn bộ hình học (XÁC ĐỊNH từ D + D.dead đã chốt) → gọi lại được khi khôi phục ngữ cảnh WebGL (bản CPU của
   // buffer đã bị giải phóng sau upload, xem RELEASE_CPU bên dưới). (thân hàm giữ thụt lề cũ cho diff gọn)
-  const frontEdges = [];   // [x0,z0,x1,z1,nx,nz,yBase,b] — biển hiệu thật (SHOP_SIGNS) neo vào đây
+  const frontEdges = [];   // [x0,z0,x1,z1,nx,nz,yBase,b,heroProg] — biển hiệu thật (SHOP_SIGNS) neo vào đây
+  const heroSigns = [];    // W5-A: sổ chữ herokit (không lặp cùng chữ trong bán kính — herokit signNear)
   const gen = (st, frontEdges) => {
+    heroSigns.length = 0;
   const tiles = new Map(), dtiles = new Map();
   const tileOf = (cx, cz) => {
     const tx = Math.floor(cx / FAB_TILE), tz = Math.floor(cz / FAB_TILE), k = tx * 4096 + tz;
@@ -1206,7 +1265,10 @@ export function buildRealFabric(scene, ctx) {
     const s = D.vStart[b], n = Math.min(255, D.vStart[b + 1] - s);
     if (n < 3) continue;
     for (let i = 0; i < n; i++) { X[i] = D.x[s + i]; Z[i] = D.z[s + i]; }
-    const fl = Math.max(1, D.floors[b]), H = heightOf(fl);
+    // W5-A: nhà chợ ≤ 2 tầng (hội trường mái tôn), cây xăng 1 tầng (ki-ốt dưới mái che) — CHỈ khi nhà thật thấp (heroTall)
+    const HP0 = heroProg(HIX[b]), hTall = heroTall(HP0, D.floors[b], D.flags[b]);
+    const fl = HP0 === HP.MARKET && !hTall ? Math.min(2, Math.max(1, D.floors[b])) : HP0 === HP.PETROL && !hTall ? 1 : Math.max(1, D.floors[b]), H = heightOf(fl);
+    if (HP0 && fl !== D.floors[b] && D.floors[b] > 0) D.floors[b] = fl;   // phản biện W5-A: chiều cao VẼ = D.floors (footprints.topAt, cây, minimap đọc chung rbdata)
     const sty = Math.min(6, D.style[b]), roofT = D.roof[b] & 15, roofC = (D.roof[b] >> 4) % ROOF_LIN.length;
     const seed = D.seed[b], s8 = seed & 255;
     let wcol = WALL_LIN[D.wall[b] % WALL_LIN.length]; const rcol = ROOF_LIN[roofC];
@@ -1229,6 +1291,12 @@ export function buildRealFabric(scene, ctx) {
     let rt = roofT;
     // W4-C: BIỆT THỰ (kiểu dựng) mái bằng gần chữ nhật → mái NGÓI 4 dốc (biệt thự Pháp HP: ngói đỏ — vệ tinh + pano)
     if ((RSZ[b] & 15) === STYLE.VILLA && (rt === ROOF.FLAT_PARAPET || rt === ROOF.FLAT) && rectness >= 0.85 && n <= 6 && areaPoly < 700 && fl <= 3 && hh(seed, 91) < 0.7) rt = ROOF.HIP_TILE;
+    // W5-A HERO-KIT: mái theo chương trình — chợ mái tôn 2 dốc, chùa/cây xăng mái do herokit dựng, trường/công sở mái ngói (ảnh)
+    const HI = HIX[b], HPg = heroProg(HI);
+    if (hTall) { /* chợ/cây xăng trước nhà cao: giữ mái thật */ }
+    else if (HPg === HP.MARKET && hw >= 1.2 && hw <= 22) rt = ROOF.GABLE_TON;
+    else if (HPg === HP.PAGODA || HPg === HP.PETROL) rt = ROOF.FLAT;
+    else if (HPg === HP.SCHOOL && (heroFlags(HI) & HF.TILE) && rectness >= 0.85 && n <= 6 && fl <= 5) rt = ROOF.HIP_TILE;
     if (rt === ROOF.HIP_TILE && (rectness < 0.85 || n > 6)) rt = ROOF.GABLE_TON;
     if ((rt === ROOF.GABLE_TON || rt === ROOF.SHED_TON) && (hw < 1.2 || hw > 22)) rt = ROOF.FLAT;
     const pitched = rt === ROOF.GABLE_TON || rt === ROOF.SHED_TON;
@@ -1251,19 +1319,37 @@ export function buildRealFabric(scene, ctx) {
     // styF = aFac.z tường (kiểu | tuổi<<4 | biển lớn<<6); rs = kiểu dựng; ev = cờ bằng chứng trực tiếp
     const styF = RSZ[b], rs = styF & 15, ev = EVB[b];
     // W4-A: vân tay → aFp mọi đỉnh của nhà này (M/DT dùng chung giữa các nhà: đặt lại MỖI nhà), màu tường thật
-    const FPB = fpBuild(D, b, rs), fpG = FPB ? FPB.gs : 0, fpMode = FPB ? FPB.mode : 0;
+    const FPB = fpBuild(D, b, rs);
+    let fpG = FPB ? FPB.gs : 0, fpMode = FPB ? FPB.mode : 0;
     M.fpv = FPB ? FPB.bytes : FP_NONE; if (DT) DT.fpv = M.fpv;
     if (FPB && FPB.wall) wcol = FPB.wall;
     if (FPB) st.fp = (st.fp || 0) + 1;
+    // W5-A HERO-KIT: bộ trệt + màu biển THẬT (màu nhấn quan sát) + màu tường theo chương trình (aFp, cùng kênh vân tay)
+    let heroAcc = null, heroClad = null;
+    if (HPg) {
+      const hb = (FPB ? FPB.bytes : FP_NONE).slice(), gsH = heroGs(HPg, rs), acc = heroAccent(HI), wl = heroWall(HI);
+      if (gsH) { hb[3] = (hb[3] & 0xf0) | gsH; fpG = gsH; }
+      if (acc >= 0 && (HPg === HP.BANK || HPg === HP.STORE || HPg === HP.PETROL || HPg === HP.HOTEL)) {
+        const r = (acc >> 16) & 255, g = (acc >> 8) & 255, bb = acc & 255, c565 = ((r >> 3) << 11) | ((g >> 2) << 5) | (bb >> 3);
+        const fg = 0.2126 * r + 0.7152 * g + 0.0722 * bb > 150 ? 1 : 0;   // nền sáng → chữ đen
+        hb[0] = c565 & 255; hb[1] = c565 >> 8; hb[2] = (hb[2] & 0xc0) | 2 | (fg << 3); fpMode = 2;
+        heroAcc = linRGB(acc);
+      } else if (fpMode === 3) { hb[2] = (hb[2] & 0xf8) | 2; fpMode = 2; }   // bảng lớn từng bay không áp lên công trình đặc trưng
+      else if (HPg !== HP.MARKET && fpMode !== 1 && fpMode !== 2) { hb[2] = (hb[2] & 0xf8) | 1; fpMode = 1; }   // không màu biển thật: KHÔNG biển (không dải chữ/bảng lớn ngẫu nhiên trên sảnh văn phòng — pano_359 'NHÀ NGHỈ')
+      // màu tường quan sát TỐI (< 0,25: diềm/ốp tối của trệt, bóng râm) KHÔNG lái màu cả nhà (phản biện W5-A 166: khối đen)
+      if (wl >= 0) { heroClad = linRGB(wl); if (!(FPB && FPB.wall) && hexLum(wl) >= 0.25) wcol = linRGB(liftHex(wl, HPg === HP.STORE || HPg === HP.OFFICE ? 0.35 : 0.55)); }
+      M.fpv = hb; if (DT) DT.fpv = hb;
+    }
     const bigFlag = (fl >= 5 || (areaPoly >= 600 && fl >= 3) || sty === STYLE.KTT || sty === STYLE.GLASS || sty === STYLE.CIVIC || sty === STYLE.VILLA
       || rs === RS.NEO || rs === RS.CONS || rs === RS.TOWER || rs === RS.TEN || rs === RS.HOTEL) ? 8 : 0;
     const tubeLike = rs === STYLE.TUBE || rs === STYLE.OLD || rs === RS.COL || rs === RS.MODERN;
-    const detOK = !(rs === STYLE.GLASS || rs === STYLE.SHED || rs === RS.CONS || rs === RS.NEO || rs === RS.TOWER || rs === RS.HOTEL);
+    const detOK = !HPg && !(rs === STYLE.GLASS || rs === STYLE.SHED || rs === RS.CONS || rs === RS.NEO || rs === RS.TOWER || rs === RS.HOTEL);   // W5-A: hero tự dựng chi tiết
     // W4-C BỘ CHI TIẾT THUỘC ĐỊA / TÂN CỔ ĐIỂN / BIỆT THỰ: gờ phào mái (ô chính, thấy từ xa) + gờ tầng + trụ áp (ô gần)
     const classic = rs === RS.COL || rs === RS.NEO || rs === STYLE.VILLA;
     // ---- TƯỜNG ----
     let hasFront = false, fnx = 0, fnz = 0, fL = 0;   // pháp tuyến cạnh mặt phố DÀI nhất (hướng tum thang / mái tôn che)
     let fAx = 0, fAz = 0, fBx = 0, fBz = 0, fRc = 9;   // W3-C: đầu mút + cấp đường của cạnh đó (biển quảng cáo trên mái)
+    const heroFronts = HPg ? [] : null;                 // W5-A: cạnh mặt phố cho herokit [ax,az,bx,bz,nx,nz,L,rc]
     for (let i = 0; i < n; i++) {
       const j = (i + 1) % n, ax = X[i], az = Z[i], bx = X[j], bz = Z[j];
       const dx = bx - ax, dz = bz - az, L = Math.hypot(dx, dz); if (L < 0.05) continue;
@@ -1319,7 +1405,8 @@ export function buildRealFabric(scene, ctx) {
       if (kind === EDGE.FRONT) {
         if (L > fL) { fL = L; fnx = nx; fnz = nz; fAx = ax; fAz = az; fBx = bx; fBz = bz; fRc = rc; }
         hasFront = true;
-        frontEdges.push([ax, az, bx, bz, nx, nz, y0, b]);
+        frontEdges.push([ax, az, bx, bz, nx, nz, y0, b, HPg]);   // [8] W5-A: chương trình hero (world.js: biển thật không đè dải NGÂN HÀNG)
+        if (heroFronts && cover === 0) heroFronts.push([ax, az, bx, bz, nx, nz, L, rc]);
         // ---- HỘP BIỂN HIỆU 3D (ô gần): đúng các bay mà shader vẽ dải biển (groundModule khớp bit với GPU) ----
         // Mặt trước = kind 6 → shader vẽ Y HỆT mặt phố phía sau (chữ/màu biển/đèn đêm) nhưng lồi ra 0,22 m; 2 mặt đầu
         // = khung tôn tối D_SIGNF. Xa hơn DET_R: biển phẳng trong atlas (cùng hình) — không "nhảy" khi đổi LOD.
@@ -1354,7 +1441,7 @@ export function buildRealFabric(scene, ctx) {
           //      2 mặt lớn (chữ xếp dọc, ô BLADE0..) + mặt trước khung tối = 6 tam giác; màu nền theo hạt giống (aFac.w)
           // W4-A: vân tay biết cỡ biển → biển dọc CHỈ khi ảnh thật có biển dọc (bay đầu luôn có, bay khác 40%)
           const fpVert = FPB && FPB.size !== 255 ? (FPB.size === FPV.size.vertical ? 1 : 0) : -1;
-          if (fpVert >= 0 ? fpVert === 1 && fl >= 2 && L >= 2.5 : rc === 0 && fl >= 2 && L >= 3 && (tubeLike || rs === RS.TEN)) {
+          if (!HPg && (fpVert >= 0 ? fpVert === 1 && fl >= 2 && L >= 2.5 : rc === 0 && fl >= 2 && L >= 3 && (tubeLike || rs === RS.TEN))) {
             const pB = fpVert === 1 ? 0.4 : (ev & FEF.BIGSIGN) || (styF & 64) ? 0.14 : 0.045, bw = L / nb, ex = dx / L, ez = dz / L;
             const yb = y0 + GROUND_H + 0.35, ytB = Math.min(y0 + H - 0.35, yb + (fl >= 3 ? 2.5 : 2.0)), TW = 0.06, D0 = 0.1, D1 = 0.1 + (ytB - yb) / 4;
             if (ytB - yb > 1.2) for (let k = 0; k < nb; k++) {
@@ -1376,7 +1463,7 @@ export function buildRealFabric(scene, ctx) {
         // ---- CỤC NÓNG ĐIỀU HOÀ 3D (ô gần): treo CAO trên tường mỗi tầng trên (đáy +2,58 m, đỉnh +3,12 m — dưới mép
         //      sàn ban công tầng trên +3,18 m → không cắt ban công/lan can), lồi 0,3 m; ~14% bay nhà ống, 21% KTT ----
         if (classic && cover === 0 && L >= 3 && !pitched) classicKit(M, DT, ax, az, bx, bz, dx, dz, L, nx, nz, nb, y0, H, fl, rt, wcol, s8, st);
-        if (DT && cover === 0 && fl >= 2 && L >= 2.4 && !(rs === STYLE.GLASS || rs === STYLE.SHED || rs === RS.CONS || rs === RS.NEO || rs === RS.MODERN || rs === RS.HOTEL)) {
+        if (DT && !HPg && cover === 0 && fl >= 2 && L >= 2.4 && !(rs === STYLE.GLASS || rs === STYLE.SHED || rs === RS.CONS || rs === RS.NEO || rs === RS.MODERN || rs === RS.HOTEL)) {
           const pAC = (rs === STYLE.KTT || rs === RS.TEN) ? 0.21 : (rs === STYLE.TUBE || rs === STYLE.OLD || rs === RS.COL || rs === RS.TOWER) ? 0.14 : 0.07;   // (v1: ×0,7 — ngân sách)
           const bw = L / nb, ex = dx / L, ez = dz / L, AW = 0.82, AH = 0.54, AD = 0.3;
           for (let k = 1; k < fl; k++) for (let q = 0; q < nb; q++) {
@@ -1456,7 +1543,28 @@ export function buildRealFabric(scene, ctx) {
       }
     }
     // ---- W4-C: MÁI SẢNH KÍNH khách sạn (porte-cochère, pano_359): tấm đua 5,5 m trên sảnh, giữa mặt phố dài nhất ----
-    if (rs === RS.HOTEL && DT && hasFront && fL >= 10 && fl >= 4) hotelCanopy(DT, fAx, fAz, fBx, fBz, fL, fnx, fnz, y0, s8, st);
+    const hotelCan = rs === RS.HOTEL && DT && hasFront && fL >= 10 && fl >= 4;
+    if (hotelCan) hotelCanopy(DT, fAx, fAz, fBx, fBz, fL, fnx, fnz, y0, s8, st);
+    // ---- W5-A HERO-KIT: khối 3D công trình đặc trưng (ô chính M + ô chi tiết DT, cùng material) ----
+    if (HPg) {
+      let fr = heroFronts;
+      if (!fr.length) {   // nhà lùi sâu không có cạnh FRONT: cạnh dài nhất nhìn ra phố (≤ 40 m)
+        fr = [];
+        for (let i = 0; i < n; i++) {
+          const j = (i + 1) % n, L = Math.hypot(X[j] - X[i], Z[j] - Z[i]); if (L < 4) continue;
+          const nx = -(Z[j] - Z[i]) / L, nz = (X[j] - X[i]) / L;
+          if (streetGap((X[i] + X[j]) / 2, (Z[i] + Z[j]) / 2, nx, nz) < 40) fr.push([X[i], Z[i], X[j], Z[j], nx, nz, L, 0]);
+        }
+      }
+      if (!fr.length && ctx.heroLog) ctx.heroLog.push([b, HPg, 0]);
+      if (fr.length) {
+        const r = buildHero({ prog: HPg, flags: heroFlags(HI), focus: heroFocus(HI), M, DT, X, Z, n, y0, H, fl, fronts: fr, wcol, acc: heroAcc, cladCol: heroClad, s8, seed, st, rs,
+          gap: streetGap, free: (x, z) => { const o = fabricAt(x, z); return (o < 0 || o === b) && !claimAt(x, z); },
+          obb: { ux, uz, vx, vz, u0, u1, v0, v1 }, hotelCanopy: hotelCan, signs: heroSigns, hi: HI, cladDark: heroWall(HI) >= 0 && hexLum(heroWall(HI)) < 0.25 });
+        st.tris += r.tris; st.detTris += r.detTris; st.heroTris = (st.heroTris || 0) + r.tris + r.detTris;
+        if (ctx.heroLog) ctx.heroLog.push([b, HPg, fr.length, +fr[0][6].toFixed(1), +streetGap((fr[0][0] + fr[0][2]) / 2, (fr[0][1] + fr[0][3]) / 2, fr[0][4], fr[0][5]).toFixed(1), r.tris, r.detTris]);
+      }
+    }
     // ---- MÁI ----
     const roofY = y0 + (rt === ROOF.FLAT ? H + 0.25 : H);
     if (rt === ROOF.FLAT_PARAPET || rt === ROOF.FLAT) {
@@ -1530,7 +1638,7 @@ export function buildRealFabric(scene, ctx) {
     }
     st.roofs++;
     // ---- ĐỒ TRÊN MÁI BẰNG (nhà ống): tum thang, bồn inox, mái tôn che sân thượng, máy nước nóng ----
-    if (rt === ROOF.FLAT_PARAPET && areaPoly < 900 && sty !== STYLE.GLASS && sty !== STYLE.SHED && rs !== RS.CONS) {
+    if (rt === ROOF.FLAT_PARAPET && areaPoly < 900 && sty !== STYLE.GLASS && sty !== STYLE.SHED && rs !== RS.CONS && !HPg) {
       const inside = (a, c) => { const x = ux * a + vx * c, z = uz * a + vz * c; return pip(X, Z, n, x, z); };
       const W = (a, c) => [ux * a + vx * c, uz * a + vz * c];
       // hướng "sau" dọc trục u: ngược mặt phố
@@ -1638,10 +1746,10 @@ export function buildRealFabric(scene, ctx) {
     //      quay ra phố, lùi 1,2 m sau tường, chân 2 cột thép; nội dung = ô BILL (từ chung, không thương hiệu). ~12 tam giác ----
     // W4-A: vân tay biết cỡ biển → biển trên mái CHỈ khi ảnh thật có (khi đó luôn dựng, nới điều kiện cấp phố/bề rộng)
     const fpRoofS = FPB && FPB.size !== 255 ? (FPB.size === FPV.size.roof ? 1 : 0) : -1;
-    if (rs !== RS.HOTEL && fpRoofS >= 0 ? fpRoofS === 1 && hasFront && fL >= 4 && fl >= 2 && fl <= 12 && (rt === ROOF.FLAT_PARAPET || rt === ROOF.FLAT)
+    if (!HPg && (rs !== RS.HOTEL && fpRoofS >= 0 ? fpRoofS === 1 && hasFront && fL >= 4 && fl >= 2 && fl <= 12 && (rt === ROOF.FLAT_PARAPET || rt === ROOF.FLAT)
       : hasFront && fRc === 0 && fL >= 6 && fl >= 3 && fl <= 9 && (rt === ROOF.FLAT_PARAPET || rt === ROOF.FLAT)
       && rs !== RS.CONS && rs !== RS.NEO && rs !== RS.COL && rs !== RS.HOTEL
-      && hh(seed, 501) < (((ev & FEF.BIGSIGN) || (styF & 64) ? 0.1 : 0.022) + (D.info && (D.info[b] & INFO.CORNER) ? 0.12 : 0))) {   // nhà GÓC phố (ngã tư pano_327): +12%
+      && hh(seed, 501) < (((ev & FEF.BIGSIGN) || (styF & 64) ? 0.1 : 0.022) + (D.info && (D.info[b] & INFO.CORNER) ? 0.12 : 0)))) {   // nhà GÓC phố (ngã tư pano_327): +12%
       const ex = (fBx - fAx) / fL, ez = (fBz - fAz) / fL, Wb = Math.min(fL * 0.8, 10), Hb = Math.min(3.6, Wb * 0.4);
       const mx = (fAx + fBx) / 2 - fnx * 1.2, mz = (fAz + fBz) / 2 - fnz * 1.2;
       const yRf = y0 + (rt === ROOF.FLAT ? H + 0.25 : H), yb = y0 + H + PARAPET_H + 0.8, yt = yb + Hb;

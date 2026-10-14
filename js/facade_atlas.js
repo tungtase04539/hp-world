@@ -14,6 +14,7 @@ export const ATLAS_N = 8;
 // W3-C: atlas CAO hơn rộng — 8 cột × 12 hàng ô (2048×3072 / LITE 1024×1536; WebGL2 mip NPOT ổn, WebGL1 citygen tự tắt mip).
 // Ô vẫn 256 px (128 LITE) → mọi ô cũ giữ nguyên độ phân giải; 96 chỗ (63 cũ + ô mới W3-C).
 export const ATLAS_ROWS = 14;   // W4-C: 12 → 14 (95 ô cũ + 10 ô W4-C = 105; còn 7 chỗ) — 2048×3584 / LITE 1024×1792
+                                // W5-A: + H_SIGN, H_FLUTE = 107 ô (còn 5 chỗ)
 export const M_WALL = 255, M_GLASS = 191, M_KEEP = 128, M_SIGN = 64, M_TEXT = 0;
 export const MOD = {};          // tên mô-đun → chỉ số ô (ổn định theo thứ tự vẽ bên dưới)
 export const MODS = [];
@@ -1242,6 +1243,25 @@ export function buildFacadeAtlas(size = 2048, opts = {}) {
     rect(0, 0.42, 4, 0.62, [244, 240, 230], M_WALL); shade(0, 0.36, 4, 0.42, 0.72);
     for (let x = 0.03; x < 4; x += 0.14) { rect(x, 0.22, x + 0.07, 0.36, [240, 236, 226], M_WALL); shade(x + 0.07, 0.22, x + 0.12, 0.36, 0.62); }
     shade(0, 0, 4, 0.2, 0.8);
+  });
+  // ======================================================================================
+  // W5-A HERO-KIT (Đợt 3 wave 5): 2 ô cho js/herokit.js (công trình đặc trưng). Đặt SAU D_CORN → chỉ số ô cũ giữ nguyên.
+  // H_SIGN: 4 dải chữ 4×1 m (từ CHUNG, không thương hiệu) — nền M_SIGN (nhuộm màu biển THẬT qua aFp hoặc SIGNC), chữ M_TEXT.
+  // H_FLUTE: thân cột đá có RÃNH dọc (cột tân cổ điển / cột sảnh ngân hàng) — nền M_WALL nhuộm màu vữa/đá theo đỉnh.
+  const HSIGN_W = ['NGÂN HÀNG', 'KHÁCH SẠN', 'SIÊU THỊ ĐIỆN MÁY', 'XĂNG DẦU'];
+  cell('H_SIGN', 4, 4, () => {
+    for (let k = 0; k < 4; k++) {
+      const y0 = k * 1.0;
+      vgrad(0, y0, 4, y0 + 1, [248, 248, 248], [214, 214, 214], M_SIGN, 3);
+      rect(0, y0, 4, y0 + 0.04, [46, 46, 48], M_KEEP); rect(0, y0 + 0.96, 4, y0 + 1, [46, 46, 48], M_KEEP);
+      const t = textMask([{ t: HSIGN_W[k], size: HSIGN_W[k].length > 12 ? 0.5 : 0.62, y: 0.53 }], 512, 128);
+      blitText(t, 512, 128, 0.12, y0 + 0.08, 3.88, y0 + 0.92, [255, 255, 255], M_TEXT);
+    }
+  });
+  cell('H_FLUTE', 1, 4, () => {
+    WALL(0.25);
+    for (let k = 0; k < 6; k++) { const x = (k + 0.5) / 6; shade(x - 0.03, 0.12, x + 0.03, 3.88, 0.78); rect(x + 0.03, 0.12, x + 0.045, 3.88, [252, 250, 244], M_WALL); }
+    shade(0, 0, 1, 0.12, 0.82); shade(0, 3.88, 1, 4, 0.85);
   });
   const ms =typeof performance !== 'undefined' ? performance.now() - t0 : 0;
   const data = B ? new Uint8Array(B.buffer) : null;
