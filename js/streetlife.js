@@ -234,12 +234,16 @@ function modelToys(G) {
   return G.mergeParts(P);
 }
 // HÀNG HOÁ chồng (thùng carton + kiện bọc nilon) — ~40 tam giác
+// phản biện r2 (345): 2 chồng khối nâu + xanh trơn nhìn xa như "sofa" → thùng carton có BĂNG DÍNH sẫm trên nắp + mép
+// dọc, kiện nilon trắng đục (không xanh), chồng lệch nhau — ~64 tam giác
 function modelGoods(G) {
   const P = [];
   P.push(G.finish(G.box(0.6, 0.45, 0.45, -0.3, 0.225, 0), 0xb08a5a));
-  P.push(G.finish(G.box(0.5, 0.4, 0.4, -0.28, 0.65, 0.02, 0, 0.2, 0), 0xa47e50));
-  P.push(G.finish(G.box(0.55, 0.5, 0.5, 0.35, 0.25, 0.05), 0x9ab8c8));
-  P.push(G.finish(G.box(0.4, 0.3, 0.35, 0.32, 0.65, 0.05), 0x8a9aa6));
+  P.push(G.finish(G.box(0.5, 0.4, 0.4, -0.26, 0.65, 0.02, 0, 0.35, 0), 0xa47e50));
+  P.push(G.finish(G.box(0.08, 0.012, 0.46, -0.3, 0.456, 0), 0x5a4630));                     // băng dính nắp thùng dưới
+  P.push(G.finish(G.box(0.07, 0.012, 0.41, -0.26, 0.856, 0.02, 0, 0.35, 0), 0x5a4630));     // băng dính thùng trên
+  P.push(G.finish(G.box(0.55, 0.5, 0.5, 0.35, 0.25, 0.05), 0xd6d8d2));                      // kiện bọc nilon trắng đục
+  P.push(G.finish(G.box(0.38, 0.28, 0.33, 0.3, 0.64, 0.02, 0, -0.25, 0), 0xb4936a));          // thùng nhỏ chồng lệch
   return G.mergeParts(P);
 }
 // XE BA GÁC (xe máy kéo thùng hàng — 22 pano nhắc: chợ Hạ Lý 092, Tam Bạc 207…): đầu xe máy + thùng phẳng thành thấp
