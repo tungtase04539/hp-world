@@ -802,6 +802,9 @@ export function buildRealFabric(scene, ctx) {
       if (hasInfo && kind === EDGE.FRONT && rcP < 0 && !wideF) { const use = (D.info[b] >> INFO.USE_SHIFT) & 3; if (use === INFO.USE_HOME) rc = 3; else if (use === INFO.USE_SHOP) rc = 0; }
       // W3-A r3: khối khuôn viên (CIVIC/GLASS/SHED + USE_HOME — chỉ nhà cbIn) → rc 3 cả trên cạnh được NÂNG/dãy gộp → trệt không biển
       if (hasInfo && kind === EDGE.FRONT && NOSIGN_ST(styF) && ((D.info[b] >> INFO.USE_SHIFT) & 3) === INFO.USE_HOME) rc = 3;
+      // W3-B: nhà có KIỂU Ô theo pano (INFO bit 6-7: khuôn viên/chợ/nhà ở) mà không bán hàng → cả cạnh hông NÂNG thành mặt phố
+      // và mặt dãy gộp cũng không mở cửa hàng (trước: lấy theo cấp phố → biệt thự/nhà ở mọc dải biển ở cạnh hông)
+      if (hasInfo && kind === EDGE.FRONT && (rcP >= 0 || wideF) && ((D.info[b] >> INFO.PK_SHIFT) & 3) && ((D.info[b] >> INFO.USE_SHIFT) & 3) !== INFO.USE_SHOP) rc = 3;
       const kb = kind | bigFlag | wideF | pitchFlag | (rc << 6);
       const ta = Y[i], tb = Y[j];
       const a0 = M.v(ax, y0 + ys, az, nx, 0, nz, 0, ys, wcol, s8, kb, styF, fl);
