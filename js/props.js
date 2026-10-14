@@ -357,23 +357,36 @@ function modelOrnateGlobes() {
 // local +Z = mũi. Một "túi" trùm: mặt cắt hông gần thẳng đứng, đỉnh tròn, gù tay lái + gương (s ≈ 0,55-0,8), yên phẳng,
 // võng ở sàn để chân; mép bạt cách đất 0,32 m (lộ nửa dưới 2 bánh); nếp nhăn = nhiễu theo đỉnh. ~270 tam giác.
 function modelCoveredBike() {
-  const g = new THREE.SphereGeometry(1, 14, 11); g.rotateX(Math.PI / 2);   // cực ở ±Z
+  // LOFT các mặt cắt chữ U ngược (siêu elip: hông gần đứng, nóc tròn) dọc trục xe; 2 nắp đầu/đuôi quạt về tâm
   const key = (K, s) => { for (let i = 1; i < K.length; i++) if (s <= K[i][0]) { const [a, va] = K[i - 1], [b, vb] = K[i]; const t = (s - a) / (b - a); return va + (vb - va) * t * t * (3 - 2 * t); } return K[K.length - 1][1]; };
-  const TOP = [[-1, 0.7], [-0.62, 0.84], [-0.1, 0.87], [0.22, 0.76], [0.52, 1.04], [0.78, 1.1], [1, 0.84]];
-  const WID = [[-1, 0.15], [-0.6, 0.23], [0, 0.26], [0.42, 0.27], [0.62, 0.4], [0.8, 0.32], [1, 0.16]];
-  const BOT = 0.32, p = g.attributes.position;
-  for (let i = 0; i < p.count; i++) {
-    const x = p.getX(i), y = p.getY(i), s = p.getZ(i), r = Math.sqrt(Math.max(1e-6, 1 - s * s));
-    const cx = x / r, cy = y / r;
-    const top = key(TOP, s), w = key(WID, s);
-    const n = Math.sin(i * 12.9898) * 43758.5453, wr = (n - Math.floor(n) - 0.5) * 0.035;   // nếp nhăn
-    const X = Math.sign(cx) * Math.pow(Math.min(1, Math.abs(cx)), 0.5) * (w + wr);
-    const Y = BOT + (top - BOT) * Math.pow(Math.max(0, (cy + 1) / 2), 0.7) + (cy > -0.9 ? wr : 0);
-    const Z = Math.sign(s) * Math.pow(Math.abs(s), 0.55) * 0.95;
-    p.setXYZ(i, X, Y, Z);
+  // nóc: đuôi 0,74 → yên 0,86-0,88 → võng sàn để chân 0,78 → gù tay lái/gương 1,08-1,12 → đầu đèn 0,9; bề ngang: tay lái 0,38
+  const TOP = [[-0.95, 0.72], [-0.75, 0.84], [-0.1, 0.88], [0.22, 0.79], [0.48, 1.06], [0.66, 1.12], [0.86, 1.02], [0.98, 0.86]];
+  const WID = [[-0.95, 0.17], [-0.75, 0.24], [0, 0.27], [0.36, 0.27], [0.58, 0.38], [0.74, 0.33], [0.98, 0.18]];
+  const Zs = [-0.95, -0.88, -0.7, -0.45, -0.15, 0.12, 0.3, 0.46, 0.6, 0.74, 0.86, 0.94, 0.98], M = 11, BOT = 0.33;
+  const pos = [], idx = [];
+  let nz = 0;
+  const wr = (a, b) => { const n = Math.sin(a * 12.9898 + b * 78.233) * 43758.5453; return (n - Math.floor(n) - 0.5) * 0.03; };   // nếp nhăn
+  for (let i = 0; i < Zs.length; i++) {
+    const z = Zs[i], top = key(TOP, z), w = key(WID, z);
+    for (let j = 0; j < M; j++) {
+      const th = Math.PI * (1 - j / (M - 1)), c = Math.cos(th), s = Math.sin(th);
+      const ww = w + wr(i, j), hh = top - BOT + wr(j, i) * 0.6;
+      pos.push(Math.sign(c) * Math.pow(Math.abs(c), 0.45) * ww, BOT + Math.pow(s, 0.45) * hh, z + wr(i + 7, j) * 0.4);
+    }
+    nz++;
   }
+  for (let i = 0; i + 1 < nz; i++) for (let j = 0; j + 1 < M; j++) { const a = i * M + j, b = a + M; idx.push(a, b + 1, a + 1, a, b, b + 1); }   // pháp tuyến hướng RA
+  for (const [ii, fl] of [[0, true], [nz - 1, false]]) {   // nắp đuôi/đầu
+    const c0 = pos.length / 3, z = Zs[ii]; pos.push(0, BOT + (key(TOP, z) - BOT) * 0.45, z + (fl ? -0.02 : 0.02));
+    for (let j = 0; j + 1 < M; j++) { const a = ii * M + j; if (fl) idx.push(c0, a, a + 1); else idx.push(c0, a + 1, a); }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx);
   g.computeVertexNormals();
-  const P = [finish(g, 0xffffff, 1)];
+  const gc = finish(g, 0xffffff, 1);
+  // mép bạt sẫm hơn (bẩn/bóng dưới gầm)
+  { const p = gc.attributes.position, c = gc.attributes.color; for (let i = 0; i < p.count; i++) { const k = p.getY(i) < BOT + 0.14 ? 0.72 : 1; c.setXYZ(i, c.getX(i) * k, c.getY(i) * k, c.getZ(i) * k); } }
+  const P = [gc];
   for (const z of [0.63, -0.6]) P.push(finish(cyl(0.27, 0.27, 0.11, 10, 0, 0.27, z, 'x'), 0x17171a));   // 2 bánh (nửa dưới lộ ra)
   return mergeParts(P);
 }
@@ -1316,8 +1329,8 @@ export function buildProps(ctx) {
     const X = XS(S), narrow = X.sw <= 2.0;
     const lat = narrow ? X.curb + 0.78 : X.park;
     // W4-B: dải SÁT BÓ VỈA (xe xiên 45-58°) khi dải đỗ giữa vỉa bị hàng hoá/sạp/chậu chiếm (phố chợ 492/124/446: ảnh thật xe
-    // máy đỗ ngoài, hàng trong) — chỉ vỉa ≥ 2,4 m
-    const latC = X.curb + 0.82, curbOK = !narrow && X.sw >= 2.4;
+    // máy đỗ ngoài, hàng trong) — chỉ vỉa ≥ 2,2 m
+    const latC = X.curb + 0.82, curbOK = !narrow && X.sw >= 2.2;
     const e0 = R.ev || S.ev[R.k0];
     const pCov = (e0 && (e0[9] & 1024) && Math.hypot(e0[0] - R.x, e0[1] - R.z) < 40) ? 0.22 : S.c === 'r' ? 0.06 : 0.025;
     const t0 = S.off + R.k0 * CELL + 0.35, t1 = S.off + R.k1 * CELL - 0.35;

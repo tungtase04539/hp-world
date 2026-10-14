@@ -1839,12 +1839,12 @@ export function buildTrees(scene, ctx = {}) {
     if (r.sq) { r.zx = (r.snx * c - r.snz * s) * r.sq; r.zz = (r.snx * s + r.snz * c) * r.sq; } else { r.zx = r.ox; r.zz = r.oz; }
     r.Rf = R; r.wox = ox; r.woz = oz;
     // Đ3-W4-B: (1) biên độ DÁNG TÁN riêng (shader hpAmp — thùy/lệch/nghiêng mặt tán): cây đứng tự do 0,15-0,42; cây sát
-    // tường (đã ép/né mặt tiền) 0,08-0,18 (thùy to phía tường sẽ lại đâm mặt tiền); hero đo theo ảnh 0 (heroFit không tính).
+    // tường (đã ép/né mặt tiền) 0,12-0,26 (thùy phía tường bị nửa-tán-ép co lại theo; lề FACADE_CLEAR 1,5 m); hero đo theo ảnh 0 (heroFit không tính).
     // (2) cây sát tường NGHIÊNG CẢ CÂY ra phía lòng đường 1,7-4,6° (45% — cây phố HP vươn ra chỗ sáng; ảnh 023/345/492)
     if (!r.big) {
       const free = r.fd === undefined || r.fd > R + FACADE_CLEAR + 1;
       const ha = hxz(r.x, r.z, 78);
-      r.amp = r.sp === SP.NON ? 0.1 + 0.15 * ha : r.sp === SP.DA || r.sp === SP.ME ? 0.08 + 0.1 * ha : free && !r.sq ? 0.15 + 0.27 * ha : 0.08 + 0.1 * ha;
+      r.amp = r.sp === SP.NON ? 0.1 + 0.15 * ha : r.sp === SP.DA || r.sp === SP.ME ? 0.08 + 0.1 * ha : free && !r.sq ? 0.15 + 0.27 * ha : 0.12 + 0.14 * ha;
       // pano nói cây NGHIÊNG (fp/audit "tilted/thân nghiêng" — r.lean): sát tường 80%; đứng tự do 40% nghiêng hướng ngẫu nhiên 2-4,6°
       const okT = !r.tiltX && !r.tiltZ && r.sp !== SP.NON && r.sp !== SP.CATCUT && r.sp !== SP.LOP && r.sp !== SP.CAU && r.sp !== SP.TOPI;
       if (okT && r.sq > 0 && hxz(r.x, r.z, 79) < (r.lean ? 0.8 : 0.45)) {
