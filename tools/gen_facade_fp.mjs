@@ -217,21 +217,36 @@ export function mapFacadeFP(polys, FP, opts = {}) {
     // tầng: trung vị có trọng số, ưu tiên near/mid
     const flL = L.filter((r) => FP.obs[r.oi][C.floors] > 0 && FP.obs[r.oi][C.depth] !== 2);
     const flSrc = flL.length ? flL : L.filter((r) => FP.obs[r.oi][C.floors] > 0);
-    let floors = -1;
+    let floors = -1, flAgree = 0, flNM = 0;
     if (flSrc.length) {
       const arr = flSrc.map((r) => [FP.obs[r.oi][C.floors], r.w * (FP.obs[r.oi][C.sure] ? 1.5 : 1)]).sort((p, q) => p[0] - q[0]);
-      const half = arr.reduce((a, p) => a + p[1], 0) / 2; let acc = 0;
+      const sumW = arr.reduce((a, p) => a + p[1], 0), half = sumW / 2; let acc = 0;
       for (const [f, w] of arr) { acc += w; if (acc >= half) { floors = f; break; } }
+      // W4-A r2 (phản biện): ĐỘ ĐỒNG THUẬN = phần trọng số trong ±1 tầng quanh trung vị (16 vs 1 → ~0,5: không tin);
+      // flNM = số quan sát near/mid có tầng (applyFP chỉ áp tầng khi đồng thuận đủ)
+      for (const [f, w] of arr) if (Math.abs(f - floors) <= 1) flAgree += w;
+      flAgree = sumW > 0 ? flAgree / sumW : 0;
+      flNM = flSrc.filter((r) => FP.obs[r.oi][C.depth] === 0 || FP.obs[r.oi][C.depth] === 1).length;
     }
     // màu tường: các quan sát gần màu quan sát nặng nhất có màu
-    let wall = -1;
-    const wl = L.filter((r) => FP.obs[r.oi][C.wall] >= 0);
+    // W4-A r2 (phản biện): bộ trích xuất đôi khi ghi MÀU BIỂN/BẠT làm màu tường (pano_193 h0: cả nhà đỏ, tường thật nhạt)
+    // → bỏ quan sát có màu tường ≈ màu nền biển của CHÍNH nó (ΔRGB < 40); màu rất rực (HSV S > 0,6) trọng số × 0,3 để một
+    // quan sát nhạt cùng nhà thắng làm màu tham chiếu (applyFP còn chặn S ≤ 0,45)
+    let wall = -1, wallDrop = 0;
+    const sat = (c) => { const mx = Math.max(...c), mn = Math.min(...c); return mx > 0 ? (mx - mn) / mx : 0; };
+    const wl = [];
+    for (const r of L) {
+      const o = FP.obs[r.oi]; if (o[C.wall] < 0) continue;
+      const c = rgb(o[C.wall]);
+      if (o[C.signBg] >= 0 && o[C.signPresent] !== 0) { const sb = rgb(o[C.signBg]); if (Math.hypot(c[0] - sb[0], c[1] - sb[1], c[2] - sb[2]) < 40) { wallDrop++; continue; } }
+      wl.push({ r, c, w: r.w * (sat(c) > 0.6 ? 0.3 : 1) });
+    }
+    wl.sort((p, q) => q.w - p.w || p.r.oi - q.r.oi);
     if (wl.length) {
-      const ref = rgb(FP.obs[wl[0].oi][C.wall]); const acc = [0, 0, 0]; let ws = 0;
-      for (const r of wl) {
-        const c = rgb(FP.obs[r.oi][C.wall]);
+      const ref = wl[0].c; const acc = [0, 0, 0]; let ws = 0;
+      for (const { c, w } of wl) {
         if (Math.hypot(c[0] - ref[0], c[1] - ref[1], c[2] - ref[2]) > 70) continue;
-        for (let k = 0; k < 3; k++) acc[k] += toLin(c[k]) * r.w; ws += r.w;
+        for (let k = 0; k < 3; k++) acc[k] += toLin(c[k]) * w; ws += w;
       }
       const s = acc.map((v) => Math.max(0, Math.min(255, toS(v / ws))));
       wall = (s[0] << 16) | (s[1] << 8) | s[2];
@@ -239,13 +254,15 @@ export function mapFacadeFP(polys, FP, opts = {}) {
     const size = vote(L, C.size);
     let sign = null;
     if (size > 0) {
-      const sr = L.find((r) => FP.obs[r.oi][C.signPresent] === 1 && FP.obs[r.oi][C.signBg] >= 0);
+      // màu biển: ưu tiên quan sát nặng nhất có biển CÙNG cỡ đã bỏ phiếu (phản biện r1), không có thì nặng nhất có biển
+      const hasS = (r) => FP.obs[r.oi][C.signPresent] === 1 && FP.obs[r.oi][C.signBg] >= 0;
+      const sr = L.find((r) => hasS(r) && FP.obs[r.oi][C.size] === size) || L.find(hasS);
       if (sr) { const so = FP.obs[sr.oi]; sign = { size, bg: so[C.signBg], fg: so[C.signFg] >= 0 ? so[C.signFg] : 0xffffff, span: Math.max(1, so[C.span] > 0 ? so[C.span] : 1) }; }
     }
     const signNone = size === 0 || (vote(L, C.signPresent) === 0);
     fp.set(bi, {
       n: L.length, w: +tot.toFixed(3), cover: +Math.max(...L.map((r) => r.cover)).toFixed(2), d: +L[0].d.toFixed(1),
-      floors, wall, style: vote(L, C.style), balcony: vote(L, C.balcony), windows: vote(L, C.windows), ground: vote(L, C.ground),
+      floors, flAgree: +flAgree.toFixed(3), flNM, wallDrop, wall, style: vote(L, C.style), balcony: vote(L, C.balcony), windows: vote(L, C.windows), ground: vote(L, C.ground),
       sign: signNone ? { size: 0 } : sign, awning: vote(L, C.awning), roof: vote(L, C.roof), age: vote(L, C.age),
       widthM: top[C.widthM], src: FP.panos[top[C.pano]][0] + '_h' + String(top[C.heading]).padStart(3, '0'),
     });

@@ -194,6 +194,9 @@ function fpRenderStyle(D, e, fl, fL, area) {
   if (s === FPV.st.construction) return fl <= 8 ? RS.CONS : -1;
   return -1;
 }
+// biển BẢNG LỚN nhiều tầng (chế độ 3): 'multi', hoặc 'banner' phủ ≥ 2 tầng — banner 1 tầng = biển màu thật thường (phản biện
+// r1: pano_078 h90 biệt thự cổng sắt / 175 h0 mặt tiền ngân hàng nhận bảng 2 tầng + sọc giả)
+const fpPanel = (D, e) => D.fp.size[e] === FPV.size.multi || (D.fp.size[e] === FPV.size.banner && D.fp.span[e] >= 2 && D.fp.span[e] !== 255);
 const FG_TXT = [[255, 255, 255], [30, 30, 30], [190, 30, 30], [240, 190, 40]];   // màu chữ lượng tử 2 bit (khớp fpFg shader)
 // 4 byte aFp + thông tin chi tiết 3D cho nhà b (kiểu dựng rs đã chốt). Trả null nếu không có vân tay.
 function fpBuild(D, b, rs) {
@@ -203,14 +206,18 @@ function fpBuild(D, b, rs) {
   const wallK = known(F.wallR[e], F.wallG[e], F.wallB[e]), bgK = known(F.bgR[e], F.bgG[e], F.bgB[e]);
   let mode = 4;                                                                  // biển không rõ → thống kê
   if (size === FPV.size.none) mode = 1;
-  else if (size !== 255 && bgK) mode = size === FPV.size.multi || size === FPV.size.banner ? 3 : 2;
+  else if (size !== 255 && bgK) mode = fpPanel(D, e) ? 3 : 2;
   const bg565 = bgK ? ((F.bgR[e] >> 3) << 11) | ((F.bgG[e] >> 2) << 5) | (F.bgB[e] >> 3) : 0;
   let fg = 0, bd = 1e9;
   for (let k = 0; k < 4; k++) { const c = FG_TXT[k], d = (c[0] - F.fgR[e]) ** 2 + (c[1] - F.fgG[e]) ** 2 + (c[2] - F.fgB[e]) ** 2; if (d < bd) { bd = d; fg = k; } }
   const span = F.span[e] === 255 ? 1 : F.span[e];
   const oldish = rs === STYLE.OLD || rs === RS.COL;
   let gs = 0;
-  if (rs !== RS.CONS) {
+  // rc 3 (USE_HOME / khuôn viên có tường) trên CIVIC/GLASS/SHED = trệt KHÔNG biển (G_CIVIC/G_WARE) — bộ FG không được đè
+  // (lớp lỗi pano_224/225: biển quán sau tường mỏ neo). gs = 0 ⇒ JS + GL2 + GL1 cùng về luật cũ (khớp bit)
+  const useI = D.info ? (D.info[b] >> INFO.USE_SHIFT) & 3 : -1, pkI = D.info ? (D.info[b] >> INFO.PK_SHIFT) & 3 : 0;
+  const noSignRc3 = NOSIGN_ST(rs) && (useI === INFO.USE_HOME || (pkI && useI !== INFO.USE_SHOP));
+  if (rs !== RS.CONS && !noSignRc3) {
     if (gnd === FPV.gnd.shop_open) gs = oldish ? 2 : 1;
     else if (gnd === FPV.gnd.shutter) gs = 3;
     else if (gnd === FPV.gnd.glass_store) gs = 4;
@@ -972,8 +979,11 @@ function renderStyles(D, CX, CZ) {
       if (zi < 0 && (rs === STYLE.TUBE || rs === STYLE.OLD) && fl <= 5 && hh(seed, 307) < 0.008) rs = RS.CONS;
     }
     // W4-A: VÂN TAY (quan sát thật của CHÍNH nhà này trong ảnh pano) thắng mọi luật trên
-    const fe = D.fpE ? D.fpE[b] : -1;
+    // W4-A r2 (phản biện): ĐANG XÂY từ bằng chứng trực tiếp (FEF.CONS: mô tả pano nhắc thi công/giàn giáo/rào tôn) GIỮ
+    // nguyên — trích xuất vân tay thấy "nhà ống" sau rào (pano_106 h90: rào "ĐANG THI CÔNG" thành nhà cửa cuốn ban công)
+    const fe = D.fpE ? D.fpE[b] : -1, consEv = rs === RS.CONS && (e & FEF.CONS);
     if (fe >= 0) { const r = fpRenderStyle(D, fe, fl, fL, area); if (r >= 0) { rs = r; sts.fpRs = (sts.fpRs || 0) + 1; } }
+    if (consEv && rs !== RS.CONS) { rs = RS.CONS; sts.fpConsKeep = (sts.fpConsKeep || 0) + 1; }
     // tích hợp W3 (W3-A × W3-C): dữ liệu CIVIC/GLASS/SHED + USE_HOME (khối khuôn viên Hải quân cbIn — W3-A r3; ô 'home' của W3-B)
     // phải GIỮ kiểu dựng thuộc NOSIGN_ST, nếu không groundModule/shader mất luật "rc 3 → trệt không biển" (CIVIC→NEO,
     // GLASS→MODERN/TOWER ở (a)-(c) ⇒ lại hiện "BÁNH MÌ"/"SỬA XE MÁY" sau tường mỏ neo pano_224/225 h270)
@@ -986,10 +996,10 @@ function renderStyles(D, CX, CZ) {
     if (e & FEF.NEW) age -= 1;
     const r4 = hh(seed, 309); if (r4 < 0.2) age += 1; else if (r4 < 0.32) age -= 1;
     if (rs === RS.CONS) age = 1;
-    if (fe >= 0 && D.fp.age[fe] <= 3) age = D.fp.age[fe];                   // W4-A: tuổi/phong hoá theo ảnh thật
+    if (fe >= 0 && D.fp.age[fe] <= 3 && rs !== RS.CONS) age = D.fp.age[fe];   // W4-A: tuổi/phong hoá theo ảnh thật (đang xây giữ 1)
     age = Math.max(0, Math.min(3, age));
     let panel = (e & FEF.BIGSIGN) || ((zf & FEZ.COMM) && hh(seed, 311) < 0.3) ? 1 : 0;
-    if (fe >= 0 && D.fp.size[fe] !== 255) panel = D.fp.size[fe] === FPV.size.multi || D.fp.size[fe] === FPV.size.banner ? 1 : 0;
+    if (fe >= 0 && D.fp.size[fe] !== 255) panel = fpPanel(D, fe) ? 1 : 0;
     rsz[b] = rs | (age << 4) | (panel << 6);
     sts.rs[rs]++; sts.age[age]++; sts.panel += panel;
   }
