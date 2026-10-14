@@ -177,7 +177,7 @@ function chk(name, value, op, limit, unit = '') {
   const ok = op === '<' ? value < limit : op === '<=' ? value <= limit : op === '>=' ? value >= limit : op === '==' ? value === limit : false;
   return { name, value, limit: `${op} ${limit}${unit}`, result: ok ? 'PASS' : 'FAIL' };
 }
-function accept(rep, meta) {
+export function accept(rep, meta) {
   const s = rep.scenario.name, out = [];
   const full = meta.mode === 'full';
   out.push(chk('lỗi giải mã phía bot', rep.decode.errors, '==', 0));
@@ -194,8 +194,8 @@ function accept(rep, meta) {
     out.push(chk('event-loop p99 (max)', rep.server.eventLoopP99.max, '<', 20, ' ms'));
   }
   if (s === 'hotspot') {
-    out.push(chk('bản ghi/snapshot max (trần 96)', rep.snapshots.maxRecordsAnyBot, '<=', AOI.CAP));
-    out.push(chk('client > 12 KB/s (đỉnh 5 s)', rep.traffic.clientsOver12KBps, '==', 0));
+    out.push(chk('bản ghi/snapshot max (trần 96)', rep.snapshots.count ? rep.snapshots.maxRecordsAnyBot : null, '<=', AOI.CAP));
+    out.push(chk('client > 12 KB/s (đỉnh 5 s)', rep.snapshots.count ? rep.traffic.clientsOver12KBps : null, '==', 0));
     out.push(chk('tick p99 (max)', rep.server.tickP99.max, '<', 40, ' ms'));
   }
   if (s === 'stress') {

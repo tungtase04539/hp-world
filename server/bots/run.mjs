@@ -18,7 +18,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildPlan, SCENARIOS } from './scenarios.mjs';
 import { scrape, pick, cpuSnapshot, cpuBusyPct } from './lib/metrics.mjs';
-import { mergeFinals, buildReport, renderMd } from './lib/report.mjs';
+import { mergeFinals, buildReport, renderMd, accept } from './lib/report.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
@@ -200,6 +200,15 @@ function fmtN(v) { return Number.isFinite(v) ? v.toFixed(1) : '—'; }
 const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (isMain) {
   const o = parseArgs(process.argv.slice(2));
+  if (o.rerender) {   // re-evaluate acceptance + re-render report.md from an existing report.json
+    const f = path.join(o.rerender, 'report.json');
+    const rep = JSON.parse(fs.readFileSync(f, 'utf8'));
+    rep.acceptance = accept(rep, rep.meta);
+    fs.writeFileSync(f, JSON.stringify(rep, null, 1));
+    fs.writeFileSync(path.join(o.rerender, 'report.md'), renderMd(rep));
+    console.log('[bots] re-rendered ' + o.rerender);
+    process.exit(0);
+  }
   if (o.help || o.h) {
     console.log(fs.readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n').slice(1, 12).join('\n'));
     console.log('scenarios: ' + Object.entries(SCENARIOS).map(([k, v]) => `\n  ${k} (${v.n} bot, ${v.durS} s): ${v.desc}`).join(''));
