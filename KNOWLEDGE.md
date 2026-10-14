@@ -53,7 +53,7 @@ Trò chơi: thế giới 3D Hải Phòng **tỉ lệ 1:1 mét thật** (từ 202
 | `js/streetlife.js` | ĐỜI SỐNG PHỐ (Đợt 3 W3-E, gọi từ props.js): chợ dân sinh (ô dù/bạt/sạp/mẹt/người bán), hàng tràn hè theo biển hiệu + bằng chứng pano, chậu cây, cờ treo nhà, băng rôn, cổng chào ngõ, xe ba gác + mô hình xe khách/ô tô phủ bạt/trạm biến áp kiốt/đèn gang 2-5 cầu. Dữ liệu: props_evidence.js cột 7-9 + PROPS_MARKETS (tools/gen_props_evidence.mjs) |
 | `js/footprints.js` | Tra cứu footprint nhà thật ĐANG VẼ (world.rbData/rbGrid của WP2, không có thì chỉ địa danh LM_POLY) cho gameplay: camera chống xuyên tường, chỗ xuống xe, người đi bộ |
 | `js/trees.js` | HỆ CÂY instanced (Đợt 3 WP4): `plant/plantLocal` (mọi helper cây chỉ xếp hàng), `plantStreetTrees` (trồng theo dữ liệu dọc phố), `buildTrees` (atlas lá + kit 12 loài — W3-G thêm cây cảnh TOPI, me tây ME, cắt trụi "bộ xương" LOP + LOD gần/xa/hero GLB) — xem §10 (WP4-trees, W2-B, W3-G) |
-| `js/treemap.js` | **SINH TỰ ĐỘNG** bởi `tools/gen_treemap.mjs` từ `audit/audit_enriched.json` (thảm cây 551 pano, 21 số/pano từ W3-G — đọc bằng `PANO_VEG_STRIDE`) — KHÔNG sửa tay |
+| `js/treemap.js` | **SINH TỰ ĐỘNG** bởi `tools/gen_treemap.mjs` từ `audit/audit_enriched.json` (thảm cây 551 pano, 23 số/pano — W3-G 21, Đ3-W5-C thêm garden/vines — đọc bằng `PANO_VEG_STRIDE`) — KHÔNG sửa tay |
 | `js/roadnet.js` / `js/roadtex.js` / `js/roadmarks.js` | Mạng đường (Đợt 3 WP6): đồ thị nút giao + dải + vỉa hè/bó vỉa theo `xsection.js`; 1 material Phong + DataArrayTexture (worker) + vạch kẻ trong shader; bằng chứng vạch kẻ/đèn từ pano (SINH bởi `tools/gen_roadmarks.mjs`) |
 | `js/xsection.js` | MẶT CẮT PHỐ — nguồn duy nhất cho lòng/bó vỉa/vỉa hè/hố cây/xe đỗ/mặt tiền. Từ Đợt 3 W3-A mọi hàm nhận CẤP hoặc WAY `{c, w?, sw?}` (`roadHW/roadW/sidewalkW/curbLine/facadeLine/treePitLine/parkingLine/furnitureLine`) — truyền WAY để dùng bề rộng thật từng phố (`ROADS_DT[i].w/.sw`, SINH bởi `tools/street_fit.mjs` qua process_osm) |
 | `js/anchorwalls.js` | TƯỜNG RÀO MỎ NEO Hải quân (Đợt 3 W3-A): `CB_WALLS` (polyline LTT/ĐBP/THĐ) + `cbFitFence` (đẩy đỉnh ra sau `facadeLine(way)` + 0,35) + `cbWallSegments` — NGUỒN DUY NHẤT cho world.js `cbWallRun` VÀ `tools/process_buildings.mjs` §9c2 (cắt nhà nhô trước tường, cờ `cbIn` khuôn viên). Không import three. Sửa `CB_WALLS` → chạy lại process_buildings |
@@ -455,6 +455,59 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-10-14 (Đ3-W5-C LIFE-GREEN)** [ĐỢT 3 wave 5 — graders wave 4: chợ quá thưa (124/446/460/097/184/092/189), hiên quán dù đỏ (267/506/083), xe máy quá ít trên mặt tiền đông (088/492/083/189), phố đông người (469/446/460), tán cây rợp ngõ/phố nhỏ (331/519/111/258/391/386/455/065), vườn biệt thự sau rào (271/538), dây leo (203), gốc cưa trụi (152/225/400)]:
+    (nhánh worktree `worktree-wf_0dec13b5-96e-3` trên dot3 bcdcacc). File: `js/streetlife.js`, `js/props.js`, `js/trees.js`, bộ sinh
+    `tools/gen_fp_nature.mjs` / `tools/gen_props_evidence.mjs` / `tools/gen_treemap.mjs` → SINH LẠI `tools/fp_nature.json`,
+    `js/props_evidence.js`, `js/treemap.js` (chạy: `node tools/gen_fp_nature.mjs --fp <keep/fp_json>` rồi gen_treemap, gen_props_evidence —
+    tất định; cột/bit CŨ y hệt: so 551 dòng, chỉ THÊM).
+    **BẰNG CHỨNG MỚI:** fp_nature thêm cột (đặt CUỐI, bộ đọc tra theo tên) umbRed/cafe/crowd/market (trường street), garden/vines (trường
+    trees). props_evidence: spill 2048 HIÊN QUÁN (audit spill 8, hoặc fp cafe ≥ 2 hướng + ô đỏ ≥ 1), spill 4096 Ô ĐỎ (audit "dù/ô … đỏ"
+    hoặc fp umbRed khi pano có ô/quán), deco 2048 ĐÔNG NGƯỜI (audit "đông người/khách đông/người mua bán…" hoặc fp crowd), deco 4096 DÂY
+    LEO (audit vegetation "dây leo/giàn/hoa giấy" hoặc fp vines) — 98/70/47/88 pano. treemap: STRIDE 21 → **23** (field 21 garden "vườn/sân
+    biệt thự/khuôn viên/sau rào", 22 vines; 56/86 pano). **BẪY:** sửa chuỗi trong bộ sinh bằng python `replace` với `\\n` thoát sai → hằng
+    STRIDE trong file sinh KHÔNG đổi trong khi mỗi dòng đã 23 số (trees.js đọc lệch toàn bộ) — luôn kiểm `PANO_VEG.length / STRIDE` = 551.
+    **CHỢ (streetlife.js):** mức 3 bước sạp 2,1-2,8 → 1,75-2,35 m; vỉa HẸP < 2,4 m (446/124/492 vỉa 1,6-2 m — dải sát mặt tiền từng trống
+    trơn) thêm 1-2 món nhỏ sát tường (bao/mẹt/sọt, `st.mkFacade`); khách đứng 0,6 → 0,8, khách thứ 2 0,35 → 0,55 (0,75 nơi "đông người");
+    hàng lấn dải lòng 40 → 55%; **XE MÁY TRONG CHỢ** (`mkBikes`): bước sạp mức 3 mà dải lòng sát bó vỉa còn trống, phố lòng ≥ 5 m → 1 xe đỗ
+    dọc mép (tâm cách bó vỉa 0,42 m, ±12°, mũi xuôi làn bên phải), `stallsRoad` kind 'bike' (len 1,9, hw 0,42) cho giao thông lách; props 6.5
+    dựng như xe đỗ (`road: 1` → `__hpProps.lists.mkRoad`, KHÔNG vào lists.bikes — clearance không tính "vật trên nhựa"). 449 xe.
+    Ngân sách người chợ 1.100 → 1.800 (LITE 350 → 500: ~2,9k ứng viên, bản cũ giữ ~38%). LOD: hàng đất ≤ 100 → 80 m, đống nông sản ≤ 60 → 45 m
+    (A/B 446_h090 +17% tam giác trước khi thu → +4,7%).
+    **HIÊN QUÁN:** pano ≤ 30 m có spill 2048 → dãy 3-5 ô (khởi 42%/ô): mỗi ô 1 Ô VUÔNG MỘT MÀU (biến thể v4 MỚI của `props_market_over` —
+    bản chợ múi xen bảng B đọc thành dù xanh-trắng ở 267) cạnh song song mặt tiền, tán 2,6-3,1 m (không chìa qua bó vỉa/chạm tường), bộ bàn
+    ghế + 1-3 khách (nhóm ngân sách `sp`, 220 → 380). Bộ bàn ghế quán 6.4 đã có ≤ 1,4 m → tán đặt ĐÚNG trên bộ đó (không thêm bàn) và dù nhỏ
+    cũ dưới tán bị bỏ (`paraI.dead`); mặt tiền = nhà thật HOẶC claim 'cell' (quán Trà Chanh 267 là nhà ô dựng tay — `hasFacade` chỉ biết
+    footprint RB). Màu: bit 4096 → 85% đỏ. `paraI` giữ màu đã gán (`it.col === undefined` mới bốc màu). 200 dãy / 390 ô.
+    **XE MÁY 2 DẢI (props.js 6.5):** vỉa ≥ 3,4 m + pano ≤ 60 m mức 3 (không phố p) → hàng xe chạy 2 lượt: dải 1 sát bó vỉa (curb + 0,8, xiên
+    42-52°), dải 2 sát mặt tiền (fac − 0,95, 52-65°, lệch pha 0,37 m); ước lượng ngân sách ×1,6. 088: 46 → 63-72 xe ≤ 20 m, 267 48 → 57-62.
+    Từ chối chủ yếu là vật cản (`stats.bikeRej[1]` ~13,7k: hố cây/cột ở dải sát bó vỉa).
+    **CỤM NGƯỜI TĨNH** (`placeClusters`, nhóm ngân sách MỚI `cl` 520 / LITE 160): nhóm 2-4 người đứng quay vào nhau sát mặt tiền hoặc ngồi
+    ghế nhựa quanh bàn thấp (30%, vỉa ≥ 2,4 m). Xác suất/ô: "đông người" ≤ 40 m 30% (thử cả giữa vỉa), phố xe dày/chợ/ghế nhựa 5%, lõi 1,2%,
+    ngoài 0,4%. 2 LƯỢT: ô "đông người" TRƯỚC hàng xe máy (xe né qua `bikeObst`), còn lại sau người đi bộ; ô cụm đặt OCC_PED → người đi bộ
+    (6.7) nay né OCC_PED (trước đây không ô nào có OCC_PED trước 6.7 — dot3 không đổi). ~680 người.
+    **DÂY LEO / HOA GIẤY** (`props_vines`, ~360 tam giác/khóm, 213 khóm): pano ≤ 35 m deco 4096 → 18% ô có mặt tiền thật treo 1 khóm từ tầng
+    2-3 theo SỐ TẦNG THẬT (`SL.bldFloors` = D.floors của footprint sau mặt tiền: ≥ 3 tầng mép trên 9,2-9,8 m, 2 tầng 6,7-7,1, 1 tầng 3,3 nhỏ),
+    rủ 2,9-4 m, rộng 2,9-4,4 m, 55% hoa giấy hồng/tím/cam. **BẪY:** treo ở 3,9-4,7 m (bản đầu) bị mái hiên/bạt tầng trệt che gần hết.
+    **CÂY (trees.js):** (1) phố r có pano RỢP (dens 3) hoặc vòm → trồng đủ (bỏ luật bỏ ngẫu nhiên 30%) + cây VÒM (`tun`). (2) MỚI
+    `plantLaneTrees`: ngõ h trong 45 m quanh pano rợp (dens 3 + vòm/cây bóng mát) → cây ở mép ngõ (hw + 0,6) nơi có khe trống (gốc + vòng
+    0,8 m không vào nhà thật, không lòng đường khác), nhịp 8,5-12,5 m, 1 bên (40% 2 bên), cây vòm — 339 cây. (3) MỚI `plantYardTrees`: dọc
+    polyline RB_PARCELS kiểu tường rào xây / hàng rào sắt (sân bên TRÁI, pháp tuyến (−uz, ux)) gốc sâu 3,2/4,6/2,4 m sau rào, nhịp theo pano
+    ≤ 60 m (garden 6,5 · rợp 9 · thường 12 · thưa 18 · không pano 14 · "không cây" bỏ), vòng 1,4 m không chạm nhà, không đường/camera/địa
+    danh/claim dựng tay; sân vườn 30% cau vua (luật cau-không-bằng-chứng vẫn áp), 15% phượng — 376 cây (50 cau). Cả 2 gọi CUỐI
+    plantStreetTrees (không sửa world.js); `window.__hpTreePlant` = thống kê. (4) Kit CATCUT MỚI "cột" (thêm CUỐI KIT_DEFS: thân r0 0,36,
+    cành cưa 0,7-1,4 m, ít chồi) + mức cắt 7 → 50/50 LOP/CATCUT (cũ 72/28) — ảnh 225/152: đa số gốc thân to cành cưa NGẮN. Tổng cây 8.029 → 8.949.
+    **SỐ ĐO (A/B cùng phiên, base = dot3 bcdcacc git archive :8913 ↔ :8903, keep/views_ab4 + 446_h090/088_h090/267_h090/538_h000, TIER 3,
+    Radeon 890M D3D11; vòng 1 xen kẽ 2×2, vòng 2 sau thu LOD):** calls 2.691 → 2.671 (−0,7%), tris 21,81 → 22,59 M (+3,6%; 4 khung chuẩn
+    +2,5%, 446 +4,7%, 267 +6%, 538 +6%); fps 60 (vsync) cả hai; hpReady 5,84 → 6,04 s (+0,2 s, bước nature 181 → 208 ms, final +60 ms);
+    heap nhiễu (570 ↔ 497 MB). Ảnh (REAL | dot3 | W5-C, 1280×634, traffic off, 27 pano đích + 8 đối chứng × 4 hướng, 0 lỗi JS mọi lô):
+    `scratchpad/dot3/W5-C/pairs` (+ pairs_r2/pairs_r3 sau sửa). Tự chấm (±0,5): chợ 446/460/184/492/124 +0,5 (hàng phủ kín hơn, khách đông
+    hơn, xe đỗ mép lòng như ảnh); 267 +0,5 (hiên dù đỏ trước quán); 088/083 +0,3; 538/271/519/455 +0,3 (cây sân sau rào, tán ngõ); 225/152/400
+    +0,2 (gốc cưa); 203 ~0 (khóm hoa giấy không lọt khung h090); 469/331/111/097/092/189/391/386/065 ~0 (lỗi chính là hình khối/phố — W5-D);
+    8 đối chứng không đổi.
+    **CÒN:** 469/331/519 phố hiển thị rộng như quảng trường (W5-D) nên cây/người mới ít tác dụng; hàng xe 2 dải ở 088 h090 vẫn thưa hơn ảnh
+    (dải sát bó vỉa vướng hố cây/cột); cây dải phố cạnh vườn 225 h180 vẫn tán xanh (luật W3-G tách polS/polP — chưa đổi); vườn biệt thự
+    chưa có cây bụi/cây cảnh thấp (chỉ cây gỗ + cau); dây leo chưa phủ được mảng mặt tiền lớn như 203.
+    **Cổng:** node --check OK, waterbfs 5/5, check_assets ĐỦ, diag full/lite: diag full "TẤT CẢ THỰC THỂ OK — 0 lỗi JS" (bất biến: overlap 1 ở (259,111) — có từ tích hợp W3), diag lite OK 0 lỗi mọi bất biến 0; 0 lỗi JS mọi lô chụp/đo.
 - **2026-10-14 (Đ3-W4 SỬA HỒI QUY TÍCH HỢP)** [chấm cặp REAL | dot3 c24a52e | tích hợp W4: 5 pano tụt điểm — sửa TẬN GỐC, không gỡ W4]:
     **(1) BẢNG LỚN TỪNG BAY trên toà một chủ** (pano_046 h0/h270 BIDV, 161 h90/h180 ngân hàng "trắng sọc xanh", 515 h0/h270 toà
     thương mại 8 T): chế độ 3 của W4-A (`aFp.z` = 3) dựng ô PANEL chữ cửa hàng NGẪU NHIÊN ở MỌI bay tầng 1(-2) → chồng "NHÀ NGHỈ/
