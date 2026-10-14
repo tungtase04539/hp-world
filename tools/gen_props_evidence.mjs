@@ -17,6 +17,7 @@
 //           · 16 hàng rào sắt · 32 xe khách đỗ thành dãy · 64 ô tô phủ bạt · 128 xe ba gác · 256 xe đạp dựng
 //           · 512 trạm biến áp/tủ điện lớn dưới đất · 1024 xe máy phủ bạt/áo trùm (Đ3-W4-B)
 //           · 2048 ĐÔNG NGƯỜI (chợ/quán/vỉa hè đông khách — Đ3-W5-C)
+//           · 4096 DÂY LEO / giàn hoa giấy trên tường-ban công (mô tả thảm cây + fp_json trees — Đ3-W5-C)
 // Chợ theo OSM (amenity=marketplace, osm_landuse.json — Overpass mục 12 của fetch_osm.sh) NHÚNG SẴN dưới đây
 // (OSM_MARKETS, toạ độ game, làm tròn 0,1 m) để bộ sinh tự đủ (tools/osm_*.json bị gitignore, máy khác có thể thiếu).
 // Làm mới danh sách: node tools/gen_props_evidence.mjs --osm tools/osm_landuse.json  (in ra mảng mới để dán vào đây).
@@ -148,6 +149,7 @@ for (const e of j) {
   if (sp & 8) sp |= 2048;
   if (/(ô\/?dù|(?<!mặc )dù|(?<!xe )ô (che|lớn))[^.;|]{0,12}đỏ|(dù|ô) đỏ/.test(mk)) sp |= 4096;
   if (/đông người|người (mua bán |đi bộ )?đông|khách đông|đông khách|đông đúc|chen chúc|nhiều người (đi bộ|mua|qua lại|ngồi)|người mua bán/.test(all)) deco |= 2048;
+  if (/dây leo|cây leo|giàn (cây|hoa|leo)|hoa giấy|bougainvillea|leo tường|leo ban công/.test(low(e.vegetation) + ' ' + all)) deco |= 4096;
   // Đ3-W4-B: bằng chứng THEO HƯỚNG từ facade fingerprints (tools/fp_nature.json, trường "street" ~6 ảnh/pano) — CHỈ NÂNG:
   // hàng xe máy dày ≥ 2 hướng → mức 3, ≥ 1 hướng (không hướng nào nói "ít/không xe máy") → ≥ 2; xe máy phủ bạt → deco 1024;
   // hàng hoá bày ≥ 2 → spill 4; ghế nhựa/bàn ghế quán ≥ 2 → clutter 1; chậu cây ≥ 1 → spill 512; dây chằng chịt ≥ 2 (pano
@@ -166,12 +168,13 @@ for (const e of j) {
     if (!(sp & 2048) && fp.cafe >= 2 && fp.umbRed >= 1) { sp |= 2048; fpStat.terrace++; }
     if (!(sp & 4096) && fp.umbRed >= 1 && (sp & (1 | 8 | 2048))) { sp |= 4096; fpStat.red++; }
     if (!(deco & 2048) && fp.crowd >= 1) { deco |= 2048; fpStat.crowd++; }
+    if (!(deco & 4096) && fp.vines >= 1) { deco |= 4096; fpStat.vines = (fpStat.vines || 0) + 1; }
   }
   rows.push([Math.round(e.X * 10) / 10, Math.round(e.Z * 10) / 10, bike, car, pole, lamp, cl, market, sp, deco]);
   stat.bike[bike]++; stat.car[car]++; stat.pole[pole]++; stat.lamp[lamp]++; stat.market[market]++;
   for (let b = 0; b < 6; b++) if (cl & (1 << b)) stat.clutter[1 << b] = (stat.clutter[1 << b] || 0) + 1;
   for (let b = 0; b < 13; b++) if (sp & (1 << b)) stat.spill[1 << b] = (stat.spill[1 << b] || 0) + 1;
-  for (let b = 0; b < 12; b++) if (deco & (1 << b)) stat.deco[1 << b] = (stat.deco[1 << b] || 0) + 1;
+  for (let b = 0; b < 13; b++) if (deco & (1 << b)) stat.deco[1 << b] = (stat.deco[1 << b] || 0) + 1;
 }
 const head = `// SINH TỰ ĐỘNG bởi tools/gen_props_evidence.mjs từ ${SRC} — ĐỪNG SỬA TAY.\n` +
   `// [X, Z, bike 0-3, car 0-2, pole 0-2, lamp bits (1 cao áp, 2 cổ điển), clutter bits (1 ghế nhựa, 2 xe đẩy, 4 thùng rác,\n` +

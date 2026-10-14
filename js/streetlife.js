@@ -329,6 +329,22 @@ export function modelOrnate5Globes(G) {
   for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2; P.push(G.finish(new THREE.IcosahedronGeometry(0.19, 0).translate(Math.cos(a) * 0.62, y + 0.2, Math.sin(a) * 0.62), 0xffffff)); }
   return G.mergeParts(P);
 }
+// Đ3-W5-C: DÂY LEO / GIÀN HOA GIẤY rủ từ ban công-mép tường (203 "khóm hoa giấy hồng", 184 "giàn cây leo trên ban công", 506
+// "giàn hoa giấy tím trên tường biệt thự"): local +Z ra lòng đường (lưng z = 0 áp tường), y = 0 = MÉP TRÊN (instance y = cao
+// ban công), rủ xuống ~2,1 m, rộng ~2,2 m. 11 cụm lá (icosa dẹt theo z, xanh cố định) thưa dần xuống dưới thành 4 tua + 7 chùm
+// hoa (màu instance: hồng sẫm/tím/cam/trắng — hoa giấy) — ~360 tam giác
+function modelVine(G) {
+  const P = [];
+  const leaf = [0x3f6e2c, 0x4a7d33, 0x35602a, 0x56893a];
+  const blob = (r, x, y, z, sz = 0.42) => new THREE.IcosahedronGeometry(r, 0).scale(1, 0.85, sz).translate(x, y, z);
+  const L = [[-0.75, -0.25, 0.42], [0, -0.18, 0.48], [0.72, -0.28, 0.4], [-0.4, -0.62, 0.36], [0.38, -0.6, 0.38],
+    [-0.85, -0.95, 0.26], [-0.1, -1.0, 0.3], [0.62, -1.05, 0.28], [-0.55, -1.45, 0.2], [0.25, -1.55, 0.22], [0.75, -1.75, 0.16]];
+  L.forEach(([x, y, r], i) => P.push(G.finish(blob(r, x, y, r * 0.42), leaf[i % 4])));
+  for (const [x, y0] of [[-0.95, -1.2], [-0.3, -1.6], [0.45, -1.9], [0.95, -1.4]]) P.push(G.finish(G.box(0.05, 0.9, 0.05, x, y0 - 0.2, 0.12, 0, 0, (x > 0 ? -1 : 1) * 0.08), 0x3a6a2a));   // tua rủ
+  const F = [[-0.55, -0.3], [0.2, -0.15], [0.6, -0.55], [-0.2, -0.75], [-0.75, -1.05], [0.35, -1.15], [0.05, -1.5]];
+  F.forEach(([x, y], i) => P.push(G.finish(blob(0.17 + (i % 3) * 0.04, x, y, 0.3 + (i % 2) * 0.08, 0.6), 0xffffff, 1)));
+  return G.mergeParts(P);
+}
 // CỔNG CHÀO khu dân cư (2 trụ + dầm; chữ = tấm băng rôn riêng) — local X = ngang ngõ (scale x = bề rộng/4), +Z ra phố
 function modelGate(G) {
   const P = [];
@@ -885,6 +901,29 @@ export function placeStreetLife(P) {
       st.flagsHouse++;
     }
   }
+  // ---- Đ3-W5-C DÂY LEO / HOA GIẤY trên mặt tiền: pano ≤ 35 m nói dây leo/giàn hoa (props_evidence deco 4096) → ~18% ô có mặt
+  //      tiền thật treo 1 khóm từ mép ban công tầng 2 (y 3,9-4,7 m), 55% hoa giấy (hồng sẫm/tím/cam), còn lại chỉ lá ----
+  const vines = [];
+  for (const S of sides) {
+    const X = XS(S);
+    for (let k = 0; k < S.n; k++) {
+      const e = S.ev[k];
+      if (!S.ok[k] || S.fore[k] || !e || !(e[9] & 4096)) continue;
+      const hv = hash3(S.ax + k * 1.9, S.az + S.side * 2.1, 421); if (hv > 0.18) continue;
+      const da = (hash3(S.ax + k, S.az, 422) - 0.5) * 1.4;
+      const [x0, z0] = cellPos(S, k, X.fac, da);
+      if (Math.hypot(e[0] - x0, e[1] - z0) > 35) continue;
+      let dF = null;
+      for (let d = -0.5; d <= 2.5; d += 0.25) { const [qx, qz] = cellPos(S, k, X.fac + d, da); if (inBuilding(qx, qz)) { dF = d; break; } }
+      if (dF === null) continue;
+      const [x, z] = cellPos(S, k, X.fac + dF - 0.03, da);
+      if (nearPano(x, z, 4)) continue;
+      const fl = hash3(x, z, 423) < 0.55;
+      vines.push({ x, z, heading: headRoad(S), yo: 3.9 + hash3(x, z, 424) * 0.8, col: fl ? pick([0xc8287a, 0xb02a8a, 0xd8508a, 0xe0702a, 0x9a3aa0], hash3(x, z, 425)) : 0x4f8a3a,
+        sc: [0.8 + hash3(x, z, 426) * 0.5, 0.75 + hash3(x, z, 427) * 0.45, 1] });
+    }
+  }
+  st.vines = vines.length;
   // ---- BĂNG RÔN căng ngang phố + CỔNG CHÀO (pano nhắc) ----
   const evRows = P.evidence || [];
   for (const e of evRows) {
@@ -961,7 +1000,7 @@ export function placeStreetLife(P) {
     }
   }
   st.ms = Math.round(performance.now() - T0);
-  return { overI, groundI, spillI, stallsRoad, flagsHouse, banners, gates, posts, mkBikes, stats: st };
+  return { overI, groundI, spillI, stallsRoad, flagsHouse, banners, gates, posts, mkBikes, vines, stats: st };
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -1002,6 +1041,8 @@ export function buildStreetLifeMeshes(B, L) {
   }
   L.stats.produce = pile.length;
   if (L.spillI.length) out.push(inst('props_spill', G.variants([modelRack(G), modelFlowers(G), modelPot(G), modelFurniture(G), modelAltar(G), modelToys(G), modelGoods(G), modelBaGac(G)]), matMkt, L.spillI, { rMax: NEAR_GROUND, keepBehind: 25, color: (it) => it.col }));
+  // Đ3-W5-C: dây leo/hoa giấy (y = mép trên khóm: chân mặt đất + yo)
+  if (L.vines && L.vines.length) out.push(inst('props_vines', modelVine(G), matMkt, L.vines.map((v) => ({ ...v, y: (v.y || 0) + v.yo, yo: 0 })), { rMax: LITE ? 140 : 220, keepBehind: 25, color: (it) => it.col }));
   if (L.flagsHouse.length) {
     const tex = houseFlagTexture();
     const geo = G.mergeGeometriesRaw(houseFlagGeometry());

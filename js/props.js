@@ -1751,7 +1751,7 @@ export function buildProps(ctx) {
   }
   // chân mọi đồ vỉa hè còn lại theo mặt đang vẽ (ô tô: yRoad riêng; dây đèn trang trí: y nền riêng)
   groundAll([...bikeI, bikeCov, stoolI, paraI, cartI, aframeI, binI, hydI, cabI, walkI, standI, sitI,
-    LIFE.overI, LIFE.groundI, LIFE.spillI, LIFE.flagsHouse, LIFE.banners, LIFE.gates, LIFE.posts]);
+    LIFE.overI, LIFE.groundI, LIFE.spillI, LIFE.flagsHouse, LIFE.banners, LIFE.gates, LIFE.posts, LIFE.vines || []]);
   const tPeds = performance.now();
 
   // ---------------------------------------------------------------------------------------------------------------
@@ -2037,7 +2037,7 @@ export function buildProps(ctx) {
   if (typeof window !== 'undefined') window.__hpProps = { stats, sides, carRejPts, spans: QA_PTS ? spans : null, cull: () => CULL.map((t) => [t.mesh.name, t.mesh.count, t.n]), bikeRows, lists: { stoolI, cartI, aframeI, walkI, standI, sitI, cars: carI.flat(), bikes: bikeI.flat().filter((b) => !b.road), bikesCov: bikeCov, cobraI, ornI, poleI, poleLampI, trafoI, binI,
     // W3-E (mkRoad = hàng chợ CỐ Ý lấn dải 1,1 m lòng đường sát bó vỉa — clearance_page bỏ qua như ô tô đỗ)
     mkOver: LIFE.overI.filter((g) => !g.road), mkGround: LIFE.groundI.filter((g) => !g.road), mkRoad: [...LIFE.groundI, ...LIFE.overI, ...LIFE.spillI, ...bikeI.flat()].filter((g) => g.road), spill: LIFE.spillI.filter((g) => !g.road),
-    kioskI, coaches: coachI, covered: coveredI, flagsHouse: LIFE.flagsHouse, banners: LIFE.banners, gates: LIFE.gates } };
+    kioskI, coaches: coachI, covered: coveredI, flagsHouse: LIFE.flagsHouse, banners: LIFE.banners, gates: LIFE.gates, vines: LIFE.vines } };
   // parkedCars: ô tô đỗ {x,z,heading,len,hw,…} (tâm ở curbLine − 0,95; phố r: curbLine − 0,05) — cho WP8 giao thông né
   // làn đỗ (xe chạy cách bó vỉa ≥ 1,9 m nơi có xe đỗ) mà không phải đọc lại collider
   // stalls (W3-E): hàng chợ lấn dải lòng đường sát bó vỉa {x,z,heading,len,hw} — traffic.js lách như ô tô đỗ
