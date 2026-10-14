@@ -104,38 +104,42 @@ const gl1Idx = (src) => src.replace(GL1_ARR, '$1($2)');
 // SHED 5, CIVIC 6); 7.. thêm ở W3-C, quyết định LÚC CHẠY trong renderStyles() từ bằng chứng pano (js/facade_evidence.js) +
 // vùng + luật sửa dữ liệu (kho tôn ≥3 tầng, lô kính hẹp, tháp ≥9 tầng). Bit 4-5 = TUỔI (lớp phong hoá 0..3), bit 6 = nhà
 // nhiều BIỂN BẢNG LỚN (phố buôn bán), bit 7 dự trữ.
-const RS = { COL: 7, NEO: 8, CONS: 9, MODERN: 10, TOWER: 11, TEN: 12 };
-const NRS = 13;
+const RS = { COL: 7, NEO: 8, CONS: 9, MODERN: 10, TOWER: 11, TEN: 12, HOTEL: 13 };
+// W4-C: 13 = KHÁCH SẠN / tháp văn phòng khung đá + kính (U_HOTEL, sảnh kính G_LOBBY, không bay "nhà ở", mái hiên kính 3D);
+// 14, 15 còn trống (aFac.z 4 bit).
+const NRS = 14;
 // Bộ mô-đun theo KIỂU DỰNG. Lặp tên = tăng trọng số.
 const SETS = {
   U0: ['U_SLIDE0', 'U_SLIDE0', 'U_SLIDE1', 'U_BALC0', 'U_BALC1', 'U_BALC0', 'U_CAGE', 'U_TILE', 'U_AC', 'U_AC', 'U_LOG'],
   U1: ['U_SHUT0', 'U_SHUT0', 'U_SHUT1', 'U_ARCH', 'U_BALU', 'U_CAGE', 'U_SLIDE1', 'U_VINE'],
   U2: ['U_KTT0', 'U_KTT0', 'U_KTT1', 'U_CAGE', 'U_LOG', 'U_TEN'],
   U3: ['U_CURT2', 'U_CURT2', 'U_CURT0', 'U_CURT1', 'U_CURT3', 'U_RIB'],        // W3-C: kính PHẢN TRỜI sáng (trước: CURT0 tối)
-  U4: ['U_VILLA', 'U_VILLA', 'U_SHUT0', 'U_ARCH', 'U_BALU', 'U_COL0'],
+  U4: ['U_VILLA2', 'U_VILLA', 'U_VILLA2', 'U_SHUT0', 'U_ARCH', 'U_BALU', 'U_COL2'],   // W4-C: + biệt thự cửa vòm/ban công con tiện
   U5: ['U_SHED'],
   U6: ['U_CIVIC', 'U_CIVIC', 'U_RIB'],
-  U7: ['U_COL0', 'U_COL0', 'U_COL1', 'U_COL1', 'U_SHUT0', 'U_ARCH', 'U_BALU', 'U_VINE'],   // thuộc địa Pháp
+  U7: ['U_COL0', 'U_COL2', 'U_COL1', 'U_COL2', 'U_COL1', 'U_SHUT0', 'U_ARCH', 'U_BALU', 'U_VINE'],   // thuộc địa Pháp (W4-C: + U_COL2 trán cong/chớp mở)
   U8: ['U_NEO', 'U_NEO', 'U_NEO', 'U_COL0'],                                               // tân cổ điển trắng
   U9: ['U_CONS', 'U_CONS', 'U_NET'],                                                       // đang xây
   U10: ['U_ACP', 'U_ACP', 'U_CURT2', 'U_SLIDE0', 'U_TOWER', 'U_ACP'],                       // nhà phố hiện đại (alu/kính)
   U11: ['U_TOWER', 'U_TOWER', 'U_TOWER', 'U_RIB', 'U_CURT2', 'U_SLIDE0'],                   // cao tầng hiện đại
   U12: ['U_TEN', 'U_TEN', 'U_KTT0', 'U_KTT1', 'U_CAGE', 'U_LOG'],                           // tập thể xuống cấp
+  U13: ['U_HOTEL', 'U_HOTEL', 'U_HOTEL', 'U_CURT2'],                                          // W4-C khách sạn/văn phòng khung đá
   // (phản biện WP2: mặt phố liền lặp 1 kiểu kệ hàng cả dãy → sửa xe/điện thoại/điện nước). W3-C: ÍT cửa cuốn (pano ban ngày
   // phần lớn MỞ cửa), thêm quán mở / quần áo / đồ gỗ / quán ăn / showroom.
-  G0: ['G_SHOP0', 'G_SHOP1', 'G_SHOP2', 'G_SHOP3', 'G_MOTO', 'G_ELEC', 'G_HARD', 'G_OPEN0', 'G_OPEN1', 'G_OPEN2', 'G_FOOD', 'G_SHOW', 'G_SHUT0', 'G_GLASS', 'G_GATE', 'G_OPEN0'],
+  G0: ['G_SHOP0', 'G_SHOP1', 'G_SHOP2', 'G_SHOP3', 'G_MOTO', 'G_ELEC', 'G_HARD', 'G_OPEN0', 'G_OPEN1', 'G_OPEN2', 'G_FOOD', 'G_SHOW', 'G_SHUT0', 'G_GLASS', 'G_GATE', 'G_OPEN0', 'G_STORE0', 'G_STORE2'],
   G1: ['G_OLD', 'G_OLD', 'G_SHOP0', 'G_SHUT0', 'G_SHUT1', 'G_GATE', 'G_SHOP2', 'G_HOME0', 'G_HARD', 'G_ELEC', 'G_OPEN2', 'G_FOOD'],
   G2: ['G_SHOP0', 'G_SHUT0', 'G_GATE', 'G_HOME0', 'G_SHOP2', 'G_HOME1', 'G_MOTO', 'G_HARD', 'G_OPEN0'],
-  G3: ['G_SHOW', 'G_GLASS', 'G_SHOW', 'G_SHOP3'],
-  G4: ['G_HOME0', 'G_CIVIC'],
+  G3: ['G_SHOW', 'G_GLASS', 'G_STORE1', 'G_STORE0'],
+  G4: ['G_VILLA', 'G_VILLA', 'G_HOME0', 'G_CIVIC'],
   G5: ['G_WARE'],
   G6: ['G_CIVIC', 'G_CIVIC', 'G_GLASS'],
-  G7: ['G_OLD', 'G_OLD', 'G_OLD', 'G_COL', 'G_OPEN0', 'G_OPEN2', 'G_SHOP1', 'G_SHUT1'],   // phố Pháp vẫn là phố buôn bán: cửa vòm gỗ đóng ÍT
+  G7: ['G_OLD', 'G_OLD', 'G_OLD', 'G_COL', 'G_OPEN0', 'G_OPEN2', 'G_SHOP1', 'G_SHUT1', 'G_VILLA'],   // phố Pháp vẫn là phố buôn bán: cửa vòm gỗ đóng ÍT
   G8: ['G_NEO', 'G_NEO', 'G_NEO', 'G_COL'],
   G9: ['G_HOARD'],
-  G10: ['G_SHOW', 'G_SHOW', 'G_ELEC', 'G_GLASS', 'G_OPEN1', 'G_SHOP3'],
-  G11: ['G_SHOW', 'G_GLASS', 'G_CIVIC', 'G_SHOW'],
+  G10: ['G_SHOW', 'G_STORE0', 'G_STORE1', 'G_STORE2', 'G_ELEC', 'G_GLASS', 'G_OPEN1', 'G_STORE0'],   // W4-C: mặt KÍNH cửa hàng/ngân hàng/phòng khám
+  G11: ['G_SHOW', 'G_STORE1', 'G_CIVIC', 'G_STORE0'],
   G12: ['G_HOME0', 'G_HOME1', 'G_SHUT1', 'G_OPEN0', 'G_GATE', 'G_HOME0'],
+  G13: ['G_LOBBY', 'G_LOBBY', 'G_LOBBY', 'G_STORE1'],
   GH: ['G_HOME0', 'G_HOME0', 'G_HOME1', 'G_HOME1', 'G_SHUT0', 'G_GATE', 'G_SHUT1'],   // mặt ngõ/phố nhỏ: nhà ở
   // tường hông/sau/chung LỘ (W3-C "không tường trống"): thêm tường hồi ố, xi măng thô có cửa sổ nhỏ + điều hoà, quảng cáo sơn
   SD: ['S_PLAIN0', 'S_EXP0', 'S_PLAIN0', 'S_PLAIN2', 'S_PLAIN1', 'S_WIN', 'S_WIN', 'S_BRICK', 'S_BACK', 'S_EXP1', 'S_EXP0'],
@@ -160,12 +164,14 @@ const pidx = (h, n) => Math.floor(((h >>> 8) * n) / 16777216);
 // chỉ ghi USE_HOME cho các kiểu này với nhà cbIn sau tường mỏ neo Hải quân — process_buildings) → trệt KHÔNG biển: G_CIVIC
 // (song sắt + chân đá) / G_WARE, thay vì bộ nhà ở GH (G_SHUT0/G_GATE/G_SHUT1 có dải biển — pano_224/225 h270 hiện "BÁNH MÌ",
 // "SỬA XE MÁY" ngay sau tường). JS + GL2 + GL1 cùng luật (khớp bit với hộp biển 3D).
-const NOSIGN_ST = (st) => st === 6 || st === 3 || st === 5;
+const NOSIGN_ST = (st) => st === 6 || st === 3 || st === 5 || st === RS.HOTEL;   // W4-C: + khách sạn
+// W4-C: kiểu KHÔNG có bay "nhà ở" (đang xây, khách sạn: sảnh/kính liền) — JS, GL2, GL1 cùng luật
+const NOHOME_ST = (st) => st === RS.CONS || st === RS.HOTEL;
 function groundModule(s8, bay, wide, rc, st) {
   const gk = wide ? ihash(s8 * 977 + bay, 101) : s8;
   const g1 = ihash(gk, bay * 2 + 1), g2 = ihash(gk, bay * 2 + 2);
   // W3-C: đang xây (RS.CONS) không có bay nhà ở; W3-A r3: rc 3 trên CIVIC/GLASS/SHED → trệt không biển
-  if (st !== RS.CONS && (g2 >>> 8) < HOME_THR[Math.min(3, rc)]) return rc >= 3 && NOSIGN_ST(st) ? (st === 5 ? 'G_WARE' : 'G_CIVIC') : SETS.GH[pidx(g1, SETS.GH.length)];
+  if (!NOHOME_ST(st) && (g2 >>> 8) < HOME_THR[Math.min(3, rc)]) return rc >= 3 && NOSIGN_ST(st) ? (st === 5 ? 'G_WARE' : 'G_CIVIC') : SETS.GH[pidx(g1, SETS.GH.length)];
   const set = SETS['G' + Math.min(NRS - 1, st)];
   return FIXED_G(st) ? set[0] : set[pidx(g1, set.length)];
 }
@@ -267,7 +273,7 @@ ${pickChain('pickGi', 'G', 'uint h', (s) => `pidx(h, ${ni(s)})`)}`;
         uint gk = wide > 0.5 ? ihash(sI * 977u + bI, 101u) : sI;
         uint g1 = ihash(gk, bI * 2u + 1u), g2 = ihash(gk, bI * 2u + 2u);
         uint thr = rc > 2.5 ? ${HOME_THR[3]}u : rc > 1.5 ? ${HOME_THR[2]}u : (rc > 0.5 ? ${HOME_THR[1]}u : ${HOME_THR[0]}u);
-        bool home = st != ${RS.CONS} && (g2 >> 8u) < thr;
+        bool home = st != ${RS.CONS} && st != ${RS.HOTEL} && (g2 >> 8u) < thr;
         m = home ? (rc > 2.5 && (st == 6 || st == 3 || st == 5) ? (st == 5 ? ${MOD.G_WARE}.0 : ${MOD.G_CIVIC}.0) : GH[pidx(g1, ${ni('GH')})]) : pickGi(st, g1);`;
   // GL1: u1 = (g1>>>8)/2^24 từ bảng tra (RGB 24 bit, NEAREST), pidx(g1,n) = int(u1·n)
   const GL1_GROUND = `uniform sampler2D uGMod;
@@ -276,7 +282,7 @@ ${pickChain('pickGi', 'G', 'float u', (s) => `int(u * ${n(s)})`)}`;
         vec3 gb = floor(gm.rgb * 255.0 + 0.5);
         float u1 = (gb.r * 65536.0 + gb.g * 256.0 + gb.b) / 16777216.0;
         float rcI = rc > 2.5 ? 3.0 : rc > 1.5 ? 2.0 : (rc > 0.5 ? 1.0 : 0.0);
-        bool home = st != ${RS.CONS} && rcI >= floor(gm.a * 255.0 + 0.5);
+        bool home = st != ${RS.CONS} && st != ${RS.HOTEL} && rcI >= floor(gm.a * 255.0 + 0.5);
         m = home ? (rcI > 2.5 && (st == 6 || st == 3 || st == 5) ? (st == 5 ? ${MOD.G_WARE}.0 : ${MOD.G_CIVIC}.0) : GH[int(u1 * ${n('GH')})]) : pickGi(st, u1);`;
   // WebGL1 (three r160 tự lùi về WebGL1 khi máy không có WebGL2 — vd GPU/driver bị chặn WebGL2): GLSL ES 1.0 không có
   // uint/phép bit, textureGrad, mảng const. Nhánh GL1 cùng thuật toán: mảng → hàm if (gl1Idx), hash nguyên → bảng tra
@@ -362,7 +368,8 @@ float fabAO = 1.0;
     float pIdx = 0.0;
     if (fl >= floors - 0.01) {
       if (pitched > 0.5) m = SD[0];
-      else m = ((st == 1 || st == 4 || st == 7 || st == 8) && h21(vec2(bs * 7.1, 3.3)) < 0.5) ? ${MOD.P_BALU}.0 : ${MOD.P_PLAIN}.0;
+      else if (st == 4 || st == 7 || st == 8) m = h21(vec2(bs * 7.1, 3.3)) < 0.75 ? ${MOD.P_COL}.0 : ${MOD.P_BALU}.0;   // W4-C: lan can mái gờ phào + con tiện
+      else m = (st == 1 && h21(vec2(bs * 7.1, 3.3)) < 0.5) ? ${MOD.P_BALU}.0 : ${MOD.P_PLAIN}.0;
     } else if (kind == 1) {
       if (fl < 0.5) {
 ${gl1 ? GL1_GROUND_MAIN : GL2_GROUND_MAIN}
@@ -388,6 +395,7 @@ ${gl1 ? GL1_GROUND_MAIN : GL2_GROUND_MAIN}
       float r = h21(vec2(seed * 3.7 + fl * 1.31, bay * 0.71 + 0.3)) < 0.8 ? mainR : altR;
       m = (h21(vec2(seed * 2.9 + bay * 0.61, float(kind) + 0.5)) < 0.12) ? SD[0] : pickU(st, r);   // ~12% bay trơn (lõi thang)
     }
+    else if (big > 0.5 && rc > 0.5 && (st == 3 || st == 11 || st == ${RS.HOTEL})) m = ${MOD.G_LOBBY}.0;   // W4-C: trệt hông LỘ của tháp kính/khách sạn = sảnh kính (pano_230: tường xi măng ố)
     else if (rc > 0.5 && st != 5) m = XP[int(h21(vec2(seed * 17.9 + bay * 0.37, fl * 0.61 + 0.3)) * ${n('XP')})];   // W3-C: tường hông/sau LỘ ra phố
     else if (kind == 2) m = BK[int(h21(vec2(seed * 9.7 + bay * 0.53, fl * 0.77 + 0.2)) * ${n('BK')})];
     else {
@@ -399,7 +407,7 @@ ${gl1 ? GL1_GROUND_MAIN : GL2_GROUND_MAIN}
     if (pnl > 0.5) { f = vec2(fu, (mod(pIdx, 2.0) + fv) * 0.5); dq.y *= 0.5; }
     cellKey = bay * 7.0 + fl * 13.0;
     fabAO = mix(0.62, 1.0, smoothstep(0.0, 1.7, hh));
-    glassK = (st == 3 || st == 10 || st == 11) ? 1.0 : 0.4;
+    glassK = (st == 3 || st == 10 || st == 11 || st == ${RS.HOTEL}) ? 1.0 : 0.4;
   } else {
     m = vFac.z; f = fract(q);
     if (kind == 5) { fabAO = 0.92; signSeed = vFac.w / 255.0; }
@@ -478,7 +486,7 @@ ${gl1 ? GL1_GROUND_MAIN : GL2_GROUND_MAIN}
 #endif`)
       .replace('#include <aomap_fragment>', 'reflectedLight.indirectDiffuse *= fabAO; reflectedLight.directDiffuse *= mix(1.0, fabAO, 0.35);');
   };
-  m.customProgramCacheKey = () => 'fabric_v3c_' + size;
+  m.customProgramCacheKey = () => 'fabric_v4c_' + size;
   _mat = m;
   return m;
 }
@@ -547,6 +555,75 @@ function steelPost(G, x, z, yB, yT, r, ox, oz, s8) {
     const nx = -(bz - az), nz = bx - ax, l = Math.hypot(nx, nz) || 1;
     G.quad([ax, yB, az, bx, yB, bz, bx, yT, bz, ax, yT, az], nx / l, 0, nz / l, [0, 0, 0.05, 0, 0.05, 1, 0, 1], WHITE, s8, 5, MOD.D_SIGNF, 0);
   }
+}
+
+// ---------- W4-C: quad theo PHÁP TUYẾN mong muốn (tự đảo thứ tự đỉnh nếu ngược chiều — khỏi nhầm CCW) ----------
+function quadN(G, p, nx, ny, nz, uv, col, s8, cell) {
+  const ax = p[3] - p[0], ay = p[4] - p[1], az = p[5] - p[2], bx = p[6] - p[0], by = p[7] - p[1], bz = p[8] - p[2];
+  const cx = ay * bz - az * by, cy = az * bx - ax * bz, cz = ax * by - ay * bx;
+  if (cx * nx + cy * ny + cz * nz < 0) {
+    p = [p[0], p[1], p[2], p[9], p[10], p[11], p[6], p[7], p[8], p[3], p[4], p[5]];
+    uv = [uv[0], uv[1], uv[6], uv[7], uv[4], uv[5], uv[2], uv[3]];
+  }
+  G.quad(p, nx, ny, nz, uv, col, s8, 5, cell, 0);
+}
+const lighten = (c, t) => [Math.round(c[0] + (255 - c[0]) * t), Math.round(c[1] + (255 - c[1]) * t), Math.round(c[2] + (255 - c[2]) * t)];
+// hộp đua dọc cạnh tường a→b (s0..s1 m dọc cạnh, nhô P, y yb..yt): mặt trước + đáy (+ đỉnh) + 2 đầu. Trả số tam giác.
+function ledge(G, ax, az, ex, ez, nx, nz, s0, s1, P, yb, yt, col, s8, cellF, vF, top, ends) {
+  const p0x = ax + ex * s0, p0z = az + ez * s0, p1x = ax + ex * s1, p1z = az + ez * s1;
+  const q0x = p0x + nx * P, q0z = p0z + nz * P, q1x = p1x + nx * P, q1z = p1z + nz * P, w = (s1 - s0) / 4, d = P / 4, h = (yt - yb) / 4;
+  quadN(G, [q0x, yb, q0z, q1x, yb, q1z, q1x, yt, q1z, q0x, yt, q0z], nx, 0, nz, [s0 / 4, vF[0], s1 / 4, vF[0], s1 / 4, vF[1], s0 / 4, vF[1]], col, s8, cellF);
+  quadN(G, [p0x, yb, p0z, p1x, yb, p1z, q1x, yb, q1z, q0x, yb, q0z], 0, -1, 0, [0, 0, w, 0, w, d, 0, d], col, s8, MOD.D_PLAIN);
+  let t = 4;
+  if (top) { quadN(G, [p0x, yt, p0z, p1x, yt, p1z, q1x, yt, q1z, q0x, yt, q0z], 0, 1, 0, [0, 0, w, 0, w, d, 0, d], col, s8, MOD.D_PLAIN); t += 2; }
+  if (ends) {
+    quadN(G, [p0x, yb, p0z, q0x, yb, q0z, q0x, yt, q0z, p0x, yt, p0z], -ex, 0, -ez, [0, 0, d, 0, d, h, 0, h], col, s8, MOD.D_PLAIN);
+    quadN(G, [p1x, yb, p1z, q1x, yb, q1z, q1x, yt, q1z, p1x, yt, p1z], ex, 0, ez, [0, 0, d, 0, d, h, 0, h], col, s8, MOD.D_PLAIN);
+    t += 4;
+  }
+  return t;
+}
+// W4-C BỘ CHI TIẾT THUỘC ĐỊA / TÂN CỔ ĐIỂN / BIỆT THỰ trên MẶT PHỐ (AUDIT4 D1 "ornate colonial detail missing" 051/161/423/
+// 496/506/538): GỜ PHÀO MÁI nhô 0,36 m (ô CHÍNH M — bóng đổ + bóng viền mái thấy từ xa, 10 tam giác), GỜ TẦNG nhô 0,13 m mỗi
+// sàn (ô gần DT, 4 tam giác/tầng), TRỤ ÁP nhô 0,11 m ở MỌI ranh bay từ tầng 1 (trệt thuộc địa là cửa hàng) — khớp trụ vẽ ở 2
+// mép bay của U_COL*/U_NEO/U_VILLA* (6 tam giác/trụ). Màu = màu tường sáng hơn 35% (gờ vữa trắng ngà).
+function classicKit(M, DT, ax, az, bx, bz, dx, dz, L, nx, nz, nb, y0, H, fl, rt, wcol, s8, st) {
+  const ex = dx / L, ez = dz / L, lc = lighten(wcol, 0.35);
+  const yTop = y0 + H + 0.06;
+  st.tris += ledge(M, ax, az, ex, ez, nx, nz, 0, L, 0.36, yTop - 0.42, yTop, lc, s8, MOD.D_CORN, [0, 1], true, true);
+  st.corn = (st.corn || 0) + 1;
+  if (!DT || fl < 2) return;
+  for (let k = 1; k < fl; k++) {
+    const y = y0 + heightOf(k);
+    st.detTris += ledge(DT, ax, az, ex, ez, nx, nz, 0, L, 0.13, y - 0.06, y + 0.16, lc, s8, MOD.D_CORN, [0.42, 1], false, false);
+  }
+  if (nb > 16) return;
+  const bw = L / nb, yb = y0 + GROUND_H - 0.1, yt = yTop - 0.42;
+  if (yt - yb < 1) return;
+  for (let k = 0; k <= nb; k++) {
+    const c = k * bw, s0 = Math.max(0, c - 0.26), s1 = Math.min(L, c + 0.26);
+    st.detTris += pilaster3(DT, ax, az, ex, ez, nx, nz, s0, s1, 0.11, yb, yt, lc, s8);
+    st.pil = (st.pil || 0) + 1;
+  }
+}
+function pilaster3(G, ax, az, ex, ez, nx, nz, s0, s1, P, yb, yt, col, s8) {
+  const p0x = ax + ex * s0, p0z = az + ez * s0, p1x = ax + ex * s1, p1z = az + ez * s1;
+  const q0x = p0x + nx * P, q0z = p0z + nz * P, q1x = p1x + nx * P, q1z = p1z + nz * P, w = (s1 - s0) / 4, h = (yt - yb) / 4, d = P / 4;
+  quadN(G, [q0x, yb, q0z, q1x, yb, q1z, q1x, yt, q1z, q0x, yt, q0z], nx, 0, nz, [0, 0, w, 0, w, h, 0, h], col, s8, MOD.D_PLAIN);
+  quadN(G, [p0x, yb, p0z, q0x, yb, q0z, q0x, yt, q0z, p0x, yt, p0z], -ex, 0, -ez, [0, 0, d, 0, d, h, 0, h], col, s8, MOD.D_PLAIN);
+  quadN(G, [p1x, yb, p1z, q1x, yb, q1z, q1x, yt, q1z, p1x, yt, p1z], ex, 0, ez, [0, 0, d, 0, d, h, 0, h], col, s8, MOD.D_PLAIN);
+  return 6;
+}
+// W4-C MÁI SẢNH KÍNH khách sạn (porte-cochère): tấm 5,5 m × ≤20 m ở +4,4..4,75 m giữa mặt phố dài nhất — mặt trên kính sẫm
+// (D_SIGNF), trần dưới sáng, diềm nhôm tối 3 phía. 10 tam giác.
+const CANOPY_SOFFIT = [232, 232, 228];
+function hotelCanopy(G, ax, az, bx, bz, fL, nx, nz, y0, s8, st) {
+  const ex = (bx - ax) / fL, ez = (bz - az) / fL, W = Math.min(20, fL * 0.55), s0 = (fL - W) / 2;
+  st.detTris += ledge(G, ax, az, ex, ez, nx, nz, s0, s0 + W, 5.5, y0 + 4.4, y0 + 4.75, WHITE, s8, MOD.D_SIGNF, [0, 1], false, true);
+  // trần sáng (đè lên mặt đáy D_PLAIN tối của ledge? không — ledge đáy dùng màu WHITE × D_PLAIN = sáng) + mặt trên kính sẫm
+  const p0x = ax + ex * s0, p0z = az + ez * s0, p1x = p0x + ex * W, p1z = p0z + ez * W, D = 5.5, yt = y0 + 4.75;
+  quadN(G, [p0x, yt, p0z, p1x, yt, p1z, p1x + nx * D, yt, p1z + nz * D, p0x + nx * D, yt, p0z + nz * D], 0, 1, 0, [0, 0, W / 4, 0, W / 4, D / 4, 0, D / 4], CANOPY_SOFFIT, s8, MOD.U_CURT2);
+  st.detTris += 2; st.canopyH = (st.canopyH || 0) + 1;
 }
 
 // ---------- hình học 2D ----------
@@ -829,7 +906,11 @@ function renderStyles(D, CX, CZ) {
     if (e) {
       // ĐANG XÂY chỉ cho nhà ≤ 8 tầng mà mô tả KHÔNG kèm kính/tân cổ điển/cao tầng: quan sát "thi công/giàn giáo" gần tháp
       // thường là rào/công trình dưới chân — phủ lưới + gạch cả tháp 15-20 tầng là sai rất lộ (nhóm đối chứng pano_285/304 h180)
-      if ((e & FEF.CONS) && fl <= 8 && !(e & (FEF.GLASS | FEF.NEO | FEF.TOWER))) rs = RS.CONS;
+      // W4-C: KHÁCH SẠN/tháp văn phòng = quan sát "cao tầng" + "kính" (hoặc + "tân cổ điển" = đế đá) trên khối LỚN — trước
+      // luật NEO/GLASS: pano_359 sảnh khách sạn kính (cao tầng+kính+tân cổ điển, dữ liệu 6 tầng) ra mặt tân cổ điển be;
+      // pano_230 tháp kính (cao tầng+kính) ra khối xám ố
+      if ((e & FEF.TOWER) && (e & (FEF.GLASS | FEF.NEO | FEF.SHOW)) && area >= 1200 && sty !== STYLE.KTT) rs = RS.HOTEL;
+      else if ((e & FEF.CONS) && fl <= 8 && !(e & (FEF.GLASS | FEF.NEO | FEF.TOWER))) rs = RS.CONS;
       else if ((e & FEF.TEN) && fl >= 3 && fl <= 8) rs = RS.TEN;
       else if ((e & FEF.NEO) && fl <= 6 && (area >= 250 || sty === STYLE.CIVIC || sty === STYLE.VILLA)) rs = RS.NEO;
       else if ((e & FEF.COL) && fl <= 5 && sty !== STYLE.SHED) rs = RS.COL;
@@ -855,12 +936,13 @@ function renderStyles(D, CX, CZ) {
     if (NOSIGN_ST(sty) && !NOSIGN_ST(rs) && D.info && ((D.info[b] >> INFO.USE_SHIFT) & 3) === INFO.USE_HOME) { rs = (rs === RS.TOWER || rs === RS.MODERN) ? STYLE.GLASS : STYLE.CIVIC; sts.nosignKeep++; }
     // (d) tuổi (lớp phong hoá shader): theo kiểu + vùng + bằng chứng cũ/mới + biến thiên theo hạt giống
     let age = (rs === RS.TEN || rs === STYLE.OLD || rs === RS.COL || rs === STYLE.KTT) ? 2
-      : (rs === STYLE.GLASS || rs === RS.MODERN || rs === RS.TOWER) ? 0 : 1;
+      : (rs === STYLE.GLASS || rs === RS.MODERN || rs === RS.TOWER || rs === RS.HOTEL) ? 0 : 1;
     age += zAge - 1;
     if (e & FEF.OLD) age += 1;
     if (e & FEF.NEW) age -= 1;
     const r4 = hh(seed, 309); if (r4 < 0.2) age += 1; else if (r4 < 0.32) age -= 1;
     if (rs === RS.CONS) age = 1;
+    if (rs === RS.HOTEL) age = Math.min(age, 1);   // W4-C: khách sạn/văn phòng được bảo trì — không ố nặng
     age = Math.max(0, Math.min(3, age));
     const panel = (e & FEF.BIGSIGN) || ((zf & FEZ.COMM) && hh(seed, 311) < 0.3) ? 1 : 0;
     rsz[b] = rs | (age << 4) | (panel << 6);
@@ -992,6 +1074,8 @@ export function buildRealFabric(scene, ctx) {
     const areaPoly = (() => { let a = 0; for (let i = 0; i < n; i++) { const j = (i + 1) % n; a += X[i] * Z[j] - X[j] * Z[i]; } return Math.abs(a / 2); })();
     const rectness = areaPoly / Math.max(1e-6, Lu * Lv);
     let rt = roofT;
+    // W4-C: BIỆT THỰ (kiểu dựng) mái bằng gần chữ nhật → mái NGÓI 4 dốc (biệt thự Pháp HP: ngói đỏ — vệ tinh + pano)
+    if ((RSZ[b] & 15) === STYLE.VILLA && (rt === ROOF.FLAT_PARAPET || rt === ROOF.FLAT) && rectness >= 0.85 && n <= 6 && areaPoly < 700 && fl <= 3 && hh(seed, 91) < 0.7) rt = ROOF.HIP_TILE;
     if (rt === ROOF.HIP_TILE && (rectness < 0.85 || n > 6)) rt = ROOF.GABLE_TON;
     if ((rt === ROOF.GABLE_TON || rt === ROOF.SHED_TON) && (hw < 1.2 || hw > 22)) rt = ROOF.FLAT;
     const pitched = rt === ROOF.GABLE_TON || rt === ROOF.SHED_TON;
@@ -1014,9 +1098,11 @@ export function buildRealFabric(scene, ctx) {
     // styF = aFac.z tường (kiểu | tuổi<<4 | biển lớn<<6); rs = kiểu dựng; ev = cờ bằng chứng trực tiếp
     const styF = RSZ[b], rs = styF & 15, ev = EVB[b];
     const bigFlag = (fl >= 5 || (areaPoly >= 600 && fl >= 3) || sty === STYLE.KTT || sty === STYLE.GLASS || sty === STYLE.CIVIC || sty === STYLE.VILLA
-      || rs === RS.NEO || rs === RS.CONS || rs === RS.TOWER || rs === RS.TEN) ? 8 : 0;
+      || rs === RS.NEO || rs === RS.CONS || rs === RS.TOWER || rs === RS.TEN || rs === RS.HOTEL) ? 8 : 0;
     const tubeLike = rs === STYLE.TUBE || rs === STYLE.OLD || rs === RS.COL || rs === RS.MODERN;
-    const detOK = !(rs === STYLE.GLASS || rs === STYLE.SHED || rs === RS.CONS || rs === RS.NEO || rs === RS.TOWER);
+    const detOK = !(rs === STYLE.GLASS || rs === STYLE.SHED || rs === RS.CONS || rs === RS.NEO || rs === RS.TOWER || rs === RS.HOTEL);
+    // W4-C BỘ CHI TIẾT THUỘC ĐỊA / TÂN CỔ ĐIỂN / BIỆT THỰ: gờ phào mái (ô chính, thấy từ xa) + gờ tầng + trụ áp (ô gần)
+    const classic = rs === RS.COL || rs === RS.NEO || rs === STYLE.VILLA;
     // ---- TƯỜNG ----
     let hasFront = false, fnx = 0, fnz = 0, fL = 0;   // pháp tuyến cạnh mặt phố DÀI nhất (hướng tum thang / mái tôn che)
     let fAx = 0, fAz = 0, fBx = 0, fBz = 0, fRc = 9;   // W3-C: đầu mút + cấp đường của cạnh đó (biển quảng cáo trên mái)
@@ -1127,7 +1213,8 @@ export function buildRealFabric(scene, ctx) {
         }
         // ---- CỤC NÓNG ĐIỀU HOÀ 3D (ô gần): treo CAO trên tường mỗi tầng trên (đáy +2,58 m, đỉnh +3,12 m — dưới mép
         //      sàn ban công tầng trên +3,18 m → không cắt ban công/lan can), lồi 0,3 m; ~14% bay nhà ống, 21% KTT ----
-        if (DT && cover === 0 && fl >= 2 && L >= 2.4 && !(rs === STYLE.GLASS || rs === STYLE.SHED || rs === RS.CONS || rs === RS.NEO || rs === RS.MODERN)) {
+        if (classic && cover === 0 && L >= 3 && !pitched) classicKit(M, DT, ax, az, bx, bz, dx, dz, L, nx, nz, nb, y0, H, fl, rt, wcol, s8, st);
+        if (DT && cover === 0 && fl >= 2 && L >= 2.4 && !(rs === STYLE.GLASS || rs === STYLE.SHED || rs === RS.CONS || rs === RS.NEO || rs === RS.MODERN || rs === RS.HOTEL)) {
           const pAC = (rs === STYLE.KTT || rs === RS.TEN) ? 0.21 : (rs === STYLE.TUBE || rs === STYLE.OLD || rs === RS.COL || rs === RS.TOWER) ? 0.14 : 0.07;   // (v1: ×0,7 — ngân sách)
           const bw = L / nb, ex = dx / L, ez = dz / L, AW = 0.82, AH = 0.54, AD = 0.3;
           for (let k = 1; k < fl; k++) for (let q = 0; q < nb; q++) {
@@ -1201,6 +1288,8 @@ export function buildRealFabric(scene, ctx) {
         }
       }
     }
+    // ---- W4-C: MÁI SẢNH KÍNH khách sạn (porte-cochère, pano_359): tấm đua 5,5 m trên sảnh, giữa mặt phố dài nhất ----
+    if (rs === RS.HOTEL && DT && hasFront && fL >= 10 && fl >= 4) hotelCanopy(DT, fAx, fAz, fBx, fBz, fL, fnx, fnz, y0, s8, st);
     // ---- MÁI ----
     const roofY = y0 + (rt === ROOF.FLAT ? H + 0.25 : H);
     if (rt === ROOF.FLAT_PARAPET || rt === ROOF.FLAT) {
@@ -1381,7 +1470,7 @@ export function buildRealFabric(scene, ctx) {
     // ---- W3-C: BIỂN QUẢNG CÁO TRÊN MÁI (ô chính — thấy từ xa): nhà 3-9 tầng mái bằng, mặt phố chính dài ≥ 6 m; khung tấm
     //      quay ra phố, lùi 1,2 m sau tường, chân 2 cột thép; nội dung = ô BILL (từ chung, không thương hiệu). ~12 tam giác ----
     if (hasFront && fRc === 0 && fL >= 6 && fl >= 3 && fl <= 9 && (rt === ROOF.FLAT_PARAPET || rt === ROOF.FLAT)
-      && rs !== RS.CONS && rs !== RS.NEO && rs !== RS.COL
+      && rs !== RS.CONS && rs !== RS.NEO && rs !== RS.COL && rs !== RS.HOTEL
       && hh(seed, 501) < (((ev & FEF.BIGSIGN) || (styF & 64) ? 0.1 : 0.022) + (D.info && (D.info[b] & INFO.CORNER) ? 0.12 : 0))) {   // nhà GÓC phố (ngã tư pano_327): +12%
       const ex = (fBx - fAx) / fL, ez = (fBz - fAz) / fL, Wb = Math.min(fL * 0.8, 10), Hb = Math.min(3.6, Wb * 0.4);
       const mx = (fAx + fBx) / 2 - fnx * 1.2, mz = (fAz + fBz) / 2 - fnz * 1.2;

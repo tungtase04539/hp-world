@@ -13,7 +13,7 @@
 export const ATLAS_N = 8;
 // W3-C: atlas CAO hơn rộng — 8 cột × 12 hàng ô (2048×3072 / LITE 1024×1536; WebGL2 mip NPOT ổn, WebGL1 citygen tự tắt mip).
 // Ô vẫn 256 px (128 LITE) → mọi ô cũ giữ nguyên độ phân giải; 96 chỗ (63 cũ + ô mới W3-C).
-export const ATLAS_ROWS = 12;
+export const ATLAS_ROWS = 14;   // W4-C: 12 → 14 (95 ô cũ + 10 ô W4-C = 105; còn 7 chỗ) — 2048×3584 / LITE 1024×1792
 export const M_WALL = 255, M_GLASS = 191, M_KEEP = 128, M_SIGN = 64, M_TEXT = 0;
 export const MOD = {};          // tên mô-đun → chỉ số ô (ổn định theo thứ tự vẽ bên dưới)
 export const MODS = [];
@@ -339,6 +339,8 @@ export const SIGN_EXT = {
   G_GLASS: SB_FULL, G_GATE: SB_FULL, G_OLD: [0.5, 3.5], G_MOTO: SB_FULL, G_ELEC: SB_FULL, G_HARD: SB_FULL,
   // W3-C: trệt mở theo loại hàng + showroom (cùng dải biển đầy bay)
   G_SHOW: SB_FULL, G_OPEN0: SB_FULL, G_OPEN1: SB_FULL, G_OPEN2: SB_FULL, G_FOOD: SB_FULL,
+  // W4-C: mặt kính cửa hàng/ngân hàng/phòng khám (bộ G10 nhà phố hiện đại) — cùng dải biển đầy bay
+  G_STORE0: SB_FULL, G_STORE1: SB_FULL, G_STORE2: SB_FULL,
 };
 // W3-C: biển bảng lớn nhiều tầng (PANEL0.. 2 dải 4×2 m/ô), biển dọc (BLADE0.. 4 dải 1×4 m/ô), biển trên mái (BILL0.. 2 dải/ô)
 export const PANEL_CELLS = 5, BLADE_CELLS = 2, BILL_CELLS = 2;   // vòng 2: PANEL 3 → 5 ô (10 mẫu — phản biện: 6 mẫu lặp lộ ở 253/386)
@@ -1109,6 +1111,137 @@ export function buildFacadeAtlas(size = 2048, opts = {}) {
       blitText(t, 512, 256, 0.12, y0 + 0.12, tx1, y0 + 1.88, A.tc, M_KEEP);
       rect(0, y0, 4, y0 + 0.05, [230, 230, 230], M_KEEP); rect(0, y0 + 1.95, 4, y0 + 2, [230, 230, 230], M_KEEP);
     }
+  });
+  // ======================================================================================
+  // W4-C FACADE KIT (Đợt 3 wave 4): khách sạn/văn phòng cao tầng (khung đá + kính), sảnh kính, mặt KÍNH cửa hàng/ngân hàng/
+  // phòng khám, thuộc địa/biệt thự CHI TIẾT hơn (trán cửa, lan can con tiện, chớp lật MỞ, trệt đá kẻ mạch), lan can mái
+  // có GỜ PHÀO + con tiện, dải PHÀO (texture cho gờ 3D citygen). Đặt SAU BILL → chỉ số ô cũ giữ nguyên. 10 ô (còn 1 chỗ trống).
+  // ======================================================================================
+  const STONE = [232, 226, 212], STONE_D = [196, 190, 176], GRANITE = [128, 126, 124], ALU_D = [36, 38, 42];
+  cell('U_HOTEL', W4, UPH, () => {     // khách sạn/tháp văn phòng: TRỤ ĐÁ kem 2 mép bay (ghép = trụ 0,9 m) + kính cao trọn tầng + dải spandrel đá
+    rect(0, 0, W4, UPH, STONE, M_WALL);
+    for (const [a, b] of [[0, 0.45], [3.55, 4]]) { rect(a, 0, b, UPH, [240, 236, 224], M_WALL); }
+    shade(0.45, 0.75, 0.53, UPH, 0.7); shade(3.47, 0.75, 3.55, UPH, 0.86);              // má trụ (lõm kính)
+    rect(0.45, 0, 3.55, 0.75, STONE_D, M_WALL); hline(0.38, 0.45, 3.55, 0.025, [170, 164, 150], M_WALL); shade(0.45, 0.68, 3.55, 0.75, 0.75);
+    skyGlass(0.53, 0.75, 3.47, UPH - 0.04, [196, 214, 226], [92, 112, 128], 0.55);
+    vline(2.0, 0.75, UPH, 0.06, ALU_D, M_KEEP); hline(0.78, 0.53, 3.47, 0.05, ALU_D, M_KEEP); hline(UPH - 0.05, 0.53, 3.47, 0.06, ALU_D, M_KEEP);
+    hline(1.05, 0.53, 3.47, 0.035, [210, 214, 216], M_KEEP);                             // tay vịn kính an toàn
+    vgrad(0.53, 0.78, 3.47, 1.05, [176, 196, 204], [150, 172, 182], M_GLASS, 2);
+    for (const x of [0.2, 3.8]) vline(x, 0, UPH, 0.02, [214, 208, 194], M_WALL);       // mạch đá dọc
+  });
+  cell('G_LOBBY', W4, GH, () => {      // SẢNH khách sạn/văn phòng: cột đá vuông 2 mép, vách kính cao, cửa kính giữa, nội thất ẤM sáng, không biển
+    rect(0, 0, W4, GH, STONE, M_WALL);
+    rect(0, 0, W4, 0.12, [176, 172, 164], M_KEEP);
+    vgrad(0.5, 0.12, 3.5, 3.45, [214, 196, 160], [168, 150, 118], M_KEEP, 4);          // sảnh: đèn ấm, trần sáng
+    for (let x = 0.8; x < 3.3; x += 0.8) disc(x, 3.25, 0.07, [255, 246, 214], M_KEEP);
+    rect(0.6, 0.12, 3.4, 0.5, [150, 132, 104], M_KEEP); rect(1.1, 0.5, 1.6, 1.9, [118, 96, 70], M_KEEP); rect(2.5, 0.5, 2.95, 1.6, [96, 84, 70], M_KEEP);   // quầy, cây, ghế
+    glaze(0.5, 0.12, 3.5, 3.45, 0.26);
+    frame(0.5, 0.12, 3.5, 3.45, ALU_D, 0.06, 3, 1); hline(2.6, 0.5, 3.5, 0.05, ALU_D, M_KEEP);
+    rect(1.55, 0.12, 2.45, 2.6, [70, 66, 58], M_KEEP, 0.25); vline(2.0, 0.12, 2.6, 0.03, [200, 200, 196], M_KEEP);   // cửa kính 2 cánh
+    for (const [a, b] of [[0, 0.5], [3.5, 4]]) { rect(a, 0.12, b, GH, [242, 238, 228], M_WALL); }
+    shade(0.5, 0.12, 0.56, 3.45, 0.72); shade(3.44, 0.12, 3.5, 3.45, 0.85);
+    rect(0, 3.45, W4, GH, [240, 236, 226], M_WALL); shade(0.5, 3.38, 3.5, 3.45, 0.6);
+  });
+  const storeFront = (lit) => {        // nền chung mặt kính cửa hàng: trong SÁNG (đèn LED trắng), sàn bóng, khung nhôm đen mảnh
+    threshold();
+    vgrad(0.2, 0.14, 3.8, 2.8, [246, 246, 244], [214, 214, 212], M_KEEP, 3);
+    rect(0.2, 0.14, 3.8, 0.42, [222, 220, 216], M_KEEP);
+    for (let x = 0.45; x < 3.7; x += 0.55) rect(x, 2.62, x + 0.3, 2.66, [255, 255, 250], M_KEEP);   // đèn âm trần
+    return lit;
+  };
+  cell('G_STORE0', W4, GH, () => {     // shop thời trang/điện máy mặt KÍNH trọn bay: kệ trưng bày sáng, ma-nơ-canh, khung đen mảnh
+    groundWall(0.08); storeFront();
+    for (let k = 0; k < 3; k++) { const x = 0.5 + k * 1.1, c = GOODS[(rnd() * GOODS.length) | 0]; rect(x, 0.42, x + 0.18, R(1.5, 1.8), [60, 60, 64], M_KEEP); disc(x + 0.09, 1.9, 0.12, [200, 186, 170], M_KEEP); rect(x - 0.08, 0.9, x + 0.26, 1.6, c, M_KEEP); }
+    rect(3.0, 0.42, 3.75, 1.9, [236, 236, 234], M_KEEP); for (let y = 0.6; y < 1.9; y += 0.32) rect(3.05, y, 3.7, y + 0.18, GOODS[(rnd() * GOODS.length) | 0], M_KEEP, 0.8);
+    glaze(0.15, 0.14, 3.85, 2.85, 0.18); frame(0.15, 0.14, 3.85, 2.85, ALU_D, 0.045, 2, 1); hline(2.45, 0.15, 3.85, 0.035, ALU_D, M_KEEP);
+    signBand();
+  });
+  cell('G_STORE1', W4, GH, () => {     // NGÂN HÀNG / PHÒNG KHÁM: trụ ốp đá granite 2 mép, vách kính + quầy, cửa kính tay nắm dài
+    rect(0, 0, W4, GH, [150, 148, 144], M_KEEP);
+    for (const [a, b] of [[0, 0.55], [3.45, 4]]) { vgrad(a, 0, b, 2.95, [152, 150, 146], GRANITE, M_KEEP, 5); for (let y = 0.6; y < 2.9; y += 0.6) hline(y, a, b, 0.012, [96, 94, 92], M_KEEP); }
+    vgrad(0.55, 0.1, 3.45, 2.85, [236, 238, 240], [200, 204, 208], M_KEEP, 3);
+    rect(0.75, 0.1, 2.3, 1.05, [196, 186, 168], M_KEEP); rect(0.75, 1.05, 2.3, 1.12, [236, 232, 224], M_KEEP);   // quầy giao dịch
+    for (const x of [0.95, 1.5, 2.05]) disc(x, 1.42, 0.1, [60, 58, 56], M_KEEP);
+    rect(0.75, 1.9, 2.3, 2.5, [26, 74, 140], M_KEEP, 0.85);                                // màn hình/bảng tỉ giá
+    glaze(0.55, 0.1, 3.45, 2.85, 0.22); frame(0.55, 0.1, 3.45, 2.85, [180, 184, 188], 0.05, 2, 1);
+    vline(2.95, 0.6, 1.6, 0.04, [220, 222, 224], M_KEEP);                                  // tay nắm cửa
+    shade(0.55, 0.1, 0.62, 2.85, 0.75);
+    signBand();
+  });
+  cell('G_STORE2', W4, GH, () => {     // shop ĐIỆN THOẠI/kính mắt: vách kính dán poster, tủ kính sáng, trần trắng
+    groundWall(0.08); storeFront();
+    for (let k = 0; k < 2; k++) { const x = 0.4 + k * 1.7; rect(x, 0.42, x + 1.2, 1.15, [240, 240, 240], M_KEEP); rect(x + 0.05, 0.95, x + 1.15, 1.12, [170, 196, 214], M_KEEP); for (let q = 0; q < 5; q++) rect(x + 0.1 + q * 0.21, 0.98, x + 0.22 + q * 0.21, 1.1, [40, 40, 44], M_KEEP); }
+    glaze(0.15, 0.14, 3.85, 2.85, 0.16);
+    const pc = [[28, 92, 168], [196, 40, 44], [240, 176, 30], [34, 120, 80]];
+    for (const [x, w] of [[0.3, 0.9], [2.7, 0.95]]) { const c = pc[(rnd() * pc.length) | 0]; rect(x, 1.35, x + w, 2.35, c, M_KEEP); rect(x + 0.12, 1.5, x + w - 0.12, 1.95, [236, 236, 234], M_KEEP); hline(2.15, x + 0.1, x + w - 0.1, 0.08, [255, 255, 255], M_KEEP); }
+    frame(0.15, 0.14, 3.85, 2.85, [210, 212, 214], 0.05, 3, 1);
+    signBand();
+  });
+  cell('U_COL2', W4, UPH, () => {      // thuộc địa CHI TIẾT: trụ áp kẻ mạch, cửa CAO trán cong + công-xon, ô lan can con tiện dưới cửa, chớp lật MỞ 2 bên
+    WALL(0.7); slab(0, 0.16);
+    pilaster(0, 0.32); pilaster(3.68, 4.0);
+    for (const [a, b] of [[0, 0.32], [3.68, 4]]) for (let y = 0.5; y < 2.9; y += 0.42) shade(a, y, b, y + 0.025, 0.86);   // mạch đá giả trên trụ
+    rect(0, 2.98, W4, UPH, OCH_L, M_WALL); shade(0, 2.9, W4, 2.98, 0.62);
+    // ô lan can con tiện dưới cửa
+    rect(1.0, 0.22, 3.0, 0.3, [244, 240, 230], M_WALL); rect(1.0, 0.9, 3.0, 0.98, [246, 242, 232], M_WALL);
+    for (let x = 1.08; x < 2.95; x += 0.17) { rect(x, 0.3, x + 0.09, 0.9, [238, 234, 224], M_WALL); shade(x + 0.09, 0.3, x + 0.15, 0.9, 0.66); }
+    // cửa cao khung vữa
+    rect(1.2, 0.98, 2.8, 2.6, OCH_L, M_WALL); shade(2.8, 0.98, 2.87, 2.6, 0.72);
+    interior(1.32, 1.0, 2.68, 2.5, -8); glass(1.36, 1.05, 2.64, 2.48, 2, -1); frame(1.32, 1.0, 2.68, 2.5, [92, 74, 58], 0.05, 2, 3);
+    // trán cong (vòng cung dẹt) + công-xon
+    for (let j = 0; j < 10; j++) { const t = j / 10, y = 2.62 + t * 0.26, hw = 0.92 * Math.sqrt(Math.max(0, 1 - t * t)); rect(2 - hw, y, 2 + hw, y + 0.035, [250, 246, 236], M_WALL); }
+    shade(1.08, 2.56, 2.92, 2.62, 0.62);
+    for (const x of [1.12, 2.78]) { rect(x, 2.3, x + 0.1, 2.62, [244, 240, 230], M_WALL); shade(x + 0.1, 2.3, x + 0.14, 2.62, 0.7); }
+    // chớp lật mở áp tường 2 bên
+    const sc = SHUT_C[(rnd() * SHUT_C.length) | 0];
+    louvre(0.5, 1.0, 1.12, 2.5, sc); louvre(2.88, 1.0, 3.5, 2.5, sc);
+    shade(1.12, 1.0, 1.18, 2.5, 0.75);
+    sillStreaks(1.0, 3.0, 0.2, 0.3);
+  });
+  cell('U_VILLA2', W4, UPH, () => {    // biệt thự: cửa đi VÒM + ban công con tiện nhô + trụ áp + chớp mở
+    WALL(0.45); slab(0, 0.16);
+    pilaster(0, 0.26); pilaster(3.74, 4.0);
+    archFill(1.05, 0.25, 2.95, 2.95, OCH_L, M_WALL);
+    archFill(1.17, 0.27, 2.83, 2.85, [44, 40, 36], M_KEEP);
+    archFill(1.22, 0.3, 2.78, 2.8, [90, 104, 112], M_GLASS); glass(1.22, 0.3, 2.78, 2.05, 0, 1);
+    vline(2.0, 0.3, 2.8, 0.05, FR_WHITE, M_KEEP); hline(2.06, 1.2, 2.8, 0.05, FR_WHITE, M_KEEP);
+    rect(1.88, 2.8, 2.12, 3.02, [250, 246, 236], M_WALL);
+    const sc = SHUT_C[(rnd() * SHUT_C.length) | 0];
+    louvre(0.42, 0.3, 1.02, 2.3, sc); louvre(2.98, 0.3, 3.58, 2.3, sc);
+    // lan can con tiện (ban công) trước cửa
+    rect(0.3, 0.12, 3.7, 0.24, [244, 240, 230], M_WALL); rect(0.3, 0.94, 3.7, 1.05, [248, 244, 234], M_WALL); shade(0.3, 0.88, 3.7, 0.94, 0.75);
+    for (let x = 0.38; x < 3.62; x += 0.19) { rect(x, 0.24, x + 0.1, 0.94, [240, 236, 226], M_WALL); shade(x + 0.1, 0.24, x + 0.17, 0.94, 0.64); }
+    plants(0.5, 1.0, 0.25);
+  });
+  cell('G_VILLA', W4, GH, () => {      // trệt biệt thự/công thự: chân đá KẺ MẠCH ngang, 2 cửa sổ vòm có chớp, bậc thềm (không biển)
+    WALL(0.5); threshold();
+    for (let y = 0.45; y < 3.4; y += 0.38) { hline(y, 0, W4, 0.03, [206, 198, 184], M_WALL); shade(0, y - 0.05, W4, y - 0.015, 0.88); }
+    rect(0, 0, W4, 0.45, [190, 184, 172], M_KEEP); hline(0.45, 0, W4, 0.05, [226, 220, 208], M_KEEP);
+    for (const x0 of [0.45, 2.35]) {
+      archFill(x0 - 0.1, 0.8, x0 + 1.3, 3.15, OCH_L, M_WALL);
+      archFill(x0, 0.9, x0 + 1.2, 3.05, [46, 42, 38], M_KEEP);
+      archFill(x0 + 0.05, 0.95, x0 + 1.15, 3.0, [96, 108, 114], M_GLASS); glass(x0 + 0.05, 0.95, x0 + 1.15, 2.4, 2, 2);
+      const sc = SHUT_C[(rnd() * SHUT_C.length) | 0];
+      louvre(x0 + 0.05, 0.95, x0 + 0.58, 2.4, sc);
+      grille(x0 + 0.62, 0.95, x0 + 1.15, 2.4, IRON_D, 2);
+      sill(x0, x0 + 1.2, 0.9); rect(x0 + 0.5, 2.98, x0 + 0.7, 3.2, [250, 246, 236], M_WALL);
+    }
+    rect(0, 3.55, W4, GH, OCH_L, M_WALL); shade(0, 3.48, W4, 3.55, 0.6);
+  });
+  cell('P_COL', W4, 0.9, () => {       // lan can mái thuộc địa/tân cổ điển: GỜ PHÀO đáy (răng cưa) + con tiện + mũ lan can
+    WALL(0.6);
+    rect(0, 0, W4, 0.2, [246, 242, 232], M_WALL); shade(0, 0, W4, 0.04, 0.6);
+    for (let x = 0.04; x < 4; x += 0.16) { rect(x, 0.04, x + 0.08, 0.1, [214, 208, 196], M_WALL); }      // răng cưa
+    rect(0, 0.74, W4, 0.9, [248, 244, 236], M_WALL); shade(0, 0.7, W4, 0.74, 0.66);
+    for (let x = 0.1; x < 3.95; x += 0.2) { rect(x, 0.2, x + 0.1, 0.7, [240, 236, 226], M_WALL); shade(x + 0.1, 0.2, x + 0.18, 0.7, 0.6); }
+    for (const x of [0, 3.84]) rect(x, 0.2, x + 0.16, 0.74, [246, 242, 232], M_WALL);   // trụ lan can 2 mép bay
+  });
+  cell('D_CORN', 4, 1, () => {         // DẢI PHÀO (mặt gờ 3D citygen): 3 lớp gờ + răng cưa + bóng dưới — nhuộm màu tường
+    WALL(0.5);
+    rect(0, 0.72, 4, 1, [250, 246, 238], M_WALL); shade(0, 0.66, 4, 0.72, 0.7);
+    rect(0, 0.42, 4, 0.62, [244, 240, 230], M_WALL); shade(0, 0.36, 4, 0.42, 0.72);
+    for (let x = 0.03; x < 4; x += 0.14) { rect(x, 0.22, x + 0.07, 0.36, [240, 236, 226], M_WALL); shade(x + 0.07, 0.22, x + 0.12, 0.36, 0.62); }
+    shade(0, 0, 4, 0.2, 0.8);
   });
   const ms =typeof performance !== 'undefined' ? performance.now() - t0 : 0;
   const data = B ? new Uint8Array(B.buffer) : null;

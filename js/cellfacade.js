@@ -270,6 +270,88 @@ export function gridFacadeSpec(draw, W, H) {
   if (rects.length < 2 || area > 0.45 * W * H) return null;
   return { base: b.c, win, rects, paths };
 }
+// W4-C: mặt tiền nhà ô "KIỂU CỔ ĐIỂN" (thuộc địa/công thự/biệt thự: có cửa vòm, HOẶC cửa sổ CAO h/w ≥ 1,3 trên nền ấm vàng
+// đất/kem hay nền sáng) — AUDIT4 D1/D2 "ornate colonial detail missing", "plain blank boxes" (423 h180, 538, 157 h0, 496 h90:
+// khối vàng/trắng chỉ có lưới cửa): thêm TRỤ ÁP giữa các cột cửa + 2 mép, GỜ PHÀO đỉnh (răng cưa + bóng đổ), GỜ TẦNG giữa
+// các hàng cửa, CHÂN TƯỜNG đậm, MŨ CỬA (gờ đua + bóng) + BỆ CỬA, CHỚP LÁ SÁCH mở 2 bên cửa khi khe đủ rộng. Cùng vị trí cửa
+// cũ, cùng cỡ ảnh, không thêm hình học. Nền hiện đại (lạnh/cửa vuông-ngang) → chỉ gờ sàn sáng + bóng (bê tông đổ sàn).
+function _hue(c) {
+  const r = c[0] / 255, g = c[1] / 255, b = c[2] / 255, mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+  if (mx === mn) return { h: 0, s: 0, l: mx };
+  const d = mx - mn, l = (mx + mn) / 2, s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
+  const h = 60 * (mx === r ? ((g - b) / d + 6) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4);
+  return { h, s, l };
+}
+const SHUT_CSS = ['rgb(58,96,72)', 'rgb(64,92,104)', 'rgb(98,70,50)', 'rgb(70,104,84)'];
+function _clusters(vals, tol) {
+  const v = [...vals].sort((a, b) => a - b), out = [];
+  for (const x of v) { if (out.length && x - out[out.length - 1][out[out.length - 1].length - 1] <= tol) out[out.length - 1].push(x); else out.push([x]); }
+  return out.map((c) => c.reduce((a, b) => a + b, 0) / c.length);
+}
+function _classicDetail(g, W, H, s, B, L) {
+  const hsl = _hue(B), warm = hsl.h >= 18 && hsl.h <= 70 && hsl.s >= 0.12;
+  const asp = s.rects.map((r) => r.h / r.w).sort((a, b) => a - b), med = asp[asp.length >> 1];
+  const classic = s.paths.length > 0 || (med >= 1.3 && (warm || hsl.l > 0.72));
+  const light = _mix(B, WHITE, 0.32), lightS = _mix(B, WHITE, 0.5), u = Math.max(1, H / 256);
+  const rowsY = _clusters(s.rects.map((r) => r.y), H * 0.02), rowsB = _clusters(s.rects.map((r) => r.y + r.h), H * 0.02);
+  const top = Math.min(...s.rects.map((r) => r.y)), bot = Math.max(...s.rects.map((r) => r.y + r.h));
+  if (!classic) {
+    // hiện đại: gờ sàn bê tông sáng + bóng dưới giữa các hàng cửa
+    for (let i = 1; i < rowsY.length; i++) {
+      const y = (rowsB[i - 1] + rowsY[i]) / 2;
+      g.fillStyle = light; g.fillRect(0, y - 2 * u, W, 3 * u);
+      g.fillStyle = 'rgba(0,0,0,0.14)'; g.fillRect(0, y + u, W, 2 * u);
+    }
+    return null;
+  }
+  const cols = _clusters(s.rects.map((r) => r.x + r.w / 2), W * 0.02);
+  const ww = s.rects.reduce((a, r) => a + r.w, 0) / s.rects.length;
+  // chân tường (đá/vữa đậm) + gờ chân
+  if (bot < H * 0.93) { g.fillStyle = 'rgba(0,0,0,0.13)'; g.fillRect(0, H - H * 0.045, W, H * 0.045); g.fillStyle = light; g.fillRect(0, H - H * 0.05, W, 2 * u); }
+  // trụ áp: giữa các cột cửa + 2 mép
+  const gap = cols.length > 1 ? (cols[cols.length - 1] - cols[0]) / (cols.length - 1) - ww : W;
+  const pw = Math.max(2 * u, Math.min(gap * 0.32, W * 0.04));
+  const pil = (xc) => { g.fillStyle = light; g.fillRect(xc - pw / 2, 0, pw, H); g.fillStyle = 'rgba(0,0,0,0.16)'; g.fillRect(xc + pw / 2, 0, Math.max(1, pw * 0.18), H); g.fillStyle = 'rgba(255,255,255,0.18)'; g.fillRect(xc - pw / 2, 0, Math.max(1, pw * 0.12), H); };
+  if (gap > ww * 0.45) for (let i = 1; i < cols.length; i++) pil((cols[i - 1] + cols[i]) / 2);
+  pil(pw / 2); pil(W - pw / 2);
+  // gờ tầng giữa các hàng cửa
+  for (let i = 1; i < rowsY.length; i++) {
+    const y = (rowsB[i - 1] + rowsY[i]) / 2;
+    g.fillStyle = lightS; g.fillRect(0, y - 2.5 * u, W, 4 * u);
+    g.fillStyle = 'rgba(0,0,0,0.2)'; g.fillRect(0, y + 1.5 * u, W, 2.5 * u);
+  }
+  // gờ phào đỉnh + răng cưa + bóng đổ (chỉ khi hàng cửa trên cùng không sát đỉnh ảnh)
+  if (top > H * 0.07) {
+    const ch = Math.min(top * 0.45, H * 0.05);
+    g.fillStyle = lightS; g.fillRect(0, 0, W, ch);
+    g.fillStyle = 'rgba(0,0,0,0.12)'; g.fillRect(0, ch * 0.45, W, Math.max(1, ch * 0.08));
+    g.fillStyle = 'rgba(0,0,0,0.22)'; g.fillRect(0, ch, W, Math.max(1.5 * u, ch * 0.2));
+    g.fillStyle = 'rgba(0,0,0,0.15)';
+    const dw = Math.max(1.5 * u, ch * 0.22);
+    for (let x = dw * 0.5; x < W; x += dw * 2) g.fillRect(x, ch * 0.62, dw, ch * 0.3);
+  }
+  // chớp lá sách mở 2 bên cửa (nền ấm, cửa kính — không phải cửa chớp đóng), khe giữa các cửa đủ rộng
+  const shutter = warm && !L.shutter && gap > ww * 0.75;
+  const sc = SHUT_CSS[Math.floor((B[0] * 7 + B[1] * 3 + B[2]) % SHUT_CSS.length)];
+  return { shutter, sc, light: lightS, u };
+}
+function _winDeco(g, d, r) {
+  const ext = r.w * 0.12, hh = Math.max(2 * d.u, r.h * 0.07);
+  if (d.shutter) {
+    const sw = r.w * 0.36;
+    for (const x of [r.x - sw - r.w * 0.06, r.x + r.w + r.w * 0.06]) {
+      g.fillStyle = d.sc; g.fillRect(x, r.y, sw, r.h);
+      g.fillStyle = 'rgba(0,0,0,0.25)';
+      const st = Math.max(1, r.h / 16);
+      for (let y = r.y + st * 0.5; y < r.y + r.h; y += st) g.fillRect(x + sw * 0.08, y, sw * 0.84, Math.max(0.6, st * 0.3));
+    }
+  }
+  // mũ cửa (gờ đua) + bóng + bệ cửa
+  g.fillStyle = d.light; g.fillRect(r.x - ext, r.y - hh * 1.6, r.w + 2 * ext, hh);
+  g.fillStyle = 'rgba(0,0,0,0.2)'; g.fillRect(r.x - ext * 0.7, r.y - hh * 0.6, r.w + 1.4 * ext, hh * 0.45);
+  g.fillStyle = d.light; g.fillRect(r.x - ext * 0.5, r.y + r.h + hh * 0.2, r.w + ext, hh * 0.7);
+  g.fillStyle = 'rgba(0,0,0,0.16)'; g.fillRect(r.x - ext * 0.3, r.y + r.h + hh * 0.9, r.w + ext * 0.6, hh * 0.6);
+}
 export function paintGridFacade(g, W, H, s) {
   const B = _guardRGB(_rgb(s.base)), Wc = _rgb(s.win), L = _look(B, Wc);
   g.fillStyle = _css(B); g.fillRect(0, 0, W, H);
@@ -281,6 +363,8 @@ export function paintGridFacade(g, W, H, s) {
     const rh = s.rects.find((r) => key(r) === rows[i - 1]).h;
     g.fillRect(0, (rows[i - 1] + rh + rows[i]) / 2 - 0.5, W, Math.max(1, H / 256));
   }
+  const deco = _classicDetail(g, W, H, s, B, L);
+  if (deco) for (const r of s.rects) _winDeco(g, deco, r);
   for (const r of s.rects) _win(g, L, s.win, r.x, r.y, r.w, r.h);
   for (const p of s.paths) {                                                   // cửa vòm / ô quạt: khung = nét, kính cắt theo hình
     const [x0, y0, ww, wh] = _bbox(p);

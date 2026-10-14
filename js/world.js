@@ -6373,7 +6373,30 @@ const twBDz = (x) => -470 + 7 * (x + 541) / 561;              // tim Bạch Đ�
     }
     twDone(nc, -1078.5, -80, 6);
     // rào tôn container gỉ quây lô đất trống (tây ngõ)
-    twWall(-1096, -88, -1112, -84.5, 2.6, mat(0xa8886a), 0.15, true, 9);
+    // W4-C (hồi quy pano_115 "ngõ hẹp thành quảng trường lát lớn"): nhà góc trắng/nhà cấp 4 của khối này bị cell sink gỡ
+    // ('near' nhà thật), lô đất trống phía TÂY ngõ (x −1093..−1111, z −74..−87, Overture không có nhà) hiện thành SÂN BÊ TÔNG
+    // trơn (landuse "sát tường") + rào tôn là HỘP CAM TRƠN. Ảnh thật 115 h270: lô đất trống nền đất, dãy CONTAINER/lán tôn
+    // (xám, mảng đỏ/xanh) quay ra ngõ, rào tôn gỉ. → claim 'rough' (landuse tô đất + cỏ dại; không có footprint trong lô) +
+    // rào tôn SÓNG gỉ + 2 container + mái tôn lán.
+    const corr = (base, rust) => new THREE.MeshLambertMaterial({ map: makeTex(512, 128, (g, w, h) => {
+      g.fillStyle = base; g.fillRect(0, 0, w, h);
+      for (let x = 0; x < w; x += 6) { g.fillStyle = 'rgba(0,0,0,0.22)'; g.fillRect(x, 0, 2, h); g.fillStyle = 'rgba(255,255,255,0.12)'; g.fillRect(x + 3, 0, 1, h); }
+      g.fillStyle = rust;
+      for (let k = 0; k < 26; k++) { const x = (k * 97) % w, ww = 3 + (k * 13) % 9, hh = 20 + (k * 37) % 90; g.globalAlpha = 0.35; g.fillRect(x, h - hh, ww, hh); }
+      g.globalAlpha = 1; g.fillStyle = 'rgba(0,0,0,0.25)'; g.fillRect(0, h - 10, w, 10);
+    }) });
+    claimPoly([[-1093.5, -74], [-1111, -74], [-1111, -86.5], [-1093.5, -88]], 'rough', 'lot_haly_115');
+    twWall(-1096, -88, -1112, -84.5, 2.6, corr('#8d8f8a', '#7a3f26'), 0.15, true, 9);
+    if (twOK(-1102.5, -81)) {
+      const lan = twGrp(-1102.5, -81, 0, 'lan_container_haly');
+      twBox(lan, 2.44, 2.6, 5.9, corr('#9a9c97', '#6e3a24'), 0, 1.3, 3.0);      // container xám
+      twBox(lan, 2.44, 2.6, 5.9, corr('#8a3b2c', '#5e2a1c'), 0, 1.3, -3.0);     // container đỏ gỉ
+      twBox(lan, 0.06, 2.0, 1.9, corr('#2f5fa6', '#2a3f66'), 1.25, 1.0, -1.4);  // cửa tôn xanh
+      const rf = twBox(lan, 4.2, 0.06, 12.6, corr('#7e7f7b', '#5b3424'), 0.6, 2.95, 0);   // mái tôn lán
+      rf.rotation.z = -0.08;
+      twDone(lan, -1102.5, -81, 0);
+      addCollider(-1102.5, -78, 1.6); addCollider(-1102.5, -84, 1.6);
+    }
     twTreeAt(-1085, -68, 3.2, 6);
   }
 }
