@@ -10969,7 +10969,10 @@ const treeP = (p, sd, along, scl) => { const [tx, tz] = at(p, sd, along, 0, -1.0
       const sp = new THREE.Shape(); sp.moveTo(-1.3, 2.5); sp.lineTo(-0.95, 2.5); sp.absarc(0, 2.5, 0.95, Math.PI, 0, true); sp.lineTo(1.3, 2.5); sp.lineTo(1.3, 3.55); sp.lineTo(-1.3, 3.55); sp.closePath();
       const spG = []; for (let c = -1; c <= 1; c++) { const e = new THREE.ExtrudeGeometry(sp, { depth: 0.4, bevelEnabled: false, curveSegments: 10 }); e.translate(c * 2.6, 0, D / 2); spG.push(e); }
       g.add(new THREE.Mesh(mergeGeometries(spG), archM));
-      lnBoard(g, 'CẦM ĐỒ — ANH ĐỨC SƠN', '#c1201a', '#ffe08a', W, D, 3.4, 26); lnHip(g, W, D, 0x7a4a34, H + 0.5); lnFin(g, 'ln_congthu_phap', bx, bz, 6, 12); } }
+      // biển CẦM ĐỒ (pano_141 h0: bảng đỏ lớn trên tầng trệt) treo TRƯỚC dãy vòm (trụ tới D/2+0,45, lan can D/2+0,47) —
+      // ở D/2+0,1 cũ nó nằm SAU lưng vòm đặc, chỉ lộ 1 dải đỏ (phản biện W3-C, crop141)
+      lnBoard(g, 'CẦM ĐỒ — ANH ĐỨC SƠN', '#c1201a', '#ffe08a', W, D, 3.4, 26); g.children[g.children.length - 1].position.z = D / 2 + 0.52;
+      lnHip(g, W, D, 0x7a4a34, H + 0.5); lnFin(g, 'ln_congthu_phap', bx, bz, 6, 12); } }
   // nhà Gốm xanh ngọc BO GÓC 2T (239 h90) — bờ bắc kề đông 239 sd -1
   { const [bx, bz, ry] = at('p239', -1, 6, 9);
     if (lnOK(bx, bz)) { const g = lnMk(bx, bz, ry), W = 8, D = 9, H = 2 * 3.3;
@@ -17579,7 +17582,9 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     // gen_shopsigns.mjs; đây là lưới an toàn lúc dựng): biển khớp danh sách → bỏ (cả 2 nhánh FABRIC).
     // (lưới an toàn TẠM cho tới khi WP3 sinh lại js/shopsigns.js theo js/brands.js — nguồn DUY NHẤT; danh sách này phủ đủ
     //  các tên mà BRAND_MAP của WP3 bắt được trong shopsigns.js hiện tại — quét node 2026-10-04)
-    const _BRAND = /\b(HANA|INAX|MB|SSI|DOJI|HABECO|ELISE|CHRISBELLA|KOJI|WINMART|VINMART|VIETTEL|VIETCOMBANK|BIDV|AGRIBANK|TECHCOMBANK|VPBANK|SACOMBANK|PNJ|FPT|PHARMACITY|HIGHLANDS|PETROLIMEX|HONDA|YAMAHA|SAMSUNG|MAY10|SKF|PASSIO|EVN ?NPC|EVN|GAC MOTOR|HAIPHARCO|BESTORE|DEEP C|NORTHFREIGHT|LIEN A|LIPTON|HOEGAARDEN|TOKY ?LIFE|MILANO|HEAD|HDOO|VIETBANK)\b|CO\.?OP|THEGIOIDIDONG|THẾ GIỚI DI ĐỘNG|SEVEN\.?(ART|UOMO)|MEDIPHARCARE|LONG CHÂU|BẢO MIN|BÁCH HO[AÁ] XANH|ĐIỆN MÁY XANH|NGÂN HÀNG Á CHÂU/i;
+    //  W3-C vòng 2: + 8 thương hiệu phản biện bắt được (COCA-COLA, D&G/ARMANI, VINAMILK, APPLE, CASIO, DAVINES, MAGIC MOMENTS,
+    //  PHIBROWS) + DIBAO/CHUNGHO/JARKO/NHAXINH/VINA KTV — bộ sinh giờ còn tự kiểm theo BRAND_WATCH (js/brands.js)
+    const _BRAND = /\b(HANA|INAX|MB|SSI|DOJI|HABECO|ELISE|CHRISBELLA|KOJI|WINMART|VINMART|VIETTEL|VIETCOMBANK|BIDV|AGRIBANK|TECHCOMBANK|VPBANK|SACOMBANK|PNJ|FPT|PHARMACITY|HIGHLANDS|PETROLIMEX|HONDA|YAMAHA|SAMSUNG|MAY10|SKF|PASSIO|EVN ?NPC|EVN|GAC MOTOR|HAIPHARCO|BESTORE|DEEP C|NORTHFREIGHT|LIEN A|LIPTON|HOEGAARDEN|TOKY ?LIFE|MILANO|HEAD|HDOO|VIETBANK|COCA-?\s?COLA|PEPSI|D ?& ?G|DOLCE|ARMANI|VINAMILK|APPLE|CASIO|DAVINES|MAGIC MOMENTS|PHI ?BROWS|DIBAO|CHUNGHO|JARKO|NHAXINH|VINA ?KTV)\b|CO\.?OP|THEGIOIDIDONG|THẾ GIỚI DI ĐỘNG|SEVEN\.?(ART|UOMO)|MEDIPHARCARE|LONG CHÂU|BẢO MIN|BÁCH HO[AÁ] XANH|ĐIỆN MÁY XANH|NGÂN HÀNG Á CHÂU/i;
     // ĐỢT 3 (FABRIC 'real'): NEO biển vào MẶT TIỀN THẬT gần nhất (≤22 m từ điểm pano+14 m) đúng dải biển hiệu tầng trệt
     // (2,95-3,85 m — đè lên biển vẽ trong atlas), quay theo pháp tuyến cạnh; biển trùng chỗ (530/954 trùng toạ độ) rải dọc
     // mặt tiền, không chồng nhau; không có mặt tiền gần → bỏ (hết biển lơ lửng).

@@ -837,7 +837,10 @@ function renderStyles(D, CX, CZ) {
       } else if (sty === STYLE.OLD && fl <= 4 && r2 < 0.1) rs = RS.COL;
       if (sty === STYLE.KTT && r3 < ((zf & FEZ.OLDQ) ? 0.6 : 0.3)) rs = RS.TEN;
       if (rs === STYLE.TUBE && (zf & FEZ.COMM) && !(zf & FEZ.OLDQ) && r3 < 0.16) rs = RS.MODERN;
-      if ((rs === STYLE.TUBE || rs === STYLE.OLD) && fl <= 5 && hh(seed, 307) < 0.008) rs = RS.CONS;   // pano: 70/1.920 quan sát (~3,6%) đang xây
+      // ĐANG XÂY ngẫu nhiên (pano: 70/1.920 quan sát ~3,6% đang xây) CHỈ ở nơi KHÔNG có pano nào ≤ 90 m (zi < 0): trong vùng
+      // phủ pano, mô tả không nhắc thi công = BẰNG CHỨNG ÂM → không phủ lưới (phản biện W3-C: 259/312 nhà CONS là roll ngẫu
+      // nhiên, ~50 cái cách camera pano thật ≤ 40 m, vd pano_141 khung chuẩn, 414 đối chứng — AUDIT3 §4.3 "mặc định chỉ thêm")
+      if (zi < 0 && (rs === STYLE.TUBE || rs === STYLE.OLD) && fl <= 5 && hh(seed, 307) < 0.008) rs = RS.CONS;
     }
     // (d) tuổi (lớp phong hoá shader): theo kiểu + vùng + bằng chứng cũ/mới + biến thiên theo hạt giống
     let age = (rs === RS.TEN || rs === STYLE.OLD || rs === RS.COL || rs === STYLE.KTT) ? 2
