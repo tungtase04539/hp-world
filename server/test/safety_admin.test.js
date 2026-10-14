@@ -83,6 +83,9 @@ test('admin page + static files + mapdata with security headers', async () => {
 test('Host / Origin / content-type / token checks', async () => {
   assert.equal((await rawRequest(base + '/admin', { headers: { host: 'evil.example' } })).status, 403);
   assert.equal((await rawRequest(base + '/admin/api/status', { headers: { ...bearer(), host: 'attacker.trycloudflare.com' } })).status, 403);
+  assert.equal((await rawRequest(base + '/metrics', { headers: { host: 'attacker.trycloudflare.com' } })).status, 403);
+  assert.equal((await rawRequest(base + '/metrics')).status, 200);
+  assert.equal((await rawRequest(base + '/healthz')).status, 200);
   // cross-site request (even with the right token) → 403; same-origin → OK
   const cross = await api('POST', '/admin/api/broadcast', { text: 'x' }, { ...bearer(), origin: 'https://evil.example' });
   assert.equal(cross.status, 403); assert.equal(cross.json.error, 'origin_not_allowed');

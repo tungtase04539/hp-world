@@ -69,11 +69,13 @@ export function register(app) {
   const A = { auth: 'admin' };
 
   // every /admin* request: IP → Host → same-origin → JSON-only writes → inner router (with security headers)
+  // (IP + Host apply to the WHOLE admin port, /metrics and /healthz included: inside Docker it listens on the container
+  // network, so a neighbour container must not reach it either)
   app.admin.use(async (req, res) => {
-    if (req.path !== '/admin' && !req.path.startsWith('/admin/')) return false;
     const deny = (status, code) => { res.send(status, { ...SEC_HEADERS, 'content-type': 'application/json; charset=utf-8' }, JSON.stringify({ error: code })); return true; };
-    if (!ipOk(req.ip)) { log.warn('admin request from a non-allowed address', { ip: req.ip, path: req.path }); return deny(403, 'forbidden_ip'); }
+    if (!ipOk(req.ip)) { log.warn('admin port request from a non-allowed address', { ip: req.ip, path: req.path }); return deny(403, 'forbidden_ip'); }
     if (!hostOk(req.headers.host)) return deny(403, 'forbidden_host');
+    if (req.path !== '/admin' && !req.path.startsWith('/admin/')) return false;
     const origin = req.headers.origin;
     if (origin && origin !== 'null') {
       if (origin.toLowerCase() !== `http://${String(req.headers.host).toLowerCase()}`) return deny(403, 'origin_not_allowed');
