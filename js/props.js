@@ -832,39 +832,40 @@ export function buildProps(ctx) {
     const p0 = r.pts[0];
     const hs = hash3(p0[0], p0[1], 11);
     const powerSide = hs < 0.5 ? 1 : -1;
-    const fl = furnitureLine(r.c), fac = facadeLine(r.c);
-    // vị trí cột ở mốc acc của bên Sx (dải cột furnitureLine) — null nếu không đặt được
-    // W3-E r2: cột sát camera pano (< 3,6 m, W2-A) giờ DỊCH dọc ±2/±4 m thay vì bỏ — bỏ cột = mất CẢ 2 nhịp dây kề đúng chỗ
-    // camera đứng (pano_092 Hạ Lý: ảnh thật búi dây dày, game trống 50 m quanh camera)
-    const tryPole = (Sx, acc) => {
-      let x = Sx.ax + Sx.ux * acc + Sx.nx * fl, z = Sx.az + Sx.uz * acc + Sx.nz * fl;
-      if (!(Sx.n > 0 && x * x + z * z < R_MAX * R_MAX && !roadIdx.blocked(x, z, ri, Sx.si, 0.3) && flat(x, z) && !avoid(x, z) && !inBuilding(x, z))) return null;
-      const x0 = x, z0 = z;
-      for (const sh of [0, 2, -2, 4, -4]) {
-        x = x0 + Sx.ux * sh; z = z0 + Sx.uz * sh;
-        if (sh && (roadIdx.blocked(x, z, ri, Sx.si, 0.3) || !flat(x, z) || avoid(x, z) || inBuilding(x, z))) continue;
-        if (panoNear(x, z, 3)) continue;
-        if (obst.hit(x, z, 0.35)) {               // né thân cây/trụ có sẵn: dịch dọc ±1,5 m
-          let moved = false;
-          for (const dd of [1.5, -1.5, 3, -3]) { const x2 = x + Sx.ux * dd, z2 = z + Sx.uz * dd; if (!obst.hit(x2, z2, 0.35)) { x = x2; z = z2; moved = true; break; } }
-          if (!moved) { if (sh) continue; return null; }
-        }
-        if (clearDisc(x, z, 0.3, 3.3)) return [x, z];   // W2-A: chân cột trên nhựa (khe đường đôi/nút giao) hoặc < 3,6 m camera pano
-        if (!nearPano(x, z, 4)) return null;            // hỏng vì nhựa (không phải camera) → như cũ: bỏ
-      }
-      return null;
-    };
-    // mặt phố trống: không nhà thật trong 20 m sau mặt tiền (dò 3 điểm dọc ±4 m × 6 độ sâu)
-    const bareFront = (Sx, acc) => {
-      for (const da of [-4, 0, 4]) for (const d of [0.8, 3, 6, 10, 15, 20]) {
-        const t = acc + da, q = fac + d;
-        if (inBuilding(Sx.ax + Sx.ux * t + Sx.nx * q, Sx.az + Sx.uz * t + Sx.nz * q)) return false;
-      }
-      return true;
-    };
-    const openPole = (Sx, p) => parkBehind(p[0], p[1], Sx.nx, Sx.nz, fac - fl);   // công viên/quảng trường/nước sau mặt tiền
+    const fl = furnitureLine(r.c);
     // ---- tuyến cột điện ----
     {
+      // vị trí cột ở mốc acc của bên Sx (dải cột furnitureLine) — null nếu không đặt được
+      // W3-E r2: cột sát camera pano (< 3,6 m, W2-A) giờ DỊCH dọc ±2/±4 m thay vì bỏ — bỏ cột = mất CẢ 2 nhịp dây kề đúng chỗ
+      // camera đứng (pano_092 Hạ Lý: ảnh thật búi dây dày, game trống 50 m quanh camera)
+      const tryPole = (Sx, acc) => {
+        const fl = XS(Sx).furn;   // dải cột (mặt cắt của bên phố — hợp đồng XS(S))
+        let x = Sx.ax + Sx.ux * acc + Sx.nx * fl, z = Sx.az + Sx.uz * acc + Sx.nz * fl;
+        if (!(Sx.n > 0 && x * x + z * z < R_MAX * R_MAX && !roadIdx.blocked(x, z, ri, Sx.si, 0.3) && flat(x, z) && !avoid(x, z) && !inBuilding(x, z))) return null;
+        const x0 = x, z0 = z;
+        for (const sh of [0, 2, -2, 4, -4]) {
+          x = x0 + Sx.ux * sh; z = z0 + Sx.uz * sh;
+          if (sh && (roadIdx.blocked(x, z, ri, Sx.si, 0.3) || !flat(x, z) || avoid(x, z) || inBuilding(x, z))) continue;
+          if (panoNear(x, z, 3)) continue;
+          if (obst.hit(x, z, 0.35)) {               // né thân cây/trụ có sẵn: dịch dọc ±1,5 m
+            let moved = false;
+            for (const dd of [1.5, -1.5, 3, -3]) { const x2 = x + Sx.ux * dd, z2 = z + Sx.uz * dd; if (!obst.hit(x2, z2, 0.35)) { x = x2; z = z2; moved = true; break; } }
+            if (!moved) { if (sh) continue; return null; }
+          }
+          if (clearDisc(x, z, 0.3, 3.3)) return [x, z];   // W2-A: chân cột trên nhựa (khe đường đôi/nút giao) hoặc < 3,6 m camera pano
+          if (!nearPano(x, z, 4)) return null;            // hỏng vì nhựa (không phải camera) → như cũ: bỏ
+        }
+        return null;
+      };
+      // mặt phố trống: không nhà thật trong 20 m sau mặt tiền (dò 3 điểm dọc ±4 m × 6 độ sâu)
+      const bareFront = (Sx, acc) => {
+        for (const da of [-4, 0, 4]) for (const d of [0.8, 3, 6, 10, 15, 20]) {
+          const t = acc + da, q = XS(Sx).fac + d;
+          if (inBuilding(Sx.ax + Sx.ux * t + Sx.nx * q, Sx.az + Sx.uz * t + Sx.nz * q)) return false;
+        }
+        return true;
+      };
+      const openPole = (Sx, p) => parkBehind(p[0], p[1], Sx.nx, Sx.nz, XS(Sx).fac - XS(Sx).furn);   // công viên/quảng trường/nước sau mặt tiền
       const list = byRoad.get(ri * 2 + (powerSide > 0 ? 1 : 0)) || [];
       let acc = 6 + hash3(p0[0], p0[1], 12) * 20, prev = null, prevSeg = -9, stepNext = 31, swapped = false, placeFail = false;
       for (const S of list) {
