@@ -19621,7 +19621,7 @@ const s4Tower = (x, z, ry, W, D, FL, wallHex, name, signTxt, signBg) => {
     const br = buildBridges(scene, {
       ways: BRIDGE_WAYS || [], ROADS_DT, groundHeightNoDeck, isWater, LAND_H, panoCams: PANO_CAM,
       roadSurfaceAt: world.roadNet ? world.roadNet.surfaceAt : null, hw: (c) => XS_ROAD_W[c] / 2, sw: (c) => SIDEWALK_W[c] || 0,
-      arch: { z0: -1016, z1: -1200, h: 40 }, lift: { x: -33.5, z: -995 }, addCollider,   // vòm: pano_285 (z −1000, bờ nam z ≈ −1001): h270 sườn tây mọc ngay mép phải (chân ≤ ~16 m phía bắc), h90 không thấy sườn đông (chân ≥ ~13 m phía bắc) → z0 −1012 (r4; bản −1024: h270 không thấy vòm); r5 (phản biện r2: h90 còn thấy mẩu sườn đông ở mép trái) → −1016
+      arch: { z0: -1018, z1: -1200, h: 40 }, lift: { x: -33.5, z: -995 }, addCollider,   // vòm: pano_285 (z −1000, bờ nam z ≈ −1001): h270 sườn tây mọc ngay mép phải (chân ≤ ~16 m phía bắc), h90 không thấy sườn đông (chân ≥ ~13 m phía bắc) → z0 −1012 (r4; bản −1024: h270 không thấy vòm); r5 (phản biện r2: h90 còn thấy mẩu sườn đông ở mép trái; −1016 còn 1 vệt mảnh) → −1018
     });
     world.bridges = br;
     console.log('[world] cầu W3-F:', JSON.stringify(br.stats));

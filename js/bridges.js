@@ -79,10 +79,12 @@ export function makeDeckIndex(ways) {
 // Bộ đệm hình học đơn giản (position/normal/color/uv) — gộp thành 1 BufferGeometry mỗi material.
 function Buf() { return { p: [], n: [], c: [], u: [], idx: [] }; }
 function quad(B, a, b, c, d, nrm, col, uv) {   // a,b,c,d theo chiều ngược kim đồng hồ nhìn từ phía pháp tuyến
-  const o = B.p.length / 3;
-  for (const v of [a, b, c, d]) B.p.push(v[0], v[1], v[2]);
-  for (let i = 0; i < 4; i++) { B.n.push(nrm[0], nrm[1], nrm[2]); B.c.push(col[0], col[1], col[2]); }
-  if (uv) for (const t of uv) B.u.push(t[0], t[1]); else for (let i = 0; i < 4; i++) B.u.push(0, 0);
+  const o = B.p.length / 3;   // (r5: 1 lệnh push mỗi thuộc tính — quad() là điểm nóng dựng cầu/bờ kè)
+  B.p.push(a[0], a[1], a[2], b[0], b[1], b[2], c[0], c[1], c[2], d[0], d[1], d[2]);
+  const nx = nrm[0], ny = nrm[1], nz = nrm[2], r = col[0], g = col[1], bl = col[2];
+  B.n.push(nx, ny, nz, nx, ny, nz, nx, ny, nz, nx, ny, nz);
+  B.c.push(r, g, bl, r, g, bl, r, g, bl, r, g, bl);
+  if (uv) B.u.push(uv[0][0], uv[0][1], uv[1][0], uv[1][1], uv[2][0], uv[2][1], uv[3][0], uv[3][1]); else B.u.push(0, 0, 0, 0, 0, 0, 0, 0);
   B.idx.push(o, o + 1, o + 2, o, o + 2, o + 3);
 }
 function toGeo(B) {

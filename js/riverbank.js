@@ -103,10 +103,13 @@ export function snapBankGrid(geo, { step, waterSD, isRiverAt, skip, landY, recol
 // ---------------------------------------------------------------------------------------------------------------
 function Buf() { return { p: [], n: [], c: [], u: [], idx: [] }; }
 function quad(B, a, b, c, d, nrm, cols, uv) {   // a,b,c,d ngược chiều kim đồng hồ nhìn từ phía pháp tuyến
-  const o = B.p.length / 3;
-  for (const v of [a, b, c, d]) B.p.push(v[0], v[1], v[2]);
-  for (let i = 0; i < 4; i++) { B.n.push(nrm[0], nrm[1], nrm[2]); const cc = Array.isArray(cols[0]) ? cols[i] : cols; B.c.push(cc[0], cc[1], cc[2]); }
-  if (uv) for (const t of uv) B.u.push(t[0], t[1]); else for (let i = 0; i < 4; i++) B.u.push(0, 0);
+  const o = B.p.length / 3;   // (r5: 1 lệnh push mỗi thuộc tính — quad() là điểm nóng dựng bờ kè)
+  B.p.push(a[0], a[1], a[2], b[0], b[1], b[2], c[0], c[1], c[2], d[0], d[1], d[2]);
+  const nx = nrm[0], ny = nrm[1], nz = nrm[2];
+  B.n.push(nx, ny, nz, nx, ny, nz, nx, ny, nz, nx, ny, nz);
+  if (Array.isArray(cols[0])) { const [c0, c1, c2, c3] = cols; B.c.push(c0[0], c0[1], c0[2], c1[0], c1[1], c1[2], c2[0], c2[1], c2[2], c3[0], c3[1], c3[2]); }
+  else B.c.push(cols[0], cols[1], cols[2], cols[0], cols[1], cols[2], cols[0], cols[1], cols[2], cols[0], cols[1], cols[2]);
+  if (uv) B.u.push(uv[0][0], uv[0][1], uv[1][0], uv[1][1], uv[2][0], uv[2][1], uv[3][0], uv[3][1]); else B.u.push(0, 0, 0, 0, 0, 0, 0, 0);
   B.idx.push(o, o + 1, o + 2, o, o + 2, o + 3);
 }
 function toGeo(B) {
