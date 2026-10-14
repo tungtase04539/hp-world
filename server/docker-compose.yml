@@ -94,6 +94,8 @@ services:
       TRUST_PROXY: cloudflare
       # cổng admin từ chối mọi yêu cầu đến từ mạng edge (cloudflared) và backend
       ADMIN_DENY_CIDRS: ${HPMP_EDGE_SUBNET:-172.31.91.0/24},${HPMP_BACKEND_SUBNET:-172.31.92.0/24}
+      # token tunnel chỉ dành cho container tunnel — xoá khỏi môi trường của game
+      TUNNEL_TOKEN: ""
     ports:
       - "127.0.0.1:${HPMP_GAME_PORT:-9100}:9100"
       - "127.0.0.1:${HPMP_ADMIN_PORT:-9101}:9101"
