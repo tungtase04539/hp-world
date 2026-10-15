@@ -2,7 +2,7 @@
 // nhảy > 8 m, mẫu giữ chỗ sau khi đứng yên, độ lệch hiển thị tắt dần, đồng hồ snapshot chống rung.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Track, INTERP, createSnapClock, wrapAngle, lerpAngle } from '../../js/net/interp.js';
+import { Track, INTERP, createSnapClock, TickBase, wrapAngle, lerpAngle } from '../../js/net/interp.js';
 import { simulate } from './interp_sim.mjs';
 
 const near = (a, b, eps, msg) => assert.ok(Math.abs(a - b) <= eps, `${msg ?? ''} ${a} ≉ ${b} (±${eps})`);
@@ -120,6 +120,30 @@ test('createSnapClock: đường bao dưới khử rung', () => {
   // máy chủ khởi động lại (tick về 0) → đặt lại
   const t0 = c.time(0, 999999);
   near(t0, 999999, 1e-9);
+});
+
+test('TickBase: máy chủ bỏ K tick (quá tải) → dấu thời gian hồi trong ≤ 1,5 s, rung thường không lấy lại mốc (NC-3)', () => {
+  let seed = 11; const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
+  for (const K of [1, 2, 4, 8]) {
+    const tb = new TickBase({ tickMs: 50, n: 64 });
+    let tick = 0, lateMax = 0, worstAfter = 0;
+    const end = 8000 + K * 100;                      // vòng tick quá tải: K snapshot chỉ cách nhau 1 tick thay vì 2
+    for (let T = 0; T < 20000; T += 100) {          // giờ máy chủ THẬT của snapshot 10 Hz (tick tăng đơn điệu)
+      const arr = T + 20 + rnd() * 15;               // giờ đến (thang máy chủ), 20–35 ms một chiều
+      const s = tb.stamp(tick, arr);
+      const err = Math.abs(s - (T + 20));
+      if (T < 8000 && T > 2000) lateMax = Math.max(lateMax, err);
+      if (T >= end + 1500) worstAfter = Math.max(worstAfter, err);
+      tick += T >= 8000 && T < end ? 1 : 2;          // → tickNo tụt sau đồng hồ thật K·50 ms vĩnh viễn
+    }
+    assert.ok(lateMax < 12, `K=${K}: sai số trước khi bỏ tick ${lateMax} ms`);
+    assert.ok(worstAfter < 16, `K=${K}: sai số sau 1,5 s vẫn ${worstAfter.toFixed(1)} ms (mốc không hồi)`);
+    assert.ok(tb.rebases >= 1 && tb.rebases <= 2, `K=${K}: số lần lấy lại mốc ${tb.rebases}`);
+  }
+  // rung lớn (0–90 ms đều) 60 s: không lấy lại mốc nhầm lần nào đáng kể
+  const tb = new TickBase({ tickMs: 50, n: 64 });
+  for (let i = 0; i < 600; i++) tb.stamp(i * 2, i * 100 + 30 + rnd() * 90);
+  assert.ok(tb.rebases <= 1, `rung 0–90 ms: ${tb.rebases} lần lấy lại mốc`);
 });
 
 test('mô phỏng luồng 10 Hz rung + TCP kẹt chùm + resume: sai số nhỏ, không giật', () => {

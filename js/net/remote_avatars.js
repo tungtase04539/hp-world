@@ -143,6 +143,7 @@ export function createRemoteAvatars({ scene, world = null, camera, tier = DEVICE
   const avatars = new Map();     // netId → avatar
   const names = new Map();       // netId → {name, badge}
   const friends = new Set();
+  const hidden = new Set();      // netId người chơi đã CHẶN: không vẽ (thân, vòng sáng, bảng tên, chấm minimap) — SAFE-3
   let selfId = -1, lastSnapMs = NaN, lastNow = NaN, enabled = true, markerAll = false;
   let selAt = -1e9, selFrames = 0, frameMs = 0, frameMsEma = 0;
   const list = [];               // mảng avatar (duyệt nhanh)
@@ -155,6 +156,7 @@ export function createRemoteAvatars({ scene, world = null, camera, tier = DEVICE
       netId, tr: new Track(), app: decodeAppearance(appearance), shirt: new THREE.Color(), paint: new THREE.Color(),
       x: 0, y: 0, z: 0, yaw: 0, mode: 0, flags: 0, v: 0, px: NaN, pz: NaN, wph: (netId * 1.618) % 6.283, wamp: 0,
       lean: 0, yawPrev: NaN, gy: 0, gx: NaN, gz: NaN, gref: NaN, far: false, d2: 0, sel: false, score: 0, pillion: null, riding: null,
+      yRec: 0, headY: 0,   // khai báo sẵn (không thêm trường lúc chạy → không đổi hidden class mỗi khung)
     };
     setLook(a, appearance);
     return a;
@@ -253,6 +255,8 @@ export function createRemoteAvatars({ scene, world = null, camera, tier = DEVICE
       if (!enabled) return st;
       dt = Math.min(Math.max(num(dt, 0.016), 0), 0.1);
       const now = Number.isFinite(nowServerMs) ? nowServerMs : (Number.isFinite(lastNow) ? lastNow + dt * 1000 : (Number.isFinite(lastSnapMs) ? lastSnapMs : 0));
+      // dt THẬT (giờ máy chủ) cho đạo hàm tốc độ/nghiêng — dt khung bị kẹp 0,05 s dưới 20 fps làm tốc độ/nghiêng phóng đại
+      const rdt = Number.isFinite(lastNow) && now > lastNow ? Math.min(0.25, (now - lastNow) / 1000) : dt;
       lastNow = now;
       if (camPos) _cam.copy(camPos); else if (camera) _cam.copy(camera.position);
       const cx = _cam.x, cz = _cam.z;
@@ -266,7 +270,7 @@ export function createRemoteAvatars({ scene, world = null, camera, tier = DEVICE
         if (out.extrap > 0) nEx++;
         if (snapped || !(a.px === a.px)) { a.v = out.spd; a.yawPrev = out.yaw; a.lean = 0; }
         else {
-          const dv = Math.hypot(out.x - a.px, out.z - a.pz) / Math.max(dt, 1e-3);
+          const dv = Math.hypot(out.x - a.px, out.z - a.pz) / Math.max(rdt, 1e-3);
           a.v += (Math.min(dv, 40) - a.v) * Math.min(1, dt * 10);
         }
         a.px = out.x; a.pz = out.z;
@@ -281,7 +285,7 @@ export function createRemoteAvatars({ scene, world = null, camera, tier = DEVICE
         }
         // nghiêng xe khi vào cua: atan(v·ω/g) (như traffic.js), êm dần
         if (a.mode === MODE.MOTO || a.mode === MODE.CYCLO) {
-          const om = (a.yawPrev === a.yawPrev ? wrapPI(a.yaw - a.yawPrev) : 0) / Math.max(dt, 1e-3);
+          const om = (a.yawPrev === a.yawPrev ? wrapPI(a.yaw - a.yawPrev) : 0) / Math.max(rdt, 1e-3);
           const lt = -Math.max(-0.45, Math.min(0.45, Math.atan((a.v * om) / 9.8)));
           a.lean += (lt - a.lean) * Math.min(1, dt * 5);
         } else a.lean = 0;
@@ -295,9 +299,9 @@ export function createRemoteAvatars({ scene, world = null, camera, tier = DEVICE
       if (t0 - selAt > 100 || ++selFrames >= 6 || list.length <= CAP) {   // ~10 Hz (thời gian thật HOẶC 6 khung)
         selAt = t0; selFrames = 0;
         const R2 = DRAW_R * DRAW_R;
-        if (list.length <= CAP) for (const a of list) a.sel = a.d2 <= R2;
+        if (list.length <= CAP) for (const a of list) a.sel = a.d2 <= R2 && !(hidden.size && hidden.has(a.netId));
         else {
-          for (const a of list) a.score = a.d2 > R2 ? Infinity : a.sel ? a.d2 * 0.64 : a.d2;
+          for (const a of list) a.score = a.d2 > R2 || (hidden.size && hidden.has(a.netId)) ? Infinity : a.sel ? a.d2 * 0.64 : a.d2;
           const s = list.slice().sort((p, q) => p.score - q.score);
           for (let i = 0; i < s.length; i++) s[i].sel = i < CAP && s[i].score < Infinity;
         }
@@ -439,10 +443,16 @@ export function createRemoteAvatars({ scene, world = null, camera, tier = DEVICE
   function markers(opts) {
     const all = (opts && opts.all) || markerAll, res = [];
     for (const a of list) {
+      if (hidden.has(a.netId)) continue;
       const f = friends.has(a.netId);
       if (f || all) res.push({ x: a.x, z: a.z, kind: f ? 'friend' : 'player', away: !!(a.flags & SFLAG.AWAY) });
     }
     return res;
+  }
+  // chặn/bỏ chặn: ẩn hẳn người đó ở máy này (lần chọn kế tiếp, ≤ 100 ms)
+  function hide(netId, on) {
+    if (on) hidden.add(netId | 0); else hidden.delete(netId | 0);
+    selAt = -1e9;
   }
   function setEnabled(on) {
     enabled = !!on;
@@ -456,12 +466,13 @@ export function createRemoteAvatars({ scene, world = null, camera, tier = DEVICE
       for (const g of groups) g.mesh.dispose();
       shMesh.dispose(); shGeo.dispose();
       tags.dispose();
-      avatars.clear(); list.length = 0; drawnList.length = 0; names.clear();
+      avatars.clear(); list.length = 0; drawnList.length = 0; names.clear(); hidden.clear();
     } catch (e) { }
   }
 
   return {
-    enter, update, leave, names: namesFn, self, frame, markers, dispose, keep,
+    enter, update, leave, names: namesFn, self, frame, markers, dispose, keep, hide,
+    isHidden: (netId) => hidden.has(netId | 0),
     stats: () => ({ ...st, tagAtlas: tags.stats() }),
     setFriends(ids) { friends.clear(); for (const id of ids || []) friends.add(id | 0); },
     setMarkerAll(on) { markerAll = !!on; },
@@ -471,7 +482,8 @@ export function createRemoteAvatars({ scene, world = null, camera, tier = DEVICE
       const r = [];
       for (const a of list) {
         const nm = names.get(a.netId);
-        r.push({ netId: a.netId, name: nm ? nm.name : '', x: +a.x.toFixed(2), z: +a.z.toFixed(2), state: a.mode | (a.flags << 3), drawn: !!a.sel });
+        r.push({ netId: a.netId, name: nm ? nm.name : '', x: +a.x.toFixed(2), z: +a.z.toFixed(2), state: a.mode | (a.flags << 3), drawn: !!a.sel,
+          hidden: hidden.has(a.netId) });
       }
       return r;
     },

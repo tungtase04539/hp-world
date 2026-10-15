@@ -11,11 +11,12 @@
 // Rớt mạng: worker RESUME trong 60 s (backoff 1-2-4-8 s); quá hạn/máy chủ khởi động lại → vé mới. Trong lúc mất máy
 // chủ: chế độ "Khám phá" (game chạy như chơi một mình) + biểu tượng trạng thái, tự nối lại.
 import { createSession } from './session.js';
+import { trustServer, forgetServer } from './config.js';
 import { createCorrector } from './correct.js';
 import { createTelemetry } from './telemetry.js';
 import { createRemoteAvatars } from './remote_avatars.js';   // C2: người chơi khác instanced (≤ 5 draw call, bảng tên, vòng sáng)
 import { createChat } from '../ui/chat.js';
-import { SYS, EVENT, CHANNEL, ACTION, ACTION_RESULT, SANCTION_KIND, CLOSE } from '../shared/protocol.js';
+import { SYS, EVENT, CHANNEL, ACTION, ACTION_RESULT, SANCTION_KIND, CLOSE, SNAP_FLAG } from '../shared/protocol.js';
 import { MODE, SFLAG, STATE_HZ_MOVING, STATE_HZ_IDLE } from '../shared/constants.js';
 import { packState } from '../shared/quant.js';
 import { dayTAt } from '../shared/clock.js';
@@ -23,6 +24,7 @@ import { dayTAt } from '../shared/clock.js';
 // bố cục gói SNAPSHOT từ worker (js/net/net_worker.js — sửa cả hai)
 const SNAP_HDR = 11, ENTER_F = 9, UPD_F = 7;
 const REJOIN_SNAP_M = 12;      // vào lại sau khi mất máy chủ: lệch vị trí đã lưu hơn thế → về vị trí máy chủ
+const RECON_MS = 2000;         // keyframe: chậm nhất sau chừng này mọi người còn thấy đã được ENTER lại (rải 24/snapshot)
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // deps: { cfg (config.parseServer), ui, i18n: {t, tf, onLangChange}, input: {input, releaseKeys, onChatKey},
@@ -39,6 +41,7 @@ function build(deps) {
   const log = (...a) => { try { console.info('[net]', ...a); } catch (e) { } };
 
   let mode = 'idle';           // idle (màn tiêu đề) | online | solo
+  let trusted = !cfg.untrusted, declined = false, trustEl = null;   // SAFE-1 (askTrust)
   let conn = 'off';            // off | joining | queue | connecting | live | lost | closed
   let worker = null;
   let started = false, attached = false;
@@ -51,6 +54,15 @@ function build(deps) {
   let queueInfo = null;
   const names = new Map();     // netId → tên hiển thị
   const visible = new Set();   // netId đang thấy
+  // KEYFRAME (sau RESUME / phiên mới): máy chủ ENTER lại mọi người đang thấy, rải ≤ 24/snapshot. Ai đang vẽ mà KHÔNG được
+  // ENTER lại khi rải xong (snapshot đầu sau keyframe có 0 ENTER, hoặc quá RECON_MS) = đã rời trong lúc mất kết nối →
+  // LEAVE (fixer vòng 1 NC-2: trước đây thành bóng ma đứng im mãi). fresh = phiên MỚI (không resume): netId có thể đã
+  // thuộc người khác (máy chủ khởi động lại) → ENTER lại thì dựng quỹ đạo mới (leave + enter), không trượt từ người cũ.
+  let recon = null;            // {ids: Set, at, fresh}
+  let freshSession = false;
+  const blockedIds = new Set();// netId người chơi đã chặn trong PHIÊN này → ẩn hình (ra.hide) — SAFE-2/3
+  // QA hook (__hp.net) chỉ khi trình duyệt tự động (navigator.webdriver) hoặc ?qa — không lộ say/drop/rejoin cho người chơi
+  const QA_ON = (() => { try { return !!navigator.webdriver || new URLSearchParams(location.search).has('qa'); } catch (e) { return false; } })();
   const pendingAct = new Map();// reqId → {type, target, cb}
   let reqId = 1;
   let statsWait = null;
@@ -65,7 +77,12 @@ function build(deps) {
   const btnChat = document.createElement('button');
   btnChat.id = 'btnChat'; btnChat.type = 'button'; btnChat.textContent = '💬'; btnChat.className = 'hidden';
   if (topRight) { topRight.insertBefore(pill, topRight.firstChild); topRight.insertBefore(btnChat, document.getElementById('btnMoto')); }
-  pill.addEventListener('click', (e) => { e.currentTarget.blur(); if (mode === 'online' && conn !== 'live' && conn !== 'connecting') { noRejoin = false; joinBackoff = 2000; doJoin(); } });
+  pill.addEventListener('click', (e) => {
+    e.currentTarget.blur();
+    if (mode !== 'online') return;
+    if (conn === 'live') { if (chat) { if (chat.playersOpen) chat.hidePlayers(); else chat.showPlayers(); } return; }   // 👥 → người quanh đây
+    if (conn !== 'connecting') { noRejoin = false; joinBackoff = 2000; doJoin(); }
+  });
   btnChat.addEventListener('click', (e) => { e.currentTarget.blur(); if (chat) chat.toggle(); });
 
   function renderPill() {
@@ -83,8 +100,13 @@ function build(deps) {
     else if (conn === 'lost') { cls = 'lost'; txt = `${t('mpStExplore')} · ${t('mpStReconnect')}`; }
     else if (conn === 'closed') { cls = 'off'; txt = `${t('mpStExplore')} · ${t('mpStClosed')}`; }
     pill.dataset.state = cls;
-    pill.textContent = txt;
-    pill.title = conn === 'live' ? cfg.label : t('mpStTip');
+    // chữ đầy đủ trong .npTxt (màn hẹp: CSS ẩn, chỉ còn chấm màu + 👥 N), đủ nghĩa cho trình đọc màn hình qua aria-label
+    const n = conn === 'live' && ra ? ra.stats().count : null;
+    pill.innerHTML = '';
+    const sp = document.createElement('span'); sp.className = 'npTxt'; sp.textContent = txt; pill.appendChild(sp);
+    if (n !== null) { const c = document.createElement('span'); c.className = 'npN'; c.textContent = `👥 ${n}`; pill.appendChild(c); }
+    pill.setAttribute('aria-label', txt);
+    pill.title = conn === 'live' ? `${txt} — ${t('ppTitle')}` : t('mpStTip');
   }
 
   // ---------------------------------------------------------------------------------------------------------------
@@ -103,6 +125,7 @@ function build(deps) {
     <div id="mpRecBox" class="hidden">
       <input id="mpRecCode" maxlength="20" autocomplete="off" spellcheck="false" autocapitalize="characters">
       <button id="mpRecBtn" type="button"></button>
+      <div id="mpRecHost"></div>
     </div>
     <div id="mpErr" role="alert"></div>`;
   const soloBtn = document.createElement('button');
@@ -123,6 +146,7 @@ function build(deps) {
     $('mpRecLink').textContent = t('mpHaveCode');
     $('mpRecCode').placeholder = t('mpRecoverPh');
     $('mpRecBtn').textContent = t('mpRecoverBtn');
+    $('mpRecHost').textContent = tf('mpRecHost', { HOST: cfg.label });   // SAFE-1: mã khôi phục gửi tới ĐÂU — thấy rõ
     soloBtn.textContent = t('mpSolo');
     srvLabel.textContent = tf('mpServer', { HOST: cfg.label });
     const who = $('mpWho');
@@ -134,16 +158,22 @@ function build(deps) {
       who.classList.add('hidden');
       $('mpForm').classList.remove('hidden');
     }
-    if (startBtn && !startBtn.classList.contains('loading')) { startBtn.setAttribute('data-i18n', 'mpEnter'); startBtn.textContent = t('mpEnter'); }
+    if (startBtn && !startBtn.classList.contains('loading')) {
+      const k = declined ? 'start' : 'mpEnter';
+      startBtn.setAttribute('data-i18n', k); startBtn.textContent = t(k);
+    }
   }
   labelTitle();
   // ô nhập trên màn tiêu đề: phím không lọt vào game (input.js typing()), Enter = bấm "Vào thành phố"
   for (const id of ['mpNick', 'mpInvite']) $(id).addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); startBtn && startBtn.click(); } });
+  // biệt danh gõ dạng tổ hợp (NFD: "ê" = e + ̂) → NFC trước khi maxlength (đếm đơn vị UTF-16) cắt mất chữ
+  $('mpNick').addEventListener('input', (e) => { const el = e.currentTarget, v = el.value, n = v.normalize('NFC'); if (n !== v) el.value = n; });
   $('mpRecCode').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); $('mpRecBtn').click(); } });
   $('mpRecLink').addEventListener('click', () => $('mpRecBox').classList.toggle('hidden'));
   $('mpRecBtn').addEventListener('click', async () => {
     const code = $('mpRecCode').value.trim();
     if (!code) return;
+    if (!trusted) { askTrust(); return; }   // SAFE-1: không bao giờ gửi mã khôi phục tới máy chủ chưa xác nhận
     $('mpRecBtn').disabled = true; setErr(t('mpWorking'));
     const r = await session.recover(code);
     $('mpRecBtn').disabled = false;
@@ -159,6 +189,7 @@ function build(deps) {
     const b = e.target && e.target.closest ? e.target.closest('#startBtn') : null;
     if (!b || bypass || mode === 'solo') return;
     try { deps.audioGesture && deps.audioGesture(); } catch (err) { }
+    if (!trusted) { e.stopPropagation(); e.preventDefault(); askTrust(); return; }
     if (mode === 'online') return;                // đã chọn (bấm lại) → để boot.js xử lý
     if (session.hasAccount) { goOnline(); return; }
     e.stopPropagation(); e.preventDefault();     // chưa có tài khoản: tạo trước, rồi mới vào
@@ -169,6 +200,34 @@ function build(deps) {
     goSolo();
     proceedStart();
   });
+
+  // ---------------------------------------------------------------------------------------------------------------
+  // SAFE-1: máy chủ LẠ (không phải mặc định / localhost / đã xác nhận) từ link ?server= — hỏi MỘT lần, tên máy chủ chữ
+  // to, TRƯỚC mọi request. Chưa đồng ý: không làm mới token, không tạo tài khoản, không gửi mã khôi phục, không nhớ.
+  function askTrust() {
+    if (trusted || declined || trustEl) return;
+    const ov = trustEl = document.createElement('div');
+    ov.id = 'mpTrust';
+    ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true');
+    ov.innerHTML = '<div class="mpCodeCard"><h3></h3><div class="mpTrustHost"></div><p class="mpCodeBody"></p>'
+      + '<div class="mpCodeBtns"><button type="button" class="mpCopy"></button><button type="button" class="mpOk"></button></div></div>';
+    ov.querySelector('h3').textContent = t('mpTrustTitle');
+    ov.querySelector('.mpTrustHost').textContent = cfg.label;
+    ov.querySelector('.mpCodeBody').textContent = t('mpTrustBody');
+    const no = ov.querySelector('.mpCopy'), yes = ov.querySelector('.mpOk');
+    no.textContent = t('mpTrustNo'); yes.textContent = t('mpTrustYes');
+    no.addEventListener('click', () => { ov.remove(); trustEl = null; declineServer(); });
+    yes.addEventListener('click', () => { ov.remove(); trustEl = null; trusted = true; trustServer(cfg); earlyRefresh(); labelTitle(); });
+    document.body.appendChild(ov);
+    try { yes.blur(); no.focus(); } catch (e) { }
+  }
+  function declineServer() {
+    declined = true;
+    forgetServer();
+    goSolo();
+    for (const el of [panel, soloBtn, srvLabel]) el.classList.add('hidden');
+    labelTitle();
+  }
 
   async function createAccount() {
     const nick = $('mpNick').value.trim();
@@ -221,12 +280,16 @@ function build(deps) {
   }
 
   // tạo phiên sớm: làm mới access token song song với dựng thế giới (luồng chính nhường ở các bước của boot)
-  if (session.hasAccount) {
+  function earlyRefresh() {
+    if (!session.hasAccount) return;
     session.ensureAccess().then((r) => {
-      if (!r.ok && (r.status === 401 || r.error === 'no_account')) { labelTitle(); setErr(errText(r)); }
-      else if (!r.ok && r.error === 'banned') setErr(errText(r));
+      if (!r.ok && (r.status === 401 || r.error === 'no_account' || r.error === 'refresh_reused' || r.error === 'unauthorized')) {
+        labelTitle(); setErr(errText(r));
+        $('mpRecBox').classList.remove('hidden');   // lời báo bảo nhập mã khôi phục → mở sẵn ô nhập
+      } else if (!r.ok && r.error === 'banned') setErr(errText(r));
     }).catch(() => {});
   }
+  if (trusted) earlyRefresh(); else askTrust();
 
   // ---------------------------------------------------------------------------------------------------------------
   // worker + vé
@@ -315,6 +378,18 @@ function build(deps) {
   function clearRemotes() {
     if (ra) for (const id of visible) { try { ra.leave(id); } catch (e) { } }
     visible.clear();
+    recon = null;
+  }
+  function resetBlocks() {
+    if (chat) chat.resetBlocked();
+    if (ra) for (const id of blockedIds) ra.hide(id, false);
+    blockedIds.clear();
+  }
+  function finishRecon() {
+    const r = recon; recon = null;
+    if (!r) return;
+    for (const id of r.ids) { visible.delete(id); if (ra) ra.leave(id); }
+    if (r.ids.size) { tel.inc('reconLeaves', r.ids.size); log(`keyframe: ${r.ids.size} người đã rời trong lúc mất kết nối`); }
   }
   function showReload() {
     const b = document.createElement('div');
@@ -348,12 +423,16 @@ function build(deps) {
       case 'world':
         if (Number.isFinite(m.dayEpoch)) { dayEpoch = m.dayEpoch; dayLength = m.dayLength || dayLength; }
         return;
-      case 'needTicket':
+      case 'needTicket': {
         log('cần vé mới:', m.reason);
         if (m.reason === 'resume_rejected' || m.reason === 'expired') tel.inc('rejoins');
         if (conn === 'live') enterExplore();
-        doJoin();
+        // máy chủ bảo lùi (SYSTEM BACKOFF) hoặc vé bị từ chối liên tiếp ('auth') → chờ, không vòng join → HELLO tức thì
+        const wait = Math.max(m.backoffMs || 0, m.reason === 'auth' ? joinBackoff : 0);
+        if (m.reason === 'auth') joinBackoff = Math.min(15000, joinBackoff * 2);
+        if (wait > 0) retryJoin(wait); else doJoin();
         return;
+      }
       case 'stats': if (statsWait) { statsWait(m.st); statsWait = null; } return;
       case 'error': console.warn('[net] worker:', m.msg); return;
       default: return;
@@ -385,7 +464,9 @@ function build(deps) {
     joinBackoff = 2000;
     tel.offline(false);
     if (ra) ra.self(netId);
+    freshSession = !m.resumed;                         // keyframe kế tiếp: đối chiếu (và dựng lại quỹ đạo nếu phiên mới)
     if (!m.resumed) {
+      resetBlocks();                                   // SAFE-2: netId không bền qua phiên — danh sách chặn của MÁY CHỦ (theo tài khoản) vẫn giữ
       corrEpoch = 0;                                   // phiên mới: máy chủ đếm epoch lại từ 0
       pendingSpawn = { x: m.spawn.x, z: m.spawn.z, yaw: m.spawn.yaw, rejoin: everLive };
       applySpawn();
@@ -415,16 +496,20 @@ function build(deps) {
     const nL = b[8], nE = b[9], nU = b[10];
     let sMs = b[2];
     if (!Number.isFinite(sMs)) sMs = serverNow();
+    const key = (b[1] & SNAP_FLAG.KEYFRAME) !== 0;
+    if (key) { finishRecon(); recon = { ids: new Set(visible), at: performance.now(), fresh: freshSession }; freshSession = false; }
     let p = SNAP_HDR;
-    for (let i = 0; i < nL; i++) { const id = b[p++]; visible.delete(id); ra.leave(id); }
+    for (let i = 0; i < nL; i++) { const id = b[p++]; visible.delete(id); ra.leave(id); if (recon) recon.ids.delete(id); }
     for (let i = 0; i < nE; i++) {
       const id = b[p], abs = { x: b[p + 1], z: b[p + 2], y: b[p + 3], yaw: b[p + 4], spd: b[p + 5], state: b[p + 6], serverMs: sMs };
       const a0 = b[p + 7], a1 = b[p + 8];
       const app = new Uint8Array([a0 & 255, (a0 >>> 8) & 255, (a0 >>> 16) & 255, (a0 >>> 24) & 255, a1 & 255, (a1 >>> 8) & 255, (a1 >>> 16) & 255, (a1 >>> 24) & 255]);
       p += ENTER_F;
       if (id === netId) continue;
+      if (recon && recon.ids.delete(id) && recon.fresh) ra.leave(id);   // phiên mới: netId có thể là người khác
       visible.add(id);
       ra.enter(id, abs, app, sMs);   // C2: dấu thời gian snapshot là tham số thứ 4 (giờ máy chủ của tick)
+      if (blockedIds.has(id)) ra.hide(id, true);
     }
     for (let i = 0; i < nU; i++) {
       const id = b[p];
@@ -432,6 +517,7 @@ function build(deps) {
       p += UPD_F;
     }
     tel.inc('snapRecords', nE + nU);
+    if (recon && ((!key && nE === 0) || performance.now() - recon.at > RECON_MS)) finishRecon();
   }
 
   function nameOf(id) { return names.get(id) || ('#' + id); }
@@ -509,7 +595,7 @@ function build(deps) {
       log(`CORRECT lý do ${m.reason} lệch ${r.dist.toFixed(1)} m${r.snapped ? ' (nhảy)' : ''}`);
       resetVel();
     }
-    nextStateAt = 0;               // gửi STATE mang epoch mới ngay
+    nextStateAt = 0;               // gửi STATE mang epoch mới ngay khi đã ở điểm sửa (lệch nhỏ: sau khi kéo xong — preFrame)
   }
 
   // ---------------------------------------------------------------------------------------------------------------
@@ -588,10 +674,22 @@ function build(deps) {
         wpost({ t: 'report', target, reason, chatRef });
       },
       onBlock(target, on, name) {
-        if (conn !== 'live') return;
+        if (conn !== 'live') { chat.system(t('chatOffline'), 'error'); return false; }
+        if (on) blockedIds.add(target); else blockedIds.delete(target);
+        if (ra) ra.hide(target, on);                      // SAFE-3: ẩn cả hình + vòng sáng + bảng tên người đã chặn
         action(on ? ACTION.BLOCK_PLAYER : ACTION.UNBLOCK_PLAYER, target, 0, (code) => {
           if (code === ACTION_RESULT.OK) chat.system(tf(on ? 'chatBlocked' : 'chatUnblocked', { NAME: name || nameOf(target) }));
         });
+        return true;
+      },
+      // bảng "Người chơi quanh đây": người đang thấy, gần trước (tên từ NAMES)
+      listPlayers() {
+        if (!ra || !ra.positions || !G) return [];
+        const ps = G.pState, p = ps.mounted ? ps.mounted.pos : ps.pos;
+        const rows = [];
+        for (const r of ra.positions()) if (r.netId !== netId) rows.push({ netId: r.netId, name: names.get(r.netId) || r.name || '', dist: Math.hypot(r.x - p.x, r.z - p.z) });
+        rows.sort((a, b) => a.dist - b.dist);
+        return rows;
       },
     });
     deps.input.onChatKey(() => {
@@ -643,9 +741,12 @@ function build(deps) {
     preFrame(dt) {
       if (!attached || mode !== 'online') return;
       try {
-        corr.step(dt);
+        const pulled = corr.step(dt);
         const now = performance.now();
         const ps = G.pState, p = ps.mounted ? ps.mounted.pos : ps.pos;
+        // NC-1: đang kéo về theo CORRECT → CHƯA gửi STATE (máy chủ chấm từ điểm đã sửa; gửi giữa chừng = vi phạm mới →
+        // CORRECT dây chuyền → bị đuổi); phần dời do kéo không phải vận tốc của người chơi
+        if (pulled) { lx = p.x; lz = p.z; lastT = now; if (corr.pending) return; }
         const dtR = (now - lastT) / 1000;
         if (Number.isFinite(lx) && dtR > 0.004 && dtR < 1) {
           const ix = (p.x - lx) / dtR, iz = (p.z - lz) / dtR;
@@ -681,8 +782,8 @@ function build(deps) {
     onDismount(v) {
       try { if (mode === 'online' && conn === 'live') { const ref = vehicleRef(v); if (ref) action(ACTION.DISMOUNT, ref, 0, null); } } catch (e) { }
     },
-    // ---- QA (window.__hp.net) ----
-    qa: {
+    // ---- QA (window.__hp.net) — chỉ khi trình duyệt tự động / ?qa ----
+    qa: !QA_ON ? null : {
       status: () => ({ mode, conn, netId, corrEpoch, started, attached, clockSynced: Number.isFinite(clockOff), visible: visible.size,
         names: names.size, serverNow: serverNow(), dayT: G && G.dayNight ? G.dayNight.t : null,
         serverDayT: Number.isFinite(dayEpoch) && Number.isFinite(serverNow()) ? dayTAt(serverNow(), dayEpoch, dayLength) : null,
@@ -696,6 +797,11 @@ function build(deps) {
       avatars: () => ra,   // QA: mô-đun người chơi khác (debug/stats/setEnabled/tags.canvas) — tools/qa/mp2_int_e2e.mjs
       names: () => [...names.entries()],
       drop: () => wpost({ t: 'drop' }),
+      blocked: () => [...blockedIds],
+      showPlayers: () => chat && chat.showPlayers(),
+      hidePlayers: () => chat && chat.hidePlayers(),
+      playerRows: () => [...document.querySelectorAll('#ppList .ppRow')].map((r) => r.textContent),
+      setBlocked: (id, on) => chat && chat.setBlocked(id | 0, !!on, nameOf(id | 0)),
       rejoin: () => { noRejoin = false; doJoin(); },
     },
   };

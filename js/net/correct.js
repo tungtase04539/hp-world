@@ -3,6 +3,11 @@
 // Lệch nhỏ (≤ SNAP_M) → kéo về MƯỢT trong PULL_S (cộng dần phần lệch, người chơi vẫn điều khiển được); lệch lớn (bị
 // dịch chuyển/teleport, đi xuyên nước…) → nhảy hẳn. Đang cưỡi xe: dời XE (người bám yên ở khung sau), xe dừng lại.
 // corrEpoch: mọi STATE sau đó mang epoch mới (net.js) — máy chủ bỏ qua STATE mang epoch cũ.
+// GIỮ STATE TRONG LÚC KÉO (fixer vòng 1, NC-1): máy chủ chấm STATE mang epoch mới TỪ ĐIỂM ĐÃ SỬA (MoveCheck.correctTo).
+// Gửi STATE khi mới kéo được ~11 % (1 khung) = vẫn lệch gần hết → lại vi phạm SPEED → CORRECT mới → … → bị đuổi (đo
+// thật: lệch 3,9 m → 15 CORRECT trong 2,5 s rồi kick). Nên net.js KHÔNG gửi STATE khi `pending` (≤ PULL_S + 1 khung) và bỏ
+// phần dời do kéo khỏi ước lượng vận tốc (`step()` trả true ở mọi khung có kéo, kể cả khung kéo xong).
+// Kiểm: tests/net/correct_cascade.test.mjs (Validator thật của máy chủ, 60/30 Hz, RTT 5/50/150 ms, lệch 1,5–6 m → đúng 1 CORRECT).
 export const SNAP_M = 6;        // m: lệch hơn thế thì nhảy hẳn (không lướt xuyên tường)
 export const PULL_S = 0.15;     // s: thời gian kéo về khi lệch nhỏ
 
@@ -45,9 +50,10 @@ export function createCorrector({ pState, surfaceY }) {
       if (v) v.vel *= 0.5;
       return { dist, snapped: false };
     },
-    // mỗi khung (sau khi nhân vật di chuyển, trước khi gửi STATE)
+    // mỗi khung (sau khi nhân vật di chuyển, trước khi gửi STATE). Trả true nếu khung này có kéo (kể cả khung kéo xong):
+    // khi đó net.js bỏ phần dời khỏi ước lượng vận tốc; còn `pending` thì chưa gửi STATE.
     step(dt) {
-      if (!pend) return;
+      if (!pend) return false;
       const k = pend.left <= dt ? 1 : dt / pend.left;
       const ax = pend.dx * k, az = pend.dz * k;
       const p = target();
@@ -56,6 +62,7 @@ export function createCorrector({ pState, surfaceY }) {
       if (v && v.mesh) v.mesh.position.copy(v.pos);
       pend.dx -= ax; pend.dz -= az; pend.left -= dt;
       if (pend.left <= 0 || k >= 1) pend = null;
+      return true;
     },
     get pending() { return !!pend; },
     stats() { return { count, snaps, lastAt, lastDist: +lastDist.toFixed(2), lastReason }; },

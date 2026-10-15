@@ -19,6 +19,7 @@ import {
 import { S2C, SYS, CLOSE, SNAP_FLAG, PROTO_VERSION } from '../shared/protocol.js';
 import { NET, PING_FAST_S } from '../shared/constants.js';
 import { ClockSync } from '../shared/clock.js';
+import { TickBase } from './interp.js';   // module thuần (không three) — mốc tick → giờ máy chủ, NC-3
 
 const W = new Writer(2048);
 const eNow = () => performance.timeOrigin + performance.now();
@@ -43,12 +44,11 @@ const pings = new Map();       // clientTime u32 → eNow lúc gửi
 let pingTimer = 0;
 const slots = new Map();       // slot → netId (bảng của MÁY CHỦ cho người xem này)
 const pool = {};               // decodeS2C dùng lại object theo opcode
-// mốc tick → giờ máy chủ: base = min(giờ đến − tick·tickMs) trên cửa sổ 64 snapshot (bỏ dao động mạng)
-const BASE_N = 64;
-const baseRing = new Float64Array(BASE_N);
-let baseN = 0, baseI = 0, tickBase = NaN;
+// mốc tick → giờ máy chủ: base = min(giờ đến − tick·tickMs) trên cửa sổ 64 snapshot (bỏ dao động mạng); bước lên bền
+// vững (máy chủ bỏ tick khi quá tải) lấy lại mốc trong ~12 snapshot (interp.js TickBase, fixer vòng 1 NC-3)
+let tb = new TickBase({ tickMs: 50, n: 64 });
 const st = { rx: 0, tx: 0, snaps: 0, keyframes: 0, decodeErrors: 0, badSlot: 0, reconnects: 0, resumeOk: 0, resumeFail: 0,
-  pingSent: 0, pongs: 0, opens: 0, closes: {} };
+  pingSent: 0, pongs: 0, opens: 0, closes: {}, tickRebases: 0 };
 
 function setPhase(p, extra) { phase = p; post({ t: 'status', s: p, ...(extra || {}) }); }
 
@@ -99,7 +99,8 @@ function onLost(code) {
     if (wasResuming) st.resumeFail++;
     resumeToken = null;
     setPhase('wait', { code });
-    post({ t: 'needTicket', reason: wasResuming ? 'resume_rejected' : 'auth' });
+    post({ t: 'needTicket', reason: wasResuming ? 'resume_rejected' : 'auth', backoffMs: serverBackoffMs });
+    serverBackoffMs = 0;
     return;
   }
   scheduleReconnect(code);
@@ -112,7 +113,8 @@ function scheduleReconnect(code) {
   if (!resumeToken || lostFor > (NET.RESUME_S - 2) * 1000) {
     resumeToken = null;
     setPhase('wait', { code });
-    post({ t: 'needTicket', reason: 'expired' });
+    post({ t: 'needTicket', reason: 'expired', backoffMs: serverBackoffMs });   // SYSTEM BACKOFF của máy chủ áp cả cho vé mới
+    serverBackoffMs = 0;
     return;
   }
   const d = Math.max(backoffMs, serverBackoffMs) + Math.random() * 1000;
@@ -193,7 +195,7 @@ function onWelcome(m) {
   lostAt = 0; backoffMs = 1000;
   liveAt = now;
   slots.clear();
-  baseN = 0; baseI = 0; tickBase = NaN;
+  tb = new TickBase({ tickMs, n: 64 });
   phase = 'live';
   post({
     t: 'welcome', netId: m.netId, serverTime: m.serverTime, tickHz: m.tickHz, snapHz: m.snapHz, dayEpoch: m.dayEpoch,
@@ -211,12 +213,7 @@ function sendReady() { if (phase === 'live' && !readySent && send(encodeReady(W)
 function tickServerMs(tick) {
   const arr = clock.synced ? clock.serverNow(eNow()) : NaN;
   if (!Number.isFinite(arr)) return NaN;
-  const b = arr - tick * tickMs;
-  baseRing[baseI] = b; baseI = (baseI + 1) % BASE_N; if (baseN < BASE_N) baseN++;
-  let mn = Infinity;
-  for (let i = 0; i < baseN; i++) if (baseRing[i] < mn) mn = baseRing[i];
-  tickBase = mn;
-  return tickBase + tick * tickMs;
+  return tb.stamp(tick, arr);
 }
 
 // SNAPSHOT → Float64Array (transfer):
@@ -224,16 +221,14 @@ function tickServerMs(tick) {
 // + nLeave × netId + nEnter × (netId, x, z, y, yaw, spd, state, app0 u32, app1 u32) + nUpd × (netId, x, z, y, yaw, spd, state)
 // (bố cục này lặp lại ở js/net/net.js — sửa cả hai; file worker KHÔNG được import từ luồng chính)
 const SNAP_HDR = 11, ENTER_F = 9, UPD_F = 7;
-const _seen = new Set();
 function onSnapshot(m) {
   st.snaps++;
   const leaves = [];
   if (m.flags & SNAP_FLAG.KEYFRAME) {
     st.keyframes++;
-    // máy chủ gửi lại MỌI người đang thấy trong ENTER: ai không còn trong đó = rời
-    _seen.clear();
-    for (const e of m.enters) _seen.add(e.netId);
-    for (const id of slots.values()) if (!_seen.has(id)) leaves.push(id);
+    // máy chủ xoá bảng slot của nó và ENTER lại mọi người đang thấy, RẢI ≤ 24/snapshot (server aoi.js ENTER_MAX) → KHÔNG
+    // suy "ai không có trong keyframe = rời" ở đây (sẽ LEAVE oan mọi người ngoài 24 đầu). Đối chiếu ai đã rời thật làm ở
+    // luồng chính (net.js reconcile: tập đang thấy trước keyframe − những ai được ENTER lại khi rải xong) — fixer vòng 1 NC-2.
     slots.clear();
   }
   for (const s of m.leaves) {
@@ -292,7 +287,7 @@ self.onmessage = (ev) => {
       case 'drop':                                   // QA: rớt mạng giả → máy chủ giữ avatar 60 s (limbo) → RESUME
         if (ws) { const o = ws; ws = null; try { o.onclose = o.onerror = o.onmessage = null; o.close(4999, 'drop'); } catch (e) { } onLost(1006); }
         break;
-      case 'stats': post({ t: 'stats', st: { ...st, phase, netId, rttMed: clock.rttMedian, samples: clock.samples } }); break;
+      case 'stats': st.tickRebases = tb.rebases; post({ t: 'stats', st: { ...st, phase, netId, rttMed: clock.rttMedian, samples: clock.samples } }); break;
       default: break;
     }
   } catch (e) {

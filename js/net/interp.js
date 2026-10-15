@@ -12,8 +12,9 @@
 //  - Máy chủ CHỈ gửi UPDATE khi bản ghi đổi → người đứng yên không có mẫu nào trong nhiều giây. Khi họ đi lại, mẫu mới
 //    cách mẫu cũ cả mấy giây: chèn mẫu "giữ chỗ" tại t − 100 ms (vị trí cũ) để họ bắt đầu đi ĐÚNG lúc, không trườn chậm
 //    suốt quãng nghỉ. Chỉ chèn khi mẫu cũ là ĐỨNG (spd ≈ 0): người đang chạy mà mất vài gói thì nội suy thẳng qua lỗ.
-//  - `createSnapClock()`: đổi (tick máy chủ, giờ nhận) → dấu thời gian mẫu ít rung: tick·50 ms + độ lệch nhỏ nhất trong
-//    cửa sổ 5 s (rung mạng chỉ làm TRỄ gói → đường bao dưới là ước lượng đúng). C1 (net.js) nên dùng nó.
+//  - `createSnapClock()` / `TickBase`: đổi (tick máy chủ, giờ nhận) → dấu thời gian mẫu ít rung: tick·50 ms + độ lệch nhỏ
+//    nhất trong cửa sổ (rung mạng chỉ làm TRỄ gói → đường bao dưới là ước lượng đúng); bước lên bền vững (máy chủ bỏ tick)
+//    được lấy lại mốc trong ~1,2 s. net_worker.js dùng TickBase.
 // Thời gian: luôn GIỜ MÁY CHỦ (ms) = đồng hồ thật + offset (js/shared/clock.js), KHÔNG dùng time/dt đã kẹp của vòng frame.
 
 export const INTERP = Object.freeze({
@@ -204,20 +205,55 @@ const _v = { vx: 0, vy: 0, vz: 0 }, _a = {}, _b = {};
 // Đồng hồ snapshot: tick máy chủ (20 Hz → 50 ms) + giờ nhận (giờ máy chủ ước lượng) → dấu thời gian mẫu.
 // Độ lệch = giờ nhận − tick·tickMs; lấy NHỎ NHẤT trong cửa sổ `windowMs` (rung mạng chỉ cộng thêm trễ). Tick nhảy
 // lùi / lệch > 10 s (máy chủ khởi động lại) → đặt lại.
+// Mốc tick → giờ máy chủ, đường bao dưới của (giờ đến − tick·tickMs) trên `n` mẫu gần nhất (rung mạng chỉ làm TRỄ gói).
+// Bước XUỐNG (gói nhanh hơn) theo ngay; bước LÊN bền vững (fixer vòng 1, NC-3: vòng tick máy chủ bỏ K tick khi quá tải →
+// tickNo tụt sau đồng hồ thật K·50 ms VĨNH VIỄN) thì cửa sổ min cũ giữ dấu thời gian sớm K·50 ms suốt cả cửa sổ (6,4 s)
+// → mọi người khác bị ngoại suy/khựng-nhảy. Sửa: nếu min của `recentN` mẫu cuối vượt mốc > `stepMs` → lấy lại mốc từ
+// nửa mới hơn của các mẫu đó (hồi trong ~recentN snapshot ≈ 1,2 s ở 10 Hz). Tick lùi (máy chủ khởi động lại) / nhảy > 10 s → đặt lại.
+// Dùng ở js/net/net_worker.js (tickServerMs) và createSnapClock() bên dưới. Không cấp phát mỗi lần gọi.
+export class TickBase {
+  constructor({ tickMs = 50, n = 64, recentN = 12, stepMs = 40, plateauMs = 60 } = {}) {
+    this.tickMs = tickMs; this.n = n; this.recentN = Math.min(recentN, n); this.stepMs = stepMs; this.plateauMs = plateauMs;
+    this.ring = new Float64Array(n);
+    this.keep = new Float64Array(this.recentN);
+    this.reset();
+  }
+  reset() { this.count = 0; this.head = 0; this.base = NaN; this.lastTick = -1; this.rebases = 0; }
+  // → giờ máy chủ (ms) của tick, hoặc NaN nếu arrivalMs không hữu hạn
+  stamp(tick, arrivalMs) {
+    if (!Number.isFinite(arrivalMs) || !Number.isFinite(tick)) return NaN;
+    const off = arrivalMs - tick * this.tickMs;
+    if (this.count && (tick < this.lastTick || Math.abs(off - this.base) > 10000)) this.reset();
+    this.lastTick = tick;
+    const n = this.n, R = this.ring;
+    R[this.head] = off; this.head = (this.head + 1) % n; if (this.count < n) this.count++;
+    let mn = Infinity;
+    for (let i = 0; i < this.count; i++) if (R[i] < mn) mn = R[i];
+    if (this.count > this.recentN) {
+      let rm = Infinity, rx = -Infinity;
+      for (let k = 1; k <= this.recentN; k++) { const v = R[(this.head - k + n) % n]; if (v < rm) rm = v; if (v > rx) rx = v; }
+      // bước lên BỀN VỮNG = cao nguyên (recentN mẫu cuối cùng mức, rung ≤ plateauMs); TCP kẹt rồi xả chùm thì độ lệch
+      // giảm dần 100 ms/mẫu (không phải cao nguyên) → không lấy lại mốc (mẫu sau chùm lại về đường bao cũ)
+      if (rm - mn > this.stepMs && rx - rm <= this.plateauMs) {   // chỉ giữ recentN mẫu cuối
+        // giữ NỬA mới hơn (chân dốc khi tick bị bỏ rải qua vài snapshot không kéo mốc xuống giữa chừng)
+        const keep = this.keep, h = Math.max(2, this.recentN >> 1);
+        mn = Infinity;
+        for (let k = 0; k < h; k++) { const v = R[(this.head - h + k + n) % n]; keep[k] = v; if (v < mn) mn = v; }
+        for (let k = 0; k < h; k++) R[k] = keep[k];
+        this.count = h; this.head = h % n; this.rebases++;
+      }
+    }
+    this.base = mn;
+    return mn + tick * this.tickMs;
+  }
+}
+
 export function createSnapClock({ tickMs = 50, windowMs = 5000 } = {}) {
-  const offs = [], at = [];
-  let lastTick = -1;
+  // windowMs giữ cho tương thích; cửa sổ tính theo số mẫu (10 Hz → 50 mẫu = 5 s)
+  const tb = new TickBase({ tickMs, n: Math.max(16, Math.round(windowMs / 100)) });
   return {
-    time(tick, arrivalMs) {
-      const off = arrivalMs - tick * tickMs;
-      if (offs.length && (tick < lastTick || Math.abs(off - offs[offs.length - 1]) > 10000)) { offs.length = 0; at.length = 0; }
-      lastTick = tick;
-      offs.push(off); at.push(arrivalMs);
-      while (at.length > 1 && arrivalMs - at[0] > windowMs) { at.shift(); offs.shift(); }
-      let m = Infinity;
-      for (let i = 0; i < offs.length; i++) if (offs[i] < m) m = offs[i];
-      return tick * tickMs + m;
-    },
-    reset() { offs.length = 0; at.length = 0; lastTick = -1; },
+    time(tick, arrivalMs) { return tb.stamp(tick, arrivalMs); },
+    reset() { tb.reset(); },
+    get rebases() { return tb.rebases; },
   };
 }

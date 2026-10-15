@@ -69,6 +69,16 @@ const dict = {
     mpRecoverBtn: 'Lấy lại tài khoản',
     mpRecovered: '✓ Đã lấy lại tài khoản {NAME}',
     mpServer: 'Máy chủ: {HOST}',
+    mpRecHost: 'Mã sẽ gửi tới máy chủ: {HOST}',
+    mpTrustTitle: '⚠️ Máy chủ lạ',
+    mpTrustBody: 'Link này đưa bạn vào một máy chủ KHÔNG phải của game. Chỉ vào nếu chính chủ game gửi link cho bạn. Đừng bao giờ nhập mã khôi phục ở máy chủ bạn không chắc chắn.',
+    mpTrustYes: 'Tôi tin máy chủ này — vào',
+    mpTrustNo: 'Không — chơi bình thường',
+    ppTitle: '👥 Người chơi quanh đây',
+    ppBlocked: '🚫 Đã chặn',
+    ppNone: 'Chưa thấy ai quanh đây.',
+    chatPhTouch: 'Nói với người xung quanh…',
+    chatNameTip: 'Chạm để báo cáo / chặn',
     mpCodeTitle: '🔑 Mã khôi phục của bạn',
     mpCodeBody: 'Đây là chìa khoá tài khoản <b>{NAME}</b>. Hãy chép lại và cất kỹ — mã chỉ hiện <b>MỘT LẦN DUY NHẤT</b>. Dùng mã này để vào lại tài khoản trên máy khác hoặc sau khi xoá dữ liệu trình duyệt. Đừng đưa mã cho bất kỳ ai.',
     mpCopy: '📋 Sao chép', mpCopied: '✓ Đã chép',
@@ -129,7 +139,7 @@ const dict = {
     chatReportWhy: 'Vì sao báo cáo {NAME}?',
     chatReason_1: 'Nói tục, xúc phạm', chatReason_2: 'Quấy rối, đe doạ', chatReason_3: 'Gian lận',
     chatReason_4: 'Spam, quảng cáo', chatReason_5: 'Tên không phù hợp', chatReason_6: 'Lý do khác',
-    chatBlocked: '🚫 Đã chặn {NAME} — bạn và người này sẽ không thấy tin của nhau nữa.',
+    chatBlocked: '🚫 Đã chặn {NAME} — bạn và người này sẽ không thấy tin của nhau nữa, và bạn không còn thấy người này trong thành phố. Bỏ chặn ở bảng 👥.',
     chatUnblocked: 'Đã bỏ chặn {NAME}.',
     chatRej_1: 'Bạn gửi nhanh quá — chờ {S} giây rồi gửi tiếp.',
     chatRej_2: 'Tin này giống tin bạn vừa gửi.',
@@ -213,6 +223,16 @@ const dict = {
     mpRecoverBtn: 'Recover account',
     mpRecovered: '✓ Account {NAME} recovered',
     mpServer: 'Server: {HOST}',
+    mpRecHost: 'The code will be sent to server: {HOST}',
+    mpTrustTitle: '⚠️ Unknown server',
+    mpTrustBody: 'This link points to a server that does NOT belong to the game. Only continue if the owner of the game sent you this link. Never enter your recovery code on a server you are not sure about.',
+    mpTrustYes: 'I trust this server — continue',
+    mpTrustNo: 'No — play normally',
+    ppTitle: '👥 Players nearby',
+    ppBlocked: '🚫 Blocked',
+    ppNone: 'Nobody nearby yet.',
+    chatPhTouch: 'Talk to people nearby…',
+    chatNameTip: 'Tap to report / block',
     mpCodeTitle: '🔑 Your recovery code',
     mpCodeBody: 'This is the key to your account <b>{NAME}</b>. Copy it and keep it safe — it is shown <b>ONLY ONCE</b>. Use it to get back into your account on another device or after clearing browser data. Never share it with anyone.',
     mpCopy: '📋 Copy', mpCopied: '✓ Copied',
@@ -273,7 +293,7 @@ const dict = {
     chatReportWhy: 'Why report {NAME}?',
     chatReason_1: 'Swearing, insults', chatReason_2: 'Harassment, threats', chatReason_3: 'Cheating',
     chatReason_4: 'Spam, ads', chatReason_5: 'Bad name', chatReason_6: 'Other',
-    chatBlocked: '🚫 {NAME} blocked — you will no longer see each other\'s messages.',
+    chatBlocked: '🚫 {NAME} blocked — you will no longer see each other\'s messages, and they disappear from your city. Unblock in the 👥 panel.',
     chatUnblocked: '{NAME} unblocked.',
     chatRej_1: 'Too fast — wait {S} s.',
     chatRej_2: 'Same as your previous message.',
@@ -302,11 +322,14 @@ export function t(key) {
   return fill((dict[lang] && dict[lang][key]) ?? dict.vi[key] ?? key);
 }
 
-// t() + thay {KEY} bằng tham số riêng (MP-2: lời máy chủ = mã + tham số, dịch ở client)
+// t() + thay {KEY} bằng tham số riêng (MP-2: lời máy chủ = mã + tham số, dịch ở client). MỘT lượt thay trên chuỗi GỐC của
+// từ điển: tham số của người gọi THẮNG biến chung (trước đây t() đã thay {N} = số địa danh của quests.setVars trước →
+// mọi thời lượng "khoá chat N phút / cấm N ngày" hiện "22" — fixer vòng 1 UX-1); giá trị đã thay không bị quét lại
+// (tên người chơi chứa "{N}" giữ nguyên chữ).
 export function tf(key, params) {
-  let s = t(key);
-  if (params && typeof s === 'string') s = s.replace(/\{(\w+)\}/g, (m, k) => (k in params ? String(params[k]) : m));
-  return s;
+  const s = (dict[lang] && dict[lang][key]) ?? dict.vi[key] ?? key;
+  if (typeof s !== 'string' || !s.includes('{')) return s;
+  return s.replace(/\{(\w+)\}/g, (m, k) => (params && k in params ? String(params[k]) : k in vars ? String(vars[k]) : m));
 }
 
 // Chọn bản dịch từ object {vi, en}

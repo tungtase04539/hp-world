@@ -11,6 +11,7 @@
 // `NET_DEFAULT_ON = true` trong js/main.js (tools/qa/mp2_c1_unit.mjs báo đỏ khi hai chỗ lệch nhau).
 export const DEFAULT_SERVER = '';            // chủ dự án điền khi có tên miền, ví dụ 'wss://hp.ten-mien.vn'
 export const STORE_KEY = 'hp3d.server';
+export const TRUST_KEY = 'hp3d.serverTrust';   // JSON [host…] người chơi đã xác nhận (hộp hỏi "Máy chủ lạ" — net.js)
 
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
 
@@ -40,7 +41,34 @@ export function parseServer(raw) {
   };
 }
 
-// Đọc cấu hình hiện hành (ghi nhớ ?server= vào localStorage). Trả null = không có máy chủ → chơi một mình.
+// Máy chủ TIN CẬY (fixer vòng 1 SAFE-1): DEFAULT_SERVER, localhost/127.0.0.1, hoặc máy người chơi đã xác nhận trong hộp
+// "Máy chủ lạ". Link chia sẻ `?server=<tên miền bất kỳ>` KHÔNG còn được nhớ ngầm: cfg.untrusted = true → net.js hỏi
+// (tên máy chủ chữ to) TRƯỚC mọi request; chỉ khi đồng ý mới nhớ (trustServer). Chặn đường lừa: link lạ → màn tạo tài
+// khoản của máy chủ kẻ gian → ô "Có mã khôi phục?" gửi mã khôi phục THẬT cho họ → chiếm tài khoản.
+function trustedHosts() {
+  try { const a = JSON.parse(localStorage.getItem(TRUST_KEY) || '[]'); return Array.isArray(a) ? a.filter((h) => typeof h === 'string') : []; } catch (e) { return []; }
+}
+export function isTrusted(p) {
+  if (!p) return false;
+  if (p.local) return true;
+  const d = parseServer(DEFAULT_SERVER);
+  if (d && d.label === p.label) return true;
+  return trustedHosts().includes(p.label);
+}
+// người chơi đồng ý vào máy chủ lạ: nhớ host + địa chỉ
+export function trustServer(p) {
+  if (!p) return;
+  try {
+    const a = trustedHosts();
+    if (!a.includes(p.label)) { a.push(p.label); while (a.length > 8) a.shift(); localStorage.setItem(TRUST_KEY, JSON.stringify(a)); }
+    if (p.raw) localStorage.setItem(STORE_KEY, p.raw);
+  } catch (e) { }
+}
+// từ chối: quên địa chỉ đã nhớ (lần sau chơi một mình như bình thường)
+export function forgetServer() { try { localStorage.removeItem(STORE_KEY); } catch (e) { } }
+
+// Đọc cấu hình hiện hành. Trả null = không có máy chủ → chơi một mình. ?server= của máy TIN CẬY được nhớ ngay; máy lạ
+// trả {…, untrusted: true} và KHÔNG nhớ (net.js hỏi trước).
 export function resolveServer(loc = (typeof location !== 'undefined' ? location : null)) {
   let fromUrl = null, hasParam = false;
   try {
@@ -49,11 +77,17 @@ export function resolveServer(loc = (typeof location !== 'undefined' ? location 
   } catch (e) { /* bỏ qua */ }
   if (hasParam) {
     const v = String(fromUrl || '').trim();
-    if (!v || v === 'off' || v === '0') { try { localStorage.removeItem(STORE_KEY); } catch (e) { } return null; }
+    if (!v || v === 'off' || v === '0') { forgetServer(); return null; }
     const p = parseServer(v);
-    if (p) { try { localStorage.setItem(STORE_KEY, v); } catch (e) { } return p; }
-    return null;
+    if (!p) return null;
+    p.raw = v;
+    if (isTrusted(p)) { try { localStorage.setItem(STORE_KEY, v); } catch (e) { } return p; }
+    p.untrusted = true;
+    return p;
   }
-  try { const v = localStorage.getItem(STORE_KEY); if (v) { const p = parseServer(v); if (p) return p; } } catch (e) { }
+  try {
+    const v = localStorage.getItem(STORE_KEY);
+    if (v) { const p = parseServer(v); if (p) { p.raw = v; if (!isTrusted(p)) p.untrusted = true; return p; } }   // (bản cũ nhớ mọi host)
+  } catch (e) { }
   return parseServer(DEFAULT_SERVER);
 }
