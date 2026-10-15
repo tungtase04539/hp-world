@@ -585,6 +585,20 @@ chủ dự án: `docs/multiplayer/VAN_HANH.md`. Đặc tả giao việc: `docs/m
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-10-15 (MP-2b TÍCH HỢP — riders + nametags + tunnel, sẵn sàng buổi chơi thử đầu tiên):** gộp `--no-ff` theo thứ tự
+    riders (5d26e84) → nametags (6d9fdc0) → tunnel (bf7d8bf). Xung đột duy nhất: SERVER.md — riders và nametags cùng viết "§9.8"
+    → riders giữ **§9.8**, bảng tên đổi thành **§9.9** (sửa mọi tham chiếu: SERVER.md §9.6 "ĐÃ SỬA §9.9", KNOWLEDGE §8c + §10).
+    Mã không xung đột (riders: main/net/vehicles/move/bot/gateway; nametags: nametags/remote_avatars; tunnel: tài liệu +
+    mo-may-chu.ps1). Kiểm sau gộp (máy chủ native `HPMP_TEST=1` 9340/9341, tĩnh 8824, Radeon 890M, 1 Chrome dưới khoá GPU; đầu
+    ra `C:/Users/Admin/hp-world-work/mp2b/integ/`): `mp2_int_e2e --bots 96` **27/27 ĐẠT**, 0 lỗi JS, log máy chủ 4 dòng
+    `"msg":"correct"` = bot gian lận (TELEPORT 155 m) + trình duyệt ở các bước CỐ Ý (teleport 325 m, 2 lệch nhỏ) → **bot trung
+    thực 0 CORRECT**; bảng tên dày (sau nối lại 57 người: 24 bảng, 13 ẩn vì chồng, 11 nâng nấc); `npm test` 160 (159 + 1 bỏ qua
+    sẵn), tests/net 28/28, `mp2_c1_unit` 278/278; một mình: `mp2_nonet` full + lite (0 request lạ, 0 WebSocket, 0 lỗi), diag
+    full + lite 0 lỗi JS, mobile 0 lỗi, waterbfs đạt, check_assets ĐỦ, tour 26 ảnh 0 lỗi (4 góc museum/port/ubnd/rap78 nhìn sát
+    tường — GIỐNG HỆT lượt fixer1 trước, lỗi chọn điểm đứng của tour.mjs, không phải hồi quy). BẪY: test "0 cấp phát mỗi khung"
+    trong `tests/net/nametags.test.mjs` trượt 1/9 lần (lần chạy đầu ngay sau `npm test` 140 s) — đo heap phụ thuộc JIT/tải máy;
+    chạy lại trước khi tin là hồi quy.
+
 - **2026-10-15 (riders fixer — không kéo về oan, SERVER.md §9.8):** vật lý thật (xe máy 16 m/s, ga 3,6, dt ≤ 50 ms) nằm trong
     trình kiểm; CORRECT "SPEED" của bot S4 trong e2e là lỗi BOT: đóng dấu `clientMs` lúc gửi thay vì lúc tính vị trí (28 bot cùng
     1 ms sau một lần khựng vòng sự kiện) + không vào phiên mới như client sau khi máy chủ khởi động lại (7 SPEED + 29
