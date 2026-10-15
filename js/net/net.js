@@ -17,13 +17,14 @@ import { createTelemetry } from './telemetry.js';
 import { createRemoteAvatars } from './remote_avatars.js';   // C2: người chơi khác instanced (≤ 5 draw call, bảng tên, vòng sáng)
 import { createChat } from '../ui/chat.js';
 import { SYS, EVENT, CHANNEL, ACTION, ACTION_RESULT, SANCTION_KIND, CLOSE, SNAP_FLAG } from '../shared/protocol.js';
-import { MODE, SFLAG, STATE_HZ_MOVING, STATE_HZ_IDLE } from '../shared/constants.js';
+import { MODE, SFLAG, STATE_HZ_MOVING, STATE_HZ_IDLE, REJOIN_SNAP_M } from '../shared/constants.js';
+import { qaAllowed } from '../qagate.js';
 import { packState } from '../shared/quant.js';
 import { dayTAt } from '../shared/clock.js';
 
 // bố cục gói SNAPSHOT từ worker (js/net/net_worker.js — sửa cả hai)
 const SNAP_HDR = 11, ENTER_F = 9, UPD_F = 7;
-const REJOIN_SNAP_M = 12;      // vào lại sau khi mất máy chủ: lệch vị trí đã lưu hơn thế → về vị trí máy chủ
+// REJOIN_SNAP_M (constants.js, 12 m): vào lại sau khi mất máy chủ: lệch vị trí đã lưu hơn thế → về vị trí máy chủ
 const RECON_MS = 2000;         // keyframe: chậm nhất sau chừng này mọi người còn thấy đã được ENTER lại (rải 24/snapshot)
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -61,8 +62,9 @@ function build(deps) {
   let recon = null;            // {ids: Set, at, fresh}
   let freshSession = false;
   const blockedIds = new Set();// netId người chơi đã chặn trong PHIÊN này → ẩn hình (ra.hide) — SAFE-2/3
-  // QA hook (__hp.net) chỉ khi trình duyệt tự động (navigator.webdriver) hoặc ?qa — không lộ say/drop/rejoin cho người chơi
-  const QA_ON = (() => { try { return !!navigator.webdriver || new URLSearchParams(location.search).has('qa'); } catch (e) { return false; } })();
+  // QA hook (__hp.net) chỉ trên máy nhà phát triển (localhost) hoặc ?qa=1 (js/qagate.js) — không lộ say/drop/rejoin cho
+  // người chơi thật (trước: navigator.webdriver hoặc ?qa bất kỳ — Chrome --enable-automation là có)
+  const QA_ON = qaAllowed();
   const pendingAct = new Map();// reqId → {type, target, cb}
   let reqId = 1;
   let statsWait = null;
@@ -601,7 +603,22 @@ function build(deps) {
 
   // ---------------------------------------------------------------------------------------------------------------
   // STATE (15 Hz đi / 2 Hz đứng) — ĐỒNG HỒ THẬT, không dùng dt đã kẹp
-  let nextStateAt = 0, lastT = 0, lx = NaN, lz = NaN, vx = 0, vz = 0, lastMode = -1;
+  let nextStateAt = 0, lastT = 0, lx = NaN, lz = NaN, vx = 0, vz = 0, lastMode = -1, lastSentAt = -1e9;
+  // Lên / xuống xe = vị trí NHẢY (tới yên xe ≤ 5 m, chỗ xuống ≤ 8 m) + đổi chế độ: máy chủ chỉ tha +9 m cho bước CÓ đổi
+  // chế độ (move.js MOUNT_SLACK_M). Nếu lên rồi xuống (hoặc xuống rồi gọi xe) lọt giữa HAI STATE 66 ms, máy chủ thấy
+  // ĐI BỘ A → ĐI BỘ C cách nhau vài mét trong 66 ms = vượt tốc → 3 STATE liền → CORRECT (riders fixer 15/10/2026). Nên
+  // gửi STATE NGAY sau mỗi lần lên/xuống (cách STATE trước ≥ MOUNT_STATE_GAP_MS — xô token máy chủ 25/s), và cú nhảy
+  // không tính vào vận tốc ước lượng.
+  const MOUNT_STATE_GAP_MS = 30;
+  function stateNowAfterMount() {
+    if (mode !== 'online' || conn !== 'live' || !started || !attached || (corr && corr.pending)) return;
+    const now = performance.now();
+    const ps = G.pState, p = ps.mounted ? ps.mounted.pos : ps.pos;
+    vx = 0; vz = 0;
+    if (now - lastSentAt >= MOUNT_STATE_GAP_MS) sendState(now);
+    else nextStateAt = lastSentAt + MOUNT_STATE_GAP_MS;
+    lx = p.x; lz = p.z; lastT = now;
+  }
   function resetVel() { lx = NaN; vx = 0; vz = 0; }
   function curMode() {
     const ps = G.pState, v = ps.mounted;
@@ -631,6 +648,7 @@ function build(deps) {
     };
     wpost({ t: 'state', s: st });
     tel.inc('stateSent');
+    lastSentAt = now;
     const moving = Math.hypot(vx, vz) > 0.15 || mode !== lastMode;
     lastMode = mode;
     nextStateAt = now + 1000 / (moving ? STATE_HZ_MOVING : STATE_HZ_IDLE);
@@ -709,6 +727,7 @@ function build(deps) {
     get mode() { return mode; },
     get conn() { return conn; },
     get online() { return mode === 'online'; },
+    qaOn: QA_ON,     // main.js: __hp.teleport khi đang online chỉ cho localhost / ?qa=1
     // nút Bắt đầu đã mở (boot.finish): đổi chữ thành "Vào thành phố"
     onBootReady() { try { labelTitle(); } catch (e) { } },
     // thế giới đã dựng + người chơi tồn tại
@@ -774,16 +793,21 @@ function build(deps) {
       try {
         if (mode !== 'online' || conn !== 'live') return;
         const ref = vehicleRef(v);
-        if (!ref) return;
-        action(ACTION.MOUNT, ref, 0, (code) => {
-          if (code !== ACTION_RESULT.OK && G.pState.mounted === v) { G.dismountNow(); ui.toast(t('vehicleBusy'), 3000); }
-        });
+        if (ref) {
+          action(ACTION.MOUNT, ref, 0, (code) => {
+            if (code !== ACTION_RESULT.OK && G.pState.mounted === v) { G.dismountNow(); ui.toast(t('vehicleBusy'), 3000); }
+          });
+        }
+        stateNowAfterMount();
       } catch (e) { }
     },
     onDismount(v) {
-      try { if (mode === 'online' && conn === 'live') { const ref = vehicleRef(v); if (ref) action(ACTION.DISMOUNT, ref, 0, null); } } catch (e) { }
+      try {
+        if (mode === 'online' && conn === 'live') { const ref = vehicleRef(v); if (ref) action(ACTION.DISMOUNT, ref, 0, null); }
+        stateNowAfterMount();
+      } catch (e) { }
     },
-    // ---- QA (window.__hp.net) — chỉ khi trình duyệt tự động / ?qa ----
+    // ---- QA (window.__hp.net) — chỉ khi localhost / ?qa=1 (js/qagate.js) ----
     qa: !QA_ON ? null : {
       status: () => ({ mode, conn, netId, corrEpoch, started, attached, clockSynced: Number.isFinite(clockOff), visible: visible.size,
         names: names.size, serverNow: serverNow(), dayT: G && G.dayNight ? G.dayNight.t : null,

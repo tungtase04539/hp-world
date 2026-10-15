@@ -2,6 +2,7 @@
 // (diag/tour/perf/mobile). Cùng quy ước với tools/qa/shoot.mjs: server tĩnh `python -m http.server <port>` ở gốc
 // repo/worktree, playwright-core nạp qua tools/qa/pw.mjs (PW_PATH → tools/qa/node_modules; cài: cd tools/qa && npm ci).
 // Dùng: const g = await openGame({ port, quality, viewport, mobile, pin, chromeArgs }); … await g.close();   (pin: khoá autoQuality, mặc định bật)
+// URL luôn có &qa=1 (js/qagate.js: __hp.net + __hp.teleport khi online chỉ cho localhost / ?qa=1).
 // openGame tự giữ KHOÁ GPU toàn máy tới g.close() — LUÔN gọi g.close() (kể cả khi lỗi) để nhả khoá sớm.
 //   g.pg (Page) · g.errors (lỗi JS) · g.hpReadyMs (window.__hp có) · g.startReadyMs (nút Bắt đầu mở, js/boot.js)
 import { PW_URL } from './pw.mjs';
@@ -38,7 +39,7 @@ export async function openGame({ port = 8177, host = '127.0.0.1', quality = 'ful
   pg.on('console', (m) => { if (m.type() === 'error') errors.push('console: ' + m.text().slice(0, 300)); });
   const t0 = Date.now();
   const q = quality ? `?quality=${quality}` : '?';
-  await pg.goto(`http://${host}:${port}/index.html${q}${extra}`, { waitUntil: 'domcontentloaded', timeout: 120000 });
+  await pg.goto(`http://${host}:${port}/index.html${q}&qa=1${extra}`, { waitUntil: 'domcontentloaded', timeout: 120000 });
   let hpReadyMs = 0, startReadyMs = 0, tErr = 0, aborted = false;
   for (let i = 0; i < 600; i++) {
     if (await pg.evaluate(() => !!(window.__hp && window.__hp.teleport)).catch(() => false)) { hpReadyMs = Date.now() - t0; break; }

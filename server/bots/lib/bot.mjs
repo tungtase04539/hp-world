@@ -12,7 +12,7 @@ import {
   Writer, encodeHello, encodeReady, encodeState, encodePing, encodeChat, decodeS2C,
 } from '../../../js/shared/codec.js';
 import { S2C, SYS, CLOSE, CHANNEL, EVENT, PROTO_VERSION, SNAP_FLAG, CHAT_CODE } from '../../../js/shared/protocol.js';
-import { MODE, SPEED, ACCEL, MODE_VMAX, STATE_HZ_MOVING, STATE_HZ_IDLE, AOI, PING_FAST_S } from '../../../js/shared/constants.js';
+import { MODE, SPEED, ACCEL, MODE_VMAX, STATE_HZ_MOVING, STATE_HZ_IDLE, AOI, PING_FAST_S, REJOIN_SNAP_M } from '../../../js/shared/constants.js';
 import { packState } from '../../../js/shared/quant.js';
 import { ClockSync } from '../../../js/shared/clock.js';
 import { pickSpawn } from '../../../js/shared/spawns.js';
@@ -192,6 +192,7 @@ export class Bot {
   _onLive(m) {
     const W = this.W;
     const now = performance.now();
+    const wasResume = this.resuming;
     if (this.resuming) {
       const same = m && m.netId === this.r.netId;
       if (same) { this.r.resumeOk++; W.c.resumeOk++; W.resumeMs.add(now - (this.dropT || this.resumeT0)); W.resumeHsMs.add(now - this.resumeT0); }
@@ -207,6 +208,7 @@ export class Bot {
       if (!this.r.netIds.includes(m.netId)) this.r.netIds.push(m.netId);
       this.resumeToken = m.resumeToken;
       if (!this.placed) this._place(m.spawn.x, m.spawn.z, m.spawn.yaw);
+      else if (!wasResume) this._rejoin(m.spawn.x, m.spawn.z, m.spawn.yaw);
       this.sendRaw(encodeReady(W8));
     } else if (!this.placed) {
       const sp = this.spawnHint && Number.isFinite(this.spawnHint.x) ? this.spawnHint : pickSpawn(null, this.rand);
@@ -231,6 +233,18 @@ export class Bot {
         this._setMode(this.s.travelMode ?? MODE.MOTO);
       } else this._newLeg(performance.now());
     }
+  }
+
+  // A FRESH session for a bot that was already in the world (server restarted, RESUME expired, ticket takeover): do what
+  // the real client does (js/net/net.js onWelcome/applySpawn) — the server counts CORRECT epochs from 0 again, and its
+  // anchor is the spawn it chose (the position saved up to 30 s ago, or a spawn point). Keeping the bot's own position
+  // when that anchor is farther than REJOIN_SNAP_M made every honest bot "teleport" on its first STATE after a server
+  // restart (riders fixer, 15/10/2026: 84 TELEPORT / SPEED CORRECTs per restart; the MP-2 e2e's 11–13 "SPEED" ones).
+  _rejoin(x, z, yaw) {
+    this.corrEpoch = 0;
+    if (Math.hypot(this.x - x, this.z - z) <= REJOIN_SNAP_M) return;
+    this.plaza = null; this.mode = MODE.WALK; this.pendingMode = -1; this.slowSince = 0; this.v = 0; this.vTarget = 0;
+    this._place(x, z, yaw);
   }
 
   _onClose(code) {
@@ -379,6 +393,7 @@ export class Bot {
     if (this.state !== 'live') return;
     const dt = Math.min(0.25, (now - this.lastTick) / 1000);
     this.lastTick = now;
+    this.posT = now;          // the position after _move below is the position AT `now` (STATE clientMs, stateMsg)
     if (this.tickHook && this.tickHook(this, now, dt) === true) return;
     this._move(now, dt);
     if (now >= this.nextStateAt) this._sendState(now);
@@ -500,7 +515,13 @@ export class Bot {
     const moving = this.v > 0.05;
     const st = {
       seq: this.seq = (this.seq + 1) & 0xffff,
-      clientMs: Math.floor(performance.now() - this.t0) & 0xffff,
+      // stamped with the time the POSITION belongs to (the tick that moved the bot), not the send time: the worker / e2e
+      // harness ticks every bot with ONE shared `now`, so an event-loop pause inside that loop (GC, Playwright IPC in
+      // tools/qa/mp2_int_e2e.mjs) used to stamp the pre-pause position with a post-pause clock; the next STATE then carried
+      // the whole pause's travel in a 20–60 ms stamp gap = 2–3x vmax in the server's 300 ms window → 3 rejected STATEs →
+      // SPEED CORRECT (riders fixer 15/10/2026: 28 riding bots corrected in the same millisecond). A real client stamps after
+      // its movement in the same frame with dt clamped to 50 ms (js/main.js), so it never had this.
+      clientMs: Math.floor((this.posT || performance.now()) - this.t0) & 0xffff,
       x: this.x, z: this.z, y: this.y, yaw: this.yaw,
       vx: moving ? Math.sin(this.yaw) * this.v : 0, vz: moving ? Math.cos(this.yaw) * this.v : 0,
       state: packState(this.mode, 0), corrEpoch: this.corrEpoch, vehicleRef: 0,

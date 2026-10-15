@@ -983,6 +983,9 @@ window.__hp = {
     return out;
   },
   teleport(x, z, camYaw = 0, pitch = 0.3, dist = 14) {
+    // MULTIPLAYER: người chơi thật không dùng được nút dịch chuyển gỡ lỗi khi đang online (chỉ localhost / ?qa=1 —
+    // js/qagate.js; máy chủ vẫn kéo về nếu ai đó tự sửa vị trí). Chơi một mình: giữ nguyên như cũ.
+    if (net && net.online && !net.qaOn) { console.warn('[hp] __hp.teleport tắt khi chơi online (cần ?qa=1)'); return false; }
     if (pState.mounted) { pState.mounted.mounted = false; pState.mounted = null; player.sit(false); }
     x = Math.max(WORLD_BOUNDS.minX + 31, Math.min(WORLD_BOUNDS.maxX - 31, x));   // clamp vào biên đi-được (tránh kẹt ngoài map — tryMove chặn mọi bước khi ở ngoài)
     z = Math.max(WORLD_BOUNDS.minZ + 31, Math.min(WORLD_BOUNDS.maxZ - 31, z));

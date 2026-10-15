@@ -266,7 +266,7 @@ export class MoveCheck {
     this.lagMinCur = Infinity; this.lagMinPrev = Infinity; this.lagBucketT = serverMs; this.lagBuckets = 0;
     // the forgiveness bucket survives resets (ticket takeover): only the first reset fills it
     if (this.forgive === undefined) { this.forgive = MOVE.FORGIVE_BURST_MS; this.forgiveT = serverMs; }
-    this.hard = false; this.lastDist = 0; this.lastLimit = 0; this.lastDt = 0;
+    this.hard = false; this.lastDist = 0; this.lastLimit = 0; this.lastDt = 0; this.lastWin = 0; this.lastSpan = 0;
     this.accepted = 0;
   }
   // after a CORRECT: keep the time base, restart the window from the corrected point at the latest client time
@@ -297,7 +297,7 @@ export class MoveCheck {
     const d = Math.sqrt(wx * wx + wz * wz);
     const lim = (this.allow[this.head] - this.allow[s] + segAllow) * MOVE.SLACK_MUL + slack;
     if (d <= lim) return false;
-    this.lastDist = d; this.lastLimit = lim;
+    this.lastDist = d; this.lastLimit = lim; this.lastSpan = this.t[this.head] - this.t[s];
     return true;
   }
 
@@ -357,7 +357,7 @@ export class MoveCheck {
   }
 
   check(clientMs16, x, z, mode, serverMs, flags = 0) {
-    this.hard = false; this.lastDist = 0; this.lastLimit = 0;
+    this.hard = false; this.lastDist = 0; this.lastLimit = 0; this.lastWin = 0; this.lastSpan = 0;
     const timeOk = this._time(clientMs16 & 0xffff, serverMs);
     const t = this.effT;
     mode &= 7;
@@ -414,10 +414,13 @@ export class MoveCheck {
         }
       }
       const slack = MOVE.SLACK_ADD_M + (mountChange ? MOVE.MOUNT_SLACK_M : 0);
-      if (this._over(i, x, z, segAllow, slack) || (ib !== i && this._over(ib, x, z, segAllow, slack)) ||
-          (il !== i && this._over(il, x, z, segAllow, slack))) return MV.SPEED;
+      // lastWin (diagnostics, server CORRECT log): 1 = 1 s window, 2 = 300 ms burst window, 3 = 4 s long window,
+      // 4 = first step after an anchor; lastSpan = client ms between the window start and the previous sample
+      if (this._over(i, x, z, segAllow, slack)) { this.lastWin = 1; return MV.SPEED; }
+      if (ib !== i && this._over(ib, x, z, segAllow, slack)) { this.lastWin = 2; return MV.SPEED; }
+      if (il !== i && this._over(il, x, z, segAllow, slack)) { this.lastWin = 3; return MV.SPEED; }
     } else if (step > stepLim) {
-      this.lastDist = step; this.lastLimit = stepLim;
+      this.lastDist = step; this.lastLimit = stepLim; this.lastWin = 4;
       return MV.SPEED;
     }
 
