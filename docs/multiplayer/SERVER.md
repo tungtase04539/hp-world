@@ -1287,3 +1287,69 @@ có dấu, 1 Chrome dưới khoá GPU, tuần tự 2 trình duyệt): **19/19 b�
 `tools/qa/mp2_c1_unit.mjs` (node: cấu hình, CORRECT, i18n vi/en, bố cục gói worker) và `tools/qa/mp2_nonet.mjs` (không máy
 chủ: 0 import js/net, 0 WebSocket, 0 request API).
 
+### 9.5 Người chơi khác trong game (C2, 15/10/2026)
+
+Tệp: `js/net/remote_avatars.js` (vẽ), `js/net/interp.js` (nội suy, thuần — chạy được trong node), `js/net/nametags.js` (bảng tên
++ vòng sáng), `js/minimap.js` (tham số `markers`). Không mở mạng, không sửa `main.js`; mọi hàm tự nuốt lỗi (không bao giờ làm
+hỏng vòng frame). C1 (`js/net/net.js`) nối như sau:
+
+```js
+import { createRemoteAvatars, randomAppearanceHex } from './net/remote_avatars.js';
+import { createSnapClock } from './net/interp.js';
+const ra = createRemoteAvatars({ scene, world, camera, tier: TIER });     // sau khi có scene/camera (main.js hook §9 mục 4)
+const snapClock = createSnapClock();                                      // 1 cái / kết nối; reset() khi nối lại trang mới
+// /v1/auth/guest: appearance = randomAppearanceHex() (hoặc encodeAppearance(look) → hex) — 8 byte, máy chủ lưu nguyên
+// WELCOME:  ra.self(netId)
+// SNAPSHOT: const t = snapClock.time(msg.tick, clock.serverNow());       // dấu thời gian snapshot (giờ máy chủ, ms)
+//           for (s of leaves) ra.leave(slotNetId[s]);
+//           for (e of enters) ra.enter(e.netId, e, e.appearance, t);     // e = {x, z, y, yaw, spd, state, appearance}
+//           for (u of updates) ra.update(slotNetId[u.slot], u, t);
+//           KEYFRAME: (tuỳ chọn) ra.keep(netIdsTrongKeyframe) — bỏ người không còn trong AOI; ENTER lại cùng netId giữ quỹ đạo
+// NAMES:    ra.names(msg.names)                                          // [{netId, name, badge}] — tên giữ qua leave/enter
+// mỗi khung (main.js trước traffic.update): ra.frame(dt, clock.serverNow(), camera.position)
+// minimap (main.js drawMinimap 10 Hz): drawMinimap(px, pz, yaw, ra.markers())   // [] ở GĐ1 (người lạ ẩn); ra.setFriends(ids)
+// thoát online / về chế độ Khám phá: ra.dispose()  (hoặc ra.setEnabled(false) khi rớt mạng tạm)
+```
+
+- **Thời gian**: `nowServerMs` = đồng hồ thật + offset `ClockSync`; dấu thời gian snapshot nên lấy từ `createSnapClock`
+  (tick·50 ms + độ lệch nhỏ nhất trong 5 s — rung mạng chỉ làm TRỄ gói nên đường bao dưới là đúng; tick lùi/lệch > 10 s → tự đặt
+  lại). Truyền giờ nhận thô cũng chạy (kém mượt hơn).
+- **Nội suy** (`Track`): vẽ ở `now − delay`, delay tự chỉnh 100–150 ms theo nhịp mẫu (10 Hz → 120, tầng xa 5 Hz → 150); hết mẫu
+  → ngoại suy theo vận tốc 2 mẫu cuối ≤ 250 ms rồi đứng; mẫu mới lệch > 8 m so với quỹ đạo dự đoán (dự đoán theo vận tốc qua cả lỗ
+  hổng ≤ 2 s) → NHẢY; gói trễ làm đổi quỹ đạo tại thời điểm đang vẽ → chênh lệch tắt dần τ 90 ms (không giật). Máy chủ chỉ gửi bản
+  ghi ĐỔI → sau quãng đứng yên chèn mẫu giữ chỗ t − 100 ms. Snapshot 10 Hz mang STATE 15 Hz mới nhất (tuổi mẫu rung 0–67 ms) →
+  thời điểm mẫu được căn theo quãng đường/`spd` khi chạy > 2 m/s (rung dấu thời gian 23 → 5,5 ms, mô phỏng `tests/net/interp_sim.mjs`).
+- **Vẽ**: ≤ 5 draw call cố định cho mọi N — người (`pedestrianGeometry`, vật liệu `traffic_walk` của traffic.js), xe máy + người
+  lái gần/xa (`motorbikeGeometry('scooter', rider 'ride')` / `motorbikeFarGeometry`, LOD theo camera như traffic), bóng tiếp đất
+  (`kitShadowMaterial`), vòng sáng + bảng tên + "vắng mặt" (1 InstancedMesh động). 3 bộ đệm instance xoay vòng, `userData.noCull`,
+  `raycast = () => {}`, `matrixAutoUpdate = false`, bounding sphere 220 m quanh camera, không đổ bóng vào shadow map. Trần: TIER ≤ 1
+  → 40, TIER ≥ 2 → 96 (gần camera nhất, người đang vẽ được ưu tiên ×0,8). Chế độ: WALK/RUN (dáng đi theo tốc độ hiển thị), AIR
+  (y bản ghi), SIT/BOAT (ngồi), MOTO (nghiêng atan(v·ω/g), cờ CARGO → thùng hàng), PILLION (gắn vào xe máy gần nhất ≤ 3 m — bật
+  người B trên xe đó, áo B = áo người ngồi sau), CYCLO (GĐ1: vẽ bằng xe máy + giỏ). Cờ AWAY → vòng xám + "vắng mặt"/"away".
+  `y` = `world.surfaceY(x, z, yBảnGhi)` (mặt cầu theo tầng) + `ROAD_TOP`.
+- **Ngoại hình 8 byte** (ENTER): b0 hạt giống màu · b1 mũ (0-4 không, 5 nón lá, 6-7 mũ lưỡi trai) / tóc dài / khẩu trang / túi ·
+  b2 áo · b3 sơn xe · b5 chiều cao 0,94–1,06 · b6 quần short / áo dài tay · b7 phiên bản. Byte ngẫu nhiên (máy chủ tự sinh) luôn
+  ra người hợp lý. `huy hiệu` (NAMES badge) 1 = viền + chữ vàng.
+- **Bảng tên**: atlas canvas 1024² (ô 256×64, LRU 60 ô, ≤ 8 ô vẽ mới/khung, tải lại texture ≤ 10 lần/s), chuỗi NFC, font hệ thống
+  có dấu tiếng Việt, co chữ cho vừa ô; 24 người gần nhất trong 25 m, cỡ 0,26 + 0,011·d m, mờ dần 17→25 m (4 mức vẽ sẵn).
+
+**Số đo** (`tools/qa/mp_c2_avatars.mjs`, Radeon 890M ANGLE d3d11, 1280×720, cùng phiên, 1 Chrome dưới khoá GPU; ảnh + `report.json`
++ `interp.json/svg` ở `C:/Users/Admin/hp-world-work/mp2/c2/`):
+
+| | TIER 3 (full) | TIER 1 (lite) |
+|---|---|---|
+| Người gửi tới / được vẽ (quảng trường Nhà hát) | 96 / 87 (9 xe máy ngoài 200 m) | 96 / 40 (trần) |
+| Draw call của mô-đun (đếm theo mesh `mp_*`, 10 khung) | 4 (người, xe máy xa, bóng, bảng tên) — kịch bản trộn: 5 | 3 |
+| Tổng draw call trung vị: không mô-đun → 0 người → 96 người | 397 → 399 → 402 (nhiễu bóng/AO ±100 giữa khung) | 480 → 480 → 481 |
+| Chương trình shader trước / sau | 76 / 76 | 51 / 51 |
+| fps · khung p95 (trước → 96 người) | 60,1 → 60,0 · 18,0 → 16,9 ms (vsync) | 60,2 → 60,0 · 16,9 → 16,8 ms |
+| CPU `ra.frame()` ở 96 người | 0,26 ms | 0,26 ms |
+| Bảng tên đang hiện | 24 (trần) | 24 |
+
+Nội suy trong game (1 người, quỹ đạo `interp_sim.truthAt`: đi bộ 3 m/s → chạy vòng 7 m/s → đứng 5 s → xe máy 16 m/s; STATE 15 Hz,
+snapshot 10 Hz chỉ bản ghi đổi, trễ 35 ms + rung 0–60 ms + đuôi 4 %, kẹt TCP 1,2 %/snapshot 300–700 ms, rớt mạng 40–42 s rồi
+RESUME keyframe): sai số vị trí vẽ p50 **0,07 m**, p90 0,18, p95 **0,23 m**, p99 1,34, max 5,4 m (kẹt TCP: ngoại suy dừng ở 250 ms
+theo SPEC rồi đuổi kịp trong ~0,2 s), bước khung lớn nhất 0,94 m, trễ hiển thị 265 ms (delay 120 + tuổi mẫu 145). Resume sau 2 s
+ở chỗ người kia đã đi tới: dự đoán theo vận tốc khớp → không nhảy. Mặt cầu Lạc Long: người/xe trên cầu y 4,22 (mặt cầu 4,11 +
+mặt nhựa), dưới gầm/ngoài cầu theo mặt đất. Dấu tiếng Việt khó ("Nguyễn Thị Hường", "Đặng Quốc Việt", "Trần Ngọc Ẩn", "Lê Thị Ứng")
+không vỡ: `atlas.png`, `tags_zoom2.png`.
