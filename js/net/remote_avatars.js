@@ -20,8 +20,8 @@
 //   5 vòng sáng + bảng tên + dấu "vắng mặt" (nametags.js: 1 Mesh động, MeshBasic map — biến thể sẵn có).
 // Hợp đồng instcull/freeze như traffic.js: userData.noCull, raycast = () => {}, matrixAutoUpdate = false, bounding sphere
 // đặt tay quanh camera; không đổ bóng vào shadow map; 3 bộ đệm instance xoay vòng (NSET) — không ghi vào bộ đệm GPU đang vẽ.
-// Trần hiển thị theo TIER: 1 (và 0) → 40, 2/3 → 96 người gần camera nhất; bảng tên 24 người gần nhất trong 25 m, mờ dần
-// từ 17 m. Vòng sáng xanh mảnh dưới chân = người thật (NPC/người đi đường không có); xám + "vắng mặt" khi họ rớt mạng.
+// Trần hiển thị theo TIER: 1 (và 0) → 40, 2/3 → 96 người gần camera nhất; bảng tên ≤ 24 trong 25 m, KHÔNG CHỒNG trên màn
+// hình (nametags.js xếp chỗ theo ưu tiên: gần · đang hiện · bạn · huy hiệu), mờ dần từ 17 m. Vòng sáng xanh mảnh dưới chân = người thật (NPC/người đi đường không có); xám + "vắng mặt" khi họ rớt mạng.
 import * as THREE from 'three';
 import { TIER as DEVICE_TIER } from '../device.js';
 import { surfaceY as worldSurfaceY } from '../world.js';
@@ -80,7 +80,7 @@ const LOCAL_HIP = 0.86;             // main.js updateMounted: pState.pos.y = hô
 // vòng sáng người đi bộ trên mặt VỈA HÈ + 2 cm (không bị vỉa hè che — trên lòng đường thì nổi 16 cm, chấp nhận được)
 const RING_DY = SIDEWALK_TOP + 0.02;
 
-export function createRemoteAvatars({ scene, world = null, camera, tier = DEVICE_TIER, surfaceY = null } = {}) {
+export function createRemoteAvatars({ scene, world = null, camera, tier = DEVICE_TIER, surfaceY = null, declutter = true } = {}) {
   const sY = surfaceY || (world && world.surfaceY) || worldSurfaceY;
   const CAP = CAP_BY_TIER(tier);
   // cùng tham số vật liệu với traffic.js → CÙNG đối tượng vật liệu (cache kitMaterial) → 0 chương trình shader mới
@@ -136,7 +136,8 @@ export function createRemoteAvatars({ scene, world = null, camera, tier = DEVICE
   shBind(shSets[0]);
   if (scene) scene.add(shMesh);
   meshes.push(shMesh);
-  const tags = createNameTags({ scene, maxTags: TAG_MAX, maxRings: CAP });
+  const tags = createNameTags({ scene, maxTags: TAG_MAX, maxRings: CAP, declutter });   // declutter: gỡ chồng bảng tên (false = A/B QA)
+  const TA = tags.args;   // khối tham số số thực của tags.ringA/tagA (truyền số thực làm tham số = đóng hộp HeapNumber mỗi lần gọi)
   meshes.push(tags.mesh);
 
   // ---------- trạng thái ----------
@@ -144,19 +145,24 @@ export function createRemoteAvatars({ scene, world = null, camera, tier = DEVICE
   const names = new Map();       // netId → {name, badge}
   const friends = new Set();
   const hidden = new Set();      // netId người chơi đã CHẶN: không vẽ (thân, vòng sáng, bảng tên, chấm minimap) — SAFE-3
-  let selfId = -1, lastSnapMs = NaN, lastNow = NaN, enabled = true, markerAll = false;
-  let selAt = -1e9, selFrames = 0, frameMs = 0, frameMsEma = 0;
+  let selfId = -1, lastSnapMs = NaN, enabled = true, markerAll = false, selFrames = 0;
+  // số thực đổi MỖI KHUNG giữ trong Float64Array: gán số thực vào biến closure `let` = 1 HeapNumber mới mỗi lần (rác mỗi khung)
+  const TM = new Float64Array(4);   // 0 lastNow (giờ máy chủ khung trước) · 1 selAt · 2 frameMsEma · 3 tagMsEma
+  TM[0] = NaN; TM[1] = -1e9;
   const list = [];               // mảng avatar (duyệt nhanh)
-  const drawnList = [];
+  // mảng TÁI DÙNG mỗi khung + đếm riêng (KHÔNG `arr.length = 0` — V8 nhả bộ nhớ đệm rồi push cấp phát lại mỗi khung)
+  const drawnList = [], cand = [], selSort = [];
+  let nDrawnL = 0;
   const out = {};
-  const st = { count: 0, drawn: 0, drawCalls: 0, peds: 0, bikes: 0, bikesFar: 0, tags: 0, rings: 0, cap: CAP, ms: 0, snaps: 0, extrap: 0 };
+  const st = { count: 0, drawn: 0, drawCalls: 0, peds: 0, bikes: 0, bikesFar: 0, tags: 0, rings: 0, cap: CAP, ms: 0, tagMs: 0, snaps: 0, extrap: 0 };
+  let frameNo = 0;
 
   function makeAvatar(netId, appearance) {
     const a = {
       netId, tr: new Track(), app: decodeAppearance(appearance), shirt: new THREE.Color(), paint: new THREE.Color(),
       x: 0, y: 0, z: 0, yaw: 0, mode: 0, flags: 0, v: 0, px: NaN, pz: NaN, wph: (netId * 1.618) % 6.283, wamp: 0,
       lean: 0, yawPrev: NaN, gy: 0, gx: NaN, gz: NaN, gref: NaN, far: false, d2: 0, sel: false, score: 0, pillion: null, riding: null,
-      yRec: 0, headY: 0,   // khai báo sẵn (không thêm trường lúc chạy → không đổi hidden class mỗi khung)
+      yRec: 0, headY: 0, yDraw: 0, tagOn: false, tagScore: 0,   // khai báo sẵn (không thêm trường lúc chạy → không đổi hidden class mỗi khung)
     };
     setLook(a, appearance);
     return a;
@@ -195,6 +201,7 @@ export function createRemoteAvatars({ scene, world = null, camera, tier = DEVICE
   }
   function stampOf(serverMs) {
     if (Number.isFinite(serverMs)) { if (!(serverMs <= lastSnapMs)) lastSnapMs = serverMs; return serverMs; }
+    const lastNow = TM[0];
     return Number.isFinite(lastSnapMs) ? lastSnapMs : Number.isFinite(lastNow) ? lastNow : 0;
   }
 
@@ -251,13 +258,15 @@ export function createRemoteAvatars({ scene, world = null, camera, tier = DEVICE
   const _cam = new THREE.Vector3();
   function frame(dt, nowServerMs, camPos) {
     const t0 = performance.now();
+    frameNo++;
     try {
       if (!enabled) return st;
       dt = Math.min(Math.max(num(dt, 0.016), 0), 0.1);
+      const lastNow = TM[0];
       const now = Number.isFinite(nowServerMs) ? nowServerMs : (Number.isFinite(lastNow) ? lastNow + dt * 1000 : (Number.isFinite(lastSnapMs) ? lastSnapMs : 0));
       // dt THẬT (giờ máy chủ) cho đạo hàm tốc độ/nghiêng — dt khung bị kẹp 0,05 s dưới 20 fps làm tốc độ/nghiêng phóng đại
       const rdt = Number.isFinite(lastNow) && now > lastNow ? Math.min(0.25, (now - lastNow) / 1000) : dt;
-      lastNow = now;
+      TM[0] = now;
       if (camPos) _cam.copy(camPos); else if (camera) _cam.copy(camera.position);
       const cx = _cam.x, cz = _cam.z;
       // 1) nội suy + dẫn xuất (tốc độ hiển thị, nghiêng xe, cao độ mặt đất/mặt cầu)
@@ -270,7 +279,8 @@ export function createRemoteAvatars({ scene, world = null, camera, tier = DEVICE
         if (out.extrap > 0) nEx++;
         if (snapped || !(a.px === a.px)) { a.v = out.spd; a.yawPrev = out.yaw; a.lean = 0; }
         else {
-          const dv = Math.hypot(out.x - a.px, out.z - a.pz) / Math.max(rdt, 1e-3);
+          const ddx = out.x - a.px, ddz = out.z - a.pz;   // (Math.hypot = builtin cấp phát mảng tham số mỗi lần gọi)
+          const dv = Math.sqrt(ddx * ddx + ddz * ddz) / Math.max(rdt, 1e-3);
           a.v += (Math.min(dv, 40) - a.v) * Math.min(1, dt * 10);
         }
         a.px = out.x; a.pz = out.z;
@@ -296,14 +306,19 @@ export function createRemoteAvatars({ scene, world = null, camera, tier = DEVICE
       }
       st.extrap = nEx;
       // 2) chọn ai được vẽ: trần theo TIER, gần camera nhất (đang vẽ được ưu tiên 0,8 — không đổi qua lại), 10 Hz
-      if (t0 - selAt > 100 || ++selFrames >= 6 || list.length <= CAP) {   // ~10 Hz (thời gian thật HOẶC 6 khung)
-        selAt = t0; selFrames = 0;
+      if (t0 - TM[1] > 100 || ++selFrames >= 6 || list.length <= CAP) {   // ~10 Hz (thời gian thật HOẶC 6 khung)
+        TM[1] = t0; selFrames = 0;
         const R2 = DRAW_R * DRAW_R;
         if (list.length <= CAP) for (const a of list) a.sel = a.d2 <= R2 && !(hidden.size && hidden.has(a.netId));
         else {
-          for (const a of list) a.score = a.d2 > R2 || (hidden.size && hidden.has(a.netId)) ? Infinity : a.sel ? a.d2 * 0.64 : a.d2;
-          const s = list.slice().sort((p, q) => p.score - q.score);
-          for (let i = 0; i < s.length; i++) s[i].sel = i < CAP && s[i].score < Infinity;
+          const n = list.length;
+          for (let i = 0; i < n; i++) {
+            const a = list[i];
+            a.score = a.d2 > R2 || (hidden.size && hidden.has(a.netId)) ? Infinity : a.sel ? a.d2 * 0.64 : a.d2;
+            selSort[i] = a;
+          }
+          sortScore(selSort, n);
+          for (let i = 0; i < n; i++) { selSort[i].sel = i < CAP && selSort[i].score < Infinity; selSort[i] = null; }
         }
       }
       // 3) người ngồi sau: gắn vào người lái xe máy gần nhất trong 3 m → bật bit PILLION trên xe đó
@@ -322,13 +337,12 @@ export function createRemoteAvatars({ scene, world = null, camera, tier = DEVICE
       shK = (shK + 1) % NSET;
       const sa = shSets[shK].ib.array;
       let ns = 0;
-      tags.begin(camera);
-      drawnList.length = 0;
+      tags.begin(camera, dt);
+      nDrawnL = 0;
       for (let i = 0; i < list.length; i++) {
         const a = list[i];
         if (!a.sel) continue;
-        drawnList.push(a);
-        const away = !!(a.flags & SFLAG.AWAY);
+        drawnList[nDrawnL++] = a;
         if (a.riding) {   // thân người ngồi sau nằm trong mô hình xe của người lái
           a.yDraw = a.riding.yDraw ?? a.gy; a.headY = a.gy + 1.75;
           continue;
@@ -385,27 +399,44 @@ export function createRemoteAvatars({ scene, world = null, camera, tier = DEVICE
           ns++;
         }
       }
-      // vòng sáng (≤ 90 m) + bảng tên (24 gần nhất trong 25 m có tên)
-      let nTagCand = 0;
-      for (const a of drawnList) {
-        if (a.d2 > RING_R * RING_R || a.riding) continue;
-        const away = !!(a.flags & SFLAG.AWAY), bike = a.mode === MODE.MOTO || a.mode === MODE.CYCLO;
-        tags.ring(a.x, a.gy + (bike ? ROAD_TOP + 0.03 : RING_DY), a.z, a.yaw, bike ? 1.25 : 0.95 * a.app.scale, bike ? 2.35 : 0.95 * a.app.scale, away);
-        if (a.d2 <= TAG_R * TAG_R && a.d2 >= TAG_NEAR2 && names.has(a.netId)) nTagCand++;
+      // vòng sáng (≤ 90 m) + bảng tên: MỌI người có tên trong 25 m là ứng viên, gọi tags.tag() theo THỨ TỰ ƯU TIÊN —
+      // nametags.js xếp chỗ trên màn hình (bảng chồng lên bảng ưu tiên cao hơn → nâng 1 nấc hoặc ẩn, có trễ + mờ dần), ≤ 24 bảng.
+      // Ưu tiên = khoảng cách × 0,7 nếu bảng ĐANG HIỆN (không đổi chỗ qua lại khi 2 người ngang nhau) × 0,25 nếu là BẠN
+      // (× 0,5 nếu huy hiệu 1 = chủ dự án / điều hành — người mới cần thấy ai đang hướng dẫn).
+      const timeTags = (frameNo & 7) === 0, tT0 = timeTags ? performance.now() : 0;   // đo 1/8 khung (performance.now() = 1 HeapNumber)
+      let nCand = 0;
+      const nFr = friends.size;
+      for (let i = 0; i < nDrawnL; i++) {
+        const a = drawnList[i];
+        if (a.d2 <= RING_R * RING_R && !a.riding) {
+          const away = !!(a.flags & SFLAG.AWAY), bike = a.mode === MODE.MOTO || a.mode === MODE.CYCLO;
+          TA[0] = a.x; TA[1] = a.gy + (bike ? ROAD_TOP + 0.03 : RING_DY); TA[2] = a.z; TA[3] = a.yaw;
+          TA[4] = bike ? 1.25 : 0.95 * a.app.scale; TA[5] = bike ? 2.35 : 0.95 * a.app.scale;
+          tags.ringA(away);
+        }
+        const nm = a.d2 <= TAG_R * TAG_R && a.d2 >= TAG_NEAR2 ? names.get(a.netId) : undefined;
+        if (nm !== undefined) {
+          a.tagScore = a.d2 * (a.tagOn ? 0.49 : 1) * (nFr && friends.has(a.netId) ? 0.0625 : nm.badge === 1 ? 0.25 : 1);
+          cand[nCand++] = a;
+        } else a.tagOn = false;
       }
       st.tags = 0;
-      if (nTagCand) {
-        const cand = [];
-        for (const a of drawnList) if (a.d2 <= TAG_R * TAG_R && a.d2 >= TAG_NEAR2 && names.has(a.netId)) cand.push(a);
-        if (cand.length > TAG_MAX) cand.sort((p, q) => p.d2 - q.d2);
+      if (nCand) {
+        sortTagScore(cand, nCand);
         const cy = camera ? camera.position.y : 0;
-        for (let i = 0; i < cand.length && i < TAG_MAX; i++) {
-          const a = cand[i], nm = names.get(a.netId);
-          const d = Math.sqrt(a.d2 + (a.headY - cy) ** 2);
-          if (tags.tag(a.netId, nm.name, nm.badge, a.x, a.headY + 0.22, a.z, d, !!(a.flags & SFLAG.AWAY), TAG_FADE, TAG_R)) st.tags++;
+        for (let i = 0; i < nCand; i++) {
+          const a = cand[i], nm = names.get(a.netId), dy = a.headY - cy;
+          cand[i] = null;
+          const d = Math.sqrt(a.d2 + dy * dy);
+          // đáy Ô (gồm lề trong suốt 0,227·h dưới viên thuốc, h = 0,26 + 0,011·d): viên thuốc cách đỉnh đầu 0,12 m ở 5 m → 0,2 m ở
+          // 25 m. Bản cũ +0,22 m cố định + lề → người gần (5 m) có bảng lơ lửng ~0,3 m trên đầu, trông như của người phía sau
+          TA[0] = a.x; TA[1] = a.headY + 0.041 + 0.0015 * d; TA[2] = a.z; TA[3] = d; TA[4] = TAG_FADE; TA[5] = TAG_R;
+          a.tagOn = tags.tagA(a.netId, nm.name, nm.badge, !!(a.flags & SFLAG.AWAY));
         }
       }
       tags.end();
+      st.tags = tags.tagCount();
+      if (timeTags) { TM[3] += (performance.now() - tT0 - TM[3]) * 0.2; st.tagMs = Math.round(TM[3] * 1000) / 1000; }
       // 5) tải dữ liệu instance (1 lần/nhóm/khung, chỉ phần đã ghi)
       let calls = 0, nDrawn = 0;
       for (const g of groups) {
@@ -415,7 +446,7 @@ export function createRemoteAvatars({ scene, world = null, camera, tier = DEVICE
         g.mesh.boundingSphere.center.set(cx, 2, cz);
         if (!g.n) continue;
         bindSet(g, s);
-        s.ib.clearUpdateRanges(); s.ib.addUpdateRange(0, g.n * STRIDE); s.ib.needsUpdate = true;
+        markRange(s.ib, g.n * STRIDE);
         calls++; nDrawn += g.n;
       }
       shMesh.count = ns; shMesh.visible = ns > 0;
@@ -423,19 +454,19 @@ export function createRemoteAvatars({ scene, world = null, camera, tier = DEVICE
       if (ns) {
         const ss = shSets[shK];
         shBind(ss);
-        ss.ib.clearUpdateRanges(); ss.ib.addUpdateRange(0, ns * SH_STRIDE); ss.ib.needsUpdate = true;
+        markRange(ss.ib, ns * SH_STRIDE);
         calls++;
       }
       if (tags.mesh.visible) calls++;
-      st.count = list.length; st.drawn = drawnList.length; st.drawCalls = calls;
-      st.peds = gPed.n; st.bikes = gBike.n; st.bikesFar = gBikeFar.n; st.rings = tags.stats().rings;
+      for (let i = 0; i < nDrawnL; i++) drawnList[i] = null;   // không giữ tham chiếu người đã rời
+      st.count = list.length; st.drawn = nDrawnL; st.drawCalls = calls;
+      st.peds = gPed.n; st.bikes = gBike.n; st.bikesFar = gBikeFar.n; st.rings = tags.ringCount();
     } catch (e) {
       st.errors = (st.errors || 0) + 1; st.lastError = String(e && e.message || e).slice(0, 200);
       if (!frame._warned) { frame._warned = true; console.warn('[remote_avatars] frame lỗi (bỏ qua):', e); }
     } finally {
-      frameMs = performance.now() - t0;
-      frameMsEma += (frameMs - frameMsEma) * 0.05;
-      st.ms = +frameMsEma.toFixed(3);
+      TM[2] += (performance.now() - t0 - TM[2]) * 0.05;
+      st.ms = Math.round(TM[2] * 1000) / 1000;   // (toFixed = 1 chuỗi mới mỗi khung)
     }
     return st;
   }
@@ -452,7 +483,7 @@ export function createRemoteAvatars({ scene, world = null, camera, tier = DEVICE
   // chặn/bỏ chặn: ẩn hẳn người đó ở máy này (lần chọn kế tiếp, ≤ 100 ms)
   function hide(netId, on) {
     if (on) hidden.add(netId | 0); else hidden.delete(netId | 0);
-    selAt = -1e9;
+    TM[1] = -1e9;
   }
   function setEnabled(on) {
     enabled = !!on;
@@ -466,7 +497,7 @@ export function createRemoteAvatars({ scene, world = null, camera, tier = DEVICE
       for (const g of groups) g.mesh.dispose();
       shMesh.dispose(); shGeo.dispose();
       tags.dispose();
-      avatars.clear(); list.length = 0; drawnList.length = 0; names.clear(); hidden.clear();
+      avatars.clear(); list.length = 0; drawnList.length = 0; cand.length = 0; names.clear(); hidden.clear();
     } catch (e) { }
   }
 
@@ -495,6 +526,34 @@ export function createRemoteAvatars({ scene, world = null, camera, tier = DEVICE
     },
     meshes, tags,
   };
+}
+
+// sắp xếp CHÈN tăng dần trên n phần tử đầu (≤ ~100, gần như đã sắp giữa các khung → ~O(n)); không cấp phát như
+// Array.prototype.sort (TimSort chép ra mảng tạm) và không cần hàm so sánh mới mỗi khung. Mỗi trường 1 hàm, truy cập TRỰC TIẾP:
+// bản chung v[key] (khoá biến) = truy cập khoá tổng quát → mỗi lần đọc trường số thực đóng hộp 1 HeapNumber (đo TIER 1: 280 KB/s)
+function sortScore(arr, n) {
+  for (let i = 1; i < n; i++) {
+    const v = arr[i], s = v.score;
+    let j = i - 1;
+    while (j >= 0 && arr[j].score > s) { arr[j + 1] = arr[j]; j--; }
+    arr[j + 1] = v;
+  }
+}
+function sortTagScore(arr, n) {
+  for (let i = 1; i < n; i++) {
+    const v = arr[i], s = v.tagScore;
+    let j = i - 1;
+    while (j >= 0 && arr[j].tagScore > s) { arr[j + 1] = arr[j]; j--; }
+    arr[j + 1] = v;
+  }
+}
+
+// tải 1 đoạn bộ đệm instance KHÔNG cấp phát: _updateRange của three r160 (renderer tự đặt lại count = −1 sau khi tải) thay
+// vì addUpdateRange (đẩy 1 đối tượng {start, count} mỗi khung); bản three không có _updateRange → addUpdateRange
+function markRange(ib, n) {
+  const u = ib._updateRange;
+  if (u) { u.offset = 0; u.count = n; } else { ib.clearUpdateRanges(); ib.addUpdateRange(0, n); }
+  ib.needsUpdate = true;
 }
 
 function wrapPI(a) { a = (a + Math.PI) % (Math.PI * 2); if (a < 0) a += Math.PI * 2; return a - Math.PI; }

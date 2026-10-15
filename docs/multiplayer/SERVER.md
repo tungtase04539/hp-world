@@ -1426,7 +1426,7 @@ draw call trung vị 24 góc 374 → 374, tam giác 3,49 M → 3,49 M; fps trung
 **Việc còn mở (sau tích hợp):**
 - Chặn chỉ ẩn CHAT; hình + bảng tên người bị chặn vẫn hiện (máy chủ vẫn gửi trong snapshot). Nên ẩn phía client (`ra.hide(netId)`)
   hoặc máy chủ lọc — quyết định sản phẩm (chống bám theo quấy rối).
-- Đám đông dày (96 người trong bán kính 13 m) → bảng tên chồng nhau trên màn hình; cần gom/xếp theo màn hình (GĐ sau).
+- ~~Đám đông dày (96 người trong bán kính 13 m) → bảng tên chồng nhau trên màn hình~~ → ĐÃ SỬA §9.9 (gỡ chồng trên màn hình).
 - Bot S4 nhận 11–13 CORRECT lý do 1 (SPEED) mỗi lượt khi chạy xe máy tới (C1 đã báo) — phía bot/move.js, trình duyệt không bị
   (trình duyệt chỉ nhận đúng 1 CORRECT: lý do 5 TELEPORT của bước cố ý).
 - Chưa đo trên điện thoại thật / qua tunnel `wss://` thật.
@@ -1458,7 +1458,7 @@ hoặc `?qa`; `PW_PATH` mặc định của tools/qa trỏ `scratchpad/pw`.
 RESUME có thêm kiểm bóng ma), 0 lỗi JS (1 dòng 403 của bước mã mời sai). A/B mô-đun (84 người trong khung, fps không kẹp):
 draw call +3, 0 chương trình shader mới, khung trung bình +0,04 ms; TIER 1: trần 40, draw call +4, +0,37 ms.
 Điện thoại (`hp-world-work/mp2/fixer1/mobile_probe.mjs`, 844×390 cảm ứng + 6 bot): **14/14 ĐẠT**.
-Còn mở (thấp): rác mỗi khung của bảng tên (chuỗi khoá per tag, mảng UV) ~0,5 MB/s; ENTER keyframe rải 24/snapshot → tới 72
+Còn mở (thấp): ~~rác mỗi khung của bảng tên (chuỗi khoá per tag, mảng UV) ~0,5 MB/s~~ (ĐÃ SỬA §9.9); ENTER keyframe rải 24/snapshot → tới 72
 người không có mẫu 0,1–0,3 s sau RESUME; xoay tại chỗ gửi STATE 2 Hz; rejoin giữ vị trí cục bộ khi lệch ≤ 12 m.
 
 ### 9.8 Riders fixer (15/10/2026) — không kéo về oan người chơi / bot trung thực
@@ -1508,3 +1508,59 @@ dồn dập, tài xế tự động bấm W/A/S/D (KeyboardEvent → input.js) t
 r 1.500 → quay đầu → xuống → cầu Lạc Long; trên nhịp cầu: xuống xe, đi/chạy/nhảy, lên–xuống dồn dập. ĐẠT = 0 CORRECT trình duyệt +
 0 dòng correct/violation + 0 lần rơi. `tools/qa/mp_converge.mjs` — 96 bot dồn về 1 điểm (như e2e) + khựng vòng sự kiện +
 khởi động lại máy chủ.
+
+### 9.9 Bảng tên trong đám đông dày — gỡ chồng trên màn hình + 0 rác mỗi khung (15/10/2026)
+
+Đóng 2 việc mở của §9.6/§9.7: "96 người trong 13 m → bảng tên chồng nhau" và "rác mỗi khung của bảng tên ~0,5 MB/s".
+Phạm vi: `js/net/nametags.js`, móc nhỏ trong `js/net/remote_avatars.js`; test `tests/net/nametags.test.mjs`; công cụ
+`tools/qa/mp_tags_{declutter,page,summary}.mjs` (+ kịch bản `SC.dense` trong `tools/qa/mp_c2_page.js`). Không đổi giao thức,
+máy chủ, `main.js`, `net.js`.
+
+**Cách làm.** `remote_avatars` đưa MỌI người có tên trong 25 m (≥ 2,5 m) vào `tags.tagA()` theo THỨ TỰ ƯU TIÊN = khoảng cách
+× 0,7 nếu bảng đang hiện × 0,25 nếu là bạn (`setFriends`) / × 0,5 nếu huy hiệu 1 (sắp xếp chèn trên mảng tái dùng).
+`nametags` chiếu từng bảng ra hình chữ nhật màn hình (đơn vị nửa-chiều-cao NDC, từ R/UP/F của camera — không cần cỡ canvas)
+và xếp chỗ THAM LAM: chỗ gốc trên đầu trống → giữ; bị chiếm → thử 1 NẤC XẾP CHỒNG (nâng đúng 1 bảng); vẫn không → ẩn; ≤ 24
+chỗ. Chống nháy: (1) trễ không gian — bảng đang hiện thử va chạm với hình thu 85 % (chấp nhận chồng ≤ ~7 % bề rộng), bảng đang
+ẩn phải trống thêm lề 0,012 (~4 px); (2) trễ thời gian — bị chiếm liên tục 0,3 s mới ẩn, đã bị ẩn vì chồng phải trống 0,6 s
+mới hiện lại, hạ khỏi nấc chồng sau 0,5 s trống; bảng mới vào tầm (quay camera) hiện ngay; (3) hiện/ẩn mờ dần 0,2/0,25 s bằng
+4 MỨC MỜ có sẵn trong atlas (× co giãn 85 → 100 %) — không alpha theo đỉnh → không chương trình shader mới; (4) ô atlas đang
+được vẽ ở khung trước không bao giờ bị LRU lấy (bản cũ có thể lấy → bảng mất 1 khung). Bảng gần đầu hơn: viên thuốc cách đỉnh
+đầu 0,12 m ở 5 m → 0,2 m ở 25 m (bản cũ +0,22 m + lề ô → người gần có bảng lơ lửng, trông như của người phía sau).
+
+**0 cấp phát ở vòng nóng** (nguyên nhân rác đo được, không chỉ khoá chuỗi): (a) SỐ THỰC TRUYỀN LÀM THAM SỐ cho hàm không được
+inline bị đóng hộp (HeapNumber mỗi số mỗi lần gọi) — `quad(12 số)`, `tag(6)`, `ring(6)` → khối tham số `Float64Array`
+(`tags.args` + `ringA(away)` / `tagA(netId, name, badge, away)`; `ring()`/`tag()` rời vẫn giữ cho test); (b) số thực gán vào
+biến closure `let` mỗi khung (dt, tanH, aspect; lastNow, selAt, EMA của remote_avatars) → `Float64Array`; (c) bản ghi người
+khởi tạo trường số thực bằng 0,5 (không phải Smi 0 → không đổi hidden class → không khử tối ưu "wrong map"); (d)
+`addUpdateRange` đẩy 1 đối tượng mỗi khung → `_updateRange` của three r160; (e) khoá chuỗi `netId|badge|level|name` → bản ghi
+theo netId + `Int16Array` ô theo mức; mảng UV → ghi thẳng; `Set` hàng chờ → mảng số; (f) `Array.prototype.sort` + hàm so
+sánh mới, `drawnList.length = 0` (V8 nhả bộ đệm), `list.slice()`, `toFixed`, `Math.hypot` (builtin cấp phát) trong `frame()`;
+sắp xếp chèn dùng khoá biến `v[key]` cũng đóng hộp (TIER 1: 280 KB/s) → mỗi trường 1 hàm.
+
+**Số đo** (`tools/qa/mp_tags_declutter.mjs`, tĩnh 8823, 1 Chrome dưới khoá GPU, Radeon 890M, 1280×720; trước = mô-đun dot3
+5da02c1 cùng công cụ; đầu ra `C:/Users/Admin/hp-world-work/mp2b/nametags/{before,after}/`, `summary.json`). "Chồng" = cặp bảng
+trên màn hình giao nhau > 15 % diện tích bảng nhỏ hơn (đọc tứ giác billboard từ bộ đệm đỉnh, chiếu bằng camera); "bật/tắt" tính
+trên người có đầu trong màn hình cách camera 3–24 m ở cả 2 khung; "nháy" = bật/tắt lại < 0,5 s.
+
+| TIER 3 (full), 96 người | trước: cặp chồng · bật/tắt/s · nháy/s · bảng | sau: cặp chồng · bật/tắt/s · nháy/s · bảng |
+|---|---|---|
+| Đám đông dày 13 m, camera đứng, 20 s | 14,7 (tối đa 26) · 6,36 · 1,84 · 24 | **0,64** (tối đa 4) · 5,15 · **0** · 21,6 |
+| như trên, camera quay 0,15 rad/s | 5,33 (14) · 7,14 · 1,75 · 24 | **0,69** (4) · 5,05 · **0** · 22,4 |
+| góc cao 12 m nhìn xuống | 7,13 (11) · 6,16 · 1,0 · 24 | **0,52** (2) · 3,99 · **0** · 22,5 |
+| Quảng trường Nhà hát (kịch bản crowd C2) | 0,53 · 2,0 · 1,0 | **0,13** · 0,62 · **0** |
+
+TIER 1 (lite, trần 40): đám đông dày 14,8 → **0,73** cặp, nháy 1,81 → **0**; quay 5,08 → 0,86; góc cao 7,4 → 1,05, nháy 1,83 → 0.
+Lượt bảng tên (ring() đầu → end(), gồm chọn/sắp ứng viên): TIER 3 0,09 → **0,13–0,16 ms** trung bình (p95 0,2 → 0,3–0,4 ms; xét
+~74 ứng viên thay vì 24), TIER 1 0,07 → 0,10 ms. fps 60 (vsync) trước = sau; draw call mô-đun 3 = 3; chương trình shader trước
+khi có mô-đun → sau như bản cũ (TIER 3 74 → 76, TIER 1 51 → 51 — 0 chương trình mới so với dot3); 0 lỗi JS.
+Rác (CDP HeapProfiler lấy mẫu gồm cả vật đã GC, 3 cửa sổ 20 s, đám đông dày đi + camera quay; cửa sổ cuối): `nametags.js`
+**326 → 21 KB/s** (còn lại = vẽ ô mới vào canvas khi bảng đổi mức/hiện — không phải trạng thái ổn định), `remote_avatars.js`
+**1.250 → 257 KB/s** (TIER 1: 766 → 227); heap sau GC tăng 0,45 MB/60 s cả trước lẫn sau (không rò). Test node (`node --import
+./tests/net/register.mjs --test tests/net/nametags.test.mjs`): A/B cùng đám đông chồng < 10 % bản không gỡ, 0 nháy trong 10 s
+đi bộ, trễ ẩn/hiện đúng khung, bạn thắng người lạ gần hơn, vòng nóng nametags + remote_avatars < 64 B/khung (bản cũ ~6 KB/khung).
+
+**Còn mở:** phần rác còn lại của `remote_avatars.js:frame` (~250 KB/s) theo bộ lấy mẫu nằm ở mã `interp.js` được INLINE vào
+`frame()` (`Track.sample/_raw/_vel` ghi số thực + `Math.hypot` — builtin cấp phát; trong node tách được: `sample`/`_raw`/`_vel`
+1,5–4,5 KB/khung khi ngoại suy) cùng `interp.js:push` 55 KB/s ở đường mạng — sửa ở `interp.js` (ngoài phạm vi lượt này):
+`Math.hypot` → `Math.sqrt`, trường `out` khởi tạo số thực. Xếp chỗ tham lam theo ưu tiên (không tối ưu toàn cục) — đám đông
+13 m ở 8 m camera hiện ~21/74 bảng; tên dài (40 ký tự) chiếm chỗ hơn. Chưa có "đường dẫn" nối bảng ở nấc chồng với người.

@@ -235,6 +235,24 @@ const SC = {
     }
     return { n: players.size, road: road ? Math.round(road.L) : 0 };
   },
+  // ĐÁM ĐÔNG DÀY (bảng tên chồng nhau — MP-2 vấn đề mở): n người trong bán kính R m, phần lớn ĐI (vòng tròn 2 chiều + đi
+  // thẳng qua lại), 1/5 đứng yên; tất cả có tên tiếng Việt khó dấu. Tham số: (cx, cz, n = 96, R = 13)
+  dense(cx, cz, n = 96, R = 13) {
+    clearPlayers();
+    let id = 100;
+    for (let i = 0; i < n; i++, id++) {
+      const k = i % 5, r = 1.5 + hash(id, 8) * (R - 1.5), ph = hash(id, 2) * 6.28;
+      let fn;
+      if (k < 3) fn = circle(cx, cz, r, (i % 2 ? 1 : -1) * (0.9 + hash(id, 4) * 0.9), ph);
+      else if (k < 4) {
+        const a = hash(id, 9) * 6.28, x0 = cx + r * Math.sin(ph), z0 = cz + r * Math.cos(ph);
+        const p = polyPath([[x0 - Math.sin(a) * 6, z0 - Math.cos(a) * 6], [x0 + Math.sin(a) * 6, z0 + Math.cos(a) * 6]]);
+        fn = along(p, hash(id, 5) * p.L, 1.1 + hash(id, 6) * 0.6, 0, MODE.WALK);
+      } else fn = stand(cx + r * Math.sin(ph), cz + r * Math.cos(ph), ph);
+      addPlayer(id, fn, i);
+    }
+    return { n: players.size, R };
+  },
   // trộn: đi bộ, chạy, xe máy (có người ngồi sau, chở hàng), ngồi, nhảy, xích lô, vắng mặt
   mix(cx, cz) {
     clearPlayers();
