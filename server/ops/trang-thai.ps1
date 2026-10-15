@@ -30,6 +30,11 @@ if ($h -and $h.ok) {
   Write-Tot ("Đang chạy {0}g {1}p — người chơi: {2} — kết nối: {3} — dữ liệu: {4} ({5} ms)" -f [int]$up.TotalHours, $up.Minutes, $h.ccu, $h.transport, $h.db, $h.dbMs)
 } else { Write-Dong ('Không trả lời ở ' + $s.GameUrl + '/healthz (máy chủ tắt hoặc đang khởi động).') }
 
+Write-Buoc 'Phiên bản (mã trên máy / máy chủ đang chạy / trang chơi của bạn bè)'
+$repo = Get-RepoBuild
+if ($repo) { Write-Dong ('Mã trên máy: ' + $repo.Short) }
+$bad += Test-BuildVersions $s $(if ($h -and $h.ok) { $h } else { $null }) $repo
+
 $envv = Read-DotEnv
 if ($h -and $h.ok -and $envv['ADMIN_TOKEN']) {
   try {

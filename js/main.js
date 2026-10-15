@@ -162,6 +162,13 @@ let net = null;
 { // Nút chọn chất lượng + tên GPU trên màn chờ (kiểm toán 2026-09-05: người chơi phải THẤY mình đang ở tier nào).
   const gpuEl = document.getElementById('gpuName');
   if (gpuEl) gpuEl.textContent = `${GPU_NAME || 'GPU ?'} · ${['tier 0', 'LITE', 'iGPU', 'FULL'][TIER]}`;
+  // Bản đang chạy (vòng sửa 1 MP-2b, DEPLOY-VERSION-GAP): version.json chỉ có trên GitHub Pages (deploy-pages.yml ghi) —
+  // bạn bè đọc được "bản xxxxxxx" cho chủ máy chủ so với mo-may-chu.ps1. Máy dev không có tệp → không hỏi (không 404).
+  if (gpuEl && /\.github\.io$/.test(location.hostname)) {
+    fetch('version.json', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).then((v) => {
+      if (v && /^[0-9a-f]{7,40}$/.test(v.sha || '')) gpuEl.textContent += ` · bản ${v.sha.slice(0, 7)}`;
+    }).catch(() => {});
+  }
   document.querySelectorAll('.qualityPick').forEach((b) => {
     b.classList.toggle('active', b.dataset.q === QUALITY_PREF);
     b.addEventListener('click', () => {
@@ -1087,13 +1094,13 @@ window.__hp = {
     };
   },
 };
-// codebase_hooks §9 mục 17: khi đang ONLINE ở bản thật (không localhost, không ?qa=1 — js/qagate.js), các tay cầm sửa trạng
-// thái người chơi/thế giới qua console trả null (__hp.teleport tự từ chối ở trên). Chơi một mình / QA: như cũ. Máy chủ vẫn
-// không tin client (move.js) — đây chỉ để không "quảng cáo" lối gian lận dễ nhất.
+// codebase_hooks §9 mục 17: bản thật CÓ multiplayer (không phải máy nhà phát triển — js/qagate.js), các tay cầm sửa trạng
+// thái người chơi/thế giới qua console LUÔN là null (__hp.teleport tự từ chối khi online ở trên). Vòng sửa 1 MP-2b
+// (QAGATE-BYPASS): trước chỉ null KHI ONLINE — tham chiếu lấy lúc "Khám phá" (chưa nối / đang nối lại) vẫn sống sau khi
+// online. Không multiplayer (net = null) / QA: như cũ. Chỉ là răn đe — máy chủ không tin client (move.js).
 if (net && !net.qaOn) {
   for (const k of ['pState', 'world', 'vehicles', 'mount', 'player', 'traffic', 'footprints']) {
-    const val = window.__hp[k];
-    Object.defineProperty(window.__hp, k, { get: () => (net.online ? null : val), enumerable: true, configurable: false });
+    Object.defineProperty(window.__hp, k, { get: () => null, enumerable: true, configurable: false });
   }
 }
 

@@ -2,7 +2,8 @@
 // MỘT Chrome (khoá GPU, launch.mjs) mở game từ một TÊN MÁY KHÔNG PHẢI localhost (`qa-off.example` → 127.0.0.1 qua
 // --host-resolver-rules; navigator.webdriver = true như mọi Chrome tự động) KHÔNG có ?qa=1, vào máy chủ test, rồi kiểm:
 //   __hp.net = null · __hp.teleport(…) từ chối khi online · __hp.pState/world/vehicles/mount/player = null khi online.
-// Sau đó nạp lại CÙNG trang với ?qa=1 → __hp.net có lại (công cụ QA vẫn chạy được).
+// Sau đó nạp lại CÙNG trang với ?qa=1 → VẪN null (vòng sửa 1 MP-2b, QAGATE-BYPASS: ?qa=1 chỉ có tác dụng trên máy nhà
+// phát triển / địa chỉ LAN riêng), rồi mở từ 127.0.0.1 → __hp.net + pState có (công cụ QA vẫn chạy được).
 //   node tools/qa/mp_qagate.mjs --port 8821 --game 9310 --out <dir>
 import fs from 'fs';
 import path from 'path';
@@ -58,18 +59,23 @@ try {
   await pg.screenshot({ path: path.join(OUT, 'qa_off_online.png') });
   step('bản thật (host lạ, không ?qa=1, webdriver=true) đang ONLINE: __hp.net = null, teleport từ chối, pState/world/vehicles/mount/player = null',
     ccu >= 1 && r.net === null && r.teleport === false && r.pState && r.world && r.vehicles && r.mount && r.player && !r.camMoved, { ccu, ...r });
-  // cùng trang + ?qa=1 → tay cầm QA có lại
+  // cùng trang + ?qa=1 trên host công khai → VẪN không có tay cầm (cả lúc chưa online: tham chiếu không lấy trước được)
   await pg.goto(`http://${HOST}:${PORT}/index.html?quality=lite&qa=1&server=ws://127.0.0.1:${GAME}`, { waitUntil: 'domcontentloaded' });
   await pg.waitForFunction(() => window.__hp && window.__hp.teleport, null, { timeout: 300000 });
+  const r1 = await pg.evaluate(() => ({ net: window.__hp.net === null ? null : typeof window.__hp.net, pState: window.__hp.pState === null ? null : 'obj' }));
+  step('host công khai + ?qa=1 (trước đây mở lại mọi tay cầm) → __hp.net = null, pState = null ngay cả khi chưa online', r1.net === null && r1.pState === null, r1);
+  // máy nhà phát triển (127.0.0.1) → tay cầm QA có
+  await pg.goto(`http://127.0.0.1:${PORT}/index.html?quality=lite&qa=1&server=ws://127.0.0.1:${GAME}`, { waitUntil: 'domcontentloaded' });
+  await pg.waitForFunction(() => window.__hp && window.__hp.teleport, null, { timeout: 300000 });
   const r2 = await pg.evaluate(() => ({ net: !!window.__hp.net, pState: !!window.__hp.pState }));
-  step('?qa=1 → __hp.net + pState có (công cụ QA chạy được)', r2.net && r2.pState, r2);
+  step('127.0.0.1 → __hp.net + pState có (công cụ QA chạy được)', r2.net && r2.pState, r2);
   report.errors = g.errors.slice(0, 10);
 } catch (e) {
   report.error = String(e && e.stack || e); console.log('LỖI', report.error);
 } finally {
   if (g) await g.close().catch(() => {});
   await new Promise((res) => { if (srv.exitCode != null) return res(); srv.once('exit', res); srv.kill(); });
-  report.pass = !report.error && report.steps.length === 2 && report.steps.every((s) => s.ok);
+  report.pass = !report.error && report.steps.length === 3 && report.steps.every((s) => s.ok);
   fs.writeFileSync(path.join(OUT, 'report.json'), JSON.stringify(report, null, 2));
   console.log(report.pass ? 'ĐẠT' : 'TRƯỢT');
   process.exit(report.pass ? 0 : 1);

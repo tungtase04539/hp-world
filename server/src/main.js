@@ -121,7 +121,7 @@ export async function startServer({ config, env, envFile, overrides, log, featur
       if (Date.now() - dbOk.at > 1000) {
         try { const ms = await db.ping(); dbOk = { at: Date.now(), ok: true, ms }; } catch { dbOk = { at: Date.now(), ok: false, ms: -1 }; }
       }
-      return { ok: dbOk.ok, version: config.version, proto: PROTO_VERSION, transport: gameT.kind, uptimeS: Math.round((Date.now() - startedAt) / 1000), db: dbOk.ok ? 'ok' : 'error', dbMs: Math.round(dbOk.ms * 100) / 100, ccu: gameT.connections, serverTime: nowMs() };
+      return { ok: dbOk.ok, version: config.version, build: config.build, proto: PROTO_VERSION, transport: gameT.kind, uptimeS: Math.round((Date.now() - startedAt) / 1000), db: dbOk.ok ? 'ok' : 'error', dbMs: Math.round(dbOk.ms * 100) / 100, ccu: gameT.connections, serverTime: nowMs() };
     };
     const healthRoute = async (req, res) => { const h = await health(); res.json(h, h.ok ? 200 : 503); };
     http.get('/healthz', healthRoute);

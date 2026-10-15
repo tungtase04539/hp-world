@@ -31,6 +31,9 @@ Write-Buoc '2/6 Khoá bí mật (server\.env)'
 if (-not (Initialize-EnvFile)) { Exit-Ops 1 }
 $envv = Read-DotEnv
 Write-Tot 'Có đủ khoá bí mật.'
+# mã bản dựng đóng vào ảnh máy chủ (/healthz "build") để so với mã trên máy và trang chơi trên GitHub Pages
+$repo = Get-RepoBuild
+if ($repo) { $env:HPMP_BUILD = $repo.Short }
 New-Item -ItemType Directory -Force -Path $script:BackupDir | Out-Null
 
 # chọn tunnel
@@ -62,8 +65,10 @@ $code = Invoke-Compose $s $upArgs
 if ($code -ne 0) { Write-Loi 'docker compose báo lỗi (xem dòng phía trên). Thử chạy lại; nếu vẫn lỗi xem VAN_HANH.md mục "Sự cố".'; Exit-Ops 1 }
 
 $h = Wait-Health $s.GameUrl 150
-if (-not $h) { Write-Loi ('Máy chủ game không trả lời ở ' + $s.GameUrl + '/healthz sau 150 giây.'); Write-Dong 'Xem nhật ký:  docker compose -p ' + $s.Project + ' logs game --tail 50'; Exit-Ops 1 }
+if (-not $h) { Write-Loi ('Máy chủ game không trả lời ở ' + $s.GameUrl + '/healthz sau 150 giây.'); Write-Dong ('Xem nhật ký:  docker compose -p ' + $s.Project + ' logs game --tail 50'); Exit-Ops 1 }
 Write-Tot ("Game chạy: kiểu kết nối {0}, cơ sở dữ liệu {1}, đang chơi {2} người." -f $h.transport, $h.db, $h.ccu)
+# đúng bản chưa? (máy chủ đang chạy được GIỮ NGUYÊN nên có thể là bản cũ; trang chơi trên GitHub Pages đưa lên riêng)
+$verWarn = Test-BuildVersions $s $h $repo
 
 Write-Buoc '4/6 Giữ máy không ngủ'
 $awakePid = Start-KeepAwake $s
@@ -86,12 +91,26 @@ if ($mode -eq 'named') {
     if ($envv['PUBLIC_HTTP_URL'] -and $envv['PUBLIC_HTTP_URL'] -notmatch '127\.0\.0\.1|localhost') { $publicUrl = $envv['PUBLIC_HTTP_URL'] }
   }
 } elseif ($mode -eq 'quick') {
-  $code = Invoke-Compose $s @('--profile', 'quicktunnel', 'up', '-d', 'quicktunnel')
-  if ($code -ne 0) { Write-Loi 'Không bật được tunnel tạm.' }
-  else {
+  # Tunnel tạm ĐANG CHẠY (lỡ chạy lại script giữa buổi): giữ nguyên — mọi người không phải đổi link.
+  # Chưa chạy (mới bật máy / sau khi máy khởi động lại): container MỚI, đọc địa chỉ từ nhật ký của lần chạy này thôi.
+  $keptUrl = $null
+  $stq = Get-ServiceState $s
+  if ($stq['quicktunnel'] -and $stq['quicktunnel'].State -eq 'running') { $keptUrl = Get-QuickTunnelUrl $s }
+  $lastUrl = Get-LastQuickUrl $s
+  if ($keptUrl) {
+    $publicUrl = $keptUrl
+    Write-Tot 'Tunnel tạm đang chạy sẵn — GIỮ NGUYÊN địa chỉ cũ, mọi người không phải đổi link.'
+    Set-LastQuickUrl $s $publicUrl
+    $code = -1
+  } else { $code = Start-QuickTunnelFresh $s }
+  if ($code -gt 0) { Write-Loi 'Không bật được tunnel tạm.' }
+  elseif ($code -eq 0) {
     $tq = Get-Date
     while (-not $publicUrl -and ((Get-Date) - $tq).TotalSeconds -lt 60) { Start-Sleep -Seconds 2; $publicUrl = Get-QuickTunnelUrl $s }
     if ($publicUrl) {
+      if ($lastUrl -and $lastUrl -eq $publicUrl) { Write-Canh 'Địa chỉ trùng lần trước — bất thường với tunnel tạm; nếu người chơi không vào được, chạy tat-may-chu.ps1 rồi mở lại.' }
+      elseif ($lastUrl) { Write-Canh ('ĐỊA CHỈ ĐÃ ĐỔI so với lần trước (' + ($lastUrl -replace '^https://', '') + ' đã hết hiệu lực) — gửi ĐỊA CHỈ MỚI bên dưới cho mọi người.') }
+      Set-LastQuickUrl $s $publicUrl
       # Địa chỉ mới cần ~20–60 giây để tên miền có trên Internet. Hỏi DNS CÔNG CỘNG (1.1.1.1), KHÔNG hỏi qua modem:
       # hỏi modem quá sớm làm nó nhớ "không tồn tại" vài phút (vòng sửa 1, SO-10).
       Write-Dong 'Đợi địa chỉ tạm có hiệu lực trên Internet (tối đa 90 giây)...'
@@ -102,10 +121,14 @@ if ($mode -eq 'named') {
       }
       if ($dnsOk) { Start-Sleep -Seconds 10; Write-Tot 'Tunnel tạm đang chạy (địa chỉ đổi mỗi lần bật).' }
       else { Write-Canh 'Tên miền tạm chưa có trên Internet sau 90 giây — đợi thêm 1–2 phút rồi mới mở / gửi địa chỉ.' }
-    } else { Write-Loi 'Chưa lấy được địa chỉ tunnel tạm sau 60 giây — xem: docker compose -p ' + $s.Project + ' --profile quicktunnel logs quicktunnel' }
+    } else { Write-Loi ('Chưa lấy được địa chỉ tunnel tạm sau 60 giây — xem: docker compose -p ' + $s.Project + ' --profile quicktunnel logs quicktunnel') }
   }
 } else {
-  Write-Dong 'Không bật tunnel: chỉ máy này vào được (thêm -TamThoi để thử qua Internet, hoặc cài tên miền — VAN_HANH.md).'
+  # chạy lại script KHÔNG có -TamThoi giữa buổi: tunnel tạm (nếu có) vẫn chạy nguyên — báo lại địa chỉ, đừng doạ "không bật"
+  $stq = Get-ServiceState $s
+  if (-not $KhongTunnel -and $stq['quicktunnel'] -and $stq['quicktunnel'].State -eq 'running') { $publicUrl = Get-QuickTunnelUrl $s }
+  if ($publicUrl) { $mode = 'quick'; Write-Tot 'Tunnel tạm vẫn đang chạy — địa chỉ KHÔNG đổi, mọi người không phải làm gì.' }
+  else { Write-Dong 'Không bật tunnel: chỉ máy này vào được (thêm -TamThoi để thử qua Internet, hoặc cài tên miền — VAN_HANH.md).' }
 }
 
 Write-Buoc '6/6 Xong'
@@ -122,6 +145,7 @@ if ($publicUrl) {
     Write-Canh 'Nếu máy này báo "không tìm thấy" địa chỉ: đợi 1–2 phút (bộ nhớ DNS của modem) rồi thử lại; người chơi ở mạng khác vào được ngay.'
   }
 }
+if ($verWarn -gt 0) { Write-Canh 'Có cảnh báo PHIÊN BẢN ở bước 3 (máy chủ hoặc trang chơi chưa phải bản mới) — xử lý trước khi mời bạn bè (VAN_HANH.md mục 16.1).' }
 Write-Dong 'Xem tình trạng:  server\ops\trang-thai.ps1     Tắt máy chủ:  server\ops\tat-may-chu.ps1'
 Write-Dong 'Khẩn cấp (ngắt Internet ngay, giữ dữ liệu):  server\ops\khoa-khan-cap.ps1'
 

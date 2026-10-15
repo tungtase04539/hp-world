@@ -164,3 +164,52 @@ test('a teleport that lands in the soft out-of-bounds band is still a hard TELEP
   assert.equal(r2.hard, false);
   assert.equal(r2.correct, 0);
 });
+
+// Fixer round 1 MP-2b (EXPLOIT-MOUNT-TOGGLE): a client that flips WALK↔MOTO on EVERY STATE used to get + MOUNT_SLACK_M
+// per step and no window at all (review: 120 m/s for 25 s, 0 CORRECT). The 4 s window now reaches back across mount
+// changes with the mount slack counted at most MOUNT_SLACK_MAX times.
+function toggleRun({ speed, hz = 25, durS = 25, toggle = true }) {
+  const v = new Validator(); v.extraFlags = MCF.SKIP_SURFACE;
+  let t = 5000, srv = 1_000_000, x = 0, z = -1400;
+  v.reset(x, z, MODE.WALK, srv);
+  const out = { viol: 0, corr: 0, states: 0, dist: 0, kick: false };
+  const dt = 1000 / hz;
+  let mode = MODE.WALK;
+  for (let ms = 0; ms < durS * 1000; ms += dt) {
+    t += dt; srv += dt;
+    z += speed * dt / 1000; out.dist += speed * dt / 1000;
+    if (toggle) mode = mode === MODE.WALK ? MODE.MOTO : MODE.WALK; else mode = MODE.MOTO;
+    const r = v.onState(Math.round(t) & 0xffff, x, z, mode, Math.round(srv) + 30, true);
+    out.states++;
+    if (!r.accepted) out.viol++;
+    if (r.kick) { out.kick = true; break; }
+    if (r.correct) { out.corr++; v.corrected(v.mc.lastX, v.mc.lastZ, mode, Math.round(srv) + 30); x = v.mc.lastX; z = v.mc.lastZ; }
+  }
+  return out;
+}
+
+test('WALK↔MOTO toggle on every STATE cannot out-run a motorbike: 60 / 120 m/s are corrected within 1.5 s', () => {
+  for (const speed of [60, 120]) {
+    const r = toggleRun({ speed, durS: 1.5 });
+    assert.ok(r.corr >= 1, `${speed} m/s toggling: ${JSON.stringify(r)}`);
+    const long = toggleRun({ speed, durS: 25 });
+    assert.ok(long.kick || long.corr >= 5, `${speed} m/s toggling 25 s: ${JSON.stringify(long)}`);
+  }
+  // 1.5 × moto speed while toggling: corrected (the toggle buys at most 2 × MOUNT_SLACK_M per 4 s)
+  assert.ok(toggleRun({ speed: 24 }).corr >= 1);
+  // control: honest moto speed while toggling, and an honest moto without toggling → never a violation
+  for (const r of [toggleRun({ speed: 15.5 }), toggleRun({ speed: 15.5, toggle: false })]) assert.equal(r.viol, 0, JSON.stringify(r));
+});
+
+test('honest personal-moto spam (call 2.4 m ahead, step off 1.3 m aside, every 60 ms) stays at 0 violations', () => {
+  const v = new Validator(); v.extraFlags = MCF.SKIP_SURFACE;
+  let t = 5000, srv = 1_000_000, x = 0, z = 0, mode = MODE.WALK;
+  v.reset(x, z, mode, srv);
+  let viol = 0;
+  for (let k = 0; k < 200; k++) {                       // 12 s of the fastest E / button spam a human produces
+    t += 60; srv += 60;
+    if (mode === MODE.WALK) { z += 2.4; mode = MODE.MOTO; } else { x += (k % 4 < 2 ? 1.3 : -1.3); mode = MODE.WALK; }
+    if (!v.onState(t & 0xffff, x, z, mode, srv + 30, true).accepted) viol++;
+  }
+  assert.equal(viol, 0);
+});

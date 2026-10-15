@@ -178,12 +178,96 @@ function Get-Listeners([int[]]$ports) {
   return $out
 }
 
-# Tìm địa chỉ tunnel tạm (https://xxx.trycloudflare.com) trong nhật ký container quicktunnel.
+# Tìm địa chỉ tunnel tạm (https://xxx.trycloudflare.com) của container quicktunnel ĐANG CHẠY — chỉ đọc nhật ký TỪ LÚC
+# container khởi động lần này (vòng sửa 1 MP-2b, OPS-STALE-TUNNEL-URL: mọi dịch vụ có restart "no", nên sau khi máy khởi
+# động lại container cũ còn nằm đó ở trạng thái Exited; `up -d` chạy lại CHÍNH nó và nhật ký vẫn còn địa chỉ CŨ đã chết —
+# đọc cả nhật ký thì 2 giây đầu lấy đúng địa chỉ cũ và in nó ra màu xanh cho anh gửi mọi người).
 function Get-QuickTunnelUrl([object]$s) {
-  $r = Get-CmdOutput 'docker' @('compose', '-p', $s.Project, '-f', $script:ComposeFile, '--profile', 'quicktunnel', 'logs', '--no-log-prefix', 'quicktunnel')
+  $ps = Get-CmdOutput 'docker' @('compose', '-p', $s.Project, '-f', $script:ComposeFile, '--profile', 'quicktunnel', 'ps', '-q', 'quicktunnel')
+  $id = (($ps.Text -split "`r?`n") | Where-Object { $_ -match '^[0-9a-f]{12,64}$' } | Select-Object -First 1)
+  if (-not $id) { return $null }
+  $ins = Get-CmdOutput 'docker' @('inspect', '-f', '{{.State.Running}}|{{.State.StartedAt}}', $id)
+  $p = $ins.Text.Trim().Split('|')
+  if ($ins.Code -ne 0 -or $p.Count -lt 2 -or $p[0] -ne 'true' -or -not $p[1]) { return $null }
+  $r = Get-CmdOutput 'docker' @('logs', '--since', $p[1].Trim(), $id)
   $m = [regex]::Matches($r.Text, 'https://[a-z0-9-]+\.trycloudflare\.com')
   if ($m.Count -gt 0) { return $m[$m.Count - 1].Value }
   return $null
+}
+
+# Bật tunnel tạm bằng một container MỚI (xoá container cũ trước — nhật ký cũ đi theo nó). Trả về mã thoát.
+function Start-QuickTunnelFresh([object]$s) {
+  $null = Get-CmdOutput 'docker' @('compose', '-p', $s.Project, '-f', $script:ComposeFile, '--profile', 'quicktunnel', 'rm', '-f', '-s', 'quicktunnel')
+  return (Invoke-Compose $s @('--profile', 'quicktunnel', 'up', '-d', '--force-recreate', '--no-deps', 'quicktunnel'))
+}
+
+# ---- Phiên bản (vòng sửa 1 MP-2b, DEPLOY-VERSION-GAP) ----------------------------------------------------------------
+# Mã nguồn trên máy này: git HEAD rút gọn 7 ký tự, thêm "+" khi có tệp đã sửa mà chưa commit. $null khi không có git.
+function Get-RepoBuild {
+  if (-not (Get-Command git -ErrorAction SilentlyContinue)) { return $null }
+  $r = Get-CmdOutput 'git' @('-C', $script:RepoDir, 'rev-parse', 'HEAD')
+  if ($r.Code -ne 0) { return $null }
+  $full = $r.Text.Trim()
+  if ($full -notmatch '^[0-9a-f]{40}$') { return $null }
+  $d = Get-CmdOutput 'git' @('-C', $script:RepoDir, 'status', '--porcelain', '--untracked-files=no')
+  $dirty = ($d.Code -eq 0 -and $d.Text.Trim().Length -gt 0)
+  $short = $full.Substring(0, 7)
+  if ($dirty) { $short += '+' }
+  return [pscustomobject]@{ Full = $full; Short = $short; Dirty = $dirty }
+}
+
+# Trang chơi bạn bè mở (GitHub Pages): version.json do .github/workflows/deploy-pages.yml ghi khi đưa bản lên.
+function Get-PagesBuild([object]$s) {
+  $base = 'https://tungtase04539.github.io/hp-world/'
+  if ($env:HPMP_PAGES_URL) { $base = $env:HPMP_PAGES_URL } elseif ($s.Test) { return $null }
+  if (-not $base.EndsWith('/')) { $base += '/' }
+  try {
+    $v = Invoke-RestMethod -Uri ($base + 'version.json?t=' + [DateTime]::UtcNow.Ticks) -TimeoutSec 8 -UseBasicParsing -Headers @{ 'Cache-Control' = 'no-cache' }
+    if ($v -and $v.sha -match '^[0-9a-f]{7,40}$') { return [pscustomobject]@{ Ok = $true; Sha = [string]$v.sha; Url = $base } }
+    return [pscustomobject]@{ Ok = $false; Sha = $null; Url = $base; Why = 'không đọc được' }
+  } catch {
+    $code = 0; try { $code = [int]$_.Exception.Response.StatusCode } catch { }
+    if ($code -eq 404) { return [pscustomobject]@{ Ok = $false; Sha = $null; Url = $base; Why = 'bản cũ, chưa có version.json' } }
+    return $null   # không có mạng / GitHub chậm: không kết luận gì
+  }
+}
+
+# So 3 bản: mã trên máy ($repo), máy chủ đang chạy (/healthz "build"), trang chơi trên GitHub Pages. Trả về số cảnh báo.
+function Test-BuildVersions([object]$s, [object]$health, [object]$repo) {
+  $warn = 0
+  if (-not $repo) { Write-Dong 'Không đọc được phiên bản mã nguồn (không có git) — bỏ qua so phiên bản.'; return 0 }
+  $srv = $null; if ($health -and $health.build) { $srv = [string]$health.build }
+  if ($srv -and $srv -ne $repo.Short) {
+    Write-Canh ("Máy chủ đang chạy BẢN CŨ ({0}); mã trên máy là bản {1}. Để dùng bản mới: TRƯỚC buổi chơi chạy tat-may-chu.ps1 rồi mo-may-chu.ps1 (mọi người đang chơi bị ngắt ~10 giây)." -f $srv, $repo.Short)
+    $warn++
+  } elseif ($srv) { Write-Tot ("Máy chủ chạy đúng bản mã trên máy ({0})." -f $srv) }
+  $pg = Get-PagesBuild $s
+  if ($pg -and -not $pg.Ok) {
+    Write-Canh ("Trang chơi của bạn bè ({0}) là {1} — nhờ lập trình viên ĐƯA BẢN MỚI LÊN GITHUB PAGES trước buổi chơi." -f $pg.Url, $pg.Why)
+    $warn++
+  } elseif ($pg) {
+    $same = $repo.Full.StartsWith($pg.Sha) -or $pg.Sha.StartsWith($repo.Full)
+    $ahead = $false
+    if (-not $same) { $a = Get-CmdOutput 'git' @('-C', $script:RepoDir, 'merge-base', '--is-ancestor', $repo.Full, $pg.Sha); $ahead = ($a.Code -eq 0) }
+    if ($same -or $ahead) { Write-Tot ("Trang chơi của bạn bè (GitHub Pages) có đủ bản này ({0})." -f $pg.Sha.Substring(0, 7)) }
+    else {
+      Write-Canh ("Trang chơi của bạn bè (GitHub Pages) là bản {0}, KHÁC mã trên máy ({1}) — nhờ lập trình viên đưa bản mới lên GitHub Pages trước buổi chơi." -f $pg.Sha.Substring(0, 7), $repo.Short)
+      $warn++
+    }
+  }
+  return $warn
+}
+
+# Địa chỉ tunnel tạm đã in lần trước (server/data, không commit) — để báo "ĐỊA CHỈ ĐÃ ĐỔI, gửi lại cho mọi người".
+function Get-LastQuickUrlFile([object]$s) { return (Join-Path $script:ServerDir ("data\quicktunnel_{0}.txt" -f $s.Project)) }
+function Get-LastQuickUrl([object]$s) {
+  $f = Get-LastQuickUrlFile $s
+  if (Test-Path -LiteralPath $f) { try { return ((Get-Content -LiteralPath $f -TotalCount 1).Trim()) } catch { } }
+  return $null
+}
+function Set-LastQuickUrl([object]$s, [string]$url) {
+  $f = Get-LastQuickUrlFile $s
+  try { New-Item -ItemType Directory -Force -Path (Split-Path -Parent $f) | Out-Null; Set-Content -LiteralPath $f -Value $url -Encoding ASCII } catch { }
 }
 
 function Get-ServiceState([object]$s) {

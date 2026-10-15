@@ -361,3 +361,19 @@ kbd { background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.35)
   #chatBox.open #chatLog { max-height: calc(100vh - 210px); }
   body:has(#chatBox.open) #questPanel { visibility: hidden; }
 }
+/* Vòng sửa 1 MP-2b (MOBILE-PORTRAIT-HUD): điện thoại DỌC — thanh trên (chấm kết nối + đồng hồ + nút) xuống 2 hàng chiếm cả
+   bề ngang, nên bảng nhiệm vụ nằm DƯỚI nó và gọn lại (bỏ dòng mô tả); khung chat đóng không lấn sang bản đồ nhỏ; mở chat
+   thì cất bản đồ nhỏ + bảng nhiệm vụ (ô nhập + nút Gửi chiếm cả bề ngang). Kiểm: tools/qa/mp_mobile_hud.mjs */
+@media (max-width: 520px) and (orientation: portrait) {
+  #questPanel { top: 108px; min-width: 0; max-width: min(230px, 62vw); padding: 6px 10px; }
+  #questTitle { font-size: 11px; margin-bottom: 2px; }
+  .quest { font-size: 11.5px; margin: 3px 0; }
+  .quest small, .quest br { display: none; }
+  /* bản đồ nhỏ cỡ điện thoại (minimap.js đặt style 210×165 nội tuyến nên luật 150×118 ở max-width 900 chưa từng ăn) */
+  #minimap { width: 150px !important; height: 118px !important; }
+  #chatBox { width: calc(100vw - 186px); }
+  #chatBox.open { width: calc(100vw - 24px); }
+  body:has(#chatBox.open) #minimap, body:has(#chatBox.open) #questPanel { visibility: hidden; }
+}
+/* hộp "Máy chủ lạ" là việc PHẢI làm trước: lời gợi ý xoay ngang (z 60) không được phủ lên nó (z 56) */
+body:has(#mpTrust) #rotateHint { display: none !important; }

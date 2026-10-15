@@ -150,6 +150,7 @@ export function loadConfig({ env = process.env, envFile = DEFAULT_ENV_FILE, over
 
   const cfg = {
     version: VERSION,
+    build: g.str('HPMP_BUILD', 'dev').slice(0, 48),   // git HEAD the image was built from (Dockerfile ARG; /healthz)
     proto: PROTO_VERSION,
     env: nodeEnv,
     inDocker,

@@ -39,4 +39,8 @@ USER node
 EXPOSE 9100 9101
 HEALTHCHECK --interval=15s --timeout=5s --start-period=40s --retries=3 CMD ["node", "/app/server/ops/healthcheck.mjs"]
 STOPSIGNAL SIGTERM
+# Mã bản dựng (git rev-parse --short HEAD, "+" = có sửa chưa commit) — mo-may-chu.ps1 truyền vào; /healthz trả "build" để
+# script so với mã trên máy (vòng sửa 1 MP-2b, DEPLOY-VERSION-GAP). Đặt CUỐI để không phá bộ nhớ đệm của các lớp trên.
+ARG HPMP_BUILD=dev
+ENV HPMP_BUILD=${HPMP_BUILD}
 CMD ["node", "/app/server/ops/container-main.mjs"]

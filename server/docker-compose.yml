@@ -83,6 +83,9 @@ services:
     build:
       context: ..
       dockerfile: server/Dockerfile
+      args:
+        # mã bản dựng (mo-may-chu.ps1 đặt = git HEAD rút gọn) → /healthz "build"
+        HPMP_BUILD: ${HPMP_BUILD:-dev}
     image: ${HPMP_IMAGE:-hpworld-game:local}
     init: true
     env_file:

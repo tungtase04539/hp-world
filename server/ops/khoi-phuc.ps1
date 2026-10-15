@@ -97,7 +97,9 @@ if ($LASTEXITCODE -ne 0) { Write-Loi 'Không sao lưu được dữ liệu hiệ
 Write-Buoc '2/5 Tạm dừng game và tunnel'
 $wasTunnel = $st['tunnel'] -and $st['tunnel'].State -eq 'running'
 $wasQuick = $st['quicktunnel'] -and $st['quicktunnel'].State -eq 'running'
-$null = Invoke-Compose $s ($script:AllProfiles + @('stop', '-t', '8', 'tunnel', 'quicktunnel', 'game'))
+# Tunnel TẠM không dừng (vòng sửa 1 MP-2b): dừng rồi bật lại là ra địa chỉ *.trycloudflare.com MỚI, cả nhóm mất link.
+# Game đã dừng nên trong lúc khôi phục không ai vào được; tunnel tạm chỉ trả lỗi tạm thời rồi tự nối lại game.
+$null = Invoke-Compose $s ($script:AllProfiles + @('stop', '-t', '8', 'tunnel', 'game'))
 Write-Buoc '3/5 Thay cơ sở dữ liệu'
 $r = Get-CmdOutput 'docker' ($liveExec + @('psql', '-U', 'hp', '-d', 'postgres', '-v', 'ON_ERROR_STOP=1', '-c', 'DROP DATABASE IF EXISTS hp WITH (FORCE)', '-c', 'CREATE DATABASE hp OWNER hp'))
 if ($r.Code -ne 0) { Write-Loi ('Không tạo lại được cơ sở dữ liệu: ' + $r.Text); Exit-Ops 1 }
@@ -107,9 +109,19 @@ Write-Tot 'Đã nạp bản sao lưu.'
 Write-Buoc '4/5 Mở lại game'
 $null = Invoke-Compose $s @('up', '-d', 'game')
 $h = Wait-Health $s.GameUrl 120
-if (-not $h) { Write-Loi 'Game không khởi động lại được — xem: docker compose -p ' + $s.Project + ' logs game --tail 50'; Exit-Ops 1 }
+if (-not $h) { Write-Loi ('Game không khởi động lại được — xem: docker compose -p ' + $s.Project + ' logs game --tail 50'); Exit-Ops 1 }
 if ($wasTunnel) { $null = Invoke-Compose $s @('--profile', 'tunnel', 'up', '-d', 'tunnel') }
-if ($wasQuick) { $null = Invoke-Compose $s @('--profile', 'quicktunnel', 'up', '-d', 'quicktunnel'); Write-Canh 'Tunnel tạm có ĐỊA CHỈ MỚI — xem trang-thai.ps1.' }
+if ($wasQuick) {
+  $stq = Get-ServiceState $s
+  if ($stq['quicktunnel'] -and $stq['quicktunnel'].State -eq 'running') { Write-Tot 'Tunnel tạm vẫn chạy — địa chỉ KHÔNG đổi.' }
+  else {
+    $null = Start-QuickTunnelFresh $s
+    $u = $null; $tq = Get-Date
+    while (-not $u -and ((Get-Date) - $tq).TotalSeconds -lt 60) { Start-Sleep -Seconds 2; $u = Get-QuickTunnelUrl $s }
+    if ($u) { Set-LastQuickUrl $s $u; Write-Canh ('Tunnel tạm có ĐỊA CHỈ MỚI — gửi lại cho mọi người: ' + ($u -replace '^https://', 'wss://')) }
+    else { Write-Canh 'Tunnel tạm có ĐỊA CHỈ MỚI — xem trang-thai.ps1.' }
+  }
+}
 Write-Buoc '5/5 Kiểm tra'
 $c = Get-Counts $liveExec
 foreach ($k in $c.Keys) { Write-Dong ("{0,-28} {1,8}" -f $k, $c[$k]) }

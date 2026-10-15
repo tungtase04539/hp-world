@@ -45,7 +45,8 @@
 //   the mount step itself gets + MOUNT_SLACK_M)
 //   segAllow = max(vmax(mode before), vmax(mode after)) · Δt        (vmax = constants.js MODE_VMAX)
 // The same rule is applied over BURST_MS (300 ms) and LONG_MS (4 s) windows, so the additive slack cannot be re-spent
-// every second (sustained ceiling vmax·1.2 + SLACK_ADD_M / 4 s per second).
+// every second (sustained ceiling vmax·1.2 + SLACK_ADD_M / 4 s per second). The 4 s window alone reaches back across
+// mounts / dismounts, with MOUNT_SLACK_M per mount change counted at most MOUNT_SLACK_MAX times (WALK↔MOTO toggling).
 // Teleport (hard flag): one step longer than max(TELEPORT_MIN_M, TELEPORT_MUL × that step's own limit).
 import { isWater, groundHeight, groundHeightNoDeck, BRIDGE_WAYS, ROADS_DT, ELEVATED_RI, nearestRiverPoint } from '../terrain.js';
 import { roadHW, sidewalkW } from '../xsection.js';
@@ -66,12 +67,14 @@ export const MOVE = Object.freeze({
                              // once per window, so with only the 1 s window ANY client (true clock or a 1.1× clock)
                              // could sustain vmax·1.2 + 1 m/s forever (run: 9.4 m/s = 1.34 × vmax). Over 4 s the
                              // sustained ceiling is vmax·1.2 + 0.25 m/s (run 8.65). Client time, so network jitter never
-                             // counts; it never reaches back across a mount / dismount (like the 1 s window).
+                             // counts. Unlike the 1 s / 300 ms windows it DOES reach back across mounts / dismounts
+                             // (MOUNT_SLACK_MAX, fixer round 1 MP-2b).
   SLACK_MUL: VALIDATE.SLACK_MUL,
   SLACK_ADD_M: VALIDATE.SLACK_ADD_M,
   TELEPORT_MUL: VALIDATE.TELEPORT_MUL,
   TELEPORT_MIN_M: 12,        // dismount searches a free spot up to 8 m away (main.js dismount), mount snaps to the seat
   MOUNT_SLACK_M: 9,          // extra metres in a window that mounts / dismounts
+  MOUNT_SLACK_MAX: 2,        // the 4 s window counts at most this many mount changes (EXPLOIT-MOUNT-TOGGLE)
   FIRST_RADIUS_M: 15,        // first STATE after a (re)start may be this far from the anchor (spawn jitter, dismount)
   FIRST_RTT_S: 1,            // extra seconds of allowance for the first STATE (RTT / loading)
   MAX_GAP_S: 30,             // allowance for a single gap is capped at this many seconds
@@ -406,24 +409,31 @@ export class MoveCheck {
       // the new mode only. (Integration 15/10/2026: before, a dismount kept +9 m slack and the previous mode's speed in
       // the window for a whole second, so a walk-mode speed hack right after riding went unflagged for ~1.2 s.)
       // one walk back: i = oldest sample within WINDOW_MS, ib = within BURST_MS, il = within LONG_MS
+      // The LONG window (4 s) DOES reach back across mounts / dismounts (fixer round 1 MP-2b, EXPLOIT-MOUNT-TOGGLE: a
+      // client toggling WALK↔MOTO on every STATE got + MOUNT_SLACK_M on every step and no window at all — 120 m/s for
+      // 25 s, 0 CORRECT). Its slack is MOUNT_SLACK_M per mount change inside it, counted at most MOUNT_SLACK_MAX times:
+      // a toggler is held to vmax(moto)·1.2 + (SLACK_ADD_M + 2·MOUNT_SLACK_M) / 4 s, while honest E-spam (mount snaps to
+      // a bike ≤ 2.4 m ahead / a parked vehicle, dismount ≤ 8 m from it) stays far inside that.
       let i = this.head, k = 0, ib = this.head, il = this.head;
-      if (!mountChange) {
-        while (k + 1 < this.count) {
-          const j = (il - 1 + n) % n;
-          const age = t - this.t[j];
-          if (age > MOVE.LONG_MS) break;
-          if (isMountedMode(this.m[j]) !== isMountedMode(this.m[il])) break;
-          il = j; k++;
+      let crossed = mountChange, changes = mountChange ? 1 : 0;
+      while (k + 1 < this.count) {
+        const j = (il - 1 + n) % n;
+        const age = t - this.t[j];
+        if (age > MOVE.LONG_MS) break;
+        if (isMountedMode(this.m[j]) !== isMountedMode(this.m[il])) { crossed = true; changes++; }
+        il = j; k++;
+        if (!crossed) {
           if (age <= MOVE.WINDOW_MS) i = j;
           if (age <= MOVE.BURST_MS) ib = j;
         }
       }
       const slack = MOVE.SLACK_ADD_M + (mountChange ? MOVE.MOUNT_SLACK_M : 0);
+      const slackLong = MOVE.SLACK_ADD_M + Math.min(MOVE.MOUNT_SLACK_MAX, changes) * MOVE.MOUNT_SLACK_M;
       // lastWin (diagnostics, server CORRECT log): 1 = 1 s window, 2 = 300 ms burst window, 3 = 4 s long window,
       // 4 = first step after an anchor; lastSpan = client ms between the window start and the previous sample
       if (this._over(i, x, z, segAllow, slack)) { this.lastWin = 1; return MV.SPEED; }
       if (ib !== i && this._over(ib, x, z, segAllow, slack)) { this.lastWin = 2; return MV.SPEED; }
-      if (il !== i && this._over(il, x, z, segAllow, slack)) { this.lastWin = 3; return MV.SPEED; }
+      if (il !== i && this._over(il, x, z, segAllow, slackLong)) { this.lastWin = 3; return MV.SPEED; }
     } else if (step > stepLim) {
       this.lastDist = step; this.lastLimit = stepLim; this.lastWin = 4;
       return MV.SPEED;

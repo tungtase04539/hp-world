@@ -21,13 +21,16 @@ jobs:
       - name: Push to gh-pages
         # Bỏ thư mục server/ (máy chủ multiplayer chạy riêng, không phục vụ qua Pages) khỏi bản mirror: dựng một commit
         # có cây thư mục y hệt HEAD trừ server/, rồi đẩy commit đó lên gh-pages. Mọi thứ khác giữ nguyên.
+        # version.json (chỉ có trên bản Pages, không commit vào nhánh): mã commit nguồn — màn tiêu đề hiện "bản xxxxxxx",
+        # server/ops/mo-may-chu.ps1 + trang-thai.ps1 so nó với mã trên máy chủ (vòng sửa 1 MP-2b, DEPLOY-VERSION-GAP).
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          TREE=$(git rev-parse "HEAD^{tree}")
           if git ls-tree -d --name-only HEAD server | grep -qx server; then
             git rm -r -q --cached server
-            TREE=$(git write-tree)
           fi
+          printf '{"sha":"%s","date":"%s"}' "${GITHUB_SHA}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > version.json
+          git add -f version.json
+          TREE=$(git write-tree)
           PAGES=$(git commit-tree "$TREE" -p HEAD -m "Pages mirror of ${GITHUB_SHA} (không có server/)")
           git push -f origin "$PAGES:refs/heads/gh-pages"
