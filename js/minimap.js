@@ -115,7 +115,10 @@ export function initMinimap() {
   base = off;
 }
 
-export function drawMinimap(px, pz, yaw) {
+// markers (MP-2 C2, tuỳ chọn): [{x, z, kind: 'friend'|'party'|'player', away?}] — người chơi khác cần hiện (bạn bè/nhóm;
+// người lạ mặc định KHÔNG có trong danh sách: remote_avatars.markers()). Thiếu/rỗng → vẽ y như chơi một mình.
+const MARK_COL = { friend: '#22b573', party: '#a259ff', player: '#28b8e6' };
+export function drawMinimap(px, pz, yaw, markers) {
   if (!ctx) return;
   // nền ngoài rìa thế giới (khi người chơi sát mép)
   ctx.fillStyle = '#eae7e0'; ctx.fillRect(0, 0, W, H);
@@ -164,6 +167,22 @@ export function drawMinimap(px, pz, yaw) {
     ctx.strokeText(label, vx, vy - 7);
     ctx.fillStyle = '#8a5a2a';
     ctx.fillText(label, vx, vy - 7);
+  }
+
+  // chấm người chơi khác (dưới mũi tên của mình); ngoài khung → kẹp vào mép (biết hướng bạn bè đang ở)
+  if (markers && markers.length) {
+    for (const m of markers) {
+      if (!m || !Number.isFinite(m.x) || !Number.isFinite(m.z)) continue;
+      let vx = (m.x - px) * sc + W / 2, vy = (m.z - pz) * sc + H / 2;
+      const edge = vx < 4 || vx > W - 4 || vy < 4 || vy > H - 4;
+      if (edge && m.kind === 'player') continue;
+      vx = Math.max(4, Math.min(W - 4, vx)); vy = Math.max(4, Math.min(H - 4, vy));
+      ctx.beginPath();
+      ctx.arc(vx, vy, m.kind === 'player' ? 2.6 : 3.4, 0, Math.PI * 2);
+      ctx.fillStyle = m.away ? '#9aa1aa' : (MARK_COL[m.kind] || MARK_COL.player);
+      ctx.fill();
+      ctx.lineWidth = 1.1; ctx.strokeStyle = '#fff'; ctx.stroke();
+    }
   }
 
   // mũi tên người chơi — LUÔN ở giữa (bản đồ trôi theo chân, bắc cố định như GG)

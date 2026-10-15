@@ -135,7 +135,7 @@ export function simulate({ seed = 1, dur = 60, fps = 60, disconnect = [40, 42], 
   };
 }
 
-if (process.argv[1] && process.argv[1].replace(/\\/g, '/').endsWith('tests/net/interp_sim.mjs')) {
+if (typeof process !== 'undefined' && process.argv && process.argv[1] && process.argv[1].replace(/\\/g, '/').endsWith('tests/net/interp_sim.mjs')) {
   const r = simulate({ seed: Number(process.argv[2] || 1) });
   console.log(JSON.stringify(r.summary, null, 1));
 }
