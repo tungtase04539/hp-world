@@ -1,0 +1,42 @@
+# allow.txt — cụm từ vô hại hay bị bắt nhầm. Một mẫu bị bắt nằm GỌN trong cụm dưới đây thì được bỏ qua.
+# Viết CÓ DẤU (để bản có dấu tục như "cặc" không lọt qua); chữ không dấu ở đây chỉ khớp chữ không dấu.
+quả/hạt/bánh/sữa/dầu/bột/cây óc chó
+con các bạn/em/anh/chị/cô/chú/bác/ông/bà/cháu/thành/người/nhà/con/cậu/bố/mẹ/cụ/vị
+cái lon/lớn/lợn bia/nước/sữa/này/kia/đó/ấy/của/to/nhỏ/rỗng/đất/con/nhất/hơn/lắm/quá
+cái buổi
+như các/buổi
+hẹn gặp lại
+con lợn/lon
+đầu/cuối/mỗi/một/hai/ba buổi
+mất/đầu/mặt các
+ăn các món/loại/thứ/kiểu/đồ/bữa/quán/nơi/hàng/bạn/em/anh/chị
+bú các ngón
+còn/con/đỗ/đó/độ điểm
+còn/con phở/phố/phó
+mà mẹ/cha/bố/má/mày
+đồ cấm/cầm
+trứng cút
+vú sữa
+vú em
+bím tóc
+tết/thắt bím
+sục sạo
+xoạc chân
+chim cu
+dâm bụt
+đi khách sạn/hàng
+đổ rác
+đồ điện
+còn điện/diện/điền/diễn
+đỡ đần
+ốc lớn/bò/lợn/to/nhỏ
+bộ máy
+đổ bóng
+# --- bổ sung vòng sửa 1 (bắt nhầm lời trẻ em kể chuyện / câu thường)
+ức hiếp
+hiếp đáp
+bắt nạt và ức hiếp
+vú nuôi
+bà vú
+đồ bóng đá/chuyền/rổ/bàn/ném
+mẹ/bố/má mày gọi/bảo/đến/đón/về/tìm/kêu/dặn

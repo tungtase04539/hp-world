@@ -1,0 +1,25 @@
+{
+  "name": "hp-world-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Hai Phong 3D multiplayer game server (closed test)",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "start": "node src/main.js",
+    "test": "node --test --test-concurrency=1 \"test/*.test.js\"",
+    "test:pg": "node test/pg_run.mjs",
+    "bots": "node bots/run.mjs"
+  },
+  "dependencies": {
+    "jose": "6.2.12",
+    "pg": "8.23.1",
+    "uWebSockets.js": "https://github.com/uNetworking/uWebSockets.js/archive/refs/tags/v20.71.0.tar.gz",
+    "ws": "8.22.0"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.10"
+  }
+}

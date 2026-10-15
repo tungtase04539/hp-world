@@ -13,3 +13,9 @@ tools/mask_debug.png
 
 # Overture footprint (regeneratable: python tools/fetch_overture.py) — 21 MB
 tools/ov_buildings.csv
+
+# Máy chủ multiplayer (server/): phụ thuộc npm, bí mật sinh lần chạy đầu, dữ liệu cục bộ (PGlite, sao lưu, nhật ký); danh sách lọc chat server/data/filter/ thì commit
+server/node_modules
+server/.env
+server/data/*
+!server/data/filter/
