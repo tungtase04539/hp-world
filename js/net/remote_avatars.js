@@ -464,6 +464,15 @@ export function createRemoteAvatars({ scene, world = null, camera, tier = DEVICE
     setFriends(ids) { friends.clear(); for (const id of ids || []) friends.add(id | 0); },
     setMarkerAll(on) { markerAll = !!on; },
     setEnabled,
+    // QA (window.__hp.net.players() — tools/qa/mp2_*): vị trí đang VẼ (sau nội suy) + tên
+    positions() {
+      const r = [];
+      for (const a of list) {
+        const nm = names.get(a.netId);
+        r.push({ netId: a.netId, name: nm ? nm.name : '', x: +a.x.toFixed(2), z: +a.z.toFixed(2), state: a.mode | (a.flags << 3), drawn: !!a.sel });
+      }
+      return r;
+    },
     // chẩn đoán / QA (tools/qa/mp_c2_avatars.mjs)
     debug(netId) {
       const a = avatars.get(netId | 0);

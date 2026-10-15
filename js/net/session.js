@@ -35,6 +35,7 @@ export function deviceId() {
 export function randomAppearance() {
   const b = new Uint8Array(8);
   try { crypto.getRandomValues(b); } catch (e) { for (let i = 0; i < 8; i++) b[i] = (Math.random() * 256) | 0; }
+  b[7] = 0;   // byte 7 = phiên bản ngoại hình (remote_avatars.js decodeAppearance: phiên bản 0)
   return [...b].map((x) => x.toString(16).padStart(2, '0')).join('');
 }
 

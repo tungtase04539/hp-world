@@ -13,7 +13,7 @@
 import { createSession } from './session.js';
 import { createCorrector } from './correct.js';
 import { createTelemetry } from './telemetry.js';
-import { createRemoteAvatars } from './remote_avatars_stub.js';   // ← C2: đổi thành './remote_avatars.js' (cùng API)
+import { createRemoteAvatars } from './remote_avatars.js';   // C2: người chơi khác instanced (≤ 5 draw call, bảng tên, vòng sáng)
 import { createChat } from '../ui/chat.js';
 import { SYS, EVENT, CHANNEL, ACTION, ACTION_RESULT, SANCTION_KIND, CLOSE } from '../shared/protocol.js';
 import { MODE, SFLAG, STATE_HZ_MOVING, STATE_HZ_IDLE } from '../shared/constants.js';
@@ -424,7 +424,7 @@ function build(deps) {
       p += ENTER_F;
       if (id === netId) continue;
       visible.add(id);
-      ra.enter(id, abs, app);
+      ra.enter(id, abs, app, sMs);   // C2: dấu thời gian snapshot là tham số thứ 4 (giờ máy chủ của tick)
     }
     for (let i = 0; i < nU; i++) {
       const id = b[p];
@@ -693,6 +693,7 @@ function build(deps) {
       openChat: () => chat && chat.open(),
       closeChat: () => chat && chat.close(),
       players: () => (ra && ra.positions ? ra.positions() : []),
+      avatars: () => ra,   // QA: mô-đun người chơi khác (debug/stats/setEnabled/tags.canvas) — tools/qa/mp2_int_e2e.mjs
       names: () => [...names.entries()],
       drop: () => wpost({ t: 'drop' }),
       rejoin: () => { noRejoin = false; doJoin(); },

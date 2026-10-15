@@ -1241,7 +1241,7 @@ gì (ký tự cuối mang 4 bit đệm) và test trượt ngẫu nhiên; nay đ�
 | `js/net/correct.js` | CORRECT: lệch ≤ 6 m kéo mượt 0,15 s, lớn hơn nhảy hẳn (đang cưỡi: dời xe, xe dừng); STATE sau đó mang `corrEpoch` mới |
 | `js/net/telemetry.js` | số liệu CỤC BỘ (không gửi đi): STATE/snapshot/CORRECT/chat/nối lại/RTT p50-p95 |
 | `js/net/net.js` | điều phối: panel tiêu đề, phiên, worker, STATE, người khác, chat, ngày/đêm, HUD — mọi hàm công khai bọc try/catch |
-| `js/net/remote_avatars_stub.js` | bản TẠM cùng API của C2 (`js/net/remote_avatars.js`): 1 InstancedMesh hộp; đổi 1 dòng import trong net.js |
+| `js/net/remote_avatars.js` (+ `interp.js`, `nametags.js`) | người chơi khác (C2, §9.5) — bản tạm `remote_avatars_stub.js` đã bỏ khi tích hợp (§9.6) |
 | `js/ui/chat.js` | khung chat 40 m, menu Báo cáo / Chặn, đường dây hỗ trợ |
 | main.js · input.js · ui.js · daynight.js · i18n.js · css/style.css | điểm nối (dưới đây), phím chat `onChatKey`/`releaseKeys`, `registerModal`, `syncTo`, khoá `mp*`/`chat*` vi+en, giao diện |
 
