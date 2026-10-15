@@ -479,6 +479,20 @@ chủ dự án: `docs/multiplayer/VAN_HANH.md`. Đặc tả giao việc: `docs/m
   người: gửi snapshot bằng nhiều luồng (giai đoạn B trong ARCH) hoặc chạy trên VPS Linux. Thử kín vài chục người thì dư sức.
 - **Chưa làm (GĐ1 phía client):** hiện người chơi khác trong game, ô nhập biệt danh/mã mời, khung chat. Các điểm nối:
   `docs/multiplayer/codebase_hooks.md` §9.
+- **Người chơi khác trong game (MP-2 C2, `js/net/remote_avatars.js` + `interp.js` + `nametags.js`):** API và số đo ở
+  `docs/multiplayer/SERVER.md` §9. Luật đã kiểm: **≤ 5 draw call cố định** cho mọi N (người · xe máy gần · xe máy xa · bóng
+  tiếp đất · vòng sáng + bảng tên), **0 chương trình shader mới** (vật liệu `kitMaterial` cùng tham số với traffic.js → cùng đối
+  tượng; bảng tên = `InstancedMesh` 1 instance MeshBasic map trong suốt = biến thể của vũng đèn đêm — `Mesh` thường từng tạo
+  thêm 1 chương trình, đo `renderer.info.programs` 76 → 77). Trần TIER 1 → 40, TIER 2/3 → 96 (gần camera nhất, trễ 0,8);
+  bảng tên 24 gần nhất trong 25 m, mờ dần 17→25 m bằng 4 MỨC MỜ vẽ sẵn trong atlas (alpha theo đỉnh = biến thể shader mới).
+  BẪY: (1) tứ giác billboard tự dựng phải CCW nhìn từ camera (bản đầu cull mặt sau → bảng tên vô hình, vòng sáng vẫn hiện);
+  (2) `surfaceY` là NỀN — xe/người đặt trên mặt nhựa `+ROAD_TOP` (như traffic.js), vòng sáng người đi bộ ở `SIDEWALK_TOP + 2 cm`
+  (thấp hơn bị vỉa hè che); (3) `page.evaluate` trả đối tượng three (mesh → scene) làm Playwright treo khi tuần tự hoá — luôn
+  trả số/JSON; (4) snapshot 10 Hz mang STATE 15 Hz mới nhất → tuổi mẫu rung 0–67 ms → tốc độ hiển thị "đập" ±30 % ở xe máy:
+  `interp.js` căn lại thời điểm mẫu theo quãng đường/`spd` (rung dấu thời gian 23 → 5,5 ms); (5) máy chủ chỉ gửi bản ghi ĐỔI
+  → người đứng yên không có mẫu nhiều giây: chèn mẫu giữ chỗ t − 100 ms khi họ đi lại (không trườn chậm suốt quãng nghỉ).
+  Kiểm: `node --test tests/net/interp.test.mjs`, `node --import ./tests/net/register.mjs --test tests/net/remote_avatars.test.mjs`
+  (three thật + world/device giả), trong game `tools/qa/mp_c2_avatars.mjs` (giả lập máy chủ + mạng trong trang, KHÔNG sửa main.js).
 
 ## 9. Deploy
 
@@ -488,6 +502,14 @@ chủ dự án: `docs/multiplayer/VAN_HANH.md`. Đặc tả giao việc: `docs/m
 - Vercel (tùy chọn): import repo, không cần build command (site tĩnh).
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
+
+- **2026-10-15 (MP-2 C2 — HÌNH NGƯỜI CHƠI KHÁC + NỘI SUY + BẢNG TÊN + chấm minimap):** `js/net/{remote_avatars,interp,nametags}.js`,
+    `js/minimap.js` (tham số `markers`), test `tests/net/*` (18 test node), công cụ `tools/qa/mp_c2_{avatars,page,plot}.mjs`.
+    Trong game thật (Radeon 890M, cùng phiên, 1 Chrome dưới khoá GPU): TIER 3 96 người ở quảng trường Nhà hát → 87 trong 200 m
+    được vẽ, **4 draw call của mô-đun** (đếm theo mesh), chương trình shader 76 → 76; TIER 1 (lite) 96 → vẽ 40, 3 draw call,
+    51 → 51; fps 60 (vsync) cả trước/sau, khung p95 16,9 ms; `frame()` 0,26 ms CPU ở 96 người. Nội suy trong game (luồng 10 Hz rung
+    + kẹt TCP + rớt 40–42 s + RESUME): sai số p50 0,07 m · p95 0,23 m · p99 1,3 m (kẹt TCP > 250 ms: ngoại suy dừng ở 250 ms theo
+    SPEC rồi đuổi kịp), bước khung lớn nhất 0,94 m, trễ hiển thị 265 ms. Ảnh: `C:/Users/Admin/hp-world-work/mp2/c2/`. Xem §8c.
 
 - **2026-10-15 (MP-1 MÁY CHỦ THỬ NGHIỆM KÍN — gộp vào dot3):** js/shared/ + server/ (146 tệp mới, chỉ sửa .gitignore và
     deploy-pages.yml để bỏ server/ khỏi gh-pages). Đã qua 3 phản biện (bảo mật, mạng, an toàn chat/vận hành) với 29 lỗi
