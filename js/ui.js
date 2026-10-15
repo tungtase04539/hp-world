@@ -69,15 +69,23 @@ export function isInfoOpen() { return !document.getElementById('infoPanel').clas
 
 export function isHelpOpen() { return !document.getElementById('helpModal').classList.contains('hidden'); }
 
+// MP-2 C1: bảng đăng ký thêm (menu người chơi trong chat, hộp báo cáo, thông báo máy chủ…).
+// m = { isOpen() → bool, close() → void, blocking: bool }. blocking = khoá điều khiển nhân vật như các bảng cũ;
+// không blocking (ô chat) thì chỉ được Esc đóng. Đăng ký sau = nằm trên (đóng trước).
+const _extra = [];
+export function registerModal(m) { _extra.push(m); return () => { const i = _extra.indexOf(m); if (i >= 0) _extra.splice(i, 1); }; }
+
 export function isAnyModalOpen() {
   return dlg.open || isInfoOpen()
     || !document.getElementById('minigame').classList.contains('hidden')
-    || isHelpOpen();
+    || isHelpOpen()
+    || _extra.some((m) => m.blocking && m.isOpen());
 }
 
 // Esc (và E với bảng Hướng dẫn/thông tin): đóng bảng trên cùng. Trả true nếu đã đóng thứ gì.
-// Thứ tự = thứ tự chồng z-index trong CSS: Hướng dẫn / thông tin / trò nấu ăn (40) > hội thoại (25).
+// Thứ tự = thứ tự chồng z-index trong CSS: bảng MP-2 đăng ký (45) > Hướng dẫn / thông tin / trò nấu ăn (40) > hội thoại (25).
 export function closeTopModal() {
+  for (let i = _extra.length - 1; i >= 0; i--) { const m = _extra[i]; if (m.isOpen()) { m.close(); return true; } }
   if (isHelpOpen()) { document.getElementById('helpModal').classList.add('hidden'); return true; }
   if (isInfoOpen()) { document.getElementById('infoPanel').classList.add('hidden'); return true; }
   if (!document.getElementById('minigame').classList.contains('hidden')) { document.getElementById('mgClose').click(); return true; }

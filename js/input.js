@@ -37,12 +37,24 @@ function recompute() {
   input.run = !!(keys['ShiftLeft'] || keys['ShiftRight']) || Math.hypot(joyX, joyY) > 0.85;
 }
 
-// Phím gõ vào ô nhập (nếu sau này có) không được điều khiển nhân vật
+// Phím gõ vào ô nhập (ô chat, biệt danh…) không được điều khiển nhân vật
 const typing = (e) => { const t = e.target; return t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable); };
+
+// MP-2 C1: phím mở chat (T hoặc /). Enter đang là TƯƠNG TÁC nên không dùng để mở chat. main/net đăng ký callback;
+// callback trả true = đã mở chat (phím bị nuốt: ký tự '/' hay 't' không lọt vào ô nhập vừa focus).
+let _chatKeyCb = null;
+export function onChatKey(fn) { _chatKeyCb = fn; }
+// Thả mọi phím đang giữ (mở ô chat khi đang giữ W → nhân vật không được tự chạy tiếp)
+export function releaseKeys() { for (const k in keys) keys[k] = false; joyX = 0; joyY = 0; recompute(); input.jump = false; input.interact = false; }
 
 export function initInput() {
   window.addEventListener('keydown', (e) => {
     if (e.repeat || typing(e)) return;
+    if (_chatKeyCb && (e.code === 'KeyT' || e.code === 'Slash') && !e.ctrlKey && !e.altKey && !e.metaKey) {
+      let used = false;
+      try { used = _chatKeyCb(e); } catch (err) { used = false; }
+      if (used) { e.preventDefault(); return; }
+    }
     keys[e.code] = true;
     if (e.code === 'Space') { input.jump = true; _jumpAt = performance.now(); e.preventDefault(); }
     if (e.code === 'KeyE' || e.code === 'Enter') input.interact = true;

@@ -11,10 +11,10 @@ import { buildNPCs } from './npcs.js';
 import { buildLandmarkSigns } from './landmarks.js';
 import { createDayNight, attachSkyRenderer } from './daynight.js';
 import { createPetals } from './petals.js';
-import { initInput, input, consumeInteract, consumeJump, consumeEscape } from './input.js';
+import { initInput, input, consumeInteract, consumeJump, consumeEscape, onChatKey, releaseKeys } from './input.js';
 import { createBoot } from './boot.js';
 import { footprintIndex } from './footprints.js';
-import { t, tx, setLang } from './i18n.js';
+import { t, tx, tf, setLang, onLangChange } from './i18n.js';
 import * as ui from './ui.js';
 import * as audio from './audio.js';
 import * as quests from './quests.js';
@@ -139,6 +139,26 @@ setLang('vi');
 initMinigame(audio);
 quests.bindQuestUI(ui, audio);
 const _hadProgress = quests.loadProgress();
+// ============ Multiplayer GĐ1 (MP-2 C1) ============
+// CHỈ nạp js/net/* khi có cấu hình máy chủ (?server=… — được nhớ — hoặc DEFAULT_SERVER của js/net/config.js). Không cấu
+// hình → không import, không socket, KHÔNG có request mạng mới nào (MP2 SPEC §1.3). Mọi lời gọi `net.*` không ném lỗi.
+// NET_DEFAULT_ON PHẢI = (DEFAULT_SERVER trong js/net/config.js khác rỗng) — tools/qa/mp2_c1_unit.mjs báo đỏ khi lệch.
+const NET_DEFAULT_ON = false;
+let net = null;
+{
+  let want = NET_DEFAULT_ON;
+  try { want = want || new URLSearchParams(location.search).has('server') || !!localStorage.getItem('hp3d.server'); } catch (e) { }
+  if (want) {
+    try {
+      const [{ resolveServer }, { createNet }] = await Promise.all([import('./net/config.js'), import('./net/net.js')]);
+      const cfg = resolveServer();
+      if (cfg) {
+        net = createNet({ cfg, ui, tier: TIER, i18n: { t, tf, onLangChange }, input: { input, releaseKeys, onChatKey },
+          audioGesture: () => audio.initAudio() });
+      }
+    } catch (e) { console.warn('[net] không nạp được multiplayer — chơi một mình:', e); net = null; }
+  }
+}
 { // Nút chọn chất lượng + tên GPU trên màn chờ (kiểm toán 2026-09-05: người chơi phải THẤY mình đang ở tier nào).
   const gpuEl = document.getElementById('gpuName');
   if (gpuEl) gpuEl.textContent = `${GPU_NAME || 'GPU ?'} · ${['tier 0', 'LITE', 'iGPU', 'FULL'][TIER]}`;
@@ -401,6 +421,7 @@ function mount(v) {
   player.sit(true);
   consumeJump();
   audio.sfx('mount');
+  if (net) net.onMount(v);   // MP-2: xe dùng chung → giữ chỗ trên máy chủ (xe có người → xuống lại)
 }
 // Đường từ (x0,z0) tới (x1,z1) không cắt nhà thật/địa danh/tường fabric (chỗ tìm xa không được nằm SAU một bức tường).
 function clearPath(x0, z0, x1, z1) {
@@ -450,7 +471,27 @@ function dismount() {
   player.sit(false);
   consumeJump();                                   // Space đã bấm lúc đang lái không được thành cú nhảy
   audio.sfx('mount');
+  if (net) net.onDismount(v);
   return true;
+}
+// MP-2: xuống xe NGAY tại chỗ (máy chủ từ chối giữ chỗ / máy chủ đặt lại vị trí) — không tìm chỗ, không bao giờ thất bại
+function forceDismount() {
+  const v = pState.mounted;
+  if (!v) return;
+  v.mounted = false; v.vel = 0;
+  pState.mounted = null;
+  player.sit(false);
+  if (net) net.onDismount(v);
+}
+// MP-2: đặt người chơi ở điểm máy chủ trả (WELCOME) — camera vòng ra SAU lưng (cam.yaw = yaw + π, xem updateCamera)
+function placePlayer(x, z, yaw) {
+  if (pState.mounted) forceDismount();
+  pState.pos.set(x, Math.max(spawnY(x, z), 0), z);
+  pState.vy = 0; pState.onGround = true;
+  if (Number.isFinite(yaw)) { pState.yaw = yaw; cam.yaw = yaw + Math.PI; }
+  cam.snap = true;
+  player.group.position.copy(pState.pos);
+  player.group.rotation.set(0, pState.yaw, 0);
 }
 
 // ============ Nút "Gọi xe máy" ============
@@ -547,6 +588,11 @@ function handleInteract() {
     });
   }
 }
+
+// MP-2: nối mạng vào game (người chơi khác, CORRECT, STATE, ngày/đêm chung). vehicles lúc này = xe DÙNG CHUNG của thế
+// giới (vehicleRef = chỉ số + 1, giống nhau mọi máy); xe máy gọi riêng thêm sau → vehicleRef 0.
+if (net) net.attach({ scene, world, camera, pState, player, vehicles, dayNight, surfaceY, place: placePlayer,
+  dismountNow: () => { if (!dismount()) forceDismount(); } });
 
 // ============ Vòng lặp chính ============
 const clock = new THREE.Clock();
@@ -723,6 +769,10 @@ function animate() {
       player.animate(dt, 0, time);   // mở modal khi đang cưỡi → GIỮ tư thế ngồi (không animate lại)
     }
     clampToPlayArea(pState.pos);     // GIAI ĐOẠN TRUNG TÂM: tường vô hình tại mép thế giới
+    if (net) {                       // MP-2: CORRECT của máy chủ (kéo mượt / nhảy) + STATE 15 Hz đi / 2 Hz đứng
+      net.preFrame(dt);
+      if (!pState.mounted) player.group.position.copy(pState.pos);
+    }
     updatePlayerShadow(dt);
 
     if (!modal && !cine.active) {
@@ -763,6 +813,7 @@ function animate() {
     const tStat = traffic.update(dt, time, pState.pos, camera.position);   // camera: chọn LOD xe gần/xa
     if (window.__hp && window.__hp._aerialCam) { /* chế độ vệ tinh: giữ camera top-down, không cập nhật */ }
     else if (cine.active) cine.update(dt); else updateCamera(dt);   // đạo diễn lo camera khi bật
+    if (net) net.frame(dt, camera.position);   // MP-2: người chơi khác (nội suy) + ngày/đêm chung + trạng thái HUD
     const sky = dayNight.update(dt, pState.pos, camera);   // camera: hộp bóng bám hướng nhìn
     traffic.setNight(sky.night);   // đèn xe máy/ô tô tự sáng về đêm
     // bloom CHỈ chạy khi trời tối (đèn phố/cửa sổ) — ban ngày tắt hẳn pass (tiết kiệm GPU; vùng sáng ban ngày đã do
@@ -815,7 +866,7 @@ function animate() {
     minimapTimer += dt;
     if (minimapTimer > 0.1) {
       minimapTimer = 0;
-      drawMinimap(pState.pos.x, pState.pos.z, pState.mounted ? pState.mounted.heading : pState.yaw);
+      drawMinimap(pState.pos.x, pState.pos.z, pState.mounted ? pState.mounted.heading : pState.yaw, net ? net.markers() : undefined);
     }
 
     // shadow map: mặt trời trôi rất chậm — render bóng 8Hz thay vì mỗi khung
@@ -892,6 +943,7 @@ window.__hp = {
   texCacheStats,     // chẩn đoán: texture tạo mới vs dùng lại
   cine,
   vehicles, mount, player,   // chẩn đoán/thử nghiệm cưỡi xe
+  get net() { return net ? net.qa : null; },   // MP-2 QA: status()/say()/players()/drop()… (null khi chơi một mình)
   world, pState, traffic, footprints: fp, PLAY_RADIUS,   // Đợt 3 WP8: tool/harness đọc trực tiếp
   bootProfile: boot.durs,    // ms từng bước khởi động (code/ground/…/freeze/actors/shaders)
   camOcclusion(on) { if (on !== undefined) cam.occlude = !!on; return cam.occlude; },   // A/B cần boom chống xuyên tường
@@ -1033,6 +1085,7 @@ function startGame() {
   started = true;
   cam.snap = true;
   _progressToast();
+  if (net) net.onStart();   // MP-2: READY + đặt ở điểm xuất hiện máy chủ + khung chat
   setTimeout(() => {
     const guide = npcs.find((n) => n.data.id === 'guide');
     if (guide) ui.startDialogue(guide);
@@ -1090,6 +1143,7 @@ animate();
 // dừng → nút mở khi người chơi quay lại tab (thế giới đã dựng xong, chỉ chờ vẽ).
 requestAnimationFrame(() => requestAnimationFrame(() => {
   boot.finish();
+  if (net) net.onBootReady();   // MP-2: chữ nút Bắt đầu → "Vào thành phố"
   const pb = document.getElementById('preloadBar');
   if (pb) pb.classList.remove('hidden');
 }));

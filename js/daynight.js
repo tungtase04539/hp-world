@@ -335,6 +335,7 @@ export function createDayNight(scene, world) {
   const tp = parseTimeParam();
   let dayT = tp.t != null ? tp.t : START_HOUR / 24;
   let frozen = tp.freeze;
+  let _sync = null;   // MP-2: {t, at, len} — đích ngày/đêm của máy chủ (syncTo)
   let _cloudT = 0;
   const CLOUD_STILL = typeof navigator !== 'undefined' && navigator.webdriver === true;
   let aerial = null, nearView = false;
@@ -462,6 +463,13 @@ export function createDayNight(scene, world) {
     sun, hemi, skyDome,
     get t() { return dayT; },
     set t(v) { dayT = ((v % 1) + 1) % 1; applySky(); updateFog(0); _envT = -1; },
+    // MP-2 C1: NGÀY/ĐÊM CHUNG — đích = giờ máy chủ (dayTAt(serverNow, dayEpoch, dayLength), net.js gọi ~1 Hz). update()
+    // nắn dayT về đích theo ĐỒNG HỒ THẬT (hằng thời gian ~2 s), lệch > 0,01 ngày (~14 s thật) thì nhảy hẳn + nướng lại IBL.
+    // KHÔNG gọi setter `t` mỗi khung (nó ép bake IBL). null = thôi đồng bộ (mất máy chủ: giờ tự trôi tiếp từ chỗ cũ).
+    syncTo(v, len = DAY_LENGTH) {
+      _sync = v == null || !Number.isFinite(v) ? null : { t: ((v % 1) + 1) % 1, at: performance.now(), len: len > 0 ? len : DAY_LENGTH };
+    },
+    get synced() { return !!_sync; },
     get hours() { return dayT * 24; },
     get frozen() { return frozen; },
     set frozen(v) { frozen = !!v; },
@@ -498,6 +506,12 @@ export function createDayNight(scene, world) {
     bakeEnv,
     update(dt, playerPos, camera) {
       if (!frozen) dayT = (dayT + dt / DAY_LENGTH) % 1;
+      if (_sync && !frozen) {
+        const tgt = _sync.t + (performance.now() - _sync.at) / 1000 / _sync.len;
+        let err = tgt - dayT; err -= Math.round(err);              // lệch vòng (−0,5; 0,5]
+        if (Math.abs(err) > 0.01) { dayT = ((tgt % 1) + 1) % 1; _envT = -1; }
+        else dayT = (((dayT + err * Math.min(1, dt * 0.5)) % 1) + 1) % 1;
+      }
       const night = applySky();
       const now = performance.now();
       // mây trôi theo đồng hồ GAME (đứng yên khi ?timefreeze / frozen, và khi trình duyệt tự động hoá — ảnh QA A/B
