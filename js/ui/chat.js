@@ -146,7 +146,7 @@ export function createChat({ ui, t, tf, releaseKeys, onSend, onReport, onBlock, 
     e.preventDefault();
     const txt = inp.value.trim();
     if (txt) { if (onSend(txt)) inp.value = ''; }
-    if (isTouch()) closeChat();   // điện thoại: gửi xong cất bàn phím
+    closeChat();                  // gửi xong đóng ô (như mọi game: T để nói tiếp); điện thoại: cất bàn phím
   });
   inp.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeChat(); }

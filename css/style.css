@@ -210,6 +210,10 @@ kbd { background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.35)
 @media (prefers-reduced-motion: reduce){#bootBar .bootShimmer{animation-duration:3s}}
 
 /* ---------- MP-2 C1: màn tiêu đề online, trạng thái mạng, chat (chỉ xuất hiện khi có máy chủ — js/net/net.js) ---------- */
+/* màn tiêu đề cao hơn khi có panel online: cuộn được, không cắt mất phần trên; màn thấp thì ẩn bảng phím */
+#titleScreen:has(#mpPanel) { align-items: flex-start; overflow-y: auto; }
+#titleScreen:has(#mpPanel) .title-inner { margin: auto; }
+@media (max-height: 780px) { #titleScreen:has(#mpPanel) .controls-hint { display: none; } #titleScreen:has(#mpPanel) p { margin-bottom: 12px; } }
 #mpPanel { margin: 0 auto 14px; width: min(380px, 86vw); display: grid; gap: 8px; }
 #mpPanel input { width: 100%; padding: 10px 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,.35);
   background: rgba(8,24,40,.55); color: #fff; font: inherit; font-size: 15px; outline: none; }

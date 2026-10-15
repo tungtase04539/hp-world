@@ -294,13 +294,22 @@ function build(deps) {
   }
   function retryJoin(ms) { clearTimeout(joinTimer); joinTimer = setTimeout(() => { joinTimer = 0; doJoin(); }, ms + Math.random() * 1000); }
 
-  // mất máy chủ → chế độ Khám phá (người khác biến mất, game chạy một mình), tự nối lại
+  // mất máy chủ → chế độ Khám phá (người khác biến mất, game chạy một mình), tự nối lại. Rớt NGẮN (RESUME < 3 s) chỉ đổi
+  // biểu tượng trạng thái: không báo, không xoá người khác (khung KEYFRAME sau resume tự khớp lại) → không nhấp nháy.
+  let exploreTimer = 0;
   function enterExplore() {
     if (conn === 'live' || conn === 'connecting' || conn === 'joining' || conn === 'off') conn = 'lost';
-    if (everLive && !lostShown) { lostShown = true; ui.toast(t('mpLost'), 5000); if (chat) chat.system(t('mpLost'), 'error'); }
-    clearRemotes();
     tel.offline(true);
     renderPill();
+    if (!everLive) { clearRemotes(); return; }
+    if (!exploreTimer && !lostShown) exploreTimer = setTimeout(() => {
+      exploreTimer = 0;
+      if (conn === 'live') return;
+      lostShown = true;
+      ui.toast(t('mpLost'), 5000); if (chat) chat.system(t('mpLost'), 'error');
+      clearRemotes();
+      renderPill();
+    }, 3000);
   }
   function clearRemotes() {
     if (ra) for (const id of visible) { try { ra.leave(id); } catch (e) { } }
@@ -370,7 +379,7 @@ function build(deps) {
     netId = m.netId;
     dayEpoch = m.dayEpoch; dayLength = m.dayLength || 1440;
     if (!Number.isFinite(clockOff) && Number.isFinite(m.serverTime)) clockOff = m.serverTime - (performance.timeOrigin + performance.now());
-    const wasLost = conn === 'lost' || lostShown;
+    const wasLost = conn === 'lost' || lostShown;   // (thông báo "đã nối lại" chỉ khi đã báo mất)
     conn = 'live';
     joinBackoff = 2000;
     tel.offline(false);
@@ -380,7 +389,8 @@ function build(deps) {
       pendingSpawn = { x: m.spawn.x, z: m.spawn.z, yaw: m.spawn.yaw, rejoin: everLive };
       applySpawn();
     }
-    if (wasLost && everLive) { ui.toast(t('mpBack'), 3000); if (chat) chat.system(t('mpBack')); }
+    clearTimeout(exploreTimer); exploreTimer = 0;
+    if (wasLost && everLive && lostShown) { ui.toast(t('mpBack'), 3000); if (chat) chat.system(t('mpBack')); }
     else if (!everLive && started) ui.toast(t('mpJoined'), 3000);
     everLive = true; lostShown = false;
     syncDay(true);
@@ -584,8 +594,8 @@ function build(deps) {
       },
     });
     deps.input.onChatKey(() => {
-      if (mode !== 'online' || !started || !chat) return false;
-      if (ui.isAnyModalOpen && ui.isAnyModalOpen()) return false;
+      // mở được cả khi đang có hội thoại NPC/bảng thông tin (chat không khoá điều khiển); không mở chồng lên menu chat
+      if (mode !== 'online' || !started || !chat || chat.menuOpen) return false;
       return chat.open();
     });
   }
