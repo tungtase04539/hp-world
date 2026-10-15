@@ -138,15 +138,16 @@ const st = (pg) => pg.evaluate(() => window.__hp.net && window.__hp.net.status()
 const shot = async (pg, name, clip) => { const f = path.join(OUT, name); await pg.screenshot({ path: f, clip }); report.shots = report.shots || []; report.shots.push(f); return f; };
 
 // camera nhìn QUA người chơi về phía điểm (bx, bz) — KHÔNG dời người chơi (teleport tại chỗ chỉ đặt cam.yaw/pitch/dist)
-async function lookToward(pg, bx, bz, dist, pitch, hideSelf = true) {
-  return pg.evaluate(([bx, bz, dist, pitch, hide]) => {
+// occl: giữ cần boom chống xuyên tường (camera không lọt ra sau nhà — dùng cho ảnh/đo đám đông ở xa); false = đúng khoảng cách
+async function lookToward(pg, bx, bz, dist, pitch, hideSelf = true, occl = false) {
+  return pg.evaluate(([bx, bz, dist, pitch, hide, occl]) => {
     const h = window.__hp, p = h.pState.pos;
     const yaw = Math.atan2(p.x - bx, p.z - bz);
-    if (h.camOcclusion) h.camOcclusion(false);   // góc QA giữ đúng khoảng cách (cần boom chống xuyên tường tắt — như shoot.mjs)
+    if (h.camOcclusion) h.camOcclusion(!!occl);
     h.teleport(p.x, p.z, yaw, pitch, dist);
     h.player.group.visible = !hide;
     return { x: p.x, z: p.z, yaw };
-  }, [bx, bz, dist, pitch, hideSelf]);
+  }, [bx, bz, dist, pitch, hideSelf, occl]);
 }
 const showSelf = (pg) => pg.evaluate(() => { window.__hp.player.group.visible = true; });
 
@@ -325,17 +326,17 @@ async function main() {
     // camera trên cao nhìn cả đám đông (đứng phía đối diện tâm đám đông)
     const pPos = await pg.evaluate(() => ({ x: window.__hp.pState.pos.x, z: window.__hp.pState.pos.z }));
     const awayX = crowd ? 2 * pPos.x - crowd.x : pPos.x, awayZ = crowd ? 2 * pPos.z - crowd.z : pPos.z + 1;
-    await lookToward(pg, crowd ? crowd.x : pPos.x, crowd ? crowd.z : pPos.z - 1, 30, 0.42, false);
+    await lookToward(pg, crowd ? crowd.x : pPos.x, crowd ? crowd.z : pPos.z - 1, 30, 0.42, false, true);
     await sleep(2500);
     await shot(pg, '05_crowd.png');
     const s5 = await pg.evaluate(() => window.__hp.net.status().ra);
-    await lookToward(pg, crowd ? crowd.x : pPos.x, crowd ? crowd.z : pPos.z - 1, 70, 0.85, false);
+    await lookToward(pg, crowd ? crowd.x : pPos.x, crowd ? crowd.z : pPos.z - 1, 70, 0.85, false, true);
     await sleep(2500);
     await shot(pg, '05_crowd_high.png');
     const perfCam = { crowd, awayX, awayZ };
     report.crowdStats = s5;
     // A/B cùng khung: bật ↔ tắt mô-đun (TIER 3)
-    await lookToward(pg, crowd ? crowd.x : pPos.x, crowd ? crowd.z : pPos.z - 1, 30, 0.42, false);
+    await lookToward(pg, crowd ? crowd.x : pPos.x, crowd ? crowd.z : pPos.z - 1, 30, 0.42, false, true);
     await sleep(1500);
     const ab3 = await abToggle(pg, DOCKER ? 1 : 3, 4000);
     report.perfTier3 = ab3;
@@ -555,7 +556,7 @@ async function main() {
           for (const q of ps) if (Math.hypot(q.x - p.x, q.z - p.z) < 40) { cx += q.x; cz += q.z; n++; }
           return n ? { x: cx / n, z: cz / n, n } : { x: p.x, z: p.z - 1, n: 0 };
         });
-        await lookToward(p2, c2.x, c2.z, 30, 0.42, false);
+        await lookToward(p2, c2.x, c2.z, 30, 0.42, false, true);
         await sleep(2000);
         await shot(p2, '16_lite_crowd.png');
         const ab1 = await abToggle(p2, 3, 4000);
@@ -563,7 +564,7 @@ async function main() {
         const S1 = ab1.summary;
         step('TIER 1 (lite): trần 40 người được vẽ, draw call mô-đun ≤ 6', g2.tier <= 1 && S1.ra && S1.ra.cap === 40 && S1.ra.drawn <= 40 && S1.ra.drawn >= Math.min(40, (many.v && many.v.count) || 0) - 2 && S1.mpCallsPerFrame <= 6,
           { tier: g2.tier, ra: S1.ra, mpCallsPerFrame: S1.mpCallsPerFrame, mpByMesh: S1.mpByMesh, fps: S1.fps, calls: S1.callsMedian });
-        await lookToward(p2, c2.x, c2.z, 70, 0.85, false);
+        await lookToward(p2, c2.x, c2.z, 70, 0.85, false, true);
         await sleep(2000);
         await shot(p2, '16_lite_crowd_high.png');
         report.errorsBrowser2 = g2.errors.slice();

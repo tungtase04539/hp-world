@@ -58,7 +58,7 @@ Trò chơi: thế giới 3D Hải Phòng **tỉ lệ 1:1 mét thật** (từ 202
 | `js/xsection.js` | MẶT CẮT PHỐ — nguồn duy nhất cho lòng/bó vỉa/vỉa hè/hố cây/xe đỗ/mặt tiền. Từ Đợt 3 W3-A mọi hàm nhận CẤP hoặc WAY `{c, w?, sw?}` (`roadHW/roadW/sidewalkW/curbLine/facadeLine/treePitLine/parkingLine/furnitureLine`) — truyền WAY để dùng bề rộng thật từng phố (`ROADS_DT[i].w/.sw`, SINH bởi `tools/street_fit.mjs` qua process_osm) |
 | `js/anchorwalls.js` | TƯỜNG RÀO MỎ NEO Hải quân (Đợt 3 W3-A): `CB_WALLS` (polyline LTT/ĐBP/THĐ) + `cbFitFence` (đẩy đỉnh ra sau `facadeLine(way)` + 0,35) + `cbWallSegments` — NGUỒN DUY NHẤT cho world.js `cbWallRun` VÀ `tools/process_buildings.mjs` §9c2 (cắt nhà nhô trước tường, cờ `cbIn` khuôn viên). Không import three. Sửa `CB_WALLS` → chạy lại process_buildings |
 | `js/traffic.js` / `js/vehicles.js` / `js/npc.js` / `js/quests.js`... | Giao thông, xe cưỡi được, NPC, nhiệm vụ |
-| `js/net/` (MP-2) | Multiplayer phía game — CHỈ nạp khi có máy chủ (`?server=` / `hp3d.server` / `DEFAULT_SERVER`): `config.js` địa chỉ, `net_worker.js` WebSocket trong Web Worker, `session.js` tài khoản/vé, `correct.js` CORRECT, `telemetry.js` số liệu cục bộ, `net.js` điều phối, `remote_avatars*.js` người chơi khác (C2). Xem §8c, SERVER.md §9 |
+| `js/net/` (MP-2) | Multiplayer phía game — CHỈ nạp khi có máy chủ (`?server=` / `hp3d.server` / `DEFAULT_SERVER`): `config.js` địa chỉ, `net_worker.js` WebSocket trong Web Worker, `session.js` tài khoản/vé, `correct.js` CORRECT, `telemetry.js` số liệu cục bộ, `net.js` điều phối, `remote_avatars.js` + `interp.js` + `nametags.js` người chơi khác (C2). Xem §8c, SERVER.md §9 |
 | `js/ui/chat.js` (MP-2) | Khung chat 40 m + menu Báo cáo/Chặn + đường dây hỗ trợ |
 | `tools/` | Pipeline dữ liệu + test tự động (xem mục 7, 8) |
 
@@ -491,8 +491,18 @@ chủ dự án: `docs/multiplayer/VAN_HANH.md`. Đặc tả giao việc: `docs/m
   HUD, tự nối lại (RESUME ≤ 60 s, sau đó vé mới). Kiểm đầu-cuối: `tools/qa/mp2_c1_e2e.mjs` (máy chủ thật chế độ test + bot S4
   trong tiến trình + 1 Chrome dưới khoá GPU). Bẫy: hội thoại hướng dẫn viên mở 0,7 s SAU khi vào — harness phải chờ nó hiện
   rồi mới Esc; biệt danh tối đa 16 ký tự ("Trần Thị Ngọc Ánh" = 17 → `nickname_invalid/length`).
-- **Chưa làm (GĐ1 phía client):** hiện người chơi khác trong game, ô nhập biệt danh/mã mời, khung chat. Các điểm nối:
-  `docs/multiplayer/codebase_hooks.md` §9.
+- **Đã tích hợp (MP-2, 15/10/2026 — SERVER.md §9.6):** C1 + C2 gộp, `net.js` dùng `remote_avatars.js` thật. Kiểm đầu-cuối 1 lệnh:
+  `tools/qa/mp2_int_e2e.mjs --port <tĩnh> --game <cổng>` (máy chủ native `HPMP_TEST=1` tự bật/tắt/khởi động lại, 96 bot S4 trong
+  tiến trình dồn quanh trình duyệt, 1 Chrome dưới khoá GPU, 24 bước gồm A/B bật↔tắt mô-đun ở TIER 3 và TIER 1); `--docker` chạy bản
+  rút gọn qua `mo-may-chu.ps1 -TestMode`; `--perfonly` chỉ đo. A/B một mình với base: `tools/qa/mp2_int_ab.mjs` (xen kẽ thứ tự,
+  `shoot.mjs --perf`, fps không kẹp). `launch.mjs openGame({chromeArgs})` nhận cờ Chrome thêm (vd. `--disable-gpu-vsync
+  --disable-frame-rate-limit` — headless kẹp 60 fps thì "fps không đổi" không đo được gì).
+  BẪY: (1) atlas canvas tải lại CẢ texture (4 MB + mipmap) = 1 khung dài mỗi lần — đếm khung > 1,8× trung vị khớp đúng số lần
+  tải; chép ô mới bằng `renderer.copyTextureToTexture` trong `mesh.onBeforeRender` (renderer có sẵn ở đó, không cần đổi API);
+  `CanvasTexture` flipY ⇒ dải canvas [y0, y0+h) đặt ở yoffset `AH − (y0 + h)`. (2) Ảnh/đo đám đông ở xa phải GIỮ cần boom chống
+  xuyên tường (`__hp.camOcclusion(true)`) — tắt đi thì camera 30 m lọt ra sau nhà, phép đo "96 người trong khung" thành đo mái nhà.
+  (3) Bot di chuyển: muốn ảnh cận cảnh thì bảo bot đứng (`bot.plaza.pauseUntil`, xe máy: `bot.idleUntil`) rồi ngắm lại theo vị
+  trí đang vẽ. (4) Chi phí thật ở TIER 3: ~15 µs/người được vẽ (96 người +1,45 ms/khung không kẹp; 60 Hz vẫn 60 fps).
 - **Người chơi khác trong game (MP-2 C2, `js/net/remote_avatars.js` + `interp.js` + `nametags.js`):** API và số đo ở
   `docs/multiplayer/SERVER.md` §9. Luật đã kiểm: **≤ 5 draw call cố định** cho mọi N (người · xe máy gần · xe máy xa · bóng
   tiếp đất · vòng sáng + bảng tên), **0 chương trình shader mới** (vật liệu `kitMaterial` cùng tham số với traffic.js → cùng đối
@@ -517,6 +527,19 @@ chủ dự án: `docs/multiplayer/VAN_HANH.md`. Đặc tả giao việc: `docs/m
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-10-15 (MP-2 TÍCH HỢP — "thấy nhau" GĐ1 phía game hoàn chỉnh):** gộp `--no-ff` C1 (mạng/phiên/giao diện) rồi C2 (hình người
+    chơi khác); `net.js` dùng `remote_avatars.js` thật, bỏ `remote_avatars_stub.js`; ENTER truyền dấu thời gian snapshot ở tham số 4;
+    `positions()`/`__hp.net.avatars()` cho QA; byte 7 ngoại hình = 0. Sửa: bảng tên chép từng dải hàng lên GPU thay vì tải lại cả
+    atlas 4 MB (hết giật định kỳ: khung dài = số lần tải → 0 lần tải cả atlas, khung trung bình +0,46 → +0,14 ms); ẩn bảng tên người
+    < 2,5 m từ camera. `tools/qa/mp2_int_e2e.mjs` (máy chủ native test 9230/9231, 96 bot S4, 1 Chrome khoá GPU, Radeon 890M):
+    **24/24 ĐẠT ×3 lượt** — người khác vẽ bằng mô-đun thật (96 vẽ, vòng sáng + 24 bảng tên có dấu, draw call mô-đun 3–4, tổng +4,
+    0 chương trình shader mới), người lái xe máy, chat 2 chiều (84–96/96 bot nhận), lọc số điện thoại, báo cáo/chặn, bot gian lận
+    bị kéo về (trình duyệt thấy lệch ≤ 7 m), teleport → CORRECT, RESUME 96→96, ngày/đêm lệch 0,01 phút, tắt máy chủ → Khám phá →
+    tự vào lại 7–8 s, TIER 1 trần 40. Hiệu năng (bật↔tắt mô-đun, fps không kẹp): TIER 3 96 người +1,45 ms/khung (110 → 95 fps; 60 Hz
+    vẫn 60), TIER 1 40 người +0,58 ms. Docker `mo-may-chu.ps1 -TestMode` (hpmp-int2) + trình duyệt qua portal: 11/11. Một mình A/B
+    với dot3 (5 lượt xen kẽ): startReady chênh trung vị −4 ms, draw call 374 = 374, 0 lỗi; diag full + lite, mobile, waterbfs, tour
+    (26 ảnh, giống hệt base), check_assets, mp2_nonet full + lite, mp2_c1_solo, mp2_c1_unit 237/237, test node 18/18 đều đạt.
+    Ảnh/số: `C:/Users/Admin/hp-world-work/mp2/int/`. Xem §8c, SERVER.md §9.6.
 - **2026-10-15 (MP-2 C1 — MẠNG + PHIÊN + GIAO DIỆN phía game, GĐ1 "thấy nhau"):** `js/net/{config,net_worker,session,correct,
     telemetry,net,remote_avatars_stub}.js`, `js/ui/chat.js`; điểm nối main.js (import động khi có máy chủ, attach, preFrame/frame,
     mount/dismount, onStart, onBootReady, `__hp.net`), input.js (`onChatKey` T và /, `releaseKeys`), ui.js (`registerModal`),

@@ -1353,3 +1353,80 @@ theo SPEC rồi đuổi kịp trong ~0,2 s), bước khung lớn nhất 0,94 m, 
 ở chỗ người kia đã đi tới: dự đoán theo vận tốc khớp → không nhảy. Mặt cầu Lạc Long: người/xe trên cầu y 4,22 (mặt cầu 4,11 +
 mặt nhựa), dưới gầm/ngoài cầu theo mặt đất. Dấu tiếng Việt khó ("Nguyễn Thị Hường", "Đặng Quốc Việt", "Trần Ngọc Ẩn", "Lê Thị Ứng")
 không vỡ: `atlas.png`, `tags_zoom2.png`.
+
+### 9.6 Tích hợp C1 + C2 (integrator MP-2, 15/10/2026) — số đo đầu-cuối với hình người chơi khác THẬT
+
+**Gộp:** `--no-ff` C1 rồi C2 vào `dot3`; `net.js` import `./remote_avatars.js` (bỏ `remote_avatars_stub.js`). Khác biệt API đã khớp:
+- `ra.enter(netId, abs, appearance, serverMs)` — C2 lấy dấu thời gian snapshot ở **tham số thứ 4** (C1 để trong `abs.serverMs` → ENTER
+  đầu tiên bị đóng dấu bằng snapshot TRƯỚC). `net.js` truyền `sMs` (mốc tick của worker: min(giờ đến − tick·50 ms) trên 64 snapshot,
+  tương đương `createSnapClock`, nên không dùng thêm `createSnapClock`).
+- `ra.positions()` (C1 QA `__hp.net.players()`) thêm vào remote_avatars: vị trí ĐANG VẼ + tên + `drawn`. `__hp.net.avatars()` trả mô-đun
+  (QA: `debug`, `stats`, `setEnabled`, `tags.canvas`).
+- ENTER lại cùng netId (keyframe sau RESUME): C2 GIỮ quỹ đạo (nhảy khi lệch > 8 m) — tốt hơn "đặt lại" của bản tạm; e2e: RESUME
+  96 → 96 người, không nhấp nháy.
+- Ngoại hình `/v1/auth/guest`: `session.js` vẫn 8 byte ngẫu nhiên nhưng byte 7 = 0 (phiên bản của `decodeAppearance`).
+- `ra.frame()` gọi SAU `updateCamera` (C1) thay vì trước `traffic.update` (gợi ý của C2) — chọn LOD/bảng tên theo camera của chính
+  khung đó; đo không thấy lỗi.
+
+**Sửa khi tích hợp (đo trước/sau):**
+1. **Bảng tên tải lên GPU theo DẢI HÀNG** (`nametags.js`): bản C2 tải lại cả atlas 1024² (4 MB + mipmap) ≤ 10 lần/s khi có ô mới. Với
+   96 người trong 25 m, ô LRU thay liên tục → ~3 lần tải/s. Đo trên TIER 3 (bật ↔ tắt mô-đun, cùng khung, 3 lượt × 4 s): số khung
+   > 1,8× trung vị = **đúng bằng số lần tải** (13/13, 13/12, 11/11; tắt mô-đun: 0) → giật định kỳ; khung trung bình +0,46 ms. Nay ô mới
+   chép bằng `renderer.copyTextureToTexture` (texSubImage2D dải hàng chứa các ô mới, ≤ 64 KB/ô, 1 lần mipmap) trong
+   `mesh.onBeforeRender` (có renderer, không đổi API); mesh không được vẽ > 3 khung (vd. test node) → quay về tải cả atlas. Sau sửa:
+   0 lần tải cả atlas, ~5 lần chép dải/s, 0 lỗi, khung trung bình +0,12–0,15 ms ở cùng phép đo.
+2. **Không vẽ bảng tên người < 2,5 m từ camera** (`remote_avatars.js` `TAG_NEAR2`): đám đông sát camera làm bảng tên phóng to che nửa
+   màn hình (ảnh `e2e/06_tags_close_viet.png` lần 1).
+
+**Đầu-cuối** — `tools/qa/mp2_int_e2e.mjs` (máy chủ native `HPMP_TEST=1` cổng 9230/9231, PGlite riêng, **96 bot S4** trong tiến trình —
+cùng lớp `Bot` với `server/bots/run.mjs` — dồn quanh điểm xuất hiện của trình duyệt, biệt danh có dấu; 1 Chrome dưới khoá GPU, fps
+không kẹp vsync; Radeon 890M ANGLE d3d11, TIER 3 rồi trình duyệt 2 TIER 1): **24/24 bước ĐẠT ở cả 3 lượt chạy** (lượt cuối sau mọi sửa:
+`C:/Users/Admin/hp-world-work/mp2/int/e2e_final3/`). Số liệu lượt cuối:
+
+| Bước | Kết quả |
+|---|---|
+| Vào thành phố (WELCOME + READY) | 1,7 s sau bấm; 82/96 bot trong 60 m sau 141 s (bot chạy xe máy từ 8 điểm xuất hiện) |
+| Người lái xe máy | ảnh `04_rider_*.png` (bot được bảo dừng xe để chụp cận cảnh), mode MOTO, mô hình xe + người lái |
+| Vẽ bằng mô-đun thật | 96 người: 96 vẽ, 84 vòng sáng, 24 bảng tên; **draw call mô-đun 3–4** (người · bóng · bảng tên [+ xe máy xa]), tổng +4; **0 chương trình shader mới** (danh sách chương trình trước khi có người khác = sau) |
+| Bảng tên tiếng Việt | "Nguyễn Thị Hường", "Đặng Quốc Việt"… đúng dấu: `06_tag_atlas.png` (atlas gốc), `06_tags_close_*.png`, `12_vn_diacritics_chat_zoom.png` |
+| Chat 2 chiều | bot → khung chat (tên + tin có dấu + emoji); trình duyệt → 84–96 bot trong 40 m nhận nguyên văn; tin có số điện thoại bị chặn (câu tiếng Việt, 0 lọt) |
+| Báo cáo / chặn | "Đã gửi báo cáo"; sau chặn tin của người đó không tới (hình người đó VẪN hiện — xem việc mở) |
+| Bot gian lận tốc độ (nhảy 155 m trong 1 STATE) | máy chủ CORRECT bot; trình duyệt thấy bot lệch tối đa 1,6–7,1 m (không nhảy theo) |
+| `__hp.teleport` 325 m | CORRECT lý do 5 (teleport), về đúng chỗ sau 0,3–0,6 s |
+| Rớt socket | RESUME cùng netId sau 1,1–1,9 s, 96 → 96 người (không nhấp nháy) |
+| Ngày/đêm | lệch máy chủ 0,01–0,02 phút game; trình duyệt 2 (TIER 1, lấy lại tài khoản bằng mã khôi phục) lệch 0,01 |
+| Tắt máy chủ | "Khám phá · Đang nối lại…" + người khác biến mất sau 3,0 s; vẫn đi được; bật lại → tự vào lại 7,1–8,0 s sau khi máy chủ lên |
+| Lỗi JS | 0 (1 dòng console `403` của bước mã mời sai — Chrome tự in cho fetch không 2xx) |
+
+**Hiệu năng trực tuyến** (cùng khung nhìn đám đông, bật ↔ tắt mô-đun `setEnabled`, 3 lượt × 4 s xen kẽ, fps KHÔNG kẹp vsync):
+
+| | TIER 3 (96 người trong khung) | TIER 1 lite (96 gửi tới → vẽ 40) |
+|---|---|---|
+| Draw call tổng (trung vị) | 412 → 416 (**+4**; mô-đun đếm theo mesh 3–4) | 526 → 528 (+2; mô-đun 3) |
+| Tam giác | +89 k | +41 k |
+| Khung trung bình / p50 / p95 | 9,07 → 10,52 ms (+1,45) / 8,4 → 9,6 / 16,0 → 16,9 | 5,60 → 6,18 ms (+0,58) / 4,9 → 5,4 / 8,9 → 9,4 |
+| fps không kẹp | 110 → 95 | 179 → 162 |
+| CPU `ra.frame()` | 0,31 ms | 0,20 ms |
+| Ở 60 Hz vsync (chơi thật) | khung 10,5 ms < 16,7 ms → **60 fps không đổi** | 60 fps không đổi |
+
+Chi phí ~15 µs/người được vẽ ở TIER 3 (thân người PBR + vòng sáng + bảng tên trong suốt). Khi đám đông khuất sau nhà (lượt 2), +0,14 ms.
+
+**Docker (đường chạy thật, chế độ thử):** `HPMP_PROJECT=hpmp-int2 HPMP_GAME_PORT=9230 HPMP_ADMIN_PORT=9231 server/ops/mo-may-chu.ps1
+-TestMode -KhongTunnel -KhongSaoLuu -KhongMoTrang`: dựng ảnh + Postgres + portal, mở sau 25 s, KHÔNG ghi `hpworld_server_live.txt`.
+Trình duyệt vào qua portal (`ws://127.0.0.1:9230`): `mp2_int_e2e.mjs --docker --bots 16` **11/11 ĐẠT** (tài khoản "Đặng Quốc Việt",
+thấy 11 bot, người lái xe máy, bảng tên, chat 2 chiều, bot gian lận bị kéo về, teleport → CORRECT), RTT p50 2,9 / p95 3,9 ms, 0 lỗi JS.
+`tat-may-chu.ps1 -TestMode` tắt sạch (không còn cổng 9230/9231); đã xoá volume/ảnh thử `hpmp-int2`.
+
+**Chế độ một mình — A/B cùng phiên với dot3** (`tools/qa/mp2_int_ab.mjs`: base `dot3` ở cổng 8814 — `git archive` + hard-link GLB, 0
+dòng 404 — với bản tích hợp ở 8813; `shoot.mjs --perf` 24 góc `views_std`, giao thông bật, fps không kẹp; 5 lượt xen kẽ thứ tự):
+startReady trung vị 7.255 → 7.273 ms (cặp từng lượt: +46, −10, +294, −73, −4 → **trung vị −4 ms**), hpReady 5.644 → 5.668 ms;
+draw call trung vị 24 góc 374 → 374, tam giác 3,49 M → 3,49 M; fps trung vị 24 góc 149 → 143 (lượt 1–3) / 149 → 153 (lượt 4–5)
+= nhiễu; 0 lỗi JS. `mp2_nonet` full + lite: 0 WebSocket, 0 request API.
+
+**Việc còn mở (sau tích hợp):**
+- Chặn chỉ ẩn CHAT; hình + bảng tên người bị chặn vẫn hiện (máy chủ vẫn gửi trong snapshot). Nên ẩn phía client (`ra.hide(netId)`)
+  hoặc máy chủ lọc — quyết định sản phẩm (chống bám theo quấy rối).
+- Đám đông dày (96 người trong bán kính 13 m) → bảng tên chồng nhau trên màn hình; cần gom/xếp theo màn hình (GĐ sau).
+- Bot S4 nhận 11–13 CORRECT lý do 1 (SPEED) mỗi lượt khi chạy xe máy tới (C1 đã báo) — phía bot/move.js, trình duyệt không bị
+  (trình duyệt chỉ nhận đúng 1 CORRECT: lý do 5 TELEPORT của bước cố ý).
+- Chưa đo trên điện thoại thật / qua tunnel `wss://` thật.
