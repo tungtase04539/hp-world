@@ -28,6 +28,7 @@ import { surfaceY as worldSurfaceY } from '../world.js';
 import { pedestrianGeometry, motorbikeGeometry, motorbikeFarGeometry, kitMaterial, kitShadowMaterial, shared,
   contactShadowGeometry, OPT, optWord, BIKE_PAINT, SHIRT, JACKET } from '../models_kit.js';
 import { MODE, SFLAG } from '../shared/constants.js';
+import { ROAD_TOP, SIDEWALK_TOP } from '../xsection.js';
 import { Track } from './interp.js';
 import { createNameTags, cleanName } from './nametags.js';
 
@@ -73,6 +74,9 @@ const DRAW_R = 200;                 // bán kính vẽ quanh camera (AOI máy ch
 const BIKE_NEAR = DEVICE_TIER >= 3 ? 50 : DEVICE_TIER === 2 ? 42 : 32, LOD_HYST = 5;   // = traffic.js NEAR_BIKE
 const SEAT_HIP = 0.9 - 0.53;        // hông người kit khi NGỒI (SK.hipY 0,9 − hạ 0,53 trong kitPose)
 const LOCAL_HIP = 0.86;             // main.js updateMounted: pState.pos.y = hông − 0,86
+// surfaceY = NỀN (không gồm lớp mặt nhựa/vỉa hè của xsection): xe/người đặt trên mặt nhựa (+ROAD_TOP, như traffic.js);
+// vòng sáng người đi bộ trên mặt VỈA HÈ + 2 cm (không bị vỉa hè che — trên lòng đường thì nổi 16 cm, chấp nhận được)
+const RING_DY = SIDEWALK_TOP + 0.02;
 
 export function createRemoteAvatars({ scene, world = null, camera, tier = DEVICE_TIER, surfaceY = null } = {}) {
   const sY = surfaceY || (world && world.surfaceY) || worldSurfaceY;
@@ -138,7 +142,7 @@ export function createRemoteAvatars({ scene, world = null, camera, tier = DEVICE
   const names = new Map();       // netId → {name, badge}
   const friends = new Set();
   let selfId = -1, lastSnapMs = NaN, lastNow = NaN, enabled = true, markerAll = false;
-  let selAt = -1e9, frameMs = 0, frameMsEma = 0;
+  let selAt = -1e9, selFrames = 0, frameMs = 0, frameMsEma = 0;
   const list = [];               // mảng avatar (duyệt nhanh)
   const drawnList = [];
   const out = {};
@@ -286,8 +290,8 @@ export function createRemoteAvatars({ scene, world = null, camera, tier = DEVICE
       }
       st.extrap = nEx;
       // 2) chọn ai được vẽ: trần theo TIER, gần camera nhất (đang vẽ được ưu tiên 0,8 — không đổi qua lại), 10 Hz
-      if (t0 - selAt > 100 || list.length <= CAP) {
-        selAt = t0;
+      if (t0 - selAt > 100 || ++selFrames >= 6 || list.length <= CAP) {   // ~10 Hz (thời gian thật HOẶC 6 khung)
+        selAt = t0; selFrames = 0;
         const R2 = DRAW_R * DRAW_R;
         if (list.length <= CAP) for (const a of list) a.sel = a.d2 <= R2;
         else {
@@ -323,7 +327,7 @@ export function createRemoteAvatars({ scene, world = null, camera, tier = DEVICE
           a.yDraw = a.riding.yDraw ?? a.gy; a.headY = a.gy + 1.75;
           continue;
         }
-        let g, opt, sx = 1, py = a.gy, sh2 = a.shirt, walk = false;
+        let g, opt, sx = 1, py = a.gy + ROAD_TOP, sh2 = a.shirt, walk = false;
         const m = a.mode;
         if (m === MODE.MOTO || m === MODE.CYCLO) {
           const lim = BIKE_NEAR - (a.far ? LOD_HYST : 0);
@@ -337,9 +341,9 @@ export function createRemoteAvatars({ scene, world = null, camera, tier = DEVICE
           g = gPed; sx = a.app.scale;
           const sit = m === MODE.SIT || m === MODE.BOAT || m === MODE.PILLION;
           opt = sit ? a.optSit : a.optPed;
-          if (m === MODE.AIR) py = Math.max(a.gy, a.yRec);
+          if (m === MODE.AIR) py = Math.max(a.gy + ROAD_TOP, a.yRec);
           else if (m === MODE.BOAT || m === MODE.PILLION) py = a.yRec + LOCAL_HIP - SEAT_HIP;   // hông lên ghế (thuyền: mặt nước + ghế)
-          else if (m === MODE.SIT) py = a.gy;
+          else if (m === MODE.SIT) py = a.gy + ROAD_TOP;
           walk = !sit;
           a.headY = py + (sit ? 1.25 : 1.72) * sx;
         }
@@ -370,7 +374,7 @@ export function createRemoteAvatars({ scene, world = null, camera, tier = DEVICE
           sa[q] = ch * rx; sa[q + 1] = 0; sa[q + 2] = -shh * rx; sa[q + 3] = 0;
           sa[q + 4] = 0; sa[q + 5] = 1; sa[q + 6] = 0; sa[q + 7] = 0;
           sa[q + 8] = shh * rz; sa[q + 9] = 0; sa[q + 10] = ch * rz; sa[q + 11] = 0;
-          sa[q + 12] = a.x; sa[q + 13] = a.gy; sa[q + 14] = a.z; sa[q + 15] = 1;
+          sa[q + 12] = a.x; sa[q + 13] = a.gy + (g === gPed ? RING_DY - 0.02 : ROAD_TOP); sa[q + 14] = a.z; sa[q + 15] = 1;
           sa[q + 16] = shp[2] * (m === MODE.AIR ? 0.6 : 1);
           ns++;
         }
@@ -380,7 +384,7 @@ export function createRemoteAvatars({ scene, world = null, camera, tier = DEVICE
       for (const a of drawnList) {
         if (a.d2 > RING_R * RING_R || a.riding) continue;
         const away = !!(a.flags & SFLAG.AWAY), bike = a.mode === MODE.MOTO || a.mode === MODE.CYCLO;
-        tags.ring(a.x, a.gy + 0.045, a.z, a.yaw, bike ? 1.25 : 0.95 * a.app.scale, bike ? 2.35 : 0.95 * a.app.scale, away);
+        tags.ring(a.x, a.gy + (bike ? ROAD_TOP + 0.03 : RING_DY), a.z, a.yaw, bike ? 1.25 : 0.95 * a.app.scale, bike ? 2.35 : 0.95 * a.app.scale, away);
         if (a.d2 <= TAG_R * TAG_R && names.has(a.netId)) nTagCand++;
       }
       st.tags = 0;
@@ -420,6 +424,7 @@ export function createRemoteAvatars({ scene, world = null, camera, tier = DEVICE
       st.count = list.length; st.drawn = drawnList.length; st.drawCalls = calls;
       st.peds = gPed.n; st.bikes = gBike.n; st.bikesFar = gBikeFar.n; st.rings = tags.stats().rings;
     } catch (e) {
+      st.errors = (st.errors || 0) + 1; st.lastError = String(e && e.message || e).slice(0, 200);
       if (!frame._warned) { frame._warned = true; console.warn('[remote_avatars] frame lỗi (bỏ qua):', e); }
     } finally {
       frameMs = performance.now() - t0;

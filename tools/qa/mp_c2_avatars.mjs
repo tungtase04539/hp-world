@@ -41,7 +41,8 @@ async function runFull() {
     await g.pg.evaluate(() => import('/tools/qa/mp_c2_page.js'));
     // A/B CÙNG PHIÊN: (1) chưa có module, (2) module + 0 người, (3) 96 người ở quảng trường
     R.base = await g.pg.evaluate(() => window.__c2.measure(5000));
-    await g.pg.evaluate(() => window.__c2.makeRA());
+    R.programsBase = await g.pg.evaluate(() => window.__c2.programs());
+    await g.pg.evaluate(() => { window.__c2.makeRA(); return 1; });
     await wait(500);
     R.module0 = await g.pg.evaluate(() => window.__c2.measure(5000));
     R.crowd = await g.pg.evaluate(([x, z]) => window.__c2.SC.crowd(x, z, 96), SQ);
@@ -79,7 +80,9 @@ async function runFull() {
     R.tags = await g.pg.evaluate(([x, z]) => window.__c2.SC.tags(x, z), [TX, TZ]);
     await view(g, TX, TZ + 3, 0, 0.12, 4.2, 3500);
     await shot(g, 'tags_close.png');
-    await shot(g, 'tags_zoom.png', { x: 340, y: 120, width: 600, height: 300 });
+    await shot(g, 'tags_zoom.png', { x: 300, y: 200, width: 680, height: 200 });
+    await view(g, TX, TZ + 1.5, 0, 0.02, 2.2, 2500);
+    await shot(g, 'tags_zoom2.png', { x: 200, y: 120, width: 880, height: 300 });
     await view(g, TX, TZ + 3, 0.15, 0.2, 14, 3000);
     await shot(g, 'tags_fade.png');
     const png = await g.pg.evaluate(() => window.__c2.atlasPNG());
@@ -130,7 +133,7 @@ async function runLite() {
     await view(g, SQ[0] + 2, SQ[1] + 6, 0, 0.32, 26, 4000);
     await g.pg.evaluate(() => import('/tools/qa/mp_c2_page.js'));
     R.base = await g.pg.evaluate(() => window.__c2.measure(5000));
-    await g.pg.evaluate(() => window.__c2.makeRA());
+    await g.pg.evaluate(() => { window.__c2.makeRA(); return 1; });
     R.module0 = await g.pg.evaluate(() => window.__c2.measure(5000));
     R.crowd = await g.pg.evaluate(([x, z]) => window.__c2.SC.crowd(x, z, 96), SQ);
     await wait(6000);
@@ -138,7 +141,7 @@ async function runLite() {
     await shot(g, 'lite_crowd96_cap40.png');
     await view(g, SQ[0] + 2, SQ[1] + 6, 0.6, 0.85, 70, 2500);
     await shot(g, 'lite_crowd96_cap40_high.png');
-    R.crowdStats = await g.pg.evaluate(() => window.__c2.stats());
+    R.crowdStats = await g.pg.evaluate(() => ({ s: window.__c2.stats(), d: [100, 101, 102, 103, 150].map((i) => window.__c2.debug(i)), cam: window.__hp.camera.position.toArray(), n: window.__c2.players.size, ev: window.__c2.evLog }));
     const TX = SQ[0] + 10, TZ = SQ[1] + 30;
     R.tags = await g.pg.evaluate(([x, z]) => window.__c2.SC.tags(x, z), [TX, TZ]);
     await view(g, TX, TZ + 3, 0, 0.12, 4.2, 3500);

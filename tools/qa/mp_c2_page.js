@@ -18,7 +18,7 @@ const R = hp.renderer, cam = hp.camera;
 const nowS = () => performance.timeOrigin + performance.now();   // "giờ máy chủ" giả = đồng hồ thật (offset 0)
 let seed = 12345;
 const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
-const hash = (a, b) => { let h = (a * 374761393 + b * 668265263) >>> 0; h = ((h ^ (h >>> 13)) * 1274126177) >>> 0; return (h ^ (h >>> 16)) / 4294967296; };
+const hash = (a, b) => { let h = (a * 374761393 + b * 668265263) >>> 0; h = ((h ^ (h >>> 13)) * 1274126177) >>> 0; return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
 
 // ---------- đo draw call cả khung (composer gọi render nhiều lần → tắt autoReset, tự reset đầu khung) ----------
 R.info.autoReset = false;
@@ -44,7 +44,24 @@ async function measure(ms = 4000) {
     callsMedian: med(frameInfo.calls), callsMin: Math.min(...frameInfo.calls), callsMax: Math.max(...frameInfo.calls),
     trisMedian: med(frameInfo.tris), programs: R.info.programs.length,
     ra: ra ? ra.stats() : null,
+    mpCalls: await attrib(),
   };
+}
+// draw call của RIÊNG mô-đun (object.name 'mp_*') trong ~10 khung: bọc renderBufferDirect — đếm chính xác, không nhiễu
+// như hiệu số tổng (bóng 2–4,5 Hz, AO… làm tổng dao động ±100 giữa các khung)
+async function attrib(frames = 10) {
+  const orig = R.renderBufferDirect, per = {};
+  let n = 0, total = 0;
+  R.renderBufferDirect = function (camera, scene, geometry, material, object, group) {
+    total++;
+    if (object && object.name && object.name.startsWith('mp_')) per[object.name] = (per[object.name] || 0) + 1;
+    return orig.apply(this, arguments);
+  };
+  await new Promise((r) => { const f = () => (++n >= frames ? r() : requestAnimationFrame(f)); requestAnimationFrame(f); });
+  R.renderBufferDirect = orig;
+  const out = {}; let mp = 0;
+  for (const k in per) { out[k] = +(per[k] / frames).toFixed(2); mp += per[k]; }
+  return { perFrame: +(mp / frames).toFixed(2), byMesh: out, allPerFrame: +(total / frames).toFixed(1) };
 }
 
 // ---------- mô-đun người chơi khác + máy chủ/mạng giả ----------

@@ -46,7 +46,7 @@ export function createNameTags({ scene, maxTags = 24, maxRings = 96, renderOrder
   // ---------- hình học động: tứ giác ----------
   const MAXQ = maxRings + maxTags * 2;
   const idx = new Uint16Array(MAXQ * 6);
-  for (let q = 0; q < MAXQ; q++) { const v = q * 4, o = q * 6; idx[o] = v; idx[o + 1] = v + 2; idx[o + 2] = v + 1; idx[o + 3] = v + 1; idx[o + 4] = v + 2; idx[o + 5] = v + 3; }
+  for (let q = 0; q < MAXQ; q++) { const v = q * 4, o = q * 6; idx[o] = v; idx[o + 1] = v + 1; idx[o + 2] = v + 2; idx[o + 3] = v + 1; idx[o + 4] = v + 3; idx[o + 5] = v + 2; }
   const geo = new THREE.BufferGeometry();
   geo.setIndex(new THREE.BufferAttribute(idx, 1));
   const NSET = 3, sets = [];
@@ -59,7 +59,10 @@ export function createNameTags({ scene, maxTags = 24, maxRings = 96, renderOrder
   geo.setAttribute('position', sets[0].p); geo.setAttribute('uv', sets[0].u);
   geo.setDrawRange(0, 0);
   geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e5);
-  const mesh = new THREE.Mesh(geo, mat);
+  // InstancedMesh 1 instance (ma trận đơn vị): CÙNG biến thể chương trình 'basic + map + trong suốt + sương + instancing'
+  // với vũng đèn đêm (daynight.js night_lamp_pools) → không biên dịch chương trình mới (Mesh thường = 1 biến thể mới:
+  // đo renderer.info.programs 76 → 77 ở lượt đầu).
+  const mesh = new THREE.InstancedMesh(geo, mat, 1);
   mesh.name = 'mp_nametags';
   mesh.frustumCulled = false;       // 1 draw call luôn quanh camera; tứ giác ngoài khung tự bị cắt ở GPU
   mesh.matrixAutoUpdate = false;    // gốc (0,0,0) — chỉ dữ liệu đỉnh đổi (hợp đồng world.updateDynMatrices)
@@ -214,8 +217,8 @@ export function createNameTags({ scene, maxTags = 24, maxRings = 96, renderOrder
     ring(x, y, z, yaw, sx, sz, away) {
       const fx = Math.sin(yaw), fz = Math.cos(yaw), ax = Math.cos(yaw), az = -Math.sin(yaw);
       const hx = sx / 2, hz = sz / 2;
-      quad(x - ax * hx - fx * hz, y, z - az * hx - fz * hz, x + ax * hx - fx * hz, y, z + az * hx - fz * hz,
-        x - ax * hx + fx * hz, y, z - az * hx + fz * hz, x + ax * hx + fx * hz, y, z + az * hx + fz * hz, ringUV[away ? 1 : 0]);
+      quad(x + ax * hx - fx * hz, y, z + az * hx - fz * hz, x - ax * hx - fx * hz, y, z - az * hx - fz * hz,   // thứ tự đảo: mặt trước hướng LÊN (CCW nhìn từ trên)
+        x + ax * hx + fx * hz, y, z + az * hx + fz * hz, x - ax * hx + fx * hz, y, z - az * hx + fz * hz, ringUV[away ? 1 : 0]);
       nRings++;
     },
     // bảng tên: đáy bảng ở (x, yBottom, z); d = khoảng cách tới camera (cỡ + mức mờ); trả true nếu đã vẽ
