@@ -249,6 +249,7 @@ function build(deps) {
   function goSolo() {
     mode = 'solo';
     if (worker) wpost({ t: 'close' });
+    if (ra) { try { ra.dispose(); } catch (e) { } ra = null; }   // một mình: không giữ nhóm vẽ người khác
     conn = 'off';
     renderPill();
   }

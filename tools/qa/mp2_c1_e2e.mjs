@@ -249,6 +249,11 @@ async function main() {
     const seen = await pg.evaluate((t) => window.__hp.net.chatLines().some((l) => l.text.includes(t)), AFTER_BLOCK);
     step('chặn từ menu chat → máy chủ ngừng giao tin của người bị chặn', !!blk.v && !seen, { text: blk.v, seenAfterBlock: seen });
     await shot(pg, '09_blocked.png');
+    // ảnh PHÓNG TO khung chat: dấu tiếng Việt khó (Nguyễn Thị Hường, Đặng/Nguyễn Văn Đức…) không vỡ
+    await pg.evaluate(() => { const b = document.getElementById('chatBox'); b.style.zoom = '2.2'; b.style.width = '560px'; });
+    await sleep(300);
+    await pg.locator('#chatLog').screenshot({ path: path.join(OUT, 'vn_diacritics_chat_zoom.png') });
+    await pg.evaluate(() => { const b = document.getElementById('chatBox'); b.style.zoom = ''; b.style.width = ''; });
     await pg.keyboard.press('Escape');
     await pg.evaluate(() => window.__hp.net.closeChat());
 

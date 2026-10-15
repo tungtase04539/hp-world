@@ -58,6 +58,8 @@ Trò chơi: thế giới 3D Hải Phòng **tỉ lệ 1:1 mét thật** (từ 202
 | `js/xsection.js` | MẶT CẮT PHỐ — nguồn duy nhất cho lòng/bó vỉa/vỉa hè/hố cây/xe đỗ/mặt tiền. Từ Đợt 3 W3-A mọi hàm nhận CẤP hoặc WAY `{c, w?, sw?}` (`roadHW/roadW/sidewalkW/curbLine/facadeLine/treePitLine/parkingLine/furnitureLine`) — truyền WAY để dùng bề rộng thật từng phố (`ROADS_DT[i].w/.sw`, SINH bởi `tools/street_fit.mjs` qua process_osm) |
 | `js/anchorwalls.js` | TƯỜNG RÀO MỎ NEO Hải quân (Đợt 3 W3-A): `CB_WALLS` (polyline LTT/ĐBP/THĐ) + `cbFitFence` (đẩy đỉnh ra sau `facadeLine(way)` + 0,35) + `cbWallSegments` — NGUỒN DUY NHẤT cho world.js `cbWallRun` VÀ `tools/process_buildings.mjs` §9c2 (cắt nhà nhô trước tường, cờ `cbIn` khuôn viên). Không import three. Sửa `CB_WALLS` → chạy lại process_buildings |
 | `js/traffic.js` / `js/vehicles.js` / `js/npc.js` / `js/quests.js`... | Giao thông, xe cưỡi được, NPC, nhiệm vụ |
+| `js/net/` (MP-2) | Multiplayer phía game — CHỈ nạp khi có máy chủ (`?server=` / `hp3d.server` / `DEFAULT_SERVER`): `config.js` địa chỉ, `net_worker.js` WebSocket trong Web Worker, `session.js` tài khoản/vé, `correct.js` CORRECT, `telemetry.js` số liệu cục bộ, `net.js` điều phối, `remote_avatars*.js` người chơi khác (C2). Xem §8c, SERVER.md §9 |
+| `js/ui/chat.js` (MP-2) | Khung chat 40 m + menu Báo cáo/Chặn + đường dây hỗ trợ |
 | `tools/` | Pipeline dữ liệu + test tự động (xem mục 7, 8) |
 
 Quan hệ dữ liệu: `tools/fetch_osm.sh` → `osm_*.json` → `tools/process_osm.mjs` → `js/mapdata.js`
@@ -477,8 +479,18 @@ chủ dự án: `docs/multiplayer/VAN_HANH.md`. Đặc tả giao việc: `docs/m
 - **Sức chứa đo trên máy này** (Ryzen AI 9 HX 370, Windows): 600 người mượt (độ trễ vòng sự kiện p99 ~26 ms khi tick chia
   lát 4 ms); 1.200 người thì một lõi bão hoà (tick p99 ~63 ms). Nguyên nhân: Windows send() 14–30 µs/lần. Muốn trên 1.000
   người: gửi snapshot bằng nhiều luồng (giai đoạn B trong ARCH) hoặc chạy trên VPS Linux. Thử kín vài chục người thì dư sức.
-- **Chưa làm (GĐ1 phía client):** hiện người chơi khác trong game, ô nhập biệt danh/mã mời, khung chat. Các điểm nối:
-  `docs/multiplayer/codebase_hooks.md` §9.
+- **Phía game GĐ1 (MP-2 C1, 15/10/2026 — chi tiết SERVER.md §9):** `?server=wss://tên-miền` (nhớ vào localStorage;
+  `?server=off` xoá) hoặc `DEFAULT_SERVER` trong `js/net/config.js` (+ `NET_DEFAULT_ON = true` trong main.js — test
+  `tools/qa/mp2_c1_unit.mjs` kiểm hai chỗ khớp). Không cấu hình → main.js KHÔNG import `js/net/*` (0 request mới, đo bằng
+  `tools/qa/mp2_nonet.mjs`). Socket ở **Web Worker** (heartbeat sống qua 17–35 s dựng thế giới); giải mã ở worker, snapshot
+  về luồng chính dạng `Float64Array` transfer theo netId. Thời gian mạng = `performance.timeOrigin + performance.now()` +
+  offset máy chủ (mỗi luồng có timeOrigin riêng nhưng cùng thang epoch); `clientMs` của STATE = u16 của `performance.now()`
+  TRANG (giữ qua RESUME). Chế độ STATE đi/chạy theo PHÍM chạy, không theo vận tốc ước lượng (ước lượng trễ vài khung →
+  báo WALK lúc đang chạy 7 m/s → vượt cửa sổ 300 ms của move.js). Ngày/đêm: `dayNight.syncTo()` 1 Hz (nắn theo đồng hồ thật,
+  lệch > 0,01 ngày thì nhảy + nướng IBL; KHÔNG gọi setter `t` mỗi khung). Mất máy chủ → "Khám phá" (một mình) + biểu tượng
+  HUD, tự nối lại (RESUME ≤ 60 s, sau đó vé mới). Kiểm đầu-cuối: `tools/qa/mp2_c1_e2e.mjs` (máy chủ thật chế độ test + bot S4
+  trong tiến trình + 1 Chrome dưới khoá GPU). Bẫy: hội thoại hướng dẫn viên mở 0,7 s SAU khi vào — harness phải chờ nó hiện
+  rồi mới Esc; biệt danh tối đa 16 ký tự ("Trần Thị Ngọc Ánh" = 17 → `nickname_invalid/length`).
 
 ## 9. Deploy
 
@@ -488,6 +500,21 @@ chủ dự án: `docs/multiplayer/VAN_HANH.md`. Đặc tả giao việc: `docs/m
 - Vercel (tùy chọn): import repo, không cần build command (site tĩnh).
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
+
+- **2026-10-15 (MP-2 C1 — MẠNG + PHIÊN + GIAO DIỆN phía game, GĐ1 "thấy nhau"):** `js/net/{config,net_worker,session,correct,
+    telemetry,net,remote_avatars_stub}.js`, `js/ui/chat.js`; điểm nối main.js (import động khi có máy chủ, attach, preFrame/frame,
+    mount/dismount, onStart, onBootReady, `__hp.net`), input.js (`onChatKey` T và /, `releaseKeys`), ui.js (`registerModal`),
+    daynight.js (`syncTo`), i18n (khoá `mp*`/`chat*` vi+en, `tf()`), css. Không sửa `server/*`, `js/shared/*`.
+    Kiểm `tools/qa/mp2_c1_e2e.mjs` (máy chủ native `HPMP_TEST=1` cổng 9210/9211, 30 bot biệt danh có dấu, Radeon 890M TIER 3):
+    **19/19 ĐẠT** — mã mời sai → câu tiếng Việt; tạo tài khoản "Nguyễn Thị Hường" → mã khôi phục 12 ký tự hiện 1 lần; vào
+    thành phố 0,8 s sau bấm (WELCOME + READY); 22 người chơi khác thấy được (stub 1 draw call); chat 2 chiều có dấu (bot →
+    khung chat; trình duyệt → 16/30 bot trong 40 m nhận nguyên văn); tin có số điện thoại bị chặn với câu tiếng Việt, 0 lọt;
+    báo cáo + chặn từ menu chat (tin sau khi chặn không tới); `__hp.teleport` 323 m → CORRECT TELEPORT nhảy về đúng chỗ trong
+    0,5 s; rớt socket → RESUME cùng netId 1,6 s; ngày/đêm lệch máy chủ 0,01 phút game; tắt máy chủ → "Khám phá · Đang nối lại…"
+    + người khác biến mất sau 3 s, vẫn đi được; bật lại → tự vào lại 7,9 s sau khi máy chủ lên (vé mới), thấy lại 12 người;
+    trình duyệt thứ 2 lấy lại tài khoản bằng mã khôi phục, ngày/đêm lệch 0,02 phút game. RTT p50 0,9 / p95 1,5 ms (loopback).
+    Một mình (không `?server=`): `mp2_nonet` full + lite 0 import js/net, 0 WebSocket, 0 request API, 0 lỗi; diag full + lite,
+    mobile, tour 26 ảnh, waterbfs, check_assets đều đạt, 0 lỗi JS. Ảnh/log: `C:/Users/Admin/hp-world-work/mp2/c1/`.
 
 - **2026-10-15 (MP-1 MÁY CHỦ THỬ NGHIỆM KÍN — gộp vào dot3):** js/shared/ + server/ (146 tệp mới, chỉ sửa .gitignore và
     deploy-pages.yml để bỏ server/ khỏi gh-pages). Đã qua 3 phản biện (bảo mật, mạng, an toàn chat/vận hành) với 29 lỗi
