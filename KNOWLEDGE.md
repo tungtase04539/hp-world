@@ -458,6 +458,28 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 - Kết luận: pipeline vận hành đúng, lỗi chấm đã nhận diện; muốn nhảy điểm lớn cần cụm
   HOUSE (dãy phố liền kề) + LANDMARK (công trình riêng) — làm ở vòng sau.
 
+## 8c. MULTIPLAYER — máy chủ thử nghiệm kín (từ 2026-10-15)
+
+Kế hoạch cho chủ dự án: `docs/multiplayer/KE_HOACH.md`. Kỹ thuật như đã xây: `docs/multiplayer/SERVER.md`. Sổ tay vận hành cho
+chủ dự án: `docs/multiplayer/VAN_HANH.md`. Đặc tả giao việc: `docs/multiplayer/MP1_SPEC.md`.
+- **Bố cục:** `js/shared/` là mã dùng chung client/server: giao thức nhị phân `codec.js`, hằng số, lượng tử, lưới AOI 128 m,
+  đồng bộ đồng hồ, điểm xuất hiện, kiểm di chuyển `move.js`, bộ lọc chat tiếng Việt `textfilter.js`. Đây là ESM thuần,
+  KHÔNG import three. Chỉ được import `../terrain.js`, `../mapdata.js`, `../brands.js`.
+  `server/` là gói Node 24 riêng (package-lock, `npm ci`, `npm test` chạy PGlite, `npm run test:pg` chạy Postgres 17 trong
+  Docker). Bot thử tải nằm ở `server/bots/run.mjs --scenario smoke|ramp|hotspot|stress|reconnect|abuse|netem-lite`.
+- **Chạy trên máy chủ dự án:** Docker (game + Postgres + cloudflared dạng container) và Cloudflare Tunnel; không mở cổng nào;
+  trang quản trị chỉ ở 127.0.0.1. Lệnh: `server/ops/mo-may-chu.ps1` / `tat-may-chu.ps1` / `trang-thai.ps1` /
+  `khoa-khan-cap.ps1` / `sao-luu.ps1`. Khi phát triển hay thử, LUÔN thêm `-TestMode` (hoặc `HPMP_TEST=1`) cùng cổng/tên dự án
+  riêng — bản thật ghi tệp `%TEMP%\hpworld_server_live.txt`, và tệp này làm mọi việc GPU (§8 khoá GPU) phải chờ.
+- **Luật:** mọi thứ có giá trị (tiền, đồ, chỉ số, nhiệm vụ) do máy chủ quyết; di chuyển theo kiểu client đi trước, server kiểm
+  (`move.js`: cửa sổ 300 ms / 1 s / 4 s, ngân sách thời gian, mặt nước/cầu). Hằng tốc độ trong `js/shared/constants.js` có
+  test dò lệch so với main.js/vehicles.js/world.js — đổi tốc độ trong game thì phải sửa cả hai.
+- **Sức chứa đo trên máy này** (Ryzen AI 9 HX 370, Windows): 600 người mượt (độ trễ vòng sự kiện p99 ~26 ms khi tick chia
+  lát 4 ms); 1.200 người thì một lõi bão hoà (tick p99 ~63 ms). Nguyên nhân: Windows send() 14–30 µs/lần. Muốn trên 1.000
+  người: gửi snapshot bằng nhiều luồng (giai đoạn B trong ARCH) hoặc chạy trên VPS Linux. Thử kín vài chục người thì dư sức.
+- **Chưa làm (GĐ1 phía client):** hiện người chơi khác trong game, ô nhập biệt danh/mã mời, khung chat. Các điểm nối:
+  `docs/multiplayer/codebase_hooks.md` §9.
+
 ## 9. Deploy
 
 - Workflow `.github/workflows/deploy-pages.yml`: push nhánh làm việc → mirror sang `gh-pages` (force).
@@ -467,6 +489,11 @@ nhờ model vision ngoài chấm từng cặp, sửa theo cụm, lặp tới khi
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-10-15 (MP-1 MÁY CHỦ THỬ NGHIỆM KÍN — gộp vào dot3):** js/shared/ + server/ (146 tệp mới, chỉ sửa .gitignore và
+    deploy-pages.yml để bỏ server/ khỏi gh-pages). Đã qua 3 phản biện (bảo mật, mạng, an toàn chat/vận hành) với 29 lỗi
+    cần sửa, và 2 vòng sửa. Kết quả: test 154/155 (1 bỏ qua), test Postgres 61/61; kịch bản bot smoke, hotspot 300,
+    stress 2.000, reconnect 1.000, abuse 200 (lọt tốc độ 0 %), netem đều đạt; ramp 1.200 trượt p99 trên máy Windows này
+    (xem §8c). Tunnel tạm: RTT p50 58 ms. Xem §8c.
 - **2026-10-15 (Đ3-W5 SỬA HỒI QUY r2: pano_336 — LỀ BÃI ĐỖ trước lan can dải bờ)** [chấm 2 người: 336 OLD 5,15 → NEW 4,75]:
     **Nguyên nhân:** W5-D thu Tam Bạc bắc về ngõ 5,5 m + vỉa 1 m ⇒ `riverbank.stripRail` đặt lan can ở hw + sw + 0,5 = 4,25 m từ
     tim ⇒ phía sông 336 h180/h270 còn vỉa 1 m sát lan can, mất hàng cổ thụ + 2 hàng xe máy đỗ (ảnh: lề bê tông ~4 m, h270 ~15 xe,
