@@ -1226,3 +1226,64 @@ gì (ký tự cuối mang 4 bit đệm) và test trượt ngẫu nhiên; nay đ�
 - Tick p99 < 25 ms / lag p99 < 20 ms ở 1.200 CCU trên máy này: cần gửi snapshot đa luồng (8.3, §6.6).
 - Harness bot: worker chết 0xC0000409 trong reconnect 1.000 trên Windows (8.3) — cần dump (WER LocalDumps hoặc procdump) để
   tìm gốc; tạm thời chạy lại tới khi `kết quả đủ bot` ĐẠT.
+
+## 9. Phía game GĐ1 — C1 mạng, phiên, giao diện (MP-2, 15/10/2026)
+
+Đặc tả: `MP2_SPEC.md` §2 C1. Không sửa `server/*` hay `js/shared/*` — client chỉ dùng API/giao thức như đã xây (§2.2, §6.3).
+
+### 9.1 File
+
+| File | Việc |
+|---|---|
+| `js/net/config.js` | địa chỉ máy chủ: `?server=` (nhớ vào localStorage `hp3d.server`, `?server=off` xoá) > localStorage > `DEFAULT_SERVER` (để trống). Nhận `wss://`/`https://`; `ws://` chỉ cho localhost; IP trần công khai bị từ chối. API = cùng gốc `https://…/v1/…`, WS `wss://…/play` |
+| `js/net/net_worker.js` | **Web Worker** giữ WebSocket: HELLO (vé / RESUME), PING 2 Hz 10 s đầu rồi 1 Hz + `ClockSync`, giải mã bằng `codec.js`, bảng slot SNAPSHOT → bản ghi theo **netId** đóng gói `Float64Array` TRANSFER về luồng chính; mốc giờ snapshot = min(giờ đến − tick·50 ms) trên 64 snapshot (bỏ dao động mạng); nối lại RESUME trong 60 s (backoff 1-2-4-8 s + 0–1 s; SYSTEM BACKOFF được tôn trọng); 4001 / quá 60 s → xin vé mới; 4002/4003/4004/4009 → không tự nối |
+| `js/net/session.js` | HTTP: guest / refresh (xoay vòng, `refresh_race` thử lại) / recover / join; `hp3d.device` (mã thiết bị ngẫu nhiên), `hp3d.mp.v1` = refresh token + tài khoản THEO gốc máy chủ (chỉ localStorage người chơi); access token chỉ trong RAM; ngoại hình 8 byte ngẫu nhiên lúc tạo tài khoản |
+| `js/net/correct.js` | CORRECT: lệch ≤ 6 m kéo mượt 0,15 s, lớn hơn nhảy hẳn (đang cưỡi: dời xe, xe dừng); STATE sau đó mang `corrEpoch` mới |
+| `js/net/telemetry.js` | số liệu CỤC BỘ (không gửi đi): STATE/snapshot/CORRECT/chat/nối lại/RTT p50-p95 |
+| `js/net/net.js` | điều phối: panel tiêu đề, phiên, worker, STATE, người khác, chat, ngày/đêm, HUD — mọi hàm công khai bọc try/catch |
+| `js/net/remote_avatars_stub.js` | bản TẠM cùng API của C2 (`js/net/remote_avatars.js`): 1 InstancedMesh hộp; đổi 1 dòng import trong net.js |
+| `js/ui/chat.js` | khung chat 40 m, menu Báo cáo / Chặn, đường dây hỗ trợ |
+| main.js · input.js · ui.js · daynight.js · i18n.js · css/style.css | điểm nối (dưới đây), phím chat `onChatKey`/`releaseKeys`, `registerModal`, `syncTo`, khoá `mp*`/`chat*` vi+en, giao diện |
+
+### 9.2 Điểm nối trong `js/main.js` (đúng bảng codebase_hooks §9)
+
+- Trước `buildWorld`: chỉ khi `?server=` / `hp3d.server` / `NET_DEFAULT_ON` → `await import('./net/config.js', './net/net.js')`,
+  `createNet({cfg, ui, tier, i18n, input, audioGesture})` (dựng panel tiêu đề, làm mới token SỚM song song dựng thế giới).
+  Không cấu hình: KHÔNG import gì mới (0 request). `NET_DEFAULT_ON` phải = (`DEFAULT_SERVER` khác rỗng) — `tools/qa/mp2_c1_unit.mjs`.
+- Sau khi có người chơi/xe/ngày-đêm: `net.attach({scene, world, camera, pState, player, vehicles, dayNight, surfaceY,
+  place: placePlayer, dismountNow})`. `vehicles` lúc này = xe DÙNG CHUNG của thế giới → `vehicleRef = chỉ số + 1` (như nhau
+  mọi máy); xe máy gọi riêng = 0.
+- `mount()` → `net.onMount(v)` (ACTION MOUNT; BUSY/DENIED → xuống lại + "Xe này đang có người dùng"); `dismount()` /
+  `forceDismount()` → `net.onDismount(v)`.
+- Mỗi khung: sau `clampToPlayArea` → `net.preFrame(dt)` (CORRECT + STATE); sau camera → `net.frame(dt, camera.position)`
+  (người khác nội suy + `dayNight.syncTo` 1 Hz + HUD); `drawMinimap(…, net ? net.markers() : undefined)`.
+- `startGame()` → `net.onStart()` (READY + đặt ở điểm xuất hiện + chat); `boot.finish()` → `net.onBootReady()`.
+- `window.__hp.net` (QA): `status() say() chatLines() players() names() drop() rejoin() openChat() workerStats()`.
+
+### 9.3 Hành vi
+
+- **Màn tiêu đề** (chỉ khi có máy chủ): Biệt danh + Mã mời (lần đầu), "Có mã khôi phục?", nút **Vào thành phố** (= nút Bắt
+  đầu, bấm sớm vẫn được) và **Chơi một mình**. Chưa có tài khoản: `/v1/auth/guest` → hộp **mã khôi phục hiện MỘT lần** (sao
+  chép + "Tôi đã lưu mã") → vào. Có tài khoản: "Xin chào, Tên#1234". Mọi mã lỗi API có câu tiếng Việt (`mpErr_*`, lý do
+  biệt danh `mpErr_nick_<reason>`, hàng chờ vị trí/ETA, cấm, lệch phiên bản → hộp "Tải lại trang").
+- **Vòng đời**: join khi bấm → WELCOME đặt người chơi ở `spawn` máy chủ (camera sau lưng) → READY lúc vào game → STATE 15 Hz
+  khi di chuyển / 2 Hz khi đứng (chế độ đi/chạy theo PHÍM chạy — không theo vận tốc ước lượng để không lệch cửa sổ 300 ms;
+  AIR khi đang nhảy; MOTO/CYCLO/BOAT khi cưỡi; cờ BUSY khi mở bảng/chat); `clientMs` = u16 của `performance.now()` TRANG (giữ
+  qua RESUME đúng CONTRACT §7). Vào lại sau khi mất máy chủ: chỉ về vị trí máy chủ nếu lệch > 12 m (báo "Máy chủ đưa bạn về
+  vị trí đã lưu").
+- **Mất máy chủ**: biểu tượng HUD đổi ngay ("Khám phá · Đang nối lại…"); quá 3 s chưa RESUME → báo + xoá người khác (rớt ngắn
+  không nhấp nháy). Game chạy như một mình; tự nối lại (RESUME ≤ 60 s, sau đó vé mới với backoff 2→15 s). Bấm biểu tượng = thử ngay.
+- **Ngày/đêm chung**: `dayNight.syncTo(dayTAt(serverNow, dayEpoch, dayLength))` 1 Hz; `update()` nắn theo đồng hồ thật
+  (hằng thời gian ~2 s), lệch > 0,01 ngày thì nhảy + nướng lại IBL (không gọi setter `t` mỗi khung).
+- **Chat**: T hoặc / mở (Enter vẫn là tương tác), Enter gửi rồi đóng, Esc đóng; nút 💬 trên HUD; tin của mình hiện khi máy chủ
+  VỌNG LẠI (thấy đúng bản đã che); từ chối (`CHAT_REJECTED` 1–8), báo cáo (`REPORT_RESULT`), khoá chat/cảnh cáo (`SANCTION`),
+  thông báo quản trị (kênh SYSTEM, from 0 → dải banner), `SUPPORT_LINE` (hộp nổi bật + Tổng đài 111) đều tiếng Việt. Chạm tên
+  → Báo cáo (6 lý do, gửi `msgRef` của dòng đó) / Chặn (ACTION BLOCK_PLAYER + ẩn ngay). Chữ người chơi chỉ qua `textContent`.
+
+### 9.4 Kiểm chứng (máy chủ dự án, Radeon 890M TIER 3, 15/10/2026)
+
+`tools/qa/mp2_c1_e2e.mjs` (máy chủ native `HPMP_TEST=1` cổng 9210/9211, PGlite riêng, 30 bot S4 trong tiến trình với biệt danh
+có dấu, 1 Chrome dưới khoá GPU, tuần tự 2 trình duyệt): **19/19 bước ĐẠT** — xem `KNOWLEDGE.md` §10 (MP-2 C1) để có số đo.
+`tools/qa/mp2_c1_unit.mjs` (node: cấu hình, CORRECT, i18n vi/en, bố cục gói worker) và `tools/qa/mp2_nonet.mjs` (không máy
+chủ: 0 import js/net, 0 WebSocket, 0 request API).
+
