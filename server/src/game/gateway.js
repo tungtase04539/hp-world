@@ -277,7 +277,26 @@ export function register(app) {
       S.kick(s, KICK_REASON.CHEAT);
       return;
     }
-    if (r.correct) sendCorrect(s, r.correct);
+    if (r.correct) {
+      logCorrect(s, r, m, t);
+      sendCorrect(s, r.correct);
+    } else if (log.isLevel('debug')) logCorrect(s, r, m, t, 'violation');   // LOG_LEVEL=debug: every rejected STATE
+  }
+  // Validator log (owner runbook: "who got pulled back and why"): one line per CORRECT with what the window saw. Honest
+  // players should produce none; a cheater is kicked after a handful, so the volume is bounded — still capped per
+  // session (CORRECT_LOG_MAX) so a reconnect loop cannot flood the disk.
+  const CORRECT_LOG_MAX = 40;
+  function logCorrect(s, r, m, t, msg = 'correct') {
+    s.corrLogN = (s.corrLogN || 0) + 1;
+    if (s.corrLogN > CORRECT_LOG_MAX) return;
+    const mc = s.v.mc, e = s.entity;
+    const rd = (v) => Math.round(v * 100) / 100;
+    (msg === 'correct' ? log.info : log.debug)(msg, {
+      netId: s.netId, account: s.accountId, reason: MV_NAMES[r.violation] || r.violation, hard: r.hard,
+      mode: m.mode, prevMode: mc.lastMode, dist: rd(mc.lastDist), limit: rd(mc.lastLimit), win: mc.lastWin, spanMs: rd(mc.lastSpan),
+      dtS: rd(mc.lastDt), points: rd(s.v.points), lead: rd(mc.base - (mc.lastServerMs - mc.clientT)), clamped: rd(mc.clientT - mc.effT),
+      from: [rd(e.x), rd(e.z)], to: [rd(m.x), rd(m.z)], spd: rd(Math.hypot(m.vx, m.vz)), n: s.corrLogN,
+    });
   }
 
   function actionResult(s, reqId, code) { send(s.conn, encodeEvent(w, EVENT.ACTION_RESULT, [reqId, code])); }

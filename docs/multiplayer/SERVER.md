@@ -1460,3 +1460,51 @@ draw call +3, 0 chương trình shader mới, khung trung bình +0,04 ms; TIER 1
 Điện thoại (`hp-world-work/mp2/fixer1/mobile_probe.mjs`, 844×390 cảm ứng + 6 bot): **14/14 ĐẠT**.
 Còn mở (thấp): rác mỗi khung của bảng tên (chuỗi khoá per tag, mảng UV) ~0,5 MB/s; ENTER keyframe rải 24/snapshot → tới 72
 người không có mẫu 0,1–0,3 s sau RESUME; xoay tại chỗ gửi STATE 2 Hz; rejoin giữ vị trí cục bộ khi lệch ≤ 12 m.
+
+### 9.8 Riders fixer (15/10/2026) — không kéo về oan người chơi / bot trung thực
+
+**Vật lý thật vs trình kiểm.** `js/vehicles.js`: xe máy 16 m/s (ga 3,6 m/s², không có tăng tốc nào khác), xích lô 4,2, thuyền
+10; đi bộ 3 / chạy 7 (main.js), nhảy giữ tốc độ ngang; mỗi khung dt ≤ 50 ms. Trình kiểm (`move.js`): ≤ vmax·1,2 + 1 m trong
+cửa sổ 1 s / 300 ms / 4 s (thời gian client). Dốc xoắn / nhịp cầu: quãng 3D ≥ 2D nên tốc độ 2D chỉ nhỏ hơn. ⇒ hằng số và trình
+kiểm KHÔNG sai; mọi CORRECT oan đo được đều do đường dữ liệu:
+
+| # | Nguồn (đo bằng log `"msg":"correct"` mới) | Sửa | Kiểm |
+|---|---|---|---|
+| R1 | **Bot đóng dấu sai giờ.** e2e MP-2 (dot3): 28 bot đang lái xe máy bị CORRECT SPEED trong CÙNG 1 ms, cửa sổ 300 ms (`win` 2), 5,8 m trong 0,22 s (26 m/s, bot chạy 14,4). Bot tính vị trí ở `now` chung của vòng tick 96 bot nhưng lấy `clientMs` lúc GỬI; vòng sự kiện khựng giữa vòng (GC / IPC Playwright cùng tiến trình) → mẫu kế mang cả quãng khựng trong khe dấu 20–60 ms → 3 STATE bị từ chối liền → CORRECT. MP-1 không gặp vì bot chạy ở worker ít cấp phát | `bot.mjs`: `posT = now` ở tick, `clientMs` = `posT` (giờ của VỊ TRÍ). Client thật đã đúng (preFrame ngay sau di chuyển, dt kẹp 50 ms) | `riders_regress` (bot thật + Validator thật + khựng 120–280 ms giữa vòng: 0 vi phạm; cách đóng dấu cũ: có CORRECT); `tools/qa/mp_converge.mjs` 96 bot, 122 lần khựng: **0 CORRECT** |
+| R2 | **Bot sau khi máy chủ khởi động lại.** Bot giữ vị trí + `corrEpoch` cũ, máy chủ neo ở vị trí lưu ≤ 30 s trước (epoch 0) → 7 SPEED bước đầu (`win` 4) + 29 SERVER_MOVE (epoch lệch) trong e2e; khi bot ở xa (đang lái) → 84 TELEPORT / 96 bot | `bot.mjs _rejoin`: WELCOME phiên mới → epoch 0; lệch > `REJOIN_SNAP_M` (12 m, nay ở constants.js, client dùng chung) → về điểm máy chủ, bỏ chế độ quảng trường, đi lại tới điểm hẹn | test (xa/gần/RESUME); `mp_converge --restartAtS 170` (96/96 bot đang đi bộ quanh điểm hẹn): **0 CORRECT** |
+| R3 | **Client: lên rồi xuống xe giữa 2 STATE.** Máy chủ chỉ tha +9 m cho bước CÓ đổi chế độ; lên + xuống trong 66 ms → máy chủ thấy ĐI BỘ A → ĐI BỘ C cách 2–6 m → 3 STATE từ chối → CORRECT | `net.js stateNowAfterMount`: gửi STATE NGAY sau mỗi `onMount`/`onDismount` (cách STATE trước ≥ 30 ms — xô token 25/s), bước nhảy không tính vào vận tốc | test (khoảng 60–400 ms, 7 hoán vị: 0 vi phạm; client cũ: có); trình duyệt thật 28 + 21 lần lên/xuống: 0 |
+| R4 | **Client: xe giao thông xô người đi bộ.** `traffic.pushOut` đẩy người ra khỏi thân xe đang chạy, không giới hạn → chạy 7 m/s bị xô thành 9,6 m/1 s trên mặt cầu HVT → CORRECT SPEED (`mp_riders` lượt 3) | `main.js updatePlayerOnFoot`: quãng dời mỗi khung ≤ tốc độ CHẾ ĐỘ (đi 3 / chạy 7, đúng luật `curMode` của STATE) × dt × 1,1 | `mp_riders` lượt 6: bài đi/chạy/nhảy trên nhịp cầu HVT 0 vi phạm |
+| R5 | Phụ (thế giới): xe máy kẹt sát lan can chỗ dốc xoắn gặp nhịp HVT (−48, −905), lùi–tiến nhiều lần → cú đẩy của `resolveCollisions` đưa xe qua mép → rơi 14,5 m xuống đất dưới vòng xoắn, kẹt | `vehicles.js`: đẩy mà tới chỗ `blockedAt` (thấp hơn > 1,2 m, nước, gờ) → về chỗ cũ, dừng | không tái hiện ở lượt 6 (dốc xoắn lên + xuống); chưa có ca tái hiện chủ động (mục còn mở) |
+| R6 | Trình kiểm: cú nhảy 155 m rơi vào DẢI ngoài vùng chơi ≤ 50 m chỉ bị chấm OUT_OF_BOUNDS 1 điểm/STATE (bot đứng: 2 Hz → 3 s mới CORRECT) | `move.js`: ngoài vùng (dải mềm) vẫn xét TELEPORT trước — cứng, CORRECT ngay. KHÔNG nới gì | test; abuse 22/22 |
+
+**Log trình kiểm.** `gateway.js`: mỗi CORRECT một dòng info `"msg":"correct"` (netId, account, reason, mode/prevMode, `dist`,
+`limit`, `win` 1 = 1 s · 2 = 300 ms · 3 = 4 s · 4 = bước đầu, `spanMs`, `dtS`, `points`, `lead` (ms, âm = trễ), `clamped`, from/to,
+`spd`); tối đa 40 dòng/phiên. `LOG_LEVEL=debug`: cả STATE bị từ chối (`"msg":"violation"`). `MoveCheck.lastWin/lastSpan`.
+
+**Tay cầm QA (codebase_hooks §9 mục 17).** `js/qagate.js qaAllowed()`: localhost / 127.0.0.1 / [::1] / *.localhost hoặc `?qa=1`
+(không theo `navigator.webdriver`). Ngoài đó: `__hp.net` = null; khi ONLINE `__hp.teleport` từ chối, `__hp.pState/world/vehicles/
+mount/player/traffic/footprints` đọc ra null (chơi một mình giữ nguyên). launch/shoot/clearance/mp2_nonet thêm `qa=1`.
+`tools/qa/mp_qagate.mjs` (host `qa-off.example` → 127.0.0.1, webdriver = true, online): ĐẠT; `?qa=1` trên cùng host → có lại.
+
+**Số đo** (máy chủ native `HPMP_TEST=1` 9310/9311, tĩnh 8821, Radeon 890M TIER 3, 1 Chrome dưới khoá GPU; đầu ra
+`C:/Users/Admin/hp-world-work/mp2b/riders/`):
+- e2e MP-2 (`mp2_int_e2e --bots 96`), cùng mã dot3 + chỉ thêm log (`e2e_base`): bot trung thực **64 CORRECT** (SPEED 35 = 28
+  cùng 1 ms `win` 2 + 7 bước đầu sau khởi động lại; SERVER_MOVE 29). Sau sửa (`e2e_after2`): **27/27 bước, bot trung thực 0** —
+  CORRECT duy nhất của bot là bot gian lận (TELEPORT cứng ngay); trình duyệt chỉ bị CORRECT ở các bước cố ý (teleport, lệch nhỏ).
+- `mp_converge` 96 bot, 240 s, 122 lần khựng 120–280 ms giữa vòng tick, khởi động lại máy chủ ở giây 170 (96/96 bot đang đi bộ
+  quanh điểm hẹn): **0 CORRECT**, 0 dòng correct.
+- `mp_riders` lượt 6: 698 s trên xe, 4,6 km, tốc độ tối đa 15,64 m/s, cao nhất 20,6 m (nhịp HVT), lên dốc xoắn + nhịp tới r 1.500
+  + quay đầu + xuống (7.581 / 7.025 khung chạy > 3 m/s trên 2 đoạn), phố 5.582 khung, cầu Lạc Long 482 khung; bài A (đi/chạy/
+  nhảy/đổi Shift 10 lần), B (28 lần lên/xuống 60–400 ms), D (trên nhịp cầu: xuống xe, đi/chạy/nhảy, 21 lần lên/xuống): **0 CORRECT,
+  0 dòng correct, 0 dòng violation (LOG_LEVEL=debug)**, 0 lỗi JS. (Lượt 3 — trước sửa R4 — bắt được 1 CORRECT SPEED khi CHẠY trên
+  nhịp cầu: 9,55 m / 0,98 s, xe máy giao thông ngay đó. Bước rơi của lượt 3/6 là giả: bộ đo không xoá độ cao khi tạm dừng cho
+  bài D đi bộ dọc nhịp dốc — đã sửa.)
+- abuse 200 (16 lớp): **22/22 chấp nhận**, speed_hack 46/46 (p50 468 / max 624 ms), teleport 14/14, clock_dilation 11/11,
+  người quan sát 0 CORRECT. `mp_qagate` ĐẠT. diag full 0 lỗi; `mp2_nonet` full: 0 request mạng/WebSocket, 0 lỗi; waterbfs đạt.
+  `npm test` 160 (159 đạt, 1 bỏ qua sẵn), tests/net 23/23, `mp2_c1_unit` 278/278.
+
+**Công cụ.** `tools/qa/mp_riders.mjs` — 1 Chrome (khoá GPU) trên máy chủ test LOG_LEVEL=debug: đi/chạy/nhảy/đổi Shift, lên–xuống
+dồn dập, tài xế tự động bấm W/A/S/D (KeyboardEvent → input.js) theo đồ thị phố thật + dốc 248 → dốc xoắn 349 → nhịp 242 tới
+r 1.500 → quay đầu → xuống → cầu Lạc Long; trên nhịp cầu: xuống xe, đi/chạy/nhảy, lên–xuống dồn dập. ĐẠT = 0 CORRECT trình duyệt +
+0 dòng correct/violation + 0 lần rơi. `tools/qa/mp_converge.mjs` — 96 bot dồn về 1 điểm (như e2e) + khựng vòng sự kiện +
+khởi động lại máy chủ.

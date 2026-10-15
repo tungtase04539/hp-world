@@ -266,7 +266,7 @@ export class MoveCheck {
     this.lagMinCur = Infinity; this.lagMinPrev = Infinity; this.lagBucketT = serverMs; this.lagBuckets = 0;
     // the forgiveness bucket survives resets (ticket takeover): only the first reset fills it
     if (this.forgive === undefined) { this.forgive = MOVE.FORGIVE_BURST_MS; this.forgiveT = serverMs; }
-    this.hard = false; this.lastDist = 0; this.lastLimit = 0; this.lastDt = 0;
+    this.hard = false; this.lastDist = 0; this.lastLimit = 0; this.lastDt = 0; this.lastWin = 0; this.lastSpan = 0;
     this.accepted = 0;
   }
   // after a CORRECT: keep the time base, restart the window from the corrected point at the latest client time
@@ -297,7 +297,7 @@ export class MoveCheck {
     const d = Math.sqrt(wx * wx + wz * wz);
     const lim = (this.allow[this.head] - this.allow[s] + segAllow) * MOVE.SLACK_MUL + slack;
     if (d <= lim) return false;
-    this.lastDist = d; this.lastLimit = lim;
+    this.lastDist = d; this.lastLimit = lim; this.lastSpan = this.t[this.head] - this.t[s];
     return true;
   }
 
@@ -357,7 +357,7 @@ export class MoveCheck {
   }
 
   check(clientMs16, x, z, mode, serverMs, flags = 0) {
-    this.hard = false; this.lastDist = 0; this.lastLimit = 0;
+    this.hard = false; this.lastDist = 0; this.lastLimit = 0; this.lastWin = 0; this.lastSpan = 0;
     const timeOk = this._time(clientMs16 & 0xffff, serverMs);
     const t = this.effT;
     mode &= 7;
@@ -365,10 +365,14 @@ export class MoveCheck {
     // play disc
     const r2 = x * x + z * z;
     const rIn = PLAY_RADIUS + MOVE.PLAY_TOL_M;
+    let outside = false;
     if (r2 > rIn * rIn) {
       const rh = PLAY_RADIUS + MOVE.PLAY_HARD_M;
       this.hard = r2 > rh * rh;
-      return MV.OUT_OF_BOUNDS;
+      if (this.hard) return MV.OUT_OF_BOUNDS;
+      // soft band (≤ 50 m outside): still judged as a TELEPORT first (riders fixer 15/10/2026 — a 155 m jump that landed
+      // 34 m outside the disc was scored 1 point per STATE, 3 s at 2 Hz before the CORRECT, instead of a hard flag)
+      outside = true;
     }
 
     // movement against the previous accepted sample / the anchor
@@ -392,6 +396,7 @@ export class MoveCheck {
       this.hard = true; this.lastDist = step; this.lastLimit = stepLim;
       return MV.TELEPORT;
     }
+    if (outside) return MV.OUT_OF_BOUNDS;
 
     // sliding window (client time): oldest accepted sample within WINDOW_MS
     if (this.count > 0) {
@@ -414,10 +419,13 @@ export class MoveCheck {
         }
       }
       const slack = MOVE.SLACK_ADD_M + (mountChange ? MOVE.MOUNT_SLACK_M : 0);
-      if (this._over(i, x, z, segAllow, slack) || (ib !== i && this._over(ib, x, z, segAllow, slack)) ||
-          (il !== i && this._over(il, x, z, segAllow, slack))) return MV.SPEED;
+      // lastWin (diagnostics, server CORRECT log): 1 = 1 s window, 2 = 300 ms burst window, 3 = 4 s long window,
+      // 4 = first step after an anchor; lastSpan = client ms between the window start and the previous sample
+      if (this._over(i, x, z, segAllow, slack)) { this.lastWin = 1; return MV.SPEED; }
+      if (ib !== i && this._over(ib, x, z, segAllow, slack)) { this.lastWin = 2; return MV.SPEED; }
+      if (il !== i && this._over(il, x, z, segAllow, slack)) { this.lastWin = 3; return MV.SPEED; }
     } else if (step > stepLim) {
-      this.lastDist = step; this.lastLimit = stepLim;
+      this.lastDist = step; this.lastLimit = stepLim; this.lastWin = 4;
       return MV.SPEED;
     }
 

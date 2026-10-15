@@ -14,6 +14,11 @@ export const JUMP_V = 6.5;            // m/s initial vertical speed
 export const GRAVITY = 26;            // m/s²
 export const JUMP_APEX = (JUMP_V * JUMP_V) / (2 * GRAVITY);   // ≈ 0.81 m
 export const LAND_H = 2;              // flat city ground level (terrain.js LAND_H)
+// A client that gets a FRESH session (server restarted, RESUME expired) keeps its own position when the server's spawn
+// (its saved position) is within this distance, else it moves to the server's spawn (js/net/net.js applySpawn; the bots
+// do the same, server/bots/lib/bot.mjs). Must stay below move.js FIRST_RADIUS_M (15 m, the first-sample tolerance) or an
+// honest rejoin is corrected (server/test: rejoin_snap_vs_first_radius).
+export const REJOIN_SNAP_M = 12;
 
 // ---- world ----------------------------------------------------------------------------------------------------------
 export const BUILD_RADIUS = 1600;                    // world.js BUILD_RADIUS

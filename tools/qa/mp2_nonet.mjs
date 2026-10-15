@@ -34,7 +34,7 @@ try {
   pg.on('pageerror', (e) => res.errors.push('pageerror: ' + e.message));
   pg.on('console', (m) => { if (m.type() === 'error') res.errors.push('console: ' + m.text().slice(0, 200)); });
   const t0 = Date.now();
-  await pg.goto(`http://127.0.0.1:${PORT}/index.html?quality=${Q}`, { waitUntil: 'domcontentloaded' });
+  await pg.goto(`http://127.0.0.1:${PORT}/index.html?quality=${Q}&qa=1`, { waitUntil: 'domcontentloaded' });
   await pg.waitForFunction(() => window.__hp && window.__hp.teleport, null, { timeout: 300000 });
   await pg.waitForFunction(() => !document.getElementById('startBtn').classList.contains('loading'), null, { timeout: 120000 });
   res.startReadyMs = Date.now() - t0;

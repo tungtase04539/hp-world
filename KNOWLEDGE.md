@@ -519,7 +519,22 @@ chủ dự án: `docs/multiplayer/VAN_HANH.md`. Đặc tả giao việc: `docs/m
   (tên máy chủ chữ to) trước MỌI request; chỉ DEFAULT_SERVER / localhost / host đã đồng ý (`hp3d.serverTrust`) được nhớ ngầm.
   (6) Danh sách chặn ở máy theo netId của PHIÊN (xoá ở WELCOME không resume); người đã chặn bị ẩn hẳn (`ra.hide`); bảng 👥
   "Người chơi quanh đây" (chạm biểu tượng kết nối hoặc 👥 trong ô chat) báo cáo/chặn được cả người không chat. (7) `__hp.net`
-  chỉ có khi `navigator.webdriver` hoặc `?qa`.
+  chỉ có ở localhost hoặc `?qa=1` (từ riders fixer; trước đó `navigator.webdriver`/`?qa` bất kỳ — xem mục dưới).
+- **Không kéo về oan (riders fixer, 15/10/2026 — SERVER.md §9.8):** vật lý thật (vehicles.js: xe máy 16 m/s, ga 3,6 m/s², kẹp
+  dt 50 ms/khung ở main.js) KHÔNG vượt trình kiểm (16·1,2 + 1 m/cửa sổ); 3D dài hơn 2D trên dốc/cầu chỉ làm tốc độ 2D NHỎ đi.
+  Các CORRECT "SPEED" của bot S4 trong e2e đến từ BOT, không từ luật: (1) bot đóng dấu `clientMs` lúc GỬI trong khi vị trí tính
+  ở `now` chung của vòng tick → vòng sự kiện khựng giữa vòng (GC, IPC Playwright) = mẫu sau mang cả quãng khựng trong khe dấu
+  20–60 ms → cửa sổ 300 ms tràn 3 STATE liền → CORRECT (28 bot cùng 1 ms). LUẬT: dấu thời gian STATE = thời điểm của VỊ TRÍ
+  (bot: `posT`; client: preFrame ngay sau di chuyển cùng khung). (2) máy chủ khởi động lại → bot giữ vị trí cũ + epoch cũ, máy
+  chủ neo ở vị trí đã lưu ≤ 30 s trước → TELEPORT/SPEED + 29 SERVER_MOVE; bot nay làm như client (`_rejoin`: epoch 0, về điểm
+  máy chủ khi lệch > `REJOIN_SNAP_M` 12 m < `FIRST_RADIUS_M` 15 m — hằng ở constants.js, test giữ thứ tự). (3) client: lên rồi
+  xuống xe (hoặc ngược lại) lọt giữa 2 STATE 66 ms = máy chủ thấy ĐI BỘ nhảy vài mét → CORRECT; nay gửi STATE NGAY sau mỗi lần
+  lên/xuống (cách STATE trước ≥ 30 ms). Máy chủ ghi `"msg":"correct"` mỗi lần kéo về (cửa sổ `win` 1 = 1 s, 2 = 300 ms,
+  3 = 4 s, 4 = bước đầu; `dist`/`limit`/`dtS`/`lead`), `LOG_LEVEL=debug` ghi cả STATE bị từ chối (`"violation"`). Kiểm:
+  `tools/qa/mp_riders.mjs` (1 Chrome lái thật), `tools/qa/mp_converge.mjs` (bot + khựng + khởi động lại máy chủ),
+  `server/test/riders_regress.test.js`. Tay cầm QA: `__hp.net`, và khi ONLINE `__hp.teleport`/`pState`/`world`/`vehicles`/
+  `mount`/`player`/`traffic`/`footprints` chỉ có ở localhost hoặc `?qa=1` (`js/qagate.js`; KHÔNG theo `navigator.webdriver`);
+  launch/shoot/clearance/mp2_nonet tự thêm `qa=1`; kiểm cổng: `tools/qa/mp_qagate.mjs`.
 - **Người chơi khác trong game (MP-2 C2, `js/net/remote_avatars.js` + `interp.js` + `nametags.js`):** API và số đo ở
   `docs/multiplayer/SERVER.md` §9. Luật đã kiểm: **≤ 5 draw call cố định** cho mọi N (người · xe máy gần · xe máy xa · bóng
   tiếp đất · vòng sáng + bảng tên), **0 chương trình shader mới** (vật liệu `kitMaterial` cùng tham số với traffic.js → cùng đối
@@ -543,6 +558,18 @@ chủ dự án: `docs/multiplayer/VAN_HANH.md`. Đặc tả giao việc: `docs/m
 - Vercel (tùy chọn): import repo, không cần build command (site tĩnh).
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
+
+- **2026-10-15 (riders fixer — không kéo về oan, SERVER.md §9.8):** vật lý thật (xe máy 16 m/s, ga 3,6, dt ≤ 50 ms) nằm trong
+    trình kiểm; CORRECT "SPEED" của bot S4 trong e2e là lỗi BOT: đóng dấu `clientMs` lúc gửi thay vì lúc tính vị trí (28 bot cùng
+    1 ms sau một lần khựng vòng sự kiện) + không vào phiên mới như client sau khi máy chủ khởi động lại (7 SPEED + 29
+    SERVER_MOVE). Client: STATE ngay sau mỗi lần lên/xuống xe; người đi bộ không bị xe giao thông xô nhanh hơn tốc độ chế độ
+    (CORRECT oan thật trên mặt cầu HVT, `mp_riders` lượt 3); xe bị đẩy khỏi vật cản không rơi qua mép cầu. Trình kiểm: nhảy vào dải
+    ngoài vùng chơi vẫn là TELEPORT cứng (không nới gì). Log máy chủ mỗi CORRECT. `__hp.net`/tay cầm sửa trạng thái khi online chỉ
+    localhost/`?qa=1` (`js/qagate.js`). Số đo (máy chủ native test 9310/9311, tĩnh 8821, Radeon 890M TIER 3): e2e MP-2 dot3 → sau:
+    bot trung thực **64 → 0 CORRECT** (27/27 bước); `mp_converge` 96 bot + 122 lần khựng + khởi động lại máy chủ: **0**; abuse
+    22/22 (speed_hack 46/46, p50 468 / max 624 ms; teleport 14/14; người quan sát 0 CORRECT); `mp_riders` (1 Chrome lái thật 698 s / 4,6 km, 15,6 m/s, dốc xoắn + nhịp HVT 20,6 m lên–xuống, đi/chạy/nhảy + 49 lần lên/xuống,
+    cả trên nhịp cầu): **0 CORRECT, 0 vi phạm**; `mp_qagate` ĐẠT; diag full 0 lỗi; mp2_nonet đạt;
+    test máy chủ 160 (159 đạt + 1 bỏ qua sẵn). Đầu ra: `C:/Users/Admin/hp-world-work/mp2b/riders/`.
 
 - **2026-10-15 (MP-2 fixer vòng 1 — sửa 9 phát hiện phản biện, SERVER.md §9.7):** NC-1 CORRECT nhỏ không còn dây chuyền →
     kick (giữ STATE tới khi kéo xong; test Validator thật 36 tổ hợp fps×RTT×lệch: đúng 1 CORRECT); NC-2 RESUME không còn bóng

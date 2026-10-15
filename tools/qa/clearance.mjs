@@ -69,7 +69,7 @@ try {
   const PROF = arg('prof', '');
   let cdp = null;
   if (PROF) { cdp = await pg.context().newCDPSession(pg); await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', { interval: 200 }); await cdp.send('Profiler.start'); }
-  await pg.goto(`http://${HOST}:${PORT}/index.html?quality=full&fabfree=0`, { waitUntil: 'domcontentloaded', timeout: 120000 });
+  await pg.goto(`http://${HOST}:${PORT}/index.html?quality=full&fabfree=0&qa=1`, { waitUntil: 'domcontentloaded', timeout: 120000 });
   let res = null;
   for (let i = 0; i < 900 && !res; i++) {
     await pg.waitForTimeout(1000);

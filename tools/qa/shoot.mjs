@@ -46,7 +46,7 @@ const errors = [];
 pg.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
 pg.on('console', (m) => { if (m.type() === 'error') errors.push('console: ' + m.text().slice(0, 300)); });
 const t0 = Date.now();
-await pg.goto(`http://${HOST}:${PORT}/index.html?quality=${Q}${QS}`, { waitUntil: 'domcontentloaded', timeout: 120000 });
+await pg.goto(`http://${HOST}:${PORT}/index.html?quality=${Q}&qa=1${QS}`, { waitUntil: 'domcontentloaded', timeout: 120000 });
 let hpAt = 0;
 for (let i = 0; i < 400; i++) {
   const ok = await pg.evaluate(() => !!(window.__hp && window.__hp.teleport)).catch(() => false);

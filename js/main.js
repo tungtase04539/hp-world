@@ -368,6 +368,7 @@ function updatePlayerOnFoot(dt, time) {
   const f = input.forward, r = input.right;
   const mag = Math.min(1, Math.hypot(f, r));
   const speed = (input.run ? RUN : WALK) * mag;
+  const x0 = pState.pos.x, z0 = pState.pos.z;
 
   if (mag > 0.05) {
     _fwd.set(-Math.sin(cam.yaw), 0, -Math.cos(cam.yaw));
@@ -385,6 +386,14 @@ function updatePlayerOnFoot(dt, time) {
     }
     pState.yaw += wrapPI(Math.atan2(dir.x, dir.z) - pState.yaw) * (1 - Math.exp(-10 * dt));
   } else resolveAll(pState.pos, 0.45);
+  // XE GIAO THÔNG ĐANG CHẠY đẩy người (traffic.pushOut) — trước đây không giới hạn: xe lách/đi sát xô người đi bộ theo tốc độ
+  // xe (10–15 m/s) → máy chủ thấy ĐI/CHẠY nhanh gấp đôi → CORRECT oan (riders fixer 15/10/2026: mặt cầu HVT, chạy 7 m/s bị
+  // xô thành 9,6 m/1 s). Quãng dời của người đi bộ mỗi khung ≤ tốc độ chế độ (đi 3 / chạy 7 m/s, đúng như STATE báo) × 1,1:
+  // bị xe đè thì chồng lên xe một chút (xe tự lách/phanh — traffic.js avoidPlayer) thay vì bị bắn đi.
+  {
+    const cap = (input.run && mag > 0.05 ? RUN : WALK) * dt * 1.1, dx = pState.pos.x - x0, dz = pState.pos.z - z0, d = Math.hypot(dx, dz);
+    if (d > cap) { pState.pos.x = x0 + dx * cap / d; pState.pos.z = z0 + dz * cap / d; }
+  }
 
   const gy = surfaceY(pState.pos.x, pState.pos.z, pState.pos.y);   // W3-F: giữ tầng mặt cầu đang đứng
   if (consumeJump() && pState.onGround) { pState.vy = JUMP; pState.onGround = false; }
@@ -983,6 +992,9 @@ window.__hp = {
     return out;
   },
   teleport(x, z, camYaw = 0, pitch = 0.3, dist = 14) {
+    // MULTIPLAYER: người chơi thật không dùng được nút dịch chuyển gỡ lỗi khi đang online (chỉ localhost / ?qa=1 —
+    // js/qagate.js; máy chủ vẫn kéo về nếu ai đó tự sửa vị trí). Chơi một mình: giữ nguyên như cũ.
+    if (net && net.online && !net.qaOn) { console.warn('[hp] __hp.teleport tắt khi chơi online (cần ?qa=1)'); return false; }
     if (pState.mounted) { pState.mounted.mounted = false; pState.mounted = null; player.sit(false); }
     x = Math.max(WORLD_BOUNDS.minX + 31, Math.min(WORLD_BOUNDS.maxX - 31, x));   // clamp vào biên đi-được (tránh kẹt ngoài map — tryMove chặn mọi bước khi ở ngoài)
     z = Math.max(WORLD_BOUNDS.minZ + 31, Math.min(WORLD_BOUNDS.maxZ - 31, z));
@@ -1075,6 +1087,15 @@ window.__hp = {
     };
   },
 };
+// codebase_hooks §9 mục 17: khi đang ONLINE ở bản thật (không localhost, không ?qa=1 — js/qagate.js), các tay cầm sửa trạng
+// thái người chơi/thế giới qua console trả null (__hp.teleport tự từ chối ở trên). Chơi một mình / QA: như cũ. Máy chủ vẫn
+// không tin client (move.js) — đây chỉ để không "quảng cáo" lối gian lận dễ nhất.
+if (net && !net.qaOn) {
+  for (const k of ['pState', 'world', 'vehicles', 'mount', 'player', 'traffic', 'footprints']) {
+    const val = window.__hp[k];
+    Object.defineProperty(window.__hp, k, { get: () => (net.online ? null : val), enumerable: true, configurable: false });
+  }
+}
 
 // Nút Bắt đầu (boot.armStart): chỉ chạy khi thế giới đã dựng + khung hình đầu đã vẽ; bấm sớm thì vào ngay khi xong.
 function startGame() {

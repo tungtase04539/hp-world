@@ -185,7 +185,7 @@ Proposed layout: `js/net/` (client), loaded as ES modules, plus a dedicated netw
 | 14 | main.js:818 `drawMinimap` and minimap.js:118 | Optional `markers` argument. |
 | 15 | quests.js:25-67 | Replace the `localStorage` functions with a `progress` adapter: `local` (guest) and `remote` (account); keep the v1 schema for migration. |
 | 16 | index.html:27-54, 57-70; css/style.css:39-68; ui.js:72-90; input.js:41-48 | Nickname field, Google button, vitals HUD, chat, player list; modal registration; chat key. |
-| 17 | main.js:885 `window.__hp` | Gate behind a QA flag in production: `pState`, `teleport`, `world` are writable from the console and are an obvious cheat vector (the server must not rely on this, but it should not be advertised). |
+| 17 | main.js:885 `window.__hp` | Gate behind a QA flag in production: `pState`, `teleport`, `world` are writable from the console and are an obvious cheat vector (the server must not rely on this, but it should not be advertised). **Done (riders fixer, 15/10/2026):** `js/qagate.js` — localhost or `?qa=1` only (not `navigator.webdriver`); while ONLINE elsewhere `__hp.net` is null, `__hp.teleport` refuses, `pState/world/vehicles/mount/player/traffic/footprints` read null (main.js); checked by `tools/qa/mp_qagate.mjs`. |
 | 18 | main.js:1056 (`boot.step('shaders')`) | Show "Connecting..." status in the boot bar; connection state in the HUD afterward. |
 
 Server-reusable pure-JS modules (no `three`, can be imported in Node 24, which is installed here as v24.15.0): `terrain.js` (groundHeight, groundHeightNoDeck, `WORLD_BOUNDS`), `mapdata.js`, `roadgraph.js` + `xsection.js`, `skymodel.js`, `buildings_data.js` (footprint grid), `landmark_polys.js`.
