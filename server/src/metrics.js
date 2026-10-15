@@ -22,10 +22,27 @@ parentPort.on('message', (m) => { if (m === 'stop') { stopped = true; parentPort
 `;
 const hrMs = () => { const t = process.hrtime(); return t[0] * 1e3 + t[1] / 1e6; };
 
-// Starts the worker probe; lag samples go to hist (a Histogram) and to st.max (max since the last take).
-export function startLagProbe(hist, { intervalMs = PROBE_MS } = {}) {
+// Starts the worker probe; lag samples go to hist (a Histogram: Prometheus buckets), to a time-stamped ring for
+// st.quantile(q) over the last windowMs (10 s — a 2,048-sample window would span ~30 s on Windows, where the worker's
+// timer only fires at 64 Hz, and keep boot-time stalls in the p99 long after) and to st.max (max since the last take).
+export function startLagProbe(hist, { intervalMs = PROBE_MS, windowMs = 10_000 } = {}) {
+  const N = 4096;
+  const vals = new Float64Array(N), at = new Float64Array(N), tmp = new Float64Array(N);
+  let head = 0, count = 0;
   const st = {
     max: 0, samples: 0, worker: null,
+    quantile(q) {
+      const from = hrMs() - windowMs;
+      let n = 0;
+      for (let k = 0, i = head; k < count; k++) {
+        i = (i - 1 + N) % N;
+        if (at[i] < from) break;
+        tmp[n++] = vals[i];
+      }
+      if (!n) return 0;
+      const s = tmp.subarray(0, n).sort();
+      return s[Math.min(n - 1, Math.max(0, Math.ceil(q * n) - 1))];
+    },
     stop() {
       const w = this.worker;
       if (!w) return;
@@ -41,6 +58,7 @@ export function startLagProbe(hist, { intervalMs = PROBE_MS } = {}) {
       const lag = hrMs() - t;
       const v = lag > 0 ? lag : 0;
       hist.observe(v);
+      vals[head] = v; at[head] = t + v; head = (head + 1) % N; if (count < N) count++;
       if (v > st.max) st.max = v;
       st.samples++;
     });
@@ -188,9 +206,8 @@ export function createMetrics({ prefix = 'hp_', processMetrics = true } = {}) {
     metrics.gauge('process_cpu_percent', 'CPU of this process, % of one core (since the previous scrape)', sampleCpu);
     metrics.gauge('process_rss_bytes', 'resident set size', () => process.memoryUsage.rss());
     metrics.gauge('process_heap_used_bytes', 'V8 heap used', () => process.memoryUsage().heapUsed);
-    const q = (p) => { const v = lagH.quantile(p); return Number.isFinite(v) ? v : 0; };
-    metrics.gauge('eventloop_delay_p50_ms', 'event-loop lag p50 (ms): wait of an external event, last 2048 probe samples', () => q(0.5));
-    metrics.gauge('eventloop_delay_p99_ms', 'event-loop lag p99 (ms): wait of an external event, last 2048 probe samples', () => q(0.99));
+    metrics.gauge('eventloop_delay_p50_ms', 'event-loop lag p50 (ms): wait of an external event, probe samples of the last 10 s', () => probe.quantile(0.5));
+    metrics.gauge('eventloop_delay_p99_ms', 'event-loop lag p99 (ms): wait of an external event, probe samples of the last 10 s', () => probe.quantile(0.99));
     metrics.gauge('eventloop_delay_max_ms', 'event-loop lag max (ms) since the last scrape', () => {
       const v = probe.max;
       probe.max = 0;        // window = between scrapes of the max gauge
