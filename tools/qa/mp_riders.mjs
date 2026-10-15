@@ -133,16 +133,16 @@ function installDriver(pg, route) {
     };
     st.release = () => { for (const k of ['KeyW', 'KeyA', 'KeyS', 'KeyD']) key(k, false); };
     const wrap = (a) => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; };
-    let revUntil = 0, chkT = performance.now(), chkX = NaN, chkZ = NaN, chkI = 0, stuckN = 0;
+    let revUntil = 0, chkT = performance.now(), chkPath = 0, chkI = 0, stuckN = 0;
     function tick() {
       if (st.done) { st.release(); return; }
       requestAnimationFrame(tick);
       const now = performance.now();
       const v = window.__hp.pState.mounted;
-      if (st.paused || !v) { st.release(); st.lastT = now; return; }
+      if (st.paused || !v) { st.release(); st.lastT = now; st.lastY = NaN; st.lastX = NaN; return; }   // (bài D đi bộ dọc nhịp dốc: không tính là rơi)
       st.mountedMs += now - st.lastT; st.lastT = now;
       const P = st.pts, x = v.pos.x, z = v.pos.z;
-      if (Number.isFinite(st.lastX)) st.distM += Math.hypot(x - st.lastX, z - st.lastZ);
+      if (Number.isFinite(st.lastX)) { const dd = Math.hypot(x - st.lastX, z - st.lastZ); st.distM += dd; chkPath += dd; }
       st.lastX = x; st.lastZ = z;
       st.maxV = Math.max(st.maxV, v.vel); st.maxY = Math.max(st.maxY, v.pos.y);
       // tiến chỉ số: điểm gần nhất trong 60 điểm tới
@@ -153,8 +153,8 @@ function installDriver(pg, route) {
       if (bd < 12 && Math.abs(v.vel) > 3) st.tagsSeen[st.tagNow] = (st.tagsSeen[st.tagNow] || 0) + 1;   // khung THẬT đang chạy trên đoạn đó
       if (Number.isFinite(st.lastY) && v.pos.y < st.lastY - 3) st.falls.push([+x.toFixed(1), +z.toFixed(1), +st.lastY.toFixed(1), +v.pos.y.toFixed(1)]);
       st.lastY = v.pos.y;
-      if (st.pauseAt >= 0 && st.i >= st.pauseAt) { st.pauseAt = -1; st.paused = true; st.release(); return; }
-      if (st.i >= P.length - 3) { st.done = true; st.release(); return; }
+      if (st.pauseAt >= 0 && st.i >= st.pauseAt && bd < 15) { st.pauseAt = -1; st.paused = true; st.release(); return; }
+      if (st.i >= P.length - 3 && bd < 15) { st.done = true; st.release(); return; }
       // điểm nhìn trước
       const La = 6 + 0.55 * Math.abs(v.vel);
       let j = st.i; while (j < P.length - 1 && Math.hypot(P[j][0] - x, P[j][1] - z) < La) j++;
@@ -168,21 +168,21 @@ function installDriver(pg, route) {
       }
       turn /= 2;
       let vt = turn > 1.3 ? 4.5 : turn > 0.8 ? 7 : turn > 0.45 ? 10 : turn > 0.25 ? 13 : 16;
-      if (Math.abs(err) > 1.0) vt = Math.min(vt, 4);
+      // đích lệch nhiều / ở sau lưng: chạy CHẬM đánh hết lái (xe đạp: bán kính ~2,7 m ở 3,5 m/s) — quay đầu không cần lùi
+      if (Math.abs(err) > 1.0) vt = Math.min(vt, 3.5);
       // kẹt (đâm cột/tường/xe): lùi 1,2 s rồi đi tiếp
-      // quay đầu (đích ở SAU lưng, xe gần đứng): lùi đánh lái ngược 1 s = quay đầu 3 điểm, không húc tường/lan can
-      if (Math.abs(err) > 2.3 && Math.abs(v.vel) < 2.5 && now > revUntil + 1500) { revUntil = now + 1000; st.uturns = (st.uturns || 0) + 1; }
       if (now < revUntil) { key('KeyW', false); key('KeyS', true); key('KeyA', err < 0); key('KeyD', err > 0); return; }
       // kẹt = trong 2 s đi được < 2 m (đâm cột/tường/xe, trườn sát tường với vel*0,4 mỗi khung): lùi 1,2 s; kẹt lặp lại ở
       // cùng đoạn → nhắm xa hơn (bỏ qua góc cắt của đồ thị phố)
+      // (quãng đường ĐI ĐƯỢC — xe đang quay vòng chậm không phải kẹt; sau mỗi lần lùi cho 2 s tiến lên rồi mới xét lại)
       if (now - chkT > 2000) {
-        const moved = Number.isFinite(chkX) ? Math.hypot(x - chkX, z - chkZ) : 99;
-        if (moved < 2) {
+        if (chkPath < 2) {
           stuckN = st.i - chkI < 5 ? stuckN + 1 : 1;
           revUntil = now + 1200; st.reverses++;
-          if (stuckN >= 3) { st.i = Math.min(P.length - 4, st.i + 8); st.skips++; }
-        } else stuckN = 0;
-        chkT = now; chkX = x; chkZ = z; chkI = st.i;
+          if (stuckN >= 3 && bd < 15) { st.i = Math.min(P.length - 4, st.i + 8); st.skips++; }
+          chkT = revUntil;
+        } else { stuckN = 0; chkT = now; }
+        chkPath = 0; chkI = st.i;
       }
       key('KeyD', err < -0.05); key('KeyA', err > 0.05);
       if (v.vel < vt - 0.4) { key('KeyS', false); key('KeyW', true); }

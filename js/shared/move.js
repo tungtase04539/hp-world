@@ -365,10 +365,14 @@ export class MoveCheck {
     // play disc
     const r2 = x * x + z * z;
     const rIn = PLAY_RADIUS + MOVE.PLAY_TOL_M;
+    let outside = false;
     if (r2 > rIn * rIn) {
       const rh = PLAY_RADIUS + MOVE.PLAY_HARD_M;
       this.hard = r2 > rh * rh;
-      return MV.OUT_OF_BOUNDS;
+      if (this.hard) return MV.OUT_OF_BOUNDS;
+      // soft band (≤ 50 m outside): still judged as a TELEPORT first (riders fixer 15/10/2026 — a 155 m jump that landed
+      // 34 m outside the disc was scored 1 point per STATE, 3 s at 2 Hz before the CORRECT, instead of a hard flag)
+      outside = true;
     }
 
     // movement against the previous accepted sample / the anchor
@@ -392,6 +396,7 @@ export class MoveCheck {
       this.hard = true; this.lastDist = step; this.lastLimit = stepLim;
       return MV.TELEPORT;
     }
+    if (outside) return MV.OUT_OF_BOUNDS;
 
     // sliding window (client time): oldest accepted sample within WINDOW_MS
     if (this.count > 0) {

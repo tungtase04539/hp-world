@@ -145,3 +145,22 @@ test('mount/dismount spam (60–400 ms): a STATE right after every toggle → 0 
   const old = mountSpam({ immediate: false, gaps: [70, 80, 75, 90] });
   assert.ok(old.viol > 0, `old client should violate: ${JSON.stringify(old)}`);
 });
+
+test('a teleport that lands in the soft out-of-bounds band is still a hard TELEPORT (corrected at once)', () => {
+  const v = new Validator(); v.extraFlags = MCF.SKIP_SURFACE;
+  const a = 1500 / Math.SQRT2;                         // r 1500, inside the disc
+  v.reset(a, a, MODE.WALK, 1_000_000, false);
+  let t = 5000, srv = 1_000_000;
+  for (let i = 0; i < 10; i++) { t += 66; srv += 66; assert.ok(v.onState(t, a, a, MODE.WALK, srv, true).accepted); }
+  const b = (1500 + 120) / Math.SQRT2;                 // r 1620: 32 m outside, 120 m away
+  const r = v.onState(t + 66, b, b, MODE.WALK, srv + 66, true);
+  assert.equal(r.accepted, false);
+  assert.ok(r.hard && r.correct, JSON.stringify(r));
+  // an honest player sliding along the edge (small step, 1 m outside) is only a soft out-of-bounds point
+  const v2 = new Validator(); v2.extraFlags = MCF.SKIP_SURFACE;
+  const e = 1589 / Math.SQRT2, e2 = 1591 / Math.SQRT2;
+  v2.reset(e, e, MODE.WALK, 1_000_000, false);
+  const r2 = v2.onState(5066, e2, e2, MODE.WALK, 1_000_066, true);
+  assert.equal(r2.hard, false);
+  assert.equal(r2.correct, 0);
+});
