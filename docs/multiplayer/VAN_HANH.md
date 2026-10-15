@@ -363,6 +363,7 @@ Cùng một cấu hình Docker chạy được cả trên máy nhà lẫn VPS. K
 | Lỗi "port is already allocated" | Có chương trình khác đang dùng cổng 9100/9101, thường là máy chủ cũ chưa tắt. Chạy `tat-may-chu.ps1` rồi mở lại |
 | Người chơi không vào được, nhưng `trang-thai.ps1` báo game [OK] | Xem dòng Tunnel. Nếu "không chạy": kiểm tra `TUNNEL_TOKEN` trong `server\.env`, rồi tắt và mở lại. Dùng tunnel tạm thì nhớ địa chỉ đã đổi |
 | Trang `https://game.../healthz` báo lỗi 1033 / 530 | Tunnel chưa kết nối. Chạy lại `mo-may-chu.ps1`. Kiểm tra mạng nhà |
+| Bạn kêu "đang chạy thì bị kéo giật về chỗ cũ" | Mỗi lần máy chủ kéo người chơi về, nhật ký có một dòng `"msg":"correct"` (tên người, lý do, quãng đường, giới hạn). Gõ `docker compose -p hpworld -f server\docker-compose.yml logs game \| Select-String '"correct"'` và gửi kết quả cho lập trình viên. Người chơi bình thường (đi, chạy, nhảy, lên xuống xe, xe máy ga hết cỡ, qua cầu) không bị kéo về |
 | Người chơi giật, lag | Xem trang quản trị: độ trễ máy chủ (tick) và số người. Đóng bớt chương trình nặng trên máy. Kiểm tra tốc độ mạng nhà (cần tốc độ lên đủ, xem mục 14) |
 | Máy ngủ, người chơi bị ngắt | Cắm sạc. Chỉnh "Khi đóng nắp máy (đang cắm sạc): Không làm gì". Chạy `trang-thai.ps1` xem "Đang giữ máy không ngủ" |
 | `trang-thai.ps1` báo sao lưu lỗi | Chạy `sao-luu.ps1` để xem lỗi. Kiểm tra ổ đĩa còn trống. Báo lập trình viên nếu vẫn lỗi |

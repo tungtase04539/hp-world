@@ -25,7 +25,7 @@ const GAME = +A.get('game', 9310);
 const OUT = path.resolve(A.get('out', 'C:/Users/Admin/hp-world-work/mp2b/riders'));
 const DATA = path.resolve(A.get('data', path.join(OUT, 'data')));
 const DRIVE_MIN_S = +A.get('driveS', 200);        // tối thiểu giây lái xe ga hết cỡ (yêu cầu ≥ 180)
-const DRIVE_MAX_S = +A.get('driveMaxS', 600);
+const DRIVE_MAX_S = +A.get('driveMaxS', 720);
 fs.mkdirSync(OUT, { recursive: true });
 fs.mkdirSync(DATA, { recursive: true });
 const HTTP = `http://127.0.0.1:${GAME}`, ADMIN = `http://127.0.0.1:${GAME + 1}`;
@@ -89,10 +89,12 @@ async function buildRoute(from) {
     const p = g.path(na, nb) || [na];
     return p.map((i) => [g.x[i], g.z[i]]);
   };
-  const way = (ri) => T.ROADS_DT[ri].pts.map((p) => [p[0], p[1]]);
+  // làm dày 2 m TRƯỚC khi cắt theo bán kính (nhịp 242 chỉ có 8 điểm: đoạn cuối dài 965 m vượt mép vùng chơi)
+  const dense = (pts) => { const o = [pts[0]]; for (let i = 1; i < pts.length; i++) { const [ax, az] = pts[i - 1], [bx, bz] = pts[i], n = Math.max(1, Math.ceil(Math.hypot(bx - ax, bz - az) / 2)); for (let k = 1; k <= n; k++) o.push([ax + (bx - ax) * k / n, az + (bz - az) * k / n]); } return o; };
+  const way = (ri) => dense(T.ROADS_DT[ri].pts.map((p) => [p[0], p[1]]));
   const inside = (pts, r) => { const o = []; for (const p of pts) { if (Math.hypot(p[0], p[1]) > r) break; o.push(p); } return o; };
   // Hoàng Văn Thụ: dốc 248 → dốc xoắn 349 → nhịp 242 (tới r 1555 — mép vùng chơi 1588), quay đầu, chạy ngược xuống
-  const hvtUp = [...way(248), ...way(349).slice(1), ...inside(way(242).slice(1), 1555)];
+  const hvtUp = [...way(248), ...way(349).slice(1), ...inside(way(242).slice(1), 1500)];
   const hvtDown = hvtUp.slice().reverse();
   const lacLong = way(20);   // (-268,-525) → (-495,-479)
   const seg = [];
@@ -103,7 +105,6 @@ async function buildRoute(from) {
   add(hvtDown, 'hvt_down');
   add(viaGraph(hvtDown[hvtDown.length - 1], lacLong[0]), 'street2');
   add(lacLong, 'laclong');
-  add(viaGraph(lacLong[lacLong.length - 1], [-909.6, 339.3]), 'street3');   // tới Hồ Tam Bạc
   // làm dày 2 m
   const out = [];
   for (let i = 0; i < seg.length; i++) {
@@ -124,7 +125,7 @@ async function buildRoute(from) {
 function installDriver(pg, route) {
   return pg.evaluate((route) => {
     const st = window.__rp = { pts: route.pts, i: 0, done: false, paused: false, pauseAt: route.pauseAt, keys: {}, maxV: 0, maxY: 0, stuck: 0, reverses: 0,
-      distM: 0, t0: performance.now(), lastX: NaN, lastZ: NaN, tagNow: '', tagsSeen: {}, mountedMs: 0, lastT: performance.now() };
+      distM: 0, t0: performance.now(), lastX: NaN, lastZ: NaN, lastY: NaN, falls: [], skips: 0, tagNow: '', tagsSeen: {}, mountedMs: 0, lastT: performance.now() };
     const key = (code, down) => {
       if (!!st.keys[code] === down) return;
       st.keys[code] = down;
@@ -132,7 +133,7 @@ function installDriver(pg, route) {
     };
     st.release = () => { for (const k of ['KeyW', 'KeyA', 'KeyS', 'KeyD']) key(k, false); };
     const wrap = (a) => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; };
-    let revUntil = 0, slowSince = 0;
+    let revUntil = 0, chkT = performance.now(), chkX = NaN, chkZ = NaN, chkI = 0, stuckN = 0;
     function tick() {
       if (st.done) { st.release(); return; }
       requestAnimationFrame(tick);
@@ -148,7 +149,10 @@ function installDriver(pg, route) {
       let bi = st.i, bd = Infinity;
       for (let k = st.i; k < Math.min(P.length, st.i + 60); k++) { const d = Math.hypot(P[k][0] - x, P[k][1] - z); if (d < bd) { bd = d; bi = k; } }
       st.i = bi;
-      st.tagNow = P[bi][2]; st.tagsSeen[st.tagNow] = (st.tagsSeen[st.tagNow] || 0) + 1;
+      st.tagNow = P[bi][2];
+      if (bd < 12 && Math.abs(v.vel) > 3) st.tagsSeen[st.tagNow] = (st.tagsSeen[st.tagNow] || 0) + 1;   // khung THẬT đang chạy trên đoạn đó
+      if (Number.isFinite(st.lastY) && v.pos.y < st.lastY - 3) st.falls.push([+x.toFixed(1), +z.toFixed(1), +st.lastY.toFixed(1), +v.pos.y.toFixed(1)]);
+      st.lastY = v.pos.y;
       if (st.pauseAt >= 0 && st.i >= st.pauseAt) { st.pauseAt = -1; st.paused = true; st.release(); return; }
       if (st.i >= P.length - 3) { st.done = true; st.release(); return; }
       // điểm nhìn trước
@@ -166,9 +170,20 @@ function installDriver(pg, route) {
       let vt = turn > 1.3 ? 4.5 : turn > 0.8 ? 7 : turn > 0.45 ? 10 : turn > 0.25 ? 13 : 16;
       if (Math.abs(err) > 1.0) vt = Math.min(vt, 4);
       // kẹt (đâm cột/tường/xe): lùi 1,2 s rồi đi tiếp
+      // quay đầu (đích ở SAU lưng, xe gần đứng): lùi đánh lái ngược 1 s = quay đầu 3 điểm, không húc tường/lan can
+      if (Math.abs(err) > 2.3 && Math.abs(v.vel) < 2.5 && now > revUntil + 1500) { revUntil = now + 1000; st.uturns = (st.uturns || 0) + 1; }
       if (now < revUntil) { key('KeyW', false); key('KeyS', true); key('KeyA', err < 0); key('KeyD', err > 0); return; }
-      if (Math.abs(v.vel) < 0.4 && st.keys.KeyW) { if (!slowSince) slowSince = now; else if (now - slowSince > 1600) { revUntil = now + 1200; slowSince = 0; st.reverses++; return; } }
-      else slowSince = 0;
+      // kẹt = trong 2 s đi được < 2 m (đâm cột/tường/xe, trườn sát tường với vel*0,4 mỗi khung): lùi 1,2 s; kẹt lặp lại ở
+      // cùng đoạn → nhắm xa hơn (bỏ qua góc cắt của đồ thị phố)
+      if (now - chkT > 2000) {
+        const moved = Number.isFinite(chkX) ? Math.hypot(x - chkX, z - chkZ) : 99;
+        if (moved < 2) {
+          stuckN = st.i - chkI < 5 ? stuckN + 1 : 1;
+          revUntil = now + 1200; st.reverses++;
+          if (stuckN >= 3) { st.i = Math.min(P.length - 4, st.i + 8); st.skips++; }
+        } else stuckN = 0;
+        chkT = now; chkX = x; chkZ = z; chkI = st.i;
+      }
       key('KeyD', err < -0.05); key('KeyA', err > 0.05);
       if (v.vel < vt - 0.4) { key('KeyS', false); key('KeyW', true); }
       else if (v.vel > vt + 2.5) { key('KeyW', false); key('KeyS', true); }
@@ -180,7 +195,7 @@ function installDriver(pg, route) {
 }
 const rp = (pg) => pg.evaluate(() => { const s = window.__rp, h = window.__hp, v = h.pState.mounted, p = v ? v.pos : h.pState.pos;
   return { i: s.i, n: s.pts.length, done: s.done, paused: s.paused, tag: s.tagNow, maxV: +s.maxV.toFixed(2), maxY: +s.maxY.toFixed(1), distM: Math.round(s.distM),
-    mountedS: +(s.mountedMs / 1000).toFixed(1), reverses: s.reverses, x: +p.x.toFixed(1), z: +p.z.toFixed(1), y: +p.y.toFixed(1), vel: v ? +v.vel.toFixed(2) : null,
+    mountedS: +(s.mountedMs / 1000).toFixed(1), reverses: s.reverses, skips: s.skips, falls: s.falls.length, x: +p.x.toFixed(1), z: +p.z.toFixed(1), y: +p.y.toFixed(1), vel: v ? +v.vel.toFixed(2) : null,
     mounted: !!v, corr: h.net.status().correct, conn: h.net.status().conn }; });
 const status = (pg) => pg.evaluate(() => { const s = window.__hp.net.status(); return { conn: s.conn, netId: s.netId, correct: s.correct, stateSent: s.tel && s.tel.stateSent }; });
 async function shot(pg, name) { const f = path.join(OUT, name); await pg.screenshot({ path: f }); report.shots.push(f); return f; }
@@ -305,14 +320,15 @@ async function main() {
     }
     await pg.evaluate(() => { window.__rp.done = true; });
     const fin = await rp(pg);
-    report.drive = { seconds: Math.round((Date.now() - tDrive) / 1000), ...fin, tagsSeen: await pg.evaluate(() => window.__rp.tagsSeen) };
+    report.drive = { seconds: Math.round((Date.now() - tDrive) / 1000), ...fin, tagsSeen: await pg.evaluate(() => window.__rp.tagsSeen), fallList: await pg.evaluate(() => window.__rp.falls) };
     fs.writeFileSync(path.join(OUT, 'track.json'), JSON.stringify(track));
     await shot(pg, '06_end.png');
     s = await status(pg);
     const tags = report.drive.tagsSeen || {};
     step('C. xe máy ga hết cỡ ≥ 3 phút (phố + dốc xoắn + nhịp cầu HVT + cầu Lạc Long) → 0 CORRECT',
-      s.correct.count === 0 && report.drive.mountedS >= 180, { correct: s.correct, mountedS: report.drive.mountedS, distM: report.drive.distM, maxV: report.drive.maxV, maxY: report.drive.maxY,
+      s.correct.count === 0 && report.drive.mountedS >= 180 && (tags.hvt_up || 0) > 300 && (tags.hvt_down || 0) > 300, { correct: s.correct, mountedS: report.drive.mountedS, distM: report.drive.distM, maxV: report.drive.maxV, maxY: report.drive.maxY,
         hvtUp: tags.hvt_up || 0, hvtDown: tags.hvt_down || 0, lacLong: tags.laclong || 0, reverses: report.drive.reverses });
+    step('không rơi khỏi mặt cầu khi đang lái (độ cao tụt > 3 m trong 1 khung)', (report.drive.fallList || []).length === 0, { falls: report.drive.fallList });
     step('D. trên mặt cầu: xuống xe, đi/chạy/nhảy, lên–xuống dồn dập → 0 CORRECT', didDeck && report.phases.D && report.phases.D.correct.count === 0, report.phases.D || {});
 
     // tổng kết phía máy chủ

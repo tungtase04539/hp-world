@@ -519,7 +519,22 @@ chủ dự án: `docs/multiplayer/VAN_HANH.md`. Đặc tả giao việc: `docs/m
   (tên máy chủ chữ to) trước MỌI request; chỉ DEFAULT_SERVER / localhost / host đã đồng ý (`hp3d.serverTrust`) được nhớ ngầm.
   (6) Danh sách chặn ở máy theo netId của PHIÊN (xoá ở WELCOME không resume); người đã chặn bị ẩn hẳn (`ra.hide`); bảng 👥
   "Người chơi quanh đây" (chạm biểu tượng kết nối hoặc 👥 trong ô chat) báo cáo/chặn được cả người không chat. (7) `__hp.net`
-  chỉ có khi `navigator.webdriver` hoặc `?qa`.
+  chỉ có ở localhost hoặc `?qa=1` (từ riders fixer; trước đó `navigator.webdriver`/`?qa` bất kỳ — xem mục dưới).
+- **Không kéo về oan (riders fixer, 15/10/2026 — SERVER.md §9.8):** vật lý thật (vehicles.js: xe máy 16 m/s, ga 3,6 m/s², kẹp
+  dt 50 ms/khung ở main.js) KHÔNG vượt trình kiểm (16·1,2 + 1 m/cửa sổ); 3D dài hơn 2D trên dốc/cầu chỉ làm tốc độ 2D NHỎ đi.
+  Các CORRECT "SPEED" của bot S4 trong e2e đến từ BOT, không từ luật: (1) bot đóng dấu `clientMs` lúc GỬI trong khi vị trí tính
+  ở `now` chung của vòng tick → vòng sự kiện khựng giữa vòng (GC, IPC Playwright) = mẫu sau mang cả quãng khựng trong khe dấu
+  20–60 ms → cửa sổ 300 ms tràn 3 STATE liền → CORRECT (28 bot cùng 1 ms). LUẬT: dấu thời gian STATE = thời điểm của VỊ TRÍ
+  (bot: `posT`; client: preFrame ngay sau di chuyển cùng khung). (2) máy chủ khởi động lại → bot giữ vị trí cũ + epoch cũ, máy
+  chủ neo ở vị trí đã lưu ≤ 30 s trước → TELEPORT/SPEED + 29 SERVER_MOVE; bot nay làm như client (`_rejoin`: epoch 0, về điểm
+  máy chủ khi lệch > `REJOIN_SNAP_M` 12 m < `FIRST_RADIUS_M` 15 m — hằng ở constants.js, test giữ thứ tự). (3) client: lên rồi
+  xuống xe (hoặc ngược lại) lọt giữa 2 STATE 66 ms = máy chủ thấy ĐI BỘ nhảy vài mét → CORRECT; nay gửi STATE NGAY sau mỗi lần
+  lên/xuống (cách STATE trước ≥ 30 ms). Máy chủ ghi `"msg":"correct"` mỗi lần kéo về (cửa sổ `win` 1 = 1 s, 2 = 300 ms,
+  3 = 4 s, 4 = bước đầu; `dist`/`limit`/`dtS`/`lead`), `LOG_LEVEL=debug` ghi cả STATE bị từ chối (`"violation"`). Kiểm:
+  `tools/qa/mp_riders.mjs` (1 Chrome lái thật), `tools/qa/mp_converge.mjs` (bot + khựng + khởi động lại máy chủ),
+  `server/test/riders_regress.test.js`. Tay cầm QA: `__hp.net`, và khi ONLINE `__hp.teleport`/`pState`/`world`/`vehicles`/
+  `mount`/`player`/`traffic`/`footprints` chỉ có ở localhost hoặc `?qa=1` (`js/qagate.js`; KHÔNG theo `navigator.webdriver`);
+  launch/shoot/clearance/mp2_nonet tự thêm `qa=1`; kiểm cổng: `tools/qa/mp_qagate.mjs`.
 - **Người chơi khác trong game (MP-2 C2, `js/net/remote_avatars.js` + `interp.js` + `nametags.js`):** API và số đo ở
   `docs/multiplayer/SERVER.md` §9. Luật đã kiểm: **≤ 5 draw call cố định** cho mọi N (người · xe máy gần · xe máy xa · bóng
   tiếp đất · vòng sáng + bảng tên), **0 chương trình shader mới** (vật liệu `kitMaterial` cùng tham số với traffic.js → cùng đối

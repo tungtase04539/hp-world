@@ -215,14 +215,21 @@ export function createVehicles(scene, groundHeight, waterHeight, spawns, resolve
     const dist = v.vel * dt, n = Math.max(1, Math.ceil(Math.abs(dist) / 0.4));
     const sx = Math.sin(v.heading) * dist / n, sz = Math.cos(v.heading) * dist / n;
     for (let k = 0; k < n; k++) {
-      const nx = v.pos.x + sx, nz = v.pos.z + sz;
+      const ox = v.pos.x, oz = v.pos.z;
+      const nx = ox + sx, nz = oz + sz;
       if (blockedAt(v, nx, nz)) { v.vel = 0; break; }
       v.pos.x = nx; v.pos.z = nz;
       // không xuyên nhà cửa / cột / NPC / đảo đá
       if (resolveCollisions) {
         const bx = v.pos.x, bz = v.pos.z;
         resolveCollisions(v.pos, v.land ? 0.8 : 1.6);
-        if (Math.hypot(v.pos.x - bx, v.pos.z - bz) > 0.01) { v.vel *= 0.4; break; }
+        if (Math.hypot(v.pos.x - bx, v.pos.z - bz) > 0.01) {
+          // cú ĐẨY ra khỏi vật cản không được đưa xe qua mép mặt cầu (riders fixer 15/10/2026: xe kẹt sát lan can nhịp cầu
+          // HVT chỗ dốc xoắn gặp nhịp chính (−48, −905), lùi–tiến nhiều lần → bị đẩy ra ngoài mép, rơi 14,5 m xuống đất dưới
+          // vòng xoắn và kẹt luôn): đẩy mà rơi xuống tầng thấp hơn → về chỗ cũ, dừng xe
+          if (v.mounted && blockedAt(v, v.pos.x, v.pos.z)) { v.pos.x = ox; v.pos.z = oz; v.vel = 0; break; }
+          v.vel *= 0.4; break;
+        }
       }
     }
     if (v.land) {
