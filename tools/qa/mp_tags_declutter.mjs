@@ -77,7 +77,8 @@ async function run(quality) {
     R.denseHigh = await ev(() => window.__tg.stop());
     await shot('dense96_high.png');
 
-    // 3) bộ nhớ: 60 s đám đông dày đi + camera quay — KHÔNG có lớp bọc đo
+    // 3) bộ nhớ: HEAP_S giây đám đông dày đi + camera quay — KHÔNG có lớp bọc đo. Chia 3 cửa sổ (JIT/khử tối ưu sau khi gỡ
+    //    lớp bọc rơi vào cửa sổ đầu); báo từng cửa sổ + cửa sổ cuối (trạng thái ổn định) + heap sau GC đầu/cuối
     await ev(() => window.__tg.uninstall());
     await ev(([x, z]) => window.__tg.orbit(x, z, 16, 0.3, 0.15), SQ);
     await wait(2000);
@@ -85,34 +86,42 @@ async function run(quality) {
     await cdp.send('HeapProfiler.enable');
     await cdp.send('HeapProfiler.collectGarbage');
     const h0 = await cdp.send('Runtime.getHeapUsage');
-    await cdp.send('HeapProfiler.startSampling', { samplingInterval: 512, includeObjectsCollectedByMajorGC: true, includeObjectsCollectedByMinorGC: true });
-    const t0 = Date.now();
-    await wait(HEAP_S * 1000);
-    const { profile } = await cdp.send('HeapProfiler.stopSampling');
-    const secs = (Date.now() - t0) / 1000;
+    const windows = [];
+    for (let w = 0; w < 3; w++) {
+      await cdp.send('HeapProfiler.startSampling', { samplingInterval: 512, includeObjectsCollectedByMajorGC: true, includeObjectsCollectedByMinorGC: true });
+      const t0 = Date.now();
+      await wait((HEAP_S / 3) * 1000);
+      const { profile } = await cdp.send('HeapProfiler.stopSampling');
+      const secs = (Date.now() - t0) / 1000;
+      const byFile = {}, byFn = {};
+      let total = 0;
+      const walk = (n) => {
+        const sz = n.selfSize || 0;
+        total += sz;
+        const u = n.callFrame.url || '';
+        const m = u.match(/\/(js\/[^?#]+)/);
+        const f = m ? m[1] : (u ? 'other' : '(native/vm)');
+        byFile[f] = (byFile[f] || 0) + sz;
+        if (/js\/net\//.test(f) && sz) { const k = `${f}:${n.callFrame.functionName || '(anon)'}:${n.callFrame.lineNumber + 1}`; byFn[k] = (byFn[k] || 0) + sz; }
+        for (const c of n.children || []) walk(c);
+      };
+      walk(profile.head);
+      const kbs = (b) => +(b / 1024 / secs).toFixed(1);
+      windows.push({
+        seconds: +secs.toFixed(1), allocTotalKBs: kbs(total),
+        allocNetKBs: Object.fromEntries(Object.entries(byFile).filter(([f]) => f.startsWith('js/net/')).map(([f, b]) => [f, kbs(b)])),
+        topNetFns: Object.entries(byFn).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([k, b]) => [k, kbs(b)]),
+        topFiles: Object.entries(byFile).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([k, b]) => [k, kbs(b)]),
+      });
+    }
     await cdp.send('HeapProfiler.collectGarbage');
     const h1 = await cdp.send('Runtime.getHeapUsage');
     await ev(() => window.__tg.stopOrbit());
-    const byFile = {}, byFn = {};
-    let total = 0;
-    const walk = (n) => {
-      const sz = n.selfSize || 0;
-      total += sz;
-      const u = n.callFrame.url || '';
-      const m = u.match(/\/(js\/[^?#]+)/);
-      const f = m ? m[1] : (u ? 'other' : '(native/vm)');
-      byFile[f] = (byFile[f] || 0) + sz;
-      if (/js\/net\//.test(f) && sz) { const k = `${f}:${n.callFrame.functionName || '(anon)'}:${n.callFrame.lineNumber + 1}`; byFn[k] = (byFn[k] || 0) + sz; }
-      for (const c of n.children || []) walk(c);
-    };
-    walk(profile.head);
-    const kbs = (b) => +(b / 1024 / secs).toFixed(1);
-    const net = Object.entries(byFile).filter(([f]) => f.startsWith('js/net/')).map(([f, b]) => [f, kbs(b)]);
+    const last = windows[windows.length - 1];
     R.heap = {
-      seconds: +secs.toFixed(1), allocTotalKBs: kbs(total), allocNetKBs: Object.fromEntries(net),
-      allocNametagsKBs: kbs(byFile['js/net/nametags.js'] || 0), allocRemoteAvatarsKBs: kbs(byFile['js/net/remote_avatars.js'] || 0),
-      topNetFns: Object.entries(byFn).sort((a, b) => b[1] - a[1]).slice(0, 12).map(([k, b]) => [k, kbs(b)]),
-      topFiles: Object.entries(byFile).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([k, b]) => [k, kbs(b)]),
+      seconds: windows.reduce((a, w) => a + w.seconds, 0), windows,
+      allocTotalKBs: last.allocTotalKBs, allocNetKBs: last.allocNetKBs, topNetFns: last.topNetFns, topFiles: last.topFiles,
+      allocNametagsKBs: last.allocNetKBs['js/net/nametags.js'] || 0, allocRemoteAvatarsKBs: last.allocNetKBs['js/net/remote_avatars.js'] || 0,
       heapAfterGcStartMB: +(h0.usedSize / 1048576).toFixed(2), heapAfterGcEndMB: +(h1.usedSize / 1048576).toFixed(2),
       heapGrowthMB: +((h1.usedSize - h0.usedSize) / 1048576).toFixed(2),
     };

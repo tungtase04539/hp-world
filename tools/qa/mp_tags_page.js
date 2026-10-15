@@ -13,11 +13,11 @@ const cam = hp.camera;
 const _v = new THREE.Vector3();
 let T = null, orig = null;
 const S = {
-  on: false, frames: 0, toggles: 0, flicker: 0, drawnSum: 0, spanMs: [], raMs: [],
+  on: false, frames: 0, toggles: 0, flicker: 0, drawnSum: 0, drawnNow: 0, spanMs: [], raMs: [],
   ov: { samples: 0, tags: 0, pairs: 0, overlapped: 0, maxPairs: 0, maxOverlapped: 0 },
   t0: 0, sampleEvery: 6,
 };
-let cur = new Map(), prev = new Map();   // netId → 1 (đã vẽ khung này / khung trước)
+let cur = new Map(), prev = new Map();   // netId (đầu trong màn hình) → 1 đã vẽ / 0 không, khung này / khung trước
 const lastToggle = new Map();
 let spanT = -1;
 
@@ -62,18 +62,36 @@ function overlapSample() {
   return { tags: r.length, pairs, overlapped: n };
 }
 
+const drawnIds = new Set();
+// người có đầu trong màn hình (|ndc| < 0,92, trước camera) cách camera 3–24 m → cur: netId → 1 có bảng / 0 không
+function onscreen() {
+  const ra = window.__ra, cp = cam.position;
+  for (const p of ra.positions()) {
+    if (!p.drawn) continue;
+    const d = Math.hypot(p.x - cp.x, p.z - cp.z);
+    if (d < 3 || d > 24) continue;
+    const dbg = ra.debug(p.netId);
+    _v.set(p.x, (dbg ? dbg.y : 2) + 1.9, p.z).applyMatrix4(cam.matrixWorldInverse);
+    if (_v.z > -0.5) continue;
+    _v.applyMatrix4(cam.projectionMatrix);
+    if (Math.abs(_v.x) < 0.92 && Math.abs(_v.y) < 0.92) cur.set(p.netId, drawnIds.has(p.netId) ? 1 : 0);
+  }
+}
 function install() {
   if (orig) return;
   T = window.__ra.tags;
   // bản gỡ chồng gọi ringA/tagA (khối tham số số thực); bản cũ dot3 gọi ring/tag — bọc cái đang được dùng
   const RK = T.ringA ? 'ringA' : 'ring', TK = T.tagA ? 'tagA' : 'tag';
   orig = { begin: T.begin, [RK]: T[RK], [TK]: T[TK], end: T.end };
-  T.begin = function () { spanT = -1; return orig.begin.apply(this, arguments); };
+  T.begin = function () { spanT = -1; cam.updateMatrixWorld(); return orig.begin.apply(this, arguments); };
   T[RK] = function () { if (spanT < 0) spanT = performance.now(); return orig[RK].apply(this, arguments); };
+  // bật/tắt tính trên MỌI người có đầu TRONG MÀN HÌNH và cách camera 3–24 m ở cả 2 khung (onscreen() trong end): bản cũ chỉ
+  // gọi tag() cho 24 người gần nhất (người rơi khỏi top 24 biến mất mà không qua tag()), bản mới gọi cho mọi ứng viên và trả
+  // false khi bảng ngoài màn hình — chỉ đếm theo lời gọi thì không công bằng
   T[TK] = function (netId) {
     if (spanT < 0) spanT = performance.now();
     const r = orig[TK].apply(this, arguments);
-    if (r) cur.set(netId, 1);
+    if (r) { S.drawnNow++; drawnIds.add(netId); }
     return r;
   };
   T.end = function () {
@@ -83,13 +101,15 @@ function install() {
     if (S.on) {
       S.spanMs.push(t1 - spanT);
       S.frames++;
-      S.drawnSum += cur.size;
+      S.drawnSum += S.drawnNow;
       const now = t1 / 1000;
       const flip = (id) => { S.toggles++; const l = lastToggle.get(id); if (l !== undefined && now - l < 0.5) S.flicker++; lastToggle.set(id, now); };
-      for (const id of cur.keys()) if (!prev.has(id)) flip(id);
-      for (const id of prev.keys()) if (!cur.has(id)) flip(id);
+      onscreen();
+      S.onSum += cur.size;
+      for (const [id, v] of cur) { const p = prev.get(id); if (p !== undefined && p !== v) flip(id); }
       if (S.frames % S.sampleEvery === 0) overlapSample();
     }
+    S.drawnNow = 0; drawnIds.clear();
     const t = prev; prev = cur; cur = t; cur.clear();
     return r;
   };
@@ -99,7 +119,7 @@ function uninstall() {
   Object.assign(T, orig); orig = null;
 }
 function start() {
-  Object.assign(S, { on: true, frames: 0, toggles: 0, flicker: 0, drawnSum: 0, spanMs: [], t0: performance.now() });
+  Object.assign(S, { on: true, frames: 0, toggles: 0, flicker: 0, drawnSum: 0, onSum: 0, spanMs: [], t0: performance.now() });
   S.ov = { samples: 0, tags: 0, pairs: 0, overlapped: 0, maxPairs: 0, maxOverlapped: 0 };
   lastToggle.clear(); prev.clear(); cur.clear();
 }
@@ -110,7 +130,7 @@ function stop() {
   const mean = S.spanMs.reduce((a, b) => a + b, 0) / Math.max(1, S.spanMs.length);
   return {
     seconds: +sec.toFixed(1), frames: S.frames, fps: +(S.frames / sec).toFixed(1),
-    tagsDrawnMean: +(S.drawnSum / Math.max(1, S.frames)).toFixed(1),
+    tagsDrawnMean: +(S.drawnSum / Math.max(1, S.frames)).toFixed(1), onscreenPeopleMean: +(S.onSum / Math.max(1, S.frames)).toFixed(1),
     togglesPerSec: +(S.toggles / sec).toFixed(2), flickerPerSec: +(S.flicker / sec).toFixed(2), toggles: S.toggles, flicker: S.flicker,
     tagPassMs: { mean: +mean.toFixed(3), p50: +q(S.spanMs, 0.5).toFixed(3), p95: +q(S.spanMs, 0.95).toFixed(3), max: +q(S.spanMs, 1).toFixed(3) },
     overlap: { samples: o.samples, onscreenTagsMean: +(o.tags / Math.max(1, o.samples)).toFixed(1), pairsMean: +(o.pairs / Math.max(1, o.samples)).toFixed(2),

@@ -20,8 +20,8 @@
 //   5 vòng sáng + bảng tên + dấu "vắng mặt" (nametags.js: 1 Mesh động, MeshBasic map — biến thể sẵn có).
 // Hợp đồng instcull/freeze như traffic.js: userData.noCull, raycast = () => {}, matrixAutoUpdate = false, bounding sphere
 // đặt tay quanh camera; không đổ bóng vào shadow map; 3 bộ đệm instance xoay vòng (NSET) — không ghi vào bộ đệm GPU đang vẽ.
-// Trần hiển thị theo TIER: 1 (và 0) → 40, 2/3 → 96 người gần camera nhất; bảng tên 24 người gần nhất trong 25 m, mờ dần
-// từ 17 m. Vòng sáng xanh mảnh dưới chân = người thật (NPC/người đi đường không có); xám + "vắng mặt" khi họ rớt mạng.
+// Trần hiển thị theo TIER: 1 (và 0) → 40, 2/3 → 96 người gần camera nhất; bảng tên ≤ 24 trong 25 m, KHÔNG CHỒNG trên màn
+// hình (nametags.js xếp chỗ theo ưu tiên: gần · đang hiện · bạn · huy hiệu), mờ dần từ 17 m. Vòng sáng xanh mảnh dưới chân = người thật (NPC/người đi đường không có); xám + "vắng mặt" khi họ rớt mạng.
 import * as THREE from 'three';
 import { TIER as DEVICE_TIER } from '../device.js';
 import { surfaceY as worldSurfaceY } from '../world.js';
@@ -317,7 +317,7 @@ export function createRemoteAvatars({ scene, world = null, camera, tier = DEVICE
             a.score = a.d2 > R2 || (hidden.size && hidden.has(a.netId)) ? Infinity : a.sel ? a.d2 * 0.64 : a.d2;
             selSort[i] = a;
           }
-          sortBy(selSort, n, 'score');
+          sortScore(selSort, n);
           for (let i = 0; i < n; i++) { selSort[i].sel = i < CAP && selSort[i].score < Infinity; selSort[i] = null; }
         }
       }
@@ -401,7 +401,8 @@ export function createRemoteAvatars({ scene, world = null, camera, tier = DEVICE
       }
       // vòng sáng (≤ 90 m) + bảng tên: MỌI người có tên trong 25 m là ứng viên, gọi tags.tag() theo THỨ TỰ ƯU TIÊN —
       // nametags.js xếp chỗ trên màn hình (bảng chồng lên bảng ưu tiên cao hơn → nâng 1 nấc hoặc ẩn, có trễ + mờ dần), ≤ 24 bảng.
-      // Ưu tiên = khoảng cách × 0,7 nếu bảng ĐANG HIỆN (không đổi chỗ qua lại khi 2 người ngang nhau) × 0,25 nếu là BẠN.
+      // Ưu tiên = khoảng cách × 0,7 nếu bảng ĐANG HIỆN (không đổi chỗ qua lại khi 2 người ngang nhau) × 0,25 nếu là BẠN
+      // (× 0,5 nếu huy hiệu 1 = chủ dự án / điều hành — người mới cần thấy ai đang hướng dẫn).
       const timeTags = (frameNo & 7) === 0, tT0 = timeTags ? performance.now() : 0;   // đo 1/8 khung (performance.now() = 1 HeapNumber)
       let nCand = 0;
       const nFr = friends.size;
@@ -413,20 +414,23 @@ export function createRemoteAvatars({ scene, world = null, camera, tier = DEVICE
           TA[4] = bike ? 1.25 : 0.95 * a.app.scale; TA[5] = bike ? 2.35 : 0.95 * a.app.scale;
           tags.ringA(away);
         }
-        if (a.d2 <= TAG_R * TAG_R && a.d2 >= TAG_NEAR2 && names.has(a.netId)) {
-          a.tagScore = a.d2 * (a.tagOn ? 0.49 : 1) * (nFr && friends.has(a.netId) ? 0.0625 : 1);
+        const nm = a.d2 <= TAG_R * TAG_R && a.d2 >= TAG_NEAR2 ? names.get(a.netId) : undefined;
+        if (nm !== undefined) {
+          a.tagScore = a.d2 * (a.tagOn ? 0.49 : 1) * (nFr && friends.has(a.netId) ? 0.0625 : nm.badge === 1 ? 0.25 : 1);
           cand[nCand++] = a;
         } else a.tagOn = false;
       }
       st.tags = 0;
       if (nCand) {
-        sortBy(cand, nCand, 'tagScore');
+        sortTagScore(cand, nCand);
         const cy = camera ? camera.position.y : 0;
         for (let i = 0; i < nCand; i++) {
           const a = cand[i], nm = names.get(a.netId), dy = a.headY - cy;
           cand[i] = null;
           const d = Math.sqrt(a.d2 + dy * dy);
-          TA[0] = a.x; TA[1] = a.headY + 0.22; TA[2] = a.z; TA[3] = d; TA[4] = TAG_FADE; TA[5] = TAG_R;
+          // đáy Ô (gồm lề trong suốt 0,227·h dưới viên thuốc, h = 0,26 + 0,011·d): viên thuốc cách đỉnh đầu 0,12 m ở 5 m → 0,2 m ở
+          // 25 m. Bản cũ +0,22 m cố định + lề → người gần (5 m) có bảng lơ lửng ~0,3 m trên đầu, trông như của người phía sau
+          TA[0] = a.x; TA[1] = a.headY + 0.041 + 0.0015 * d; TA[2] = a.z; TA[3] = d; TA[4] = TAG_FADE; TA[5] = TAG_R;
           a.tagOn = tags.tagA(a.netId, nm.name, nm.badge, !!(a.flags & SFLAG.AWAY));
         }
       }
@@ -524,13 +528,22 @@ export function createRemoteAvatars({ scene, world = null, camera, tier = DEVICE
   };
 }
 
-// sắp xếp CHÈN tăng dần theo trường `key` trên n phần tử đầu (≤ ~100, gần như đã sắp giữa các khung → ~O(n)); không cấp phát
-// như Array.prototype.sort (TimSort chép ra mảng tạm) và không cần hàm so sánh mới mỗi khung
-function sortBy(arr, n, key) {
+// sắp xếp CHÈN tăng dần trên n phần tử đầu (≤ ~100, gần như đã sắp giữa các khung → ~O(n)); không cấp phát như
+// Array.prototype.sort (TimSort chép ra mảng tạm) và không cần hàm so sánh mới mỗi khung. Mỗi trường 1 hàm, truy cập TRỰC TIẾP:
+// bản chung v[key] (khoá biến) = truy cập khoá tổng quát → mỗi lần đọc trường số thực đóng hộp 1 HeapNumber (đo TIER 1: 280 KB/s)
+function sortScore(arr, n) {
   for (let i = 1; i < n; i++) {
-    const v = arr[i], s = v[key];
+    const v = arr[i], s = v.score;
     let j = i - 1;
-    while (j >= 0 && arr[j][key] > s) { arr[j + 1] = arr[j]; j--; }
+    while (j >= 0 && arr[j].score > s) { arr[j + 1] = arr[j]; j--; }
+    arr[j + 1] = v;
+  }
+}
+function sortTagScore(arr, n) {
+  for (let i = 1; i < n; i++) {
+    const v = arr[i], s = v.tagScore;
+    let j = i - 1;
+    while (j >= 0 && arr[j].tagScore > s) { arr[j + 1] = arr[j]; j--; }
     arr[j + 1] = v;
   }
 }
