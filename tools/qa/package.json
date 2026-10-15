@@ -1,0 +1,8 @@
+{
+  "name": "hpworld-qa",
+  "private": true,
+  "description": "Công cụ QA (Chrome headless qua playwright-core). Cài: cd tools/qa && npm ci — node_modules không commit.",
+  "dependencies": {
+    "playwright-core": "1.48.2"
+  }
+}

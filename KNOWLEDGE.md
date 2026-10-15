@@ -373,6 +373,8 @@ node tools/qa/clearance.mjs --port 8177 --out <x.json> [--src] [--eval f.js] [--
   xanh giữa buổi chơi = sập máy chủ (bỏ qua chỉ khi chủ dự án đồng ý: `HPWORLD_ALLOW_GPU_WHILE_LIVE=1`). Bộ canh thứ hai
   `tools/qa/gpu_watchdog.ps1` (kill Chrome headless GPU thừa; chạy nền lại sau mỗi lần khởi động máy, log ở
   `%LOCALAPPDATA%\hpworld\`).
+- **playwright-core cho công cụ QA:** `cd tools/qa && npm ci` (1.48.2, node_modules không commit). Mọi công cụ lấy đường dẫn qua
+  `tools/qa/pw.mjs` (PW_PATH → tools/qa/node_modules của checkout đang chạy → của checkout chính) — không còn trỏ vào thư mục tạm.
 - **DỮ LIỆU BỀN KHÔNG ĐỂ Ở THƯ MỤC TẠM (bài học 2026-10-15):** thư mục scratchpad của phiên Claude (trong %TEMP%) bị xoá sạch
   lúc 00:12 → mất 3.306 tệp ghi chú trích từ ảnh pano (fp_json) mà `tools/gen_herokit.mjs` cần → herokit chỉ còn đường
   `tools/rekey_herokit.mjs`. Mọi đầu ra tốn công tạo lại (trích xuất bằng agent, spec, công cụ QA) phải COMMIT vào repo

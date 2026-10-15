@@ -1,12 +1,13 @@
 // tools/qa/launch.mjs — khởi động game trong Chrome headless HỆ THỐNG (GPU thật qua ANGLE d3d11) cho các tool kiểm thử
 // (diag/tour/perf/mobile). Cùng quy ước với tools/qa/shoot.mjs: server tĩnh `python -m http.server <port>` ở gốc
-// repo/worktree, playwright-core nạp từ PW_PATH (mặc định: bản cài ở scratchpad phiên 04e77d80 — đổi nếu bị dọn).
+// repo/worktree, playwright-core nạp qua tools/qa/pw.mjs (PW_PATH → tools/qa/node_modules; cài: cd tools/qa && npm ci).
 // Dùng: const g = await openGame({ port, quality, viewport, mobile, pin, chromeArgs }); … await g.close();   (pin: khoá autoQuality, mặc định bật)
 // openGame tự giữ KHOÁ GPU toàn máy tới g.close() — LUÔN gọi g.close() (kể cả khi lỗi) để nhả khoá sớm.
 //   g.pg (Page) · g.errors (lỗi JS) · g.hpReadyMs (window.__hp có) · g.startReadyMs (nút Bắt đầu mở, js/boot.js)
+import { PW_URL } from './pw.mjs';
 import os from 'os';
 import path from 'path';
-const PW = process.env.PW_PATH || 'file:///C:/Users/Admin/AppData/Local/Temp/claude/C--Users-Admin-hp-world/04e77d80-6633-4919-bfa9-5d86fbe6ae69/scratchpad/pw/node_modules/playwright-core/index.mjs';
+const PW = PW_URL;
 const CHROME = process.env.CHROME_PATH || 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 
 export function args(argv = process.argv.slice(2)) {

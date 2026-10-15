@@ -6,7 +6,8 @@
 //
 // Cách làm: dịch chuyển người chơi vòng quanh lõi nhiều lần (ép stream vào/ra liên tục), đo
 // geometries/textures/programs + JS heap sau mỗi vòng. Số CHỈ ĐƯỢC PHÉP ổn định, không tăng dần.
-const PW = process.env.PW_PATH || 'playwright-core';
+import { PW_URL } from './qa/pw.mjs';
+const PW = PW_URL;
 const { chromium } = await import(PW);
 
 const PORT = process.argv[2] || '8179';

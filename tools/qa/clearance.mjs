@@ -15,8 +15,9 @@ if (process.argv.includes('--xsec')) {
   console.log('XSEC', JSON.stringify(res.stats));
   process.exit(0);
 }
-const PW = process.env.PW_PATH || 'file:///C:/Users/Admin/AppData/Local/Temp/claude/C--Users-Admin-hp-world/04e77d80-6633-4919-bfa9-5d86fbe6ae69/scratchpad/pw/node_modules/playwright-core/index.mjs';
+const PW = PW_URL;
 const { chromium } = await import(PW);
+import { PW_URL } from './pw.mjs';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';

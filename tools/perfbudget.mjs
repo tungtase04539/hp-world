@@ -8,7 +8,8 @@
 // không phải triangle). LITE là cấu hình máy yếu — ngân sách chặt hơn.
 // playwright-core KHÔNG cài trong repo (dự án không có build step / node_modules) — nạp từ nơi đã cài:
 // đặt PW_PATH=<đường dẫn tới playwright-core> hoặc để mặc định thư mục scratchpad phiên làm việc.
-const PW = process.env.PW_PATH || 'playwright-core';
+import { PW_URL } from './qa/pw.mjs';
+const PW = PW_URL;
 const { chromium } = await import(PW);
 
 const PORT = process.argv[2] || '8179';

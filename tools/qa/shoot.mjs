@@ -10,9 +10,10 @@
 // Tự chờ khoá GPU toàn máy (có thể phải đợi agent khác chụp xong). Giữ mỗi lần chụp NGẮN (ít góc) để không chiếm khoá lâu.
 // views.json = [{id, kind:'pano', X, Z, h, pitch?}, {id, kind:'aerial', x, z, half}, {id, kind:'cam', x, z, yaw, pitch, dist}]
 // In ra JSON: {errors, buildMs, tier, gpu, perf:{...}, shots:[...]}
-// PW_PATH = đường dẫn module playwright-core (mặc định: bản cài ở scratchpad phiên 04e77d80, đổi nếu bị dọn)
-const PW = process.env.PW_PATH || 'file:///C:/Users/Admin/AppData/Local/Temp/claude/C--Users-Admin-hp-world/04e77d80-6633-4919-bfa9-5d86fbe6ae69/scratchpad/pw/node_modules/playwright-core/index.mjs';
+// playwright-core: tools/qa/pw.mjs (PW_PATH → tools/qa/node_modules; cài: cd tools/qa && npm ci)
+const PW = PW_URL;
 const { chromium } = await import(PW);
+import { PW_URL } from './pw.mjs';
 import fs from 'fs';
 const A = process.argv.slice(2);
 const arg = (k, d) => { const i = A.indexOf('--' + k); return i >= 0 ? A[i + 1] : d; };

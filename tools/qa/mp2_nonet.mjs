@@ -1,6 +1,7 @@
 // tools/qa/mp2_nonet.mjs — CHƠI MỘT MÌNH KHÔNG CÓ MÁY CHỦ (MP2 SPEC §1.3): không ?server=, localStorage sạch → không nạp
 // js/net/*, js/ui/chat.js, không WebSocket, không request tới API máy chủ; 0 lỗi JS. Một Chrome dưới khoá GPU.
 //   node tools/qa/mp2_nonet.mjs --port 8811 [--quality full|lite] [--out <thư mục>]
+import { PW_URL } from './pw.mjs';
 import fs from 'fs';
 import path from 'path';
 import { args } from './launch.mjs';
@@ -11,7 +12,7 @@ const PORT = +A.get('port', 8811);
 const Q = A.get('quality', 'full');
 const OUT = A.get('out', 'C:/Users/Admin/hp-world-work/mp2/c1/nonet');
 fs.mkdirSync(OUT, { recursive: true });
-const PW = process.env.PW_PATH || 'file:///C:/Users/Admin/AppData/Local/Temp/claude/C--Users-Admin-hp-world/04e77d80-6633-4919-bfa9-5d86fbe6ae69/scratchpad/pw/node_modules/playwright-core/index.mjs';
+const PW = PW_URL;
 const { chromium } = await import(PW);
 const rel = await acquireGpu(`mp2_nonet :${PORT} ${Q}`);
 const br = await chromium.launch({ executablePath: process.env.CHROME_PATH || 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true,
