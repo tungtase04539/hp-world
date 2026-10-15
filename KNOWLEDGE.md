@@ -542,6 +542,14 @@ chủ dự án: `docs/multiplayer/VAN_HANH.md`. Đặc tả giao việc: `docs/m
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-10-15 (MP-2 fixer vòng 1 — sửa 9 phát hiện phản biện, SERVER.md §9.7):** NC-1 CORRECT nhỏ không còn dây chuyền →
+    kick (giữ STATE tới khi kéo xong; test Validator thật 36 tổ hợp fps×RTT×lệch: đúng 1 CORRECT); NC-2 RESUME không còn bóng
+    ma (đối chiếu keyframe rải ở net.js, worker bỏ diff sai); NC-3 `TickBase` lấy lại mốc khi máy chủ bỏ tick (khung ngoại suy
+    6,4 s sau sự cố 80–100 % → 9–34 %); UX-1 `tf()` (thời lượng chế tài từng hiện "22"); SAFE-1 hộp "Máy chủ lạ" trước mọi
+    request; SAFE-2/3 chặn theo phiên + bảng 👥 người quanh đây + ẩn người đã chặn; MOB-1/2/3 CSS điện thoại. Kiểm: e2e 96 bot
+    **27/27**, điện thoại **14/14**, `mp2_c1_unit` 278/278, test node 23/23; một mình: diag full + lite, mobile, waterbfs, tour,
+    check_assets, mp2_nonet full + lite đạt, 0 lỗi JS. Đầu ra: `C:/Users/Admin/hp-world-work/mp2/fixer1/`.
+
 - **2026-10-15 (MP-2 TÍCH HỢP — "thấy nhau" GĐ1 phía game hoàn chỉnh):** gộp `--no-ff` C1 (mạng/phiên/giao diện) rồi C2 (hình người
     chơi khác); `net.js` dùng `remote_avatars.js` thật, bỏ `remote_avatars_stub.js`; ENTER truyền dấu thời gian snapshot ở tham số 4;
     `positions()`/`__hp.net.avatars()` cho QA; byte 7 ngoại hình = 0. Sửa: bảng tên chép từng dải hàng lên GPU thay vì tải lại cả

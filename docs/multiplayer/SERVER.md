@@ -1430,3 +1430,33 @@ draw call trung vị 24 góc 374 → 374, tam giác 3,49 M → 3,49 M; fps trung
 - Bot S4 nhận 11–13 CORRECT lý do 1 (SPEED) mỗi lượt khi chạy xe máy tới (C1 đã báo) — phía bot/move.js, trình duyệt không bị
   (trình duyệt chỉ nhận đúng 1 CORRECT: lý do 5 TELEPORT của bước cố ý).
 - Chưa đo trên điện thoại thật / qua tunnel `wss://` thật.
+
+### 9.7 Fixer vòng 1 sau phản biện (15/10/2026) — sửa tận gốc + số đo lại
+
+Không đổi `server/*`, `js/shared/*`, giao thức. Phạm vi: `js/net/{net,net_worker,correct,interp,config,remote_avatars}.js`,
+`js/ui/chat.js`, `js/i18n.js`, `css/style.css`, test.
+
+| Mã | Lỗi (phản biện) | Sửa | Kiểm |
+|---|---|---|---|
+| NC-1 | CORRECT nhỏ (1,5–6 m, kéo mượt 0,15 s): `onCorrect` đặt `nextStateAt = 0` → khung sau gửi STATE epoch mới khi mới kéo ~11 % → máy chủ chấm từ điểm đã sửa (`correctTo`), điểm vi phạm không reset → CORRECT dây chuyền (đo: 15 lần/2,5 s) → kick + `noRejoin` | `corr.step()` trả true khi có kéo; `preFrame` KHÔNG gửi STATE khi `corr.pending` (≤ PULL_S + 1 khung) và bỏ phần dời do kéo khỏi ước lượng vận tốc | `tests/net/correct_cascade.test.mjs` — Validator THẬT, 60/30 Hz × RTT 5/50/150 ms × lệch 1,5–5,95 m: **đúng 1 CORRECT, 0 kick** (bản cũ, đối chứng: 3–8). Trình duyệt thật (e2e bước 8b): 1,8 m×3 và 1,5 m×4 → **1 CORRECT** mỗi lần, vẫn trực tuyến cùng netId |
+| NC-2 | Sau RESUME, người rời trong lúc mất kết nối thành bóng ma vĩnh viễn (worker xoá bảng slot ở WELCOME rồi mới diff keyframe → không LEAVE ai); diff keyframe trong worker còn sai với ENTER rải 24/snapshot | Worker bỏ diff keyframe (chỉ xoá slot). `net.js` đối chiếu: keyframe → `recon = tập đang vẽ`; mỗi ENTER xoá khỏi tập; chốt ở snapshot đầu sau keyframe có 0 ENTER (rải xong) hoặc 2 s → LEAVE phần còn lại. Phiên MỚI (không resume): ENTER lại cùng netId thì dựng quỹ đạo mới (netId có thể là người khác sau khi máy chủ khởi động lại). KHÔNG thêm luật "lâu không có mẫu thì xoá" — máy chủ chỉ gửi bản ghi ĐỔI, người đứng yên không có mẫu | e2e bước 9 (mở rộng): rớt socket, 6 bot đang vẽ rời + bị kick trong lúc đó → RESUME 1,9 s, **0 bóng ma**, 96 → 90 (= bot còn sống), `tel.reconLeaves` 6 |
+| NC-3 | Mốc tick = min(giờ đến − tick·50) trên 64 snapshot: bước LÊN (máy chủ bỏ tick khi quá tải) chỉ theo sau 6,4 s → mọi người khác bị ngoại suy/khựng | `interp.js TickBase` (worker + `createSnapClock`): 12 mẫu cuối là CAO NGUYÊN (dao động ≤ 60 ms) cao hơn mốc > 40 ms → lấy lại mốc từ nửa mới hơn. TCP kẹt rồi xả chùm (độ lệch giảm 100 ms/mẫu) không phải cao nguyên → không lấy lại mốc | `tests/net/interp.test.mjs` (K = 1/2/4/8 tick bị bỏ → sai số < 16 ms sau 1,5 s; rung 0–90 ms 60 s ≤ 1 lần lấy lại mốc; mô phỏng TCP kẹt + resume cũ vẫn đạt). Đo lại kịch bản phản biện (6,4 s sau sự cố, chạy 5 m/s): khung đang ngoại suy K=2/4/8: 80/100/100 % → **9/22/34 %**, sai số p95 0,29/0,74/1,62 m |
+| UX-1 | Mọi thời lượng (khoá chat, cấm, chờ, ETA) hiện "22" | `tf()` thay tham số trên chuỗi GỐC, một lượt (tham số thắng biến chung `{N}`; giá trị không bị quét lại) | `mp2_c1_unit` §6; e2e + điện thoại: "🔇 Bạn bị khoá chat 10 phút." / "Bạn đang bị khoá chat (10 phút)." |
+| SAFE-1 | `?server=<tên miền bất kỳ>` được nhớ ngầm → đường lừa lấy mã khôi phục | `config.js`: chỉ DEFAULT_SERVER / localhost / host người chơi đã xác nhận (`hp3d.serverTrust`) được nhớ; máy lạ → `cfg.untrusted` → `net.js` hiện hộp "⚠️ Máy chủ lạ" (tên máy chủ chữ 24 px) TRƯỚC mọi request (không làm mới token, không tạo tài khoản, không gửi mã khôi phục). "Không" → quên địa chỉ, chơi một mình. Ô mã khôi phục ghi rõ "Mã sẽ gửi tới máy chủ: host" | `mp2_c1_unit` §7; trình duyệt: hộp hiện, **0 request** tới máy lạ, từ chối → nút "Bắt đầu khám phá", localStorage trống |
+| SAFE-2 | Danh sách chặn ở máy theo netId phiên (netId cấp lại sau khi máy chủ khởi động) | Xoá ở mọi WELCOME không resume (danh sách theo TÀI KHOẢN ở máy chủ vẫn giữ); mục "Đã chặn" + Bỏ chặn trong bảng 👥; chặn khi mất kết nối → báo "Chưa kết nối", không chặn giả | điện thoại: chặn → mục Đã chặn 1 dòng → Bỏ chặn → hiện lại |
+| SAFE-3 | Chỉ báo cáo/chặn được người đã CHAT; người bị chặn vẫn hiện | Bảng **👥 Người chơi quanh đây** (chạm biểu tượng kết nối hoặc nút 👥 trong ô chat): người đang thấy, gần trước, mỗi dòng → menu Báo cáo/Chặn (`chatRef` 0). `remote_avatars.hide(netId)`: người đã chặn không vẽ thân/vòng sáng/bảng tên/chấm minimap | e2e: 60 dòng, người bị chặn `drawn=false`; test node `hide()` |
+| MOB-1/2/3 | Màn tiêu đề ngang: nút dưới nếp gấp; dọc: biểu tượng kết nối tràn trái; ngang: chat đè bảng nhiệm vụ | CSS: cao ≤ 500 px ẩn giới thiệu/phụ đề, 2 ô nhập cạnh nhau; ≤ 520 px rộng: biểu tượng = chấm + 👥 N (chữ đầy đủ ở `aria-label`), `#topRight` xuống dòng; ngang thấp: khung chat sang phải cần điều khiển (left 168 px), mở chat thì cất bảng nhiệm vụ | 844×390 / 740×360 / 667×375: hai nút ở y ≤ 259; dọc 390: `#topRight` x 12…378; chat không chồng bảng nhiệm vụ/cần điều khiển |
+
+Việc nhỏ làm kèm: menu Báo cáo đặt CẠNH tên (không che tin), cao tối đa bằng màn hình (cuộn); placeholder chat ngắn trên cảm
+ứng và GIỮ ô chat mở sau khi gửi; tên trong chat gạch chân chấm (biết chạm được); biệt danh chuẩn hoá NFC trước giới hạn 16 ký tự;
+`refresh_reused`/`unauthorized` lúc tải → mở sẵn ô mã khôi phục; vé mới (`needTicket`) tôn trọng SYSTEM BACKOFF + backoff 'auth';
+`ra.frame` dùng dt THẬT (giờ máy chủ) cho tốc độ/nghiêng (dưới 20 fps không phóng đại); `__hp.net` chỉ khi `navigator.webdriver`
+hoặc `?qa`; `PW_PATH` mặc định của tools/qa trỏ `scratchpad/pw`.
+
+**Số đo lại** (máy chủ native `HPMP_TEST=1` 9260/9261, tĩnh 8817, Radeon 890M TIER 3, 1 Chrome dưới khoá GPU):
+`mp2_int_e2e.mjs --bots 96` **27/27 ĐẠT** (24 bước cũ + 3 mới: bảng 👥/ẩn người chặn, CORRECT nhỏ, khoá chat đúng phút; bước
+RESUME có thêm kiểm bóng ma), 0 lỗi JS (1 dòng 403 của bước mã mời sai). A/B mô-đun (84 người trong khung, fps không kẹp):
+draw call +3, 0 chương trình shader mới, khung trung bình +0,04 ms; TIER 1: trần 40, draw call +4, +0,37 ms.
+Điện thoại (`hp-world-work/mp2/fixer1/mobile_probe.mjs`, 844×390 cảm ứng + 6 bot): **14/14 ĐẠT**.
+Còn mở (thấp): rác mỗi khung của bảng tên (chuỗi khoá per tag, mảng UV) ~0,5 MB/s; ENTER keyframe rải 24/snapshot → tới 72
+người không có mẫu 0,1–0,3 s sau RESUME; xoay tại chỗ gửi STATE 2 Hz; rejoin giữ vị trí cục bộ khi lệch ≤ 12 m.
