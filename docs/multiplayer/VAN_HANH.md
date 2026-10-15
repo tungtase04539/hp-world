@@ -28,6 +28,8 @@ Hoặc mở PowerShell trong thư mục dự án rồi dán dòng lệnh ở c�
 
 (`...` = `powershell -ExecutionPolicy Bypass -File server\ops\`)
 
+**Lần đầu mời bạn bè vào chơi thử một buổi tối?** Làm theo **mục 16** (từng bước, từ hôm trước tới lúc tắt máy).
+
 Trang quản trị: **http://127.0.0.1:9101/admin**. Trang này chỉ mở được trên chính máy này. Mã đăng nhập là dòng
 `ADMIN_TOKEN=` trong file `server\.env`.
 
@@ -370,3 +372,174 @@ Cùng một cấu hình Docker chạy được cả trên máy nhà lẫn VPS. K
 | Quên mã quản trị | Mở `server\.env` bằng Notepad, dòng `ADMIN_TOKEN=` |
 | Nghi máy bị tấn công / mạng nhà nghẽn | Chạy ngay `khoa-khan-cap.ps1`, rồi báo lập trình viên |
 | Công cụ đồ hoạ của lập trình viên "chờ máy chủ tắt" mãi | Máy chủ đang mở là đúng. Tắt máy chủ bằng `tat-may-chu.ps1` khi không còn ai chơi |
+
+---
+
+## 16. Tổ chức buổi chơi thử (một tối chơi cùng bạn bè)
+
+Mục này dành cho **buổi đầu tiên**: anh mời vài người bạn vào chơi cùng một tối, chưa có tên miền riêng. Mọi lệnh dưới
+đây đã được chạy thử thật (15/10/2026) qua một đường hầm Cloudflare tạm, với ~30 người chơi giả lập vào qua Internet, một
+trình duyệt máy tính và hai màn hình điện thoại (dọc + ngang).
+
+Cách chạy lệnh như mục 0: nhấp phải vào file trong `server\ops\` → **Run with PowerShell**, hoặc mở PowerShell trong thư
+mục dự án rồi dán nguyên dòng lệnh.
+
+### 16.1 Hôm trước hoặc buổi chiều (khoảng 15 phút)
+
+1. **Windows Update** (mục 9): Cài đặt → Windows Update → cài hết bản cập nhật đang chờ và **khởi động lại máy ngay
+   từ buổi chiều**. Rồi vào Tuỳ chọn nâng cao → **Giờ hoạt động** → "Thủ công", ví dụ **8:00 – 23:59**. Như vậy Windows
+   không tự khởi động lại giữa buổi chơi.
+2. **Nguồn điện** (mục 1 và 11): cắm sạc suốt buổi. Cài đặt → Hệ thống → Nguồn → "Khi đóng nắp máy (đang cắm sạc)" →
+   **Không làm gì**. Chế độ nguồn: **Hiệu suất tốt nhất**.
+3. **Màn hình**: Cài đặt → Hệ thống → Nguồn → **Tắt màn hình sau 5 phút**. Màn hình tắt hẳn thì đỡ tốn máy hơn hình động
+   bảo vệ màn hình (OLED Care) — mục 11.
+4. **Không chạy việc đồ hoạ nặng**: tối đó đừng chơi game, đừng xem video nặng, đừng mở game Hải Phòng 3D **trên chính
+   máy này** (máy từng bị màn hình xanh khi chạy nhiều trình duyệt 3D — mục 10). Anh muốn vào chơi cùng thì dùng **điện
+   thoại** hoặc máy khác. Báo lập trình viên tối đó đừng chạy công cụ kiểm tra đồ hoạ (khi máy chủ mở, công cụ của dự án
+   tự chờ).
+5. **Docker Desktop** đang chạy (biểu tượng cá voi ở khay đồng hồ đứng yên).
+
+### 16.2 Khoảng 30 phút trước giờ hẹn: mở máy chủ với đường link tạm
+
+1. Chạy:
+   ```
+   powershell -ExecutionPolicy Bypass -File server\ops\mo-may-chu.ps1 -TamThoi
+   ```
+   Script làm 6 bước, mỗi bước ghi **[OK]**. Với đường link tạm, bước 5 đợi thêm tối đa 90 giây cho địa chỉ có hiệu lực
+   trên Internet (đo được khi đã dựng sẵn: cả lệnh mất 22–33 giây; lần đầu sau khi cập nhật mã có thể vài phút). Cuối cùng script in một dòng màu xanh:
+   ```
+   ĐỊA CHỈ MÁY CHỦ CHO NGƯỜI CHƠI:  wss://ab-cd-ef.trycloudflare.com
+   ```
+   (`ab-cd-ef` là ví dụ — địa chỉ thật là vài chữ tiếng Anh nối bằng dấu gạch, **mỗi lần mở một địa chỉ ngẫu nhiên khác**).
+   **Chép lại địa chỉ này**; nó dùng cho cả buổi. Lỡ đóng cửa sổ: chạy `trang-thai.ps1` (16.4), dòng `[OK] Tunnel tạm:` in
+   lại đúng địa chỉ. Trang quản trị cũng tự mở.
+   - Lỡ chạy `mo-may-chu.ps1` thêm lần nữa giữa buổi: không sao — script thấy máy chủ đang chạy thì **giữ nguyên** (ghi
+     "giữ nguyên, không dựng lại nên không ai bị ngắt") và đường link vẫn như cũ.
+2. **Tạo mã mời** — mỗi người bạn một mã, cộng thêm 2–3 mã **dự phòng**:
+   ```
+   powershell -ExecutionPolicy Bypass -File server\ops\tao-ma-moi.ps1 -SoLuong 8 -SoNgay 3 -GhiChu "choi thu toi thu bay"
+   ```
+   Script in các mã dạng `S5YHW-G5H6H` và lưu danh sách vào `server\data\ma-moi\`. Mỗi mã chỉ dùng được cho **một người**
+   (`-SoLanDung 1`, mặc định). Hoặc trên trang quản trị: tab **Mã mời** → điền số mã, số lần dùng, số ngày, ghi chú →
+   **Tạo mã** → **Sao chép tất cả** (mã chỉ hiện một lần).
+3. **Tự thử trước bằng điện thoại** (tắt Wi-Fi, dùng 4G — không thử trên máy chủ): mở đường link ở bước 4 với một mã dự
+   phòng, làm như một người bạn (16.3). Thấy mình trong thành phố, chat được là ổn.
+4. **Đường link gửi cho bạn bè** — ghép địa chỉ ở bước 1 vào sau `?server=`:
+   ```
+   https://tungtase04539.github.io/hp-world/?server=wss://ab-cd-ef.trycloudflare.com
+   ```
+   Gửi **riêng** cho từng người (Zalo/Messenger), kèm **mã mời của riêng người đó**. Tin nhắn mẫu:
+   > Tối nay 20:00 vào chơi Hải Phòng 3D cùng anh nhé! Mở link này (điện thoại hay máy tính đều được):
+   > https://tungtase04539.github.io/hp-world/?server=wss://ab-cd-ef.trycloudflare.com
+   > Mã mời của em: S5YHW-G5H6H (chỉ em dùng, đừng gửi ai).
+   > Game sẽ hỏi "⚠️ Máy chủ lạ" và hiện chữ to "ab-cd-ef.trycloudflare.com" — đúng tên đó thì bấm "Tôi tin máy chủ này — vào".
+   > Lúc tạo nhân vật game hiện "mã khôi phục" — nhớ CHỤP MÀN HÌNH lại.
+
+   Không đăng link hay mã lên nhóm đông người / mạng xã hội. Link chỉ dùng được tới khi anh tắt máy chủ.
+
+### 16.3 Bạn bè sẽ thấy gì (để anh hướng dẫn qua điện thoại)
+
+1. Trang game tải (vài giây tới nửa phút tuỳ mạng). Hiện ngay hộp **"⚠️ Máy chủ lạ"**, tên máy chủ chữ to màu vàng
+   (`ab-cd-ef.trycloudflare.com`), lời nhắc "chỉ vào nếu chính chủ game gửi link". Hộp này **cố ý** hiện với mọi đường link
+   tạm: nó chặn kẻ xấu gửi link giả để lừa lấy tài khoản. Bạn bè kiểm tên máy chủ khớp với link anh gửi → bấm **"Tôi tin
+   máy chủ này — vào"**. Trước khi bấm, game chưa gửi gì tới máy chủ.
+   - Lỡ bấm "Không — chơi bình thường": game chạy một mình. Chỉ cần **mở lại đúng đường link** là hộp hỏi lại.
+   - Điện thoại cầm **dọc**: game phủ thêm lời gợi ý "Xoay ngang điện thoại để có trải nghiệm đẹp nhất nhé!" lên trên hộp
+     này. Xoay ngang điện thoại (khuyên dùng) hoặc bấm **"Vẫn chơi màn hình dọc"**, rồi mới thấy và bấm được hộp "Máy chủ lạ".
+2. Màn tiêu đề có ô **Biệt danh** (3–16 ký tự, gõ tiếng Việt có dấu được) và ô **Mã mời** → bấm **"Vào thành phố"**.
+   Mã mời sai / đã dùng hết → game báo bằng tiếng Việt; anh gửi một mã dự phòng.
+3. Hiện **mã khôi phục** 12 ký tự (dạng `ABCD-EFGH-JKLM`) — **chỉ hiện một lần**. Dặn bạn bè chụp màn hình. Mã này dùng khi:
+   đổi máy / đổi trình duyệt / xoá dữ liệu trình duyệt, **và khi đường link của anh đổi** (16.5).
+4. Vào thành phố. Góc trên phải có biểu tượng kết nối: chấm xanh **"Trực tuyến · 👥 số người · độ trễ"** (điện thoại màn
+   dọc chỉ hiện chấm + 👥 số người).
+   - **Chat**: máy tính bấm phím **T** (Enter gửi, Esc đóng); điện thoại chạm nút **💬** → gõ → nút gửi. Chỉ người trong
+     khoảng **40 m** thấy tin. Số điện thoại, link, chửi tục bị chặn tự động.
+   - **Bảng 👥 Người chơi quanh đây**: chạm biểu tượng kết nối (hoặc nút 👥 trong khung chat) → danh sách người gần → chạm
+     một tên → **Báo cáo** hoặc **Chặn**. Chạm tên trong khung chat cũng được.
+5. Mạng chập chờn (đi qua chỗ sóng yếu, chuyển Wi-Fi ↔ 4G): game tự nối lại trong vài giây, vẫn là nhân vật cũ
+   (đo qua đường hầm: nối lại sau 2,8 giây, cùng nhân vật, vẫn thấy đủ người).
+
+Độ trễ đo qua đường hầm tạm (máy chủ ở nhà anh → Cloudflare → về lại): trung vị **60–62 ms**, 95 % dưới **66–71 ms** (đo bằng 1 trình duyệt máy tính, 2 điện thoại giả lập và 30 người chơi giả, hơn 4.000 mẫu).
+Bạn bè ở Việt Nam qua Viettel/VNPT/FPT thường thêm vài chục ms; dưới 120 ms là chơi mượt. Muốn đo mạng từng người:
+gửi link `netprobe.html` (mục 12).
+
+### 16.4 Trong buổi chơi
+
+- **Trang quản trị** `http://127.0.0.1:9101/admin` (chỉ mở trên máy này; mã đăng nhập là dòng `ADMIN_TOKEN=` trong
+  `server\.env`):
+  - **Tổng quan**: bản đồ ai đang ở đâu + **chat trực tiếp** (dòng bị chặn/đánh dấu tô màu).
+  - **Báo cáo** (có số đỏ khi có báo cáo mới): mỗi báo cáo kèm các dòng chat xung quanh. Bấm **Khoá chat 10 phút** /
+    **1 giờ** / **24 giờ**, **Đuổi khỏi game**, **Cấm vào game**, hoặc **Bỏ qua**. Người bị khoá chat vẫn chơi được nhưng
+    nói không ai thấy, và game báo cho họ biết khoá bao lâu. Chi tiết: mục 6.
+    **Tối đầu tiên, báo cáo KHÔNG tự khoá ai**: mọi tài khoản đều mới tạo (chưa đủ 1 ngày, chưa chơi đủ 30 phút), nên
+    báo cáo hiện nhãn "không tính tự khoá" và chỉ nằm chờ anh xem. Hãy để mắt tới tab này suốt buổi.
+  - **Thông báo**: gửi một dòng cho mọi người (ví dụ "10 phút nữa anh tắt máy chủ nhé").
+  - **Mã mời**: tạo thêm mã nếu có người tới muộn.
+- **Xem tình trạng** bất cứ lúc nào:
+  ```
+  powershell -ExecutionPolicy Bypass -File server\ops\trang-thai.ps1
+  ```
+  Phải thấy `[OK] Tunnel tạm: running` và `[OK] Tunnel tạm: wss://…` (đúng địa chỉ đã gửi bạn bè); mục AN TOÀN mọi
+  dòng phải là `chỉ 127.0.0.1 (chỉ máy này)`. (Mục "Sao lưu" báo [CHÚ Ý] "Chưa có bản sao lưu nào" ở lần đầu là bình
+  thường — 16.6 sẽ sao lưu.)
+- **Có chuyện bất thường** (mạng nhà nghẽn, ai đó quấy phá nặng, thấy điều gì lạ): bấm **NGẮT KHẨN CẤP**:
+  ```
+  powershell -ExecutionPolicy Bypass -File server\ops\khoa-khan-cap.ps1
+  ```
+  Đường vào từ Internet bị cắt sau khoảng 2 giây. Trên máy bạn bè, biểu tượng kết nối chuyển sang **"Khám phá"** (trong
+  khoảng 9 giây; dòng chữ ghi "Khám phá · Đang nối lại…"), người khác biến mất, nhưng **vẫn đi lại một mình bình
+  thường** — không ai bị văng khỏi game. Dữ liệu (nhân vật, chat, báo cáo) vẫn nguyên. Máy chủ game vẫn chạy trên máy anh.
+
+### 16.5 Mở lại sau khi ngắt (hoặc sau khi máy khởi động lại): ĐƯỜNG LINK SẼ ĐỔI
+
+Đường link tạm **không bao giờ quay lại**. Mở lại là có địa chỉ mới, nên game của bạn bè **không tự nối lại** — trang đang
+mở cứ ở "Khám phá · Đang nối lại…" mãi (đã thử: chờ 20 giây sau khi có đường hầm mới vẫn "Khám phá"; dòng chữ "đang nối
+lại" ở đây không đúng — nó đang gọi địa chỉ đã chết). Làm thế này:
+
+1. Chạy lại `mo-may-chu.ps1 -TamThoi` (lệnh ở 16.2; mất khoảng 25–35 giây). Máy chủ game đang chạy được giữ nguyên, chỉ
+   đường hầm mới được bật. Script in địa chỉ **mới** `wss://...trycloudflare.com`. (Nếu máy đã khởi động lại thì lệnh này
+   cũng bật lại cả máy chủ.)
+2. Gửi **đường link mới** cho mọi người (cùng mẫu ở 16.2 bước 4, thay địa chỉ). Nhắn kèm:
+   > Link cũ hỏng rồi, mở link mới này. Game sẽ lại hỏi "Máy chủ lạ" (tên mới) → bấm tin. Rồi bấm
+   > **"Có mã khôi phục?"**, nhập mã khôi phục em đã chụp → **"Lấy lại tài khoản"** → **"Vào thành phố"**: vẫn là nhân vật cũ.
+
+   Đã thử: từ lúc mở link mới tới lúc đứng lại trong thành phố bằng đúng nhân vật cũ mất khoảng 15 giây.
+3. Vì sao phải nhập lại mã khôi phục: trình duyệt nhớ tài khoản **theo từng địa chỉ máy chủ** (để link lạ không lấy được
+   tài khoản). Địa chỉ đổi thì trình duyệt coi như máy chủ mới. Tài khoản vẫn nằm nguyên trên máy anh.
+4. Ai **mất mã khôi phục**: gửi họ một **mã mời dự phòng** → họ tạo nhân vật mới (nhân vật cũ vẫn nằm trong dữ liệu).
+
+Vì lý do này, trong buổi thử **chỉ ngắt khi thật cần**, và đừng tắt/mở lại máy chủ giữa chừng.
+
+### 16.6 Sau buổi chơi
+
+1. Gửi thông báo trên trang quản trị (ví dụ "Cảm ơn mọi người, anh tắt máy chủ nhé!"), đợi 1–2 phút.
+2. Xem tab **Báo cáo** còn gì đang chờ, xử lý hoặc bấm Bỏ qua (nhất là các báo cáo nhãn đỏ "AN TOÀN TRẺ EM").
+3. **Sao lưu** khi máy chủ còn đang mở:
+   ```
+   powershell -ExecutionPolicy Bypass -File server\ops\sao-luu.ps1
+   ```
+   Kết quả `[OK] Đã sao lưu: hp-NGÀY-GIỜ.dump`, nằm trong `server\data\backups\` (mục 8).
+4. **Tắt máy chủ**:
+   ```
+   powershell -ExecutionPolicy Bypass -File server\ops\tat-may-chu.ps1
+   ```
+   Tunnel, game, cơ sở dữ liệu dừng trong khoảng 8 giây; máy về chế độ ngủ bình thường; công cụ đồ hoạ được phép
+   chạy lại. Đường link tạm chết luôn — lần chơi sau sẽ là link mới, nhưng bạn bè **vẫn giữ nhân vật** (nhập mã khôi phục
+   như 16.5).
+5. Hỏi bạn bè cảm nhận (giật? khó hiểu chỗ nào?) và chuyển cho lập trình viên.
+
+### 16.7 Khi anh đã mua tên miền (để bạn bè khỏi bị hỏi "Máy chủ lạ" và link không đổi nữa)
+
+1. Làm mục **7b** (tên miền trên Cloudflare + tunnel tên miền + điền `server\.env`). Từ đó chỉ cần chạy
+   `mo-may-chu.ps1` (**không** có `-TamThoi`); địa chỉ máy chủ cố định, ví dụ `wss://game.haiphong3d.vn`.
+2. Nhờ lập trình viên đặt địa chỉ đó làm **máy chủ mặc định** của game:
+   - `js/net/config.js`: `export const DEFAULT_SERVER = 'wss://game.haiphong3d.vn';`
+   - `js/main.js`: `const NET_DEFAULT_ON = true;` (hai dòng phải đi cùng nhau — `tools/qa/mp2_c1_unit.mjs` báo đỏ nếu lệch).
+   - Đưa bản này lên GitHub Pages.
+3. Sau đó bạn bè chỉ cần mở **`https://tungtase04539.github.io/hp-world/`** (không cần `?server=`): **không còn hộp "Máy
+   chủ lạ"** (máy chủ mặc định là máy chủ tin cậy), link không bao giờ đổi, tắt/mở máy chủ hay khởi động lại máy thì game
+   bạn bè **tự nối lại**, không phải nhập lại mã khôi phục.
+4. **Riêng những người đã từng chơi bằng link tạm**: trình duyệt của họ còn NHỚ địa chỉ `...trycloudflare.com` cũ, và địa
+   chỉ đã nhớ được ưu tiên hơn máy chủ mặc định — mở link thường họ sẽ thấy "Khám phá" mãi. Gửi họ **một lần** đường link
+   `https://tungtase04539.github.io/hp-world/?server=wss://game.haiphong3d.vn` (không hỏi "Máy chủ lạ" vì là máy chủ mặc
+   định); từ đó link thường dùng được. Lần đầu trên địa chỉ mới họ cũng nhập mã khôi phục một lần (như 16.5).

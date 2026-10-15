@@ -40,10 +40,22 @@ elseif (-not $KhongTunnel -and $envv['TUNNEL_TOKEN']) { $mode = 'named' }
 if ($KhongTunnel) { $mode = 'none' }
 
 Write-Buoc '3/6 Khởi động game + cơ sở dữ liệu (lần đầu mất vài phút để dựng)'
+# Máy chủ game ĐANG CHẠY và khoẻ (ví dụ mở lại tunnel sau khoa-khan-cap.ps1, hoặc lỡ chạy script này 2 lần giữa buổi chơi):
+# KHÔNG dựng lại. `up --build` luôn sinh ảnh mới → Docker tạo lại container game → mọi người chơi bị ngắt ~10 giây
+# (đo 15/10/2026 trên Docker Compose v5.1: ảnh đổi ID dù mọi lớp CACHED). Muốn cập nhật bản mới: tat-may-chu.ps1 rồi mở lại.
+$dangChay = $null
+if (-not $KhongBuild) {
+  $st0 = Get-ServiceState $s
+  if ($st0['game'] -and $st0['game'].State -eq 'running' -and $st0['portal'] -and $st0['portal'].State -eq 'running') {
+    $h0 = Get-Health $s.GameUrl 3
+    if ($h0 -and $h0.ok) { $dangChay = $h0 }
+  }
+}
+if ($dangChay) { Write-Dong ("Máy chủ game đang chạy ({0} người đang chơi) — giữ nguyên, không dựng lại nên không ai bị ngắt. Muốn cập nhật bản mới: tat-may-chu.ps1 rồi mo-may-chu.ps1." -f $dangChay.ccu) }
 $profiles = @()
 if (-not $KhongSaoLuu) { $profiles += @('--profile', 'backup') }
 $upArgs = $profiles + @('up', '-d', '--remove-orphans')
-if (-not $KhongBuild) { $upArgs += '--build' }
+if (-not $KhongBuild -and -not $dangChay) { $upArgs += '--build' }
 $upArgs += @('game', 'db', 'portal')
 if (-not $KhongSaoLuu) { $upArgs += 'backup' }
 $code = Invoke-Compose $s $upArgs

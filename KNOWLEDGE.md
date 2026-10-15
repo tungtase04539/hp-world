@@ -535,6 +535,22 @@ chủ dự án: `docs/multiplayer/VAN_HANH.md`. Đặc tả giao việc: `docs/m
   `server/test/riders_regress.test.js`. Tay cầm QA: `__hp.net`, và khi ONLINE `__hp.teleport`/`pState`/`world`/`vehicles`/
   `mount`/`player`/`traffic`/`footprints` chỉ có ở localhost hoặc `?qa=1` (`js/qagate.js`; KHÔNG theo `navigator.webdriver`);
   launch/shoot/clearance/mp2_nonet tự thêm `qa=1`; kiểm cổng: `tools/qa/mp_qagate.mjs`.
+  chỉ có khi `navigator.webdriver` hoặc `?qa`.
+- **Buổi chơi thử qua tunnel tạm (15/10/2026, VAN_HANH §16 = sổ tay cho chủ dự án):** đã chạy THẬT bộ Docker chế độ thử +
+  Cloudflare quick tunnel (`mo-may-chu.ps1 -TestMode -TamThoi`, 22–33 s, DNS qua 1.1.1.1 có ngay) + 30 bot QUA `wss://…
+  trycloudflare.com` + 1 Chrome. RTT qua tunnel (máy nhà → mép Cloudflare → về): trình duyệt p50 62 / p95 68 ms, 30 bot 4.036
+  mẫu p50 60 / p95 71 / p99 172 ms; điện thoại giả lập p50 60–62. BẪY/LUẬT: (1) phiên tài khoản lưu theo GỐC máy chủ
+  (`hp3d.mp.v1[origin]`) → tunnel tạm đổi địa chỉ (sau `khoa-khan-cap` / khởi động lại) thì trang cũ "Khám phá · Đang nối
+  lại…" MÃI (gọi địa chỉ chết), link mới hỏi lại "Máy chủ lạ" và KHÔNG nhận tài khoản cũ → người chơi phải dùng mã khôi phục
+  (đúng tài khoản, ~15 s). (2) Địa chỉ đã nhớ trong localStorage THẮNG `DEFAULT_SERVER` (`resolveServer`) → khi có tên miền,
+  ai từng chơi link tạm phải mở `?server=<tên miền>` một lần. (3) `docker compose up --build` (Compose v5.1) sinh ảnh ID mới
+  dù mọi lớp CACHED → TẠO LẠI container game = ngắt mọi người ~10 s; `mo-may-chu.ps1` nay KHÔNG `--build` khi game + portal
+  đang chạy và /healthz ok ("giữ nguyên") — chạy lại để mở tunnel không còn khởi động lại máy chủ. (4) Tài khoản bot tạo qua
+  127.0.0.1 (miễn giới hạn IP) rồi nối qua tunnel bằng refresh token — tạo qua tunnel thì `guestIp` 30/giờ/IP chặn. (5) Tối
+  đầu tiên mọi tài khoản < 1 ngày → báo cáo luôn "không tính tự khoá", chủ phải tự xem tab Báo cáo. (6) Điện thoại dọc: lớp
+  `#rotateHint` phủ TRÊN hộp "Máy chủ lạ" (phải bấm "Vẫn chơi màn hình dọc" hoặc xoay ngang trước). Kịch bản:
+  `C:/Users/Admin/hp-world-work/mp2b/tun/playtest.mjs` (`--mobile` chỉ phần điện thoại); khoá GPU lấy TRƯỚC khi bật tunnel
+  (chờ khoá sau khi bật thì đồng hồ 15 phút của tunnel chạy không), watchdog `docker rm -f` mỗi tunnel sau 15 phút.
 - **Người chơi khác trong game (MP-2 C2, `js/net/remote_avatars.js` + `interp.js` + `nametags.js`):** API và số đo ở
   `docs/multiplayer/SERVER.md` §9. Luật đã kiểm: **≤ 5 draw call cố định** cho mọi N (người · xe máy gần · xe máy xa · bóng
   tiếp đất · vòng sáng + bảng tên), **0 chương trình shader mới** (vật liệu `kitMaterial` cùng tham số với traffic.js → cùng đối
@@ -590,6 +606,17 @@ chủ dự án: `docs/multiplayer/VAN_HANH.md`. Đặc tả giao việc: `docs/m
     0,13–0,16 ms (p95 0,3–0,4); draw call mô-đun 3 = 3, 0 chương trình shader mới, fps 60 = 60, 0 lỗi JS. Rác: nametags 326 →
     21 KB/s, remote_avatars 1.250 → 257 KB/s (TIER 1 766 → 227); heap sau GC +0,45 MB/60 s như bản cũ. Test node 28/28 (mới:
     `tests/net/nametags.test.mjs` 5). Đầu ra: `C:/Users/Admin/hp-world-work/mp2b/nametags/`.
+- **2026-10-15 (MP-2b TUNNEL + buổi chơi thử của chủ dự án):** VAN_HANH **§16 "Tổ chức buổi chơi thử"** (trước buổi: Windows
+    Update/giờ hoạt động, sạc, tắt màn hình, không GPU; mở `-TamThoi`; mã mời + mã dự phòng; link
+    `https://tungtase04539.github.io/hp-world/?server=wss://…` + tin nhắn mẫu; bạn bè thấy hộp "Máy chủ lạ" → bấm tin; trong buổi:
+    trang quản trị, `trang-thai`, `khoa-khan-cap`; mở lại = LINK MỚI + mã khôi phục; sau buổi: `sao-luu` rồi `tat-may-chu`; khi có
+    tên miền: `DEFAULT_SERVER` + `NET_DEFAULT_ON`). `mo-may-chu.ps1` không dựng lại khi máy chủ đang chạy (trước đây chạy lại để mở
+    tunnel = tạo lại container game, ngắt mọi người). Kiểm THẬT qua Cloudflare quick tunnel (bộ thử `hpmp-tun` 9320/9321, 3 tunnel,
+    mỗi cái < 15 phút, 1 Chrome dưới khoá GPU): máy tính **20/20**, điện thoại 375×812 + 812×375 **14/15** (trượt duy nhất: bot chưa
+    tới 40 m kịp lúc ở màn ngang — chat cảm ứng vẫn gửi, 2 bot nhận). Số: RTT p50 60–62 / p95 66–71 ms; RESUME 2,8 s; khẩn cấp 2,0–2,3 s
+    → "Khám phá" 9 s; tắt 7,5–8 s; sao lưu 71 KB. Mọi lệnh trong §16 đã chạy (chế độ thử). Ảnh/số:
+    `C:/Users/Admin/hp-world-work/mp2b/tun/`. Xem §8c.
+
 - **2026-10-15 (MP-2 fixer vòng 1 — sửa 9 phát hiện phản biện, SERVER.md §9.7):** NC-1 CORRECT nhỏ không còn dây chuyền →
     kick (giữ STATE tới khi kéo xong; test Validator thật 36 tổ hợp fps×RTT×lệch: đúng 1 CORRECT); NC-2 RESUME không còn bóng
     ma (đối chiếu keyframe rải ở net.js, worker bỏ diff sai); NC-3 `TickBase` lấy lại mốc khi máy chủ bỏ tick (khung ngoại suy
