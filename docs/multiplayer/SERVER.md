@@ -725,6 +725,9 @@ thêm lên ingress 404 + Bearer token + publish 127.0.0.1.
 bằng `cmd /c <` vì `docker cp` không ghi được vào tmpfs / root FS chỉ đọc) · `tao-ma-moi` · `cai-lich` (cung cấp, không
 chạy) · `giu-may-thuc` (tiến trình nền `SetThreadExecutionState(ES_CONTINUOUS|ES_SYSTEM_REQUIRED)`; bản thật chạm
 `%TEMP%\hpworld_server_live.txt` mỗi 60 s).
+`mo-may-chu.ps1` KHÔNG `--build` khi game + portal đang chạy và `/healthz` ok (15/10/2026): Compose v5.1 `up --build` sinh ảnh ID
+mới dù mọi lớp CACHED → tạo lại container game → ngắt mọi người ~10 s; chạy lại script để mở lại tunnel (sau `khoa-khan-cap`)
+giờ giữ nguyên máy chủ. Cập nhật mã mới = `tat-may-chu` rồi `mo-may-chu`. Buổi chơi thử qua tunnel tạm: VAN_HANH §16.
 **Chế độ thử** (`-TestMode` / `HPMP_TEST=1`): không ghi/xoá tệp đánh dấu, không mở trình duyệt, và **bắt buộc**
 `HPMP_PROJECT/HPMP_GAME_PORT/HPMP_ADMIN_PORT` khác bản thật (hpworld/9100/9101), không thì dừng. Biến khác:
 `HPMP_EDGE_SUBNET`, `HPMP_BACKEND_SUBNET`, `HPMP_IMAGE`, `HPMP_TUNNEL_IMAGE`.
