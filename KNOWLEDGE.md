@@ -525,7 +525,17 @@ chủ dự án: `docs/multiplayer/VAN_HANH.md`. Đặc tả giao việc: `docs/m
   tiếp đất · vòng sáng + bảng tên), **0 chương trình shader mới** (vật liệu `kitMaterial` cùng tham số với traffic.js → cùng đối
   tượng; bảng tên = `InstancedMesh` 1 instance MeshBasic map trong suốt = biến thể của vũng đèn đêm — `Mesh` thường từng tạo
   thêm 1 chương trình, đo `renderer.info.programs` 76 → 77). Trần TIER 1 → 40, TIER 2/3 → 96 (gần camera nhất, trễ 0,8);
-  bảng tên 24 gần nhất trong 25 m, mờ dần 17→25 m bằng 4 MỨC MỜ vẽ sẵn trong atlas (alpha theo đỉnh = biến thể shader mới).
+  bảng tên ≤ 24 trong 25 m, mờ dần 17→25 m bằng 4 MỨC MỜ vẽ sẵn trong atlas (alpha theo đỉnh = biến thể shader mới).
+  **Bảng tên KHÔNG CHỒNG trên màn hình** (SERVER.md §9.8): `remote_avatars` gọi `tags.tagA()` cho MỌI ứng viên theo ưu tiên
+  (khoảng cách × 0,7 đang hiện × 0,25 bạn / × 0,5 huy hiệu 1); `nametags` chiếu ra hình chữ nhật màn hình, giữ chỗ tham lam →
+  1 nấc xếp chồng → ẩn; trễ không gian (đang hiện thu 85 %, đang ẩn + lề 4 px) + trễ thời gian (ẩn sau 0,3 s bị chiếm, hiện lại
+  sau 0,6 s trống) + mờ dần bằng mức atlas → 0 nháy. BẪY V8 (rác mỗi khung): số thực TRUYỀN LÀM THAM SỐ cho hàm không inline,
+  gán vào biến closure `let`, đọc bằng khoá biến `o[key]`, `Math.hypot`, `arr.length = 0` rồi push, `addUpdateRange` (1 đối
+  tượng/lần), trường khởi tạo Smi 0 rồi ghi số thực (đổi hidden class → khử tối ưu "wrong map" → chạy tầng thấp, đóng hộp mọi
+  số) — đều tạo HeapNumber/đối tượng mỗi khung. Dùng khối `Float64Array` làm tham số/biến khung, `_updateRange` (three r160),
+  khởi tạo trường số thực bằng 0,5. Đo rác: CDP `HeapProfiler.startSampling` với `includeObjectsCollectedByMajorGC/MinorGC`
+  (`tools/qa/mp_tags_declutter.mjs`; node: `node:inspector/promises` trong `tests/net/nametags.test.mjs`) — đo SAU khi JIT ổn
+  định (làm nóng cùng đường mã; cửa sổ đầu có thể trùng lúc TurboFan biên dịch).
   BẪY: (1) tứ giác billboard tự dựng phải CCW nhìn từ camera (bản đầu cull mặt sau → bảng tên vô hình, vòng sáng vẫn hiện);
   (2) `surfaceY` là NỀN — xe/người đặt trên mặt nhựa `+ROAD_TOP` (như traffic.js), vòng sáng người đi bộ ở `SIDEWALK_TOP + 2 cm`
   (thấp hơn bị vỉa hè che); (3) `page.evaluate` trả đối tượng three (mesh → scene) làm Playwright treo khi tuần tự hoá — luôn
@@ -544,6 +554,15 @@ chủ dự án: `docs/multiplayer/VAN_HANH.md`. Đặc tả giao việc: `docs/m
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
 
+- **2026-10-15 (MP-2 BẢNG TÊN GỠ CHỒNG — đám đông dày, SERVER.md §9.8):** `js/net/nametags.js` xếp chỗ trên màn hình theo ưu
+    tiên (gần · đang hiện · bạn · huy hiệu), 1 nấc xếp chồng, trễ ẩn 0,3 s / hiện lại 0,6 s, mờ dần bằng mức atlas; bảng gần đầu
+    hơn; 0 cấp phát vòng nóng (khối tham số Float64Array, `_updateRange`, bỏ khoá chuỗi/mảng UV/Set/sort/hypot). Móc nhỏ ở
+    `remote_avatars.js`. Đo `tools/qa/mp_tags_declutter.mjs` (1 Chrome khoá GPU, Radeon 890M, trước = mô-đun dot3 cùng công cụ):
+    96 người / 13 m đi bộ TIER 3 cặp bảng chồng 14,7 → **0,64**, camera quay 5,33 → 0,69, góc cao 7,13 → 0,52; nháy (bật/tắt lại
+    < 0,5 s) 1,0–1,84/s → **0**; TIER 1 14,8 → 0,73, nháy 1,81 → 0; ~22 bảng hiện; dấu khó (Ứ Ẩ Ỷ Ữ) đúng. Lượt bảng tên 0,09 →
+    0,13–0,16 ms (p95 0,3–0,4); draw call mô-đun 3 = 3, 0 chương trình shader mới, fps 60 = 60, 0 lỗi JS. Rác: nametags 326 →
+    21 KB/s, remote_avatars 1.250 → 257 KB/s (TIER 1 766 → 227); heap sau GC +0,45 MB/60 s như bản cũ. Test node 28/28 (mới:
+    `tests/net/nametags.test.mjs` 5). Đầu ra: `C:/Users/Admin/hp-world-work/mp2b/nametags/`.
 - **2026-10-15 (MP-2 fixer vòng 1 — sửa 9 phát hiện phản biện, SERVER.md §9.7):** NC-1 CORRECT nhỏ không còn dây chuyền →
     kick (giữ STATE tới khi kéo xong; test Validator thật 36 tổ hợp fps×RTT×lệch: đúng 1 CORRECT); NC-2 RESUME không còn bóng
     ma (đối chiếu keyframe rải ở net.js, worker bỏ diff sai); NC-3 `TickBase` lấy lại mốc khi máy chủ bỏ tick (khung ngoại suy
