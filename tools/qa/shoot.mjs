@@ -11,7 +11,7 @@
 // views.json = [{id, kind:'pano', X, Z, h, pitch?}, {id, kind:'aerial', x, z, half}, {id, kind:'cam', x, z, yaw, pitch, dist}]
 // In ra JSON: {errors, buildMs, tier, gpu, perf:{...}, shots:[...]}
 // PW_PATH = đường dẫn module playwright-core (mặc định: bản cài ở scratchpad phiên 04e77d80, đổi nếu bị dọn)
-const PW = process.env.PW_PATH || 'file:///C:/Users/Admin/AppData/Local/Temp/claude/C--Users-Admin-hp-world/04e77d80-6633-4919-bfa9-5d86fbe6ae69/scratchpad/node_modules/playwright-core/index.mjs';
+const PW = process.env.PW_PATH || 'file:///C:/Users/Admin/AppData/Local/Temp/claude/C--Users-Admin-hp-world/04e77d80-6633-4919-bfa9-5d86fbe6ae69/scratchpad/pw/node_modules/playwright-core/index.mjs';
 const { chromium } = await import(PW);
 import fs from 'fs';
 const A = process.argv.slice(2);

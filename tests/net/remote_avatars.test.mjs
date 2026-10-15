@@ -115,3 +115,20 @@ test('dữ liệu hỏng / gọi sai thứ tự không bao giờ ném lỗi; sel
   assert.equal(ra.frame(1 / 60, 400, camera.position).count, 0);
   assert.deepEqual(ra.markers(), []);   // người lạ mặc định ẩn trên minimap
 });
+
+test('hide(netId): người đã chặn không vẽ (thân/vòng sáng/bảng tên/minimap), bỏ chặn thì hiện lại (fixer vòng 1 SAFE-3)', () => {
+  const { ra, camera } = setup(3);
+  crowd(ra, camera, 12);
+  ra.setMarkerAll(true);
+  const before = ra.stats().drawn;
+  ra.hide(103, true);
+  for (let f = 0; f < 3; f++) ra.frame(1 / 60, 1800 + f * 16.7, camera.position);
+  const p = ra.positions().find((q) => q.netId === 103);
+  assert.ok(p && p.hidden && !p.drawn, 'người bị ẩn vẫn trong danh sách nhưng không vẽ');
+  assert.equal(ra.stats().drawn, before - 1);
+  assert.ok(!ra.markers().some((m) => Math.abs(m.x - p.x) < 1e-6 && Math.abs(m.z - p.z) < 1e-6), 'không có chấm minimap');
+  ra.hide(103, false);
+  for (let f = 0; f < 3; f++) ra.frame(1 / 60, 1900 + f * 16.7, camera.position);
+  assert.equal(ra.stats().drawn, before);
+  ra.dispose();
+});

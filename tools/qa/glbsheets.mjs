@@ -2,7 +2,7 @@
 // usage: [OCC=0.12] node tools/qa/glbsheets.mjs <port> <outdir> nhahat,ga,...   (server tĩnh ở gốc repo; cần assets/ cục bộ)
 // OCC → thêm <m>_occ.json (ảnh chiếu bằng + độ cao từng ô) cho tools/qa/lmfit.py. PW_PATH như shoot.mjs.
 import fs from 'fs';
-const PW = process.env.PW_PATH || 'file:///C:/Users/Admin/AppData/Local/Temp/claude/C--Users-Admin-hp-world/04e77d80-6633-4919-bfa9-5d86fbe6ae69/scratchpad/node_modules/playwright-core/index.mjs';
+const PW = process.env.PW_PATH || 'file:///C:/Users/Admin/AppData/Local/Temp/claude/C--Users-Admin-hp-world/04e77d80-6633-4919-bfa9-5d86fbe6ae69/scratchpad/pw/node_modules/playwright-core/index.mjs';
 const { chromium } = await import(PW);
 const { acquireGpu } = await import('./gpulock.mjs');
 const [port, out, list] = process.argv.slice(2);

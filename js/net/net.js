@@ -118,7 +118,7 @@ function build(deps) {
   panel.innerHTML = `
     <div id="mpWho" class="hidden"></div>
     <div id="mpForm">
-      <input id="mpNick" maxlength="16" autocomplete="nickname" spellcheck="false">
+      <input id="mpNick" maxlength="40" autocomplete="nickname" spellcheck="false">
       <input id="mpInvite" maxlength="24" autocomplete="off" spellcheck="false" autocapitalize="characters">
     </div>
     <button id="mpRecLink" type="button" class="mp-link"></button>
@@ -167,7 +167,8 @@ function build(deps) {
   // ô nhập trên màn tiêu đề: phím không lọt vào game (input.js typing()), Enter = bấm "Vào thành phố"
   for (const id of ['mpNick', 'mpInvite']) $(id).addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); startBtn && startBtn.click(); } });
   // biệt danh gõ dạng tổ hợp (NFD: "ê" = e + ̂) → NFC trước khi maxlength (đếm đơn vị UTF-16) cắt mất chữ
-  $('mpNick').addEventListener('input', (e) => { const el = e.currentTarget, v = el.value, n = v.normalize('NFC'); if (n !== v) el.value = n; });
+  // (maxlength 40 cho chỗ dán chuỗi NFD; giới hạn THẬT 16 ký tự áp sau khi chuẩn hoá)
+  $('mpNick').addEventListener('input', (e) => { const el = e.currentTarget, v = el.value; let n = v.normalize('NFC'); if (n.length > 16) n = n.slice(0, 16); if (n !== v) el.value = n; });
   $('mpRecCode').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); $('mpRecBtn').click(); } });
   $('mpRecLink').addEventListener('click', () => $('mpRecBox').classList.toggle('hidden'));
   $('mpRecBtn').addEventListener('click', async () => {
@@ -230,7 +231,7 @@ function build(deps) {
   }
 
   async function createAccount() {
-    const nick = $('mpNick').value.trim();
+    const nick = $('mpNick').value.normalize('NFC').trim();
     if (!nick) { setErr(t('mpNeedNick')); $('mpNick').focus(); return; }
     startBtn.disabled = true; soloBtn.disabled = true;
     setErr(t('mpWorking'));

@@ -503,6 +503,21 @@ chủ dự án: `docs/multiplayer/VAN_HANH.md`. Đặc tả giao việc: `docs/m
   xuyên tường (`__hp.camOcclusion(true)`) — tắt đi thì camera 30 m lọt ra sau nhà, phép đo "96 người trong khung" thành đo mái nhà.
   (3) Bot di chuyển: muốn ảnh cận cảnh thì bảo bot đứng (`bot.plaza.pauseUntil`, xe máy: `bot.idleUntil`) rồi ngắm lại theo vị
   trí đang vẽ. (4) Chi phí thật ở TIER 3: ~15 µs/người được vẽ (96 người +1,45 ms/khung không kẹp; 60 Hz vẫn 60 fps).
+- **Bẫy netcode đã sửa (fixer MP-2 vòng 1 — SERVER.md §9.7):** (1) CORRECT nhỏ (≤ 6 m, kéo mượt 0,15 s): máy chủ chấm STATE
+  mang epoch mới TỪ ĐIỂM ĐÃ SỬA (`MoveCheck.correctTo`) và KHÔNG xoá điểm vi phạm → STATE gửi giữa lúc kéo = vi phạm mới →
+  CORRECT dây chuyền → bị đuổi (lệch 3,9 m = 15 CORRECT rồi kick). Luật: `corr.step()` trả true khi có kéo, đang `pending`
+  thì KHÔNG gửi STATE; phần dời do kéo không tính vào vận tốc. Test `tests/net/correct_cascade.test.mjs` (Validator THẬT).
+  (2) KEYFRAME (RESUME/phiên mới) RẢI ENTER ≤ 24/snapshot (`aoi.js ENTER_MAX`) — không bao giờ suy "ai không có trong keyframe =
+  rời" từ MỘT snapshot; đối chiếu ở `net.js` (tập đang vẽ trước keyframe − ai được ENTER lại, chốt ở snapshot đầu có 0 ENTER
+  hoặc 2 s). Máy chủ chỉ gửi UPDATE khi bản ghi ĐỔI → KHÔNG dùng "lâu không có mẫu" để xoá người (người đứng yên). (3) Vòng tick
+  máy chủ quá tải BỎ tick → tickNo tụt sau đồng hồ thật vĩnh viễn; mốc "min(giờ đến − tick·50) trên 6,4 s" theo bước xuống ngay
+  nhưng bước lên phải chờ hết cửa sổ → `interp.js TickBase` lấy lại mốc khi 12 mẫu cuối là một CAO NGUYÊN cao hơn > 40 ms (TCP
+  kẹt rồi xả chùm thì độ lệch giảm dần 100 ms/mẫu — không phải cao nguyên, không lấy lại mốc). (4) `i18n.tf()` thay tham số trên
+  chuỗi GỐC (trước đó `t()` đã thay `{N}` = số địa danh → mọi thời lượng chế tài hiện "22"). (5) `?server=` máy lạ phải xác nhận
+  (tên máy chủ chữ to) trước MỌI request; chỉ DEFAULT_SERVER / localhost / host đã đồng ý (`hp3d.serverTrust`) được nhớ ngầm.
+  (6) Danh sách chặn ở máy theo netId của PHIÊN (xoá ở WELCOME không resume); người đã chặn bị ẩn hẳn (`ra.hide`); bảng 👥
+  "Người chơi quanh đây" (chạm biểu tượng kết nối hoặc 👥 trong ô chat) báo cáo/chặn được cả người không chat. (7) `__hp.net`
+  chỉ có khi `navigator.webdriver` hoặc `?qa`.
 - **Người chơi khác trong game (MP-2 C2, `js/net/remote_avatars.js` + `interp.js` + `nametags.js`):** API và số đo ở
   `docs/multiplayer/SERVER.md` §9. Luật đã kiểm: **≤ 5 draw call cố định** cho mọi N (người · xe máy gần · xe máy xa · bóng
   tiếp đất · vòng sáng + bảng tên), **0 chương trình shader mới** (vật liệu `kitMaterial` cùng tham số với traffic.js → cùng đối

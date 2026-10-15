@@ -80,6 +80,11 @@ async function makeInvite(uses) {
   const j = await r.json();
   return (j.codes || [])[0];
 }
+async function adm(pathq, body) {
+  const r = await fetch(ADMIN + pathq, body ? { method: 'POST', headers: { authorization: 'Bearer ' + adminToken(), 'content-type': 'application/json' }, body: JSON.stringify(body) }
+    : { headers: { authorization: 'Bearer ' + adminToken() } });
+  return { status: r.status, body: await r.json().catch(() => null) };
+}
 async function guest(nickname, invite, deviceId) {
   const r = await fetch(HTTP + '/v1/auth/guest', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ nickname, inviteCode: invite, deviceId }) });
   return { status: r.status, body: await r.json() };
@@ -437,8 +442,18 @@ async function main() {
       talker.sendChat(AFTER_BLOCK);
       await sleep(2500);
       const seen = await pg.evaluate((t) => window.__hp.net.chatLines().some((l) => l.text.includes(t)), AFTER_BLOCK);
-      const blockedStillDrawn = await pg.evaluate((id) => window.__hp.net.players().some((q) => q.netId === id), talker.r.netId);
-      step('chặn từ menu chat → máy chủ ngừng giao tin của người bị chặn', !!blk.v && !seen, { text: blk.v, seenAfterBlock: seen, blockedAvatarStillListed: blockedStillDrawn });
+      const blockedDrawn = await pg.evaluate((id) => window.__hp.net.players().some((q) => q.netId === id && q.drawn), talker.r.netId);
+      step('chặn từ menu chat → máy chủ ngừng giao tin của người bị chặn', !!blk.v && !seen, { text: blk.v, seenAfterBlock: seen });
+      // fixer vòng 1 SAFE-3: người đã chặn KHÔNG còn vẽ (thân + vòng sáng + bảng tên); bảng 👥 liệt kê người quanh đây +
+      // mục "Đã chặn" có Bỏ chặn
+      await pg.evaluate(() => window.__hp.net.showPlayers());
+      await sleep(400);
+      const pp = await pg.evaluate(() => ({ rows: window.__hp.net.playerRows().length, blocked: document.querySelectorAll('#ppBlocked .ppRow').length,
+        open: !document.getElementById('playersPanel').classList.contains('hidden') }));
+      await shot(pg, '11b_players_panel.png');
+      await pg.evaluate(() => window.__hp.net.hidePlayers());
+      step('người đã chặn biến khỏi màn hình + bảng 👥 người quanh đây (báo cáo/chặn người không chat)', !blockedDrawn && pp.open && pp.rows > 0 && pp.blocked === 1,
+        { blockedAvatarDrawn: blockedDrawn, panelRows: pp.rows, blockedRows: pp.blocked });
       await shot(pg, '11_blocked.png');
       await pg.evaluate(() => { const b = document.getElementById('chatBox'); b.style.zoom = '2.2'; b.style.width = '560px'; });
       await sleep(300);
@@ -475,18 +490,60 @@ async function main() {
     step('__hp.teleport 325 m → máy chủ CORRECT, trình duyệt về vị trí hợp lệ', !!back.v, { ...back.v, ms: back.ms });
     await sleep(1000);
 
+    // 8b) CORRECT NHỎ (≤ 6 m, đường kéo mượt) — fixer vòng 1 NC-1: trước đây 1 lần lệch 3,9 m = 15 CORRECT liên tiếp rồi
+    // bị đuổi (STATE gửi khi mới kéo ~11 %). Nay: giữ STATE tới khi kéo xong → 1 (tối đa 2) CORRECT, không bị đuổi.
+    {
+      const smalls = [];
+      for (const [stepM, n] of [[1.8, 3], [1.5, 4]]) {
+        await sleep(6500);   // điểm vi phạm của lần trước tan hết (−1/s)
+        const r = await pg.evaluate(async ([stepM, n]) => {
+          const h = window.__hp, ps = h.pState, s0 = h.net.status();
+          const c0 = s0.tel.corrections, x0 = ps.pos.x, z0 = ps.pos.z;
+          for (let i = 0; i < n; i++) { ps.pos.x += stepM; await new Promise((res) => setTimeout(res, 75)); }
+          await new Promise((res) => setTimeout(res, 3000));
+          const s1 = h.net.status();
+          return { stepM, n, corrections: s1.tel.corrections - c0, snaps: s1.correct ? s1.correct.snaps - (s0.correct ? s0.correct.snaps : 0) : null,
+            lastDist: s1.correct ? s1.correct.lastDist : null, conn: s1.conn, netId: s1.netId, endDist: +Math.hypot(ps.pos.x - x0, ps.pos.z - z0).toFixed(2) };
+        }, [stepM, n]);
+        smalls.push(r);
+      }
+      const me = await st(pg);
+      step('CORRECT nhỏ (kéo mượt) → 1–2 CORRECT, không dây chuyền, không bị đuổi', smalls.every((r) => r.corrections >= 1 && r.corrections <= 2 && r.conn === 'live' && r.netId === me.netId),
+        { smalls });
+    }
+
     if (!DOCKER) {
       // 9) RESUME: rớt socket giả → nối lại cùng netId (≤ 60 s); người khác không nhấp nháy
       const r0 = await st(pg);
       const n0 = r0.ra.count;
+      // fixer vòng 1 NC-2: trong lúc mất kết nối, 6 người đang thấy RỜI (bot dừng + quản trị kick) → sau RESUME họ phải
+      // biến mất (trước đây: bóng ma đứng im mãi, số người trên HUD đếm cả họ)
+      const vis = await pg.evaluate(() => window.__hp.net.players().filter((q) => q.drawn).map((q) => q.netId));
+      const pl = await adm('/admin/api/players');
+      const victims = ((pl.body && pl.body.players) || []).filter((q) => q.online && vis.includes(q.netId)).slice(0, 6);
       await pg.evaluate(() => window.__hp.net.drop());
+      for (const v of victims) { const b = bots.find((x) => x.r.netId === v.netId); if (b) b.stop(); }
+      const kicks = [];
+      for (const v of victims) kicks.push((await adm(`/admin/api/players/${v.id}/sanction`, { action: 'kick', note: 'e2e: rời trong lúc trình duyệt mất kết nối' })).status);
       const lost = await waitFor(pg, () => (window.__hp.net.status().conn !== 'live' ? window.__hp.net.status().conn : null), null, 3000, 'rớt');
-      const minDuring = { v: n0 };
       const res = await waitFor(pg, (o) => { const s = window.__hp.net.status(); return s.conn === 'live' && s.tel.resumes > o.r ? s : null; }, { r: r0.tel.resumes }, 15000, 'resume');
-      await sleep(1500);
+      await sleep(3500);
       const r1 = await st(pg);
-      step('rớt socket → RESUME giữ netId, người khác vẫn hiện', !!res.v && res.v.netId === r0.netId && r1.ra.count >= Math.floor(n0 * 0.8),
-        { lostState: lost.v, ms: res.ms, netIdBefore: r0.netId, netIdAfter: res.v && res.v.netId, countBefore: n0, countAfter: r1.ra.count, minDuring: minDuring.v });
+      const ghosts = await pg.evaluate((ids) => window.__hp.net.players().filter((q) => ids.includes(q.netId)).map((q) => q.netId), victims.map((v) => v.netId));
+      const liveBots = bots.filter((b) => b.state === 'live').length;
+      step('rớt socket → RESUME giữ netId, người khác vẫn hiện; ai rời trong lúc mất kết nối thì biến mất (không bóng ma)',
+        !!res.v && res.v.netId === r0.netId && r1.ra.count >= Math.floor((n0 - victims.length) * 0.8) && victims.length > 0 && ghosts.length === 0,
+        { lostState: lost.v, ms: res.ms, netIdBefore: r0.netId, netIdAfter: res.v && res.v.netId, countBefore: n0, countAfter: r1.ra.count,
+          victims: victims.map((v) => v.netId), kicks, ghosts, reconLeaves: r1.tel.reconLeaves || 0, liveBots });
+
+      // 9b) thời lượng chế tài hiện ĐÚNG số (fixer vòng 1 UX-1: trước đây mọi thời lượng hiện "22" = số địa danh)
+      const meRow = ((await adm('/admin/api/players')).body?.players || []).find((q) => q.online && q.netId === r1.netId);
+      if (meRow) {
+        await adm(`/admin/api/players/${meRow.id}/sanction`, { action: 'mute10m', note: 'e2e: thời lượng' });
+        const mt = await waitFor(pg, () => { const l = window.__hp.net.chatLines().filter((x) => /khoá chat/.test(x.text)).pop(); return l ? l.text : null; }, null, 6000, 'khoá chat');
+        await shot(pg, '13b_mute_duration.png');
+        step('khoá chat 10 phút hiện "10 phút" (không phải số địa danh)', !!mt.v && /10 phút/.test(mt.v) && !/22 phút/.test(mt.v), { text: mt.v });
+      } else step('khoá chat 10 phút hiện "10 phút"', false, { why: 'không tìm thấy tài khoản trình duyệt ở /admin/api/players' });
 
       // 10) ngày/đêm: client vs máy chủ
       await sleep(2500);

@@ -11,7 +11,7 @@ const PORT = +A.get('port', 8811);
 const Q = A.get('quality', 'full');
 const OUT = A.get('out', 'C:/Users/Admin/hp-world-work/mp2/c1/nonet');
 fs.mkdirSync(OUT, { recursive: true });
-const PW = process.env.PW_PATH || 'file:///C:/Users/Admin/AppData/Local/Temp/claude/C--Users-Admin-hp-world/04e77d80-6633-4919-bfa9-5d86fbe6ae69/scratchpad/node_modules/playwright-core/index.mjs';
+const PW = process.env.PW_PATH || 'file:///C:/Users/Admin/AppData/Local/Temp/claude/C--Users-Admin-hp-world/04e77d80-6633-4919-bfa9-5d86fbe6ae69/scratchpad/pw/node_modules/playwright-core/index.mjs';
 const { chromium } = await import(PW);
 const rel = await acquireGpu(`mp2_nonet :${PORT} ${Q}`);
 const br = await chromium.launch({ executablePath: process.env.CHROME_PATH || 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true,
