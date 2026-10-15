@@ -69,6 +69,8 @@ export function randomAppearanceHex(rand = Math.random) {
 
 const CAP_BY_TIER = (t) => (t >= 2 ? 96 : 40);
 const TAG_MAX = 24, TAG_R = 25, TAG_FADE = 17, RING_R = 90;
+// (tích hợp MP-2) không vẽ bảng tên người đứng < 2,5 m từ camera: đám đông sát camera → bảng tên phóng to che nửa màn hình
+const TAG_NEAR2 = 2.5 * 2.5;
 const STRIDE = 28, SH_STRIDE = 17, NSET = 3;
 const DRAW_R = 200;                 // bán kính vẽ quanh camera (AOI máy chủ 160 m + camera lùi)
 const BIKE_NEAR = DEVICE_TIER >= 3 ? 50 : DEVICE_TIER === 2 ? 42 : 32, LOD_HYST = 5;   // = traffic.js NEAR_BIKE
@@ -385,12 +387,12 @@ export function createRemoteAvatars({ scene, world = null, camera, tier = DEVICE
         if (a.d2 > RING_R * RING_R || a.riding) continue;
         const away = !!(a.flags & SFLAG.AWAY), bike = a.mode === MODE.MOTO || a.mode === MODE.CYCLO;
         tags.ring(a.x, a.gy + (bike ? ROAD_TOP + 0.03 : RING_DY), a.z, a.yaw, bike ? 1.25 : 0.95 * a.app.scale, bike ? 2.35 : 0.95 * a.app.scale, away);
-        if (a.d2 <= TAG_R * TAG_R && names.has(a.netId)) nTagCand++;
+        if (a.d2 <= TAG_R * TAG_R && a.d2 >= TAG_NEAR2 && names.has(a.netId)) nTagCand++;
       }
       st.tags = 0;
       if (nTagCand) {
         const cand = [];
-        for (const a of drawnList) if (a.d2 <= TAG_R * TAG_R && names.has(a.netId)) cand.push(a);
+        for (const a of drawnList) if (a.d2 <= TAG_R * TAG_R && a.d2 >= TAG_NEAR2 && names.has(a.netId)) cand.push(a);
         if (cand.length > TAG_MAX) cand.sort((p, q) => p.d2 - q.d2);
         const cy = camera ? camera.position.y : 0;
         for (let i = 0; i < cand.length && i < TAG_MAX; i++) {

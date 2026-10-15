@@ -279,13 +279,12 @@ async function main() {
       const s = await pg.evaluate(() => {
         const h = window.__hp, p = h.pState.pos, ps = h.net.players();
         const d = (q) => Math.hypot(q.x - p.x, q.z - p.z);
-        const bikes = ps.filter((q) => (q.state & 7) === 4 && q.drawn && d(q) > 9 && d(q) < 32).map((q) => ({ ...q, d: d(q) })).sort((a, b) => a.d - b.d);
+        const bikes = ps.filter((q) => (q.state & 7) === 4 && q.drawn && d(q) > 5 && d(q) < 22).map((q) => ({ ...q, d: d(q) })).sort((a, b) => a.d - b.d);
         return { near: ps.filter((q) => d(q) < 60).length, count: ps.length, bikes: bikes.slice(0, 4), stats: h.net.status().ra };
       });
-      if (riderShots < 3 && s.bikes.length && Date.now() - (report._lastRider || 0) > 6000) {
+      if (riderShots < 4 && s.bikes.length && Date.now() - (report._lastRider || 0) > 5000) {
         const b = s.bikes[0];
-        await lookToward(pg, b.x, b.z, 6, 0.18);
-        await sleep(120);
+        await lookToward(pg, b.x, b.z, 4, 0.14);
         await shot(pg, `04_rider_${riderShots}.png`);
         const dbg = await pg.evaluate((id) => window.__hp.net.avatars().debug(id), b.netId);
         report.riders.push({ netId: b.netId, name: b.name, d: +b.d.toFixed(1), nBikes: s.bikes.length, debug: dbg, stats: s.stats });
@@ -336,18 +335,24 @@ async function main() {
     // bảng tên cận cảnh: dấu tiếng Việt khó
     const hard = await pg.evaluate(() => {
       const h = window.__hp, p = h.pState.pos;
-      return h.net.players().filter((q) => /Nguyễn Thị Hường|Đặng Quốc Việt/.test(q.name) && q.drawn)
-        .map((q) => ({ ...q, d: Math.hypot(q.x - p.x, q.z - p.z) })).filter((q) => q.d < 14).sort((a, b) => a.d - b.d).slice(0, 4);
+      // người mang tên khó, cách người chơi 2,5–8 m, ÍT người khác quanh (bảng tên không chồng nhau) — 1 Hường + 1 Việt
+      const all = h.net.players();
+      const c = all.filter((q) => /Nguyễn Thị Hường|Đặng Quốc Việt/.test(q.name) && q.drawn)
+        .map((q) => ({ ...q, d: Math.hypot(q.x - p.x, q.z - p.z), crowd: all.filter((o) => o !== q && Math.hypot(o.x - q.x, o.z - q.z) < 2.5).length }))
+        .filter((q) => q.d > 2.5 && q.d < 8).sort((a, b) => a.crowd - b.crowd || a.d - b.d);
+      const out = [];
+      for (const re of [/Nguyễn Thị Hường/, /Đặng Quốc Việt/]) { const q = c.find((x) => re.test(x.name)); if (q) out.push(q); }
+      return out;
     });
     report.hardNames = hard;
     const zooms = [];
     for (const q of hard.slice(0, 2)) {
-      await lookToward(pg, q.x, q.z, 2.6, 0.06);
+      await lookToward(pg, q.x, q.z, 1.6, 0.05);
       await sleep(1800);
       const nm = q.name.startsWith('Nguyễn') ? 'huong' : 'viet';
       await shot(pg, `06_tags_close_${nm}.png`);
-      const z = await tagZoom(pg, q.netId, `06_tag_zoom_${nm}.png`);
-      zooms.push({ netId: q.netId, name: q.name, d: +q.d.toFixed(1), zoom: z });
+      const z = await tagZoom(pg, q.netId, `06_tag_zoom_${nm}.png`, 520, 170);
+      zooms.push({ netId: q.netId, name: q.name, d: +q.d.toFixed(1), crowd: q.crowd, zoom: z });
     }
     const atlas = await pg.evaluate(() => { const ra = window.__hp.net.avatars(); return ra && ra.tags && ra.tags.canvas ? ra.tags.canvas.toDataURL('image/png') : null; });
     if (atlas) fs.writeFileSync(path.join(OUT, '06_tag_atlas.png'), Buffer.from(atlas.split(',')[1], 'base64'));
