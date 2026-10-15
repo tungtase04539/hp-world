@@ -519,7 +519,7 @@ chủ dự án: `docs/multiplayer/VAN_HANH.md`. Đặc tả giao việc: `docs/m
   (tên máy chủ chữ to) trước MỌI request; chỉ DEFAULT_SERVER / localhost / host đã đồng ý (`hp3d.serverTrust`) được nhớ ngầm.
   (6) Danh sách chặn ở máy theo netId của PHIÊN (xoá ở WELCOME không resume); người đã chặn bị ẩn hẳn (`ra.hide`); bảng 👥
   "Người chơi quanh đây" (chạm biểu tượng kết nối hoặc 👥 trong ô chat) báo cáo/chặn được cả người không chat. (7) `__hp.net`
-  chỉ có ở localhost hoặc `?qa=1` (từ riders fixer; trước đó `navigator.webdriver`/`?qa` bất kỳ — xem mục dưới).
+  chỉ có ở máy nhà phát triển (localhost; LAN riêng + `?qa=1`) — từ fixer MP-2b vòng 1, xem mục dưới.
 - **Không kéo về oan (riders fixer, 15/10/2026 — SERVER.md §9.8):** vật lý thật (vehicles.js: xe máy 16 m/s, ga 3,6 m/s², kẹp
   dt 50 ms/khung ở main.js) KHÔNG vượt trình kiểm (16·1,2 + 1 m/cửa sổ); 3D dài hơn 2D trên dốc/cầu chỉ làm tốc độ 2D NHỎ đi.
   Các CORRECT "SPEED" của bot S4 trong e2e đến từ BOT, không từ luật: (1) bot đóng dấu `clientMs` lúc GỬI trong khi vị trí tính
@@ -532,10 +532,22 @@ chủ dự án: `docs/multiplayer/VAN_HANH.md`. Đặc tả giao việc: `docs/m
   lên/xuống (cách STATE trước ≥ 30 ms). Máy chủ ghi `"msg":"correct"` mỗi lần kéo về (cửa sổ `win` 1 = 1 s, 2 = 300 ms,
   3 = 4 s, 4 = bước đầu; `dist`/`limit`/`dtS`/`lead`), `LOG_LEVEL=debug` ghi cả STATE bị từ chối (`"violation"`). Kiểm:
   `tools/qa/mp_riders.mjs` (1 Chrome lái thật), `tools/qa/mp_converge.mjs` (bot + khựng + khởi động lại máy chủ),
-  `server/test/riders_regress.test.js`. Tay cầm QA: `__hp.net`, và khi ONLINE `__hp.teleport`/`pState`/`world`/`vehicles`/
-  `mount`/`player`/`traffic`/`footprints` chỉ có ở localhost hoặc `?qa=1` (`js/qagate.js`; KHÔNG theo `navigator.webdriver`);
-  launch/shoot/clearance/mp2_nonet tự thêm `qa=1`; kiểm cổng: `tools/qa/mp_qagate.mjs`.
-  chỉ có khi `navigator.webdriver` hoặc `?qa`.
+  `server/test/riders_regress.test.js`. Tay cầm QA: xem mục fixer MP-2b vòng 1 ngay dưới.
+- **Fixer MP-2b vòng 1 (15/10/2026 — SERVER.md §9.10), LUẬT:** (1) Trình kiểm: cửa sổ **4 s ĐI QUA lên/xuống xe**, bù
+  `MOUNT_SLACK_M` 9 m × tối đa `MOUNT_SLACK_MAX` 2 lần đổi trong cửa sổ; cửa sổ 1 s / 300 ms vẫn dừng ở lần đổi. Trước đó
+  bật WALK↔MOTO mỗi STATE = +9 m mỗi bước, KHÔNG cửa sổ nào → 120 m/s mãi không bị bắt (lớp abuse `mount_toggle`). Đừng bao
+  giờ cấp bù "mỗi lần đổi chế độ" mà không giới hạn theo thời gian. (2) Dung sai cố ý: gian lận ≤ ×1,2 (`SLACK_MUL`) không bị
+  bắt — đã biết. (3) Tunnel tạm: KHÔNG đọc cả nhật ký container (restart "no" → container cũ được chạy lại, nhật ký còn địa chỉ
+  CHẾT); luôn `docker logs --since <StartedAt>` của container đang chạy, bật mới = `rm -f -s` + `up --force-recreate`; tunnel
+  tạm đang chạy thì giữ nguyên (bạn bè giữ link). (4) Phiên bản: `/healthz build` (= git HEAD lúc dựng, `HPMP_BUILD`),
+  `version.json` trên Pages (deploy-pages.yml), `mo-may-chu`/`trang-thai` so cả ba; màn tiêu đề trên `*.github.io` ghi
+  "bản xxxxxxx". (5) Cổng QA (`js/qagate.js`): `?qa=1` CHỈ ở LAN riêng (localhost luôn có); host công khai không bao giờ;
+  bản thật có multiplayer → `__hp.pState/world/vehicles/mount/player/traffic/footprints` LUÔN null, `__hp.net` null, teleport từ
+  chối khi online. Chỉ là răn đe. launch/shoot/clearance/mp2_nonet chạy từ 127.0.0.1 (tự thêm `qa=1`); kiểm: `mp_qagate`.
+  (6) HUD điện thoại dọc (`max-width 520px` + portrait): bảng nhiệm vụ dưới thanh trên, bản đồ nhỏ 150×118 (`!important` —
+  minimap.js đặt kích thước nội tuyến), chat mở thì ẩn bản đồ; kiểm `tools/qa/mp_mobile_hud.mjs` (đo hộp chữ nhật giao nhau,
+  dọc + ngang). (7) Client tunnel tạm mất > 30 s → "Có thể đã đổi link"; địa chỉ tạm đã nhớ không đè `DEFAULT_SERVER`.
+  (8) Chủ dự án chạy script bằng `server/ops/*.cmd` (nhấp đúp) — nhấp phải "Run with PowerShell" không truyền tham số.
 - **Buổi chơi thử qua tunnel tạm (15/10/2026, VAN_HANH §16 = sổ tay cho chủ dự án):** đã chạy THẬT bộ Docker chế độ thử +
   Cloudflare quick tunnel (`mo-may-chu.ps1 -TestMode -TamThoi`, 22–33 s, DNS qua 1.1.1.1 có ngay) + 30 bot QUA `wss://…
   trycloudflare.com` + 1 Chrome. RTT qua tunnel (máy nhà → mép Cloudflare → về): trình duyệt p50 62 / p95 68 ms, 30 bot 4.036
@@ -584,6 +596,21 @@ chủ dự án: `docs/multiplayer/VAN_HANH.md`. Đặc tả giao việc: `docs/m
 - Vercel (tùy chọn): import repo, không cần build command (site tĩnh).
 
 ## 10. Nhật ký cập nhật (thêm dòng mới ở TRÊN CÙNG)
+
+- **2026-10-15 (MP-2b FIXER vòng 1 — 6 phát hiện phản biện, SERVER.md §9.10):** (1) EXPLOIT-MOUNT-TOGGLE (4): bật WALK↔MOTO
+    mỗi STATE chạy 120 m/s không bị bắt → cửa sổ 4 s đi qua lên/xuống xe, bù ≤ 2 × 9 m (`move.js MOUNT_SLACK_MAX`); lớp abuse
+    `mount_toggle` 9/9 bị kéo về; mount-spam trung thực vẫn 0 (unit + Chrome `mp_riders` A/B). (2) OPS-STALE-TUNNEL-URL (4):
+    sau khởi động lại máy `mo-may-chu -TamThoi` in địa chỉ CŨ đã chết → container tunnel MỚI + nhật ký `--since StartedAt`;
+    đang chạy thì giữ; báo "ĐỊA CHỈ ĐÃ ĐỔI"; `khoi-phuc` không dừng tunnel tạm (thử bằng compose giả: PASS). (3) DEPLOY-VERSION-GAP
+    (3): `/healthz build` + `version.json` trên Pages + `Test-BuildVersions` trong mo-may-chu/trang-thai; VAN_HANH §16.1 bước 6
+    (Pages hôm nay: CHƯA có version.json → script cảnh báo đúng). (4) `server/ops/*.cmd` nhấp đúp + cách mở PowerShell (§0).
+    (5) HUD điện thoại dọc không đè (mới: `tools/qa/mp_mobile_hud.mjs` 10/10). (6) `?qa=1` chỉ ở LAN riêng; tay cầm bản thật
+    luôn null (`mp_qagate` 3/3). Nhỏ: biệt danh ≤ 2 dấu/chữ, client "Có thể đã đổi link" sau 30 s, địa chỉ tạm đã nhớ không đè
+    DEFAULT_SERVER, mã mời ví dụ giả. Kiểm (máy chủ native thử 9360/9361, tĩnh 8826, Radeon 890M, 1 Chrome dưới khoá GPU, đầu
+    ra `C:/Users/Admin/hp-world-work/mp2b/fix1/`): `npm test` 167 (166 + 1 bỏ qua sẵn), tests/net 28/28, `mp2_c1_unit` 282/282,
+    abuse 200 bot mọi tiêu chí PASS (bot trung thực 0 CORRECT); một mình: diag full + lite 0 lỗi JS, `mp2_nonet` full + lite,
+    mobile 0 lỗi, waterbfs, check_assets ĐỦ. BẪY: abuse cần `INVITE_REQUIRED=false` trên máy chủ thử (không thì 403 + 429 hết);
+    `mp_riders` phụ thuộc điểm xuất phát ngẫu nhiên — tài xế có thể kẹt (i=3, reverses tăng mãi) → C/D không tới cầu.
 
 - **2026-10-15 (MP-2b TÍCH HỢP — riders + nametags + tunnel, sẵn sàng buổi chơi thử đầu tiên):** gộp `--no-ff` theo thứ tự
     riders (5d26e84) → nametags (6d9fdc0) → tunnel (bf7d8bf). Xung đột duy nhất: SERVER.md — riders và nametags cùng viết "§9.8"

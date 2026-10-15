@@ -365,7 +365,9 @@ kbd { background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.35)
    bề ngang, nên bảng nhiệm vụ nằm DƯỚI nó và gọn lại (bỏ dòng mô tả); khung chat đóng không lấn sang bản đồ nhỏ; mở chat
    thì cất bản đồ nhỏ + bảng nhiệm vụ (ô nhập + nút Gửi chiếm cả bề ngang). Kiểm: tools/qa/mp_mobile_hud.mjs */
 @media (max-width: 520px) and (orientation: portrait) {
-  #questPanel { top: 108px; min-width: 0; max-width: min(230px, 62vw); padding: 6px 10px; }
+  #questPanel { top: 60px; min-width: 0; max-width: min(230px, 62vw); padding: 6px 10px; }
+  /* online: chấm kết nối + nút 💬 làm thanh trên xuống 2 hàng */
+  #hud:has(#netStatus:not(.hidden)) #questPanel { top: 108px; }
   #questTitle { font-size: 11px; margin-bottom: 2px; }
   .quest { font-size: 11.5px; margin: 3px 0; }
   .quest small, .quest br { display: none; }

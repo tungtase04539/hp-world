@@ -52,6 +52,11 @@ function build(deps) {
   let corrEpoch = 0, seq = 0;
   let pendingSpawn = null;     // {x, z, yaw, rejoin}
   let everLive = false, lostShown = false, joinBusy = false, joinTimer = 0, joinBackoff = 2000, noRejoin = false;
+  // Đường link TẠM (*.trycloudflare.com) không bao giờ quay lại sau khi chủ máy chủ bật lại tunnel (VAN_HANH §16.5): mất
+  // > 30 s thì nói thật "có thể đã đổi link" thay vì "đang nối lại…" mãi (vòng sửa 1 MP-2b). Vẫn tự thử nối lại như cũ.
+  const QUICK_LINK = /\.trycloudflare\.com(:\d+)?$/i.test(String(cfg.label || ''));
+  let lostSince = 0, newLinkTimer = 0, newLinkShown = false;
+  const quickLinkStale = () => QUICK_LINK && everLive && lostSince > 0 && performance.now() - lostSince > 30000;
   let queueInfo = null;
   const names = new Map();     // netId → tên hiển thị
   const visible = new Set();   // netId đang thấy
@@ -99,7 +104,7 @@ function build(deps) {
       txt = `${t('mpStOnline')} · 👥 ${n}${Number.isFinite(rtt) ? ` · ${Math.round(rtt)} ms` : ''}`;
     } else if (conn === 'joining' || conn === 'connecting') { cls = 'wait'; txt = t('mpStConnecting'); }
     else if (conn === 'queue') { cls = 'wait'; txt = tf('mpStQueue', { POS: queueInfo ? queueInfo.position : '?' }); }
-    else if (conn === 'lost') { cls = 'lost'; txt = `${t('mpStExplore')} · ${t('mpStReconnect')}`; }
+    else if (conn === 'lost') { cls = 'lost'; txt = `${t('mpStExplore')} · ${t(quickLinkStale() ? 'mpStNewLink' : 'mpStReconnect')}`; }
     else if (conn === 'closed') { cls = 'off'; txt = `${t('mpStExplore')} · ${t('mpStClosed')}`; }
     pill.dataset.state = cls;
     // chữ đầy đủ trong .npTxt (màn hẹp: CSS ẩn, chỉ còn chấm màu + 👥 N), đủ nghĩa cho trình đọc màn hình qua aria-label
@@ -366,6 +371,14 @@ function build(deps) {
   let exploreTimer = 0;
   function enterExplore() {
     if (conn === 'live' || conn === 'connecting' || conn === 'joining' || conn === 'off') conn = 'lost';
+    if (!lostSince) lostSince = performance.now();
+    if (QUICK_LINK && everLive && !newLinkTimer && !newLinkShown) newLinkTimer = setTimeout(() => {
+      newLinkTimer = 0;
+      if (conn === 'live' || !quickLinkStale()) return;
+      newLinkShown = true;
+      ui.toast(t('mpNewLink'), 9000); if (chat) chat.system(t('mpNewLink'), 'error');
+      renderPill();
+    }, 30500);
     tel.offline(true);
     renderPill();
     if (!everLive) { clearRemotes(); return; }
@@ -478,6 +491,7 @@ function build(deps) {
     if (wasLost && everLive && lostShown) { ui.toast(t('mpBack'), 3000); if (chat) chat.system(t('mpBack')); }
     else if (!everLive && started) ui.toast(t('mpJoined'), 3000);
     everLive = true; lostShown = false;
+    lostSince = 0; newLinkShown = false; clearTimeout(newLinkTimer); newLinkTimer = 0;
     syncDay(true);
     renderPill();
   }

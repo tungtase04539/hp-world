@@ -714,6 +714,9 @@ export function checkNickname(name) {
   // Latin letters only (Vietnamese included) — no look-alike scripts, no symbols
   if (!/^[\p{Script=Latin}\p{M}0-9 _.\-]+$/u.test(t)) return { ok: false, reason: 'chars' };
   if (/^[ _.\-]|[ _.\-]$|[ _.\-]{2,}/.test(t)) return { ok: false, reason: 'chars' };
+  // at most 2 combining marks on one letter (Vietnamese needs ≤ 2 even fully decomposed: ệ = e + ̂ + ̣). "Zalgo" stacks
+  // spill out of the chat line and the 👥 list (fixer round 1 MP-2b); a mark with no letter before it is refused too
+  if (/\p{M}{3,}/u.test(t) || /^\p{M}|[ _.\-0-9]\p{M}/u.test(t)) return { ok: false, reason: 'chars' };
   if ((t.match(/\p{L}/gu) || []).length < 2) return { ok: false, reason: 'chars' };
   const k = nickKey(t);
   const flatK = k.replace(/ /g, '');

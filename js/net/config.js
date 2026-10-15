@@ -87,6 +87,10 @@ export function resolveServer(loc = (typeof location !== 'undefined' ? location 
   }
   try {
     const v = localStorage.getItem(STORE_KEY);
+    // một địa chỉ TẠM đã nhớ (*.trycloudflare.com — chết khi chủ máy chủ tắt tunnel) không được đè máy chủ mặc định khi
+    // đã có tên miền riêng (VAN_HANH §16.7; vòng sửa 1 MP-2b)
+    const def = parseServer(DEFAULT_SERVER);
+    if (v && def && /\.trycloudflare\.com$/i.test((parseServer(v) || {}).label || '')) { localStorage.removeItem(STORE_KEY); return def; }
     if (v) { const p = parseServer(v); if (p) { p.raw = v; if (!isTrusted(p)) p.untrusted = true; return p; } }   // (bản cũ nhớ mọi host)
   } catch (e) { }
   return parseServer(DEFAULT_SERVER);
