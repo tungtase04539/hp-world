@@ -189,6 +189,10 @@ export function accept(rep, meta) {
   const full = meta.mode === 'full';
   out.push(chk('lỗi giải mã phía bot', rep.decode.errors, '==', 0));
   out.push(chk('bot vào được (%)', rep.connect.everLivePct, '>=', s === 'stress' ? 0 : 99, ' %'));
+  // fixer round 2: a worker whose final result never arrived silently shrank the denominators (reconnect "800/800 =
+  // 100 %" while 200 bots never resumed) — every planned bot must be in the report
+  out.push(chk('kết quả đủ bot (đã ghi / dự kiến)', rep.connect.bots, '==', rep.scenario.n));
+  out.push(chk('worker bot gửi kết quả', meta.finalsReceived ?? null, '==', rep.bots?.workers ?? meta.workers));
   if (['smoke', 'ramp', 'netem-lite', 'hotspot'].includes(s)) {
     out.push(chk('CORRECT bot trung thực / phút / bot (tổng)', rep.corrections.honestPerBotPerMin, '<', 2));
     out.push(chk('bot trung thực ≥ 2 CORRECT/phút', rep.corrections.botsOver2PerMin, '==', 0));
@@ -215,6 +219,8 @@ export function accept(rep, meta) {
   }
   if (s === 'reconnect') {
     out.push(full ? chk('resume giữ đúng netId (%)', rep.resume.rate, '>=', 100, ' %') : { name: 'resume giữ đúng netId', value: null, limit: '100 %', result: 'n/a' });
+    // and every planned bot resumed (not only the ones whose worker reported)
+    out.push(full ? chk('bot resume đúng / số bot dự kiến', rep.resume.ok ?? null, '>=', rep.scenario.n) : { name: 'bot resume đúng / dự kiến', value: null, limit: 'N', result: 'n/a' });
   }
   if (s === 'abuse' && rep.abuse) {
     for (const [k, e] of Object.entries(rep.abuse.classes)) {

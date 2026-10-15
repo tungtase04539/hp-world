@@ -11,6 +11,7 @@
 //   node tools/qa/gpulock.mjs run -- node server/bots/run.mjs ...      (this script warns when it is not under it)
 // Output: <out>/report.json, <out>/report.md, <out>/timeseries.json (+ creds file when --creds is given).
 import { fork } from 'node:child_process';
+import WebSocket from 'ws';
 import { Worker } from 'node:worker_threads';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -94,21 +95,23 @@ export async function runScenario(opts) {
   const finalsDone = new Promise((r) => { finalsResolve = r; });
   const onMsg = (m) => {
     if (m.type === 'tick') {
+      m.at = Date.now();
+      if (m.maxLoopMs > 1000) console.error(`[bots] worker ${m.workerId}: one loop() took ${m.maxLoopMs} ms · states ${JSON.stringify(m.states)}`);
       latest.set(m.workerId, m);
       for (const k in m.d) accum[k] = (accum[k] || 0) + m.d[k];
       accum.cpuMs = (accum.cpuMs || 0) + m.cpuMs;
     } else if (m.type === 'final') {
       finals.push(m);
       if (finals.length === workers.length) finalsResolve();
-    } else if (m.type === 'ready') { workers[m.workerId].ready = true; workers[m.workerId].baseRss = m.baseRss; }
+    } else if (m.type === 'ready') { workers[m.workerId].ready = true; workers[m.workerId].baseRss = m.baseRss; workers[m.workerId].inspectUrl = m.inspectUrl || null; }
   };
   const workerFile = path.join(HERE, 'worker.mjs');
   for (let w = 0; w < nW; w++) {
     const cfg = { workerId: w, seed, bots: slices[w], tickMs: +(o.tickMs || 20) };
     if (proc === 'fork') {
-      const cp = fork(workerFile, [], { stdio: ['ignore', 'inherit', 'inherit', 'ipc'], execArgv: [] });
+      const cp = fork(workerFile, [], { stdio: ['ignore', 'inherit', 'inherit', 'ipc'], execArgv: (process.env.HPBOT_EXEC_ARGV || '').split(' ').filter(Boolean) });
       cp.on('message', onMsg);
-      cp.on('exit', (code) => { if (code && !workers[w].finalSeen) log(`[bots] worker ${w} exited ${code}`); });
+      cp.on('exit', (code, sig) => { if (code !== 0 && !workers[w].finalSeen) console.error(`[bots] worker ${w} exited ${code} ${sig || ''} before its final result`); });
       cp.on('error', (e) => { if (!workers[w].finalSeen) log(`[bots] worker ${w} ipc error ${e.code || e.message}`); });
       workers.push({ id: w, send: (m) => { try { if (cp.connected) cp.send(m); } catch { /* gone */ } }, kill: () => { try { cp.kill(); } catch { /* ignore */ } }, ready: false });
       cp.send({ type: 'init', cfg });
@@ -138,7 +141,7 @@ export async function runScenario(opts) {
 
   // scrape loop
   const ts = [];
-  let lastCpu = cpuSnapshot(), lastScrapeT = Date.now(), lastLog = 0, rawFirst = null, rawLast = null;
+  let lastCpu = cpuSnapshot(), lastScrapeT = Date.now(), lastLog = 0, lastStaleLog = 0, rawFirst = null, rawLast = null;
   const parentCpu0 = process.cpuUsage();
   const doScrape = async () => {
     const s = await scrape(adminUrl, httpUrl, o.adminToken);
@@ -160,6 +163,13 @@ export async function runScenario(opts) {
     };
     accum = {};
     lastCpu = cpu; lastScrapeT = now;
+    // a worker that stopped reporting (blocked event loop) — logged once per 10 s with its last known bot states
+    const stale = [...latest.values()].filter((m) => now - m.at > 5000);
+    if (stale.length) {
+      entry.staleWorkers = stale.map((m) => ({ id: m.workerId, silentMs: now - m.at, states: m.states }));
+      if (now - lastStaleLog >= 10000) { lastStaleLog = now; console.error(`[bots] t=${Math.round(entry.t / 1000)}s worker(s) silent: ${JSON.stringify(entry.staleWorkers)}`); }
+      for (const s of stale) { const w = workers[s.id]; if (w && w.inspectUrl && !w.stackTaken) { w.stackTaken = true; stallStack(w).catch((e) => console.error('[bots] stall stack failed', e.message)); } }
+    }
     ts.push(entry);
     if (now - lastLog >= 10000) {
       lastLog = now;
@@ -179,6 +189,10 @@ export async function runScenario(opts) {
   const pc = process.cpuUsage(parentCpu0);
   meta.parentCpuPct = +(((pc.user + pc.system) / 1000 / (plan.durS * 1000)) * 100).toFixed(2);
   meta.finalsReceived = finals.length;
+  if (finals.length < workers.length) {
+    const got = new Set(finals.map((f) => f.workerId));
+    for (const w of workers) if (!got.has(w.id)) { const m = latest.get(w.id); console.error(`[bots] worker ${w.id}: NO final result · last tick ${m ? Math.round((Date.now() - m.at) / 1000) + ' s ago, states ' + JSON.stringify(m.states) + ', maxLoopMs ' + m.maxLoopMs : 'never'}`); }
+  }
 
   const merged = mergeFinals(finals);
   const rep = buildReport({ meta, plan, merged, ts, workers, raw: { first: rawFirst, last: rawLast } });
@@ -194,6 +208,27 @@ export async function runScenario(opts) {
   log(`[bots] done: ${rep.acceptance.map((a) => `${a.result === 'PASS' ? 'OK' : a.result} ${a.name}`).join(' | ')}`);
   log(`[bots] report: ${path.join(out, 'report.md')}`);
   return { report: rep, out, fails };
+}
+
+// pause a stalled worker through its inspector and print where it is (HPBOT_INSPECT_STALL=1)
+function stallStack(w) {
+  return new Promise((resolve, reject) => {
+    const ws = new WebSocket(w.inspectUrl);
+    let id = 0;
+    const send = (method, params) => ws.send(JSON.stringify({ id: ++id, method, params }));
+    const t = setTimeout(() => { try { ws.terminate(); } catch { /* ignore */ } reject(new Error('timeout')); }, 15000);
+    ws.on('open', () => { send('Debugger.enable'); send('Debugger.pause'); });
+    ws.on('message', (d) => {
+      const m = JSON.parse(String(d));
+      if (m.method === 'Debugger.paused') {
+        const frames = m.params.callFrames.slice(0, 25).map((f) => `${f.functionName || '(anon)'} ${(f.url || '').split('/').slice(-2).join('/')}:${f.location.lineNumber + 1}`);
+        console.error(`[bots] worker ${w.id} STALL STACK: ${frames.join(' <- ')}`);
+        send('Debugger.resume');
+        clearTimeout(t); setTimeout(() => { try { ws.close(); } catch { /* ignore */ } resolve(); }, 200);
+      }
+    });
+    ws.on('error', (e) => { clearTimeout(t); reject(e); });
+  });
 }
 
 function fmtN(v) { return Number.isFinite(v) ? v.toFixed(1) : '—'; }

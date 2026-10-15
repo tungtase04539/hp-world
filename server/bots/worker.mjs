@@ -3,6 +3,9 @@
 // Worker → parent: {type:'ready'}, {type:'tick', ...per-second deltas + CPU/RSS/ELU}, {type:'final', ...}.
 import { isMainThread, parentPort } from 'node:worker_threads';
 import { performance } from 'node:perf_hooks';
+import fs from 'node:fs';
+import inspector from 'node:inspector';
+import path from 'node:path';
 import { Bot } from './lib/bot.mjs';
 import { installAbuse } from './lib/abuse.mjs';
 import { buildRoadGraph } from './lib/roadgraph.mjs';
@@ -29,6 +32,7 @@ function makeW() {
 }
 
 let bots = [], W = null, ctx = null, cfg = null, timer = null, secTimer = null, t0 = 0, last = null, lastCpu = null, lastElu = null;
+let maxLoopMs = 0;   // longest loop() in the last second (fixer round 2: a stuck worker lost 200 bots of a reconnect run)
 const pending = [];   // [startAt, spec] not yet started
 
 function cpuNow() {
@@ -47,11 +51,18 @@ function init(c) {
   last = { ...W.c }; lastCpu = cpuNow(); lastElu = performance.eventLoopUtilization();
   timer = setInterval(loop, c.tickMs || 20);
   secTimer = setInterval(second, 1000);
-  port.post({ type: 'ready', workerId: c.workerId, graphNodes: graph.nodes, graphMs: graph.buildMs, baseRss: process.memoryUsage().rss });
+  dbg('init');
+  // HPBOT_INSPECT_STALL=1: open the inspector so the parent can pause a stalled worker and log its stack
+  let inspectUrl = null;
+  if (process.env.HPBOT_INSPECT_STALL === '1') { try { inspector.open(0, '127.0.0.1'); inspectUrl = inspector.url(); } catch { /* ignore */ } }
+  port.post({ type: 'ready', workerId: c.workerId, graphNodes: graph.nodes, graphMs: graph.buildMs, baseRss: process.memoryUsage().rss, inspectUrl });
 }
 
 function loop() {
   const now = performance.now();
+  try { loopBody(now); } finally { const d = performance.now() - now; if (d > maxLoopMs) maxLoopMs = d; }
+}
+function loopBody(now) {
   const el = now - t0;
   while (pending.length && pending[0].startAt <= el) {
     const spec = pending.shift();
@@ -68,6 +79,11 @@ function loop() {
   }
 }
 
+// HPBOT_DEBUG_DIR: each worker appends one line per second (event loop alive?) — tells a blocked worker from a
+// blocked IPC channel when the parent stops receiving ticks
+const DBG_DIR = process.env.HPBOT_DEBUG_DIR || '';
+function dbg(line) { if (DBG_DIR && cfg) { try { fs.appendFileSync(path.join(DBG_DIR, `worker${cfg.workerId}.log`), `${new Date().toISOString()} ${line}
+`); } catch { /* ignore */ } } }
 function second() {
   let live = 0, waiting = 0, connecting = 0;
   for (const b of bots) {
@@ -85,8 +101,11 @@ function second() {
   const mem = process.memoryUsage();
   port.post({
     type: 'tick', workerId: cfg.workerId, t: Math.round(performance.now() - t0), live, waiting, connecting,
-    started: bots.length, d, cpuMs, elu: elu.utilization, rss: mem.rss, heap: mem.heapUsed,
+    started: bots.length, d, cpuMs, elu: elu.utilization, rss: mem.rss, heap: mem.heapUsed, maxLoopMs: Math.round(maxLoopMs),
+    states: bots.reduce((a, b) => { a[b.state] = (a[b.state] || 0) + 1; return a; }, {}),
   });
+  dbg(`tick live=${live} wait=${waiting} conn=${connecting} maxLoopMs=${Math.round(maxLoopMs)}`);
+  maxLoopMs = 0;
 }
 
 function onEvent(ev) {
@@ -119,8 +138,10 @@ async function finish() {
 
 port.on((m) => {
   if (!m || typeof m !== 'object') return;
+  if (m.type !== 'init') dbg('msg ' + m.type);
   if (m.type === 'init') init(m.cfg);
   else if (m.type === 'event') onEvent(m.ev);
   else if (m.type === 'finish') finish();
 });
-if (port.kind === 'fork') process.on('disconnect', () => process.exit(0));
+if (port.kind === 'fork') process.on('disconnect', () => { dbg('ipc disconnect'); process.exit(0); });
+process.on('exit', (code) => dbg('exit ' + code));
