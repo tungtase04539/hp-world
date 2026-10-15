@@ -2,8 +2,8 @@
 //
 // Vì sao không dùng world.makeTextSprite: mỗi nhãn 1 canvas 512×128 + 1 texture + 1 vật liệu + 1 draw call. Ở đây:
 //  - MỘT ATLAS canvas 1024×1024 (ô 256×64, 4 cột × 16 hàng). Hàng 0 là ô TĨNH (vòng sáng xanh / xám, "vắng mặt" vi/en);
-//    60 ô còn lại cấp phát LRU theo khoá (netId, tên, huy hiệu, MỨC MỜ). Tên vẽ 1 lần khi cần, chỉ tải lại texture
-//    ≤ 10 lần/s (cả atlas — 4 MB, chỉ khi có ô mới).
+//    60 ô còn lại cấp phát LRU theo khoá (netId, tên, huy hiệu, MỨC MỜ). Tên vẽ 1 lần khi cần; ô mới tải lên GPU theo DẢI
+//    HÀNG (copyTextureToTexture trong onBeforeRender — tích hợp MP-2), không tải lại cả atlas 4 MB.
 //  - MỘT Mesh (không instanced) với hình học ĐỘNG: mỗi khung CPU ghi tứ giác quay về camera cho ≤ 24 bảng tên + tứ giác
 //    nằm phẳng cho mỗi vòng sáng. 3 bộ đệm đỉnh xoay vòng (như traffic.js NSET — không ghi vào bộ đệm GPU đang vẽ).
 //  - Vật liệu MeshBasicMaterial({map, transparent}) CHUẨN của three (không onBeforeCompile) → cùng biến thể chương trình
@@ -77,7 +77,13 @@ export function createNameTags({ scene, maxTags = 24, maxRings = 96, renderOrder
   const cells = [];
   for (let i = 0; i < COLS * ROWS; i++) cells.push({ key: null, used: -1, ready: false, w: CW });
   const byKey = new Map();
-  let dirty = false, lastUpload = -1e9, frameNo = 0, drawnThisFrame = 0, uploads = 0, drawsTotal = 0;
+  let dirty = false, lastUpload = -1e9, frameNo = 0, drawnThisFrame = 0, uploads = 0, drawsTotal = 0, subUploads = 0, subFail = 0;
+  // (tích hợp MP-2) TẢI LÊN TỪNG DẢI Ô thay vì cả atlas 4 MB: mỗi lần tải cả atlas (+ mipmap) = 1 khung dài (đo 96 người, TIER 3:
+  // số khung > 1,8× trung vị = đúng số lần tải, 0 khi tắt mô-đun). Ô mới vẽ → `pend`; ngay trước khi vẽ mesh (onBeforeRender có
+  // renderer) chép DẢI HÀNG chứa các ô đó bằng renderer.copyTextureToTexture (texSubImage2D, ≤ 64 KB/ô) + 1 lần mipmap.
+  const pend = new Set();
+  const bands = [];
+  let pendAge = 0;
   const cellXY = (i) => [(i % COLS) * CW, Math.floor(i / COLS) * CH];
 
   function pill(x, y, w, h, r) {
@@ -156,8 +162,8 @@ export function createNameTags({ scene, maxTags = 24, maxRings = 96, renderOrder
   drawRing(STATIC.RING_AWAY, '170,176,186', 0.8);
   cells[STATIC.AWAY_VI].w = drawAway(STATIC.AWAY_VI, 'vắng mặt');
   cells[STATIC.AWAY_EN].w = drawAway(STATIC.AWAY_EN, 'away');
-  for (let i = 0; i < 4; i++) { cells[i].key = 'static' + i; cells[i].used = Infinity; }
-  dirty = true;
+  for (let i = 0; i < 4; i++) { cells[i].key = 'static' + i; cells[i].used = Infinity; cells[i].ready = true; }
+  // ô tĩnh: lần tải ĐẦU của texture (CanvasTexture mới = needsUpdate) mang cả atlas lên GPU
 
   // ô cho (netId, tên, huy hiệu, mức) — null nếu chưa sẵn sàng (vẽ ở khung sau / chờ tải lên)
   function cellFor(netId, name, badge, level) {
@@ -178,9 +184,34 @@ export function createNameTags({ scene, maxTags = 24, maxRings = 96, renderOrder
     c.key = key; c.used = frameNo; c.ready = false;
     c.w = drawTag(best, name, badge, TAG_LEVELS[level]);
     byKey.set(key, best);
-    drawnThisFrame++; drawsTotal++; dirty = true;
+    drawnThisFrame++; drawsTotal++; pend.add(best);
     return -1;
   }
+
+  function flush(renderer) {
+    if (!pend.size) return;
+    try {
+      let r0 = ROWS, r1 = -1;
+      for (const i of pend) { const r = Math.floor(i / COLS); if (r < r0) r0 = r; if (r > r1) r1 = r; }
+      const y0 = r0 * CH, h = (r1 - r0 + 1) * CH;
+      const nr = r1 - r0 + 1;
+      let b = bands[nr];   // 1 canvas nguồn cho mỗi số hàng (đổi cỡ canvas mỗi khung = cấp phát lại)
+      if (!b) { const c = document.createElement('canvas'); c.width = AW; c.height = h; b = bands[nr] = { cv: c, tex: new THREE.CanvasTexture(c), g: c.getContext('2d') }; }
+      const bandTex = b.tex, bg = b.g;
+      bg.clearRect(0, 0, AW, h);
+      bg.drawImage(cv, 0, y0, AW, h, 0, 0, AW, h);
+      // flipY (như tải cả atlas): hàng canvas y0 → hàng texture AH − 1 − y0 ⇒ dải đặt ở yoffset = AH − (y0 + h)
+      _pos.set(0, AH - (y0 + h));
+      renderer.copyTextureToTexture(_pos, bandTex, tex);   // tự tải cả atlas lần đầu (version), rồi chép dải + mipmap
+      for (const i of pend) cells[i].ready = true;
+      subUploads++;
+    } catch (e) {
+      subFail++; dirty = true;   // lỗi (mất context…) → quay về tải cả atlas
+    }
+    pend.clear(); pendAge = 0;
+  }
+  const _pos = new THREE.Vector2();
+  mesh.onBeforeRender = (renderer) => flush(renderer);
 
   // ---------- ghi tứ giác ----------
   let P = null, U = null, nq = 0;
@@ -255,16 +286,18 @@ export function createNameTags({ scene, maxTags = 24, maxRings = 96, renderOrder
       geo.setDrawRange(0, nq * 6);
       mesh.visible = nq > 0;
       const now = performance.now();
-      if (dirty && now - lastUpload >= UPLOAD_MS) {
+      if (pend.size) { if (++pendAge > 3) dirty = true; } else pendAge = 0;   // mesh không được vẽ (không có renderer) → cả atlas
+      if (dirty && now - lastUpload >= UPLOAD_MS) {   // chỉ khi tải từng dải lỗi (fallback): cả atlas ≤ 10 lần/s
         tex.needsUpdate = true; dirty = false; lastUpload = now; uploads++;
         for (const c of cells) if (c.key !== null) c.ready = true;
+        pend.clear(); pendAge = 0;
       }
     },
     forget(netId) {   // tên đổi / người rời hẳn: nhả ô (LRU sẽ dùng lại)
       const p = netId + '|';
       for (const [k, i] of byKey) if (k.startsWith(p)) { byKey.delete(k); cells[i].key = null; cells[i].used = -1; cells[i].ready = false; }
     },
-    stats() { return { quads: nq, rings: nRings, tags: nTags, away: nAway, cellsUsed: byKey.size, uploads, draws: drawsTotal }; },
+    stats() { return { quads: nq, rings: nRings, tags: nTags, away: nAway, cellsUsed: byKey.size, uploads, subUploads, subFail, draws: drawsTotal }; },
     canvas: cv,
     dispose() {
       if (mesh.parent) mesh.parent.remove(mesh);

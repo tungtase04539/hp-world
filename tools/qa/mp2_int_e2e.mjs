@@ -31,6 +31,7 @@ const OUT = path.resolve(A.get('out', 'C:/Users/Admin/hp-world-work/mp2/int/' + 
 const DATA = path.resolve(A.get('data', path.join(OUT, '..', 'data_e2e')));
 const NBOTS = +A.get('bots', DOCKER ? 16 : 96);
 const UNCAPPED = A.get('uncapped', '1') !== '0';
+const PERFONLY = A.has('perfonly');   // chỉ: vào + bot + đo A/B TIER 3 (thăm dò hiệu năng nhanh), bỏ các bước còn lại
 const CHROME_ARGS = UNCAPPED ? ['--disable-gpu-vsync', '--disable-frame-rate-limit'] : [];
 fs.mkdirSync(OUT, { recursive: true });
 if (!DOCKER) fs.mkdirSync(DATA, { recursive: true });
@@ -141,6 +142,7 @@ async function lookToward(pg, bx, bz, dist, pitch, hideSelf = true) {
   return pg.evaluate(([bx, bz, dist, pitch, hide]) => {
     const h = window.__hp, p = h.pState.pos;
     const yaw = Math.atan2(p.x - bx, p.z - bz);
+    if (h.camOcclusion) h.camOcclusion(false);   // góc QA giữ đúng khoảng cách (cần boom chống xuyên tường tắt — như shoot.mjs)
     h.teleport(p.x, p.z, yaw, pitch, dist);
     h.player.group.visible = !hide;
     return { x: p.x, z: p.z, yaw };
@@ -154,6 +156,8 @@ async function measure(pg, ms = 4000) {
   return pg.evaluate(async (ms) => {
     const h = window.__hp, R = h.renderer;
     const calls = [], tris = [], dts = [];
+    const ra0 = h.net && h.net.avatars && h.net.avatars();
+    const up0 = ra0 ? ra0.stats().tagAtlas.uploads : 0, sub0 = ra0 ? ra0.stats().tagAtlas.subUploads || 0 : 0;
     const prev = R.info.autoReset; R.info.autoReset = false; R.info.reset();
     let last = performance.now(); const end = last + ms;
     while (performance.now() < end) {
@@ -165,6 +169,8 @@ async function measure(pg, ms = 4000) {
     calls.shift(); tris.shift(); dts.shift();
     const med = (a) => { const s = a.slice().sort((x, y) => x - y); return s.length ? s[s.length >> 1] : 0; };
     const sd = dts.slice().sort((a, b) => a - b), sum = dts.reduce((a, b) => a + b, 0);
+    const m50 = med(dts), longFrames = dts.filter((x) => x > m50 * 1.8).length;
+    const tagUploads = ra0 ? ra0.stats().tagAtlas.uploads - up0 : 0, tagSubUploads = ra0 ? (ra0.stats().tagAtlas.subUploads || 0) - sub0 : 0;
     // draw call theo mesh mp_*
     const orig = R.renderBufferDirect, per = {};
     let nF = 0, total = 0;
@@ -179,7 +185,7 @@ async function measure(pg, ms = 4000) {
     for (const k in per) { byMesh[k] = +(per[k] / 10).toFixed(2); mp += per[k]; }
     const ra = h.net && h.net.avatars && h.net.avatars();
     return { frames: dts.length, fps: +(1000 * dts.length / sum).toFixed(1), p50ms: +med(dts).toFixed(2), p95ms: +(sd[Math.floor(sd.length * 0.95)] || 0).toFixed(2),
-      callsMedian: med(calls), trisMedian: med(tris), programs: R.info.programs.length,
+      callsMedian: med(calls), trisMedian: med(tris), programs: R.info.programs.length, longFrames, tagUploads, tagSubUploads, meanMs: +(sum / dts.length).toFixed(3),
       mpCallsPerFrame: +(mp / 10).toFixed(2), mpByMesh: byMesh, ra: ra ? (({ count, drawn, drawCalls, peds, bikes, bikesFar, tags, rings, cap, ms }) => ({ count, drawn, drawCalls, peds, bikes, bikesFar, tags, rings, cap, ms }))(ra.stats()) : null };
   }, ms);
 }
@@ -194,7 +200,7 @@ async function abToggle(pg, rounds = 3, ms = 4000) {
   await setRA(pg, true);
   const med = (a, k) => { const s = a.map((x) => x[k]).sort((x, y) => x - y); return s[s.length >> 1]; };
   const sum = {};
-  for (const k of ['fps', 'p50ms', 'p95ms', 'callsMedian', 'trisMedian']) sum[k] = { on: med(on, k), off: med(off, k), delta: +(med(on, k) - med(off, k)).toFixed(2) };
+  for (const k of ['fps', 'meanMs', 'p50ms', 'p95ms', 'callsMedian', 'trisMedian', 'longFrames', 'tagUploads', 'tagSubUploads']) sum[k] = { on: med(on, k), off: med(off, k), delta: +(med(on, k) - med(off, k)).toFixed(2) };
   sum.mpCallsPerFrame = med(on, 'mpCallsPerFrame');
   sum.mpByMesh = on[on.length - 1].mpByMesh;
   sum.ra = on[on.length - 1].ra;
@@ -208,7 +214,8 @@ async function tagZoom(pg, netId, file, w = 460, hgt = 150) {
     const h = window.__hp, ra = h.net.avatars(), d = ra && ra.debug(id);
     if (!d) return null;
     const v = new h.THREE.Vector3(d.x, d.y + 1.95, d.z).project(h.camera);
-    return { sx: (v.x + 1) / 2 * innerWidth, sy: (1 - v.y) / 2 * innerHeight, vis: v.z < 1, W: innerWidth, H: innerHeight };
+    const sx = (v.x + 1) / 2 * innerWidth, sy = (1 - v.y) / 2 * innerHeight;
+    return { sx, sy, vis: v.z < 1 && sx >= 0 && sx <= innerWidth && sy >= 0 && sy <= innerHeight, W: innerWidth, H: innerHeight };
   }, netId);
   if (!c || !c.vis) return null;
   const x = Math.max(0, Math.min(c.W - w, Math.round(c.sx - w / 2))), y = Math.max(0, Math.min(c.H - hgt, Math.round(c.sy - hgt * 0.6)));
@@ -284,7 +291,15 @@ async function main() {
       });
       if (riderShots < 4 && s.bikes.length && Date.now() - (report._lastRider || 0) > 5000) {
         const b = s.bikes[0];
-        await lookToward(pg, b.x, b.z, 4, 0.14);
+        // lượt chẵn: chụp khi đang chạy; lượt lẻ: bảo bot DỪNG XE (vẫn ngồi trên xe, idleUntil) rồi chụp cận cảnh
+        const bo = bots.find((x) => x.r.netId === b.netId);
+        if (riderShots % 2 === 1 && bo) {
+          bo.idleUntil = performance.now() + 9000;
+          await sleep(2500);
+          const q = await pg.evaluate((id) => window.__hp.net.players().find((x) => x.netId === id) || null, b.netId);
+          if (q) await lookToward(pg, q.x, q.z, 3.2, 0.12);
+          await sleep(900);
+        } else await lookToward(pg, b.x, b.z, 4, 0.14);
         await shot(pg, `04_rider_${riderShots}.png`);
         const dbg = await pg.evaluate((id) => window.__hp.net.avatars().debug(id), b.netId);
         report.riders.push({ netId: b.netId, name: b.name, d: +b.d.toFixed(1), nBikes: s.bikes.length, debug: dbg, stats: s.stats });
@@ -332,6 +347,7 @@ async function main() {
       S.ra && S.ra.drawn >= Math.min(need, 40) && S.ra.rings > 0 && S.ra.tags > 0 && S.mpCallsPerFrame <= 6 && S.ra.drawCalls <= 6,
       { ra: S.ra, mpCallsPerFrame: S.mpCallsPerFrame, mpByMesh: S.mpByMesh, callsDelta: S.callsMedian, fps: S.fps, newPrograms: newProgs });
 
+    if (PERFONLY) { await g.close(); return; }
     // bảng tên cận cảnh: dấu tiếng Việt khó
     const hard = await pg.evaluate(() => {
       const h = window.__hp, p = h.pState.pos;
@@ -346,9 +362,14 @@ async function main() {
     });
     report.hardNames = hard;
     const zooms = [];
-    for (const q of hard.slice(0, 2)) {
+    for (const q0 of hard.slice(0, 2)) {
+      // bảo bot ĐỨNG YÊN (plaza.pauseUntil) để khung hình không trôi, rồi ngắm theo vị trí đang vẽ
+      const bo = bots.find((x) => x.r.netId === q0.netId);
+      if (bo && bo.plaza) { bo.plaza.pauseUntil = performance.now() + 20000; bo.vTarget = 0; }
+      await sleep(1500);
+      const q = { ...q0, ...(await pg.evaluate((id) => window.__hp.net.players().find((x) => x.netId === id) || null, q0.netId) || {}) };
       await lookToward(pg, q.x, q.z, 1.6, 0.05);
-      await sleep(1800);
+      await sleep(1500);
       const nm = q.name.startsWith('Nguyễn') ? 'huong' : 'viet';
       await shot(pg, `06_tags_close_${nm}.png`);
       const z = await tagZoom(pg, q.netId, `06_tag_zoom_${nm}.png`, 520, 170);
