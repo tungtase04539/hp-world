@@ -58,7 +58,10 @@ test('guest: Nick#1234, validation, EdDSA access token, secrets never in respons
     const claims = await auth.verifyAccess(a.accessToken);
     assert.equal(claims.sub, a.account.id); assert.equal(claims.dn, a.account.displayName);
     assert.ok(claims.exp - claims.iat === AUTH.ACCESS_S);
-    assert.equal(await auth.verifyAccess(a.accessToken.slice(0, -2) + 'AA'), null);
+    // tamper a byte in the MIDDLE of the signature (fixer round 2: replacing the last two base64url chars with 'AA' was a
+    // no-op ~1/256 of the time — the final char carries 4 padding bits — and the test failed at random)
+    const tok = a.accessToken, mid = tok.lastIndexOf('.') + 20;
+    assert.equal(await auth.verifyAccess(tok.slice(0, mid) + (tok[mid] === 'A' ? 'B' : 'A') + tok.slice(mid + 1)), null);
     // another key → rejected; expired → rejected
     const other = crypto.generateKeyPairSync('ed25519').privateKey;
     const forged = await new SignJWT({}).setProtectedHeader({ alg: 'EdDSA', kid: s.config.secrets.jwtKid }).setSubject(a.account.id)

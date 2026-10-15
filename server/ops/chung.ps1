@@ -51,6 +51,8 @@ function Get-HpSettings([switch]$TestMode) {
     throw 'Chế độ thử (TestMode / HPMP_TEST=1) phải dùng bộ Docker và cổng riêng: đặt HPMP_PROJECT, HPMP_GAME_PORT, HPMP_ADMIN_PORT khác bản thật (hpworld / 9100 / 9101).'
   }
   if ($test) { $env:HPMP_TEST = '1' }
+  # bản thử dựng ảnh RIÊNG (vòng sửa 2: thiếu dòng này thì bản thử ghi đè ảnh hpworld-game:local của bản thật)
+  if ($test -and -not $env:HPMP_IMAGE) { $env:HPMP_IMAGE = $proj + '-game:local' }
   # để docker compose nội suy đúng cổng / tên ảnh
   $env:HPMP_GAME_PORT = [string]$gp
   $env:HPMP_ADMIN_PORT = [string]$ap

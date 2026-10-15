@@ -80,3 +80,14 @@
 - Kịch bản bot (GPU lock, 9175/9176): smoke, abuse (16 lớp), reconnect 1.000, netem-lite, ramp 1.200; Docker `hpmp-fix`
   (portal + mạng internal, quick tunnel, khoá khẩn cấp, tắt). Dọn: không còn container / volume / mạng / ảnh `hpmp-fix*`,
   không còn gì nghe 9175/9176/55441; `server/.env` và `server/data` thử đã xoá.
+
+## Vòng sửa 2 (fixer, 15/10/2026) — XONG
+
+- 4 phát hiện của người kiểm chứng: SERVER.md §8. Event-loop: đo bằng đầu dò worker (độ trễ thật của một tin từ ngoài, bỏ
+  lượng tử 15,6 ms của Windows) + tick chia lát 4 ms (`TICK_SLICE_MS`). NET-4: cửa sổ quãng đường 4 s (trần duy trì
+  vmax·1,2 + 0,25 m/s thay vì + 1 m/s). Đo lại sạch (một máy chủ mỗi lần, dừng theo cổng) hotspot/stress/reconnect/ramp +
+  ramp Docker; báo cáo bot nay TRƯỢT khi thiếu kết quả của một worker (trước: "100 %" trên mẫu thiếu).
+- Test: `test/fix2_regress.test.js` (7); `npm test` 154 xanh + 1 bỏ qua; `npm run test:pg` 61/61 (`hpmp-fix:55441`).
+- Còn trượt: tick p99 / lag p99 ở 1.000–1.200 CCU trên máy này (send của Windows + nhiễu máy, §8.3); NET-9 (bot ở máy khác);
+  worker bot chết 0xC0000409 khi reconnect 1.000 trên Windows (harness).
+- Dọn: không còn container / volume / ảnh `hpmp-fix*`, không còn gì nghe 9175/9176/55441; `server/.env` thử đã xoá.

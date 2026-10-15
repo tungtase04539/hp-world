@@ -252,6 +252,16 @@ nhất**, và tắt các ứng dụng chạy nền nặng (game, phần mềm đ
 máy có những "khựng" ngắn khoảng 1 lần mỗi giây kể cả khi không chạy máy chủ; lúc đông (trên ~800 người) các khựng đó
 làm máy chủ tưởng là quá tải và tự giảm chất lượng. Với vài chục người chơi của buổi thử kín thì không ảnh hưởng.
 
+**Màn hình chờ OLED Care của ASUS** (hình động chạy khi anh không dùng máy) tốn khoảng 1,5 lõi CPU suốt lúc nó chạy; khi thử
+tải, máy chủ chậm đi rõ rệt trong lúc đó. Đừng tắt hẳn nó (nó bảo vệ màn OLED khỏi bị lưu ảnh). Cách tốt hơn khi để máy làm
+máy chủ: Cài đặt → Hệ thống → Nguồn → **Tắt màn hình sau** 5 phút — màn hình tắt hẳn thì vừa bảo vệ màn OLED vừa không tốn CPU.
+Đây là cài đặt anh tự chỉnh; các script không đổi cài đặt nào của máy.
+
+**Ô "Trễ vòng lặp" trên trang quản trị** (từ 15/10/2026) là thời gian một tin của người chơi phải chờ trước khi máy chủ xử lý.
+Bình thường dưới 5 ms; với vài chục người chơi luôn dưới 15 ms. Trên 50 ms kéo dài nghĩa là máy đang bận việc khác (đóng
+bớt chương trình nặng). Trước đây ô này luôn hiện khoảng 16 ms kể cả khi máy rảnh (đó là nhịp đồng hồ của Windows, không
+phải máy chủ chậm).
+
 ## 12. Đo mạng người chơi (netprobe)
 
 Gửi cho người thử đường link `https://tungtase04539.github.io/hp-world/netprobe.html?s=<địa chỉ máy chủ>`. Người thử

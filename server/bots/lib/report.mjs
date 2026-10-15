@@ -260,7 +260,7 @@ export function renderMd(r) {
   L.push(`| tick sim p50 | ${ss(r.server.tickP50, ' ms')} |`);
   L.push(`| lắp snapshot p99 (\`${r.server.snapMetric || 'chưa có metric'}\`) | ${ss(r.server.snapP99, ' ms')} |`);
   L.push(`| event-loop p99 / max (tin từ ngoài chờ bao lâu) | ${ss(r.server.eventLoopP99, ' ms')} / ${ss(r.server.eventLoopMax, ' ms')} |`);
-  if (r.server.eventLoopTimerP99?.n) L.push(`| event-loop kiểu cũ (đồng hồ 5 ms, gồm lượng tử 15,6 ms của Windows) p99 | ${ss(r.server.eventLoopTimerP99, ' ms')} |`);
+  if (r.server.eventLoopTimerP99?.n) L.push(`| event-loop kiểu cũ (timer 5 ms, đã trừ 5 ms; trên Windows còn gồm lượng tử 15,6 ms) p99 | ${ss(r.server.eventLoopTimerP99, ' ms')} |`);
   if (r.server.tickSpanP99?.n) L.push(`| tick chia lát: thời gian thực từ snapshot đầu → cuối p99 · tick phải làm nốt đồng bộ | ${ss(r.server.tickSpanP99, ' ms')} · ${r.server.tickOverruns ?? '—'} |`);
   L.push(`| CPU tiến trình máy chủ (% 1 lõi) | ${ss(r.server.cpuPct, ' %', 1)} |`);
   L.push(`| RSS máy chủ | ${ss(r.server.rssMB, ' MB', 0)} |`);

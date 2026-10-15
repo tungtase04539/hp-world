@@ -1108,3 +1108,121 @@ Máy chủ chạy thẳng trên Windows (uWS) với Postgres 17 Docker, `INVITE_
 - `/v1/chat/filter` vẫn công bố mọi danh sách (cũng có trong repo công khai).
 - Bộ lọc: các câu còn lọt ở 7.7; danh sách cần người Việt bản ngữ duyệt sau buổi đầu.
 - Ramp 1.200 cần đo lại với bot ở máy khác (NET-9) trước khi kết luận về p99 tick.
+
+## 8. Vòng sửa 2 (fixer, 15/10/2026) — 4 phát hiện của người kiểm chứng (ramp/reconnect/độ sạch số đo/NET-4)
+
+Mã: `server/src/game/sim.js`, `server/src/app.js` (`timers.loop` có `external`), `server/src/metrics.js`, `server/src/config.js`
+(`TICK_SLICE_MS`), `js/shared/move.js` (`MOVE.LONG_MS`), `server/bots/{run,worker}.mjs`, `server/bots/lib/{report,metrics}.mjs`.
+Test hồi quy: `server/test/fix2_regress.test.js` (7 test, chạy trong `npm test`). Báo cáo đầy đủ: scratchpad `mp/fix2/run/*`
+(không commit). Phần dưới thay cho các đoạn tương ứng ở §6.4 mục 6, §7.4 và §7.9 khi khác.
+
+### 8.1 Độ trễ vòng sự kiện (scenario:ramp-eventloop) — đo cho đúng, rồi mới giảm
+
+**Nguyên nhân gốc 1 — số đo sai.** `hp_eventloop_delay_*` lấy từ `perf_hooks.monitorEventLoopDelay({resolution: 5})`: nó ghi
+**khoảng cách giữa hai lần chạy của một timer 5 ms**, tức là gồm chính 5 ms đó và, trên Windows, lượng tử timer hệ thống
+15,6 ms. Đo trên máy chủ dự án: một tiến trình Node **rảnh hoàn toàn** đọc p50 15,5 ms / p99 16,6 ms; một vòng bận 19 ms mỗi
+50 ms đọc p99 30,4 ms (= 19 ms + một lượng tử) — các con số "event-loop p99 30–34 ms" của ramp phần lớn là đồng hồ Windows.
+**Sửa**: `metrics.js startLagProbe` — một worker thread nhỏ gửi đồng hồ (`process.hrtime`, cùng đồng hồ đơn điệu với luồng
+chính) mỗi 5 ms; luồng chính ghi (lúc nhận − lúc gửi) = **thời gian một sự kiện từ bên ngoài phải chờ** — đúng điều một tin
+WebSocket của người chơi trải qua. `hp_eventloop_delay_p50/p99_ms` = phân vị trên mẫu **10 s gần nhất** (trên Windows worker
+chỉ thức 64 lần/s nên cửa sổ 2.048 mẫu dài ~30 s và giữ khựng lúc khởi động quá lâu); `_max_ms` = lớn nhất giữa hai lần đọc;
+histogram `hp_eventloop_lag_ms` cho Prometheus. Số cũ vẫn xuất, đã trừ độ phân giải: `hp_eventloop_timer_delay_{p50,p99}_ms`.
+Kiểm chứng (`fix2/probe_idle.mjs`): rảnh → probe p50 0,11 / p99 0,27 ms (timer cũ 10,5 / 11,6 ms sau khi trừ 5 ms); khối 4 ms
+mỗi 50 ms → p99 4,2 ms; khối 19 ms → p99 19,2 ms (timer cũ 30,4). Đối chiếu khi tải: probe p99 khớp RTT PING→PONG p99 của
+bot (ramp 1.200: probe 116–159 ms, RTT p99 130 ms) — số mới là độ trễ thật, không phải số "đẹp" hơn.
+
+**Nguyên nhân gốc 2 — tick là một khối đồng bộ.** Ở 1.200 CCU một tick (≈ 600 snapshot) chạy 14–23 ms liền một mạch, phần lớn
+là `send()` của uWS (Windows 14–30 µs/lần); mọi STATE/PING/HTTP đến trong lúc đó phải chờ hết khối. **Sửa**: tick **chia lát**
+(`sim.js tickSliced`): mỗi lượt vòng sự kiện làm tối đa `TICK_SLICE_MS` (mặc định 4 ms, `server/.env`) việc snapshot rồi
+`setImmediate`; danh sách phiên của tick chốt lúc bắt đầu, phiên rời đi giữa chừng (`_ai = -1`) bị bỏ qua; nếu tick kế tiếp
+đến hạn khi các lát chưa xong thì phần còn lại chạy đồng bộ trước (`hp_sim_tick_overrun_total`). Thời lượng tick đưa vào thang
+suy giảm và `hp_sim_tick_ms` = **tổng các lát** (việc thật; `timers.loop(..., {external: true})` + `handle.record(ms)`); thời
+gian thực từ snapshot đầu → cuối: `hp_sim_tick_span_ms`. `TICK_SLICE_MS=0` = như cũ (một mạch).
+A/B cùng phiên, cùng máy (ramp 600 CCU, 40 s lên + 110 s giữ, khoá GPU; `fix2/run/ab2_*`): lát 4 ms so với một mạch —
+lag p99 (trung vị các lần đọc) **26 ms so với 62 ms**, RTT PING p95 **18,7 so với 30,1 ms**, p99 **44,8 so với 70,6 ms**,
+tick p99 39 so với 47 ms, thang **ở L0** (một mạch: lên L1). Ở 1.200 CCU (`ab1_*`, máy đang chậm, xem 8.3) hai cách gần như
+nhau (tick p99 66 so với 78 ms, lag p99 141 so với 133 ms): máy chủ đã gần bão hoà một lõi, chia lát không bù được CPU thiếu.
+
+### 8.2 Cửa sổ quãng đường 4 s (NET-4 phần dư) — `js/shared/move.js`
+
+**Nguyên nhân gốc**: phần nới cộng `SLACK_ADD_M` (1 m) được cấp **cho mỗi cửa sổ 1 s**, nên cửa sổ trượt cho phép giữ mãi
+vmax·1,2 + 1 m/s — chạy bộ 9,4 m/s (1,34 × vmax) với **đồng hồ thật**, 0 vi phạm (đo: 9,3 m/s trong 60 s → 0 vi phạm). Đồng hồ
+×1,1 (9,0 m/s, 15 vi phạm, 0 CORRECT) chỉ là một cách đi vào cùng khe đó. **Sửa**: thêm cửa sổ dài `MOVE.LONG_MS` = 4 s cùng
+luật (1,2 × Σ phụ cấp + 1 m), đi chung một vòng lùi với cửa sổ 1 s và 300 ms, không vắt qua lên/xuống xe; vòng mẫu
+`MOVE.RING` 48 → 128 (đủ 4 s ở 30 Hz). Trần duy trì còn vmax·1,2 + 0,25 m/s (chạy bộ 8,65). Đo (`fix2/slack.mjs`, mô hình
+của người kiểm tra): đồng hồ thật 9,3 m/s → 63 vi phạm, 32 CORRECT, trung bình còn 8,65 m/s; ×1,1 → **19 CORRECT** (trước 0),
+8,84 m/s trong 60 s (gồm 2 s của xô tha thứ, một lần mỗi phiên), bị kick trong 300 s; ×1,19 → kick. Người trung thực: chạy/đi
+bộ/xe máy ở vmax và ở 1,2 × vmax, 2/15/30 Hz, 5 phút, đồng hồ khung hình rung 40–90 ms + mạng rung ±15 ms → 0 vi phạm; bot
+thật: abuse (speed_hack 46/46 trong 1 s, clock_dilation 11/11 trong 2 s), netem-lite 300 và ramp 1.200 → **0 CORRECT** cho bot
+trung thực. Test: 4 test NET-4 trong `fix2_regress` (hai test đầu TRƯỢT với `move.js` cũ — đã thử).
+
+### 8.3 Đo lại sạch (stress / hotspot / reconnect) và vì sao p99 ở ~1.000 CCU vẫn trượt trên máy này
+
+- **Một máy chủ mỗi lần chạy**: `mp/fix2/run.sh` dựng máy chủ mới (DB mới) cho mỗi kịch bản, in PID đang nghe 9175/9176
+  (phải đúng MỘT), chạy bot dưới `tools/qa/gpulock.mjs`, rồi dừng theo **cổng đang nghe** (`stop.ps1`:
+  `Get-NetTCPConnection -State Listen` → PID Windows; PID của bash không phải PID Windows — lý do người kiểm chứng để sót
+  4 máy chủ cũ) và kiểm `listeners left: 0`. Mọi lần chạy ở 8.4: 1 PID, 0 còn sót.
+- **Báo cáo bot không còn "100 %" trên mẫu thiếu** (phát hiện khi đo lại): lần reconnect sạch đầu tiên của vòng này ghi
+  "resume 800/800 = 100 %" trong khi máy chủ đếm 200 phiên hết hạn chờ — một worker bot (200 bot) **chết** giữa chừng và kết
+  quả của nó biến khỏi mẫu số. `report.mjs` nay có tiêu chí `kết quả đủ bot` (= N dự kiến), `worker bot gửi kết quả`
+  (= số worker) và, cho reconnect, `bot resume đúng / số bot dự kiến` (≥ N). `run.mjs` luôn in (kể cả `--quiet`) worker im
+  lặng > 5 s (kèm trạng thái bot), mã thoát khác 0 và worker thiếu kết quả; công cụ chẩn đoán: `HPBOT_DEBUG_DIR` (mỗi worker
+  ghi một dòng mỗi giây), `HPBOT_INSPECT_STALL=1` (dừng worker im lặng qua inspector, in ngăn xếp), `HPBOT_EXEC_ARGV`. Kết quả:
+  worker thoát với **0xC0000409** (abort gốc; không có báo cáo lỗi V8 hay dòng stderr nào) trong khoảng 1/2 số lần chạy
+  reconnect 1.000 trên Windows, cả khi bot chạy bằng tiến trình con lẫn worker thread (khi là thread thì cả tiến trình bot
+  chết) — lỗi gốc trong Node 24.15/Windows khi ~200 socket `ws` phía client rớt/nối lại cùng lúc; **không** phải lỗi máy chủ
+  (máy chủ vẫn nhận resume của các bot khác; phiên của bot chết hết hạn đúng 60 s). Chưa tìm được gốc (cần dump); báo cáo nay
+  bắt được trường hợp này thay vì báo đạt giả.
+- **Máy đang chậm hơn lúc người kiểm chứng đo**: trong cả phiên đo này trình bảo vệ màn hình OLED Care của ASUS chạy liên tục
+  (~145 % một lõi CPU, bật lúc 06:30 giờ máy khi máy rảnh — không tắt vì nó bảo vệ màn OLED). Đầu dò thuần JS (`fix2/jit.mjs`,
+  cùng một khối việc 0,8 ms lặp 8 s) cho p90 = 1,5–2 × p50 và **p99 = 3–4 × p50**, kể cả khi ghim vào một cặp lõi; ưu tiên cao
+  không đổi gì → p99 của tick ≈ 3–4 × p50 ở mọi kịch bản. Cùng kịch bản ramp, tick p50: người kiểm chứng 14 ms (máy rảnh), vòng
+  này 23 ms (bản không chia lát cũng 21 ms trong cùng giờ, `ab1_s0`).
+- **Profile CPU** (ramp 1.200, 60 s, `fix2/prof/ramp.cpuprofile`): luồng chính rảnh 30 %; `send` của uWS **37 %** (≈ 30 µs mỗi
+  lần gửi trên Windows lúc này), AOI 13,5 %, xử lý tin đến 12 % (kiểm di chuyển 5 %). Không còn khối việc thừa đáng kể để cắt
+  trong JS: phần lớn là syscall gửi của Windows.
+
+### 8.4 Số đo vòng sửa 2 (máy chủ dự án, 15/10/2026 00:00–02:20 UTC, cổng 9175/9176, Postgres 17 `127.0.0.1:55441`, bộ `hpmp-fix`)
+
+Máy chủ thẳng trên Windows (uWS) trừ dòng "Docker"; một máy chủ mỗi lần chạy; bot cùng máy; mọi lần > 300 bot hoặc > 60 s dưới
+khoá GPU. "lag p99" = `hp_eventloop_delay_p99_ms` mới (trung vị các lần đọc / lớn nhất).
+
+| Kịch bản | Đo được | Kết quả |
+|---|---|---|
+| smoke 50 | 50/50, 0 lỗi, 0 CORRECT; tick p99 2,4 ms; **lag p99 2,1 / 3,5 ms** (timer cũ 12,2 ms); mọi tiêu chí kể cả "event-loop p99 < 20 ms" | ĐẠT |
+| hotspot 300 | trần 96 giữ (max 96, vượt 0); đỉnh 5 s max 8,9 KB/s, 0 khách > 12 KB/s; 0 CORRECT; tick p50 7,3 / p99 27 ms (ngưỡng kịch bản 40); lag p99 8 / 15 ms; L0 | ĐẠT |
+| stress 2.000 | 1.200 vào đúng trần, 5.856 lượt xếp hàng, 0 lỗi, 0 CORRECT; thang 0→1→2 từng bậc; health cuối ok; RSS 262 MB | ĐẠT |
+| reconnect 1.000 (các lần không có worker bot chết: `reconnect4`, `reconnect6`, `rect1`, `rect2`) | **1.000/1.000** resume đúng netId; bắt tay resume p50 4–4,5 / p99 75–103 ms; tick p50 16 ms, **p99 52–56 ms**; lag p99 56–67 / max ≤ 108 ms; thang L0→L1→L0→L1 (không quá L1; người kiểm chứng: tick p99 66–73, lag 83–142, tới L2) | ĐẠT tiêu chí kịch bản; tick p99 > 25 ms (8.3) |
+| reconnect 1.000 (`reconnect2/3/5/7/8/9/12`, `rect3`) | worker bot chết 0xC0000409 → 400–800 bot resume; nay báo **TRƯỢT** `kết quả đủ bot` / `bot resume / dự kiến` (trước: "100 %") | lỗi harness, 8.3 |
+| abuse 200 (16 lớp) | 16/16 lớp trong hạn; speed_hack 46/46 p50 426 / max 545 ms; clock_dilation 11/11 p50 1.379 / max 1.485 ms; 0 CORRECT người quan sát | ĐẠT |
+| netem-lite 300 | 300/300; **0 CORRECT** (cả bot netem) với cửa sổ 4 s; tick p99 18,8 ms; lag p99 5,4 / 7 ms | ĐẠT |
+| ramp 0 → 1.200 + giữ 5 phút | 1.200/1.200, 0 lỗi, 0 CORRECT, snapshot p95 521 B, RSS 274 MB; tick p50 23 ms, **p99 65–68 ms**; lag p99 116–159 ms (RTT PING p99 130 ms); thang L0→L1 (227 s)→L2 (548 s) | TRƯỢT tick/lag p99 (8.3) |
+| ramp 1.200 — **Docker** (đường bản thật trên máy này: container Linux, uWS, Postgres container, qua portal) | 1.200/1.200, 0 lỗi, 0 CORRECT, snapshot p95 548 B, RSS 223 MB; tick p50 **13,6 ms**, p99 64–67 ms; lag p99 **31–57 ms** (thẳng Windows cùng giờ: 116–159); thang chỉ L1 ở 277 s | TRƯỢT tick/lag p99 (8.3) |
+
+**Đọc**: ở ≤ 300 CCU (buổi thử kín chỉ vài chục người) mọi chỉ số đạt với dư lớn: lag p99 2–15 ms, tick p99 ≤ 27 ms. Ở
+1.000–1.200 CCU trên máy này máy chủ dùng 70–80 % một lõi và p99 của tick ≈ 3–4 × p50 vì nhiễu của chính máy (8.3) → tick p99
+< 25 ms và lag p99 < 20 ms **không đạt và không đạt được bằng sửa JS**: cần (a) đo trên máy Linux riêng / VPS với bot ở máy khác
+(NET-9 — vẫn chưa làm, cần máy thứ hai), hoặc (b) chuyển việc `send` snapshot sang nhiều luồng uWS (giai đoạn sau, §6.6). Thang
+suy giảm làm đúng việc của nó (lên L1–L2 từng bậc, không bao giờ L4 ở 1.200).
+
+- **Ảnh Docker của bản thử** (phát hiện khi đo ramp Docker): `-TestMode` dùng bộ/cổng riêng nhưng vẫn dựng ảnh tên
+  `hpworld-game:local` của bản thật (vòng sửa 1 tránh được chỉ vì đặt tay `HPMP_IMAGE`). `chung.ps1 Get-HpSettings` nay đặt
+  `HPMP_IMAGE=<bộ>-game:local` cho bản thử khi chưa đặt. Lần đo này đã ghi đè `hpworld-game:local` bằng bản dựng từ mã hiện tại —
+  vô hại vì `mo-may-chu.ps1` luôn dựng lại (`--build`) khi mở bản thật.
+
+### 8.5 Kiểm thử
+
+`npm test`: thêm `test/fix2_regress.test.js` — NET-4 (đồng hồ thật 9,3 m/s bị bắt; ×1,1 bị CORRECT và trung bình 60 s ≤ trần;
+người trung thực 0 vi phạm ở mọi chế độ/tần số/5 phút/rung khung hình; cửa sổ dài không vắt qua lên/xuống xe), tick chia lát
+(nhường vòng sự kiện, bỏ phiên đã rời, làm nốt đồng bộ khi quá hạn, tick đồng bộ vẫn như cũ), `timers.loop` ghi thời lượng
+ngoài, đầu dò độ trễ (rảnh < 5 ms; sau một khối 40 ms đọc ≥ 20 ms). Kết quả: `npm test` **154 xanh + 1 bỏ qua** (155); `npm run test:pg` (Postgres 17, bộ `hpmp-fix`, cổng 55441) **61/61**. Sửa
+thêm một test chập chờn có sẵn: `core_auth` làm hỏng chữ ký JWT bằng cách thay 2 ký tự cuối bằng `AA` — ~1/256 lần đó là không đổi
+gì (ký tự cuối mang 4 bit đệm) và test trượt ngẫu nhiên; nay đổi một ký tự ở giữa chữ ký.
+
+### 8.6 Còn mở sau vòng sửa 2
+
+- **NET-9**: đo lại ramp/reconnect với bot ở máy khác (và máy chủ Linux) — cần máy thứ hai; mọi số ở 8.4 là cận trên khi bot,
+  máy chủ và ứng dụng của chủ dự án chạy chung máy.
+- Tick p99 < 25 ms / lag p99 < 20 ms ở 1.200 CCU trên máy này: cần gửi snapshot đa luồng (8.3, §6.6).
+- Harness bot: worker chết 0xC0000409 trong reconnect 1.000 trên Windows (8.3) — cần dump (WER LocalDumps hoặc procdump) để
+  tìm gốc; tạm thời chạy lại tới khi `kết quả đủ bot` ĐẠT.
